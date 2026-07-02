@@ -1,0 +1,22 @@
+== G2-c4  Architecture Contract ==
+  checked: 6 boundaries, 1 externals, 12 allow rules, 2 deny rules, 14 dsl elements, 6 boundaries bound to dsl, 6 mitigation rows, 3 dependencies with mitigation rows
+  ok
+== G3-machine  machines + oracle ==
+  warn   Deal.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
+  warn   Task.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
+  warn   User.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
+  note   Deal.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStage is set by every setPending* action to the current domain state, which is one of the six DealStage values; the six priorIs* guards cover DealStage totally
+  note   Task.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: only Open and InProgress have transitions into the persist overlay, so priorStatus ranges over {Open, InProgress}; both priorIs* guards are present
+  note   User.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present
+  checked: 5 machines, 194 transitions, 5 oracles fresh, 194 matrix rows reconciled, 186 named units covered, 3 states relying on unproven _exhaustive liveness
+== Gx-trace  cross-layer traceability ==
+  note   Deal: 3 operational-overlay states (persisting, persistRetry, rolledBack)
+  note   Task: 3 operational-overlay states (persisting, persistRetry, rolledBack)
+  note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
+  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 24 invariants enforced, 11 invariants attested (structural/prose), 13 invariants unit-backed (guard/action/actor)
+  ok
+== G4-import  code respects the contract ==
+  checked: 3 files ignored by contract, 16 go files checked, 21 imports resolved, 12 edges verified, 12 test files skipped
+  ok
+
+0 blocking (ERROR/DRIFT) finding(s)

@@ -1,0 +1,5 @@
+generated CommandExecution.oracle.md  (28 transition rows)
+generated Deal.oracle.md  (57 transition rows)
+generated Session.oracle.md  (60 transition rows)
+generated Task.oracle.md  (30 transition rows)
+generated User.oracle.md  (19 transition rows)

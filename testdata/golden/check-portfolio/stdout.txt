@@ -1,0 +1,14 @@
+== G2-c4  Architecture Contract ==
+  checked: 7 boundaries, 2 externals, 13 allow rules, 2 deny rules, 12 dsl elements, 7 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows
+  ok
+== G3-machine  machines + oracle ==
+  warn   Portfolio.machine.json: liveness for reverted rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
+  note   Portfolio.machine.json: state reverted always-list is fully guarded; liveness rests on the declared exhaustiveness: prior is set by every setPending action to the review stage the operation departed from; its codomain is exactly the four PortfolioStatus values, so one guarded branch per stage is total
+  checked: 3 machines, 33 transitions, 3 oracles fresh, 31 named units covered, 1 states relying on unproven _exhaustive liveness
+== Gx-trace  cross-layer traceability ==
+  note   Portfolio: 3 operational-overlay states (committing, commitRetry, reverted)
+  note   RecommendationRun: 1 operational-overlay states (collectRetry)
+  checked: 6 entities, 1 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 3 placement rows with machines, 5 placement rows waived, 18 invariants enforced, 12 invariants attested (structural/prose), 6 invariants unit-backed (guard/action/actor)
+  ok
+
+0 blocking (ERROR/DRIFT) finding(s)
