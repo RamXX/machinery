@@ -9,12 +9,6 @@ import (
 // Phase-1 stubs. Each subcommand exits 2 with "not implemented" until its phase
 // replaces the body. The differential harness depends on these existing.
 
-func newComposeCmd() *cobra.Command {
-	return &cobra.Command{Use: "compose <composition.yaml> <coordinator.machine.json> [out-dir]", RunE: func(cmd *cobra.Command, args []string) error {
-		return exit2(fmt.Errorf("compose: not implemented"))
-	}}
-}
-
 func newCheckCmd() *cobra.Command {
 	return &cobra.Command{Use: "check <design-dir> [--impl d] [--gate ...]", RunE: func(cmd *cobra.Command, args []string) error {
 		return exit2(fmt.Errorf("check: not implemented"))
