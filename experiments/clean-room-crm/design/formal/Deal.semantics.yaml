@@ -1,0 +1,19 @@
+# Data-refinement semantics for the Deal aggregate.
+# Rung 2 of the correctness ladder. This annotation is RECONCILED against Deal.machine.json by
+# tools/refine_gen.py before any TLA+ is emitted: the domain states, the initial stage, the
+# advance/win/lose/reopen transition structure, the persist overlay shape, and the rollback routing
+# must all match the machine, or generation fails. It then emits DealData (stage-forward,
+# atomicity, close-date), DealContract (resting/busy/terminates), and DealRefinement (a TLC-checked
+# proof that DealData refines DealContract).
+pattern: linear-lifecycle
+machine: Deal
+stages: [Prospecting, Qualification, Proposal, Negotiation]
+win_stage: Won
+lose_stage: Lost
+reopen_to: Negotiation
+close_date_on: Won
+max_retries: 3
+advance_event: advance
+win_event: win
+lose_event: lose
+reopen_event: reopen

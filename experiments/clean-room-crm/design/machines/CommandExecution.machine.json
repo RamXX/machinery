@@ -1,0 +1,92 @@
+{
+  "id": "commandExecution",
+  "_role": "operational",
+  "initial": "opening",
+  "_comment": "Operational envelope for one CLI invocation, in crm.app. Lifecycle: open the store (integrity check), authenticate the session, authorize the command, execute the domain operation, then terminate. Placement: in-memory, one instance per process invocation, not persisted. Concurrency: one OS process per invocation; the store's write transaction serializes committing writers, and a lost race surfaces as a ConflictError that the aggregate persist overlay (Deal/Task) already retried, so this envelope only reports the outcome (refused). It runs no retry loop of its own.",
+  "_delays": {
+    "OPEN_TIMEOUT": "3000 ms - opening and integrity-checking the local database file",
+    "AUTH_TIMEOUT": "2000 ms - reading and validating the session file",
+    "AUTHZ_TIMEOUT": "2000 ms - reading the target record's owner and team for the scope check",
+    "EXEC_TIMEOUT": "5000 ms - running the domain operation including its own bounded persist retries"
+  },
+  "context": {
+    "verb": null,
+    "actorUsername": null,
+    "targetId": null
+  },
+  "states": {
+    "opening": {
+      "invoke": {
+        "src": "openDb",
+        "onDone": { "target": "authenticating" },
+        "onError": [
+          { "target": "failedCorrupt", "guard": "isCorrupt" },
+          { "target": "failedError" }
+        ]
+      },
+      "after": {
+        "OPEN_TIMEOUT": { "target": "failedError" }
+      }
+    },
+    "authenticating": {
+      "invoke": {
+        "src": "loadSession",
+        "onDone": [
+          { "target": "authorizing", "guard": "sessionActive" },
+          { "target": "rejected" }
+        ],
+        "onError": { "target": "failedError" }
+      },
+      "after": {
+        "AUTH_TIMEOUT": { "target": "failedError" }
+      }
+    },
+    "authorizing": {
+      "invoke": {
+        "src": "checkScope",
+        "onDone": [
+          { "target": "executing", "guard": "permitted" },
+          { "target": "rejected" }
+        ],
+        "onError": { "target": "failedError" }
+      },
+      "after": {
+        "AUTHZ_TIMEOUT": { "target": "failedError" }
+      }
+    },
+    "executing": {
+      "invoke": {
+        "src": "execute",
+        "onDone": { "target": "done" },
+        "onError": [
+          { "target": "refused", "guard": "isConflict" },
+          { "target": "rejected", "guard": "isRejected" },
+          { "target": "failedError" }
+        ]
+      },
+      "after": {
+        "EXEC_TIMEOUT": { "target": "refused" }
+      }
+    },
+    "done": {
+      "type": "final",
+      "entry": "refreshSession"
+    },
+    "rejected": {
+      "type": "final",
+      "entry": "emitRejection"
+    },
+    "refused": {
+      "type": "final",
+      "entry": "emitBusyNotice"
+    },
+    "failedCorrupt": {
+      "type": "final",
+      "entry": "emitCorruptAlert"
+    },
+    "failedError": {
+      "type": "final",
+      "entry": "emitError"
+    }
+  }
+}

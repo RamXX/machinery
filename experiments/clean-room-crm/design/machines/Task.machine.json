@@ -1,0 +1,70 @@
+{
+  "id": "task",
+  "initial": "Open",
+  "_comment": "Task aggregate lifecycle. Realized as a pure transition function in crm.domain; the load-act-save loop runs in crm.app. Per-instance concurrency: LadybugDB optimistic version check on Save. A conflicting write is retried (persistRetry) up to MaxRetries with backoff, then rolled back (rolledBack). Terminal states (Done, Abandoned) are final and accept no further actions.",
+  "_delays": {
+    "PERSIST_TIMEOUT": "5000 ms - LadybugDB write timeout before a persist attempt is treated as failed",
+    "RETRY_BACKOFF": "~200 ms exponential backoff between optimistic-lock retries"
+  },
+  "context": {
+    "taskId": null,
+    "pending": null,
+    "prior": null,
+    "retries": 0
+  },
+  "states": {
+    "Open": {
+      "on": {
+        "start": { "target": "persisting", "actions": "setPendingStart" },
+        "abandon": { "target": "persisting", "actions": "setPendingAbandon" }
+      },
+      "_ignores": {
+        "complete": "a task must be started before it can be completed"
+      }
+    },
+    "InProgress": {
+      "on": {
+        "complete": { "target": "persisting", "actions": "setPendingComplete" },
+        "abandon": { "target": "persisting", "actions": "setPendingAbandon" }
+      },
+      "_ignores": {
+        "start": "the task is already in progress"
+      }
+    },
+    "Done": { "type": "final" },
+    "Abandoned": { "type": "final" },
+    "persisting": {
+      "invoke": {
+        "src": "persist",
+        "input": { "taskId": "context.taskId", "pending": "context.pending" },
+        "onDone": [
+          { "target": "InProgress", "guard": "pendingIsInProgress", "actions": "commit" },
+          { "target": "Done", "guard": "pendingIsDone", "actions": "commit" },
+          { "target": "Abandoned", "guard": "pendingIsAbandoned", "actions": "commit" }
+        ],
+        "onError": [
+          { "target": "persistRetry", "guard": "isRetriable" },
+          { "target": "rolledBack" }
+        ]
+      },
+      "after": {
+        "PERSIST_TIMEOUT": { "target": "persistRetry" }
+      }
+    },
+    "persistRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "retriesExhausted" }
+      ],
+      "after": {
+        "RETRY_BACKOFF": { "target": "persisting", "actions": "incrementRetries" }
+      }
+    },
+    "rolledBack": {
+      "_exhaustive": "prior is set by every setPending action to the state the operation departed from, which for Task is only Open or InProgress; terminal states issue no commands",
+      "always": [
+        { "target": "Open", "guard": "priorIsOpen" },
+        { "target": "InProgress", "guard": "priorIsInProgress" }
+      ]
+    }
+  }
+}

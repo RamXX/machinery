@@ -1,0 +1,118 @@
+{
+  "id": "deal",
+  "initial": "Prospecting",
+  "_comment": "Deal aggregate lifecycle. Realized as a pure transition function in crm.domain; the load-act-save loop runs in crm.app. Per-instance concurrency: LadybugDB optimistic version check on Save. A conflicting write (ConflictError) is retried (persistRetry) up to MaxRetries with backoff, then the in-memory transition is rolled back and the deal is left unchanged (rolledBack). No per-entity process; each command loads, acts, and saves under the version guard.",
+  "_delays": {
+    "PERSIST_TIMEOUT": "5000 ms - LadybugDB write timeout before a persist attempt is treated as failed",
+    "RETRY_BACKOFF": "~200 ms exponential backoff between optimistic-lock retries"
+  },
+  "context": {
+    "dealId": null,
+    "amount": 0,
+    "closedAt": null,
+    "pending": null,
+    "prior": null,
+    "retries": 0
+  },
+  "states": {
+    "Prospecting": {
+      "on": {
+        "advance": { "target": "persisting", "actions": "setPendingAdvance" },
+        "win": { "target": "persisting", "actions": "setPendingWin" },
+        "lose": { "target": "persisting", "actions": "setPendingLose" }
+      },
+      "_ignores": {
+        "reopen": "reopen applies to terminal stages only; a deal that has not closed cannot be reopened"
+      }
+    },
+    "Qualification": {
+      "on": {
+        "advance": { "target": "persisting", "actions": "setPendingAdvance" },
+        "win": { "target": "persisting", "actions": "setPendingWin" },
+        "lose": { "target": "persisting", "actions": "setPendingLose" }
+      },
+      "_ignores": {
+        "reopen": "reopen applies to terminal stages only"
+      }
+    },
+    "Proposal": {
+      "on": {
+        "advance": { "target": "persisting", "actions": "setPendingAdvance" },
+        "win": { "target": "persisting", "actions": "setPendingWin" },
+        "lose": { "target": "persisting", "actions": "setPendingLose" }
+      },
+      "_ignores": {
+        "reopen": "reopen applies to terminal stages only"
+      }
+    },
+    "Negotiation": {
+      "on": {
+        "win": { "target": "persisting", "actions": "setPendingWin" },
+        "lose": { "target": "persisting", "actions": "setPendingLose" }
+      },
+      "_ignores": {
+        "advance": "Negotiation is the last open stage; there is no further stage to advance to, only win or lose",
+        "reopen": "reopen applies to terminal stages only"
+      }
+    },
+    "Won": {
+      "on": {
+        "reopen": { "target": "persisting", "guard": "canReopen", "actions": "setPendingReopen" }
+      },
+      "_ignores": {
+        "advance": "Won is terminal; it does not advance",
+        "win": "Won is already won",
+        "lose": "a won deal is not directly re-lost; reopen it first"
+      }
+    },
+    "Lost": {
+      "on": {
+        "reopen": { "target": "persisting", "guard": "canReopen", "actions": "setPendingReopen" }
+      },
+      "_ignores": {
+        "advance": "Lost is terminal; it does not advance",
+        "win": "a lost deal is not directly won; reopen it first",
+        "lose": "Lost is already lost"
+      }
+    },
+    "persisting": {
+      "invoke": {
+        "src": "persist",
+        "input": { "dealId": "context.dealId", "pending": "context.pending" },
+        "onDone": [
+          { "target": "Qualification", "guard": "pendingIsQualification", "actions": "commit" },
+          { "target": "Proposal", "guard": "pendingIsProposal", "actions": "commit" },
+          { "target": "Negotiation", "guard": "pendingIsNegotiation", "actions": "commit" },
+          { "target": "Won", "guard": "pendingIsWon", "actions": ["commit", "recordClose"] },
+          { "target": "Lost", "guard": "pendingIsLost", "actions": ["commit", "recordClose"] }
+        ],
+        "onError": [
+          { "target": "persistRetry", "guard": "isRetriable" },
+          { "target": "rolledBack" }
+        ]
+      },
+      "after": {
+        "PERSIST_TIMEOUT": { "target": "persistRetry" }
+      }
+    },
+    "persistRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "retriesExhausted" }
+      ],
+      "after": {
+        "RETRY_BACKOFF": { "target": "persisting", "actions": "incrementRetries" }
+      }
+    },
+    "rolledBack": {
+      "_exhaustive": "prior is set by every setPending action to the stage the operation departed from; its codomain is exactly the six DealStage values, so one guarded branch per stage is total",
+      "always": [
+        { "target": "Prospecting", "guard": "priorIsProspecting" },
+        { "target": "Qualification", "guard": "priorIsQualification" },
+        { "target": "Proposal", "guard": "priorIsProposal" },
+        { "target": "Negotiation", "guard": "priorIsNegotiation" },
+        { "target": "Won", "guard": "priorIsWon" },
+        { "target": "Lost", "guard": "priorIsLost" }
+      ]
+    }
+  }
+}
