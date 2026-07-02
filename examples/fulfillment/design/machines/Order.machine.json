@@ -1,0 +1,143 @@
+{
+  "_comment": "Order aggregate lifecycle (states = OrderStatus; events = Order actions). PLACEMENT (ARCHITECTURE.md section 4): a row in the Order DB with a status column, optimistic lock per row; every mutation persists in one transaction together with its outbox event (the transactional outbox). Saga-emitted events (markReserved, markPaid, markShipped, fail) arrive over the bus at least once; the consumer dedupes by message id BEFORE the machine sees the event, so a redelivered event that still reaches the machine is stale by state, and the _ignores entries say what stale means per state. Out-of-order events are nacked (ignored here) and redelivered by the bus until the preceding event lands.",
+  "_delays": {
+    "persistTimeout": "5000 ms - Order DB write timeout (ARCHITECTURE.md section 3, per-service DB posture)",
+    "persistRetryBackoff": "500 ms - transient DB unavailability or optimistic-lock conflict; retriesExhausted at 3"
+  },
+  "id": "order",
+  "initial": "Pending",
+  "context": {
+    "orderId": null,
+    "customerId": null,
+    "totalCents": 0,
+    "status": "Pending",
+    "pendingStatus": null,
+    "priorStatus": null,
+    "retries": 0,
+    "lastError": null
+  },
+  "states": {
+    "Pending": {
+      "on": {
+        "confirm": [
+          { "target": "persisting", "guard": "guardCanConfirm", "actions": "setPendingConfirmed" },
+          { "actions": "recordConfirmDenied" }
+        ],
+        "cancel": [
+          { "target": "persisting", "guard": "guardCanCancel", "actions": "setPendingCancelled" },
+          { "actions": "recordCancelDenied" }
+        ]
+      },
+      "_ignores": {
+        "markReserved": "the saga starts only after confirm; stale or out-of-order saga event, nack for redelivery",
+        "markPaid": "out-of-order saga event; nack for redelivery after markReserved lands",
+        "markShipped": "out-of-order saga event; nack for redelivery",
+        "markDelivered": "out-of-order saga event; nack for redelivery",
+        "fail": "the saga cannot fail an order it has not started; stale event"
+      }
+    },
+    "Confirmed": {
+      "on": {
+        "markReserved": { "target": "persisting", "actions": "setPendingReserved" },
+        "cancel": [
+          { "target": "persisting", "guard": "guardCanCancel", "actions": "setPendingCancelled" },
+          { "actions": "recordCancelDenied" }
+        ],
+        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+      },
+      "_ignores": {
+        "confirm": "idempotent redelivery: already confirmed",
+        "markPaid": "out-of-order saga event; nack for redelivery after markReserved lands",
+        "markShipped": "out-of-order saga event; nack for redelivery",
+        "markDelivered": "out-of-order saga event; nack for redelivery"
+      }
+    },
+    "Reserved": {
+      "on": {
+        "markPaid": { "target": "persisting", "actions": "setPendingPaid" },
+        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+      },
+      "_ignores": {
+        "confirm": "idempotent redelivery: already confirmed",
+        "markReserved": "idempotent redelivery: already reserved",
+        "markShipped": "out-of-order saga event; nack for redelivery after markPaid lands",
+        "markDelivered": "out-of-order saga event; nack for redelivery",
+        "cancel": "past the cancellation point; cancellation now flows through the saga's compensation as fail"
+      }
+    },
+    "Paid": {
+      "on": {
+        "markShipped": { "target": "persisting", "actions": "setPendingShipped" },
+        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+      },
+      "_ignores": {
+        "confirm": "idempotent redelivery: already confirmed",
+        "markReserved": "idempotent redelivery: already reserved",
+        "markPaid": "idempotent redelivery: already paid",
+        "markDelivered": "out-of-order saga event; nack for redelivery after markShipped lands",
+        "cancel": "past the cancellation point; cancellation now flows through the saga's compensation as fail"
+      }
+    },
+    "Shipped": {
+      "on": {
+        "markDelivered": { "target": "persisting", "actions": "setPendingDelivered" },
+        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+      },
+      "_ignores": {
+        "confirm": "idempotent redelivery: already confirmed",
+        "markReserved": "idempotent redelivery: already reserved",
+        "markPaid": "idempotent redelivery: already paid",
+        "markShipped": "idempotent redelivery: already shipped",
+        "cancel": "shipped orders cannot be cancelled; a lost parcel arrives as fail (Shipment Lost)"
+      }
+    },
+    "Delivered": { "type": "final" },
+    "Cancelled": { "type": "final" },
+    "Failed": { "type": "final" },
+    "persisting": {
+      "invoke": {
+        "src": "persistOrder",
+        "input": {
+          "orderId": "context.orderId",
+          "status": "context.pendingStatus"
+        },
+        "onDone": [
+          { "target": "Confirmed", "guard": "pendingIsConfirmed", "actions": "commitStatus" },
+          { "target": "Reserved", "guard": "pendingIsReserved", "actions": "commitStatus" },
+          { "target": "Paid", "guard": "pendingIsPaid", "actions": "commitStatus" },
+          { "target": "Shipped", "guard": "pendingIsShipped", "actions": "commitStatus" },
+          { "target": "Delivered", "guard": "pendingIsDelivered", "actions": "commitStatus" },
+          { "target": "Cancelled", "guard": "pendingIsCancelled", "actions": "commitStatus" },
+          { "target": "Failed", "guard": "pendingIsFailed", "actions": "commitStatus" },
+          { "target": "rolledBack", "actions": "recordRoutingError" }
+        ],
+        "onError": [
+          { "target": "persistRetry", "guard": "isErrUnavailable", "actions": "recordError" },
+          { "target": "persistRetry", "guard": "isErrConflict", "actions": "recordConflict" },
+          { "target": "rolledBack", "actions": "recordUnknownError" }
+        ]
+      },
+      "after": {
+        "persistTimeout": { "target": "rolledBack", "actions": "recordTimeout" }
+      }
+    },
+    "persistRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "retriesExhausted", "actions": "recordRetriesExhausted" }
+      ],
+      "after": {
+        "persistRetryBackoff": { "target": "persisting", "actions": "incrementRetries" }
+      }
+    },
+    "rolledBack": {
+      "_exhaustive": "priorStatus is set by every setPending* action to the current domain state; only Pending, Confirmed, Reserved, Paid, and Shipped have transitions into the persist overlay (final states persist nothing), and all five priorIs* guards are present",
+      "always": [
+        { "target": "Pending", "guard": "priorIsPending" },
+        { "target": "Confirmed", "guard": "priorIsConfirmed" },
+        { "target": "Reserved", "guard": "priorIsReserved" },
+        { "target": "Paid", "guard": "priorIsPaid" },
+        { "target": "Shipped", "guard": "priorIsShipped" }
+      ]
+    }
+  }
+}

@@ -46,10 +46,13 @@ enums:
       - {name: Lost, definition: "Lost in transit; terminal."}
   SagaStatus:
     values:
-      - {name: Running, definition: "Executing the forward path."}
+      - {name: Reserving, definition: "Holding stock; the first forward step."}
+      - {name: Paying, definition: "Capturing payment; stock is held."}
+      - {name: Shipping, definition: "Dispatching; payment is captured."}
       - {name: Compensating, definition: "Unwinding after a failure."}
       - {name: Completed, definition: "Fulfilled; terminal."}
       - {name: Failed, definition: "Compensated and abandoned; terminal."}
+      - {name: FailedDirty, definition: "Compensation could not complete within the retry bound; an obligation may still be held. Explicit residual; pages an operator."}
   MessageStatus:
     values:
       - {name: Pending, definition: "Written to the outbox, not yet published."}

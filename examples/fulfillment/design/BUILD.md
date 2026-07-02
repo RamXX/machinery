@@ -1,7 +1,9 @@
 # BUILD: Order Fulfillment
 
-A distributed order-fulfillment platform. A coding agent with zero prior context can build it from
-this document; the design artifacts it references are the source of truth.
+MODE: manifest. This document is the entry point over the `design/` tree, not a self-contained
+blueprint: a coding agent builds from this document PLUS the artifacts it references (the domain
+model, the architecture contract, the machines, and the generated oracles), which are the source of
+truth. The zero-context claim applies to the design tree as a whole.
 
 ## 1. Purpose and scope
 
@@ -37,9 +39,21 @@ The FulfillmentSaga is `machines/FulfillmentSaga.machine.json`; its oracle is ge
 - `formal/Checkout.tla` (composition, generated from `checkout.composition.yaml`): the cross-aggregate
   invariants `reserve-before-pay` and `no-ship-before-pay` hold over the composed contracts.
 
-The Order, Payment, Reservation, and Shipment lifecycles are per-service aggregates; each is a
-status-column state machine (`order-forward`, `payment-terminal`, and the like) realized as an Ecto
-schema plus a transition function per the ARCHITECTURE.md placement table.
+Every lifecycle entity has its machine, each with a generated oracle and a named-unit matrix, and
+each with a generated TLC control-flow proof (termination of every overlay excursion, bounded
+retries, no deadlock):
+
+| machine | realization | proof |
+|---|---|---|
+| `machines/FulfillmentSaga.machine.json` | `gen_statem` per order (Order Service) | `formal/FulfillmentSaga.tla` + `formal/FulfillmentSagaData.tla` |
+| `machines/Order.machine.json` | Ecto schema + transition function, Order DB row | `formal/Order.tla` |
+| `machines/Reservation.machine.json` | Ecto schema, Inventory DB row | `formal/Reservation.tla` |
+| `machines/Payment.machine.json` | Ecto schema, Payment DB row; gateway calls carry an idempotency key | `formal/Payment.tla` |
+| `machines/Shipment.machine.json` | Ecto schema, Shipping DB row; carrier calls bounded-retried | `formal/Shipment.tla` |
+| `machines/OutboxMessage.machine.json` | outbox table row; one machine activation per poller attempt | `formal/OutboxMessage.tla` |
+
+Each machine's `.matrix.md` carries the named-unit contracts (every guard, action, and actor with
+its test type and fixture) and the failure catalog mapping ARCHITECTURE.md section 3 to transitions.
 
 ## 5. Traceability matrix
 
@@ -53,7 +67,7 @@ Every invariant with where it is enforced. Formal entries are TLC-checked.
 | `available-nonneg` | guard in the Inventory reserve/release actions |
 | `order-owned-by-customer` | structural (order created with a customer) |
 | `order-total-matches-items` | computed on place; property test |
-| `order-forward` | Order lifecycle machine (guarded transitions) |
+| `order-forward` | `Order.machine.json` (each state exposes only its forward saga event; `setPending*` named units) |
 | `order-delivered-terminal` | structural (terminal states have no outgoing transition) |
 | `line-item-quantity-positive` | validation on add |
 | `reservation-quantity-positive` | validation on hold |
@@ -83,12 +97,23 @@ then the real gateway and carrier adapters. The saga is built against the verifi
 
 ## 7. Hard-TDD protocol
 
-A test-writer derives the suite from the generated oracle (`FulfillmentSaga.oracle.md`, one row per
-transition) and the traceability matrix, and from the formal properties (the saga terminates, money is
-never silently lost, no-ship-before-pay). The tests are then locked; the implementer makes them pass
-without editing them. A wrong test is a design defect that returns to the design and the formal model.
+A test-writer derives the suite from the six generated oracles (`machines/*.oracle.md`, one row per
+transition, keyed by STABLE id, never by row number), the named-unit contract tables (each row states
+its test type and fixture), the traceability matrix, and the formal properties (the saga terminates,
+money is never silently lost, no-ship-before-pay). The tests are then locked; the implementer makes
+them pass without editing them. A wrong test is a design defect that returns to the design and the
+formal model. Generated transition tests live apart from hand-written tests so a design revision can
+regenerate them without clobbering anything.
 
-## 8. Residual risks
+## 8. State migration
+
+Machine states are persisted (saga rows, aggregate status columns, outbox rows; see the
+ARCHITECTURE.md placement table). No persisted instances exist yet (design only). From the first
+deployment onward, any revision that renames, splits, or removes a state of a persisted machine MUST
+ship a mapping table from old persisted values to new states (or an explicit drain rule for in-flight
+instances) in this section before the revision is implemented.
+
+## 9. Residual risks
 
 `FailedDirty` is the explicit residual when compensation cannot complete within the retry bound; it
 requires manual reconciliation and must page an operator. Exactly-once effect depends on every consumer

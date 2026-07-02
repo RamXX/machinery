@@ -62,3 +62,30 @@ TLC-verified. The remaining phases (C4, the other machines, BUILD.md) are the co
   explicit FailedDirty residual for exhausted retries) is proven.
 
 `make verify-formal` now checks 11 proofs across both examples, all green.
+
+## Update 2: strains 3 and 4 resolved; the hardened gates finished the design
+
+A design review of the toolchain (four adversarial tracks: the formal layer, the gates, the
+methodology, and the claims) found that several green checks were weaker than they read, and the
+fixes landed here first:
+
+- **Strain 3 is closed.** The distributed C4 is now fully exercised: the Architecture Contract is
+  v2 (elements bound to `workspace.dsl`, boundary `modules:` for the Elixir target, mitigation rows
+  keyed by backticked dependency ids covering the bus, the four DBs, the gateway, and the carrier),
+  and G2 verifies it non-vacuously (`checked:` counts printed).
+- **Strain 4 is closed.** G3 regenerates each oracle in memory and diffs it against the committed
+  copy; a stale oracle is DRIFT. The oracle rows carry content-derived STABLE ids for the tests.
+- **The hardened Gx gate found real drift in this design.** SagaStatus said Running while the
+  machine said Reserving/Paying/Shipping, and FailedDirty was missing from the enum entirely; the
+  enum is now the fine-grained truth. The same gate demanded the five missing lifecycle machines,
+  and they now exist (Order, Payment, Reservation, Shipment, OutboxMessage), each with a generated
+  oracle, a named-unit matrix with test types and fixtures, and a generated TLC control-flow proof.
+- **The annotations are no longer trust points.** `refine_gen` and `compose_gen` reconcile
+  `FulfillmentSaga.semantics.yaml` and `checkout.composition.yaml` against the machines before
+  emitting anything; a drifted annotation fails generation. The saga data model now compensates PER
+  OBLIGATION (partial compensation is representable), and `Checkout` models the full branching
+  (step failures, compensation in any order, the FailedDirty stall) with an auto-generated
+  clean-compensation invariant, its step order validated against the saga machine's forward chain.
+
+`make verify-formal` now checks 16 proofs across both examples, all green, and `machinery check`
+passes both designs with every count non-zero.

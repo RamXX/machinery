@@ -1,0 +1,83 @@
+{
+  "_comment": "OutboxMessage lifecycle (states = MessageStatus; events = OutboxMessage actions; enqueue creates the row inside the producing transaction, so it is the initial state, not an event). PLACEMENT: a table in each service DB, drained by a poller. This machine models ONE publish attempt: on any bus failure the attempt rolls back to Pending and the NEXT poller sweep re-drives publish, which is exactly the at-least-once guarantee (outbox-at-least-once): the row is never lost, and unbounded retry lives in the poller loop (the operational envelope), not inside one attempt, so each attempt terminates provably. Consumers dedupe by message id, giving the exactly-once effect.",
+  "_delays": {
+    "busTimeout": "5000 ms - bus publish timeout for one attempt",
+    "persistTimeout": "5000 ms - service DB write timeout",
+    "persistRetryBackoff": "500 ms - transient DB unavailability or conflict; retriesExhausted at 3"
+  },
+  "id": "outboxMessage",
+  "initial": "Pending",
+  "context": {
+    "messageId": null,
+    "messageType": null,
+    "status": "Pending",
+    "pendingStatus": null,
+    "priorStatus": null,
+    "retries": 0,
+    "lastError": null
+  },
+  "states": {
+    "Pending": {
+      "on": {
+        "publish": { "target": "publishing", "actions": "loadPayload" }
+      },
+      "_ignores": {
+        "markConsumed": "a consume acknowledgment for a message not yet published is stale; nack for redelivery"
+      }
+    },
+    "Published": {
+      "on": {
+        "markConsumed": { "target": "persisting", "actions": "setPendingConsumed" }
+      },
+      "_ignores": {
+        "publish": "the poller re-selected an already-published row (race with its own sweep); publishing again is safe (consumers dedupe) but skipped"
+      }
+    },
+    "Consumed": { "type": "final" },
+    "publishing": {
+      "invoke": {
+        "src": "publishToBus",
+        "input": { "messageId": "context.messageId", "messageType": "context.messageType" },
+        "onDone": { "target": "persisting", "actions": "setPendingPublished" },
+        "onError": { "target": "rolledBack", "actions": "recordPublishError" }
+      },
+      "after": {
+        "busTimeout": { "target": "rolledBack", "actions": "recordPublishTimeout" }
+      }
+    },
+    "persisting": {
+      "invoke": {
+        "src": "persistOutboxRow",
+        "input": { "messageId": "context.messageId", "status": "context.pendingStatus" },
+        "onDone": [
+          { "target": "Published", "guard": "pendingIsPublished", "actions": "commitStatus" },
+          { "target": "Consumed", "guard": "pendingIsConsumed", "actions": "commitStatus" },
+          { "target": "rolledBack", "actions": "recordRoutingError" }
+        ],
+        "onError": [
+          { "target": "persistRetry", "guard": "isErrUnavailable", "actions": "recordError" },
+          { "target": "persistRetry", "guard": "isErrConflict", "actions": "recordConflict" },
+          { "target": "rolledBack", "actions": "recordUnknownError" }
+        ]
+      },
+      "after": {
+        "persistTimeout": { "target": "rolledBack", "actions": "recordTimeout" }
+      }
+    },
+    "persistRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "retriesExhausted", "actions": "recordRetriesExhausted" }
+      ],
+      "after": {
+        "persistRetryBackoff": { "target": "persisting", "actions": "incrementRetries" }
+      }
+    },
+    "rolledBack": {
+      "_exhaustive": "priorStatus is set on every path into the overlay from a domain state; only Pending and Published reach the overlay (Consumed is final), and both priorIs* guards are present; a rollback to Pending is precisely the at-least-once re-drive point for the next poller sweep",
+      "always": [
+        { "target": "Pending", "guard": "priorIsPending" },
+        { "target": "Published", "guard": "priorIsPublished" }
+      ]
+    }
+  }
+}
