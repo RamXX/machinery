@@ -65,12 +65,14 @@ def _simple(t):
 
 def generate(path):
     m = json.load(open(path))
-    mid = m.get("id", "machine").capitalize()
+    mid = m.get("id", "machine")
+    mid = mid[:1].upper() + mid[1:]
     states = [(p, n, node) for p, n, node in walk_states(m.get("states")) if "." not in p]
     names = [n for _, n, _ in states]
     domain, overlay = classify(states)
     rname, rnode = retry_state(states)
     initial = m.get("initial")
+    final = sorted(n for _, n, node in states if node.get("type") == "final")
 
     dom_actions, ovl_actions, defs, comments = [], [], [], []
     idx = 0
@@ -102,6 +104,9 @@ def generate(path):
         defs.append(f'RetryAgain == st = "{rname}" /\\ rc < MaxRetries /\\ st\' = "{ft}" /\\ rc\' = rc + 1')
         ovl_actions += ["RetryExhausted", "RetryAgain"]
 
+    if final:
+        defs.append("Terminated == st \\in Final /\\ UNCHANGED vars")
+
     def setexpr(s):
         return "{" + ", ".join(f'"{x}"' for x in sorted(s)) + "}"
 
@@ -117,6 +122,8 @@ def generate(path):
     lines.append(f"States == {setexpr(set(names))}")
     lines.append(f"Domain == {setexpr(domain)}")
     lines.append(f"Overlay == {setexpr(overlay)}")
+    if final:
+        lines.append(f"Final == {setexpr(set(final))}")
     lines.append("")
     lines.append("TypeOK == st \\in States /\\ rc \\in 0..MaxRetries")
     lines.append(f'Init == st = "{initial}" /\\ rc = 0')
@@ -127,7 +134,7 @@ def generate(path):
     lines.append("")
     lines.append("DomainNext == " + (" \\/ ".join(dom_actions) if dom_actions else "FALSE"))
     lines.append("OverlayNext == " + (" \\/ ".join(ovl_actions) if ovl_actions else "FALSE"))
-    lines.append("Next == DomainNext \\/ OverlayNext")
+    lines.append("Next == DomainNext \\/ OverlayNext" + (" \\/ Terminated" if final else ""))
     lines.append("")
     lines.append("Spec == Init /\\ [][Next]_vars /\\ WF_vars(OverlayNext)")
     lines.append("")

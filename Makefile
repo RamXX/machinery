@@ -41,9 +41,8 @@ check: ## Run the deterministic gate suite on the go-crm example
 oracle: ## Regenerate the transition oracles from the machine JSON (go-crm)
 	@python3 skills/machinery/tools/oracle_gen.py examples/go-crm/design/machines
 
-verify-formal: ## Generate + TLC model-check the Deal machine (safety + liveness)
-	@python3 skills/machinery/tools/tla_gen.py examples/go-crm/design/machines/Deal.machine.json examples/go-crm/design/formal
-	@bash skills/machinery/tools/tlc.sh examples/go-crm/design/formal/Deal.tla
+verify-formal: ## Generate + TLC-check every machine, the Deal data refinement, and the refinement mapping
+	@bash skills/machinery/tools/verify_formal.sh examples/go-crm/design
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'
