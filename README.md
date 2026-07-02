@@ -36,6 +36,25 @@ The state machines come last because they need the other two as inputs, and half
 *derived* from the domain model rather than invented. The final artifact is a `BUILD.md` a zero-context
 coder can build from, plus the machines that are simultaneously the test oracle and the formal spec.
 
+## Agentic systems: the machine is the envelope, not the agent
+
+"Most software is a state machine" is a claim about control flow, not about cognition, and agentic
+programs are where the difference bites. An agent is a non-deterministic policy (an LLM choosing which
+tool to call) running inside a deterministic envelope: the perceive-act-observe loop, tool execution,
+budgets, guardrails, approval gates, side-effect compensation, sub-agent orchestration. The envelope
+is the state machine; the policy is not, and machinery does not pretend otherwise.
+
+What machinery models is the containment. Every tool is an `invoke` with an enumerated failure set, a
+timeout, and an idempotency key, so the action space is bounded even when the choice within it is not;
+the loop is a machine whose termination and budget are model-checked, so it provably stops; every
+irreversible action is a saga with compensation and an explicit stalled-dirty residual; every
+guardrail is a guard tied to an invariant; sub-agents coordinate through the event-contract table. The
+LLM decision itself is a contracted, non-deterministic oracle machinery fences but never tries to
+prove. You get liveness (it stops, within budget, and cleans up) without usefulness (that it chose
+well), so keep the action space enumerated and the high-stakes guardrails deterministic: that is the
+region machinery can prove, and whatever you leave to the model's discretion is region it cannot.
+Fittingly, machinery is itself built this way, a gated pipeline around a non-deterministic conductor.
+
 ## The pipeline
 
 ```
