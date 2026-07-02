@@ -89,13 +89,7 @@ func TestTLAGivesEachRetryStateItsOwnCounter(t *testing.T) {
 }
 
 func TestTLAModelsMultiTargetRetryResume(t *testing.T) {
-	src := `{"id":"widget","initial":"Draft","states":{
-		"Draft":{"on":{"publish":[{"target":"persisting","guard":"g","actions":"a"},{"actions":"b"}],"lock":{"target":"locked"}},
-		         "done":{"target":"Done"}},
-		"Done":{"type":"final"},
-		"persisting":{"invoke":{"src":"s","onDone":{"target":"Published"},"onError":{"target":"Draft"}},"after":{"t":{"target":"Draft"}}},
-		"Published":{"type":"final"},
-		"locked":{"always":[{"target":"Draft","guard":"retriesExhausted"}],"after":{"backoff":[{"target":"persisting","guard":"phaseA"},{"target":"Draft","guard":"phaseB"}]}}}`
+	src := `{"id":"widget","initial":"Draft","states":{"Draft":{"on":{"x":{"target":"locked"},"d":{"target":"Done"}}},"Done":{"type":"final"},"locked":{"always":[{"target":"Draft","guard":"retriesExhausted"}],"after":{"backoff":[{"target":"Draft","guard":"phaseA"},{"target":"persisting","guard":"phaseB"}]}},"persisting":{"invoke":{"src":"s","onDone":{"target":"Done"},"onError":{"target":"Draft"}},"after":{"t":{"target":"Draft"}}}}}`
 	_, tla, _, err := Generate(writeSrc(t, src))
 	if err != nil {
 		t.Fatal(err)
