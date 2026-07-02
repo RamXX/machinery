@@ -29,12 +29,21 @@ design into three layers that compose rather than merely coexist:
   must always hold. Linted.
 - **The how**, an architecture (C4): the components, the deployment, and what every dependency does
   when it fails. Contract-checked.
-- **The behavior**, state machines (XState): every state, transition, guard, timeout, and failure
-  mode, conditioned on the architecture the previous layer fixed. Model-checked.
+- **The behavior**, state machines in the [XState](https://github.com/statelyai/xstate) v5 JSON
+  format (the notation, not the library): every state, transition, guard, timeout, and failure mode,
+  conditioned on the architecture the previous layer fixed. Model-checked.
 
 The state machines come last because they need the other two as inputs, and half of each machine is
 *derived* from the domain model rather than invented. The final artifact is a `BUILD.md` a zero-context
 coder can build from, plus the machines that are simultaneously the test oracle and the formal spec.
+
+To be clear about that XState reference: machinery uses the XState config **format** as a linted
+notation and does not run the XState library. The lint is our own (a deliberately narrowed subset,
+plus annotations like `_role` and `_exhaustive` that are not XState), and so are the oracle generator
+and the model checking. The de-annotated config loads into [Stately](https://stately.ai/) and
+`@xstate/graph` for optional visualization and covering-path generation, and a TypeScript build may
+adopt XState directly, while Go, Rust, Python, and Elixir targets hand-roll the state field. The
+guarantees come from machinery's tooling and TLC, never from XState.
 
 ## Agentic systems: the machine is the envelope, not the agent
 
@@ -186,14 +195,48 @@ they are covered.
 
 ## Install
 
-Requires [`modelith`](https://github.com/stacklok/modelith) on `PATH` and Python 3.10+ with PyYAML
-for the gate tools. **Java 11+ is optional**: it is needed only for `make verify-formal`, which runs
-TLC to model-check the TLA+ proofs (`tlc.sh` then fetches the pinned TLA+ tools on first use).
-Without Java you still get the full design and every deterministic gate; what you add with Java is
-the exhaustive machine-checked proofs, the top of the correctness ladder (see below for why that is
-worth having). `structurizr-cli` is optional too (C4 diagram export only). Run `make preflight` (or
-`make doctor`) to check every prerequisite; `make install` runs the same check and warns about
-anything missing.
+### Prerequisites
+
+`make preflight` (or `make doctor`) checks all of these at any time; `make install` runs the same
+check and warns about anything missing.
+
+**Required**
+
+- **[modelith](https://github.com/stacklok/modelith)** -- Phase 1 domain-model lint and render. A Go
+  tool, so install it with the [Go](https://go.dev/dl/) toolchain on any OS:
+  `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` (then put `$(go env GOPATH)/bin` on
+  your `PATH`), or take a binary from the
+  [releases](https://github.com/stacklok/modelith/releases). Install Go first if needed: macOS
+  `brew install go`, Linux [go.dev/dl](https://go.dev/dl/) or your package manager, Windows
+  `winget install GoLang.Go`.
+- **[Python](https://www.python.org/downloads/) 3.10+** and **[PyYAML](https://pyyaml.org/)** -- the
+  deterministic gate tools. macOS: `brew install python@3.12`; Linux:
+  `sudo apt install python3 python3-pip` (or your distro's package); Windows:
+  `winget install Python.Python.3.12`. Then `python3 -m pip install pyyaml` (Windows:
+  `py -m pip install pyyaml`), or let [uv](https://docs.astral.sh/uv/) supply it with
+  `uv run --with pyyaml`.
+
+**Optional**
+
+- **[Java](https://adoptium.net/) 11+** -- only for `make verify-formal`, which runs
+  [TLC](https://github.com/tlaplus/tlaplus) to model-check the proofs (`tlc.sh` then fetches the
+  pinned [tla2tools.jar](https://github.com/tlaplus/tlaplus/releases) on first use). macOS:
+  `brew install --cask temurin`; Linux: `sudo apt install default-jdk` or
+  `sudo dnf install java-21-openjdk`, or [download Temurin](https://adoptium.net/temurin/releases/);
+  Windows: `winget install EclipseAdoptium.Temurin.21.JDK` or
+  [download](https://adoptium.net/temurin/releases/). Without Java you still get the full design and
+  every deterministic gate; with it you add the machine-checked proofs (the top of the correctness
+  ladder above).
+- **[Structurizr CLI](https://github.com/structurizr/cli)** -- only to export C4 diagrams from
+  `workspace.dsl` (the [Structurizr DSL](https://github.com/structurizr/dsl) text and every gate need
+  no export); needs Java. Any OS: download a
+  [release zip](https://github.com/structurizr/cli/releases), unzip, and add it to `PATH`
+  (`structurizr.sh` on macOS/Linux, `structurizr.bat` on Windows); or run the
+  [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`.
+- **[uv](https://docs.astral.sh/uv/)** -- runs `make test` and can resolve PyYAML on the fly. macOS
+  and Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh` (or `brew install uv`); Windows:
+  `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"` (or
+  `winget install astral-sh.uv`).
 
 ```sh
 make install       # symlink the skill and agents into every agent home (edits go live)
@@ -247,6 +290,27 @@ See `skills/machinery/tools/README.md` for the checkers and generators, and
 (design changes after code exists: stable test ids, oracle diffs as the affected-test list, and a
 mandatory state-migration note for persisted machines) and a sharding rule for designs beyond
 roughly ten stateful components.
+
+## Built on
+
+machinery is a thin methodology over these external projects. It invokes or emits their notations and
+bundles none of them.
+
+- [Modelith](https://github.com/stacklok/modelith) -- the domain-model language and linter (Phase 1).
+- [C4 model](https://c4model.com/) -- the architecture technique (Phase 2).
+- [Structurizr DSL](https://github.com/structurizr/dsl) and
+  [Structurizr CLI](https://github.com/structurizr/cli) -- architecture-as-code, and optional C4
+  diagram export.
+- [XState](https://github.com/statelyai/xstate) and [Stately](https://stately.ai/) -- the
+  state-machine JSON format (notation only; machinery does not run the library) and its visualizer.
+- [TLA+ and TLC](https://github.com/tlaplus/tlaplus) -- the specification language and model checker
+  (the formal layer).
+- [Eclipse Temurin / Adoptium](https://adoptium.net/) -- the JVM that runs TLC.
+- [Python](https://www.python.org/) and [PyYAML](https://pyyaml.org/) -- the gate tooling.
+- [uv](https://docs.astral.sh/uv/) -- the test runner and dependency resolver.
+- [Go](https://go.dev/) -- to install Modelith.
+- [LadybugDB](https://github.com/LadybugDB/go-ladybug) -- the embedded store used only by the go-crm
+  example, not a machinery dependency.
 
 ## License
 
