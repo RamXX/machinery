@@ -29,11 +29,12 @@ def walk_states(states, prefix=""):
 def _norm(t):
     for it in (t if isinstance(t, list) else [t]):
         if isinstance(it, str):
-            yield {"target": it, "actions": []}
+            yield {"target": it, "guard": None, "actions": []}
         elif isinstance(it, dict):
             acts = it.get("actions", [])
             acts = acts if isinstance(acts, list) else [acts]
-            yield {"target": it.get("target"), "actions": [a for a in acts if isinstance(a, str)]}
+            yield {"target": it.get("target"), "guard": it.get("guard"),
+                   "actions": [a for a in acts if isinstance(a, str)]}
 
 
 def transitions_of(node):

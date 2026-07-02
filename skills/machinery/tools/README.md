@@ -32,8 +32,26 @@ formal layer never diverge on how a machine is read.
 
 ## Design principle: generate, do not co-author
 
-Where an artifact can be derived it should be generated, not authored twice. The transition
-matrix and the test oracle are derivable from the machine JSON; generating them makes the
-G3 drift class impossible by construction rather than merely detected. G3 today detects the
-drift; the oracle generator (next) removes it. `machine_lint.py` is the standalone structural
-linter; `machinery_check.py` is the full suite and supersedes its drift check.
+Where an artifact can be derived it should be generated, not authored twice. `oracle_gen.py`
+generates the transition matrix and the hard-TDD test oracle from the machine JSON
+(`<M>.oracle.md`), so the G3 drift class is impossible by construction, not merely detected.
+
+## Formal verification (rung 3)
+
+`tla_gen.py` translates a machine (the IR) into a TLA+ control-flow model with a bounded retry
+counter, and `tlc.sh` runs the TLC model checker on it (fetching `tla2tools.jar` on first use;
+needs Java 11+). For the Deal machine this exhaustively proves `TypeOK` (safety: the retry
+counter never exceeds its bound), `Live_OverlayResolves` (liveness: the persist overlay always
+returns to a resting domain stage, so a deal never gets stuck half-persisted or retrying
+forever), and deadlock-freedom. Guards are over-approximated, which is sound for these
+properties. Data-refined invariants (stage-forward, atomicity of the persisted value) need the
+action semantics and are a hand-annotated refinement on top of this generated skeleton.
+
+Run both from the repo root: `make oracle` and `make verify-formal`.
+
+## Tools
+
+- `machine_lint.py` standalone structural machine linter.
+- `machinery_check.py` the full deterministic gate suite (supersedes machine_lint's drift check).
+- `oracle_gen.py` rung 1: generate the transition oracle from the machine JSON.
+- `tla_gen.py` + `tlc.sh` rung 3: generate and model-check a TLA+ model of a machine.
