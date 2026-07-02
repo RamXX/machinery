@@ -15,12 +15,6 @@ func newLintCmd() *cobra.Command {
 	}}
 }
 
-func newOracleCmd() *cobra.Command {
-	return &cobra.Command{Use: "oracle <machines-dir>", RunE: func(cmd *cobra.Command, args []string) error {
-		return exit2(fmt.Errorf("oracle: not implemented"))
-	}}
-}
-
 func newTLACmd() *cobra.Command {
 	return &cobra.Command{Use: "tla <machine.json> [out-dir]", RunE: func(cmd *cobra.Command, args []string) error {
 		return exit2(fmt.Errorf("tla: not implemented"))

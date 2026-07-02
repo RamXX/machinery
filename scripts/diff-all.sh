@@ -10,7 +10,8 @@ go build -o "$ROOT/.bin/machinery" "$ROOT/cmd/machinery" || { echo "go build fai
 
 pass=0; fail=0
 run() {  # run <label> <cmd...>
-  "$@" >/dev/null 2>&1 && { echo "  PASS  $1"; pass=$((pass+1)); } || { echo "  FAIL  $1"; fail=$((fail+1)); }
+  local label="$1"; shift
+  "$@" >/dev/null 2>&1 && { echo "  PASS  $label"; pass=$((pass+1)); } || { echo "  FAIL  $label"; fail=$((fail+1)); }
 }
 
 for ex in go-crm fulfillment portfolio-engine; do
