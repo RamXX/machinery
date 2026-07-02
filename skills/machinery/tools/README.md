@@ -45,6 +45,13 @@ unknown keys) are hard errors, never silently narrowed.
 
 ## Formal verification
 
+This layer (`make verify-formal`) is optional: it is the only part of machinery that needs **Java**,
+because TLC (the TLA+ model checker) is a JVM program. Generating the specs is pure Python; only
+checking them needs Java. Skipping it costs you nothing in the design or the deterministic gates, but
+it is where the exhaustive proofs live -- the checks that catch a stranded-money saga, an unbounded
+retry, or a contract violation that no symbolic gate or human review would. Recommended wherever a
+JVM is available.
+
 The ladder, and what each rung actually proves:
 
 - **Rung 1, generation** (`oracle_gen.py`): the transition oracle is generated from the

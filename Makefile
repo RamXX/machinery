@@ -52,8 +52,8 @@ preflight: ## Check machinery's runtime prerequisites (warns; installs nothing)
 	@if python3 -c 'import yaml' >/dev/null 2>&1; then echo "  ok       PyYAML"; \
 	 else echo "  MISSING  PyYAML (the gate tools parse YAML) -- install: python3 -m pip install pyyaml, or run gates via: uv run --with pyyaml -- python3 ..."; fi
 	@if command -v java >/dev/null 2>&1; then echo "  ok       java ($$(java -version 2>&1 | head -1))"; \
-	 else echo "  MISSING  Java 11+ (the formal layer; tlc.sh runs TLC)"; fi
-	@echo "  auto     the TLA+ tools (tla2tools.jar) download on first 'make verify-formal', pinned and checksum-verified"
+	 else echo "  optional Java 11+ -- needed ONLY for 'make verify-formal' (TLC model-checks the TLA+ proofs). The design pipeline and every gate run without it; with it you also get the exhaustive proofs. https://adoptium.net/"; fi
+	@echo "  auto     'make verify-formal' downloads the TLA+ tools (tla2tools.jar) on first use, pinned and checksum-verified (that step needs Java)"
 	@if command -v uv >/dev/null 2>&1; then echo "  ok       uv"; \
 	 else echo "  optional uv (runs 'make test' and resolves PyYAML on the fly) -- https://docs.astral.sh/uv/"; fi
 	@if command -v structurizr-cli >/dev/null 2>&1 || command -v structurizr >/dev/null 2>&1; then echo "  ok       structurizr-cli (C4 diagram export)"; \

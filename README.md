@@ -84,6 +84,16 @@ that holds all of this together is itself held: a pytest suite encodes every vac
 attack from an adversarial design review as a permanent regression, and CI runs the tests, the
 gates, the proofs, and the example build on every push.
 
+Generating every artifact (the oracle, the TLA+ specs, the reconciled models) is pure Python and
+needs no Java. Only the *checking* of the proofs (rungs 3 and 4, and rung 2's refinement) runs under
+TLC, which is a Java program, so **Java is required only for `make verify-formal`**. That step is
+optional but recommended: the deterministic gates (rung 2's generation and every symbolic check)
+already catch malformed machines, drift, and boundary erosion, but they cannot tell you that a saga
+can strand money, that a retry can loop forever, or that a subsystem violates the contract its
+neighbors assume. The model checking is what proves those, exhaustively, with a concrete
+counterexample when it fails (it caught two real defects in the examples below). A Java-free setup is
+a complete, gated design; adding Java upgrades "structurally consistent" to "machine-checked."
+
 ## Proof it works: the go-crm example
 
 `examples/go-crm` is a Go CRM with a native CLI over an embedded LadybugDB graph and role- and
@@ -113,8 +123,9 @@ lost, with compensation modeled per obligation so partial compensation is a real
 Building that proof caught a real bug in the saga as first drawn, where a single failed refund could
 leave a customer charged with nothing returned. TLC produced the exact counterexample and the fix is
 checked. The hardened cross-layer gate then caught a second real defect: the domain model's saga
-enum had drifted from the machine and was missing the FailedDirty residual entirely. Across both
-designs, `make verify-formal` checks sixteen proofs, all green.
+enum had drifted from the machine and was missing the FailedDirty residual entirely. Across the
+example designs, `make verify-formal` checks every proof, all green, regenerated from source on each
+run (and only this step needs Java).
 
 ## Brownfield systems
 
@@ -156,10 +167,14 @@ they are covered.
 
 ## Install
 
-Requires [`modelith`](https://github.com/stacklok/modelith) on `PATH`, Python 3.10+ with PyYAML for
-the gate tools, and Java 11+ for the formal layer (`tlc.sh` fetches the TLA+ tools on first use).
-`structurizr-cli` is optional (C4 diagram export only). Run `make preflight` (or `make doctor`) to
-check every prerequisite; `make install` runs the same check and warns about anything missing.
+Requires [`modelith`](https://github.com/stacklok/modelith) on `PATH` and Python 3.10+ with PyYAML
+for the gate tools. **Java 11+ is optional**: it is needed only for `make verify-formal`, which runs
+TLC to model-check the TLA+ proofs (`tlc.sh` then fetches the pinned TLA+ tools on first use).
+Without Java you still get the full design and every deterministic gate; what you add with Java is
+the exhaustive machine-checked proofs, the top of the correctness ladder (see below for why that is
+worth having). `structurizr-cli` is optional too (C4 diagram export only). Run `make preflight` (or
+`make doctor`) to check every prerequisite; `make install` runs the same check and warns about
+anything missing.
 
 ```sh
 make install       # symlink the skill and agents into every agent home (edits go live)
