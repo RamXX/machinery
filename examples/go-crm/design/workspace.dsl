@@ -57,11 +57,11 @@ workspace "Go CRM" "Single-binary CRM with an embedded LadybugDB graph and role-
     styles {
       element "Person" {
         shape Person
-        background #08427B
+        background #438DD5
         color #ffffff
       }
       element "Software System" {
-        background #1168BD
+        background #2E6295
         color #ffffff
       }
       element "Container" {
@@ -69,8 +69,8 @@ workspace "Go CRM" "Single-binary CRM with an embedded LadybugDB graph and role-
         color #ffffff
       }
       element "Component" {
-        background #85BBF0
-        color #000000
+        background #6FA8DC
+        color #ffffff
       }
       element "Database" {
         shape Cylinder

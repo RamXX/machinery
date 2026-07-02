@@ -66,11 +66,11 @@ workspace "Order Fulfillment" "Distributed fulfillment platform: a saga coordina
     styles {
       element "Person" {
         shape Person
-        background #08427B
+        background #438DD5
         color #ffffff
       }
       element "Software System" {
-        background #1168BD
+        background #2E6295
         color #ffffff
       }
       element "Container" {
@@ -78,8 +78,8 @@ workspace "Order Fulfillment" "Distributed fulfillment platform: a saga coordina
         color #ffffff
       }
       element "Component" {
-        background #85BBF0
-        color #000000
+        background #6FA8DC
+        color #ffffff
       }
       element "Database" {
         shape Cylinder
@@ -88,7 +88,8 @@ workspace "Order Fulfillment" "Distributed fulfillment platform: a saga coordina
         shape Pipe
       }
       element "External" {
-        background #999999
+        background #8E8E93
+        color #ffffff
       }
     }
   }

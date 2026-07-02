@@ -266,7 +266,8 @@ knows where the interrogation stopped.
 - `references/xstate-format.md` - the enforced XState v5 JSON-serializable subset, the machine
   annotations (`_role`, `_lifecycle_of`, `_exhaustive`, `_ignores`), and the failure-mode and
   choreography idioms.
-- `references/c4-standalone.md` - Structurizr DSL essentials, the Architecture Contract v2, the
+- `references/c4-standalone.md` - Structurizr DSL authoring guide (strict syntax rules, dark-mode
+  palette, validation via `structurizr-cli export`), the Architecture Contract v2, the
   dependency-mitigation, persistence-placement, and event-contract table formats, and the NFR record.
 - `references/build-md-template.md` - the full `BUILD.md` skeleton (full and manifest modes).
 - `machinery check` - the deterministic gate suite (G2-c4, G3-machine, Gx-trace, G4-import).

@@ -45,12 +45,12 @@ workspace "TermCRM" "Terminal CRM for a small sales team over an embedded local 
         shape Cylinder
       }
       element "Software System" {
-        background #1168bd
+        background #2E6295
         color #ffffff
       }
       element "Person" {
         shape Person
-        background #08427b
+        background #438DD5
         color #ffffff
       }
     }
