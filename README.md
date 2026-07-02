@@ -25,10 +25,10 @@ line.
 Most software is a state machine. Make that explicit and the rest follows. machinery separates a
 design into three layers that compose rather than merely coexist:
 
-- **The what**, a domain model (Modelith): the entities, the relationships, and the invariants that
-  must always hold. Linted.
-- **The how**, an architecture (C4): the components, the deployment, and what every dependency does
-  when it fails. Contract-checked.
+- **The what**, a domain model ([Modelith](https://modelith.sh/)): the entities, the relationships,
+  and the invariants that must always hold. Linted.
+- **The how**, an architecture ([C4](https://c4model.com/)): the components, the deployment, and what
+  every dependency does when it fails. Contract-checked.
 - **The behavior**, state machines in the [XState](https://github.com/statelyai/xstate) v5 JSON
   format (the notation, not the library): every state, transition, guard, timeout, and failure mode,
   conditioned on the architecture the previous layer fixed. Model-checked.
@@ -43,7 +43,8 @@ plus annotations like `_role` and `_exhaustive` that are not XState), and so are
 and the model checking. The de-annotated config loads into [Stately](https://stately.ai/) and
 `@xstate/graph` for optional visualization and covering-path generation, and a TypeScript build may
 adopt XState directly, while Go, Rust, Python, and Elixir targets hand-roll the state field. The
-guarantees come from machinery's tooling and TLC, never from XState.
+guarantees come from machinery's tooling and [TLC](https://github.com/tlaplus/tlaplus), never from
+XState.
 
 ## Agentic systems: the machine is the envelope, not the agent
 
@@ -113,7 +114,7 @@ attack from an adversarial design review as a permanent regression, and CI runs 
 gates, the proofs, and the example build on every push.
 
 Generating every artifact (the oracle, the TLA+ specs, the reconciled models) is pure Python and
-needs no Java. Only the *checking* of the proofs (rungs 3 and 4, and rung 2's refinement) runs under
+needs no [Java](https://adoptium.net/). Only the *checking* of the proofs (rungs 3 and 4, and rung 2's refinement) runs under
 TLC, which is a Java program, so **Java is required only for `make verify-formal`**. That step is
 optional but recommended: the deterministic gates (rung 2's generation and every symbolic check)
 already catch malformed machines, drift, and boundary erosion, but they cannot tell you that a saga
@@ -124,7 +125,8 @@ a complete, gated design; adding Java upgrades "structurally consistent" to "mac
 
 ## Proof it works: the go-crm example
 
-`examples/go-crm` is a Go CRM with a native CLI over an embedded LadybugDB graph and role- and
+`examples/go-crm` is a Go CRM with a native CLI over an embedded
+[LadybugDB](https://github.com/LadybugDB/go-ladybug) graph and role- and
 ownership-based access control, taken end to end:
 
 - **Designed** through all four phases. Domain model lints clean (9 entities, 24 invariants); C4 model
@@ -202,13 +204,13 @@ check and warns about anything missing.
 
 **Required**
 
-- **[modelith](https://github.com/stacklok/modelith)** -- Phase 1 domain-model lint and render. A Go
-  tool, so install it with the [Go](https://go.dev/dl/) toolchain on any OS:
-  `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` (then put `$(go env GOPATH)/bin` on
-  your `PATH`), or take a binary from the
-  [releases](https://github.com/stacklok/modelith/releases). Install Go first if needed: macOS
-  `brew install go`, Linux [go.dev/dl](https://go.dev/dl/) or your package manager, Windows
-  `winget install GoLang.Go`.
+- **[modelith](https://modelith.sh/)** -- Phase 1 domain-model lint and render. Primary install is
+  [Homebrew](https://brew.sh/) (macOS and Linux): `brew install stacklok/tap/modelith`. Secondary:
+  with the [Go](https://go.dev/dl/) toolchain on any OS,
+  `go install github.com/stacklok/modelith/cmd/modelith@latest` (then put `$(go env GOPATH)/bin` on
+  your `PATH`); or download a prebuilt binary (macOS, Linux, Windows) from the
+  [releases](https://github.com/stacklok/modelith/releases). Full options:
+  [modelith.sh/cli](https://modelith.sh/cli/).
 - **[Python](https://www.python.org/downloads/) 3.10+** and **[PyYAML](https://pyyaml.org/)** -- the
   deterministic gate tools. macOS: `brew install python@3.12`; Linux:
   `sudo apt install python3 python3-pip` (or your distro's package); Windows:
@@ -296,7 +298,7 @@ roughly ten stateful components.
 machinery is a thin methodology over these external projects. It invokes or emits their notations and
 bundles none of them.
 
-- [Modelith](https://github.com/stacklok/modelith) -- the domain-model language and linter (Phase 1).
+- [Modelith](https://modelith.sh/) -- the domain-model language and linter (Phase 1).
 - [C4 model](https://c4model.com/) -- the architecture technique (Phase 2).
 - [Structurizr DSL](https://github.com/structurizr/dsl) and
   [Structurizr CLI](https://github.com/structurizr/cli) -- architecture-as-code, and optional C4
