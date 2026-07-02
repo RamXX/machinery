@@ -1,16 +1,16 @@
-// Package gates_experiments contains the shared, language-neutral mutation
+// Package experiments contains the shared, language-neutral mutation
 // experiments ported from the pytest suite (tests/test_machine_lint.py,
 // test_machinery_check.py, test_formal_gens.py). They encode the review's
 // vacuity/drift findings as data; the Go table runner applies each mutation
 // to a fixture design and asserts the expected finding + exit.
-package gates_experiments
+package experiments
 
 // Experiment is one adversarial mutation: apply it to a clean design and
 // assert the tool catches it (expected finding substring + nonzero exit).
 type Experiment struct {
-	Name       string // human label
-	Tool       string // "lint" | "check" | "tla" | "refine" | "compose"
-	Mutation   string // describes what to mutate (for documentation)
+	Name     string // human label
+	Tool     string // "lint" | "check" | "tla" | "refine" | "compose"
+	Mutation string // describes what to mutate (for documentation)
 	// Expect is applied to the synthesized fixture: the substring the gate
 	// finding or generator error must contain, and whether it must be nonzero.
 	ExpectSubstr string

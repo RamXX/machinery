@@ -1,0 +1,64 @@
+# security.yml — security scanning: dependency vulnerabilities and leaked secrets.
+# Runs on every push/PR and nightly (to catch new CVEs disclosed after a PR).
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * *"   # 06:00 UTC daily
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  # govulncheck scans the Go module against the Go vulnerability database. It
+  # reports only vulnerabilities in code paths the binary actually uses (not
+  # every transitive CVE), so it is high-signal.
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run govulncheck (machinery toolchain)
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+      # Also scan the example application's dependencies (separate go.mod).
+      - name: Run govulncheck (go-crm example impl)
+        working-directory: examples/go-crm/impl
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  # gitleaks scans the full history and the working tree for secrets (API keys,
+  # tokens, private keys). Runs in "no-git" mode on PRs for speed and full-history
+  # mode nightly for depth.
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for secret scanning
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # If you have a paid Gitleaks license, set GITLEAKS_LICENSE; otherwise
+          # the OSS scan runs on push/PR (the free tier is sufficient here).
+
+  # Dependency Review (GitHub native): blocks PRs that introduce a dependency
+  # with a known vulnerability or an incompatible license. Only on PRs.
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          # Fail on any high/critical vulnerability introduced; warn on moderate.
+          fail-on-severity: high

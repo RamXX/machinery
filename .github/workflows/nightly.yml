@@ -1,0 +1,76 @@
+# nightly.yml — the deep, non-blocking checks that run once a day (and on the
+# 0.0 tag pushes). These are the "accumulate evidence over time that the two
+# implementations never disagree" jobs from MIGRATION.md Phase 11. They do not
+# block PRs; they surface drift on a cadence so it cannot accumulate silently.
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 5 * * *"   # 05:00 UTC daily
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  # Regenerate every committed oracle with Go and assert an empty git diff.
+  # Silent when parity holds; a diff means the committed oracle is stale OR the
+  # generator drifted (the differential job distinguishes which).
+  regen-clean-tree:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Regenerate oracles with Go
+        run: |
+          make build
+          for ex in go-crm fulfillment portfolio-engine; do
+            .bin/machinery oracle examples/$ex/design/machines
+          done
+      - name: Assert clean tree
+        run: git diff --exit-code -- examples/
+
+  # The full differential sweep + pytest oracle, on a cadence. If the per-push
+  # differential ever passed but nightly catches a divergence (e.g. a Python
+  # runtime update changed repr formatting), this is the canary.
+  differential-nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v5
+      - run: pip install pyyaml
+      - name: Go unit suite
+        run: go test -count=1 ./...
+      - name: Python pytest oracle
+        run: uv run -q -- pytest -q
+      - name: Differential harness
+        run: bash scripts/diff-all.sh
+
+  # Nightly govulncheck — catches newly-disclosed CVEs in dependencies between
+  # PRs. Mirrors the security.yml job but on the schedule so we learn of a vuln
+  # the day it's disclosed, not the next time someone opens a PR.
+  vulncheck-nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+      - working-directory: examples/go-crm/impl
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...

@@ -22,8 +22,9 @@ func fmtActions(v *ir.Value) string {
 }
 
 // StableID mirrors oracle_gen.stable_id:
-//   sha256("{tag}|{source}|{trig}|{guard or ''}").hex()[:6]
-//   return f"{tag}-{h}"
+//
+//	sha256("{tag}|{source}|{trig}|{guard or ''}").hex()[:6]
+//	return f"{tag}-{h}"
 func StableID(tag, source, trig, guard string) string {
 	h := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s", tag, source, trig, guard)))
 	return tag + "-" + hex.EncodeToString(h[:])[:6]
@@ -125,7 +126,7 @@ func nilIfEmptyList(acts []string) *ir.Value {
 func Generate(path string) (string, error) {
 	m, err := ir.LoadMachineJSON(path)
 	if err != nil {
-		return "", fmt.Errorf("oracle_gen: %s", err)
+		return "", fmt.Errorf("oracle_gen: %w", err)
 	}
 	return Render(m, path), nil
 }

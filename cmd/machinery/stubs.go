@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/ramirosalas/machinery/internal/formal"
@@ -53,13 +51,4 @@ func newIRDumpCmd() *cobra.Command {
 		return irDumpRun(args[0])
 	}
 	return c
-}
-
-// exit2 mirrors Python sys.exit(nonzero): print to stderr, exit code 2.
-// We return an error that main prints; main exits 1 on RunE error, so to get
-// exit code 2 we os.Exit directly here.
-func exit2(err error) error {
-	fmt.Fprintln(stderrW, err)
-	exitFunc(2)
-	return err
 }

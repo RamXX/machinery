@@ -5,25 +5,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/ramirosalas/machinery/internal/ir"
 )
 
-func writeMachine(t *testing.T, m *ir.Value) string {
+func writeSrc(t *testing.T, src string) string {
 	t.Helper()
 	d := t.TempDir()
 	p := filepath.Join(d, "Widget.machine.json")
-	// re-serialize the ordered value to JSON
-	b := ir.DumpJSON
-	_ = b
-	os.WriteFile(p, []byte(m.AsObject().GetString("__src")), 0644)
-	return p
-}
-
-func writeSrc(t *testing.T, src string) string {
-	d := t.TempDir()
-	p := filepath.Join(d, "Widget.machine.json")
-	os.WriteFile(p, []byte(src), 0644)
+	if err := os.WriteFile(p, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
 	return p
 }
 

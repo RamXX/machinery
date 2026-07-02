@@ -34,9 +34,9 @@ var StateTypes = map[string]bool{"": true, "atomic": true, "compound": true, "fi
 
 // Result is the output of LintMachine.
 type Result struct {
-	Errs  []string
-	Warns []string
-	Notes []string
+	Errs   []string
+	Warns  []string
+	Notes  []string
 	Counts Counts
 }
 
@@ -424,14 +424,14 @@ func sortedSetBool(m map[string]bool) []string { return sortedKeysMap(m) }
 
 // MRow is a canonical machine transition row.
 type MRow struct {
-	Source    string
-	Trigger   string
-	Guard     string
-	HasGuard  bool
-	Fallback  bool
+	Source     string
+	Trigger    string
+	Guard      string
+	HasGuard   bool
+	Fallback   bool
 	FirstGuard string
-	Target    string
-	Actions   []string
+	Target     string
+	Actions    []string
 }
 
 // XRow is a canonical matrix transition row.

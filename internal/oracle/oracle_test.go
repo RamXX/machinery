@@ -133,7 +133,9 @@ func TestStableIDConstantWhenOnlyExpectationChanges(t *testing.T) {
 
 func TestRenderIsDeterministic(t *testing.T) {
 	m := minimalMachine()
-	if Render(m, "w") != Render(m, "w") {
+	a := Render(m, "w")
+	b := Render(m, "w")
+	if a != b {
 		t.Fatal("render not deterministic")
 	}
 }

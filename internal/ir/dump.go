@@ -8,11 +8,11 @@ import (
 
 // IRDumpState is one state in the canonical IR dump.
 type IRDumpState struct {
-	Path  string    `json:"path"`
-	Name  string    `json:"name"`
-	Type  *string   `json:"type"`
-	Entry []string  `json:"entry"`
-	Exit  []string  `json:"exit"`
+	Path  string   `json:"path"`
+	Name  string   `json:"name"`
+	Type  *string  `json:"type"`
+	Entry []string `json:"entry"`
+	Exit  []string `json:"exit"`
 }
 
 // IRDumpTransition is one transition in the canonical IR dump.

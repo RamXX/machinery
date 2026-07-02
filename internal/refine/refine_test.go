@@ -131,7 +131,7 @@ func TestUnsupportedPatternExits(t *testing.T) {
 
 // helpers
 func readFile(path string) ([]byte, error) { return osReadFile(path) }
-func containsStr(s, sub string) bool           { return len(s) >= len(sub) && indexOf(s, sub) >= 0 }
+func containsStr(s, sub string) bool       { return len(s) >= len(sub) && indexOf(s, sub) >= 0 }
 func indexOf(s, sub string) int {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {

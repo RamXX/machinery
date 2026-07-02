@@ -1,4 +1,4 @@
-package gates_experiments
+package experiments
 
 import (
 	"strings"
@@ -38,7 +38,7 @@ func containsAny(findings []string, sub string) bool {
 // TestMachineLintExperiments runs every machine_lint mutation experiment.
 func TestMachineLintExperiments(t *testing.T) {
 	cases := []struct {
-		name  string
+		name   string
 		mutate func(*ir.Value)
 		want   string
 	}{

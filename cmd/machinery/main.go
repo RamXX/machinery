@@ -47,8 +47,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
-// notImplemented is the Phase-1 stub exit behavior: exit 2 with a clear message.
-func notImplemented(name string) error {
-	return fmt.Errorf("%s: not implemented", name)
-}

@@ -136,7 +136,7 @@ func exModules(text string) []string {
 	return out
 }
 
-func rustImports(text, rel string) []string {
+func rustImports(text string) []string {
 	var out []string
 	for _, m := range rustUseRe.FindAllStringSubmatch(text, -1) {
 		path := m[1]
@@ -277,8 +277,11 @@ func CheckImports(design, impl string) *Gate {
 
 	edgeHits := map[[2]string]string{}
 	var files []string
-	filepath.Walk(impl, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+	walkErr := filepath.Walk(impl, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
 			return nil
 		}
 		ext := filepath.Ext(path)
@@ -287,6 +290,9 @@ func CheckImports(design, impl string) *Gate {
 		}
 		return nil
 	})
+	if walkErr != nil {
+		g.Errs = append(g.Errs, "walking "+impl+": "+walkErr.Error())
+	}
 	sort.Strings(files)
 
 	for _, path := range files {
@@ -336,7 +342,7 @@ func CheckImports(design, impl string) *Gate {
 		case "elixir":
 			refs = exModules(text)
 		case "rust":
-			refs = rustImports(text, rel)
+			refs = rustImports(text)
 		}
 		for _, ref := range refs {
 			dstB, norm := internalTarget(ref)

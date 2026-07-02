@@ -95,14 +95,6 @@ var identRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
 
 // --- helpers ---
 
-func readPath(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
 func readOrEmpty(path string) string {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -138,7 +130,7 @@ func isTokenChar(b byte) bool {
 // --- contract (G2-c4) ---
 
 var (
-	contractHeadingRe = regexp.MustCompile(`(?ims)^#+[^\n]*architecture contract[^\n]*\n.*?` + "```yaml\n(.*?)\n```")
+	contractHeadingRe  = regexp.MustCompile(`(?ims)^#+[^\n]*architecture contract[^\n]*\n.*?` + "```yaml\n(.*?)\n```")
 	contractFallbackRe = regexp.MustCompile("(?s)```yaml\n(contract_version:.*?)\n```")
 	edgeRuleRe         = regexp.MustCompile(`^"?\s*([^\s"]+)\s*->\s*([^\s"#]+)`)
 	dslDeclRe          = regexp.MustCompile(`^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(person|softwareSystem|container|component)\b(.*)$`)
@@ -582,7 +574,7 @@ func sortedGlob(dir, pattern string) []string {
 	var out []string
 	for _, e := range entries {
 		if !e.IsDir() {
-		 matched, _ := filepath.Match(pattern, e.Name())
+			matched, _ := filepath.Match(pattern, e.Name())
 			if matched {
 				out = append(out, filepath.Join(dir, e.Name()))
 			}

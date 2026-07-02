@@ -1,0 +1,61 @@
+# golangci-lint v2 configuration for machinery.
+# Tailored to a cobra-CLI + internal packages project: file I/O and a java
+# subprocess. High-signal linters on; noisy stylistic ones off.
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - errcheck      # unchecked errors are bugs (file I/O, exec)
+    - govet         # go vet superset
+    - ineffassign   # assignments to values never read
+    - staticcheck   # the SA* suite (real bugs, deadcode, simplifications)
+    - unused        # unused functions/vars/types
+    - misspell      # typos in identifiers/comments
+    - bodyclose     # http.Response.Body not closed (formal.go fetches the jar)
+    - errorlint     # %w vs %s on errors, typed nil
+    - nilerr        # returning nil after an err
+    - noctx         # http requests without context
+    - unconvert     # unnecessary type conversions
+    - unparam       # unused function parameters
+    - gocritic      # common pitfalls
+    - reassign      # reassigning package-level vars (http.DefaultClient)
+  settings:
+    staticcheck:
+      checks: ["all"]
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+        - sprintfQuotedString  # we EMIT literal double-quotes in TLA+ output; %q would break byte-parity
+        - appendCombine        # generators build lists incrementally for readability
+        - ifElseChain          # refactor suggestion, not a bug
+        - singleCaseSwitch     # refactor suggestion
+        - preferDecodeRune     # refactor suggestion; we operate on ASCII identifiers
+  exclusions:
+    presets:
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - "examples"          # the example app has its own go.mod/tests
+      - "third_party$"
+      - "builtin$"
+    rules:
+      # tests legitimately use magic numbers and skip some error checks
+      - path: _test\.go
+        linters: [errcheck, unparam, gocritic]
+      # the command package exits directly on tool errors (the CLI contract)
+      - path: cmd/machinery/
+        linters: [errcheck]
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  fix: false

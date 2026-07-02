@@ -23,8 +23,8 @@ func newCheckCmd() *cobra.Command {
 	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: g2,g3,gx,g4")
 	c.RunE = func(cmd *cobra.Command, args []string) error {
 		design := args[0]
-		if fi, err := os.Stat(design); err != nil || !fi.IsDir() {
-			fmt.Fprintf(stderrW, "machinery_check: design directory %s does not exist\n", quote(design))
+		if err := checkIsDir(design); err != nil {
+			fmt.Fprintln(stderrW, err)
 			exitFunc(1)
 			return nil
 		}
@@ -77,3 +77,12 @@ func newCheckCmd() *cobra.Command {
 }
 
 func quote(s string) string { return "'" + s + "'" }
+
+// checkIsDir mirrors the Python "design directory does not exist" error.
+func checkIsDir(design string) error {
+	fi, err := os.Stat(design)
+	if err != nil || !fi.IsDir() {
+		return fmt.Errorf("machinery_check: design directory %s does not exist", quote(design))
+	}
+	return nil
+}

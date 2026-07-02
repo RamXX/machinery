@@ -1,0 +1,42 @@
+# formal.yml — TLC model-checking of every generated TLA+ spec.
+# Separated from ci.yml because the JVM setup is heavy and TLC is the slowest
+# job (~minutes per design). Runs on push/PR but is allowed to report
+# independently so a TLC regression is visible without masking faster checks.
+name: formal
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+concurrency:
+  group: formal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-formal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      # Cache the pinned tla2tools.jar so we don't re-download/verify every run.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/machinery
+          key: tla2tools-v1.7.4
+      - name: Build machinery
+        run: make build
+      - name: Regenerate + TLC-check go-crm
+        run: .bin/machinery verify-formal examples/go-crm/design
+      - name: Regenerate + TLC-check fulfillment
+        run: .bin/machinery verify-formal examples/fulfillment/design
+      - name: Regenerate + TLC-check portfolio-engine
+        run: .bin/machinery verify-formal examples/portfolio-engine/design

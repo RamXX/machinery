@@ -35,7 +35,7 @@ func Classify(states []ir.StateEntry) (domain, overlay map[string]bool) {
 	return
 }
 
-// RetryStates mirrors tla_gen.retry_states: states with guarded always + after.
+// RetryState is a state with a guarded always plus an after: a bounded retry loop.
 type RetryState struct {
 	Name string
 	Node *ir.Value
@@ -112,11 +112,12 @@ func targetsOf(x *ir.Value, what, mid string) []string {
 		if it == nil {
 			continue
 		}
-		if it.Kind == ir.KindObject {
+		switch it.Kind {
+		case ir.KindObject:
 			if tv := it.AsObject().Get2("target"); tv != nil && tv.Kind == ir.KindString {
 				targets = append(targets, tv.AsString())
 			}
-		} else if it.Kind == ir.KindString {
+		case ir.KindString:
 			targets = append(targets, it.AsString())
 		}
 	}
@@ -297,7 +298,7 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	for _, r := range retries {
 		rn := r.Name
 		rnode := r.Node.AsObject()
-		var rcVar string = rcOf[rn]
+		var rcVar = rcOf[rn]
 		aStep := stStep(targetsOf(rnode.Get2("always"), fmt.Sprintf("retry state %s always", rn), mid))
 		afterObj := rnode.Get2("after").AsObject()
 		if afterObj.Len() != 1 {
