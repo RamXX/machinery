@@ -9,15 +9,20 @@ scratchpad/
 .idea/
 .vscode/
 
-# Python
+# Python (legacy, no longer runtime deps)
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
 
 # Go build artifacts
 .bin/
 machinery
 machinery.exe
+
+# Archived code (moved out of the active tree)
+legacy/
+experiments/
 
 # TLC scratch (tlc.sh runs with -cleanup, but interrupted runs leave these)
 states/
