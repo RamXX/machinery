@@ -1,5 +1,12 @@
 # machinery check: deterministic verification gates
 
+> **Status (migration):** these `*.py` files are the **legacy Python
+> implementation**, retained as the differential oracle during the Python→Go
+> shadow window. The canonical tool is the `machinery` Go binary
+> (`make build`); invoke `machinery check|oracle|tla|refine|compose|verify-formal`.
+> See `MIGRATION.md`. The Python here is bug-for-bug frozen; it is deleted at
+> the `python-removed` tag once the shadow is silent.
+
 Pure static analysis over a machinery design (and, with `--impl`, the code). No LLM.
 These are the hard symbolic checks that make correctness not depend on an agent getting
 every cross-reference right. Two design rules govern the whole suite:
