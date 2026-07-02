@@ -9,12 +9,6 @@ import (
 // Phase-1 stubs. Each subcommand exits 2 with "not implemented" until its phase
 // replaces the body. The differential harness depends on these existing.
 
-func newLintCmd() *cobra.Command {
-	return &cobra.Command{Use: "lint <machines-dir>", RunE: func(cmd *cobra.Command, args []string) error {
-		return exit2(fmt.Errorf("lint: not implemented"))
-	}}
-}
-
 func newTLACmd() *cobra.Command {
 	return &cobra.Command{Use: "tla <machine.json> [out-dir]", RunE: func(cmd *cobra.Command, args []string) error {
 		return exit2(fmt.Errorf("tla: not implemented"))
