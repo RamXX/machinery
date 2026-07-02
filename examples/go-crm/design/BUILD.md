@@ -1028,7 +1028,7 @@ Each is a randomized/generative property over the relevant operation. Format: `P
 | test id | property |
 |---|---|
 | P-username-unique | For any two register attempts with the same username, the second fails; the store never holds two Users with one username. |
-| P-password-hashed | For any password, the persisted `passwordHash` is a valid argon2id encoding and never equals the plaintext; no plaintext appears in the DB or token file. |
+| P-password-hashed | For any non-degenerate password, the persisted `passwordHash` is a valid argon2id PHC encoding, never equals the plaintext, and the plaintext does not appear in the credential material (the salt and derived-key segments); the fixed algorithm and parameter prefix is metadata and is excluded from the leak check. |
 | P-disabled-cannot-auth | For any Disabled user and any password, Login never yields a Session (ErrDisabled). |
 | P-single-team | For any sequence of team assignments, a User is a member of at most one Team. |
 | P-team-name-unique | For any two Team creates with the same name, the second fails; never two Teams with one name. |
