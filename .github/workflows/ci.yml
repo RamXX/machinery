@@ -45,3 +45,41 @@ jobs:
       - name: go-crm hermetic suite
         working-directory: examples/go-crm/impl
         run: go test ./... -count=1
+
+  # Phase 1: the live scoreboard. Allowed to fail during the migration window;
+  # promoted to required in Phase 11 once parity is proven.
+  differential:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pyyaml
+      - name: Go unit tests
+        run: go test ./...
+      - name: Differential harness (Go == Python byte-for-byte)
+        run: bash scripts/diff-all.sh
+
+  # Phase 11 nightly: regenerate all committed oracles/.tla with Go and assert
+  # an empty git diff. Silent when parity holds.
+  nightly-regen:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Regenerate with Go, assert clean tree
+        run: |
+          go build -o .bin/machinery ./cmd/machinery
+          for ex in go-crm fulfillment portfolio-engine; do
+            .bin/machinery oracle examples/$ex/design/machines
+          done
+          git diff --exit-code
