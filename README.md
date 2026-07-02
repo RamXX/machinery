@@ -1,5 +1,12 @@
 # machinery
 
+[![CI](https://github.com/ramirosalas/machinery/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ramirosalas/machinery/actions/workflows/ci.yml)
+[![Formal Verification](https://github.com/ramirosalas/machinery/actions/workflows/formal.yml/badge.svg?branch=main)](https://github.com/ramirosalas/machinery/actions/workflows/formal.yml)
+[![Security](https://github.com/ramirosalas/machinery/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/ramirosalas/machinery/actions/workflows/security.yml)
+[![Nightly](https://github.com/ramirosalas/machinery/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/ramirosalas/machinery/actions/workflows/nightly.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/ramirosalas/machinery.svg)](https://pkg.go.dev/github.com/ramirosalas/machinery)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ramirosalas/machinery)](https://goreportcard.com/report/github.com/ramirosalas/machinery)
+
 **Design software once, as a state machine, and let everything else be derived and proven from it:
 the tests, the architecture contracts, the build instructions, and machine-checked proofs of
 correctness.** machinery is a design methodology and toolchain that turns a fuzzy idea into a
@@ -273,7 +280,12 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 ## How it is put together
 
 - `skills/machinery/SKILL.md` the conductor, plus `references/` (XState format, C4 technique, BUILD.md
-  template) and `tools/` (the deterministic gate suite and the formal generators).
+  template) and `tools/` (the frozen Python differential oracle during migration).
+- `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `refine`, `compose`,
+  `check`, `verify-formal`, `doctor`, `preflight`.
+- `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
+  `refine/`, `compose/`, `gates/` (the G2/G3/Gx/G4 suite), `formal/` (TLC orchestration),
+  `experiments/` (the shared mutation-experiment table). Every package has unit tests.
 - `agents/` two synthesis subagents (the machine author and the build-doc writer).
 - `examples/go-crm/` the worked example: `design/` (the blueprint and the formal models) and `impl/`
   (the verified Go build).
@@ -283,14 +295,38 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   Python drawdown portfolio recommender): exercises the terminal-lifecycle pattern and a
   persistence overlay renamed from the defaults, proving the formal layer is not hardcoded to one
   vocabulary.
-- `tests/` the toolchain's own test suite; the design-review vacuity and drift experiments live here
-  as permanent regressions.
+- `tests/` the Python toolchain's own test suite (the frozen differential oracle during migration);
+  the Go experiment table lives in `internal/experiments/`.
 
 See `skills/machinery/tools/README.md` for the checkers and generators, and
 `examples/go-crm/design/formal/README.md` for the proofs. The skill also defines a revision mode
 (design changes after code exists: stable test ids, oracle diffs as the affected-test list, and a
 mandatory state-migration note for persisted machines) and a sharding rule for designs beyond
 roughly ten stateful components.
+
+## Testing & CI
+
+The Go toolchain has full unit tests in every package, plus a shared mutation-experiment table
+(the vacuity/drift findings from design review, ported from the pytest suite). Current coverage:
+
+| Package | Coverage | Role |
+|---------|----------|------|
+| `internal/tla` | 90% | TLA+ control-flow generator |
+| `internal/oracle` | 87% | transition oracle (content-hashed ids) |
+| `internal/lint` | 84% | structural lint + matrix reconciliation |
+| `internal/refine` | 83% | data-refinement (3 patterns) |
+| `internal/compose` | 79% | cross-aggregate composition |
+| `internal/gates` | 77% | the G2/G3/Gx/G4 gate suite |
+| `internal/ir` | 57% | shared IR (covered transitively via lint/gates) |
+| **internal/ overall** | **~75%** | (cmd/ is thin CLI plumbing) |
+
+Run `go test -coverprofile=cover.out ./internal/... && go tool cover -func=cover.out` locally.
+CI runs `go test -race ./...`. Beyond unit tests, two stronger nets are always green in CI:
+
+- **Differential parity** — `scripts/diff-all.sh` proves the Go binary equals the Python tools
+  byte-for-byte (stdout/stderr/exit) on every example and every generator.
+- **Formal verification** — `machinery verify-formal` regenerates and TLC-model-checks all 22 TLA+
+  proofs across the three examples.
 
 ## Built on
 
