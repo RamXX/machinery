@@ -160,13 +160,19 @@ Requires [`modelith`](https://github.com/stacklok/modelith) on `PATH`. The forma
 `tlc.sh` fetches the TLA+ tools on first use.
 
 ```sh
-make install       # symlink the skill and agents into ~/.claude (edits go live)
+make install       # symlink the skill and agents into every agent home (edits go live)
 make doctor        # check dependencies and install status
 make test          # run the toolchain's own test suite (pytest via uv)
-make check         # run the deterministic gate suite on both examples
-make verify-formal # regenerate and TLC-check all sixteen proofs
+make check         # run the deterministic gate suite on the examples
+make verify-formal # regenerate and TLC-check the full formal suite
 make oracle        # regenerate the transition oracles from the machine JSON
 ```
+
+machinery is agent-agnostic. `make install` places the skill under `<home>/skills` and the two role
+docs under `<home>/agents` for every home in `AGENT_HOMES`, which defaults to `~/.claude` (Claude
+Code) and `~/.agents` (the cross-agent convention). Override it to add or restrict targets, for
+example `make install AGENT_HOMES="$HOME/.agents"`. `make install-copy` does the same without
+symlinks, and `make uninstall` removes machinery from every home.
 
 The gate tools need Python 3.10+ with PyYAML (declared in `pyproject.toml`; `uv` resolves it).
 `tlc.sh` uses a version-pinned, checksum-verified `tla2tools.jar`. CI runs the test suite, both
@@ -174,7 +180,8 @@ gate runs, the full formal suite, and the go-crm build on every push.
 
 ## Use
 
-In a Claude Code session, from the project you want to design:
+In an agent session (Claude Code, or any agent that loads skills from an installed home), from the
+project you want to design:
 
 ```
 Design a new <system> with machinery.
@@ -190,8 +197,12 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 - `agents/` two synthesis subagents (the machine author and the build-doc writer).
 - `examples/go-crm/` the worked example: `design/` (the blueprint and the formal models) and `impl/`
   (the verified Go build).
-- `examples/fulfillment/` the distributed stress test: `design/` only (six machines, eight of the
-  sixteen proofs, and `FINDINGS.md`, the record of what strained and what was fixed).
+- `examples/fulfillment/` the distributed stress test: `design/` only (six machines, eight proofs,
+  and `FINDINGS.md`, the record of what strained and what was fixed).
+- `examples/portfolio-engine/` a second design-only example in a different domain and language (a
+  Python drawdown portfolio recommender): exercises the terminal-lifecycle pattern and a
+  persistence overlay renamed from the defaults, proving the formal layer is not hardcoded to one
+  vocabulary.
 - `tests/` the toolchain's own test suite; the design-review vacuity and drift experiments live here
   as permanent regressions.
 
