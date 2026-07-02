@@ -14,6 +14,7 @@ workspace "Go CRM" "Single-binary CRM with an embedded LadybugDB graph and role-
         authz    = component "Authorization (RBAC)" "Decides allow or deny for (user, verb, entityType, ownerId, teamId). Enforces the rbac-* invariants." "Go"
         domain   = component "Domain Services" "Aggregates and lifecycle logic for Deal, Task, and User; invariant guards; state transitions." "Go"
         repo     = component "Repository" "Maps domain operations to Cypher, executes them via go-ladybug, maps rows and errors back to the domain." "Go / go-ladybug"
+        model    = component "Domain Model" "Shared vocabulary: entity types, enums, and typed errors. Imports nothing." "Go"
       }
 
       store       = container "Graph Store" "Embedded property graph on local disk: nodes and relationships for every record." "LadybugDB (embedded)" "Database"
@@ -32,7 +33,9 @@ workspace "Go CRM" "Single-binary CRM with an embedded LadybugDB graph and role-
     session  -> sessionfile "Reads and writes the session token"
     domain   -> authz   "Authorizes the action against record owner and team"
     domain   -> repo    "Reads and writes records"
+    domain   -> model   "Uses the shared domain types"
     repo     -> store   "Executes Cypher in a transaction" "go-ladybug / Cypher"
+    repo     -> model   "Maps rows to the shared domain types"
   }
 
   views {

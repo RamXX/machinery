@@ -45,36 +45,57 @@ design treats that refusal as a first-class, recoverable failure rather than a c
 ## 4. Architecture Contract
 
 ```yaml
-contract_version: 1
+contract_version: 2
 boundaries:
   - id: crm.commands
     kind: component
+    element: commands
     code: [ "internal/cli/**" ]
     exposes: [ "internal/cli/root.go" ]
   - id: crm.session
     kind: component
+    element: session
     code: [ "internal/session/**" ]
     exposes: [ "internal/session/session.go" ]
   - id: crm.authz
     kind: component
+    element: authz
     code: [ "internal/authz/**" ]
     exposes: [ "internal/authz/authz.go" ]
   - id: crm.domain
     kind: component
+    element: domain
     code: [ "internal/domain/**" ]
     exposes: [ "internal/domain/service.go" ]
   - id: crm.repo
     kind: component
+    element: repo
     code: [ "internal/repo/**" ]
     exposes: [ "internal/repo/repo.go" ]
+  - id: crm.model
+    kind: component
+    element: model
+    code: [ "internal/model/**" ]   # shared domain types; no exposes list, all of it is API
+externals:
+  - id: external.ladybug
+    element: store
+    imports: [ "github.com/LadybugDB/go-ladybug" ]
+ignore:
+  - "internal/testsupport/**"   # hard-TDD fakes shared by the test suites
+  - "internal/arch/**"          # the architecture-boundary test package itself
 dependency_rules:
   allow:
     - crm.commands -> crm.session
     - crm.commands -> crm.domain
     - crm.commands -> crm.repo      # open db, own the transaction boundary
+    - crm.commands -> crm.model
     - crm.session  -> crm.repo
+    - crm.session  -> crm.model
+    - crm.authz    -> crm.model
     - crm.domain   -> crm.authz
     - crm.domain   -> crm.repo
+    - crm.domain   -> crm.model
+    - crm.repo     -> crm.model
     - crm.repo     -> external.ladybug   # the repository is the sole importer of the embedded store
   deny:
     - crm.commands -> crm.authz     # authorization is decided inside domain services
@@ -82,6 +103,7 @@ dependency_rules:
   notes:
     - "All graph access goes through crm.repo. Only crm.repo imports go-ladybug."
     - "Authorization is enforced in crm.domain, never in the command layer, so no command path can skip it."
+    - "crm.model is the shared vocabulary (types, enums, typed errors); every component may import it, it imports nothing."
 ```
 
 ## 5. Interface contracts (boundary shapes for the hard-TDD contract tests)
@@ -127,12 +149,12 @@ writer) or fatal-until-restore (corruption). The state machines must handle them
 
 | dependency | failure modes | mitigation (deployment) | residual behavior the FSM must handle | bound |
 |---|---|---|---|---|
-| LadybugDB open | file locked by another `crm` process | none (single-file embedded) | `ErrLocked` on open: retry with backoff, then exit with a clear message | retry <= 3, ~1.5s total |
-| LadybugDB open | corrupt or version-incompatible directory | none (no HA); backup via `crm backup` / restore via `crm restore` | `ErrCorrupt`: fail loudly, tell the user to restore from backup | fatal, no auto-recovery |
-| LadybugDB write | Cypher/constraint violation | one write transaction per invocation | `ErrConstraint`: roll back, surface as a domain validation error | atomic, no partial write |
-| LadybugDB write | disk full | none | `ErrDiskFull`: roll back, fail loudly; DB stays consistent | atomic |
-| LadybugDB query | runaway query | `Connection.SetTimeout` + `Interrupt` | `ErrTimeout`: abort, surface, roll back | timeout 10s |
-| Session file | missing / expired / unreadable | none | `ErrNoSession` / `ErrExpired`: require `crm login` | user re-authenticates |
+| `store` (LadybugDB open) | file locked by another `crm` process | none (single-file embedded) | `ErrLocked` on open: retry with backoff, then exit with a clear message | retry <= 3, ~1.5s total |
+| `store` (LadybugDB open) | corrupt or version-incompatible directory | none (no HA); backup via `crm backup` / restore via `crm restore` | `ErrCorrupt`: fail loudly, tell the user to restore from backup | fatal, no auto-recovery |
+| `store` (LadybugDB write) | Cypher/constraint violation | one write transaction per invocation | `ErrConstraint`: roll back, surface as a domain validation error | atomic, no partial write |
+| `store` (LadybugDB write) | disk full | none | `ErrDiskFull`: roll back, fail loudly; DB stays consistent | atomic |
+| `store` (LadybugDB query) | runaway query | `Connection.SetTimeout` + `Interrupt` | `ErrTimeout`: abort, surface, roll back | timeout 10s |
+| `sessionfile` | missing / expired / unreadable | none | `ErrNoSession` / `ErrExpired`: require `crm login` | user re-authenticates |
 
 ## 7. Persistence and placement (the C4 to FSM bridge)
 
@@ -141,11 +163,11 @@ aggregate is loaded, acted on, and saved inside the one write transaction the Co
 
 | component | machine placement | persistence | concurrency serialization |
 |---|---|---|---|
-| Deal aggregate | ephemeral in-process; load-act-save in the Tx | graph node `stage` attribute | read-modify-write in one write Tx; cross-process by the store's single-writer lock |
-| Task aggregate | ephemeral in-process; load-act-save in the Tx | graph node `status` attribute | as above |
-| User aggregate | ephemeral in-process; load-act-save in the Tx | graph node `status` attribute | as above |
-| Session | in-process during a command; token on disk | `~/.crm/session` (user id + expiry, HMAC-signed) | last write wins; single local user |
-| Command execution | ephemeral per invocation (the operational envelope) | none | one invocation owns the write Tx |
+| `Deal` aggregate | ephemeral in-process; load-act-save in the Tx | graph node `stage` attribute | read-modify-write in one write Tx; cross-process by the store's single-writer lock |
+| `Task` aggregate | ephemeral in-process; load-act-save in the Tx | graph node `status` attribute | as above |
+| `User` aggregate | ephemeral in-process; load-act-save in the Tx | graph node `status` attribute | as above |
+| `Session` | in-process during a command; token on disk | `~/.crm/session` (user id + expiry, HMAC-signed) | last write wins; single local user |
+| `CommandExecution` | ephemeral per invocation (the operational envelope) | none | one invocation owns the write Tx |
 
 ## 8. Gate 2 result
 

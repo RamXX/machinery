@@ -71,6 +71,7 @@
       }
     },
     "rolledBack": {
+      "_exhaustive": "both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present",
       "always": [
         { "target": "Active", "guard": "priorIsActive" },
         { "target": "Disabled", "guard": "priorIsDisabled" }

@@ -2,17 +2,29 @@
 EXTENDS Naturals
 
 \* Generated from CommandExecution.machine.json by tools/tla_gen.py. Control-flow model.
+\*
+\* ASSUMPTIONS (what this abstraction erases; the proof is conditional on them):
+\*   1. Guards are erased to nondeterminism: sound for safety; for liveness the
+\*      guard lists must be exhaustive. machine_lint enforces an unguarded
+\*      fallback or an _exhaustive note on every fully guarded always-list.
+\*   2. Every invoke resolves exactly once (onDone or onError; no lost or
+\*      duplicated completion) and every after timer eventually fires.
+\*   3. Single machine instance; no interleaving with other instances or
+\*      machines, no message loss/duplication/reordering between machines.
+\*   4. Context data, event payloads, action effects, and real time (the
+\*      _delays values) are not modeled at this rung; the data-refined rung
+\*      (refine_gen) and the implementation tests carry those.
 CONSTANT MaxRetries
-VARIABLES st, rc
-vars == << st, rc >>
+VARIABLES st, rc1
+vars == << st, rc1 >>
 
 States == {"Authorizing", "Corrupt", "DBError", "DBLocked", "Denied", "Done", "Executing", "Opening", "Parsing", "Rendering", "ResolvingSession", "ValidationFailed"}
 Domain == {"Corrupt", "DBError", "Denied", "Done", "ValidationFailed"}
 Overlay == {"Authorizing", "DBLocked", "Executing", "Opening", "Parsing", "Rendering", "ResolvingSession"}
 Final == {"Corrupt", "DBError", "Denied", "Done", "ValidationFailed"}
 
-TypeOK == st \in States /\ rc \in 0..MaxRetries
-Init == st = "Parsing" /\ rc = 0
+TypeOK == st \in States /\ rc1 \in 0..MaxRetries
+Init == st = "Parsing" /\ rc1 = 0
 
   \* T1: Parsing -always-> Opening
   \* T2: Parsing -always-> ValidationFailed
@@ -40,37 +52,37 @@ Init == st = "Parsing" /\ rc = 0
   \* T24: Executing -onError:executeInTx-> DBError
   \* T25: Rendering -always-> Done
 
-T1 == st = "Parsing" /\ st' = "Opening" /\ rc' = rc
-T2 == st = "Parsing" /\ st' = "ValidationFailed" /\ rc' = 0
-T3 == st = "Opening" /\ st' = "DBError" /\ rc' = 0
-T4 == st = "Opening" /\ st' = "ResolvingSession" /\ rc' = rc
-T5 == st = "Opening" /\ st' = "DBLocked" /\ rc' = rc
-T6 == st = "Opening" /\ st' = "Corrupt" /\ rc' = 0
-T7 == st = "Opening" /\ st' = "DBError" /\ rc' = 0
-T8 == st = "Opening" /\ st' = "DBError" /\ rc' = 0
-T9 == st = "ResolvingSession" /\ st' = "DBError" /\ rc' = 0
-T10 == st = "ResolvingSession" /\ st' = "Authorizing" /\ rc' = rc
-T11 == st = "ResolvingSession" /\ st' = "Denied" /\ rc' = 0
-T12 == st = "ResolvingSession" /\ st' = "Denied" /\ rc' = 0
-T13 == st = "ResolvingSession" /\ st' = "DBLocked" /\ rc' = rc
-T14 == st = "ResolvingSession" /\ st' = "DBError" /\ rc' = 0
-T15 == st = "Authorizing" /\ st' = "Executing" /\ rc' = rc
-T16 == st = "Authorizing" /\ st' = "Denied" /\ rc' = 0
-T17 == st = "Executing" /\ st' = "DBError" /\ rc' = 0
-T18 == st = "Executing" /\ st' = "Rendering" /\ rc' = rc
-T19 == st = "Executing" /\ st' = "ValidationFailed" /\ rc' = 0
-T20 == st = "Executing" /\ st' = "DBLocked" /\ rc' = rc
-T21 == st = "Executing" /\ st' = "DBLocked" /\ rc' = rc
-T22 == st = "Executing" /\ st' = "DBError" /\ rc' = 0
-T23 == st = "Executing" /\ st' = "DBError" /\ rc' = 0
-T24 == st = "Executing" /\ st' = "DBError" /\ rc' = 0
-T25 == st = "Rendering" /\ st' = "Done" /\ rc' = 0
-RetryExhausted == st = "DBLocked" /\ rc >= MaxRetries /\ st' = "DBError" /\ rc' = rc
-RetryAgain == st = "DBLocked" /\ rc < MaxRetries /\ st' = "Opening" /\ rc' = rc + 1
+T1 == st = "Parsing" /\ st' = "Opening" /\ rc1' = rc1
+T2 == st = "Parsing" /\ st' = "ValidationFailed" /\ rc1' = 0
+T3 == st = "Opening" /\ st' = "DBError" /\ rc1' = 0
+T4 == st = "Opening" /\ st' = "ResolvingSession" /\ rc1' = rc1
+T5 == st = "Opening" /\ st' = "DBLocked" /\ rc1' = rc1
+T6 == st = "Opening" /\ st' = "Corrupt" /\ rc1' = 0
+T7 == st = "Opening" /\ st' = "DBError" /\ rc1' = 0
+T8 == st = "Opening" /\ st' = "DBError" /\ rc1' = 0
+T9 == st = "ResolvingSession" /\ st' = "DBError" /\ rc1' = 0
+T10 == st = "ResolvingSession" /\ st' = "Authorizing" /\ rc1' = rc1
+T11 == st = "ResolvingSession" /\ st' = "Denied" /\ rc1' = 0
+T12 == st = "ResolvingSession" /\ st' = "Denied" /\ rc1' = 0
+T13 == st = "ResolvingSession" /\ st' = "DBLocked" /\ rc1' = rc1
+T14 == st = "ResolvingSession" /\ st' = "DBError" /\ rc1' = 0
+T15 == st = "Authorizing" /\ st' = "Executing" /\ rc1' = rc1
+T16 == st = "Authorizing" /\ st' = "Denied" /\ rc1' = 0
+T17 == st = "Executing" /\ st' = "DBError" /\ rc1' = 0
+T18 == st = "Executing" /\ st' = "Rendering" /\ rc1' = rc1
+T19 == st = "Executing" /\ st' = "ValidationFailed" /\ rc1' = 0
+T20 == st = "Executing" /\ st' = "DBLocked" /\ rc1' = rc1
+T21 == st = "Executing" /\ st' = "DBLocked" /\ rc1' = rc1
+T22 == st = "Executing" /\ st' = "DBError" /\ rc1' = 0
+T23 == st = "Executing" /\ st' = "DBError" /\ rc1' = 0
+T24 == st = "Executing" /\ st' = "DBError" /\ rc1' = 0
+T25 == st = "Rendering" /\ st' = "Done" /\ rc1' = 0
+RetryExhausted_DBLocked == st = "DBLocked" /\ rc1 >= MaxRetries /\ st' = "DBError" /\ rc1' = rc1
+RetryAgain_DBLocked == st = "DBLocked" /\ rc1 < MaxRetries /\ st' \in {"Executing", "Opening"} /\ rc1' = rc1 + 1
 Terminated == st \in Final /\ UNCHANGED vars
 
 DomainNext == FALSE
-OverlayNext == T1 \/ T2 \/ T3 \/ T4 \/ T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ RetryExhausted \/ RetryAgain
+OverlayNext == T1 \/ T2 \/ T3 \/ T4 \/ T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ RetryExhausted_DBLocked \/ RetryAgain_DBLocked
 Next == DomainNext \/ OverlayNext \/ Terminated
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)

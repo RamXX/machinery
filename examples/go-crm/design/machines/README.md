@@ -3,7 +3,9 @@
 Five machines, one per stateful component from ARCHITECTURE.md section 7. Each has a
 `<Component>.machine.json` (XState v5, JSON-serializable; guards/actions/actors are string
 names implemented by the coding agent; delays are named) and a `<Component>.matrix.md`
-(named-unit contracts, failure catalog, and the transition oracle for hard TDD).
+(named-unit contracts, failure catalog, and a transition table reconciled row by row against
+the machine by G3). The CANONICAL transition oracle is the generated `<Component>.oracle.md`
+(oracle_gen; stable test ids; G3 diffs it against a fresh generation).
 
 | machine | kind | traces to |
 |---|---|---|

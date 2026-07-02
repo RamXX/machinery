@@ -1,32 +1,34 @@
 ---- MODULE System ----
 \* Assume-guarantee composition, the rule that makes the recursion scale. A caller
 \* (the command envelope) drives a deal aggregate that is known ONLY through its
-\* contract (DealContract): the caller ASSUMES the aggregate is atomic while busy and
-\* always terminates. Under that assumption the caller GUARANTEES that the command
-\* completes and leaves the deal resting. Because DealData refines DealContract
-\* (checked in DealRefinement), substituting the real Deal aggregate preserves these
-\* guarantees without re-checking the whole system: the parts are verified against
-\* small contracts, never against the flattened composition.
+\* contract: the aggregate's steps below are INSTANCED from DealContract, not
+\* hand-mirrored, so the assumption the caller makes is the same module that
+\* DealRefinement proves DealData provides. If refine_gen regenerates a different
+\* contract, this module checks against the new one or fails to parse; the
+\* assumption and the proven guarantee cannot drift apart silently.
+\*
+\* Checked here: under the contract's fairness (busy work finishes), every command
+\* completes and observes a resting aggregate; and the composed system's aggregate
+\* steps themselves satisfy the contract spec (AggregateContractHolds), which is
+\* what justifies substituting the real, refinement-checked aggregate.
 EXTENDS Naturals
 
-Phases == {"resting", "busy"}
-Kinds == {"open", "terminal"}
 CmdStates == {"idle", "waiting", "done"}
 
 VARIABLES cmd, phase, kind
 vars == << cmd, phase, kind >>
 
-TypeOK == cmd \in CmdStates /\ phase \in Phases /\ kind \in Kinds
-Init == cmd = "idle" /\ phase = "resting" /\ kind = "open"
+DC == INSTANCE DealContract WITH phase <- phase, kind <- kind
 
-\* the caller starts the aggregate (a Begin step of the contract)
-Invoke ==
-  /\ cmd = "idle" /\ phase = "resting"
-  /\ cmd' = "waiting" /\ phase' = "busy" /\ kind' = kind
+TypeOK == cmd \in CmdStates /\ DC!CTypeOK
+Init == cmd = "idle" /\ DC!CInit
+
+\* the caller starts the aggregate: exactly a Begin step of the contract
+Invoke == cmd = "idle" /\ phase = "resting" /\ cmd' = "waiting" /\ DC!Begin
 
 \* the aggregate as its contract allows: churn atomically, or finish
-AggChurn == phase = "busy" /\ phase' = "busy" /\ kind' = kind /\ cmd' = cmd
-AggFinish == phase = "busy" /\ phase' = "resting" /\ kind' \in Kinds /\ cmd' = cmd
+AggChurn == DC!Churn /\ cmd' = cmd
+AggFinish == DC!Finish /\ cmd' = cmd
 
 \* the caller observes completion
 Complete == cmd = "waiting" /\ phase = "resting" /\ cmd' = "done" /\ UNCHANGED << phase, kind >>
@@ -39,4 +41,8 @@ Spec == Init /\ [][Next]_vars /\ WF_vars(AggFinish) /\ WF_vars(Complete)
 
 Safe_DoneImpliesResting == (cmd = "done") => (phase = "resting")
 Live_CommandCompletes == (cmd = "waiting") ~> (cmd = "done")
+
+\* the composition's aggregate behavior satisfies the contract spec, fairness
+\* included: the assumption made of the aggregate is discharged, not just named
+AggregateContractHolds == DC!CSpec
 ====

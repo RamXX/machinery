@@ -148,6 +148,7 @@
       }
     },
     "rolledBack": {
+      "_exhaustive": "priorStage is set by every setPending* action to the current domain state, which is one of the six DealStage values; the six priorIs* guards cover DealStage totally",
       "always": [
         { "target": "Lead", "guard": "priorIsLead" },
         { "target": "Qualified", "guard": "priorIsQualified" },
