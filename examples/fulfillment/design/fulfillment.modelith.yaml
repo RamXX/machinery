@@ -1,0 +1,301 @@
+# yaml-language-server: $schema=https://modelith.sh/schema/domain-model/v1.json
+kind: DomainModel
+version: v1
+title: Order Fulfillment
+description: >
+  A distributed order-fulfillment platform. Placing an order runs a saga that
+  reserves inventory, captures payment, and dispatches a shipment across separate
+  services, compensating on failure. Reliable messaging uses a transactional
+  outbox with idempotent consumers.
+
+glossary:
+  System: "The platform acting on its own behalf across services."
+  Operator: "A human operator managing catalog and stock."
+  PaymentGateway: "An external payment processor that authorizes, captures, and refunds."
+  Carrier: "An external shipping carrier that dispatches and tracks parcels."
+
+enums:
+  OrderStatus:
+    values:
+      - {name: Pending, definition: "Created, not yet confirmed."}
+      - {name: Confirmed, definition: "Validated and priced."}
+      - {name: Reserved, definition: "Inventory held for every line."}
+      - {name: Paid, definition: "Payment captured."}
+      - {name: Shipped, definition: "Handed to the carrier."}
+      - {name: Delivered, definition: "Received by the customer; terminal."}
+      - {name: Cancelled, definition: "Ended before fulfillment; terminal."}
+      - {name: Failed, definition: "Ended by an unrecoverable error; terminal."}
+  PaymentStatus:
+    values:
+      - {name: Pending, definition: "Not yet authorized."}
+      - {name: Authorized, definition: "Funds held."}
+      - {name: Captured, definition: "Funds taken."}
+      - {name: Failed, definition: "Declined or errored; terminal."}
+      - {name: Refunded, definition: "Captured funds returned; terminal."}
+  ReservationStatus:
+    values:
+      - {name: Held, definition: "Stock set aside."}
+      - {name: Committed, definition: "Consumed by a shipment."}
+      - {name: Released, definition: "Returned to available stock."}
+  ShipmentStatus:
+    values:
+      - {name: Pending, definition: "Awaiting dispatch."}
+      - {name: Dispatched, definition: "Handed to the carrier."}
+      - {name: InTransit, definition: "Moving to the customer."}
+      - {name: Delivered, definition: "Received; terminal."}
+      - {name: Lost, definition: "Lost in transit; terminal."}
+  SagaStatus:
+    values:
+      - {name: Running, definition: "Executing the forward path."}
+      - {name: Compensating, definition: "Unwinding after a failure."}
+      - {name: Completed, definition: "Fulfilled; terminal."}
+      - {name: Failed, definition: "Compensated and abandoned; terminal."}
+  MessageStatus:
+    values:
+      - {name: Pending, definition: "Written to the outbox, not yet published."}
+      - {name: Published, definition: "Handed to the broker at least once."}
+      - {name: Consumed, definition: "Acknowledged by an idempotent consumer."}
+
+entities:
+  Customer:
+    definition: >
+      A person who places orders. A `Customer` owns the `Order` records they create.
+    attributes:
+      - {name: name, type: string}
+      - {name: email, type: string}
+    invariants:
+      - {id: customer-email-unique, statement: "No two `Customer` records share an email."}
+    actions:
+      - {name: register, actor: System, preserves: [customer-email-unique]}
+
+  Product:
+    definition: >
+      A sellable item in the catalog. `Inventory` tracks stock for a `Product`.
+    attributes:
+      - {name: sku, type: string}
+      - {name: name, type: string}
+      - {name: priceCents, type: integer}
+    invariants:
+      - {id: product-price-nonneg, statement: "A `Product` price is zero or positive."}
+    actions:
+      - {name: create, actor: Operator, preserves: [product-price-nonneg]}
+      - {name: reprice, actor: Operator, preserves: [product-price-nonneg]}
+
+  Inventory:
+    definition: >
+      The stock position for a `Product`: how much is on hand and how much is
+      currently reserved. Availability is on hand minus reserved.
+    attributes:
+      - {name: onHand, type: integer}
+      - {name: reserved, type: integer}
+    relationships:
+      - {entity: Product, cardinality: 1:1, ownership: referenced}
+    invariants:
+      - {id: reserved-within-stock, statement: "The reserved quantity of an `Inventory` never exceeds its onHand quantity."}
+      - {id: available-nonneg, statement: "The available quantity of an `Inventory`, onHand minus reserved, is never negative."}
+    actions:
+      - {name: restock, actor: Operator}
+      - {name: reserve, actor: System, preserves: [reserved-within-stock, available-nonneg]}
+      - {name: release, actor: System, preserves: [available-nonneg]}
+      - {name: commit, actor: System}
+
+  Order:
+    definition: >
+      A customer's request to buy, priced from its `LineItem` set and driven to
+      fulfillment by a `FulfillmentSaga`. An `Order` moves through OrderStatus.
+    attributes:
+      - {name: totalCents, type: integer}
+      - {name: status, type: OrderStatus}
+    relationships:
+      - {entity: Customer, cardinality: n:1, ownership: referenced}
+      - {entity: LineItem, cardinality: 1:n, ownership: owned}
+      - {entity: Payment, cardinality: 1:1, ownership: owned}
+      - {entity: Shipment, cardinality: 1:1, ownership: owned}
+      - {entity: FulfillmentSaga, cardinality: 1:1, ownership: owned}
+    invariants:
+      - {id: order-owned-by-customer, statement: "Every `Order` belongs to exactly one `Customer`."}
+      - {id: order-total-matches-items, statement: "An `Order` total equals the sum over its `LineItem` records of quantity times unit price."}
+      - {id: order-forward, statement: "An `Order` moves forward through its statuses or to Cancelled or Failed; it never moves backward."}
+      - {id: order-delivered-terminal, statement: "An `Order` in Delivered, Cancelled, or Failed is terminal."}
+    actions:
+      - {name: place, actor: Customer, preserves: [order-total-matches-items, order-owned-by-customer]}
+      - {name: confirm, actor: System}
+      - {name: markReserved, actor: System}
+      - {name: markPaid, actor: System}
+      - {name: markShipped, actor: System}
+      - {name: markDelivered, actor: System, preserves: [order-delivered-terminal]}
+      - {name: cancel, actor: Customer}
+      - {name: fail, actor: System, preserves: [order-delivered-terminal]}
+
+  LineItem:
+    definition: >
+      One `Product` and a quantity within an `Order`. A `LineItem` cannot exist
+      apart from its `Order`.
+    attributes:
+      - {name: quantity, type: integer}
+      - {name: unitPriceCents, type: integer}
+    relationships:
+      - {entity: Product, cardinality: n:1, ownership: referenced}
+    invariants:
+      - {id: line-item-quantity-positive, statement: "A `LineItem` quantity is positive."}
+    actions:
+      - {name: add, actor: Customer, preserves: [line-item-quantity-positive]}
+
+  Reservation:
+    definition: >
+      A hold placed on an `Inventory` for one `LineItem`. A `Reservation` moves
+      through ReservationStatus from Held to Committed or Released.
+    attributes:
+      - {name: quantity, type: integer}
+      - {name: status, type: ReservationStatus}
+    relationships:
+      - {entity: Inventory, cardinality: n:1, ownership: referenced}
+      - {entity: LineItem, cardinality: 1:1, ownership: referenced}
+    invariants:
+      - {id: reservation-quantity-positive, statement: "A `Reservation` quantity is positive."}
+      - {id: reservation-terminal, statement: "A `Reservation` in Committed or Released is terminal."}
+    actions:
+      - {name: hold, actor: System, preserves: [reservation-quantity-positive, reserved-within-stock]}
+      - {name: commit, actor: System, preserves: [reservation-terminal]}
+      - {name: release, actor: System, preserves: [reservation-terminal]}
+
+  Payment:
+    definition: >
+      The money movement for an `Order`, handled through the `PaymentGateway`. A
+      `Payment` moves through PaymentStatus.
+    attributes:
+      - {name: amountCents, type: integer}
+      - {name: idempotencyKey, type: string}
+      - {name: status, type: PaymentStatus}
+    invariants:
+      - {id: payment-amount-nonneg, statement: "A `Payment` amount is zero or positive."}
+      - {id: payment-idempotent, statement: "A `Payment` with a given idempotencyKey is captured at most once."}
+      - {id: payment-terminal, statement: "A `Payment` in Failed or Refunded is terminal."}
+    actions:
+      - {name: authorize, actor: PaymentGateway}
+      - {name: capture, actor: PaymentGateway, preserves: [payment-idempotent]}
+      - {name: fail, actor: PaymentGateway, preserves: [payment-terminal]}
+      - {name: refund, actor: PaymentGateway, preserves: [payment-terminal]}
+
+  Refund:
+    definition: >
+      A return of captured funds on a `Payment`, issued during compensation.
+    attributes:
+      - {name: amountCents, type: integer}
+    relationships:
+      - {entity: Payment, cardinality: n:1, ownership: referenced}
+    invariants:
+      - {id: refund-amount-positive, statement: "A `Refund` amount is positive."}
+    actions:
+      - {name: issue, actor: PaymentGateway}
+
+  Shipment:
+    definition: >
+      The physical fulfillment of an `Order` to an `Address`, handled by the
+      `Carrier`. A `Shipment` moves through ShipmentStatus.
+    attributes:
+      - {name: trackingId, type: string}
+      - {name: status, type: ShipmentStatus}
+    relationships:
+      - {entity: Address, cardinality: 1:1, ownership: owned}
+    invariants:
+      - {id: shipment-terminal, statement: "A `Shipment` in Delivered or Lost is terminal."}
+    actions:
+      - {name: dispatch, actor: Carrier, preserves: [no-ship-before-pay]}
+      - {name: markInTransit, actor: Carrier}
+      - {name: deliver, actor: Carrier, preserves: [shipment-terminal]}
+      - {name: markLost, actor: Carrier, preserves: [shipment-terminal]}
+
+  Address:
+    definition: >
+      A postal destination for a `Shipment`. Part of the `Shipment` it belongs to.
+    attributes:
+      - {name: line1, type: string}
+      - {name: city, type: string}
+      - {name: postalCode, type: string}
+      - {name: country, type: string}
+    invariants:
+      - {id: address-country-present, statement: "An `Address` has a non-empty country."}
+    actions:
+      - {name: capture, actor: Customer}
+
+  FulfillmentSaga:
+    definition: >
+      The orchestration that drives an `Order` through reserve, pay, and ship, and
+      unwinds on failure. A `FulfillmentSaga` moves through SagaStatus.
+    attributes:
+      - {name: status, type: SagaStatus}
+    invariants:
+      - {id: saga-terminal, statement: "A `FulfillmentSaga` in Completed or Failed is terminal."}
+    actions:
+      - {name: start, actor: System}
+      - {name: advance, actor: System}
+      - {name: compensate, actor: System, preserves: [saga-compensation]}
+      - {name: complete, actor: System, preserves: [saga-terminal]}
+      - {name: abort, actor: System, preserves: [saga-terminal, saga-compensation]}
+
+  OutboxMessage:
+    definition: >
+      A domain event written in the same transaction as the state change that
+      produced it, then published to the broker. A `OutboxMessage` moves through
+      MessageStatus.
+    attributes:
+      - {name: messageType, type: string}
+      - {name: status, type: MessageStatus}
+    invariants:
+      - {id: outbox-at-least-once, statement: "A `OutboxMessage` is published until it is Consumed; delivery is at least once."}
+    actions:
+      - {name: enqueue, actor: System}
+      - {name: publish, actor: System, preserves: [outbox-at-least-once]}
+      - {name: markConsumed, actor: System}
+
+invariants:
+  - {id: no-ship-before-pay, statement: "A `Shipment` is dispatched only after its `Order` `Payment` is Captured."}
+  - {id: capture-matches-total, statement: "A captured `Payment` amount equals its `Order` total."}
+  - {id: refund-within-capture, statement: "A `Refund` amount does not exceed the captured amount of its `Payment`."}
+  - {id: reserve-before-pay, statement: "An `Order` is not Paid until every `Reservation` for its `LineItem` records is Held."}
+  - {id: saga-compensation, statement: "If a `FulfillmentSaga` fails after reserving or capturing, every `Reservation` is Released and every captured `Payment` is Refunded."}
+  - {id: exactly-once-effect, statement: "Consumers are idempotent, so at-least-once `OutboxMessage` delivery yields an exactly-once effect."}
+
+scenarios:
+  - name: Happy path fulfillment
+    steps:
+      - "A `Customer` places an `Order` with two `LineItem` records, each for a `Product`; the total matches the items."
+      - "The `FulfillmentSaga` starts, holds a `Reservation` on each `Inventory`, and the `Order` becomes Reserved."
+      - "The `PaymentGateway` captures the `Payment` for the order total; the `Order` becomes Paid."
+      - "The `Carrier` dispatches the `Shipment` to its `Address` and later delivers it; the `Order` becomes Delivered."
+    invariants_touched: [order-total-matches-items, reserved-within-stock, capture-matches-total, no-ship-before-pay, order-forward]
+  - name: Payment failure compensates
+    steps:
+      - "A `Reservation` is Held for each line, then the `PaymentGateway` fails the `Payment`."
+      - "The `FulfillmentSaga` compensates: every `Reservation` is Released and the `Order` is Failed."
+    invariants_touched: [saga-compensation, reservation-terminal, order-delivered-terminal, payment-terminal]
+  - name: Insufficient inventory
+    steps:
+      - "A hold would push an `Inventory` reserved quantity above onHand, so it is refused."
+      - "The `FulfillmentSaga` cannot reserve and the `Order` is Cancelled."
+    invariants_touched: [reserved-within-stock, available-nonneg, order-delivered-terminal]
+  - name: Duplicate payment is idempotent
+    steps:
+      - "A capture is retried with the same idempotencyKey."
+      - "The `Payment` is captured only once."
+    invariants_touched: [payment-idempotent, capture-matches-total]
+  - name: Cancel after payment refunds and releases
+    steps:
+      - "A `Customer` cancels a Paid `Order`."
+      - "The `FulfillmentSaga` compensates: a `Refund` is issued and each `Reservation` is Released."
+    invariants_touched: [saga-compensation, refund-within-capture, reservation-terminal]
+  - name: Shipment lost in transit
+    steps:
+      - "The `Carrier` marks a Dispatched `Shipment` as Lost."
+      - "The `Shipment` is terminal in Lost."
+    invariants_touched: [shipment-terminal]
+  - name: Reliable messaging retries
+    steps:
+      - "An `OutboxMessage` is enqueued in the same transaction as an `Order` change."
+      - "It is published at least once until an idempotent consumer marks it Consumed."
+    invariants_touched: [outbox-at-least-once, exactly-once-effect]
+  - name: Reserve precedes pay
+    steps:
+      - "The `FulfillmentSaga` holds every `Reservation` before the `PaymentGateway` captures the `Payment`."
+    invariants_touched: [reserve-before-pay, reserved-within-stock]

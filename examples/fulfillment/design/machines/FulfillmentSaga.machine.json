@@ -1,0 +1,64 @@
+{
+  "_comment": "FulfillmentSaga orchestrator: forward path reserve -> pay -> ship, with compensation (refund then release) on failure. PLACEMENT: a persistent saga process per order (Elixir gen_statem / GenServer under a Registry, state journaled). Not a linear lifecycle: it is an orchestration with a compensation reversal, which is why refine_gen's linear-lifecycle pattern does not apply and this is a good stress case for the control-flow model checker.",
+  "_delays": {
+    "reserveTimeout": "5000 ms",
+    "payTimeout": "8000 ms",
+    "shipTimeout": "8000 ms",
+    "refundTimeout": "8000 ms",
+    "releaseTimeout": "5000 ms",
+    "releaseBackoff": "500 ms - compensation retry backoff; give up at 3"
+  },
+  "id": "fulfillmentSaga",
+  "initial": "Reserving",
+  "context": { "orderId": null, "retries": 0 },
+  "states": {
+    "Reserving": {
+      "invoke": {
+        "src": "reserveInventory",
+        "onDone": { "target": "Paying", "actions": "markReserved" },
+        "onError": { "target": "Failed", "actions": "recordReserveFailed" }
+      },
+      "after": { "reserveTimeout": { "target": "Failed", "actions": "recordReserveTimeout" } }
+    },
+    "Paying": {
+      "invoke": {
+        "src": "capturePayment",
+        "onDone": { "target": "Shipping", "actions": "markPaid" },
+        "onError": { "target": "CompensatingReserve", "actions": "recordPayFailed" }
+      },
+      "after": { "payTimeout": { "target": "CompensatingReserve", "actions": "recordPayTimeout" } }
+    },
+    "Shipping": {
+      "invoke": {
+        "src": "dispatchShipment",
+        "onDone": { "target": "Completed", "actions": "markShipped" },
+        "onError": { "target": "CompensatingPay", "actions": "recordShipFailed" }
+      },
+      "after": { "shipTimeout": { "target": "CompensatingPay", "actions": "recordShipTimeout" } }
+    },
+    "CompensatingPay": {
+      "invoke": {
+        "src": "refundPayment",
+        "onDone": { "target": "CompensatingReserve", "actions": "recordRefunded" },
+        "onError": { "target": "CompensatingReserve", "actions": "recordRefundFailed" }
+      },
+      "after": { "refundTimeout": { "target": "CompensatingReserve", "actions": "recordRefundTimeout" } }
+    },
+    "CompensatingReserve": {
+      "invoke": {
+        "src": "releaseReservations",
+        "onDone": { "target": "Failed", "actions": "recordReleased" },
+        "onError": { "target": "releaseRetry", "actions": "recordReleaseError" }
+      },
+      "after": { "releaseTimeout": { "target": "releaseRetry", "actions": "recordReleaseTimeout" } }
+    },
+    "releaseRetry": {
+      "always": [
+        { "target": "Failed", "guard": "retriesExhausted", "actions": "recordReleaseGaveUp" }
+      ],
+      "after": { "releaseBackoff": { "target": "CompensatingReserve", "actions": "incrementRetries" } }
+    },
+    "Completed": { "type": "final" },
+    "Failed": { "type": "final" }
+  }
+}
