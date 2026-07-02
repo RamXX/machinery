@@ -9,8 +9,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// version is set at link time (or defaults). Matches modelith's --version pattern.
-const version = "0.1.0-dev"
+// version is set at link time via -ldflags "-X main.version=v0.1.0".
+// Defaults to "dev" for local `go build`.
+var version = "dev"
 
 func main() {
 	root := &cobra.Command{
