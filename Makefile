@@ -6,7 +6,7 @@ AGENTS_DIR := $(CLAUDE_DIR)/agents
 SRC := $(CURDIR)
 
 .DEFAULT_GOAL := help
-.PHONY: install install-copy uninstall doctor help
+.PHONY: install install-copy uninstall doctor check help
 
 install: ## Symlink machinery into ~/.claude (live edits from this repo)
 	@mkdir -p $(SKILLS_DIR) $(AGENTS_DIR)
@@ -34,6 +34,9 @@ doctor: ## Check dependencies and install status
 	@test -e $(SKILLS_DIR)/machinery && echo "ok: skill at $(SKILLS_DIR)/machinery" || echo "not installed: run make install"
 	@test -e $(AGENTS_DIR)/machinery-fsm-author.md && echo "ok: fsm-author agent installed" || echo "not installed: run make install"
 	@test -e $(AGENTS_DIR)/machinery-build-writer.md && echo "ok: build-writer agent installed" || echo "not installed: run make install"
+
+check: ## Run the deterministic gate suite on the go-crm example
+	@python3 skills/machinery/tools/machinery_check.py examples/go-crm/design --impl examples/go-crm/impl
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'

@@ -75,6 +75,7 @@ dependency_rules:
     - crm.session  -> crm.repo
     - crm.domain   -> crm.authz
     - crm.domain   -> crm.repo
+    - crm.repo     -> external.ladybug   # the repository is the sole importer of the embedded store
   deny:
     - crm.commands -> crm.authz     # authorization is decided inside domain services
     - "crm.* -> external.ladybug"   # only crm.repo may import go-ladybug

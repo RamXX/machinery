@@ -102,7 +102,8 @@ persisted aggregate). This is the real bridge into Phase 3.
 
 **GATE 2:** every Modelith action maps to an owning component. Every external dependency has a
 declared mitigation posture. Boundary and interface contracts are defined. Persistence and placement
-are decided for each stateful component.
+are decided for each stateful component. Deterministic gate: `tools/machinery_check.py <design>`
+**G2-c4** must be clean.
 
 ### Phase 3 - State machines (the behavior)
 
@@ -114,7 +115,8 @@ giant machine. See `references/xstate-format.md`.
 **GATE 3:** every `invoke` has `onError` and a timeout (`after`). Every invariant is guarded or
 structurally impossible. Every C4 dependency failure has a transition, reclassified by its mitigation
 rather than deleted (see below). No unreachable or dead states. Every event is handled or explicitly
-ignored in every state.
+ignored in every state. Deterministic gate: `tools/machinery_check.py <design>` **G3-machine** must be
+clean (structural lint plus oracle reconciliation, no LLM).
 
 ### Phase 4 - BUILD.md
 
@@ -122,7 +124,8 @@ Spawn the `machinery-build-writer` subagent. It assembles the blueprint from all
 traceability matrix and the transition-derived test spec. See `references/build-md-template.md`.
 
 **GATE 4:** a coding agent with zero context could build the system from `BUILD.md` alone. It is
-self-contained, the test matrix is present, and the traceability is complete.
+self-contained, the test matrix is present, and the traceability is complete. Deterministic gates:
+**Gx-trace** clean, and once code exists **G4-import** clean (`tools/machinery_check.py <design> --impl <code>`).
 
 ## Mitigations reclassify failures, they do not delete them
 
@@ -170,3 +173,6 @@ generation, so the tests are derived from the spec rather than invented.
 - `references/c4-standalone.md` - Structurizr DSL essentials, the Architecture Contract, and the
   dependency-mitigation and persistence-placement decision formats.
 - `references/build-md-template.md` - the full `BUILD.md` skeleton.
+- `tools/machinery_check.py` - the deterministic gate suite (G2-c4, G3-machine, Gx-trace, G4-import).
+  Run it at each gate so correctness does not rely on the model getting every cross-reference right.
+  See `tools/README.md`.
