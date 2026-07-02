@@ -1,0 +1,3 @@
+generated MarketDataFeed.oracle.md  (6 transition rows)
+generated Portfolio.oracle.md  (19 transition rows)
+generated RecommendationRun.oracle.md  (8 transition rows)

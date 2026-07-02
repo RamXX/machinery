@@ -1,0 +1,15 @@
+== FulfillmentSaga.machine.json: 8 states ==
+  ok
+== Order.machine.json: 11 states ==
+  warn   Order.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStatus is set by every setPending* action to the current domain state; only Pending, Confirmed, Reserved, Paid, and Shipped have transitions into the persist overlay (final states persist nothing), and all five priorIs* guards are present
+== OutboxMessage.machine.json: 7 states ==
+  warn   OutboxMessage.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStatus is set on every path into the overlay from a domain state; only Pending and Published reach the overlay (Consumed is final), and both priorIs* guards are present; a rollback to Pending is precisely the at-least-once re-drive point for the next poller sweep
+== Payment.machine.json: 13 states ==
+  warn   Payment.machine.json: state gatewayResume always-list is fully guarded; liveness rests on the declared exhaustiveness: gatewayOp is set by setGatewayAuthorize/setGatewayCapture/setGatewayRefund before entering the three gateway-call states, the only states that reach gatewayRetry; the three gatewayFor* guards cover {authorize, capture, refund} totally
+  warn   Payment.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStatus is set on every path into the overlay from a domain state; only Pending, Authorized, and Captured reach the overlay (Failed and Refunded are final), and all three priorIs* guards are present
+== Reservation.machine.json: 6 states ==
+  warn   Reservation.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: only Held has transitions into the persist overlay (Committed and Released are final), so priorStatus is always Held and the single priorIsHeld guard is total
+== Shipment.machine.json: 10 states ==
+  warn   Shipment.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStatus is set on every path into the overlay from a domain state; only Pending, Dispatched, and InTransit reach the overlay (Delivered and Lost are final), and all three priorIs* guards are present
+
+0 error/drift finding(s) across 6 machine(s)

@@ -1,0 +1,8 @@
+== MarketDataFeed.machine.json: 3 states ==
+  ok
+== Portfolio.machine.json: 7 states ==
+  warn   Portfolio.machine.json: state reverted always-list is fully guarded; liveness rests on the declared exhaustiveness: prior is set by every setPending action to the review stage the operation departed from; its codomain is exactly the four PortfolioStatus values, so one guarded branch per stage is total
+== RecommendationRun.machine.json: 5 states ==
+  ok
+
+0 error/drift finding(s) across 3 machine(s)

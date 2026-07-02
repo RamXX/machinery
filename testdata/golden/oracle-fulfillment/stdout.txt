@@ -1,0 +1,6 @@
+generated FulfillmentSaga.oracle.md  (14 transition rows)
+generated Order.oracle.md  (33 transition rows)
+generated OutboxMessage.oracle.md  (16 transition rows)
+generated Payment.oracle.md  (37 transition rows)
+generated Reservation.oracle.md  (12 transition rows)
+generated Shipment.oracle.md  (26 transition rows)
