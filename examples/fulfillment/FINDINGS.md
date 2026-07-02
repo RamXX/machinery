@@ -47,5 +47,18 @@ Target language: Elixir/OTP.
 ## Status
 
 Phase 1 (domain model) complete and clean. The saga machine is authored and its control-flow model is
-TLC-verified. The remaining phases (C4, the other machines, BUILD.md, the multi-contract composition)
-are the continuation, and items 1 and 2 above are the tooling work that continuation will drive.
+TLC-verified. The remaining phases (C4, the other machines, BUILD.md) are the continuation.
+
+## Update: strains 1 and 2 resolved, and a real bug caught
+
+- **Strain 1 is closed.** `refine_gen` gained a `saga` pattern. `FulfillmentSagaData` is generated
+  from a six-line annotation and TLC proves that money and stock are never silently lost.
+- **Strain 2 is closed.** `compose_gen` generates a composition spec from a `*.composition.yaml`.
+  `Checkout` proves the cross-aggregate invariants `reserve-before-pay` and `no-ship-before-pay`
+  over the composed contracts, which no single aggregate could.
+- **The data-refined saga model earned its keep.** It caught a money-losing bug in the saga as first
+  drawn: a single refund attempt could leave a captured payment un-refunded during compensation. TLC
+  produced the exact six-step counterexample. The fix (one idempotent, retried compensate step with an
+  explicit FailedDirty residual for exhausted retries) is proven.
+
+`make verify-formal` now checks 11 proofs across both examples, all green.

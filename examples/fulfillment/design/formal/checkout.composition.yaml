@@ -1,0 +1,12 @@
+composition: checkout
+aggregates:
+  reservation: { states: [Free, Held], initial: Free }
+  payment: { states: [NotCaptured, Captured], initial: NotCaptured }
+  shipment: { states: [NotDispatched, Dispatched], initial: NotDispatched }
+sequence:
+  - { aggregate: reservation, to: Held }
+  - { aggregate: payment, to: Captured }
+  - { aggregate: shipment, to: Dispatched }
+invariants:
+  reserve-before-pay: 'payment = "Captured" => reservation = "Held"'
+  no-ship-before-pay: 'shipment = "Dispatched" => payment = "Captured"'

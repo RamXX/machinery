@@ -1,0 +1,12 @@
+# Declarative semantics for the saga pattern: the forward steps, and for each the
+# side effect it commits and the compensating obligation to undo it. refine_gen
+# generates a data-refined model that proves money and stock are never silently
+# lost. The last step has no undo (it is the completing step).
+machine: fulfillmentSaga
+pattern: saga
+states: [Reserving, Paying, Shipping]
+obligations:
+  Reserving: { sets: reserved, undo: released }
+  Paying: { sets: captured, undo: refunded }
+  Shipping: { sets: shipped }
+max_retries: 3
