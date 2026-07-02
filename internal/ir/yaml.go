@@ -1,8 +1,8 @@
 package ir
 
 import (
+	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -34,9 +34,9 @@ func yamlNodeToValue(n *yaml.Node) (*Value, error) {
 		case "!!str":
 			return StringValue(n.Value), nil
 		case "!!int":
-			return NumberValue(jsonNumber(n.Value)), nil
+			return NumberValue(json.Number(n.Value)), nil
 		case "!!float":
-			return NumberValue(jsonNumber(n.Value)), nil
+			return NumberValue(json.Number(n.Value)), nil
 		case "!!bool":
 			b := n.Value == "true" || n.Value == "True" || n.Value == "TRUE"
 			return BoolValue(b), nil
@@ -71,14 +71,4 @@ func yamlNodeToValue(n *yaml.Node) (*Value, error) {
 	return nil, fmt.Errorf("ir: unsupported yaml node kind %d", n.Kind)
 }
 
-// jsonNumber normalizes a YAML scalar into a JSON-compatible number text.
-// YAML integers/floats render the same as JSON for our purposes.
-func jsonNumber(s string) string {
-	if _, err := strconv.ParseInt(s, 10, 64); err == nil {
-		return s
-	}
-	if _, err := strconv.ParseFloat(s, 64); err == nil {
-		return s
-	}
-	return s
-}
+// (the jsonNumber helper was removed: YAML scalars map directly onto json.Number.)
