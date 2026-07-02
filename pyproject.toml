@@ -1,0 +1,16 @@
+[project]
+name = "machinery-tools"
+version = "0.1.0"
+description = "Deterministic gate suite and formal-model generators for the machinery design skill"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

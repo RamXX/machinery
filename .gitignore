@@ -8,3 +8,11 @@ scratchpad/
 # Editors
 .idea/
 .vscode/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# TLC scratch (tlc.sh runs with -cleanup, but interrupted runs leave these)
+states/
