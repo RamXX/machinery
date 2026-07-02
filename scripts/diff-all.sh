@@ -17,6 +17,11 @@ run() {  # run <label> <cmd...>
 for ex in go-crm fulfillment portfolio-engine; do
   run "lint-$ex" "$ROOT/scripts/diff-tool.sh" lint "$ROOT/examples/$ex/design/machines"
   run "oracle-$ex" "$ROOT/scripts/diff-tool.sh" oracle "$ROOT/examples/$ex/design/machines"
+  if [ "$ex" = "go-crm" ]; then
+    run "check-$ex" "$ROOT/scripts/diff-tool.sh" check "$ROOT/examples/$ex/design" --impl "$ROOT/examples/$ex/impl"
+  else
+    run "check-$ex" "$ROOT/scripts/diff-tool.sh" check "$ROOT/examples/$ex/design"
+  fi
 done
 echo ""
 echo "$pass passed, $fail failed"

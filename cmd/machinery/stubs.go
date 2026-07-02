@@ -9,12 +9,6 @@ import (
 // Phase-1 stubs. Each subcommand exits 2 with "not implemented" until its phase
 // replaces the body. The differential harness depends on these existing.
 
-func newCheckCmd() *cobra.Command {
-	return &cobra.Command{Use: "check <design-dir> [--impl d] [--gate ...]", RunE: func(cmd *cobra.Command, args []string) error {
-		return exit2(fmt.Errorf("check: not implemented"))
-	}}
-}
-
 func newVerifyFormalCmd() *cobra.Command {
 	return &cobra.Command{Use: "verify-formal <design-dir>", RunE: func(cmd *cobra.Command, args []string) error {
 		return exit2(fmt.Errorf("verify-formal: not implemented"))

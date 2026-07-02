@@ -1,0 +1,412 @@
+package gates
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+
+	"github.com/ramirosalas/machinery/internal/ir"
+)
+
+// --- imports (G4-import) ---
+
+var testFilePatterns = []string{"*_test.go", "*_test.py", "test_*.py", "*.test.ts", "*.test.tsx",
+	"*.test.js", "*_test.exs", "*_spec.rb"}
+
+func isTestFile(rel string) bool {
+	base := filepath.Base(rel)
+	for _, p := range testFilePatterns {
+		if ok, _ := filepath.Match(p, base); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func matchGlob(rel, pattern string) bool {
+	pattern = strings.TrimSuffix(pattern, "/")
+	if ok, _ := filepath.Match(pattern, rel); ok {
+		return true
+	}
+	static := strings.ReplaceAll(pattern, "/**", "")
+	static = strings.ReplaceAll(static, "/*", "")
+	static = strings.TrimSuffix(static, "/")
+	return rel == static || strings.HasPrefix(rel, static+"/")
+}
+
+func boundaryOf(rel string, pkgmap [][2]string) string {
+	best := -1
+	var bestBid string
+	for _, pm := range pkgmap {
+		pattern, bid := pm[0], pm[1]
+		if matchGlob(rel, pattern) {
+			static := strings.ReplaceAll(pattern, "/**", "")
+			static = strings.ReplaceAll(static, "/*", "")
+			if len(static) > best {
+				best = len(static)
+				bestBid = bid
+			}
+		}
+	}
+	return bestBid
+}
+
+func goModuleName(impl string) string {
+	data, err := os.ReadFile(filepath.Join(impl, "go.mod"))
+	if err != nil {
+		return ""
+	}
+	m := regexp.MustCompile(`(?m)^module\s+(\S+)`).FindSubmatch(data)
+	if m != nil {
+		return string(m[1])
+	}
+	return ""
+}
+
+var (
+	goBlockImportRe = regexp.MustCompile(`(?ms)^import\s*\((.*?)\)`)
+	goLineImportRe  = regexp.MustCompile(`(?m)^import\s+(?:[\w.]+\s+)?"([^"]+)"`)
+	goBlockLineRe   = regexp.MustCompile(`(?:^|\s)(?:[\w.]+\s+)?"([^"]+)"`)
+	pyImportRe      = regexp.MustCompile(`(?m)^\s*import\s+([\w.]+)`)
+	pyFromRe        = regexp.MustCompile(`(?m)^\s*from\s+([\w.]+)\s+import\b`)
+	tsImportRe      = regexp.MustCompile(`(?:from|import|require\()\s*['"]([^'"]+)['"]`)
+	exModRe         = regexp.MustCompile(`(?m)^\s*(?:alias|import|use|require)\s+([A-Z][\w.]*)`)
+	rustUseRe       = regexp.MustCompile(`(?m)^\s*use\s+([\w:]+)`)
+	exDefmoduleRe   = regexp.MustCompile(`(?m)^\s*defmodule\s+([A-Z][\w.]*)`)
+)
+
+func goImports(text string) []string {
+	var out []string
+	for _, blk := range goBlockImportRe.FindAllStringSubmatch(text, -1) {
+		for _, m := range goBlockLineRe.FindAllStringSubmatch(blk[1], -1) {
+			out = append(out, m[1])
+		}
+	}
+	for _, m := range goLineImportRe.FindAllStringSubmatch(text, -1) {
+		out = append(out, m[1])
+	}
+	return out
+}
+
+func pyImports(text, rel string) []string {
+	var out []string
+	for _, m := range pyImportRe.FindAllStringSubmatch(text, -1) {
+		out = append(out, strings.ReplaceAll(m[1], ".", "/"))
+	}
+	for _, m := range pyFromRe.FindAllStringSubmatch(text, -1) {
+		mod := m[1]
+		if strings.HasPrefix(mod, ".") {
+			base := filepath.Dir(rel)
+			for i := 1; i < len(mod)-len(strings.TrimLeft(mod, ".")); i++ {
+				base = filepath.Dir(base)
+			}
+			mod = filepath.Join(base, strings.ReplaceAll(strings.TrimLeft(mod, "."), ".", "/"))
+			mod = strings.Trim(mod, "/")
+			out = append(out, mod)
+		} else {
+			out = append(out, strings.ReplaceAll(mod, ".", "/"))
+		}
+	}
+	return out
+}
+
+func tsImports(text, rel string) []string {
+	var out []string
+	for _, m := range tsImportRe.FindAllStringSubmatch(text, -1) {
+		spec := m[1]
+		if strings.HasPrefix(spec, ".") {
+			joined, _ := filepath.Abs(filepath.Join(filepath.Dir(rel), spec))
+			_ = joined
+			out = append(out, filepath.Clean(filepath.Join(filepath.Dir(rel), spec)))
+		} else {
+			out = append(out, spec)
+		}
+	}
+	return out
+}
+
+func exModules(text string) []string {
+	var out []string
+	for _, m := range exModRe.FindAllStringSubmatch(text, -1) {
+		out = append(out, m[1])
+	}
+	return out
+}
+
+func rustImports(text, rel string) []string {
+	var out []string
+	for _, m := range rustUseRe.FindAllStringSubmatch(text, -1) {
+		path := m[1]
+		if strings.HasPrefix(path, "crate::") {
+			out = append(out, "src/"+strings.ReplaceAll(path[len("crate::"):], "::", "/"))
+		} else {
+			out = append(out, strings.SplitN(path, "::", 2)[0])
+		}
+	}
+	return out
+}
+
+var langExts = map[string]string{
+	".go": "go", ".py": "python", ".ts": "ts", ".tsx": "ts", ".js": "ts",
+	".jsx": "ts", ".ex": "elixir", ".exs": "elixir", ".rs": "rust",
+}
+
+// CheckImports implements G4-import.
+func CheckImports(design, impl string) *Gate {
+	g := NewGate("G4-import  code respects the contract")
+	g.startOrder()
+	if fi, err := os.Stat(impl); err != nil || !fi.IsDir() {
+		g.Errs = append(g.Errs, fmt.Sprintf("--impl %s is not a directory", ir.Repr(impl)))
+		return g
+	}
+	cg := NewGate("_")
+	c := loadContract(filepath.Join(design, "ARCHITECTURE.md"), cg)
+	if c == nil {
+		g.Errs = append(g.Errs, cg.Errs...)
+		if len(cg.Errs) == 0 {
+			g.Errs = append(g.Errs, "no contract to check against")
+		}
+		return g
+	}
+	co := c.AsObject()
+	var boundaries []*ir.Value
+	for _, b := range objSlice(co.Get2("boundaries")) {
+		if bo := b.AsObject(); bo != nil && bo.GetString("id") != "" {
+			boundaries = append(boundaries, b)
+		}
+	}
+	var externals []*ir.Value
+	for _, x := range objSlice(co.Get2("externals")) {
+		if xo := x.AsObject(); xo != nil && xo.GetString("id") != "" {
+			externals = append(externals, x)
+		}
+	}
+	var ignore []string
+	for _, ig := range objSlice(co.Get2("ignore")) {
+		ignore = append(ignore, ig.AsString())
+	}
+	var pkgmap [][2]string
+	exposes := map[string][]string{}
+	for _, b := range boundaries {
+		bo := b.AsObject()
+		for _, code := range objSlice(bo.Get2("code")) {
+			pkgmap = append(pkgmap, [2]string{code.AsString(), bo.GetString("id")})
+		}
+		if exp := bo.Get2("exposes"); exp != nil {
+			var es []string
+			for _, e := range exp.AsArray() {
+				es = append(es, e.AsString())
+			}
+			exposes[bo.GetString("id")] = es
+		}
+	}
+	var extByPrefix, extModules, boundModules [][2]string
+	for _, x := range externals {
+		xo := x.AsObject()
+		for _, p := range objSlice(xo.Get2("imports")) {
+			extByPrefix = append(extByPrefix, [2]string{p.AsString(), xo.GetString("id")})
+		}
+		for _, mp := range objSlice(xo.Get2("modules")) {
+			extModules = append(extModules, [2]string{mp.AsString(), xo.GetString("id")})
+		}
+	}
+	for _, b := range boundaries {
+		bo := b.AsObject()
+		for _, mp := range objSlice(bo.Get2("modules")) {
+			boundModules = append(boundModules, [2]string{mp.AsString(), bo.GetString("id")})
+		}
+	}
+	rules := co.GetObject("dependency_rules")
+	if rules == nil {
+		rules = ir.NewObject()
+	}
+	allow := contractEdges(rules, "allow", nil)
+	deny := contractEdges(rules, "deny", nil)
+
+	matchRule := func(edges [][2]string, src, dst string) bool {
+		for _, e := range edges {
+			ok1, _ := filepath.Match(e[0], src)
+			ok2, _ := filepath.Match(e[1], dst)
+			if ok1 && ok2 {
+				return true
+			}
+		}
+		return false
+	}
+
+	goModule := goModuleName(impl)
+
+	internalTarget := func(ref string) (string, string) {
+		if goModule != "" && (ref == goModule || strings.HasPrefix(ref, goModule+"/")) {
+			rel := strings.TrimLeft(ref[len(goModule):], "/")
+			return boundaryOf(rel, pkgmap), rel
+		}
+		for _, bm := range boundModules {
+			if ref == bm[0] || strings.HasPrefix(ref, bm[0]+".") {
+				return bm[1], ref
+			}
+		}
+		if b := boundaryOf(ref, pkgmap); b != "" {
+			return b, ref
+		}
+		for _, ext := range []string{"", ".py", ".ts", ".tsx", ".js", ".rs"} {
+			if b := boundaryOf(ref+ext, pkgmap); b != "" {
+				return b, ref + ext
+			}
+		}
+		return "", ""
+	}
+
+	externalTarget := func(ref string) string {
+		for _, ep := range extByPrefix {
+			prefix := strings.TrimSuffix(ep[0], "/")
+			if ref == ep[0] || strings.HasPrefix(ref, prefix+"/") {
+				return ep[1]
+			}
+		}
+		for _, em := range extModules {
+			if ref == em[0] || strings.HasPrefix(ref, em[0]+".") {
+				return em[1]
+			}
+		}
+		return ""
+	}
+
+	edgeHits := map[[2]string]string{}
+	var files []string
+	filepath.Walk(impl, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		ext := filepath.Ext(path)
+		if _, ok := langExts[ext]; ok {
+			files = append(files, path)
+		}
+		return nil
+	})
+	sort.Strings(files)
+
+	for _, path := range files {
+		rel, _ := filepath.Rel(impl, path)
+		ignored := false
+		for _, ig := range ignore {
+			if matchGlob(rel, ig) {
+				ignored = true
+				break
+			}
+		}
+		if ignored {
+			g.Count("files ignored by contract")
+			continue
+		}
+		if isTestFile(rel) {
+			g.Count("test files skipped")
+			continue
+		}
+		lang := langExts[filepath.Ext(path)]
+		srcB := boundaryOf(rel, pkgmap)
+		text := readOrEmpty(path)
+		if srcB == "" && lang == "elixir" {
+			for _, mod := range exDefmoduleRe.FindAllStringSubmatch(text, -1) {
+				for _, bm := range boundModules {
+					if mod[1] == bm[0] || strings.HasPrefix(mod[1], bm[0]+".") {
+						srcB = bm[1]
+						break
+					}
+				}
+			}
+		}
+		if srcB == "" {
+			g.Errs = append(g.Errs, "source file "+rel+" maps to no contract boundary; add it to a boundary's code globs or to the contract ignore list")
+			continue
+		}
+		g.Count(lang + " files checked")
+
+		var refs []string
+		switch lang {
+		case "go":
+			refs = goImports(text)
+		case "python":
+			refs = pyImports(text, rel)
+		case "ts":
+			refs = tsImports(text, rel)
+		case "elixir":
+			refs = exModules(text)
+		case "rust":
+			refs = rustImports(text, rel)
+		}
+		for _, ref := range refs {
+			dstB, norm := internalTarget(ref)
+			if dstB == "" {
+				dstB = externalTarget(ref)
+				norm = ref
+				if dstB == "" {
+					if goModule != "" && strings.HasPrefix(ref, goModule+"/") {
+						g.Errs = append(g.Errs, rel+": imports "+ref+", which maps to no contract boundary (code outside the contract)")
+					}
+					continue
+				}
+			}
+			g.Count("imports resolved")
+			if dstB == srcB {
+				continue
+			}
+			exp := exposes[dstB]
+			if exp != nil && norm != "" {
+				exposedDirs := map[string]bool{}
+				for _, e := range exp {
+					if !strings.Contains(e, "*") {
+						exposedDirs[filepath.Dir(e)] = true
+					}
+				}
+				ok := exposedDirs[norm]
+				if !ok {
+					for _, e := range exp {
+						for _, cand := range []string{norm, norm + ".py", norm + ".ts", norm + ".js", norm + ".rs"} {
+							if m, _ := filepath.Match(e, cand); m {
+								ok = true
+								break
+							}
+						}
+						if ok {
+							break
+						}
+					}
+				}
+				if !ok {
+					g.Errs = append(g.Errs, rel+": imports "+ref+", which is not in the exposes list of "+dstB)
+				}
+			}
+			edge := [2]string{srcB, dstB}
+			if _, hit := edgeHits[edge]; hit {
+				continue
+			}
+			edgeHits[edge] = rel
+			denied := matchRule(deny, srcB, dstB)
+			allowed := matchRule(allow, srcB, dstB)
+			if denied && !allowed {
+				g.Errs = append(g.Errs, srcB+" -> "+dstB+" is denied by the contract (seen in "+rel+"); either the code violates the boundary or the contract needs an explicit allow")
+			} else if !allowed && !denied {
+				g.Errs = append(g.Errs, "undeclared cross-boundary edge "+srcB+" -> "+dstB+" (seen in "+rel+"); add an explicit allow or deny to the contract")
+			} else {
+				g.Count("edges verified")
+			}
+		}
+	}
+
+	anyChecked := false
+	for k, v := range g.Counts {
+		if strings.HasSuffix(k, "files checked") && v > 0 {
+			anyChecked = true
+			break
+		}
+	}
+	if !anyChecked {
+		g.Errs = append(g.Errs, "no source files under "+impl+" mapped to any contract boundary; the gate checked nothing")
+	}
+	g.RequireNonzero("imports resolved", "no imports were resolved against the contract")
+	return g
+}
