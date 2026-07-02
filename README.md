@@ -156,8 +156,10 @@ they are covered.
 
 ## Install
 
-Requires [`modelith`](https://github.com/stacklok/modelith) on `PATH`. The formal layer needs Java 11+;
-`tlc.sh` fetches the TLA+ tools on first use.
+Requires [`modelith`](https://github.com/stacklok/modelith) on `PATH`, Python 3.10+ with PyYAML for
+the gate tools, and Java 11+ for the formal layer (`tlc.sh` fetches the TLA+ tools on first use).
+`structurizr-cli` is optional (C4 diagram export only). Run `make preflight` (or `make doctor`) to
+check every prerequisite; `make install` runs the same check and warns about anything missing.
 
 ```sh
 make install       # symlink the skill and agents into every agent home (edits go live)

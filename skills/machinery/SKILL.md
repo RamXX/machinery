@@ -14,9 +14,9 @@ description: >
 
 Turn a fuzzy product idea into a `BUILD.md` that a coding agent with zero prior context
 can implement under hard TDD. You are the conductor. You interrogate the user, enforce a
-gate between every phase, reuse the `modelith` tooling, embed the C4 technique, and spawn
-subagents for the heavy synthesis. You do not write production code here. The artifact is
-the design.
+gate between every phase, reuse the `modelith` tooling, embed the C4 technique, and delegate
+the heavy synthesis to the two author roles (as subagents where your runtime spawns them,
+otherwise inline). You do not write production code here. The artifact is the design.
 
 ## The thesis
 
@@ -131,8 +131,9 @@ recorded as such".
 
 ### Phase 3 - State machines (the behavior)
 
-Spawn the `machinery-fsm-author` subagent with the full Modelith and C4 context and the target
-language(s). It composes the domain lifecycle (derived from enums and actions) with the operational
+Hand the full Modelith and C4 context and the target language(s) to the `machinery-fsm-author` role
+(run it as a subagent where your runtime supports one, otherwise perform its steps inline). It
+composes the domain lifecycle (derived from enums and actions) with the operational
 and failure overlay (from C4 mitigations). One machine per stateful component or aggregate, never one
 giant machine. See `references/xstate-format.md`.
 
@@ -160,7 +161,8 @@ deleted (see below).
 
 ### Phase 4 - BUILD.md
 
-Spawn the `machinery-build-writer` subagent. It assembles the blueprint from all three layers plus the
+Hand all three layers to the `machinery-build-writer` role (a subagent where supported, otherwise
+inline). It assembles the blueprint from all three layers plus the
 traceability matrix and references the generated oracles as the test spec. See
 `references/build-md-template.md`.
 
@@ -226,7 +228,7 @@ machinery designs change after code exists. The protocol:
 ## Sharding large designs
 
 Beyond roughly ten stateful components or two bounded contexts, do not author everything in one
-pass. Spawn `machinery-fsm-author` once per bounded context, giving each spawn only:
+pass. Run `machinery-fsm-author` once per bounded context, giving each run only:
 
 - its context's Modelith entities and invariants,
 - the full enum definitions it references,
@@ -245,16 +247,18 @@ knows where the interrogation stopped.
 
 ## Operating discipline
 
-- Batch questions. Use `AskUserQuestion` when the choices are discrete. Converge, do not loop.
+- Batch questions. When the choices are discrete, ask them as a single multiple-choice question.
+  Converge, do not loop.
 - Each phase has an exit gate. Stop interrogating the moment it passes.
 - Fuzziness is a signal, not an obstacle. When the user cannot give a crisp definition, that gap is
   the point of the exercise. Surface it.
-- You are the conductor. Reuse `domain-model-author` for Phase 1; spawn `machinery-fsm-author` and
-  `machinery-build-writer` for Phases 3 and 4. Do the C4 work inline using the reference.
-- If a `Read` is intercepted by a code-discovery-gate hook (some environments run one), retry it once;
-  the design docs are plain text, not code discovery. Tell spawned subagents the same in their prompts.
+- You are the conductor. Reuse `domain-model-author` for Phase 1; run `machinery-fsm-author` and
+  `machinery-build-writer` for Phases 3 and 4 (as subagents where supported, otherwise inline). Do
+  the C4 work inline using the reference.
+- If your runtime intercepts a file read with a code-discovery gate, retry it once; the design docs
+  are plain text, not code discovery. Pass the same note to any subagent you delegate to.
 - House style: generated artifacts carry no em dashes and no emojis. `modelith render` output contains
-  em dashes, so post-process it (Phase 1). When you spawn `machinery-fsm-author` and
+  em dashes, so post-process it (Phase 1). When you delegate to `machinery-fsm-author` and
   `machinery-build-writer`, pass the house-style constraint in their prompts.
 
 ## References
