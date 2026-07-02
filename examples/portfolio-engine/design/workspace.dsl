@@ -49,11 +49,12 @@ workspace "DrawdownRecommender" "Local tool that recommends a 16-stock, lowest-d
         shape Cylinder
       }
       element "External" {
-        background #999999
+        background #8E8E93
+        color #ffffff
       }
       element "Person" {
         shape Person
-        background #08427b
+        background #438DD5
         color #ffffff
       }
     }

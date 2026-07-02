@@ -4,45 +4,158 @@ Phase 2 fixes how the system is built and deployed, and what each dependency doe
 This is the standalone C4 technique: Structurizr DSL plus a machine-checkable Architecture Contract,
 with no dependency on any project settings or external tracker. Two decisions here feed Phase 3
 directly: the **dependency mitigation posture** and the **persistence and placement** of each stateful
-component. `machinery_check.py --gate g2` verifies the contract deterministically; run it before
-calling Gate 2.
+component. `machinery check <design> --gate g2` verifies the contract deterministically; run it
+before calling Gate 2.
 
-## workspace.dsl (Structurizr)
+## workspace.dsl (Structurizr) — authoring guide
 
-```
-workspace "Project" "One-line description" {
+The DSL is text — the gates parse it for element identifiers and tags, never rendering it. But it
+must also be valid Structurizr DSL so `structurizr-cli export` can produce diagrams. **Follow these
+rules exactly; the Structurizr CLI parser is strict and rejects shorthand that older versions
+accepted.**
+
+### Syntax rules (the parser is strict)
+
+1. **One property per line inside `{ }` blocks.** Never use semicolons to separate properties.
+   ```dsl
+   # WRONG — newer Structurizr CLI rejects this:
+   element "Person" { shape Person; background #08427B; color #ffffff }
+   systemContext sys "Context" { include *; autoLayout lr }
+
+   # CORRECT:
+   element "Person" {
+     shape Person
+     background #438DD5
+     color #ffffff
+   }
+   systemContext sys "Context" {
+     include *
+     autoLayout lr
+   }
+   ```
+
+2. **Never declare a `deployment` view without deployment nodes.** A deployment view references a
+   named environment (e.g. `"production"`). If the model defines no `deploymentNode` for that
+   environment, the parser throws "The environment does not exist." Omit the deployment view entirely
+   unless you have actual deployment topology to show. Most single-binary or design-only examples
+   need only `systemContext`, `container`, and `component` views.
+
+3. **Element declarations**: `person`, `softwareSystem`, `container`, `component`. Each takes
+   `identifier "Name" "Description"` and optionally a technology string and tags:
+   ```dsl
+   store = container "Graph Store" "Embedded property graph." "LadybugDB" "Database"
+   ```
+   The last quoted string `"Database"` is a **tag**. G2 derives required mitigation coverage from
+   the tags `Database`, `Queue`, and `External`.
+
+4. **Relationships**: `source -> dest "Description" "Technology"`.
+
+5. **Identifiers**: lowercase, no spaces. Use the singular canonical names from the domain model.
+
+### Complete valid template
+
+```dsl
+workspace "Project" "One-line description." {
+
   model {
-    user = person "User" "Who uses it"
+    user = person "User" "Who uses it."
 
-    sys = softwareSystem "System" "What it does" {
-      api = container "API" "Business logic" "Elixir/Phoenix"
-      db  = container "Database" "State of record" "PostgreSQL" "Database"
-      q   = container "Queue" "Async work" "RabbitMQ" "Queue"
+    sys = softwareSystem "System" "What it does." {
+      api = container "API" "Business logic." "Elixir/Phoenix"
+      db  = container "Database" "State of record." "PostgreSQL" "Database"
+      q   = container "Queue" "Async work." "RabbitMQ" "Queue"
     }
-    pay = softwareSystem "Payments" "Third-party charges" "External"
+    pay = softwareSystem "Payments" "Third-party charges." "External"
 
     user -> api "Uses" "HTTPS"
-    api -> db  "Reads/writes" "SQL"
-    api -> q   "Publishes" "AMQP"
-    api -> pay "Charges" "REST"
+    api  -> db  "Reads/writes" "SQL"
+    api  -> q   "Publishes" "AMQP"
+    api  -> pay "Charges" "REST"
   }
+
   views {
-    systemContext sys { include *; autoLayout }
-    container sys { include *; autoLayout }
-    deployment sys "production" { include *; autoLayout }
+    systemContext sys "Context" {
+      include *
+      autoLayout lr
+    }
+
+    container sys "Containers" {
+      include *
+      autoLayout lr
+    }
+
     styles {
-      element "Database" { shape Cylinder }
-      element "External" { background #999999 }
+      element "Person" {
+        shape Person
+        background #438DD5
+        color #ffffff
+      }
+      element "Software System" {
+        background #2E6295
+        color #ffffff
+      }
+      element "Container" {
+        background #438DD5
+        color #ffffff
+      }
+      element "Component" {
+        background #6FA8DC
+        color #ffffff
+      }
+      element "Database" {
+        shape Cylinder
+      }
+      element "Queue" {
+        shape Pipe
+      }
+      element "External" {
+        background #8E8E93
+        color #ffffff
+      }
     }
   }
 }
 ```
 
-Elements: `person`, `softwareSystem`, `container`, `component`. Relationships:
-`source -> dest "Description" "Technology"`. Add a `deployment` view when placement matters
-(pods, replicas, operators). Prefer the singular, canonical names already used in the domain model.
-Tag datastores `Database`, queues `Queue`, and third-party systems `External`: G2 derives the
-required mitigation coverage from these tags.
+### Dark-mode-friendly color palette
+
+The standard C4 colors (`#08427B`, `#1168BD`, `#85BBF0` with black text) are designed for white
+backgrounds and wash out or become unreadable on dark backgrounds (GitHub dark mode, VS Code dark
+themes). The palette above uses brighter, medium-tone blues with **white text throughout**, which
+reads cleanly on both light and dark backgrounds:
+
+| Element | Background | Why |
+|---------|-----------|-----|
+| Person | `#438DD5` | Medium-bright blue, visible on dark; shape Person distinguishes it |
+| Software System | `#2E6295` | Slightly darker, recedes behind containers |
+| Container | `#438DD5` | Same as Person — the C4 convention; shape distinguishes |
+| Component | `#6FA8DC` | Lighter blue, white text (not black — black fails on dark) |
+| External | `#8E8E93` | Neutral gray; clearly "not ours" |
+| Database | inherits + `shape Cylinder` | |
+| Queue | inherits + `shape Pipe` | |
+
+### Validate and export
+
+After authoring, always validate the DSL compiles and exports before committing:
+
+```bash
+# Validate + export to Mermaid (renders inline in GitHub README/PRs):
+structurizr-cli export -workspace design/workspace.dsl -format mermaid -output design/diagrams/
+
+# Export to SVG (for embedding in docs):
+structurizr-cli export -workspace design/workspace.dsl -format svg -output design/diagrams/
+
+# Interactive in-browser (best for exploration):
+docker run -it --rm -p 8080:8080 -v $(pwd)/design:/usr/local/structurizr structurizr/lite
+```
+
+If `structurizr-cli` is unavailable, install it:
+```bash
+brew install structurizr-cli   # macOS
+# Or: download from https://github.com/structurizr/cli/releases, add to PATH
+```
+
+Requires Java 17+.
 
 ## ARCHITECTURE.md must carry the Architecture Contract (v2)
 
@@ -182,7 +295,7 @@ rule). Columns:
 
 ## Gate 2 checklist
 
-Deterministic (run `tools/machinery_check.py <design> --gate g2`; needs PyYAML):
+Deterministic (run `machinery check <design> --gate g2`):
 
 - The contract parses, boundaries bind to `workspace.dsl` elements, ids are unique, no edge is both
   allowed and denied, no rule references an undeclared boundary or external.
@@ -192,15 +305,10 @@ Deterministic (run `tools/machinery_check.py <design> --gate g2`; needs PyYAML):
 
 LLM-attested (you verify; the tool cannot):
 
+- The `workspace.dsl` compiles under `structurizr-cli export` (run it; fix syntax errors).
 - Every Modelith action maps to an owning component in `workspace.dsl`.
 - Every boundary crossing has an interface contract (shape, errors, idempotency).
 - Every stateful component has a persistence-and-placement decision (the machine-per-row check runs
   in Gx-trace once machines exist).
 - The event-contract table exists for multi-component designs and covers every cross-component event.
 - The NFR record is filled (security, capacity, observability).
-
-## Diagram export (optional)
-
-`structurizr-cli export -workspace design/workspace.dsl -format mermaid -output design/diagrams/`
-(needs Java 17+). If unavailable, hand-write the equivalent Mermaid `C4Container` block into
-ARCHITECTURE.md; the DSL is still the source of truth.
