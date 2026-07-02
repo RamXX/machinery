@@ -9,12 +9,6 @@ import (
 // Phase-1 stubs. Each subcommand exits 2 with "not implemented" until its phase
 // replaces the body. The differential harness depends on these existing.
 
-func newTLACmd() *cobra.Command {
-	return &cobra.Command{Use: "tla <machine.json> [out-dir]", RunE: func(cmd *cobra.Command, args []string) error {
-		return exit2(fmt.Errorf("tla: not implemented"))
-	}}
-}
-
 func newRefineCmd() *cobra.Command {
 	return &cobra.Command{Use: "refine <machine.json> <semantics.yaml> [out-dir]", RunE: func(cmd *cobra.Command, args []string) error {
 		return exit2(fmt.Errorf("refine: not implemented"))
