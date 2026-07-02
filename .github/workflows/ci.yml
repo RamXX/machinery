@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Toolchain test suite
+        run: uv run -q -- pytest -q
+      - name: Gate suite, go-crm (design + impl)
+        run: uv run -q -- python skills/machinery/tools/machinery_check.py examples/go-crm/design --impl examples/go-crm/impl
+      - name: Gate suite, fulfillment (design only)
+        run: uv run -q -- python skills/machinery/tools/machinery_check.py examples/fulfillment/design
+
+  formal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/machinery
+          key: tla2tools-v1.7.4
+      - name: Install generator dependency
+        run: pip install pyyaml
+      - name: Regenerate and TLC-check all proofs
+        run: make verify-formal
+
+  go-crm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: examples/go-crm/impl/go.mod
+      - name: go-crm hermetic suite
+        working-directory: examples/go-crm/impl
+        run: go test ./... -count=1
