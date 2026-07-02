@@ -10,9 +10,9 @@ AGENT_HOMES ?= $(HOME)/.claude $(HOME)/.agents
 SRC := $(CURDIR)
 
 .DEFAULT_GOAL := help
-.PHONY: install install-copy uninstall build install-binary preflight doctor check oracle verify-formal test help
+.PHONY: install install-copy uninstall build install-binary install-cli preflight doctor check oracle verify-formal test help
 
-install: ## Symlink machinery into every agent home (live edits from this repo)
+install: ## Symlink machinery skill+agents into agent homes, install the CLI binary on PATH
 	@for home in $(AGENT_HOMES); do \
 	  mkdir -p "$$home/skills" "$$home/agents"; \
 	  rm -rf "$$home/skills/machinery"; \
@@ -21,7 +21,8 @@ install: ## Symlink machinery into every agent home (live edits from this repo)
 	  ln -sfn "$(SRC)/agents/machinery-build-writer.md" "$$home/agents/machinery-build-writer.md"; \
 	  echo "linked machinery -> $$home"; \
 	done
-	@$(MAKE) --no-print-directory preflight
+	@$(MAKE) --no-print-directory install-cli
+	@$(MACH) preflight
 
 install-copy: ## Copy machinery into every agent home (no live edits)
 	@for home in $(AGENT_HOMES); do \
@@ -44,6 +45,9 @@ uninstall: ## Remove machinery from every agent home
 MODELITH_VERSION ?= v0.4.0
 MACHINERY_VERSION ?= latest
 MACH ?= $(CURDIR)/.bin/machinery
+# Where to install the binary on PATH. Default: ~/.local/bin (no sudo, on PATH
+# on most systems). Override: INSTALL_DIR=/usr/local/bin make install-cli
+INSTALL_DIR ?= $(HOME)/.local/bin
 
 # Detect OS and arch for binary downloads (matching the release matrix).
 MACH_OS := $(shell uname -s | tr A-Z a-z)
@@ -55,13 +59,25 @@ ifeq ($(MACH_ARCH),aarch64)
   MACH_ARCH := arm64
 endif
 
-.PHONY: build install-binary
+.PHONY: build install-binary install-cli
 build: ## Build the machinery binary from source (needs Go)
 	@mkdir -p .bin && go build -ldflags "-X main.version=dev" -o .bin/machinery ./cmd/machinery
 
-install-binary: ## Download the prebuilt machinery binary (no Go needed)
+install-cli: ## Install the machinery CLI binary onto PATH ($(INSTALL_DIR))
+	@mkdir -p "$(INSTALL_DIR)"
+	@$(MAKE) --no-print-directory $(MACH) >/dev/null
+	@cp "$(MACH)" "$(INSTALL_DIR)/machinery"
+	@echo "installed machinery -> $(INSTALL_DIR)/machinery"
+	@command -v machinery >/dev/null 2>&1 && machinery version || \
+	  { echo ""; echo "$(INSTALL_DIR) is not on your PATH. Add it:"; \
+	    echo "  echo 'export PATH=\"$(INSTALL_DIR):\$$PATH\"' >> ~/.zshrc"; }
+
+install-binary: ## Download a prebuilt binary, or build from source if no release exists yet
 	@mkdir -p .bin
-	@if command -v curl >/dev/null 2>&1; then \
+	@if command -v curl >/dev/null 2>&1 && \
+	  curl -fsSL -o /dev/null -w "%{http_code}" \
+	    "https://api.github.com/repos/ramirosalas/machinery/releases" 2>/dev/null | \
+	  grep -q "200"; then \
 	  echo "Downloading machinery $(MACHINERY_VERSION) for $(MACH_OS)/$(MACH_ARCH)..."; \
 	  ext=""; [ "$(MACH_OS)" = "windows" ] && ext=".exe"; \
 	  if [ "$(MACHINERY_VERSION)" = "latest" ]; then \
@@ -75,7 +91,8 @@ install-binary: ## Download the prebuilt machinery binary (no Go needed)
 	  chmod +x .bin/machinery; \
 	  echo "Installed: $$(.bin/machinery version)"; \
 	else \
-	  echo "curl is required to download the binary."; exit 1; \
+	  echo "No GitHub remote yet (or no connectivity). Building from source..."; \
+	  $(MAKE) --no-print-directory build; \
 	fi
 
 # If the binary doesn't exist, try downloading it first; fall back to building.
