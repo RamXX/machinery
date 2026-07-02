@@ -1,0 +1,334 @@
+kind: DomainModel
+version: v1
+title: Drawdown Portfolio Recommender
+description: >
+  A local tool that recommends a stock portfolio. It draws the top 30 constituents of each
+  configured market index, dedupes them into a candidate universe, then runs an optimization
+  that selects exactly 16 stocks minimizing historical maximum drawdown. A run collects price
+  history, optimizes, and produces a portfolio a manager may review and accept or reject.
+
+glossary:
+  Analyst: "A person who configures indices and starts recommendation runs."
+  Manager: "A person who reviews a recommended `Portfolio` and accepts or rejects it."
+  Admin: "A person who may perform any action, including manager decisions."
+  Constituent: "A `Security` that is a member of an `Index`, carrying its rank within that index."
+  Candidate: "A `Security` in the deduped universe a run optimizes over."
+  Source: "An `Index` a `CandidateSet` was drawn from."
+
+enums:
+  RunStatus:
+    description: "The lifecycle of a `RecommendationRun`. Collecting and Optimizing are working phases; Ready and Failed are terminal."
+    values:
+      - name: Collecting
+        definition: "Fetching the price history for every candidate."
+      - name: Optimizing
+        definition: "Searching candidate portfolios for the lowest maximum drawdown."
+      - name: Ready
+        definition: "Terminal success: a portfolio was produced."
+      - name: Failed
+        definition: "Terminal failure: no portfolio was produced."
+  PortfolioStatus:
+    description: "The review lifecycle of a `Portfolio`. Proposed and UnderReview are open; Accepted and Rejected are decided."
+    values:
+      - name: Proposed
+        definition: "Freshly produced by a run, not yet reviewed."
+      - name: UnderReview
+        definition: "A manager is reviewing it."
+      - name: Accepted
+        definition: "Approved for use. Records when it was accepted."
+      - name: Rejected
+        definition: "Declined."
+
+entities:
+  Index:
+    definition: >
+      A named market index with a ranked list of constituent securities (for example the top
+      names of a large-cap index). Only the top 30 by rank feed a candidate universe. An index
+      is a source of candidates, not something the tool trades.
+    relationships:
+      - entity: Security
+        cardinality: n:n
+        role: "`Constituent`"
+        note: "The securities that belong to this index, by rank."
+    attributes:
+      - name: id
+        type: string
+        description: "Stable unique identifier."
+      - name: name
+        type: string
+        description: "Index name, for example a large-cap 500 index."
+      - name: provider
+        type: string
+        description: "Where the constituent list comes from."
+      - name: asOf
+        type: timestamp
+        description: "When the constituent list was captured."
+    actions:
+      - name: refresh
+        actor: Analyst
+        preserves: [index-top-30]
+        description: "Re-pull the ranked constituent list for this index."
+    invariants:
+      - id: index-top-30
+        statement: "Only the top 30 constituents of an `Index` by rank are eligible to enter a `CandidateSet`."
+
+  Security:
+    definition: >
+      A tradable stock identified by a unique ticker. A security may belong to several indices
+      and may appear as a candidate or as a holding. It is the atomic unit the portfolio is built
+      from; it is not itself a portfolio or an index.
+    attributes:
+      - name: ticker
+        type: string
+        description: "Unique exchange ticker symbol."
+      - name: name
+        type: string
+        description: "Company name."
+      - name: sector
+        type: string
+        description: "Sector classification, for diversification context."
+    actions:
+      - name: upsert
+        actor: Analyst
+        description: "Create or update a security's reference data."
+    invariants:
+      - id: ticker-unique
+        statement: "Every `Security` has a ticker that is unique across all securities."
+
+  CandidateSet:
+    definition: >
+      The deduped union of the top 30 constituents of every configured `Index`, captured as of a
+      date. It is the exact universe a run optimizes over. A security appears at most once, no
+      matter how many indices list it.
+    relationships:
+      - entity: Index
+        cardinality: n:n
+        role: "`Source`"
+        note: "The indices this universe was drawn from."
+      - entity: Security
+        cardinality: n:n
+        role: "`Candidate`"
+        note: "The deduped candidate securities."
+    attributes:
+      - name: id
+        type: string
+        description: "Stable unique identifier."
+      - name: asOf
+        type: timestamp
+        description: "When the universe was captured."
+      - name: size
+        type: integer
+        derived: true
+        derivation: "The count of distinct candidate securities after deduping across all source indices."
+        description: "Number of distinct candidates."
+    actions:
+      - name: build
+        actor: Analyst
+        preserves: [candidate-deduped, candidate-from-top-30]
+        description: "Assemble the deduped universe from the current source indices."
+    invariants:
+      - id: candidate-deduped
+        statement: "No `Security` appears more than once in a `CandidateSet`."
+      - id: candidate-from-top-30
+        statement: "Every `Security` in a `CandidateSet` is a top-30 `Constituent` of at least one source `Index`."
+
+  RecommendationRun:
+    definition: >
+      One optimization job: it takes a `CandidateSet`, collects the price history for every
+      candidate, searches for the 16-stock portfolio with the lowest maximum drawdown, and ends
+      Ready with a `Portfolio` or Failed with none. A run is the process; the `Portfolio` is its
+      result.
+    relationships:
+      - entity: CandidateSet
+        cardinality: n:1
+        note: "The universe this run optimizes over."
+      - entity: Portfolio
+        cardinality: 1:1
+        role: "`Candidate`"
+        note: "The portfolio produced, once the run is Ready."
+    attributes:
+      - name: id
+        type: string
+        description: "Stable unique identifier."
+      - name: requestedAt
+        type: timestamp
+        description: "When the run was started."
+      - name: lookbackDays
+        type: integer
+        description: "How many days of price history the drawdown is computed over."
+      - name: status
+        type: RunStatus
+        description: "Current lifecycle phase. This is the lifecycle."
+    actions:
+      - name: start
+        actor: Analyst
+        preserves: [run-ready-has-portfolio]
+        description: "Create a run over a candidate set and begin collecting prices."
+      - name: abort
+        actor: Analyst
+        preserves: [run-terminal-absorbing]
+        description: "Give up a run that cannot proceed; it ends Failed."
+    invariants:
+      - id: run-ready-has-portfolio
+        statement: "A `RecommendationRun` in Ready references exactly one produced `Portfolio`; there is no partial success."
+      - id: run-forward-only
+        statement: "A `RecommendationRun` only advances Collecting to Optimizing to Ready, or fails; it never moves backward."
+      - id: run-terminal-absorbing
+        statement: "A `RecommendationRun` in Ready or Failed accepts no further lifecycle actions."
+
+  Portfolio:
+    definition: >
+      A recommended set of exactly 16 holdings with a computed maximum drawdown, produced by a
+      run and reviewed by a manager. It carries a review lifecycle: proposed, under review, then
+      accepted or rejected, and a rejected or accepted portfolio may be reopened for review.
+    relationships:
+      - entity: Holding
+        cardinality: 1:n
+        role: "`Candidate`"
+        ownership: owned
+        note: "The 16 positions that make up the portfolio."
+    attributes:
+      - name: id
+        type: string
+        description: "Stable unique identifier."
+      - name: maxDrawdown
+        type: integer
+        description: "The largest peak-to-trough decline over the lookback, in basis points; the objective minimized."
+      - name: status
+        type: PortfolioStatus
+        description: "Review lifecycle state. This is the lifecycle."
+      - name: proposedAt
+        type: timestamp
+        description: "When the run produced it."
+      - name: acceptedAt
+        type: timestamp
+        description: "When it was accepted; set on reaching Accepted, unset otherwise."
+    actions:
+      - name: advance
+        actor: Manager
+        preserves: [portfolio-review-forward]
+        description: "Move a Proposed portfolio into UnderReview."
+      - name: accept
+        actor: Manager
+        preserves: [portfolio-review-forward, portfolio-accept-role, portfolio-accepted-has-date]
+        description: "Approve the portfolio from an open review stage. Manager or Admin only."
+      - name: reject
+        actor: Manager
+        preserves: [portfolio-review-forward, portfolio-accept-role]
+        description: "Decline the portfolio from an open review stage. Manager or Admin only."
+      - name: reopen
+        actor: Manager
+        preserves: [portfolio-review-forward, portfolio-reopen-role]
+        description: "Reopen a decided portfolio back to UnderReview. Manager or Admin only."
+    invariants:
+      - id: portfolio-size-16
+        statement: "A `Portfolio` holds exactly 16 `Holding`s."
+      - id: portfolio-holdings-deduped
+        statement: "No `Security` appears in more than one `Holding` of a `Portfolio`."
+      - id: portfolio-from-candidates
+        statement: "Every `Holding`'s `Security` is a member of the run's `CandidateSet`."
+      - id: portfolio-has-drawdown
+        statement: "Every `Portfolio` records the `maxDrawdown` it was selected to minimize."
+      - id: portfolio-review-forward
+        statement: >
+          A `Portfolio` only advances Proposed to UnderReview, decides to Accepted or Rejected, or
+          is reopened to UnderReview; it never otherwise moves backward.
+      - id: portfolio-accept-role
+        statement: "Only a `Manager` or `Admin` may accept or reject a `Portfolio`."
+      - id: portfolio-reopen-role
+        statement: "Only a `Manager` or `Admin` may reopen a decided `Portfolio`."
+      - id: portfolio-accepted-has-date
+        statement: "A `Portfolio` in Accepted records an `acceptedAt` timestamp."
+
+  Holding:
+    definition: >
+      One position in a `Portfolio`: a candidate `Security` and the fraction of the portfolio
+      allocated to it. A holding exists only as part of a portfolio; it is not a standalone record.
+    relationships:
+      - entity: Security
+        cardinality: n:1
+        role: "`Candidate`"
+        note: "The security held."
+    attributes:
+      - name: id
+        type: string
+        description: "Stable unique identifier."
+      - name: weight
+        type: integer
+        description: "Allocation in basis points; the weights of a portfolio sum to 10000."
+    actions:
+      - name: set
+        actor: Analyst
+        preserves: [holding-weight-nonneg, holding-weights-sum-full]
+        description: "Set a holding's security and weight when the optimizer commits a portfolio."
+    invariants:
+      - id: holding-weight-nonneg
+        statement: "A `Holding` `weight` is never negative (no short positions)."
+      - id: holding-weights-sum-full
+        statement: "The `weight`s of a `Portfolio`'s `Holding`s sum to 10000 basis points (100 percent)."
+
+invariants:
+  - id: feed-circuit-breaks
+    statement: >
+      When the market-data provider fails repeatedly, the feed circuit opens so calls fast-fail
+      instead of hanging, and a run collecting prices fails cleanly rather than stalling.
+
+scenarios:
+  - name: Recommend a portfolio end to end
+    description: "The happy path from candidate universe to a produced portfolio."
+    actors: [Analyst]
+    steps:
+      - "An `Analyst` builds a `CandidateSet` from the deduped top 30 of each `Index`."
+      - "The `Analyst` starts a `RecommendationRun` over that `CandidateSet`."
+      - "The run collects prices, optimizes, and reaches Ready with a `Portfolio` of exactly 16 `Holding`s."
+    invariants_touched: [candidate-deduped, candidate-from-top-30, portfolio-size-16, run-ready-has-portfolio, portfolio-has-drawdown]
+
+  - name: Price feed is down
+    description: "Repeated market-data failures trip the circuit and fail the run cleanly."
+    actors: [Analyst]
+    steps:
+      - "A `RecommendationRun` is Collecting prices."
+      - "The market-data provider fails on every attempt; the feed circuit opens after the threshold."
+      - "The run exhausts its bounded retries and ends Failed, producing no `Portfolio`."
+    invariants_touched: [feed-circuit-breaks, run-terminal-absorbing, run-forward-only]
+
+  - name: Manager reviews and accepts
+    description: "A produced portfolio is reviewed and approved."
+    actors: [Manager]
+    steps:
+      - "A `Portfolio` is Proposed."
+      - "A `Manager` advances it to UnderReview and then accepts it; its status becomes Accepted and `acceptedAt` is recorded."
+    invariants_touched: [portfolio-review-forward, portfolio-accept-role, portfolio-accepted-has-date]
+
+  - name: Only a manager reopens a rejected portfolio
+    description: "Reopening is role-gated and returns to review."
+    actors: [Analyst, Manager]
+    steps:
+      - "A `Portfolio` is Rejected."
+      - "An `Analyst` attempts to reopen it and is refused because they are not a manager or admin."
+      - "A `Manager` reopens it; the `Portfolio` returns to UnderReview."
+    invariants_touched: [portfolio-reopen-role, portfolio-review-forward]
+
+  - name: Candidate universe is deduped
+    description: "A security listed by two indices appears once."
+    actors: [Analyst]
+    steps:
+      - "Two source `Index` lists both include the same `Security` in their top 30."
+      - "The built `CandidateSet` contains that `Security` exactly once, drawn from the top 30 of at least one `Index`."
+    invariants_touched: [candidate-deduped, candidate-from-top-30, index-top-30]
+
+  - name: Weights are valid and full
+    description: "A portfolio's holdings are non-negative and sum to 100 percent."
+    actors: [Analyst]
+    steps:
+      - "The optimizer commits a `Portfolio` of 16 `Holding`s over distinct candidate securities."
+      - "Each `Holding` `weight` is non-negative and the weights sum to 10000 basis points."
+    invariants_touched: [holding-weight-nonneg, holding-weights-sum-full, portfolio-holdings-deduped, portfolio-from-candidates, ticker-unique]
+
+  - name: A security's ticker is unique
+    description: "Reference data cannot duplicate a ticker."
+    actors: [Analyst]
+    steps:
+      - "An `Analyst` upserts a `Security` with a ticker."
+      - "Upserting a different security with the same ticker updates the existing one rather than creating a duplicate."
+    invariants_touched: [ticker-unique]

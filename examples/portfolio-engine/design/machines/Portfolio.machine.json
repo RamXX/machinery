@@ -1,0 +1,93 @@
+{
+  "id": "portfolio",
+  "initial": "Proposed",
+  "_comment": "Portfolio review lifecycle. Realized as a pure transition function in pf.domain; the load-act-save loop runs in pf.app. Concurrency: two managers may review at once, so every state change is written through the commit overlay (committing/commitRetry/reverted) under a DuckDB optimistic version check; a conflicting write retries with backoff up to MaxRetries, then rolls back the in-memory transition and refuses. The overlay states are named for this domain (committing/commitRetry/reverted), not the persistence default, to show the pattern is not tied to any vocabulary.",
+  "_delays": {
+    "COMMIT_TIMEOUT": "5000 ms - DuckDB write timeout before a commit attempt is treated as failed",
+    "RETRY_BACKOFF": "~200 ms exponential backoff between optimistic-lock retries"
+  },
+  "context": {
+    "portfolioId": null,
+    "pending": null,
+    "prior": null,
+    "retries": 0,
+    "acceptedAt": null
+  },
+  "states": {
+    "Proposed": {
+      "on": {
+        "advance": { "target": "committing", "actions": "setPendingAdvance" },
+        "accept": { "target": "committing", "guard": "canDecide", "actions": "setPendingAccept" },
+        "reject": { "target": "committing", "guard": "canDecide", "actions": "setPendingReject" }
+      },
+      "_ignores": {
+        "reopen": "reopen applies to decided portfolios only; a Proposed portfolio has not been decided"
+      }
+    },
+    "UnderReview": {
+      "on": {
+        "accept": { "target": "committing", "guard": "canDecide", "actions": "setPendingAccept" },
+        "reject": { "target": "committing", "guard": "canDecide", "actions": "setPendingReject" }
+      },
+      "_ignores": {
+        "advance": "UnderReview is the last open stage; the next step is accept or reject",
+        "reopen": "reopen applies to decided portfolios only"
+      }
+    },
+    "Accepted": {
+      "on": {
+        "reopen": { "target": "committing", "guard": "canReopen", "actions": "setPendingReopen" }
+      },
+      "_ignores": {
+        "advance": "Accepted is decided; it does not advance",
+        "accept": "Accepted is already accepted",
+        "reject": "a decided portfolio is not directly re-decided; reopen it first"
+      }
+    },
+    "Rejected": {
+      "on": {
+        "reopen": { "target": "committing", "guard": "canReopen", "actions": "setPendingReopen" }
+      },
+      "_ignores": {
+        "advance": "Rejected is decided; it does not advance",
+        "accept": "a decided portfolio is not directly re-decided; reopen it first",
+        "reject": "Rejected is already rejected"
+      }
+    },
+    "committing": {
+      "invoke": {
+        "src": "persistDecision",
+        "input": { "portfolioId": "context.portfolioId", "pending": "context.pending" },
+        "onDone": [
+          { "target": "UnderReview", "guard": "pendingIsUnderReview", "actions": "commit" },
+          { "target": "Accepted", "guard": "pendingIsAccepted", "actions": ["commit", "recordAccepted"] },
+          { "target": "Rejected", "guard": "pendingIsRejected", "actions": "commit" }
+        ],
+        "onError": [
+          { "target": "commitRetry", "guard": "isRetriable" },
+          { "target": "reverted" }
+        ]
+      },
+      "after": {
+        "COMMIT_TIMEOUT": { "target": "commitRetry" }
+      }
+    },
+    "commitRetry": {
+      "always": [
+        { "target": "reverted", "guard": "retriesExhausted" }
+      ],
+      "after": {
+        "RETRY_BACKOFF": { "target": "committing", "actions": "incRetries" }
+      }
+    },
+    "reverted": {
+      "_exhaustive": "prior is set by every setPending action to the review stage the operation departed from; its codomain is exactly the four PortfolioStatus values, so one guarded branch per stage is total",
+      "always": [
+        { "target": "Proposed", "guard": "priorIsProposed" },
+        { "target": "UnderReview", "guard": "priorIsUnderReview" },
+        { "target": "Accepted", "guard": "priorIsAccepted" },
+        { "target": "Rejected", "guard": "priorIsRejected" }
+      ]
+    }
+  }
+}

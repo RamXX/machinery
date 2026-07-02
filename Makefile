@@ -40,16 +40,18 @@ doctor: ## Check dependencies and install status
 test: ## Run the toolchain test suite (pytest via uv)
 	@uv run -q -- pytest -q
 
-check: ## Run the deterministic gate suite on both examples
+check: ## Run the deterministic gate suite on the examples
 	@python3 skills/machinery/tools/machinery_check.py examples/go-crm/design --impl examples/go-crm/impl
 	@python3 skills/machinery/tools/machinery_check.py examples/fulfillment/design
+	@python3 skills/machinery/tools/machinery_check.py examples/portfolio-engine/design
 
 oracle: ## Regenerate the transition oracles from the machine JSON (go-crm)
 	@python3 skills/machinery/tools/oracle_gen.py examples/go-crm/design/machines
 
-verify-formal: ## Regenerate + TLC-check the whole formal suite for both examples (from source)
+verify-formal: ## Regenerate + TLC-check the whole formal suite for the examples (from source)
 	@echo "== go-crm =="; bash skills/machinery/tools/verify_formal.sh examples/go-crm/design
 	@echo "== fulfillment =="; bash skills/machinery/tools/verify_formal.sh examples/fulfillment/design
+	@echo "== portfolio-engine =="; bash skills/machinery/tools/verify_formal.sh examples/portfolio-engine/design
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'
