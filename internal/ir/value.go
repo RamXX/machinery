@@ -9,6 +9,7 @@ package ir
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -17,16 +18,15 @@ import (
 
 // Value is a JSON value whose object members preserve source order.
 //
-//   KindObject  -> *Object
-//   KindArray   -> []*Value
-//   KindString  -> string
-//   KindNumber  -> json.Number (we decode with UseNumber to preserve int-vs-float)
-//   KindBool    -> bool
-//   KindNull    -> nil
+//	KindObject  -> *Object
+//	KindArray   -> []*Value
+//	KindString  -> string
+//	KindNumber  -> json.Number (we decode with UseNumber to preserve int-vs-float)
+//	KindBool    -> bool
+//	KindNull    -> nil
 type Value struct {
-	Kind  Kind
-	Data  any
-	order []string // (for Object) insertion-ordered keys; stored also inside *Object
+	Kind Kind
+	Data any
 }
 
 // Kind tags a Value.
@@ -230,31 +230,21 @@ func decodeToken(dec *json.Decoder, t json.Token) (*Value, error) {
 func LoadMachineJSON(path string) (*Value, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("cannot read %s: %s", path, err)
+		return nil, fmt.Errorf("cannot read %s: %w", path, err)
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	v, derr := orderedDecode(dec)
 	if derr != nil {
 		// json.SyntaxError carries Offset; translate to a 1-based line like Python.
-		if se, ok := derr.(*json.SyntaxError); ok {
+		var se *json.SyntaxError
+		if errors.As(derr, &se) {
 			line := 1 + bytes.Count(data[:se.Offset], []byte("\n"))
-			return nil, fmt.Errorf("invalid JSON in %s: line %d: %s", path, line, normalizeJSONMsg(se.Error()))
+			return nil, fmt.Errorf("invalid JSON in %s: line %d: %s", path, line, se.Error())
 		}
-		return nil, fmt.Errorf("invalid JSON in %s: %s", path, derr)
+		return nil, fmt.Errorf("invalid JSON in %s: %w", path, derr)
 	}
 	return v, nil
-}
-
-// normalizeJSONMsg trims the json package's "invalid character ...:" noise so
-// the message reads like Python's "<msg>". We keep the substantive tail.
-func normalizeJSONMsg(s string) string {
-	// json.SyntaxError.Error() looks like: "invalid character 'x' looking for..."
-	// Python reports just the tail. Keep the full message minus the leading
-	// "invalid character " prefix when present is undesirable; the differential
-	// harness normalizes only paths, so we keep Go's text but the tests assert
-	// substrings ("invalid JSON"). Return as-is.
-	return s
 }
 
 // SortedKeys returns o.Keys() sorted by code point (Python sorted() semantics).

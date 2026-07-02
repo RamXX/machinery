@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 const modelithVersion = "v0.4.0"
@@ -33,7 +35,7 @@ func preflightRun() {
 	}
 
 	// PyYAML
-	if ok, err := runCheck("python3", "-c", "import yaml"); err == nil && ok {
+	if runCheck("python3", "-c", "import yaml") {
 		fmt.Fprintln(out, "  ok       PyYAML")
 	} else {
 		fmt.Fprintln(out, "  MISSING  PyYAML (the gate tools parse YAML) -- install: python3 -m pip install pyyaml")
@@ -91,20 +93,23 @@ func doctorRun() {
 }
 
 func run(name string, args ...string) string {
-	cmd := exec.Command(name, args...)
-	b, _ := cmd.Output()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	b, _ := exec.CommandContext(ctx, name, args...).Output()
 	return string(b)
 }
 
 func runErr(name string, args ...string) string {
-	cmd := exec.Command(name, args...)
-	b, _ := cmd.CombinedOutput()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	b, _ := exec.CommandContext(ctx, name, args...).CombinedOutput()
 	return string(b)
 }
 
-func runCheck(name string, args ...string) (bool, error) {
-	cmd := exec.Command(name, args...)
-	return cmd.Run() == nil, nil
+func runCheck(name string, args ...string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, name, args...).Run() == nil
 }
 
 func lastWord(s string) string {

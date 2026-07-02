@@ -6,16 +6,16 @@ import (
 	"strings"
 )
 
-// IDENT mirrors machine_lint.IDENT: [A-Za-z_][A-Za-z0-9_]*
+// IdentPattern is machine_lint.IDENT: [A-Za-z_][A-Za-z0-9_]*.
 const IdentPattern = `[A-Za-z_][A-Za-z0-9_]*`
 
 var identRe = regexp.MustCompile(IdentPattern)
 
 // StateEntry is a walked state: (path, simpleName, node).
 type StateEntry struct {
-	Path  string
-	Name  string
-	Node  *Value
+	Path string
+	Name string
+	Node *Value
 }
 
 // WalkStates yields every state depth-first, mirroring machine_lint.walk_states.
@@ -48,13 +48,13 @@ func (o *Object) Get2(key string) *Value {
 // Transition is a flattened transition (the dicts from machine_lint._norm +
 // kind/event metadata from transitions_of).
 type Transition struct {
-	Kind    string // on | after | always | stateDone | onDone | onError
-	Event   string
-	Target  string // "" means absent (caller treats nil as internal)
-	HasTgt  bool   // distinguishes target:"" from missing? Python uses it.get("target")
-	Guard   string // guard name or "" (empty) when guard is None
-	HasGuard bool  // true when a guard key was present and string
-	Actions []string
+	Kind     string // on | after | always | stateDone | onDone | onError
+	Event    string
+	Target   string // "" means absent (caller treats nil as internal)
+	HasTgt   bool   // distinguishes target:"" from missing? Python uses it.get("target")
+	Guard    string // guard name or "" (empty) when guard is None
+	HasGuard bool   // true when a guard key was present and string
+	Actions  []string
 }
 
 // ActionNames mirrors machine_lint.action_names: a transition/actions/entry/exit
@@ -135,7 +135,8 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 			var tgt string
 			hasTgt := false
 			if tv := o.Get2("target"); tv != nil && tv.Kind != KindNull {
-				if tv.Kind == KindArray {
+				switch tv.Kind {
+				case KindArray:
 					arr := tv.AsArray()
 					if problems != nil {
 						*problems = append(*problems, fmt.Sprintf("array transition target %s%s (parallel targets are unsupported)",
@@ -145,7 +146,7 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 						tgt = arr[0].AsString()
 						hasTgt = true
 					}
-				} else if tv.Kind == KindString {
+				case KindString:
 					tgt = tv.AsString()
 					hasTgt = true
 				}
@@ -394,12 +395,13 @@ func Title(s string) string {
 
 // goRepr produces a Python-like repr for use in error messages, to match the
 // exact strings machine_lint emits (so the differential harness passes).
-//   Python repr('foo')  == "'foo'"
-//   Python repr(42)     == "42"
-//   Python repr([1,2])  == "[1, 2]"
-//   Python repr({'a':1})== "{'a': 1}"
-//   Python repr(None)   == "None"
-//   Python repr(True)   == "True"
+//
+//	Python repr('foo')  == "'foo'"
+//	Python repr(42)     == "42"
+//	Python repr([1,2])  == "[1, 2]"
+//	Python repr({'a':1})== "{'a': 1}"
+//	Python repr(None)   == "None"
+//	Python repr(True)   == "True"
 func goRepr(v *Value) string {
 	if v == nil {
 		return "None"

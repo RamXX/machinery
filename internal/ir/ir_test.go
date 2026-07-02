@@ -126,10 +126,10 @@ func TestParseMdTablesNoSeparator(t *testing.T) {
 
 func TestCleanCell(t *testing.T) {
 	cases := map[string]string{
-		"`foo`":           "foo",
+		"`foo`":            "foo",
 		"`foo` (internal)": "foo",
-		"`a` (final)":     "a",
-		"-":               "-",
+		"`a` (final)":      "a",
+		"-":                "-",
 	}
 	for in, want := range cases {
 		if got := CleanCell(in); got != want {

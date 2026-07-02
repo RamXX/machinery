@@ -113,10 +113,7 @@ func generateImpl(comp, machine *ir.Value, machineName string) (string, string, 
 		invsVal = ir.ObjectValue(ir.NewObject())
 	}
 	invs := invsVal.AsObject()
-	var aggnames []string
-	for _, k := range aggsVal.Keys() {
-		aggnames = append(aggnames, k)
-	}
+	aggnames := aggsVal.Keys()
 
 	// validate against the coordinator machine
 	fc := ForwardChain(machine)
@@ -219,7 +216,7 @@ func generateImpl(comp, machine *ir.Value, machineName string) (string, string, 
 	L = append(L, fmt.Sprintf("VARIABLES %s", varlist))
 	L = append(L, fmt.Sprintf("vars == << %s >>", varlist))
 	L = append(L, "")
-	typeok := fmt.Sprintf(`TypeOK == saga \in SagaStates`)
+	typeok := `TypeOK == saga \in SagaStates`
 	for _, a := range aggnames {
 		typeok += fmt.Sprintf(` /\ %s \in %sStates`, a, ir.Title(a))
 	}

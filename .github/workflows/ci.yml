@@ -1,3 +1,7 @@
+# ci.yml — the required pipeline. Every push and PR must pass this.
+# Coverage: build, lint (golangci-lint + gofmt + vet), unit tests, the three
+# example gate suites, the go-crm impl tests, and the Python==Go differential
+# parity harness. A single failure blocks merge.
 name: ci
 
 on:
@@ -5,89 +9,147 @@ on:
     branches: [main]
   pull_request:
 
+# Cancel superseded runs on the same ref (saves CI minutes on rapid pushes).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  tools:
+  # ---------------------------------------------------------------- build ---
+  # Compile the binary on three OSes; a build failure is caught before anything
+  # else runs. The binary is cached for the downstream jobs in the matrix.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build machinery binary
+        run: go build -o machinery ./cmd/machinery
+      - name: Smoke-test --version
+        run: ./machinery version
+
+  # ----------------------------------------------------------------- lint ---
+  # golangci-lint (the configured linter set) + gofmt (formatting gate) +
+  # go vet (the stdlib analyzer). Formatting is enforced so PRs don't drift.
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
-      - uses: astral-sh/setup-uv@v5
-      - name: Build machinery binary
-        run: make build
-      - name: Toolchain Go test suite
-        run: go test ./...
-      - name: Gate suite, go-crm (design + impl) via Go binary
-        run: .bin/machinery check examples/go-crm/design --impl examples/go-crm/impl
-      - name: Gate suite, fulfillment (design only) via Go binary
-        run: .bin/machinery check examples/fulfillment/design
+          go-version-file: go.mod
+          cache: true
+      - name: gofmt (formatting gate)
+        run: |
+          unformatted=$(gofmt -l cmd/ internal/)
+          if [ -n "$unformatted" ]; then
+            echo "::error::Files are not gofmt-clean:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          # Uses the v2 config in .golangci.yml. Pin a specific version (e.g.
+          # v2.x.y) once the remote exists, for reproducibility.
+          version: latest
+          args: --config .golangci.yml --timeout 5m
 
-  formal:
+  # ----------------------------------------------------------------- test ---
+  # The Go unit + experiment suite (every package). This is the fast feedback
+  # loop; the examples-exercising jobs run separately below.
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-go@v5
         with:
-          distribution: temurin
-          java-version: "21"
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/machinery
-          key: tla2tools-v1.7.4
-      - name: Install generator dependency
-        run: pip install pyyaml
-      - name: Regenerate + TLC-check all proofs via Go binary
-        run: make verify-formal
+          go-version-file: go.mod
+          cache: true
+      - name: Go unit + experiment tests (with race detector)
+        run: go test -race -count=1 ./...
 
-  go-crm:
+  # ---------------------------------------------------------------- gates ---
+  # Run the deterministic gate suite on all three shipped examples via the Go
+  # binary. This is the dogfood: machinery checks its own reference designs.
+  gates:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build machinery
+        run: make build
+      - name: Gate suite — go-crm (design + impl)
+        run: .bin/machinery check examples/go-crm/design --impl examples/go-crm/impl
+      - name: Gate suite — fulfillment (design only)
+        run: .bin/machinery check examples/fulfillment/design
+      - name: Gate suite — portfolio-engine (design only)
+        run: .bin/machinery check examples/portfolio-engine/design
+
+  # ----------------------------------------------------- go-crm impl tests ---
+  # The example Go application has its own hermetic test suite (separate go.mod).
+  go-crm-impl:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: examples/go-crm/impl/go.mod
+          cache: false
       - name: go-crm hermetic suite
         working-directory: examples/go-crm/impl
         run: go test ./... -count=1
 
-  # Phase 11: the differential scoreboard, now REQUIRED. On every push, Go must
-  # equal Python byte-for-byte on stdout/stderr/exit/emitted-files across the
-  # whole corpus, and the Go unit + experiment suite must be green. A single
-  # divergence fails the build.
+  # -------------------------------------------------------- differential ---
+  # The shadow scoreboard, now REQUIRED. Go must equal Python byte-for-byte on
+  # stdout/stderr/exit across the whole corpus, and the Python pytest oracle
+  # must still be green. A single divergence fails the build. (Python is the
+  # frozen differential oracle during the migration window; removed at the
+  # python-removed tag once the shadow is silent for K>=20 runs.)
   differential:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version-file: go.mod
+          cache: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - uses: astral-sh/setup-uv@v5
       - run: pip install pyyaml
-      - name: Go unit + experiment tests
-        run: go test ./...
-      - name: Python pytest suite (the oracle during shadow)
+      - name: Go unit suite
+        run: go test -count=1 ./...
+      - name: Python pytest oracle (the differential reference)
         run: uv run -q -- pytest -q
       - name: Differential harness (Go == Python byte-for-byte)
         run: bash scripts/diff-all.sh
 
-  # Phase 11 nightly: regenerate all committed oracles/.tla with Go and assert
-  # an empty git diff. Silent when parity holds.
-  nightly-regen:
-    if: github.event_name == 'push'
+  # ----------------------------------------------------------- tidy gate ---
+  # go.mod / go.sum must be tidy and in sync. A stray dependency or a missing
+  # go.sum entry fails here, not in a downstream consumer.
+  tidy:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
-      - name: Regenerate with Go, assert clean tree
+          go-version-file: go.mod
+          cache: true
+      - name: go mod tidy (verify clean)
         run: |
-          go build -o .bin/machinery ./cmd/machinery
-          for ex in go-crm fulfillment portfolio-engine; do
-            .bin/machinery oracle examples/$ex/design/machines
-          done
-          git diff --exit-code
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum

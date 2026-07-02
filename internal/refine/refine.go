@@ -139,15 +139,6 @@ func contains(xs []string, x string) bool {
 	return false
 }
 
-func setInSlice(xs []string, m map[string]bool) bool {
-	for _, x := range xs {
-		if m[x] {
-			return true
-		}
-	}
-	return false
-}
-
 func ReconcileLifecycle(machine, sem *ir.Value) map[string]bool {
 	so := sem.AsObject()
 	busy, retry, rollback := lifecycleOverlay(sem)
@@ -806,11 +797,6 @@ func EmitTerminal(machine, sem *ir.Value, sourceNames [2]string) (string, map[st
 
 // --- saga pattern ---
 
-type oblSpec struct {
-	Sets string
-	Undo string
-}
-
 func ReconcileSaga(machine, sem *ir.Value) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1120,8 +1106,10 @@ func intNum(v *ir.Value) int {
 		return 0
 	}
 	n := v.AsNumber()
-	i := 0
-	fmt.Sscanf(string(n), "%d", &i)
+	var i int
+	if _, err := fmt.Sscanf(string(n), "%d", &i); err != nil {
+		return 0
+	}
 	return i
 }
 
@@ -1182,14 +1170,6 @@ func filterOut(xs []string, x string) []string {
 		if e != x {
 			out = append(out, e)
 		}
-	}
-	return out
-}
-
-func mapStr(xs []string, fn func(string) string) []string {
-	out := make([]string, len(xs))
-	for i, x := range xs {
-		out[i] = fn(x)
 	}
 	return out
 }

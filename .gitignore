@@ -14,5 +14,10 @@ __pycache__/
 *.pyc
 .venv/
 
+# Go build artifacts
+.bin/
+machinery
+machinery.exe
+
 # TLC scratch (tlc.sh runs with -cleanup, but interrupted runs leave these)
 states/

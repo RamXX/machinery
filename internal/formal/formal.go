@@ -3,6 +3,7 @@
 package formal
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ramirosalas/machinery/internal/compose"
 	"github.com/ramirosalas/machinery/internal/ir"
@@ -48,7 +50,13 @@ func ensureJar() (string, error) {
 	url := "https://github.com/tlaplus/tlaplus/releases/download/" + tlaVersion + "/tla2tools.jar"
 	fmt.Fprintf(os.Stderr, "fetching tla2tools.jar %s into %s\n", tlaVersion, jar)
 	tmp := jar + ".tmp"
-	resp, err := http.Get(url)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -84,7 +92,10 @@ func runTLC(tlaPath, cfgPath string) (string, error) {
 	dir := filepath.Dir(tlaPath)
 	// TLC writes a states/ working directory; remove it on exit.
 	defer os.RemoveAll(filepath.Join(dir, "states"))
-	cmd := exec.Command("java", "-XX:+UseParallelGC", "-cp", jar, "tlc2.TLC", "-cleanup",
+	// TLC is exhaustive model-checking; give it a generous but bounded budget.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "java", "-XX:+UseParallelGC", "-cp", jar, "tlc2.TLC", "-cleanup",
 		"-config", filepath.Base(cfgPath), filepath.Base(tlaPath))
 	cmd.Dir = dir
 	var buf strings.Builder
@@ -99,21 +110,24 @@ func runTLC(tlaPath, cfgPath string) (string, error) {
 func VerifyFormal(design string) int {
 	mdir := filepath.Join(design, "machines")
 	fdir := filepath.Join(design, "formal")
-	os.MkdirAll(fdir, 0755)
+	if err := os.MkdirAll(fdir, 0755); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
 
-	// regenerate
+	// regenerate (the sub-generators print their own status / exit on error)
 	for _, mj := range globExt(mdir, ".machine.json") {
-		tla.Run(mj, fdir)
+		_ = tla.Run(mj, fdir)
 	}
 	for _, sem := range globExt(fdir, ".semantics.yaml") {
 		m := strings.TrimSuffix(filepath.Base(sem), ".semantics.yaml")
-		refine.Run(filepath.Join(mdir, m+".machine.json"), sem, fdir)
+		_ = refine.Run(filepath.Join(mdir, m+".machine.json"), sem, fdir)
 	}
 	for _, comp := range globExt(fdir, ".composition.yaml") {
 		data, _ := os.ReadFile(comp)
 		compV, _ := ir.LoadYAML(data)
 		coord := compV.AsObject().GetString("coordinator")
-		compose.Run(comp, filepath.Join(mdir, coord+".machine.json"), fdir)
+		_ = compose.Run(comp, filepath.Join(mdir, coord+".machine.json"), fdir)
 	}
 
 	pass, fail := 0, 0
