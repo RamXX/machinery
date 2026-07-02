@@ -67,6 +67,20 @@ func (o *Object) Get(k string) (*Value, bool) {
 // Has reports key presence.
 func (o *Object) Has(k string) bool { _, ok := o.values[k]; return ok }
 
+// Delete removes a key (no-op if absent), preserving remaining order.
+func (o *Object) Delete(k string) {
+	if _, ok := o.values[k]; !ok {
+		return
+	}
+	delete(o.values, k)
+	for i, key := range o.keys {
+		if key == k {
+			o.keys = append(o.keys[:i], o.keys[i+1:]...)
+			return
+		}
+	}
+}
+
 // Keys returns the insertion-ordered keys.
 func (o *Object) Keys() []string { return append([]string{}, o.keys...) }
 
