@@ -134,19 +134,20 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 			o := it.AsObject()
 			var tgt string
 			hasTgt := false
-			if tv := o.Get2("target"); tv != nil {
-				hasTgt = true
+			if tv := o.Get2("target"); tv != nil && tv.Kind != KindNull {
 				if tv.Kind == KindArray {
 					arr := tv.AsArray()
 					if problems != nil {
 						*problems = append(*problems, fmt.Sprintf("array transition target %s%s (parallel targets are unsupported)",
 							goRepr(tv), whereSuffix(where)))
 					}
-					if len(arr) > 0 {
+					if len(arr) > 0 && arr[0].Kind == KindString {
 						tgt = arr[0].AsString()
+						hasTgt = true
 					}
 				} else if tv.Kind == KindString {
 					tgt = tv.AsString()
+					hasTgt = true
 				}
 			}
 			var guard string

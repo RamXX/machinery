@@ -64,9 +64,15 @@ func newPreflightCmd() *cobra.Command {
 }
 
 func newIRDumpCmd() *cobra.Command {
-	return &cobra.Command{Use: "ir-dump <machine.json>", Hidden: true, RunE: func(cmd *cobra.Command, args []string) error {
-		return exit2(fmt.Errorf("ir-dump: not implemented"))
-	}}
+	c := &cobra.Command{
+		Use:    "ir-dump <machine.json>",
+		Hidden: true,
+		Args:   cobra.ExactArgs(1),
+	}
+	c.RunE = func(cmd *cobra.Command, args []string) error {
+		return irDumpRun(args[0])
+	}
+	return c
 }
 
 // exit2 mirrors Python sys.exit(nonzero): print to stderr, exit code 2.
