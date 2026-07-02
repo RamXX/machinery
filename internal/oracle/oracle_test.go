@@ -87,10 +87,22 @@ func TestStableIDChangesWhenStimulusChanges(t *testing.T) {
 		                          "onError":{"target":"Draft","actions":"recordError"}},
 		              "after":{"persistTimeout":{"target":"Draft","actions":"recordTimeout"}}}}}`)
 	after := rowsOf(t, Render(m2, "w"))
+	// Python asserts set(before) != set(after): at least one id changed.
+	same := true
 	for sid := range before {
-		if _, ok := after[sid]; ok {
-			t.Errorf("stimulus changed but stable id %q survived", sid)
+		if _, ok := after[sid]; !ok {
+			same = false
+			break
 		}
+	}
+	for sid := range after {
+		if _, ok := before[sid]; !ok {
+			same = false
+			break
+		}
+	}
+	if same {
+		t.Fatal("stimulus changed but stable id set unchanged")
 	}
 }
 
