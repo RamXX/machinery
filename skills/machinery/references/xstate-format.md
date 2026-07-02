@@ -5,7 +5,7 @@ referenced by **string name** and implemented separately by the coding agent. Th
 config is exactly the JSON-serializable subset, and it is valid to paste into the Stately visualizer
 for validation. We author the structure; the coding agent authors the implementations.
 
-The subset below is **enforced** by `tools/machine_lint.py`, which G3 runs: unknown keys are hard
+The subset below is **enforced** by `machinery lint`, which G3 runs: unknown keys are hard
 lint errors, not silently skipped. Parallel and history states, root-level `on`, non-string guards,
 and array transition targets are rejected. Do not author outside the subset.
 
@@ -222,10 +222,10 @@ there. The state graph itself imports unchanged.
 
 Deterministic (run the tools; do not eyeball):
 
-- `tools/machine_lint.py design/machines` checks subset conformance, reachability, dead ends,
+- `machinery lint design/machines` checks subset conformance, reachability, dead ends,
   `invoke` with `onError` plus `after`, shadowed branches, guarded-always exhaustiveness
   (`_exhaustive`), and resting-state event completeness (`_ignores`).
-- `tools/oracle_gen.py design/machines` generates `<M>.oracle.md`; commit it. G3 regenerates it in
+- `machinery oracle design/machines` generates `<M>.oracle.md`; commit it. G3 regenerates it in
   memory and diffs; a stale committed oracle is DRIFT. Tests key on the oracle's stable ids.
 
 Judgment (the lint cannot check these; you must):

@@ -25,7 +25,7 @@ python3 machinery_check.py <design-dir> [--impl <code-dir>] [--gate g2,g3,gx,g4]
 
 Exit is non-zero on any ERROR or DRIFT. `warn` and `note` do not fail the gate. Use
 `--gate` to run the subset that applies mid-phase; the default runs everything.
-Requires PyYAML (`uv run --with pyyaml -- python3 ...` or have it installed).
+Requires the `machinery` Go binary (`make install`). No Python or PyYAML needed.
 
 ## Gates
 
