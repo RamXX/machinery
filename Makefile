@@ -1,41 +1,53 @@
 # machinery installer. Symlinks (or copies) the skill and agents into ~/.claude.
 
-CLAUDE_DIR ?= $(HOME)/.claude
-SKILLS_DIR := $(CLAUDE_DIR)/skills
-AGENTS_DIR := $(CLAUDE_DIR)/agents
+# machinery is agent-agnostic: it installs the skill under <home>/skills and the
+# two role docs under <home>/agents for every agent home listed here. Defaults
+# cover Claude Code (~/.claude) and the cross-agent convention (~/.agents).
+# Override to add or restrict targets, for example:
+#   make install AGENT_HOMES="$(HOME)/.agents"
+#   make install AGENT_HOMES="$(HOME)/.claude $(HOME)/.agents /opt/team/.agents"
+AGENT_HOMES ?= $(HOME)/.claude $(HOME)/.agents
 SRC := $(CURDIR)
 
 .DEFAULT_GOAL := help
 .PHONY: install install-copy uninstall doctor check oracle verify-formal test help
 
-install: ## Symlink machinery into ~/.claude (live edits from this repo)
-	@mkdir -p $(SKILLS_DIR) $(AGENTS_DIR)
-	@rm -rf $(SKILLS_DIR)/machinery
-	@ln -sfn $(SRC)/skills/machinery $(SKILLS_DIR)/machinery
-	@ln -sfn $(SRC)/agents/machinery-fsm-author.md $(AGENTS_DIR)/machinery-fsm-author.md
-	@ln -sfn $(SRC)/agents/machinery-build-writer.md $(AGENTS_DIR)/machinery-build-writer.md
-	@echo "linked machinery -> $(CLAUDE_DIR)"
+install: ## Symlink machinery into every agent home (live edits from this repo)
+	@for home in $(AGENT_HOMES); do \
+	  mkdir -p "$$home/skills" "$$home/agents"; \
+	  rm -rf "$$home/skills/machinery"; \
+	  ln -sfn "$(SRC)/skills/machinery" "$$home/skills/machinery"; \
+	  ln -sfn "$(SRC)/agents/machinery-fsm-author.md" "$$home/agents/machinery-fsm-author.md"; \
+	  ln -sfn "$(SRC)/agents/machinery-build-writer.md" "$$home/agents/machinery-build-writer.md"; \
+	  echo "linked machinery -> $$home"; \
+	done
 
-install-copy: ## Copy machinery into ~/.claude (no live edits)
-	@mkdir -p $(SKILLS_DIR) $(AGENTS_DIR)
-	@rm -rf $(SKILLS_DIR)/machinery
-	@cp -R $(SRC)/skills/machinery $(SKILLS_DIR)/machinery
-	@cp $(SRC)/agents/machinery-fsm-author.md $(AGENTS_DIR)/
-	@cp $(SRC)/agents/machinery-build-writer.md $(AGENTS_DIR)/
-	@echo "copied machinery -> $(CLAUDE_DIR)"
+install-copy: ## Copy machinery into every agent home (no live edits)
+	@for home in $(AGENT_HOMES); do \
+	  mkdir -p "$$home/skills" "$$home/agents"; \
+	  rm -rf "$$home/skills/machinery"; \
+	  cp -R "$(SRC)/skills/machinery" "$$home/skills/machinery"; \
+	  cp "$(SRC)/agents/machinery-fsm-author.md" "$$home/agents/"; \
+	  cp "$(SRC)/agents/machinery-build-writer.md" "$$home/agents/"; \
+	  echo "copied machinery -> $$home"; \
+	done
 
-uninstall: ## Remove machinery from ~/.claude
-	@rm -rf $(SKILLS_DIR)/machinery
-	@rm -f $(AGENTS_DIR)/machinery-fsm-author.md $(AGENTS_DIR)/machinery-build-writer.md
-	@echo "removed machinery from $(CLAUDE_DIR)"
+uninstall: ## Remove machinery from every agent home
+	@for home in $(AGENT_HOMES); do \
+	  rm -rf "$$home/skills/machinery"; \
+	  rm -f "$$home/agents/machinery-fsm-author.md" "$$home/agents/machinery-build-writer.md"; \
+	  echo "removed machinery from $$home"; \
+	done
 
 MODELITH_VERSION ?= v0.4.0
 
 doctor: ## Check dependencies and install status
 	@command -v modelith >/dev/null 2>&1 && echo "ok: modelith $$(modelith --version) (pinned: $(MODELITH_VERSION))" || echo "MISSING: modelith (go install github.com/stacklok/modelith/cmd/modelith@$(MODELITH_VERSION))"
-	@test -e $(SKILLS_DIR)/machinery && echo "ok: skill at $(SKILLS_DIR)/machinery" || echo "not installed: run make install"
-	@test -e $(AGENTS_DIR)/machinery-fsm-author.md && echo "ok: fsm-author agent installed" || echo "not installed: run make install"
-	@test -e $(AGENTS_DIR)/machinery-build-writer.md && echo "ok: build-writer agent installed" || echo "not installed: run make install"
+	@for home in $(AGENT_HOMES); do \
+	  test -e "$$home/skills/machinery" && echo "ok: skill at $$home/skills/machinery" || echo "not installed at $$home: run make install"; \
+	  test -e "$$home/agents/machinery-fsm-author.md" && echo "ok: fsm-author agent at $$home/agents" || echo "fsm-author not installed at $$home: run make install"; \
+	  test -e "$$home/agents/machinery-build-writer.md" && echo "ok: build-writer agent at $$home/agents" || echo "build-writer not installed at $$home: run make install"; \
+	done
 
 test: ## Run the toolchain test suite (pytest via uv)
 	@uv run -q -- pytest -q
