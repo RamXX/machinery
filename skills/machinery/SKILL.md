@@ -271,7 +271,7 @@ knows where the interrogation stopped.
   dependency-mitigation, persistence-placement, and event-contract table formats, and the NFR record.
 - `references/build-md-template.md` - the full `BUILD.md` skeleton (full and manifest modes).
 - `machinery check` - the deterministic gate suite (G2-c4, G3-machine, Gx-trace, G4-import).
-  Needs PyYAML (`uv run --with pyyaml`). Run it at each gate with `--gate` so correctness does not
+  Single Go binary (`make install`). Run it at each gate with `--gate` so correctness does not
   rely on the model getting every cross-reference right. See `tools/README.md`.
 - `machinery oracle` - generates the canonical `<M>.oracle.md` transition oracles from the
   machine JSON. Run after every machine edit and commit the output; G3 diffs it.

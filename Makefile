@@ -44,6 +44,7 @@ uninstall: ## Remove machinery from every agent home
 
 MODELITH_VERSION ?= v0.4.0
 MACHINERY_VERSION ?= latest
+INTERNAL_VERSION := v0.1.0
 MACH ?= $(CURDIR)/.bin/machinery
 # Where to install the binary on PATH. Default: ~/.local/bin (no sudo, on PATH
 # on most systems). Override: INSTALL_DIR=/usr/local/bin make install-cli
@@ -61,7 +62,7 @@ endif
 
 .PHONY: build install-binary install-cli
 build: ## Build the machinery binary from source (needs Go)
-	@mkdir -p .bin && go build -ldflags "-X main.version=dev" -o .bin/machinery ./cmd/machinery
+	@mkdir -p .bin && go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery
 
 install-cli: ## Install the machinery CLI binary onto PATH ($(INSTALL_DIR))
 	@mkdir -p "$(INSTALL_DIR)"
@@ -100,7 +101,7 @@ $(MACH):
 	@mkdir -p .bin
 	@if command -v go >/dev/null 2>&1; then \
 	  echo "Building from source (Go detected)..."; \
-	  go build -ldflags "-X main.version=dev" -o .bin/machinery ./cmd/machinery; \
+	  go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery; \
 	else \
 	  echo "No binary and no Go toolchain; downloading prebuilt..."; \
 	  $(MAKE) --no-print-directory install-binary; \

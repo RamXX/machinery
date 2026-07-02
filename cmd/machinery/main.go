@@ -10,8 +10,8 @@ import (
 )
 
 // version is set at link time via -ldflags "-X main.version=v0.1.0".
-// Defaults to "dev" for local `go build`.
-var version = "dev"
+// The default below is what `go build` without ldflags reports.
+var version = "v0.1.0"
 
 func main() {
 	root := &cobra.Command{

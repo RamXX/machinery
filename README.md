@@ -116,7 +116,7 @@ formal correctness into every layer, strongest first:
 
 Rungs 1 through 3 are generated from the design automatically. Rungs 2 and 4 are generated from
 short declarative annotations that the generators verify against the machines. And the toolchain
-that holds all of this together is itself held: a pytest suite encodes every vacuity and drift
+that holds all of this together is itself held: a Go test suite encodes every vacuity and drift
 attack from an adversarial design review as a permanent regression, and CI runs the tests, the
 gates, the proofs, and the example build on every push.
 
@@ -250,18 +250,14 @@ check and warns about anything missing.
 - **[Structurizr CLI](https://github.com/structurizr/cli)** -- only to export C4 diagrams from
   `workspace.dsl` (the [Structurizr DSL](https://github.com/structurizr/dsl) text and every gate need
   no export); needs Java. Any OS: download a
-  [release zip](https://github.com/structurizr/cli/releases), unzip, and add it to `PATH`
-  (`structurizr.sh` on macOS/Linux, `structurizr.bat` on Windows); or run the
-  [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`.
-- **[uv](https://docs.astral.sh/uv/)** -- runs `make test` and can resolve PyYAML on the fly. macOS
-  and Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh` (or `brew install uv`); Windows:
-  `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"` (or
-  `winget install astral-sh.uv`).
+   [release zip](https://github.com/structurizr/cli/releases), unzip, and add it to `PATH`
+   (`structurizr.sh` on macOS/Linux, `structurizr.bat` on Windows); or run the
+   [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`.
 
 ```sh
-make install       # symlink the skill and agents into every agent home (edits go live)
+make install       # install the CLI binary on PATH + symlink skill/agents into agent homes
 make doctor        # check dependencies and install status
-make test          # run the toolchain's own test suite (pytest via uv)
+make test          # run the Go toolchain test suite (needs Go)
 make check         # run the deterministic gate suite on the examples
 make verify-formal # regenerate and TLC-check the full formal suite
 make oracle        # regenerate the transition oracles from the machine JSON
@@ -273,9 +269,9 @@ Code) and `~/.agents` (the cross-agent convention). Override it to add or restri
 example `make install AGENT_HOMES="$HOME/.agents"`. `make install-copy` does the same without
 symlinks, and `make uninstall` removes machinery from every home.
 
-The gate tools need Python 3.10+ with PyYAML (declared in `pyproject.toml`; `uv` resolves it).
-`tlc.sh` uses a version-pinned, checksum-verified `tla2tools.jar`. CI runs the test suite, both
-gate runs, the full formal suite, and the go-crm build on every push.
+The gate tools are a single Go binary (no Python runtime). `verify-formal` downloads a version-pinned,
+checksum-verified `tla2tools.jar` on first use. CI runs the test suite, all gate runs, the full formal
+suite, cross-compile builds, security scanning, and the go-crm build on every push.
 
 ## Use
 
@@ -319,7 +315,7 @@ roughly ten stateful components.
 ## Testing & CI
 
 The Go toolchain has full unit tests in every package, plus a shared mutation-experiment table
-(the vacuity/drift findings from design review, ported from the pytest suite). Current coverage:
+(the vacuity/drift findings from design review, ported to Go tests). Current coverage:
 
 | Package | Coverage | Role |
 |---------|----------|------|
@@ -355,9 +351,7 @@ bundles none of them.
 - [TLA+ and TLC](https://github.com/tlaplus/tlaplus) -- the specification language and model checker
   (the formal layer).
 - [Eclipse Temurin / Adoptium](https://adoptium.net/) -- the JVM that runs TLC.
-- [Python](https://www.python.org/) and [PyYAML](https://pyyaml.org/) -- the gate tooling.
-- [uv](https://docs.astral.sh/uv/) -- the test runner and dependency resolver.
-- [Go](https://go.dev/) -- to install Modelith.
+- [Go](https://go.dev/) -- to build machinery from source and to install Modelith.
 - [LadybugDB](https://github.com/LadybugDB/go-ladybug) -- the embedded store used only by the go-crm
   example, not a machinery dependency.
 
