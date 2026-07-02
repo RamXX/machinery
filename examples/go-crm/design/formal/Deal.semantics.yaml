@@ -10,3 +10,9 @@ lose_stage: Lost
 reopen_to: Negotiation           # a reopen returns a terminal deal to this open stage
 close_date_on: Won               # committing to this stage sets the close date
 max_retries: 3
+# Event names (Modelith actions) so refine_gen can verify the machine's
+# transition structure against this annotation instead of trusting it.
+advance_event: advanceStage
+win_event: win
+lose_event: lose
+reopen_event: reopen

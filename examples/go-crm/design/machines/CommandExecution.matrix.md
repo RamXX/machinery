@@ -24,7 +24,7 @@ This is the home of the LadybugDB open/write/timeout failure rows from ARCHITECT
 | `ensureRolledBack` | action | `(ctx) -> ctx` | roll back the write tx (idempotent; store guarantees no partial write) | C4 6 atomicity |
 | `renderOutput` | action | `(ctx) -> ctx` | format tables/JSON to stdout (entry of Rendering) | - |
 | `recordAllowed` / `recordDenyReason` | action | `(ctx,evt) -> ctx` | record the authz outcome | rbac-* surfacing |
-| `recordError` / `recordCorrupt` / `recordUnavailable` / `recordOpenError` / `recordNeedLogin` / `recordSessionError` / `recordConstraint` / `recordConflict` / `recordDiskFull` / `recordTimeout` / `recordExecuteError` / `recordLockExhausted` | action | `(ctx,evt) -> ctx` | `lastError:=classified error` | maps repo/session errors |
+| `recordParseError` / `recordError` / `recordCorrupt` / `recordUnavailable` / `recordOpenError` / `recordNeedLogin` / `recordSessionError` / `recordConstraint` / `recordConflict` / `recordDiskFull` / `recordTimeout` / `recordExecuteError` / `recordLockExhausted` | action | `(ctx,evt) -> ctx` | `lastError:=classified error` | maps parse/repo/session errors |
 | `recordSuccessExit` / `recordDeniedExit` / `recordValidationExit` / `recordDBErrorExit` / `recordCorruptExit` | action | `(ctx) -> ctx` | set process `exitCode` (entry of each terminal state) | CLI exit contract |
 
 ## (b) Failure catalog (every ARCHITECTURE.md section 6 dependency row lands here or in Session)

@@ -103,6 +103,7 @@
       }
     },
     "rolledBack": {
+      "_exhaustive": "only Open and InProgress have transitions into the persist overlay, so priorStatus ranges over {Open, InProgress}; both priorIs* guards are present",
       "always": [
         { "target": "Open", "guard": "priorIsOpen" },
         { "target": "InProgress", "guard": "priorIsInProgress" }

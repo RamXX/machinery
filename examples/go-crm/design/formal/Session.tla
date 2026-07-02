@@ -2,16 +2,28 @@
 EXTENDS Naturals
 
 \* Generated from Session.machine.json by tools/tla_gen.py. Control-flow model.
+\*
+\* ASSUMPTIONS (what this abstraction erases; the proof is conditional on them):
+\*   1. Guards are erased to nondeterminism: sound for safety; for liveness the
+\*      guard lists must be exhaustive. machine_lint enforces an unguarded
+\*      fallback or an _exhaustive note on every fully guarded always-list.
+\*   2. Every invoke resolves exactly once (onDone or onError; no lost or
+\*      duplicated completion) and every after timer eventually fires.
+\*   3. Single machine instance; no interleaving with other instances or
+\*      machines, no message loss/duplication/reordering between machines.
+\*   4. Context data, event payloads, action effects, and real time (the
+\*      _delays values) are not modeled at this rung; the data-refined rung
+\*      (refine_gen) and the implementation tests carry those.
 CONSTANT MaxRetries
-VARIABLES st, rc
-vars == << st, rc >>
+VARIABLES st, rc1
+vars == << st, rc1 >>
 
 States == {"Active", "Anonymous", "AuthDenied", "AuthFailed", "Authenticating", "CheckingUser", "Expired", "Invalidated", "LoggedOut", "LoggingOut", "Resolving", "SessionUnavailable", "VerifyRetry", "WritingSession"}
 Domain == {"Active", "Anonymous", "AuthDenied", "AuthFailed", "Expired", "Invalidated", "LoggedOut", "SessionUnavailable"}
 Overlay == {"Authenticating", "CheckingUser", "LoggingOut", "Resolving", "VerifyRetry", "WritingSession"}
 
-TypeOK == st \in States /\ rc \in 0..MaxRetries
-Init == st = "Anonymous" /\ rc = 0
+TypeOK == st \in States /\ rc1 \in 0..MaxRetries
+Init == st = "Anonymous" /\ rc1 = 0
 
   \* T1: Anonymous -on:login-> Authenticating
   \* T2: Anonymous -on:resume-> Resolving
@@ -72,69 +84,69 @@ Init == st = "Anonymous" /\ rc = 0
   \* T57: SessionUnavailable -on:logout-> SessionUnavailable
   \* T58: SessionUnavailable -on:useSession-> SessionUnavailable
 
-T1 == st = "Anonymous" /\ st' = "Authenticating" /\ rc' = 0
-T2 == st = "Anonymous" /\ st' = "Resolving" /\ rc' = 0
-T3 == st = "Anonymous" /\ st' = "Anonymous" /\ rc' = 0
-T4 == st = "Anonymous" /\ st' = "Anonymous" /\ rc' = 0
-T5 == st = "Authenticating" /\ st' = "SessionUnavailable" /\ rc' = 0
-T6 == st = "Authenticating" /\ st' = "AuthDenied" /\ rc' = 0
-T7 == st = "Authenticating" /\ st' = "WritingSession" /\ rc' = rc
-T8 == st = "Authenticating" /\ st' = "AuthFailed" /\ rc' = 0
-T9 == st = "Authenticating" /\ st' = "AuthDenied" /\ rc' = 0
-T10 == st = "Authenticating" /\ st' = "VerifyRetry" /\ rc' = rc
-T11 == st = "Authenticating" /\ st' = "SessionUnavailable" /\ rc' = 0
-T12 == st = "WritingSession" /\ st' = "SessionUnavailable" /\ rc' = 0
-T13 == st = "WritingSession" /\ st' = "Active" /\ rc' = 0
-T14 == st = "WritingSession" /\ st' = "SessionUnavailable" /\ rc' = 0
-T15 == st = "Resolving" /\ st' = "SessionUnavailable" /\ rc' = 0
-T16 == st = "Resolving" /\ st' = "Expired" /\ rc' = 0
-T17 == st = "Resolving" /\ st' = "CheckingUser" /\ rc' = rc
-T18 == st = "Resolving" /\ st' = "Anonymous" /\ rc' = 0
-T19 == st = "Resolving" /\ st' = "Expired" /\ rc' = 0
-T20 == st = "Resolving" /\ st' = "SessionUnavailable" /\ rc' = 0
-T21 == st = "CheckingUser" /\ st' = "SessionUnavailable" /\ rc' = 0
-T22 == st = "CheckingUser" /\ st' = "Active" /\ rc' = 0
-T23 == st = "CheckingUser" /\ st' = "Invalidated" /\ rc' = 0
-T24 == st = "CheckingUser" /\ st' = "VerifyRetry" /\ rc' = rc
-T25 == st = "CheckingUser" /\ st' = "Invalidated" /\ rc' = 0
-T26 == st = "CheckingUser" /\ st' = "SessionUnavailable" /\ rc' = 0
-T27 == st = "Active" /\ st' = "LoggingOut" /\ rc' = 0
-T28 == st = "Active" /\ st' = "Active" /\ rc' = 0
-T29 == st = "Active" /\ st' = "Active" /\ rc' = 0
-T30 == st = "Active" /\ st' = "Active" /\ rc' = 0
-T31 == st = "Active" /\ st' = "Expired" /\ rc' = 0
-T32 == st = "LoggingOut" /\ st' = "LoggedOut" /\ rc' = 0
-T33 == st = "LoggingOut" /\ st' = "LoggedOut" /\ rc' = 0
-T34 == st = "LoggingOut" /\ st' = "LoggedOut" /\ rc' = 0
-T35 == st = "Expired" /\ st' = "Authenticating" /\ rc' = 0
-T36 == st = "Expired" /\ st' = "Expired" /\ rc' = 0
-T37 == st = "Expired" /\ st' = "Expired" /\ rc' = 0
-T38 == st = "Expired" /\ st' = "Expired" /\ rc' = 0
-T39 == st = "LoggedOut" /\ st' = "Authenticating" /\ rc' = 0
-T40 == st = "LoggedOut" /\ st' = "LoggedOut" /\ rc' = 0
-T41 == st = "LoggedOut" /\ st' = "LoggedOut" /\ rc' = 0
-T42 == st = "LoggedOut" /\ st' = "LoggedOut" /\ rc' = 0
-T43 == st = "AuthFailed" /\ st' = "Authenticating" /\ rc' = 0
-T44 == st = "AuthFailed" /\ st' = "AuthFailed" /\ rc' = 0
-T45 == st = "AuthFailed" /\ st' = "AuthFailed" /\ rc' = 0
-T46 == st = "AuthFailed" /\ st' = "AuthFailed" /\ rc' = 0
-T47 == st = "AuthDenied" /\ st' = "Authenticating" /\ rc' = 0
-T48 == st = "AuthDenied" /\ st' = "AuthDenied" /\ rc' = 0
-T49 == st = "AuthDenied" /\ st' = "AuthDenied" /\ rc' = 0
-T50 == st = "AuthDenied" /\ st' = "AuthDenied" /\ rc' = 0
-T51 == st = "Invalidated" /\ st' = "Authenticating" /\ rc' = 0
-T52 == st = "Invalidated" /\ st' = "Invalidated" /\ rc' = 0
-T53 == st = "Invalidated" /\ st' = "Invalidated" /\ rc' = 0
-T54 == st = "Invalidated" /\ st' = "Invalidated" /\ rc' = 0
-T55 == st = "SessionUnavailable" /\ st' = "Authenticating" /\ rc' = 0
-T56 == st = "SessionUnavailable" /\ st' = "Resolving" /\ rc' = 0
-T57 == st = "SessionUnavailable" /\ st' = "SessionUnavailable" /\ rc' = 0
-T58 == st = "SessionUnavailable" /\ st' = "SessionUnavailable" /\ rc' = 0
-RetryExhausted == st = "VerifyRetry" /\ rc >= MaxRetries /\ st' = "SessionUnavailable" /\ rc' = rc
-RetryAgain == st = "VerifyRetry" /\ rc < MaxRetries /\ st' = "Authenticating" /\ rc' = rc + 1
+T1 == st = "Anonymous" /\ st' = "Authenticating" /\ rc1' = 0
+T2 == st = "Anonymous" /\ st' = "Resolving" /\ rc1' = 0
+T3 == st = "Anonymous" /\ st' = "Anonymous" /\ rc1' = 0
+T4 == st = "Anonymous" /\ st' = "Anonymous" /\ rc1' = 0
+T5 == st = "Authenticating" /\ st' = "SessionUnavailable" /\ rc1' = 0
+T6 == st = "Authenticating" /\ st' = "AuthDenied" /\ rc1' = 0
+T7 == st = "Authenticating" /\ st' = "WritingSession" /\ rc1' = rc1
+T8 == st = "Authenticating" /\ st' = "AuthFailed" /\ rc1' = 0
+T9 == st = "Authenticating" /\ st' = "AuthDenied" /\ rc1' = 0
+T10 == st = "Authenticating" /\ st' = "VerifyRetry" /\ rc1' = rc1
+T11 == st = "Authenticating" /\ st' = "SessionUnavailable" /\ rc1' = 0
+T12 == st = "WritingSession" /\ st' = "SessionUnavailable" /\ rc1' = 0
+T13 == st = "WritingSession" /\ st' = "Active" /\ rc1' = 0
+T14 == st = "WritingSession" /\ st' = "SessionUnavailable" /\ rc1' = 0
+T15 == st = "Resolving" /\ st' = "SessionUnavailable" /\ rc1' = 0
+T16 == st = "Resolving" /\ st' = "Expired" /\ rc1' = 0
+T17 == st = "Resolving" /\ st' = "CheckingUser" /\ rc1' = rc1
+T18 == st = "Resolving" /\ st' = "Anonymous" /\ rc1' = 0
+T19 == st = "Resolving" /\ st' = "Expired" /\ rc1' = 0
+T20 == st = "Resolving" /\ st' = "SessionUnavailable" /\ rc1' = 0
+T21 == st = "CheckingUser" /\ st' = "SessionUnavailable" /\ rc1' = 0
+T22 == st = "CheckingUser" /\ st' = "Active" /\ rc1' = 0
+T23 == st = "CheckingUser" /\ st' = "Invalidated" /\ rc1' = 0
+T24 == st = "CheckingUser" /\ st' = "VerifyRetry" /\ rc1' = rc1
+T25 == st = "CheckingUser" /\ st' = "Invalidated" /\ rc1' = 0
+T26 == st = "CheckingUser" /\ st' = "SessionUnavailable" /\ rc1' = 0
+T27 == st = "Active" /\ st' = "LoggingOut" /\ rc1' = 0
+T28 == st = "Active" /\ st' = "Active" /\ rc1' = 0
+T29 == st = "Active" /\ st' = "Active" /\ rc1' = 0
+T30 == st = "Active" /\ st' = "Active" /\ rc1' = 0
+T31 == st = "Active" /\ st' = "Expired" /\ rc1' = 0
+T32 == st = "LoggingOut" /\ st' = "LoggedOut" /\ rc1' = 0
+T33 == st = "LoggingOut" /\ st' = "LoggedOut" /\ rc1' = 0
+T34 == st = "LoggingOut" /\ st' = "LoggedOut" /\ rc1' = 0
+T35 == st = "Expired" /\ st' = "Authenticating" /\ rc1' = 0
+T36 == st = "Expired" /\ st' = "Expired" /\ rc1' = 0
+T37 == st = "Expired" /\ st' = "Expired" /\ rc1' = 0
+T38 == st = "Expired" /\ st' = "Expired" /\ rc1' = 0
+T39 == st = "LoggedOut" /\ st' = "Authenticating" /\ rc1' = 0
+T40 == st = "LoggedOut" /\ st' = "LoggedOut" /\ rc1' = 0
+T41 == st = "LoggedOut" /\ st' = "LoggedOut" /\ rc1' = 0
+T42 == st = "LoggedOut" /\ st' = "LoggedOut" /\ rc1' = 0
+T43 == st = "AuthFailed" /\ st' = "Authenticating" /\ rc1' = 0
+T44 == st = "AuthFailed" /\ st' = "AuthFailed" /\ rc1' = 0
+T45 == st = "AuthFailed" /\ st' = "AuthFailed" /\ rc1' = 0
+T46 == st = "AuthFailed" /\ st' = "AuthFailed" /\ rc1' = 0
+T47 == st = "AuthDenied" /\ st' = "Authenticating" /\ rc1' = 0
+T48 == st = "AuthDenied" /\ st' = "AuthDenied" /\ rc1' = 0
+T49 == st = "AuthDenied" /\ st' = "AuthDenied" /\ rc1' = 0
+T50 == st = "AuthDenied" /\ st' = "AuthDenied" /\ rc1' = 0
+T51 == st = "Invalidated" /\ st' = "Authenticating" /\ rc1' = 0
+T52 == st = "Invalidated" /\ st' = "Invalidated" /\ rc1' = 0
+T53 == st = "Invalidated" /\ st' = "Invalidated" /\ rc1' = 0
+T54 == st = "Invalidated" /\ st' = "Invalidated" /\ rc1' = 0
+T55 == st = "SessionUnavailable" /\ st' = "Authenticating" /\ rc1' = 0
+T56 == st = "SessionUnavailable" /\ st' = "Resolving" /\ rc1' = 0
+T57 == st = "SessionUnavailable" /\ st' = "SessionUnavailable" /\ rc1' = 0
+T58 == st = "SessionUnavailable" /\ st' = "SessionUnavailable" /\ rc1' = 0
+RetryExhausted_VerifyRetry == st = "VerifyRetry" /\ rc1 >= MaxRetries /\ st' = "SessionUnavailable" /\ rc1' = rc1
+RetryAgain_VerifyRetry == st = "VerifyRetry" /\ rc1 < MaxRetries /\ st' = "Authenticating" /\ rc1' = rc1 + 1
 
 DomainNext == T1 \/ T2 \/ T3 \/ T4 \/ T27 \/ T28 \/ T29 \/ T30 \/ T31 \/ T35 \/ T36 \/ T37 \/ T38 \/ T39 \/ T40 \/ T41 \/ T42 \/ T43 \/ T44 \/ T45 \/ T46 \/ T47 \/ T48 \/ T49 \/ T50 \/ T51 \/ T52 \/ T53 \/ T54 \/ T55 \/ T56 \/ T57 \/ T58
-OverlayNext == T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ T26 \/ T32 \/ T33 \/ T34 \/ RetryExhausted \/ RetryAgain
+OverlayNext == T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ T26 \/ T32 \/ T33 \/ T34 \/ RetryExhausted_VerifyRetry \/ RetryAgain_VerifyRetry
 Next == DomainNext \/ OverlayNext
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)
