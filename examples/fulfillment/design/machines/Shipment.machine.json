@@ -1,0 +1,115 @@
+{
+  "_comment": "Shipment aggregate lifecycle (states = ShipmentStatus; events = Shipment actions). PLACEMENT: a row in the Shipping DB, optimistic lock; the carrier is called from the dispatching overlay with bounded retry (ARCHITECTURE.md section 3, carrier posture). A dispatch that exhausts its retries leaves the shipment Pending and surfaces the error; the saga compensates. Carrier tracking callbacks (markInTransit, deliver, markLost) arrive over the bus at least once, deduped by message id before the machine. deliver is accepted from Dispatched as well as InTransit because carriers skip scans. Enforces shipment-terminal: Delivered and Lost are final.",
+  "_delays": {
+    "carrierTimeout": "8000 ms - carrier dispatch call timeout",
+    "carrierRetryBackoff": "500 ms - retryable carrier failure (5xx, timeout); retriesExhausted at 3",
+    "persistTimeout": "5000 ms - Shipping DB write timeout",
+    "persistRetryBackoff": "500 ms - transient DB unavailability or optimistic-lock conflict; retriesExhausted at 3"
+  },
+  "id": "shipment",
+  "initial": "Pending",
+  "context": {
+    "shipmentId": null,
+    "orderId": null,
+    "trackingId": null,
+    "status": "Pending",
+    "pendingStatus": null,
+    "priorStatus": null,
+    "carrierRetries": 0,
+    "retries": 0,
+    "lastError": null
+  },
+  "states": {
+    "Pending": {
+      "on": {
+        "dispatch": { "target": "dispatching", "actions": "setCarrierDispatch" }
+      },
+      "_ignores": {
+        "markInTransit": "no dispatch has succeeded; a tracking event for an undispatched shipment is stale, nack for redelivery",
+        "deliver": "no dispatch has succeeded; stale tracking event",
+        "markLost": "no dispatch has succeeded; stale tracking event"
+      }
+    },
+    "Dispatched": {
+      "on": {
+        "markInTransit": { "target": "persisting", "actions": "setPendingInTransit" },
+        "deliver": { "target": "persisting", "actions": "setPendingDelivered" },
+        "markLost": { "target": "persisting", "actions": "setPendingLost" }
+      },
+      "_ignores": {
+        "dispatch": "idempotent redelivery: already dispatched (carrier keyed by shipmentId)"
+      }
+    },
+    "InTransit": {
+      "on": {
+        "deliver": { "target": "persisting", "actions": "setPendingDelivered" },
+        "markLost": { "target": "persisting", "actions": "setPendingLost" }
+      },
+      "_ignores": {
+        "dispatch": "idempotent redelivery: already dispatched",
+        "markInTransit": "idempotent redelivery: already in transit"
+      }
+    },
+    "Delivered": { "type": "final" },
+    "Lost": { "type": "final" },
+    "dispatching": {
+      "invoke": {
+        "src": "carrierDispatch",
+        "input": { "shipmentId": "context.shipmentId", "orderId": "context.orderId" },
+        "onDone": { "target": "persisting", "actions": ["captureTrackingId", "setPendingDispatched"] },
+        "onError": [
+          { "target": "carrierRetry", "guard": "isErrRetryable", "actions": "recordCarrierError" },
+          { "target": "rolledBack", "actions": "recordDispatchFailed" }
+        ]
+      },
+      "after": {
+        "carrierTimeout": { "target": "carrierRetry", "actions": "recordCarrierTimeout" }
+      }
+    },
+    "carrierRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "carrierRetriesExhausted", "actions": "recordCarrierExhausted" }
+      ],
+      "after": {
+        "carrierRetryBackoff": { "target": "dispatching", "actions": "incrementCarrierRetries" }
+      }
+    },
+    "persisting": {
+      "invoke": {
+        "src": "persistShipment",
+        "input": { "shipmentId": "context.shipmentId", "status": "context.pendingStatus" },
+        "onDone": [
+          { "target": "Dispatched", "guard": "pendingIsDispatched", "actions": "commitStatus" },
+          { "target": "InTransit", "guard": "pendingIsInTransit", "actions": "commitStatus" },
+          { "target": "Delivered", "guard": "pendingIsDelivered", "actions": "commitStatus" },
+          { "target": "Lost", "guard": "pendingIsLost", "actions": "commitStatus" },
+          { "target": "rolledBack", "actions": "recordRoutingError" }
+        ],
+        "onError": [
+          { "target": "persistRetry", "guard": "isErrUnavailable", "actions": "recordError" },
+          { "target": "persistRetry", "guard": "isErrConflict", "actions": "recordConflict" },
+          { "target": "rolledBack", "actions": "recordUnknownError" }
+        ]
+      },
+      "after": {
+        "persistTimeout": { "target": "rolledBack", "actions": "recordTimeout" }
+      }
+    },
+    "persistRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "retriesExhausted", "actions": "recordRetriesExhausted" }
+      ],
+      "after": {
+        "persistRetryBackoff": { "target": "persisting", "actions": "incrementRetries" }
+      }
+    },
+    "rolledBack": {
+      "_exhaustive": "priorStatus is set on every path into the overlay from a domain state; only Pending, Dispatched, and InTransit reach the overlay (Delivered and Lost are final), and all three priorIs* guards are present",
+      "always": [
+        { "target": "Pending", "guard": "priorIsPending" },
+        { "target": "Dispatched", "guard": "priorIsDispatched" },
+        { "target": "InTransit", "guard": "priorIsInTransit" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,156 @@
+{
+  "_comment": "Payment aggregate lifecycle (states = PaymentStatus; events = Payment actions). PLACEMENT: a row in the Payment DB, optimistic lock; the gateway (stripe) is called from the lowercase overlay states with an idempotency key, so a retried call cannot double-charge (ARCHITECTURE.md section 3, payment-gateway posture). Every gateway outcome is then persisted with the outbox event in one transaction. A refund that exhausts its retries leaves the payment Captured and surfaces the error to the saga, which owns the FailedDirty residual; the aggregate itself never lies about the captured state (refund-within-capture, payment-idempotent).",
+  "_delays": {
+    "gatewayTimeout": "8000 ms - gateway call timeout (capture/authorize/refund)",
+    "gatewayRetryBackoff": "500 ms - retryable gateway failure (5xx, timeout); retriesExhausted at 3",
+    "persistTimeout": "5000 ms - Payment DB write timeout",
+    "persistRetryBackoff": "500 ms - transient DB unavailability or optimistic-lock conflict; retriesExhausted at 3"
+  },
+  "id": "payment",
+  "initial": "Pending",
+  "context": {
+    "paymentId": null,
+    "orderId": null,
+    "amountCents": 0,
+    "idempotencyKey": null,
+    "status": "Pending",
+    "pendingStatus": null,
+    "priorStatus": null,
+    "gatewayOp": null,
+    "gatewayRetries": 0,
+    "retries": 0,
+    "lastError": null
+  },
+  "states": {
+    "Pending": {
+      "on": {
+        "authorize": [
+          { "target": "authorizing", "guard": "guardAmountNonneg", "actions": "setGatewayAuthorize" },
+          { "actions": "recordAuthorizeDenied" }
+        ],
+        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+      },
+      "_ignores": {
+        "capture": "out-of-order saga event: nothing authorized yet; nack for redelivery",
+        "refund": "nothing captured; a stale refund event is a no-op by refund-within-capture"
+      }
+    },
+    "Authorized": {
+      "on": {
+        "capture": { "target": "capturing", "actions": "setGatewayCapture" },
+        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+      },
+      "_ignores": {
+        "authorize": "idempotent redelivery: already authorized (same idempotency key)",
+        "refund": "nothing captured yet; release of an authorization is the gateway's auto-expiry"
+      }
+    },
+    "Captured": {
+      "on": {
+        "refund": { "target": "refunding", "actions": "setGatewayRefund" }
+      },
+      "_ignores": {
+        "authorize": "idempotent redelivery: already past authorization",
+        "capture": "idempotent redelivery: already captured (same idempotency key)",
+        "fail": "a captured payment fails only through refund; the saga compensates, it does not fail the aggregate"
+      }
+    },
+    "Failed": { "type": "final" },
+    "Refunded": { "type": "final" },
+    "authorizing": {
+      "invoke": {
+        "src": "gatewayAuthorize",
+        "input": { "amountCents": "context.amountCents", "idempotencyKey": "context.idempotencyKey" },
+        "onDone": { "target": "persisting", "actions": "setPendingAuthorized" },
+        "onError": [
+          { "target": "gatewayRetry", "guard": "isErrRetryable", "actions": "recordGatewayError" },
+          { "target": "persisting", "actions": ["recordGatewayRejected", "setPendingFailed"] }
+        ]
+      },
+      "after": {
+        "gatewayTimeout": { "target": "gatewayRetry", "actions": "recordGatewayTimeout" }
+      }
+    },
+    "capturing": {
+      "invoke": {
+        "src": "gatewayCapture",
+        "input": { "amountCents": "context.amountCents", "idempotencyKey": "context.idempotencyKey" },
+        "onDone": { "target": "persisting", "actions": "setPendingCaptured" },
+        "onError": [
+          { "target": "gatewayRetry", "guard": "isErrRetryable", "actions": "recordGatewayError" },
+          { "target": "persisting", "actions": ["recordGatewayRejected", "setPendingFailed"] }
+        ]
+      },
+      "after": {
+        "gatewayTimeout": { "target": "gatewayRetry", "actions": "recordGatewayTimeout" }
+      }
+    },
+    "refunding": {
+      "invoke": {
+        "src": "gatewayRefund",
+        "input": { "amountCents": "context.amountCents", "idempotencyKey": "context.idempotencyKey" },
+        "onDone": { "target": "persisting", "actions": "setPendingRefunded" },
+        "onError": [
+          { "target": "gatewayRetry", "guard": "isErrRetryable", "actions": "recordGatewayError" },
+          { "target": "rolledBack", "actions": "recordRefundFailed" }
+        ]
+      },
+      "after": {
+        "gatewayTimeout": { "target": "gatewayRetry", "actions": "recordGatewayTimeout" }
+      }
+    },
+    "gatewayRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "gatewayRetriesExhausted", "actions": "recordGatewayExhausted" }
+      ],
+      "after": {
+        "gatewayRetryBackoff": { "target": "gatewayResume", "actions": "incrementGatewayRetries" }
+      }
+    },
+    "gatewayResume": {
+      "_exhaustive": "gatewayOp is set by setGatewayAuthorize/setGatewayCapture/setGatewayRefund before entering the three gateway-call states, the only states that reach gatewayRetry; the three gatewayFor* guards cover {authorize, capture, refund} totally",
+      "always": [
+        { "target": "authorizing", "guard": "gatewayForAuthorize" },
+        { "target": "capturing", "guard": "gatewayForCapture" },
+        { "target": "refunding", "guard": "gatewayForRefund" }
+      ]
+    },
+    "persisting": {
+      "invoke": {
+        "src": "persistPayment",
+        "input": { "paymentId": "context.paymentId", "status": "context.pendingStatus" },
+        "onDone": [
+          { "target": "Authorized", "guard": "pendingIsAuthorized", "actions": "commitStatus" },
+          { "target": "Captured", "guard": "pendingIsCaptured", "actions": "commitStatus" },
+          { "target": "Refunded", "guard": "pendingIsRefunded", "actions": "commitStatus" },
+          { "target": "Failed", "guard": "pendingIsFailed", "actions": "commitStatus" },
+          { "target": "rolledBack", "actions": "recordRoutingError" }
+        ],
+        "onError": [
+          { "target": "persistRetry", "guard": "isErrUnavailable", "actions": "recordError" },
+          { "target": "persistRetry", "guard": "isErrConflict", "actions": "recordConflict" },
+          { "target": "rolledBack", "actions": "recordUnknownError" }
+        ]
+      },
+      "after": {
+        "persistTimeout": { "target": "rolledBack", "actions": "recordTimeout" }
+      }
+    },
+    "persistRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "retriesExhausted", "actions": "recordRetriesExhausted" }
+      ],
+      "after": {
+        "persistRetryBackoff": { "target": "persisting", "actions": "incrementRetries" }
+      }
+    },
+    "rolledBack": {
+      "_exhaustive": "priorStatus is set on every path into the overlay from a domain state; only Pending, Authorized, and Captured reach the overlay (Failed and Refunded are final), and all three priorIs* guards are present",
+      "always": [
+        { "target": "Pending", "guard": "priorIsPending" },
+        { "target": "Authorized", "guard": "priorIsAuthorized" },
+        { "target": "Captured", "guard": "priorIsCaptured" }
+      ]
+    }
+  }
+}

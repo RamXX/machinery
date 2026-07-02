@@ -21,20 +21,30 @@ contract_version: 1
 boundaries:
   - id: order.service
     kind: container
+    element: orderSvc
     code: [ "apps/order/**" ]
     exposes: [ "apps/order/lib/order_web/**" ]
+    modules: [ "Order", "OrderWeb" ]
   - id: inventory.service
     kind: container
+    element: inventorySvc
     code: [ "apps/inventory/**" ]
+    modules: [ "Inventory" ]
   - id: payment.service
     kind: container
+    element: paymentSvc
     code: [ "apps/payment/**" ]
+    modules: [ "Payment" ]
   - id: shipping.service
     kind: container
+    element: shippingSvc
     code: [ "apps/shipping/**" ]
+    modules: [ "Shipping" ]
   - id: shared.contracts
     kind: component
+    element: contracts
     code: [ "libs/contracts/**" ]
+    modules: [ "Contracts" ]
 dependency_rules:
   allow:
     - order.service -> shared.contracts
@@ -57,11 +67,11 @@ where this design differs most from go-crm, and where the FulfillmentSaga's comp
 
 | dependency | failure modes | mitigation | residual behavior the machines handle | bound |
 |---|---|---|---|---|
-| Message bus | unavailable, partition, duplicate | transactional outbox (at-least-once), clustered bus | duplicate delivery handled by idempotent consumers; delayed delivery becomes a saga step timeout then compensation | dedupe by message id; step timeout 5-8s |
-| Payment gateway | 5xx, timeout, duplicate charge | idempotency key, bounded retry | a timeout compensates (refund is idempotent and retried); a partial capture is reconciled by the refund | idempotency key; capture retried |
-| Per-service DB | unavailable, conflict | HA Postgres, the outbox | transient unavailability retries; the outbox guarantees no event is lost on a crash | retry <= 3 |
-| Carrier | 5xx, timeout, lost parcel | retry, tracking | a dispatch timeout compensates; a lost parcel is the terminal Shipment Lost | timeout 8s |
-| Network partition (service to bus) | messages delayed | outbox retry, saga step timeout | a step that does not confirm in time drives the saga into compensation | saga step timeout |
+| `bus` (message bus) | unavailable, partition, duplicate | transactional outbox (at-least-once), clustered bus | duplicate delivery handled by idempotent consumers; delayed delivery becomes a saga step timeout then compensation | dedupe by message id; step timeout 5-8s |
+| `stripe` (payment gateway) | 5xx, timeout, duplicate charge | idempotency key, bounded retry | a timeout compensates (refund is idempotent and retried); a partial capture is reconciled by the refund | idempotency key; capture retried |
+| `orderDb` `inventoryDb` `paymentDb` `shippingDb` (per-service DB) | unavailable, conflict | HA Postgres, the outbox | transient unavailability retries; the outbox guarantees no event is lost on a crash | retry <= 3 |
+| `carrier` | 5xx, timeout, lost parcel | retry, tracking | a dispatch timeout compensates; a lost parcel is the terminal Shipment Lost | timeout 8s |
+| `bus` (network partition, service to bus) | messages delayed | outbox retry, saga step timeout | a step that does not confirm in time drives the saga into compensation | saga step timeout |
 
 The saga's compensation is a single idempotent step (refund if captured, release if reserved), retried;
 if it cannot complete within the bound the saga ends in the explicit residual FailedDirty. The data-refined
@@ -71,9 +81,9 @@ model `formal/FulfillmentSagaData.tla` proves that money and stock are never sil
 
 | component | placement | persistence | concurrency serialization |
 |---|---|---|---|
-| FulfillmentSaga | a persistent process per order (`gen_statem` under a `Registry`) | saga state row plus the outbox in the Order DB | one process per order (actor mailbox) |
-| Order, Payment, Reservation, Shipment | per-service DB rows | status columns per aggregate | optimistic lock per row |
-| Outbox | a table in each service DB, drained by a poller | rows marked Published then Consumed | at-least-once; consumers dedupe by message id |
+| `FulfillmentSaga` | a persistent process per order (`gen_statem` under a `Registry`) | saga state row plus the outbox in the Order DB | one process per order (actor mailbox) |
+| `Order` `Payment` `Reservation` `Shipment` | per-service DB rows | status columns per aggregate | optimistic lock per row |
+| `OutboxMessage` | a table in each service DB, drained by a poller | rows marked Published then Consumed; the machine models one publish attempt, the poller supplies the at-least-once re-drive | at-least-once; consumers dedupe by message id |
 
 ## 5. Gate 2 result
 

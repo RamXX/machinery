@@ -1,0 +1,65 @@
+{
+  "_comment": "Reservation aggregate lifecycle (states = ReservationStatus; events = Reservation actions; hold creates the aggregate, so it is the initial state, not an event). PLACEMENT: a row in the Inventory DB, optimistic lock; commit/release arrive over the bus at least once, deduped by message id before the machine. Enforces reservation-terminal: Committed and Released are final.",
+  "_delays": {
+    "persistTimeout": "5000 ms - Inventory DB write timeout",
+    "persistRetryBackoff": "500 ms - transient DB unavailability or optimistic-lock conflict; retriesExhausted at 3"
+  },
+  "id": "reservation",
+  "initial": "Held",
+  "context": {
+    "reservationId": null,
+    "orderId": null,
+    "quantity": 0,
+    "status": "Held",
+    "pendingStatus": null,
+    "priorStatus": null,
+    "retries": 0,
+    "lastError": null
+  },
+  "states": {
+    "Held": {
+      "on": {
+        "commit": { "target": "persisting", "actions": "setPendingCommitted" },
+        "release": { "target": "persisting", "actions": "setPendingReleased" }
+      }
+    },
+    "Committed": { "type": "final" },
+    "Released": { "type": "final" },
+    "persisting": {
+      "invoke": {
+        "src": "persistReservation",
+        "input": {
+          "reservationId": "context.reservationId",
+          "status": "context.pendingStatus"
+        },
+        "onDone": [
+          { "target": "Committed", "guard": "pendingIsCommitted", "actions": "commitStatus" },
+          { "target": "Released", "guard": "pendingIsReleased", "actions": "commitStatus" },
+          { "target": "rolledBack", "actions": "recordRoutingError" }
+        ],
+        "onError": [
+          { "target": "persistRetry", "guard": "isErrUnavailable", "actions": "recordError" },
+          { "target": "persistRetry", "guard": "isErrConflict", "actions": "recordConflict" },
+          { "target": "rolledBack", "actions": "recordUnknownError" }
+        ]
+      },
+      "after": {
+        "persistTimeout": { "target": "rolledBack", "actions": "recordTimeout" }
+      }
+    },
+    "persistRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "retriesExhausted", "actions": "recordRetriesExhausted" }
+      ],
+      "after": {
+        "persistRetryBackoff": { "target": "persisting", "actions": "incrementRetries" }
+      }
+    },
+    "rolledBack": {
+      "_exhaustive": "only Held has transitions into the persist overlay (Committed and Released are final), so priorStatus is always Held and the single priorIsHeld guard is total",
+      "always": [
+        { "target": "Held", "guard": "priorIsHeld" }
+      ]
+    }
+  }
+}

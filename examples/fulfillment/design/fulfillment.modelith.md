@@ -56,10 +56,13 @@ A distributed order-fulfillment platform. Placing an order runs a saga that rese
 
 | Value | Definition |
 | --- | --- |
-| `Running` | Executing the forward path. |
+| `Reserving` | Holding stock; the first forward step. |
+| `Paying` | Capturing payment; stock is held. |
+| `Shipping` | Dispatching; payment is captured. |
 | `Compensating` | Unwinding after a failure. |
 | `Completed` | Fulfilled; terminal. |
 | `Failed` | Compensated and abandoned; terminal. |
+| `FailedDirty` | Compensation could not complete within the retry bound; an obligation may still be held. Explicit residual; pages an operator. |
 
 ### `ShipmentStatus`
 

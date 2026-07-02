@@ -22,6 +22,7 @@ workspace "Order Fulfillment" "Distributed fulfillment platform: a saga coordina
       inventoryDb = container "Inventory DB" "Stock and reservations." "PostgreSQL" "Database"
       paymentDb = container "Payment DB" "Payments and refunds." "PostgreSQL" "Database"
       shippingDb = container "Shipping DB" "Shipments." "PostgreSQL" "Database"
+      contracts = container "Shared Contracts" "Versioned message and event schemas shared by every service (build-time library)." "Elixir library"
     }
 
     customer -> api "Places and tracks orders" "HTTPS"

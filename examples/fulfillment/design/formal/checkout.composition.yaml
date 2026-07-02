@@ -1,12 +1,21 @@
+# Cross-aggregate composition, validated against the coordinator machine:
+# compose_gen checks that the step order below IS the FulfillmentSaga's forward
+# onDone chain and that every failure route matches, then models the full
+# branching (step failures, per-obligation compensation in any order, the
+# FailedDirty stall) and checks the invariants over all of it.
 composition: checkout
+coordinator: FulfillmentSaga     # machines/FulfillmentSaga.machine.json
 aggregates:
-  reservation: { states: [Free, Held], initial: Free }
-  payment: { states: [NotCaptured, Captured], initial: NotCaptured }
+  reservation: { states: [Free, Held, Released], initial: Free }
+  payment: { states: [NotCaptured, Captured, Refunded], initial: NotCaptured }
   shipment: { states: [NotDispatched, Dispatched], initial: NotDispatched }
 sequence:
-  - { aggregate: reservation, to: Held }
-  - { aggregate: payment, to: Captured }
-  - { aggregate: shipment, to: Dispatched }
+  - { step: Reserving, aggregate: reservation, to: Held, undo: { to: Released } }
+  - { step: Paying, aggregate: payment, to: Captured, undo: { to: Refunded } }
+  - { step: Shipping, aggregate: shipment, to: Dispatched }   # completing step: no undo
 invariants:
-  reserve-before-pay: 'payment = "Captured" => reservation = "Held"'
+  # capture implies the stock hold happened first (Released only exists after a
+  # hold, so this holds across compensation too)
+  reserve-before-pay: 'payment = "Captured" => reservation # "Free"'
+  # dispatch happens only after a successful capture, on every branch
   no-ship-before-pay: 'shipment = "Dispatched" => payment = "Captured"'
