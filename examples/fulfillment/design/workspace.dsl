@@ -51,18 +51,45 @@ workspace "Order Fulfillment" "Distributed fulfillment platform: a saga coordina
   }
 
   views {
-    systemContext plat "Context" { include *; autoLayout lr }
-    container plat "Containers" { include *; autoLayout }
-    component orderSvc "OrderService" { include *; autoLayout }
-    deployment plat "production" "Deployment" { include *; autoLayout }
+    systemContext plat "Context" {
+      include *
+      autoLayout lr
+    }
+    container plat "Containers" {
+      include *
+      autoLayout
+    }
+    component orderSvc "OrderService" {
+      include *
+      autoLayout
+    }
     styles {
-      element "Person" { shape Person; background #08427B; color #ffffff }
-      element "Software System" { background #1168BD; color #ffffff }
-      element "Container" { background #438DD5; color #ffffff }
-      element "Component" { background #85BBF0; color #000000 }
-      element "Database" { shape Cylinder }
-      element "Queue" { shape Pipe }
-      element "External" { background #999999 }
+      element "Person" {
+        shape Person
+        background #08427B
+        color #ffffff
+      }
+      element "Software System" {
+        background #1168BD
+        color #ffffff
+      }
+      element "Container" {
+        background #438DD5
+        color #ffffff
+      }
+      element "Component" {
+        background #85BBF0
+        color #000000
+      }
+      element "Database" {
+        shape Cylinder
+      }
+      element "Queue" {
+        shape Pipe
+      }
+      element "External" {
+        background #999999
+      }
     }
   }
 }

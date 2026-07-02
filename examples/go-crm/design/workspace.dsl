@@ -54,17 +54,27 @@ workspace "Go CRM" "Single-binary CRM with an embedded LadybugDB graph and role-
       autoLayout
     }
 
-    deployment crm "production" "Deployment" {
-      include *
-      autoLayout
-    }
-
     styles {
-      element "Person"          { shape Person;  background #08427B; color #ffffff }
-      element "Software System" { background #1168BD; color #ffffff }
-      element "Container"       { background #438DD5; color #ffffff }
-      element "Component"       { background #85BBF0; color #000000 }
-      element "Database"        { shape Cylinder }
+      element "Person" {
+        shape Person
+        background #08427B
+        color #ffffff
+      }
+      element "Software System" {
+        background #1168BD
+        color #ffffff
+      }
+      element "Container" {
+        background #438DD5
+        color #ffffff
+      }
+      element "Component" {
+        background #85BBF0
+        color #000000
+      }
+      element "Database" {
+        shape Cylinder
+      }
     }
   }
 }
