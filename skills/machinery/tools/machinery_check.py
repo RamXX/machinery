@@ -127,6 +127,9 @@ def check_machines(mdir):
         # the named-unit contract table. An action fired but represented in
         # neither is drift (the oracle no longer specifies the machine).
         mpath = path.replace(".machine.json", ".matrix.md")
+        if not os.path.exists(mpath):
+            warns.append(f"{base}: no hand-authored matrix; the oracle is generated from the machine, so no drift is possible")
+            continue
         rows, acol = transition_table(mpath)
         if rows is None:
             errs.append(f"{base}: no transition-matrix table found in the matrix file")
@@ -264,14 +267,17 @@ def check_traceability(design):
                 adv.append(f"{comp}: event {ev!r} is not a Modelith action for a domain entity")
 
     # every invariant enforced somewhere: named in a matrix maps-to column or in BUILD.md section 6
-    corpus = ""
-    for f in glob.glob(os.path.join(mdir, "*.matrix.md")) + [os.path.join(design, "BUILD.md")]:
-        if os.path.exists(f):
-            corpus += open(f).read()
+    build = os.path.join(design, "BUILD.md")
+    if not os.path.exists(build):
+        adv.append("traceability: BUILD.md not yet authored; invariant-enforcement check deferred to Phase 4")
+        return errs, warns, adv
+    corpus = open(build).read()
+    for f in glob.glob(os.path.join(mdir, "*.matrix.md")):
+        corpus += open(f).read()
     for iid in sorted(inv_ids):
         if iid not in corpus:
-            errs.append(f"traceability: invariant {iid!r} is enforced by nothing (absent from all "
-                        f"machine matrices and BUILD.md)")
+            errs.append(f"traceability: invariant {iid!r} is enforced by nothing (absent from "
+                        f"BUILD.md and the machine matrices)")
     return errs, warns, adv
 
 
