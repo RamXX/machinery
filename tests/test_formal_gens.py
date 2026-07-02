@@ -175,6 +175,107 @@ def test_saga_requires_undo_on_non_final_steps():
         refine_gen.emit_saga(load(SAGA_MACHINE), sem, ("m", "s"))
 
 
+# ---------------------- terminal-lifecycle (parameterized) ------------------
+
+def terminal_machine():
+    """A forward pipeline with non-default (non-CRM) state names, to prove the
+    pattern is not hardcoded to any domain's vocabulary."""
+    return {
+        "id": "run",
+        "initial": "Collecting",
+        "states": {
+            "Collecting": {
+                "invoke": {"src": "fetch", "onDone": {"target": "Optimizing"},
+                           "onError": {"target": "collectRetry"}},
+                "after": {"FETCH_TIMEOUT": {"target": "collectRetry"}},
+            },
+            "Optimizing": {
+                "invoke": {"src": "optimize",
+                           "onDone": {"target": "Ready", "actions": "recordResult"},
+                           "onError": {"target": "Failed"}},
+                "after": {"OPT_TIMEOUT": {"target": "Failed"}},
+            },
+            "collectRetry": {
+                "always": [{"target": "Failed", "guard": "retriesExhausted"}],
+                "after": {"BACKOFF": {"target": "Collecting", "actions": "incRetries"}},
+            },
+            "Ready": {"type": "final", "entry": "publishReady"},
+            "Failed": {"type": "final", "entry": "publishFailure"},
+        },
+    }
+
+
+TERMINAL_SEM = {
+    "pattern": "terminal-lifecycle",
+    "machine": "Run",
+    "phases": ["Collecting", "Optimizing"],
+    "success_terminal": "Ready",
+    "failure_terminals": ["Failed"],
+    "retry": {"state": "collectRetry", "serves": "Collecting"},
+    "success_flag": "resultReady",
+    "max_retries": 3,
+}
+
+
+def test_terminal_reconciles_and_emits_with_annotation_names():
+    mid, files = refine_gen.emit_terminal(terminal_machine(), dict(TERMINAL_SEM), ("m", "s"))
+    assert mid == "Run"
+    tla = files["RunData.tla"]
+    # every state/flag name is taken from the annotation, not hardcoded
+    assert 'Phases == {"Collecting", "Optimizing"}' in tla
+    assert "resultReady" in tla and "collectRetry" in tla
+    assert "Inv_Complete" in tla and "Live_Terminates" in tla
+    assert "persisting" not in tla  # no leak from the lifecycle pattern's defaults
+
+
+def test_terminal_rejects_phase_order_drift():
+    sem = dict(TERMINAL_SEM)
+    sem["phases"] = ["Optimizing", "Collecting"]  # wrong order
+    with pytest.raises(SystemExit):
+        refine_gen.emit_terminal(terminal_machine(), sem, ("m", "s"))
+
+
+def test_terminal_rejects_unserved_phase_failing_into_retry():
+    """A phase with no declared retry must fail into a terminal, not a retry state."""
+    m = terminal_machine()
+    m["states"]["Optimizing"]["invoke"]["onError"]["target"] = "collectRetry"
+    with pytest.raises(SystemExit, match="failure paths"):
+        refine_gen.emit_terminal(m, dict(TERMINAL_SEM), ("m", "s"))
+
+
+def test_terminal_rejects_missing_completion_on_success():
+    """If the success terminal is not the last phase's onDone target, reconcile fails."""
+    m = terminal_machine()
+    m["states"]["Optimizing"]["invoke"]["onDone"]["target"] = "Failed"
+    with pytest.raises(SystemExit, match="onDone"):
+        refine_gen.emit_terminal(m, dict(TERMINAL_SEM), ("m", "s"))
+
+
+def test_terminal_rejects_domain_state_drift():
+    sem = dict(TERMINAL_SEM)
+    sem["failure_terminals"] = ["Failed", "Aborted"]  # Aborted not in the machine
+    with pytest.raises(SystemExit, match="domain states disagree"):
+        refine_gen.emit_terminal(terminal_machine(), sem, ("m", "s"))
+
+
+def test_lifecycle_overlay_names_are_configurable():
+    """The linear-lifecycle overlay names come from the annotation; renaming them
+    in both the machine and the semantics must still reconcile (no hardcoding)."""
+    m = load(DEAL_MACHINE)
+    sem = load(DEAL_SEM)
+    rename = {"persisting": "saving", "persistRetry": "saveRetry", "rolledBack": "reverted"}
+    # rename the overlay states throughout the machine
+    blob = json.dumps(m)
+    for old, new in rename.items():
+        blob = blob.replace(f'"{old}"', f'"{new}"')
+    m2 = json.loads(blob)
+    sem["overlay"] = {"busy": "saving", "retry": "saveRetry", "rollback": "reverted"}
+    mid, files = refine_gen.emit_lifecycle(m2, sem, ("m", "s"))
+    tla = files["DealData.tla"]
+    assert '"saving", "saveRetry", "reverted"' in tla
+    assert "persisting" not in tla  # the default name does not leak in
+
+
 # -------------------------------- compose_gen -------------------------------
 
 import compose_gen

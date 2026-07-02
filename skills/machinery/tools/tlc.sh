@@ -29,5 +29,8 @@ if [ ! -f "$JAR" ]; then
 fi
 
 dir="$(cd "$(dirname "$tla")" && pwd)"
+# TLC writes a states/ working directory; remove it on exit so a direct run does
+# not litter the design tree (verify_formal.sh also relies on this staying clean).
+trap 'rm -rf "$dir/states"' EXIT
 java -XX:+UseParallelGC -cp "$JAR" tlc2.TLC -cleanup \
   -config "$dir/$(basename "$cfg")" "$dir/$(basename "$tla")"

@@ -144,7 +144,10 @@ every reacted-to event they do not handle. After authoring, `tools/oracle_gen.py
 must be run and the generated `<M>.oracle.md` files committed; they are canonical, never hand-edited.
 
 **GATE 3:** run `tools/machinery_check.py <design> --gate g3` (add `,gx` to pull the traceability
-check forward). **G3-machine** verifies, deterministically: structural lint (only the supported
+check forward, but note: before Phase 4, Gx-trace reports every invariant not enforced by a machine
+guard as an ERROR, because their enforcement point is recorded in the Phase-4 BUILD.md traceability
+matrix; those errors are expected until BUILD.md exists, so run bare `--gate g3` here and the full
+check at Gate 4). **G3-machine** verifies, deterministically: structural lint (only the supported
 XState subset; unknown keys, parallel/history states, root-level `on`, and non-string guards are
 hard errors; reachability; no dead-end non-final state; every `invoke` has `onError` and an `after`
 timeout; no shadowed branch; guarded-always exhaustiveness), the committed oracle byte-identical to

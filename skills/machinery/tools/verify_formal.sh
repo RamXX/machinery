@@ -2,6 +2,14 @@
 # Regenerate and TLC-model-check the whole formal suite for a design, from source.
 # Generic: it discovers machines, semantics annotations, and composition annotations,
 # regenerates every model, and checks every spec that has a config.
+#
+# SOURCE (hand-authored, version these):  design/machines/*.machine.json and, in
+#   design/formal/, the *.semantics.yaml / *.composition.yaml annotations and any
+#   hand-authored *.tla+*.cfg (e.g. System). GENERATED (regenerated every run,
+#   safe to gitignore): the other design/formal/*.tla and *.cfg. Source and
+#   generated share design/formal/ because TLC requires EXTENDS/INSTANCE'd modules
+#   to sit next to the spec that references them.
+#
 #   *.machine.json       -> tla_gen      control-flow (safety + liveness + deadlock)
 #   *.semantics.yaml     -> refine_gen   data invariants + contract + refinement
 #   *.composition.yaml   -> compose_gen  cross-aggregate invariants

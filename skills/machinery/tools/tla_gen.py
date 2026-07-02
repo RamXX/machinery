@@ -179,11 +179,16 @@ def generate(path):
     lines.append(f"\\* Generated from {os.path.basename(path)} by tools/tla_gen.py. Control-flow model.")
     lines.append("\\*")
     lines.append("\\* ASSUMPTIONS (what this abstraction erases; the proof is conditional on them):")
-    lines.append("\\*   1. Guards are erased to nondeterminism: sound for safety; for liveness the")
-    lines.append("\\*      guard lists must be exhaustive. machine_lint enforces an unguarded")
-    lines.append("\\*      fallback or an _exhaustive note on every fully guarded always-list.")
-    for n, note in exhaustive_notes:
-        lines.append(f"\\*      - {n}: {note}")
+    lines.append("\\*   1. Guards are erased to nondeterminism: SOUND for safety. For LIVENESS this")
+    lines.append("\\*      is conditional on every fully guarded branch list being exhaustive.")
+    lines.append("\\*      machine_lint requires an unguarded fallback or an _exhaustive note; where")
+    lines.append("\\*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result")
+    lines.append("\\*      below is only as sound as these hand-checked, UNVERIFIED claims:")
+    if exhaustive_notes:
+        for n, note in exhaustive_notes:
+            lines.append(f"\\*      - UNVERIFIED, state {n}: {note}")
+    else:
+        lines.append("\\*      (none here: every guarded branch list has an unguarded fallback)")
     lines.append("\\*   2. Every invoke resolves exactly once (onDone or onError; no lost or")
     lines.append("\\*      duplicated completion) and every after timer eventually fires.")
     lines.append("\\*   3. Single machine instance; no interleaving with other instances or")
