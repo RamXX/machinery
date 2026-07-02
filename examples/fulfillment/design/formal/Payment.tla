@@ -4,11 +4,13 @@ EXTENDS Naturals
 \* Generated from Payment.machine.json by tools/tla_gen.py. Control-flow model.
 \*
 \* ASSUMPTIONS (what this abstraction erases; the proof is conditional on them):
-\*   1. Guards are erased to nondeterminism: sound for safety; for liveness the
-\*      guard lists must be exhaustive. machine_lint enforces an unguarded
-\*      fallback or an _exhaustive note on every fully guarded always-list.
-\*      - gatewayResume: gatewayOp is set by setGatewayAuthorize/setGatewayCapture/setGatewayRefund before entering the three gateway-call states, the only states that reach gatewayRetry; the three gatewayFor* guards cover {authorize, capture, refund} totally
-\*      - rolledBack: priorStatus is set on every path into the overlay from a domain state; only Pending, Authorized, and Captured reach the overlay (Failed and Refunded are final), and all three priorIs* guards are present
+\*   1. Guards are erased to nondeterminism: SOUND for safety. For LIVENESS this
+\*      is conditional on every fully guarded branch list being exhaustive.
+\*      machine_lint requires an unguarded fallback or an _exhaustive note; where
+\*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
+\*      below is only as sound as these hand-checked, UNVERIFIED claims:
+\*      - UNVERIFIED, state gatewayResume: gatewayOp is set by setGatewayAuthorize/setGatewayCapture/setGatewayRefund before entering the three gateway-call states, the only states that reach gatewayRetry; the three gatewayFor* guards cover {authorize, capture, refund} totally
+\*      - UNVERIFIED, state rolledBack: priorStatus is set on every path into the overlay from a domain state; only Pending, Authorized, and Captured reach the overlay (Failed and Refunded are final), and all three priorIs* guards are present
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or

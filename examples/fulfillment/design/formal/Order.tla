@@ -4,10 +4,12 @@ EXTENDS Naturals
 \* Generated from Order.machine.json by tools/tla_gen.py. Control-flow model.
 \*
 \* ASSUMPTIONS (what this abstraction erases; the proof is conditional on them):
-\*   1. Guards are erased to nondeterminism: sound for safety; for liveness the
-\*      guard lists must be exhaustive. machine_lint enforces an unguarded
-\*      fallback or an _exhaustive note on every fully guarded always-list.
-\*      - rolledBack: priorStatus is set by every setPending* action to the current domain state; only Pending, Confirmed, Reserved, Paid, and Shipped have transitions into the persist overlay (final states persist nothing), and all five priorIs* guards are present
+\*   1. Guards are erased to nondeterminism: SOUND for safety. For LIVENESS this
+\*      is conditional on every fully guarded branch list being exhaustive.
+\*      machine_lint requires an unguarded fallback or an _exhaustive note; where
+\*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
+\*      below is only as sound as these hand-checked, UNVERIFIED claims:
+\*      - UNVERIFIED, state rolledBack: priorStatus is set by every setPending* action to the current domain state; only Pending, Confirmed, Reserved, Paid, and Shipped have transitions into the persist overlay (final states persist nothing), and all five priorIs* guards are present
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or

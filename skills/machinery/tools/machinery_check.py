@@ -295,6 +295,19 @@ def check_machines(design):
         g.notes += notes
         g.count("transitions", counts["transitions"])
 
+        # _exhaustive states carry a liveness claim TLC cannot verify (guards are
+        # erased in the generated TLA+ model). Surface it prominently at the gate:
+        # a false claim yields a green liveness proof for a machine that can deadlock.
+        exhaustive = [n for p, n, node in walk_states(m.get("states"))
+                      if isinstance(node, dict) and isinstance(node.get("_exhaustive"), str)
+                      and node["_exhaustive"].strip()]
+        if exhaustive:
+            g.count("states relying on unproven _exhaustive liveness", len(exhaustive))
+            g.warns.append(f"{base}: liveness for {', '.join(sorted(exhaustive))} rests on an "
+                           f"UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so "
+                           f"TLC cannot check it); verify the guard set is provably total, or add "
+                           f"an unguarded fallback branch so the liveness proof becomes sound")
+
         # committed oracle must be byte-identical to a fresh generation
         opath = path.replace(".machine.json", ".oracle.md")
         fresh = oracle_gen.render(m, path)
@@ -448,7 +461,10 @@ def check_traceability(design):
                 for r in rows:
                     if not r:
                         continue
-                    named = re.findall(rf"`({IDENT})`", r[0])
+                    # the FIRST backticked token is the component; later backticked
+                    # words in the same cell (e.g. an attribute named in the waiver
+                    # reason) are prose, not extra components
+                    named = re.findall(rf"`({IDENT})`", r[0])[:1]
                     if not named:
                         g.errs.append(f"placement row names no component in backticks: "
                                       f"{r[0]!r}")
@@ -462,12 +478,21 @@ def check_traceability(design):
                                           f"and no '(no machine: <reason>)' waiver")
                 break
 
-    # invariants: enforced somewhere structured (matrix or BUILD.md table cells)
-    cells = []
+    # invariants: enforced somewhere structured (matrix or BUILD.md table cells).
+    # Distinguish UNIT-BACKED enforcement (the invariant is cited against a concrete
+    # guard/action/actor in a matrix named-unit "maps to" column, so it has an
+    # implementation unit with a contract and a test) from ATTESTED enforcement (it
+    # appears only in a prose/BUILD table cell, e.g. "enforced by (structural)").
+    # Both satisfy traceability, but the split is reported so a green "enforced"
+    # count cannot silently mean "an id was typed into a cell".
+    cells, unit_cells = [], []
     for f in glob.glob(os.path.join(mdir, "*.matrix.md")):
         for header, rows in parse_md_tables(_read(f)):
+            mi = find_col(header, "maps to")
             for r in rows:
                 cells += r
+                if mi is not None and mi < len(r):
+                    unit_cells.append(r[mi])
     build = os.path.join(design, "BUILD.md")
     if os.path.exists(build):
         for header, rows in parse_md_tables(_read(build)):
@@ -477,11 +502,16 @@ def check_traceability(design):
         g.warns.append("BUILD.md not present; invariant enforcement is checked against "
                        "the matrices only (fine before Phase 4)")
     corpus = "\n".join(cells)
+    unit_corpus = "\n".join(unit_cells)
     if not inv_ids:
         g.errs.append("the domain model declares no invariants; nothing constrains the design")
     for iid in sorted(inv_ids):
         if _token_in(iid, corpus):
             g.count("invariants enforced")
+            if _token_in(iid, unit_corpus):
+                g.count("invariants unit-backed (guard/action/actor)")
+            else:
+                g.count("invariants attested (structural/prose)")
         else:
             g.errs.append(f"invariant {iid!r} is referenced by no matrix or BUILD.md table; "
                           f"it is enforced by nothing")
