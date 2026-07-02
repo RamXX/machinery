@@ -90,6 +90,14 @@ ownership-based access control, taken end to end:
 
 Every number above is real output in this repository, not an illustration.
 
+And it holds on a second, deliberately different design. `examples/fulfillment` is a distributed
+order-fulfillment platform: microservices, a saga orchestrator, compensation, and a transactional
+outbox. The same generators produced its formal models, and TLC proved them: the saga always
+terminates, and its data-refined model proves that money and stock are never silently lost. Building
+that proof caught a real bug in the saga as first drawn, where a single failed refund could leave a
+customer charged with nothing returned. TLC produced the exact counterexample and the fix is proven.
+Across both designs, `make verify-formal` checks eleven proofs, all green.
+
 ## Install
 
 Requires [`modelith`](https://github.com/stacklok/modelith) on `PATH`. The formal layer needs Java 11+;

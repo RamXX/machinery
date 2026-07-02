@@ -59,5 +59,7 @@ Run from the repo root: `make oracle` and `make verify-formal`.
 - `oracle_gen.py` rung 1: generate the transition oracle from the machine JSON.
 - `tla_gen.py` + `tlc.sh` rung 3: generate and model-check a control-flow TLA+ model of a machine.
 - `refine_gen.py` rung 3: generate the data-refined model, abstract contract, and refinement proof
-  from a `*.semantics.yaml` annotation (the linear-lifecycle pattern so far).
-- `verify_formal.sh` regenerate and TLC-check the whole formal suite (`make verify-formal`).
+  from a `*.semantics.yaml` annotation (linear-lifecycle and saga patterns).
+- `compose_gen.py` rung 4: generate a composition spec from a `*.composition.yaml` that proves
+  cross-aggregate invariants over the composed subsystem contracts, which no single aggregate can.
+- `verify_formal.sh` regenerate and TLC-check the whole formal suite for a design (`make verify-formal`).
