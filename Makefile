@@ -10,7 +10,7 @@ AGENT_HOMES ?= $(HOME)/.claude $(HOME)/.agents
 SRC := $(CURDIR)
 
 .DEFAULT_GOAL := help
-.PHONY: install install-copy uninstall build preflight doctor check oracle verify-formal test help
+.PHONY: install install-copy uninstall build install-binary preflight doctor check oracle verify-formal test help
 
 install: ## Symlink machinery into every agent home (live edits from this repo)
 	@for home in $(AGENT_HOMES); do \
@@ -42,34 +42,71 @@ uninstall: ## Remove machinery from every agent home
 	done
 
 MODELITH_VERSION ?= v0.4.0
+MACHINERY_VERSION ?= latest
 MACH ?= $(CURDIR)/.bin/machinery
 
-.PHONY: build
-build: ## Build the machinery Go binary into .bin/
-	@mkdir -p .bin && go build -o .bin/machinery ./cmd/machinery
+# Detect OS and arch for binary downloads (matching the release matrix).
+MACH_OS := $(shell uname -s | tr A-Z a-z)
+MACH_ARCH := $(shell uname -m)
+ifeq ($(MACH_ARCH),x86_64)
+  MACH_ARCH := amd64
+endif
+ifeq ($(MACH_ARCH),aarch64)
+  MACH_ARCH := arm64
+endif
 
-# ensure the binary exists before any tool target uses it
+.PHONY: build install-binary
+build: ## Build the machinery binary from source (needs Go)
+	@mkdir -p .bin && go build -ldflags "-X main.version=dev" -o .bin/machinery ./cmd/machinery
+
+install-binary: ## Download the prebuilt machinery binary (no Go needed)
+	@mkdir -p .bin
+	@if command -v curl >/dev/null 2>&1; then \
+	  echo "Downloading machinery $(MACHINERY_VERSION) for $(MACH_OS)/$(MACH_ARCH)..."; \
+	  ext=""; [ "$(MACH_OS)" = "windows" ] && ext=".exe"; \
+	  if [ "$(MACHINERY_VERSION)" = "latest" ]; then \
+	    url=$$(curl -fsSL "https://api.github.com/repos/ramirosalas/machinery/releases/latest" | \
+	      grep -o "https://[^[:space:]\"']*machinery-$(MACH_OS)-$(MACH_ARCH)$$ext[^[:space:]\"']*" | head -1); \
+	  else \
+	    url="https://github.com/ramirosalas/machinery/releases/download/$(MACHINERY_VERSION)/machinery-$(MACH_OS)-$(MACH_ARCH)$$ext"; \
+	  fi; \
+	  [ -z "$$url" ] && { echo "No matching binary found."; exit 1; }; \
+	  curl -fsSL -o .bin/machinery "$$url"; \
+	  chmod +x .bin/machinery; \
+	  echo "Installed: $$(.bin/machinery version)"; \
+	else \
+	  echo "curl is required to download the binary."; exit 1; \
+	fi
+
+# If the binary doesn't exist, try downloading it first; fall back to building.
 $(MACH):
-	@mkdir -p .bin && go build -o .bin/machinery ./cmd/machinery
+	@mkdir -p .bin
+	@if command -v go >/dev/null 2>&1; then \
+	  echo "Building from source (Go detected)..."; \
+	  go build -ldflags "-X main.version=dev" -o .bin/machinery ./cmd/machinery; \
+	else \
+	  echo "No binary and no Go toolchain; downloading prebuilt..."; \
+	  $(MAKE) --no-print-directory install-binary; \
+	fi
 
-preflight: ## Check machinery's runtime prerequisites (warns; installs nothing)
-	@$(MAKE) --no-print-directory build >/dev/null && $(MACH) preflight
+preflight: $(MACH) ## Check machinery's runtime prerequisites (warns; installs nothing)
+	@$(MACH) preflight
 
-doctor: ## Check prerequisites and install status
-	@$(MAKE) --no-print-directory build >/dev/null && $(MACH) doctor
+doctor: $(MACH) ## Check prerequisites and install status
+	@$(MACH) doctor
 
-test: ## Run the Go toolchain test suite
+test: ## Run the Go toolchain test suite (needs Go)
 	@go test ./...
 
-check: ## Run the deterministic gate suite on the examples (Go binary)
+check: $(MACH) ## Run the deterministic gate suite on the examples
 	@$(MACH) check examples/go-crm/design --impl examples/go-crm/impl
 	@$(MACH) check examples/fulfillment/design
 	@$(MACH) check examples/portfolio-engine/design
 
-oracle: ## Regenerate the transition oracles from the machine JSON (go-crm)
+oracle: $(MACH) ## Regenerate the transition oracles from the machine JSON (go-crm)
 	@$(MACH) oracle examples/go-crm/design/machines
 
-verify-formal: ## Regenerate + TLC-check the whole formal suite for the examples (from source, Go binary)
+verify-formal: $(MACH) ## Regenerate + TLC-check the whole formal suite for the examples (from source)
 	@echo "== go-crm =="; $(MACH) verify-formal examples/go-crm/design
 	@echo "== fulfillment =="; $(MACH) verify-formal examples/fulfillment/design
 	@echo "== portfolio-engine =="; $(MACH) verify-formal examples/portfolio-engine/design
