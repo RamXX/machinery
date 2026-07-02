@@ -1,0 +1,12 @@
+# Declarative semantics for the Deal aggregate: the meaning the machine JSON omits
+# (guards, action effects, ordering). refine_gen.py turns this plus the machine into
+# a data-refined TLA+ model, an abstract contract, and a checked refinement mapping,
+# so Parts 1 and 3 are generated per subsystem instead of hand-written.
+machine: deal
+pattern: linear-lifecycle        # ordered open stages, plus win/lose terminals and reopen
+stages: [Lead, Qualified, Proposal, Negotiation]   # the open stages, in order
+win_stage: Won
+lose_stage: Lost
+reopen_to: Negotiation           # a reopen returns a terminal deal to this open stage
+close_date_on: Won               # committing to this stage sets the close date
+max_retries: 3
