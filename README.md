@@ -211,12 +211,11 @@ check and warns about anything missing.
   your `PATH`); or download a prebuilt binary (macOS, Linux, Windows) from the
   [releases](https://github.com/stacklok/modelith/releases). Full options:
   [modelith.sh/cli](https://modelith.sh/cli/).
-- **[Python](https://www.python.org/downloads/) 3.10+** and **[PyYAML](https://pyyaml.org/)** -- the
-  deterministic gate tools. macOS: `brew install python@3.12`; Linux:
-  `sudo apt install python3 python3-pip` (or your distro's package); Windows:
-  `winget install Python.Python.3.12`. Then `python3 -m pip install pyyaml` (Windows:
-  `py -m pip install pyyaml`), or let [uv](https://docs.astral.sh/uv/) supply it with
-  `uv run --with pyyaml`.
+- **[Go](https://go.dev/dl/) 1.22+** -- the deterministic gate tools are a single
+  `machinery` binary built from this repo. macOS/Linux/Windows: install Go, then
+  `make build` (places `.bin/machinery`); the gates and generators all run without
+  Python or PyYAML. (A Python implementation is kept as the differential oracle
+  during the migration window; it is not a runtime dependency.)
 
 **Optional**
 
