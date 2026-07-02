@@ -1,0 +1,282 @@
+# yaml-language-server: $schema=https://modelith.sh/schema/domain-model/v1.json
+kind: DomainModel
+version: v1
+title: Go CRM
+description: >
+  A single-binary customer relationship manager operated from a native
+  command-line interface, storing all data in an embedded LadybugDB property
+  graph, with a small role- and ownership-based access model that governs both
+  row-level visibility and CRUD.
+
+glossary:
+  Admin: "A `User` role with unrestricted CRUD and visibility across all records."
+  Manager: "A `User` role that can read and write records owned by any member of the manager's `Team`, and reassign ownership within that team."
+  Rep: "A `User` role that can create records, write records it owns, and read records within its `Team`."
+  ReadOnly: "A `User` role that may read records within its `VisibilityScope` but may not create, update, or delete."
+  Owner: "The `User` to whom a record belongs; ownership is the unit of row-level visibility."
+  Session: "A local expiring credential written to disk after a successful login that identifies the acting `User` for later commands until logout or expiry."
+  VisibilityScope: "The set of records a `User` may read, determined by role and ownership: own records for a `Rep`, team records for a `Manager`, all records for an `Admin`."
+
+enums:
+  UserRole:
+    values:
+      - {name: Admin, definition: "Unrestricted access."}
+      - {name: Manager, definition: "Team-wide read and write and reassignment."}
+      - {name: Rep, definition: "Own and team records."}
+      - {name: ReadOnly, definition: "Read within scope only."}
+  UserStatus:
+    values:
+      - {name: Active, definition: "May authenticate and act."}
+      - {name: Disabled, definition: "May not authenticate; retained for audit."}
+  DealStage:
+    values:
+      - {name: Lead, definition: "Unqualified opportunity."}
+      - {name: Qualified, definition: "Confirmed fit and budget."}
+      - {name: Proposal, definition: "A proposal has been sent."}
+      - {name: Negotiation, definition: "Terms under negotiation."}
+      - {name: Won, definition: "Closed successfully; terminal."}
+      - {name: Lost, definition: "Closed unsuccessfully; terminal."}
+  TaskStatus:
+    values:
+      - {name: Open, definition: "Created, not started."}
+      - {name: InProgress, definition: "Being worked."}
+      - {name: Done, definition: "Completed; terminal."}
+      - {name: Cancelled, definition: "Abandoned; terminal."}
+  ActivityType:
+    values:
+      - {name: Call, definition: "A phone call."}
+      - {name: Meeting, definition: "An in-person or virtual meeting."}
+      - {name: Email, definition: "An email exchange."}
+      - {name: Note, definition: "A freeform note."}
+
+entities:
+  User:
+    definition: >
+      A person who authenticates to the CRM and performs actions. A `User` holds a
+      single role and belongs to at most one `Team`. Every record in the system is
+      owned by exactly one `User`.
+    attributes:
+      - {name: username, type: string}
+      - {name: passwordHash, type: string}
+      - {name: role, type: UserRole}
+      - {name: status, type: UserStatus}
+      - {name: createdAt, type: timestamp}
+    invariants:
+      - {id: username-unique, statement: "No two `User` records share a username."}
+      - {id: password-hashed, statement: "A `User` password is persisted only as a hash, never in plaintext."}
+      - {id: disabled-cannot-auth, statement: "A `User` whose status is Disabled cannot establish a `Session`."}
+      - {id: single-team, statement: "A `User` belongs to at most one `Team`."}
+    actions:
+      - {name: register, actor: Admin, preserves: [username-unique, password-hashed], description: "Create a new `User` with a role and an initial password."}
+      - {name: login, actor: User, preserves: [disabled-cannot-auth], description: "Authenticate and open a `Session`."}
+      - {name: logout, actor: User, description: "Close the current `Session`."}
+      - {name: changePassword, actor: User, preserves: [password-hashed], description: "Replace the stored password hash."}
+      - {name: disable, actor: Admin, description: "Mark a `User` Disabled."}
+      - {name: enable, actor: Admin, description: "Return a Disabled `User` to Active."}
+      - {name: assignRole, actor: Admin, description: "Change a `User` role."}
+
+  Team:
+    definition: >
+      A named group of `User` records used to scope row-level visibility. A
+      `Manager` reads and writes the records of every `User` in the manager's team.
+    attributes:
+      - {name: name, type: string}
+    relationships:
+      - {entity: User, cardinality: 1:n, ownership: referenced}
+    invariants:
+      - {id: team-name-unique, statement: "No two `Team` records share a name."}
+    actions:
+      - {name: create, actor: Admin}
+      - {name: rename, actor: Admin}
+
+  Account:
+    definition: >
+      An organization that is a customer or prospect. An `Account` groups the
+      `Contact` people who work there and the `Deal` opportunities pursued with it.
+    attributes:
+      - {name: name, type: string}
+      - {name: domain, type: string}
+      - {name: industry, type: string}
+    relationships:
+      - {entity: Contact, cardinality: 1:n, ownership: referenced}
+      - {entity: Deal, cardinality: 1:n, ownership: referenced}
+      - {entity: User, cardinality: n:1, ownership: referenced}
+    invariants:
+      - {id: account-owned, statement: "Every `Account` has exactly one owning `User`."}
+    actions:
+      - {name: create, actor: User, preserves: [account-owned]}
+      - {name: update, actor: Owner}
+      - {name: reassign, actor: Manager}
+      - {name: delete, actor: Owner}
+
+  Contact:
+    definition: >
+      A person associated with an `Account`. A `Contact` is the human counterpart
+      the CRM `User` communicates with, and is the subject of `Activity` records.
+    attributes:
+      - {name: fullName, type: string}
+      - {name: email, type: string}
+      - {name: phone, type: string}
+      - {name: title, type: string}
+    relationships:
+      - {entity: User, cardinality: n:1, ownership: referenced}
+    invariants:
+      - {id: contact-owned, statement: "Every `Contact` has exactly one owning `User`."}
+    actions:
+      - {name: create, actor: User, preserves: [contact-owned]}
+      - {name: update, actor: Owner}
+      - {name: reassign, actor: Manager}
+      - {name: delete, actor: Owner}
+
+  Deal:
+    definition: >
+      A sales opportunity with an `Account`, progressing through the stages of a
+      `Pipeline`. A `Deal` moves forward through its stages and ends as Won or Lost.
+    attributes:
+      - {name: title, type: string}
+      - {name: amountCents, type: integer}
+      - {name: stage, type: DealStage}
+      - {name: closeDate, type: timestamp}
+    relationships:
+      - {entity: User, cardinality: n:1, ownership: referenced}
+      - {entity: Contact, cardinality: n:n, ownership: referenced}
+    invariants:
+      - {id: deal-owned, statement: "Every `Deal` has exactly one owning `User`."}
+      - {id: deal-amount-nonneg, statement: "A `Deal` amount is zero or positive."}
+      - {id: deal-stage-forward, statement: "A `Deal` moves only to a later stage or to Won or Lost; it never moves backward except by an explicit reopen."}
+      - {id: deal-terminal, statement: "A `Deal` in Won or Lost is terminal and changes only by reopen."}
+      - {id: deal-won-has-closedate, statement: "A `Deal` in Won has a closeDate."}
+    actions:
+      - {name: create, actor: User, preserves: [deal-owned, deal-amount-nonneg]}
+      - {name: advanceStage, actor: Owner, preserves: [deal-stage-forward]}
+      - {name: win, actor: Owner, preserves: [deal-terminal, deal-won-has-closedate]}
+      - {name: lose, actor: Owner, preserves: [deal-terminal]}
+      - {name: reopen, actor: Manager, preserves: [deal-stage-forward]}
+      - {name: reassign, actor: Manager}
+
+  Pipeline:
+    definition: >
+      A named grouping of `Deal` records that share a go-to-market motion, for
+      example Enterprise or SMB. Every pipeline uses the same canonical stage set;
+      a `Pipeline` is a namespace, not a redefinition of the stages.
+    attributes:
+      - {name: name, type: string}
+      - {name: isDefault, type: boolean}
+    relationships:
+      - {entity: Deal, cardinality: 1:n, ownership: referenced}
+    invariants:
+      - {id: one-default-pipeline, statement: "Exactly one `Pipeline` is marked default."}
+    actions:
+      - {name: create, actor: Admin}
+      - {name: setDefault, actor: Admin, preserves: [one-default-pipeline]}
+
+  Activity:
+    definition: >
+      An immutable record of an interaction (a call, meeting, email, or note) about
+      a `Contact` or `Deal`. An `Activity` is an append-only log entry, not a
+      stateful object.
+    attributes:
+      - {name: type, type: ActivityType}
+      - {name: subject, type: string}
+      - {name: body, type: string}
+      - {name: occurredAt, type: timestamp}
+    relationships:
+      - {entity: User, cardinality: n:1, ownership: referenced}
+      - {entity: Contact, cardinality: n:1, ownership: referenced}
+    invariants:
+      - {id: activity-immutable, statement: "An `Activity` body and occurredAt never change after creation."}
+      - {id: activity-owned, statement: "Every `Activity` records the `User` who logged it."}
+    actions:
+      - {name: log, actor: User, preserves: [activity-immutable, activity-owned]}
+      - {name: delete, actor: Manager, description: "Remove an `Activity`, for correction only."}
+
+  Task:
+    definition: >
+      A unit of follow-up work with a due date, owned by a `User` and optionally
+      linked to a `Deal`. A `Task` moves from Open through to a terminal Done or
+      Cancelled.
+    attributes:
+      - {name: title, type: string}
+      - {name: dueDate, type: timestamp}
+      - {name: status, type: TaskStatus}
+    relationships:
+      - {entity: User, cardinality: n:1, ownership: referenced}
+      - {entity: Deal, cardinality: n:1, ownership: referenced}
+    invariants:
+      - {id: task-owned, statement: "Every `Task` has exactly one owning `User`."}
+      - {id: task-terminal, statement: "A `Task` in Done or Cancelled is terminal."}
+      - {id: task-assignee-visible, statement: "A `Task` may be reassigned only to a `User` within the assigner's `VisibilityScope`."}
+    actions:
+      - {name: create, actor: User, preserves: [task-owned]}
+      - {name: start, actor: Owner}
+      - {name: complete, actor: Owner, preserves: [task-terminal]}
+      - {name: cancel, actor: Owner, preserves: [task-terminal]}
+      - {name: reassign, actor: Manager, preserves: [task-assignee-visible]}
+
+  Tag:
+    definition: >
+      A freeform label applied to `Contact`, `Account`, or `Deal` records for
+      grouping and filtering. A `Tag` has no lifecycle of its own.
+    attributes:
+      - {name: name, type: string}
+      - {name: color, type: string}
+    relationships:
+      - {entity: Deal, cardinality: n:n, ownership: referenced}
+    invariants:
+      - {id: tag-name-unique, statement: "No two `Tag` records share a name."}
+    actions:
+      - {name: create, actor: User}
+      - {name: apply, actor: User, description: "Attach a `Tag` to a record."}
+      - {name: remove, actor: User}
+
+invariants:
+  - {id: rbac-crud-verbs, statement: "A `User` may perform a verb only if the role grants it: `Admin`, `Manager`, and `Rep` may create, read, update, and delete; `ReadOnly` may only read."}
+  - {id: rbac-read-visibility, statement: "A `User` may read only records within its `VisibilityScope`: an `Admin` reads all records, and every other `User` reads records it owns or that are owned by a member of its `Team`."}
+  - {id: rbac-write-scope, statement: "A `User` may update or delete a record only within scope: an `Admin` any record, a `Manager` any record owned by a member of the manager's `Team`, a `Rep` only records it owns; a `ReadOnly` `User` may write nothing."}
+  - {id: rbac-reassign-authority, statement: "Only an `Admin`, or a `Manager` acting within the manager's `Team`, may change the `Owner` of a record."}
+  - {id: session-active-user, statement: "A `Session` is valid only while its `User` status is Active."}
+
+scenarios:
+  - name: Rep creates and wins a deal
+    steps:
+      - "A `Rep` logs in, opening a `Session`."
+      - "The `Rep` creates an `Account`, a `Contact` at that account, and a `Deal` for the account."
+      - "The `Rep` advances the `Deal` from Lead through Qualified, Proposal, and Negotiation."
+      - "The `Rep` marks the `Deal` Won, supplying a closeDate."
+    invariants_touched: [rbac-crud-verbs, rbac-write-scope, deal-stage-forward, deal-won-has-closedate, deal-owned]
+  - name: Rep cannot see another team's deal
+    steps:
+      - "A `Rep` on one `Team` requests a `Deal` owned by a `Rep` on another team."
+      - "The read is denied because the `Deal` is outside the requesting rep's `VisibilityScope`."
+    invariants_touched: [rbac-read-visibility]
+  - name: ReadOnly user is refused a write
+    steps:
+      - "A `ReadOnly` `User` attempts to update a `Contact` within its `VisibilityScope`."
+      - "The update is refused because the role grants no write verb."
+    invariants_touched: [rbac-crud-verbs, rbac-write-scope]
+  - name: Manager reassigns within the team
+    steps:
+      - "A `Manager` reassigns a `Deal` from one team member to another."
+      - "The reassignment succeeds because both are in the manager's `Team`."
+    invariants_touched: [rbac-reassign-authority, rbac-write-scope]
+  - name: Disabled user cannot log in
+    steps:
+      - "An `Admin` disables a `User`."
+      - "The disabled `User` attempts to log in and is refused before any `Session` is created."
+    invariants_touched: [disabled-cannot-auth, session-active-user]
+  - name: A won deal is reopened
+    steps:
+      - "A `Deal` in Won is reopened by a `Manager` back to Negotiation."
+      - "Only reopen may move a terminal `Deal`."
+    invariants_touched: [deal-terminal, deal-stage-forward]
+  - name: Task runs to completion
+    steps:
+      - "A `Rep` creates a `Task` linked to a `Deal`, starts it, then completes it."
+      - "The completed `Task` is terminal."
+    invariants_touched: [task-owned, task-terminal]
+  - name: Logging activities and tagging a deal
+    steps:
+      - "A `Rep` logs a call `Activity` about a `Contact`, then a meeting `Activity` about the `Deal`."
+      - "The `Rep` applies a `Tag` to the `Deal`, which runs in the default `Pipeline`."
+      - "The `Activity` records cannot be edited once written."
+    invariants_touched: [activity-immutable, activity-owned, one-default-pipeline, tag-name-unique]
