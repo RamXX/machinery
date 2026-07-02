@@ -31,14 +31,28 @@ workspace "TermCRM" "Terminal CRM for a small sales team over an embedded local 
   }
 
   views {
-    systemContext crm "context" { include *; autoLayout }
-    container crm "containers" { include *; autoLayout }
-    deployment crm "laptop" { include *; autoLayout }
+    systemContext crm "context" {
+      include *
+      autoLayout
+    }
+    container crm "containers" {
+      include *
+      autoLayout
+    }
 
     styles {
-      element "Database" { shape Cylinder }
-      element "Software System" { background #1168bd; color #ffffff }
-      element "Person" { shape Person; background #08427b; color #ffffff }
+      element "Database" {
+        shape Cylinder
+      }
+      element "Software System" {
+        background #1168bd
+        color #ffffff
+      }
+      element "Person" {
+        shape Person
+        background #08427b
+        color #ffffff
+      }
     }
   }
 }

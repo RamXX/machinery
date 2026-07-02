@@ -35,14 +35,27 @@ workspace "DrawdownRecommender" "Local tool that recommends a 16-stock, lowest-d
   }
 
   views {
-    systemContext pf "context" { include *; autoLayout }
-    container pf "containers" { include *; autoLayout }
-    deployment pf "laptop" { include *; autoLayout }
+    systemContext pf "context" {
+      include *
+      autoLayout
+    }
+    container pf "containers" {
+      include *
+      autoLayout
+    }
 
     styles {
-      element "Database" { shape Cylinder }
-      element "External" { background #999999 }
-      element "Person" { shape Person; background #08427b; color #ffffff }
+      element "Database" {
+        shape Cylinder
+      }
+      element "External" {
+        background #999999
+      }
+      element "Person" {
+        shape Person
+        background #08427b
+        color #ffffff
+      }
     }
   }
 }
