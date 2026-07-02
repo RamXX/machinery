@@ -10,13 +10,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
       - uses: astral-sh/setup-uv@v5
-      - name: Toolchain test suite
-        run: uv run -q -- pytest -q
-      - name: Gate suite, go-crm (design + impl)
-        run: uv run -q -- python skills/machinery/tools/machinery_check.py examples/go-crm/design --impl examples/go-crm/impl
-      - name: Gate suite, fulfillment (design only)
-        run: uv run -q -- python skills/machinery/tools/machinery_check.py examples/fulfillment/design
+      - name: Build machinery binary
+        run: make build
+      - name: Toolchain Go test suite
+        run: go test ./...
+      - name: Gate suite, go-crm (design + impl) via Go binary
+        run: .bin/machinery check examples/go-crm/design --impl examples/go-crm/impl
+      - name: Gate suite, fulfillment (design only) via Go binary
+        run: .bin/machinery check examples/fulfillment/design
 
   formal:
     runs-on: ubuntu-latest
@@ -32,7 +37,7 @@ jobs:
           key: tla2tools-v1.7.4
       - name: Install generator dependency
         run: pip install pyyaml
-      - name: Regenerate and TLC-check all proofs
+      - name: Regenerate + TLC-check all proofs via Go binary
         run: make verify-formal
 
   go-crm:
@@ -46,11 +51,12 @@ jobs:
         working-directory: examples/go-crm/impl
         run: go test ./... -count=1
 
-  # Phase 1: the live scoreboard. Allowed to fail during the migration window;
-  # promoted to required in Phase 11 once parity is proven.
+  # Phase 11: the differential scoreboard, now REQUIRED. On every push, Go must
+  # equal Python byte-for-byte on stdout/stderr/exit/emitted-files across the
+  # whole corpus, and the Go unit + experiment suite must be green. A single
+  # divergence fails the build.
   differential:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -60,8 +66,10 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install pyyaml
-      - name: Go unit tests
+      - name: Go unit + experiment tests
         run: go test ./...
+      - name: Python pytest suite (the oracle during shadow)
+        run: uv run -q -- pytest -q
       - name: Differential harness (Go == Python byte-for-byte)
         run: bash scripts/diff-all.sh
 
