@@ -1,0 +1,55 @@
+{
+  "id": "recommendationRun",
+  "initial": "Collecting",
+  "_comment": "RecommendationRun forward pipeline. Realized as a pure transition function in pf.domain; the run loop runs in pf.app. Single writer: the one process that started the run drives it to a terminal state, so no optimistic-lock overlay is needed on the run itself. The flaky dependency is the market-data provider, handled by the collectRetry overlay (bounded retry of the fetch) and, at the feed layer, the MarketDataFeed circuit breaker.",
+  "_delays": {
+    "FETCH_TIMEOUT": "20000 ms - collecting price history for the whole candidate universe",
+    "OPTIMIZE_TIMEOUT": "60000 ms - the 16-of-N min-drawdown search",
+    "RETRY_BACKOFF": "~1000 ms exponential backoff between price-fetch retries"
+  },
+  "context": {
+    "runId": null,
+    "candidateSetId": null,
+    "retries": 0,
+    "portfolioId": null
+  },
+  "states": {
+    "Collecting": {
+      "invoke": {
+        "src": "fetchPrices",
+        "input": { "candidateSetId": "context.candidateSetId", "lookbackDays": "context.lookbackDays" },
+        "onDone": { "target": "Optimizing" },
+        "onError": { "target": "collectRetry" }
+      },
+      "after": {
+        "FETCH_TIMEOUT": { "target": "collectRetry" }
+      }
+    },
+    "Optimizing": {
+      "invoke": {
+        "src": "optimize",
+        "onDone": { "target": "Ready", "actions": "recordPortfolio" },
+        "onError": { "target": "Failed" }
+      },
+      "after": {
+        "OPTIMIZE_TIMEOUT": { "target": "Failed" }
+      }
+    },
+    "collectRetry": {
+      "always": [
+        { "target": "Failed", "guard": "retriesExhausted" }
+      ],
+      "after": {
+        "RETRY_BACKOFF": { "target": "Collecting", "actions": "incRetries" }
+      }
+    },
+    "Ready": {
+      "type": "final",
+      "entry": "publishReady"
+    },
+    "Failed": {
+      "type": "final",
+      "entry": "publishFailure"
+    }
+  }
+}

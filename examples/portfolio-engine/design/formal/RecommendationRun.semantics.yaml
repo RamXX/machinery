@@ -1,0 +1,11 @@
+# Terminal-lifecycle refinement for the run pipeline. Proves completeness (a Ready run
+# has its portfolio: no partial success), terminal absorption, and termination. The
+# domain-progress proof is separate from any persistence overlay.
+pattern: terminal-lifecycle
+machine: RecommendationRun
+phases: [Collecting, Optimizing]
+success_terminal: Ready
+failure_terminals: [Failed]
+retry: { state: collectRetry, serves: Collecting }
+success_flag: portfolioReady
+max_retries: 3

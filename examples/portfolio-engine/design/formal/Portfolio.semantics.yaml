@@ -1,0 +1,16 @@
+# Linear-lifecycle refinement for the Portfolio review lifecycle. The persist overlay
+# states are named committing/commitRetry/reverted for this domain (not the defaults),
+# to show the pattern reads its overlay names from the annotation.
+pattern: linear-lifecycle
+machine: Portfolio
+stages: [Proposed, UnderReview]
+win_stage: Accepted
+lose_stage: Rejected
+reopen_to: UnderReview
+close_date_on: Accepted
+overlay: { busy: committing, retry: commitRetry, rollback: reverted }
+max_retries: 3
+advance_event: advance
+win_event: accept
+lose_event: reject
+reopen_event: reopen

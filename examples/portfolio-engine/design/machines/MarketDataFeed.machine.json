@@ -1,0 +1,49 @@
+{
+  "id": "marketDataFeed",
+  "_role": "operational",
+  "initial": "closed",
+  "_comment": "Circuit breaker guarding outbound calls to the market-data provider (pf.feed), one instance per process. Not a domain lifecycle: it is the operational envelope for a flaky external. closed = calls flow and failures are counted; open = calls fast-fail without reaching the provider; halfOpen = one trial call decides whether to close again. Cross-call failure count lives in context; a bounded count trips the breaker.",
+  "_delays": {
+    "COOLDOWN": "30000 ms - how long the circuit stays open before probing half-open"
+  },
+  "context": {
+    "failures": 0,
+    "threshold": 5
+  },
+  "states": {
+    "closed": {
+      "on": {
+        "failure": [
+          { "target": "open", "guard": "atThreshold", "actions": "recordTrip" },
+          { "target": "closed", "actions": "incFailures" }
+        ],
+        "success": { "target": "closed", "actions": "resetFailures" }
+      },
+      "_ignores": {
+        "probeResult": "no half-open probe is outstanding while the circuit is closed"
+      }
+    },
+    "open": {
+      "after": {
+        "COOLDOWN": { "target": "halfOpen" }
+      },
+      "_ignores": {
+        "failure": "no calls reach the provider while the circuit is open; they fast-fail as CircuitOpenError",
+        "success": "no calls reach the provider while the circuit is open",
+        "probeResult": "no half-open probe is outstanding while the circuit is open"
+      }
+    },
+    "halfOpen": {
+      "on": {
+        "probeResult": [
+          { "target": "closed", "guard": "probeSucceeded", "actions": "resetFailures" },
+          { "target": "open", "actions": "recordTrip" }
+        ]
+      },
+      "_ignores": {
+        "failure": "only the single trial probe is evaluated in half-open; other call outcomes are ignored until it resolves",
+        "success": "only the single trial probe is evaluated in half-open"
+      }
+    }
+  }
+}
