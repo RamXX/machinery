@@ -50,8 +50,32 @@ plus annotations like `_role` and `_exhaustive` that are not XState), and so are
 and the model checking. The de-annotated config loads into [Stately](https://stately.ai/) and
 `@xstate/graph` for optional visualization and covering-path generation, and a TypeScript build may
 adopt XState directly, while Go, Rust, Python, and Elixir targets hand-roll the state field. The
-guarantees come from machinery's tooling and [TLC](https://github.com/tlaplus/tlaplus), never from
-XState.
+guarantees come from machinery's tooling and [TLC](https://github.com/tlaplus/tlaplus), the model
+checker for [TLA+](https://lamport.azurewebsites.net/tla/tla.html) (Leslie Lamport's formal
+specification language for state-transition systems), never from XState.
+
+### Why these notations, and not the obvious alternatives
+
+Each layer's notation was chosen to be text-based, generable, and machine-checkable, not for
+familiarity:
+
+- **Modelith, not UML class diagrams or prose.** It is purpose-built to carry entity lifecycle and
+  invariants as first-class, lintable data, which is what lets half of each state machine be
+  *derived* instead of hand-written; a diagram or a prose spec carries none of that as checkable
+  structure.
+- **C4, not UML component diagrams or arc42.** It has a text form (Structurizr DSL) a gate can parse
+  and bind, and it centers components and their dependencies, exactly where the per-dependency
+  failure posture lives; UML is diagram-first and heavier, and arc42 is a documentation template
+  rather than a checkable model.
+- **XState v5 JSON, not SCXML or a hand-rolled DSL.** JSON is trivially generable and byte-diffable,
+  the v5 shape already has the constructs we need (hierarchy, guards, `invoke`, delays), and the
+  ecosystem (Stately, `@xstate/graph`) gives visualization and covering-path generation for free;
+  SCXML is XML with weaker tooling, and a bespoke DSL means owning a parser and a visualizer forever.
+- **TLA+ and TLC, not Alloy or property-based testing.** TLC checks a finite instance *exhaustively*
+  for the temporal properties that matter here (termination, deadlock-freedom, safety, liveness) and
+  returns a concrete counterexample; Alloy finds structure within a bound but is weaker on temporal
+  and liveness over transition systems, and property-based tests sample the state space rather than
+  exhaust it.
 
 ## Agentic systems: the machine is the envelope, not the agent
 
@@ -245,20 +269,27 @@ check and warns about anything missing.
   [releases](https://github.com/stacklok/modelith/releases). machinery pins modelith at `v0.4.0`,
   and `machinery preflight` warns when the installed version does not match the pin. Full options:
   [modelith.sh/cli](https://modelith.sh/cli/).
-- **machinery** -- the deterministic gate tools and formal generators. A single static binary
-  (no Python, no Go runtime). Two ways to install:
+- **machinery** -- the deterministic gate tools and formal generators, plus the agent skill and role
+  docs. A single static binary (no Python, no Go runtime). Three ways to install:
 
-  **Download a prebuilt binary** (no toolchain needed: macOS arm64/x86, Linux amd64/arm64,
-  Windows amd64):
+  **One line, no clone** (fetches the binary and the skill from the latest release; no Git, no Go):
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh
+  ```
+  This installs the `machinery` binary to `~/.local/bin` and places the skill + role docs into your
+  agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see [Agent homes](#agent-homes)).
+  Override with environment variables, for example `MACHINERY_VERSION=v0.1.1`,
+  `INSTALL_DIR=/usr/local/bin`, or `MACHINERY_HOMES="$HOME/.claude"`.
+
+  **Binary only** (no toolchain: macOS arm64/x86, Linux amd64/arm64, Windows amd64):
   ```bash
   make install-binary                      # auto-detects OS/arch, fetches latest release
-  # or pin a version:
-  make install-binary MACHINERY_VERSION=v0.1.0
+  make install-binary MACHINERY_VERSION=v0.1.0   # or pin a version
   ```
-  Binaries are published on the [releases page](https://github.com/RamXX/machinery/releases);
-  download `machinery-<os>-<arch>`, put it on your `PATH`.
+  Binaries are on the [releases page](https://github.com/RamXX/machinery/releases); download
+  `machinery-<os>-<arch>` and put it on your `PATH`.
 
-  **Or build from source** (if you have [Go](https://go.dev/dl/) 1.26+; `go.mod` pins 1.26.4):
+  **Build from source** (if you have [Go](https://go.dev/dl/) 1.26+; `go.mod` pins 1.26.4):
   ```bash
   make build                               # builds .bin/machinery
   ```
@@ -282,19 +313,29 @@ check and warns about anything missing.
    [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`.
 
 ```sh
-make install       # install the CLI binary on PATH + symlink skill/agents into agent homes
+make install       # DEVELOPER install: binary on PATH + live-symlink skill/agents (edits are live)
 make doctor        # check dependencies and install status
 make test          # run the Go toolchain test suite (needs Go)
+make test-install  # verify install.sh's canonical-copy + symlink topology (offline)
 make check         # run the deterministic gate suite on the examples
 make verify-formal # regenerate and TLC-check the full formal suite
 make oracle        # regenerate the go-crm transition oracles from the machine JSON
 ```
 
-machinery is agent-agnostic. `make install` places the skill under `<home>/skills` and the two role
-docs under `<home>/agents` for every home in `AGENT_HOMES`, which defaults to `~/.claude` (Claude
-Code) and `~/.agents` (the cross-agent convention). Override it to add or restrict targets, for
-example `make install AGENT_HOMES="$HOME/.agents"`. `make install-copy` does the same without
-symlinks, and `make uninstall` removes machinery from every home.
+### Agent homes
+
+machinery is agent-agnostic. Both install paths place the skill under `<home>/skills/machinery` and
+the two role docs under `<home>/agents`, for every home in the homes list, which defaults to
+`~/.agents` (the cross-agent convention) and `~/.claude` (Claude Code).
+
+- **`install.sh` (recommended, no clone).** Puts the real files in the first home (`~/.agents` by
+  default) and symlinks the others to it, so there is a single canonical copy under your home
+  directory to update, tied to a release rather than to a repo checkout. Override the set with
+  `MACHINERY_HOMES` (a single entry becomes the canonical copy, and no symlinks are made).
+- **`make install` (developer).** Symlinks every home directly into this working tree, so edits to
+  the skill are live. That is what you want when hacking on machinery itself, not for a plain
+  install. `AGENT_HOMES` overrides the homes; `make install-copy` copies instead of symlinking; and
+  `make uninstall` removes machinery from every home.
 
 The gate tools are a single Go binary (no Python runtime). `verify-formal` downloads a version-pinned,
 checksum-verified `tla2tools.jar` on first use. CI runs the test suite, all gate runs, the full formal
