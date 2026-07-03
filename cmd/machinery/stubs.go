@@ -10,13 +10,16 @@ import (
 // replaces the body. The differential harness depends on these existing.
 
 func newVerifyFormalCmd() *cobra.Command {
+	var genOnly bool
 	c := &cobra.Command{
 		Use:   "verify-formal <design-dir>",
 		Short: "Regenerate + TLC-check the formal suite for a design",
 		Args:  cobra.ExactArgs(1),
 	}
+	c.Flags().BoolVar(&genOnly, "gen-only", false,
+		"regenerate the formal suite from source without running TLC (no Java needed)")
 	c.RunE = func(cmd *cobra.Command, args []string) error {
-		rc := formal.VerifyFormal(args[0])
+		rc := formal.VerifyFormal(args[0], genOnly)
 		exitFunc(rc)
 		return nil
 	}

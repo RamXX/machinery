@@ -49,7 +49,9 @@ One line per subcommand:
   synthesis input) and recommends sharding or recursive decomposition.
 - `machinery verify-formal <design-dir>` regenerates the tla/refine/compose specs into
   `design/formal/` and TLC-checks every `.tla`/`.cfg` pair. It fails on generator errors and on
-  zero pairs, so an empty formal directory can never read as a green suite.
+  zero pairs, so an empty formal directory can never read as a green suite. `--gen-only`
+  regenerates without running TLC (no Java needed): the freshness half of the check for
+  Java-free environments such as a nightly regen gate.
 - `machinery doctor` checks dependencies and install status.
 - `machinery preflight` the same check, for use before a design session.
 - `machinery version` prints the build version.

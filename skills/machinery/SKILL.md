@@ -169,7 +169,8 @@ Examples of all three patterns live under `examples/*/design/formal/`. Then run
 `machinery verify-formal design` and commit `design/formal/` (the annotations are sources; the
 generated `.tla`/`.cfg` files are committed alongside). The reconcilers hard-fail on drift: a design
 change that invalidates an annotation fails generation rather than proving a stale twin. Java is
-optional here; without it the formal suite is generated but unchecked, and STATE.md must say so.
+optional here; without it, run `machinery verify-formal --gen-only design` so the suite is still
+regenerated from source, and record in STATE.md that it is generated but unchecked.
 
 **GATE 3:** run `machinery check <design> --gate g3` (add `,gx` to pull the traceability
 check forward, but note: before Phase 4, Gx-trace reports every invariant not enforced by a machine
@@ -186,7 +187,8 @@ LLM-attested: whether each guard's semantics actually enforce the invariant it n
 every C4 dependency failure has its residual transition, reclassified by its mitigation rather than
 deleted (see below). When formal annotations exist under `design/formal/`, a green
 `machinery verify-formal design` is part of this gate (deterministic when Java is present; without
-Java, record in STATE.md that the formal suite is generated but unchecked).
+Java, run it with `--gen-only` and record in STATE.md that the formal suite is generated but
+unchecked).
 
 ### Phase 4 - BUILD.md
 
