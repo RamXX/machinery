@@ -148,3 +148,73 @@ func toValueSlice(xs []string) []*ir.Value {
 	}
 	return out
 }
+
+func TestLifecycleMissingStagesIsErrorNotSilentSuccess(t *testing.T) {
+	// Regression: EmitLifecycle used to swallow panics via an outer recover and
+	// return ("", nil, nil): exit 0, zero files. Any malformed semantics must
+	// surface as a reconciliation error.
+	machine := loadJSON(t, filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json"))
+	sem := loadYAML(t, filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"))
+	sem.AsObject().Set("stages", ir.ArrayValue(nil))
+	mid, files, err := EmitLifecycle(machine, sem, [2]string{"m", "s"})
+	if err == nil {
+		t.Fatalf("expected error, got mid=%q files=%d", mid, len(files))
+	}
+	if !containsStr(err.Error(), "stages") {
+		t.Fatalf("error does not name stages: %v", err)
+	}
+	if len(files) != 0 {
+		t.Fatalf("files emitted despite error: %d", len(files))
+	}
+}
+
+func TestLifecycleInvalidReopenToIsError(t *testing.T) {
+	machine := loadJSON(t, filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json"))
+	sem := loadYAML(t, filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"))
+	sem.AsObject().Set("reopen_to", ir.StringValue("NoSuchStage"))
+	_, _, err := EmitLifecycle(machine, sem, [2]string{"m", "s"})
+	if err == nil || !containsStr(err.Error(), "reopen_to") {
+		t.Fatalf("bogus reopen_to accepted: %v", err)
+	}
+}
+
+func TestTerminalEmissionUsesReconciledFailureRoute(t *testing.T) {
+	// A phase whose machine routes failure to failures[1] must be modeled to
+	// failures[1], not silently rerouted to failures[0].
+	machineSrc := `{"id":"run","initial":"Collecting","states":{
+	  "Collecting":{"invoke":{"src":"collect","onDone":{"target":"Scoring"},"onError":{"target":"Aborted"}},"after":{"t1":{"target":"Aborted"}}},
+	  "Scoring":{"invoke":{"src":"score","onDone":{"target":"Completed"},"onError":{"target":"Expired"}},"after":{"t2":{"target":"Expired"}}},
+	  "Completed":{"type":"final"},
+	  "Aborted":{"type":"final"},
+	  "Expired":{"type":"final"}}}`
+	semSrc := `machine: run
+pattern: terminal-lifecycle
+phases: [Collecting, Scoring]
+success_terminal: Completed
+failure_terminals: [Aborted, Expired]
+`
+	m, err := ir.LoadMachineJSONStr("w", machineSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sem, err := ir.LoadYAML([]byte(semSrc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, files, err := EmitTerminal(m, sem, [2]string{"m", "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body string
+	for name, b := range files {
+		if containsStr(name, "Data.tla") {
+			body = b
+		}
+	}
+	if body == "" {
+		t.Fatal("no Data.tla emitted")
+	}
+	if !containsStr(body, `Fail_Scoring == st = "Scoring" /\ st' = "Expired"`) {
+		t.Fatalf("Fail_Scoring not routed to the machine's reconciled target:\n%s", body)
+	}
+}

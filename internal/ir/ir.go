@@ -101,9 +101,16 @@ func whereSuffix(where string) string {
 	return " in " + where
 }
 
+// transitionKeys whitelists transition-object members (lint.TransitionKeys
+// mirrors this list for its docs); validated here so every consumer that
+// passes a problems slice sees the finding.
+var transitionKeys = map[string]bool{
+	"target": true, "guard": true, "actions": true, "description": true, "_comment": true,
+}
+
 // normTransitions mirrors machine_lint._norm: normalize a transition value into
 // a list of {target, guard, actions}. Problems (array target, non-string guard,
-// unsupported value) are recorded, matching Python text.
+// unknown keys, unsupported value) are recorded, matching Python text.
 type normBranch struct {
 	Target   string
 	HasTgt   bool
@@ -132,6 +139,14 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 			out = append(out, normBranch{Target: it.AsString(), HasTgt: true})
 		case KindObject:
 			o := it.AsObject()
+			for _, k := range o.Keys() {
+				if !transitionKeys[k] {
+					if problems != nil {
+						*problems = append(*problems, fmt.Sprintf("unsupported key %s in transition%s (a typo here silently becomes an internal self-transition)",
+							goRepr(StringValue(k)), whereSuffix(where)))
+					}
+				}
+			}
 			var tgt string
 			hasTgt := false
 			if tv := o.Get2("target"); tv != nil && tv.Kind != KindNull {
@@ -154,9 +169,13 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 			var guard string
 			hasGuard := false
 			if gv := o.Get2("guard"); gv != nil {
-				if gv.Kind == KindString {
+				if gv.Kind == KindString && gv.AsString() != "" {
 					guard = gv.AsString()
 					hasGuard = true
+				} else if gv.Kind == KindString {
+					if problems != nil {
+						*problems = append(*problems, fmt.Sprintf("empty guard string%s (write an unguarded branch instead)", whereSuffix(where)))
+					}
 				} else if problems != nil {
 					*problems = append(*problems, fmt.Sprintf("non-string guard %s%s", goRepr(gv), whereSuffix(where)))
 				}
@@ -361,16 +380,6 @@ func CleanCell(cell string) string {
 // FindAllIdent is a helper wrapping the IDENT regex (returns all matches).
 func FindAllIdent(s string) []string {
 	return identRe.FindAllString(s, -1)
-}
-
-// FindAllIdentSubexpr returns the captured groups of IDENT matches.
-func FindAllIdentSubexpr(s string) []string {
-	matches := identRe.FindAllStringSubmatch(s, -1)
-	out := make([]string, 0, len(matches))
-	for _, m := range matches {
-		out = append(out, m[1])
-	}
-	return out
 }
 
 // Simple mirrors refine/compose _simple: "#a.b" -> "b", "" -> "".

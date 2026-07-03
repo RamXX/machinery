@@ -1,8 +1,11 @@
 // Package experiments contains the shared, language-neutral mutation
-// experiments ported from the pytest suite (tests/test_machine_lint.py,
-// test_machinery_check.py, test_formal_gens.py). They encode the review's
-// vacuity/drift findings as data; the Go table runner applies each mutation
-// to a fixture design and asserts the expected finding + exit.
+// experiments from the adversarial design reviews. They encode every
+// vacuity/drift finding as data; the runners in this package's tests apply
+// each mutation to a fixture design and assert the tool catches it
+// (experiments_test.go for the lint table, gatesuite_test.go for the full
+// gate suite on a synthesized design+impl fixture). Review findings convert
+// 1:1 into entries here; do not remove or weaken an entry to make a change
+// pass.
 package experiments
 
 // Experiment is one adversarial mutation: apply it to a clean design and
@@ -121,9 +124,36 @@ var ComposeExperiments = []Experiment{
 		ExpectSubstr: "undo", ExpectExit: true},
 }
 
+// PackExperiments are the recursive-decomposition (G5-pack) failure modes,
+// run against the checkout-split fixture in packsuite_test.go.
+var PackExperiments = []Experiment{
+	{Name: "edited-pack-fails-hash", Tool: "check", Mutation: "hand-edit a pack file",
+		ExpectSubstr: "fails its own content hash", ExpectExit: true},
+	{Name: "stale-child-pin", Tool: "check", Mutation: "change a contract machine at the parent",
+		ExpectSubstr: "was built against pack", ExpectExit: true},
+	{Name: "dropped-consumed-event", Tool: "check", Mutation: "child stops handling a boundary event",
+		ExpectSubstr: "is handled or ignored by no machine", ExpectExit: true},
+	{Name: "dropped-produced-event", Tool: "check", Mutation: "child stops emitting a boundary event",
+		ExpectSubstr: "appears in no machine action", ExpectExit: true},
+	{Name: "frozen-enum-drift", Tool: "check", Mutation: "child renames a public enum value",
+		ExpectSubstr: "drifted from the pack", ExpectExit: true},
+	{Name: "delegated-invariant-untraced", Tool: "check", Mutation: "child drops the delegated invariant",
+		ExpectSubstr: "delegated invariant", ExpectExit: true},
+	{Name: "partial-packmap", Tool: "pack", Mutation: "drop a state from the map",
+		ExpectSubstr: "no mapping entry", ExpectExit: true},
+	{Name: "stale-refinement-artifact", Tool: "check", Mutation: "hand-edit the committed refinement module",
+		ExpectSubstr: "stale", ExpectExit: true},
+	{Name: "double-ownership", Tool: "pack", Mutation: "two subsystems own one entity",
+		ExpectSubstr: "ownership must be exactly-once", ExpectExit: true},
+	{Name: "unowned-entity", Tool: "pack", Mutation: "an entity with no owner",
+		ExpectSubstr: "owned by no subsystem", ExpectExit: true},
+	{Name: "contract-outside-subset", Tool: "pack", Mutation: "contract machine uses after:",
+		ExpectSubstr: "restricted to plain on-transitions", ExpectExit: true},
+}
+
 // All returns every experiment across all tools.
 func All() []Experiment {
-	return concat(MachineLintExperiments, MachineryCheckExperiments, RefineExperiments, ComposeExperiments)
+	return concat(MachineLintExperiments, MachineryCheckExperiments, RefineExperiments, ComposeExperiments, PackExperiments)
 }
 
 func concat(parts ...[]Experiment) []Experiment {

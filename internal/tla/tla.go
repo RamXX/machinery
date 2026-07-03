@@ -188,6 +188,9 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	mid = ir.Title(mid)
 
 	allStates := ir.WalkStates(ro.Get2("states"), "")
+	if len(allStates) == 0 {
+		die("tla_gen: %s: machine has no states", mid)
+	}
 	var nested []string
 	for _, s := range allStates {
 		if strings.Contains(s.Path, ".") {
@@ -222,6 +225,9 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 		counters = append(counters, v)
 	}
 	initial := ro.GetString("initial")
+	if initial == "" {
+		die("tla_gen: %s: machine has no initial state", mid)
+	}
 	var finalStates []string
 	for _, s := range states {
 		if s.Node.AsObject().GetString("type") == "final" {
@@ -260,6 +266,12 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	idx := 0
 	for _, s := range states {
 		if _, ok := rcOf[s.Name]; ok {
+			// a retry-shaped state's transitions are generated from its loop
+			// shape below; extra on: handlers would be silently dropped from
+			// the model, so they are an unsupported shape, not a skip
+			if onV := s.Node.AsObject().Get2("on"); onV.AsObject().Len() > 0 {
+				die("tla_gen: %s: retry state %s declares on: handlers, which rung 3 would silently drop; route the events through a non-retry state or extend the generator", mid, s.Name)
+			}
 			continue
 		}
 		for _, tr := range ir.TransitionsOf(s.Node, nil, s.Name) {
@@ -343,7 +355,7 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	lines = append(lines, fmt.Sprintf("---- MODULE %s ----", mid))
 	lines = append(lines, `EXTENDS Naturals`)
 	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("\\* Generated from %s by tools/tla_gen.py. Control-flow model.", filepath.Base(path)))
+	lines = append(lines, fmt.Sprintf("\\* Generated from %s by machinery tla. Control-flow model.", filepath.Base(path)))
 	lines = append(lines, "\\*")
 	lines = append(lines, "\\* ASSUMPTIONS (what this abstraction erases; the proof is conditional on them):")
 	lines = append(lines, "\\*   1. Guards are erased to nondeterminism: SOUND for safety. For LIVENESS this")
@@ -417,7 +429,15 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	lines = append(lines, "====")
 	tlaOut := strings.Join(lines, "\n") + "\n"
 
-	cfgOut := "CONSTANT MaxRetries = 3\nSPECIFICATION Spec\nINVARIANT TypeOK\nPROPERTY Live_OverlayResolves\n"
+	maxRetries := 3
+	if v := ro.Get2("_max_retries"); v != nil {
+		n, err := v.AsNumber().Int64()
+		if v.Kind != ir.KindNumber || err != nil || n < 1 {
+			die("tla_gen: %s: _max_retries must be a positive integer", mid)
+		}
+		maxRetries = int(n)
+	}
+	cfgOut := fmt.Sprintf("CONSTANT MaxRetries = %d\nSPECIFICATION Spec\nINVARIANT TypeOK\nPROPERTY Live_OverlayResolves\n", maxRetries)
 	return mid, tlaOut, cfgOut
 }
 

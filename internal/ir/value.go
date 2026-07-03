@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -58,17 +59,28 @@ func (o *Object) Set(k string, v *Value) {
 	o.values[k] = v
 }
 
+// Read methods below are nil-receiver-safe: AsObject() returns nil for any
+// non-object Value (including JSON null), and chained reads on that nil must
+// degrade to "absent", never SIGSEGV (malformed input is reported by the lint
+// layer, not by a crash). Set stays panicking: mutating nil is a program bug.
+
 // Get returns (value, true) or (nil, false).
 func (o *Object) Get(k string) (*Value, bool) {
+	if o == nil {
+		return nil, false
+	}
 	v, ok := o.values[k]
 	return v, ok
 }
 
 // Has reports key presence.
-func (o *Object) Has(k string) bool { _, ok := o.values[k]; return ok }
+func (o *Object) Has(k string) bool { _, ok := o.Get(k); return ok }
 
 // Delete removes a key (no-op if absent), preserving remaining order.
 func (o *Object) Delete(k string) {
+	if o == nil {
+		return
+	}
 	if _, ok := o.values[k]; !ok {
 		return
 	}
@@ -82,13 +94,26 @@ func (o *Object) Delete(k string) {
 }
 
 // Keys returns the insertion-ordered keys.
-func (o *Object) Keys() []string { return append([]string{}, o.keys...) }
+func (o *Object) Keys() []string {
+	if o == nil {
+		return nil
+	}
+	return append([]string{}, o.keys...)
+}
 
 // Len is the number of members.
-func (o *Object) Len() int { return len(o.keys) }
+func (o *Object) Len() int {
+	if o == nil {
+		return 0
+	}
+	return len(o.keys)
+}
 
 // Iter calls fn(key,value) in source order; stop early by returning false.
 func (o *Object) Iter(fn func(k string, v *Value) bool) {
+	if o == nil {
+		return
+	}
 	for _, k := range o.keys {
 		if !fn(k, o.values[k]) {
 			return
@@ -243,6 +268,12 @@ func LoadMachineJSON(path string) (*Value, error) {
 			return nil, fmt.Errorf("invalid JSON in %s: line %d: %s", path, line, se.Error())
 		}
 		return nil, fmt.Errorf("invalid JSON in %s: %w", path, derr)
+	}
+	// reject trailing content after the first value (json.load "Extra data")
+	if t, err := dec.Token(); err == nil {
+		return nil, fmt.Errorf("invalid JSON in %s: extra data after the machine object (%v)", path, t)
+	} else if !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("invalid JSON in %s: extra data after the machine object", path)
 	}
 	return v, nil
 }

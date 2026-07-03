@@ -374,3 +374,96 @@ func TestTransientStatesAreExemptFromCompleteness(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestEmptyTransitionTableIsDriftNotAbsence(t *testing.T) {
+	// Regression: a present-but-row-less table must reconcile (and report every
+	// machine transition as drift), never read as "no table present".
+	headerOnly := "## Transition matrix\n\n" +
+		"| # | source | event / after / always | guard | target | actions |\n" +
+		"|---|---|---|---|---|---|\n"
+	drift, n := ReconcileMatrix(minimalMachine(), headerOnly, "w")
+	if len(drift) == 0 {
+		t.Fatal("header-only transition table reconciled clean; deleting all rows must be drift")
+	}
+	if !contains(drift, "machine transition has no matrix row") {
+		t.Fatalf("expected machine-side drift, got %v", drift)
+	}
+	if n != 5 {
+		t.Errorf("machine rows reconciled n=%d, want 5 (all drifted, none matched)", n)
+	}
+}
+
+func TestAllRowsFilteredTableIsDriftNotAbsence(t *testing.T) {
+	filtered := "## Transition matrix\n\n" +
+		"| # | source | event / after / always | guard | target | actions |\n" +
+		"|---|---|---|---|---|---|\n" +
+		"| 1 | Published | (final) | - | - | - |\n"
+	drift, _ := ReconcileMatrix(minimalMachine(), filtered, "w")
+	if len(drift) == 0 {
+		t.Fatal("documentation-only table reconciled clean against a machine with transitions")
+	}
+}
+
+func TestUnknownTransitionKeyIsError(t *testing.T) {
+	// {"tagret": "B"} used to silently become an internal self-transition
+	m := minimalMachine()
+	m.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Set("on",
+		strObjL(`{"publish":[{"tagret":"Published","actions":"a"},{"actions":"b"}],"pub2":{"target":"Published"}}`))
+	if !contains(errsOf(t, m, "w"), "unsupported key 'tagret' in transition") {
+		t.Fail()
+	}
+}
+
+func TestCompoundInitialMissingChildIsError(t *testing.T) {
+	m := minimalMachine()
+	st := m.AsObject().Get2("states").AsObject()
+	st.Get2("Draft").AsObject().Get2("on").AsObject().Set("wrap", strObjL(`{"target":"Wrapper"}`))
+	st.Set("Wrapper", strObjL(`{"initial":"Ghost","states":{"Inner":{"type":"final"}},"onDone":{"target":"Published"}}`))
+	if !contains(errsOf(t, m, "w"), "initial 'Ghost' is not one of its children") {
+		t.Fail()
+	}
+}
+
+func TestWildcardAndPlatformEventNamesAreErrors(t *testing.T) {
+	m := minimalMachine()
+	m.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Get2("on").AsObject().
+		Set("*", strObjL(`{"target":"Published"}`))
+	if !contains(errsOf(t, m, "w"), "outside the supported subset") {
+		t.Fail()
+	}
+	m2 := minimalMachine()
+	m2.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Get2("on").AsObject().
+		Set("done.invoke.save", strObjL(`{"target":"Published"}`))
+	if !contains(errsOf(t, m2, "w"), "outside the supported subset") {
+		t.Fail()
+	}
+}
+
+func TestUnguardedAlwaysCycleIsError(t *testing.T) {
+	m, _ := ir.LoadMachineJSONStr("w", `{"id":"widget","initial":"a","states":{
+	  "a":{"always":{"target":"b"}},
+	  "b":{"always":{"target":"a"}}}}`)
+	if !contains(errsOf(t, m, "w"), "unguarded always cycle") {
+		t.Fail()
+	}
+}
+
+func TestDuplicateGuardBranchIsError(t *testing.T) {
+	m := minimalMachine()
+	m.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Set("on",
+		strObjL(`{"publish":[{"target":"persisting","guard":"g","actions":"a"},{"target":"Published","guard":"g"},{"actions":"b"}]}`))
+	if !contains(errsOf(t, m, "w"), "two branches with the same guard") {
+		t.Fail()
+	}
+}
+
+func TestEmptyGuardStringIsError(t *testing.T) {
+	m := minimalMachine()
+	m.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Set("on",
+		strObjL(`{"publish":[{"target":"persisting","guard":"","actions":"a"},{"actions":"b"}]}`))
+	if !contains(errsOf(t, m, "w"), "empty guard string") {
+		t.Fail()
+	}
+}
+
+func strObjL(s string) *ir.Value { v, _ := ir.LoadMachineJSONStr("x", s); return v }

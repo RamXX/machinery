@@ -1,6 +1,7 @@
 package oracle
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -137,5 +138,52 @@ func TestRenderIsDeterministic(t *testing.T) {
 	b := Render(m, "w")
 	if a != b {
 		t.Fatal("render not deterministic")
+	}
+}
+
+func TestStableIDPrefixCollisionIsExtended(t *testing.T) {
+	// Brute-force two event names whose stimulus hashes share a 6-hex prefix;
+	// distinct transitions must never render as duplicate-branch suffixes.
+	tag := "WIDG"
+	base := stableHash(tag, "Draft", "on:evbase", "")
+	var collide string
+	for i := 0; ; i++ {
+		cand := fmt.Sprintf("ev%d", i)
+		if cand == "evbase" {
+			continue
+		}
+		if stableHash(tag, "Draft", "on:"+cand, "")[:6] == base[:6] {
+			collide = cand
+			break
+		}
+		if i > 3_000_000 {
+			t.Skip("no collision found in budget")
+		}
+	}
+	src := fmt.Sprintf(`{"id":"widget","initial":"Draft","states":{
+	  "Draft":{"on":{"evbase":{"target":"Done"},"%s":{"target":"Done"}}},
+	  "Done":{"type":"final"}}}`, collide)
+	m, err := ir.LoadMachineJSONStr("w", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := Render(m, "w")
+	if strings.Contains(out, base[:6]+".2") {
+		t.Fatalf("distinct transitions rendered as duplicate suffix:\n%s", out)
+	}
+	if !strings.Contains(out, "WIDG-"+base[:8]) {
+		t.Fatalf("expected extended 8-hex prefix for colliding rows:\n%s", out)
+	}
+}
+
+func TestTagTruncationIsRuneSafe(t *testing.T) {
+	src := `{"id":"багаж","initial":"A","states":{"A":{"on":{"x":{"target":"B"}}},"B":{"type":"final"}}}`
+	m, err := ir.LoadMachineJSONStr("w", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := Render(m, "w") // must not split a rune mid-byte
+	if !strings.Contains(out, "БАГА-") {
+		t.Fatalf("expected rune-safe 4-rune tag, got:\n%s", out)
 	}
 }

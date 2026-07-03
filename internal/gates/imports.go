@@ -13,6 +13,59 @@ import (
 
 // --- imports (G4-import) ---
 
+// walkSourceFiles collects source files under root, FOLLOWING directory
+// symlinks (the Python glob("**") did; monorepo/pnpm/bazel layouts satisfy
+// boundary code globs via symlinks, and skipping them makes the code
+// invisible to the gate). Cycles are broken by tracking resolved paths.
+// Dangling symlinks are skipped.
+func walkSourceFiles(root string) ([]string, error) {
+	var files []string
+	visited := map[string]bool{}
+	var walk func(dir string) error
+	walk = func(dir string) error {
+		real, err := filepath.EvalSymlinks(dir)
+		if err != nil {
+			return err
+		}
+		if visited[real] {
+			return nil // symlink cycle
+		}
+		visited[real] = true
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return err
+		}
+		for _, e := range entries {
+			p := filepath.Join(dir, e.Name())
+			if e.Type()&os.ModeSymlink != 0 {
+				fi, statErr := os.Stat(p) // follow the link
+				if statErr != nil {
+					continue // dangling symlink
+				}
+				if fi.IsDir() {
+					if err := walk(p); err != nil {
+						return err
+					}
+					continue
+				}
+			} else if e.IsDir() {
+				if err := walk(p); err != nil {
+					return err
+				}
+				continue
+			}
+			if _, ok := langExts[filepath.Ext(p)]; ok {
+				files = append(files, p)
+			}
+		}
+		return nil
+	}
+	if err := walk(root); err != nil {
+		return files, err
+	}
+	return files, nil
+}
+
 var testFilePatterns = []string{"*_test.go", "*_test.py", "test_*.py", "*.test.ts", "*.test.tsx",
 	"*.test.js", "*_test.exs", "*_spec.rb"}
 
@@ -70,12 +123,13 @@ var (
 	goBlockImportRe = regexp.MustCompile(`(?ms)^import\s*\((.*?)\)`)
 	goLineImportRe  = regexp.MustCompile(`(?m)^import\s+(?:[\w.]+\s+)?"([^"]+)"`)
 	goBlockLineRe   = regexp.MustCompile(`(?:^|\s)(?:[\w.]+\s+)?"([^"]+)"`)
-	pyImportRe      = regexp.MustCompile(`(?m)^\s*import\s+([\w.]+)`)
+	pyImportRe      = regexp.MustCompile(`(?m)^\s*import\s+([\w.]+(?:\s+as\s+\w+)?(?:\s*,\s*[\w.]+(?:\s+as\s+\w+)?)*)`)
 	pyFromRe        = regexp.MustCompile(`(?m)^\s*from\s+([\w.]+)\s+import\b`)
-	tsImportRe      = regexp.MustCompile(`(?:from|import|require\()\s*['"]([^'"]+)['"]`)
-	exModRe         = regexp.MustCompile(`(?m)^\s*(?:alias|import|use|require)\s+([A-Z][\w.]*)`)
-	rustUseRe       = regexp.MustCompile(`(?m)^\s*use\s+([\w:]+)`)
-	exDefmoduleRe   = regexp.MustCompile(`(?m)^\s*defmodule\s+([A-Z][\w.]*)`)
+	// from/import/dynamic import()/require() forms
+	tsImportRe    = regexp.MustCompile(`(?:from|import\s*\(|import|require\()\s*['"]([^'"]+)['"]`)
+	exModRe       = regexp.MustCompile(`(?m)^\s*(?:alias|import|use|require)\s+([A-Z][\w.]*)`)
+	rustUseRe     = regexp.MustCompile(`(?m)^\s*use\s+([\w:]+)`)
+	exDefmoduleRe = regexp.MustCompile(`(?m)^\s*defmodule\s+([A-Z][\w.]*)`)
 )
 
 func goImports(text string) []string {
@@ -94,7 +148,11 @@ func goImports(text string) []string {
 func pyImports(text, rel string) []string {
 	var out []string
 	for _, m := range pyImportRe.FindAllStringSubmatch(text, -1) {
-		out = append(out, strings.ReplaceAll(m[1], ".", "/"))
+		// "import a as x, b.c" imports every listed module, not just the first
+		for _, part := range strings.Split(m[1], ",") {
+			mod := strings.Fields(strings.TrimSpace(part))[0]
+			out = append(out, strings.ReplaceAll(mod, ".", "/"))
+		}
 	}
 	for _, m := range pyFromRe.FindAllStringSubmatch(text, -1) {
 		mod := m[1]
@@ -276,20 +334,7 @@ func CheckImports(design, impl string) *Gate {
 	}
 
 	edgeHits := map[[2]string]string{}
-	var files []string
-	walkErr := filepath.Walk(impl, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		ext := filepath.Ext(path)
-		if _, ok := langExts[ext]; ok {
-			files = append(files, path)
-		}
-		return nil
-	})
+	files, walkErr := walkSourceFiles(impl)
 	if walkErr != nil {
 		g.Errs = append(g.Errs, "walking "+impl+": "+walkErr.Error())
 	}
