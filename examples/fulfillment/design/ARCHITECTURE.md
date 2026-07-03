@@ -17,7 +17,7 @@ to the Order DB, which is a near 1:1 realization of the FulfillmentSaga machine.
 ## 2. Architecture Contract
 
 ```yaml
-contract_version: 1
+contract_version: 2
 boundaries:
   - id: order.service
     kind: container
@@ -85,8 +85,49 @@ model `formal/FulfillmentSagaData.tla` proves that money and stock are never sil
 | `Order` `Payment` `Reservation` `Shipment` | per-service DB rows | status columns per aggregate | optimistic lock per row |
 | `OutboxMessage` | a table in each service DB, drained by a poller | rows marked Published then Consumed; the machine models one publish attempt, the poller supplies the at-least-once re-drive | at-least-once; consumers dedupe by message id |
 
-## 5. Gate 2 result
+## 5. Event-contract table
+
+Bus coupling is invisible to import-level checking, so this table is the governing artifact for
+every message that crosses a service boundary. Every row rides the transactional outbox of the
+producing service (`OutboxMessage`: Pending, Published, Consumed; the poller re-drives until
+Consumed, `outbox-at-least-once`), so delivery is at least once everywhere and every consumer
+dedupes by message id (`exactly-once-effect`). Payloads name `fulfillment.modelith.yaml`
+attributes. Order placement itself does not cross the bus: the customer reaches the API over HTTPS
+and the API starts the saga in-process; the saga's first outbox emission is the `reserve` command.
+
+| event | producer | consumer | payload (Modelith attributes) | delivery | ordering | dedupe |
+|---|---|---|---|---|---|---|
+| `reserve` command | Order Service (saga, via its outbox) | Inventory Service | order id; per line: `LineItem.quantity`, `Product.sku`; the hold creates `Reservation.quantity`, `Reservation.status` | at-least-once via outbox | first saga step; no cross-order ordering assumed | consumer dedupes by message id; hold idempotent per order and line item |
+| `release` command (compensation) | Order Service (saga, via its outbox) | Inventory Service | order id; the `Reservation` records to release | at-least-once via outbox; re-driven by the `compensate` step | after `reserved`; releasing a Released reservation is a no-op (`reservation-terminal`) | message id; release is idempotent |
+| `capture` command | Order Service (saga, via its outbox) | Payment Service | `Payment.amountCents` (equals `Order.totalCents`, `capture-matches-total`), `Payment.idempotencyKey` | at-least-once via outbox | only after `reserved` (`reserve-before-pay`, proven in `formal/Checkout.tla`) | `Payment.idempotencyKey` (`payment-idempotent`); the gateway is called with the same key |
+| `refund` command (compensation) | Order Service (saga, via its outbox) | Payment Service | `Refund.amountCents` (capped by `refund-within-capture`), `Payment.idempotencyKey` | at-least-once via outbox; re-driven by the `compensate` step | only after a successful capture | idempotency key; refund is idempotent |
+| `dispatch` command | Order Service (saga, via its outbox) | Shipping Service | order id; `Address.line1`, `Address.city`, `Address.postalCode`, `Address.country` (`address-country-present`); line quantities | at-least-once via outbox | only after `captured` (`no-ship-before-pay`, proven in `formal/Checkout.tla`) | message id; one `Shipment` per `Order` (1:1) |
+| `reserved` / `released` events | Inventory Service (via its outbox) | Order Service (saga) | order id, `Reservation.status`, `Reservation.quantity` | at-least-once via outbox | per order; the saga reacts only to the reply for its current step, stale replies are ignored | message id |
+| `captured` / `refunded` / `failed` events | Payment Service (via its outbox) | Order Service (saga) | order id, `Payment.status`, `Payment.amountCents` | at-least-once via outbox | per order; as above | message id |
+| `dispatched` / `delivered` / `lost` events | Shipping Service (via its outbox) | Order Service (saga) | order id, `Shipment.status`, `Shipment.trackingId` | at-least-once via outbox | per order; as above; `delivered` / `lost` drive the Order's `markDelivered` / `fail` | message id |
+
+## 6. NFR record
+
+- **Security posture**: the customer-facing API and the operator's stock management are HTTPS. The
+  payment gateway credential lives only in the Payment Service and is never logged; the platform
+  stores no card data, only `Payment.amountCents` and `Payment.idempotencyKey` (the gateway holds
+  the instrument). Each service connects only to its own database and to the bus; the Architecture
+  Contract forbids direct service-to-service calls. Out of scope: end-user authentication and
+  storefront hardening (catalog UX is out of scope for this design).
+- **Capacity assumptions**: one `gen_statem` per in-flight order; thousands of orders per day, not
+  millions. Each service scales against its own PostgreSQL; the bus carries a bounded handful of
+  messages per order. Step timeouts (5-8s) and retry bounds (<= 3) cap in-flight work; correctness
+  of compensation is chosen over throughput.
+- **Observability and alerting**: every service logs state transitions keyed by order id and
+  message id. A `FulfillmentSaga` that enters `FailedDirty` MUST page an operator: money or stock
+  may still be held and no automatic recovery exists (this is the paging requirement the
+  FulfillmentSaga matrix cites). Monitor outbox lag (age of the oldest Pending `OutboxMessage`)
+  and bus redelivery counts; sustained growth in either means delivery or an idempotent consumer
+  is broken. Metrics and log tooling choices are deferred to implementation; the signals above are
+  not.
+
+## 7. Gate 2 result
 
 Every Modelith action maps to an owning service; every external dependency has a mitigation-posture row;
 the contract is consistent and the services are forbidden from calling each other directly; persistence
-and placement are decided per component. PASS.
+and placement are decided per component; every bus-crossing message has an event-contract row. PASS.

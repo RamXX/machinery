@@ -1,9 +1,11 @@
 # BUILD: Order Fulfillment
 
-MODE: manifest. This document is the entry point over the `design/` tree, not a self-contained
-blueprint: a coding agent builds from this document PLUS the artifacts it references (the domain
-model, the architecture contract, the machines, and the generated oracles), which are the source of
-truth. The zero-context claim applies to the design tree as a whole.
+Mode: full (self-contained).
+
+Single deliverable; there is no `design/BUILD/` shard directory. A coding agent builds from this
+document, and the `design/` files it references (the domain model, the architecture contract, the
+machines, and the generated oracles) are the source of truth for full detail. When this document
+and a source file disagree, the source file wins and this document is a defect: stop and fix it.
 
 ## 1. Purpose and scope
 
@@ -14,7 +16,7 @@ catalog UX, returns after delivery, tax and promotions.
 
 ## 2. Domain model (the what)
 
-Source of truth: `fulfillment.modelith.yaml` (lints clean; 12 entities, 6 enums, 28 invariants, 8
+Source of truth: `fulfillment.modelith.yaml` (lints clean; 12 entities, 6 enums, 25 invariants, 8
 scenarios). Render it with `modelith render`. The data dictionary lives there and is not restated here.
 
 ## 3. Architecture (the how)
@@ -23,7 +25,9 @@ Source of truth: `workspace.dsl` and `ARCHITECTURE.md`. Four Elixir services, ea
 PostgreSQL, communicating only over a message bus (no direct service-to-service calls, enforced by the
 Architecture Contract). Reliable delivery is a transactional outbox plus idempotent consumers. The
 Order Service owns the saga as a `gen_statem` per order. The distributed mitigation posture (message
-bus, gateway, per-service DB, carrier, partition) is in ARCHITECTURE.md section 3.
+bus, gateway, per-service DB, carrier, partition) is in ARCHITECTURE.md section 3. The event-contract
+table governing every bus-crossing message (producer, consumer, payload, delivery, ordering, dedupe)
+is ARCHITECTURE.md section 5.
 
 ## 4. Behavior and formal verification
 
@@ -94,6 +98,24 @@ reserves (stub inventory) -> saga captures (stub gateway) -> saga dispatches (st
 Delivered`, exercising one real message-bus round trip and the outbox. Then vertical slices per service,
 then the real gateway and carrier adapters. The saga is built against the verified machine: its
 `gen_statem` states and transitions mirror `FulfillmentSaga.machine.json` one to one.
+
+### Toolchain and versions
+
+Design-only example: no `impl/` exists yet. This pins the environment for the first implementer so
+two implementing agents cannot diverge.
+
+- Target language: Elixir/OTP, an umbrella of four apps plus `libs/contracts` (per `workspace.dsl`
+  and ARCHITECTURE.md section 1): Phoenix for the order API, Ecto for persistence, Oban for the
+  outbox poller, `gen_statem` for the saga. Pin exact Elixir/OTP and library versions in `mix.lock`
+  at project start; that lockfile then becomes the source of truth for pins.
+- Infrastructure: one PostgreSQL per service and RabbitMQ as the bus; integration fixtures run the
+  real bus and services via docker compose (per the `machines/*.matrix.md` fixture columns), no mocks.
+- Tests: ExUnit; transition tests are derived from the generated oracles, named-unit and property
+  tests from the matrix tables.
+- The two design-gate commands an implementer runs, from the example root:
+  `machinery oracle design/machines` (regenerate and commit the oracles after any machine change)
+  and `machinery check design` (all design gates; add `--impl <dir>` once code exists). Formal
+  proofs re-run with `make verify-formal` (TLC; needs Java 11+).
 
 ## 7. Hard-TDD protocol
 

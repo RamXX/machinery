@@ -1,6 +1,6 @@
 # Generated transition oracle: `recommendationRun`
 
-Generated from `RecommendationRun.machine.json` by tools/oracle_gen.py. DO NOT EDIT BY HAND.
+Generated from `RecommendationRun.machine.json` by `machinery oracle`. DO NOT EDIT BY HAND.
 Single source of truth for the hard-TDD transition tests: one transition row is one
 test case. Key tests on the STABLE id, not the row number; row numbers renumber when
 the design changes, stable ids do not.

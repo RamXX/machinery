@@ -9,7 +9,7 @@ Target language: Elixir/OTP.
 
 - **Modelith scaled.** The larger domain (12 entities, 6 enums, 28 invariants, 8 scenarios,
   distributed failure semantics) lints clean, same as the small one. Gate 1 is not size-sensitive.
-- **Oracle generation generalized.** `oracle_gen` produced the saga's transition oracle (17 rows)
+- **Oracle generation generalized.** the oracle generator (now `machinery oracle`) produced the saga's transition oracle (17 rows)
   with no special casing.
 - **Control-flow model checking generalized to a genuinely new shape.** The saga is not a lifecycle:
   it is a forward path (reserve, pay, ship) with a compensation reversal (refund, release) and a
@@ -41,7 +41,7 @@ Target language: Elixir/OTP.
    the multi-service contract; that phase of this design is not yet authored.
 
 4. **Close the oracle loop in the gate.** `machinery check` still reconciles the machine against a
-   hand-authored matrix. Now that `oracle_gen` produces the oracle from the machine, G3 should diff
+   hand-authored matrix. Now that the generator produces the oracle from the machine, G3 should diff
    the committed oracle against the freshly generated one, making the check a pure generate-and-compare.
 
 ## Status

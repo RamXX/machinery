@@ -1,5 +1,7 @@
 # BUILD: Go CRM
 
+Mode: full (self-contained).
+
 > Single deliverable. Self-contained by design: a coding agent with zero prior context builds the
 > system from this file alone, under hard TDD (section 10). Source-of-truth files are referenced per
 > section for full detail, but you do not need to open them to build. When this document and a source
@@ -698,11 +700,14 @@ check **C-REPO-20**. Carried explicitly in section 11.
 ## 7. Test specification (the hard-TDD oracle)
 
 This section is the input to the test-writer agent (section 10). It writes tests from here; it does not
-invent them. Sources: the five `design/machines/*.matrix.md` transition matrices (flattened 1:1 below),
-the section 4.6 interface contracts, and the section 3.4 invariants.
+invent them. Sources: the five generated `design/machines/<M>.oracle.md` transition oracles (7.1), the
+five `design/machines/*.matrix.md` named-unit tables, the section 4.6 interface contracts, and the
+section 3.4 invariants.
 
-**Test id scheme.** `T-<MACHINE>-NN` = one transition/guard-branch row (MACHINE in DEAL, TASK, USER, SESS,
-CMD; NN is the matrix row number, so `T-DEAL-07` is Deal.matrix row 7). `C-<BOUNDARY>-NN` = a contract test
+**Test id scheme.** Transition tests key on the oracle's STABLE id column (e.g. `DEAL-eb0c40`), never on
+a row number: row numbers renumber whenever the design changes, stable ids do not. The oracle also emits
+a sequential `T-<MACHINE>-NN` id per row (MACHINE in DEAL, TASK, USER, SESS, CMD); those names are how
+sections 6 and 8 of this document cite individual rows. `C-<BOUNDARY>-NN` = a contract test
 at a section-4.6 boundary (REPO, AUTHZ, SESS) plus `C-ARCH-01` for the dependency contract. `P-<invariant>`
 = a property test, one per invariant.
 
@@ -713,240 +718,40 @@ row is not "covered" until every falsifying clause of its guard has a case.
 
 **Covering-path completeness.** Because the machines are XState v5 JSON, the test-writer may load each
 `machines/<M>.machine.json` into `@xstate/graph` and call `getShortestPaths` / `getSimplePaths` /
-`getAdjacencyMap` to enumerate every edge (event + guard branch) and confirm the flattened rows below cover
-the full adjacency map with no transition or guard branch dropped. The flattened tables are the canonical
-oracle; the covering paths are the completeness check. Test-writer procedure: (1) generate the adjacency
-map per machine, (2) assert one T-row exists per edge, (3) fail the suite build if any edge lacks a row.
+`getAdjacencyMap` to enumerate every edge (event + guard branch) and confirm the generated oracle rows
+cover the full adjacency map with no transition or guard branch dropped. The generated oracle files are
+the canonical spec; the covering paths are the completeness check. Test-writer procedure: (1) generate the
+adjacency map per machine, (2) assert one oracle row (by stable id) exists per edge, (3) fail the suite
+build if any edge lacks a row.
 
-### 7.1 Transition tests (flattened matrices)
+### 7.1 Transition tests (the generated oracles)
 
-Columns: test id | component | given state + context | event / trigger | expected next state | expected actions | derived from.
+The per-transition test spec is not pasted here. For every machine the canonical spec is its
+generated oracle file, `design/machines/<M>.oracle.md`: one row per transition and guard branch,
+keyed by the oracle's STABLE id column. Row numbers renumber when the design changes; stable ids do
+not. Regenerate with `machinery oracle design/machines` after any machine change; the stable-id
+diff is the affected-test list.
 
-**Deal (`crm.domain`, `machines/Deal.machine.json`) - 57 rows.**
+**Deal (`crm.domain`).** `machines/Deal.oracle.md` (57 transition rows) is the canonical
+per-transition test spec for the Deal aggregate, keyed by stable id (e.g. `DEAL-eb0c40`).
 
-| test id | given state + context | event / trigger | next state | actions | derived from |
-|---|---|---|---|---|---|
-| T-DEAL-01 | Lead; caller may write; amount>=0 | advanceStage | persisting | setPendingAdvance | advanceStage / deal-stage-forward,rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-02 | Lead; guard false (not-writable OR amount<0) | advanceStage | Lead (internal) | recordAdvanceDenied | guard false |
-| T-DEAL-03 | Lead; closeDate present; may write; amount>=0 | win | persisting | setPendingWin | win / deal-won-has-closedate,rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-04 | Lead; guard false (no closeDate OR not-writable OR amount<0) | win | Lead (internal) | recordWinDenied | guard false |
-| T-DEAL-05 | Lead; may write; amount>=0 | lose | persisting | setPendingLose | lose / rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-06 | Lead; guard false | lose | Lead (internal) | recordLoseDenied | guard false |
-| T-DEAL-07 | Lead (non-terminal) | reopen | Lead (internal) | recordReopenNotTerminal | deal-terminal (reopen only on terminal) |
-| T-DEAL-08 | Qualified; may write; amount>=0 | advanceStage | persisting | setPendingAdvance (->Proposal) | deal-stage-forward,rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-09 | Qualified; guard false | advanceStage | Qualified (internal) | recordAdvanceDenied | guard false |
-| T-DEAL-10 | Qualified; closeDate; may write; amount>=0 | win | persisting | setPendingWin | deal-won-has-closedate,rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-11 | Qualified; guard false | win | Qualified (internal) | recordWinDenied | guard false |
-| T-DEAL-12 | Qualified; may write; amount>=0 | lose | persisting | setPendingLose | rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-13 | Qualified; guard false | lose | Qualified (internal) | recordLoseDenied | guard false |
-| T-DEAL-14 | Qualified (non-terminal) | reopen | Qualified (internal) | recordReopenNotTerminal | deal-terminal |
-| T-DEAL-15 | Proposal; may write; amount>=0 | advanceStage | persisting | setPendingAdvance (->Negotiation) | deal-stage-forward,rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-16 | Proposal; guard false | advanceStage | Proposal (internal) | recordAdvanceDenied | guard false |
-| T-DEAL-17 | Proposal; closeDate; may write; amount>=0 | win | persisting | setPendingWin | deal-won-has-closedate,rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-18 | Proposal; guard false | win | Proposal (internal) | recordWinDenied | guard false |
-| T-DEAL-19 | Proposal; may write; amount>=0 | lose | persisting | setPendingLose | rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-20 | Proposal; guard false | lose | Proposal (internal) | recordLoseDenied | guard false |
-| T-DEAL-21 | Proposal (non-terminal) | reopen | Proposal (internal) | recordReopenNotTerminal | deal-terminal |
-| T-DEAL-22 | Negotiation (no forward stage) | advanceStage | Negotiation (internal) | recordAdvanceDenied | deal-stage-forward (win/lose only) |
-| T-DEAL-23 | Negotiation; closeDate; may write; amount>=0 | win | persisting | setPendingWin | deal-won-has-closedate,rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-24 | Negotiation; guard false | win | Negotiation (internal) | recordWinDenied | guard false |
-| T-DEAL-25 | Negotiation; may write; amount>=0 | lose | persisting | setPendingLose | rbac-write-scope,deal-amount-nonneg |
-| T-DEAL-26 | Negotiation; guard false | lose | Negotiation (internal) | recordLoseDenied | guard false |
-| T-DEAL-27 | Negotiation (non-terminal) | reopen | Negotiation (internal) | recordReopenNotTerminal | deal-terminal |
-| T-DEAL-28 | Won; caller Manager/Admin in scope | reopen | persisting | setPendingReopen (->Negotiation) | reopen / rbac-reassign-authority,rbac-write-scope |
-| T-DEAL-29 | Won; guard false (not Manager/Admin in scope) | reopen | Won (internal) | recordReopenDenied | guard false |
-| T-DEAL-30 | Won (terminal) | advanceStage | Won (internal) | recordTerminalRejected | deal-terminal (structural) |
-| T-DEAL-31 | Won (terminal) | win | Won (internal) | recordTerminalRejected | deal-terminal (structural) |
-| T-DEAL-32 | Won (terminal) | lose | Won (internal) | recordTerminalRejected | deal-terminal (structural) |
-| T-DEAL-33 | Lost; caller Manager/Admin in scope | reopen | persisting | setPendingReopen (->Negotiation) | reopen / rbac-reassign-authority,rbac-write-scope |
-| T-DEAL-34 | Lost; guard false | reopen | Lost (internal) | recordReopenDenied | guard false |
-| T-DEAL-35 | Lost (terminal) | advanceStage | Lost (internal) | recordTerminalRejected | deal-terminal (structural) |
-| T-DEAL-36 | Lost (terminal) | win | Lost (internal) | recordTerminalRejected | deal-terminal (structural) |
-| T-DEAL-37 | Lost (terminal) | lose | Lost (internal) | recordTerminalRejected | deal-terminal (structural) |
-| T-DEAL-38 | persisting; pendingStage=Qualified | saveDeal onDone | Qualified | commitStage | persist success routing |
-| T-DEAL-39 | persisting; pendingStage=Proposal | saveDeal onDone | Proposal | commitStage | persist success routing |
-| T-DEAL-40 | persisting; pendingStage=Negotiation | saveDeal onDone | Negotiation | commitStage | persist success routing |
-| T-DEAL-41 | persisting; pendingStage=Won | saveDeal onDone | Won | commitStage, commitCloseDate | persist success; deal-won-has-closedate |
-| T-DEAL-42 | persisting; pendingStage=Lost | saveDeal onDone | Lost | commitStage | persist success routing |
-| T-DEAL-43 | persisting; pending routes to none | saveDeal onDone (else) | rolledBack | recordRoutingError | defensive |
-| T-DEAL-44 | persisting; error=ErrLocked | saveDeal onError | persistRetry | recordError | store-locked |
-| T-DEAL-45 | persisting; error=ErrConstraint | saveDeal onError | rolledBack | recordConstraint | constraint |
-| T-DEAL-46 | persisting; error=ErrDiskFull | saveDeal onError | rolledBack | recordDiskFull | disk-full |
-| T-DEAL-47 | persisting; error=ErrTimeout | saveDeal onError | rolledBack | recordTimeout | timeout |
-| T-DEAL-48 | persisting; error=other | saveDeal onError (else) | rolledBack | recordUnknownError | catch-all |
-| T-DEAL-49 | persisting; 10s elapsed | after persistTimeout | rolledBack | recordTimeout | timeout 10s |
-| T-DEAL-50 | persistRetry; retries>=3 | always | rolledBack | recordRetriesExhausted | retry bound |
-| T-DEAL-51 | persistRetry; retries<3 | after persistRetryBackoff | persisting | incrementRetries | backoff ~0.5s |
-| T-DEAL-52 | rolledBack; priorStage=Lead | always | Lead | - | atomic rollback |
-| T-DEAL-53 | rolledBack; priorStage=Qualified | always | Qualified | - | atomic rollback |
-| T-DEAL-54 | rolledBack; priorStage=Proposal | always | Proposal | - | atomic rollback |
-| T-DEAL-55 | rolledBack; priorStage=Negotiation | always | Negotiation | - | atomic rollback |
-| T-DEAL-56 | rolledBack; priorStage=Won | always | Won | - | atomic rollback |
-| T-DEAL-57 | rolledBack; priorStage=Lost | always | Lost | - | atomic rollback |
+**Task (`crm.domain`).** `machines/Task.oracle.md` (30 transition rows) is the canonical
+per-transition test spec for the Task aggregate, keyed by stable id. Done and Cancelled are `final`,
+so their structural rejections appear as the absence of outgoing rows, not as extra rows.
 
-**Task (`crm.domain`, `machines/Task.machine.json`) - 32 rows.**
+**User (`crm.domain`).** `machines/User.oracle.md` (19 transition rows) is the canonical
+per-transition test spec for the User status lifecycle, keyed by stable id.
 
-| test id | given state + context | event / trigger | next state | actions | derived from |
-|---|---|---|---|---|---|
-| T-TASK-01 | Open; caller may write | start | persisting | setPendingStart | start / rbac-write-scope |
-| T-TASK-02 | Open; guard false | start | Open (internal) | recordStartDenied | guard false |
-| T-TASK-03 | Open; non-terminal; may write | complete | persisting | setPendingComplete | complete / task-terminal,rbac-write-scope |
-| T-TASK-04 | Open; guard false | complete | Open (internal) | recordCompleteDenied | guard false |
-| T-TASK-05 | Open; non-terminal; may write | cancel | persisting | setPendingCancel | cancel / task-terminal,rbac-write-scope |
-| T-TASK-06 | Open; guard false | cancel | Open (internal) | recordCancelDenied | guard false |
-| T-TASK-07 | Open; new assignee in scope; caller Manager/Admin in scope | reassign | persisting | setPendingReassign | reassign / task-assignee-visible,rbac-reassign-authority,rbac-write-scope |
-| T-TASK-08 | Open; guard false (assignee out of scope OR caller not Mgr/Admin) | reassign | Open (internal) | recordReassignDenied | guard false |
-| T-TASK-09 | InProgress (already started) | start | InProgress (internal) | recordAlreadyStarted | idempotent no-op |
-| T-TASK-10 | InProgress; non-terminal; may write | complete | persisting | setPendingComplete | complete / task-terminal,rbac-write-scope |
-| T-TASK-11 | InProgress; guard false | complete | InProgress (internal) | recordCompleteDenied | guard false |
-| T-TASK-12 | InProgress; non-terminal; may write | cancel | persisting | setPendingCancel | cancel / task-terminal,rbac-write-scope |
-| T-TASK-13 | InProgress; guard false | cancel | InProgress (internal) | recordCancelDenied | guard false |
-| T-TASK-14 | InProgress; assignee in scope; caller Mgr/Admin in scope | reassign | persisting | setPendingReassign | reassign / task-assignee-visible,rbac-reassign-authority,rbac-write-scope |
-| T-TASK-15 | InProgress; guard false | reassign | InProgress (internal) | recordReassignDenied | guard false |
-| T-TASK-16 | Done (final) | any of start/complete/cancel/reassign | none (final) | - | task-terminal (structural) |
-| T-TASK-17 | Cancelled (final) | any of start/complete/cancel/reassign | none (final) | - | task-terminal (structural) |
-| T-TASK-18 | persisting; pendingStatus=Open | saveTask onDone | Open | commitStatus | reassign-in-Open routing |
-| T-TASK-19 | persisting; pendingStatus=InProgress | saveTask onDone | InProgress | commitStatus | start / reassign-in-InProgress routing |
-| T-TASK-20 | persisting; pendingStatus=Done | saveTask onDone | Done | commitStatus | complete routing |
-| T-TASK-21 | persisting; pendingStatus=Cancelled | saveTask onDone | Cancelled | commitStatus | cancel routing |
-| T-TASK-22 | persisting; pending routes to none | saveTask onDone (else) | rolledBack | recordRoutingError | defensive |
-| T-TASK-23 | persisting; error=ErrLocked | saveTask onError | persistRetry | recordError | store-locked |
-| T-TASK-24 | persisting; error=ErrConstraint | saveTask onError | rolledBack | recordConstraint | constraint |
-| T-TASK-25 | persisting; error=ErrDiskFull | saveTask onError | rolledBack | recordDiskFull | disk-full |
-| T-TASK-26 | persisting; error=ErrTimeout | saveTask onError | rolledBack | recordTimeout | timeout |
-| T-TASK-27 | persisting; error=other | saveTask onError (else) | rolledBack | recordUnknownError | catch-all |
-| T-TASK-28 | persisting; 10s elapsed | after persistTimeout | rolledBack | recordTimeout | timeout 10s |
-| T-TASK-29 | persistRetry; retries>=3 | always | rolledBack | recordRetriesExhausted | retry bound |
-| T-TASK-30 | persistRetry; retries<3 | after persistRetryBackoff | persisting | incrementRetries | backoff ~0.5s |
-| T-TASK-31 | rolledBack; priorStatus=Open | always | Open | - | atomic rollback |
-| T-TASK-32 | rolledBack; priorStatus=InProgress | always | InProgress | - | atomic rollback |
+**Session (`crm.session`).** `machines/Session.oracle.md` (60 transition rows) is the canonical
+per-transition test spec for the Session machine, keyed by stable id.
 
-**User (`crm.domain`, `machines/User.machine.json`) - 19 rows.**
+**CommandExecution (`crm.commands`).** `machines/CommandExecution.oracle.md` (28 transition rows) is
+the canonical per-transition test spec for the invocation envelope, keyed by stable id; the exit-code
+actions of the five terminal states live in the oracle's state entry/exit table.
 
-| test id | given state + context | event / trigger | next state | actions | derived from |
-|---|---|---|---|---|---|
-| T-USER-01 | Active; actor.role==Admin | disable | persisting | setPendingDisable | disable / rbac-crud-verbs |
-| T-USER-02 | Active; actor not Admin | disable | Active (internal) | recordAuthorityDenied | guard false |
-| T-USER-03 | Active | enable | Active (internal) | recordAlreadyActive | idempotent no-op |
-| T-USER-04 | Disabled; actor.role==Admin | enable | persisting | setPendingEnable | enable / rbac-crud-verbs |
-| T-USER-05 | Disabled; actor not Admin | enable | Disabled (internal) | recordAuthorityDenied | guard false |
-| T-USER-06 | Disabled | disable | Disabled (internal) | recordAlreadyDisabled | idempotent no-op |
-| T-USER-07 | persisting; pendingStatus=Active | saveUser onDone | Active | commitStatus | enable routing |
-| T-USER-08 | persisting; pendingStatus=Disabled | saveUser onDone | Disabled | commitStatus | disable routing |
-| T-USER-09 | persisting; pending routes to none | saveUser onDone (else) | rolledBack | recordRoutingError | defensive |
-| T-USER-10 | persisting; error=ErrLocked | saveUser onError | persistRetry | recordError | store-locked |
-| T-USER-11 | persisting; error=ErrConstraint | saveUser onError | rolledBack | recordConstraint | constraint |
-| T-USER-12 | persisting; error=ErrDiskFull | saveUser onError | rolledBack | recordDiskFull | disk-full |
-| T-USER-13 | persisting; error=ErrTimeout | saveUser onError | rolledBack | recordTimeout | timeout |
-| T-USER-14 | persisting; error=other | saveUser onError (else) | rolledBack | recordUnknownError | catch-all |
-| T-USER-15 | persisting; 10s elapsed | after persistTimeout | rolledBack | recordTimeout | timeout 10s |
-| T-USER-16 | persistRetry; retries>=3 | always | rolledBack | recordRetriesExhausted | retry bound |
-| T-USER-17 | persistRetry; retries<3 | after persistRetryBackoff | persisting | incrementRetries | backoff ~0.5s |
-| T-USER-18 | rolledBack; priorStatus=Active | always | Active | - | atomic rollback |
-| T-USER-19 | rolledBack; priorStatus=Disabled | always | Disabled | - | atomic rollback |
-
-**Session (`crm.session`, `machines/Session.machine.json`) - 60 rows.**
-
-| test id | given state + context | event / trigger | next state | actions | derived from |
-|---|---|---|---|---|---|
-| T-SESS-01 | Anonymous | login | Authenticating | setCredentials | login |
-| T-SESS-02 | Anonymous | resume | Resolving | - | Current() resolution |
-| T-SESS-03 | Anonymous | logout | Anonymous (internal) | recordNoSessionToLogout | explicit ignore |
-| T-SESS-04 | Anonymous | useSession | Anonymous (internal) | recordNoActiveSession | explicit reject |
-| T-SESS-05 | Authenticating; verified user Disabled | verifyCredentials onDone | AuthDenied | recordDisabled | disabled-cannot-auth |
-| T-SESS-06 | Authenticating; verified user Active | verifyCredentials onDone (else) | WritingSession | captureUser | verify ok |
-| T-SESS-07 | Authenticating; error=ErrBadCredentials | verifyCredentials onError | AuthFailed | recordBadCredentials | ErrBadCredentials |
-| T-SESS-08 | Authenticating; error=ErrDisabled | verifyCredentials onError | AuthDenied | recordDisabled | disabled-cannot-auth |
-| T-SESS-09 | Authenticating; error=ErrLocked | verifyCredentials onError | VerifyRetry | recordError | store-locked |
-| T-SESS-10 | Authenticating; error=other | verifyCredentials onError (else) | SessionUnavailable | recordVerifyError | store unavailable/corrupt |
-| T-SESS-11 | Authenticating; 5s elapsed | after verifyTimeout | SessionUnavailable | recordTimeout | verify timeout 5s |
-| T-SESS-12 | VerifyRetry; retries>=3 | always | SessionUnavailable | recordRetriesExhausted | retry bound |
-| T-SESS-13 | VerifyRetry; retries<3 | after verifyRetryBackoff | Authenticating | incrementRetries | backoff ~0.5s |
-| T-SESS-14 | WritingSession | writeSessionFile onDone | Active | - | token written |
-| T-SESS-15 | WritingSession | writeSessionFile onError | SessionUnavailable | recordFileError | token write failed |
-| T-SESS-16 | WritingSession; 2s elapsed | after fileIoTimeout | SessionUnavailable | recordTimeout | file io timeout 2s |
-| T-SESS-17 | Resolving; token expiresAt<=now | readSessionFile onDone | Expired | recordExpired | token expiry |
-| T-SESS-18 | Resolving; token valid | readSessionFile onDone (else) | CheckingUser | captureToken | token valid |
-| T-SESS-19 | Resolving; error=ErrNoSession | readSessionFile onError | Anonymous | recordNoSession | ErrNoSession |
-| T-SESS-20 | Resolving; error=ErrExpired | readSessionFile onError | Expired | recordExpired | ErrExpired |
-| T-SESS-21 | Resolving; error=other | readSessionFile onError (else) | SessionUnavailable | recordFileError | token unreadable |
-| T-SESS-22 | Resolving; 2s elapsed | after fileIoTimeout | SessionUnavailable | recordTimeout | file io timeout 2s |
-| T-SESS-23 | CheckingUser; loaded user Active | loadUser onDone | Active | captureUser | session-active-user |
-| T-SESS-24 | CheckingUser; loaded user not Active | loadUser onDone (else) | Invalidated | recordUserNotActive | session-active-user (deny) |
-| T-SESS-25 | CheckingUser; error=ErrLocked | loadUser onError | VerifyRetry | recordError | store-locked |
-| T-SESS-26 | CheckingUser; error=ErrNotFound | loadUser onError | Invalidated | recordUserMissing | user deleted |
-| T-SESS-27 | CheckingUser; error=other | loadUser onError (else) | SessionUnavailable | recordLoadError | store unavailable |
-| T-SESS-28 | CheckingUser; 10s elapsed | after loadUserTimeout | SessionUnavailable | recordTimeout | query timeout 10s |
-| T-SESS-29 | Active | logout | LoggingOut | - | logout |
-| T-SESS-30 | Active | useSession | Active (internal) | recordSessionUsed | command uses session |
-| T-SESS-31 | Active | login | Active (internal) | recordAlreadyActive | explicit ignore |
-| T-SESS-32 | Active | resume | Active (internal) | recordAlreadyResolved | explicit ignore |
-| T-SESS-33 | Active; 8h elapsed | after sessionTTL | Expired | recordExpired | token expiry |
-| T-SESS-34 | LoggingOut | clearSessionFile onDone | LoggedOut | - | token cleared |
-| T-SESS-35 | LoggingOut | clearSessionFile onError | LoggedOut | recordLogoutWarning | best-effort logout |
-| T-SESS-36 | LoggingOut; 2s elapsed | after fileIoTimeout | LoggedOut | recordLogoutWarning | best-effort logout |
-| T-SESS-37 | Expired | login | Authenticating | setCredentials | re-auth |
-| T-SESS-38 | Expired | resume | Expired (internal) | recordExpiredNeedsLogin | explicit reject |
-| T-SESS-39 | Expired | logout | Expired (internal) | recordNoSessionToLogout | explicit ignore |
-| T-SESS-40 | Expired | useSession | Expired (internal) | recordSessionExpired | explicit reject |
-| T-SESS-41 | LoggedOut | login | Authenticating | setCredentials | re-auth |
-| T-SESS-42 | LoggedOut | resume | LoggedOut (internal) | recordNoSession | explicit reject |
-| T-SESS-43 | LoggedOut | logout | LoggedOut (internal) | recordNoSessionToLogout | explicit ignore |
-| T-SESS-44 | LoggedOut | useSession | LoggedOut (internal) | recordNoActiveSession | explicit reject |
-| T-SESS-45 | AuthFailed | login | Authenticating | setCredentials | retry auth |
-| T-SESS-46 | AuthFailed | resume | AuthFailed (internal) | recordNoSession | explicit reject |
-| T-SESS-47 | AuthFailed | logout | AuthFailed (internal) | recordNoSessionToLogout | explicit ignore |
-| T-SESS-48 | AuthFailed | useSession | AuthFailed (internal) | recordNoActiveSession | explicit reject |
-| T-SESS-49 | AuthDenied | login | Authenticating | setCredentials | retry (denied if still disabled) |
-| T-SESS-50 | AuthDenied | resume | AuthDenied (internal) | recordNoSession | explicit reject |
-| T-SESS-51 | AuthDenied | logout | AuthDenied (internal) | recordNoSessionToLogout | explicit ignore |
-| T-SESS-52 | AuthDenied | useSession | AuthDenied (internal) | recordNoActiveSession | explicit reject |
-| T-SESS-53 | Invalidated | login | Authenticating | setCredentials | re-auth |
-| T-SESS-54 | Invalidated | resume | Invalidated (internal) | recordNoSession | explicit reject |
-| T-SESS-55 | Invalidated | logout | Invalidated (internal) | recordNoSessionToLogout | explicit ignore |
-| T-SESS-56 | Invalidated | useSession | Invalidated (internal) | recordNoActiveSession | explicit reject |
-| T-SESS-57 | SessionUnavailable | login | Authenticating | setCredentials | retry auth |
-| T-SESS-58 | SessionUnavailable | resume | Resolving | - | retry resolution |
-| T-SESS-59 | SessionUnavailable | logout | SessionUnavailable (internal) | recordNoSessionToLogout | explicit ignore |
-| T-SESS-60 | SessionUnavailable | useSession | SessionUnavailable (internal) | recordNoActiveSession | explicit reject |
-
-**CommandExecution (`crm.commands`, `machines/CommandExecution.machine.json`) - 33 rows.**
-
-| test id | given state + context | event / trigger | next state | actions | derived from |
-|---|---|---|---|---|---|
-| T-CMD-01 | Parsing; argv valid | always | Opening | captureArgs | arg validation ok |
-| T-CMD-02 | Parsing; argv invalid | always | ValidationFailed | recordParseError | bad args |
-| T-CMD-03 | Opening | openDatabase onDone | ResolvingSession | captureTx | db open ok |
-| T-CMD-04 | Opening; error=ErrLocked | openDatabase onError | DBLocked | recordError | open-lock |
-| T-CMD-05 | Opening; error=ErrCorrupt | openDatabase onError | Corrupt | recordCorrupt | corrupt (fatal) |
-| T-CMD-06 | Opening; error=ErrUnavailable | openDatabase onError | DBError | recordUnavailable | unavailable |
-| T-CMD-07 | Opening; error=other | openDatabase onError (else) | DBError | recordOpenError | catch-all |
-| T-CMD-08 | Opening; 5s elapsed | after openTimeout | DBError | recordTimeout | open timeout 5s |
-| T-CMD-09 | DBLocked; retries>=3 | always | DBError | recordLockExhausted | retry bound |
-| T-CMD-10 | DBLocked; phase=open; retries<3 | after dbRetryBackoff | Opening | incrementRetries | retry the open |
-| T-CMD-11 | DBLocked; phase=execute; retries<3 | after dbRetryBackoff | Executing | incrementRetries | retry the write Tx |
-| T-CMD-12 | ResolvingSession | resolveSession onDone | Authorizing | captureActor | session resolved |
-| T-CMD-13 | ResolvingSession; error=ErrNoSession | resolveSession onError | Denied | recordNeedLogin | no session |
-| T-CMD-14 | ResolvingSession; error=ErrExpired | resolveSession onError | Denied | recordNeedLogin | expired |
-| T-CMD-15 | ResolvingSession; error=ErrLocked | resolveSession onError | DBLocked | recordError | open-lock (session hits repo) |
-| T-CMD-16 | ResolvingSession; error=other | resolveSession onError (else) | DBError | recordSessionError | unavailable |
-| T-CMD-17 | ResolvingSession; 5s elapsed | after sessionResolveTimeout | DBError | recordTimeout | session resolve timeout 5s |
-| T-CMD-18 | Authorizing; Decision.Allowed | always | Executing | recordAllowed | rbac-crud-verbs,rbac-read-visibility,rbac-write-scope,rbac-reassign-authority |
-| T-CMD-19 | Authorizing; !Decision.Allowed | always | Denied | recordDenyReason | authz deny |
-| T-CMD-20 | Executing | executeInTx onDone | Rendering | captureResult | commit ok |
-| T-CMD-21 | Executing; error=ErrConstraint | executeInTx onError | ValidationFailed | ensureRolledBack, recordConstraint | constraint |
-| T-CMD-22 | Executing; error=ErrLocked | executeInTx onError | DBLocked | ensureRolledBack, recordError | write-lock |
-| T-CMD-23 | Executing; error=ErrConflict | executeInTx onError | DBLocked | ensureRolledBack, recordConflict | conflict |
-| T-CMD-24 | Executing; error=ErrDiskFull | executeInTx onError | DBError | ensureRolledBack, recordDiskFull | disk-full |
-| T-CMD-25 | Executing; error=ErrTimeout | executeInTx onError | DBError | ensureRolledBack, recordTimeout | timeout |
-| T-CMD-26 | Executing; error=other | executeInTx onError (else) | DBError | ensureRolledBack, recordExecuteError | catch-all |
-| T-CMD-27 | Executing; 10s elapsed | after queryTimeout | DBError | ensureRolledBack, recordTimeout | query timeout 10s |
-| T-CMD-28 | Rendering | always | Done | renderOutput (entry) | render + exit 0 |
-| T-CMD-29 | Done (final) | - | - | recordSuccessExit | success exit |
-| T-CMD-30 | Denied (final) | - | - | recordDeniedExit | authn/authz exit |
-| T-CMD-31 | ValidationFailed (final) | - | - | recordValidationExit | validation exit |
-| T-CMD-32 | DBError (final) | - | - | recordDBErrorExit | db-error exit |
-| T-CMD-33 | Corrupt (final) | - | - | recordCorruptExit | fatal exit (restore) |
+**Historical note.** The existing impl test suite predates stable-id keying and keys on the
+sequential `T-<MACHINE>-NN` ids. Those remain valid because the oracle regenerates them, but they
+renumber on design changes, so new tests key on the stable id column.
 
 ### 7.2 Contract tests (per boundary, from section 4.6)
 
@@ -1153,6 +958,20 @@ and copies the LadybugDB directory to a timestamped archive at `<dest>`; `crm re
 run against a healthy in-use DB, then replaces `~/.crm/db` from the archive. The Corrupt terminal state's
 message must direct the user to `crm restore` (T-CMD-33). Both are covered in M4.
 
+### Toolchain and versions
+
+Pin the environment so two implementing agents cannot diverge. The source of truth for pins is
+`impl/go.mod`.
+
+- Go 1.26 (`go 1.26` in `impl/go.mod`); one statically linked binary.
+- `github.com/LadybugDB/go-ladybug` v0.17.0, imported only by `internal/repo/**` (C-ARCH-01).
+- `golang.org/x/crypto` v0.53.0 for argon2id (`golang.org/x/crypto/argon2`).
+- Tests: the Go stdlib `testing` package only (no assertion or mocking libraries); integration
+  tests run against a real temporary LadybugDB directory, no mocks.
+- The two design-gate commands an implementer runs, from the example root:
+  `machinery oracle design/machines` (regenerate and commit the oracles after any machine change)
+  and `machinery check design --impl <impl-dir>` (all gates against the implementation).
+
 ## 10. Hard-TDD protocol (read this before writing any code)
 
 1. **Test-writer agent** reads sections 6 and 7 only and writes the full test suite from the spec: one test
@@ -1221,3 +1040,32 @@ Named risks are cheaper than surprises. Each is either accepted-by-design or cov
     `update` of non-stage fields (title/amount) is a plain write guarded by `rbac-write-scope`; if amount is
     edited it must re-check `deal-amount-nonneg` (P-deal-amount-nonneg applies). Flagged so it is not assumed
     to be machine-driven.
+
+## 12. State migration
+
+Four placement rows persist machine state (ARCHITECTURE.md section 7): `Deal` persists `stage`,
+`Task` and `User` persist `status` as graph node attributes, and `Session` persists its token
+(`userId` plus `expiresAt`, HMAC-signed) in `~/.crm/session`. This is a greenfield design and no
+production data exists; the protocol below binds from the first deployment onward, per machine.
+
+- **Deal.** When a `DealStage` value is renamed, split, or removed, the revision MUST ship a
+  mapping table from every old persisted `stage` value to its new stage, applied once over all Deal
+  nodes before the new binary takes writes, or an explicit drain rule for deals stranded in a
+  removed stage. No persisted instances yet; the protocol applies from first deployment.
+- **Task.** Same protocol for `TaskStatus`: a mapping table from every old persisted `status` value
+  to its new status, or an explicit drain rule (Done/Cancelled rows are terminal and must map into
+  the new terminal set). No persisted instances yet; the protocol applies from first deployment.
+- **User.** Same protocol for `UserStatus` (`Active`/`Disabled`): a mapping table from old persisted
+  values to new states, or an explicit drain rule. A mapping that leaves any user without a valid
+  status is a defect (`session-active-user` depends on it). No persisted instances yet; the
+  protocol applies from first deployment.
+- **Session.** The token persists identity and expiry (`userId`, `expiresAt`), not a machine-state
+  value, so renaming Session states needs no data migration. The drain rule for token-format or
+  signing-key changes: outstanding tokens fail the signature or parse check (`ErrUnreadable`) or
+  expire within `sessionTTL` (8h), forcing re-login; a mapping table is never required. No
+  persisted instances yet; the protocol applies from first deployment.
+
+The transient persist-overlay states (`persisting`, `persistRetry`, `rolledBack`) and the whole
+CommandExecution envelope are never persisted (they live only inside one invocation), so renaming
+them needs no migration. Regenerate the oracles after any machine change; the stable-id diff is the
+affected-test list.
