@@ -105,9 +105,13 @@ func runTLC(tlaPath, cfgPath string) (string, error) {
 	return buf.String(), err
 }
 
-// VerifyFormal regenerates + TLC-checks the whole formal suite for a design.
-// Mirrors verify_formal.sh line-for-line in its output.
-func VerifyFormal(design string) int {
+// VerifyFormal regenerates the whole formal suite for a design from source
+// and, unless genOnly is set, TLC-checks every .tla/.cfg pair. Mirrors
+// verify_formal.sh line-for-line in its full-mode output. genOnly exists so
+// Java-free environments (the nightly regen gate, adopter CI) can assert
+// freshness through the same code path that the checked run uses, instead of
+// re-implementing the generator orchestration in shell.
+func VerifyFormal(design string, genOnly bool) int {
 	mdir := filepath.Join(design, "machines")
 	fdir := filepath.Join(design, "formal")
 	if err := os.MkdirAll(fdir, 0755); err != nil {
@@ -152,6 +156,25 @@ func VerifyFormal(design string) int {
 		if err := compose.Run(comp, filepath.Join(mdir, coord+".machine.json"), fdir); err != nil {
 			genErr(err)
 		}
+	}
+
+	if genOnly {
+		pairs := 0
+		for _, tlaF := range globExt(fdir, ".tla") {
+			if _, err := os.Stat(strings.TrimSuffix(tlaF, ".tla") + ".cfg"); err == nil {
+				pairs++
+			}
+		}
+		fmt.Fprintf(os.Stdout, "%d spec pair(s) regenerated from source; TLC skipped (--gen-only)\n", pairs)
+		if genFail > 0 {
+			fmt.Fprintf(os.Stderr, "verify-formal: %d generator failure(s); the committed specs above were NOT regenerated from source\n", genFail)
+			return 1
+		}
+		if pairs == 0 {
+			fmt.Fprintln(os.Stderr, "verify-formal: no .tla/.cfg pairs under "+fdir+": nothing to generate is a failure, not a pass")
+			return 1
+		}
+		return 0
 	}
 
 	pass, fail := 0, 0

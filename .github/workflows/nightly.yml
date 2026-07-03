@@ -33,25 +33,18 @@ jobs:
             .bin/machinery oracle "$md"
           done
           .bin/machinery pack generate examples/checkout-split/parent/design
+      # verify-formal --gen-only runs the exact generator orchestration the
+      # checked run uses (tla + refine + compose, coordinator parsed as YAML),
+      # with TLC skipped so this job stays Java-free. The previous shell
+      # reimplementation of this loop misparsed a commented coordinator line;
+      # single-sourcing it in the binary is the fix.
       - name: Regenerate formal specs with Go
         run: |
           for d in examples/go-crm/design examples/fulfillment/design \
                    examples/portfolio-engine/design \
                    examples/checkout-split/orders/design \
                    examples/checkout-split/payments/design; do
-            for mj in $d/machines/*.machine.json; do
-              .bin/machinery tla "$mj" "$d/formal" || exit 1
-            done
-            for sem in $d/formal/*.semantics.yaml; do
-              [ -e "$sem" ] || continue
-              m=$(basename "$sem" .semantics.yaml)
-              .bin/machinery refine "$d/machines/$m.machine.json" "$sem" "$d/formal" || exit 1
-            done
-            for comp in $d/formal/*.composition.yaml; do
-              [ -e "$comp" ] || continue
-              coord=$(sed -n 's/^coordinator: *//p' "$comp")
-              .bin/machinery compose "$comp" "$d/machines/$coord.machine.json" "$d/formal" || exit 1
-            done
+            .bin/machinery verify-formal --gen-only "$d" || exit 1
           done
       - name: Regenerate pack refinement proofs with Go
         run: |
