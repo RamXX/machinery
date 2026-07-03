@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ramirosalas/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 func repoRoot() string { return "../.." }
@@ -175,6 +175,59 @@ func TestLifecycleInvalidReopenToIsError(t *testing.T) {
 	_, _, err := EmitLifecycle(machine, sem, [2]string{"m", "s"})
 	if err == nil || !containsStr(err.Error(), "reopen_to") {
 		t.Fatalf("bogus reopen_to accepted: %v", err)
+	}
+}
+
+func TestLifecycleMissingReopenToIsError(t *testing.T) {
+	// Regression: reopen_to was validated only when non-empty; leaving it out
+	// generated pending' = "" that only failed later under TLC.
+	machine := loadJSON(t, filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json"))
+	sem := loadYAML(t, filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"))
+	sem.AsObject().Delete("reopen_to")
+	_, files, err := EmitLifecycle(machine, sem, [2]string{"m", "s"})
+	if err == nil || !containsStr(err.Error(), "reopen_to") {
+		t.Fatalf("missing reopen_to accepted (files=%d): %v", len(files), err)
+	}
+}
+
+func TestTerminalRetryExhaustionModelsEveryTarget(t *testing.T) {
+	// Regression: exhaustion modeled only the alphabetically-first always
+	// target; with several failure terminals the TLA under-approximated.
+	machineSrc := `{"id":"run","initial":"Collecting","states":{
+	  "Collecting":{"invoke":{"src":"collect","onDone":{"target":"Scoring"},"onError":{"target":"collectRetry"}},"after":{"t1":{"target":"collectRetry"}}},
+	  "Scoring":{"invoke":{"src":"score","onDone":{"target":"Completed"},"onError":{"target":"Expired"}},"after":{"t2":{"target":"Expired"}}},
+	  "collectRetry":{"always":[{"target":"Aborted","guard":"gaveUp"},{"target":"Expired"}],"after":{"b":{"target":"Collecting"}}},
+	  "Completed":{"type":"final"},
+	  "Aborted":{"type":"final"},
+	  "Expired":{"type":"final"}}}`
+	semSrc := `machine: run
+pattern: terminal-lifecycle
+phases: [Collecting, Scoring]
+success_terminal: Completed
+failure_terminals: [Aborted, Expired]
+retry: { state: collectRetry, serves: Collecting }
+max_retries: 2
+`
+	m, err := ir.LoadMachineJSONStr("w", machineSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sem, err := ir.LoadYAML([]byte(semSrc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, files, err := EmitTerminal(m, sem, [2]string{"m", "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body string
+	for name, b := range files {
+		if containsStr(name, "Data.tla") {
+			body = b
+		}
+	}
+	if !containsStr(body, `st' \in {"Aborted", "Expired"}`) {
+		t.Fatalf("exhaustion does not model every reconciled target:\n%s", body)
 	}
 }
 

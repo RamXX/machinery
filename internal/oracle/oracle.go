@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ramirosalas/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 // fmtActions mirrors oracle_gen._fmt: ", ".join(names) or "-".

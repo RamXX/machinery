@@ -1,0 +1,6 @@
+== scale  design size and decomposition signals ==
+  machines: 0 (states 0, transitions 0)
+  entities: 2, invariants: 3, boundary event rows: 3
+  estimated synthesis input: ~1k tokens (modelith + architecture + matrices)
+  decomposition: PARENT (decomposition.yaml present)
+  recommendation: single-run design; neither sharding nor recursion is indicated

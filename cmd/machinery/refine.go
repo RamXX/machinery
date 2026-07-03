@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ramirosalas/machinery/internal/refine"
+	"github.com/RamXX/machinery/internal/refine"
 )
 
 func newRefineCmd() *cobra.Command {

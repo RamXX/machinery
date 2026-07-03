@@ -1,7 +1,7 @@
 # Maps this design's exposed machine onto the pack's contract machine.
 # machinery pack refine reconciles this and generates formal/OrderPackRefinement.
 subsystem: orders
-pack_hash: 52e76d18c9677f17b5926377403290d6df3d46382d05c205a2100fca309755fe
+pack_hash: 74d12db263215c50447db6008ab8277148b1bffcb0d4c7c810cc4c4c64d664e9
 machine: Order
 mapping:
   Placed: Open

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ramirosalas/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 func minimalMachine() *ir.Value {
@@ -282,9 +282,9 @@ const matrixOK = `
 `
 
 func TestMatchingMatrixReconciles(t *testing.T) {
-	drift, n := ReconcileMatrix(minimalMachine(), matrixOK, "w")
-	if len(drift) != 0 {
-		t.Fatalf("drift: %v", drift)
+	errs, drift, n := ReconcileMatrix(minimalMachine(), matrixOK, "w")
+	if len(errs) != 0 || len(drift) != 0 {
+		t.Fatalf("errs=%v drift=%v", errs, drift)
 	}
 	if n != 5 {
 		t.Errorf("n=%d", n)
@@ -294,7 +294,7 @@ func TestMatchingMatrixReconciles(t *testing.T) {
 func TestRetargetedTransitionIsDrift(t *testing.T) {
 	m := minimalMachine()
 	m.AsObject().Get2("states").AsObject().Get2("persisting").AsObject().Get2("invoke").AsObject().Get2("onDone").AsObject().Set("target", ir.StringValue("Draft"))
-	drift, _ := ReconcileMatrix(m, matrixOK, "w")
+	_, drift, _ := ReconcileMatrix(m, matrixOK, "w")
 	if !contains(drift, "machine transition has no matrix row") || !contains(drift, "matrix row has no machine transition") {
 		t.Fatalf("expected both drift kinds, got %v", drift)
 	}
@@ -302,9 +302,9 @@ func TestRetargetedTransitionIsDrift(t *testing.T) {
 
 func TestMatrixWithoutTransitionTableIsNotDrift(t *testing.T) {
 	text := "## Named units\n\n| name | kind | signature |\n|---|---|---|\n| `x` | guard | f |\n"
-	drift, n := ReconcileMatrix(minimalMachine(), text, "w")
-	if len(drift) != 0 || n != 0 {
-		t.Fatalf("drift=%v n=%d", drift, n)
+	errs, drift, n := ReconcileMatrix(minimalMachine(), text, "w")
+	if len(errs) != 0 || len(drift) != 0 || n != 0 {
+		t.Fatalf("errs=%v drift=%v n=%d", errs, drift, n)
 	}
 }
 
@@ -381,7 +381,7 @@ func TestEmptyTransitionTableIsDriftNotAbsence(t *testing.T) {
 	headerOnly := "## Transition matrix\n\n" +
 		"| # | source | event / after / always | guard | target | actions |\n" +
 		"|---|---|---|---|---|---|\n"
-	drift, n := ReconcileMatrix(minimalMachine(), headerOnly, "w")
+	_, drift, n := ReconcileMatrix(minimalMachine(), headerOnly, "w")
 	if len(drift) == 0 {
 		t.Fatal("header-only transition table reconciled clean; deleting all rows must be drift")
 	}
@@ -398,9 +398,24 @@ func TestAllRowsFilteredTableIsDriftNotAbsence(t *testing.T) {
 		"| # | source | event / after / always | guard | target | actions |\n" +
 		"|---|---|---|---|---|---|\n" +
 		"| 1 | Published | (final) | - | - | - |\n"
-	drift, _ := ReconcileMatrix(minimalMachine(), filtered, "w")
+	_, drift, _ := ReconcileMatrix(minimalMachine(), filtered, "w")
 	if len(drift) == 0 {
 		t.Fatal("documentation-only table reconciled clean against a machine with transitions")
+	}
+}
+
+func TestMalformedSeparatorTransitionTableIsErrorNotAbsence(t *testing.T) {
+	// Regression: a separator row without pipes (e.g. bare dashes under the
+	// header) split the block, so a table that LOOKS like a transition table
+	// parsed as no table at all and rows contradicting the machine passed.
+	broken := "## Transition matrix\n\n" +
+		"| # | source | event / after / always | guard | target | actions |\n" +
+		"---\n" +
+		"| 1 | Draft | publish | guardCanPublish | persisting | setPending |\n" +
+		"| 2 | Draft | frob | - | Nowhere | - |\n"
+	errs, drift, n := ReconcileMatrix(minimalMachine(), broken, "w")
+	if !contains(errs, "no transition table parsed") {
+		t.Fatalf("malformed separator row read as absence: errs=%v drift=%v n=%d", errs, drift, n)
 	}
 }
 

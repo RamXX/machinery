@@ -6,12 +6,16 @@ package pack
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
-	"github.com/ramirosalas/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 func yamlScalar(v *ir.Value) string {
+	if v == nil {
+		return "null"
+	}
 	switch v.Kind {
 	case ir.KindString:
 		return yamlQuote(v.AsString())
@@ -29,6 +33,10 @@ func yamlScalar(v *ir.Value) string {
 	return ""
 }
 
+// numberLikeRe matches strings a yaml parser would type-flip into numbers
+// (plain ints, floats, exponent forms, hex/octal/binary ints).
+var numberLikeRe = regexp.MustCompile(`^[-+]?([0-9][0-9_]*(\.[0-9]*)?|\.[0-9]+)([eE][-+]?[0-9]+)?$|^[-+]?0[xXoObB][0-9a-fA-F_]+$|^[-+]?\.(inf|Inf|INF)$|^\.(nan|NaN|NAN)$`)
+
 // yamlQuote double-quotes a string when a plain scalar would be ambiguous.
 func yamlQuote(s string) string {
 	if s == "" {
@@ -43,6 +51,10 @@ func yamlQuote(s string) string {
 	}
 	switch strings.ToLower(s) {
 	case "true", "false", "null", "yes", "no", "on", "off", "~":
+		plain = false
+	}
+	if numberLikeRe.MatchString(s) {
+		// "1e5" or "1.5" left plain would round-trip as a number, not a string
 		plain = false
 	}
 	if plain && (s[0] == ' ' || s[len(s)-1] == ' ' || s[0] == '-' || s[0] == '?') {

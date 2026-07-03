@@ -11,6 +11,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -21,7 +22,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ramirosalas/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 var updateGolden = flag.Bool("update", false, "re-capture the golden corpus from the current binary")
@@ -41,9 +42,9 @@ func goldenBin(t *testing.T) string {
 			return
 		}
 		builtBin = filepath.Join(dir, "machinery")
-		out, err := exec.Command("go", "build", "-o", builtBin, ".").CombinedOutput()
+		out, err := exec.CommandContext(t.Context(), "go", "build", "-o", builtBin, ".").CombinedOutput()
 		if err != nil {
-			buildErr = fmt.Errorf("go build: %v\n%s", err, out)
+			buildErr = fmt.Errorf("go build: %w\n%s", err, out)
 		}
 	})
 	if buildErr != nil {
@@ -68,12 +69,13 @@ func goldenDir(t *testing.T, caseName string) string {
 // runBin executes the built binary, returning stdout, stderr, exit code.
 func runBin(t *testing.T, args ...string) (string, string, int) {
 	t.Helper()
-	cmd := exec.Command(goldenBin(t), args...)
+	cmd := exec.CommandContext(t.Context(), goldenBin(t), args...)
 	var out, errB bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errB
 	err := cmd.Run()
 	code := 0
-	if ee, ok := err.(*exec.ExitError); ok {
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
 		code = ee.ExitCode()
 	} else if err != nil {
 		t.Fatal(err)
@@ -153,7 +155,7 @@ func TestGoldenOracle(t *testing.T) {
 				}
 			}
 			// capture-golden ran oracle with stderr folded into stdout
-			cmd := exec.Command(goldenBin(t), "oracle", scratch)
+			cmd := exec.CommandContext(t.Context(), goldenBin(t), "oracle", scratch)
 			var combined bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &combined, &combined
 			_ = cmd.Run()
@@ -234,6 +236,90 @@ func TestGoldenGen(t *testing.T) {
 				compareOrUpdate(t, filepath.Join(g, filepath.Base(p)), string(data))
 			}
 			assertSameFileSet(t, g, produced, ".tla", ".cfg")
+		})
+	}
+}
+
+// copyDirInto copies a directory tree (regular files only) into dst.
+func copyDirInto(t *testing.T, src, dst string) {
+	t.Helper()
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		sp := filepath.Join(src, e.Name())
+		dp := filepath.Join(dst, e.Name())
+		if e.IsDir() {
+			if err := os.MkdirAll(dp, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			copyDirInto(t, sp, dp)
+			continue
+		}
+		data, err := os.ReadFile(sp)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(dp, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestGoldenPackGenerate(t *testing.T) {
+	root := repoRootDir(t)
+	scratch := t.TempDir()
+	copyDirInto(t, filepath.Join(root, "examples", "checkout-split", "parent", "design"), scratch)
+	// drop the committed packs so the golden captures a from-scratch generation
+	if err := os.RemoveAll(filepath.Join(scratch, "packs")); err != nil {
+		t.Fatal(err)
+	}
+	out, errS, code := runBin(t, "pack", "generate", scratch)
+	g := goldenDir(t, "pack-generate-checkout-split")
+	compareOrUpdate(t, filepath.Join(g, "stdout.txt"), out)
+	compareOrUpdate(t, filepath.Join(g, "stderr.txt"), errS)
+	compareOrUpdate(t, filepath.Join(g, "exitcode.txt"), fmt.Sprintf("%d\n", code))
+	packDirs, err := filepath.Glob(filepath.Join(scratch, "packs", "*.pack"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(packDirs) == 0 {
+		t.Fatal("pack generate produced no packs")
+	}
+	for _, pd := range packDirs {
+		produced, err := filepath.Glob(filepath.Join(pd, "*"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		gp := filepath.Join(g, filepath.Base(pd))
+		for _, p := range produced {
+			data, err := os.ReadFile(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			compareOrUpdate(t, filepath.Join(gp, filepath.Base(p)), string(data))
+		}
+		assertSameFileSet(t, gp, produced, ".yaml", ".md", ".json", ".tla", ".cfg")
+	}
+}
+
+func TestGoldenScale(t *testing.T) {
+	root := repoRootDir(t)
+	cases := []struct {
+		caseName string
+		design   string
+	}{
+		{"scale-go-crm", filepath.Join(root, "examples", "go-crm", "design")},
+		{"scale-checkout-split-parent", filepath.Join(root, "examples", "checkout-split", "parent", "design")},
+	}
+	for _, c := range cases {
+		t.Run(c.caseName, func(t *testing.T) {
+			out, errS, code := runBin(t, "scale", c.design)
+			g := goldenDir(t, c.caseName)
+			compareOrUpdate(t, filepath.Join(g, "stdout.txt"), out)
+			compareOrUpdate(t, filepath.Join(g, "stderr.txt"), errS)
+			compareOrUpdate(t, filepath.Join(g, "exitcode.txt"), fmt.Sprintf("%d\n", code))
 		})
 	}
 }

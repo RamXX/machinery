@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ramirosalas/machinery/internal/gates"
-	"github.com/ramirosalas/machinery/internal/pack"
+	"github.com/RamXX/machinery/internal/gates"
+	"github.com/RamXX/machinery/internal/pack"
 )
 
 func newCheckCmd() *cobra.Command {

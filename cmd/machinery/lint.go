@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ramirosalas/machinery/internal/lint"
+	"github.com/RamXX/machinery/internal/lint"
 )
 
 func newLintCmd() *cobra.Command {

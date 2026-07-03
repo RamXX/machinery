@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ramirosalas/machinery/internal/compose"
-	"github.com/ramirosalas/machinery/internal/ir"
-	"github.com/ramirosalas/machinery/internal/refine"
-	"github.com/ramirosalas/machinery/internal/tla"
+	"github.com/RamXX/machinery/internal/compose"
+	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/refine"
+	"github.com/RamXX/machinery/internal/tla"
 )
 
 const (

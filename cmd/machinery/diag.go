@@ -20,9 +20,14 @@ func preflightRun() {
 	// modelith
 	if p, err := exec.LookPath("modelith"); err == nil {
 		ver := strings.TrimSpace(strings.Join(strings.Fields(run(p, "--version")), " "))
-		fmt.Fprintf(out, "  ok       modelith %s (pinned %s)\n", lastWord(ver), modelithVersion)
+		installed := lastWord(ver)
+		if strings.TrimPrefix(installed, "v") == strings.TrimPrefix(modelithVersion, "v") {
+			fmt.Fprintf(out, "  ok       modelith %s (pinned %s)\n", installed, modelithVersion)
+		} else {
+			fmt.Fprintf(out, "  WARN     modelith %s does not match the pin %s -- install: go install github.com/stacklok/modelith/cmd/modelith@%s (or make install-modelith)\n", installed, modelithVersion, modelithVersion)
+		}
 	} else {
-		fmt.Fprintf(out, "  MISSING  modelith (Phase 1 domain model lint/render) -- install: go install github.com/stacklok/modelith/cmd/modelith@%s\n", modelithVersion)
+		fmt.Fprintf(out, "  MISSING  modelith (Phase 1 domain model lint/render) -- install: go install github.com/stacklok/modelith/cmd/modelith@%s (or make install-modelith)\n", modelithVersion)
 	}
 
 	// the gate tools and generators are this binary itself: nothing else needed
@@ -84,12 +89,6 @@ func runErr(name string, args ...string) string {
 	defer cancel()
 	b, _ := exec.CommandContext(ctx, name, args...).CombinedOutput()
 	return string(b)
-}
-
-func runCheck(name string, args ...string) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	return exec.CommandContext(ctx, name, args...).Run() == nil
 }
 
 func lastWord(s string) string {

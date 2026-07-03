@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ramirosalas/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 // ExitError carries a hard-error (maps to Python sys.exit).
@@ -262,6 +262,16 @@ func ReconcileLifecycle(machine, sem *ir.Value) map[string]bool {
 	if !domainExpected[closeOn] {
 		die("close_date_on %s is not a domain state", ir.Repr(closeOn))
 	}
+	// the pattern requires reopen routes (checked above), so reopen_to is
+	// mandatory; leaving it empty used to generate pending' = "" and only
+	// fail later under TLC
+	reopenTo := so.GetString("reopen_to")
+	if reopenTo == "" {
+		die("linear-lifecycle must declare reopen_to (the machine's terminals declare reopen routes; the generated model needs their target stage)")
+	}
+	if !contains(stages, reopenTo) {
+		die("reopen_to %s is not a declared stage (%s)", ir.Repr(reopenTo), strings.Join(stages, ", "))
+	}
 	return enters
 }
 
@@ -308,9 +318,6 @@ func emitLifecycleImpl(machine, sem *ir.Value, sourceNames [2]string) (string, m
 	closeOn := so.GetString("close_date_on")
 	maxr := intNum(so.Get2("max_retries"))
 	initial := stages[0]
-	if reopenTo != "" && !contains(stages, reopenTo) {
-		die("reopen_to %s is not a declared stage (%s)", ir.Repr(reopenTo), strings.Join(stages, ", "))
-	}
 
 	terminal := []string{win, lose}
 	domain := append(append([]string{}, stages...), terminal...)
@@ -679,10 +686,12 @@ func EmitTerminal(machine, sem *ir.Value, sourceNames [2]string) (string, map[st
 		rcOf[r.State] = v
 		counters = append(counters, v)
 	}
-	exhaustTo := map[string]string{}
+	// every reconciled exhaustion target, not just the first: with several
+	// failure terminals the model must keep the machine's nondeterminism
+	exhaustTo := map[string][]string{}
 	top := topStates(machine)
 	for _, r := range retries {
-		exhaustTo[r.State] = sortedSet(alwaysTargets(top[r.State]))[0]
+		exhaustTo[r.State] = sortedSet(alwaysTargets(top[r.State]))
 	}
 
 	q := func(xs []string) string {
@@ -795,7 +804,15 @@ func EmitTerminal(machine, sem *ir.Value, sourceNames [2]string) (string, map[st
 		ctr := rcOf[r.State]
 		et := exhaustTo[r.State]
 		L = append(L, fmt.Sprintf(`RetryAgain_%s == st = "%s" /\ %s < MaxRetries /\ st' = "%s" /\ %s' = %s + 1 /\ %s`, rs, rs, ctr, serves, ctr, ctr, unch([]string{ctr})))
-		L = append(L, fmt.Sprintf(`RetryExhausted_%s == st = "%s" /\ %s >= MaxRetries /\ st' = "%s" /\ %s`, rs, rs, ctr, et, unch(nil)))
+		if len(et) == 1 {
+			L = append(L, fmt.Sprintf(`RetryExhausted_%s == st = "%s" /\ %s >= MaxRetries /\ st' = "%s" /\ %s`, rs, rs, ctr, et[0], unch(nil)))
+		} else {
+			var quoted []string
+			for _, t := range et {
+				quoted = append(quoted, `"`+t+`"`)
+			}
+			L = append(L, fmt.Sprintf(`RetryExhausted_%s == st = "%s" /\ %s >= MaxRetries /\ st' \in {%s} /\ %s`, rs, rs, ctr, strings.Join(quoted, ", "), unch(nil)))
+		}
 		acts = append(acts, "RetryAgain_"+rs, "RetryExhausted_"+rs)
 	}
 	L = append(L, "Terminated == st \\in Terminal /\\ UNCHANGED vars")

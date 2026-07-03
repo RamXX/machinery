@@ -1,4 +1,4 @@
-module github.com/ramirosalas/machinery
+module github.com/RamXX/machinery
 
 go 1.26.4
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ramirosalas/machinery/internal/oracle"
+	"github.com/RamXX/machinery/internal/oracle"
 )
 
 func newOracleCmd() *cobra.Command {

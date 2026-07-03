@@ -1,0 +1,5 @@
+== scale  design size and decomposition signals ==
+  machines: 5 (states 47, transitions 194)
+  entities: 9, invariants: 24, boundary event rows: 0
+  estimated synthesis input: ~19k tokens (modelith + architecture + matrices)
+  recommendation: single-run design; neither sharding nor recursion is indicated

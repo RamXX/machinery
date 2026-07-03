@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
-	"github.com/ramirosalas/machinery/internal/ir"
-	"github.com/ramirosalas/machinery/internal/lint"
-	"github.com/ramirosalas/machinery/internal/tla"
+	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/lint"
+	"github.com/RamXX/machinery/internal/tla"
 )
 
 // Subsystem is one entry of decomposition.yaml.
@@ -65,6 +66,24 @@ func HasDecomposition(design string) bool {
 func HasPack(design string) bool {
 	_, err := os.Stat(filepath.Join(design, "pack", "pack.yaml"))
 	return err == nil
+}
+
+// subsystemIDRe restricts ids to a bare-name charset: they become path
+// segments (packs/<id>.pack) and must not traverse out of the design tree.
+var subsystemIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// pathInsideDesign reports whether the (relative) path stays inside the
+// design directory once cleaned. Absolute paths never qualify.
+func pathInsideDesign(design, rel string) bool {
+	if filepath.IsAbs(rel) {
+		return false
+	}
+	joined := filepath.Clean(filepath.Join(design, rel))
+	back, err := filepath.Rel(filepath.Clean(design), joined)
+	if err != nil {
+		return false
+	}
+	return back != ".." && !strings.HasPrefix(back, ".."+string(filepath.Separator))
 }
 
 func strList(v *ir.Value) []string {
@@ -125,6 +144,10 @@ func LoadDecomposition(design string) (*Decomposition, error) {
 			report("subsystem without an id")
 			continue
 		}
+		if !subsystemIDRe.MatchString(s.ID) {
+			report("subsystem id %s is not a bare name (letters, digits, underscore, hyphen); ids become path segments under packs/ and must not traverse", ir.Repr(s.ID))
+			continue
+		}
 		if seen[s.ID] {
 			report("duplicate subsystem id %s", ir.Repr(s.ID))
 		}
@@ -134,6 +157,11 @@ func LoadDecomposition(design string) (*Decomposition, error) {
 		}
 		if s.ContractMachine == "" {
 			report("subsystem %s declares no contract_machine", ir.Repr(s.ID))
+		} else if !pathInsideDesign(design, s.ContractMachine) {
+			report("subsystem %s contract_machine %s resolves outside the design directory", ir.Repr(s.ID), ir.Repr(s.ContractMachine))
+		}
+		if filepath.IsAbs(s.ChildDesign) {
+			report("subsystem %s child_design %s must be a relative path", ir.Repr(s.ID), ir.Repr(s.ChildDesign))
 		}
 	}
 
@@ -186,7 +214,7 @@ func LoadDecomposition(design string) (*Decomposition, error) {
 	// subset (on-transitions and finals only: a contract is an interface
 	// protocol, not an implementation)
 	for _, s := range d.Subsystems {
-		if s.ContractMachine == "" {
+		if s.ContractMachine == "" || !pathInsideDesign(design, s.ContractMachine) {
 			continue
 		}
 		mp := filepath.Join(design, s.ContractMachine)
@@ -267,15 +295,11 @@ func contractBoundaryIDs(design string) map[string]bool {
 	if err != nil {
 		return out
 	}
-	// same locator the gates use: yaml fence starting with contract_version
-	s := string(text)
-	idx := strings.Index(s, "contract_version")
-	if idx < 0 {
+	// the same heading-anchored locator G2 uses (ir.ContractFence); a laxer
+	// locator here once rejected every boundary on a design G2 passed
+	fence, ok := ir.ContractFence(string(text))
+	if !ok {
 		return out
-	}
-	fence := s[idx:]
-	if end := strings.Index(fence, "```"); end >= 0 {
-		fence = fence[:end]
 	}
 	v, err := ir.LoadYAML([]byte(fence))
 	if err != nil || v.AsObject() == nil {
@@ -362,31 +386,55 @@ func GeneratePacks(design string) (map[string]map[string]string, error) {
 		// 3. the boundary event contracts (rows this subsystem produces or consumes)
 		files["events.md"] = eventsSlice(events, s)
 
-		// 4. the manifest, hash last
-		files["pack.yaml"] = manifest(s, mid, files)
+		// 4. the manifest, hash last: the content_hash covers every file
+		// including the manifest itself (normalized minus the hash line)
+		body := manifestBody(s, mid)
+		files["pack.yaml"] = body
+		files["pack.yaml"] = body + "content_hash: " + ContentHash(files) + "\n"
 		out[s.ID] = files
 	}
 	return out, nil
 }
 
-// ContentHash hashes the pack files (excluding pack.yaml) deterministically.
+// ContentHash hashes the pack files deterministically. The manifest
+// (pack.yaml) is covered too, normalized with its own content_hash line
+// removed (the hash is written into the manifest, so the manifest is hashed
+// minus that line). Excluding the manifest entirely once let a child edit
+// pack/pack.yaml (deleting a delegated invariant) and still pass G5.
 func ContentHash(files map[string]string) string {
 	var names []string
 	for n := range files {
-		if n == "pack.yaml" {
-			continue
-		}
 		names = append(names, n)
 	}
 	sort.Strings(names)
 	h := sha256.New()
 	for _, n := range names {
-		fmt.Fprintf(h, "%s\n%d\n%s\n", n, len(files[n]), files[n])
+		body := files[n]
+		if n == "pack.yaml" {
+			body = stripContentHashLine(body)
+		}
+		fmt.Fprintf(h, "%s\n%d\n%s\n", n, len(body), body)
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func manifest(s Subsystem, contractModule string, files map[string]string) string {
+// stripContentHashLine removes the manifest's content_hash line so the hash
+// written into the manifest does not feed back into itself.
+func stripContentHashLine(manifest string) string {
+	lines := strings.Split(manifest, "\n")
+	var kept []string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "content_hash:") {
+			continue
+		}
+		kept = append(kept, l)
+	}
+	return strings.Join(kept, "\n")
+}
+
+// manifestBody builds the manifest without its content_hash line; the caller
+// appends the line after hashing the full file set.
+func manifestBody(s Subsystem, contractModule string) string {
 	var b strings.Builder
 	b.WriteString("# GENERATED by machinery pack. The frozen interface between the parent\n")
 	b.WriteString("# design and this subsystem's child design. DO NOT EDIT: regenerate at the\n")
@@ -408,7 +456,6 @@ func manifest(s Subsystem, contractModule string, files map[string]string) strin
 	writeList("components", s.Components)
 	writeList("boundaries", s.Boundaries)
 	writeList("delegated_invariants", s.DelegatedInvariants)
-	b.WriteString("content_hash: " + ContentHash(files) + "\n")
 	return b.String()
 }
 
@@ -471,9 +518,9 @@ func sliceModelith(dm *ir.Value, s Subsystem) string {
 	b.WriteString("# GENERATED by machinery pack: the domain slice owned by subsystem '" + s.ID + "'.\n")
 	b.WriteString("# The child design extends this INTERNALLY; the entities, enum values, and\n")
 	b.WriteString("# delegated invariants below are the frozen public shape. DO NOT EDIT.\n")
-	b.WriteString("kind: " + o.GetString("kind") + "\n")
-	b.WriteString("version: " + o.GetString("version") + "\n")
-	b.WriteString("title: " + o.GetString("title") + " / " + s.ID + "\n")
+	b.WriteString("kind: " + yamlScalar(o.Get2("kind")) + "\n")
+	b.WriteString("version: " + yamlScalar(o.Get2("version")) + "\n")
+	b.WriteString("title: " + yamlQuote(o.GetString("title")+" / "+s.ID) + "\n")
 	b.WriteString("enums:\n")
 	for _, en := range enums.Keys() {
 		if !usedEnums[en] {

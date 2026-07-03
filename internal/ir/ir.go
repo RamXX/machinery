@@ -356,6 +356,32 @@ func ParseMdTables(text string) []MdTable {
 	return tables
 }
 
+// --- Architecture Contract locator ---
+//
+// The single source of truth for finding the contract fence in an
+// ARCHITECTURE.md: a yaml fence under a heading containing "architecture
+// contract", falling back to the first yaml fence starting with
+// contract_version. Both internal/gates (G2) and internal/pack read the
+// contract; a second, laxer locator once made G5 reject boundaries on a
+// design G2 passed (prose mentioning contract_version above the heading).
+var (
+	contractHeadingRe  = regexp.MustCompile(`(?ims)^#+[^\n]*architecture contract[^\n]*\n.*?` + "```yaml\n(.*?)\n```")
+	contractFallbackRe = regexp.MustCompile("(?s)```yaml\n(contract_version:.*?)\n```")
+)
+
+// ContractFence extracts the Architecture Contract yaml fence body from a
+// markdown document. Returns ok=false when no contract fence is present.
+func ContractFence(text string) (string, bool) {
+	m := contractHeadingRe.FindStringSubmatch(text)
+	if m == nil {
+		m = contractFallbackRe.FindStringSubmatch(text)
+	}
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
+}
+
 // FindCol mirrors machine_lint.find_col: first header cell whose lowercased
 // text contains any of names.
 func FindCol(header []string, names ...string) int {

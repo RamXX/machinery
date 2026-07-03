@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ramirosalas/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 // ExitError carries a hard-error (maps to Python sys.exit).

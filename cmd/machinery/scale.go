@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ramirosalas/machinery/internal/ir"
-	"github.com/ramirosalas/machinery/internal/lint"
-	"github.com/ramirosalas/machinery/internal/pack"
+	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/lint"
+	"github.com/RamXX/machinery/internal/pack"
 )
 
 // Thresholds for the decomposition recommendation. Deliberately conservative

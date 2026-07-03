@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ramirosalas/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 // RootKeys / StateKeys / InvokeKeys / StateTypes mirror machine_lint.py exactly.
@@ -649,6 +649,20 @@ func MatrixTransitionRows(text string) ([]XRow, string) {
 			return out, ""
 		}
 	}
+	// No parsed table matched. If a header LINE still looks like a transition
+	// table, the table exists but failed to parse (e.g. a malformed separator
+	// row that split the block); silence here let contradicting rows pass as
+	// "no table". A broken table is a hard error, not an absence.
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "|") {
+			continue
+		}
+		ll := strings.ToLower(trimmed)
+		if strings.Contains(ll, "source") && strings.Contains(ll, "target") && strings.Contains(ll, "actions") {
+			return nil, "a transition-table header is present but no transition table parsed (malformed separator row?); fix the table instead of leaving it unparseable"
+		}
+	}
 	return nil, ""
 }
 
@@ -666,16 +680,17 @@ func guardMatches(mr MRow, cell string) bool {
 	return cell == "-" || cell == ""
 }
 
-// ReconcileMatrix mirrors machine_lint.reconcile_matrix.
-func ReconcileMatrix(m *ir.Value, matrixText, base string) ([]string, int) {
-	var drift []string
+// ReconcileMatrix mirrors machine_lint.reconcile_matrix. Parse failures (a
+// table that looks like a transition table but cannot be reconciled) come
+// back as errs; row mismatches come back as drift.
+func ReconcileMatrix(m *ir.Value, matrixText, base string) (errs, drift []string, nrows int) {
 	mrows := MachineTransitionRows(m)
-	xrows, err := MatrixTransitionRows(matrixText)
-	if err != "" {
-		return []string{base + ": " + err}, 0
+	xrows, perr := MatrixTransitionRows(matrixText)
+	if perr != "" {
+		return []string{base + ": " + perr}, nil, 0
 	}
 	if xrows == nil {
-		return nil, 0
+		return nil, nil, 0
 	}
 	unmatched := make([]int, len(xrows))
 	for i := range unmatched {
@@ -737,7 +752,7 @@ func ReconcileMatrix(m *ir.Value, matrixText, base string) ([]string, int) {
 		drift = append(drift, fmt.Sprintf("%s: matrix row has no machine transition: %s --%s [%s]--> %s / %s",
 			base, x.Source, x.Trigger, g, x.Target, actsStr))
 	}
-	return drift, len(mrows)
+	return nil, drift, len(mrows)
 }
 
 func eqActions(a, b []string) bool {
@@ -828,7 +843,8 @@ func Lint(path string) (nStates int, errs, warns, drift []string) {
 	mx = strings.TrimSuffix(mx, ".machine") + ".matrix.md"
 	if _, statErr := os.Stat(mx); statErr == nil {
 		data, _ := os.ReadFile(mx)
-		d, _ := ReconcileMatrix(m, string(data), base)
+		es, d, _ := ReconcileMatrix(m, string(data), base)
+		e = append(e, es...)
 		drift = d
 	} else {
 		w = append(w, base+": no matrix file; named-unit contracts are unchecked (the generated oracle still covers transitions)")
