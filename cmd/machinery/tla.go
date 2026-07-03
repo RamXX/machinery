@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ramirosalas/machinery/internal/tla"
+	"github.com/RamXX/machinery/internal/tla"
 )
 
 func newTLACmd() *cobra.Command {

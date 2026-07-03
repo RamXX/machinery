@@ -11,9 +11,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ramirosalas/machinery/internal/gates"
-	"github.com/ramirosalas/machinery/internal/pack"
+	"github.com/RamXX/machinery/internal/gates"
+	"github.com/RamXX/machinery/internal/pack"
 )
+
+func init() {
+	RegisterRunner("packsuite_test.go",
+		"edited-pack-fails-hash", "stale-child-pin", "dropped-consumed-event",
+		"dropped-produced-event", "frozen-enum-drift", "delegated-invariant-untraced",
+		"partial-packmap", "stale-refinement-artifact", "double-ownership",
+		"unowned-entity", "contract-outside-subset")
+}
 
 func copyTree(t *testing.T, src, dst string) {
 	t.Helper()
@@ -199,5 +207,133 @@ func TestExplicitG5OnPlainDesignIsError(t *testing.T) {
 	design, _ := fixture(t) // the widget fixture: no decomposition, no pack
 	if !containsAny(gates.CheckPack(design).Errs, "nothing to check") {
 		t.Error("G5 on a plain design must error, not silently pass")
+	}
+}
+
+// ------------------- 2026-07-02 review: G5 hardening -----------------------
+
+// The content hash covers the manifest: deleting a delegated invariant from
+// the child's copied pack/pack.yaml alone must fail the child's G5.
+func TestChildEditingManifestDelegatedInvariantFailsHash(t *testing.T) {
+	_, orders, _ := splitFixture(t)
+	editFile(t, filepath.Join(orders, "pack", "pack.yaml"), "  - no-ship-without-capture\n", "")
+	if !containsAny(gates.CheckPack(orders).Errs, "fails its own content hash") {
+		t.Error("editing the child's pack manifest passed G5")
+	}
+}
+
+// A produced boundary event needs an EMITTER; a mere on: handler proves
+// consumption, not emission, and used to satisfy the produced check.
+func TestChildProducedEventHandlerOnlyFailsG5(t *testing.T) {
+	_, _, payments := splitFixture(t)
+	mp := filepath.Join(payments, "machines", "Payment.machine.json")
+	editFile(t, mp,
+		`"capture": {"target": "Captured", "actions": "markPaid"}`,
+		`"capture": {"target": "Captured", "actions": "recordCapture"}, "markPaid": {"target": "Captured"}`)
+	data, _ := os.ReadFile(filepath.Join(payments, "machines", "Payment.matrix.md"))
+	mustWrite(t, filepath.Join(payments, "machines", "Payment.matrix.md"),
+		strings.ReplaceAll(string(data), "markPaid", "recordCapture"))
+	g := gates.CheckPack(payments)
+	if !containsAny(g.Errs, "'markPaid' (produced) appears in no machine action") {
+		t.Errorf("handler-only produced event passed G5: %v", g.Errs)
+	}
+}
+
+// Subsystem ids become path segments under packs/; traversal must fail.
+func TestSubsystemIDTraversalFailsGeneration(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	editFile(t, filepath.Join(parent, "decomposition.yaml"), "- id: orders", "- id: ../../../escaped/orders")
+	_, err := pack.GeneratePacks(parent)
+	if err == nil || !strings.Contains(err.Error(), "bare name") {
+		t.Fatalf("traversal subsystem id accepted: %v", err)
+	}
+}
+
+// contract_machine must resolve inside the design directory.
+func TestContractMachineEscapeFailsGeneration(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	editFile(t, filepath.Join(parent, "decomposition.yaml"),
+		"contract_machine: contracts/OrdersContract.machine.json",
+		"contract_machine: ../../../../contracts/OrdersContract.machine.json")
+	_, err := pack.GeneratePacks(parent)
+	if err == nil || !strings.Contains(err.Error(), "outside the design directory") {
+		t.Fatalf("escaping contract_machine accepted: %v", err)
+	}
+}
+
+// The pack boundary lookup uses the same heading-anchored contract locator as
+// G2; prose mentioning contract_version above the heading must not break it.
+func TestProseContractVersionMentionDoesNotBreakG5(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	arch := filepath.Join(parent, "ARCHITECTURE.md")
+	data, err := os.ReadFile(arch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, arch, "The contract_version discipline is explained below.\n\n"+string(data))
+	g := gates.CheckPack(parent)
+	if len(g.Errs) != 0 || len(g.Drift) != 0 {
+		t.Errorf("prose contract_version mention broke G5: errs=%v drift=%v", g.Errs, g.Drift)
+	}
+}
+
+// Parent freshness findings iterate the pack files in sorted order, so the
+// gate output is byte-stable across runs (map-order iteration was not).
+func TestParentPackFindingsAreDeterministicallyOrdered(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	for _, name := range []string{"events.md", "domain.modelith.yaml"} {
+		if err := os.Remove(filepath.Join(parent, "packs", "orders.pack", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g := gates.CheckPack(parent)
+	var missing []string
+	for _, e := range g.Errs {
+		if strings.Contains(e, "missing committed file") {
+			missing = append(missing, e)
+		}
+	}
+	if len(missing) != 2 {
+		t.Fatalf("expected 2 missing-file findings, got %v", g.Errs)
+	}
+	if !strings.Contains(missing[0], "domain.modelith.yaml") || !strings.Contains(missing[1], "events.md") {
+		t.Errorf("findings not in sorted (deterministic) order: %v", missing)
+	}
+}
+
+// A committed pack file a fresh generation never produces is stale trust bait.
+func TestExtraStaleFileInPackFailsParentG5(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	mustWrite(t, filepath.Join(parent, "packs", "orders.pack", "leftover.tla"), "---- MODULE stale ----\n====\n")
+	if !containsAny(gates.CheckPack(parent).Errs, "not part of a fresh generation") {
+		t.Error("extra stale committed pack file passed G5")
+	}
+}
+
+// A subsystem with no child_design is non-blocking (parent-first workflow)
+// but must WARN and show up in the checked counts.
+func TestUnpinnedSubsystemWarnsButDoesNotBlock(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	editFile(t, filepath.Join(parent, "decomposition.yaml"), "    child_design: ../../payments/design\n", "")
+	g := gates.CheckPack(parent)
+	if len(g.Errs) != 0 || len(g.Drift) != 0 {
+		t.Errorf("unpinned subsystem must not block: errs=%v drift=%v", g.Errs, g.Drift)
+	}
+	if !containsAny(g.Warns, "declares no child_design") {
+		t.Errorf("missing unpinned-subsystem warning: %v", g.Warns)
+	}
+	if g.Counts["children pinned"] != 1 || g.Counts["children unpinned"] != 1 {
+		t.Errorf("pin counts wrong: %v", g.Counts)
+	}
+}
+
+// An absolute child_design is rejected at decomposition load.
+func TestAbsoluteChildDesignFailsGeneration(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	editFile(t, filepath.Join(parent, "decomposition.yaml"),
+		"child_design: ../../payments/design", "child_design: /etc/payments/design")
+	_, err := pack.GeneratePacks(parent)
+	if err == nil || !strings.Contains(err.Error(), "must be a relative path") {
+		t.Fatalf("absolute child_design accepted: %v", err)
 	}
 }

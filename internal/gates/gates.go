@@ -12,9 +12,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ramirosalas/machinery/internal/ir"
-	"github.com/ramirosalas/machinery/internal/lint"
-	"github.com/ramirosalas/machinery/internal/oracle"
+	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/lint"
+	"github.com/RamXX/machinery/internal/oracle"
 )
 
 // --- Gate accumulator (mirrors machinery_check.Gate) ---
@@ -91,8 +91,6 @@ func (g *Gate) Emit(out io.Writer) int {
 	}
 	return len(g.Errs) + len(g.Drift)
 }
-
-var identRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
 
 // --- helpers ---
 
@@ -171,12 +169,12 @@ func isTokenChar(b byte) bool {
 // --- contract (G2-c4) ---
 
 var (
-	contractHeadingRe  = regexp.MustCompile(`(?ims)^#+[^\n]*architecture contract[^\n]*\n.*?` + "```yaml\n(.*?)\n```")
-	contractFallbackRe = regexp.MustCompile("(?s)```yaml\n(contract_version:.*?)\n```")
-	edgeRuleRe         = regexp.MustCompile(`^"?\s*([^\s"]+)\s*->\s*([^\s"#]+)`)
-	dslDeclRe          = regexp.MustCompile(`^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(person|softwareSystem|container|component)\b(.*)$`)
-	mitTokRe           = regexp.MustCompile("`([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)`")
-	kebabRe            = regexp.MustCompile("`([a-z][a-z0-9]*(?:-[a-z0-9]+)+)`")
+	edgeRuleRe = regexp.MustCompile(`^"?\s*([^\s"]+)\s*->\s*([^\s"#]+)`)
+	dslDeclRe  = regexp.MustCompile(`^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(person|softwareSystem|container|component)\b(.*)$`)
+	// mitigation tokens allow hyphens inside segments: external ids like
+	// external.rest-of-monolith must be able to satisfy their own row
+	mitTokRe = regexp.MustCompile("`([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)`")
+	kebabRe  = regexp.MustCompile("`([a-z][a-z0-9]*(?:-[a-z0-9]+)+)`")
 )
 
 func loadContract(archPath string, g *Gate) *ir.Value {
@@ -189,16 +187,12 @@ func loadContract(archPath string, g *Gate) *ir.Value {
 		g.Errs = append(g.Errs, filepath.Base(archPath)+" is unreadable: "+err.Error())
 		return nil
 	}
-	text := string(data)
-	m := contractHeadingRe.FindStringSubmatch(text)
-	if m == nil {
-		m = contractFallbackRe.FindStringSubmatch(text)
-	}
-	if m == nil {
+	fence, ok := ir.ContractFence(string(data))
+	if !ok {
 		g.Errs = append(g.Errs, "no Architecture Contract found (need a ```yaml fence under a heading containing 'Architecture Contract', starting with contract_version)")
 		return nil
 	}
-	c, err := ir.LoadYAML([]byte(m[1]))
+	c, err := ir.LoadYAML([]byte(fence))
 	if err != nil {
 		g.Errs = append(g.Errs, "Architecture Contract is not valid YAML: "+err.Error())
 		return nil
@@ -506,6 +500,10 @@ func CheckC4(design string) *Gate {
 		}
 		if !found {
 			g.Errs = append(g.Errs, "the model has a Queue-tagged element but ARCHITECTURE.md has no event-contract table (columns: producer, consumer, payload, delivery, ordering, dedupe); bus coupling is invisible to G4-import, so this table is its governing artifact")
+		} else {
+			// a header with zero rows governs nothing; the queue coupling is
+			// then entirely unchecked
+			g.RequireNonzero("event contracts", "the event-contract table has no rows although the model has a Queue-tagged element")
 		}
 	}
 
@@ -630,7 +628,8 @@ func CheckMachines(design string) *Gate {
 			continue
 		}
 		mtext := readOrEmpty(mpath)
-		drift, nrows := lint.ReconcileMatrix(m, mtext, base)
+		merrs, drift, nrows := lint.ReconcileMatrix(m, mtext, base)
+		g.Errs = append(g.Errs, merrs...)
 		g.Drift = append(g.Drift, drift...)
 		g.Count("matrix rows reconciled", nrows)
 		declared := lint.NamedUnitNames(mtext)

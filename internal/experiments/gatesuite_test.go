@@ -12,10 +12,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ramirosalas/machinery/internal/gates"
-	"github.com/ramirosalas/machinery/internal/ir"
-	"github.com/ramirosalas/machinery/internal/oracle"
+	"github.com/RamXX/machinery/internal/gates"
+	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/oracle"
 )
+
+func init() {
+	RegisterRunner("gatesuite_test.go",
+		"empty-design", "deleted-mitigation-table", "stale-oracle", "missing-oracle",
+		"retargeted-transition-drift", "unit-without-namedunit-row", "unenforced-invariant",
+		"invariant-not-whole-token", "machine-state-not-in-enum", "enum-value-without-state",
+		"machine-event-not-action", "unmapped-machine", "placement-row-no-machine",
+		"single-form-import-bypass", "undeclared-cross-boundary", "import-unexposed-internals",
+		"source-outside-contract")
+}
 
 const fixtureMachineJSON = `{"id":"widget","initial":"Draft","context":{"widgetId":null},"states":{
  "Draft":{"on":{"publish":[
@@ -826,5 +836,78 @@ func TestQueueCoupledDesignRequiresEventContractTable(t *testing.T) {
 	g2 := gates.CheckC4(design)
 	if containsAny(g2.Errs, "no event-contract table") {
 		t.Errorf("event-contract table not recognized: %v", g2.Errs)
+	}
+}
+
+// ------------------- 2026-07-02 review: gate hardening ---------------------
+
+// A header-only event-contract table governs nothing: with a Queue-tagged
+// element it must fail, not satisfy the check by its header alone.
+func TestQueueCoupledHeaderOnlyEventTableIsError(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "workspace.dsl"),
+		`db       = container "DB" "The database." "SQLite" "Database"`,
+		`db       = container "DB" "The database." "SQLite" "Database"
+      bus      = container "Bus" "The broker." "NATS" "Queue"`)
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"),
+		"| `db` | unavailable, corrupt | retry, backup | surface after retries | retry <= 3 |",
+		"| `db` | unavailable, corrupt | retry, backup | surface after retries | retry <= 3 |\n"+
+			"| `bus` | down, redelivery | outbox, dedupe | at-least-once | ack window |")
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"),
+		"## 6. Dependency mitigation posture",
+		"## 5b. Event contracts\n\n"+
+			"| event | producer | consumer | payload | delivery | ordering | dedupe |\n"+
+			"|---|---|---|---|---|---|---|\n\n"+
+			"## 6. Dependency mitigation posture")
+	g := gates.CheckC4(design)
+	if !containsAny(g.Errs, "event-contract table has no rows") {
+		t.Errorf("header-only event-contract table passed G2: %v", g.Errs)
+	}
+}
+
+// A hyphenated external id must be able to satisfy its own mitigation row.
+func TestHyphenatedExternalMitigationRowPassesG2(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"),
+		`ignore: [ "internal/scaffold/**" ]`,
+		"  - id: external.rest-of-monolith\n    imports: [ \"example.com/monolith\" ]\nignore: [ \"internal/scaffold/**\" ]")
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"),
+		"| `db` | unavailable, corrupt | retry, backup | surface after retries | retry <= 3 |",
+		"| `db` | unavailable, corrupt | retry, backup | surface after retries | retry <= 3 |\n"+
+			"| `external.rest-of-monolith` | down | queue and retry | stale reads | retry <= 3 |")
+	g := gates.CheckC4(design)
+	if len(g.Errs) != 0 {
+		t.Errorf("hyphenated external with a correct mitigation row failed G2: %v", g.Errs)
+	}
+}
+
+// A violating edge witnessed by several files must say so, not name only the
+// alphabetically-first file.
+func TestViolatingEdgeCountsAdditionalWitnessFiles(t *testing.T) {
+	design, impl := fixture(t)
+	sneak := "package app\n\nimport \"example.com/dbdriver\"\n\nvar _ = dbdriver.Name\n"
+	mustWrite(t, filepath.Join(impl, "internal", "app", "sneaky.go"), sneak)
+	mustWrite(t, filepath.Join(impl, "internal", "app", "sneaky2.go"), sneak)
+	g := gates.CheckImports(design, impl)
+	found := false
+	for _, e := range g.Errs {
+		if strings.Contains(e, "widget.app -> external.db is denied") && strings.Contains(e, "and 1 more file") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("edge violation does not count its extra witness files: %v", g.Errs)
+	}
+}
+
+// A transition table with a malformed separator row must be a hard G3 error,
+// never "no transition table" plus a green gate.
+func TestMalformedTransitionTableSeparatorIsG3Error(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "machines", "Widget.matrix.md"),
+		"|---|---|---|---|---|---|\n", "---\n")
+	g := gates.CheckMachines(design)
+	if !containsAny(g.Errs, "no transition table parsed") {
+		t.Errorf("malformed transition-table separator passed G3: errs=%v drift=%v", g.Errs, g.Drift)
 	}
 }

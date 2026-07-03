@@ -22,8 +22,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ramirosalas/machinery/internal/ir"
-	"github.com/ramirosalas/machinery/internal/pack"
+	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/pack"
 )
 
 // CheckPack implements G5-pack. Applicable when the design is a decomposed
@@ -62,7 +62,13 @@ func checkParentPacks(design string, g *Gate) {
 		g.Count("subsystems")
 		dir := filepath.Join(design, "packs", id+".pack")
 		stale := false
-		for name, want := range fresh[id] {
+		var names []string
+		for name := range fresh[id] {
+			names = append(names, name)
+		}
+		sort.Strings(names) // deterministic finding order across runs
+		for _, name := range names {
+			want := fresh[id][name]
 			got, rerr := os.ReadFile(filepath.Join(dir, name))
 			if rerr != nil {
 				g.Errs = append(g.Errs, "pack "+id+": missing committed file "+name+"; run machinery pack generate")
@@ -74,6 +80,19 @@ func checkParentPacks(design string, g *Gate) {
 				stale = true
 			}
 		}
+		// extra committed files are stale artifacts a fresh generation never
+		// produces; the child would copy and trust them
+		if entries, rerr := os.ReadDir(dir); rerr == nil {
+			for _, e := range entries {
+				if e.IsDir() {
+					continue
+				}
+				if _, ok := fresh[id][e.Name()]; !ok {
+					g.Errs = append(g.Errs, "pack "+id+": committed file "+e.Name()+" is not part of a fresh generation; remove it and rerun machinery pack generate")
+					stale = true
+				}
+			}
+		}
 		if !stale {
 			g.Count("packs fresh")
 		}
@@ -81,6 +100,10 @@ func checkParentPacks(design string, g *Gate) {
 	// two-way pinning: children built against the current pack
 	for _, s := range d.Subsystems {
 		if s.ChildDesign == "" {
+			// non-blocking: the parent-first workflow generates packs before
+			// any child design exists, but an unpinned subsystem is unchecked
+			g.Count("children unpinned")
+			g.Warns = append(g.Warns, "subsystem "+s.ID+" declares no child_design; its pack pin is unchecked (set child_design in decomposition.yaml once the child design exists)")
 			continue
 		}
 		childDir := filepath.Join(design, s.ChildDesign)
@@ -93,7 +116,7 @@ func checkParentPacks(design string, g *Gate) {
 		if pm.PackHash != currentHash {
 			g.Errs = append(g.Errs, fmt.Sprintf("subsystem %s: the child at %s was built against pack %.12s but the current pack is %.12s; regenerate the pack, re-copy it to the child, and re-run the child's gates", s.ID, s.ChildDesign, pm.PackHash, currentHash))
 		} else {
-			g.Count("children pinned to current packs")
+			g.Count("children pinned")
 		}
 	}
 	g.RequireNonzero("subsystems", "no subsystems parsed from decomposition.yaml")
@@ -296,7 +319,10 @@ func checkBoundaryEvents(design, eventsMD string, g *Gate) {
 				g.Errs = append(g.Errs, "boundary event "+ir.Repr(e.name)+" (consumed) is handled or ignored by no machine; a neighbor relies on this subsystem reacting to it")
 			}
 		case "produces":
-			if tokenIn(e.name, fired) || handled[e.name] {
+			// emission only: an action or matrix row must fire the event.
+			// handled[] proves consumption, not emission; accepting it let a
+			// child stop emitting by merely declaring an on: handler
+			if tokenIn(e.name, fired) {
 				g.Count("produced events emitted")
 			} else {
 				g.Errs = append(g.Errs, "boundary event "+ir.Repr(e.name)+" (produced) appears in no machine action or matrix row; a neighbor relies on this subsystem emitting it")

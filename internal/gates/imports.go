@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ramirosalas/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 // --- imports (G4-import) ---
@@ -333,7 +333,14 @@ func CheckImports(design, impl string) *Gate {
 		return ""
 	}
 
-	edgeHits := map[[2]string]string{}
+	// Each distinct cross-boundary edge is judged once, but every witness file
+	// is counted so a violation's error names the real amount of work.
+	type edgeRec struct {
+		witness string
+		files   map[string]bool
+	}
+	edgeHits := map[[2]string]*edgeRec{}
+	var edgeOrder [][2]string
 	files, walkErr := walkSourceFiles(impl)
 	if walkErr != nil {
 		g.Errs = append(g.Errs, "walking "+impl+": "+walkErr.Error())
@@ -432,19 +439,31 @@ func CheckImports(design, impl string) *Gate {
 				}
 			}
 			edge := [2]string{srcB, dstB}
-			if _, hit := edgeHits[edge]; hit {
+			if rec, hit := edgeHits[edge]; hit {
+				rec.files[rel] = true
 				continue
 			}
-			edgeHits[edge] = rel
-			denied := matchRule(deny, srcB, dstB)
-			allowed := matchRule(allow, srcB, dstB)
-			if denied && !allowed {
-				g.Errs = append(g.Errs, srcB+" -> "+dstB+" is denied by the contract (seen in "+rel+"); either the code violates the boundary or the contract needs an explicit allow")
-			} else if !allowed && !denied {
-				g.Errs = append(g.Errs, "undeclared cross-boundary edge "+srcB+" -> "+dstB+" (seen in "+rel+"); add an explicit allow or deny to the contract")
-			} else {
-				g.Count("edges verified")
-			}
+			edgeHits[edge] = &edgeRec{witness: rel, files: map[string]bool{rel: true}}
+			edgeOrder = append(edgeOrder, edge)
+		}
+	}
+	for _, edge := range edgeOrder {
+		srcB, dstB := edge[0], edge[1]
+		rec := edgeHits[edge]
+		seen := "seen in " + rec.witness
+		if extra := len(rec.files) - 1; extra == 1 {
+			seen += " and 1 more file"
+		} else if extra > 1 {
+			seen += fmt.Sprintf(" and %d more files", extra)
+		}
+		denied := matchRule(deny, srcB, dstB)
+		allowed := matchRule(allow, srcB, dstB)
+		if denied && !allowed {
+			g.Errs = append(g.Errs, srcB+" -> "+dstB+" is denied by the contract ("+seen+"); either the code violates the boundary or the contract needs an explicit allow")
+		} else if !allowed && !denied {
+			g.Errs = append(g.Errs, "undeclared cross-boundary edge "+srcB+" -> "+dstB+" ("+seen+"); add an explicit allow or deny to the contract")
+		} else {
+			g.Count("edges verified")
 		}
 	}
 

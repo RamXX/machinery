@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/ramirosalas/machinery/internal/formal"
+	"github.com/RamXX/machinery/internal/formal"
 )
 
 // Phase-1 stubs. Each subcommand exits 2 with "not implemented" until its phase

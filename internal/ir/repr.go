@@ -43,7 +43,7 @@ func Repr(v interface{}) string {
 }
 
 // GetString reads o[key] as a string ("" if absent or non-string), mirroring
-// Python's `o.get("key")` returning None when absent — callers distinguish via
+// Python's `o.get("key")` returning None when absent; callers distinguish via
 // Has. For lint fields like `node.get("type")` Python returns None when absent;
 // use GetStringOr for that (returns ("", true) only when present-and-string).
 func (o *Object) GetString(key string) string {

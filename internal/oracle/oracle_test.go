@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ramirosalas/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 func minimalMachine() *ir.Value {

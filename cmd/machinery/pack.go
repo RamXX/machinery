@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ramirosalas/machinery/internal/pack"
+	"github.com/RamXX/machinery/internal/pack"
 )
 
 func newPackCmd() *cobra.Command {

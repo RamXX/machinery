@@ -11,4 +11,4 @@ components:
 boundaries:
   - payments.svc
 delegated_invariants: []
-content_hash: 5334ddb4d4c805ceb0ff26ef7aa7b01653f053513029a041f1285fd5f2f3afb8
+content_hash: 176277444df9a017d7de5892e52ebeb1e0d675aa2c9173d8e85d548b1cd1d042

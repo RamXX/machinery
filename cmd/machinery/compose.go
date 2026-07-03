@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ramirosalas/machinery/internal/compose"
+	"github.com/RamXX/machinery/internal/compose"
 )
 
 func newComposeCmd() *cobra.Command {
