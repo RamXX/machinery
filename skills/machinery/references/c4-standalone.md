@@ -210,12 +210,21 @@ Field semantics:
 - **externals**: `{id, element (optional dsl element), imports: [import-path prefixes],
   modules: [module-name prefixes, for Elixir]}`. Any `dependency_rules` reference to `external.*`
   must be declared here.
-- **ignore**: globs for source paths exempt from boundary mapping (test scaffolding, generated code).
+- **ignore**: globs for source paths exempt from boundary mapping (test scaffolding, generated
+  code). Staged brownfield adoption leans on this too: start with broad ignore globs over the
+  unmodeled remainder and ratchet them down as slices come under the gates (see
+  `docs/brownfield-team-guide.md` in the machinery repo).
+- **dependency_rules**: `allow` and `deny` edges, `src -> dest`, with `*` globs. Precedence: an
+  explicit (literal) allow overrides a matching deny GLOB, which is how "deny the pattern, allow
+  the one sanctioned edge" is written; but a literal allow and a literal deny of the same edge is
+  a G2 error, not an override. Deny rules cannot reference boundaries that do not exist yet in
+  `workspace.dsl`; keep planned-but-unbuilt boundaries in comments until they have DSL elements.
+- **Ids** (boundary and external) use letters, digits, underscore, dot, and hyphen.
 - `contract_version: 2` names this format.
 
-G2 verifies: boundaries bind to `workspace.dsl` elements, no duplicate ids, no edge both allowed
-and denied, no rule referencing an undeclared boundary or external, and the mitigation coverage
-below. G4-import later enforces the rules against the code.
+G2 verifies: boundaries bind to `workspace.dsl` elements, no duplicate ids, no edge both literally
+allowed and literally denied, no rule referencing an undeclared boundary or external, and the
+mitigation coverage below. G4-import later enforces the rules against the code.
 
 ## Interface / boundary contracts (feed the hard-TDD contract tests)
 
@@ -298,7 +307,7 @@ rule). Columns:
 Deterministic (run `machinery check <design> --gate g2`):
 
 - The contract parses, boundaries bind to `workspace.dsl` elements, ids are unique, no edge is both
-  allowed and denied, no rule references an undeclared boundary or external.
+  literally allowed and literally denied, no rule references an undeclared boundary or external.
 - Every contract external and every Database/Queue/External-tagged element has a mitigation row
   naming it backticked in the first column.
 - Read the `checked:` counts; an empty check is an ERROR, never a silent pass.

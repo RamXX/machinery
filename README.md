@@ -1,11 +1,11 @@
 # machinery
 
-[![CI](https://github.com/ramirosalas/machinery/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ramirosalas/machinery/actions/workflows/ci.yml)
-[![Formal Verification](https://github.com/ramirosalas/machinery/actions/workflows/formal.yml/badge.svg?branch=main)](https://github.com/ramirosalas/machinery/actions/workflows/formal.yml)
-[![Security](https://github.com/ramirosalas/machinery/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/ramirosalas/machinery/actions/workflows/security.yml)
-[![Nightly](https://github.com/ramirosalas/machinery/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/ramirosalas/machinery/actions/workflows/nightly.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/ramirosalas/machinery.svg)](https://pkg.go.dev/github.com/ramirosalas/machinery)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ramirosalas/machinery)](https://goreportcard.com/report/github.com/ramirosalas/machinery)
+[![CI](https://github.com/RamXX/machinery/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/ci.yml)
+[![Formal Verification](https://github.com/RamXX/machinery/actions/workflows/formal.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/formal.yml)
+[![Security](https://github.com/RamXX/machinery/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/security.yml)
+[![Nightly](https://github.com/RamXX/machinery/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/nightly.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/RamXX/machinery.svg)](https://pkg.go.dev/github.com/RamXX/machinery)
+[![Go Report Card](https://goreportcard.com/badge/github.com/RamXX/machinery)](https://goreportcard.com/report/github.com/RamXX/machinery)
 
 **Design software once, as a state machine, and let everything else be derived and proven from it:
 the tests, the architecture contracts, the build instructions, and machine-checked proofs of
@@ -76,14 +76,24 @@ Fittingly, machinery is itself built this way, a gated pipeline around a non-det
 
 ```
 Phase 0  Frame        what, who, purpose, target language
-Phase 1  Modelith     domain model             gate: modelith lint clean
-Phase 2  C4           architecture + contract   gate: every action owned, every dependency has a mitigation posture
-Phase 3  XState       state machines            gate: every invoke has onError + timeout; every invariant guarded
-Phase 4  BUILD.md     the blueprint             gate: a zero-context coding agent could build it
+Phase 1  Modelith     domain model
+         tool: modelith lint clean
+         attested: lifecycle enums, action pre/post, invariant owners, scenario coverage
+Phase 2  C4           architecture + contract
+         tool: G2-c4 (contract parses and binds; mitigation coverage)
+         attested: every action owned; interface contracts; NFR record
+Phase 3  XState       state machines
+         tool: G3-machine (lint; every invoke has onError + timeout; oracle fresh; matrix reconciled)
+         attested: each guard enforces the invariant it names; residual failure transitions kept
+Phase 4  BUILD.md     the blueprint
+         tool: Gx-trace (+ G4-import once code exists)
+         attested: a zero-context coding agent could build it
 ```
 
 An interrogation, not a form. The conductor pushes on naming and on "what must always be true," and
-does not advance a phase until its gate passes.
+does not advance a phase until its gate passes. Every gate splits into a deterministic half the
+tool verifies and an attested half the conductor checks by judgment; the skill spells out that
+split per gate, and the table above keeps the two apart.
 
 ## What makes it production-grade: the correctness ladder
 
@@ -139,7 +149,7 @@ ownership-based access control, taken end to end:
 
 - **Designed** through all four phases. Domain model lints clean (9 entities, 24 invariants); C4 model
   with the dependency posture that an embedded store forces (corruption is fatal-until-restore, not a
-  transient); five state machines; a 1223-line `BUILD.md`.
+  transient); five state machines; a 1071-line `BUILD.md`.
 - **Built by a zero-context coding agent** under hard TDD: a test-writer wrote the suite from the
   blueprint, the tests were locked, and an implementer made them pass without touching a test. Result:
   286 tests green, 83% coverage, architecture boundaries upheld in the source. The one impossible test
@@ -169,14 +179,20 @@ run (and only this step needs Java).
 
 The pipeline reads as greenfield, but the toolchain does not care. On an existing system you run
 the phases as archaeology instead of invention: write the Modelith model, the contract, and the
-machines to describe the system AS IT IS, then let the gates arbitrate. G4 checks the real code
-against the contract immediately, and Gx surfaces every place the code's actual states and events
-disagree with your model, which is exactly the drift map you want from a legacy system. From there,
-revision mode is the operating loop: design changes as diffs, stable-id oracle diffs as the
-affected-test list, and state-migration notes for persisted machines, which a brownfield system has
-on day one. Two things change character: oracle-derived tests start as characterization tests (when
-one fails, you decide case by case whether the code or the machine is the truth), and the first
-modeling pass is a real investment, roughly proportional to how undocumented the system is.
+machines to describe the system AS IT IS, then let the gates arbitrate what they can see. Be
+precise about what that is: the only code-facing gate is G4-import, and it reads import statements
+only, so what you get from day one is the import-boundary drift map, not a behavioral comparison.
+No gate executes or reads code behavior. Behavioral code-vs-model drift surfaces through
+characterization tests derived from the generated oracles; the oracle stable ids give every
+transition a durable test key, and G3's staleness DRIFT keeps the oracles regenerated as the model
+is corrected, which is the loop that maps the drift. The adjudication rule: oracle-derived tests
+start descriptive and become locked (hard TDD) once a human adjudicates each failing row as
+code-is-truth (fix the model) or model-is-truth (file the code defect). From there, revision mode
+is the operating loop: design changes as diffs, stable-id oracle diffs as the affected-test list,
+and state-migration notes for persisted machines, which a brownfield system has on day one. The
+first modeling pass is a real investment, roughly proportional to how undocumented the system is.
+For the staged team adoption protocol (baseline allow rules, incremental `--gate` lists, merge and
+CI recipes), see `docs/brownfield-team-guide.md`.
 
 ## Which model to use where
 
@@ -188,6 +204,14 @@ machine is derived mechanically, and lint, oracle diff, reconciliation, and TLC 
 a weaker model would fumble, so a mid-tier model is much safer for the synthesis. The deterministic
 layer narrows the failure mode rather than removing it: with a weak interrogator you get a
 structurally consistent, formally verified model of the wrong system.
+
+### When not to use machinery
+
+CRUD screens, UI-heavy surfaces, and pure transforms get a contract spec and ordinary tests, not
+the four-phase pipeline; forcing a machine onto them is ceremony, and it reads as ceremony.
+machinery pays off where state actually bites: lifecycle, saga, protocol, retry, and workflow
+logic, and the deterministic envelopes around agentic systems. Model the stateful core, not the
+whole repo.
 
 ## What machinery does not verify
 
@@ -215,9 +239,11 @@ check and warns about anything missing.
 - **[modelith](https://modelith.sh/)** -- Phase 1 domain-model lint and render. Primary install is
   [Homebrew](https://brew.sh/) (macOS and Linux): `brew install stacklok/tap/modelith`. Secondary:
   with the [Go](https://go.dev/dl/) toolchain on any OS,
-  `go install github.com/stacklok/modelith/cmd/modelith@latest` (then put `$(go env GOPATH)/bin` on
-  your `PATH`); or download a prebuilt binary (macOS, Linux, Windows) from the
-  [releases](https://github.com/stacklok/modelith/releases). Full options:
+  `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` or `make install-modelith`, which
+  installs the same pin (then put `$(go env GOPATH)/bin` on your `PATH`); or download a prebuilt
+  binary (macOS, Linux, Windows) from the
+  [releases](https://github.com/stacklok/modelith/releases). machinery pins modelith at `v0.4.0`,
+  and `machinery preflight` warns when the installed version does not match the pin. Full options:
   [modelith.sh/cli](https://modelith.sh/cli/).
 - **machinery** -- the deterministic gate tools and formal generators. A single static binary
   (no Python, no Go runtime). Two ways to install:
@@ -229,7 +255,7 @@ check and warns about anything missing.
   # or pin a version:
   make install-binary MACHINERY_VERSION=v0.1.0
   ```
-  Binaries are published on the [releases page](https://github.com/ramirosalas/machinery/releases);
+  Binaries are published on the [releases page](https://github.com/RamXX/machinery/releases);
   download `machinery-<os>-<arch>`, put it on your `PATH`.
 
   **Or build from source** (if you have [Go](https://go.dev/dl/) 1.26+; `go.mod` pins 1.26.4):
@@ -274,6 +300,33 @@ The gate tools are a single Go binary (no Python runtime). `verify-formal` downl
 checksum-verified `tla2tools.jar` on first use. CI runs the test suite, all gate runs, the full formal
 suite, cross-compile builds, security scanning, and the go-crm build on every push.
 
+## Quickstart (five minutes)
+
+```bash
+git clone https://github.com/RamXX/machinery && cd machinery
+make build
+.bin/machinery check examples/go-crm/design --impl examples/go-crm/impl
+```
+
+The check prints one block per gate. Each block carries a `checked:` line, the exact counts of
+what was actually verified (a gate that finds nothing to check fails rather than passing), and a
+verdict: `ok`, or findings at three severities defined in the table below. The final line
+summarizes blocking findings; a zero there is a clean design. Then, if Java is present:
+
+```bash
+make verify-formal   # regenerates and TLC-checks all 26 proofs across the examples
+```
+
+| Gate | One line |
+|---|---|
+| Gate 1 | `modelith lint` on the domain model (Phase 1). The binary has no `g1`, by design: Phase 1's gate is modelith's own linter. |
+| G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, and every dependency has a mitigation row. |
+| G3-machine | machines pass structural lint, committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
+| Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows. |
+| G4-import | code imports respect the contract boundaries (Go, Python, TypeScript/JavaScript, Elixir, Rust). |
+| G5-pack | decomposed designs only: packs fresh, children pinned to the current packs, refinement proofs fresh. |
+| ERROR / DRIFT / WARN | ERROR is blocking; DRIFT means a generated artifact is stale, also blocking; WARN is advisory. |
+
 ## Use
 
 In an agent session (Claude Code, or any agent that loads skills from an installed home), from the
@@ -314,8 +367,9 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   the flattened system; this is that principle applied to the design process itself. When to
   escalate: `machinery scale` measures a design and recommends sharding or recursion.
 - `testdata/golden/` the byte-for-byte golden corpus: expected stdout, stderr, exit code, and every
-  generated artifact for every subcommand across the examples, checked by
-  `go test ./cmd/machinery -run TestGolden`; the Go experiment table lives in `internal/experiments/`.
+  generated artifact for every deterministic generator and gate subcommand across the examples,
+  checkout-split included, checked by `go test ./cmd/machinery -run TestGolden`; the Go experiment
+  table lives in `internal/experiments/`.
 
 See `skills/machinery/tools/README.md` for the checkers and generators, and
 `examples/go-crm/design/formal/README.md` for the proofs. The skill also defines a revision mode
@@ -337,8 +391,8 @@ full gate suite run against a synthesized design/impl fixture) runs as Go tests 
 | `internal/lint` | 85% | structural lint + matrix reconciliation |
 | `internal/refine` | 83% | data-refinement (3 patterns) |
 | `internal/compose` | 81% | cross-aggregate composition |
-| `internal/gates` | 63% | the G2/G3/Gx/G4/G5 gate suite (G5 exercised via `internal/experiments`) |
-| `internal/pack` | 57% | contract packs (the mutation suite lives in `internal/experiments`) |
+| `internal/gates` | 62% | the G2/G3/Gx/G4/G5 gate suite (G5 exercised via `internal/experiments`) |
+| `internal/pack` | 58% | contract packs (the mutation suite lives in `internal/experiments`) |
 | `internal/ir` | 55% | shared IR (covered transitively via lint/gates) |
 | `internal/formal` | 23% | TLC orchestration (the TLC-run paths need Java) |
 | **internal/ overall** | **~70%** | own-package tests only; the cross-package adversarial suites in `internal/experiments` exercise gates and pack further (cmd/ is thin CLI plumbing) |
@@ -347,8 +401,11 @@ Run `go test -coverprofile=cover.out ./internal/... && go tool cover -func=cover
 CI runs `go test -race ./...`. Beyond unit tests, two stronger nets are always green in CI:
 
 - **Golden corpus**: `testdata/golden` byte-compares stdout, stderr, exit code, and every generated
-  artifact for every subcommand across all three examples (`make golden`; re-captured with
-  `make golden-update` after intended output changes).
+  artifact for every deterministic generator and gate subcommand (lint, oracle, tla, refine,
+  compose, check, pack generate, scale) across the examples, checkout-split included (`make golden`;
+  re-captured with `make golden-update` after intended output changes). Environment-dependent
+  commands (verify-formal, doctor, preflight) are exercised by the formal-verification and CI jobs
+  instead.
 - **Formal verification**: `machinery verify-formal` regenerates and TLC-model-checks all 26 TLA+
   proofs across the examples (including the checkout-split contract-refinement proofs).
 
