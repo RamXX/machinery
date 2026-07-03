@@ -46,7 +46,7 @@ uninstall: ## Remove machinery from every agent home
 # (preflight compares the installed version against it); move both together.
 MODELITH_VERSION ?= v0.4.0
 MACHINERY_VERSION ?= latest
-INTERNAL_VERSION := v0.1.0
+INTERNAL_VERSION := v0.1.1
 MACH ?= $(CURDIR)/.bin/machinery
 # Where to install the binary on PATH. Default: ~/.local/bin (no sudo, on PATH
 # on most systems). Override: INSTALL_DIR=/usr/local/bin make install-cli
