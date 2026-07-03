@@ -419,6 +419,21 @@ func TestMalformedSeparatorTransitionTableIsErrorNotAbsence(t *testing.T) {
 	}
 }
 
+func TestProseRowKeywordsAreNotATransitionHeader(t *testing.T) {
+	// Regression (07-03 re-review): the header detection matched "source",
+	// "target", and "actions" as substrings of the whole line, so an ordinary
+	// failure-catalog row containing "resource"/"retarget"/"compensating
+	// actions" hard-errored a matrix that has no transition table at all.
+	prose := "## Failure catalog\n\n" +
+		"| failure | detection | recovery | compensation | bound |\n" +
+		"|---|---|---|---|---|\n" +
+		"| upstream source feed outage | health probe | retarget to backup feed | replay compensating actions | retry <= 3 |\n"
+	errs, drift, n := ReconcileMatrix(minimalMachine(), prose, "w")
+	if contains(errs, "no transition table parsed") {
+		t.Fatalf("prose data row misread as a transition-table header: errs=%v drift=%v n=%d", errs, drift, n)
+	}
+}
+
 func TestUnknownTransitionKeyIsError(t *testing.T) {
 	// {"tagret": "B"} used to silently become an internal self-transition
 	m := minimalMachine()

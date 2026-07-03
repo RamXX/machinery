@@ -297,8 +297,17 @@ func checkBoundaryEvents(design, eventsMD string, g *Gate) {
 			for _, k := range so.GetObject("_ignores").Keys() {
 				handled[k] = true
 			}
-			for _, tr := range ir.TransitionsOf(s.Node, nil, s.Path) {
-				actionCells = append(actionCells, tr.Actions...)
+			// every action position counts as emission evidence: entry and
+			// exit actions and invoke actors emit too, not just transitions
+			for a := range ir.ActionsOf(s.Node, nil, s.Path) {
+				actionCells = append(actionCells, a)
+			}
+			for _, inv := range ir.InvokesOf(s.Node) {
+				if io := inv.AsObject(); io != nil {
+					if src := io.GetString("src"); src != "" {
+						actionCells = append(actionCells, src)
+					}
+				}
 			}
 		}
 	}
@@ -325,7 +334,7 @@ func checkBoundaryEvents(design, eventsMD string, g *Gate) {
 			if tokenIn(e.name, fired) {
 				g.Count("produced events emitted")
 			} else {
-				g.Errs = append(g.Errs, "boundary event "+ir.Repr(e.name)+" (produced) appears in no machine action or matrix row; a neighbor relies on this subsystem emitting it")
+				g.Errs = append(g.Errs, "boundary event "+ir.Repr(e.name)+" (produced) appears in no machine action (entry, exit, transition, invoke src) and no matrix cell; a neighbor relies on this subsystem emitting it. If the emitting action is named differently, name the event whole-token in that action's matrix row")
 			}
 		}
 	}

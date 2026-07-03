@@ -194,6 +194,26 @@ func TestGoldenCheck(t *testing.T) {
 	}
 }
 
+// checkout-split is the decomposed design (a parent and two children); its
+// check runs exercise G5-pack, so the corpus pins that output byte-for-byte,
+// including the deterministic ordering of the freshness and pinning lines.
+func TestGoldenCheckCheckoutSplit(t *testing.T) {
+	root := repoRootDir(t)
+	for _, c := range []struct{ sub, checkCase string }{
+		{"parent", "check-checkout-split-parent"},
+		{"orders", "check-checkout-split-orders"},
+		{"payments", "check-checkout-split-payments"},
+	} {
+		t.Run(c.sub, func(t *testing.T) {
+			out, errS, code := runBin(t, "check", filepath.Join(root, "examples", "checkout-split", c.sub, "design"))
+			g := goldenDir(t, c.checkCase)
+			compareOrUpdate(t, filepath.Join(g, "stdout.txt"), out)
+			compareOrUpdate(t, filepath.Join(g, "stderr.txt"), errS)
+			compareOrUpdate(t, filepath.Join(g, "exitcode.txt"), fmt.Sprintf("%d\n", code))
+		})
+	}
+}
+
 func TestGoldenGen(t *testing.T) {
 	root := repoRootDir(t)
 	for _, c := range goldenExamples {

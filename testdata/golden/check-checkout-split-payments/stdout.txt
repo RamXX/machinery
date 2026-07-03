@@ -1,0 +1,14 @@
+== G2-c4  Architecture Contract ==
+  checked: 1 boundaries, 2 externals, 2 allow rules, 4 dsl elements, 1 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 event contracts
+  ok
+== G3-machine  machines + oracle ==
+  checked: 1 machines, 3 transitions, 1 oracles fresh, 3 named units covered
+  ok
+== Gx-trace  cross-layer traceability ==
+  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor)
+  ok
+== G5-pack  contract packs ==
+  checked: 6 pack files, 1 pack hash verified, 3 refinement artifacts fresh, 1 owned entities present, 1 owned enums shape-checked, 1 consumed events handled, 2 produced events emitted
+  ok
+
+0 blocking (ERROR/DRIFT) finding(s)

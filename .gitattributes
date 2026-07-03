@@ -1,0 +1,4 @@
+# The toolchain is byte-exact: content hashes (packs), golden comparisons, and
+# oracle freshness diffs all assume LF. Pin it so an autocrlf checkout cannot
+# spuriously fail G5 or the golden corpus.
+* text=auto eol=lf

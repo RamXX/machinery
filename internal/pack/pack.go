@@ -70,7 +70,9 @@ func HasPack(design string) bool {
 
 // subsystemIDRe restricts ids to a bare-name charset: they become path
 // segments (packs/<id>.pack) and must not traverse out of the design tree.
-var subsystemIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+// Interior dots are path-safe (orders.v2); separators and empty segments
+// (which is what ".." would be) are not.
+var subsystemIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$`)
 
 // pathInsideDesign reports whether the (relative) path stays inside the
 // design directory once cleaned. Absolute paths never qualify.
