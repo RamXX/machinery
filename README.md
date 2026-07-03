@@ -287,7 +287,7 @@ make doctor        # check dependencies and install status
 make test          # run the Go toolchain test suite (needs Go)
 make check         # run the deterministic gate suite on the examples
 make verify-formal # regenerate and TLC-check the full formal suite
-make oracle        # regenerate the transition oracles from the machine JSON
+make oracle        # regenerate the go-crm transition oracles from the machine JSON
 ```
 
 machinery is agent-agnostic. `make install` places the skill under `<home>/skills` and the two role
@@ -367,8 +367,9 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   the flattened system; this is that principle applied to the design process itself. When to
   escalate: `machinery scale` measures a design and recommends sharding or recursion.
 - `testdata/golden/` the byte-for-byte golden corpus: expected stdout, stderr, exit code, and every
-  generated artifact for every deterministic generator and gate subcommand across the examples,
-  checkout-split included, checked by `go test ./cmd/machinery -run TestGolden`; the Go experiment
+  generated artifact for the deterministic subcommands (lint, oracle, tla, refine, and compose on
+  the three standalone examples; check on all four; pack generate and scale on checkout-split),
+  checked by `go test ./cmd/machinery -run TestGolden`; the Go experiment
   table lives in `internal/experiments/`.
 
 See `skills/machinery/tools/README.md` for the checkers and generators, and
@@ -394,15 +395,16 @@ full gate suite run against a synthesized design/impl fixture) runs as Go tests 
 | `internal/gates` | 62% | the G2/G3/Gx/G4/G5 gate suite (G5 exercised via `internal/experiments`) |
 | `internal/pack` | 58% | contract packs (the mutation suite lives in `internal/experiments`) |
 | `internal/ir` | 55% | shared IR (covered transitively via lint/gates) |
-| `internal/formal` | 23% | TLC orchestration (the TLC-run paths need Java) |
+| `internal/formal` | 31% | TLC orchestration (the TLC-run paths need Java) |
 | **internal/ overall** | **~70%** | own-package tests only; the cross-package adversarial suites in `internal/experiments` exercise gates and pack further (cmd/ is thin CLI plumbing) |
 
 Run `go test -coverprofile=cover.out ./internal/... && go tool cover -func=cover.out` locally.
 CI runs `go test -race ./...`. Beyond unit tests, two stronger nets are always green in CI:
 
 - **Golden corpus**: `testdata/golden` byte-compares stdout, stderr, exit code, and every generated
-  artifact for every deterministic generator and gate subcommand (lint, oracle, tla, refine,
-  compose, check, pack generate, scale) across the examples, checkout-split included (`make golden`;
+  artifact for the deterministic subcommands: lint, oracle, tla, refine, and compose on the three
+  standalone examples; check on all four (the checkout-split runs pin the G5-pack output); and
+  pack generate and scale on checkout-split (`make golden`;
   re-captured with `make golden-update` after intended output changes). Environment-dependent
   commands (verify-formal, doctor, preflight) are exercised by the formal-verification and CI jobs
   instead.

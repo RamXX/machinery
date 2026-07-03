@@ -23,7 +23,7 @@ Three consequences:
 - A fully green `machinery check --impl .` on day one means the design is coherent and the
   import graph matches the contract. It says nothing about whether the code behaves like
   the machines. Behavioral drift surfaces only when you run oracle-derived tests against
-  the real code (section 5).
+  the real code (section 3, stage 3).
 - G4 cannot see coupling through shared database tables or bus topics. The event-contract
   table in ARCHITECTURE.md is the governing artifact for those seams, and it is maintained
   by hand.
@@ -64,15 +64,18 @@ one day and needs no domain model and no machines.
 
 1. Author `design/workspace.dsl` and `design/ARCHITECTURE.md` with an Architecture
    Contract (v2) describing the boundaries you INTEND, one boundary per package or package
-   group you are claiming. Ids may use letters, digits, underscores, dots, and hyphens.
-2. Everything you have not modeled yet gets one of two treatments:
-   - Source files you do not want walked at all: `ignore:` globs.
-   - Internal packages that modeled code still imports: declare a single external, for
-     example `external.rest_of_monolith`, list those packages under its `imports:`
-     prefixes, add `allow: [yourboundary -> external.rest_of_monolith]`, and give it a
-     mitigation row whose posture is recorded as "own unmodeled code, out of scope until
-     modeled". G2 requires the row even for your own code; write it truthfully rather than
-     fighting it.
+   group you are claiming. Ids are dot-separated segments, each starting with a letter or
+   underscore and continuing with letters, digits, underscores, and hyphens.
+2. Everything you have not modeled yet needs BOTH of these, not one or the other:
+   - `ignore:` globs covering the unmodeled packages' own source files, so G4 does not
+     error on every file that maps to no boundary.
+   - For unmodeled internal packages that modeled code still imports: declare a single
+     external, for example `external.rest_of_monolith`, list those packages under its
+     `imports:` prefixes, add `allow: [yourboundary -> external.rest_of_monolith]`, and
+     give it a mitigation row whose posture is recorded as "own unmodeled code, out of
+     scope until modeled". G2 requires the row even for your own code; write it truthfully
+     rather than fighting it. The `imports:` prefixes govern only the edges INTO that code;
+     they do not exempt its files, which is what the `ignore:` globs are for.
 3. Baseline today's real violations as explicit `allow:` rules, each tagged with a
    comment such as `# BASELINE 2026-07: orders reaches into billing directly`. Do not use
    a matching `deny:` to record intent for the same literal edge: G2 rejects an edge that
@@ -260,6 +263,9 @@ the other half is somebody's memory" and a design history you can audit.
   offenders; budget remediation by the count, not by the number of error lines.
 - A stale child in a decomposed design is only visible to the parent's check (the parent
   does warn about subsystems with no `child_design` link, whose pins it cannot verify).
+  The same holds for tampering: a child-side edit that rewrites the pack copy and
+  recomputes its hash is self-consistent and passes the child's own gate; the parent's
+  check is the authority, so it must run in CI wherever the parent design lives.
 - `deny:` rules cannot reference boundaries that do not exist yet; planned-but-unbuilt
   boundaries live in comments until they have DSL elements.
 

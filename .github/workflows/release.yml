@@ -1,4 +1,4 @@
-# release.yml — cross-compile and publish the machinery binary on tag push.
+# release.yml - cross-compile and publish the machinery binary on tag push.
 # Produces static binaries for the three major OSes + archs, checksums them,
 # and attaches everything to a GitHub Release. Users install without Go.
 name: release

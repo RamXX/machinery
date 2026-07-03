@@ -1,4 +1,4 @@
-# security.yml — security scanning: dependency vulnerabilities and leaked secrets.
+# security.yml - security scanning: dependency vulnerabilities and leaked secrets.
 # Runs on every push/PR and nightly (to catch new CVEs disclosed after a PR).
 name: security
 
@@ -37,8 +37,7 @@ jobs:
           govulncheck ./...
 
   # gitleaks scans the full history and the working tree for secrets (API keys,
-  # tokens, private keys). Runs in "no-git" mode on PRs for speed and full-history
-  # mode nightly for depth.
+  # tokens, private keys) on every trigger (full clone, fetch-depth 0).
   gitleaks:
     runs-on: ubuntu-latest
     steps:
