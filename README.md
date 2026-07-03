@@ -92,8 +92,9 @@ formal correctness into every layer, strongest first:
 
 1. **Generate, do not co-author.** Anything derivable is generated from the machine JSON: the
    test oracle (with content-derived stable ids that survive design revisions) and the TLA+ specs.
-   The gates then diff every committed generated artifact against a fresh generation, so staleness
-   is caught as drift, never assumed away.
+   G3 then byte-diffs every committed oracle against a fresh generation on every check, and the
+   formal specs are regenerated from source by `verify-formal` (with the nightly regen-clean-tree
+   job asserting the committed copies match), so staleness is caught as drift, never assumed away.
 2. **Deterministic symbolic gates that cannot pass on absence.** `machinery check` verifies, with no
    LLM in the loop: machines are well-formed (reachability, unambiguous targets, no dead ends, every
    side effect has an error path and a timeout, every resting state handles or explicitly ignores
@@ -120,8 +121,8 @@ that holds all of this together is itself held: a Go test suite encodes every va
 attack from an adversarial design review as a permanent regression, and CI runs the tests, the
 gates, the proofs, and the example build on every push.
 
-Generating every artifact (the oracle, the TLA+ specs, the reconciled models) is pure Python and
-needs no [Java](https://adoptium.net/). Only the *checking* of the proofs (rungs 3 and 4, and rung 2's refinement) runs under
+Generating every artifact (the oracle, the TLA+ specs, the reconciled models) is the `machinery`
+Go binary itself and needs no [Java](https://adoptium.net/). Only the *checking* of the proofs (rungs 3 and 4, and rung 2's refinement) runs under
 TLC, which is a Java program, so **Java is required only for `make verify-formal`**. That step is
 optional but recommended: the deterministic gates (rung 2's generation and every symbolic check)
 already catch malformed machines, drift, and boundary erosion, but they cannot tell you that a saga
@@ -141,7 +142,7 @@ ownership-based access control, taken end to end:
   transient); five state machines; a 1223-line `BUILD.md`.
 - **Built by a zero-context coding agent** under hard TDD: a test-writer wrote the suite from the
   blueprint, the tests were locked, and an implementer made them pass without touching a test. Result:
-  286 tests green, 89% coverage, architecture boundaries upheld in the source. The one impossible test
+  286 tests green, 83% coverage, architecture boundaries upheld in the source. The one impossible test
   was escalated as a design defect and fixed in the design, not the code.
 - **Gated** by `machinery check`: it certified the design consistent and caught a real contract defect
   the prose review had missed. The hardened gates verify it non-vacuously: 194 transitions reconciled
@@ -221,7 +222,7 @@ check and warns about anything missing.
 - **machinery** -- the deterministic gate tools and formal generators. A single static binary
   (no Python, no Go runtime). Two ways to install:
 
-  **Download a prebuilt binary** (no toolchain needed — macOS arm64/x86, Linux amd64/arm64,
+  **Download a prebuilt binary** (no toolchain needed: macOS arm64/x86, Linux amd64/arm64,
   Windows amd64):
   ```bash
   make install-binary                      # auto-detects OS/arch, fetches latest release
@@ -231,7 +232,7 @@ check and warns about anything missing.
   Binaries are published on the [releases page](https://github.com/ramirosalas/machinery/releases);
   download `machinery-<os>-<arch>`, put it on your `PATH`.
 
-  **Or build from source** (if you have [Go](https://go.dev/dl/) 1.22+):
+  **Or build from source** (if you have [Go](https://go.dev/dl/) 1.26+; `go.mod` pins 1.26.4):
   ```bash
   make build                               # builds .bin/machinery
   ```
@@ -288,12 +289,13 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 ## How it is put together
 
 - `skills/machinery/SKILL.md` the conductor, plus `references/` (XState format, C4 technique, BUILD.md
-  template) and `tools/` (the frozen Python differential oracle during migration).
+  template) and `tools/` (the TLC shell wrappers, `tlc.sh` and `verify_formal.sh`).
 - `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `refine`, `compose`,
-  `check`, `verify-formal`, `doctor`, `preflight`.
+  `check`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
-  `refine/`, `compose/`, `gates/` (the G2/G3/Gx/G4 suite), `formal/` (TLC orchestration),
-  `experiments/` (the shared mutation-experiment table). Every package has unit tests.
+  `refine/`, `compose/`, `gates/` (the G2/G3/Gx/G4/G5 suite), `pack/` (recursive decomposition via
+  contract packs), `formal/` (TLC orchestration), `experiments/` (the shared mutation-experiment
+  table). Every package has unit tests.
 - `agents/` two synthesis subagents (the machine author and the build-doc writer).
 - `examples/go-crm/` the worked example: `design/` (the blueprint and the formal models) and `impl/`
   (the verified Go build).
@@ -303,8 +305,17 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   Python drawdown portfolio recommender): exercises the terminal-lifecycle pattern and a
   persistence overlay renamed from the defaults, proving the formal layer is not hardcoded to one
   vocabulary.
-- `tests/` the Python toolchain's own test suite (the frozen differential oracle during migration);
-  the Go experiment table lives in `internal/experiments/`.
+- `examples/checkout-split/` the recursive-decomposition example: a parent design that stops at
+  contracts (`decomposition.yaml`, two abstract contract machines, generated `packs/`) plus two
+  child designs, each a full machinery run against its frozen pack, with a TLC-checked proof that
+  its machine refines the contract the neighbor relies on (G5-pack holds both sides: pack
+  freshness, hash pinning in both directions, frozen public shape, boundary-event coverage, and
+  refinement-proof freshness). Designs scale by verifying parts against contracts, never against
+  the flattened system; this is that principle applied to the design process itself. When to
+  escalate: `machinery scale` measures a design and recommends sharding or recursion.
+- `testdata/golden/` the byte-for-byte golden corpus: expected stdout, stderr, exit code, and every
+  generated artifact for every subcommand across the examples, checked by
+  `go test ./cmd/machinery -run TestGolden`; the Go experiment table lives in `internal/experiments/`.
 
 See `skills/machinery/tools/README.md` for the checkers and generators, and
 `examples/go-crm/design/formal/README.md` for the proofs. The skill also defines a revision mode
@@ -314,27 +325,32 @@ roughly ten stateful components.
 
 ## Testing & CI
 
-The Go toolchain has full unit tests in every package, plus a shared mutation-experiment table
-(the vacuity/drift findings from design review, ported to Go tests). Current coverage:
+The Go toolchain has full unit tests in every package, including `internal/formal`. The adversarial
+mutation suite (every vacuity and drift finding from the design reviews, lint mutations plus the
+full gate suite run against a synthesized design/impl fixture) runs as Go tests in
+`internal/experiments`. Current coverage:
 
 | Package | Coverage | Role |
 |---------|----------|------|
 | `internal/tla` | 90% | TLA+ control-flow generator |
-| `internal/oracle` | 87% | transition oracle (content-hashed ids) |
-| `internal/lint` | 84% | structural lint + matrix reconciliation |
+| `internal/oracle` | 86% | transition oracle (content-hashed ids) |
+| `internal/lint` | 85% | structural lint + matrix reconciliation |
 | `internal/refine` | 83% | data-refinement (3 patterns) |
-| `internal/compose` | 79% | cross-aggregate composition |
-| `internal/gates` | 77% | the G2/G3/Gx/G4 gate suite |
-| `internal/ir` | 57% | shared IR (covered transitively via lint/gates) |
-| **internal/ overall** | **~75%** | (cmd/ is thin CLI plumbing) |
+| `internal/compose` | 81% | cross-aggregate composition |
+| `internal/gates` | 63% | the G2/G3/Gx/G4/G5 gate suite (G5 exercised via `internal/experiments`) |
+| `internal/pack` | 57% | contract packs (the mutation suite lives in `internal/experiments`) |
+| `internal/ir` | 55% | shared IR (covered transitively via lint/gates) |
+| `internal/formal` | 23% | TLC orchestration (the TLC-run paths need Java) |
+| **internal/ overall** | **~70%** | own-package tests only; the cross-package adversarial suites in `internal/experiments` exercise gates and pack further (cmd/ is thin CLI plumbing) |
 
 Run `go test -coverprofile=cover.out ./internal/... && go tool cover -func=cover.out` locally.
 CI runs `go test -race ./...`. Beyond unit tests, two stronger nets are always green in CI:
 
-- **Differential parity** — `scripts/diff-all.sh` proves the Go binary equals the Python tools
-  byte-for-byte (stdout/stderr/exit) on every example and every generator.
-- **Formal verification** — `machinery verify-formal` regenerates and TLC-model-checks all 22 TLA+
-  proofs across the three examples.
+- **Golden corpus**: `testdata/golden` byte-compares stdout, stderr, exit code, and every generated
+  artifact for every subcommand across all three examples (`make golden`; re-captured with
+  `make golden-update` after intended output changes).
+- **Formal verification**: `machinery verify-formal` regenerates and TLC-model-checks all 26 TLA+
+  proofs across the examples (including the checkout-split contract-refinement proofs).
 
 ## Built on
 
@@ -357,7 +373,6 @@ bundles none of them.
 
 ## License
 
-Copyright 2026 Ramiro Salas. Licensed under the Apache License 2.0; see `LICENSE`. machinery invokes
-`modelith` and emits XState and C4 notation; it bundles none of them, so no dependency's license binds
-it. The tools it works with are permissively licensed and compatible with Apache-2.0: Modelith and
-Structurizr are Apache-2.0, XState and LadybugDB are MIT, and C4 is an open notation.
+Copyright 2026 Ramiro Salas. Licensed under the Apache License 2.0; see `LICENSE`. 
+`machinery` invokes `modelith` and emits XState and C4 notation; it bundles none of them, so no dependency's license binds
+it. The tools it works with are permissively licensed and compatible with Apache-2.0: Modelith and Structurizr are Apache-2.0, XState and LadybugDB are MIT, and C4 is an open notation.
