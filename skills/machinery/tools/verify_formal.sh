@@ -16,13 +16,13 @@
 #   *.composition.yaml   -> machinery compose  cross-aggregate invariants
 #   hand-authored *.tla with a *.cfg           also checked (e.g. System)
 # Usage: verify_formal.sh <design-dir>
-# Needs the machinery binary on PATH (make install); override with MACHINERY=/path/to/machinery.
+# Needs the machinery binary on PATH (see install.sh); override with MACHINERY=/path/to/machinery.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 machinery="${MACHINERY:-machinery}"
 command -v "$machinery" >/dev/null 2>&1 || {
-  echo "machinery binary not found on PATH (make install), or set MACHINERY=/path/to/machinery" >&2
+  echo "machinery binary not found on PATH (see install.sh), or set MACHINERY=/path/to/machinery" >&2
   exit 1
 }
 design="${1:?usage: verify_formal.sh <design-dir>}"

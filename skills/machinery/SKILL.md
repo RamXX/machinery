@@ -82,7 +82,9 @@ Never advance until the current gate passes. State the gate result to the user b
 
 The deterministic gates live in `machinery check <design> [--impl <dir>] [--gate g2,g3,gx,g4,g5]`
 (g5 runs automatically on decomposed designs; see Recursive decomposition).
-It is a single Go binary; build it with `make build`.
+It is a single Go binary; install it with the one-line installer
+(`curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh`) or
+`go build ./cmd/machinery`.
 Gates fail on absence: a missing artifact or an empty check is an ERROR, never a silent pass, and
 every gate prints a `checked: <counts>` line of what it actually verified. Use `--gate` to run a
 subset while a phase is in flight; the default runs everything applicable.
@@ -391,7 +393,7 @@ knows where the interrogation stopped.
 - `references/build-md-template.md` - the full `BUILD.md` skeleton (full and manifest modes).
 - `machinery check` - the deterministic gate suite (G2-c4, G3-machine, Gx-trace, G4-import,
   G5-pack for decomposed designs).
-  Single Go binary (`make install`). Run it at each gate with `--gate` so correctness does not
+  Single Go binary. Run it at each gate with `--gate` so correctness does not
   rely on the model getting every cross-reference right. See `tools/README.md`.
 - `machinery oracle` - generates the canonical `<M>.oracle.md` transition oracles from the
   machine JSON. Run after every machine edit and commit the output; G3 diffs it.
