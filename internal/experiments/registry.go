@@ -6,6 +6,11 @@ package experiments
 // (TestEveryDeclaredExperimentHasARunner) fails when a declared experiment has
 // no registered runner. Registering an undeclared name panics, so a stale
 // registration breaks just as loudly as a missing one.
+//
+// The registry enforces NAME coverage only: it cannot verify that the
+// registering test actually applies the mutation and asserts the finding.
+// That half of the contract lives in review; a registration whose test
+// asserts nothing is a lie the registry cannot catch.
 
 import "sort"
 

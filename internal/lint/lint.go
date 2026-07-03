@@ -649,17 +649,27 @@ func MatrixTransitionRows(text string) ([]XRow, string) {
 			return out, ""
 		}
 	}
-	// No parsed table matched. If a header LINE still looks like a transition
-	// table, the table exists but failed to parse (e.g. a malformed separator
+	// No parsed table matched. If a line still reads as a transition-table
+	// HEADER, the table exists but failed to parse (e.g. a malformed separator
 	// row that split the block); silence here let contradicting rows pass as
-	// "no table". A broken table is a hard error, not an absence.
+	// "no table". A broken table is a hard error, not an absence. Matching is
+	// per-cell label-prefix, never substring-in-line: a prose data row
+	// containing "resource", "retarget", or "transactions" is not a header.
 	for _, line := range strings.Split(text, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if !strings.HasPrefix(trimmed, "|") {
 			continue
 		}
-		ll := strings.ToLower(trimmed)
-		if strings.Contains(ll, "source") && strings.Contains(ll, "target") && strings.Contains(ll, "actions") {
+		found := map[string]bool{}
+		for _, c := range strings.Split(strings.Trim(trimmed, "|"), "|") {
+			cell := strings.ToLower(strings.TrimSpace(ir.CleanCell(c)))
+			for _, k := range []string{"source", "target", "actions"} {
+				if cell == k || strings.HasPrefix(cell, k+" ") {
+					found[k] = true
+				}
+			}
+		}
+		if found["source"] && found["target"] && found["actions"] {
 			return nil, "a transition-table header is present but no transition table parsed (malformed separator row?); fix the table instead of leaving it unparseable"
 		}
 	}

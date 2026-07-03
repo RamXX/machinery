@@ -239,6 +239,31 @@ func TestChildProducedEventHandlerOnlyFailsG5(t *testing.T) {
 	}
 }
 
+// Emission through an entry action is real emission: with the transition
+// action renamed and the matrix scrubbed of the token, an entry action named
+// after the produced event must still satisfy the produced check. (The 07-03
+// re-review found entry/exit/invoke emitters were excluded from `fired`.)
+func TestChildProducedEventViaEntryActionPassesG5(t *testing.T) {
+	_, _, payments := splitFixture(t)
+	mp := filepath.Join(payments, "machines", "Payment.machine.json")
+	editFile(t, mp,
+		`"capture": {"target": "Captured", "actions": "markPaid"}`,
+		`"capture": {"target": "Captured", "actions": "recordCapture"}`)
+	editFile(t, mp,
+		`"Captured": {`,
+		`"Captured": {`+"\n   "+`"entry": "markPaid",`)
+	data, err := os.ReadFile(filepath.Join(payments, "machines", "Payment.matrix.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, filepath.Join(payments, "machines", "Payment.matrix.md"),
+		strings.ReplaceAll(string(data), "markPaid", "recordCapture"))
+	g := gates.CheckPack(payments)
+	if containsAny(g.Errs, "'markPaid' (produced)") {
+		t.Errorf("entry-action emitter failed the produced check: %v", g.Errs)
+	}
+}
+
 // Subsystem ids become path segments under packs/; traversal must fail.
 func TestSubsystemIDTraversalFailsGeneration(t *testing.T) {
 	parent, _, _ := splitFixture(t)
