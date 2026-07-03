@@ -440,6 +440,24 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 		}
 	}
 
+	// Named-unit names (guards, actions, actors) become TLA+/oracle identifiers
+	// and are matched against the contract table by the IDENT regex. A hyphen
+	// passes every structural check above but can never be extracted from the
+	// contract, so G3 reports a phantom "no named-unit contract row". Reject it
+	// here, at the source, with an actionable message.
+	guards, actions, actors := MachineUnitNames(m)
+	for _, u := range []struct {
+		kind  string
+		names map[string]bool
+	}{{"guard", guards}, {"action", actions}, {"actor", actors}} {
+		for _, name := range sortedKeysMap(u.names) {
+			if !regexpIdent.MatchString(name) {
+				errs = append(errs, fmt.Sprintf("%s: %s %s is not a valid identifier (must match [A-Za-z_][A-Za-z0-9_]*); rename to camelCase (named units become TLA+/oracle identifiers, so hyphens are not allowed)",
+					base, u.kind, ir.Repr(name)))
+			}
+		}
+	}
+
 	return errs, warns, notes, counts
 }
 
