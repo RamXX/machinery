@@ -3,7 +3,7 @@
 Mode: full (self-contained).
 
 > Single deliverable. Self-contained by design: a coding agent with zero prior context builds the
-> system from this file alone, under hard TDD (section 10). Source-of-truth files are referenced per
+> system from this file alone, under hard TDD (section 11). Source-of-truth files are referenced per
 > section for full detail, but you do not need to open them to build. When this document and a source
 > file disagree, the source file wins and this document is a defect: stop and fix it.
 >
@@ -82,7 +82,7 @@ The only source for these words.
 - **Walking skeleton** - the thinnest end-to-end slice that exercises one real transition through one real
   boundary, built first to prove the topology before breadth is added.
 - **Hard TDD** - a test-writer agent writes tests from sections 6 and 7; tests are locked; the implementer
-  makes them pass without editing them (section 10).
+  makes them pass without editing them (section 11).
 
 ## 3. Domain model (the what)
 
@@ -351,7 +351,7 @@ unit exactly once). `Login` is not retried on `ErrBadCredentials`. Retry bound e
 
 CLI invocations are short-lived and single-process, so **there are no in-memory actors**. Every stateful
 aggregate is loaded, acted on, and saved inside the one write transaction the Command Layer owns. This is a
-hard constraint the section 9 Go realization must honor.
+hard constraint the section 10 Go realization must honor.
 
 | component | placement | persistence | concurrency serialization |
 |---|---|---|---|
@@ -661,7 +661,7 @@ is enforced in crm.domain, never in the command layer" rule. It gets a contract 
 Every one of the 24 invariants, with its enforcement point (machine guard / structural / DB-constraint /
 operation-level), owning component, the interface contract that carries it (section 4.6), and its test ids
 (section 7). No invariant is dropped. The one invariant enforced by neither a guard nor a structural
-guarantee (`one-default-pipeline`) is called out as a named residual (also section 11).
+guarantee (`one-default-pipeline`) is called out as a named residual (also section 12).
 
 | invariant | enforced by (class) | in component | interface contract | test id(s) |
 |---|---|---|---|---|
@@ -695,11 +695,11 @@ structural guarantee: Pipeline has no lifecycle machine, and nothing in any stat
 defaults. It is enforced solely by the `setDefault` operation as an atomic read-modify-write inside the one
 write Tx (unset the prior default, set the new one). Coverage is the operation-level property test
 **P-one-default-pipeline** asserting the post-condition `count(isDefault==true) == 1`, plus the repo-level
-check **C-REPO-20**. Carried explicitly in section 11.
+check **C-REPO-20**. Carried explicitly in section 12.
 
 ## 7. Test specification (the hard-TDD oracle)
 
-This section is the input to the test-writer agent (section 10). It writes tests from here; it does not
+This section is the input to the test-writer agent (section 11). It writes tests from here; it does not
 invent them. Sources: the five generated `design/machines/<M>.oracle.md` transition oracles (7.1), the
 five `design/machines/*.matrix.md` named-unit tables, the section 4.6 interface contracts, and the
 section 3.4 invariants.
@@ -707,7 +707,7 @@ section 3.4 invariants.
 **Test id scheme.** Transition tests key on the oracle's STABLE id column (e.g. `DEAL-eb0c40`), never on
 a row number: row numbers renumber whenever the design changes, stable ids do not. The oracle also emits
 a sequential `T-<MACHINE>-NN` id per row (MACHINE in DEAL, TASK, USER, SESS, CMD); those names are how
-sections 6 and 8 of this document cite individual rows. `C-<BOUNDARY>-NN` = a contract test
+sections 6 and 9 of this document cite individual rows. `C-<BOUNDARY>-NN` = a contract test
 at a section-4.6 boundary (REPO, AUTHZ, SESS) plus `C-ARCH-01` for the dependency contract. `P-<invariant>`
 = a property test, one per invariant.
 
@@ -857,11 +857,40 @@ Each is a randomized/generative property over the relevant operation. Format: `P
 | P-rbac-reassign-authority | For any reassign: Allowed only for Admin, or Manager acting within the manager's team. |
 | P-session-active-user | For any resume, the session resolves to Active only while the user's status is Active; a status flip to Disabled invalidates it. |
 
-## 8. Build plan
+## 8. State migration
+
+Four placement rows persist machine state (ARCHITECTURE.md section 7): `Deal` persists `stage`,
+`Task` and `User` persist `status` as graph node attributes, and `Session` persists its token
+(`userId` plus `expiresAt`, HMAC-signed) in `~/.crm/session`. This is a greenfield design and no
+production data exists; the protocol below binds from the first deployment onward, per machine.
+
+- **Deal.** When a `DealStage` value is renamed, split, or removed, the revision MUST ship a
+  mapping table from every old persisted `stage` value to its new stage, applied once over all Deal
+  nodes before the new binary takes writes, or an explicit drain rule for deals stranded in a
+  removed stage. No persisted instances yet; the protocol applies from first deployment.
+- **Task.** Same protocol for `TaskStatus`: a mapping table from every old persisted `status` value
+  to its new status, or an explicit drain rule (Done/Cancelled rows are terminal and must map into
+  the new terminal set). No persisted instances yet; the protocol applies from first deployment.
+- **User.** Same protocol for `UserStatus` (`Active`/`Disabled`): a mapping table from old persisted
+  values to new states, or an explicit drain rule. A mapping that leaves any user without a valid
+  status is a defect (`session-active-user` depends on it). No persisted instances yet; the
+  protocol applies from first deployment.
+- **Session.** The token persists identity and expiry (`userId`, `expiresAt`), not a machine-state
+  value, so renaming Session states needs no data migration. The drain rule for token-format or
+  signing-key changes: outstanding tokens fail the signature or parse check (`ErrUnreadable`) or
+  expire within `sessionTTL` (8h), forcing re-login; a mapping table is never required. No
+  persisted instances yet; the protocol applies from first deployment.
+
+The transient persist-overlay states (`persisting`, `persistRetry`, `rolledBack`) and the whole
+CommandExecution envelope are never persisted (they live only inside one invocation), so renaming
+them needs no migration. Regenerate the oracles after any machine change; the stable-id diff is the
+affected-test list.
+
+## 9. Build plan
 
 Walking skeleton first (prove the topology through one real boundary), then one aggregate lifecycle per
 vertical slice, each slice fully green before the next. Definition of done (DoD) is stated per milestone;
-the global gates are section 10 (all transitions have a T-row test, all invariants a P-test, all boundaries
+the global gates are section 11 (all transitions have a T-row test, all invariants a P-test, all boundaries
 a C-test, no cross-boundary violation, >= 80% combined coverage).
 
 **M0 - Walking skeleton (thinnest end-to-end thread).** Implement exactly the path
@@ -901,7 +930,7 @@ Activity, Tag, Team). DoD: C-AUTHZ-01..14 green; all four P-rbac-* green; DB-uni
 P-tag-name-unique, P-team-name-unique green; **P-one-default-pipeline and C-REPO-20 green** (the named
 residual); C-ARCH-01 still green across the whole tree.
 
-## 9. Language realization notes
+## 10. Language realization notes
 
 Target language: **Go 1.22+**. How the machines and contracts become code.
 
@@ -972,7 +1001,7 @@ Pin the environment so two implementing agents cannot diverge. The source of tru
   `machinery oracle design/machines` (regenerate and commit the oracles after any machine change)
   and `machinery check design --impl <impl-dir>` (all gates against the implementation).
 
-## 10. Hard-TDD protocol (read this before writing any code)
+## 11. Hard-TDD protocol (read this before writing any code)
 
 1. **Test-writer agent** reads sections 6 and 7 only and writes the full test suite from the spec: one test
    per T-row (7.1), one per C-row (7.2), one property test per P-row (7.3). It does not invent behavior; if
@@ -981,7 +1010,7 @@ Pin the environment so two implementing agents cannot diverge. The source of tru
    them pass. Locking is structural (the test files are owned by the test-writer; changes require a design
    round-trip).
 3. **The implementer agent** writes production code until the locked tests pass, honoring the section 4.5
-   Architecture Contract (C-ARCH-01) and the section 9 realization rules.
+   Architecture Contract (C-ARCH-01) and the section 10 realization rules.
 4. **Completeness gates.** Every transition in section 5/7.1 has a T-test; every invariant in section 3.4 is
    property-tested (7.3); every boundary in section 4.6 has contract tests (7.2). Coverage target and gates
    per project conventions (>= 80% combined; integration tests use a real LadybugDB dir and no mocks; unit
@@ -992,7 +1021,7 @@ Pin the environment so two implementing agents cannot diverge. The source of tru
    Never "adjust" a test to pass, and never edit a test to match code that drifted from the spec. The
    round-trip is design -> BUILD.md -> tests -> code, always in that direction.
 
-## 11. Open questions and residual risks
+## 12. Open questions and residual risks
 
 Named risks are cheaper than surprises. Each is either accepted-by-design or covered by a specific test.
 
@@ -1010,7 +1039,7 @@ Named risks are cheaper than surprises. Each is either accepted-by-design or cov
    discipline. Residual: a new repo method that mutates an owner/immutable field would need a new test;
    flagged for review gate.
 3. **Corruption is fatal-until-restore.** If the user never ran `crm backup`, an `ErrCorrupt` open is
-   unrecoverable data loss. Mitigation: `crm backup`/`crm restore` (section 9, M4) and the Corrupt-state
+   unrecoverable data loss. Mitigation: `crm backup`/`crm restore` (section 10, M4) and the Corrupt-state
    message directing the user to restore. Residual: backup cadence is a user responsibility, not enforced by
    the binary. Consider a future "backup reminder" or auto-snapshot-before-migration.
 4. **`ErrConflict` retried as if locked.** CommandExecution routes `isErrConflict` to DBLocked and retries
@@ -1034,38 +1063,9 @@ Named risks are cheaper than surprises. Each is either accepted-by-design or cov
 9. **Spec-to-code drift on the machines.** The machine JSON is the oracle; the Go transition switch is the
    implementation. Drift is prevented by hard TDD (locked T-tests) plus the `@xstate/graph` covering-path
    check that every edge has a T-row. Residual: if the JSON changes, tests regenerate before code (section
-   10 rule 5).
+   11 rule 5).
 10. **Deferred / not modeled.** Deal `reassign` and the Account/Contact/Tag/Activity CRUD verbs are covered
     by authz + repo contract tests, not by a lifecycle machine (they are pure records, section 5.6). Deal
     `update` of non-stage fields (title/amount) is a plain write guarded by `rbac-write-scope`; if amount is
     edited it must re-check `deal-amount-nonneg` (P-deal-amount-nonneg applies). Flagged so it is not assumed
     to be machine-driven.
-
-## 12. State migration
-
-Four placement rows persist machine state (ARCHITECTURE.md section 7): `Deal` persists `stage`,
-`Task` and `User` persist `status` as graph node attributes, and `Session` persists its token
-(`userId` plus `expiresAt`, HMAC-signed) in `~/.crm/session`. This is a greenfield design and no
-production data exists; the protocol below binds from the first deployment onward, per machine.
-
-- **Deal.** When a `DealStage` value is renamed, split, or removed, the revision MUST ship a
-  mapping table from every old persisted `stage` value to its new stage, applied once over all Deal
-  nodes before the new binary takes writes, or an explicit drain rule for deals stranded in a
-  removed stage. No persisted instances yet; the protocol applies from first deployment.
-- **Task.** Same protocol for `TaskStatus`: a mapping table from every old persisted `status` value
-  to its new status, or an explicit drain rule (Done/Cancelled rows are terminal and must map into
-  the new terminal set). No persisted instances yet; the protocol applies from first deployment.
-- **User.** Same protocol for `UserStatus` (`Active`/`Disabled`): a mapping table from old persisted
-  values to new states, or an explicit drain rule. A mapping that leaves any user without a valid
-  status is a defect (`session-active-user` depends on it). No persisted instances yet; the
-  protocol applies from first deployment.
-- **Session.** The token persists identity and expiry (`userId`, `expiresAt`), not a machine-state
-  value, so renaming Session states needs no data migration. The drain rule for token-format or
-  signing-key changes: outstanding tokens fail the signature or parse check (`ErrUnreadable`) or
-  expire within `sessionTTL` (8h), forcing re-login; a mapping table is never required. No
-  persisted instances yet; the protocol applies from first deployment.
-
-The transient persist-overlay states (`persisting`, `persistRetry`, `rolledBack`) and the whole
-CommandExecution envelope are never persisted (they live only inside one invocation), so renaming
-them needs no migration. Regenerate the oracles after any machine change; the stable-id diff is the
-affected-test list.
