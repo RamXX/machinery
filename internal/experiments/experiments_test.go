@@ -118,13 +118,11 @@ func TestOracleStableIDExperiments(t *testing.T) {
 	})
 }
 
-// TestMachineryCheckExperiments spot-checks the gate suite adversarial cases
-// against a synthesized fixture (proves Go catches the same vacuity as Python).
-func TestMachineryCheckExperiments(t *testing.T) {
-	// The full gate experiments need a filesystem fixture; the byte-parity
-	// differential harness (diff-all.sh) already proves Go == Python on the
-	// shipped examples. Here we assert the Gate accumulator's absence-is-failure
-	// discipline directly: an empty gate must report "nothing checked".
+// TestGateAccumulatorAbsenceIsFailure asserts the Gate accumulator's
+// absence-is-failure discipline directly: an empty gate must report "nothing
+// checked". The full MachineryCheckExperiments run against a filesystem
+// fixture in gatesuite_test.go.
+func TestGateAccumulatorAbsenceIsFailure(t *testing.T) {
 	g := gates.NewGate("probe")
 	g.RequireNonzero("machines", "no machines parsed")
 	if !containsAny(g.Errs, "nothing checked") {

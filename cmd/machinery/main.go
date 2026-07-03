@@ -19,8 +19,9 @@ func main() {
 		Short:         "machinery deterministic design tooling",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		Version:       version,
 	}
-	root.PersistentFlags().Bool("version", false, "print version and exit")
+	root.SetVersionTemplate("machinery version {{.Version}}\n")
 
 	root.AddCommand(newLintCmd())
 	root.AddCommand(newOracleCmd())
@@ -29,6 +30,8 @@ func main() {
 	root.AddCommand(newComposeCmd())
 	root.AddCommand(newCheckCmd())
 	root.AddCommand(newVerifyFormalCmd())
+	root.AddCommand(newPackCmd())
+	root.AddCommand(newScaleCmd())
 	root.AddCommand(newDoctorCmd())
 	root.AddCommand(newPreflightCmd())
 	root.AddCommand(newIRDumpCmd()) // hidden: the Phase-2 parity probe

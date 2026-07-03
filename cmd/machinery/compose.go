@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/ramirosalas/machinery/internal/compose"
@@ -17,7 +19,10 @@ func newComposeCmd() *cobra.Command {
 		if len(args) > 2 {
 			outdir = args[2]
 		}
-		compose.Run(args[0], args[1], outdir)
+		if err := compose.Run(args[0], args[1], outdir); err != nil {
+			fmt.Fprintln(stderrW, err)
+			exitFunc(1)
+		}
 		return nil
 	}
 	return c

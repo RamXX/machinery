@@ -5,6 +5,7 @@ package gates
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -58,7 +59,7 @@ func (g *Gate) RequireNonzero(label, what string) {
 
 // Emit prints the gate like Python (ERRS, DRIFT, warns, notes, checked:, ok).
 // Returns the number of blocking findings (errs + drift).
-func (g *Gate) Emit(out *os.File) int {
+func (g *Gate) Emit(out io.Writer) int {
 	fmt.Fprintf(out, "== %s ==\n", g.Title)
 	for _, e := range g.Errs {
 		fmt.Fprintf(out, "  ERROR  %s\n", e)
@@ -103,6 +104,46 @@ func readOrEmpty(path string) string {
 	return string(data)
 }
 
+// modeRe matches the BUILD.md template's mandatory mode declaration line.
+var modeRe = regexp.MustCompile(`(?m)^Mode:\s*(full|manifest)\b`)
+
+// headingContains reports whether any markdown heading line contains the
+// (lowercase) needle.
+func headingContains(text, needle string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(line, "#") && strings.Contains(strings.ToLower(line), needle) {
+			return true
+		}
+	}
+	return false
+}
+
+// isPersisted reports whether a placement-table persistence cell means the
+// machine's state survives the process (and so needs a migration protocol).
+func isPersisted(cell string) bool {
+	c := strings.ToLower(strings.TrimSpace(cell))
+	switch {
+	case c == "" || c == "-" || c == "none" || c == "n/a":
+		return false
+	case strings.Contains(c, "in-memory") || strings.Contains(c, "in memory") || strings.Contains(c, "ephemeral"):
+		return false
+	}
+	return true
+}
+
+// sortedGlobExt lists <dir>/*<ext> sorted; empty when dir does not exist.
+func sortedGlobExt(dir, ext string) []string {
+	entries, _ := os.ReadDir(dir)
+	var out []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ext) {
+			out = append(out, filepath.Join(dir, e.Name()))
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // tokenIn mirrors _token_in: whole-token containment (inv-1 must not match inv-12).
 func tokenIn(token, text string) bool {
 	// re.search(rf"(?<![A-Za-z0-9_-]){token}(?![A-Za-z0-9_-])", text)
@@ -143,7 +184,12 @@ func loadContract(archPath string, g *Gate) *ir.Value {
 		g.Errs = append(g.Errs, filepath.Base(archPath)+" does not exist")
 		return nil
 	}
-	text := readOrEmpty(archPath)
+	data, err := os.ReadFile(archPath)
+	if err != nil {
+		g.Errs = append(g.Errs, filepath.Base(archPath)+" is unreadable: "+err.Error())
+		return nil
+	}
+	text := string(data)
 	m := contractHeadingRe.FindStringSubmatch(text)
 	if m == nil {
 		m = contractFallbackRe.FindStringSubmatch(text)
@@ -158,8 +204,22 @@ func loadContract(archPath string, g *Gate) *ir.Value {
 		return nil
 	}
 	co := c.AsObject()
+	if co == nil {
+		g.Errs = append(g.Errs, "Architecture Contract yaml is not a mapping (got a list or scalar)")
+		return nil
+	}
 	if _, ok := co.Get("contract_version"); !ok {
 		g.Errs = append(g.Errs, "Architecture Contract has no contract_version")
+		return nil
+	}
+	// the version's VALUE is checked, not just its presence: v1 contracts
+	// mislabeled as current used to pass silently
+	if v := co.Get2("contract_version"); v == nil || v.Kind != ir.KindNumber || string(v.AsNumber()) != "2" {
+		got := "?"
+		if v != nil {
+			got = goReprValue(v)
+		}
+		g.Errs = append(g.Errs, "contract_version "+got+" is not supported; this toolchain checks contract v2 (element bindings, externals, ignore)")
 		return nil
 	}
 	if co.Get2("boundaries") == nil {
@@ -169,6 +229,9 @@ func loadContract(archPath string, g *Gate) *ir.Value {
 	return c
 }
 
+// contractEdges parses src->dst rules. g may be nil (a G4-only run parses the
+// rules a second time and must not duplicate G2's findings): unparseable rules
+// are then skipped silently here because G2 reports them.
 func contractEdges(rules *ir.Object, key string, g *Gate) [][2]string {
 	var out [][2]string
 	v := rules.Get2(key)
@@ -180,7 +243,7 @@ func contractEdges(rules *ir.Object, key string, g *Gate) [][2]string {
 		m := edgeRuleRe.FindStringSubmatch(s)
 		if m != nil {
 			out = append(out, [2]string{m[1], m[2]})
-		} else {
+		} else if g != nil {
 			g.Errs = append(g.Errs, fmt.Sprintf("unparseable %s rule: %s (expected 'src -> dst')", key, ir.Repr(s)))
 		}
 	}
@@ -308,11 +371,11 @@ func CheckC4(design string) *Gate {
 			}
 		}
 	}
-	allowSet := edgeSet(allow)
 	denySet := edgeSet(deny)
-	for e := range allowSet {
+	for _, e := range allow { // slice order, not map order: deterministic output
 		if denySet[e] {
 			g.Errs = append(g.Errs, fmt.Sprintf("edge %s -> %s is both allowed and denied", e[0], e[1]))
+			denySet[e] = false // report each edge once even if listed twice
 		}
 	}
 
@@ -422,6 +485,30 @@ func CheckC4(design string) *Gate {
 		}
 	}
 
+	// bus/queue coupling is invisible to G4-import; the event-contract table
+	// is the governing artifact, so a queue-coupled design must have one
+	queueCoupled := false
+	for name, e := range els {
+		if e.Tags["Queue"] {
+			queueCoupled = true
+			_ = name
+		}
+	}
+	if queueCoupled {
+		found := false
+		for _, tbl := range ir.ParseMdTables(text) {
+			hl := strings.ToLower(strings.Join(tbl.Header, " "))
+			if strings.Contains(hl, "producer") && strings.Contains(hl, "consumer") && strings.Contains(hl, "delivery") {
+				found = true
+				g.Count("event contracts", len(tbl.Rows))
+				break
+			}
+		}
+		if !found {
+			g.Errs = append(g.Errs, "the model has a Queue-tagged element but ARCHITECTURE.md has no event-contract table (columns: producer, consumer, payload, delivery, ordering, dedupe); bus coupling is invisible to G4-import, so this table is its governing artifact")
+		}
+	}
+
 	g.RequireNonzero("boundaries", "no boundaries parsed")
 	g.RequireNonzero("dsl elements", "no workspace.dsl elements parsed")
 	return g
@@ -444,16 +531,16 @@ func edgeSet(edges [][2]string) map[[2]string]bool {
 	return m
 }
 
+// uniqueDuplicates returns the unique values in first-occurrence order (the
+// caller filters to count>1); deterministic so error order never varies.
 func uniqueDuplicates(xs []string) []string {
 	seen := map[string]bool{}
 	var out []string
 	for _, x := range xs {
 		if !seen[x] {
 			seen[x] = true
+			out = append(out, x)
 		}
-	}
-	for x := range seen {
-		out = append(out, x)
 	}
 	return out
 }
@@ -528,9 +615,11 @@ func CheckMachines(design string) *Gate {
 		opath := replaceExt(path, ".machine.json", ".oracle.md")
 		fresh := oracle.Render(m, path)
 		if _, err := os.Stat(opath); err != nil {
-			g.Errs = append(g.Errs, base+": no committed oracle ("+filepath.Base(opath)+"); run oracle_gen.py")
-		} else if readOrEmpty(opath) != fresh {
-			g.Drift = append(g.Drift, base+": committed oracle is stale (differs from a fresh generation); rerun oracle_gen.py")
+			g.Errs = append(g.Errs, base+": no committed oracle ("+filepath.Base(opath)+"); run machinery oracle")
+		} else if committed, err := os.ReadFile(opath); err != nil {
+			g.Errs = append(g.Errs, base+": committed oracle is unreadable: "+err.Error())
+		} else if string(committed) != fresh {
+			g.Drift = append(g.Drift, base+": committed oracle is stale (differs from a fresh generation); rerun machinery oracle")
 		} else {
 			g.Count("oracles fresh")
 		}
@@ -621,6 +710,10 @@ func loadModelith(design string, g *Gate) *ir.Value {
 		g.Errs = append(g.Errs, filepath.Base(paths[0])+": invalid YAML: "+err.Error())
 		return nil
 	}
+	if v.AsObject() == nil {
+		g.Errs = append(g.Errs, filepath.Base(paths[0])+": not a yaml mapping (empty file?)")
+		return nil
+	}
 	return v
 }
 
@@ -644,6 +737,10 @@ func CheckTraceability(design string) *Gate {
 		}
 	}
 	entities := dmo.GetObject("entities")
+	if entities.Len() == 0 {
+		g.Errs = append(g.Errs, "modelith model declares no entities; an empty domain model is a failure, not a pass")
+		return g
+	}
 	g.Count("entities", entities.Len())
 
 	invIDs := map[string]bool{}
@@ -803,20 +900,25 @@ func CheckTraceability(design string) *Gate {
 	}
 
 	// placement table
+	persistedPlacements := 0
 	arch := filepath.Join(design, "ARCHITECTURE.md")
 	if _, err := os.Stat(arch); err == nil {
 		text := readOrEmpty(arch)
 		for _, tbl := range ir.ParseMdTables(text) {
 			hl := strings.ToLower(strings.Join(tbl.Header, " "))
 			if strings.Contains(hl, "placement") && strings.Contains(hl, "persistence") {
+				pi := ir.FindCol(tbl.Header, "persistence")
 				for _, r := range tbl.Rows {
 					if len(r) == 0 {
 						continue
 					}
-					named := identRe.FindAllString(r[0], 1)
-					// first backticked token only
-					bt := backtickTokens(r[0])
-					if len(bt) > 0 {
+					if pi >= 0 && pi < len(r) && isPersisted(r[pi]) {
+						persistedPlacements++
+					}
+					// only a backticked token names a component; a bare word is
+					// prose, and accepting it lets de-backticked rows pass silently
+					var named []string
+					if bt := backtickTokens(r[0]); len(bt) > 0 {
 						named = []string{bt[0]}
 					}
 					if len(named) == 0 {
@@ -853,9 +955,37 @@ func CheckTraceability(design string) *Gate {
 	}
 	build := filepath.Join(design, "BUILD.md")
 	if _, err := os.Stat(build); err == nil {
-		for _, tbl := range ir.ParseMdTables(readOrEmpty(build)) {
+		buildText := readOrEmpty(build)
+		for _, tbl := range ir.ParseMdTables(buildText) {
 			for _, r := range tbl.Rows {
 				cells = append(cells, r...)
+			}
+		}
+		// manifest mode shards contribute to the traceability corpus too
+		for _, shard := range sortedGlobExt(filepath.Join(design, "BUILD"), ".md") {
+			for _, tbl := range ir.ParseMdTables(readOrEmpty(shard)) {
+				for _, r := range tbl.Rows {
+					cells = append(cells, r...)
+				}
+			}
+			g.Count("build shards scanned")
+		}
+		// template conformance: deterministic structural requirements
+		if modeRe.FindString(buildText) == "" {
+			g.Errs = append(g.Errs, "BUILD.md declares no mode; the template requires a top 'Mode: full ...' or 'Mode: manifest ...' line")
+		} else {
+			g.Count("build mode declared")
+		}
+		if !headingContains(buildText, "toolchain") {
+			g.Errs = append(g.Errs, "BUILD.md has no Toolchain heading; two implementing agents must not diverge on environment (pin language, libraries, test framework)")
+		} else {
+			g.Count("toolchain section present")
+		}
+		if persistedPlacements > 0 {
+			if !headingContains(buildText, "state migration") {
+				g.Errs = append(g.Errs, fmt.Sprintf("%d placement row(s) persist machine state but BUILD.md has no State migration heading (mapping table or drain rule for future state changes, or 'no persisted instances yet')", persistedPlacements))
+			} else {
+				g.Count("state-migration section present")
 			}
 		}
 	} else {

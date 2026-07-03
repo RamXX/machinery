@@ -16,7 +16,13 @@ import (
 var RootKeys = map[string]bool{
 	"id": true, "initial": true, "context": true, "states": true, "description": true,
 	"meta": true, "version": true, "_comment": true, "_delays": true,
-	"_lifecycle_of": true, "_role": true, "_component": true,
+	"_lifecycle_of": true, "_role": true, "_component": true, "_max_retries": true,
+}
+
+// TransitionKeys whitelists transition-object members. A typo ("tagret") used
+// to silently become an internal self-transition; unknown keys are errors.
+var TransitionKeys = map[string]bool{
+	"target": true, "guard": true, "actions": true, "description": true, "_comment": true,
 }
 
 var StateKeys = map[string]bool{
@@ -114,6 +120,16 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 				errs = append(errs, fmt.Sprintf("%s: unsupported key %s in state %s", base, ir.Repr(k), p))
 			}
 		}
+		// a null (or otherwise non-object/non-array) transition container is
+		// malformed input, not "no transitions": error loudly
+		for _, k := range []string{"on", "after", "_ignores"} {
+			if v := o.Get2(k); v != nil && v.Kind != ir.KindObject {
+				errs = append(errs, fmt.Sprintf("%s: state %s: %s must be an object, not null or another type", base, p, ir.Repr(k)))
+			}
+		}
+		if v := o.Get2("invoke"); v != nil && v.Kind != ir.KindObject && v.Kind != ir.KindArray {
+			errs = append(errs, fmt.Sprintf("%s: state %s: 'invoke' must be an object or array, not null or another type", base, p))
+		}
 		stype := o.GetString("type")
 		if !StateTypes[stype] {
 			errs = append(errs, fmt.Sprintf("%s: unsupported state type %s in %s (parallel/history are not in the supported subset)",
@@ -131,6 +147,10 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 		}
 		if o.GetString("initial") != "" && o.Get2("states") == nil {
 			errs = append(errs, base+": state "+p+" has initial but no child states")
+		}
+		if init := o.GetString("initial"); init != "" && o.Get2("states") != nil &&
+			!o.Get2("states").AsObject().Has(init) {
+			errs = append(errs, fmt.Sprintf("%s: compound state %s initial %s is not one of its children", base, p, ir.Repr(init)))
 		}
 		if !isFinal && o.Get2("states") == nil && len(trs) == 0 {
 			errs = append(errs, base+": dead-end non-final leaf state "+p)
@@ -153,7 +173,7 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 		ir.ActionNames(o.Get2("entry"), &problems, p+" entry")
 		ir.ActionNames(o.Get2("exit"), &problems, p+" exit")
 
-		// branch shadowing
+		// branch shadowing + duplicate guards (uniform across every branch list)
 		checkShadow := func(label string, t *ir.Value) {
 			branches := normBranches(t)
 			for i := 0; i < len(branches)-1; i++ {
@@ -162,9 +182,26 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 						base, p, label, i+1))
 				}
 			}
+			// two branches with the same guard: the second can never fire
+			seenGuard := map[string]bool{}
+			for _, b := range branches {
+				key := "unguarded"
+				if b.HasGuard {
+					key = b.Guard
+				}
+				if seenGuard[key] && key != "unguarded" { // unguarded dups already reported above
+					errs = append(errs, fmt.Sprintf("%s: state %s %s has two branches with the same guard (%s); the second is unreachable",
+						base, p, label, key))
+				}
+				seenGuard[key] = true
+			}
 		}
 		if on := o.Get2("on"); on != nil {
 			for _, ev := range on.AsObject().Keys() {
+				if ev == "*" || strings.HasPrefix(ev, "done.") || strings.HasPrefix(ev, "error.") {
+					errs = append(errs, fmt.Sprintf("%s: state %s: event name %s is outside the supported subset (wildcard and platform events would be modeled as ordinary events; use explicit events and invoke onDone/onError)",
+						base, p, ir.Repr(ev)))
+				}
 				checkShadow("on:"+ev, on.AsObject().Get2(ev))
 			}
 		}
@@ -214,6 +251,55 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 
 	for _, pr := range problems {
 		errs = append(errs, base+": "+pr)
+	}
+
+	// unguarded always cycles loop forever; TLC's liveness property misses
+	// them when the loop states classify as domain, so lint must catch them
+	alwaysNext := map[string][]string{}
+	for _, s := range states {
+		for _, tr := range ir.TransitionsOf(s.Node, nil, s.Path) {
+			if tr.Kind == "always" && !tr.HasGuard {
+				dest, _ := resolve(tr.Target, s.Path)
+				if dest != "" {
+					alwaysNext[s.Path] = append(alwaysNext[s.Path], dest)
+				}
+			}
+		}
+	}
+	color := map[string]int{} // 0 unvisited, 1 on stack, 2 done
+	var cycStack []string
+	var cycles []string
+	var dfs func(u string) bool
+	dfs = func(u string) bool {
+		color[u] = 1
+		cycStack = append(cycStack, u)
+		for _, v := range alwaysNext[u] {
+			if color[v] == 1 {
+				i := len(cycStack) - 1
+				for i >= 0 && cycStack[i] != v {
+					i--
+				}
+				cyc := append(append([]string{}, cycStack[i:]...), v)
+				cycles = append(cycles, strings.Join(cyc, " -> "))
+				return true
+			}
+			if color[v] == 0 && dfs(v) {
+				return true
+			}
+		}
+		cycStack = cycStack[:len(cycStack)-1]
+		color[u] = 2
+		return false
+	}
+	for _, s := range states { // deterministic source order
+		if color[s.Path] == 0 && len(alwaysNext[s.Path]) > 0 {
+			if dfs(s.Path) {
+				break // one cycle is enough to fail; report deterministically
+			}
+		}
+	}
+	for _, c := range cycles {
+		errs = append(errs, base+": unguarded always cycle "+c+" (eventless transitions with no guard re-fire forever)")
 	}
 
 	// event completeness
@@ -366,6 +452,7 @@ func srcRepr(ivObj *ir.Object) string {
 
 type normBranchRec struct {
 	HasGuard bool
+	Guard    string
 	Target   string
 	HasTgt   bool
 }
@@ -388,8 +475,12 @@ func normBranches(t *ir.Value) []normBranchRec {
 		}
 		o := it.AsObject()
 		b := normBranchRec{}
-		if gv := o.Get2("guard"); gv != nil && gv.Kind == ir.KindString {
+		// an empty guard string is NOT a guard (ir.normTransition reports it);
+		// counting it as guarded would let a fully-guarded always-list pass
+		// the exhaustiveness check on a vacuous guard
+		if gv := o.Get2("guard"); gv != nil && gv.Kind == ir.KindString && gv.AsString() != "" {
 			b.HasGuard = true
+			b.Guard = gv.AsString()
 		}
 		if tv := o.Get2("target"); tv != nil && tv.Kind == ir.KindString {
 			b.Target = tv.AsString()
@@ -517,7 +608,9 @@ func MatrixTransitionRows(text string) ([]XRow, string) {
 			if si < 0 || ei < 0 || gi < 0 || ti < 0 || ai < 0 {
 				return nil, "transition table found but a required column is missing (need source, event/trigger, guard, target, actions)"
 			}
-			var out []XRow
+			// Non-nil even when every row is filtered out: a present-but-empty
+			// table must reconcile (and drift), not read as "no table".
+			out := []XRow{}
 			for _, r := range tbl.Rows {
 				maxI := si
 				for _, idx := range []int{ei, gi, ti, ai} {

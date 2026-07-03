@@ -1,7 +1,9 @@
-# CLI Contract (the frozen spec)
+# CLI Port Contract (historical)
 
-This is the observable behavior the Go binary must reproduce byte-for-byte and
-exit-code-for-exit-code. Captured at `pre-go-migration`.
+Historical: this froze the observable CLI behavior at the Python-to-Go migration (tag
+`pre-go-migration`). The Python names below are the provenance of each subcommand; the Python
+tools are deleted and the golden corpus under `testdata/golden` is now the regression net.
+Behavior may evolve past this document; changes land in the golden corpus.
 
 ## Tools and their Go subcommands
 

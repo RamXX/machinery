@@ -115,19 +115,43 @@ func VerifyFormal(design string) int {
 		return 1
 	}
 
-	// regenerate (the sub-generators print their own status / exit on error)
+	// regenerate; a generator that cannot produce its spec is a verification
+	// failure, never a silent skip (a stale committed spec must not pass as fresh)
+	genFail := 0
+	genErr := func(err error) {
+		fmt.Fprintln(os.Stderr, err)
+		genFail++
+	}
 	for _, mj := range globExt(mdir, ".machine.json") {
-		_ = tla.Run(mj, fdir)
+		if err := tla.Run(mj, fdir); err != nil {
+			genErr(err)
+		}
 	}
 	for _, sem := range globExt(fdir, ".semantics.yaml") {
 		m := strings.TrimSuffix(filepath.Base(sem), ".semantics.yaml")
-		_ = refine.Run(filepath.Join(mdir, m+".machine.json"), sem, fdir)
+		if err := refine.Run(filepath.Join(mdir, m+".machine.json"), sem, fdir); err != nil {
+			genErr(err)
+		}
 	}
 	for _, comp := range globExt(fdir, ".composition.yaml") {
-		data, _ := os.ReadFile(comp)
-		compV, _ := ir.LoadYAML(data)
+		data, err := os.ReadFile(comp)
+		if err != nil {
+			genErr(fmt.Errorf("compose_gen: %w", err))
+			continue
+		}
+		compV, err := ir.LoadYAML(data)
+		if err != nil || compV.Kind != ir.KindObject {
+			genErr(fmt.Errorf("compose_gen: %s is not a composition mapping", comp))
+			continue
+		}
 		coord := compV.AsObject().GetString("coordinator")
-		_ = compose.Run(comp, filepath.Join(mdir, coord+".machine.json"), fdir)
+		if coord == "" {
+			genErr(fmt.Errorf("compose_gen: %s declares no coordinator", comp))
+			continue
+		}
+		if err := compose.Run(comp, filepath.Join(mdir, coord+".machine.json"), fdir); err != nil {
+			genErr(err)
+		}
 	}
 
 	pass, fail := 0, 0
@@ -157,6 +181,14 @@ func VerifyFormal(design string) int {
 	}
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintf(os.Stdout, "%d passed, %d failed\n", pass, fail)
+	if genFail > 0 {
+		fmt.Fprintf(os.Stderr, "verify-formal: %d generator failure(s); the committed specs above were NOT regenerated from source\n", genFail)
+		return 1
+	}
+	if pass+fail == 0 {
+		fmt.Fprintln(os.Stderr, "verify-formal: no .tla/.cfg pairs under "+fdir+": nothing to check is a failure, not a pass")
+		return 1
+	}
 	if fail > 0 {
 		return 1
 	}

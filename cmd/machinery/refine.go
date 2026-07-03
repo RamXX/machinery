@@ -19,9 +19,11 @@ func newRefineCmd() *cobra.Command {
 		if len(args) > 2 {
 			outdir = args[2]
 		}
-		refine.Run(args[0], args[1], outdir)
+		if err := refine.Run(args[0], args[1], outdir); err != nil {
+			fmt.Fprintln(stderrW, err)
+			exitFunc(1)
+		}
 		return nil
 	}
-	_ = fmt.Sprintf
 	return c
 }

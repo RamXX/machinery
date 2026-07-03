@@ -13,7 +13,7 @@
   note   Deal: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   Task: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
-  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 24 invariants enforced, 11 invariants attested (structural/prose), 13 invariants unit-backed (guard/action/actor)
+  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 24 invariants enforced, 11 invariants attested (structural/prose), 13 invariants unit-backed (guard/action/actor)
   ok
 == G4-import  code respects the contract ==
   checked: 3 files ignored by contract, 16 go files checked, 21 imports resolved, 12 edges verified, 12 test files skipped

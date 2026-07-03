@@ -1,5 +1,5 @@
 == G2-c4  Architecture Contract ==
-  checked: 5 boundaries, 4 allow rules, 3 deny rules, 19 dsl elements, 5 boundaries bound to dsl, 5 mitigation rows, 7 dependencies with mitigation rows
+  checked: 5 boundaries, 4 allow rules, 3 deny rules, 19 dsl elements, 5 boundaries bound to dsl, 5 mitigation rows, 7 dependencies with mitigation rows, 8 event contracts
   ok
 == G3-machine  machines + oracle ==
   warn   Order.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
@@ -21,7 +21,7 @@
   note   Payment: 8 operational-overlay states (authorizing, capturing, refunding, gatewayRetry, gatewayResume, persisting, persistRetry, rolledBack)
   note   Reservation: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   Shipment: 5 operational-overlay states (dispatching, carrierRetry, persisting, persistRetry, rolledBack)
-  checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 3 placement rows with machines, 25 invariants enforced, 16 invariants attested (structural/prose), 9 invariants unit-backed (guard/action/actor)
+  checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 3 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 16 invariants attested (structural/prose), 9 invariants unit-backed (guard/action/actor)
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

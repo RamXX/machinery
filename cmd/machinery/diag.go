@@ -25,21 +25,8 @@ func preflightRun() {
 		fmt.Fprintf(out, "  MISSING  modelith (Phase 1 domain model lint/render) -- install: go install github.com/stacklok/modelith/cmd/modelith@%s\n", modelithVersion)
 	}
 
-	// python3 — after migration this is optional, but preflight keeps reporting it
-	// to match the Makefile until the deletion gate flips it.
-	if p, err := exec.LookPath("python3"); err == nil {
-		v := strings.TrimSpace(run(p, "--version"))
-		fmt.Fprintf(out, "  ok       python3 %s (the gate tools need 3.10+)\n", lastWord(v))
-	} else {
-		fmt.Fprintln(out, "  MISSING  python3 3.10+ (the deterministic gate tools)")
-	}
-
-	// PyYAML
-	if runCheck("python3", "-c", "import yaml") {
-		fmt.Fprintln(out, "  ok       PyYAML")
-	} else {
-		fmt.Fprintln(out, "  MISSING  PyYAML (the gate tools parse YAML) -- install: python3 -m pip install pyyaml")
-	}
+	// the gate tools and generators are this binary itself: nothing else needed
+	fmt.Fprintln(out, "  ok       machinery "+version+" (the deterministic gate tools and formal generators are this binary; no Python, no other runtime)")
 
 	// java (optional, reported ok when present)
 	if p, err := exec.LookPath("java"); err == nil {
@@ -49,13 +36,6 @@ func preflightRun() {
 		fmt.Fprintln(out, "  optional Java 11+ -- needed ONLY for 'make verify-formal' (TLC model-checks the TLA+ proofs). The design pipeline and every gate run without it; with it you also get the exhaustive proofs. https://adoptium.net/")
 	}
 	fmt.Fprintln(out, "  auto     'machinery verify-formal' downloads the TLA+ tools (tla2tools.jar) on first use, pinned and checksum-verified (that step needs Java)")
-
-	// uv (optional)
-	if _, err := exec.LookPath("uv"); err == nil {
-		fmt.Fprintln(out, "  ok       uv")
-	} else {
-		fmt.Fprintln(out, "  optional uv (legacy Python test runner) -- https://docs.astral.sh/uv/")
-	}
 
 	// structurizr-cli (optional)
 	if _, err := exec.LookPath("structurizr-cli"); err == nil {

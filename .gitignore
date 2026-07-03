@@ -15,14 +15,16 @@ __pycache__/
 .venv/
 .pytest_cache/
 
-# Go build artifacts
+# Go build artifacts. Root-anchored: an unanchored "machinery" matches the
+# cmd/machinery/ DIRECTORY and silently swallows every new file in it.
 .bin/
-machinery
-machinery.exe
+/machinery
+/machinery.exe
 
-# Archived code (moved out of the active tree)
-legacy/
-experiments/
+# Archived code (moved out of the active tree). Root-anchored: an unanchored
+# experiments/ would silently swallow internal/experiments/ test files.
+/legacy/
+/experiments/
 
 # TLC scratch (tlc.sh runs with -cleanup, but interrupted runs leave these)
 states/
