@@ -1,13 +1,15 @@
 ---
 name: machinery
 description: >
-  Design greenfield software as a build-ready blueprint. Use when the user wants to
-  design a new system, service, or app from scratch, produce a BUILD.md for a coding
-  agent, spec something out before implementation, or express program logic as state
-  machines. Runs a four-phase interrogation: domain model (Modelith) then architecture
-  (C4) then state machines (XState) then BUILD.md. Triggers: "design a new ...",
-  "greenfield", "build a blueprint", "spec this out", "state machine design", "produce
-  a BUILD.md", "design agent".
+  Design software as a build-ready blueprint, greenfield or brownfield. Use when the user
+  wants to design a new system, service, or app from scratch, produce a BUILD.md for a
+  coding agent, spec something out before implementation, express program logic as state
+  machines, model an existing system as it is, bring a legacy repo under control, or
+  adopt machinery on an existing codebase. Runs a four-phase interrogation: domain model
+  (Modelith) then architecture (C4) then state machines (XState) then BUILD.md. Triggers:
+  "design a new ...", "greenfield", "brownfield", "build a blueprint", "spec this out",
+  "state machine design", "produce a BUILD.md", "design agent", "model an existing
+  system", "adopt machinery".
 ---
 
 # machinery
@@ -95,8 +97,9 @@ Python need an explicit state field plus a lock or event sourcing) and it is a C
 ### Phase 1 - Domain model (the what)
 
 Invoke the `domain-model-author` skill to run this conversation; use `domain-model-lint` for the
-gate. Interrogate breadth-first (skeleton, then invariants and scenarios, then refinement). Push on
-naming and on "what must always be true."
+gate. When those skills are not installed in the agent home, run the interrogation inline and use
+`modelith lint` directly as the gate. Interrogate breadth-first (skeleton, then invariants and
+scenarios, then refinement). Push on naming and on "what must always be true."
 
 After `modelith render`, strip em dashes from the generated `*.modelith.md` (the renderer emits them,
 house style forbids them): `perl -CSD -i -pe 's/\x{2014}/-/g' design/*.modelith.md`.
@@ -206,6 +209,32 @@ test scaffolding); test files are skipped.
 LLM-attested: the zero-context claim itself: a coding agent with no prior context could build the
 system from `BUILD.md` alone (per shard, when sharded).
 
+## Brownfield (archaeology) mode
+
+An existing system runs the same four phases with an inverted stance: describe, do not invent.
+
+- **Phase 0** additionally records that this is archaeology and what already exists: code, schema,
+  production data, deployment.
+- **Phase 1** excavates the domain model from the code, the schema, and the production data, AS IT
+  IS. Where the code is incoherent (one word, two meanings), record the incoherence as an open
+  question in the model instead of picking a winner.
+- **Phase 2** records the existing architecture and declares the INTENDED boundaries. Today's real
+  violations are baselined as explicit allow rules, each tagged with a BASELINE comment. Gates run
+  with a staged `--gate` list: g2,g4 on day one; add g3 as machines land; add gx only when every
+  lifecycle enum in the model has a machine, because Gx has no per-entity waiver.
+- **Phase 3** machines describe current behavior. Oracle-derived tests run as characterization
+  tests, and each failing row is adjudicated: code-is-truth means the model is wrong archaeology,
+  fix it; model-is-truth means the code has a defect, file it and quarantine the test with its
+  stable id. A test locks (the hard-TDD rule) at adjudication, not at generation.
+- **Phase 4**'s zero-context claim applies to the new work carved out of the modeled slice, not to
+  the legacy remainder.
+
+Day-one state migration runs in reverse: the first version of any machine whose states are
+persisted carries a mapping table from every legacy persisted value to a modeled state, plus a
+rule for unmapped strays (fail loudly, never silently coerce). The full team protocol (adoption
+ladder, ownership, PR discipline, CI recipes) is `docs/brownfield-team-guide.md` in the machinery
+repo.
+
 ## Mitigations reclassify failures, they do not delete them
 
 A common trap. If C4 puts Postgres on Kubernetes behind an operator, the operator does not remove the
@@ -250,6 +279,11 @@ machinery designs change after code exists. The protocol:
    to new states, or an explicit drain rule for in-flight instances.
 5. Generated tests live apart from hand-written tests (a marker comment or a directory), so
    regeneration never clobbers hand-written ones.
+6. Renames are the exception to reading the diff naively: stable ids hash the machine name and
+   source state, so renaming an entity, machine, or state churns every affected id with no
+   behavioral change. Handle a rename as a dedicated mapping change (rename, regenerate, record
+   the old-id to new-id pairs), never as delete-all-plus-new, and never hand-edit oracles to
+   avoid the churn (G3 flags that as DRIFT).
 
 ## Sharding large designs
 
@@ -315,6 +349,18 @@ cross-contract reliance to safety plus each contract's own termination).
 For multi-session interrogations, keep `design/STATE.md` with one line per phase: status
 (pending / in-progress / gate-passed), date, and open questions. A resuming conductor reads it and
 knows where the interrogation stopped.
+
+## Working as a team
+
+- A design change and its regenerated artifacts (oracles, formal, packs) land atomically in one
+  change; a change that edits a machine without its regenerated oracle is malformed.
+- Never hand-resolve a merge conflict in a generated file: take either side, regenerate, and
+  re-run the gates.
+- `STATE.md` is single-writer: the active conductor.
+- Optional `design/DECISIONS.md`: one dated line per contested-vocabulary decision.
+- Consuming repos run `machinery check` (with their staged `--gate` list) in their own CI on every
+  change and again after merge. The full recipe is `docs/brownfield-team-guide.md` in the
+  machinery repo.
 
 ## Operating discipline
 

@@ -106,6 +106,10 @@ For every machine whose placement row (section 4) says its state is persisted, t
 protocol for future state changes: when a state is renamed, split, or removed, ship a mapping table
 from old persisted values to new states, or an explicit drain rule for in-flight instances. If
 nothing is deployed, state exactly that: "no persisted instances yet".
+Brownfield runs this in reverse on day one: when a machine models an ALREADY-persisted legacy
+lifecycle, the first version of this document must include the mapping table from every observed
+legacy persisted value to a modeled state, plus an explicit rule for unmapped values (fail loudly,
+never silently coerce).
 
 ## 9. Build plan
 - Walking skeleton first: the thinnest end-to-end slice that exercises one real transition through one

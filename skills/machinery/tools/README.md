@@ -36,9 +36,17 @@ One line per subcommand:
 - `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
   `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate
   composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
-- `machinery check <design-dir> [--impl <code-dir>] [--gate g2,g3,gx,g4]` the deterministic gate
-  suite (G2-c4, G3-machine, Gx-trace, G4-import). Gates fail on absence; every gate prints a
-  `checked:` line. Exit is non-zero on any ERROR or DRIFT.
+- `machinery check <design-dir> [--impl <code-dir>] [--gate g2,g3,gx,g4,g5]` the deterministic gate
+  suite (G2-c4, G3-machine, Gx-trace, G4-import, G5-pack on decomposed designs). Gates fail on
+  absence; every gate prints a `checked:` line. Exit is non-zero on any ERROR or DRIFT.
+- `machinery pack generate <parent-design>` emits the frozen per-subsystem contract packs
+  (`design/packs/<id>.pack/`) from `decomposition.yaml`: the owned domain slice, the boundary event
+  rows, the contract machine plus its TLA+ module, the delegated invariants, and a content hash.
+- `machinery pack refine <child-design>` reconciles the child's `packmap.yaml` against the pack's
+  contract machine and the child's exposed machine, then generates the pack-refinement proof that
+  `verify-formal` TLC-checks. Reconciliation failure is a hard error.
+- `machinery scale <design>` measures a design's size (stateful components, bounded contexts,
+  synthesis input) and recommends sharding or recursive decomposition.
 - `machinery verify-formal <design-dir>` regenerates the tla/refine/compose specs into
   `design/formal/` and TLC-checks every `.tla`/`.cfg` pair. It fails on generator errors and on
   zero pairs, so an empty formal directory can never read as a green suite.

@@ -40,6 +40,11 @@ contexts' machines. The interface contracts and event-contract rows in the promp
 cross-context inputs. Every external event your machines consume must appear in the event-contract
 rows you were given; if one does not, report the gap instead of inventing the contract.
 
+**Archaeology mode:** when the conductor marks the run as brownfield, derive the states and events
+from the existing code and persisted data as they are; never invent cleaner ones. Every mismatch
+between code reality and domain-model intent is surfaced as an open question to the conductor,
+never silently resolved.
+
 ## Method
 
 1. **Decompose by component, not one giant machine.** One machine per stateful component or aggregate,
