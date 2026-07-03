@@ -50,6 +50,9 @@ jobs:
           CGO_ENABLED: "0"
         run: go build -trimpath -ldflags "-s -w -X main.version=ci" -o machinery ./cmd/machinery
       - name: Smoke-test --version
+        # Cross-compiled targets cannot execute on the build runner; smoke-test
+        # only the native os/arch pairs (linux/arm64 is built on an amd64 runner).
+        if: ${{ !(matrix.goos == 'linux' && matrix.goarch == 'arm64') }}
         run: ./machinery version
 
   # ----------------------------------------------------------------- lint ---
@@ -73,10 +76,11 @@ jobs:
           fi
       - name: go vet
         run: go vet ./...
-      - uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6.5.2
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           # Uses the v2 config in .golangci.yml; the linter version is pinned
           # for reproducibility (bump deliberately, with the diff reviewed).
+          # The action must be v7+ to accept a golangci-lint v2 version string.
           version: v2.9.0
           args: --config .golangci.yml --timeout 5m
 
