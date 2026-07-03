@@ -241,6 +241,11 @@ func copyFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
+	// Replace an existing destination (in particular a symlink left by a prior
+	// install) rather than following it and writing through to its target.
+	if err := os.Remove(dst); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	in, err := os.Open(src)
 	if err != nil {
 		return err

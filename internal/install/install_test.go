@@ -91,6 +91,42 @@ func TestInstallCanonicalSymlink(t *testing.T) {
 	}
 }
 
+func TestInstallReplacesSymlinkedRoleDoc(t *testing.T) {
+	// Regression: a prior symlink-based install leaves the role docs as symlinks.
+	// Re-installing must replace them with real files, never write through the
+	// symlink into whatever it pointed at (which was the repo on a dev machine).
+	src := fakeSource(t)
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	external := filepath.Join(root, "external")
+	if err := os.MkdirAll(external, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	extDoc := filepath.Join(external, RoleDocs[0])
+	if err := os.WriteFile(extDoc, []byte("ORIGINAL"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, "agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(home, "agents", RoleDocs[0])
+	if err := os.Symlink(extDoc, link); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Install(Options{Homes: []string{home}, From: src, Copy: true}); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Lstat(link); err != nil {
+		t.Fatal(err)
+	} else if fi.Mode()&os.ModeSymlink != 0 {
+		t.Errorf("role doc must be a real file after install, still a symlink")
+	}
+	if b, _ := os.ReadFile(extDoc); string(b) != "ORIGINAL" {
+		t.Errorf("install wrote through the symlink into the external file: %q", b)
+	}
+}
+
 func TestInstallCopyMode(t *testing.T) {
 	src := fakeSource(t)
 	root := t.TempDir()
@@ -349,8 +385,10 @@ func TestErrorPaths(t *testing.T) {
 	if err := copyFile(srcF, filepath.Join(blocker, "child")); err == nil {
 		t.Error("copyFile should fail when the destination parent is a regular file")
 	}
-	if err := copyFile(srcF, t.TempDir()); err == nil {
-		t.Error("copyFile should fail when the destination is a directory")
+	nonEmptyDir := t.TempDir()
+	write(t, filepath.Join(nonEmptyDir, "child"), "x")
+	if err := copyFile(srcF, nonEmptyDir); err == nil {
+		t.Error("copyFile should fail when the destination is a non-empty directory")
 	}
 	if err := copyTree(filepath.Join(t.TempDir(), "nope"), t.TempDir()); err == nil {
 		t.Error("copyTree should fail on a missing source")
