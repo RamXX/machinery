@@ -10,9 +10,9 @@ AGENT_HOMES ?= $(HOME)/.claude $(HOME)/.agents
 SRC := $(CURDIR)
 
 .DEFAULT_GOAL := help
-.PHONY: install install-copy uninstall build install-binary install-cli install-modelith preflight doctor check oracle verify-formal test golden golden-update help
+.PHONY: install install-copy uninstall build install-binary install-cli install-modelith preflight doctor check oracle verify-formal test test-install golden golden-update help
 
-install: ## Symlink machinery skill+agents into agent homes, install the CLI binary on PATH
+install: ## DEVELOPER install: live-symlink skill+agents from this checkout into agent homes + CLI on PATH
 	@for home in $(AGENT_HOMES); do \
 	  mkdir -p "$$home/skills" "$$home/agents"; \
 	  rm -rf "$$home/skills/machinery"; \
@@ -135,6 +135,9 @@ doctor: $(MACH) ## Check prerequisites and install status
 
 test: ## Run the Go toolchain test suite (needs Go)
 	@go test ./...
+
+test-install: ## Verify install.sh lays down the canonical-copy + symlink topology (offline)
+	@go test -count=1 -run TestInstallScript ./cmd/machinery
 
 golden: ## Run the golden-corpus byte-for-byte regression net
 	@go test -count=1 -run TestGolden ./cmd/machinery
