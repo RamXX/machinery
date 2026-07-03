@@ -18,17 +18,17 @@ jobs:
   verify-formal:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: "21"
       # Cache the pinned tla2tools.jar so we don't re-download/verify every run.
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/machinery
           key: tla2tools-v1.7.4
@@ -40,3 +40,7 @@ jobs:
         run: .bin/machinery verify-formal examples/fulfillment/design
       - name: Regenerate + TLC-check portfolio-engine
         run: .bin/machinery verify-formal examples/portfolio-engine/design
+      - name: Regenerate + TLC-check checkout-split children (contract refinement proofs)
+        run: |
+          .bin/machinery verify-formal examples/checkout-split/orders/design
+          .bin/machinery verify-formal examples/checkout-split/payments/design
