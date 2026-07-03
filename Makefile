@@ -10,7 +10,7 @@ AGENT_HOMES ?= $(HOME)/.claude $(HOME)/.agents
 SRC := $(CURDIR)
 
 .DEFAULT_GOAL := help
-.PHONY: install install-copy uninstall build install-binary install-cli preflight doctor check oracle verify-formal test golden golden-update help
+.PHONY: install install-copy uninstall build install-binary install-cli install-modelith preflight doctor check oracle verify-formal test golden golden-update help
 
 install: ## Symlink machinery skill+agents into agent homes, install the CLI binary on PATH
 	@for home in $(AGENT_HOMES); do \
@@ -42,6 +42,8 @@ uninstall: ## Remove machinery from every agent home
 	  echo "removed machinery from $$home"; \
 	done
 
+# Pinned modelith release. The canonical pin lives in cmd/machinery/diag.go
+# (preflight compares the installed version against it); move both together.
 MODELITH_VERSION ?= v0.4.0
 MACHINERY_VERSION ?= latest
 INTERNAL_VERSION := v0.1.0
@@ -76,16 +78,15 @@ install-cli: ## Install the machinery CLI binary onto PATH ($(INSTALL_DIR))
 install-binary: ## Download a prebuilt binary, or build from source if no release exists yet
 	@mkdir -p .bin
 	@if command -v curl >/dev/null 2>&1 && \
-	  curl -fsSL -o /dev/null -w "%{http_code}" \
-	    "https://api.github.com/repos/ramirosalas/machinery/releases" 2>/dev/null | \
-	  grep -q "200"; then \
+	  curl -fsSL "https://api.github.com/repos/RamXX/machinery/releases?per_page=1" 2>/dev/null | \
+	  grep -q '"tag_name"'; then \
 	  echo "Downloading machinery $(MACHINERY_VERSION) for $(MACH_OS)/$(MACH_ARCH)..."; \
 	  ext=""; [ "$(MACH_OS)" = "windows" ] && ext=".exe"; \
 	  if [ "$(MACHINERY_VERSION)" = "latest" ]; then \
-	    url=$$(curl -fsSL "https://api.github.com/repos/ramirosalas/machinery/releases/latest" | \
+	    url=$$(curl -fsSL "https://api.github.com/repos/RamXX/machinery/releases/latest" | \
 	      grep -o "https://[^[:space:]\"']*machinery-$(MACH_OS)-$(MACH_ARCH)$$ext[^[:space:]\"']*" | head -1); \
 	  else \
-	    url="https://github.com/ramirosalas/machinery/releases/download/$(MACHINERY_VERSION)/machinery-$(MACH_OS)-$(MACH_ARCH)$$ext"; \
+	    url="https://github.com/RamXX/machinery/releases/download/$(MACHINERY_VERSION)/machinery-$(MACH_OS)-$(MACH_ARCH)$$ext"; \
 	  fi; \
 	  [ -z "$$url" ] && { echo "No matching binary found."; exit 1; }; \
 	  curl -fsSL -o .bin/machinery "$$url"; \
@@ -107,7 +108,7 @@ install-binary: ## Download a prebuilt binary, or build from source if no releas
 	  chmod +x .bin/machinery; \
 	  echo "Installed: $$(.bin/machinery version)"; \
 	else \
-	  echo "No GitHub remote yet (or no connectivity). Building from source..."; \
+	  echo "No published release yet (or no connectivity). Building from source..."; \
 	  $(MAKE) --no-print-directory build; \
 	fi
 
@@ -121,6 +122,10 @@ $(MACH):
 	  echo "No binary and no Go toolchain; downloading prebuilt..."; \
 	  $(MAKE) --no-print-directory install-binary; \
 	fi
+
+install-modelith: ## Install the pinned modelith release (needs Go)
+	@go install github.com/stacklok/modelith/cmd/modelith@$(MODELITH_VERSION)
+	@echo "installed modelith $(MODELITH_VERSION)"
 
 preflight: $(MACH) ## Check machinery's runtime prerequisites (warns; installs nothing)
 	@$(MACH) preflight

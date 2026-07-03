@@ -1,7 +1,7 @@
 # ci.yml — the required pipeline. Every push and PR must pass this.
 # Coverage: build, lint (golangci-lint + gofmt + vet), unit tests (including
 # the adversarial gate-experiment suite and the golden-corpus regression net),
-# the three example gate suites, and the go-crm impl tests. A single failure
+# the example gate suites (all four examples), and the go-crm impl tests. A single failure
 # blocks merge.
 name: ci
 

@@ -58,7 +58,13 @@ jobs:
           .bin/machinery pack refine examples/checkout-split/orders/design
           .bin/machinery pack refine examples/checkout-split/payments/design
       - name: Assert clean tree
-        run: git diff --exit-code -- examples/
+        run: |
+          status=$(git status --porcelain)
+          if [ -n "$status" ]; then
+            echo "$status"
+            echo "::error::regeneration dirtied the tree (a stale tracked artifact or a newly emitted file)"
+            exit 1
+          fi
 
   # The golden corpus + full unit suite, on a cadence: the canary for
   # environment-driven divergence (Go toolchain updates changing output).
