@@ -1,7 +1,7 @@
 # machinery tools: the CLI and the TLC shell wrappers
 
-The toolchain is the single `machinery` Go binary (`make install` puts it on PATH; `make build`
-builds `.bin/machinery` from source). This directory holds the only pieces that are not the binary:
+The toolchain is the single `machinery` Go binary (install it with the one-line installer, or
+`go build ./cmd/machinery`). This directory holds the only pieces that are not the binary:
 two shell wrappers around TLC, the TLA+ model checker, for environments that prefer the shell path.
 `machinery verify-formal` embeds the same orchestration logic, so the wrappers are a convenience,
 not a requirement.

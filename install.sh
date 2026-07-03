@@ -1,22 +1,21 @@
 #!/bin/sh
-# install.sh - install machinery without cloning the repo.
+# install.sh - bootstrap machinery without cloning the repo.
 #
-# Fetches the machinery CLI binary and the agent skill + role docs from a
-# GitHub release and installs them into your agent home(s). No git checkout,
-# no Go toolchain, no Python.
+# Downloads the machinery CLI binary (checksum-verified) from a GitHub release,
+# then hands off to `machinery install` to place the skill + role docs into your
+# agent homes. All the placement logic lives in the binary; this script only
+# has to deliver the first binary.
 #
 #   curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh
 #
 # Environment overrides (all optional):
 #   MACHINERY_VERSION      release tag to install, or "latest" (default: latest)
-#   MACHINERY_HOMES        space-separated agent homes; the FIRST holds the real
-#                          files, the rest are symlinked to it
+#   MACHINERY_HOMES        space-separated agent homes; the FIRST is canonical
 #                          (default: "$HOME/.agents $HOME/.claude")
 #   INSTALL_DIR            where the CLI binary lands (default: "$HOME/.local/bin")
 #   MACHINERY_REPO         owner/name to fetch from (default: RamXX/machinery)
-#   MACHINERY_SKILL_SRC    use this local dir as the skill/agents source instead
-#                          of downloading (expects skills/ and agents/ under it)
-#   MACHINERY_SKIP_BINARY  set to 1 to skip installing the CLI binary
+#   MACHINERY_BIN          use this machinery binary instead of downloading (dev/test)
+#   MACHINERY_SKILL_SRC    pass a local checkout to `machinery install --from` (offline)
 set -eu
 
 REPO="${MACHINERY_REPO:-RamXX/machinery}"
@@ -27,9 +26,6 @@ HOMES="${MACHINERY_HOMES:-$HOME/.agents $HOME/.claude}"
 say() { printf '%s\n' "$*"; }
 die() { printf 'install: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "required tool not found: $1"; }
-
-need curl
-need tar
 
 # --- detect os/arch (must match the release asset names) -------------------
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -48,31 +44,29 @@ esac
 binname="machinery"
 if [ "$os" = windows ]; then binname="machinery.exe"; fi
 
-tmp=$(mktemp -d "${TMPDIR:-/tmp}/machinery.XXXXXX")
-trap 'rm -rf "$tmp"' EXIT INT TERM
-
-sha256() {
-  if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
-  elif command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
-  else die "no sha256 tool (shasum or sha256sum) found"; fi
-}
-
-# --- resolve the release tag -----------------------------------------------
-if [ "$VERSION" = "latest" ]; then
-  curl -fsSL -o "$tmp/rel.json" "https://api.github.com/repos/$REPO/releases/latest" \
-    || die "cannot reach the GitHub API to resolve the latest release"
-  TAG=$(grep '"tag_name"' "$tmp/rel.json" | head -1 |
-    sed 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/')
-  [ -n "${TAG:-}" ] || die "no published release found for $REPO"
+# --- obtain the binary -----------------------------------------------------
+if [ -n "${MACHINERY_BIN:-}" ]; then
+  mach="$MACHINERY_BIN"
+  say "using machinery binary: $mach"
 else
-  TAG="$VERSION"
-fi
-say "machinery $TAG ($os/$arch)"
-
-# --- 1. install the CLI binary ---------------------------------------------
-if [ "${MACHINERY_SKIP_BINARY:-0}" = "1" ]; then
-  say "skipping CLI binary (MACHINERY_SKIP_BINARY=1)"
-else
+  need curl
+  sha256() {
+    if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
+    elif command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+    else die "no sha256 tool (shasum or sha256sum) found"; fi
+  }
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/machinery.XXXXXX")
+  trap 'rm -rf "$tmp"' EXIT INT TERM
+  if [ "$VERSION" = "latest" ]; then
+    curl -fsSL -o "$tmp/rel.json" "https://api.github.com/repos/$REPO/releases/latest" \
+      || die "cannot reach the GitHub API to resolve the latest release"
+    TAG=$(grep '"tag_name"' "$tmp/rel.json" | head -1 |
+      sed 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/')
+    [ -n "${TAG:-}" ] || die "no published release found for $REPO"
+  else
+    TAG="$VERSION"
+  fi
+  say "machinery $TAG ($os/$arch)"
   asset="machinery-${os}-${arch}${ext}"
   base="https://github.com/$REPO/releases/download/$TAG"
   say "Downloading $asset..."
@@ -87,56 +81,29 @@ else
   mkdir -p "$INSTALL_DIR"
   cp "$tmp/$asset" "$INSTALL_DIR/$binname"
   chmod +x "$INSTALL_DIR/$binname"
-  say "installed $binname -> $INSTALL_DIR/$binname"
+  mach="$INSTALL_DIR/$binname"
+  say "installed $binname -> $mach"
 fi
 
-# --- 2. obtain the skill + agent sources -----------------------------------
-if [ -n "${MACHINERY_SKILL_SRC:-}" ]; then
-  src="$MACHINERY_SKILL_SRC"
-  [ -d "$src/skills/machinery" ] || die "MACHINERY_SKILL_SRC has no skills/machinery: $src"
-else
-  say "Fetching skill + agents..."
-  curl -fsSL -o "$tmp/src.tar.gz" "https://github.com/$REPO/archive/refs/tags/$TAG.tar.gz" \
-    || die "failed to download source tarball for $TAG"
-  mkdir -p "$tmp/src"
-  tar -xzf "$tmp/src.tar.gz" -C "$tmp/src"
-  # the archive unpacks into a single top-level dir (e.g. machinery-0.1.1/)
-  src=$(find "$tmp/src" -maxdepth 1 -mindepth 1 -type d | head -1)
-  { [ -n "$src" ] && [ -d "$src/skills/machinery" ]; } || die "unexpected tarball layout"
-fi
-
-# --- 3. lay out canonical files + symlinks ---------------------------------
-# The first home in $HOMES holds the real files; the rest symlink to it.
-canon=""
-for home in $HOMES; do
-  if [ -z "$canon" ]; then
-    canon="$home"
-    mkdir -p "$canon/skills" "$canon/agents"
-    rm -rf "$canon/skills/machinery"
-    cp -R "$src/skills/machinery" "$canon/skills/machinery"
-    cp "$src/agents/machinery-fsm-author.md" "$src/agents/machinery-build-writer.md" "$canon/agents/"
-    say "installed skill + agents -> $canon (canonical)"
-  else
-    mkdir -p "$home/skills" "$home/agents"
-    rm -rf "$home/skills/machinery"
-    ln -sfn "$canon/skills/machinery" "$home/skills/machinery"
-    ln -sfn "$canon/agents/machinery-fsm-author.md" "$home/agents/machinery-fsm-author.md"
-    ln -sfn "$canon/agents/machinery-build-writer.md" "$home/agents/machinery-build-writer.md"
-    say "linked skill + agents -> $home (-> $canon)"
-  fi
+# --- place the skill + role docs (the binary owns this) --------------------
+set -- install
+for h in $HOMES; do
+  set -- "$@" --home "$h"
 done
-
-# --- 4. best-effort environment check --------------------------------------
-mach="$INSTALL_DIR/$binname"
-if [ -x "$mach" ]; then
-  "$mach" preflight || true
-elif command -v machinery >/dev/null 2>&1; then
-  machinery preflight || true
+if [ -n "${MACHINERY_SKILL_SRC:-}" ]; then
+  set -- "$@" --from "$MACHINERY_SKILL_SRC"
 fi
+if [ "$VERSION" != "latest" ]; then
+  set -- "$@" --version "$VERSION"
+fi
+"$mach" "$@"
+
+# --- best-effort environment check -----------------------------------------
+"$mach" preflight || true
 case ":${PATH}:" in
   *":$INSTALL_DIR:"*) : ;;
   *)
-    if [ "${MACHINERY_SKIP_BINARY:-0}" != "1" ]; then
+    if [ -z "${MACHINERY_BIN:-}" ]; then
       say ""
       say "note: $INSTALL_DIR is not on your PATH. Add it:"
       say "  export PATH=\"$INSTALL_DIR:\$PATH\""

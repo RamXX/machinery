@@ -50,7 +50,7 @@ team gets a ratchet, not a big bang. The stage you are on is encoded in one plac
 
 - Install a pinned machinery release (`MACHINERY_VERSION=v0.1.0`) or
   `go install github.com/RamXX/machinery/cmd/machinery@v0.1.0`. Pin modelith too
-  (`v0.4.0`; `make install-modelith` installs the pinned release, and
+  (`v0.4.0`; `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` installs the pinned release, and
   `machinery preflight` warns when the installed version does not match the pin. Keep the
   pin in your CI file as well).
 - Create `design/` at the repo root, per the SKILL.md output layout. It is versioned with

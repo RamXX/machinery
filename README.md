@@ -157,7 +157,7 @@ gates, the proofs, and the example build on every push.
 
 Generating every artifact (the oracle, the TLA+ specs, the reconciled models) is the `machinery`
 Go binary itself and needs no [Java](https://adoptium.net/). Only the *checking* of the proofs (rungs 3 and 4, and rung 2's refinement) runs under
-TLC, which is a Java program, so **Java is required only for `make verify-formal`**. That step is
+TLC, which is a Java program, so **Java is required only for `machinery verify-formal`**. That step is
 optional but recommended: the deterministic gates (rung 2's generation and every symbolic check)
 already catch malformed machines, drift, and boundary erosion, but they cannot tell you that a saga
 can strand money, that a retry can loop forever, or that a subsystem violates the contract its
@@ -255,16 +255,16 @@ they are covered.
 
 ### Prerequisites
 
-`make preflight` (or `make doctor`) checks all of these at any time; `make install` runs the same
-check and warns about anything missing.
+`machinery preflight` (or `machinery doctor`) checks all of these at any time and warns about
+anything missing; it installs nothing.
 
 **Required**
 
 - **[modelith](https://modelith.sh/)** -- Phase 1 domain-model lint and render. Primary install is
   [Homebrew](https://brew.sh/) (macOS and Linux): `brew install stacklok/tap/modelith`. Secondary:
   with the [Go](https://go.dev/dl/) toolchain on any OS,
-  `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` or `make install-modelith`, which
-  installs the same pin (then put `$(go env GOPATH)/bin` on your `PATH`); or download a prebuilt
+  `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` (then put `$(go env GOPATH)/bin` on
+  your `PATH`); or download a prebuilt
   binary (macOS, Linux, Windows) from the
   [releases](https://github.com/stacklok/modelith/releases). machinery pins modelith at `v0.4.0`,
   and `machinery preflight` warns when the installed version does not match the pin. Full options:
@@ -272,33 +272,33 @@ check and warns about anything missing.
 - **machinery** -- the deterministic gate tools and formal generators, plus the agent skill and role
   docs. A single static binary (no Python, no Go runtime). Three ways to install:
 
-  **One line, no clone** (fetches the binary and the skill from the latest release; no Git, no Go):
+  **One line, no clone** (downloads the checksum-verified binary, then installs the skill; no Git, no
+  Go, no Make):
   ```bash
   curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh
   ```
-  This installs the `machinery` binary to `~/.local/bin` and places the skill + role docs into your
-  agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see [Agent homes](#agent-homes)).
-  Override with environment variables, for example `MACHINERY_VERSION=v0.1.1`,
-  `INSTALL_DIR=/usr/local/bin`, or `MACHINERY_HOMES="$HOME/.claude"`.
+  This puts the `machinery` binary on `~/.local/bin` and runs `machinery install` to place the skill
+  + role docs into your agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see
+  [Agent homes](#agent-homes)). Override with environment variables, for example
+  `MACHINERY_VERSION=v0.1.1`, `INSTALL_DIR=/usr/local/bin`, or `MACHINERY_HOMES="$HOME/.claude"`.
 
-  **Binary only** (no toolchain: macOS arm64/x86, Linux amd64/arm64, Windows amd64):
+  **Binary by hand** (macOS arm64/x86, Linux amd64/arm64, Windows amd64): download
+  `machinery-<os>-<arch>` from the [releases page](https://github.com/RamXX/machinery/releases), put
+  it on your `PATH`, then let it install its own skill:
   ```bash
-  make install-binary                      # auto-detects OS/arch, fetches latest release
-  make install-binary MACHINERY_VERSION=v0.1.0   # or pin a version
+  machinery install                        # fetches the matching skill + role docs into your agent homes
   ```
-  Binaries are on the [releases page](https://github.com/RamXX/machinery/releases); download
-  `machinery-<os>-<arch>` and put it on your `PATH`.
 
   **Build from source** (if you have [Go](https://go.dev/dl/) 1.26+; `go.mod` pins 1.26.4):
   ```bash
-  make build                               # builds .bin/machinery
+  go build -o machinery ./cmd/machinery    # then: machinery install --from .
   ```
 
 **Optional**
 
-- **[Java](https://adoptium.net/) 11+** -- only for `make verify-formal`, which runs
-  [TLC](https://github.com/tlaplus/tlaplus) to model-check the proofs (`tlc.sh` then fetches the
-  pinned [tla2tools.jar](https://github.com/tlaplus/tlaplus/releases) on first use). macOS:
+- **[Java](https://adoptium.net/) 11+** -- only for `machinery verify-formal`, which runs
+  [TLC](https://github.com/tlaplus/tlaplus) to model-check the proofs (the binary fetches the pinned
+  [tla2tools.jar](https://github.com/tlaplus/tlaplus/releases) into your cache on first use). macOS:
   `brew install --cask temurin`; Linux: `sudo apt install default-jdk` or
   `sudo dnf install java-21-openjdk`, or [download Temurin](https://adoptium.net/temurin/releases/);
   Windows: `winget install EclipseAdoptium.Temurin.21.JDK` or
@@ -312,36 +312,51 @@ check and warns about anything missing.
    (`structurizr.sh` on macOS/Linux, `structurizr.bat` on Windows); or run the
    [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`.
 
+Everything after install is a `machinery` subcommand run on your own design path, no clone and no
+Make:
+
 ```sh
-make install       # DEVELOPER install: binary on PATH + live-symlink skill/agents (edits are live)
-make doctor        # check dependencies and install status
-make test          # run the Go toolchain test suite (needs Go)
-make test-install  # verify install.sh's canonical-copy + symlink topology (offline)
-make check         # run the deterministic gate suite on the examples
-make verify-formal # regenerate and TLC-check the full formal suite
-make oracle        # regenerate the go-crm transition oracles from the machine JSON
+machinery install                     # place the skill + role docs into your agent homes
+machinery uninstall                   # remove them
+machinery preflight                   # check prerequisites (warns; installs nothing)
+machinery check <your-design>         # run the deterministic gate suite
+machinery verify-formal <your-design> # regenerate + TLC-check the proofs (needs Java)
+machinery oracle <machines-dir>       # regenerate the transition oracles from the machine JSON
 ```
+
+The `Makefile` is contributor-only (building and testing machinery itself); `make help` lists those
+targets. End users never need it.
 
 ### Agent homes
 
-machinery is agent-agnostic. Both install paths place the skill under `<home>/skills/machinery` and
-the two role docs under `<home>/agents`, for every home in the homes list, which defaults to
-`~/.agents` (the cross-agent convention) and `~/.claude` (Claude Code).
+machinery is agent-agnostic. `machinery install` places the skill under `<home>/skills/machinery`
+and the two role docs under `<home>/agents`, for every home in the list, which defaults to
+`~/.agents` (the cross-agent convention) and `~/.claude` (Claude Code). The first home holds the real
+files and the rest are symlinked to it, so there is one canonical copy to update.
 
-- **`install.sh` (recommended, no clone).** Puts the real files in the first home (`~/.agents` by
-  default) and symlinks the others to it, so there is a single canonical copy under your home
-  directory to update, tied to a release rather than to a repo checkout. Override the set with
-  `MACHINERY_HOMES` (a single entry becomes the canonical copy, and no symlinks are made).
-- **`make install` (developer).** Symlinks every home directly into this working tree, so edits to
-  the skill are live. That is what you want when hacking on machinery itself, not for a plain
-  install. `AGENT_HOMES` overrides the homes; `make install-copy` copies instead of symlinking; and
-  `make uninstall` removes machinery from every home.
+- **`machinery install` (recommended).** Fetches the skill from the release that matches the binary
+  and lays it down as above. `--home` (repeatable) overrides the set, `--copy` copies into every home
+  instead of symlinking, and `--from <dir>` installs from a local checkout. `machinery uninstall`
+  removes it.
+- **`make dev-link` (developer).** Symlinks every home directly into a working-tree checkout, so
+  edits to the skill are live. That is what you want when hacking on machinery itself, not for a
+  plain install.
 
 The gate tools are a single Go binary (no Python runtime). `verify-formal` downloads a version-pinned,
 checksum-verified `tla2tools.jar` on first use. CI runs the test suite, all gate runs, the full formal
 suite, cross-compile builds, security scanning, and the go-crm build on every push.
 
 ## Quickstart (five minutes)
+
+Install without cloning, then run the binary on any design:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh
+machinery check <your-design>            # deterministic gates
+machinery verify-formal <your-design>    # proofs, if Java is present
+```
+
+To try it on the bundled examples, clone and build (the only reason to clone):
 
 ```bash
 git clone https://github.com/RamXX/machinery && cd machinery
@@ -385,11 +400,11 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 - `skills/machinery/SKILL.md` the conductor, plus `references/` (XState format, C4 technique, BUILD.md
   template) and `tools/` (the TLC shell wrappers, `tlc.sh` and `verify_formal.sh`).
 - `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `refine`, `compose`,
-  `check`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`.
+  `check`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`, `install`, `uninstall`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
   `refine/`, `compose/`, `gates/` (the G2/G3/Gx/G4/G5 suite), `pack/` (recursive decomposition via
-  contract packs), `formal/` (TLC orchestration), `experiments/` (the shared mutation-experiment
-  table). Every package has unit tests.
+  contract packs), `formal/` (TLC orchestration), `install/` (skill placement behind `machinery
+  install`), `experiments/` (the shared mutation-experiment table). Every package has unit tests.
 - `agents/` two synthesis subagents (the machine author and the build-doc writer).
 - `examples/go-crm/` the worked example: `design/` (the blueprint and the formal models) and `impl/`
   (the verified Go build).
@@ -433,6 +448,7 @@ full gate suite run against a synthesized design/impl fixture) runs as Go tests 
 | `internal/lint` | 85% | structural lint + matrix reconciliation |
 | `internal/refine` | 83% | data-refinement (3 patterns) |
 | `internal/compose` | 81% | cross-aggregate composition |
+| `internal/install` | 80% | skill placement behind `machinery install` (fetch, extract, canonical+symlink layout) |
 | `internal/gates` | 62% | the G2/G3/Gx/G4/G5 gate suite (G5 exercised via `internal/experiments`) |
 | `internal/pack` | 58% | contract packs (the mutation suite lives in `internal/experiments`) |
 | `internal/ir` | 55% | shared IR (covered transitively via lint/gates) |
