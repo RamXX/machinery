@@ -10,7 +10,7 @@ AGENT_HOMES ?= $(HOME)/.claude $(HOME)/.agents
 SRC := $(CURDIR)
 
 .DEFAULT_GOAL := help
-.PHONY: install install-copy uninstall build install-binary install-cli preflight doctor check oracle verify-formal test help
+.PHONY: install install-copy uninstall build install-binary install-cli preflight doctor check oracle verify-formal test golden golden-update help
 
 install: ## Symlink machinery skill+agents into agent homes, install the CLI binary on PATH
 	@for home in $(AGENT_HOMES); do \
@@ -89,6 +89,21 @@ install-binary: ## Download a prebuilt binary, or build from source if no releas
 	  fi; \
 	  [ -z "$$url" ] && { echo "No matching binary found."; exit 1; }; \
 	  curl -fsSL -o .bin/machinery "$$url"; \
+	  sums_url=$$(dirname "$$url")/checksums-sha256.txt; \
+	  if curl -fsSL -o .bin/checksums-sha256.txt "$$sums_url" 2>/dev/null; then \
+	    want=$$(grep "machinery-$(MACH_OS)-$(MACH_ARCH)$$ext$$" .bin/checksums-sha256.txt | awk '{print $$1}'); \
+	    got=$$(shasum -a 256 .bin/machinery 2>/dev/null | awk '{print $$1}' || sha256sum .bin/machinery | awk '{print $$1}'); \
+	    if [ -z "$$want" ] || [ "$$want" != "$$got" ]; then \
+	      rm -f .bin/machinery; \
+	      echo "checksum mismatch for machinery-$(MACH_OS)-$(MACH_ARCH)$$ext (want $$want, got $$got); refusing to install"; \
+	      exit 1; \
+	    fi; \
+	    echo "checksum verified"; \
+	  else \
+	    rm -f .bin/machinery; \
+	    echo "release has no checksums-sha256.txt; refusing to install an unverified binary"; \
+	    exit 1; \
+	  fi; \
 	  chmod +x .bin/machinery; \
 	  echo "Installed: $$(.bin/machinery version)"; \
 	else \
@@ -116,10 +131,19 @@ doctor: $(MACH) ## Check prerequisites and install status
 test: ## Run the Go toolchain test suite (needs Go)
 	@go test ./...
 
+golden: ## Run the golden-corpus byte-for-byte regression net
+	@go test -count=1 -run TestGolden ./cmd/machinery
+
+golden-update: ## Re-capture the golden corpus from the current binary (review the diff!)
+	@go test -count=1 -run TestGolden ./cmd/machinery -update
+
 check: $(MACH) ## Run the deterministic gate suite on the examples
 	@$(MACH) check examples/go-crm/design --impl examples/go-crm/impl
 	@$(MACH) check examples/fulfillment/design
 	@$(MACH) check examples/portfolio-engine/design
+	@$(MACH) check examples/checkout-split/parent/design
+	@$(MACH) check examples/checkout-split/orders/design
+	@$(MACH) check examples/checkout-split/payments/design
 
 oracle: $(MACH) ## Regenerate the transition oracles from the machine JSON (go-crm)
 	@$(MACH) oracle examples/go-crm/design/machines
@@ -128,6 +152,8 @@ verify-formal: $(MACH) ## Regenerate + TLC-check the whole formal suite for the 
 	@echo "== go-crm =="; $(MACH) verify-formal examples/go-crm/design
 	@echo "== fulfillment =="; $(MACH) verify-formal examples/fulfillment/design
 	@echo "== portfolio-engine =="; $(MACH) verify-formal examples/portfolio-engine/design
+	@echo "== checkout-split/orders =="; $(MACH) verify-formal examples/checkout-split/orders/design
+	@echo "== checkout-split/payments =="; $(MACH) verify-formal examples/checkout-split/payments/design
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'

@@ -13,7 +13,9 @@ on:
         required: true
 
 permissions:
-  contents: write   # needed to create the release
+  contents: write      # needed to create the release
+  id-token: write      # SLSA build provenance (attest-build-provenance)
+  attestations: write  # SLSA build provenance (attest-build-provenance)
 
 jobs:
   # ---------------------------------------------------------------- build ---
@@ -36,8 +38,8 @@ jobs:
             goarch: amd64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -62,7 +64,7 @@ jobs:
           go build -trimpath -ldflags "-s -w -X main.version=${{ steps.ver.outputs.version }}" \
             -o "dist/$binary" ./cmd/machinery
           echo "Built dist/$binary"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: machinery-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
@@ -73,7 +75,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Resolve version
         id: ver
         run: |
@@ -82,15 +84,19 @@ jobs:
           else
             echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
           merge-multiple: true
       - name: Generate checksums
         working-directory: dist
         run: sha256sum machinery-* | tee checksums-sha256.txt
+      - name: Attest build provenance (SLSA)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: dist/machinery-*
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ steps.ver.outputs.version }}
           name: machinery ${{ steps.ver.outputs.version }}

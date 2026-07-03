@@ -1,7 +1,6 @@
 # nightly.yml — the deep, non-blocking checks that run once a day (and on the
-# 0.0 tag pushes). These are the "accumulate evidence over time that the two
-# implementations never disagree" jobs from MIGRATION.md Phase 11. They do not
-# block PRs; they surface drift on a cadence so it cannot accumulate silently.
+# 0.0 tag pushes). They do not block PRs; they surface drift on a cadence so
+# it cannot accumulate silently.
 name: nightly
 
 on:
@@ -13,48 +12,68 @@ permissions:
   contents: read
 
 jobs:
-  # Regenerate every committed oracle with Go and assert an empty git diff.
-  # Silent when parity holds; a diff means the committed oracle is stale OR the
-  # generator drifted (the differential job distinguishes which).
+  # Regenerate every committed generated artifact (oracles AND formal specs)
+  # and assert an empty git diff. Silent when fresh; a diff means a committed
+  # artifact is stale or a generator drifted.
   regen-clean-tree:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
       - name: Regenerate oracles with Go
         run: |
           make build
-          for ex in go-crm fulfillment portfolio-engine; do
-            .bin/machinery oracle examples/$ex/design/machines
+          for md in examples/go-crm/design/machines examples/fulfillment/design/machines \
+                    examples/portfolio-engine/design/machines \
+                    examples/checkout-split/orders/design/machines \
+                    examples/checkout-split/payments/design/machines; do
+            .bin/machinery oracle "$md"
           done
+          .bin/machinery pack generate examples/checkout-split/parent/design
+      - name: Regenerate formal specs with Go
+        run: |
+          for d in examples/go-crm/design examples/fulfillment/design \
+                   examples/portfolio-engine/design \
+                   examples/checkout-split/orders/design \
+                   examples/checkout-split/payments/design; do
+            for mj in $d/machines/*.machine.json; do
+              .bin/machinery tla "$mj" "$d/formal" || exit 1
+            done
+            for sem in $d/formal/*.semantics.yaml; do
+              [ -e "$sem" ] || continue
+              m=$(basename "$sem" .semantics.yaml)
+              .bin/machinery refine "$d/machines/$m.machine.json" "$sem" "$d/formal" || exit 1
+            done
+            for comp in $d/formal/*.composition.yaml; do
+              [ -e "$comp" ] || continue
+              coord=$(sed -n 's/^coordinator: *//p' "$comp")
+              .bin/machinery compose "$comp" "$d/machines/$coord.machine.json" "$d/formal" || exit 1
+            done
+          done
+      - name: Regenerate pack refinement proofs with Go
+        run: |
+          .bin/machinery pack refine examples/checkout-split/orders/design
+          .bin/machinery pack refine examples/checkout-split/payments/design
       - name: Assert clean tree
         run: git diff --exit-code -- examples/
 
-  # The full differential sweep + pytest oracle, on a cadence. If the per-push
-  # differential ever passed but nightly catches a divergence (e.g. a Python
-  # runtime update changed repr formatting), this is the canary.
-  differential-nightly:
+  # The golden corpus + full unit suite, on a cadence: the canary for
+  # environment-driven divergence (Go toolchain updates changing output).
+  golden-nightly:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - uses: astral-sh/setup-uv@v5
-      - run: pip install pyyaml
       - name: Go unit suite
         run: go test -count=1 ./...
-      - name: Python pytest oracle
-        run: uv run -q -- pytest -q
-      - name: Differential harness
-        run: bash scripts/diff-all.sh
+      - name: Golden corpus
+        run: go test -count=1 -run TestGolden ./cmd/machinery
 
   # Nightly govulncheck — catches newly-disclosed CVEs in dependencies between
   # PRs. Mirrors the security.yml job but on the schedule so we learn of a vuln
@@ -62,15 +81,15 @@ jobs:
   vulncheck-nightly:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
       - run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
           govulncheck ./...
       - working-directory: examples/go-crm/impl
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
           govulncheck ./...
