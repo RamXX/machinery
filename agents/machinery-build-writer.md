@@ -30,7 +30,7 @@ constraint the conductor passes in its prompt.
 - `design/machines/*.machine.json`, `design/machines/*.matrix.md`, and the generated
   `design/machines/*.oracle.md`.
 - The target language(s).
-- The path to the machinery skill's `tools/` directory (for `machinery_check.py`).
+- The `machinery` CLI on PATH (`make install`).
 
 Read all of them in full. Read the `machinery` skill's `references/build-md-template.md` and follow its
 section structure exactly.
@@ -83,17 +83,16 @@ template's sections. Fill every section; mark any as N/A only with a stated reas
 ## Run the checker before you return (non-negotiable)
 
 ```
-python3 <tools>/machinery_check.py design
+machinery check design
 ```
 
-(Needs PyYAML: run under `uv run --with pyyaml -- python3 ...` if it is not installed.) Gate 4's
-deterministic part is not optional: fix every finding you can (typically Gx-trace findings against
+Gate 4's deterministic part is not optional: fix every finding you can (typically Gx-trace findings against
 your own tables), and report verbatim any finding you cannot fix because it belongs to an upstream
 artifact. Include the `checked:` counts in your report.
 
 ## Self-check before you return (Gate 4)
 
-- `machinery_check.py` ran; findings fixed or reported.
+- `machinery check` ran; findings fixed or reported.
 - The mode is declared, and in manifest mode the root states the sharding explicitly.
 - A coding agent with zero context could build the system from BUILD.md alone (per shard when sharded).
 - The data dictionary appears exactly once and is the single source of truth.
@@ -104,5 +103,5 @@ artifact. Include the `checked:` counts in your report.
 - The build plan starts with a walking skeleton.
 - The hard-TDD protocol is stated and unambiguous.
 
-Return a short summary: the sections written, the machinery_check result, the Gate 4 result, and any
+Return a short summary: the sections written, the `machinery check` result, the Gate 4 result, and any
 residual risk surfaced in the open-questions section. Do not paste the full BUILD.md back; it is on disk.

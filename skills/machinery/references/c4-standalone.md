@@ -7,9 +7,9 @@ directly: the **dependency mitigation posture** and the **persistence and placem
 component. `machinery check <design> --gate g2` verifies the contract deterministically; run it
 before calling Gate 2.
 
-## workspace.dsl (Structurizr) — authoring guide
+## workspace.dsl (Structurizr) - authoring guide
 
-The DSL is text — the gates parse it for element identifiers and tags, never rendering it. But it
+The DSL is text - the gates parse it for element identifiers and tags, never rendering it. But it
 must also be valid Structurizr DSL so `structurizr-cli export` can produce diagrams. **Follow these
 rules exactly; the Structurizr CLI parser is strict and rejects shorthand that older versions
 accepted.**
@@ -18,7 +18,7 @@ accepted.**
 
 1. **One property per line inside `{ }` blocks.** Never use semicolons to separate properties.
    ```dsl
-   # WRONG — newer Structurizr CLI rejects this:
+   # WRONG - newer Structurizr CLI rejects this:
    element "Person" { shape Person; background #08427B; color #ffffff }
    systemContext sys "Context" { include *; autoLayout lr }
 
@@ -128,8 +128,8 @@ reads cleanly on both light and dark backgrounds:
 |---------|-----------|-----|
 | Person | `#438DD5` | Medium-bright blue, visible on dark; shape Person distinguishes it |
 | Software System | `#2E6295` | Slightly darker, recedes behind containers |
-| Container | `#438DD5` | Same as Person — the C4 convention; shape distinguishes |
-| Component | `#6FA8DC` | Lighter blue, white text (not black — black fails on dark) |
+| Container | `#438DD5` | Same as Person - the C4 convention; shape distinguishes |
+| Component | `#6FA8DC` | Lighter blue, white text (not black - black fails on dark) |
 | External | `#8E8E93` | Neutral gray; clearly "not ours" |
 | Database | inherits + `shape Cylinder` | |
 | Queue | inherits + `shape Pipe` | |

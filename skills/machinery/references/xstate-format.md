@@ -99,7 +99,7 @@ escape (no `after`, `on`, or `invoke`). The reason must state why the guard set 
 guard is true the machine is stuck, so this is the liveness side condition, made visible. Without
 the annotation, that shape is a lint ERROR. **The formal layer cannot verify this claim** (rung-3
 TLA+ erases guards), so a false `_exhaustive` yields a green liveness proof for a machine that can
-deadlock: `machinery_check` G3 emits a warn naming every `_exhaustive` state for exactly this
+deadlock: `machinery check` G3 emits a warn naming every `_exhaustive` state for exactly this
 reason. Reserve `_exhaustive` for guard sets that are provably total (a `prior`/`pending` field whose
 codomain is exactly the enumerated states, as in a rollback router). Otherwise prefer an unguarded
 fallback branch, which TLC does check:

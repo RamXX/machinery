@@ -6,35 +6,43 @@
 # SOURCE (hand-authored, version these):  design/machines/*.machine.json and, in
 #   design/formal/, the *.semantics.yaml / *.composition.yaml annotations and any
 #   hand-authored *.tla+*.cfg (e.g. System). GENERATED (regenerated every run,
-#   safe to gitignore): the other design/formal/*.tla and *.cfg. Source and
-#   generated share design/formal/ because TLC requires EXTENDS/INSTANCE'd modules
-#   to sit next to the spec that references them.
+#   committed; the nightly regen job asserts the committed copies match): the
+#   other design/formal/*.tla and *.cfg. Source and generated share
+#   design/formal/ because TLC requires EXTENDS/INSTANCE'd modules to sit next
+#   to the spec that references them.
 #
-#   *.machine.json       -> tla_gen      control-flow (safety + liveness + deadlock)
-#   *.semantics.yaml     -> refine_gen   data invariants + contract + refinement
-#   *.composition.yaml   -> compose_gen  cross-aggregate invariants
-#   hand-authored *.tla with a *.cfg     also checked (e.g. System)
+#   *.machine.json       -> machinery tla      control-flow (safety + liveness + deadlock)
+#   *.semantics.yaml     -> machinery refine   data invariants + contract + refinement
+#   *.composition.yaml   -> machinery compose  cross-aggregate invariants
+#   hand-authored *.tla with a *.cfg           also checked (e.g. System)
 # Usage: verify_formal.sh <design-dir>
+# Needs the machinery binary on PATH (make install); override with MACHINERY=/path/to/machinery.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
+machinery="${MACHINERY:-machinery}"
+command -v "$machinery" >/dev/null 2>&1 || {
+  echo "machinery binary not found on PATH (make install), or set MACHINERY=/path/to/machinery" >&2
+  exit 1
+}
 design="${1:?usage: verify_formal.sh <design-dir>}"
 mdir="$design/machines"
 fdir="$design/formal"
 mkdir -p "$fdir"
 
 for mj in "$mdir"/*.machine.json; do
-  [ -e "$mj" ] && python3 "$here/tla_gen.py" "$mj" "$fdir" >/dev/null
+  [ -e "$mj" ] && "$machinery" tla "$mj" "$fdir" >/dev/null
 done
 for sem in "$fdir"/*.semantics.yaml; do
   [ -e "$sem" ] || continue
   m="$(basename "$sem" .semantics.yaml)"
-  python3 "$here/refine_gen.py" "$mdir/$m.machine.json" "$sem" "$fdir" >/dev/null
+  "$machinery" refine "$mdir/$m.machine.json" "$sem" "$fdir" >/dev/null
 done
 for comp in "$fdir"/*.composition.yaml; do
   [ -e "$comp" ] || continue
-  coord="$(python3 -c "import yaml; print(yaml.safe_load(open('$comp'))['coordinator'])")"
-  python3 "$here/compose_gen.py" "$comp" "$mdir/$coord.machine.json" "$fdir" >/dev/null
+  # coordinator: <Name> is a top-level scalar; strip any trailing comment.
+  coord="$(sed -n 's/^coordinator:[[:space:]]*//p' "$comp" | head -n 1 | sed 's/[[:space:]]*#.*$//;s/[[:space:]]*$//')"
+  "$machinery" compose "$comp" "$mdir/$coord.machine.json" "$fdir" >/dev/null
 done
 
 pass=0

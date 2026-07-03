@@ -28,7 +28,8 @@ constraint the conductor passes in its prompt.
 - `design/workspace.dsl` and `design/ARCHITECTURE.md`, including the dependency mitigation postures,
   the persistence-and-placement decisions, and (for multi-component designs) the event-contract table.
 - The target language(s).
-- The path to the machinery skill's `tools/` directory (for `machine_lint.py` and `oracle_gen.py`).
+- The `machinery` CLI on PATH (`make install`); `machinery lint` and `machinery oracle` are the
+  tools you must run.
 
 Read all of them in full before writing anything. Run `modelith render design/domain.modelith.yaml`
 if the rendered form is missing. Read the `machinery` skill's `references/xstate-format.md` for the
@@ -99,15 +100,15 @@ For each component `<C>`:
     or `-` for the unguarded fallback branch; `X (internal)` for internal transitions; rows marked
     `(final)` or `(any event)` are documentation-only and skipped). The generated oracle already
     covers the transitions, so most machines do not need one.
-- `design/machines/<C>.oracle.md` - GENERATED: run `python3 <tools>/oracle_gen.py design/machines`
+- `design/machines/<C>.oracle.md` - GENERATED: run `machinery oracle design/machines`
   and commit the output. Never hand-edit it; G3 regenerates it in memory and diffs, so a stale or
   edited oracle is DRIFT.
 
 ## Run the tools before you return (non-negotiable)
 
 ```
-python3 <tools>/machine_lint.py design/machines
-python3 <tools>/oracle_gen.py design/machines
+machinery lint design/machines
+machinery oracle design/machines
 ```
 
 Fix every lint ERROR and rerun until clean, then generate the oracles. Returning machines that fail
@@ -133,6 +134,6 @@ Your own judgment (the tools cannot check these; attest them explicitly):
 - Every dependency failure from the C4 mitigation table has its residual transition.
 - Every consumed external event has its event-contract row and a redelivery story.
 
-Return a concise summary: the machines you wrote, the lint and oracle_gen results, the Gate 3 result
+Return a concise summary: the machines you wrote, the `machinery lint` and `machinery oracle` results, the Gate 3 result
 (pass or the exact gaps), and any invariant with no enforcement point. Do not restate the full files;
 the conductor has them on disk.

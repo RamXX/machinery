@@ -125,7 +125,7 @@ Target language(s): <...>. How the machines become code:
 ### Toolchain and versions
 Pin the environment so two implementing agents cannot diverge on it: language version, library
 versions with exact pins or a lockfile instruction, test framework and version, and any codegen
-tools (including how to run oracle_gen and machinery_check).
+tools (including how to run `machinery oracle` and `machinery check`).
 
 ## 11. Hard-TDD protocol (read this before writing any code)
 1. A test-writer agent reads sections 6 and 7 and writes the full test suite from the spec, keying
@@ -138,7 +138,7 @@ tools (including how to run oracle_gen and machinery_check).
 5. Generated tests live apart from hand-written tests (a marker comment or a directory), so
    regenerating them on a design change never clobbers hand-written ones.
 6. If a test is wrong, that is a design defect: stop, fix the design and this BUILD.md, rerun
-   oracle_gen, and regenerate the affected tests (the stable-id diff is the affected-test list).
+   `machinery oracle`, and regenerate the affected tests (the stable-id diff is the affected-test list).
    Do not "adjust" a test to pass.
 
 ## 12. Open questions and residual risks

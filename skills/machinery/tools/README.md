@@ -1,119 +1,69 @@
-# machinery check: deterministic verification gates
+# machinery tools: the CLI and the TLC shell wrappers
 
-> **Status (migration):** these `*.py` files are the **legacy Python
-> implementation**, retained as the differential oracle during the Python→Go
-> shadow window. The canonical tool is the `machinery` Go binary
-> (`make build`); invoke `machinery check|oracle|tla|refine|compose|verify-formal`.
-> See `MIGRATION.md`. The Python here is bug-for-bug frozen; it is deleted at
-> the `python-removed` tag once the shadow is silent.
+The toolchain is the single `machinery` Go binary (`make install` puts it on PATH; `make build`
+builds `.bin/machinery` from source). This directory holds the only pieces that are not the binary:
+two shell wrappers around TLC, the TLA+ model checker, for environments that prefer the shell path.
+`machinery verify-formal` embeds the same orchestration logic, so the wrappers are a convenience,
+not a requirement.
 
-Pure static analysis over a machinery design (and, with `--impl`, the code). No LLM.
-These are the hard symbolic checks that make correctness not depend on an agent getting
-every cross-reference right. Two design rules govern the whole suite:
+## What lives here
 
-1. **Absence is failure.** A missing artifact, an unparseable section, or a gate that
-   found nothing to check is an ERROR, never a silent pass. Every gate prints a
-   `checked:` line with counts of what it actually verified, so "clean" is always
-   distinguishable from "checked nothing".
-2. **Generate, do not co-author.** Derivable artifacts are generated (the oracle, the
-   TLA+ models), and the gates verify the committed copies are byte-identical to a
-   fresh generation, so staleness is DRIFT, not an assumption.
+- `tlc.sh <spec.tla>` runs TLC on one `.tla`/`.cfg` pair. On first use it fetches
+  `tla2tools.jar` v1.7.4 from the TLA+ releases, verifies it against the pinned sha256
+  (`936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`), caches it under
+  `~/.cache/machinery/`, and cleans TLC's `states/` working directory on exit. Override the pin
+  with `TLA_TOOLS_VERSION` plus `TLA_TOOLS_SHA256` (both, deliberately). Needs Java 11+.
+- `verify_formal.sh <design-dir>` regenerates the whole formal suite from source (via the
+  `machinery` binary) into `design/formal/` and TLC-checks every `.tla`/`.cfg` pair through
+  `tlc.sh`. A pass requires both a zero TLC exit code and the no-error line, so a Java crash, a
+  download failure, or a TLC message change can never read as PASS.
 
-```sh
-python3 machinery_check.py <design-dir> [--impl <code-dir>] [--gate g2,g3,gx,g4]
-```
+## The CLI
 
-Exit is non-zero on any ERROR or DRIFT. `warn` and `note` do not fail the gate. Use
-`--gate` to run the subset that applies mid-phase; the default runs everything.
-Requires the `machinery` Go binary (`make install`). No Python or PyYAML needed.
+One line per subcommand:
 
-## Gates
+- `machinery lint <machines-dir>` structural lint of every `*.machine.json` (reachability, invoke
+  error paths and timeouts, shadowed branches, event completeness, the enforced XState subset).
+- `machinery oracle <machines-dir>` writes the canonical `<M>.oracle.md` transition oracle next to
+  each machine (sequential test ids for humans, content-derived stable ids for tests). G3 byte-diffs
+  the committed oracle against a fresh in-memory generation, so a stale or edited oracle is DRIFT.
+- `machinery tla <machine.json> [out-dir]` generates the control-flow TLA+ model and `.cfg` for one
+  machine (bounded retry counters, liveness, deadlock-freedom; assumptions printed in the header).
+- `machinery refine <machine.json> <semantics.yaml> [out-dir]` reconciles a `<M>.semantics.yaml`
+  annotation against the machine, then generates the data-refined model, the abstract contract, and
+  the refinement proof. Patterns: `linear-lifecycle`, `terminal-lifecycle`, `saga` (state names come
+  from the annotation, nothing is hardcoded to a domain). Reconciliation failure is a hard error.
+- `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
+  `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate
+  composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
+- `machinery check <design-dir> [--impl <code-dir>] [--gate g2,g3,gx,g4]` the deterministic gate
+  suite (G2-c4, G3-machine, Gx-trace, G4-import). Gates fail on absence; every gate prints a
+  `checked:` line. Exit is non-zero on any ERROR or DRIFT.
+- `machinery verify-formal <design-dir>` regenerates the tla/refine/compose specs into
+  `design/formal/` and TLC-checks every `.tla`/`.cfg` pair. It fails on generator errors and on
+  zero pairs, so an empty formal directory can never read as a green suite.
+- `machinery doctor` checks dependencies and install status.
+- `machinery preflight` the same check, for use before a design session.
+- `machinery version` prints the build version.
 
-| Gate | What it checks | Kills |
-|---|---|---|
-| G2-c4 | The Architecture Contract (v2: `element`, `externals`, `ignore`) parses from its marked heading; boundary ids are unique and bind to `workspace.dsl` elements; rules reference declared boundaries and never contradict; every infrastructure dependency (contract externals plus DSL elements tagged Database/Queue/External) has a backticked mitigation row. | drift between the C4 model, its contract, and the failure postures |
-| G3-machine | Full structural lint per machine (targets resolve unambiguously, reachability, no dead ends, invoke has onError + after, no shadowed branches, guarded-always exhaustiveness via `_exhaustive`, event completeness on resting states via `_ignores`, only the supported XState subset). The committed oracle must be byte-identical to a fresh generation. The hand matrix, if it has a transition table, must reconcile row by row in BOTH directions (source, trigger, guard shape, target, actions). Every guard, action, and actor fired by the machine must have a named-unit contract row. | malformed machines; machine-vs-oracle staleness; machine-vs-matrix drift; unspecified units |
-| Gx-trace | Machine-to-model binding is explicit (filename matches an entity, `_lifecycle_of`, or `_role: operational`; anything else is an error). For lifecycle machines: TitleCase states are exactly the entity's lifecycle-enum values (both directions), events are Modelith actions of that entity. Every entity with a lifecycle enum has a machine; every backticked placement-table component (first backticked token per row) has a machine or a waiver. Every invariant id appears (whole-token) in a matrix or BUILD.md table cell; it is reported as **unit-backed** (cited against a guard/action/actor in a matrix `maps to` column) or **attested** (named only in a prose/BUILD cell), so "enforced" cannot silently mean "mentioned". Backticked kebab references in maps-to columns must exist in the model (typo catch). | silent drift between the what, the how, and the behavior |
-| G4-import | (needs `--impl`) Maps each source file to a boundary via the `code` globs (unmapped source is an error unless contract-`ignore`d; test files are skipped and counted). Extracts imports for Go (single and block form, module name from go.mod), Python, TypeScript/JavaScript, Elixir (via boundary `modules:`), and Rust; resolves externals via the contract `externals` map; enforces `exposes` (importing non-exposed internals is an error); any denied or undeclared cross-boundary edge is an error. | boundary erosion in code |
+The binary is the whole toolchain: no interpreter, no runtime dependencies. Java 11+ is needed
+only for TLC (`verify-formal`, `tlc.sh`, `verify_formal.sh`).
 
-Known out of scope for G4, by construction: coupling through shared database tables or
-message-bus topics is invisible to import analysis. The event-contract table in
-ARCHITECTURE.md is the governing artifact for those seams (see the c4 reference).
+## Two design rules govern the gate suite
 
-## The machine IR
+1. **Absence is failure.** A missing artifact, an unparseable section, or a gate that found nothing
+   to check is an ERROR, never a silent pass. "Clean" is always distinguishable from "checked
+   nothing".
+2. **Generate, do not co-author.** Derivable artifacts are generated (the oracle, the TLA+ models),
+   and the gates verify the committed copies match a fresh generation, so staleness is DRIFT, not an
+   assumption.
 
-`machine_lint.py` is both the standalone linter and the shared IR: `walk_states`,
-`transitions_of` (on / after / always / state-level onDone / invoke onDone / onError),
-`actions_of` (string and `{type: ...}` action objects), plus the matrix parser and the
-structural reconciler. Every other tool (oracle_gen, tla_gen, refine_gen, machinery_check)
-consumes this one IR, so the gates and the formal layer cannot diverge on how a machine is
-read. Unsupported XState constructs (parallel, history, root-level `on`, array targets,
-unknown keys) are hard errors, never silently narrowed.
+## The formal suite
 
-## Formal verification
-
-This layer (`make verify-formal`) is optional: it is the only part of machinery that needs **Java**,
-because TLC (the TLA+ model checker) is a JVM program. Generating the specs is pure Python; only
-checking them needs Java. Skipping it costs you nothing in the design or the deterministic gates, but
-it is where the exhaustive proofs live -- the checks that catch a stranded-money saga, an unbounded
-retry, or a contract violation that no symbolic gate or human review would. Recommended wherever a
-JVM is available.
-
-The ladder, and what each rung actually proves:
-
-- **Rung 1, generation** (`oracle_gen.py`): the transition oracle is generated from the
-  machine, with a sequential test id for humans and a content-derived STABLE id for tests
-  (row numbers renumber on the first design change; stable ids survive unrelated edits).
-  G3 diffs the committed oracle against a fresh generation.
-- **Rung 3, control flow** (`tla_gen.py` + `tlc.sh`): a TLA+ model per machine, every
-  retry loop with its own bounded counter. TLC exhaustively checks `Live_OverlayResolves`
-  (no unbounded retry, nothing stuck half-done) and deadlock-freedom; `TypeOK` is a
-  regression lock. Every generated module carries an ASSUMPTIONS block: guards are erased
-  (sound for safety; liveness is conditional on guard-list exhaustiveness, which the lint
-  discharges via fallback-or-`_exhaustive`), invokes resolve exactly once, timers fire,
-  single instance, no data. Where a state uses `_exhaustive` (a guard set claimed total,
-  which TLC cannot verify), the header lists it as UNVERIFIED and G3 emits a per-machine
-  warn naming those states, since a false claim yields a green liveness proof for a machine
-  that can deadlock; prefer an unguarded fallback branch, which TLC does verify. `tlc.sh`
-  runs a pinned, checksum-verified `tla2tools.jar` (needs Java 11+) and cleans its `states/`
-  working dir on exit.
-- **Rungs 2 and 4, data and composition** (`refine_gen.py`, `compose_gen.py`): the
-  `<M>.semantics.yaml` and `<C>.composition.yaml` annotations are trust points, so they
-  are RECONCILED against the machine before anything is emitted: states, transition
-  structure, failure routing, and step order must match the machine JSON exactly, or
-  generation fails. refine_gen supports three patterns and takes its state names from the
-  annotation (nothing is hardcoded to a domain): `linear-lifecycle` (ordered open stages,
-  win/lose, reopen, and a persist-retry-rollback overlay whose names default to
-  persisting/persistRetry/rolledBack but are configurable under `overlay:`; proves
-  stage-forward, atomicity, close-date, and a refinement to an abstract contract);
-  `terminal-lifecycle` (a forward pipeline of invoking phases to a success or failure
-  terminal with optional bounded retry overlays; proves completeness -- a success terminal
-  implies its completion flag, so there is no partial success -- terminal absorption, and
-  termination; the domain-progress proof is separate from any persistence mechanism);
-  and `saga` (forward steps with per-obligation compensation, so partial compensation is
-  representable; keeps the canonical saga role names, shared with compose_gen). It also
-  emits the abstract contract and a TLC-checked refinement for the lifecycle pattern. compose_gen emits the cross-aggregate composition over the coordinator's
-  real branching (failures, per-obligation compensation, the FailedDirty stall) with an
-  auto-generated clean-compensation invariant. `System.tla` (go-crm) INSTANCEs the
-  generated contract module, so the assumption a caller makes is the same module the
-  refinement proves, and TLC additionally checks the composition satisfies the contract
-  spec. What remains assumed after reconciliation is printed into each generated header.
-- `verify_formal.sh` regenerates and TLC-checks the whole suite from source
-  (`make verify-formal`, sixteen proofs across the two examples). A pass requires both a
-  zero TLC exit code and the no-error line, and failures print the TLC output.
-
-## Tools
-
-- `machine_lint.py` structural machine linter and the shared IR.
-- `machinery_check.py` the full deterministic gate suite.
-- `oracle_gen.py` rung 1: generate the transition oracle (stable ids) from the machine JSON.
-- `tla_gen.py` + `tlc.sh` rung 3: generate and model-check a control-flow TLA+ model.
-- `refine_gen.py` rung 2: reconcile a `*.semantics.yaml` against the machine, then generate
-  the data-refined model, abstract contract, and refinement proof. Patterns:
-  linear-lifecycle, terminal-lifecycle, saga (all take their state names from the annotation).
-- `compose_gen.py` rung 4: validate a `*.composition.yaml` against the coordinator machine,
-  then generate the branching composition that checks cross-aggregate invariants.
-- `verify_formal.sh` regenerate and TLC-check everything for a design (`make verify-formal`).
-
-The suite itself is tested: `make test` runs the pytest suite in `tests/`, which encodes
-every vacuity and drift experiment from the design review as a permanent regression.
+`make verify-formal` runs the full ladder across the example designs: 26 TLA+ proofs, all green
+(8 in `examples/go-crm`, 8 in `examples/fulfillment`, 6 in `examples/portfolio-engine`, and 4 in
+`examples/checkout-split`, two per child incl. the contract-refinement proofs), regenerated
+from source on every run. The `*.semantics.yaml` and `*.composition.yaml` annotations are trust
+points, so they are reconciled against the machine before anything is emitted: a design change that
+invalidates an annotation fails generation rather than proving a stale twin. What remains assumed
+after reconciliation is printed into each generated header.
