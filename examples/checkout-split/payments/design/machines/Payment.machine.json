@@ -1,0 +1,29 @@
+{
+ "id": "payment",
+ "_comment": "Payment lifecycle. Placement: db row, single writer per payment id. Created by the consumed request event (creation is not a transition; redelivery is deduped by Payment.orderId). Publishes markPaid/markDeclined via transition actions.",
+ "initial": "Requested",
+ "context": {"paymentId": null, "orderId": null, "amount": null},
+ "states": {
+  "Requested": {
+   "on": {
+    "capture": {"target": "Captured", "actions": "markPaid"},
+    "decline": {"target": "Declined", "actions": "markDeclined"}
+   },
+   "_ignores": {
+    "request": "creation event; at-least-once redelivery deduped by Payment.orderId",
+    "refund": "nothing captured yet"
+   }
+  },
+  "Captured": {
+   "on": {
+    "refund": {"target": "Refunded", "actions": "recordRefund"}
+   },
+   "_ignores": {
+    "capture": "payment-single-capture: already captured; redelivery deduped by Payment.id",
+    "decline": "stale processor message after capture"
+   }
+  },
+  "Declined": {"type": "final"},
+  "Refunded": {"type": "final"}
+ }
+}

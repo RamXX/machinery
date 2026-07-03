@@ -1,0 +1,57 @@
+kind: DomainModel
+version: v1
+title: Checkout Split
+description: >
+  A deliberately small two-subsystem checkout: an orders service and a payments
+  service coupled only through the bus. The worked example for recursive
+  decomposition via contract packs.
+
+enums:
+  OrderStatus:
+    values:
+      - {name: Placed, definition: "Created; awaiting payment settlement."}
+      - {name: Paid, definition: "Payment captured; may ship."}
+      - {name: Shipped, definition: "Handed to the carrier; terminal."}
+      - {name: Declined, definition: "Payment declined; terminal."}
+      - {name: Cancelled, definition: "Cancelled before settlement; terminal."}
+  PaymentStatus:
+    values:
+      - {name: Requested, definition: "Created from an order's payment request."}
+      - {name: Captured, definition: "Funds taken."}
+      - {name: Declined, definition: "Declined by the processor; terminal."}
+      - {name: Refunded, definition: "Captured funds returned; terminal."}
+
+entities:
+  Order:
+    definition: "A customer order in the orders subsystem."
+    attributes:
+      - {name: id, type: string}
+      - {name: status, type: OrderStatus}
+      - {name: total, type: number}
+    actions:
+      - {name: place, actor: Customer, preserves: [order-total-positive]}
+      - {name: markPaid, actor: System}
+      - {name: markDeclined, actor: System}
+      - {name: ship, actor: Operator, preserves: [no-ship-without-capture]}
+      - {name: cancel, actor: Customer}
+    invariants:
+      - {id: order-total-positive, definition: "An order's total is strictly positive."}
+  Payment:
+    definition: "A payment attempt in the payments subsystem."
+    attributes:
+      - {name: id, type: string}
+      - {name: orderId, type: string}
+      - {name: amount, type: number}
+      - {name: status, type: PaymentStatus}
+    actions:
+      - {name: request, actor: System}
+      - {name: capture, actor: System, preserves: [payment-single-capture]}
+      - {name: decline, actor: System}
+      - {name: refund, actor: Operator}
+    invariants:
+      - {id: payment-single-capture, definition: "A payment is captured at most once."}
+
+invariants:
+  - {id: no-ship-without-capture, definition: "An order ships only after its payment is captured. Cross-subsystem; enforcement is delegated to the orders subsystem, which may only reach Shipped from Paid, and Paid only on the payments subsystem's markPaid event."}
+
+scenarios: []

@@ -1,0 +1,37 @@
+kind: DomainModel
+version: v1
+title: Checkout Split / orders
+description: >
+  The orders subsystem, designed against its contract pack. The Order entity's
+  public shape (its lifecycle enum) is frozen by the pack; everything internal
+  is this design's own.
+
+enums:
+  OrderStatus:
+    values:
+      - {name: Placed, definition: "Created; awaiting payment settlement."}
+      - {name: Paid, definition: "Payment captured; may ship."}
+      - {name: Shipped, definition: "Handed to the carrier; terminal."}
+      - {name: Declined, definition: "Payment declined; terminal."}
+      - {name: Cancelled, definition: "Cancelled before settlement; terminal."}
+
+entities:
+  Order:
+    definition: "A customer order in the orders subsystem."
+    attributes:
+      - {name: id, type: string}
+      - {name: status, type: OrderStatus}
+      - {name: total, type: number}
+    actions:
+      - {name: place, actor: Customer, preserves: [order-total-positive]}
+      - {name: markPaid, actor: System}
+      - {name: markDeclined, actor: System}
+      - {name: ship, actor: Operator, preserves: [no-ship-without-capture]}
+      - {name: cancel, actor: Customer}
+    invariants:
+      - {id: order-total-positive, definition: "An order's total is strictly positive."}
+
+invariants:
+  - {id: no-ship-without-capture, definition: "An order ships only after its payment is captured. Delegated by the parent; enforced structurally: Shipped is reachable only from Paid, and Paid only on the payments subsystem's markPaid event."}
+
+scenarios: []

@@ -1,0 +1,33 @@
+kind: DomainModel
+version: v1
+title: Checkout Split / payments
+description: >
+  The payments subsystem, designed against its contract pack. The Payment
+  entity's public shape is frozen by the pack.
+
+enums:
+  PaymentStatus:
+    values:
+      - {name: Requested, definition: "Created from an order's payment request."}
+      - {name: Captured, definition: "Funds taken."}
+      - {name: Declined, definition: "Declined by the processor; terminal."}
+      - {name: Refunded, definition: "Captured funds returned; terminal."}
+
+entities:
+  Payment:
+    definition: "A payment attempt in the payments subsystem."
+    attributes:
+      - {name: id, type: string}
+      - {name: orderId, type: string}
+      - {name: amount, type: number}
+      - {name: status, type: PaymentStatus}
+    actions:
+      - {name: request, actor: System}
+      - {name: capture, actor: System, preserves: [payment-single-capture]}
+      - {name: decline, actor: System}
+      - {name: refund, actor: Operator}
+    invariants:
+      - {id: payment-single-capture, definition: "A payment is captured at most once. Structural: capture is only handled in Requested."}
+
+invariants: []
+scenarios: []

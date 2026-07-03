@@ -1,0 +1,27 @@
+{
+ "id": "ordersContract",
+ "_role": "operational",
+ "_comment": "The abstract protocol neighbors rely on: an open order settles exactly once (paid, declined, or cancelled) and ships only after payment.",
+ "initial": "Open",
+ "states": {
+  "Open": {
+   "on": {
+    "markPaid": {"target": "Paid"},
+    "markDeclined": {"target": "Done"},
+    "cancel": {"target": "Done"}
+   },
+   "_ignores": {"ship": "not yet paid; shipping an unpaid order is the delegated invariant no-ship-without-capture"}
+  },
+  "Paid": {
+   "on": {
+    "ship": {"target": "Done"}
+   },
+   "_ignores": {
+    "markPaid": "at-least-once redelivery; deduped by Payment.id",
+    "markDeclined": "stale message after settlement; deduped by Payment.id",
+    "cancel": "cancellation after payment is out of the contract; a refund flow would extend it"
+   }
+  },
+  "Done": {"type": "final"}
+ }
+}

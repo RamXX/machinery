@@ -1,0 +1,51 @@
+{
+ "id": "order",
+ "_comment": "Order lifecycle. Placement: db row, single writer per order id (events serialize on the row lock). Consumes markPaid/markDeclined from the bus; publishes request via the entry action on Placed.",
+ "initial": "Placed",
+ "context": {
+  "orderId": null,
+  "total": null
+ },
+ "states": {
+  "Placed": {
+   "entry": "request",
+   "on": {
+    "markPaid": {
+     "target": "Paid"
+    },
+    "markDeclined": {
+     "target": "Declined"
+    },
+    "cancel": {
+     "target": "Cancelled",
+     "actions": "recordCancel"
+    }
+   },
+   "_ignores": {
+    "ship": "no-ship-without-capture: an unpaid order cannot ship"
+   }
+  },
+  "Paid": {
+   "on": {
+    "ship": {
+     "target": "Shipped",
+     "actions": "recordShipment"
+    }
+   },
+   "_ignores": {
+    "markPaid": "at-least-once redelivery; deduped by Payment.id",
+    "markDeclined": "stale settlement message; deduped by Payment.id",
+    "cancel": "cancellation after payment needs the refund flow, which this subsystem does not own"
+   }
+  },
+  "Shipped": {
+   "type": "final"
+  },
+  "Declined": {
+   "type": "final"
+  },
+  "Cancelled": {
+   "type": "final"
+  }
+ }
+}

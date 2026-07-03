@@ -1,7 +1,7 @@
 ---- MODULE CommandExecution ----
 EXTENDS Naturals
 
-\* Generated from CommandExecution.machine.json by tools/tla_gen.py. Control-flow model.
+\* Generated from CommandExecution.machine.json by machinery tla. Control-flow model.
 \*
 \* ASSUMPTIONS (what this abstraction erases; the proof is conditional on them):
 \*   1. Guards are erased to nondeterminism: SOUND for safety. For LIVENESS this

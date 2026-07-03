@@ -169,7 +169,25 @@ aggregate is loaded, acted on, and saved inside the one write transaction the Co
 | `Session` | in-process during a command; token on disk | `~/.crm/session` (user id + expiry, HMAC-signed) | last write wins; single local user |
 | `CommandExecution` | ephemeral per invocation (the operational envelope) | none | one invocation owns the write Tx |
 
-## 8. Gate 2 result
+## 8. NFR record
+
+- **Security posture**: a local single-user CLI with no network surface. Authentication is OS-level
+  access to the machine plus the local login (argon2id-hashed passwords, an HMAC-signed session
+  token, files written 0600). Authorization is role- and ownership-based: decided by the pure
+  Authorization component at a single call site and re-checked in the domain guards (the four
+  `rbac-*` invariants). Passwords and secrets are never logged (`password-hashed`). Out of scope by
+  design: multi-tenant isolation, network hardening, and encryption at rest beyond file permissions.
+- **Capacity assumptions**: one team's CRM in a single embedded LadybugDB directory; thousands of
+  records, not millions. One process, one connection, one write transaction at a time; concurrent
+  writers serialize on the single-writer lock and the second is refused after bounded retry
+  (<= 3, ~1.5s). Throughput beyond one interactive user per machine is explicitly out of scope.
+- **Observability**: the operator is the user. The signals are the process exit code (one per
+  CommandExecution terminal state), rendered output on stdout, and a classified error on stderr
+  (Denied, ValidationFailed, DBError, Corrupt), carrying the violated invariant id on a rejected
+  transition. The Corrupt path prints a loud, distinct message directing the user to `crm restore`.
+  No metrics backend, no structured log file, no tracing: out of scope for a local CLI.
+
+## 9. Gate 2 result
 
 - Every Modelith action maps to an owning component: lifecycle actions to Domain Services, `login`/
   `logout`/`changePassword` to Session, RBAC-gated verbs to Authorization plus Domain Services,

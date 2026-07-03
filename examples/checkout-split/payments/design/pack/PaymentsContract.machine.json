@@ -1,0 +1,16 @@
+{
+ "id": "paymentsContract",
+ "_role": "operational",
+ "_comment": "The abstract per-payment protocol neighbors rely on: a requested payment settles exactly once (captured or declined). The instance exists from the request; creation is not a transition.",
+ "initial": "Settling",
+ "states": {
+  "Settling": {
+   "on": {
+    "capture": {"target": "Done"},
+    "decline": {"target": "Done"}
+   },
+   "_ignores": {"request": "creation event; at-least-once redelivery deduped by Payment.orderId"}
+  },
+  "Done": {"type": "final"}
+ }
+}

@@ -1,0 +1,16 @@
+decomposition_version: 1
+subsystems:
+  - id: orders
+    owns: [Order]
+    components: [orders]
+    boundaries: [orders.svc]
+    contract_machine: contracts/OrdersContract.machine.json
+    delegated_invariants: [no-ship-without-capture]
+    child_design: ../../orders/design
+  - id: payments
+    owns: [Payment]
+    components: [payments]
+    boundaries: [payments.svc]
+    contract_machine: contracts/PaymentsContract.machine.json
+    delegated_invariants: []
+    child_design: ../../payments/design
