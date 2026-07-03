@@ -52,6 +52,8 @@ var MachineLintExperiments = []Experiment{
 		ExpectSubstr: "neither handles nor explicitly ignores event 'publish'", ExpectExit: true},
 	{Name: "both-handles-ignores", Tool: "lint", Mutation: "publish in on and _ignores",
 		ExpectSubstr: "both handles and ignores event 'publish'", ExpectExit: true},
+	{Name: "kebab-case-unit-name", Tool: "lint", Mutation: "rename a guard to kebab-case",
+		ExpectSubstr: "is not a valid identifier", ExpectExit: true},
 }
 
 // MachineryCheckExperiments are the gate-suite review findings.

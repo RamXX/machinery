@@ -102,6 +102,9 @@ var machineLintRunners = map[string]func(*ir.Value){
 		ig := strObj(`{"publish":"never mind"}`)
 		m.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Set("_ignores", ig)
 	},
+	"kebab-case-unit-name": func(m *ir.Value) {
+		m.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Get2("on").AsObject().Get2("publish").AsArray()[0].AsObject().Set("guard", ir.StringValue("guard-can-publish"))
+	},
 }
 
 func init() {

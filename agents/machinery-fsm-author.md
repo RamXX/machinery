@@ -94,7 +94,9 @@ For each component `<C>`:
   needed) and the `_exhaustive` / `_ignores` annotations.
 - `design/machines/<C>.matrix.md` - the named-unit contract and failure-catalog document:
   - the **named-unit contract table**: one row per guard, action, and actor (invoke src) the machine
-    fires (G3 reports DRIFT for any missing row), with columns: name, kind, signature, pre/post,
+    fires (G3 reports DRIFT for any missing row). Unit names MUST be identifiers matching
+    `[A-Za-z_][A-Za-z0-9_]*` (camelCase, e.g. `guardCanPublish`); hyphens are rejected at lint, since
+    every name becomes a TLA+/oracle identifier. Columns: name, kind, signature, pre/post,
     maps-to (invariant id or C4 rel), **test type** (unit / integration / property), and **fixture**
     (real dependency or fake, and which). Idempotency and side-effect contracts are integration or
     property tests against the real dependency or a contract-tested fake; mark them so.

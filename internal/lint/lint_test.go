@@ -53,6 +53,32 @@ func TestMinimalMachineIsClean(t *testing.T) {
 	}
 }
 
+func TestKebabCaseUnitNameIsError(t *testing.T) {
+	// A hyphenated guard/action passes every structural check but can never be
+	// extracted from the contract table, so G3 reports a phantom "no named-unit
+	// contract row". Lint must reject it at the source (Finding 1).
+	m, _ := ir.LoadMachineJSONStr("w", `{"id":"widget","initial":"Draft","states":{
+		"Draft":{"on":{"publish":[
+			{"target":"Published","guard":"guard-can-publish","actions":"set-pending"}]}},
+		"Published":{"type":"final"}}}`)
+	errs := errsOf(t, m, "w")
+	if !contains(errs, "guard 'guard-can-publish' is not a valid identifier") {
+		t.Errorf("expected the kebab-case guard to be rejected, got: %v", errs)
+	}
+	if !contains(errs, "action 'set-pending' is not a valid identifier") {
+		t.Errorf("expected the kebab-case action to be rejected, got: %v", errs)
+	}
+}
+
+func TestCamelCaseUnitNamesAreClean(t *testing.T) {
+	// The reference examples are camelCase; the identifier check must not flag them.
+	for _, e := range errsOf(t, minimalMachine(), "w") {
+		if strings.Contains(e, "is not a valid identifier") {
+			t.Errorf("camelCase unit wrongly rejected: %s", e)
+		}
+	}
+}
+
 func TestUnknownRootKeyIsError(t *testing.T) {
 	m := minimalMachine()
 	m.AsObject().Set("fancyExtension", ir.BoolValue(true))
