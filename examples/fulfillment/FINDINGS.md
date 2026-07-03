@@ -7,7 +7,7 @@ Target language: Elixir/OTP.
 
 ## What held up
 
-- **Modelith scaled.** The larger domain (12 entities, 6 enums, 28 invariants, 8 scenarios,
+- **Modelith scaled.** The larger domain (12 entities, 6 enums, 25 invariants, 8 scenarios,
   distributed failure semantics) lints clean, same as the small one. Gate 1 is not size-sensitive.
 - **Oracle generation generalized.** the oracle generator (now `machinery oracle`) produced the saga's transition oracle (17 rows)
   with no special casing.

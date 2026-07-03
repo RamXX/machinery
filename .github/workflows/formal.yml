@@ -1,4 +1,4 @@
-# formal.yml — TLC model-checking of every generated TLA+ spec.
+# formal.yml - TLC model-checking of every generated TLA+ spec.
 # Separated from ci.yml because the JVM setup is heavy and TLC is the slowest
 # job (~minutes per design). Runs on push/PR but is allowed to report
 # independently so a TLC regression is visible without masking faster checks.

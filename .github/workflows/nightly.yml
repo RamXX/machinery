@@ -1,5 +1,5 @@
-# nightly.yml — the deep, non-blocking checks that run once a day (and on the
-# 0.0 tag pushes). They do not block PRs; they surface drift on a cadence so
+# nightly.yml - the deep, non-blocking checks that run once a day (or on
+# manual dispatch). They do not block PRs; they surface drift on a cadence so
 # it cannot accumulate silently.
 name: nightly
 
@@ -74,7 +74,7 @@ jobs:
       - name: Golden corpus
         run: go test -count=1 -run TestGolden ./cmd/machinery
 
-  # Nightly govulncheck — catches newly-disclosed CVEs in dependencies between
+  # Nightly govulncheck - catches newly-disclosed CVEs in dependencies between
   # PRs. Mirrors the security.yml job but on the schedule so we learn of a vuln
   # the day it's disclosed, not the next time someone opens a PR.
   vulncheck-nightly:

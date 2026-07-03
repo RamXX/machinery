@@ -219,7 +219,11 @@ Field semantics:
   the one sanctioned edge" is written; but a literal allow and a literal deny of the same edge is
   a G2 error, not an override. Deny rules cannot reference boundaries that do not exist yet in
   `workspace.dsl`; keep planned-but-unbuilt boundaries in comments until they have DSL elements.
-- **Ids** (boundary and external) use letters, digits, underscore, dot, and hyphen.
+- **Ids** (boundary and external) are dot-separated segments; each segment starts with a letter
+  or underscore and continues with letters, digits, underscores, and hyphens
+  (`crm.api`, `external.rest-of-monolith`). A segment starting with a digit or a hyphen never
+  matches its mitigation row. Decomposition subsystem ids are stricter: bare names (letters,
+  digits, underscores, hyphens, interior dots), because they become path segments.
 - `contract_version: 2` names this format.
 
 G2 verifies: boundaries bind to `workspace.dsl` elements, no duplicate ids, no edge both literally

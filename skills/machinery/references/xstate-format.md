@@ -209,7 +209,8 @@ against the real dependency or a contract-tested fake; they are never derivable 
 For humans, a machine file also carries two underscore-prefixed helper keys that are NOT part of the
 XState config schema (the lint accepts exactly these plus the annotations above):
 
-- `_comment` - a header note stating placement and concurrency serialization (from C4 section 7).
+- `_comment` - a header note stating placement and concurrency serialization (from the
+  persistence-and-placement table in the C4 reference).
 - `_delays` - the named delays with their millisecond bounds and rationale, for example
   `"persistTimeout": "10000 ms - LadybugDB write timeout"`. The `after` blocks reference these by name.
 

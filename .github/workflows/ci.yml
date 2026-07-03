@@ -1,4 +1,4 @@
-# ci.yml — the required pipeline. Every push and PR must pass this.
+# ci.yml - the required pipeline. Every push and PR must pass this.
 # Coverage: build, lint (golangci-lint + gofmt + vet), unit tests (including
 # the adversarial gate-experiment suite and the golden-corpus regression net),
 # the example gate suites (all four examples), and the go-crm impl tests. A single failure
@@ -99,7 +99,7 @@ jobs:
         run: go test -race -count=1 ./...
 
   # ---------------------------------------------------------------- gates ---
-  # Run the deterministic gate suite on all three shipped examples via the Go
+  # Run the deterministic gate suite on every shipped example via the Go
   # binary. This is the dogfood: machinery checks its own reference designs.
   gates:
     runs-on: ubuntu-latest
@@ -112,13 +112,13 @@ jobs:
           cache: true
       - name: Build machinery
         run: make build
-      - name: Gate suite — go-crm (design + impl)
+      - name: Gate suite - go-crm (design + impl)
         run: .bin/machinery check examples/go-crm/design --impl examples/go-crm/impl
-      - name: Gate suite — fulfillment (design only)
+      - name: Gate suite - fulfillment (design only)
         run: .bin/machinery check examples/fulfillment/design
-      - name: Gate suite — portfolio-engine (design only)
+      - name: Gate suite - portfolio-engine (design only)
         run: .bin/machinery check examples/portfolio-engine/design
-      - name: Gate suite — checkout-split (recursive decomposition, parent + children)
+      - name: Gate suite - checkout-split (recursive decomposition, parent + children)
         run: |
           .bin/machinery check examples/checkout-split/parent/design
           .bin/machinery check examples/checkout-split/orders/design
@@ -141,9 +141,10 @@ jobs:
   # -------------------------------------------------------------- golden ---
   # The golden-corpus scoreboard, REQUIRED. The corpus under testdata/golden
   # was captured at Python parity and is now the binary's own byte-for-byte
-  # regression net across every subcommand and example (stdout/stderr/exit and
-  # every generated artifact). An intended output change re-captures with
-  # `go test ./cmd/machinery -run TestGolden -update` and reviews the diff.
+  # regression net (stdout/stderr/exit and every generated artifact) for the
+  # deterministic subcommands across the examples. An intended output change
+  # re-captures with `go test ./cmd/machinery -run TestGolden -update` and
+  # reviews the diff.
   golden:
     runs-on: ubuntu-latest
     steps:
@@ -152,17 +153,18 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Golden corpus (byte-for-byte, all subcommands, all examples)
+      - name: Golden corpus (byte-for-byte, deterministic subcommands)
         run: go test -count=1 -run TestGolden ./cmd/machinery
       - name: Adversarial gate-experiment suite
         run: go test -count=1 ./internal/experiments/
 
   # ------------------------------------------------------------ docs gate ---
-  # The toolchain command surface is documented in five places (README, SKILL,
-  # agent prompts, template, tools README). This gate fails on any reference
-  # to the deleted Python toolchain so the surfaces cannot drift apart again
-  # (the exact class of rot the Go port shipped with). Historical mentions are
-  # allowed only in internal/README-contract.md and Go package docs.
+  # The toolchain command surface is documented in six places (README, SKILL,
+  # agent prompts, template, tools README, and the team guide in docs/). This
+  # gate fails on any reference to the deleted Python toolchain so the surfaces
+  # cannot drift apart again (the exact class of rot the Go port shipped with).
+  # Historical mentions are allowed only in internal/README-contract.md and Go
+  # package docs.
   docs:
     runs-on: ubuntu-latest
     steps:
@@ -170,14 +172,17 @@ jobs:
       - name: No stale Python-toolchain references in the doc surface
         run: |
           if grep -rnE "python3|PyYAML|pyyaml|uv run|oracle_gen\.py|machine_lint\.py|machinery_check\.py|tla_gen\.py|refine_gen\.py|compose_gen\.py|diff-all\.sh|capture-golden\.sh" \
-              README.md skills/ agents/ Makefile; then
+              README.md skills/ agents/ docs/ Makefile; then
             echo "::error::stale Python-toolchain reference found (the toolchain is the Go binary)"
             exit 1
           fi
           echo "doc surface clean"
+      # The pattern is spelled with an ANSI-C \u escape so this file itself
+      # stays free of the literal character and the grep can scan .github/
+      # without self-matching.
       - name: No em dashes in the doc surface (house style)
         run: |
-          if grep -rn $'—' README.md skills/ agents/; then
+          if grep -rn $'\u2014' README.md skills/ agents/ docs/ Makefile .github/; then
             echo "::error::em dash found; house style forbids it"
             exit 1
           fi
