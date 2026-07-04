@@ -349,9 +349,12 @@ func CheckC4(design string) *Gate {
 	}
 	allow := contractEdges(rules, "allow", g)
 	deny := contractEdges(rules, "deny", g)
+	baseline := contractEdges(rules, "baseline", g)
 	g.Count("allow rules", len(allow))
 	g.Count("deny rules", len(deny))
-	for _, e := range append(allow, deny...) {
+	g.Count("baseline rules", len(baseline))
+	all := append(append(append([][2]string{}, allow...), deny...), baseline...)
+	for _, e := range all {
 		for _, side := range e {
 			if strings.Contains(side, "*") {
 				continue
@@ -370,6 +373,16 @@ func CheckC4(design string) *Gate {
 		if denySet[e] {
 			g.Errs = append(g.Errs, fmt.Sprintf("edge %s -> %s is both allowed and denied", e[0], e[1]))
 			denySet[e] = false // report each edge once even if listed twice
+		}
+	}
+	// allow+baseline contradicts (an allowed edge is not a violation, so there
+	// is nothing to amnesty); deny+baseline is legitimate and recommended: the
+	// deny records the intent, the baseline records the tolerated debt
+	baseSet := edgeSet(baseline)
+	for _, e := range allow {
+		if baseSet[e] {
+			g.Errs = append(g.Errs, fmt.Sprintf("edge %s -> %s is both allowed and baselined; baseline marks tolerated violations, an allowed edge needs no amnesty", e[0], e[1]))
+			baseSet[e] = false
 		}
 	}
 

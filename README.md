@@ -215,8 +215,14 @@ code-is-truth (fix the model) or model-is-truth (file the code defect). From the
 is the operating loop: design changes as diffs, stable-id oracle diffs as the affected-test list,
 and state-migration notes for persisted machines, which a brownfield system has on day one. The
 first modeling pass is a real investment, roughly proportional to how undocumented the system is.
-For the staged team adoption protocol (baseline allow rules, incremental `--gate` lists, merge and
-CI recipes), see the [brownfield team guide](docs/brownfield-team-guide.md).
+Day one of adoption is a command, not a transcription exercise: `machinery baseline <design>
+--impl .` scans the code exactly as G4 does, proposes the `baseline:` rules that tolerate today's
+violating edges (structurally distinct from intended `allow:` rules, and compatible with a `deny:`
+that keeps the intent written), and records `design/ratchet.json`, the snapshot that makes any NEW
+offender file on an amnestied edge a blocking finding, so the baseline can only shrink silently,
+never grow. For the staged team adoption protocol (the baseline and ratchet flow, incremental
+`--gate` lists, merge and CI recipes), see the
+[brownfield team guide](docs/brownfield-team-guide.md).
 
 ## Which model to use where
 
@@ -320,6 +326,7 @@ machinery install                     # place the skill + role docs into your ag
 machinery uninstall                   # remove them
 machinery preflight                   # check prerequisites (warns; installs nothing)
 machinery check <your-design>         # run the deterministic gate suite
+machinery baseline <design> --impl .  # brownfield Stage 1: propose baseline rules, write the ratchet
 machinery verify-formal <your-design> # regenerate + TLC-check the proofs (needs Java)
 machinery oracle <machines-dir>       # regenerate the transition oracles from the machine JSON
 ```

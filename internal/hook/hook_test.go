@@ -163,6 +163,8 @@ func TestPreDeniesGeneratedArtifacts(t *testing.T) {
 		{"design/formal/Deal.cfg", "MultiEdit", true, "verify-formal"},
 		{"design/packs/billing.pack/domain.yaml", "Write", true, "pack generate"},
 		{"design/pack/contract.machine.json", "Edit", true, "frozen pack"},
+		{"design/ratchet.json", "Edit", true, "machinery baseline"},
+		{"design/ratchet.json", "Write", true, "defeats the ratchet"},
 		{"design/formal/Deal.semantics.yaml", "Edit", false, ""}, // annotation source
 		{"design/machines/Deal.machine.json", "Edit", false, ""}, // machine source
 		{"design/machines/Deal.matrix.md", "Edit", false, ""},    // hand matrix
@@ -365,6 +367,56 @@ func TestStopMissingDesignDirWarns(t *testing.T) {
 	}
 	if got.Decision == "block" || !strings.Contains(got.SystemMessage, "blueprint") {
 		t.Fatalf("a missing design dir warns and skips, got %+v", got)
+	}
+}
+
+// writeG4Fixture builds a managed root whose impl has one undeclared
+// cross-boundary import (alpha -> beta), so G4 is red at stop time.
+func writeG4Fixture(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, ConfigName), `{"impl":"."}`)
+	arch := "# Architecture\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
+		"  - id: alpha\n    code: [\"alpha/**\"]\n  - id: beta\n    code: [\"beta/**\"]\n```\n"
+	writeFile(t, filepath.Join(root, "design", "ARCHITECTURE.md"), arch)
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/m\n")
+	writeFile(t, filepath.Join(root, "alpha", "a.go"), "package alpha\n\nimport \"example.com/m/beta\"\n")
+	writeFile(t, filepath.Join(root, "beta", "b.go"), "package beta\n")
+	return root
+}
+
+func TestStopImportFindingsDisarmedThenArmed(t *testing.T) {
+	root := writeG4Fixture(t)
+	sid := "s-arming"
+	t.Cleanup(func() { clearState(root, sid) })
+
+	// no ratchet.json: pre-baseline debt warns with the arming instruction
+	appendState(root, sid, "impl")
+	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	var got stopOut
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("stop output is not JSON: %v (%q)", err, out)
+	}
+	if got.Decision == "block" {
+		t.Fatalf("import findings must not block before a baseline exists: %+v", got)
+	}
+	if !strings.Contains(got.SystemMessage, "disarmed") || !strings.Contains(got.SystemMessage, "machinery baseline") {
+		t.Fatalf("the warning must name the arming step: %+v", got)
+	}
+
+	// an empty snapshot (greenfield arming) makes the same finding block
+	writeFile(t, filepath.Join(root, "design", "ratchet.json"), `{"date":"2026-07","edges":{}}`)
+	appendState(root, sid, "impl")
+	out = runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	got = stopOut{}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("stop output is not JSON: %v (%q)", err, out)
+	}
+	if got.Decision != "block" {
+		t.Fatalf("with the baseline recorded an import finding must block: %+v", got)
+	}
+	if !strings.Contains(got.Reason, "undeclared cross-boundary edge") {
+		t.Fatalf("the block must carry the gate output: %q", got.Reason)
 	}
 }
 

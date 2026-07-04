@@ -4,7 +4,7 @@ This guide is for a small team (roughly 2 to 8 developers) adopting machinery on
 existing repository that has grown messy, with the goal of clawing back to a sustainable,
 gated model. The greenfield pipeline in `skills/machinery/SKILL.md` still applies; this
 document covers what changes when the code already exists and when more than one person
-works the design at once. Every recipe here was verified against machinery v0.1.0.
+works the design at once. Every recipe here was verified against machinery v0.1.6.
 
 ## 1. Calibrate expectations first: what the tool sees, and what it never sees
 
@@ -48,8 +48,8 @@ team gets a ratchet, not a big bang. The stage you are on is encoded in one plac
 
 ### Stage 0: pin the toolchain, create the design directory
 
-- Install a pinned machinery release (`MACHINERY_VERSION=v0.1.0`) or
-  `go install github.com/RamXX/machinery/cmd/machinery@v0.1.0`. Pin modelith too
+- Install a pinned machinery release (`MACHINERY_VERSION=v0.1.6`) or
+  `go install github.com/RamXX/machinery/cmd/machinery@v0.1.6`. Pin modelith too
   (`v0.4.0`; `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` installs the pinned release, and
   `machinery preflight` warns when the installed version does not match the pin. Keep the
   pin in your CI file as well).
@@ -59,42 +59,63 @@ team gets a ratchet, not a big bang. The stage you are on is encoded in one plac
 ### Stage 1: boundary baseline (gates g2 and g4, day one)
 
 The goal of this stage: the intended clean boundaries are written down, today's violations
-are explicitly recorded, and CI fails on any NEW kind of violation. This is achievable in
-one day and needs no domain model and no machines.
+are explicitly recorded and pinned, and CI fails on any NEW violation. The gates need no
+domain model and no machines at this stage, but you do: the intended boundaries are a
+domain claim, and the code alone cannot tell you what they should be.
 
-1. Author `design/workspace.dsl` and `design/ARCHITECTURE.md` with an Architecture
+1. **Start with the domain conversation, not the DSL.** Before drawing a single boundary,
+   run the opening of the Modelith interrogation with whoever owns the system: what are
+   the real entities, where does one word carry two meanings, and, for every tangle the
+   code shows, the question that actually matters: "this looks messy because <specific
+   observation>; what is your desired end state?" The answers are the intended boundaries
+   of step 2 and the `deny:` intent of step 3; skipping this step produces boundaries that
+   mirror the mess instead of naming the way out. The full domain model can keep growing
+   through Stage 2; the dialog starts here. (When your agents have a codebase-graph MCP
+   such as codebase-memory-mcp, index the repository and drive this exploration through
+   it; the graph surfaces the tangles worth asking about faster than file reading.)
+2. Author `design/workspace.dsl` and `design/ARCHITECTURE.md` with an Architecture
    Contract (v2) describing the boundaries you INTEND, one boundary per package or package
    group you are claiming. Ids are dot-separated segments, each starting with a letter or
    underscore and continuing with letters, digits, underscores, and hyphens.
-2. Everything you have not modeled yet needs BOTH of these, not one or the other:
-   - `ignore:` globs covering the unmodeled packages' own source files, so G4 does not
-     error on every file that maps to no boundary.
-   - For unmodeled internal packages that modeled code still imports: declare a single
-     external, for example `external.rest_of_monolith`, list those packages under its
-     `imports:` prefixes, add `allow: [yourboundary -> external.rest_of_monolith]`, and
-     give it a mitigation row whose posture is recorded as "own unmodeled code, out of
-     scope until modeled". G2 requires the row even for your own code; write it truthfully
-     rather than fighting it. The `imports:` prefixes govern only the edges INTO that code;
-     they do not exempt its files, which is what the `ignore:` globs are for.
-3. Baseline today's real violations as explicit `allow:` rules, each tagged with a
-   comment such as `# BASELINE 2026-07: orders reaches into billing directly`. Do not use
-   a matching `deny:` to record intent for the same literal edge: G2 rejects an edge that
-   is both allowed and denied. Intent lives in the comment and in the ratchet review.
-4. CI runs `machinery check design --impl . --gate g2,g4`. From this moment, a new
-   undeclared cross-boundary edge fails the build.
+3. Run `machinery baseline design --impl .` and work through its three outputs:
+   - **Proposed `baseline:` rules**, one per violating edge, with a dated witness comment.
+     Review each against the step-1 answers and paste the survivors into
+     `dependency_rules`. A `baseline:` edge is a tolerated violation, structurally
+     distinct from an intended `allow:`; add a `deny:` for the same edge when it should
+     eventually die (deny plus baseline is legitimate: the deny is the intent, the
+     baseline the debt, and the deny takes over the moment the baseline entry is deleted).
+   - **Suggested `ignore:` globs** for source files outside every boundary. Unmodeled code
+     needs BOTH the ignore globs (so its own files do not error) AND, where modeled code
+     still imports it, a declared external such as `external.rest_of_monolith` with those
+     packages under `imports:` prefixes, an `allow:` into it, and a truthful mitigation
+     row ("own unmodeled code, out of scope until modeled").
+   - **`design/ratchet.json`**, the set-based snapshot of every baselined edge's offender
+     files. Commit it; it is generated, so never hand-edit it (the machinery Claude Code
+     plugin denies such edits), and review its diff in PRs like any contract change.
+4. CI runs `machinery check design --impl . --gate g2,g4`. From this moment two things
+   fail the build: a new undeclared cross-boundary edge, and a new offender file on a
+   baselined edge (the ratchet). Committing `ratchet.json` is also what arms the machinery
+   Claude Code plugin's turn-end import blocking, so agent sessions are held to the same
+   line as CI.
 
-Know the baseline's one hole: an `allow` rule amnesties the whole edge, including files
-written next year. A new file that repeats a baselined violation passes silently. The
-ratchet therefore needs a human cadence: put a recurring calendar slot (monthly works) on
-shrinking the BASELINE list and the `ignore:` globs, and treat a quarter with zero
-shrinkage as a warning sign that the gate has become wallpaper.
+What the ratchet does and does not close: a baselined edge can no longer grow silently
+(the snapshot pins its offender files, and growth is an ERROR naming the new files), but
+`ignore:` globs remain unratcheted amnesty for whole directories, and a deliberate
+`machinery baseline` rerun accepts current reality by design. So the human cadence still
+matters, just with better instruments: a recurring slot (monthly works) on shrinking the
+`baseline:` list and the `ignore:` globs, rerunning `machinery baseline` after each
+burn-down so the "ratchet can tighten" notes become the agenda, and treating a quarter
+with zero shrinkage as the gate becoming wallpaper.
 
 ### Stage 2: domain archaeology and the first machines (add gate g3)
 
-- Model the domain AS IT IS, not as you wish it were. The entities, statuses, and actions
-  come out of the code and the database, not out of a product conversation. Where the code
-  is incoherent (two meanings for one word), record the incoherence as an open question in
-  the model rather than silently picking a winner.
+- Continue the domain model Stage 1 started, AS IT IS, not as you wish it were. The
+  entities, statuses, and actions come out of the code and the database; the vocabulary
+  disputes and the desired end state come out of the conversation with the owners, and
+  both belong in the model. Where the code is incoherent (two meanings for one word),
+  record the incoherence as an open question in the model rather than silently picking a
+  winner. Use the codebase graph (codebase-memory-mcp or equivalent, indexed first) to
+  excavate lifecycles and call chains instead of grepping.
 - Keep the domain model trimmed to the slice you are gating. Gx has no per-entity waiver:
   every entity with a lifecycle enum must have a machine before Gx passes. Machine-at-a-time
   adoption therefore means the domain model grows entity by entity alongside the machines.
@@ -168,9 +189,10 @@ and is the default attestor for that design's LLM-attested gate halves.
   matters: two individually green design PRs can merge into a stale combination.
 
 **Merge protocol for generated files.** Never hand-resolve a conflict in a generated file.
-On any conflict in `*.oracle.md`, `formal/*.tla|cfg`, or `packs/`: take either side,
-regenerate (`machinery oracle design/machines`, `machinery verify-formal design`, or
-`machinery pack generate`), commit, and let `machinery check` arbitrate the result. The
+On any conflict in `*.oracle.md`, `formal/*.tla|cfg`, `packs/`, or `ratchet.json`: take
+either side, regenerate (`machinery oracle design/machines`, `machinery verify-formal
+design`, `machinery pack generate`, or `machinery baseline design --impl .`), commit, and
+let `machinery check` arbitrate the result. The
 sources (machine JSON, matrix, contract, domain model) merge like ordinary text and their
 conflicts are resolved by humans as usual; the generated layer is always reconstructed,
 never merged.
@@ -192,8 +214,8 @@ jobs:
       - uses: actions/checkout@<pinned-sha>
       - name: Install machinery (pinned)
         run: |
-          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.1.0/machinery-linux-amd64
-          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.1.0/checksums-sha256.txt
+          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.1.6/machinery-linux-amd64
+          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.1.6/checksums-sha256.txt
           grep machinery-linux-amd64 checksums-sha256.txt | sha256sum -c -
           install -m 0755 machinery-linux-amd64 /usr/local/bin/machinery
       - name: Install modelith (pinned)
@@ -255,8 +277,10 @@ the other half is somebody's memory" and a design history you can audit.
 
 ## 8. Sharp edges (verified, work around until fixed)
 
-- No built-in baseline or ratchet mechanism: the BASELINE comment convention in section 3
-  is manual, and allow rules amnesty future files on the same edge.
+- The ratchet is scoped to baselined edges: it catches every new offender file on an
+  amnestied edge, but `ignore:` globs still amnesty whole directories unratcheted, and a
+  deliberate `machinery baseline` rerun accepts growth by design. Review `ratchet.json`
+  diffs in PRs; an unexplained regrowth in that diff is the tell.
 - Gx requires a machine for every lifecycle enum in the domain model, with no per-entity
   waiver; trim the model to the gated slice instead.
 - G4 reports violations per edge, naming one witness file plus a count of additional
@@ -271,7 +295,8 @@ the other half is somebody's memory" and a design history you can audit.
 
 ## 9. What "sustainable" looks like (the exit criteria)
 
-You are done adopting when, for each design: the BASELINE allow list is empty; `ignore:`
+You are done adopting when, for each design: the `baseline:` list is empty and
+`ratchet.json` records no edges; `ignore:`
 covers test scaffolding only; every lifecycle enum has a machine and Gx is in the CI gate
 list; the characterization suite is fully adjudicated and locked; CI runs the full check
 on every PR plus formal verification at least nightly; and a new hire cannot merge a

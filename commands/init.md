@@ -16,19 +16,27 @@ no-op until the project root has a `.machinery.json` (or a conventional
      artifacts appear) or an explicit list for brownfield adoption
      (day one is typically `g2,g4`; see docs/brownfield-team-guide.md),
    - enable the import-boundary gate G4 on source edits now? (sets `impl`,
-     usually `.`; requires the Architecture Contract to declare boundary
-     `modules:`, otherwise it will fail loudly on every file),
+     usually `.`; requires the Architecture Contract's boundaries to declare
+     `code:` globs, otherwise it will fail loudly on every file),
    - strict mode: block the end of any turn on ANY red gate finding, not
      only DRIFT and import violations (default off; right for repos whose
      design is complete and ratcheted).
 3. Write `.machinery.json` with only the fields that differ from the
    defaults, for example: {"gates": "g2,g4", "impl": "."}
-4. Run `machinery preflight`; if the binary or modelith is missing, point at
+4. When `impl` is enabled, arm the import blocking: run
+   `machinery baseline <design> --impl <impl>`, have the user review and
+   paste the proposed `baseline:` rules into the Architecture Contract, and
+   commit `<design>/ratchet.json`. Import findings only WARN at turn end
+   until that snapshot exists (blocking a session on pre-existing debt would
+   invite silent amnesty); on a clean greenfield repo the command writes an
+   empty snapshot, which is the arming marker.
+5. Run `machinery preflight`; if the binary or modelith is missing, point at
    the one-line installer in the README.
-5. Remind the user that hooks load at session start: the governance hooks
+6. Remind the user that hooks load at session start: the governance hooks
    take effect on the next Claude Code session in this project.
-6. For brownfield adoption, offer to start the archaeology run with
+7. For brownfield adoption, offer to start the archaeology run with
    /machinery:design brownfield, and point at docs/brownfield-team-guide.md
-   for the team adoption ladder, baseline allow rules, and CI recipes.
+   for the team adoption ladder, the baseline and ratchet flow, and CI
+   recipes.
 
 Arguments: $ARGUMENTS
