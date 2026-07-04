@@ -1,6 +1,6 @@
 {
   "name": "machinery",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Design software as a build-ready, formally verified blueprint, then hold the line: the four-phase machinery skill, the FSM and BUILD.md author agents, slash commands, and hooks that enforce the deterministic gates in machinery-managed repos (a strict no-op everywhere else).",
   "author": {
     "name": "RamXX",
