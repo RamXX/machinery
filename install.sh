@@ -10,8 +10,11 @@
 #
 # Environment overrides (all optional):
 #   MACHINERY_VERSION      release tag to install, or "latest" (default: latest)
-#   MACHINERY_HOMES        space-separated agent homes; the FIRST is canonical
-#                          (default: "$HOME/.agents $HOME/.claude")
+#   MACHINERY_HOMES        space-separated agent homes; the FIRST is canonical.
+#                          Unset, the binary uses its defaults ("$HOME/.agents"
+#                          then "$HOME/.claude") and skips any home the Claude
+#                          Code plugin already serves; setting this passes the
+#                          homes explicitly, which always wins over that skip.
 #   INSTALL_DIR            where the CLI binary lands (default: "$HOME/.local/bin")
 #   MACHINERY_REPO         owner/name to fetch from (default: RamXX/machinery)
 #   MACHINERY_BIN          use this machinery binary instead of downloading (dev/test)
@@ -21,7 +24,7 @@ set -eu
 REPO="${MACHINERY_REPO:-RamXX/machinery}"
 VERSION="${MACHINERY_VERSION:-latest}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
-HOMES="${MACHINERY_HOMES:-$HOME/.agents $HOME/.claude}"
+HOMES="${MACHINERY_HOMES:-}"
 
 say() { printf '%s\n' "$*"; }
 die() { printf 'install: %s\n' "$*" >&2; exit 1; }
@@ -86,6 +89,9 @@ else
 fi
 
 # --- place the skill + role docs (the binary owns this) --------------------
+# No --home flags unless MACHINERY_HOMES is set: the binary's default home
+# list already skips any home the Claude Code plugin serves, and an explicit
+# --home is the documented way to override that.
 set -- install
 for h in $HOMES; do
   set -- "$@" --home "$h"
