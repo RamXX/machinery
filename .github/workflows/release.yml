@@ -64,6 +64,21 @@ jobs:
           go build -trimpath -ldflags "-s -w -X main.version=${{ steps.ver.outputs.version }}" \
             -o "dist/$binary" ./cmd/machinery
           echo "Built dist/$binary"
+      - name: Package tarball (pvg-compatible)
+        if: matrix.goos != 'windows'
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        # Convergence managers that follow the goreleaser convention (pvg's
+        # channel installer) expect <tool>_<ver>_<os>_<arch>.tar.gz containing
+        # the bare `machinery` binary, verified against checksums.txt. The
+        # bare per-platform binaries above remain for install.sh.
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          plain="${version#v}"
+          cp "dist/machinery-${GOOS}-${GOARCH}" machinery
+          tar czf "dist/machinery_${plain}_${GOOS}_${GOARCH}.tar.gz" machinery
+          rm machinery
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: machinery-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -91,10 +106,15 @@ jobs:
       - name: Generate checksums
         working-directory: dist
         run: sha256sum machinery-* | tee checksums-sha256.txt
+      - name: Generate goreleaser-style checksums (pvg-compatible)
+        working-directory: dist
+        run: sha256sum machinery_*.tar.gz | tee checksums.txt
       - name: Attest build provenance (SLSA)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-path: dist/machinery-*
+          subject-path: |
+            dist/machinery-*
+            dist/machinery_*.tar.gz
       - name: Create release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
@@ -103,4 +123,6 @@ jobs:
           generate_release_notes: true
           files: |
             dist/machinery-*
+            dist/machinery_*.tar.gz
             dist/checksums-sha256.txt
+            dist/checksums.txt
