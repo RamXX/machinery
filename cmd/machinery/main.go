@@ -9,11 +9,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// version is set at link time via -ldflags "-X main.version=v0.1.4" (the
+// version is set at link time via -ldflags "-X main.version=v0.1.5" (the
 // Makefile and the release workflow both inject it). The -dev default below is
 // what a bare `go build` without ldflags reports, so an ad-hoc build is never
 // mistaken for a released binary.
-var version = "v0.1.4-dev"
+var version = "v0.1.5-dev"
 
 func main() {
 	root := &cobra.Command{

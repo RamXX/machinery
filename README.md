@@ -280,7 +280,7 @@ anything missing; it installs nothing.
   This puts the `machinery` binary on `~/.local/bin` and runs `machinery install` to place the skill
   + role docs into your agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see
   [Agent homes](#agent-homes)). Override with environment variables, for example
-  `MACHINERY_VERSION=v0.1.4`, `INSTALL_DIR=/usr/local/bin`, or `MACHINERY_HOMES="$HOME/.claude"`.
+  `MACHINERY_VERSION=v0.1.5`, `INSTALL_DIR=/usr/local/bin`, or `MACHINERY_HOMES="$HOME/.claude"`.
 
   **Binary by hand** (macOS arm64/x86, Linux amd64/arm64, Windows amd64): download
   `machinery-<os>-<arch>` from the [releases page](https://github.com/RamXX/machinery/releases), put
