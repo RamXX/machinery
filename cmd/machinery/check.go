@@ -3,13 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"sort"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/RamXX/machinery/internal/gates"
-	"github.com/RamXX/machinery/internal/pack"
 )
 
 func newCheckCmd() *cobra.Command {
@@ -29,58 +26,24 @@ func newCheckCmd() *cobra.Command {
 			exitFunc(1)
 			return nil
 		}
-		gatesToRun := map[string]bool{}
-		explicit := gateList != ""
-		gs := "g2,g3,gx,g4,g5"
-		if !explicit && pack.HasDecomposition(design) {
-			if fi, err := os.Stat(design + "/machines"); err != nil || !fi.IsDir() {
-				// a pure decomposed parent authors no machines: its behavior
-				// layer is the children's, held by the packs; G3/Gx run there
-				gs = "g2,g5"
-				fmt.Fprintln(stdoutW, "note: decomposed parent with no machines/; running g2,g5 (G3/Gx/G4 run on the child designs)")
-			}
+		sel, err := gates.Select(design, gateList)
+		if sel.Note != "" {
+			fmt.Fprintln(stdoutW, sel.Note)
 		}
-		if explicit {
-			gs = gateList
-		}
-		for _, g := range strings.Split(strings.ToLower(gs), ",") {
-			gatesToRun[strings.TrimSpace(g)] = true
-		}
-		var unknown []string
-		for g := range gatesToRun {
-			if g != "g2" && g != "g3" && g != "gx" && g != "g4" && g != "g5" {
-				unknown = append(unknown, g)
-			}
-		}
-		if len(unknown) > 0 {
-			sort.Strings(unknown)
-			fmt.Fprintf(stderrW, "machinery_check: unknown gate(s): %s\n", strings.Join(unknown, ", "))
+		if err != nil {
+			fmt.Fprintf(stderrW, "machinery_check: %s\n", err)
 			exitFunc(1)
 			return nil
 		}
-		if gatesToRun["g4"] && explicit && implDir == "" {
+		if sel.Run["g4"] && sel.Explicit && implDir == "" {
 			fmt.Fprintln(stderrW, "machinery_check: --gate g4 requires --impl")
 			exitFunc(1)
 			return nil
 		}
 
 		fail := 0
-		if gatesToRun["g2"] {
-			fail += gates.CheckC4(design).Emit(stdoutW)
-		}
-		if gatesToRun["g3"] {
-			fail += gates.CheckMachines(design).Emit(stdoutW)
-		}
-		if gatesToRun["gx"] {
-			fail += gates.CheckTraceability(design).Emit(stdoutW)
-		}
-		if gatesToRun["g4"] && implDir != "" {
-			fail += gates.CheckImports(design, implDir).Emit(stdoutW)
-		}
-		// G5 runs by default only on decomposed designs; asking for it
-		// explicitly on a plain design is an error, never a silent pass
-		if gatesToRun["g5"] && (explicit || pack.HasDecomposition(design) || pack.HasPack(design)) {
-			fail += gates.CheckPack(design).Emit(stdoutW)
+		for _, g := range gates.RunSelected(design, implDir, sel) {
+			fail += g.Emit(stdoutW)
 		}
 		fmt.Fprintf(stdoutW, "\n%d blocking (ERROR/DRIFT) finding(s)\n", fail)
 		if fail > 0 {

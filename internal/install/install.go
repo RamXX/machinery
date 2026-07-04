@@ -68,6 +68,21 @@ func Install(opts Options) error {
 		if homes, err = absHomes(DefaultHomes()); err != nil {
 			return err
 		}
+		// The Claude Code plugin ships the same skill + role docs; placing a
+		// second copy into a home the plugin already serves would duplicate
+		// them. Only the default list is filtered: an explicit --home wins.
+		kept := homes[:0]
+		for _, h := range homes {
+			if pluginInstalled(h) {
+				fmt.Fprintf(out, "skipping %s: the machinery Claude Code plugin already provides the skill + role docs there\n", h)
+				continue
+			}
+			kept = append(kept, h)
+		}
+		homes = kept
+		if len(homes) == 0 {
+			return nil
+		}
 	}
 
 	src := opts.From
@@ -135,6 +150,16 @@ func Uninstall(homes []string, out io.Writer) error {
 		fmt.Fprintf(out, "removed machinery -> %s\n", home)
 	}
 	return nil
+}
+
+// pluginInstalled reports whether the machinery Claude Code plugin is cached
+// under home (a ~/.claude-style config dir). The glob follows the plugin
+// cache layout <home>/plugins/cache/<marketplace>/<plugin>; if that layout
+// ever changes the worst case is a benign duplicate skill, exactly the
+// pre-plugin behavior.
+func pluginInstalled(home string) bool {
+	m, _ := filepath.Glob(filepath.Join(home, "plugins", "cache", "*", "machinery"))
+	return len(m) > 0
 }
 
 func absHomes(homes []string) ([]string, error) {

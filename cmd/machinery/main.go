@@ -39,6 +39,7 @@ func main() {
 	root.AddCommand(newInstallCmd())
 	root.AddCommand(newUninstallCmd())
 	root.AddCommand(newIRDumpCmd()) // hidden: the Phase-2 parity probe
+	root.AddCommand(newHookCmd())   // hidden: Claude Code plugin plumbing
 
 	// top-level --version
 	ver := &cobra.Command{
