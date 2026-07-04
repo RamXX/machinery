@@ -216,7 +216,7 @@ is the operating loop: design changes as diffs, stable-id oracle diffs as the af
 and state-migration notes for persisted machines, which a brownfield system has on day one. The
 first modeling pass is a real investment, roughly proportional to how undocumented the system is.
 For the staged team adoption protocol (baseline allow rules, incremental `--gate` lists, merge and
-CI recipes), see `docs/brownfield-team-guide.md`.
+CI recipes), see the [brownfield team guide](docs/brownfield-team-guide.md).
 
 ## Which model to use where
 
@@ -346,6 +346,35 @@ The gate tools are a single Go binary (no Python runtime). `verify-formal` downl
 checksum-verified `tla2tools.jar` on first use. CI runs the test suite, all gate runs, the full formal
 suite, cross-compile builds, security scanning, and the go-crm build on every push.
 
+### Claude Code plugin (optional, recommended for Claude Code)
+
+For Claude Code specifically, this repository is also a plugin: the same skill and role agents,
+plus `/machinery:design`, `/machinery:check`, `/machinery:init`, and `/machinery:status` commands,
+plus hooks that make the deterministic half of the gates non-optional inside every session. Install
+the binary first (the hooks call it), then the plugin:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh
+```
+
+```
+/plugin marketplace add RamXX/machinery
+/plugin install machinery@machinery
+```
+
+In a machinery-managed project (a `.machinery.json` at the root, or the conventional
+`design/domain.modelith.yaml`), the hooks: announce the governance contract at session start, deny
+hand-edits to generated artifacts (`*.oracle.md`, `formal/*.tla` and `*.cfg`, `packs/`, `pack/`),
+and run `machinery check` before any turn that touched the design (or watched sources, with
+`"impl"` configured) is allowed to end; DRIFT and import-boundary violations block, mid-phase
+ERRORs only warn. In every other repository the hooks are a strict no-op: they exit before reading
+anything, so the plugin never disturbs other projects or plugins. Details, including the
+`.machinery.json` reference: the [Claude Code plugin guide](docs/claude-plugin.md).
+
+With the plugin installed, `machinery install` detects it and skips `~/.claude` (the plugin already
+serves the skill and agents there); other agent homes are unaffected, and non-Claude users need no
+plugin: the `machinery install` path above is unchanged.
+
 ## Quickstart (five minutes)
 
 Install without cloning, then run the binary on any design:
@@ -392,7 +421,8 @@ project you want to design:
 Design a new <system> with machinery.
 ```
 
-The conductor takes it from Phase 0. It is fully standalone: no tracker, no project settings, no
+With the Claude Code plugin, `/machinery:design <what you want>` does the same thing explicitly,
+and `/machinery:status` reports where a design stands. The conductor takes it from Phase 0. It is fully standalone: no tracker, no project settings, no
 other process dependencies. Target languages it realizes: Elixir, Go, Rust, TypeScript, Python.
 
 ## How it is put together
@@ -406,6 +436,14 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   contract packs), `formal/` (TLC orchestration), `install/` (skill placement behind `machinery
   install`), `experiments/` (the shared mutation-experiment table). Every package has unit tests.
 - `agents/` two synthesis subagents (the machine author and the build-doc writer).
+- `commands/`, `hooks/`, and `.claude-plugin/` the Claude Code plugin surface: the slash commands,
+  the gate-enforcing hooks and their shim, and the plugin + marketplace manifests. The repo root is
+  the plugin; see the [Claude Code plugin guide](docs/claude-plugin.md).
+- `docs/` the deep dives: the [brownfield team guide](docs/brownfield-team-guide.md) (staged
+  adoption ladder, baseline allow rules, PR discipline, CI recipes), the
+  [Claude Code plugin guide](docs/claude-plugin.md) (hooks, `.machinery.json` reference, commands),
+  and the [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft
+  rung-4 design note, not yet implemented).
 - `examples/go-crm/` the worked example: `design/` (the blueprint and the formal models) and `impl/`
   (the verified Go build).
 - `examples/fulfillment/` the distributed stress test: `design/` only (six machines, eight proofs,

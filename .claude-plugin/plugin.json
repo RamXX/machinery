@@ -1,0 +1,23 @@
+{
+  "name": "machinery",
+  "version": "0.1.3",
+  "description": "Design software as a build-ready, formally verified blueprint, then hold the line: the four-phase machinery skill, the FSM and BUILD.md author agents, slash commands, and hooks that enforce the deterministic gates in machinery-managed repos (a strict no-op everywhere else).",
+  "author": {
+    "name": "RamXX",
+    "url": "https://github.com/RamXX"
+  },
+  "homepage": "https://github.com/RamXX/machinery",
+  "repository": "https://github.com/RamXX/machinery",
+  "license": "Apache-2.0",
+  "keywords": [
+    "design",
+    "architecture",
+    "state-machines",
+    "formal-verification",
+    "xstate",
+    "c4",
+    "tla",
+    "tdd",
+    "governance"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "machinery",
+  "owner": {
+    "name": "RamXX",
+    "url": "https://github.com/RamXX"
+  },
+  "metadata": {
+    "description": "machinery: design software as a build-ready, formally verified blueprint, with deterministic gates enforced by hooks in machinery-managed repos."
+  },
+  "plugins": [
+    {
+      "name": "machinery",
+      "source": "./",
+      "description": "Four-phase design pipeline (Modelith, C4, XState, BUILD.md) with deterministic gates, plus hooks that enforce them in machinery-managed repos and stay silent everywhere else."
+    }
+  ]
+}
