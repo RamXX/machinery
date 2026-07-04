@@ -132,16 +132,40 @@ versions with exact pins or a lockfile instruction, test framework and version, 
 tools (including how to run `machinery oracle` and `machinery check`).
 
 ## 11. Hard-TDD protocol (read this before writing any code)
-1. A test-writer agent reads sections 6 and 7 and writes the full test suite from the spec, keying
-   transition tests on the oracle stable ids.
-2. The tests are then LOCKED. The implementer agent may not modify them to make them pass.
-3. The implementer agent writes the code until the locked tests pass.
-4. Every oracle row has a test keyed on its stable id. Every guard-conjunction clause has its
-   falsifying test (section 7). Every invariant in section 3 is property-tested. Coverage target
-   and gates as stated in the project conventions.
-5. Generated tests live apart from hand-written tests (a marker comment or a directory), so
+1. RED precondition: run `machinery check design` (with this project's staged `--gate` list if it
+   declares one) and require ZERO blocking findings before deriving any test. The oracles are the
+   test spec; a red design means the spec itself cannot be trusted, and tests derived from it test
+   the wrong things with confidence. Fix the design first, never the tests.
+2. A test-writer agent reads sections 6 and 7 and writes the full test suite from the spec, keying
+   transition tests on the oracle stable ids. A runtime that cannot spawn a fresh-context
+   test-writer (no subagents) runs RED then GREEN sequentially with the same single agent; the
+   derivation rule is unchanged (tests come from sections 6 and 7 and the oracles, never from
+   implementation intentions), and the gate runs in steps 1 and 3 are what separate the phases in
+   place of context isolation.
+3. RED exit gate, all three deterministic checks required before anything locks:
+   a. Coverage of the spec: every oracle row's stable id appears whole-token somewhere in the
+      suite (verify with a grep per id; a missing id is a missing test), every guard-conjunction
+      clause has its falsifying test (section 7), every invariant in section 3 has its property
+      test.
+   b. Architecture: `machinery check design --impl <impl-dir>` is green. G4-import skips test
+      files but checks everything they import and every support file, so the compile skeleton,
+      stubs, and scaffolding the tests stand on already respect the Architecture Contract (put
+      test scaffolding under the contract's `ignore:` paths). A suite that only compiles against
+      a boundary violation would force the implementer to reproduce that violation to go green.
+   c. The suite RUNS and is red for the right reason: failing assertions on missing behavior,
+      never compile or import errors inside the tests themselves.
+   Together these are the guarantee: the spec is gate-checked, the suite's coverage of the spec is
+   id-checked, and the suite's own skeleton respects the architecture, so the implementer has no
+   correct move except delivering the designed behavior inside the designed boundaries.
+4. The tests are then LOCKED. The implementer agent may not modify them to make them pass.
+5. The implementer agent writes the code until the locked tests pass.
+6. GREEN acceptance bar, both together: the locked suite passes AND
+   `machinery check design --impl <impl-dir>` is green again. Code that passes the tests by
+   crossing a boundary fails the gate; code that respects the boundaries but fails a test is not
+   done. Coverage target and any further gates as stated in the project conventions.
+7. Generated tests live apart from hand-written tests (a marker comment or a directory), so
    regenerating them on a design change never clobbers hand-written ones.
-6. If a test is wrong, that is a design defect: stop, fix the design and this BUILD.md, rerun
+8. If a test is wrong, that is a design defect: stop, fix the design and this BUILD.md, rerun
    `machinery oracle`, and regenerate the affected tests (the stable-id diff is the affected-test list).
    Do not "adjust" a test to pass.
 
