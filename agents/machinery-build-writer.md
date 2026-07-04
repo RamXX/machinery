@@ -70,10 +70,18 @@ section structure exactly.
 9. **Sequence the build as a walking skeleton then vertical slices.** The first milestone is the thinnest
    end-to-end path through one real boundary. Then one component lifecycle per slice, each green before
    the next.
-10. **State the hard-TDD protocol.** Test-writer writes tests from sections 6 and 7, keyed on oracle
-    stable ids; tests are then locked; implementer makes them pass without editing them; generated
-    tests live apart from hand-written ones; a wrong test is a design defect that sends the work back
-    to the design, not a test to "adjust."
+10. **State the hard-TDD protocol with its gate discipline explicit** (template section 11; write
+    it out in full, never summarize it away). The RED side must be anchored to the deterministic
+    gates so the suite provably tests the right things: `machinery check` green BEFORE deriving
+    tests (a red design is an untrustworthy spec), and a RED exit gate of (a) every oracle stable
+    id whole-token in the suite plus every guard-falsifying clause and invariant property test,
+    (b) `machinery check --impl` green over the scaffolding and stubs, (c) the suite red on
+    assertions, not on its own compile errors. Only then do the tests lock; the implementer makes
+    them pass without editing them; GREEN is accepted only with the locked tests AND
+    `machinery check --impl` green together. Include the fallback for runtimes without subagents:
+    the same agent runs RED then GREEN sequentially, and the two gate runs are what separate the
+    phases in place of fresh context. Generated tests live apart from hand-written ones; a wrong
+    test is a design defect that sends the work back to the design, not a test to "adjust."
 
 ## Output
 
@@ -101,7 +109,10 @@ artifact. Include the `checked:` counts in your report.
   named-unit test plan, contract tests, and property tests.
 - The state-migration section and the toolchain-and-versions subsection are present.
 - The build plan starts with a walking skeleton.
-- The hard-TDD protocol is stated and unambiguous.
+- The hard-TDD protocol is stated and unambiguous, including the gate anchors: check-green before
+  test derivation, the three-part RED exit gate (stable-id coverage, `machinery check --impl`
+  green, red-on-assertions), the GREEN bar of tests plus gate together, and the sequential
+  fallback for runtimes that cannot spawn a fresh-context test-writer.
 
 Return a short summary: the sections written, the `machinery check` result, the Gate 4 result, and any
 residual risk surfaced in the open-questions section. Do not paste the full BUILD.md back; it is on disk.

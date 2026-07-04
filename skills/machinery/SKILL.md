@@ -270,6 +270,18 @@ the tests from the oracle rows and the named-unit contracts; the implementer age
 and must not modify the tests. `@xstate/graph` covering-path generation remains available for
 multi-step path tests on top of the per-transition rows.
 
+The protocol is gate-anchored at both ends, and the BUILD.md you produce must say so explicitly
+(the template's section 11 spells it out): RED derives tests only from a design where
+`machinery check` is green, because a red design means the oracle-spec itself cannot be trusted;
+RED is complete only when every oracle stable id appears whole-token in the suite, when
+`machinery check <design> --impl <dir>` is green over the scaffolding and stubs the tests compile
+against, and when the suite is red on assertions rather than its own errors; GREEN is accepted only
+when the locked tests and that same check pass together. This is what makes the discipline hold on
+runtimes that cannot spawn a fresh-context test-writer (Codex and other single-context agents): the
+same agent runs RED then GREEN sequentially, and the deterministic gate runs separate the phases in
+place of context isolation, so the suite provably covers the checked spec and the implementer has
+no green path that bypasses the architecture.
+
 ## Revision mode (iteration 2 and later)
 
 machinery designs change after code exists. The protocol:
