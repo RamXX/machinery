@@ -1,7 +1,7 @@
 ---
 name: machinery
 metadata:
-  version: "0.1.6"
+  version: "0.1.7"
 description: >
   Design software as a build-ready blueprint, greenfield or brownfield. Use when the user
   wants to design a new system, service, or app from scratch, produce a BUILD.md for a
