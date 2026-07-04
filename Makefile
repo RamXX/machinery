@@ -12,7 +12,7 @@
 
 AGENT_HOMES ?= $(HOME)/.agents $(HOME)/.claude
 SRC := $(CURDIR)
-INTERNAL_VERSION := v0.1.4
+INTERNAL_VERSION := v0.1.5
 MACH ?= $(CURDIR)/.bin/machinery
 # Where dev-link copies the built binary. Override: INSTALL_DIR=/usr/local/bin
 INSTALL_DIR ?= $(HOME)/.local/bin
