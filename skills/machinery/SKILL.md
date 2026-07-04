@@ -218,16 +218,41 @@ system from `BUILD.md` alone (per shard, when sharded).
 ## Brownfield (archaeology) mode
 
 An existing system runs the same four phases with an inverted stance: describe, do not invent.
+Two standing rules for every archaeology session:
+
+- **Use the codebase graph when the runtime has one.** When a codebase-graph MCP server is
+  available (codebase-memory-mcp or equivalent), always use it: check `index_status` and run
+  `index_repository` first if the repo is not indexed, then drive the excavation through its
+  tools (`get_architecture`, `search_graph`, `trace_call_path`, `get_code_snippet`) instead of
+  raw file search. It maps entities, boundaries, and call chains faster and more completely
+  than grep. Fall back to plain search only when no such server is present.
+- **Archaeology is still an interrogation.** The code and the graph tell you what IS; only the
+  user can tell you what SHOULD BE, and the gap between the two is the design's most valuable
+  output. When the structure looks messy, say so concretely and ask: "this looks tangled because
+  <specific observation: two modules share a table, one word has two meanings, X reaches into
+  Y's internals>; what is your desired end state here?" The answers become the INTENDED
+  boundaries of Phase 2, the contested-vocabulary decisions of the domain model, and the deny
+  rules that give the baseline something to burn down toward. Never silently infer intent from
+  structure: messy structure is precisely where inference fails.
 
 - **Phase 0** additionally records that this is archaeology and what already exists: code, schema,
   production data, deployment.
 - **Phase 1** excavates the domain model from the code, the schema, and the production data, AS IT
-  IS. Where the code is incoherent (one word, two meanings), record the incoherence as an open
+  IS. Start this conversation on day one, in parallel with the boundary baseline below: the
+  Modelith interrogation is the instrument for understanding the mess, not a later phase's
+  paperwork, and the intended boundaries are a domain claim you cannot make well before it.
+  Where the code is incoherent (one word, two meanings), record the incoherence as an open
   question in the model instead of picking a winner.
-- **Phase 2** records the existing architecture and declares the INTENDED boundaries. Today's real
-  violations are baselined as explicit allow rules, each tagged with a BASELINE comment. Gates run
-  with a staged `--gate` list: g2,g4 on day one; add g3 as machines land; add gx only when every
-  lifecycle enum in the model has a machine, because Gx has no per-entity waiver.
+- **Phase 2** records the existing architecture and declares the INTENDED boundaries. Then run
+  `machinery baseline <design> --impl <dir>`: it scans the code exactly as G4 does, prints the
+  `baseline:` rules that tolerate today's violating edges (review each, paste into the contract's
+  `dependency_rules`; keep intent explicit with a `deny:` for edges that should die), suggests
+  `ignore:` globs for unmodeled code, and writes `design/ratchet.json`, the snapshot that pins
+  every baselined edge to its current offender files. From then on G4 fails when an amnestied
+  edge grows a new offender, and burning debt down is rewarded (`machinery baseline` reruns
+  tighten the snapshot). Gates run with a staged `--gate` list: g2,g4 on day one; add g3 as
+  machines land; add gx only when every lifecycle enum in the model has a machine, because Gx
+  has no per-entity waiver.
 - **Phase 3** machines describe current behavior. Oracle-derived tests run as characterization
   tests, and each failing row is adjudicated: code-is-truth means the model is wrong archaeology,
   fix it; model-is-truth means the code has a defect, file it and quarantine the test with its
@@ -409,5 +434,9 @@ knows where the interrogation stopped.
   G5-pack for decomposed designs).
   Single Go binary. Run it at each gate with `--gate` so correctness does not
   rely on the model getting every cross-reference right. See `tools/README.md`.
+- `machinery baseline <design> --impl <dir>` - the brownfield Stage-1 generator: proposes
+  `baseline:` rules for today's violating edges, suggests `ignore:` globs, and writes
+  `design/ratchet.json` (generated; never hand-edit), the snapshot G4 ratchets baselined
+  edges against.
 - `machinery oracle` - generates the canonical `<M>.oracle.md` transition oracles from the
   machine JSON. Run after every machine edit and commit the output; G3 diffs it.

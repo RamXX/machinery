@@ -212,8 +212,33 @@ var langExts = map[string]string{
 	".jsx": "ts", ".ex": "elixir", ".exs": "elixir", ".rs": "rust",
 }
 
+// scanEdge is one observed cross-boundary edge with its offender files, as
+// judged by the contract: "allowed", "denied", "undeclared", or "baselined".
+type scanEdge struct {
+	Src, Dst string
+	Witness  string
+	Files    []string // sorted
+	Status   string
+}
+
+// importScan collects what `machinery baseline` needs from a G4 pass, so the
+// generator and the gate share one discovery implementation and can never
+// disagree about what the code contains.
+type importScan struct {
+	Edges         []scanEdge
+	UnmappedFiles []string         // source files outside every boundary (rel)
+	OrphanRefs    map[string][]string // module-internal import -> referencing files
+	Complete      bool             // the walk and judgment actually ran
+}
+
 // CheckImports implements G4-import.
 func CheckImports(design, impl string) *Gate {
+	return checkImports(design, impl, nil)
+}
+
+// checkImports is CheckImports with an optional scan collector; scan may be
+// nil (the plain gate) and collecting must never change the gate's findings.
+func checkImports(design, impl string, scan *importScan) *Gate {
 	g := NewGate("G4-import  code respects the contract")
 	g.startOrder()
 	if fi, err := os.Stat(impl); err != nil || !fi.IsDir() {
@@ -283,6 +308,11 @@ func CheckImports(design, impl string) *Gate {
 	}
 	allow := contractEdges(rules, "allow", nil)
 	deny := contractEdges(rules, "deny", nil)
+	baselineRules := contractEdges(rules, "baseline", nil)
+	ratchet, ratchetErr := LoadRatchet(design)
+	if ratchetErr != nil {
+		g.Errs = append(g.Errs, ratchetErr.Error())
+	}
 
 	matchRule := func(edges [][2]string, src, dst string) bool {
 		for _, e := range edges {
@@ -379,6 +409,9 @@ func CheckImports(design, impl string) *Gate {
 		}
 		if srcB == "" {
 			g.Errs = append(g.Errs, "source file "+rel+" maps to no contract boundary; add it to a boundary's code globs or to the contract ignore list")
+			if scan != nil {
+				scan.UnmappedFiles = append(scan.UnmappedFiles, rel)
+			}
 			continue
 		}
 		g.Count(lang + " files checked")
@@ -404,6 +437,12 @@ func CheckImports(design, impl string) *Gate {
 				if dstB == "" {
 					if goModule != "" && strings.HasPrefix(ref, goModule+"/") {
 						g.Errs = append(g.Errs, rel+": imports "+ref+", which maps to no contract boundary (code outside the contract)")
+						if scan != nil {
+							if scan.OrphanRefs == nil {
+								scan.OrphanRefs = map[string][]string{}
+							}
+							scan.OrphanRefs[ref] = append(scan.OrphanRefs[ref], rel)
+						}
 					}
 					continue
 				}
@@ -447,6 +486,7 @@ func CheckImports(design, impl string) *Gate {
 			edgeOrder = append(edgeOrder, edge)
 		}
 	}
+	missingRatchetReported := false
 	for _, edge := range edgeOrder {
 		srcB, dstB := edge[0], edge[1]
 		rec := edgeHits[edge]
@@ -458,13 +498,93 @@ func CheckImports(design, impl string) *Gate {
 		}
 		denied := matchRule(deny, srcB, dstB)
 		allowed := matchRule(allow, srcB, dstB)
-		if denied && !allowed {
+		baselined := matchRule(baselineRules, srcB, dstB)
+		status := ""
+		switch {
+		case baselined && allowed:
+			// G2 reports the allow+baseline contradiction; judge as allowed
+			// here so the finding is not duplicated per edge
+			status = "allowed"
+			g.Count("edges verified")
+		case baselined:
+			// baseline tolerates the edge (even a denied one: intent stays
+			// written as deny while the debt is being burned down) but the
+			// ratchet holds it to its snapshot: no new offender files
+			status = "baselined"
+			g.Count("baselined edges")
+			key := srcB + " -> " + dstB
+			if ratchet == nil {
+				if !missingRatchetReported {
+					g.Errs = append(g.Errs, "contract has baseline: rules but design has no "+RatchetFile+"; run 'machinery baseline <design> --impl <dir>' to record the snapshot")
+					missingRatchetReported = true
+				}
+			} else if snap, ok := ratchet.Edges[key]; !ok {
+				g.Errs = append(g.Errs, "baselined edge "+key+" has no "+RatchetFile+" entry ("+seen+"); rerun 'machinery baseline' to record it")
+			} else {
+				snapSet := setOf(snap)
+				var grew []string
+				for f := range rec.files {
+					if !snapSet[f] {
+						grew = append(grew, f)
+					}
+				}
+				sort.Strings(grew)
+				if len(grew) > 0 {
+					show := strings.Join(grew, ", ")
+					if len(grew) > 3 {
+						show = strings.Join(grew[:3], ", ") + fmt.Sprintf(" and %d more", len(grew)-3)
+					}
+					g.Errs = append(g.Errs, fmt.Sprintf("ratchet: baselined edge %s grew by %d new offender file(s) (%s); fix the new code, or rerun 'machinery baseline' only if the growth is a deliberate decision", key, len(grew), show))
+				} else {
+					shrunk := 0
+					for _, f := range snap {
+						if !rec.files[f] {
+							shrunk++
+						}
+					}
+					if shrunk > 0 {
+						g.Notes = append(g.Notes, fmt.Sprintf("ratchet can tighten: %s dropped %d offender file(s); rerun 'machinery baseline'", key, shrunk))
+					}
+					g.Count("ratcheted edges")
+				}
+			}
+		case denied && !allowed:
+			status = "denied"
 			g.Errs = append(g.Errs, srcB+" -> "+dstB+" is denied by the contract ("+seen+"); either the code violates the boundary or the contract needs an explicit allow")
-		} else if !allowed && !denied {
+		case !allowed && !denied:
+			status = "undeclared"
 			g.Errs = append(g.Errs, "undeclared cross-boundary edge "+srcB+" -> "+dstB+" ("+seen+"); add an explicit allow or deny to the contract")
-		} else {
+		default:
+			status = "allowed"
 			g.Count("edges verified")
 		}
+		if scan != nil {
+			var files []string
+			for f := range rec.files {
+				files = append(files, f)
+			}
+			sort.Strings(files)
+			scan.Edges = append(scan.Edges, scanEdge{Src: srcB, Dst: dstB, Witness: rec.witness, Files: files, Status: status})
+		}
+	}
+	if ratchet != nil {
+		observed := map[string]bool{}
+		for _, e := range edgeOrder {
+			observed[e[0]+" -> "+e[1]] = true
+		}
+		var stale []string
+		for k := range ratchet.Edges {
+			if !observed[k] {
+				stale = append(stale, k)
+			}
+		}
+		sort.Strings(stale)
+		for _, k := range stale {
+			g.Notes = append(g.Notes, "ratchet edge "+k+" is no longer observed; rerun 'machinery baseline' to retire it")
+		}
+	}
+	if scan != nil {
+		scan.Complete = true
 	}
 
 	anyChecked := false

@@ -31,6 +31,7 @@ func main() {
 	root.AddCommand(newRefineCmd())
 	root.AddCommand(newComposeCmd())
 	root.AddCommand(newCheckCmd())
+	root.AddCommand(newBaselineCmd())
 	root.AddCommand(newVerifyFormalCmd())
 	root.AddCommand(newPackCmd())
 	root.AddCommand(newScaleCmd())
