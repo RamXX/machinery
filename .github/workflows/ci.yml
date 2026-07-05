@@ -76,12 +76,17 @@ jobs:
           fi
       - name: go vet
         run: go vet ./...
+      - name: Read pinned golangci-lint version
+        id: gciv
+        run: echo "version=$(cat .golangci-version)" >> "$GITHUB_OUTPUT"
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          # Uses the v2 config in .golangci.yml; the linter version is pinned
-          # for reproducibility (bump deliberately, with the diff reviewed).
+          # Uses the v2 config in .golangci.yml. The linter version is the single
+          # source of truth in .golangci-version, shared with the local preflight
+          # gate (make lint-install) so CI and local run the identical linter.
+          # Bump that file deliberately, with the diff reviewed.
           # The action must be v7+ to accept a golangci-lint v2 version string.
-          version: v2.9.0
+          version: ${{ steps.gciv.outputs.version }}
           args: --config .golangci.yml --timeout 5m
 
   # ----------------------------------------------------------------- test ---

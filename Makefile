@@ -14,11 +14,14 @@ AGENT_HOMES ?= $(HOME)/.agents $(HOME)/.claude
 SRC := $(CURDIR)
 INTERNAL_VERSION := v0.1.7
 MACH ?= $(CURDIR)/.bin/machinery
+# Single source of truth for the linter version, shared with CI (ci.yml reads
+# the same file) and the local preflight gate.
+GOLANGCI_VERSION := $(shell cat .golangci-version 2>/dev/null)
 # Where dev-link copies the built binary. Override: INSTALL_DIR=/usr/local/bin
 INSTALL_DIR ?= $(HOME)/.local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: build dev-link uninstall test test-install golden golden-update check verify-formal preflight hooks help
+.PHONY: build dev-link uninstall test test-install golden golden-update check verify-formal preflight hooks lint-install help
 
 build: ## Build the machinery binary from source into .bin/machinery (needs Go)
 	@mkdir -p .bin && go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery
@@ -76,6 +79,11 @@ hooks: ## Install the git pre-push hook (points core.hooksPath at .githooks)
 	@git config core.hooksPath .githooks
 	@chmod +x .githooks/pre-push scripts/preflight.sh
 	@echo "pre-push hook installed. Bypass once with: SKIP_PREFLIGHT=1 git push"
+
+lint-install: ## Install the pinned golangci-lint (.golangci-version) so local matches CI exactly
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
+	  | sh -s -- -b "$(shell go env GOPATH)/bin" "$(GOLANGCI_VERSION)"
+	@echo "installed golangci-lint $(GOLANGCI_VERSION) to $(shell go env GOPATH)/bin"
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'

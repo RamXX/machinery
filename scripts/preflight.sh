@@ -36,10 +36,16 @@ go vet ./... || fail "go vet reported problems"
 # 3. golangci-lint (ci: lint job) ------------------------------------------
 say "golangci-lint"
 if command -v golangci-lint >/dev/null 2>&1; then
+  want=$(cat .golangci-version 2>/dev/null)
+  have=$(golangci-lint version --short 2>/dev/null)
+  if [ -n "$want" ] && [ "${want#v}" != "${have#v}" ]; then
+    printf '\033[33m  golangci-lint %s installed but .golangci-version pins %s.\033[0m\n' "${have:-unknown}" "$want" >&2
+    printf '\033[33m  CI runs %s; match it with: make lint-install\033[0m\n' "$want" >&2
+  fi
   golangci-lint run --config .golangci.yml --timeout 5m || fail "golangci-lint reported problems"
 else
   printf '\033[33m  golangci-lint not installed; skipping (CI still enforces it).\033[0m\n' >&2
-  printf '\033[33m  install: https://golangci-lint.run/welcome/install/\033[0m\n' >&2
+  printf '\033[33m  install the pinned version with: make lint-install\033[0m\n' >&2
 fi
 
 # 4. go.mod / go.sum tidy (ci: tidy job) -----------------------------------
