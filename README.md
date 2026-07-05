@@ -332,7 +332,8 @@ machinery oracle <machines-dir>       # regenerate the transition oracles from t
 ```
 
 The `Makefile` is contributor-only (building and testing machinery itself); `make help` lists those
-targets. End users never need it.
+targets. End users never need it. If you are hacking on machinery itself, see
+[CONTRIBUTING.md](CONTRIBUTING.md) and run `make hooks` once to arm the pre-push gate.
 
 ### Agent homes
 
