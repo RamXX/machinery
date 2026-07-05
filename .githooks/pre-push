@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# pre-push - run the local CI mirror before any push reaches the remote.
+#
+# Installed by pointing git at this directory:  make hooks
+# (equivalently: git config core.hooksPath .githooks)
+#
+# Skip in an emergency with:  SKIP_PREFLIGHT=1 git push
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+exec "$repo_root/scripts/preflight.sh"
