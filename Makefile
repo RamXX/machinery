@@ -18,7 +18,7 @@ MACH ?= $(CURDIR)/.bin/machinery
 INSTALL_DIR ?= $(HOME)/.local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: build dev-link uninstall test test-install golden golden-update check verify-formal help
+.PHONY: build dev-link uninstall test test-install golden golden-update check verify-formal preflight hooks help
 
 build: ## Build the machinery binary from source into .bin/machinery (needs Go)
 	@mkdir -p .bin && go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery
@@ -68,6 +68,14 @@ verify-formal: build ## Regenerate + TLC-check the whole formal suite across the
 	@echo "== portfolio-engine =="; $(MACH) verify-formal examples/portfolio-engine/design
 	@echo "== checkout-split/orders =="; $(MACH) verify-formal examples/checkout-split/orders/design
 	@echo "== checkout-split/payments =="; $(MACH) verify-formal examples/checkout-split/payments/design
+
+preflight: ## Run the local CI mirror (ci.yml, cheapest gate first); green here means green in CI
+	@scripts/preflight.sh
+
+hooks: ## Install the git pre-push hook (points core.hooksPath at .githooks)
+	@git config core.hooksPath .githooks
+	@chmod +x .githooks/pre-push scripts/preflight.sh
+	@echo "pre-push hook installed. Bypass once with: SKIP_PREFLIGHT=1 git push"
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'
