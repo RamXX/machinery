@@ -226,9 +226,9 @@ type scanEdge struct {
 // disagree about what the code contains.
 type importScan struct {
 	Edges         []scanEdge
-	UnmappedFiles []string         // source files outside every boundary (rel)
+	UnmappedFiles []string            // source files outside every boundary (rel)
 	OrphanRefs    map[string][]string // module-internal import -> referencing files
-	Complete      bool             // the walk and judgment actually ran
+	Complete      bool                // the walk and judgment actually ran
 }
 
 // CheckImports implements G4-import.
