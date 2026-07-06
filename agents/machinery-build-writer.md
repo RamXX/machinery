@@ -29,6 +29,12 @@ constraint the conductor passes in its prompt.
   and the event-contract table where one exists).
 - `design/machines/*.machine.json`, `design/machines/*.matrix.md`, and the generated
   `design/machines/*.oracle.md`.
+- When the design carries the policy layer: `design/formal/policy.relational.yaml` and the
+  generated `design/formal/Policy.als` and `design/formal/Policy.oracle.md` (the authorization
+  decision table). Section 6 cites the oracle as an enforcement class for the invariants it
+  compiles, and section 7 requires the oracle conformance test (parse the table, assert the pure
+  authorization function on every reachable row; the go-crm example's
+  `impl/internal/authz/oracle_test.go` is the reference shape).
 - The target language(s).
 - The `machinery` CLI on PATH (`make install`).
 
