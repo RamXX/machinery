@@ -9,10 +9,11 @@ Report where this repository's machinery design stands.
    gates, impl dir, and strict mode; state which are in effect.
 2. Read `<design>/STATE.md` if present and report per-phase status and open
    questions.
-3. Inventory which artifacts exist (domain model, workspace.dsl and
-   Architecture Contract, machines with matrices and oracles, formal/,
-   BUILD.md, decomposition/packs) so the current phase is visible even
-   without STATE.md.
+3. Inventory which artifacts exist (domain model, the policy annotation
+   `formal/policy.relational.yaml` with its generated `Policy.als` and
+   `Policy.oracle.md`, workspace.dsl and Architecture Contract, machines with
+   matrices and oracles, formal/, BUILD.md, decomposition/packs) so the
+   current phase is visible even without STATE.md.
 4. Run `machinery check <design>` with the configured gates and impl, and
    summarize: which gates are green, ERROR and DRIFT counts, and the single
    most important next action.

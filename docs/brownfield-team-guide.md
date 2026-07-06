@@ -126,6 +126,16 @@ with zero shrinkage as the gate becoming wallpaper.
   to parse is a hard G3 error, so rot in a hand-maintained matrix is caught loudly rather
   than silently skipping the row-by-row reconciliation. The `checked:` line always states
   how many matrix rows were actually reconciled.
+- If the system has role- or ownership-based access control, this is also the stage to
+  bring in the policy layer (it needs only the domain model, so it can even precede the
+  machines): author `design/formal/policy.relational.yaml` describing the policy AS THE
+  CODE BEHAVES (read the authorization code, not the wiki), run `machinery alloy design/`,
+  and commit both generated artifacts. Gate `gp` activates automatically once the
+  annotation exists. A failed meta-check at this point is a latent policy hole the team
+  probably does not know about; treat it as a finding to adjudicate with the owners. The
+  generated `Policy.oracle.md` then powers an authorization characterization test, the
+  same adjudication loop as Stage 3 (code-is-truth: fix the annotation; policy-is-truth:
+  file the code defect). Full reference: [policy-layer.md](policy-layer.md).
 
 ### Stage 3: characterization tests (the behavioral loop)
 
