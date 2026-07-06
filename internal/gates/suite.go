@@ -29,7 +29,7 @@ const decomposedParentNote = "note: decomposed parent with no machines/; running
 // with no machines/ directory, and an unknown gate name is an error.
 func Select(design, gateList string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
-	gs := "g2,g3,gx,g4,g5"
+	gs := "gp,g2,g3,gx,g4,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if fi, err := os.Stat(design + "/machines"); err != nil || !fi.IsDir() {
 			// a pure decomposed parent authors no machines: its behavior
@@ -46,7 +46,7 @@ func Select(design, gateList string) (Selection, error) {
 	}
 	var unknown []string
 	for g := range sel.Run {
-		if g != "g2" && g != "g3" && g != "gx" && g != "g4" && g != "g5" {
+		if g != "gp" && g != "g2" && g != "g3" && g != "gx" && g != "g4" && g != "g5" {
 			unknown = append(unknown, g)
 		}
 	}
@@ -57,13 +57,17 @@ func Select(design, gateList string) (Selection, error) {
 	return sel, nil
 }
 
-// RunSelected runs the selected gates in canonical order (G2, G3, Gx, G4,
-// G5) with `machinery check`'s applicability rules: G4 only with an impl
-// dir, and G5 only when explicitly requested or when the design is
-// decomposed, so a plain design never runs it by accident. The returned
+// RunSelected runs the selected gates in canonical order (Gp, G2, G3, Gx,
+// G4, G5) with `machinery check`'s applicability rules: Gp only when the
+// design carries a policy annotation (or is explicitly requested), G4 only
+// with an impl dir, and G5 only when explicitly requested or when the design
+// is decomposed, so a plain design never runs them by accident. The returned
 // gates carry their findings; the caller emits them.
 func RunSelected(design, impl string, sel Selection) []*Gate {
 	var out []*Gate
+	if sel.Run["gp"] && (sel.Explicit || HasPolicyAnnotation(design)) {
+		out = append(out, CheckPolicy(design))
+	}
 	if sel.Run["g2"] {
 		out = append(out, CheckC4(design))
 	}

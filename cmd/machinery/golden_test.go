@@ -214,6 +214,29 @@ func TestGoldenCheckCheckoutSplit(t *testing.T) {
 	}
 }
 
+// The relational policy generator runs on the one example that opted into
+// the layer; the corpus pins the CLI output and the generated model byte for
+// byte (the fulfillment and portfolio-engine designs have no annotation, so
+// the layer correctly does not run there).
+func TestGoldenAlloy(t *testing.T) {
+	root := repoRootDir(t)
+	scratch := t.TempDir()
+	out, errS, code := runBin(t, "alloy", filepath.Join(root, "examples", "go-crm", "design"), scratch)
+	// the out-dir is a temp path; normalize it so the golden is stable
+	out = strings.ReplaceAll(out, scratch, "<out-dir>")
+	g := goldenDir(t, "alloy-go-crm")
+	compareOrUpdate(t, filepath.Join(g, "stdout.txt"), out)
+	compareOrUpdate(t, filepath.Join(g, "stderr.txt"), errS)
+	compareOrUpdate(t, filepath.Join(g, "exitcode.txt"), fmt.Sprintf("%d\n", code))
+	for _, name := range []string{"Policy.als", "Policy.oracle.md"} {
+		data, err := os.ReadFile(filepath.Join(scratch, name))
+		if err != nil {
+			t.Fatalf("%s not produced: %v", name, err)
+		}
+		compareOrUpdate(t, filepath.Join(g, name), string(data))
+	}
+}
+
 func TestGoldenGen(t *testing.T) {
 	root := repoRootDir(t)
 	for _, c := range goldenExamples {
