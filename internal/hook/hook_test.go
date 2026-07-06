@@ -165,10 +165,12 @@ func TestPreDeniesGeneratedArtifacts(t *testing.T) {
 		{"design/pack/contract.machine.json", "Edit", true, "frozen pack"},
 		{"design/ratchet.json", "Edit", true, "machinery baseline"},
 		{"design/ratchet.json", "Write", true, "defeats the ratchet"},
-		{"design/formal/Deal.semantics.yaml", "Edit", false, ""}, // annotation source
-		{"design/machines/Deal.machine.json", "Edit", false, ""}, // machine source
-		{"design/machines/Deal.matrix.md", "Edit", false, ""},    // hand matrix
-		{"design/domain.modelith.md", "Edit", false, ""},         // rendered, but post-processed by hand
+		{"design/formal/Policy.als", "Write", true, "machinery alloy"},
+		{"design/formal/Deal.semantics.yaml", "Edit", false, ""},    // annotation source
+		{"design/formal/policy.relational.yaml", "Edit", false, ""}, // annotation source
+		{"design/machines/Deal.machine.json", "Edit", false, ""},    // machine source
+		{"design/machines/Deal.matrix.md", "Edit", false, ""},       // hand matrix
+		{"design/domain.modelith.md", "Edit", false, ""},            // rendered, but post-processed by hand
 		{"src/main.go", "Write", false, ""},
 		{"design/machines/Deal.oracle.md", "Bash", false, ""}, // not a file tool: G3 DRIFT catches it at stop
 	}

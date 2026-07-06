@@ -28,6 +28,7 @@ func main() {
 	root.AddCommand(newLintCmd())
 	root.AddCommand(newOracleCmd())
 	root.AddCommand(newTLACmd())
+	root.AddCommand(newAlloyCmd())
 	root.AddCommand(newRefineCmd())
 	root.AddCommand(newComposeCmd())
 	root.AddCommand(newCheckCmd())

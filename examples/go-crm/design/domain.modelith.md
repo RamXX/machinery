@@ -261,7 +261,7 @@ A unit of follow-up work with a due date, owned by a `User` and optionally linke
 
 - **task-owned** - Every `Task` has exactly one owning `User`.
 - **task-terminal** - A `Task` in Done or Cancelled is terminal.
-- **task-assignee-visible** - A `Task` may be reassigned only to a `User` within the assigner's `VisibilityScope`.
+- **task-assignee-visible** - A `Task` may be reassigned only to a `User` the assigner can see: an `Admin` to any `User`, a `Manager` to a member of the manager's `Team` (`VisibilityScope` is a set of records, so eligibility is by team membership, not by scope membership).
 
 ### `Team`
 
@@ -316,6 +316,7 @@ A person who authenticates to the CRM and performs actions. A `User` holds a sin
 - **password-hashed** - A `User` password is persisted only as a hash, never in plaintext.
 - **disabled-cannot-auth** - A `User` whose status is Disabled cannot establish a `Session`.
 - **single-team** - A `User` belongs to at most one `Team`.
+- **manager-has-team** - A `User` with role Manager belongs to exactly one `Team`; team scope is a Manager's entire write authority, so a teamless Manager could not write even its own records.
 
 ## Relationships
 
@@ -350,7 +351,7 @@ erDiagram
 - **rbac-crud-verbs** - A `User` may perform a verb only if the role grants it: `Admin`, `Manager`, and `Rep` may create, read, update, and delete; `ReadOnly` may only read.
 - **rbac-read-visibility** - A `User` may read only records within its `VisibilityScope`: an `Admin` reads all records, and every other `User` reads records it owns or that are owned by a member of its `Team`.
 - **rbac-write-scope** - A `User` may update or delete a record only within scope: an `Admin` any record, a `Manager` any record owned by a member of the manager's `Team`, a `Rep` only records it owns; a `ReadOnly` `User` may write nothing.
-- **rbac-reassign-authority** - Only an `Admin`, or a `Manager` acting within the manager's `Team`, may change the `Owner` of a record.
+- **rbac-reassign-authority** - Only an `Admin`, or a `Manager` acting within the manager's `Team`, may change the `Owner` of a record; an `Admin` may reassign to any `User`, and a `Manager` only to a member of the manager's `Team`, so a reassignment never moves a record outside the actor's own authority.
 - **session-active-user** - A `Session` is valid only while its `User` status is Active.
 
 ## Scenarios
@@ -404,7 +405,7 @@ erDiagram
 
 **Invariants touched**
 
-- **rbac-reassign-authority** - Only an `Admin`, or a `Manager` acting within the manager's `Team`, may change the `Owner` of a record.
+- **rbac-reassign-authority** - Only an `Admin`, or a `Manager` acting within the manager's `Team`, may change the `Owner` of a record; an `Admin` may reassign to any `User`, and a `Manager` only to a member of the manager's `Team`, so a reassignment never moves a record outside the actor's own authority.
 - **rbac-write-scope** - A `User` may update or delete a record only within scope: an `Admin` any record, a `Manager` any record owned by a member of the manager's `Team`, a `Rep` only records it owns; a `ReadOnly` `User` may write nothing.
 
 ### Disabled user cannot log in
