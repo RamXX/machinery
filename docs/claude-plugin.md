@@ -48,13 +48,15 @@ exits 0: governance degrades loudly to absent, it never breaks a session.
 | Event | Behavior |
 |---|---|
 | SessionStart | Injects the governance contract into context: design dir, staged gates, the read-only artifact list, and `design/STATE.md` (the session ledger) when present. Every session in the repo knows the rules, whether or not the skill ever triggers. |
-| PreToolUse | Denies Edit/Write/MultiEdit/NotebookEdit on generated artifacts: `<design>/**/*.oracle.md`, `<design>/formal/*.tla` and `*.cfg`, `<design>/packs/**` (generated packs), `<design>/pack/**` (the frozen pack a child was built against), `<design>/ratchet.json` (the baseline snapshot). The refusal names the regeneration command. |
+| PreToolUse | Denies Edit/Write/MultiEdit/NotebookEdit on generated artifacts: `<design>/**/*.oracle.md`, `<design>/formal/*.tla`, `*.cfg` and `*.als`, `<design>/packs/**` (generated packs), `<design>/pack/**` (the frozen pack a child was built against), `<design>/ratchet.json` (the baseline snapshot). The refusal names the regeneration command. |
 | PostToolUse | Silently records that the session touched the design (or watched sources, when `impl` is configured). No gates run mid-edit; authoring stays fluid. |
 | Stop / SubagentStop | If the session touched anything watched, runs `machinery check` (in-process; same suite semantics as the CLI). DRIFT findings block the stop with the gate output as the reason; the model fixes and the check re-runs. G4 import-boundary findings block only when they are ARMED: `<design>/ratchet.json` exists, written by `machinery baseline`. Before that snapshot exists, import findings warn with the arming instruction instead of blocking, because blocking a session on pre-existing boundary debt it did not create invites the model to "fix" the debt by adding allow rules, which is silent amnesty. Plain ERRORs only warn, because a half-built design is a normal interrogation state. After one blocked-and-continued attempt, the hook warns instead of blocking again, so it can never loop. |
 
-Gate selection at stop time is progressive when no staged list is configured: G2 once
-`workspace.dsl` or `ARCHITECTURE.md` exists, G3 once `machines/*.machine.json` exist, Gx once
-`BUILD.md` exists, G5 on decomposed designs, G4 only when `impl` is configured. A phase you have
+Gate selection at stop time is progressive when no staged list is configured: Gp once
+`formal/policy.relational.yaml` exists (the policy layer; see the
+[policy layer guide](policy-layer.md)), G2 once `workspace.dsl` or `ARCHITECTURE.md` exists, G3
+once `machines/*.machine.json` exist, Gx once `BUILD.md` exists, G5 on decomposed designs, G4 only
+when `impl` is configured. A phase you have
 not reached is not demanded of you; a phase you have reached is held.
 
 What the hooks deliberately do not do: they cannot make the interrogation good, they do not check

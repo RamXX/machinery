@@ -71,11 +71,16 @@ familiarity:
   the v5 shape already has the constructs we need (hierarchy, guards, `invoke`, delays), and the
   ecosystem (Stately, `@xstate/graph`) gives visualization and covering-path generation for free;
   SCXML is XML with weaker tooling, and a bespoke DSL means owning a parser and a visualizer forever.
-- **TLA+ and TLC, not Alloy or property-based testing.** TLC checks a finite instance *exhaustively*
-  for the temporal properties that matter here (termination, deadlock-freedom, safety, liveness) and
-  returns a concrete counterexample; Alloy finds structure within a bound but is weaker on temporal
-  and liveness over transition systems, and property-based tests sample the state space rather than
-  exhaust it.
+- **TLA+ and TLC for behavior, not property-based testing.** TLC checks a finite instance
+  *exhaustively* for the temporal properties that matter here (termination, deadlock-freedom,
+  safety, liveness) and returns a concrete counterexample; property-based tests sample the state
+  space rather than exhaust it.
+- **Alloy for the static relational layer, where TLC never looks.** Access-control invariants
+  (roles, ownership, team scoping) are relations over configurations, not steps over time: no state
+  machine enforces them, so TLC cannot check them, and a structural linter sees only well-formed
+  prose. Bounded relational search is exactly Alloy's strength. machinery generates the Alloy model
+  from the domain model plus a short policy annotation (`machinery alloy`), with a standard
+  meta-check suite; nobody hand-writes Alloy, the same rule as the TLA+.
 
 ## Agentic systems: the machine is the envelope, not the agent
 
@@ -103,6 +108,9 @@ Phase 0  Frame        what, who, purpose, target language
 Phase 1  Modelith     domain model
          tool: modelith lint clean
          attested: lifecycle enums, action pre/post, invariant owners, scenario coverage
+Phase 1.5 Policy      static relational model (opt-in: designs with access-control invariants)
+         tool: Gp-policy (annotation binds + covers; committed Policy.als fresh); solver via verify-formal
+         attested: the policy annotation states what the prose invariants mean
 Phase 2  C4           architecture + contract
          tool: G2-c4 (contract parses and binds; mitigation coverage)
          attested: every action owned; interface contracts; NFR record
@@ -119,13 +127,52 @@ does not advance a phase until its gate passes. Every gate splits into a determi
 tool verifies and an attested half the conductor checks by judgment; the skill spells out that
 split per gate, and the table above keeps the two apart.
 
+## The policy layer: access control as a checked model
+
+Most business systems carry a handful of cross-cutting access rules: who may read, write, or
+reassign what, scoped by role, ownership, and team. These rules are the classic blind spot: no
+state machine enforces them (so model checking never sees them), a linter only checks that the
+prose is well-formed, and every agent that touches the codebase interprets the English slightly
+differently. The go-crm example shipped with an RBAC rule set that had survived prose review,
+every gate, eight formal proofs, and a full TDD build, and it still contained two real defects
+(a Manager without a team provably could not write its own records, and a Manager could hand a
+record to someone outside its own authority in one legal step).
+
+The policy layer closes that gap without asking anyone to learn a formal language. You (or the
+conductor, during the Phase 1 interrogation) write one short annotation,
+`design/formal/policy.relational.yaml`: who acts (the role enum), what they act on (the owned
+entities), and per-verb scopes from a four-word algebra (`all | own | team | none`). Everything
+else is generated and machine-held:
+
+- **`machinery alloy <design>`** compiles the annotation plus the domain model into two artifacts.
+  `Policy.als` is a relational model with a standard meta-check suite; the
+  [Alloy analyzer](https://alloytools.org/) searches every configuration within a bound and
+  returns a concrete counterexample when the rules hide a hole ("here is the teamless Manager and
+  the record it cannot touch"). `Policy.oracle.md` is the same policy enumerated as a decision
+  table: every role, verb, and ownership case with its expected verdict, under stable ids.
+- **Your implementation consumes the table.** One conformance test parses the oracle and asserts
+  the authorization function on every reachable row. From then on, policy-versus-code drift in
+  either direction is a failing test that names the exact case.
+- **The gates hold all of it.** Gp-policy fails the build when the annotation stops matching the
+  domain model, when a cross-cutting invariant is neither compiled nor explicitly waived, or when
+  a committed artifact is stale; the plugin hooks refuse hand-edits to the generated files.
+
+The layer is opt-in and costs nothing where it does not apply: a design without access-control
+invariants (fulfillment, portfolio-engine) never sees it. Where it does apply, the annotation is
+also an interrogation instrument: it forces the questions prose lets you skip, like "must a
+Manager have a team?" and "where may a reassigned record go?", which is exactly where the go-crm
+defects lived. The full guide, including the annotation reference, the oracle test pattern, and
+the brownfield workflow, is [docs/policy-layer.md](docs/policy-layer.md).
+
 ## What makes it production-grade: the correctness ladder
 
 A domain-model linter is table stakes. The differentiator is that machinery pushes deterministic and
 formal correctness into every layer, strongest first:
 
-1. **Generate, do not co-author.** Anything derivable is generated from the machine JSON: the
-   test oracle (with content-derived stable ids that survive design revisions) and the TLA+ specs.
+1. **Generate, do not co-author.** Anything derivable is generated from the design sources: the
+   transition oracle (with content-derived stable ids that survive design revisions), the TLA+
+   specs, and, on designs with a policy annotation, the Alloy model plus the authorization oracle
+   (the policy enumerated as a decision table the implementation tests consume).
    G3 then byte-diffs every committed oracle against a fresh generation on every check, and the
    formal specs are regenerated from source by `verify-formal` (with the nightly regen-clean-tree
    job asserting the committed copies match), so staleness is caught as drift, never assumed away.
@@ -141,7 +188,12 @@ formal correctness into every layer, strongest first:
    (each loop with its own counter), every operation terminates, nothing gets stuck half-done, no
    deadlock. Every generated spec states its assumptions in its header (guards erased soundly for
    safety, liveness conditional on guard exhaustiveness that the linter discharges, single instance,
-   no data at this rung), so a green check reads as exactly what it is.
+   no data at this rung), so a green check reads as exactly what it is. The same rung extends
+   sideways into statics: when a design carries access-control invariants, `machinery alloy`
+   compiles them (from a short policy annotation) into a bounded relational model that Alloy
+   searches exhaustively within scope, with generated meta-checks for the classes of defect a
+   policy hides best: a write-capable role whose own records are out of scope, a reassignment that
+   escapes the actor's own authority, a granted verb that is exercisable nowhere.
 4. **Refinement and assume-guarantee.** The data-and-composition annotations are reconciled against
    the machines before anything is emitted, so a drifted annotation fails generation instead of
    proving a stale twin. Each subsystem is proven to refine the small contract its neighbors rely
@@ -162,7 +214,8 @@ optional but recommended: the deterministic gates (rung 2's generation and every
 already catch malformed machines, drift, and boundary erosion, but they cannot tell you that a saga
 can strand money, that a retry can loop forever, or that a subsystem violates the contract its
 neighbors assume. The model checking is what proves those, exhaustively, with a concrete
-counterexample when it fails (it caught two real defects in the examples below). A Java-free setup is
+counterexample when it fails (it caught two real defects in the examples below, and the relational
+policy layer caught two more in go-crm's RBAC). A Java-free setup is
 a complete, gated design; adding Java upgrades "structurally consistent" to "machine-checked."
 
 ## Proof it works: the go-crm example
@@ -171,7 +224,7 @@ a complete, gated design; adding Java upgrades "structurally consistent" to "mac
 [LadybugDB](https://github.com/LadybugDB/go-ladybug) graph and role- and
 ownership-based access control, taken end to end:
 
-- **Designed** through all four phases. Domain model lints clean (9 entities, 24 invariants); C4 model
+- **Designed** through all four phases. Domain model lints clean (9 entities, 25 invariants); C4 model
   with the dependency posture that an embedded store forces (corruption is fatal-until-restore, not a
   transient); five state machines; a 1071-line `BUILD.md`.
 - **Built by a zero-context coding agent** under hard TDD: a test-writer wrote the suite from the
@@ -182,7 +235,16 @@ ownership-based access control, taken end to end:
   the prose review had missed. The hardened gates verify it non-vacuously: 194 transitions reconciled
   row by row against the matrices, every guard, action, and actor covered by a named-unit contract,
   every import edge checked against the architecture contract.
-- **Proven** by `make verify-formal`: eight TLC proofs, all green, regenerated from source every run.
+- **Proven** by `make verify-formal`: eight TLC proofs plus the 14-command relational policy suite,
+  all green, regenerated from source every run. The policy suite earned its place the hard way: run
+  against the RBAC invariants as first written, it found a Manager without a team could not write
+  even the records it owned (the write-scope rule granted by team membership only, and nothing
+  required a Manager to have a team), and a Manager could reassign a record to a user outside its
+  team, beyond its own authority. Both were invariant defects invisible to the linter and to TLC;
+  both are fixed in the domain model, and the checks that caught them now run on every design with
+  a policy annotation. The same annotation also compiles to a 70-row authorization oracle
+  (`Policy.oracle.md`) that the implementation's test suite asserts case by case, so the code is
+  held to the policy the same way the machines are held to their oracles.
 
 Every number above is real output in this repository, not an illustration.
 
@@ -303,8 +365,12 @@ anything missing; it installs nothing.
 **Optional**
 
 - **[Java](https://adoptium.net/) 11+** -- only for `machinery verify-formal`, which runs
-  [TLC](https://github.com/tlaplus/tlaplus) to model-check the proofs (the binary fetches the pinned
-  [tla2tools.jar](https://github.com/tlaplus/tlaplus/releases) into your cache on first use). macOS:
+  [TLC](https://github.com/tlaplus/tlaplus) to model-check the proofs and, on designs with a policy
+  annotation, [Alloy](https://alloytools.org/) to check the relational policy model (the binary
+  fetches the pinned, checksum-verified
+  [tla2tools.jar](https://github.com/tlaplus/tlaplus/releases) and
+  [org.alloytools.alloy.dist.jar](https://github.com/AlloyTools/org.alloytools.alloy/releases) into
+  your cache on first use). macOS:
   `brew install --cask temurin`; Linux: `sudo apt install default-jdk` or
   `sudo dnf install java-21-openjdk`, or [download Temurin](https://adoptium.net/temurin/releases/);
   Windows: `winget install EclipseAdoptium.Temurin.21.JDK` or
@@ -407,12 +473,13 @@ verdict: `ok`, or findings at three severities defined in the table below. The f
 summarizes blocking findings; a zero there is a clean design. Then, if Java is present:
 
 ```bash
-make verify-formal   # regenerates and TLC-checks all 26 proofs across the examples
+make verify-formal   # regenerates and checks all 26 TLC proofs + the go-crm policy suite
 ```
 
 | Gate | One line |
 |---|---|
 | Gate 1 | `modelith lint` on the domain model (Phase 1). The binary has no `g1`, by design: Phase 1's gate is modelith's own linter. |
+| Gp-policy | designs with a policy annotation only: it binds to the domain model, covers every top-level invariant, and the committed `Policy.als` and `Policy.oracle.md` byte-match a fresh generation. |
 | G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, and every dependency has a mitigation row. |
 | G3-machine | machines pass structural lint, committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
 | Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows. |
@@ -437,17 +504,21 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 
 - `skills/machinery/SKILL.md` the conductor, plus `references/` (XState format, C4 technique, BUILD.md
   template) and `tools/` (the TLC shell wrappers, `tlc.sh` and `verify_formal.sh`).
-- `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `refine`, `compose`,
-  `check`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`, `install`, `uninstall`.
+- `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `alloy`, `refine`,
+  `compose`, `check`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`, `install`,
+  `uninstall`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
-  `refine/`, `compose/`, `gates/` (the G2/G3/Gx/G4/G5 suite), `pack/` (recursive decomposition via
-  contract packs), `formal/` (TLC orchestration), `install/` (skill placement behind `machinery
-  install`), `experiments/` (the shared mutation-experiment table). Every package has unit tests.
+  `alloy/` (the relational policy generator), `refine/`, `compose/`, `gates/` (the Gp/G2/G3/Gx/G4/G5
+  suite), `pack/` (recursive decomposition via contract packs), `formal/` (TLC + Alloy
+  orchestration), `install/` (skill placement behind `machinery install`), `experiments/` (the
+  shared mutation-experiment table). Every package has unit tests.
 - `agents/` two synthesis subagents (the machine author and the build-doc writer).
 - `commands/`, `hooks/`, and `.claude-plugin/` the Claude Code plugin surface: the slash commands,
   the gate-enforcing hooks and their shim, and the plugin + marketplace manifests. The repo root is
   the plugin; see the [Claude Code plugin guide](docs/claude-plugin.md).
-- `docs/` the deep dives: the [brownfield team guide](docs/brownfield-team-guide.md) (staged
+- `docs/` the deep dives: the [policy layer guide](docs/policy-layer.md) (the annotation
+  reference, the meta-checks in plain language, the authorization-oracle test pattern, greenfield
+  and brownfield workflows), the [brownfield team guide](docs/brownfield-team-guide.md) (staged
   adoption ladder, baseline allow rules, PR discipline, CI recipes), the
   [Claude Code plugin guide](docs/claude-plugin.md) (hooks, `.machinery.json` reference, commands),
   and the [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft
@@ -527,7 +598,9 @@ bundles none of them.
 - [XState](https://github.com/statelyai/xstate) and [Stately](https://stately.ai/) -- the
   state-machine JSON format (notation only; machinery does not run the library) and its visualizer.
 - [TLA+ and TLC](https://github.com/tlaplus/tlaplus) -- the specification language and model checker
-  (the formal layer).
+  (the behavioral formal layer).
+- [Alloy](https://alloytools.org/) -- the relational model finder (the static policy layer;
+  `machinery alloy` emits its notation and `verify-formal` runs the pinned analyzer).
 - [Eclipse Temurin / Adoptium](https://adoptium.net/) -- the JVM that runs TLC.
 - [Go](https://go.dev/) -- to build machinery from source and to install Modelith.
 - [LadybugDB](https://github.com/LadybugDB/go-ladybug) -- the embedded store used only by the go-crm

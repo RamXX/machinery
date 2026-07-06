@@ -81,13 +81,24 @@ One table proving nothing was dropped between layers:
 Every invariant from section 3 appears here. Any invariant not enforced by a guard and not
 structurally impossible is called out explicitly as a known risk. Invariant ids must appear inside
 table cells as whole tokens: Gx-trace matches them structurally, so `inv-1` buried inside `inv-12`
-does not count, and prose outside a table does not count.
+does not count, and prose outside a table does not count. When the design carries a policy
+annotation, the invariants it compiles cite the relational model as an enforcement class
+("generated authz oracle rows") alongside their runtime guard, and the conformance test id
+(P-authz-oracle or equivalent) appears in their test column.
 
 ## 7. Test specification (the hard-TDD oracle)
 The transition test spec IS the generated `design/machines/<Component>.oracle.md` files. Do not
 restate the transition tables here; reference the oracles. Tests key on each row's STABLE id, never
 the sequential test id: row numbers renumber when the design changes, stable ids survive unrelated
 insertions and change only when that transition's stimulus changes.
+
+When the design carries a policy annotation, the authorization test spec IS the generated
+`design/formal/Policy.oracle.md` the same way: require ONE conformance test that parses the table
+and asserts the pure authorization function on every reachable row, expanding each abstract owner
+case into all the concrete variants the oracle header lists, across every resource entity type.
+Do not restate the decision rows. Rows marked `unreachable` are skipped (the write discipline
+refuses to construct them; say where that discipline lives). The go-crm example's
+`impl/internal/authz/oracle_test.go` is the reference shape.
 
 BUILD.md adds only what the oracles cannot derive:
 - The guard-branch completeness analysis: one test per falsifying clause of each conjunction guard

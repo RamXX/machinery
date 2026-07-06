@@ -29,6 +29,14 @@ One line per subcommand:
   the committed oracle against a fresh in-memory generation, so a stale or edited oracle is DRIFT.
 - `machinery tla <machine.json> [out-dir]` generates the control-flow TLA+ model and `.cfg` for one
   machine (bounded retry counters, liveness, deadlock-freedom; assumptions printed in the header).
+- `machinery alloy <design-dir> [out-dir]` reconciles `formal/policy.relational.yaml` against the
+  domain model, then generates two artifacts from the one reconciliation: `formal/Policy.als`, the
+  static relational policy model with the standard meta-checks (satisfiability, write-implies-read,
+  capable-writes-own, reassign-retains-authority, per-role exercisability), and
+  `formal/Policy.oracle.md`, the authorization decision table (role x verb x ownership-case, stable
+  ids hashing the case, never the verdict) that implementation tests consume. Reconciliation
+  failure is a hard error; `verify-formal` runs the pinned Alloy analyzer on the model, and
+  Gp-policy byte-diffs both committed artifacts against a fresh generation.
 - `machinery refine <machine.json> <semantics.yaml> [out-dir]` reconciles a `<M>.semantics.yaml`
   annotation against the machine, then generates the data-refined model, the abstract contract, and
   the refinement proof. Patterns: `linear-lifecycle`, `terminal-lifecycle`, `saga` (state names come
@@ -36,9 +44,10 @@ One line per subcommand:
 - `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
   `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate
   composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
-- `machinery check <design-dir> [--impl <code-dir>] [--gate g2,g3,gx,g4,g5]` the deterministic gate
-  suite (G2-c4, G3-machine, Gx-trace, G4-import, G5-pack on decomposed designs). Gates fail on
-  absence; every gate prints a `checked:` line. Exit is non-zero on any ERROR or DRIFT.
+- `machinery check <design-dir> [--impl <code-dir>] [--gate gp,g2,g3,gx,g4,g5]` the deterministic
+  gate suite (Gp-policy on designs with a policy annotation, G2-c4, G3-machine, Gx-trace,
+  G4-import, G5-pack on decomposed designs). Gates fail on absence; every gate prints a `checked:`
+  line. Exit is non-zero on any ERROR or DRIFT.
 - `machinery pack generate <parent-design>` emits the frozen per-subsystem contract packs
   (`design/packs/<id>.pack/`) from `decomposition.yaml`: the owned domain slice, the boundary event
   rows, the contract machine plus its TLA+ module, the delegated invariants, and a content hash.

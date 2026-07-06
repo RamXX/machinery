@@ -1,6 +1,6 @@
 ---
 description: Run the deterministic machinery gates and explain every finding
-argument-hint: "[design-dir] [--impl dir] [--gate g2,g3,gx,g4,g5]"
+argument-hint: "[design-dir] [--impl dir] [--gate gp,g2,g3,gx,g4,g5]"
 allowed-tools: Bash(machinery:*), Read, Grep, Glob
 ---
 
