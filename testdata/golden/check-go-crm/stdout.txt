@@ -1,6 +1,9 @@
 == Gp-policy static relational model ==
   checked: 4 roles, 5 resources, 4 policy rules, 1 residuals (waived with reason), 12 invariants carried, 14 solver commands generated, 70 authz oracle rows generated, 2 committed artifacts fresh (byte-identical)
   ok
+== Gi-integrity structural relational model ==
+  checked: 4 entities, 3 unique keys, 1 singleton flags, 4 invariants carried, 5 solver commands generated, 1 committed artifacts fresh (byte-identical)
+  ok
 == G2-c4  Architecture Contract ==
   checked: 6 boundaries, 1 externals, 12 allow rules, 2 deny rules, 14 dsl elements, 6 boundaries bound to dsl, 6 mitigation rows, 3 dependencies with mitigation rows
   ok
@@ -16,7 +19,7 @@
   note   Deal: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   Task: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
-  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 6 invariants policy-checked (relational model), 6 invariants attested (structural/prose), 13 invariants unit-backed (guard/action/actor)
+  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants attested (structural/prose), 13 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
   ok
 == G4-import  code respects the contract ==
   checked: 3 files ignored by contract, 16 go files checked, 21 imports resolved, 13 test files skipped, 12 edges verified

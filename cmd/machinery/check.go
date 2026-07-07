@@ -11,14 +11,14 @@ import (
 
 func newCheckCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "check <design-dir> [--impl d] [--gate gp,g2,g3,gx,g4,g5]",
+		Use:   "check <design-dir> [--impl d] [--gate gp,gi,g2,g3,gx,g4,g5]",
 		Short: "Run the deterministic verification gates on a design",
 		Args:  cobra.ExactArgs(1),
 	}
 	var implDir string
 	var gateList string
 	c.Flags().StringVar(&implDir, "impl", "", "implementation directory for G4-import")
-	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gp,g2,g3,gx,g4,g5")
+	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gp,gi,g2,g3,gx,g4,g5")
 	c.RunE = func(cmd *cobra.Command, args []string) error {
 		design := args[0]
 		if err := checkIsDir(design); err != nil {

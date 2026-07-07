@@ -1,2 +1,4 @@
 alloy_gen: reconciled policy.relational.yaml against domain.modelith.yaml: 4 roles, 5 resources, 4 rule(s), 1 residual(s), 12 invariant(s) carried
 wrote Policy.als (14 commands) and Policy.oracle.md (70 decision rows) to <out-dir>
+alloy_gen: reconciled integrity.relational.yaml against domain.modelith.yaml: 4 entities, 0 relationship(s), 3 unique, 1 singleton, 0 residual(s), 4 invariant(s) carried
+wrote Integrity.als (5 commands) to <out-dir>

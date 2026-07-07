@@ -1014,19 +1014,22 @@ func CheckTraceability(design string) *Gate {
 	// stronger than a prose reference (Gp-policy holds the annotation to
 	// the domain model; here it only credits coverage)
 	policyIDs := alloy.CarriedIDs(filepath.Join(design, "formal", alloy.AnnotationName))
+	integrityIDs := alloy.CarriedIntegrityIDs(filepath.Join(design, "formal", alloy.IntegrityAnnotationName))
 	var invSorted []string
 	for iid := range invIDs {
 		invSorted = append(invSorted, iid)
 	}
 	sort.Strings(invSorted)
 	for _, iid := range invSorted {
-		if tokenIn(iid, corpus) || policyIDs[iid] {
+		if tokenIn(iid, corpus) || policyIDs[iid] || integrityIDs[iid] {
 			g.Count("invariants enforced")
 			switch {
 			case tokenIn(iid, unitCorpus):
 				g.Count("invariants unit-backed (guard/action/actor)")
 			case policyIDs[iid]:
 				g.Count("invariants policy-checked (relational model)")
+			case integrityIDs[iid]:
+				g.Count("invariants integrity-checked (relational model)")
 			default:
 				g.Count("invariants attested (structural/prose)")
 			}
