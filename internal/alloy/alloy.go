@@ -1131,34 +1131,64 @@ func Paths(design string) (domainPath, annotationPath string, err error) {
 	return models[0], filepath.Join(design, "formal", AnnotationName), nil
 }
 
-// Run is the `machinery alloy <design> [out-dir]` entrypoint.
+func statFile(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && !fi.IsDir()
+}
+
+// Run is the `machinery alloy <design> [out-dir]` entrypoint. One command
+// emits every relational layer the design opted into (policy, integrity), one
+// artifact set per present annotation, in a fixed order. At least one
+// annotation must be present; each layer is independently skippable.
 func Run(design, outdir string) error {
-	domainPath, annPath, err := Paths(design)
-	if err != nil {
-		return err
-	}
-	if _, err := os.Stat(annPath); err != nil {
-		return fmt.Errorf("alloy_gen: no %s under %s; the relational layer is opt-in, author the annotation first (see the machinery skill, Phase 1)", AnnotationName, filepath.Dir(annPath))
-	}
-	als, oracle, stats, err := GenerateAll(domainPath, annPath)
+	domainPath, policyAnn, err := Paths(design)
 	if err != nil {
 		return err
 	}
 	if outdir == "" {
 		outdir = filepath.Join(design, "formal")
 	}
+	formalDir := filepath.Join(design, "formal")
+	integrityAnn := filepath.Join(formalDir, IntegrityAnnotationName)
+
+	havePolicy := statFile(policyAnn)
+	haveIntegrity := statFile(integrityAnn)
+	if !havePolicy && !haveIntegrity {
+		return fmt.Errorf("alloy_gen: no relational annotation under %s (looked for %s, %s); the relational layer is opt-in, author an annotation first (see the machinery skill, Phase 1)",
+			formalDir, AnnotationName, IntegrityAnnotationName)
+	}
 	if err := os.MkdirAll(outdir, 0755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(outdir, OutputName), []byte(als), 0644); err != nil {
-		return err
+
+	if havePolicy {
+		als, oracle, stats, err := GenerateAll(domainPath, policyAnn)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(outdir, OutputName), []byte(als), 0644); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(outdir, OracleName), []byte(oracle), 0644); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stdout, "alloy_gen: reconciled %s against %s: %d roles, %d resources, %d rule(s), %d residual(s), %d invariant(s) carried\n",
+			AnnotationName, filepath.Base(domainPath), stats.Roles, stats.Resources, stats.Rules, stats.Residuals, stats.Carried)
+		fmt.Fprintf(os.Stdout, "wrote %s (%d commands) and %s (%d decision rows) to %s\n",
+			OutputName, len(stats.Commands), OracleName, stats.OracleRows, outdir)
 	}
-	if err := os.WriteFile(filepath.Join(outdir, OracleName), []byte(oracle), 0644); err != nil {
-		return err
+
+	if haveIntegrity {
+		als, stats, err := GenerateIntegrity(domainPath, integrityAnn)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(outdir, IntegrityOutputName), []byte(als), 0644); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stdout, "alloy_gen: reconciled %s against %s: %d entities, %d relationship(s), %d unique, %d singleton, %d residual(s), %d invariant(s) carried\n",
+			IntegrityAnnotationName, filepath.Base(domainPath), stats.Entities, stats.Relationships, stats.Uniques, stats.Singletons, stats.Residuals, stats.Carried)
+		fmt.Fprintf(os.Stdout, "wrote %s (%d commands) to %s\n", IntegrityOutputName, len(stats.Commands), outdir)
 	}
-	fmt.Fprintf(os.Stdout, "alloy_gen: reconciled %s against %s: %d roles, %d resources, %d rule(s), %d residual(s), %d invariant(s) carried\n",
-		AnnotationName, filepath.Base(domainPath), stats.Roles, stats.Resources, stats.Rules, stats.Residuals, stats.Carried)
-	fmt.Fprintf(os.Stdout, "wrote %s (%d commands) and %s (%d decision rows) to %s\n",
-		OutputName, len(stats.Commands), OracleName, stats.OracleRows, outdir)
 	return nil
 }

@@ -190,6 +190,28 @@ func VerifyFormal(design string, genOnly bool) int {
 		}
 	}
 
+	// static relational integrity model (opt-in: present only when the design
+	// carries an integrity annotation)
+	integrityAnn := filepath.Join(fdir, alloy.IntegrityAnnotationName)
+	haveIntegrity := false
+	var integrityCommands []alloy.Command
+	if _, err := os.Stat(integrityAnn); err == nil {
+		haveIntegrity = true
+		domainPath, _, perr := alloy.Paths(design)
+		if perr != nil {
+			genErr(perr)
+			haveIntegrity = false
+		} else if als, stats, aerr := alloy.GenerateIntegrity(domainPath, integrityAnn); aerr != nil {
+			genErr(aerr)
+			haveIntegrity = false
+		} else if werr := os.WriteFile(filepath.Join(fdir, alloy.IntegrityOutputName), []byte(als), 0644); werr != nil {
+			genErr(werr)
+			haveIntegrity = false
+		} else {
+			integrityCommands = stats.Commands
+		}
+	}
+
 	if genOnly {
 		pairs := 0
 		for _, tlaF := range globExt(fdir, ".tla") {
@@ -201,11 +223,14 @@ func VerifyFormal(design string, genOnly bool) int {
 		if havePolicy {
 			fmt.Fprintf(os.Stdout, "relational policy model + authz oracle regenerated (%s, %d commands; %s); Alloy skipped (--gen-only)\n", alloy.OutputName, len(policyCommands), alloy.OracleName)
 		}
+		if haveIntegrity {
+			fmt.Fprintf(os.Stdout, "relational integrity model regenerated (%s, %d commands); Alloy skipped (--gen-only)\n", alloy.IntegrityOutputName, len(integrityCommands))
+		}
 		if genFail > 0 {
 			fmt.Fprintf(os.Stderr, "verify-formal: %d generator failure(s); the committed specs above were NOT regenerated from source\n", genFail)
 			return 1
 		}
-		if pairs == 0 && !havePolicy {
+		if pairs == 0 && !havePolicy && !haveIntegrity {
 			fmt.Fprintln(os.Stderr, "verify-formal: no .tla/.cfg pairs under "+fdir+": nothing to generate is a failure, not a pass")
 			return 1
 		}
@@ -237,27 +262,32 @@ func VerifyFormal(design string, genOnly bool) int {
 			fail++
 		}
 	}
-	if havePolicy {
-		vs, aerr := runAlloy(filepath.Join(fdir, alloy.OutputName), policyCommands)
+	runLayer := func(present bool, alsName, prefix string, commands []alloy.Command) {
+		if !present {
+			return
+		}
+		vs, aerr := runAlloy(filepath.Join(fdir, alsName), commands)
 		if aerr != nil {
 			fmt.Fprintln(os.Stderr, aerr)
 			fail++
-		} else {
-			for _, v := range vs {
-				name := "Policy/" + v.Command.Name
-				if v.Pass {
-					fmt.Fprintf(os.Stdout, "  PASS  %s\n", name)
-					pass++
-				} else {
-					fmt.Fprintf(os.Stdout, "  FAIL  %s\n", name)
-					if v.Detail != "" {
-						fmt.Fprintf(os.Stdout, "        %s\n", v.Detail)
-					}
-					fail++
+			return
+		}
+		for _, v := range vs {
+			name := prefix + "/" + v.Command.Name
+			if v.Pass {
+				fmt.Fprintf(os.Stdout, "  PASS  %s\n", name)
+				pass++
+			} else {
+				fmt.Fprintf(os.Stdout, "  FAIL  %s\n", name)
+				if v.Detail != "" {
+					fmt.Fprintf(os.Stdout, "        %s\n", v.Detail)
 				}
+				fail++
 			}
 		}
 	}
+	runLayer(havePolicy, alloy.OutputName, "Policy", policyCommands)
+	runLayer(haveIntegrity, alloy.IntegrityOutputName, "Integrity", integrityCommands)
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintf(os.Stdout, "%d passed, %d failed\n", pass, fail)
 	if genFail > 0 {
