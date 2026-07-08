@@ -75,12 +75,14 @@ familiarity:
   *exhaustively* for the temporal properties that matter here (termination, deadlock-freedom,
   safety, liveness) and returns a concrete counterexample; property-based tests sample the state
   space rather than exhaust it.
-- **Alloy for the static relational layer, where TLC never looks.** Access-control invariants
-  (roles, ownership, team scoping) are relations over configurations, not steps over time: no state
-  machine enforces them, so TLC cannot check them, and a structural linter sees only well-formed
-  prose. Bounded relational search is exactly Alloy's strength. machinery generates the Alloy model
-  from the domain model plus a short policy annotation (`machinery alloy`), with a standard
-  meta-check suite; nobody hand-writes Alloy, the same rule as the TLA+.
+- **Alloy for the static relational layers, where TLC never looks.** Some invariants are relations
+  over configurations, not steps over time: no state machine enforces them, so TLC cannot check them,
+  and a structural linter sees only well-formed prose. Bounded relational search is exactly Alloy's
+  strength. machinery has three opt-in relational algebras, each generated from the domain model plus
+  a short annotation (`machinery alloy`), each solver-checked by `verify-formal`: **policy** (access
+  control: roles, ownership, team scoping), **integrity** (structure: uniqueness, singletons,
+  cardinality), and **isolation** (multi-tenant reference isolation). Nobody hand-writes Alloy, the
+  same rule as the TLA+.
 
 ## Agentic systems: the machine is the envelope, not the agent
 
@@ -108,9 +110,12 @@ Phase 0  Frame        what, who, purpose, target language
 Phase 1  Modelith     domain model
          tool: modelith lint clean
          attested: lifecycle enums, action pre/post, invariant owners, scenario coverage
-Phase 1.5 Policy      static relational model (opt-in: designs with access-control invariants)
-         tool: Gp-policy (annotation binds + covers; committed Policy.als fresh); solver via verify-formal
-         attested: the policy annotation states what the prose invariants mean
+Phase 1.5 Relational  static relational models (opt-in, per invariant shape):
+           policy    access control      -> Gp-policy    (Policy.als + Policy.oracle.md)
+           integrity structure/keys      -> Gi-integrity (Integrity.als)
+           isolation multi-tenant refs   -> Gn-isolation (Isolation.als + Isolation.oracle.md)
+         tool: each gate binds + covers; committed models fresh; solver via verify-formal
+         attested: the annotations state what the prose invariants mean
 Phase 2  C4           architecture + contract
          tool: G2-c4 (contract parses and binds; mitigation coverage)
          attested: every action owned; interface contracts; NFR record

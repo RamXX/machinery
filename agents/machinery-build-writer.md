@@ -29,12 +29,19 @@ constraint the conductor passes in its prompt.
   and the event-contract table where one exists).
 - `design/machines/*.machine.json`, `design/machines/*.matrix.md`, and the generated
   `design/machines/*.oracle.md`.
-- When the design carries the policy layer: `design/formal/policy.relational.yaml` and the
-  generated `design/formal/Policy.als` and `design/formal/Policy.oracle.md` (the authorization
-  decision table). Section 6 cites the oracle as an enforcement class for the invariants it
-  compiles, and section 7 requires the oracle conformance test (parse the table, assert the pure
-  authorization function on every reachable row; the go-crm example's
-  `impl/internal/authz/oracle_test.go` is the reference shape).
+- When the design carries any relational layer, its generated artifacts (each is opt-in; include
+  only those present):
+  - **policy** (`policy.relational.yaml` -> `Policy.als`, `Policy.oracle.md`): the authorization
+    decision table. Section 6 cites the oracle as an enforcement class; section 7 requires the
+    oracle conformance test (parse the table, assert the pure authorization function on every
+    reachable row; `impl/internal/authz/oracle_test.go` is the reference shape).
+  - **integrity** (`integrity.relational.yaml` -> `Integrity.als`): structural admissibility, held
+    at design time by Gi-integrity and verify-formal. No oracle and no impl test: cite the invariants
+    it carries as integrity-checked in section 6.
+  - **isolation** (`isolation.relational.yaml` -> `Isolation.als`, `Isolation.oracle.md`): the
+    tenant-scoping decision table. Section 7 requires the tenant oracle conformance test against the
+    pure link-authorization function; `impl/internal/authz/tenant_oracle_test.go` is the reference
+    shape.
 - The target language(s).
 - The `machinery` CLI on PATH (`make install`).
 
