@@ -127,12 +127,16 @@ with zero shrinkage as the gate becoming wallpaper.
   than silently skipping the row-by-row reconciliation. The `checked:` line always states
   how many matrix rows were actually reconciled.
 - If the system has role- or ownership-based access control, this is also the stage to
-  bring in the policy layer (it needs only the domain model, so it can even precede the
+  bring in the relational layers (they need only the domain model, so they can even precede the
   machines): author `design/formal/policy.relational.yaml` describing the policy AS THE
   CODE BEHAVES (read the authorization code, not the wiki), run `machinery alloy design/`,
   and commit both generated artifacts. Gate `gp` activates automatically once the
-  annotation exists. A failed meta-check at this point is a latent policy hole the team
-  probably does not know about; treat it as a finding to adjudicate with the owners. The
+  annotation exists. The sibling layers slot in the same way when they apply: `integrity`
+  (`integrity.relational.yaml`, gate `gi`) for uniqueness/singleton/cardinality invariants, and
+  `isolation` (`isolation.relational.yaml`, gate `gn`) for cross-entity multi-tenant references; see
+  the [integrity](integrity-layer.md) and [isolation](isolation-layer.md) guides. A failed
+  meta-check at this point is a latent hole the team probably does not know about; treat it as a
+  finding to adjudicate with the owners. The
   generated `Policy.oracle.md` then powers an authorization characterization test, the
   same adjudication loop as Stage 3 (code-is-truth: fix the annotation; policy-is-truth:
   file the code defect). Full reference: [policy-layer.md](policy-layer.md).
