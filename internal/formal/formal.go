@@ -212,6 +212,31 @@ func VerifyFormal(design string, genOnly bool) int {
 		}
 	}
 
+	// static relational isolation model (opt-in: present only when the design
+	// carries an isolation annotation)
+	isolationAnn := filepath.Join(fdir, alloy.IsolationAnnotationName)
+	haveIsolation := false
+	var isolationCommands []alloy.Command
+	if _, err := os.Stat(isolationAnn); err == nil {
+		haveIsolation = true
+		domainPath, _, perr := alloy.Paths(design)
+		if perr != nil {
+			genErr(perr)
+			haveIsolation = false
+		} else if als, oracleMD, stats, aerr := alloy.GenerateIsolation(domainPath, isolationAnn); aerr != nil {
+			genErr(aerr)
+			haveIsolation = false
+		} else if werr := os.WriteFile(filepath.Join(fdir, alloy.IsolationOutputName), []byte(als), 0644); werr != nil {
+			genErr(werr)
+			haveIsolation = false
+		} else if werr := os.WriteFile(filepath.Join(fdir, alloy.IsolationOracleName), []byte(oracleMD), 0644); werr != nil {
+			genErr(werr)
+			haveIsolation = false
+		} else {
+			isolationCommands = stats.Commands
+		}
+	}
+
 	if genOnly {
 		pairs := 0
 		for _, tlaF := range globExt(fdir, ".tla") {
@@ -226,11 +251,14 @@ func VerifyFormal(design string, genOnly bool) int {
 		if haveIntegrity {
 			fmt.Fprintf(os.Stdout, "relational integrity model regenerated (%s, %d commands); Alloy skipped (--gen-only)\n", alloy.IntegrityOutputName, len(integrityCommands))
 		}
+		if haveIsolation {
+			fmt.Fprintf(os.Stdout, "relational isolation model + tenant oracle regenerated (%s, %d commands; %s); Alloy skipped (--gen-only)\n", alloy.IsolationOutputName, len(isolationCommands), alloy.IsolationOracleName)
+		}
 		if genFail > 0 {
 			fmt.Fprintf(os.Stderr, "verify-formal: %d generator failure(s); the committed specs above were NOT regenerated from source\n", genFail)
 			return 1
 		}
-		if pairs == 0 && !havePolicy && !haveIntegrity {
+		if pairs == 0 && !havePolicy && !haveIntegrity && !haveIsolation {
 			fmt.Fprintln(os.Stderr, "verify-formal: no .tla/.cfg pairs under "+fdir+": nothing to generate is a failure, not a pass")
 			return 1
 		}
@@ -288,6 +316,7 @@ func VerifyFormal(design string, genOnly bool) int {
 	}
 	runLayer(havePolicy, alloy.OutputName, "Policy", policyCommands)
 	runLayer(haveIntegrity, alloy.IntegrityOutputName, "Integrity", integrityCommands)
+	runLayer(haveIsolation, alloy.IsolationOutputName, "Isolation", isolationCommands)
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintf(os.Stdout, "%d passed, %d failed\n", pass, fail)
 	if genFail > 0 {

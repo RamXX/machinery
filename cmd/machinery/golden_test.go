@@ -224,7 +224,7 @@ func TestGoldenAlloy(t *testing.T) {
 		ex        string
 		artifacts []string
 	}{
-		{"go-crm", []string{"Policy.als", "Policy.oracle.md", "Integrity.als"}},
+		{"go-crm", []string{"Policy.als", "Policy.oracle.md", "Integrity.als", "Isolation.als", "Isolation.oracle.md"}},
 		{"fulfillment", []string{"Integrity.als"}},
 	} {
 		t.Run(c.ex, func(t *testing.T) {

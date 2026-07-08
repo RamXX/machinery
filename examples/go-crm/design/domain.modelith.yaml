@@ -187,8 +187,9 @@ entities:
     invariants:
       - {id: activity-immutable, statement: "An `Activity` body and occurredAt never change after creation."}
       - {id: activity-owned, statement: "Every `Activity` records the `User` who logged it."}
+      - {id: activity-contact-same-tenant, statement: "An `Activity` and the `Contact` it concerns are owned within the same `Team`; an `Activity` never references a `Contact` in another tenant, so following the link cannot cross a tenant boundary."}
     actions:
-      - {name: log, actor: User, preserves: [activity-immutable, activity-owned]}
+      - {name: log, actor: User, preserves: [activity-immutable, activity-owned, activity-contact-same-tenant]}
       - {name: delete, actor: Manager, description: "Remove an `Activity`, for correction only."}
 
   Task:
@@ -207,8 +208,9 @@ entities:
       - {id: task-owned, statement: "Every `Task` has exactly one owning `User`."}
       - {id: task-terminal, statement: "A `Task` in Done or Cancelled is terminal."}
       - {id: task-assignee-visible, statement: "A `Task` may be reassigned only to a `User` the assigner can see: an `Admin` to any `User`, a `Manager` to a member of the manager's `Team` (`VisibilityScope` is a set of records, so eligibility is by team membership, not by scope membership)."}
+      - {id: task-deal-same-tenant, statement: "A `Task` and the `Deal` it is linked to are owned within the same `Team`; a `Task` never references a `Deal` in another tenant, so following the link cannot cross a tenant boundary."}
     actions:
-      - {name: create, actor: User, preserves: [task-owned]}
+      - {name: create, actor: User, preserves: [task-owned, task-deal-same-tenant]}
       - {name: start, actor: Owner}
       - {name: complete, actor: Owner, preserves: [task-terminal]}
       - {name: cancel, actor: Owner, preserves: [task-terminal]}
