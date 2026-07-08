@@ -360,6 +360,12 @@ func selectGates(designDir string, cfg Config) gates.Selection {
 	if fileExists(filepath.Join(designDir, "formal", "policy.relational.yaml")) {
 		run["gp"] = true
 	}
+	if fileExists(filepath.Join(designDir, "formal", "integrity.relational.yaml")) {
+		run["gi"] = true
+	}
+	if fileExists(filepath.Join(designDir, "formal", "isolation.relational.yaml")) {
+		run["gn"] = true
+	}
 	if fileExists(filepath.Join(designDir, "workspace.dsl")) || fileExists(filepath.Join(designDir, "ARCHITECTURE.md")) {
 		run["g2"] = true
 	}
