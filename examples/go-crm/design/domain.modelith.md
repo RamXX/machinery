@@ -112,13 +112,14 @@ An immutable record of an interaction (a call, meeting, email, or note) about a 
 
 **Actions**
 
-- `log` - actor `User`; preserves activity-immutable, activity-owned
+- `log` - actor `User`; preserves activity-immutable, activity-owned, activity-contact-same-tenant
 - `delete` - actor `Manager` - Remove an `Activity`, for correction only.
 
 **Invariants**
 
 - **activity-immutable** - An `Activity` body and occurredAt never change after creation.
 - **activity-owned** - Every `Activity` records the `User` who logged it.
+- **activity-contact-same-tenant** - An `Activity` and the `Contact` it concerns are owned within the same `Team`; an `Activity` never references a `Contact` in another tenant, so following the link cannot cross a tenant boundary.
 
 ### `Contact`
 
@@ -251,7 +252,7 @@ A unit of follow-up work with a due date, owned by a `User` and optionally linke
 
 **Actions**
 
-- `create` - actor `User`; preserves task-owned
+- `create` - actor `User`; preserves task-owned, task-deal-same-tenant
 - `start` - actor `Owner`
 - `complete` - actor `Owner`; preserves task-terminal
 - `cancel` - actor `Owner`; preserves task-terminal
@@ -262,6 +263,7 @@ A unit of follow-up work with a due date, owned by a `User` and optionally linke
 - **task-owned** - Every `Task` has exactly one owning `User`.
 - **task-terminal** - A `Task` in Done or Cancelled is terminal.
 - **task-assignee-visible** - A `Task` may be reassigned only to a `User` the assigner can see: an `Admin` to any `User`, a `Manager` to a member of the manager's `Team` (`VisibilityScope` is a set of records, so eligibility is by team membership, not by scope membership).
+- **task-deal-same-tenant** - A `Task` and the `Deal` it is linked to are owned within the same `Team`; a `Task` never references a `Deal` in another tenant, so following the link cannot cross a tenant boundary.
 
 ### `Team`
 

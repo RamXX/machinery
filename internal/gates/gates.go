@@ -1015,13 +1015,14 @@ func CheckTraceability(design string) *Gate {
 	// the domain model; here it only credits coverage)
 	policyIDs := alloy.CarriedIDs(filepath.Join(design, "formal", alloy.AnnotationName))
 	integrityIDs := alloy.CarriedIntegrityIDs(filepath.Join(design, "formal", alloy.IntegrityAnnotationName))
+	isolationIDs := alloy.CarriedIsolationIDs(filepath.Join(design, "formal", alloy.IsolationAnnotationName))
 	var invSorted []string
 	for iid := range invIDs {
 		invSorted = append(invSorted, iid)
 	}
 	sort.Strings(invSorted)
 	for _, iid := range invSorted {
-		if tokenIn(iid, corpus) || policyIDs[iid] || integrityIDs[iid] {
+		if tokenIn(iid, corpus) || policyIDs[iid] || integrityIDs[iid] || isolationIDs[iid] {
 			g.Count("invariants enforced")
 			switch {
 			case tokenIn(iid, unitCorpus):
@@ -1030,6 +1031,8 @@ func CheckTraceability(design string) *Gate {
 				g.Count("invariants policy-checked (relational model)")
 			case integrityIDs[iid]:
 				g.Count("invariants integrity-checked (relational model)")
+			case isolationIDs[iid]:
+				g.Count("invariants isolation-checked (relational model)")
 			default:
 				g.Count("invariants attested (structural/prose)")
 			}

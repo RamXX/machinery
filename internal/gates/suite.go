@@ -29,7 +29,7 @@ const decomposedParentNote = "note: decomposed parent with no machines/; running
 // with no machines/ directory, and an unknown gate name is an error.
 func Select(design, gateList string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
-	gs := "gp,gi,g2,g3,gx,g4,g5"
+	gs := "gp,gi,gn,g2,g3,gx,g4,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if fi, err := os.Stat(design + "/machines"); err != nil || !fi.IsDir() {
 			// a pure decomposed parent authors no machines: its behavior
@@ -46,7 +46,7 @@ func Select(design, gateList string) (Selection, error) {
 	}
 	var unknown []string
 	for g := range sel.Run {
-		if g != "gp" && g != "gi" && g != "g2" && g != "g3" && g != "gx" && g != "g4" && g != "g5" {
+		if g != "gp" && g != "gi" && g != "gn" && g != "g2" && g != "g3" && g != "gx" && g != "g4" && g != "g5" {
 			unknown = append(unknown, g)
 		}
 	}
@@ -70,6 +70,9 @@ func RunSelected(design, impl string, sel Selection) []*Gate {
 	}
 	if sel.Run["gi"] && (sel.Explicit || HasIntegrityAnnotation(design)) {
 		out = append(out, CheckIntegrity(design))
+	}
+	if sel.Run["gn"] && (sel.Explicit || HasIsolationAnnotation(design)) {
+		out = append(out, CheckIsolation(design))
 	}
 	if sel.Run["g2"] {
 		out = append(out, CheckC4(design))

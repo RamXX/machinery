@@ -1150,12 +1150,14 @@ func Run(design, outdir string) error {
 	}
 	formalDir := filepath.Join(design, "formal")
 	integrityAnn := filepath.Join(formalDir, IntegrityAnnotationName)
+	isolationAnn := filepath.Join(formalDir, IsolationAnnotationName)
 
 	havePolicy := statFile(policyAnn)
 	haveIntegrity := statFile(integrityAnn)
-	if !havePolicy && !haveIntegrity {
-		return fmt.Errorf("alloy_gen: no relational annotation under %s (looked for %s, %s); the relational layer is opt-in, author an annotation first (see the machinery skill, Phase 1)",
-			formalDir, AnnotationName, IntegrityAnnotationName)
+	haveIsolation := statFile(isolationAnn)
+	if !havePolicy && !haveIntegrity && !haveIsolation {
+		return fmt.Errorf("alloy_gen: no relational annotation under %s (looked for %s, %s, %s); the relational layer is opt-in, author an annotation first (see the machinery skill, Phase 1)",
+			formalDir, AnnotationName, IntegrityAnnotationName, IsolationAnnotationName)
 	}
 	if err := os.MkdirAll(outdir, 0755); err != nil {
 		return err
@@ -1189,6 +1191,23 @@ func Run(design, outdir string) error {
 		fmt.Fprintf(os.Stdout, "alloy_gen: reconciled %s against %s: %d entities, %d relationship(s), %d unique, %d singleton, %d residual(s), %d invariant(s) carried\n",
 			IntegrityAnnotationName, filepath.Base(domainPath), stats.Entities, stats.Relationships, stats.Uniques, stats.Singletons, stats.Residuals, stats.Carried)
 		fmt.Fprintf(os.Stdout, "wrote %s (%d commands) to %s\n", IntegrityOutputName, len(stats.Commands), outdir)
+	}
+
+	if haveIsolation {
+		als, oracle, stats, err := GenerateIsolation(domainPath, isolationAnn)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(outdir, IsolationOutputName), []byte(als), 0644); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(outdir, IsolationOracleName), []byte(oracle), 0644); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stdout, "alloy_gen: reconciled %s against %s: %d record(s), %d reference(s), %d residual(s), %d invariant(s) carried\n",
+			IsolationAnnotationName, filepath.Base(domainPath), stats.Records, stats.References, stats.Residuals, stats.Carried)
+		fmt.Fprintf(os.Stdout, "wrote %s (%d commands) and %s (%d decision rows) to %s\n",
+			IsolationOutputName, len(stats.Commands), IsolationOracleName, stats.OracleRows, outdir)
 	}
 	return nil
 }
