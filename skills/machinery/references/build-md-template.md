@@ -100,6 +100,14 @@ Do not restate the decision rows. Rows marked `unreachable` are skipped (the wri
 refuses to construct them; say where that discipline lives). The go-crm example's
 `impl/internal/authz/oracle_test.go` is the reference shape.
 
+When the design carries an isolation annotation, the tenant-scoping test spec IS the generated
+`design/formal/Isolation.oracle.md` the same way: require ONE conformance test that parses the table
+and asserts the pure link-authorization function on every row, expanding each tenant case into its
+concrete owner-tenant pairs. The go-crm example's `impl/internal/authz/tenant_oracle_test.go` is the
+reference shape. The integrity layer carries no oracle and no impl test: it is a design-side
+admissibility proof held by `Gi-integrity` and `verify-formal`, so section 6 simply cites its
+invariants as integrity-checked.
+
 BUILD.md adds only what the oracles cannot derive:
 - The guard-branch completeness analysis: one test per falsifying clause of each conjunction guard
   (the T-XXX-04a/b/c pattern). A guard `A AND B AND C` needs one test with only A false, one with

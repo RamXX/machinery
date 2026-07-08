@@ -357,6 +357,33 @@ func TestStopBeforeAnyGateApplies(t *testing.T) {
 	}
 }
 
+// TestSelectGatesProgressiveRelational locks the brownfield behavior: each
+// relational annotation turns on its own gate at stop time (no config needed),
+// so a repo that adopts the integrity or isolation layer gets it checked before
+// the turn can end, exactly as the policy layer does.
+func TestSelectGatesProgressiveRelational(t *testing.T) {
+	dir := t.TempDir()
+	formal := filepath.Join(dir, "formal")
+	if err := os.MkdirAll(formal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sel := selectGates(dir, Config{})
+	for _, g := range []string{"gp", "gi", "gn"} {
+		if sel.Run[g] {
+			t.Errorf("%s must not run before its annotation exists", g)
+		}
+	}
+	writeFile(t, filepath.Join(formal, "policy.relational.yaml"), "subjects: {}\n")
+	writeFile(t, filepath.Join(formal, "integrity.relational.yaml"), "entities: []\n")
+	writeFile(t, filepath.Join(formal, "isolation.relational.yaml"), "tenant: {}\n")
+	sel = selectGates(dir, Config{})
+	for _, g := range []string{"gp", "gi", "gn"} {
+		if !sel.Run[g] {
+			t.Errorf("%s must run once formal/%s exists", g, map[string]string{"gp": "policy", "gi": "integrity", "gn": "isolation"}[g]+".relational.yaml")
+		}
+	}
+}
+
 func TestStopMissingDesignDirWarns(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigName), `{"design":"blueprint"}`)
