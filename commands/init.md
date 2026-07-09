@@ -37,6 +37,7 @@ no-op until the project root has a `.machinery.json` (or a conventional
 7. For brownfield adoption, offer to start the archaeology run with
    /machinery:design brownfield, and point at docs/brownfield-team-guide.md
    for the team adoption ladder, the baseline and ratchet flow, and CI
-   recipes.
+   recipes. If the user wants a replacement foundation with selective salvage, offer
+   /machinery:design rebuild and point at docs/rebuild-guide.md instead.
 
 Arguments: $ARGUMENTS

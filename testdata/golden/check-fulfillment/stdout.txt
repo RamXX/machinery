@@ -1,3 +1,6 @@
+== Gi-integrity structural relational model ==
+  checked: 3 entities, 2 relationships, 1 unique keys, 2 invariants carried, 4 solver commands generated, 1 committed artifacts fresh (byte-identical)
+  ok
 == G2-c4  Architecture Contract ==
   checked: 5 boundaries, 4 allow rules, 3 deny rules, 19 dsl elements, 5 boundaries bound to dsl, 5 mitigation rows, 7 dependencies with mitigation rows, 8 event contracts
   ok
@@ -21,7 +24,7 @@
   note   Payment: 8 operational-overlay states (authorizing, capturing, refunding, gatewayRetry, gatewayResume, persisting, persistRetry, rolledBack)
   note   Reservation: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   Shipment: 5 operational-overlay states (dispatching, carrierRetry, persisting, persistRetry, rolledBack)
-  checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 3 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 16 invariants attested (structural/prose), 9 invariants unit-backed (guard/action/actor)
+  checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 3 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 15 invariants attested (structural/prose), 1 invariants integrity-checked (relational model), 9 invariants unit-backed (guard/action/actor)
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

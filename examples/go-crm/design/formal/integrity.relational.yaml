@@ -1,0 +1,18 @@
+# Declarative structural-integrity semantics for the Go CRM domain model: the
+# uniqueness and singleton invariants the domain model states as prose and the
+# policy layer does NOT carry (policy owns the rbac-* and ownership scopes; this
+# owns the structural keys). machinery alloy compiles it to a bounded relational
+# model (Integrity.als) whose admissibility runs prove the constraint set is
+# jointly satisfiable and each constraint is non-vacuous.
+#
+# These four invariants are entity-level and fall outside every other net: TLC
+# checks behavior over time, the policy layer checks access, and the linter
+# checks that the prose is well-formed. Only a relational solver can prove that
+# three uniqueness constraints plus a singleton admit a world that scales.
+entities: [User, Team, Tag, Pipeline]
+unique:
+  - {entity: User, attribute: username, invariant: username-unique}
+  - {entity: Team, attribute: name, invariant: team-name-unique}
+  - {entity: Tag, attribute: name, invariant: tag-name-unique}
+singleton:
+  - {entity: Pipeline, flag: isDefault, invariant: one-default-pipeline}

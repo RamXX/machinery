@@ -40,7 +40,7 @@ func preflightRun() {
 	} else {
 		fmt.Fprintln(out, "  optional Java 11+ -- needed ONLY for 'make verify-formal' (TLC model-checks the TLA+ proofs). The design pipeline and every gate run without it; with it you also get the exhaustive proofs. https://adoptium.net/")
 	}
-	fmt.Fprintln(out, "  auto     'machinery verify-formal' downloads the TLA+ tools (tla2tools.jar) on first use, pinned and checksum-verified (that step needs Java)")
+	fmt.Fprintln(out, "  auto     'machinery verify-formal' downloads the TLA+ tools (tla2tools.jar) and, for designs with a relational annotation (policy, integrity, or isolation), the Alloy analyzer (org.alloytools.alloy.dist.jar) on first use, pinned and checksum-verified (that step needs Java)")
 
 	// structurizr-cli (optional)
 	if _, err := exec.LookPath("structurizr-cli"); err == nil {

@@ -1,0 +1,20 @@
+# Declarative multi-tenant isolation semantics for the Go CRM. The `Team` is the
+# tenant; a record's tenant is its owner's team. The policy layer governs who may
+# read or write a record by role and ownership, but it never inspects what a
+# record REFERENCES: a Task a Rep may read can carry a link to a Deal owned in
+# another team, and following that link leaks a record the Rep could never read
+# directly. These cross-entity references must stay inside one tenant.
+#
+# machinery alloy compiles this to Isolation.als, whose SharedReferent checks
+# prove two records in different tenants can never share a referent, and to
+# Isolation.oracle.md, the tenant-scoping decision table the implementation's
+# link-authorization test consumes.
+tenant:
+  entity: Team
+subject:
+  entity: User
+  tenant_attr: team        # a User's Team is its tenant membership (at most one)
+  membership: lone
+references:
+  - {from: Task, to: Deal, field: deal, invariant: task-deal-same-tenant}
+  - {from: Activity, to: Contact, field: contact, invariant: activity-contact-same-tenant}

@@ -1,0 +1,18 @@
+---Trace---
+------State 0 (loop)-------
+univ={Admin$0, Manager$0, Rep$0, ReadOnly$0, Team$0, User$0, User$1, User$2, User$3, User$4, User$5, Record$0, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7}
+Int={-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7}
+seq/Int={0, 1, 2, 3, 4, 5}
+String={}
+none={}
+this/Admin={Admin$0}
+this/Manager={Manager$0}
+this/Rep={Rep$0}
+this/ReadOnly={ReadOnly$0}
+this/Role={Admin$0, Manager$0, Rep$0, ReadOnly$0}
+this/Team={Team$0}
+this/User={User$0, User$1, User$2, User$3, User$4, User$5}
+this/User<:role={User$0->ReadOnly$0, User$1->ReadOnly$0, User$2->Rep$0, User$3->Admin$0, User$4->Admin$0, User$5->Manager$0}
+this/User<:team={User$0->Team$0, User$1->Team$0, User$2->Team$0, User$3->Team$0, User$4->Team$0}
+this/Record={Record$0}
+this/Record<:owner={Record$0->User$5}
