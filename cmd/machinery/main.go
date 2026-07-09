@@ -13,7 +13,7 @@ import (
 // Makefile and the release workflow both inject it). The -dev default below is
 // what a bare `go build` without ldflags reports, so an ad-hoc build is never
 // mistaken for a released binary.
-var version = "v0.1.8-dev"
+var version = "v0.1.9-dev"
 
 func main() {
 	root := &cobra.Command{
@@ -39,9 +39,10 @@ func main() {
 	root.AddCommand(newDoctorCmd())
 	root.AddCommand(newPreflightCmd())
 	root.AddCommand(newInstallCmd())
+	root.AddCommand(newUpdateCmd())
 	root.AddCommand(newUninstallCmd())
 	root.AddCommand(newIRDumpCmd()) // hidden: the Phase-2 parity probe
-	root.AddCommand(newHookCmd())   // hidden: Claude Code plugin plumbing
+	root.AddCommand(newHookCmd())   // hidden: agent-host adapter plumbing
 
 	// top-level --version
 	ver := &cobra.Command{

@@ -81,6 +81,15 @@ func editEvent(event, tool, sessionID, file string) Input {
 	}
 }
 
+func codexPatchEvent(event, sessionID, patch string) Input {
+	return Input{
+		SessionID:     sessionID,
+		HookEventName: event,
+		ToolName:      "apply_patch",
+		ToolInput:     toolInput{Command: patch},
+	}
+}
+
 // --- detection: the no-op guarantee ---
 
 func TestLoadDetection(t *testing.T) {
@@ -206,6 +215,42 @@ func TestPreIgnoresPathsOutsideRoot(t *testing.T) {
 	}
 }
 
+func TestCodexApplyPatchDeniesAnyGeneratedArtifact(t *testing.T) {
+	root := managedRoot(t)
+	patch := "*** Begin Patch\n" +
+		"*** Update File: src/main.go\n" +
+		"@@\n-old\n+new\n" +
+		"*** Update File: design/machines/Deal.oracle.md\n" +
+		"@@\n-old\n+new\n" +
+		"*** End Patch"
+	out := runEvent(t, root, codexPatchEvent("PreToolUse", "s-codex-pre", patch))
+	var got preOut
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("Codex deny output is not JSON: %v (%q)", err, out)
+	}
+	if got.HookSpecificOutput.PermissionDecision != "deny" {
+		t.Fatalf("a multi-file patch touching a generated artifact must be denied: %+v", got)
+	}
+	if !strings.Contains(got.HookSpecificOutput.PermissionDecisionReason, "machinery oracle") {
+		t.Fatalf("deny reason must identify the regeneration command: %+v", got)
+	}
+}
+
+func TestEditedPathsParsesCodexPatchOperations(t *testing.T) {
+	in := codexPatchEvent("PreToolUse", "s-paths", "*** Begin Patch\n"+
+		"*** Add File: src/new.go\n"+
+		"*** Update File: src/old.go\n"+
+		"*** Move to: src/moved.go\n"+
+		"*** Delete File: src/gone.go\n"+
+		"*** Update File: src/old.go\n"+
+		"*** End Patch")
+	got := editedPaths(in)
+	want := []string{"src/new.go", "src/old.go", "src/gone.go", "src/moved.go"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("editedPaths = %v, want %v", got, want)
+	}
+}
+
 // --- PostToolUse: the touched ledger ---
 
 func TestPostRecordsTouches(t *testing.T) {
@@ -221,6 +266,23 @@ func TestPostRecordsTouches(t *testing.T) {
 	runEvent(t, root, editEvent("PostToolUse", "Edit", sid, filepath.Join(root, "src", "main.go")))
 	if d, i := readState(root, sid); !d || !i {
 		t.Fatalf("source edit: got design=%v impl=%v", d, i)
+	}
+}
+
+func TestCodexApplyPatchRecordsAllTouchedClasses(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, ConfigName), `{"impl":"."}`)
+	sid := "s-codex-post"
+	t.Cleanup(func() { clearState(root, sid) })
+	patch := "*** Begin Patch\n" +
+		"*** Update File: design/machines/Deal.machine.json\n" +
+		"@@\n-old\n+new\n" +
+		"*** Add File: src/main.go\n" +
+		"+package main\n" +
+		"*** End Patch"
+	runEvent(t, root, codexPatchEvent("PostToolUse", sid, patch))
+	if d, i := readState(root, sid); !d || !i {
+		t.Fatalf("Codex multi-file patch: got design=%v impl=%v", d, i)
 	}
 }
 
@@ -519,6 +581,9 @@ func TestPluginHooksJSONWiring(t *testing.T) {
 			t.Fatalf("hooks.json missing event %s", ev)
 		}
 		for _, e := range entries {
+			if (ev == "PreToolUse" || ev == "PostToolUse") && !strings.Contains(e.Matcher, "apply_patch") {
+				t.Fatalf("%s matcher must include the Codex apply_patch tool, got %q", ev, e.Matcher)
+			}
 			for _, h := range e.Hooks {
 				if h.Type != "command" {
 					t.Fatalf("%s: only command hooks are shipped, got %q", ev, h.Type)
@@ -545,6 +610,7 @@ func TestPluginManifests(t *testing.T) {
 	var plugin struct {
 		Name    string `json:"name"`
 		Version string `json:"version"`
+		Skills  string `json:"skills"`
 	}
 	raw, err := os.ReadFile(repoPath(".claude-plugin", "plugin.json"))
 	if err != nil {
@@ -556,12 +622,24 @@ func TestPluginManifests(t *testing.T) {
 	if plugin.Name != "machinery" || plugin.Version == "" {
 		t.Fatalf("plugin.json must name and version the plugin, got %+v", plugin)
 	}
+	claudeVersion := plugin.Version
+
+	raw, err = os.ReadFile(repoPath(".codex-plugin", "plugin.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &plugin); err != nil {
+		t.Fatalf("Codex plugin.json does not parse: %v", err)
+	}
+	if plugin.Name != "machinery" || plugin.Version != claudeVersion || plugin.Skills != "./skills/" {
+		t.Fatalf("Codex manifest must reuse the shared skill and match the Claude version, got %+v", plugin)
+	}
 	skillRaw, err := os.ReadFile(repoPath("skills", "machinery", "SKILL.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(skillRaw), "version: \""+plugin.Version+"\"") {
-		t.Fatalf("plugin version %s and skill metadata version diverge", plugin.Version)
+	if !strings.Contains(string(skillRaw), "version: \""+claudeVersion+"\"") {
+		t.Fatalf("plugin version %s and skill metadata version diverge", claudeVersion)
 	}
 
 	var mkt struct {
@@ -610,6 +688,61 @@ func TestShimNoopContract(t *testing.T) {
 	if code != 0 || out != "" || errOut != "" {
 		t.Fatalf("unmanaged root: shim must be a silent no-op, got code=%d out=%q err=%q", code, out, errOut)
 	}
+}
+
+func TestShimFindsGitRootWithoutClaudeEnvironment(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is required for Codex root discovery")
+	}
+	root := t.TempDir()
+	cmd := exec.CommandContext(t.Context(), "git", "init", "-q", root)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, out)
+	}
+	writeFile(t, filepath.Join(root, ConfigName), `{}`)
+	subdir := filepath.Join(root, "nested", "work")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	binDir := t.TempDir()
+	fake := filepath.Join(binDir, "machinery")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\nprintf '%s' \"$*\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	shim, err := filepath.Abs(repoPath("hooks", "machinery-hook.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hookCmd := exec.CommandContext(t.Context(), "/bin/sh", shim)
+	hookCmd.Dir = subdir
+	hookCmd.Env = withoutEnv(os.Environ(), "CLAUDE_PROJECT_DIR")
+	hookCmd.Env = append(hookCmd.Env, "PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	hookCmd.Stdin = strings.NewReader(`{"hook_event_name":"SessionStart"}`)
+	out, err := hookCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("shim: %v: %s", err, out)
+	}
+	rootCmd := exec.CommandContext(t.Context(), "git", "-C", subdir, "rev-parse", "--show-toplevel")
+	rootOut, err := rootCmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "hook --root " + strings.TrimSpace(string(rootOut))
+	if string(out) != want {
+		t.Fatalf("shim invocation = %q, want %q", out, want)
+	}
+}
+
+func withoutEnv(env []string, key string) []string {
+	prefix := key + "="
+	out := make([]string, 0, len(env))
+	for _, entry := range env {
+		if !strings.HasPrefix(entry, prefix) {
+			out = append(out, entry)
+		}
+	}
+	return out
 }
 
 func runShim(t *testing.T, projectDir, stdin string) (stdout, stderr string, code int) {

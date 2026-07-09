@@ -1,6 +1,6 @@
 {
   "name": "machinery",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Design greenfield, brownfield, hybrid, and rebuild software as a build-ready, formally verified blueprint, then hold the line with deterministic gates and governance hooks.",
   "author": {
     "name": "RamXX",

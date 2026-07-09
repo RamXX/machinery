@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -72,6 +73,55 @@ func TestInstallCommand(t *testing.T) {
 	}
 }
 
+func TestInstallAndDoctorTargetAll(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("HOME override does not steer agent config paths on Windows")
+	}
+	root := repoRootDir(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	if out, errS, code := runBin(t, "install", "--from", root, "--target", "all"); code != 0 {
+		t.Fatalf("machinery install --target all exited %d: %s\n%s", code, errS, out)
+	}
+	for _, path := range []string{
+		filepath.Join(home, ".agents", "skills", "machinery", "SKILL.md"),
+		filepath.Join(home, ".claude", "agents", "machinery-fsm-author.md"),
+		filepath.Join(home, ".codex", "agents", "machinery-fsm-author.toml"),
+		filepath.Join(home, ".config", "opencode", "agents", "machinery-fsm-author.md"),
+		filepath.Join(home, ".config", "opencode", "commands", "design.md"),
+		filepath.Join(home, ".config", "opencode", "plugins", "machinery.js"),
+	} {
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("target install missing %s: %v", path, err)
+		}
+	}
+
+	out, errS, code := runBin(t, "doctor", "--target", "all")
+	if code != 0 {
+		t.Fatalf("machinery doctor --target all exited %d: %s", code, errS)
+	}
+	for _, marker := range []string{"[claude]", "[codex]", "[opencode]", "[shared]"} {
+		if !strings.Contains(out, marker) {
+			t.Errorf("doctor output missing %s:\n%s", marker, out)
+		}
+	}
+
+	if out, errS, code := runBin(t, "uninstall", "--target", "all"); code != 0 {
+		t.Fatalf("machinery uninstall --target all exited %d: %s\n%s", code, errS, out)
+	}
+	for _, path := range []string{
+		filepath.Join(home, ".agents", "skills", "machinery"),
+		filepath.Join(home, ".claude", "agents", "machinery-fsm-author.md"),
+		filepath.Join(home, ".codex", "agents", "machinery-fsm-author.toml"),
+		filepath.Join(home, ".config", "opencode", "plugins", "machinery.js"),
+	} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("target uninstall left %s (err=%v)", path, err)
+		}
+	}
+}
+
 // TestInstallScript exercises the install.sh bootstrap end to end offline: it
 // hands the script the built binary (MACHINERY_BIN) and the working tree as the
 // skill source (MACHINERY_SKILL_SRC), so it delegates to `machinery install`
@@ -105,4 +155,36 @@ func TestInstallScript(t *testing.T) {
 		t.Fatalf("install.sh failed: %v\n%s", err, out)
 	}
 	assertTopology(t, agents, claude)
+}
+
+func TestInstallScriptHostTargets(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("install.sh is a POSIX shell installer")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no POSIX sh available")
+	}
+	root := repoRootDir(t)
+	home := t.TempDir()
+	cmd := exec.CommandContext(t.Context(), sh, filepath.Join(root, "install.sh"))
+	cmd.Env = append(os.Environ(),
+		"HOME="+home,
+		"MACHINERY_BIN="+goldenBin(t),
+		"MACHINERY_SKILL_SRC="+root,
+		"MACHINERY_TARGETS=codex opencode",
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("targeted install.sh failed: %v\n%s", err, out)
+	}
+	for _, path := range []string{
+		filepath.Join(home, ".agents", "skills", "machinery", "SKILL.md"),
+		filepath.Join(home, ".codex", "agents", "machinery-fsm-author.toml"),
+		filepath.Join(home, ".config", "opencode", "commands", "design.md"),
+		filepath.Join(home, ".config", "opencode", "plugins", "machinery.js"),
+	} {
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("targeted bootstrap missing %s: %v", path, err)
+		}
+	}
 }

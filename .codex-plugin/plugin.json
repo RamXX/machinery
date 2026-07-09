@@ -1,0 +1,41 @@
+{
+  "name": "machinery",
+  "version": "0.1.9",
+  "description": "Design greenfield, brownfield, hybrid, and rebuild software as a build-ready, formally verified blueprint with deterministic gates.",
+  "author": {
+    "name": "RamXX",
+    "url": "https://github.com/RamXX"
+  },
+  "homepage": "https://github.com/RamXX/machinery",
+  "repository": "https://github.com/RamXX/machinery",
+  "license": "Apache-2.0",
+  "keywords": [
+    "design",
+    "architecture",
+    "state-machines",
+    "formal-verification",
+    "tdd",
+    "migration",
+    "rebuild"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "machinery",
+    "shortDescription": "Checked software blueprints for new and existing systems",
+    "longDescription": "Turn greenfield, brownfield, hybrid, or rebuild work into a build-ready blueprint with traceable domain, architecture, state-machine, migration, and test contracts.",
+    "developerName": "RamXX",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/RamXX/machinery",
+    "defaultPrompt": [
+      "Design this system with machinery",
+      "Run the machinery gates and explain the findings",
+      "Plan a production rebuild that preserves valuable behavior"
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}

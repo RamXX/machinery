@@ -9,7 +9,9 @@ the outer wall.
 
 The repository root is the plugin. Installing it gives you the same `skills/machinery` skill and
 the two role agents that `machinery install` lays into agent homes, plus slash commands and hooks.
-Nothing is duplicated in the repo; there is one skill and one set of role docs.
+Nothing is duplicated in the repo; there is one skill and one set of role docs. Codex reuses the
+same skill and hook implementation, while OpenCode uses a thin event translator. See the
+[agent portability guide](agent-portability.md) for the cross-host contract and feature matrix.
 
 ## Install
 
@@ -26,10 +28,18 @@ curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | s
 /plugin install machinery@machinery
 ```
 
-Non-Claude agents are untouched by all of this: `machinery install` keeps placing the skill and
-role docs into `~/.agents` (and any `--home` you name) exactly as before. When the plugin is
-detected under `~/.claude/plugins`, the default `machinery install` skips `~/.claude` with a note,
-so the skill is never present twice; an explicit `--home ~/.claude` overrides the skip.
+The no-target `machinery install` keeps placing the skill and role docs into `~/.agents` (and any
+`--home` you name) exactly as before. When the plugin is detected under `~/.claude/plugins`, the
+default install skips `~/.claude` with a note, so the skill is never present twice; an explicit
+`--home ~/.claude` overrides the skip. Codex and OpenCode users can opt into native wrappers with
+`machinery install --target codex|opencode|all`.
+
+For later releases, `machinery update` refreshes the binary and every recorded direct agent home
+or adapter. If this Claude plugin is installed, it also runs the supported host-owned flow
+(`claude plugin marketplace update machinery`, then `claude plugin update machinery@machinery`)
+instead of writing `~/.claude/plugins/cache` itself. Run `/reload-plugins` afterward to activate the
+new skill, agents, commands, and hooks in the current session. Managed plugin scopes may refuse the
+refresh; update reports that as a warning with the command an administrator can run.
 
 ## When the hooks act, and when they are a no-op
 
@@ -113,11 +123,16 @@ loudly, it does not silently disable governance.
 
 ## Layout (for contributors)
 
-- `.claude-plugin/plugin.json`: the manifest; `.claude-plugin/marketplace.json` makes the repo
+- `.claude-plugin/plugin.json`: the Claude manifest; `.claude-plugin/marketplace.json` makes the repo
   installable via `/plugin marketplace add RamXX/machinery` with the repo root as the plugin
   source, which is how the plugin reuses `skills/` and `agents/` without copies.
-- `hooks/hooks.json` + `hooks/machinery-hook.sh`: every event, one shim, detection first.
+- `.codex-plugin/plugin.json`: the Codex manifest; it points at the same `skills/`, while Codex
+  discovers the same `hooks/hooks.json` by convention.
+- `hooks/hooks.json` + `hooks/machinery-hook.sh`: every event, one shared Claude/Codex shim,
+  detection first. The shim uses `CLAUDE_PROJECT_DIR` when present and Git-root discovery otherwise.
 - `commands/*.md`: the four commands.
+- `adapters/opencode/`: native OpenCode command wrappers and the event translator; the gate logic is
+  not duplicated there.
 - The hook logic itself is `machinery hook` (hidden subcommand, `internal/hook`), so it is
   versioned, tested (`internal/hook/hook_test.go`, including a regression net over `hooks.json`
   and the manifests), and shares the exact gate-suite semantics with `machinery check` through

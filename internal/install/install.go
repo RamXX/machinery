@@ -40,11 +40,13 @@ var (
 // Options configures Install.
 type Options struct {
 	Homes   []string  // target agent homes; the first is canonical (real files)
+	Targets []string  // optional first-class host adapters: claude, codex, opencode, all
 	From    string    // local source dir (contains skills/ and agents/); skips download
 	Copy    bool      // copy into every home instead of symlinking the non-canonical ones
 	Version string    // release tag to fetch when From is empty; "", "latest", or a non-release tag -> newest release
 	Repo    string    // source repo owner/name (default RamXX/machinery)
 	Out     io.Writer // progress messages (nil -> discarded)
+	Record  bool      // persist this successful topology for `machinery update`
 }
 
 // DefaultHomes is the canonical-first default target list: ~/.agents then ~/.claude.
@@ -59,6 +61,23 @@ func Install(opts Options) error {
 	out := opts.Out
 	if out == nil {
 		out = io.Discard
+	}
+	if len(opts.Targets) > 0 {
+		if len(opts.Homes) > 0 {
+			return fmt.Errorf("--home and --target cannot be combined")
+		}
+		src, cleanup, err := resolveInstallSource(opts, out)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+		if err := installTargets(opts.Targets, src, opts.Copy, out); err != nil {
+			return err
+		}
+		if opts.Record {
+			return recordTargetInstall(opts.Targets, opts.Copy)
+		}
+		return nil
 	}
 	homes, err := absHomes(opts.Homes)
 	if err != nil {
@@ -85,26 +104,11 @@ func Install(opts Options) error {
 		}
 	}
 
-	src := opts.From
-	if src != "" {
-		if src, err = filepath.Abs(src); err != nil {
-			return err
-		}
-	} else {
-		repo := opts.Repo
-		if repo == "" {
-			repo = defaultRepo
-		}
-		dir, cleanup, ferr := fetchSource(repo, opts.Version, out)
-		if ferr != nil {
-			return ferr
-		}
-		defer cleanup()
-		src = dir
-	}
-	if err := validateSource(src); err != nil {
+	src, cleanup, err := resolveInstallSource(opts, out)
+	if err != nil {
 		return err
 	}
+	defer cleanup()
 
 	canon := homes[0]
 	if err := placeReal(canon, src, out); err != nil {
@@ -121,7 +125,37 @@ func Install(opts Options) error {
 			return err
 		}
 	}
+	if opts.Record {
+		return recordHomeInstall(homes, opts.Copy)
+	}
 	return nil
+}
+
+func resolveInstallSource(opts Options, out io.Writer) (string, func(), error) {
+	if opts.From != "" {
+		src, err := filepath.Abs(opts.From)
+		if err != nil {
+			return "", func() {}, err
+		}
+		if err := validateSource(src); err != nil {
+			return "", func() {}, err
+		}
+		return src, func() {}, nil
+	}
+
+	repo := opts.Repo
+	if repo == "" {
+		repo = defaultRepo
+	}
+	src, cleanup, err := fetchSource(repo, opts.Version, out)
+	if err != nil {
+		return "", func() {}, err
+	}
+	if err := validateSource(src); err != nil {
+		cleanup()
+		return "", func() {}, err
+	}
+	return src, cleanup, nil
 }
 
 // Uninstall removes the skill and role docs from every home.
