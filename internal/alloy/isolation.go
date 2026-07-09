@@ -44,13 +44,14 @@ const IsolationOracleName = "Isolation.oracle.md"
 // IsoRef is one cross-entity reference the isolation layer holds to
 // tenant-consistency: a field on the From sig pointing at the To sig.
 type IsoRef struct {
-	From       string
-	To         string
-	Field      string
-	Card       string // domain cardinality From -> To
-	Mult       string // lone | set (a reference may be absent)
-	ManyToOne  bool   // many From can point at one To: SharedReferent applies
-	Invariants []string
+	From        string
+	To          string
+	Field       string
+	Card        string // domain cardinality From -> To
+	Mult        string // lone | set (a reference may be absent)
+	ManyToOne   bool   // many From can point at one To: SharedReferent applies
+	InverseLone bool   // 1:1 / 1:n: every To is referenced by at most one From
+	Invariants  []string
 }
 
 // Isolation is the fully reconciled isolation annotation, ready for emission.
@@ -206,9 +207,11 @@ func LoadIsolation(domainPath, annotationPath string) *Isolation {
 		case "n:1", "1:1":
 			ref.Mult = "lone"
 			ref.ManyToOne = ref.Card == "n:1"
+			ref.InverseLone = ref.Card == "1:1"
 		case "1:n", "n:n":
 			ref.Mult = "set"
 			ref.ManyToOne = ref.Card == "n:n"
+			ref.InverseLone = ref.Card == "1:n"
 		default:
 			die("%s: unsupported cardinality %s", where, ir.Repr(ref.Card))
 		}
@@ -370,9 +373,14 @@ func (p *Isolation) emit() (string, IsolationStats) {
 	for _, r := range p.Refs {
 		w("")
 		w("// %s: %s %s and the %s it references are owned in the same tenant", strings.Join(r.Invariants, ", "), article(r.From), r.From, r.To)
-		w("fact Isolation_%s_%s {", r.From, r.To)
+		w("fact Isolation_%s_%s_%s {", r.From, r.To, upperFirst(r.Field))
 		w("  all x: %s | some x.%s implies sameTenant[x.owner, x.%s.owner]", r.From, r.Field, r.Field)
 		w("}")
+		if r.InverseLone {
+			w("fact Cardinality_%s_%s_%s {", r.From, r.To, upperFirst(r.Field))
+			w("  all target: %s | lone target.~%s", r.To, r.Field)
+			w("}")
+		}
 	}
 
 	// --- meta-checks ---
@@ -401,7 +409,7 @@ func (p *Isolation) emit() (string, IsolationStats) {
 		if !r.ManyToOne {
 			continue
 		}
-		name := fmt.Sprintf("SharedReferent_%s_%s", r.From, r.To)
+		name := fmt.Sprintf("SharedReferent_%s_%s_%s", r.From, r.To, upperFirst(r.Field))
 		w("")
 		w("// PASS = no counterexample: two %s records that reference the same %s are", r.From, r.To)
 		w("// owned in the same tenant. A counterexample would be a %s referenced from", r.To)
@@ -414,7 +422,7 @@ func (p *Isolation) emit() (string, IsolationStats) {
 
 	// per-reference non-vacuity: a same-tenant link is actually constructible
 	for _, r := range p.Refs {
-		name := fmt.Sprintf("Possible_%s_%s", r.From, r.To)
+		name := fmt.Sprintf("Possible_%s_%s_%s", r.From, r.To, upperFirst(r.Field))
 		w("")
 		w("// PASS = instance found: %s %s referencing %s %s exists, so the isolation", article(r.From), r.From, article(r.To), r.To)
 		w("// fact is not vacuously satisfied by forbidding the link entirely.")
@@ -472,7 +480,7 @@ func (p *Isolation) generateOracle() (string, int) {
 	var rows []row
 	for _, r := range p.Refs {
 		for _, c := range isoCases {
-			key := fmt.Sprintf("%s->%s|%s", r.From, r.To, c.key)
+			key := fmt.Sprintf("%s.%s->%s|%s", r.From, r.Field, r.To, c.key)
 			rows = append(rows, row{ref: r, c: c, key: key, hash: stableIsoID(key)})
 		}
 	}
@@ -532,8 +540,8 @@ func (p *Isolation) generateOracle() (string, int) {
 	w("| test id | stable id | reference | tenant case | expectation | invariants |")
 	w("|---|---|---|---|---|---|")
 	for i, rr := range rows {
-		w("| O-TENANT-%02d | %s | %s -> %s | %s | %s | %s |",
-			i+1, stable(rr.hash), rr.ref.From, rr.ref.To, rr.c.key, rr.c.expectation, strings.Join(rr.ref.Invariants, ", "))
+		w("| O-TENANT-%02d | %s | %s.%s -> %s | %s | %s | %s |",
+			i+1, stable(rr.hash), rr.ref.From, rr.ref.Field, rr.ref.To, rr.c.key, rr.c.expectation, strings.Join(rr.ref.Invariants, ", "))
 	}
 	return b.String(), len(rows)
 }

@@ -38,6 +38,34 @@ role and record ownership, with every write applied atomically inside one databa
 - Concurrent multi-user write throughput: concurrent writers serialize on the single-writer lock; the
   second is refused after bounded retry.
 
+## Migration implementation plan
+
+The rebuild is implemented from `design/migration.yaml`; this section turns that checked contract into
+deliverable work. The prototype remains the source of truth until the final cutover phase. Production code
+must not import prototype packages directly: the only legacy dependency is a read-only exporter behind a
+migration port, and every exported object receives a stable manifest id.
+
+1. **Characterize and inventory.** Lock the reusable prototype behavior as adapter-level tests. Classify the
+   exporter, embedded schema, test suite, and seed data exactly as the migration asset inventory specifies.
+   Capture a signed backup and two byte-stable export manifests before target work begins.
+2. **Build target-first boundaries.** Implement the target domain, authz, repository, and machines from this
+   BUILD and the target model. Put transformations in a migration package outside the target domain. Unit-test
+   every data and lifecycle mapping, including password re-hashing and `Won` close-date derivation.
+3. **Backfill and shadow.** Make imports restartable by stable operation id. Reconcile counts, field hashes,
+   states, ownership, and authorization outcomes. Shadow reads compare normalized results while returning only
+   the legacy result; every mismatch is quarantined or explained.
+4. **Dual-write safely.** Fault-inject either-side failures, duplicate delivery, reordering, and replay. An
+   acknowledged operation must exist in both manifests or raise an alert; conflicts fail closed with legacy
+   authoritative. Exercise the rollback path while writes continue.
+5. **Cut over and retire.** Freeze legacy writes, drain the ordered log, require zero unexplained drift and
+   green target SLOs, then switch reads and writes together. Keep the exporter, manifests, backup, and routing
+   rollback available for 72 hours. Remove transition code only after the exit criteria and owner approval.
+
+Regression proof is layered: mapping-table tests cover every source and target field; lifecycle-table tests
+cover every legacy state; adapter characterization runs against both systems; reconciliation fixtures cover
+malformed records; phase tests inject exporter, replay, dual-write, and routing failures; the ordinary domain,
+architecture, state-machine, formal, and implementation gates remain mandatory throughout the transition.
+
 ## 2. Glossary
 
 The only source for these words.

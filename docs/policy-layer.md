@@ -144,6 +144,13 @@ Each rule carries `invariant:` (one id or a list) and exactly one shape:
   target must be stated, not implied: leaving it implicit is precisely the under-specification the
   layer exists to catch.
 
+When a grants rule exists, grants and scopes are one closed contract, not independent prose. Every
+granted `read`, `update`, or `delete` verb must have a scope rule, and a scope rule for one of those
+verbs is rejected when the grants rule gives it to no role. The generated allow predicate always
+applies both capability and scope. A policy may omit the grants rule and let scopes define
+capability directly. Closure is checked before generation so a typo cannot produce an oracle whose
+verdicts silently disagree with stated grants.
+
 ### `residuals`
 
 Every top-level (cross-cutting) invariant the rules do not compile must appear here with a

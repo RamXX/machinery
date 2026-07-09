@@ -44,6 +44,11 @@ The state machines come last because they need the other two as inputs, and half
 *derived* from the domain model rather than invented. The final artifact is a `BUILD.md` a zero-context
 coder can build from, plus the machines that are simultaneously the test oracle and the formal spec.
 
+For a rebuild or hybrid migration, machinery keeps a second, legacy domain model instead of blending
+current and intended behavior into one document. A checked `migration.yaml` disposes every legacy
+entity and salvageable asset, maps replaced data and lifecycle states, and defines the coexistence,
+rollback, and cutover contract. The target still goes through the complete pipeline below.
+
 To be clear about that XState reference: machinery uses the XState config **format** as a linted
 notation and does not run the XState library. The lint is our own (a deliberately narrowed subset,
 plus annotations like `_role` and `_exhaustive` that are not XState), and so are the oracle generator
@@ -107,6 +112,9 @@ Fittingly, machinery is itself built this way, a gated pipeline around a non-det
 
 ```
 Phase 0  Frame        what, who, purpose, target language
+Rebuild  Transition   legacy model + target model + migration.yaml (opt-in)
+         tool: Gm-transition (complete disposition, mappings, phases, cutover, risks)
+         attested: what is worth saving; transformation and rollback semantics
 Phase 1  Modelith     domain model
          tool: modelith lint clean
          attested: lifecycle enums, action pre/post, invariant owners, scenario coverage
@@ -229,7 +237,10 @@ a complete, gated design; adding Java upgrades "structurally consistent" to "mac
 [LadybugDB](https://github.com/LadybugDB/go-ladybug) graph and role- and
 ownership-based access control, taken end to end:
 
-- **Designed** through all four phases. Domain model lints clean (9 entities, 25 invariants); C4 model
+- **Designed** through all four phases as the production target of a checked rebuild. The legacy
+  prototype and `migration.yaml` account for 4 legacy entities, 16 field mappings, 9 lifecycle
+  mappings, 4 coexistence/cutover phases, and 3 transition risks. The target domain model lints
+  clean (9 entities, 25 invariants); C4 model
   with the dependency posture that an embedded store forces (corruption is fatal-until-restore, not a
   transient); five state machines; a 1071-line `BUILD.md`.
 - **Built by a zero-context coding agent** under hard TDD: a test-writer wrote the suite from the
@@ -240,8 +251,9 @@ ownership-based access control, taken end to end:
   the prose review had missed. The hardened gates verify it non-vacuously: 194 transitions reconciled
   row by row against the matrices, every guard, action, and actor covered by a named-unit contract,
   every import edge checked against the architecture contract.
-- **Proven** by `make verify-formal`: eight TLC proofs plus the 14-command relational policy suite,
-  all green, regenerated from source every run. The policy suite earned its place the hard way: run
+- **Proven** by `make verify-formal`: eight TLC proofs plus 24 Alloy commands across policy,
+  integrity, and isolation (32 checks total), all green, regenerated from source every run. The
+  policy suite earned its place the hard way: run
   against the RBAC invariants as first written, it found a Manager without a team could not write
   even the records it owned (the write-scope rule granted by team membership only, and nothing
   required a Manager to have a team), and a Manager could reassign a record to a user outside its
@@ -259,6 +271,8 @@ outbox, with six state machines (the saga plus the Order, Payment, Reservation, 
 OutboxMessage lifecycles). The same generators produced its formal models, and TLC checked them: the
 saga always terminates, and its data-refined model shows that money and stock are never silently
 lost, with compensation modeled per obligation so partial compensation is a real, checked state.
+Its integrity layer also proves the inverse side of the `Order.payment` 1:1 relationship, so two
+orders cannot share one payment - a constraint that forward field multiplicity alone does not imply.
 Building that proof caught a real bug in the saga as first drawn, where a single failed refund could
 leave a customer charged with nothing returned. TLC produced the exact counterexample and the fix is
 checked. The hardened cross-layer gate then caught a second real defect: the domain model's saga
@@ -291,6 +305,25 @@ never grow. For the staged team adoption protocol (the baseline and ratchet flow
 `--gate` lists, merge and CI recipes), see the
 [brownfield team guide](docs/brownfield-team-guide.md).
 
+## Rebuild and hybrid systems
+
+When the current platform works but should not be the production foundation, do not model a
+fictional halfway system. Keep `design/legacy/domain.modelith.yaml` as the current truth,
+`design/domain.modelith.yaml` as the target truth, and `design/migration.yaml` as the checked bridge.
+The optional file activates **Gm-transition**, which requires a disposition for every legacy entity,
+a mapped-or-new decision for every target entity, a salvage decision for implementation assets,
+complete field and lifecycle coverage for replacements, ordered source-of-truth phases, an explicit
+target-only cutover and rollback window, and owned failure postures for temporary migration
+dependencies. Shadow reads must define parity; dual writes must define idempotency, conflict
+resolution, and reconciliation.
+
+This keeps "save what can be saved" precise: characterized behavior, export readers, data, tests,
+or modules can be reused or wrapped deliberately, while obsolete schemas and topology are replaced
+without silently constraining the target. Gm checks contract completeness and narrative integration;
+the migration implementation and transformations remain the responsibility of the locked tests in
+BUILD.md. The [rebuild and hybrid guide](docs/rebuild-guide.md) contains the full contract reference,
+workflow, test checklist, and the worked Go CRM rebuild.
+
 ## Which model to use where
 
 The gates check structure, not substance: a shallow domain model with the wrong invariants gates
@@ -319,6 +352,8 @@ contracts carry them into unit, integration, and property tests, but a wrong imp
 correctly-named guard is caught by tests, not proofs); races between concurrent machine instances
 and message loss, duplication, or reordering between machines (the models are single-instance; the
 event-contract table and the idempotency contracts govern those seams, and the tests exercise them);
+whether migration transformations preserve real production data (Gm proves decision coverage, not
+the implementation or a database run; mapping, reconciliation, and rollback tests hold that);
 coupling through shared database tables or bus topics (invisible to import analysis); and security,
 capacity, and observability beyond what the Phase 2 NFR record captures. The methodology's stance is
 to name every one of these residuals in the design artifacts rather than let a green check imply
@@ -362,7 +397,7 @@ anything missing; it installs nothing.
   machinery install                        # fetches the matching skill + role docs into your agent homes
   ```
 
-  **Build from source** (if you have [Go](https://go.dev/dl/) 1.26+; `go.mod` pins 1.26.4):
+  **Build from source** (if you have [Go](https://go.dev/dl/) 1.26+; `go.mod` pins 1.26.5):
   ```bash
   go build -o machinery ./cmd/machinery    # then: machinery install --from .
   ```
@@ -513,7 +548,7 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   `compose`, `check`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`, `install`,
   `uninstall`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
-  `alloy/` (the relational policy generator), `refine/`, `compose/`, `gates/` (the Gp/G2/G3/Gx/G4/G5
+  `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the Gm/Gp/Gi/Gn/G2/G3/Gx/G4/G5
   suite), `pack/` (recursive decomposition via contract packs), `formal/` (TLC + Alloy
   orchestration), `install/` (skill placement behind `machinery install`), `experiments/` (the
   shared mutation-experiment table). Every package has unit tests.
@@ -521,14 +556,17 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 - `commands/`, `hooks/`, and `.claude-plugin/` the Claude Code plugin surface: the slash commands,
   the gate-enforcing hooks and their shim, and the plugin + marketplace manifests. The repo root is
   the plugin; see the [Claude Code plugin guide](docs/claude-plugin.md).
-- `docs/` the deep dives: the [policy layer guide](docs/policy-layer.md) (the annotation
+- `docs/` the deep dives: the [rebuild and hybrid guide](docs/rebuild-guide.md) (dual domain truths,
+  migration contract, coexistence and rollback test protocol), the
+  [policy layer guide](docs/policy-layer.md) (the annotation
   reference, the meta-checks in plain language, the authorization-oracle test pattern, greenfield
   and brownfield workflows), the [brownfield team guide](docs/brownfield-team-guide.md) (staged
   adoption ladder, baseline allow rules, PR discipline, CI recipes), the
   [Claude Code plugin guide](docs/claude-plugin.md) (hooks, `.machinery.json` reference, commands),
   and the [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft
   rung-4 design note, not yet implemented).
-- `examples/go-crm/` the worked example: `design/` (the blueprint and the formal models) and `impl/`
+- `examples/go-crm/` the worked rebuild example: `design/legacy/` (the working prototype truth),
+  `design/migration.yaml` (the checked transition), the target blueprint/formal models, and `impl/`
   (the verified Go build).
 - `examples/fulfillment/` the distributed stress test: `design/` only (six machines, eight proofs,
   and `FINDINGS.md`, the record of what strained and what was fixed).
@@ -566,16 +604,18 @@ full gate suite run against a synthesized design/impl fixture) runs as Go tests 
 | Package | Coverage | Role |
 |---------|----------|------|
 | `internal/tla` | 90% | TLA+ control-flow generator |
+| `internal/alloy` | 88% | policy, integrity, and isolation generators/oracles |
 | `internal/oracle` | 86% | transition oracle (content-hashed ids) |
 | `internal/lint` | 85% | structural lint + matrix reconciliation |
+| `internal/hook` | 86% | progressive governance and generated-artifact protection |
 | `internal/refine` | 83% | data-refinement (3 patterns) |
 | `internal/compose` | 81% | cross-aggregate composition |
 | `internal/install` | 80% | skill placement behind `machinery install` (fetch, extract, canonical+symlink layout) |
-| `internal/gates` | 62% | the G2/G3/Gx/G4/G5 gate suite (G5 exercised via `internal/experiments`) |
+| `internal/gates` | 69% | the Gm/Gp/Gi/Gn/G2/G3/Gx/G4/G5 gate suite (G5 also exercised via `internal/experiments`) |
 | `internal/pack` | 58% | contract packs (the mutation suite lives in `internal/experiments`) |
 | `internal/ir` | 55% | shared IR (covered transitively via lint/gates) |
-| `internal/formal` | 31% | TLC orchestration (the TLC-run paths need Java) |
-| **internal/ overall** | **~70%** | own-package tests only; the cross-package adversarial suites in `internal/experiments` exercise gates and pack further (cmd/ is thin CLI plumbing) |
+| `internal/formal` | 41% | TLC/Alloy orchestration (solver-run paths need Java) |
+| **internal/ overall** | **75%** | own-package tests only; the cross-package adversarial suites in `internal/experiments` exercise gates and pack further (cmd/ is thin CLI plumbing) |
 
 Run `go test -coverprofile=cover.out ./internal/... && go tool cover -func=cover.out` locally.
 CI runs `go test -race ./...`. Beyond unit tests, two stronger nets are always green in CI:
@@ -604,7 +644,7 @@ bundles none of them.
   state-machine JSON format (notation only; machinery does not run the library) and its visualizer.
 - [TLA+ and TLC](https://github.com/tlaplus/tlaplus) -- the specification language and model checker
   (the behavioral formal layer).
-- [Alloy](https://alloytools.org/) -- the relational model finder (the static policy layer;
+- [Alloy](https://alloytools.org/) -- the relational model finder (the static relational layers;
   `machinery alloy` emits its notation and `verify-formal` runs the pinned analyzer).
 - [Eclipse Temurin / Adoptium](https://adoptium.net/) -- the JVM that runs TLC.
 - [Go](https://go.dev/) -- to build machinery from source and to install Modelith.

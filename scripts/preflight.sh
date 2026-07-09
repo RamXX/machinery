@@ -20,7 +20,12 @@ step=0
 say()  { step=$((step + 1)); printf '\n\033[1m[preflight %d] %s\033[0m\n' "$step" "$1"; }
 fail() { printf '\n\033[31mpreflight FAILED: %s\033[0m\n' "$1" >&2; exit 1; }
 
-# 1. gofmt (ci: lint job, formatting gate) ---------------------------------
+# 1. whitespace (ci: docs job) ---------------------------------------------
+say "git diff --check (aggregate branch diff)"
+base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD^)
+git diff --check "$base" || fail "branch diff contains whitespace errors"
+
+# 2. gofmt (ci: lint job, formatting gate) ---------------------------------
 say "gofmt (formatting gate)"
 unformatted=$(gofmt -l cmd/ internal/)
 if [ -n "$unformatted" ]; then
@@ -29,11 +34,11 @@ if [ -n "$unformatted" ]; then
   fail "files are not gofmt-clean"
 fi
 
-# 2. go vet (ci: lint job) --------------------------------------------------
+# 3. go vet (ci: lint job) --------------------------------------------------
 say "go vet ./..."
 go vet ./... || fail "go vet reported problems"
 
-# 3. golangci-lint (ci: lint job) ------------------------------------------
+# 4. golangci-lint (ci: lint job) ------------------------------------------
 say "golangci-lint"
 if command -v golangci-lint >/dev/null 2>&1; then
   want=$(cat .golangci-version 2>/dev/null)
@@ -48,7 +53,7 @@ else
   printf '\033[33m  install the pinned version with: make lint-install\033[0m\n' >&2
 fi
 
-# 4. go.mod / go.sum tidy (ci: tidy job) -----------------------------------
+# 5. go.mod / go.sum tidy (ci: tidy job) -----------------------------------
 say "go mod tidy (verify clean)"
 go mod tidy || fail "go mod tidy errored"
 if ! git diff --quiet -- go.mod go.sum; then
@@ -56,7 +61,7 @@ if ! git diff --quiet -- go.mod go.sum; then
   fail "go.mod/go.sum not tidy (the fix has been applied; review and stage it)"
 fi
 
-# 5. docs gate (ci: docs job) ----------------------------------------------
+# 6. docs gate (ci: docs job) ----------------------------------------------
 say "docs gate (no stale Python refs, no em dashes)"
 if grep -rnE "python3|PyYAML|pyyaml|uv run|oracle_gen\.py|machine_lint\.py|machinery_check\.py|tla_gen\.py|refine_gen\.py|compose_gen\.py|diff-all\.sh|capture-golden\.sh" \
     README.md skills/ agents/ docs/ Makefile; then
@@ -67,20 +72,20 @@ if grep -rn $'\u2014' README.md skills/ agents/ docs/ Makefile .github/; then
   fail "em dash found in the doc surface (house style forbids it)"
 fi
 
-# 6. build (ci: build + gates jobs) ----------------------------------------
+# 7. build (ci: build + gates jobs) ----------------------------------------
 say "build .bin/machinery"
 make build || fail "build failed"
 
-# 7. race tests (ci: test job) ---------------------------------------------
+# 8. race tests (ci: test job) ---------------------------------------------
 say "go test -race ./..."
 go test -race -count=1 ./... || fail "unit/experiment tests failed"
 
-# 8. golden corpus + adversarial experiments (ci: golden job) --------------
+# 9. golden corpus + adversarial experiments (ci: golden job) --------------
 say "golden corpus + gate-experiment suite"
 go test -count=1 -run TestGolden ./cmd/machinery || fail "golden corpus drifted (re-capture with: make golden-update)"
 go test -count=1 ./internal/experiments/ || fail "adversarial gate-experiment suite failed"
 
-# 9. example gate suites (ci: gates job) -----------------------------------
+# 10. example gate suites (ci: gates job) ----------------------------------
 say "machinery check (all 6 examples)"
 .bin/machinery check examples/go-crm/design --impl examples/go-crm/impl || fail "gate suite: go-crm"
 .bin/machinery check examples/fulfillment/design                       || fail "gate suite: fulfillment"
@@ -89,7 +94,7 @@ say "machinery check (all 6 examples)"
 .bin/machinery check examples/checkout-split/orders/design             || fail "gate suite: checkout-split/orders"
 .bin/machinery check examples/checkout-split/payments/design           || fail "gate suite: checkout-split/payments"
 
-# 10. go-crm impl hermetic suite (ci: go-crm-impl job) ---------------------
+# 11. go-crm impl hermetic suite (ci: go-crm-impl job) ---------------------
 say "go-crm impl tests (separate module)"
 ( cd examples/go-crm/impl && go test ./... -count=1 ) || fail "go-crm impl tests failed"
 

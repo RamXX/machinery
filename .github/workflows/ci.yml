@@ -1,7 +1,7 @@
 # ci.yml - the required pipeline. Every push and PR must pass this.
 # Coverage: build, lint (golangci-lint + gofmt + vet), unit tests (including
 # the adversarial gate-experiment suite and the golden-corpus regression net),
-# the example gate suites (all four examples), and the go-crm impl tests. A single failure
+# the example gate suites (all six design roots), and the go-crm impl tests. A single failure
 # blocks merge.
 name: ci
 
@@ -174,6 +174,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - name: No whitespace errors in the aggregate change
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: git diff --check "$BASE_SHA..HEAD"
       - name: No stale Python-toolchain references in the doc surface
         run: |
           if grep -rnE "python3|PyYAML|pyyaml|uv run|oracle_gen\.py|machine_lint\.py|machinery_check\.py|tla_gen\.py|refine_gen\.py|compose_gen\.py|diff-all\.sh|capture-golden\.sh" \

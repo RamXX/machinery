@@ -62,6 +62,11 @@ func TestGenerateIntegrityFulfillment(t *testing.T) {
 	if !strings.Contains(als, "payment: one Payment") {
 		t.Errorf("mandatory 1:1 not rendered as 'one':\n%s", als)
 	}
+	if !strings.Contains(als, "fact Cardinality_Order_Payment {") ||
+		!strings.Contains(als, "all target: Payment | lone target.~payment") ||
+		!strings.Contains(als, "check Exclusive_Order_Payment") {
+		t.Errorf("1:1 inverse cardinality is not enforced and checked:\n%s", als)
+	}
 	if !strings.Contains(als, "fact Unique_Customer_Email {") {
 		t.Error("email uniqueness fact missing")
 	}
@@ -136,10 +141,16 @@ func TestIntegrityMultiplicities(t *testing.T) {
 		t.Errorf("stats = %+v", stats)
 	}
 	for _, want := range []string{
-		"owner: one A", // n:1 mandatory
-		"c: lone C",    // 1:1 optional -> lone (default field name = lowercased To)
-		"a: some A",    // 1:n mandatory -> some
-		"b: set B",     // n:n optional -> set
+		"owner: one A",           // n:1 mandatory
+		"c: lone C",              // 1:1 optional -> lone (default field name = lowercased To)
+		"a: some A",              // 1:n mandatory -> some
+		"b: set B",               // n:n optional -> set
+		"fact Cardinality_B_C {", // 1:1 inverse exclusivity
+		"all target: C | lone target.~c",
+		"check Exclusive_B_C",
+		"fact Cardinality_C_A {", // 1:n inverse exclusivity
+		"all target: A | lone target.~a",
+		"check Exclusive_C_A",
 	} {
 		if !strings.Contains(als, want) {
 			t.Errorf("multiplicity rendering missing %q:\n%s", want, als)
@@ -181,7 +192,8 @@ func TestIntegrityErrors(t *testing.T) {
 		{"no constraints", intDomain,
 			"entities: [A]\n",
 			"compiles no constraints"},
-		{"scope out of range", intDomain, intAnnotation + "scope: 99\n", "between 2 and 12"},
+		{"scope out of range", intDomain, intAnnotation + "scope: 99\n", "between 3 and 12"},
+		{"scope too small for population witness", intDomain, intAnnotation + "scope: 2\n", "between 3 and 12"},
 		{"residual needs reason", intDomain,
 			intAnnotation + "residuals:\n  - {invariant: a-code-unique}\n",
 			"needs both an invariant id and a reason"},

@@ -11,7 +11,7 @@ import (
 func newAlloyCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "alloy <design-dir> [out-dir]",
-		Short: "Generate the static relational policy model from the domain model + policy annotation",
+		Short: "Generate opted-in relational proofs and decision oracles",
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	c.RunE = func(cmd *cobra.Command, args []string) error {

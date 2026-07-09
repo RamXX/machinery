@@ -16,4 +16,3 @@ this/User<:role={User$0->ReadOnly$0, User$1->ReadOnly$0, User$2->Rep$0, User$3->
 this/User<:team={User$0->Team$0, User$1->Team$0, User$2->Team$0, User$3->Team$0, User$4->Team$0}
 this/Record={Record$0}
 this/Record<:owner={Record$0->User$5}
-

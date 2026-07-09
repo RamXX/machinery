@@ -9,7 +9,8 @@ Report where this repository's machinery design stands.
    gates, impl dir, and strict mode; state which are in effect.
 2. Read `<design>/STATE.md` if present and report per-phase status and open
    questions.
-3. Inventory which artifacts exist (domain model, the relational annotations
+3. Inventory which artifacts exist (target domain model, optional legacy domain model and
+   `migration.yaml`, the relational annotations
    `formal/{policy,integrity,isolation}.relational.yaml` with their generated
    models and oracles, workspace.dsl and Architecture Contract, machines with
    matrices and oracles, formal/, BUILD.md, decomposition/packs) so the

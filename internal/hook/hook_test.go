@@ -357,29 +357,29 @@ func TestStopBeforeAnyGateApplies(t *testing.T) {
 	}
 }
 
-// TestSelectGatesProgressiveRelational locks the brownfield behavior: each
-// relational annotation turns on its own gate at stop time (no config needed),
-// so a repo that adopts the integrity or isolation layer gets it checked before
-// the turn can end, exactly as the policy layer does.
-func TestSelectGatesProgressiveRelational(t *testing.T) {
+// TestSelectGatesProgressiveOptional locks progressive opt-in behavior: each
+// relational annotation and the migration contract turns on its own gate at
+// stop time without requiring configuration.
+func TestSelectGatesProgressiveOptional(t *testing.T) {
 	dir := t.TempDir()
 	formal := filepath.Join(dir, "formal")
 	if err := os.MkdirAll(formal, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	sel := selectGates(dir, Config{})
-	for _, g := range []string{"gp", "gi", "gn"} {
+	for _, g := range []string{"gm", "gp", "gi", "gn"} {
 		if sel.Run[g] {
 			t.Errorf("%s must not run before its annotation exists", g)
 		}
 	}
+	writeFile(t, filepath.Join(dir, "migration.yaml"), "contract_version: 1\n")
 	writeFile(t, filepath.Join(formal, "policy.relational.yaml"), "subjects: {}\n")
 	writeFile(t, filepath.Join(formal, "integrity.relational.yaml"), "entities: []\n")
 	writeFile(t, filepath.Join(formal, "isolation.relational.yaml"), "tenant: {}\n")
 	sel = selectGates(dir, Config{})
-	for _, g := range []string{"gp", "gi", "gn"} {
+	for _, g := range []string{"gm", "gp", "gi", "gn"} {
 		if !sel.Run[g] {
-			t.Errorf("%s must run once formal/%s exists", g, map[string]string{"gp": "policy", "gi": "integrity", "gn": "isolation"}[g]+".relational.yaml")
+			t.Errorf("%s must run once its opt-in artifact exists", g)
 		}
 	}
 }
@@ -555,6 +555,13 @@ func TestPluginManifests(t *testing.T) {
 	}
 	if plugin.Name != "machinery" || plugin.Version == "" {
 		t.Fatalf("plugin.json must name and version the plugin, got %+v", plugin)
+	}
+	skillRaw, err := os.ReadFile(repoPath("skills", "machinery", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(skillRaw), "version: \""+plugin.Version+"\"") {
+		t.Fatalf("plugin version %s and skill metadata version diverge", plugin.Version)
 	}
 
 	var mkt struct {

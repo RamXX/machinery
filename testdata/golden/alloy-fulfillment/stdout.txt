@@ -1,2 +1,2 @@
 alloy_gen: reconciled integrity.relational.yaml against fulfillment.modelith.yaml: 3 entities, 2 relationship(s), 1 unique, 0 singleton, 0 residual(s), 2 invariant(s) carried
-wrote Integrity.als (3 commands) to <out-dir>
+wrote Integrity.als (4 commands) to <out-dir>

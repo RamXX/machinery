@@ -31,6 +31,7 @@ func TestGenerateGoCRM(t *testing.T) {
 		"sig Record { owner: one User }",
 		"pred sameTeam[a, b: User]",
 		"pred canRead[u: User, r: Record]",
+		"grantsRead[u] and (",
 		"pred canReassign[u: User, r: Record, t: User]",
 		"run SomeWorld",
 		"check WriteImpliesRead",
@@ -46,6 +47,50 @@ func TestGenerateGoCRM(t *testing.T) {
 	if strings.Contains(als, "Possible_ReadOnly_update") {
 		t.Error("ReadOnly must not get a write exercisability run")
 	}
+}
+
+func TestPolicyGrantScopeClosure(t *testing.T) {
+	domain := strings.Replace(miniDomain,
+		"  - {id: top-read, statement: s}\n",
+		"  - {id: top-grants, statement: s}\n  - {id: top-read, statement: s}\n", 1)
+	prefix := `
+subjects:
+  entity: U
+  role_attr: role
+  team: {entity: T, membership: lone, invariant: u-team}
+resources: [Rec]
+owned_invariants: [rec-owned]
+rules:
+`
+
+	t.Run("scope without grant", func(t *testing.T) {
+		annotation := prefix + `  - invariant: top-grants
+    grants: {A: [update, delete]}
+  - invariant: top-read
+    verbs: [read]
+    scope: {A: all, B: own, C: none}
+  - invariant: top-write
+    verbs: [update, delete]
+    scope: {A: all, B: own, C: none}
+`
+		if _, _, err := gen(t, domain, annotation); err == nil || !strings.Contains(err.Error(), "scope rule defines read authority but the grants rule grants read to no role") {
+			t.Fatalf("want scope-without-grant reconciliation error, got %v", err)
+		}
+	})
+
+	t.Run("grant without scope", func(t *testing.T) {
+		annotation := prefix + `  - invariant: top-grants
+    grants: {A: [read]}
+  - invariant: top-write
+    verbs: [update, delete]
+    scope: {A: all, B: own, C: none}
+residuals:
+  - {invariant: top-read, reason: read scope intentionally absent for the mutation}
+`
+		if _, _, err := gen(t, domain, annotation); err == nil || !strings.Contains(err.Error(), "grants rule grants read to A but no scope rule") {
+			t.Fatalf("want grant-without-scope reconciliation error, got %v", err)
+		}
+	})
 }
 
 func TestDeterminism(t *testing.T) {

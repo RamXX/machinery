@@ -24,6 +24,7 @@ constraint the conductor passes in its prompt.
 ## Inputs
 
 - `design/domain.modelith.yaml` and `design/domain.modelith.md`.
+- In rebuild/hybrid mode, `design/legacy/domain.modelith.yaml` and `design/migration.yaml`.
 - `design/workspace.dsl` and `design/ARCHITECTURE.md` (with the Architecture Contract, interface
   contracts, dependency mitigation postures, persistence-and-placement decisions, the NFR record,
   and the event-contract table where one exists).
@@ -77,13 +78,18 @@ section structure exactly.
    says its state is persisted, the migration protocol for future state changes (mapping table from
    old persisted values to new states, or a drain rule), or the explicit statement "no persisted
    instances yet".
-8. **Pin the toolchain** (template section 10 subsection): language version, exact library pins or a
+8. **Write the transition implementation plan when `migration.yaml` exists.** Preserve the two
+   domain truths. Sequence asset salvage, adapters, mappings, backfill, shadow, dual-write, cutover,
+   rollback, and retirement from the contract. Require one table test per field and lifecycle
+   mapping plus characterization, idempotent replay, reconciliation, fault-injection, rollback, and
+   evidence-gated cutover tests. Do not let target domain packages import legacy internals.
+9. **Pin the toolchain** (template section 10 subsection): language version, exact library pins or a
    lockfile instruction, test framework, codegen tools. Two implementing agents must not diverge on
    environment.
-9. **Sequence the build as a walking skeleton then vertical slices.** The first milestone is the thinnest
+10. **Sequence the build as a walking skeleton then vertical slices.** The first milestone is the thinnest
    end-to-end path through one real boundary. Then one component lifecycle per slice, each green before
    the next.
-10. **State the hard-TDD protocol with its gate discipline explicit** (template section 11; write
+11. **State the hard-TDD protocol with its gate discipline explicit** (template section 11; write
     it out in full, never summarize it away). The RED side must be anchored to the deterministic
     gates so the suite provably tests the right things: `machinery check` green BEFORE deriving
     tests (a red design is an untrustworthy spec), and a RED exit gate of (a) every oracle stable
@@ -121,6 +127,8 @@ artifact. Include the `checked:` counts in your report.
 - Section 7 references the oracles by stable id and adds the guard-falsifying-clause tests, the
   named-unit test plan, contract tests, and property tests.
 - The state-migration section and the toolchain-and-versions subsection are present.
+- In rebuild/hybrid mode, the `Migration implementation plan` covers every contract phase and the
+  mapping, characterization, replay, reconciliation, failure, rollback, and cutover regression nets.
 - The build plan starts with a walking skeleton.
 - The hard-TDD protocol is stated and unambiguous, including the gate anchors: check-green before
   test derivation, the three-part RED exit gate (stable-id coverage, `machinery check --impl`
