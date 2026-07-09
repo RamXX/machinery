@@ -66,6 +66,7 @@ entities:
       - {id: password-hashed, statement: "A `User` password is persisted only as a hash, never in plaintext."}
       - {id: disabled-cannot-auth, statement: "A `User` whose status is Disabled cannot establish a `Session`."}
       - {id: single-team, statement: "A `User` belongs to at most one `Team`."}
+      - {id: manager-has-team, statement: "A `User` with role Manager belongs to exactly one `Team`; team scope is a Manager's entire write authority, so a teamless Manager could not write even its own records."}
     actions:
       - {name: register, actor: Admin, preserves: [username-unique, password-hashed], description: "Create a new `User` with a role and an initial password."}
       - {name: login, actor: User, preserves: [disabled-cannot-auth], description: "Authenticate and open a `Session`."}
@@ -186,8 +187,9 @@ entities:
     invariants:
       - {id: activity-immutable, statement: "An `Activity` body and occurredAt never change after creation."}
       - {id: activity-owned, statement: "Every `Activity` records the `User` who logged it."}
+      - {id: activity-contact-same-tenant, statement: "An `Activity` and the `Contact` it concerns are owned within the same `Team`; an `Activity` never references a `Contact` in another tenant, so following the link cannot cross a tenant boundary."}
     actions:
-      - {name: log, actor: User, preserves: [activity-immutable, activity-owned]}
+      - {name: log, actor: User, preserves: [activity-immutable, activity-owned, activity-contact-same-tenant]}
       - {name: delete, actor: Manager, description: "Remove an `Activity`, for correction only."}
 
   Task:
@@ -205,9 +207,10 @@ entities:
     invariants:
       - {id: task-owned, statement: "Every `Task` has exactly one owning `User`."}
       - {id: task-terminal, statement: "A `Task` in Done or Cancelled is terminal."}
-      - {id: task-assignee-visible, statement: "A `Task` may be reassigned only to a `User` within the assigner's `VisibilityScope`."}
+      - {id: task-assignee-visible, statement: "A `Task` may be reassigned only to a `User` the assigner can see: an `Admin` to any `User`, a `Manager` to a member of the manager's `Team` (`VisibilityScope` is a set of records, so eligibility is by team membership, not by scope membership)."}
+      - {id: task-deal-same-tenant, statement: "A `Task` and the `Deal` it is linked to are owned within the same `Team`; a `Task` never references a `Deal` in another tenant, so following the link cannot cross a tenant boundary."}
     actions:
-      - {name: create, actor: User, preserves: [task-owned]}
+      - {name: create, actor: User, preserves: [task-owned, task-deal-same-tenant]}
       - {name: start, actor: Owner}
       - {name: complete, actor: Owner, preserves: [task-terminal]}
       - {name: cancel, actor: Owner, preserves: [task-terminal]}
@@ -233,7 +236,7 @@ invariants:
   - {id: rbac-crud-verbs, statement: "A `User` may perform a verb only if the role grants it: `Admin`, `Manager`, and `Rep` may create, read, update, and delete; `ReadOnly` may only read."}
   - {id: rbac-read-visibility, statement: "A `User` may read only records within its `VisibilityScope`: an `Admin` reads all records, and every other `User` reads records it owns or that are owned by a member of its `Team`."}
   - {id: rbac-write-scope, statement: "A `User` may update or delete a record only within scope: an `Admin` any record, a `Manager` any record owned by a member of the manager's `Team`, a `Rep` only records it owns; a `ReadOnly` `User` may write nothing."}
-  - {id: rbac-reassign-authority, statement: "Only an `Admin`, or a `Manager` acting within the manager's `Team`, may change the `Owner` of a record."}
+  - {id: rbac-reassign-authority, statement: "Only an `Admin`, or a `Manager` acting within the manager's `Team`, may change the `Owner` of a record; an `Admin` may reassign to any `User`, and a `Manager` only to a member of the manager's `Team`, so a reassignment never moves a record outside the actor's own authority."}
   - {id: session-active-user, statement: "A `Session` is valid only while its `User` status is Active."}
 
 scenarios:

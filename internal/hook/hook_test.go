@@ -165,10 +165,12 @@ func TestPreDeniesGeneratedArtifacts(t *testing.T) {
 		{"design/pack/contract.machine.json", "Edit", true, "frozen pack"},
 		{"design/ratchet.json", "Edit", true, "machinery baseline"},
 		{"design/ratchet.json", "Write", true, "defeats the ratchet"},
-		{"design/formal/Deal.semantics.yaml", "Edit", false, ""}, // annotation source
-		{"design/machines/Deal.machine.json", "Edit", false, ""}, // machine source
-		{"design/machines/Deal.matrix.md", "Edit", false, ""},    // hand matrix
-		{"design/domain.modelith.md", "Edit", false, ""},         // rendered, but post-processed by hand
+		{"design/formal/Policy.als", "Write", true, "machinery alloy"},
+		{"design/formal/Deal.semantics.yaml", "Edit", false, ""},    // annotation source
+		{"design/formal/policy.relational.yaml", "Edit", false, ""}, // annotation source
+		{"design/machines/Deal.machine.json", "Edit", false, ""},    // machine source
+		{"design/machines/Deal.matrix.md", "Edit", false, ""},       // hand matrix
+		{"design/domain.modelith.md", "Edit", false, ""},            // rendered, but post-processed by hand
 		{"src/main.go", "Write", false, ""},
 		{"design/machines/Deal.oracle.md", "Bash", false, ""}, // not a file tool: G3 DRIFT catches it at stop
 	}
@@ -355,6 +357,33 @@ func TestStopBeforeAnyGateApplies(t *testing.T) {
 	}
 }
 
+// TestSelectGatesProgressiveOptional locks progressive opt-in behavior: each
+// relational annotation and the migration contract turns on its own gate at
+// stop time without requiring configuration.
+func TestSelectGatesProgressiveOptional(t *testing.T) {
+	dir := t.TempDir()
+	formal := filepath.Join(dir, "formal")
+	if err := os.MkdirAll(formal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sel := selectGates(dir, Config{})
+	for _, g := range []string{"gm", "gp", "gi", "gn"} {
+		if sel.Run[g] {
+			t.Errorf("%s must not run before its annotation exists", g)
+		}
+	}
+	writeFile(t, filepath.Join(dir, "migration.yaml"), "contract_version: 1\n")
+	writeFile(t, filepath.Join(formal, "policy.relational.yaml"), "subjects: {}\n")
+	writeFile(t, filepath.Join(formal, "integrity.relational.yaml"), "entities: []\n")
+	writeFile(t, filepath.Join(formal, "isolation.relational.yaml"), "tenant: {}\n")
+	sel = selectGates(dir, Config{})
+	for _, g := range []string{"gm", "gp", "gi", "gn"} {
+		if !sel.Run[g] {
+			t.Errorf("%s must run once its opt-in artifact exists", g)
+		}
+	}
+}
+
 func TestStopMissingDesignDirWarns(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigName), `{"design":"blueprint"}`)
@@ -526,6 +555,13 @@ func TestPluginManifests(t *testing.T) {
 	}
 	if plugin.Name != "machinery" || plugin.Version == "" {
 		t.Fatalf("plugin.json must name and version the plugin, got %+v", plugin)
+	}
+	skillRaw, err := os.ReadFile(repoPath("skills", "machinery", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(skillRaw), "version: \""+plugin.Version+"\"") {
+		t.Fatalf("plugin version %s and skill metadata version diverge", plugin.Version)
 	}
 
 	var mkt struct {

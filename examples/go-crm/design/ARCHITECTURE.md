@@ -28,6 +28,28 @@ design treats that refusal as a first-class, recoverable failure rather than a c
 | store | LadybugDB via `github.com/LadybugDB/go-ladybug` | embedded property graph; CRM is relationship-shaped |
 | query | Cypher (through `Connection.Query` / `Prepare` + `Execute`) | LadybugDB's query language; parameterized statements |
 
+## Transition architecture
+
+This is a rebuild of a working prototype, not an in-place refactor. The two domain truths are explicit:
+`legacy/domain.modelith.yaml` describes what exists and `domain.modelith.yaml` describes the intended
+production system. `migration.yaml` is the checked bridge between them. It inventories the implementation
+assets worth saving, disposes every legacy entity, covers every replaced field and lifecycle state, and
+defines the ordered source-of-truth changes.
+
+During baseline and shadow, the prototype remains authoritative. The target is populated through a wrapped,
+read-only export adapter and is never allowed to influence served results. During dual-write, stable operation
+ids make both writes idempotent; the legacy system remains authoritative and continuous reconciliation detects
+field, lifecycle, and authorization divergence. Cutover freezes legacy writes, drains the ordered log, runs a
+final zero-drift reconciliation, and switches both paths to the target. The old schema and seed data are not
+carried into the target repository merely because they already exist.
+
+The transition adds three temporary dependencies: the prototype exporter, the ordered change log/dual-write
+adapter, and cutover routing. Their failure posture is fail-closed: keep or restore legacy authority, stop the
+phase advance, retain signed manifests, and replay by stable operation id. Rollback returns to the preceding
+dual-write phase within 72 hours with zero acknowledged-write loss; sessions may be invalidated rather than
+risk resolving a different actor. These transition components are removed only after the rollback window and
+reconciliation obligations in `migration.yaml` are satisfied.
+
 ## 3. Components (inside the `crm` binary)
 
 - **Command Layer** owns process lifecycle: it opens the database, begins and commits or rolls back the

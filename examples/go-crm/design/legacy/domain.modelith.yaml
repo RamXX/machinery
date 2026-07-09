@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=https://modelith.sh/schema/domain-model/v1.json
+kind: DomainModel
+version: v1
+title: Go CRM prototype
+description: >
+  The working prototype that proves the CRM workflow but is not suitable as
+  the production foundation. Its embedded schema and behavior are inputs to
+  the rebuild, not constraints on the target architecture.
+
+enums:
+  LegacyUserRole:
+    values:
+      - {name: Admin, definition: "May manage every prototype record."}
+      - {name: Sales, definition: "May manage assigned sales records."}
+  LegacyUserStatus:
+    values:
+      - {name: Enabled, definition: "May sign in to the prototype."}
+      - {name: Blocked, definition: "May not sign in to the prototype."}
+  LegacyDealStage:
+    values:
+      - {name: New, definition: "A newly captured opportunity."}
+      - {name: Working, definition: "An opportunity being qualified."}
+      - {name: ClosedWon, definition: "A successfully closed opportunity."}
+      - {name: ClosedLost, definition: "An unsuccessfully closed opportunity."}
+  LegacyTaskStatus:
+    values:
+      - {name: Todo, definition: "Work has not started."}
+      - {name: Doing, definition: "Work is in progress."}
+      - {name: Done, definition: "Work is complete."}
+  LegacyActivityType:
+    values:
+      - {name: Call, definition: "A phone call."}
+      - {name: Meeting, definition: "A meeting."}
+      - {name: Email, definition: "An email."}
+      - {name: Note, definition: "A freeform note."}
+
+entities:
+  LegacyUser:
+    definition: "A prototype operator with coarse-grained access."
+    attributes:
+      - {name: username, type: string}
+      - {name: password, type: string}
+      - {name: role, type: LegacyUserRole}
+      - {name: status, type: LegacyUserStatus}
+    invariants:
+      - {id: legacy-username-unique, statement: "No two prototype users share a username."}
+  LegacyDeal:
+    definition: "A minimally tracked sales opportunity."
+    attributes:
+      - {name: title, type: string}
+      - {name: amount, type: integer}
+      - {name: stage, type: LegacyDealStage}
+    invariants:
+      - {id: legacy-deal-amount-nonnegative, statement: "A prototype deal amount is never negative."}
+  LegacyTask:
+    definition: "A prototype follow-up item."
+    attributes:
+      - {name: title, type: string}
+      - {name: due, type: timestamp}
+      - {name: status, type: LegacyTaskStatus}
+    invariants:
+      - {id: legacy-task-due-present, statement: "Every prototype task has a due timestamp."}
+  LegacyNote:
+    definition: "A prototype interaction or note attached to a customer."
+    attributes:
+      - {name: kind, type: LegacyActivityType}
+      - {name: title, type: string}
+      - {name: body, type: string}
+      - {name: createdAt, type: timestamp}
+    invariants:
+      - {id: legacy-note-body-preserved, statement: "The prototype preserves a note body after creation."}
+
+scenarios:
+  - name: Prototype sales workflow
+    steps:
+      - "A `LegacyUser` signs in and creates a `LegacyDeal`."
+      - "The user records a `LegacyTask` and a `LegacyNote` while working the deal."
+      - "The deal closes and the related task is completed."
+    invariants_touched: [legacy-username-unique, legacy-deal-amount-nonnegative, legacy-task-due-present, legacy-note-body-preserved]

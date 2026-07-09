@@ -214,6 +214,39 @@ func TestGoldenCheckCheckoutSplit(t *testing.T) {
 	}
 }
 
+// The relational generators run on the examples that opted into a layer; the
+// corpus pins the CLI output and every generated model byte for byte. go-crm
+// carries both the policy and the integrity layers; fulfillment carries only
+// integrity; portfolio-engine has no annotation, so no layer runs there.
+func TestGoldenAlloy(t *testing.T) {
+	root := repoRootDir(t)
+	for _, c := range []struct {
+		ex        string
+		artifacts []string
+	}{
+		{"go-crm", []string{"Policy.als", "Policy.oracle.md", "Integrity.als", "Isolation.als", "Isolation.oracle.md"}},
+		{"fulfillment", []string{"Integrity.als"}},
+	} {
+		t.Run(c.ex, func(t *testing.T) {
+			scratch := t.TempDir()
+			out, errS, code := runBin(t, "alloy", filepath.Join(root, "examples", c.ex, "design"), scratch)
+			// the out-dir is a temp path; normalize it so the golden is stable
+			out = strings.ReplaceAll(out, scratch, "<out-dir>")
+			g := goldenDir(t, "alloy-"+c.ex)
+			compareOrUpdate(t, filepath.Join(g, "stdout.txt"), out)
+			compareOrUpdate(t, filepath.Join(g, "stderr.txt"), errS)
+			compareOrUpdate(t, filepath.Join(g, "exitcode.txt"), fmt.Sprintf("%d\n", code))
+			for _, name := range c.artifacts {
+				data, err := os.ReadFile(filepath.Join(scratch, name))
+				if err != nil {
+					t.Fatalf("%s not produced: %v", name, err)
+				}
+				compareOrUpdate(t, filepath.Join(g, name), string(data))
+			}
+		})
+	}
+}
+
 func TestGoldenGen(t *testing.T) {
 	root := repoRootDir(t)
 	for _, c := range goldenExamples {

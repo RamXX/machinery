@@ -29,6 +29,12 @@ One line per subcommand:
   the committed oracle against a fresh in-memory generation, so a stale or edited oracle is DRIFT.
 - `machinery tla <machine.json> [out-dir]` generates the control-flow TLA+ model and `.cfg` for one
   machine (bounded retry counters, liveness, deadlock-freedom; assumptions printed in the header).
+- `machinery alloy <design-dir> [out-dir]` reconciles every present relational annotation against
+  the domain model and emits its generated proof artifacts: policy (`Policy.als` plus the
+  authorization oracle), integrity (`Integrity.als`, including inverse exclusivity for `1:1` and
+  `1:n` relationships), and isolation (`Isolation.als` plus the field-qualified tenant oracle).
+  Reconciliation failure is a hard error; `verify-formal` runs the pinned Alloy analyzer, and the
+  Gp/Gi/Gn gates byte-diff committed artifacts against fresh generation.
 - `machinery refine <machine.json> <semantics.yaml> [out-dir]` reconciles a `<M>.semantics.yaml`
   annotation against the machine, then generates the data-refined model, the abstract contract, and
   the refinement proof. Patterns: `linear-lifecycle`, `terminal-lifecycle`, `saga` (state names come
@@ -36,9 +42,10 @@ One line per subcommand:
 - `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
   `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate
   composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
-- `machinery check <design-dir> [--impl <code-dir>] [--gate g2,g3,gx,g4,g5]` the deterministic gate
-  suite (G2-c4, G3-machine, Gx-trace, G4-import, G5-pack on decomposed designs). Gates fail on
-  absence; every gate prints a `checked:` line. Exit is non-zero on any ERROR or DRIFT.
+- `machinery check <design-dir> [--impl <code-dir>] [--gate gm,gp,gi,gn,g2,g3,gx,g4,g5]` the deterministic
+  gate suite (Gm-transition on rebuild/hybrid contracts; Gp/Gi/Gn relational gates; G2-c4,
+  G3-machine, Gx-trace, G4-import, G5-pack on decomposed designs). Gates fail on absence; every gate prints a `checked:`
+  line. Exit is non-zero on any ERROR or DRIFT.
 - `machinery pack generate <parent-design>` emits the frozen per-subsystem contract packs
   (`design/packs/<id>.pack/`) from `decomposition.yaml`: the owned domain slice, the boundary event
   rows, the contract machine plus its TLA+ module, the delegated invariants, and a content hash.
@@ -56,8 +63,9 @@ One line per subcommand:
 - `machinery preflight` the same check, for use before a design session.
 - `machinery version` prints the build version.
 
-The binary is the whole toolchain: no interpreter, no runtime dependencies. Java 11+ is needed
-only for TLC (`verify-formal`, `tlc.sh`, `verify_formal.sh`).
+The binary is the whole generation and deterministic-gate toolchain: no interpreter or runtime
+dependencies. Java 11+ is needed only for solver execution by `verify-formal` (TLC and, when a
+relational annotation exists, Alloy) and the TLC shell wrappers.
 
 ## Two design rules govern the gate suite
 

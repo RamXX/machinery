@@ -15,8 +15,12 @@ type Decision struct {
 
 // Authorizer decides whether an actor may perform a verb on an entity of a
 // given type owned by ownerID within teamID (BUILD.md 4.6).
+// AuthorizeReassign is the complete reassignment decision: authority over the
+// record plus the target rule (design/formal/Policy.oracle.md, reassign rows).
 type Authorizer interface {
 	Authorize(actor model.User, verb model.Verb, entity model.EntityType, ownerID, teamID string) Decision
+	AuthorizeReassign(actor model.User, entity model.EntityType, ownerID, teamID string, target model.User) Decision
+	AuthorizeLink(sourceOwner, targetOwner model.User) Decision
 }
 
 // authorizer is the concrete pure implementation.
@@ -83,6 +87,38 @@ func (authorizer) Authorize(actor model.User, verb model.Verb, entity model.Enti
 	default:
 		return deny("rbac-crud-verbs: unknown verb")
 	}
+}
+
+// AuthorizeReassign composes reassign authority over the record with the
+// target rule: an Admin may reassign to any User, a Manager only to a member
+// of the manager's own Team, so a reassignment never moves a record outside
+// the actor's authority (rbac-reassign-authority, task-assignee-visible).
+func (a authorizer) AuthorizeReassign(actor model.User, entity model.EntityType, ownerID, teamID string, target model.User) Decision {
+	if d := a.Authorize(actor, model.VerbReassign, entity, ownerID, teamID); !d.Allowed {
+		return d
+	}
+	if actor.Role == model.RoleAdmin {
+		return allow()
+	}
+	if actor.TeamID != "" && actor.TeamID == target.TeamID {
+		return allow()
+	}
+	return deny("rbac-reassign-authority: Manager may reassign only to a member of its own Team")
+}
+
+// AuthorizeLink decides whether a record owned by sourceOwner may reference a
+// record owned by targetOwner without crossing a tenant boundary. The tenant
+// of a record is its owner's Team; the reference is allowed exactly when the
+// two owners share a tenant, so following the link never leaves the tenant. A
+// teamless owner has no tenant, so any link touching one is refused. This is
+// the single home of the cross-entity tenant-consistency invariants
+// (task-deal-same-tenant, activity-contact-same-tenant); it is held to the
+// generated design/formal/Isolation.oracle.md by TestTenantOracleConformance.
+func (authorizer) AuthorizeLink(sourceOwner, targetOwner model.User) Decision {
+	if sourceOwner.TeamID != "" && sourceOwner.TeamID == targetOwner.TeamID {
+		return allow()
+	}
+	return deny("tenant-isolation: a reference may not cross a tenant boundary")
 }
 
 // allow is the granted decision (empty Reason, per C-AUTHZ-13).

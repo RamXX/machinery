@@ -238,14 +238,12 @@ func (t *Task) guardCanStart(evt TaskEvent) bool    { return t.canWrite() }
 func (t *Task) guardCanComplete(evt TaskEvent) bool { return t.canWrite() }
 func (t *Task) guardCanCancel(evt TaskEvent) bool   { return t.canWrite() }
 
-// guardCanReassign requires reassign authority (Admin, or Manager in scope) AND
-// that the new assignee is inside the assigner's VisibilityScope
+// guardCanReassign is the complete reassignment decision: authority over the
+// record (Admin, or Manager in scope) AND the target rule (an Admin may
+// reassign to any User, a Manager only to a member of its own Team)
 // (task-assignee-visible, rbac-reassign-authority, rbac-write-scope).
 func (t *Task) guardCanReassign(evt TaskEvent) bool {
-	authority := t.Authz.Authorize(t.Actor, model.VerbReassign, model.EntityTask, t.OwnerID, t.TeamID).Allowed
-	a := evt.NewAssignee
-	visible := t.Authz.Authorize(t.Actor, model.VerbRead, model.EntityTask, a.ID, a.TeamID).Allowed
-	return authority && visible
+	return t.Authz.AuthorizeReassign(t.Actor, model.EntityTask, t.OwnerID, t.TeamID, evt.NewAssignee).Allowed
 }
 
 func (t *Task) pendingIsOpen() bool       { return t.PendingStatus == TSOpen }

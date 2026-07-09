@@ -1,0 +1,147 @@
+contract_version: 1
+mode: rebuild
+legacy:
+  model: legacy/domain.modelith.yaml
+target:
+  model: domain.modelith.yaml
+
+dispositions:
+  - legacy: LegacyUser
+    target: User
+    strategy: replace
+    rationale: Replace plaintext credentials and coarse access with hashed credentials, explicit roles, teams, and centralized authorization.
+  - legacy: LegacyDeal
+    target: Deal
+    strategy: replace
+    rationale: Preserve sales intent while adopting the production lifecycle, ownership, pipeline, and integer-money rules.
+  - legacy: LegacyTask
+    target: Task
+    strategy: replace
+    rationale: Preserve follow-up work while adopting the explicit lifecycle and ownership model.
+  - legacy: LegacyNote
+    target: Activity
+    strategy: replace
+    rationale: Preserve the interaction history as immutable production activity records.
+
+new_entities: [Team, Account, Contact, Pipeline, Tag]
+
+assets:
+  - name: prototype characterization suite
+    kind: test
+    strategy: reuse
+    target: target adapter compatibility suite
+    rationale: Its observable workflow examples are reliable evidence even though the prototype internals are not.
+    verification: Run every characterization against both adapters and review intentional deltas.
+  - name: prototype export module
+    kind: module
+    strategy: wrap
+    target: migration exporter adapter
+    rationale: The existing reader understands the prototype files and can be isolated behind a stable migration port.
+    verification: Export fixture snapshots twice and require byte-stable identifiers and row counts.
+  - name: embedded prototype schema
+    kind: schema
+    strategy: replace
+    target: production LadybugDB schema and repository
+    rationale: The prototype schema cannot enforce the target ownership, lifecycle, and authorization invariants.
+    verification: Reconcile entity counts, required fields, enum translations, and target property tests.
+  - name: developer seed database
+    kind: data
+    strategy: retire
+    rationale: It contains disposable local fixtures rather than customer records.
+    verification: Confirm the inventory classifies it as non-production and excludes it from migration manifests.
+
+data_mappings:
+  - {source: LegacyUser.username, target: User.username, transform: normalize and preserve, validation: unique normalized username with source-to-target manifest equality, rollback: restore the pre-import target snapshot}
+  - {source: LegacyUser.password, target: User.passwordHash, transform: verify then hash with argon2id and never persist plaintext, validation: login characterization succeeds and no plaintext appears in target storage or logs, rollback: remove imported target user and require legacy authentication}
+  - {source: LegacyUser.role, target: User.role, transform: translate Admin to Admin and Sales to Rep unless an approved manager roster says Manager, validation: every source role has one reviewed target role, rollback: restore legacy role from the signed manifest}
+  - {source: LegacyUser.status, target: User.status, transform: translate with state_mappings, validation: enabled and blocked account counts reconcile, rollback: restore legacy account status}
+  - {source: "-", target: User.createdAt, transform: derive from the earliest source audit timestamp or import timestamp, validation: every target user has a non-null timestamp and derivation provenance, rollback: discard the imported target user}
+  - {source: LegacyDeal.title, target: Deal.title, transform: preserve Unicode text, validation: normalized text hashes match, rollback: restore source title from manifest}
+  - {source: LegacyDeal.amount, target: Deal.amountCents, transform: validate the prototype integer is cents and preserve it, validation: nonnegative values and aggregate cents reconcile exactly, rollback: restore source amount from manifest}
+  - {source: LegacyDeal.stage, target: Deal.stage, transform: translate with state_mappings, validation: every source deal is assigned one target stage, rollback: restore source stage from manifest}
+  - {source: "-", target: Deal.closeDate, transform: derive from the closing audit event for won deals and leave absent otherwise, validation: every Won deal has a closeDate and non-won deals preserve source semantics, rollback: discard the derived value}
+  - {source: LegacyTask.title, target: Task.title, transform: preserve Unicode text, validation: normalized text hashes match, rollback: restore source title from manifest}
+  - {source: LegacyTask.due, target: Task.dueDate, transform: convert to UTC while preserving instant, validation: source and target instants compare equal, rollback: restore source timestamp from manifest}
+  - {source: LegacyTask.status, target: Task.status, transform: translate with state_mappings, validation: every source task has one target status, rollback: restore source status from manifest}
+  - {source: LegacyNote.kind, target: Activity.type, transform: translate the equivalent activity enum by name, validation: every source kind has one target type, rollback: restore source kind from manifest}
+  - {source: LegacyNote.title, target: Activity.subject, transform: preserve Unicode text, validation: normalized text hashes match, rollback: restore source title from manifest}
+  - {source: LegacyNote.body, target: Activity.body, transform: preserve immutable body bytes, validation: content hashes match, rollback: restore source body from manifest}
+  - {source: LegacyNote.createdAt, target: Activity.occurredAt, transform: convert to UTC while preserving instant, validation: source and target instants compare equal, rollback: restore source timestamp from manifest}
+
+state_mappings:
+  - {source: LegacyUser.Enabled, target: User.Active, reason: Enabled accounts retain access after credential migration.}
+  - {source: LegacyUser.Blocked, target: User.Disabled, reason: Blocked accounts must remain unable to authenticate.}
+  - {source: LegacyDeal.New, target: Deal.Lead, reason: New is the prototype's unqualified entry state.}
+  - {source: LegacyDeal.Working, target: Deal.Qualified, reason: Working means active qualification; later target stages require explicit evidence.}
+  - {source: LegacyDeal.ClosedWon, target: Deal.Won, reason: Preserve the successful terminal outcome.}
+  - {source: LegacyDeal.ClosedLost, target: Deal.Lost, reason: Preserve the unsuccessful terminal outcome.}
+  - {source: LegacyTask.Todo, target: Task.Open, reason: Preserve not-started work.}
+  - {source: LegacyTask.Doing, target: Task.InProgress, reason: Preserve active work.}
+  - {source: LegacyTask.Done, target: Task.Done, reason: Preserve the terminal completion state.}
+
+phases:
+  - id: baseline
+    source_of_truth: legacy
+    read_path: legacy
+    write_path: legacy
+    backfill: Produce immutable manifests and repeatable exports without changing production reads or writes.
+    entry_criteria: Prototype characterization tests and backup/restore rehearsal are green.
+    exit_criteria: Two consecutive exports have stable identifiers, counts, and content hashes.
+    rollback: Remain entirely on the legacy platform and discard target imports.
+    observability: [legacy command success rate, export row counts, export content hashes]
+  - id: shadow
+    source_of_truth: legacy
+    read_path: shadow
+    write_path: legacy
+    backfill: Import a snapshot then continuously apply the ordered change log to the target.
+    entry_criteria: Baseline export is stable and the target property suite is green.
+    exit_criteria: Read parity and reconciliation remain within zero unexplained drift for seven days.
+    rollback: Disable target shadow reads and rebuild the target from the last signed snapshot.
+    observability: [read parity mismatches, replication lag, reconciliation drift, target error rate]
+    parity: Compare normalized result sets and authorization decisions; quarantine and explain every mismatch.
+  - id: dual-write
+    source_of_truth: legacy
+    read_path: shadow
+    write_path: dual
+    backfill: Continue incremental replay while new acknowledged writes are applied to both systems.
+    entry_criteria: Shadow parity has zero unexplained drift and dual-write fault injection passes.
+    exit_criteria: Every acknowledged write reconciles and rollback has been rehearsed under load.
+    rollback: Stop target writes, keep legacy authoritative, and replay the signed change log before retrying.
+    observability: [write divergence, reconciliation lag, duplicate write count, authorization decision mismatch]
+    idempotency: Use a stable migration operation id as the unique write key in both systems.
+    conflict_resolution: Reject conflicting writes, keep legacy authoritative, and require an operator-reviewed replay.
+    reconciliation: Compare operation manifests, entity counts, field hashes, lifecycle states, and authorization outcomes continuously.
+    parity: Compare normalized reads and authorization decisions while serving legacy results.
+  - id: cutover
+    source_of_truth: target
+    read_path: target
+    write_path: target
+    backfill: Freeze legacy writes, drain the change log, run final reconciliation, then switch traffic.
+    entry_criteria: Zero unexplained drift, target SLOs green, restore rehearsal green, and cutover approval recorded.
+    exit_criteria: The rollback window expires with target SLOs and reconciliation green.
+    rollback: Route reads and writes to dual-write, restore legacy authority, and replay target operations using stable ids.
+    observability: [target command success rate, target latency, reconciliation drift, rollback readiness]
+
+cutover:
+  phase: cutover
+  rollback_phase: dual-write
+  decision_criteria: Zero unexplained reconciliation drift; target authorization, durability, and latency SLOs green; named owner approves.
+  rollback_window: 72h
+  max_data_loss: zero acknowledged writes
+
+risks:
+  - dependency: prototype export module
+    detection: Export row-count or content-hash mismatch between repeated snapshots.
+    mitigation: Stop the transition, retain legacy authority, and repair the wrapped exporter against characterized fixtures.
+    residual: Corrupt source records may require manual quarantine and an explicit exception manifest.
+    owner: migration data steward
+  - dependency: ordered change log and dual-write adapter
+    detection: Replication lag, missing operation ids, duplicate ids, or source/target field-hash divergence.
+    mitigation: Stop cutover, keep legacy authoritative, and replay idempotently from the last reconciled operation.
+    residual: An unacknowledged in-flight legacy write can require operator review before replay.
+    owner: migration platform owner
+  - dependency: cutover routing and local session files
+    detection: Target error-rate spike, authorization mismatch, or sessions resolving different users after routing changes.
+    mitigation: Route back to dual-write, invalidate sessions, restore legacy authority, and reconcile before retrying.
+    residual: Users may need to authenticate again after rollback.
+    owner: cutover commander

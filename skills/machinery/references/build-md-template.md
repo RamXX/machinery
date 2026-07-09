@@ -56,6 +56,21 @@ rest of the document uses. The reader has no other source for these words.
   signal per residual failure state).
 - Source of truth: `design/workspace.dsl` and `design/ARCHITECTURE.md`.
 
+### Migration implementation plan (rebuild/hybrid only)
+Required when `design/migration.yaml` exists; otherwise write "N/A - no legacy/target transition".
+Turn the checked contract into build and test work without restating it incompletely:
+- Identify the read-only legacy adapter and the target-side migration boundary. Target domain code
+  must not import legacy internals directly.
+- Sequence asset salvage, transformation implementation, backfill, shadow, dual-write, cutover,
+  rollback-window, and retirement work according to `migration.yaml`.
+- Require one table test per data mapping and lifecycle mapping; characterization against both
+  adapters; duplicate/reorder/interruption replay tests; reconciliation drift and manifest-tamper
+  tests; either-side dual-write fault injection; rollback rehearsal; and evidence-gated cutover.
+- State stable identifier and signed-manifest rules, source-of-truth authority per phase, operator
+  ownership, and the exact conditions under which transition code may be removed.
+- Source of truth: `design/migration.yaml`; do not weaken its entry/exit, rollback, observability,
+  parity, idempotency, conflict-resolution, reconciliation, or maximum-data-loss commitments.
+
 ## 5. Behavior: the state machines (the logic)
 For each stateful component, one subsection:
 - A one-paragraph narration of its lifecycle in plain language.
@@ -81,13 +96,32 @@ One table proving nothing was dropped between layers:
 Every invariant from section 3 appears here. Any invariant not enforced by a guard and not
 structurally impossible is called out explicitly as a known risk. Invariant ids must appear inside
 table cells as whole tokens: Gx-trace matches them structurally, so `inv-1` buried inside `inv-12`
-does not count, and prose outside a table does not count.
+does not count, and prose outside a table does not count. When the design carries a policy
+annotation, the invariants it compiles cite the relational model as an enforcement class
+("generated authz oracle rows") alongside their runtime guard, and the conformance test id
+(P-authz-oracle or equivalent) appears in their test column.
 
 ## 7. Test specification (the hard-TDD oracle)
 The transition test spec IS the generated `design/machines/<Component>.oracle.md` files. Do not
 restate the transition tables here; reference the oracles. Tests key on each row's STABLE id, never
 the sequential test id: row numbers renumber when the design changes, stable ids survive unrelated
 insertions and change only when that transition's stimulus changes.
+
+When the design carries a policy annotation, the authorization test spec IS the generated
+`design/formal/Policy.oracle.md` the same way: require ONE conformance test that parses the table
+and asserts the pure authorization function on every reachable row, expanding each abstract owner
+case into all the concrete variants the oracle header lists, across every resource entity type.
+Do not restate the decision rows. Rows marked `unreachable` are skipped (the write discipline
+refuses to construct them; say where that discipline lives). The go-crm example's
+`impl/internal/authz/oracle_test.go` is the reference shape.
+
+When the design carries an isolation annotation, the tenant-scoping test spec IS the generated
+`design/formal/Isolation.oracle.md` the same way: require ONE conformance test that parses the table
+and asserts the pure link-authorization function on every row, expanding each tenant case into its
+concrete owner-tenant pairs. The go-crm example's `impl/internal/authz/tenant_oracle_test.go` is the
+reference shape. The integrity layer carries no oracle and no impl test: it is a design-side
+admissibility proof held by `Gi-integrity` and `verify-formal`, so section 6 simply cites its
+invariants as integrity-checked.
 
 BUILD.md adds only what the oracles cannot derive:
 - The guard-branch completeness analysis: one test per falsifying clause of each conjunction guard

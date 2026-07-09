@@ -1,0 +1,16 @@
+# Declarative structural-integrity semantics for the fulfillment domain model.
+# fulfillment has no access policy (its cross-cutting invariants are saga and
+# money-conservation properties the TLC rung owns), but it does carry structural
+# invariants: an Order belongs to exactly one Customer, and Customer emails are
+# unique. machinery alloy compiles them to Integrity.als and proves the mandatory
+# ownership plus the uniqueness constraint admit a world that scales.
+#
+# The Order -> Payment 1:1 owned relationship is modeled structurally (no
+# invariant binding: the domain states no separate id for it) so the admissibility
+# runs reason over the real relationship multiplicity, not a stripped-down graph.
+entities: [Customer, Order, Payment]
+relationships:
+  - {from: Order, to: Customer, field: customer, mandatory: true, invariant: order-owned-by-customer}
+  - {from: Order, to: Payment, field: payment, mandatory: true}
+unique:
+  - {entity: Customer, attribute: email, invariant: customer-email-unique}

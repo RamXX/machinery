@@ -4,7 +4,12 @@ This guide is for a small team (roughly 2 to 8 developers) adopting machinery on
 existing repository that has grown messy, with the goal of clawing back to a sustainable,
 gated model. The greenfield pipeline in `skills/machinery/SKILL.md` still applies; this
 document covers what changes when the code already exists and when more than one person
-works the design at once. Every recipe here was verified against machinery v0.1.6.
+works the design at once. Every recipe here was verified against machinery v0.1.7.
+
+This guide assumes the current implementation remains the implementation. If you are building a
+new production foundation while preserving selected behavior, data, tests, or modules, use the
+[rebuild and hybrid guide](rebuild-guide.md): it keeps separate legacy and target models and holds
+their transition with Gm.
 
 ## 1. Calibrate expectations first: what the tool sees, and what it never sees
 
@@ -48,8 +53,8 @@ team gets a ratchet, not a big bang. The stage you are on is encoded in one plac
 
 ### Stage 0: pin the toolchain, create the design directory
 
-- Install a pinned machinery release (`MACHINERY_VERSION=v0.1.6`) or
-  `go install github.com/RamXX/machinery/cmd/machinery@v0.1.6`. Pin modelith too
+- Install a pinned machinery release (`MACHINERY_VERSION=v0.1.7`) or
+  `go install github.com/RamXX/machinery/cmd/machinery@v0.1.7`. Pin modelith too
   (`v0.4.0`; `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` installs the pinned release, and
   `machinery preflight` warns when the installed version does not match the pin. Keep the
   pin in your CI file as well).
@@ -126,6 +131,20 @@ with zero shrinkage as the gate becoming wallpaper.
   to parse is a hard G3 error, so rot in a hand-maintained matrix is caught loudly rather
   than silently skipping the row-by-row reconciliation. The `checked:` line always states
   how many matrix rows were actually reconciled.
+- If the system has role- or ownership-based access control, this is also the stage to
+  bring in the relational layers (they need only the domain model, so they can even precede the
+  machines): author `design/formal/policy.relational.yaml` describing the policy AS THE
+  CODE BEHAVES (read the authorization code, not the wiki), run `machinery alloy design/`,
+  and commit both generated artifacts. Gate `gp` activates automatically once the
+  annotation exists. The sibling layers slot in the same way when they apply: `integrity`
+  (`integrity.relational.yaml`, gate `gi`) for uniqueness/singleton/cardinality invariants, and
+  `isolation` (`isolation.relational.yaml`, gate `gn`) for cross-entity multi-tenant references; see
+  the [integrity](integrity-layer.md) and [isolation](isolation-layer.md) guides. A failed
+  meta-check at this point is a latent hole the team probably does not know about; treat it as a
+  finding to adjudicate with the owners. The
+  generated `Policy.oracle.md` then powers an authorization characterization test, the
+  same adjudication loop as Stage 3 (code-is-truth: fix the annotation; policy-is-truth:
+  file the code defect). Full reference: [policy-layer.md](policy-layer.md).
 
 ### Stage 3: characterization tests (the behavioral loop)
 
@@ -214,8 +233,8 @@ jobs:
       - uses: actions/checkout@<pinned-sha>
       - name: Install machinery (pinned)
         run: |
-          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.1.6/machinery-linux-amd64
-          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.1.6/checksums-sha256.txt
+          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.1.7/machinery-linux-amd64
+          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.1.7/checksums-sha256.txt
           grep machinery-linux-amd64 checksums-sha256.txt | sha256sum -c -
           install -m 0755 machinery-linux-amd64 /usr/local/bin/machinery
       - name: Install modelith (pinned)

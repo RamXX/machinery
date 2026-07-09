@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RamXX/machinery/internal/alloy"
 	"github.com/RamXX/machinery/internal/compose"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/refine"
@@ -40,16 +41,22 @@ func jarPath() string {
 
 // ensureJar fetches+checksum-verifies the pinned jar on first use (like tlc.sh).
 func ensureJar() (string, error) {
-	jar := jarPath()
-	if _, err := os.Stat(jar); err == nil {
-		return jar, nil
+	return fetchJar(jarPath(),
+		"https://github.com/tlaplus/tlaplus/releases/download/"+tlaVersion+"/tla2tools.jar",
+		"tla2tools.jar "+tlaVersion, tlaSHA256)
+}
+
+// fetchJar downloads url into dest and verifies the pinned sha256; a jar
+// already on disk is trusted (it was verified when it landed).
+func fetchJar(dest, url, label, wantSHA string) (string, error) {
+	if _, err := os.Stat(dest); err == nil {
+		return dest, nil
 	}
-	if err := os.MkdirAll(filepath.Dir(jar), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return "", err
 	}
-	url := "https://github.com/tlaplus/tlaplus/releases/download/" + tlaVersion + "/tla2tools.jar"
-	fmt.Fprintf(os.Stderr, "fetching tla2tools.jar %s into %s\n", tlaVersion, jar)
-	tmp := jar + ".tmp"
+	fmt.Fprintf(os.Stderr, "fetching %s into %s\n", label, dest)
+	tmp := dest + ".tmp"
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -73,14 +80,14 @@ func ensureJar() (string, error) {
 	data, _ := os.ReadFile(tmp)
 	sum := sha256.Sum256(data)
 	got := hex.EncodeToString(sum[:])
-	if got != tlaSHA256 {
+	if got != wantSHA {
 		os.Remove(tmp)
-		return "", fmt.Errorf("checksum mismatch for tla2tools.jar %s: got %s, want %s", tlaVersion, got, tlaSHA256)
+		return "", fmt.Errorf("checksum mismatch for %s: got %s, want %s", label, got, wantSHA)
 	}
-	if err := os.Rename(tmp, jar); err != nil {
+	if err := os.Rename(tmp, dest); err != nil {
 		return "", err
 	}
-	return jar, nil
+	return dest, nil
 }
 
 // runTLC mirrors tlc.sh: java -cp jar tlc2.TLC on a .tla/.cfg pair.
@@ -158,6 +165,78 @@ func VerifyFormal(design string, genOnly bool) int {
 		}
 	}
 
+	// static relational policy layer (opt-in: present only when the design
+	// carries a policy annotation)
+	policyAnn := filepath.Join(fdir, alloy.AnnotationName)
+	havePolicy := false
+	var policyCommands []alloy.Command
+	if _, err := os.Stat(policyAnn); err == nil {
+		havePolicy = true
+		domainPath, _, perr := alloy.Paths(design)
+		if perr != nil {
+			genErr(perr)
+			havePolicy = false
+		} else if als, oracleMD, stats, aerr := alloy.GenerateAll(domainPath, policyAnn); aerr != nil {
+			genErr(aerr)
+			havePolicy = false
+		} else if werr := os.WriteFile(filepath.Join(fdir, alloy.OutputName), []byte(als), 0644); werr != nil {
+			genErr(werr)
+			havePolicy = false
+		} else if werr := os.WriteFile(filepath.Join(fdir, alloy.OracleName), []byte(oracleMD), 0644); werr != nil {
+			genErr(werr)
+			havePolicy = false
+		} else {
+			policyCommands = stats.Commands
+		}
+	}
+
+	// static relational integrity model (opt-in: present only when the design
+	// carries an integrity annotation)
+	integrityAnn := filepath.Join(fdir, alloy.IntegrityAnnotationName)
+	haveIntegrity := false
+	var integrityCommands []alloy.Command
+	if _, err := os.Stat(integrityAnn); err == nil {
+		haveIntegrity = true
+		domainPath, _, perr := alloy.Paths(design)
+		if perr != nil {
+			genErr(perr)
+			haveIntegrity = false
+		} else if als, stats, aerr := alloy.GenerateIntegrity(domainPath, integrityAnn); aerr != nil {
+			genErr(aerr)
+			haveIntegrity = false
+		} else if werr := os.WriteFile(filepath.Join(fdir, alloy.IntegrityOutputName), []byte(als), 0644); werr != nil {
+			genErr(werr)
+			haveIntegrity = false
+		} else {
+			integrityCommands = stats.Commands
+		}
+	}
+
+	// static relational isolation model (opt-in: present only when the design
+	// carries an isolation annotation)
+	isolationAnn := filepath.Join(fdir, alloy.IsolationAnnotationName)
+	haveIsolation := false
+	var isolationCommands []alloy.Command
+	if _, err := os.Stat(isolationAnn); err == nil {
+		haveIsolation = true
+		domainPath, _, perr := alloy.Paths(design)
+		if perr != nil {
+			genErr(perr)
+			haveIsolation = false
+		} else if als, oracleMD, stats, aerr := alloy.GenerateIsolation(domainPath, isolationAnn); aerr != nil {
+			genErr(aerr)
+			haveIsolation = false
+		} else if werr := os.WriteFile(filepath.Join(fdir, alloy.IsolationOutputName), []byte(als), 0644); werr != nil {
+			genErr(werr)
+			haveIsolation = false
+		} else if werr := os.WriteFile(filepath.Join(fdir, alloy.IsolationOracleName), []byte(oracleMD), 0644); werr != nil {
+			genErr(werr)
+			haveIsolation = false
+		} else {
+			isolationCommands = stats.Commands
+		}
+	}
+
 	if genOnly {
 		pairs := 0
 		for _, tlaF := range globExt(fdir, ".tla") {
@@ -166,11 +245,20 @@ func VerifyFormal(design string, genOnly bool) int {
 			}
 		}
 		fmt.Fprintf(os.Stdout, "%d spec pair(s) regenerated from source; TLC skipped (--gen-only)\n", pairs)
+		if havePolicy {
+			fmt.Fprintf(os.Stdout, "relational policy model + authz oracle regenerated (%s, %d commands; %s); Alloy skipped (--gen-only)\n", alloy.OutputName, len(policyCommands), alloy.OracleName)
+		}
+		if haveIntegrity {
+			fmt.Fprintf(os.Stdout, "relational integrity model regenerated (%s, %d commands); Alloy skipped (--gen-only)\n", alloy.IntegrityOutputName, len(integrityCommands))
+		}
+		if haveIsolation {
+			fmt.Fprintf(os.Stdout, "relational isolation model + tenant oracle regenerated (%s, %d commands; %s); Alloy skipped (--gen-only)\n", alloy.IsolationOutputName, len(isolationCommands), alloy.IsolationOracleName)
+		}
 		if genFail > 0 {
 			fmt.Fprintf(os.Stderr, "verify-formal: %d generator failure(s); the committed specs above were NOT regenerated from source\n", genFail)
 			return 1
 		}
-		if pairs == 0 {
+		if pairs == 0 && !havePolicy && !haveIntegrity && !haveIsolation {
 			fmt.Fprintln(os.Stderr, "verify-formal: no .tla/.cfg pairs under "+fdir+": nothing to generate is a failure, not a pass")
 			return 1
 		}
@@ -202,6 +290,33 @@ func VerifyFormal(design string, genOnly bool) int {
 			fail++
 		}
 	}
+	runLayer := func(present bool, alsName, prefix string, commands []alloy.Command) {
+		if !present {
+			return
+		}
+		vs, aerr := runAlloy(filepath.Join(fdir, alsName), commands)
+		if aerr != nil {
+			fmt.Fprintln(os.Stderr, aerr)
+			fail++
+			return
+		}
+		for _, v := range vs {
+			name := prefix + "/" + v.Command.Name
+			if v.Pass {
+				fmt.Fprintf(os.Stdout, "  PASS  %s\n", name)
+				pass++
+			} else {
+				fmt.Fprintf(os.Stdout, "  FAIL  %s\n", name)
+				if v.Detail != "" {
+					fmt.Fprintf(os.Stdout, "        %s\n", v.Detail)
+				}
+				fail++
+			}
+		}
+	}
+	runLayer(havePolicy, alloy.OutputName, "Policy", policyCommands)
+	runLayer(haveIntegrity, alloy.IntegrityOutputName, "Integrity", integrityCommands)
+	runLayer(haveIsolation, alloy.IsolationOutputName, "Isolation", isolationCommands)
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintf(os.Stdout, "%d passed, %d failed\n", pass, fail)
 	if genFail > 0 {

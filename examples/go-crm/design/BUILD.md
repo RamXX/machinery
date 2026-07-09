@@ -38,6 +38,34 @@ role and record ownership, with every write applied atomically inside one databa
 - Concurrent multi-user write throughput: concurrent writers serialize on the single-writer lock; the
   second is refused after bounded retry.
 
+## Migration implementation plan
+
+The rebuild is implemented from `design/migration.yaml`; this section turns that checked contract into
+deliverable work. The prototype remains the source of truth until the final cutover phase. Production code
+must not import prototype packages directly: the only legacy dependency is a read-only exporter behind a
+migration port, and every exported object receives a stable manifest id.
+
+1. **Characterize and inventory.** Lock the reusable prototype behavior as adapter-level tests. Classify the
+   exporter, embedded schema, test suite, and seed data exactly as the migration asset inventory specifies.
+   Capture a signed backup and two byte-stable export manifests before target work begins.
+2. **Build target-first boundaries.** Implement the target domain, authz, repository, and machines from this
+   BUILD and the target model. Put transformations in a migration package outside the target domain. Unit-test
+   every data and lifecycle mapping, including password re-hashing and `Won` close-date derivation.
+3. **Backfill and shadow.** Make imports restartable by stable operation id. Reconcile counts, field hashes,
+   states, ownership, and authorization outcomes. Shadow reads compare normalized results while returning only
+   the legacy result; every mismatch is quarantined or explained.
+4. **Dual-write safely.** Fault-inject either-side failures, duplicate delivery, reordering, and replay. An
+   acknowledged operation must exist in both manifests or raise an alert; conflicts fail closed with legacy
+   authoritative. Exercise the rollback path while writes continue.
+5. **Cut over and retire.** Freeze legacy writes, drain the ordered log, require zero unexplained drift and
+   green target SLOs, then switch reads and writes together. Keep the exporter, manifests, backup, and routing
+   rollback available for 72 hours. Remove transition code only after the exit criteria and owner approval.
+
+Regression proof is layered: mapping-table tests cover every source and target field; lifecycle-table tests
+cover every legacy state; adapter characterization runs against both systems; reconciliation fixtures cover
+malformed records; phase tests inject exporter, replay, dual-write, and routing failures; the ordinary domain,
+architecture, state-machine, formal, and implementation gates remain mandatory throughout the transition.
+
 ## 2. Glossary
 
 The only source for these words.
@@ -192,6 +220,7 @@ Enforcement point, component, and test ids are in the section 6 matrix; not dupl
 | `password-hashed` | A `User` password is persisted only as a hash, never plaintext. | User |
 | `disabled-cannot-auth` | A `Disabled` `User` cannot establish a `Session`. | User/Session |
 | `single-team` | A `User` belongs to at most one `Team`. | User |
+| `manager-has-team` | A `User` with role Manager belongs to exactly one `Team` (team scope is a Manager's entire write authority). | User |
 | `team-name-unique` | No two `Team` records share a name. | Team |
 | `account-owned` | Every `Account` has exactly one owning `User`. | Account |
 | `contact-owned` | Every `Contact` has exactly one owning `User`. | Contact |
@@ -205,12 +234,12 @@ Enforcement point, component, and test ids are in the section 6 matrix; not dupl
 | `activity-owned` | Every `Activity` records the `User` who logged it. | Activity |
 | `task-owned` | Every `Task` has exactly one owning `User`. | Task |
 | `task-terminal` | A `Task` in Done or Cancelled is terminal. | Task |
-| `task-assignee-visible` | A `Task` may be reassigned only to a `User` within the assigner's `VisibilityScope`. | Task |
+| `task-assignee-visible` | A `Task` may be reassigned only to a `User` the assigner can see: Admin to any `User`, Manager to a member of the manager's `Team`. | Task |
 | `tag-name-unique` | No two `Tag` records share a name. | Tag |
 | `rbac-crud-verbs` | A verb is allowed only if the role grants it: Admin/Manager/Rep may create/read/update/delete; ReadOnly only read. | RBAC |
 | `rbac-read-visibility` | Read only within `VisibilityScope`: Admin all; others own or team-owned records. | RBAC |
 | `rbac-write-scope` | Update/delete only in scope: Admin any; Manager any team member's record; Rep only its own; ReadOnly none. | RBAC |
-| `rbac-reassign-authority` | Only an Admin, or a Manager acting within the manager's `Team`, may change a record's `Owner`. | RBAC |
+| `rbac-reassign-authority` | Only an Admin, or a Manager acting within the manager's `Team`, may change a record's `Owner`; Admin may reassign to any `User`, Manager only to a team member. | RBAC |
 | `session-active-user` | A `Session` is valid only while its `User` status is Active. | Session |
 
 ## 4. Architecture (the how)
@@ -459,7 +488,7 @@ VisibilityScope; reassign changes the owner but keeps the status, so the persist
 | `guardCanStart` | guard | `(ctx,evt)->bool` | true iff caller may write (owner/manager/admin in scope) | `rbac-write-scope` |
 | `guardCanComplete` | guard | `(ctx,evt)->bool` | true iff source non-terminal AND caller may write | `task-terminal`,`rbac-write-scope` |
 | `guardCanCancel` | guard | `(ctx,evt)->bool` | true iff source non-terminal AND caller may write | `task-terminal`,`rbac-write-scope` |
-| `guardCanReassign` | guard | `(ctx,evt)->bool` | true iff new assignee in assigner VisibilityScope AND caller Manager/Admin in scope | `task-assignee-visible`,`rbac-reassign-authority`,`rbac-write-scope` |
+| `guardCanReassign` | guard | `(ctx,evt)->bool` | true iff new assignee is reassignable by the caller (Admin: any User; Manager: a member of the caller's Team) AND caller Manager/Admin in scope | `task-assignee-visible`,`rbac-reassign-authority`,`rbac-write-scope` |
 | `pendingIsOpen/InProgress/Done/Cancelled` | guard | `(ctx)->bool` | true iff `pendingStatus` equals that status | persist success routing |
 | `priorIsOpen/InProgress` | guard | `(ctx)->bool` | true iff `priorStatus` equals that status | rollback routing |
 | `isErrLocked/isErrConstraint/isErrDiskFull/isErrTimeout`, `retriesExhausted` | guard | as Deal | typed error / retry bound | section 4.6 |
@@ -474,7 +503,7 @@ VisibilityScope; reassign changes the owner but keeps the status, so the persist
 | failure | detection | transition | recovery | bound / residual |
 |---|---|---|---|---|
 | Constraint/disk-full/timeout/locked on write | `saveTask` onError classes, after persistTimeout | persisting->rolledBack->priorStatus (locked via persistRetry) | as Deal 5.1 | as Deal 5.1 |
-| Reassign to out-of-scope user | `guardCanReassign` false | Open/InProgress internal, `recordReassignDenied` | reject; no write | `task-assignee-visible` before invoke. Residual: none |
+| Reassign to out-of-scope user | `guardCanReassign` false | Open/InProgress internal, `recordReassignDenied` | reject; no write | `task-assignee-visible` (Admin: any; Manager: team member only) before invoke. Residual: none |
 | Mutate a terminal task | event at Done/Cancelled (`final`) | none (structurally rejected) | closed; no-op | `task-terminal` structural. Residual: none |
 
 ### 5.3 User aggregate (`crm.domain`) - `machines/User.machine.json`
@@ -669,6 +698,7 @@ guarantee (`one-default-pipeline`) is called out as a named residual (also secti
 | `password-hashed` | structural (only argon2id hashes ever written; no action stores plaintext) | crm.session | `Sessions.Login` / `verifyCredentials`, `setCredentials` | P-password-hashed, C-SESS-10 |
 | `disabled-cannot-auth` | machine guard (`guardUserDisabled`; `isErrDisabled`) | crm.session | `Sessions.Login` -> ErrDisabled | T-SESS-05, T-SESS-08, P-disabled-cannot-auth, C-SESS-03 |
 | `single-team` | structural (data model: User has at most one Team relationship) | crm.repo / crm.domain | `Repo.SaveUser` (write discipline) | P-single-team |
+| `manager-has-team` | design-time: relational policy model (solver-checked, `formal/Policy.als`); runtime: write discipline in `Repo.SaveUser`/`assignRole` | crm.repo / crm.domain | `Repo.SaveUser`, `assignRole` refuse role Manager with no team | P-manager-has-team (revision: impl predates this invariant) |
 | `team-name-unique` | DB-constraint (unique index on `Team.name`) | crm.repo | `Repo.SaveTeam` -> ErrConstraint | P-team-name-unique, C-REPO-18 |
 | `account-owned` | structural (owner set at create; required n:1) | crm.domain / crm.repo | `Repo.SaveAccount` | P-account-owned |
 | `contact-owned` | structural (owner set at create; required n:1) | crm.domain / crm.repo | `Repo.SaveContact` | P-contact-owned |
@@ -682,12 +712,12 @@ guarantee (`one-default-pipeline`) is called out as a named residual (also secti
 | `activity-owned` | structural (`log` records the acting User) | crm.domain | `Repo.SaveActivity` | P-activity-owned |
 | `task-owned` | structural + machine guard (owner set at create; `guardCanReassign` admits one in-scope owner) | crm.domain | `saveTask` | T-TASK-07,08,14,15, P-task-owned |
 | `task-terminal` | structural (Done/Cancelled are `final`; no reopen) | crm.domain | `saveTask` | T-TASK-16,17, P-task-terminal |
-| `task-assignee-visible` | machine guard (`guardCanReassign`) | crm.domain | `saveTask` | T-TASK-07,08,14,15, P-task-assignee-visible |
+| `task-assignee-visible` | machine guard (`guardCanReassign` via `authz.AuthorizeReassign`, the complete reassign decision) + generated authz oracle rows (design/formal/Policy.oracle.md) | crm.authz + crm.domain | `Authorizer.AuthorizeReassign` | T-TASK-07,08,14,15, P-task-assignee-visible, P-authz-oracle |
 | `tag-name-unique` | DB-constraint (unique index on `Tag.name`) | crm.repo | `Repo.SaveTag` -> ErrConstraint | P-tag-name-unique, C-REPO-19 |
-| `rbac-crud-verbs` | machine guard (`guardAuthorized`; User `guardAdminAuthority`) | crm.authz + crm.domain | `Authorizer.Authorize` | T-CMD-18,19, T-USER-01,02,04,05, C-AUTHZ-01..03, P-rbac-crud-verbs |
-| `rbac-read-visibility` | machine guard (`guardAuthorized`, reads authorized too) | crm.authz | `Authorizer.Authorize` | T-CMD-18,19, C-AUTHZ-04..07, P-rbac-read-visibility |
-| `rbac-write-scope` | machine guard (`guardAuthorized`; domain `guardCan*` re-checks) | crm.authz + crm.domain | `Authorizer.Authorize` | T-CMD-18,19, C-AUTHZ-08,09, P-rbac-write-scope |
-| `rbac-reassign-authority` | machine guard (`guardAuthorized`; Deal `guardCanReopen`; Task `guardCanReassign`) | crm.authz + crm.domain | `Authorizer.Authorize` | T-CMD-18,19, T-DEAL-28,29,33,34, T-TASK-07,08,14,15, C-AUTHZ-10..12, P-rbac-reassign-authority |
+| `rbac-crud-verbs` | machine guard (`guardAuthorized`; User `guardAdminAuthority`) + generated authz oracle rows | crm.authz + crm.domain | `Authorizer.Authorize` | T-CMD-18,19, T-USER-01,02,04,05, C-AUTHZ-01..03, P-rbac-crud-verbs, P-authz-oracle |
+| `rbac-read-visibility` | machine guard (`guardAuthorized`, reads authorized too) + generated authz oracle rows | crm.authz | `Authorizer.Authorize` | T-CMD-18,19, C-AUTHZ-04..07, P-rbac-read-visibility, P-authz-oracle |
+| `rbac-write-scope` | machine guard (`guardAuthorized`; domain `guardCan*` re-checks) + generated authz oracle rows | crm.authz + crm.domain | `Authorizer.Authorize` | T-CMD-18,19, C-AUTHZ-08,09, P-rbac-write-scope, P-authz-oracle |
+| `rbac-reassign-authority` | machine guard (`guardAuthorized`; Deal `guardCanReopen`; Task `guardCanReassign`) + `Authorizer.AuthorizeReassign` (authority AND target rule) + generated authz oracle rows | crm.authz + crm.domain | `Authorizer.Authorize`, `Authorizer.AuthorizeReassign` | T-CMD-18,19, T-DEAL-28,29,33,34, T-TASK-07,08,14,15, C-AUTHZ-10..12, P-rbac-reassign-authority, P-authz-oracle |
 | `session-active-user` | machine guard (`guardSessionUserActive`) | crm.session | `Sessions.Current` | T-SESS-23,24, P-session-active-user, C-SESS-08 |
 
 **Known / named risk.** `one-default-pipeline` is the only invariant with no enforcing machine guard and no
@@ -855,6 +885,7 @@ Each is a randomized/generative property over the relevant operation. Format: `P
 | P-rbac-read-visibility | For any read: Admin Allowed for all; others Allowed only for own or same-team records. |
 | P-rbac-write-scope | For any update/delete: Admin any; Manager only team members' records; Rep only own; ReadOnly none. |
 | P-rbac-reassign-authority | For any reassign: Allowed only for Admin, or Manager acting within the manager's team. |
+| P-authz-oracle | The pure Authorizer agrees with every reachable row of the generated decision table `design/formal/Policy.oracle.md` (every owner-case variant, every resource entity type); regenerated by `machinery alloy`, keyed on stable AUTHZ-* ids. |
 | P-session-active-user | For any resume, the session resolves to Active only while the user's status is Active; a status flip to Disabled invalidates it. |
 
 ## 8. State migration

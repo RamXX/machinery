@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/alloy"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/lint"
 	"github.com/RamXX/machinery/internal/oracle"
@@ -1008,17 +1009,31 @@ func CheckTraceability(design string) *Gate {
 	if len(invIDs) == 0 {
 		g.Errs = append(g.Errs, "the domain model declares no invariants; nothing constrains the design")
 	}
+	// the relational policy model is an enforcement artifact too: an
+	// invariant compiled into Policy.als is solver-checked, which is
+	// stronger than a prose reference (Gp-policy holds the annotation to
+	// the domain model; here it only credits coverage)
+	policyIDs := alloy.CarriedIDs(filepath.Join(design, "formal", alloy.AnnotationName))
+	integrityIDs := alloy.CarriedIntegrityIDs(filepath.Join(design, "formal", alloy.IntegrityAnnotationName))
+	isolationIDs := alloy.CarriedIsolationIDs(filepath.Join(design, "formal", alloy.IsolationAnnotationName))
 	var invSorted []string
 	for iid := range invIDs {
 		invSorted = append(invSorted, iid)
 	}
 	sort.Strings(invSorted)
 	for _, iid := range invSorted {
-		if tokenIn(iid, corpus) {
+		if tokenIn(iid, corpus) || policyIDs[iid] || integrityIDs[iid] || isolationIDs[iid] {
 			g.Count("invariants enforced")
-			if tokenIn(iid, unitCorpus) {
+			switch {
+			case tokenIn(iid, unitCorpus):
 				g.Count("invariants unit-backed (guard/action/actor)")
-			} else {
+			case policyIDs[iid]:
+				g.Count("invariants policy-checked (relational model)")
+			case integrityIDs[iid]:
+				g.Count("invariants integrity-checked (relational model)")
+			case isolationIDs[iid]:
+				g.Count("invariants isolation-checked (relational model)")
+			default:
 				g.Count("invariants attested (structural/prose)")
 			}
 		} else {
