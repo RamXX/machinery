@@ -17,9 +17,10 @@ func newBaselineCmd() *cobra.Command {
 that would tolerate today's violating edges (paste them into the Architecture
 Contract's dependency_rules after review), and write design/ratchet.json, the
 set-based snapshot of every tolerated edge's offender files. From then on G4
-fails when a baselined edge gains a new offender file, and the machinery
-Claude Code plugin blocks import findings at turn end (the snapshot is what
-arms that blocking). Rerun after burning down debt to tighten the ratchet.`,
+fails when a baselined edge gains a new offender file, and machinery host
+adapters with blocking stop hooks reject import findings at turn end (the
+snapshot is what arms that blocking). Rerun after burning down debt to tighten
+the ratchet.`,
 		Args: cobra.ExactArgs(1),
 	}
 	var implDir, date string

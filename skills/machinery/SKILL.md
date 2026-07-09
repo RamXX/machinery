@@ -1,7 +1,7 @@
 ---
 name: machinery
 metadata:
-  version: "0.1.8"
+  version: "0.1.9"
 description: >
   Design software as a build-ready blueprint, greenfield, brownfield, hybrid, or rebuild. Use when the user
   wants to design a new system, service, or app from scratch, produce a BUILD.md for a
@@ -23,6 +23,29 @@ can implement under hard TDD. You are the conductor. You interrogate the user, e
 gate between every phase, reuse the `modelith` tooling, embed the C4 technique, and delegate
 the heavy synthesis to the two author roles (as subagents where your runtime spawns them,
 otherwise inline). You do not write production code here. The artifact is the design.
+
+## Runtime capability contract
+
+Run the methodology from capabilities, never from a host name. The skill, design artifacts, and
+`machinery` CLI are the portable core; commands, subagents, and lifecycle hooks are optional host
+accelerators. At the start of a run, use the strongest capability the runtime actually exposes:
+
+- If fresh-context subagents are available, delegate Phase 3 to `machinery-fsm-author` and Phase 4
+  to `machinery-build-writer`. If either role or delegation is unavailable, execute that role's
+  canonical instructions inline and keep the same inputs, outputs, and gates.
+- If host commands are available, they may start or resume this skill. If not, a plain-language
+  request such as "design this rebuild with machinery" is equivalent.
+- If edit and stop hooks are available, let them protect generated artifacts and run the inner-loop
+  gates. If they are absent or advisory, treat generated artifacts as read-only by instruction,
+  run `machinery check` explicitly before every phase handoff, and rely on the consuming repository's
+  CI check as the authoritative enforcement boundary.
+- Never require a host-specific tool name, model name, frontmatter field, or command syntax in a
+  design artifact. Detect available read, write, search, shell, question, and delegation tools and
+  adapt locally. Host adapters may wrap this contract; they may not weaken or redefine it.
+
+The result must be equivalent across Claude Code, Codex, OpenCode, and any Agent Skills runtime:
+the same canonical role bodies, artifact schemas, deterministic gates, and BUILD.md handoff. What
+may differ is ergonomics and how early a violation is caught, never what counts as a valid design.
 
 ## The thesis
 
@@ -606,3 +629,6 @@ knows where the interrogation stopped.
   edges against.
 - `machinery oracle` - generates the canonical `<M>.oracle.md` transition oracles from the
   machine JSON. Run after every machine edit and commit the output; G3 diffs it.
+- `machinery update [--version <tag>]` - checksum-verifies and force-refreshes the CLI plus every
+  recorded direct agent home and native host adapter from one release. Host plugin caches remain
+  host-owned and are refreshed through the Claude Code/Codex CLIs when detected.

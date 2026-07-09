@@ -1,7 +1,7 @@
 #!/bin/sh
-# machinery Claude Code plugin: the single hook shim. Forwards the hook event
-# on stdin to `machinery hook`, which reads hook_event_name from the JSON and
-# answers on stdout per the Claude Code hook contract.
+# machinery Claude Code/Codex plugin: the single hook shim. Forwards the hook
+# event on stdin to `machinery hook`, which reads hook_event_name from the JSON
+# and answers on stdout using the hosts' compatible hook contract.
 #
 # Deliberately boring, in this order:
 #   1. Not a machinery-managed project (no .machinery.json, no
@@ -13,7 +13,13 @@
 #      of breaking the session.
 set -u
 
-root="${CLAUDE_PROJECT_DIR:-$PWD}"
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+  root="$CLAUDE_PROJECT_DIR"
+elif command -v git >/dev/null 2>&1 && git_root=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null); then
+  root="$git_root"
+else
+  root="$PWD"
+fi
 if [ ! -f "$root/.machinery.json" ] && [ ! -f "$root/design/domain.modelith.yaml" ]; then
   exit 0
 fi

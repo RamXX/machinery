@@ -95,13 +95,15 @@ domain claim, and the code alone cannot tell you what they should be.
      packages under `imports:` prefixes, an `allow:` into it, and a truthful mitigation
      row ("own unmodeled code, out of scope until modeled").
    - **`design/ratchet.json`**, the set-based snapshot of every baselined edge's offender
-     files. Commit it; it is generated, so never hand-edit it (the machinery Claude Code
-     plugin denies such edits), and review its diff in PRs like any contract change.
+     files. Commit it; it is generated, so never hand-edit it (machinery host adapters
+     deny such edits where their edit API permits), and review its diff in PRs like any
+     contract change.
 4. CI runs `machinery check design --impl . --gate g2,g4`. From this moment two things
    fail the build: a new undeclared cross-boundary edge, and a new offender file on a
    baselined edge (the ratchet). Committing `ratchet.json` is also what arms the machinery
-   Claude Code plugin's turn-end import blocking, so agent sessions are held to the same
-   line as CI.
+   blocking stop hooks in supported host adapters, so those agent sessions are held to the
+   same line as CI. OpenCode surfaces the idle result as a warning; CI remains authoritative
+   for every host.
 
 What the ratchet does and does not close: a baselined edge can no longer grow silently
 (the snapshot pins its offender files, and growth is an ERROR naming the new files), but

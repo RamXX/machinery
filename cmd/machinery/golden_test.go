@@ -70,6 +70,10 @@ func goldenDir(t *testing.T, caseName string) string {
 func runBin(t *testing.T, args ...string) (string, string, int) {
 	t.Helper()
 	cmd := exec.CommandContext(t.Context(), goldenBin(t), args...)
+	cmd.Env = os.Environ()
+	if os.Getenv("MACHINERY_CONFIG_DIR") == "" {
+		cmd.Env = append(cmd.Env, "MACHINERY_CONFIG_DIR="+t.TempDir())
+	}
 	var out, errB bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errB
 	err := cmd.Run()

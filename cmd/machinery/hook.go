@@ -6,14 +6,14 @@ import (
 	"github.com/RamXX/machinery/internal/hook"
 )
 
-// newHookCmd is the Claude Code plugin plumbing: the plugin's hook shim pipes
-// each hook event (JSON on stdin) through `machinery hook`, and the answer
+// newHookCmd is the shared host-adapter plumbing: a hook shim or plugin pipes
+// each normalized event (JSON on stdin) through `machinery hook`, and the answer
 // (deny/block/context JSON, or nothing) goes to stdout. Hidden because it is
 // machine-to-machine, not a user command; humans run `machinery check`.
 func newHookCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:    "hook",
-		Short:  "Handle one Claude Code hook event (JSON on stdin; plugin plumbing)",
+		Short:  "Handle one normalized agent-host hook event (JSON on stdin; adapter plumbing)",
 		Hidden: true,
 		Args:   cobra.NoArgs,
 	}

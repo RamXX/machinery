@@ -1,7 +1,8 @@
-// Package hook handles the Claude Code plugin hook events behind
+// Package hook handles the shared Claude Code and Codex hook events behind
 // `machinery hook`: it reads one hook event as JSON on stdin and answers on
-// stdout per the Claude Code hook contract (deny/block/context as JSON, exit
-// code always 0 on a handled event).
+// stdout using their compatible deny/block/context JSON contract (exit code
+// always 0 on a handled event). OpenCode's adapter translates its native
+// plugin events into the same input shape.
 //
 // Every event is a strict no-op unless the project is machinery-managed: a
 // .machinery.json at the project root, or the conventional
@@ -36,7 +37,7 @@ import (
 // ConfigName is the project-root marker and configuration file.
 const ConfigName = ".machinery.json"
 
-// Input mirrors the Claude Code hook stdin JSON (only the fields used here).
+// Input is the compatible subset of the Claude Code and Codex hook stdin JSON.
 type Input struct {
 	SessionID      string    `json:"session_id"`
 	Cwd            string    `json:"cwd"`
@@ -49,6 +50,8 @@ type Input struct {
 type toolInput struct {
 	FilePath     string `json:"file_path"`
 	NotebookPath string `json:"notebook_path"`
+	Command      string `json:"command"`
+	Patch        string `json:"patch"`
 }
 
 // Config is the .machinery.json shape. Every field is optional; an absent
@@ -139,6 +142,10 @@ var fileTools = map[string]bool{
 	"Write":        true,
 	"MultiEdit":    true,
 	"NotebookEdit": true,
+	"apply_patch":  true,
+	"edit":         true,
+	"write":        true,
+	"patch":        true,
 }
 
 type preOut struct {
@@ -155,19 +162,22 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 	if !fileTools[in.ToolName] {
 		return nil
 	}
-	rel := relToRoot(root, editedPath(in))
-	if rel == "" {
-		return nil
+	for _, edited := range editedPaths(in) {
+		rel := relToRoot(root, edited)
+		if rel == "" {
+			continue
+		}
+		reason := generatedReason(designRel(cfg), rel)
+		if reason == "" {
+			continue
+		}
+		return emitJSON(w, preOut{HookSpecificOutput: preSpecific{
+			HookEventName:            "PreToolUse",
+			PermissionDecision:       "deny",
+			PermissionDecisionReason: reason,
+		}})
 	}
-	reason := generatedReason(designRel(cfg), rel)
-	if reason == "" {
-		return nil
-	}
-	return emitJSON(w, preOut{HookSpecificOutput: preSpecific{
-		HookEventName:            "PreToolUse",
-		PermissionDecision:       "deny",
-		PermissionDecisionReason: reason,
-	}})
+	return nil
 }
 
 // generatedReason classifies rel (a root-relative, slash-separated path) as
@@ -235,15 +245,24 @@ func post(root string, cfg Config, in Input) error {
 	if !fileTools[in.ToolName] {
 		return nil
 	}
-	rel := relToRoot(root, editedPath(in))
-	if rel == "" {
-		return nil
-	}
 	design := designRel(cfg)
-	switch {
-	case rel == design || strings.HasPrefix(rel, design+"/"):
+	touchedDesign, touchedImpl := false, false
+	for _, edited := range editedPaths(in) {
+		rel := relToRoot(root, edited)
+		if rel == "" {
+			continue
+		}
+		switch {
+		case rel == design || strings.HasPrefix(rel, design+"/"):
+			touchedDesign = true
+		case cfg.Impl != "" && sourceExt[path.Ext(rel)] && underImpl(cfg, rel):
+			touchedImpl = true
+		}
+	}
+	if touchedDesign {
 		appendState(root, in.SessionID, "design")
-	case cfg.Impl != "" && sourceExt[path.Ext(rel)] && underImpl(cfg, rel):
+	}
+	if touchedImpl {
 		appendState(root, in.SessionID, "impl")
 	}
 	return nil
@@ -483,11 +502,40 @@ func clearState(root, sessionID string) { _ = os.Remove(statePath(root, sessionI
 
 // --- small helpers ---
 
-func editedPath(in Input) string {
+var patchPathLine = regexp.MustCompile(`(?m)^\*\*\* (?:Add|Update|Delete) File: (.+)$`)
+var patchMoveLine = regexp.MustCompile(`(?m)^\*\*\* Move to: (.+)$`)
+
+// editedPaths normalizes the two supported hook protocols. Claude file tools
+// provide file_path/notebook_path. Codex apply_patch provides the complete
+// patch in tool_input.command; the OpenCode adapter may use command or patch.
+func editedPaths(in Input) []string {
 	if in.ToolInput.FilePath != "" {
-		return in.ToolInput.FilePath
+		return []string{in.ToolInput.FilePath}
 	}
-	return in.ToolInput.NotebookPath
+	if in.ToolInput.NotebookPath != "" {
+		return []string{in.ToolInput.NotebookPath}
+	}
+	patchText := in.ToolInput.Command
+	if patchText == "" {
+		patchText = in.ToolInput.Patch
+	}
+	if patchText == "" {
+		return nil
+	}
+
+	seen := map[string]bool{}
+	var paths []string
+	for _, re := range []*regexp.Regexp{patchPathLine, patchMoveLine} {
+		for _, match := range re.FindAllStringSubmatch(patchText, -1) {
+			p := strings.TrimSpace(match[1])
+			if p == "" || seen[p] {
+				continue
+			}
+			seen[p] = true
+			paths = append(paths, p)
+		}
+	}
+	return paths
 }
 
 // designRel returns the configured design directory as a clean, slash-

@@ -388,7 +388,8 @@ anything missing; it installs nothing.
   This puts the `machinery` binary on `~/.local/bin` and runs `machinery install` to place the skill
   + role docs into your agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see
   [Agent homes](#agent-homes)). Override with environment variables, for example
-  `MACHINERY_VERSION=v0.1.7`, `INSTALL_DIR=/usr/local/bin`, or `MACHINERY_HOMES="$HOME/.claude"`.
+  `MACHINERY_VERSION=v0.1.7`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/.claude"`, or
+  `MACHINERY_TARGETS="codex opencode"`.
 
   **Binary by hand** (macOS arm64/x86, Linux amd64/arm64, Windows amd64): download
   `machinery-<os>-<arch>` from the [releases page](https://github.com/RamXX/machinery/releases), put
@@ -429,7 +430,11 @@ Make:
 
 ```sh
 machinery install                     # place the skill + role docs into your agent homes
+machinery update                      # force-refresh the binary and every recorded harness
 machinery uninstall                   # remove them
+machinery install --target all        # add native Claude, Codex, and OpenCode integration
+machinery doctor --target all         # inspect every host-specific artifact
+machinery uninstall --target all      # remove every host adapter and the shared skill
 machinery preflight                   # check prerequisites (warns; installs nothing)
 machinery check <your-design>         # run the deterministic gate suite
 machinery baseline <design> --impl .  # brownfield Stage 1: propose baseline rules, write the ratchet
@@ -443,10 +448,11 @@ targets. End users never need it. If you are hacking on machinery itself, see
 
 ### Agent homes
 
-machinery is agent-agnostic. `machinery install` places the skill under `<home>/skills/machinery`
-and the two role docs under `<home>/agents`, for every home in the list, which defaults to
-`~/.agents` (the cross-agent convention) and `~/.claude` (Claude Code). The first home holds the real
-files and the rest are symlinked to it, so there is one canonical copy to update.
+machinery's core is host-neutral: one Agent Skill, one pair of canonical role bodies, one artifact
+contract, and one deterministic CLI. `machinery install` preserves the original portable layout by
+placing the skill under `<home>/skills/machinery` and the two role docs under `<home>/agents`. The
+default homes are `~/.agents` (the cross-agent convention) and `~/.claude` (Claude Code); the first
+holds real files and the rest are symlinked to it, so there is one canonical copy to update.
 
 - **`machinery install` (recommended).** Fetches the skill from the release that matches the binary
   and lays it down as above. `--home` (repeatable) overrides the set, `--copy` copies into every home
@@ -455,6 +461,45 @@ files and the rest are symlinked to it, so there is one canonical copy to update
 - **`make dev-link` (developer).** Symlinks every home directly into a working-tree checkout, so
   edits to the skill are live. That is what you want when hacking on machinery itself, not for a
   plain install.
+
+For native host surfaces, use repeatable `--target claude|codex|opencode|all`. Codex gets TOML
+subagents under `~/.codex/agents`; OpenCode gets native subagents, commands, and a governance plugin
+under `~/.config/opencode`; both reuse the skill at `~/.agents/skills`. The renderers strip
+host-specific frontmatter and wrap the same canonical role bodies, so there are no Claude, Codex,
+and OpenCode prompt forks to drift apart. `--target` and `--home` cannot be combined.
+
+```bash
+machinery install --target codex
+machinery install --target opencode
+machinery install --target all
+machinery doctor --target all
+```
+
+Every runtime follows the capability contract in the skill: use fresh-context roles when supported,
+otherwise execute the same role inline; use lifecycle hooks when supported, otherwise run explicit
+checks. CI `machinery check` is always the merge authority. The exact topology, feature matrix,
+OpenCode stop-hook limitation, and adapter extension rules are in the
+[agent portability guide](docs/agent-portability.md).
+
+Every successful CLI install records its exact topology (custom home groups, symlink/copy mode,
+and native targets) in the user config directory. `machinery update` uses that receipt, plus
+standard-path discovery for older installations, to force-download the requested release, verify
+its published checksum and reported version, replace the running binary atomically, and refresh
+every recorded harness from the same release source. It does not skip work when the requested
+version matches the installed version.
+
+```bash
+machinery update                         # latest release, all detected installations
+machinery update --version v0.1.9        # force an exact release
+machinery update --target all            # restrict the harness refresh explicitly
+machinery update --skip-plugins          # leave host-managed plugin caches alone
+```
+
+Claude Code and Codex own their plugin caches. When those plugins are detected, update asks the
+host CLI to refresh them; it never edits cache directories directly. A missing host CLI or a
+managed-scope refusal is reported as a warning while direct skills and adapters still update. Open
+a new Codex task or run Claude Code's `/reload-plugins` after a plugin refresh. Full failure and
+recovery behavior is in the [agent portability guide](docs/agent-portability.md#updating-a-release).
 
 The gate tools are a single Go binary (no Python runtime). `verify-formal` downloads a version-pinned,
 checksum-verified `tla2tools.jar` on first use. CI runs the test suite, all gate runs, the full formal
@@ -485,9 +530,9 @@ ERRORs only warn. In every other repository the hooks are a strict no-op: they e
 anything, so the plugin never disturbs other projects or plugins. Details, including the
 `.machinery.json` reference: the [Claude Code plugin guide](docs/claude-plugin.md).
 
-With the plugin installed, `machinery install` detects it and skips `~/.claude` (the plugin already
-serves the skill and agents there); other agent homes are unaffected, and non-Claude users need no
-plugin: the `machinery install` path above is unchanged.
+With the plugin installed, the default `machinery install` detects it and skips `~/.claude` (the
+plugin already serves the skill and agents there). The legacy no-target install remains unchanged;
+Codex and OpenCode users can opt into their native adapters with `--target`.
 
 ## Quickstart (five minutes)
 
@@ -529,7 +574,7 @@ make verify-formal   # regenerates and checks all 26 TLC proofs + the go-crm pol
 
 ## Use
 
-In an agent session (Claude Code, or any agent that loads skills from an installed home), from the
+In an agent session (Claude Code, Codex, OpenCode, or any runtime that loads Agent Skills), from the
 project you want to design:
 
 ```
@@ -546,16 +591,19 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   template) and `tools/` (the TLC shell wrappers, `tlc.sh` and `verify_formal.sh`).
 - `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `alloy`, `refine`,
   `compose`, `check`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`, `install`,
-  `uninstall`.
+  `update`, `uninstall`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
   `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the Gm/Gp/Gi/Gn/G2/G3/Gx/G4/G5
   suite), `pack/` (recursive decomposition via contract packs), `formal/` (TLC + Alloy
   orchestration), `install/` (skill placement behind `machinery install`), `experiments/` (the
   shared mutation-experiment table). Every package has unit tests.
 - `agents/` two synthesis subagents (the machine author and the build-doc writer).
-- `commands/`, `hooks/`, and `.claude-plugin/` the Claude Code plugin surface: the slash commands,
-  the gate-enforcing hooks and their shim, and the plugin + marketplace manifests. The repo root is
-  the plugin; see the [Claude Code plugin guide](docs/claude-plugin.md).
+- `commands/`, `hooks/`, `.claude-plugin/`, and `.codex-plugin/` the Claude Code and Codex plugin
+  surfaces: slash commands where supported, the shared gate-enforcing hooks and shim, and both
+  manifests. The repo root is the plugin; see the [Claude Code plugin guide](docs/claude-plugin.md)
+  and [agent portability guide](docs/agent-portability.md).
+- `adapters/opencode/` the OpenCode commands and thin JavaScript translation layer. The methodology
+  and gate behavior remain in the shared skill and binary.
 - `docs/` the deep dives: the [rebuild and hybrid guide](docs/rebuild-guide.md) (dual domain truths,
   migration contract, coexistence and rollback test protocol), the
   [policy layer guide](docs/policy-layer.md) (the annotation
@@ -563,6 +611,8 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   and brownfield workflows), the [brownfield team guide](docs/brownfield-team-guide.md) (staged
   adoption ladder, baseline allow rules, PR discipline, CI recipes), the
   [Claude Code plugin guide](docs/claude-plugin.md) (hooks, `.machinery.json` reference, commands),
+  the [agent portability guide](docs/agent-portability.md) (Claude Code, Codex, OpenCode, and
+  capability fallbacks),
   and the [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft
   rung-4 design note, not yet implemented).
 - `examples/go-crm/` the worked rebuild example: `design/legacy/` (the working prototype truth),

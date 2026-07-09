@@ -27,11 +27,12 @@ func newVerifyFormalCmd() *cobra.Command {
 }
 
 func newDoctorCmd() *cobra.Command {
-	c := &cobra.Command{Use: "doctor", Short: "Check prerequisites and install status"}
+	var targets []string
+	c := &cobra.Command{Use: "doctor", Short: "Check prerequisites and install status", Args: cobra.NoArgs}
 	c.RunE = func(cmd *cobra.Command, args []string) error {
-		doctorRun()
-		return nil
+		return doctorRun(targets)
 	}
+	c.Flags().StringArrayVar(&targets, "target", nil, "host adapter to inspect: claude, codex, opencode, or all (repeatable)")
 	return c
 }
 

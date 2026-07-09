@@ -15,6 +15,8 @@
 #                          then "$HOME/.claude") and skips any home the Claude
 #                          Code plugin already serves; setting this passes the
 #                          homes explicitly, which always wins over that skip.
+#   MACHINERY_TARGETS      space-separated host adapters from claude, codex,
+#                          opencode, all. Cannot be combined with MACHINERY_HOMES.
 #   INSTALL_DIR            where the CLI binary lands (default: "$HOME/.local/bin")
 #   MACHINERY_REPO         owner/name to fetch from (default: RamXX/machinery)
 #   MACHINERY_BIN          use this machinery binary instead of downloading (dev/test)
@@ -25,10 +27,13 @@ REPO="${MACHINERY_REPO:-RamXX/machinery}"
 VERSION="${MACHINERY_VERSION:-latest}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 HOMES="${MACHINERY_HOMES:-}"
+TARGETS="${MACHINERY_TARGETS:-}"
 
 say() { printf '%s\n' "$*"; }
 die() { printf 'install: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "required tool not found: $1"; }
+
+[ -z "$HOMES" ] || [ -z "$TARGETS" ] || die "MACHINERY_HOMES and MACHINERY_TARGETS cannot be combined"
 
 # --- detect os/arch (must match the release asset names) -------------------
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -95,6 +100,9 @@ fi
 set -- install
 for h in $HOMES; do
   set -- "$@" --home "$h"
+done
+for target in $TARGETS; do
+  set -- "$@" --target "$target"
 done
 if [ -n "${MACHINERY_SKILL_SRC:-}" ]; then
   set -- "$@" --from "$MACHINERY_SKILL_SRC"

@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/RamXX/machinery/internal/install"
 )
 
 const modelithVersion = "v0.4.0"
@@ -53,7 +56,28 @@ func preflightRun() {
 }
 
 // doctorRun mirrors the Makefile `doctor` target: preflight + install status.
-func doctorRun() {
+// With targets it checks each host's native adapter; without them it preserves
+// the original ~/.claude + ~/.agents report.
+func doctorRun(targets []string) error {
+	if len(targets) > 0 {
+		artifacts, err := install.TargetArtifacts(targets)
+		if err != nil {
+			return err
+		}
+		preflightRun()
+		out := stdoutW
+		fmt.Fprintln(out, "install status:")
+		for _, artifact := range artifacts {
+			if _, err := os.Stat(artifact.Path); err == nil {
+				fmt.Fprintf(out, "  ok       [%s] %s at %s\n", artifact.Target, artifact.Label, artifact.Path)
+			} else {
+				fmt.Fprintf(out, "  MISSING  [%s] %s at %s -- run machinery install --target %s\n", artifact.Target, artifact.Label, artifact.Path, strings.Join(targets, " --target "))
+			}
+		}
+		reportUpdateReceipt(out)
+		return nil
+	}
+
 	preflightRun()
 	out := stdoutW
 	fmt.Fprintln(out, "install status:")
@@ -74,6 +98,20 @@ func doctorRun() {
 		} else {
 			fmt.Fprintf(out, "  MISSING  build-writer role at %s/agents -- run make install\n", home)
 		}
+	}
+	reportUpdateReceipt(out)
+	return nil
+}
+
+func reportUpdateReceipt(out io.Writer) {
+	status, err := install.InstallationReceiptStatus()
+	switch {
+	case err != nil:
+		fmt.Fprintf(out, "  WARN     update receipt at %s is unreadable: %v\n", status.Path, err)
+	case status.Exists:
+		fmt.Fprintf(out, "  ok       update receipt at %s (%d home group(s), %d native target(s))\n", status.Path, status.HomeInstalls, status.Targets)
+	default:
+		fmt.Fprintf(out, "  auto     no update receipt at %s; standard installed paths will be discovered on the first 'machinery update'\n", status.Path)
 	}
 }
 

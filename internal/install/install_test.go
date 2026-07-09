@@ -13,8 +13,8 @@ import (
 	"testing"
 )
 
-// fakeSource builds a minimal source tree (skills/machinery/SKILL.md plus the
-// two role docs) and returns its path.
+// fakeSource builds a minimal source tree containing the shared skill, the
+// canonical role bodies, and the OpenCode adapter assets.
 func fakeSource(t *testing.T) string {
 	t.Helper()
 	src := t.TempDir()
@@ -28,13 +28,20 @@ func fakeSource(t *testing.T) string {
 		t.Fatal(err)
 	}
 	for _, d := range RoleDocs {
-		write(t, filepath.Join(src, "agents", d), "role\n")
+		write(t, filepath.Join(src, "agents", d), "---\nname: role\ndescription: role\ntools: Read, Write\nmodel: opus\n---\n\ncanonical role body for "+d+"\n")
 	}
+	for _, d := range openCodeCommands {
+		write(t, filepath.Join(src, "adapters", "opencode", "commands", d), "---\ndescription: command\n---\n\ncommand "+d+"\n")
+	}
+	write(t, filepath.Join(src, "adapters", "opencode", "plugins", "machinery.js"), "export const MachineryPlugin = async () => ({})\n")
 	return src
 }
 
 func write(t *testing.T, path, content string) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -143,6 +150,154 @@ func TestInstallCopyMode(t *testing.T) {
 		}
 		if _, err := os.Stat(filepath.Join(skill, "SKILL.md")); err != nil {
 			t.Errorf("--copy: %s missing SKILL.md: %v", home, err)
+		}
+	}
+}
+
+func TestInstallTargetCodex(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("HOME override does not steer os.UserHomeDir on Windows")
+	}
+	src := fakeSource(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	if err := Install(Options{Targets: []string{"codex"}, From: src}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "machinery", "SKILL.md")); err != nil {
+		t.Fatalf("Codex target must install the shared skill: %v", err)
+	}
+	for _, spec := range roleSpecs {
+		path := filepath.Join(home, ".codex", "agents", spec.Name+".toml")
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("Codex agent missing: %v", err)
+		}
+		doc := string(raw)
+		if !strings.Contains(doc, "developer_instructions = '''") || !strings.Contains(doc, "canonical role body for "+spec.File) {
+			t.Fatalf("Codex agent does not embed the canonical role body:\n%s", doc)
+		}
+		if strings.Contains(doc, "model: opus") || strings.Contains(doc, "tools: Read") {
+			t.Fatalf("Claude frontmatter leaked into the Codex agent:\n%s", doc)
+		}
+	}
+}
+
+func TestInstallTargetAllAddsOpenCodeWithoutChangingLegacyTopology(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("HOME override does not steer os.UserHomeDir on Windows")
+	}
+	src := fakeSource(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	if err := Install(Options{Targets: []string{"all"}, From: src}); err != nil {
+		t.Fatal(err)
+	}
+	shared := filepath.Join(home, ".agents")
+	claude := filepath.Join(home, ".claude")
+	if isSymlink(t, filepath.Join(shared, "skills", "machinery")) {
+		t.Fatal("the shared skill must remain the real canonical copy")
+	}
+	if !isSymlink(t, filepath.Join(claude, "skills", "machinery")) {
+		t.Fatal("the all-target install must preserve the Claude symlink topology")
+	}
+	for _, spec := range roleSpecs {
+		path := filepath.Join(home, ".config", "opencode", "agents", spec.Name+".md")
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("OpenCode agent missing: %v", err)
+		}
+		doc := string(raw)
+		if !strings.Contains(doc, "mode: subagent") || !strings.Contains(doc, "canonical role body for "+spec.File) {
+			t.Fatalf("OpenCode agent does not wrap the canonical role body:\n%s", doc)
+		}
+		if strings.Contains(doc, "model: opus") {
+			t.Fatalf("Claude model pin leaked into the OpenCode agent:\n%s", doc)
+		}
+	}
+	for _, command := range openCodeCommands {
+		if _, err := os.Stat(filepath.Join(home, ".config", "opencode", "commands", command)); err != nil {
+			t.Errorf("OpenCode command %s missing: %v", command, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(home, ".config", "opencode", "plugins", "machinery.js")); err != nil {
+		t.Fatalf("OpenCode governance adapter missing: %v", err)
+	}
+}
+
+func TestInstallTargetsRejectInvalidAndAmbiguousOptions(t *testing.T) {
+	src := fakeSource(t)
+	if err := Install(Options{Targets: []string{"cursor"}, From: src}); err == nil || !strings.Contains(err.Error(), "unknown install target") {
+		t.Fatalf("unknown target error = %v", err)
+	}
+	if err := Install(Options{Targets: []string{"codex"}, Homes: []string{t.TempDir()}, From: src}); err == nil || !strings.Contains(err.Error(), "cannot be combined") {
+		t.Fatalf("target/home conflict error = %v", err)
+	}
+}
+
+func TestTargetArtifactsMatchInstalledTopology(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("HOME override does not steer os.UserHomeDir on Windows")
+	}
+	src := fakeSource(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := Install(Options{Targets: []string{"all"}, From: src}); err != nil {
+		t.Fatal(err)
+	}
+	artifacts, err := TargetArtifacts([]string{"all"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(artifacts) != 15 {
+		t.Fatalf("all-target artifact count = %d, want 15", len(artifacts))
+	}
+	for _, artifact := range artifacts {
+		if _, err := os.Stat(artifact.Path); err != nil {
+			t.Errorf("doctor artifact missing after install: [%s] %s at %s: %v", artifact.Target, artifact.Label, artifact.Path, err)
+		}
+	}
+}
+
+func TestUninstallTargetsPreservesSharedAssetsUntilCompleteRemoval(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("HOME override does not steer os.UserHomeDir on Windows")
+	}
+	src := fakeSource(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := Install(Options{Targets: []string{"all"}, From: src}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := UninstallTargets([]string{"opencode"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "machinery", "SKILL.md")); err != nil {
+		t.Fatalf("single-host removal must preserve the shared skill: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".codex", "agents", "machinery-fsm-author.toml")); err != nil {
+		t.Fatalf("OpenCode removal must preserve Codex assets: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".config", "opencode", "plugins", "machinery.js")); !os.IsNotExist(err) {
+		t.Fatalf("OpenCode adapter remains after removal: %v", err)
+	}
+
+	if err := Install(Options{Targets: []string{"opencode"}, From: src}); err != nil {
+		t.Fatal(err)
+	}
+	if err := UninstallTargets([]string{"all"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	artifacts, err := TargetArtifacts([]string{"all"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, artifact := range artifacts {
+		if _, err := os.Stat(artifact.Path); !os.IsNotExist(err) {
+			t.Errorf("artifact remains after complete target removal: %s (err=%v)", artifact.Path, err)
 		}
 	}
 }
