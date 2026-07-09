@@ -49,12 +49,12 @@ sig Contact {
 pred sameTenant[a, b: User] { some a.team and a.team = b.team }
 
 // task-deal-same-tenant: a Task and the Deal it references are owned in the same tenant
-fact Isolation_Task_Deal {
+fact Isolation_Task_Deal_Deal {
   all x: Task | some x.deal implies sameTenant[x.owner, x.deal.owner]
 }
 
 // activity-contact-same-tenant: an Activity and the Contact it references are owned in the same tenant
-fact Isolation_Activity_Contact {
+fact Isolation_Activity_Contact_Contact {
   all x: Activity | some x.contact implies sameTenant[x.owner, x.contact.owner]
 }
 
@@ -72,21 +72,21 @@ run SomeWorld {
 // PASS = no counterexample: two Task records that reference the same Deal are
 // owned in the same tenant. A counterexample would be a Deal referenced from
 // two tenants at once -- a shared referent bridging the boundary.
-check SharedReferent_Task_Deal {
+check SharedReferent_Task_Deal_Deal {
   all x, y: Task | (some x.deal and x.deal = y.deal) implies sameTenant[x.owner, y.owner]
 } for 6
 
 // PASS = no counterexample: two Activity records that reference the same Contact are
 // owned in the same tenant. A counterexample would be a Contact referenced from
 // two tenants at once -- a shared referent bridging the boundary.
-check SharedReferent_Activity_Contact {
+check SharedReferent_Activity_Contact_Contact {
   all x, y: Activity | (some x.contact and x.contact = y.contact) implies sameTenant[x.owner, y.owner]
 } for 6
 
 // PASS = instance found: a Task referencing a Deal exists, so the isolation
 // fact is not vacuously satisfied by forbidding the link entirely.
-run Possible_Task_Deal { some x: Task | some x.deal } for 6
+run Possible_Task_Deal_Deal { some x: Task | some x.deal } for 6
 
 // PASS = instance found: an Activity referencing a Contact exists, so the isolation
 // fact is not vacuously satisfied by forbidding the link entirely.
-run Possible_Activity_Contact { some x: Activity | some x.contact } for 6
+run Possible_Activity_Contact_Contact { some x: Activity | some x.contact } for 6

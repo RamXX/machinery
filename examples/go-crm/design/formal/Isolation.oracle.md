@@ -24,11 +24,11 @@ Tenant cases (relationship between the source owner and the target owner):
 
 | test id | stable id | reference | tenant case | expectation | invariants |
 |---|---|---|---|---|---|
-| O-TENANT-01 | TENANT-628a20 | Task -> Deal | same-tenant | allow | task-deal-same-tenant |
-| O-TENANT-02 | TENANT-573586 | Task -> Deal | cross-tenant | deny | task-deal-same-tenant |
-| O-TENANT-03 | TENANT-80d13b | Task -> Deal | source-teamless | deny | task-deal-same-tenant |
-| O-TENANT-04 | TENANT-39c30d | Task -> Deal | target-teamless | deny | task-deal-same-tenant |
-| O-TENANT-05 | TENANT-83df41 | Activity -> Contact | same-tenant | allow | activity-contact-same-tenant |
-| O-TENANT-06 | TENANT-20579d | Activity -> Contact | cross-tenant | deny | activity-contact-same-tenant |
-| O-TENANT-07 | TENANT-b8ad1b | Activity -> Contact | source-teamless | deny | activity-contact-same-tenant |
-| O-TENANT-08 | TENANT-19ae37 | Activity -> Contact | target-teamless | deny | activity-contact-same-tenant |
+| O-TENANT-01 | TENANT-97e9c6 | Task.deal -> Deal | same-tenant | allow | task-deal-same-tenant |
+| O-TENANT-02 | TENANT-ab139b | Task.deal -> Deal | cross-tenant | deny | task-deal-same-tenant |
+| O-TENANT-03 | TENANT-3ff52e | Task.deal -> Deal | source-teamless | deny | task-deal-same-tenant |
+| O-TENANT-04 | TENANT-fd4ae5 | Task.deal -> Deal | target-teamless | deny | task-deal-same-tenant |
+| O-TENANT-05 | TENANT-f6e72d | Activity.contact -> Contact | same-tenant | allow | activity-contact-same-tenant |
+| O-TENANT-06 | TENANT-49174b | Activity.contact -> Contact | cross-tenant | deny | activity-contact-same-tenant |
+| O-TENANT-07 | TENANT-0b87ae | Activity.contact -> Contact | source-teamless | deny | activity-contact-same-tenant |
+| O-TENANT-08 | TENANT-54ea9e | Activity.contact -> Contact | target-teamless | deny | activity-contact-same-tenant |

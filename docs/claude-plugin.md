@@ -52,7 +52,9 @@ exits 0: governance degrades loudly to absent, it never breaks a session.
 | PostToolUse | Silently records that the session touched the design (or watched sources, when `impl` is configured). No gates run mid-edit; authoring stays fluid. |
 | Stop / SubagentStop | If the session touched anything watched, runs `machinery check` (in-process; same suite semantics as the CLI). DRIFT findings block the stop with the gate output as the reason; the model fixes and the check re-runs. G4 import-boundary findings block only when they are ARMED: `<design>/ratchet.json` exists, written by `machinery baseline`. Before that snapshot exists, import findings warn with the arming instruction instead of blocking, because blocking a session on pre-existing boundary debt it did not create invites the model to "fix" the debt by adding allow rules, which is silent amnesty. Plain ERRORs only warn, because a half-built design is a normal interrogation state. After one blocked-and-continued attempt, the hook warns instead of blocking again, so it can never loop. |
 
-Gate selection at stop time is progressive when no staged list is configured: Gp / Gi / Gn once the
+Gate selection at stop time is progressive when no staged list is configured: Gm once
+`migration.yaml` exists (rebuild/hybrid transition contract; see the
+[rebuild guide](rebuild-guide.md)); Gp / Gi / Gn once the
 matching `formal/{policy,integrity,isolation}.relational.yaml` exists (the relational layers; see the
 [policy](policy-layer.md), [integrity](integrity-layer.md), and [isolation](isolation-layer.md)
 guides), G2 once `workspace.dsl` or `ARCHITECTURE.md` exists, G3
@@ -101,7 +103,7 @@ loudly, it does not silently disable governance.
 
 ## Slash commands
 
-- `/machinery:design [greenfield|brownfield] <what>`: start or resume the four-phase conductor
+- `/machinery:design [greenfield|brownfield|rebuild|hybrid] <what>`: start or resume the four-phase conductor
   (reads `design/STATE.md` to resume).
 - `/machinery:check [design-dir] [--impl d] [--gate list]`: run the gates and explain every
   finding, honoring `.machinery.json`.

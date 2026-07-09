@@ -45,6 +45,12 @@ from the existing code and persisted data as they are; never invent cleaner ones
 between code reality and domain-model intent is surfaced as an open question to the conductor,
 never silently resolved.
 
+**Rebuild/hybrid mode:** author the target machines from `design/domain.modelith.yaml`, not from the
+legacy model. Read `migration.yaml` for persisted-state mappings and coexistence obligations. If
+backfill, replay, dual-write, reconciliation, or cutover has its own retries, timeouts, and partial
+failures, model that transition controller as a separate operational machine; do not contaminate
+target entity lifecycles with temporary legacy states.
+
 ## Method
 
 1. **Decompose by component, not one giant machine.** One machine per stateful component or aggregate,

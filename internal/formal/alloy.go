@@ -1,8 +1,7 @@
-// Alloy orchestration for the static relational policy model: fetch the
-// pinned Alloy dist jar, run `exec` headless on the generated Policy.als, and
-// read the verdicts out of the receipt.json it writes. The counterpart of
-// runTLC one rung down: TLC checks the machines' behavior, Alloy checks the
-// configurations the policy invariants admit.
+// Alloy orchestration for the opted-in static relational proof layers: fetch
+// the pinned Alloy dist jar, run `exec` headless, and read the verdicts from
+// its receipt. TLC checks machine behavior; Alloy checks admissible static
+// configurations.
 
 package formal
 

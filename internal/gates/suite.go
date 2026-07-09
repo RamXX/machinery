@@ -23,19 +23,25 @@ type Selection struct {
 // decomposedParentNote matches the historical `machinery check` output byte
 // for byte; the golden corpus pins it.
 const decomposedParentNote = "note: decomposed parent with no machines/; running g2,g5 (G3/Gx/G4 run on the child designs)"
+const decomposedParentMigrationNote = "note: decomposed parent with no machines/; running gm,g2,g5 (G3/Gx/G4 run on the child designs)"
 
 // Select resolves a --gate list (or, when gateList is empty, the default
-// suite) for design: the default narrows to g2,g5 on a decomposed parent
-// with no machines/ directory, and an unknown gate name is an error.
+// suite) for design: the default narrows to g2,g5 (plus gm when present) on a
+// decomposed parent with no machines/ directory, and an unknown gate name is
+// an error.
 func Select(design, gateList string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
-	gs := "gp,gi,gn,g2,g3,gx,g4,g5"
+	gs := "gm,gp,gi,gn,g2,g3,gx,g4,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if fi, err := os.Stat(design + "/machines"); err != nil || !fi.IsDir() {
 			// a pure decomposed parent authors no machines: its behavior
 			// layer is the children's, held by the packs; G3/Gx run there
 			gs = "g2,g5"
 			sel.Note = decomposedParentNote
+			if HasMigrationContract(design) {
+				gs = "gm,g2,g5"
+				sel.Note = decomposedParentMigrationNote
+			}
 		}
 	}
 	if sel.Explicit {
@@ -46,7 +52,7 @@ func Select(design, gateList string) (Selection, error) {
 	}
 	var unknown []string
 	for g := range sel.Run {
-		if g != "gp" && g != "gi" && g != "gn" && g != "g2" && g != "g3" && g != "gx" && g != "g4" && g != "g5" {
+		if g != "gm" && g != "gp" && g != "gi" && g != "gn" && g != "g2" && g != "g3" && g != "gx" && g != "g4" && g != "g5" {
 			unknown = append(unknown, g)
 		}
 	}
@@ -57,14 +63,17 @@ func Select(design, gateList string) (Selection, error) {
 	return sel, nil
 }
 
-// RunSelected runs the selected gates in canonical order (Gp, G2, G3, Gx,
-// G4, G5) with `machinery check`'s applicability rules: Gp only when the
-// design carries a policy annotation (or is explicitly requested), G4 only
+// RunSelected runs the selected gates in canonical order (Gm, Gp, Gi, Gn, G2,
+// G3, Gx, G4, G5) with `machinery check`'s applicability rules: opt-in gates
+// run only when their source exists (or when explicitly requested), G4 only
 // with an impl dir, and G5 only when explicitly requested or when the design
-// is decomposed, so a plain design never runs them by accident. The returned
-// gates carry their findings; the caller emits them.
+// is decomposed. The returned gates carry their findings; the caller emits
+// them.
 func RunSelected(design, impl string, sel Selection) []*Gate {
 	var out []*Gate
+	if sel.Run["gm"] && (sel.Explicit || HasMigrationContract(design)) {
+		out = append(out, CheckMigration(design))
+	}
 	if sel.Run["gp"] && (sel.Explicit || HasPolicyAnnotation(design)) {
 		out = append(out, CheckPolicy(design))
 	}

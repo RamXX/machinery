@@ -29,6 +29,12 @@ sig Order {
 
 sig Payment {}
 
+// 1:1: the Order side of Order -> Payment is exclusive
+fact Cardinality_Order_Payment {
+  all target: Payment | lone target.~payment
+}
+check Exclusive_Order_Payment { all target: Payment | lone target.~payment } for 6
+
 // value domains: one atom per distinct attribute value (bounded types
 // get exactly as many atoms as the type admits)
 sig Val_Customer_Email {}

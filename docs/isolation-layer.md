@@ -92,7 +92,10 @@ Each entry names a cross-entity reference the domain model already declares, and
 consistency invariant it holds. Keys: `from`, `to`, optional `field` (default lowercased `to`),
 `invariant` (required: every reference carries the id it holds). Both `from` and `to` must be
 tenant-scoped records, each with an n:1 ownership relationship to the subject entity. An `n:1`
-reference (many `from` can point at one `to`) additionally gets a `SharedReferent` check.
+reference (many `from` can point at one `to`) additionally gets a `SharedReferent` check. A `1:1`
+or `1:n` reference gets the corresponding inverse exclusivity fact. Generated names and oracle
+identity include `field`, so two references between the same entity pair cannot collide or share a
+stable id accidentally.
 
 ### `residuals`
 
@@ -107,8 +110,8 @@ Optional integer 2 to 12 (default 6): the Alloy search bound.
 | check | question it answers | a FAIL means |
 |---|---|---|
 | `SomeWorld` (run) | can a genuinely multi-tenant world with a link still exist? | the isolation facts collapse tenancy (over-isolation: links force one tenant) |
-| `SharedReferent_<From>_<To>` (check) | can two records of different tenants reference the same target? | a shared referent bridges the tenant boundary -- the sharp leak |
-| `Possible_<From>_<To>` (run) | is a same-tenant link actually constructible? | the isolation fact is vacuous (it forbids the link entirely) |
+| `SharedReferent_<From>_<Field>_<To>` (check) | can two records of different tenants reference the same target? | a shared referent bridges the tenant boundary -- the sharp leak |
+| `Possible_<From>_<Field>_<To>` (run) | is a same-tenant link actually constructible? | the isolation fact is vacuous (it forbids the link entirely) |
 
 The layer was mutation-verified during development: strip the enforcing facts and `SharedReferent`
 finds a `Deal` referenced from two tenants at once. With the facts (the invariants enforced), it
@@ -121,13 +124,14 @@ admitted but nothing enforced.
 
 ```
 | test id     | stable id     | reference    | tenant case | expectation | invariants |
-| O-TENANT-02 | TENANT-573586 | Task -> Deal | cross-tenant| deny        | task-deal-same-tenant |
+| O-TENANT-02 | TENANT-ab139b | Task.deal -> Deal | cross-tenant | deny | task-deal-same-tenant |
 ```
 
 Because the algebra decides every case from one boolean (do the two owners share a tenant), the four
 tenant cases (`same-tenant`, `cross-tenant`, `source-teamless`, `target-teamless`) are the complete
-semantics. Stable ids hash the case, never the verdict: a design change flips expectations under
-unchanged ids.
+semantics. Stable ids hash the field-qualified reference and case, never the verdict: a design
+change flips expectations under unchanged ids, while a second field between the same entity pair
+gets its own identity.
 
 **The tenant oracle test** is one test, written once, that parses the table and asserts the pure
 link-authorization function on every row, expanding each tenant case into its concrete owner-team

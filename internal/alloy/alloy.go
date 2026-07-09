@@ -1,8 +1,6 @@
-// Package alloy generates the static relational policy model (Alloy) from the
-// Modelith domain model plus a declarative policy annotation, AFTER reconciling
-// the annotation against the domain model. The counterpart of internal/refine
-// one layer down the stack: refine carries the meaning the machine JSON omits;
-// this carries the meaning the domain model's prose invariants omit.
+// Package alloy generates opted-in static relational proofs and decision
+// oracles from the Modelith domain model plus policy, integrity, and isolation
+// annotations, after reconciling each annotation against the domain model.
 //
 // The annotation (design/formal/policy.relational.yaml) is written in a small
 // closed algebra: a subject entity with a role enum, optional team scoping,
@@ -363,268 +361,321 @@ func Load(domainPath, annotationPath string) *Policy {
 	root := v.AsObject()
 	checkKeys(root, rootKeys, filepath.Base(annotationPath))
 
-	p := &Policy{
-		Scope:          6,
-		DomainFile:     filepath.Base(domainPath),
-		AnnotationFile: filepath.Base(annotationPath),
-		scopeByVerb:    map[string]*Rule{},
+	l := &policyLoader{
+		d:       d,
+		root:    root,
+		claimed: map[string]string{},
+		p: &Policy{
+			Scope:          6,
+			DomainFile:     filepath.Base(domainPath),
+			AnnotationFile: filepath.Base(annotationPath),
+			scopeByVerb:    map[string]*Rule{},
+		},
 	}
+	l.loadSubjects()
+	l.loadResources()
+	l.validateNames()
+	l.seedStructuralClaims()
+	l.loadRules()
+	l.validateGrantScopeClosure()
+	l.loadResiduals()
+	l.validateCoverage()
+	l.loadScope()
+	return l.p
+}
 
-	// subjects
-	subj := root.GetObject("subjects")
+type policyLoader struct {
+	d       *domain
+	root    *ir.Object
+	p       *Policy
+	claimed map[string]string
+}
+
+func (l *policyLoader) loadSubjects() {
+	subj := l.root.GetObject("subjects")
 	if subj.Len() == 0 {
 		die("annotation declares no subjects")
 	}
 	checkKeys(subj, subjectKeys, "subjects")
-	p.SubjectEntity = subj.GetString("entity")
-	if p.SubjectEntity == "" {
+	l.p.SubjectEntity = subj.GetString("entity")
+	if l.p.SubjectEntity == "" {
 		die("subjects.entity is required")
 	}
-	if _, ok := d.entities.Get(p.SubjectEntity); !ok {
-		die("subjects.entity %s is not a Modelith entity", ir.Repr(p.SubjectEntity))
+	if _, ok := l.d.entities.Get(l.p.SubjectEntity); !ok {
+		die("subjects.entity %s is not a Modelith entity", ir.Repr(l.p.SubjectEntity))
 	}
-	p.RoleAttr = subj.GetString("role_attr")
-	if p.RoleAttr == "" {
+	l.p.RoleAttr = subj.GetString("role_attr")
+	if l.p.RoleAttr == "" {
 		die("subjects.role_attr is required")
 	}
-	p.RoleEnum = d.attrType(p.SubjectEntity, p.RoleAttr)
-	if p.RoleEnum == "" {
-		die("subjects.role_attr %s is not an attribute of %s", ir.Repr(p.RoleAttr), p.SubjectEntity)
+	l.p.RoleEnum = l.d.attrType(l.p.SubjectEntity, l.p.RoleAttr)
+	if l.p.RoleEnum == "" {
+		die("subjects.role_attr %s is not an attribute of %s", ir.Repr(l.p.RoleAttr), l.p.SubjectEntity)
 	}
-	roles, ok := d.enums[p.RoleEnum]
+	roles, ok := l.d.enums[l.p.RoleEnum]
 	if !ok || len(roles) == 0 {
-		die("subjects.role_attr %s has type %s, which is not an enum with values", ir.Repr(p.RoleAttr), ir.Repr(p.RoleEnum))
+		die("subjects.role_attr %s has type %s, which is not an enum with values", ir.Repr(l.p.RoleAttr), ir.Repr(l.p.RoleEnum))
 	}
-	p.Roles = roles
-
-	// team (optional)
+	l.p.Roles = roles
 	if tv := subj.Get2("team"); tv != nil {
-		team := tv.AsObject()
-		if team == nil {
-			die("subjects.team must be a mapping")
-		}
-		checkKeys(team, teamKeys, "subjects.team")
-		p.TeamEntity = team.GetString("entity")
-		if p.TeamEntity == "" {
-			die("subjects.team.entity is required")
-		}
-		if _, ok := d.entities.Get(p.TeamEntity); !ok {
-			die("subjects.team.entity %s is not a Modelith entity", ir.Repr(p.TeamEntity))
-		}
-		if !d.hasRelationship(p.TeamEntity, p.SubjectEntity, "") && !d.hasRelationship(p.SubjectEntity, p.TeamEntity, "") {
-			die("the domain model declares no relationship between %s and %s; team scoping has nothing to bind to", p.TeamEntity, p.SubjectEntity)
-		}
-		p.Membership = team.GetString("membership")
-		if p.Membership != "lone" && p.Membership != "one" {
-			die("subjects.team.membership must be 'lone' or 'one' (Modelith cardinality cannot express which; the annotation must decide)")
-		}
-		p.RequiredFor = strList(team.Get2("required_for"), "subjects.team.required_for")
-		if len(p.RequiredFor) > 0 && p.Membership == "one" {
-			die("subjects.team.required_for is redundant with membership 'one'; drop one of them")
-		}
-		roleSet := setOf(p.Roles)
-		for _, r := range p.RequiredFor {
-			if !roleSet[r] {
-				die("subjects.team.required_for names role %s, which is not a value of enum %s", ir.Repr(r), p.RoleEnum)
-			}
-		}
-		p.TeamInvs = strList(team.Get2("invariant"), "subjects.team.invariant")
+		l.loadTeam(tv)
 	}
+}
 
-	// resources
-	p.Resources = strList(root.Get2("resources"), "resources")
-	if len(p.Resources) == 0 {
+func (l *policyLoader) loadTeam(v *ir.Value) {
+	team := v.AsObject()
+	if team == nil {
+		die("subjects.team must be a mapping")
+	}
+	checkKeys(team, teamKeys, "subjects.team")
+	l.p.TeamEntity = team.GetString("entity")
+	if l.p.TeamEntity == "" {
+		die("subjects.team.entity is required")
+	}
+	if _, ok := l.d.entities.Get(l.p.TeamEntity); !ok {
+		die("subjects.team.entity %s is not a Modelith entity", ir.Repr(l.p.TeamEntity))
+	}
+	if !l.d.hasRelationship(l.p.TeamEntity, l.p.SubjectEntity, "") && !l.d.hasRelationship(l.p.SubjectEntity, l.p.TeamEntity, "") {
+		die("the domain model declares no relationship between %s and %s; team scoping has nothing to bind to", l.p.TeamEntity, l.p.SubjectEntity)
+	}
+	l.p.Membership = team.GetString("membership")
+	if l.p.Membership != "lone" && l.p.Membership != "one" {
+		die("subjects.team.membership must be 'lone' or 'one' (Modelith cardinality cannot express which; the annotation must decide)")
+	}
+	l.p.RequiredFor = strList(team.Get2("required_for"), "subjects.team.required_for")
+	if len(l.p.RequiredFor) > 0 && l.p.Membership == "one" {
+		die("subjects.team.required_for is redundant with membership 'one'; drop one of them")
+	}
+	roleSet := setOf(l.p.Roles)
+	for _, role := range l.p.RequiredFor {
+		if !roleSet[role] {
+			die("subjects.team.required_for names role %s, which is not a value of enum %s", ir.Repr(role), l.p.RoleEnum)
+		}
+	}
+	l.p.TeamInvs = strList(team.Get2("invariant"), "subjects.team.invariant")
+}
+
+func (l *policyLoader) loadResources() {
+	l.p.Resources = strList(l.root.Get2("resources"), "resources")
+	if len(l.p.Resources) == 0 {
 		die("resources must list at least one entity")
 	}
 	seen := map[string]bool{}
-	for _, r := range p.Resources {
-		if seen[r] {
-			die("resources lists %s twice", ir.Repr(r))
+	for _, resource := range l.p.Resources {
+		if seen[resource] {
+			die("resources lists %s twice", ir.Repr(resource))
 		}
-		seen[r] = true
-		if _, ok := d.entities.Get(r); !ok {
-			die("resource %s is not a Modelith entity", ir.Repr(r))
+		seen[resource] = true
+		if _, ok := l.d.entities.Get(resource); !ok {
+			die("resource %s is not a Modelith entity", ir.Repr(resource))
 		}
-		if r == p.SubjectEntity || r == p.TeamEntity {
-			die("resource %s is the subject or team entity; a resource is a record under ownership", ir.Repr(r))
+		if resource == l.p.SubjectEntity || resource == l.p.TeamEntity {
+			die("resource %s is the subject or team entity; a resource is a record under ownership", ir.Repr(resource))
 		}
-		if !d.hasRelationship(r, p.SubjectEntity, "n:1") {
-			die("resource %s declares no n:1 relationship to %s (ownership); add the relationship or drop the resource", ir.Repr(r), p.SubjectEntity)
+		if !l.d.hasRelationship(resource, l.p.SubjectEntity, "n:1") {
+			die("resource %s declares no n:1 relationship to %s (ownership); add the relationship or drop the resource", ir.Repr(resource), l.p.SubjectEntity)
 		}
 	}
-	p.OwnedInvs = strList(root.Get2("owned_invariants"), "owned_invariants")
+	l.p.OwnedInvs = strList(l.root.Get2("owned_invariants"), "owned_invariants")
+}
 
-	// sig-name collisions with the generated skeleton
+func (l *policyLoader) validateNames() {
 	reserved := map[string]bool{"Role": true, "Record": true}
-	for _, r := range p.Roles {
-		if reserved[r] || r == p.SubjectEntity || r == p.TeamEntity {
-			die("role value %s collides with a signature name; rename it in the enum", ir.Repr(r))
+	for _, role := range l.p.Roles {
+		if reserved[role] || role == l.p.SubjectEntity || role == l.p.TeamEntity {
+			die("role value %s collides with a signature name; rename it in the enum", ir.Repr(role))
 		}
-		for _, res := range p.Resources {
-			if r == res {
-				die("role value %s collides with resource entity %s; rename one", ir.Repr(r), ir.Repr(res))
+		for _, resource := range l.p.Resources {
+			if role == resource {
+				die("role value %s collides with resource entity %s; rename one", ir.Repr(role), ir.Repr(resource))
 			}
 		}
 	}
-	for _, n := range append([]string{p.SubjectEntity, p.TeamEntity}, p.Resources...) {
-		if reserved[n] {
-			die("entity %s collides with a reserved signature name (Role, Record)", ir.Repr(n))
+	for _, name := range append([]string{l.p.SubjectEntity, l.p.TeamEntity}, l.p.Resources...) {
+		if reserved[name] {
+			die("entity %s collides with a reserved signature name (Role, Record)", ir.Repr(name))
 		}
 	}
+}
 
-	// rules
-	rules := listOf(root.Get2("rules"))
+func (l *policyLoader) claim(id, by, where string) {
+	if !l.d.allInvs[id] {
+		die("%s references invariant %s, which the domain model does not declare", where, ir.Repr(id))
+	}
+	if prev, dup := l.claimed[id]; dup {
+		die("invariant %s is claimed twice (%s and %s); every id maps to exactly one rule or residual", ir.Repr(id), prev, by)
+	}
+	l.claimed[id] = by
+}
+
+func (l *policyLoader) seedStructuralClaims() {
+	for _, inv := range l.p.TeamInvs {
+		l.claim(inv, "subjects.team", "subjects.team.invariant")
+	}
+	for _, inv := range l.p.OwnedInvs {
+		l.claim(inv, "owned_invariants", "owned_invariants")
+	}
+}
+
+func (l *policyLoader) loadRules() {
+	rules := listOf(l.root.Get2("rules"))
 	if len(rules) == 0 {
 		die("annotation declares no rules; with nothing to compile there is nothing to check")
 	}
-	claimed := map[string]string{} // invariant id -> "rule"/"residual"
-	claim := func(id, by, where string) {
-		if !d.allInvs[id] {
-			die("%s references invariant %s, which the domain model does not declare", where, ir.Repr(id))
-		}
-		if prev, dup := claimed[id]; dup {
-			die("invariant %s is claimed twice (%s and %s); every id maps to exactly one rule or residual", ir.Repr(id), prev, by)
-		}
-		claimed[id] = by
-	}
-	for _, inv := range p.TeamInvs {
-		claim(inv, "subjects.team", "subjects.team.invariant")
-	}
-	for _, inv := range p.OwnedInvs {
-		claim(inv, "owned_invariants", "owned_invariants")
-	}
-
 	for i, rv := range rules {
 		ro := rv.AsObject()
 		if ro == nil {
 			die("rules[%d] is not a mapping", i)
 		}
 		checkKeys(ro, ruleKeys, fmt.Sprintf("rules[%d]", i))
-		r := Rule{Invariants: strList(ro.Get2("invariant"), fmt.Sprintf("rules[%d].invariant", i))}
-		if len(r.Invariants) == 0 {
+		rule := Rule{Invariants: strList(ro.Get2("invariant"), fmt.Sprintf("rules[%d].invariant", i))}
+		if len(rule.Invariants) == 0 {
 			die("rules[%d] declares no invariant id; every rule carries the id it compiles", i)
 		}
-		where := fmt.Sprintf("rules[%d] (%s)", i, r.Invariants[0])
-		for _, inv := range r.Invariants {
-			claim(inv, "a rule", where)
+		where := fmt.Sprintf("rules[%d] (%s)", i, rule.Invariants[0])
+		for _, inv := range rule.Invariants {
+			l.claim(inv, "a rule", where)
 		}
 		shapes := 0
-		if ro.Get2("grants") != nil {
-			shapes++
-		}
-		if ro.Get2("scope") != nil {
-			shapes++
-		}
-		if ro.Get2("reassign") != nil {
-			shapes++
+		for _, key := range []string{"grants", "scope", "reassign"} {
+			if ro.Get2(key) != nil {
+				shapes++
+			}
 		}
 		if shapes != 1 {
 			die("%s must have exactly one shape: grants, verbs+scope, or reassign", where)
 		}
 		switch {
 		case ro.Get2("grants") != nil:
-			if p.grantsRule != nil {
-				die("%s: a second grants rule; v1 supports exactly one verb-capability map", where)
-			}
-			g := ro.GetObject("grants")
-			r.Grants = map[string][]string{}
-			roleSet := setOf(p.Roles)
-			for _, role := range g.Keys() {
-				if !roleSet[role] {
-					die("%s grants to %s, which is not a value of enum %s", where, ir.Repr(role), p.RoleEnum)
-				}
-				vs := strList(g.Get2(role), where+" grants."+role)
-				for _, verb := range vs {
-					if !verbSet[verb] {
-						die("%s grants unknown verb %s (the v1 vocabulary is %s; reassign is its own rule)", where, ir.Repr(verb), strings.Join(Verbs, ", "))
-					}
-				}
-				r.Grants[role] = vs
-			}
-			for _, role := range p.Roles { // enum order
-				if _, ok := r.Grants[role]; ok {
-					r.GrantRoles = append(r.GrantRoles, role)
-				}
-			}
-			p.Rules = append(p.Rules, r)
-			p.grantsRule = &p.Rules[len(p.Rules)-1]
+			l.loadGrantRule(ro, rule, where)
 		case ro.Get2("scope") != nil:
-			r.ScopeVerbs = strList(ro.Get2("verbs"), where+" verbs")
-			if len(r.ScopeVerbs) == 0 {
-				die("%s: a scope rule needs a verbs list", where)
-			}
-			for _, verb := range r.ScopeVerbs {
-				if !scopedVerbs[verb] {
-					die("%s: verb %s cannot carry a scope (scoped verbs: read, update, delete)", where, ir.Repr(verb))
-				}
-				if p.scopeByVerb[verb] != nil {
-					die("%s: verb %s is already scoped by another rule", where, ir.Repr(verb))
-				}
-			}
-			r.Scope = parseScopeMap(ro.GetObject("scope"), p.Roles, where, p.TeamEntity != "")
-			p.Rules = append(p.Rules, r)
-			for _, verb := range r.ScopeVerbs {
-				p.scopeByVerb[verb] = &p.Rules[len(p.Rules)-1]
-			}
-		default: // reassign
-			if p.reassignRule != nil {
-				die("%s: a second reassign rule", where)
-			}
-			ra := ro.GetObject("reassign")
-			checkKeys(ra, reassignKeys, where+" reassign")
-			r.Reassign = parseScopeMap(ra.GetObject("scope"), p.Roles, where+" reassign.scope", p.TeamEntity != "")
-			for _, e := range r.Reassign {
-				if e.Expr.None {
-					die("%s: reassign scope 'none' is the default; omit the role instead", where)
-				}
-			}
-			tgt := ra.GetObject("target")
-			if tgt.Len() == 0 {
-				die("%s: reassign.target is required; where a record may go must be stated, not implied", where)
-			}
-			r.ReassignAny = map[string]bool{}
-			inScope := map[string]bool{}
-			for _, e := range r.Reassign {
-				for _, role := range e.Roles {
-					inScope[role] = true
-				}
-			}
-			for _, role := range tgt.Keys() {
-				if !inScope[role] {
-					die("%s: reassign.target names %s, which has no reassign scope", where, ir.Repr(role))
-				}
-				tv := tgt.Get2(role)
-				if tv == nil || tv.Kind != ir.KindString {
-					die("%s: reassign.target.%s must be 'any' or 'team'", where, role)
-				}
-				switch tv.AsString() {
-				case "any":
-					r.ReassignAny[role] = true
-				case "team":
-					if p.TeamEntity == "" {
-						die("%s: reassign.target 'team' needs subjects.team", where)
-					}
-				default:
-					die("%s: reassign.target.%s must be 'any' or 'team', got %s", where, role, ir.Repr(tv.AsString()))
-				}
-			}
-			for role := range inScope {
-				if _, ok := tgt.Get(role); !ok {
-					die("%s: reassign.target must decide every role with reassign scope; %s is undecided", where, ir.Repr(role))
-				}
-			}
-			for _, role := range p.Roles {
-				if inScope[role] {
-					r.ReassignRoles = append(r.ReassignRoles, role)
-				}
-			}
-			p.Rules = append(p.Rules, r)
-			p.reassignRule = &p.Rules[len(p.Rules)-1]
+			l.loadScopeRule(ro, rule, where)
+		default:
+			l.loadReassignRule(ro, rule, where)
 		}
 	}
+}
 
-	// residuals
-	for i, rv := range listOf(root.Get2("residuals")) {
+func (l *policyLoader) loadGrantRule(ro *ir.Object, rule Rule, where string) {
+	if l.p.grantsRule != nil {
+		die("%s: a second grants rule; v1 supports exactly one verb-capability map", where)
+	}
+	g := ro.GetObject("grants")
+	rule.Grants = map[string][]string{}
+	roleSet := setOf(l.p.Roles)
+	for _, role := range g.Keys() {
+		if !roleSet[role] {
+			die("%s grants to %s, which is not a value of enum %s", where, ir.Repr(role), l.p.RoleEnum)
+		}
+		verbs := strList(g.Get2(role), where+" grants."+role)
+		for _, verb := range verbs {
+			if !verbSet[verb] {
+				die("%s grants unknown verb %s (the v1 vocabulary is %s; reassign is its own rule)", where, ir.Repr(verb), strings.Join(Verbs, ", "))
+			}
+		}
+		rule.Grants[role] = verbs
+	}
+	for _, role := range l.p.Roles {
+		if _, ok := rule.Grants[role]; ok {
+			rule.GrantRoles = append(rule.GrantRoles, role)
+		}
+	}
+	l.p.Rules = append(l.p.Rules, rule)
+	l.p.grantsRule = &l.p.Rules[len(l.p.Rules)-1]
+}
+
+func (l *policyLoader) loadScopeRule(ro *ir.Object, rule Rule, where string) {
+	rule.ScopeVerbs = strList(ro.Get2("verbs"), where+" verbs")
+	if len(rule.ScopeVerbs) == 0 {
+		die("%s: a scope rule needs a verbs list", where)
+	}
+	for _, verb := range rule.ScopeVerbs {
+		if !scopedVerbs[verb] {
+			die("%s: verb %s cannot carry a scope (scoped verbs: read, update, delete)", where, ir.Repr(verb))
+		}
+		if l.p.scopeByVerb[verb] != nil {
+			die("%s: verb %s is already scoped by another rule", where, ir.Repr(verb))
+		}
+	}
+	rule.Scope = parseScopeMap(ro.GetObject("scope"), l.p.Roles, where, l.p.TeamEntity != "")
+	l.p.Rules = append(l.p.Rules, rule)
+	for _, verb := range rule.ScopeVerbs {
+		l.p.scopeByVerb[verb] = &l.p.Rules[len(l.p.Rules)-1]
+	}
+}
+
+func (l *policyLoader) loadReassignRule(ro *ir.Object, rule Rule, where string) {
+	if l.p.reassignRule != nil {
+		die("%s: a second reassign rule", where)
+	}
+	ra := ro.GetObject("reassign")
+	checkKeys(ra, reassignKeys, where+" reassign")
+	rule.Reassign = parseScopeMap(ra.GetObject("scope"), l.p.Roles, where+" reassign.scope", l.p.TeamEntity != "")
+	inScope := map[string]bool{}
+	for _, entry := range rule.Reassign {
+		if entry.Expr.None {
+			die("%s: reassign scope 'none' is the default; omit the role instead", where)
+		}
+		for _, role := range entry.Roles {
+			inScope[role] = true
+		}
+	}
+	target := ra.GetObject("target")
+	if target.Len() == 0 {
+		die("%s: reassign.target is required; where a record may go must be stated, not implied", where)
+	}
+	rule.ReassignAny = map[string]bool{}
+	for _, role := range target.Keys() {
+		if !inScope[role] {
+			die("%s: reassign.target names %s, which has no reassign scope", where, ir.Repr(role))
+		}
+		value := target.Get2(role)
+		if value == nil || value.Kind != ir.KindString {
+			die("%s: reassign.target.%s must be 'any' or 'team'", where, role)
+		}
+		switch value.AsString() {
+		case "any":
+			rule.ReassignAny[role] = true
+		case "team":
+			if l.p.TeamEntity == "" {
+				die("%s: reassign.target 'team' needs subjects.team", where)
+			}
+		default:
+			die("%s: reassign.target.%s must be 'any' or 'team', got %s", where, role, ir.Repr(value.AsString()))
+		}
+	}
+	for role := range inScope {
+		if _, ok := target.Get(role); !ok {
+			die("%s: reassign.target must decide every role with reassign scope; %s is undecided", where, ir.Repr(role))
+		}
+	}
+	for _, role := range l.p.Roles {
+		if inScope[role] {
+			rule.ReassignRoles = append(rule.ReassignRoles, role)
+		}
+	}
+	l.p.Rules = append(l.p.Rules, rule)
+	l.p.reassignRule = &l.p.Rules[len(l.p.Rules)-1]
+}
+
+func (l *policyLoader) validateGrantScopeClosure() {
+	if l.p.grantsRule == nil {
+		return
+	}
+	for _, verb := range []string{"read", "update", "delete"} {
+		roles := l.p.rolesWith(verb)
+		scope := l.p.scopeByVerb[verb]
+		switch {
+		case len(roles) > 0 && scope == nil:
+			die("grants rule grants %s to %s but no scope rule defines which records they may access", verb, strings.Join(roles, ", "))
+		case len(roles) == 0 && scope != nil:
+			die("scope rule defines %s authority but the grants rule grants %s to no role", verb, verb)
+		}
+	}
+}
+
+func (l *policyLoader) loadResiduals() {
+	for i, rv := range listOf(l.root.Get2("residuals")) {
 		ro := rv.AsObject()
 		if ro == nil {
 			die("residuals[%d] is not a mapping", i)
@@ -635,30 +686,31 @@ func Load(domainPath, annotationPath string) *Policy {
 		if id == "" || reason == "" {
 			die("residuals[%d] needs both an invariant id and a reason; an unexplained waiver is a hole", i)
 		}
-		claim(id, "a residual", fmt.Sprintf("residuals[%d]", i))
-		p.Residuals = append(p.Residuals, [2]string{id, reason})
+		l.claim(id, "a residual", fmt.Sprintf("residuals[%d]", i))
+		l.p.Residuals = append(l.p.Residuals, [2]string{id, reason})
 	}
+}
 
-	// coverage: every top-level invariant is a rule or a residual
+func (l *policyLoader) validateCoverage() {
 	var uncovered []string
-	for _, id := range d.topInvs {
-		if _, ok := claimed[id]; !ok {
+	for _, id := range l.d.topInvs {
+		if _, ok := l.claimed[id]; !ok {
 			uncovered = append(uncovered, id)
 		}
 	}
 	if len(uncovered) > 0 {
 		die("top-level invariant(s) %s are neither compiled by a rule nor waived by a residual; the relational layer must account for every cross-cutting invariant", strings.Join(uncovered, ", "))
 	}
+}
 
-	// scope bound
-	if sv := root.Get2("scope"); sv != nil {
+func (l *policyLoader) loadScope() {
+	if sv := l.root.Get2("scope"); sv != nil {
 		n, err := sv.AsNumber().Int64()
 		if sv.Kind != ir.KindNumber || err != nil || n < 2 || n > 12 {
 			die("scope must be an integer between 2 and 12")
 		}
-		p.Scope = int(n)
+		l.p.Scope = int(n)
 	}
-	return p
 }
 
 func setOf(xs []string) map[string]bool {
@@ -909,7 +961,7 @@ func (p *Policy) emit() (string, Stats) {
 				die("scope rule for %s grants nothing to any role; an all-none rule checks nothing", verb)
 			}
 			gate := ""
-			if p.grantsRule != nil && len(p.rolesWith(verb)) > 0 {
+			if p.grantsRule != nil {
 				gate = fmt.Sprintf("grants%s[u] and ", verbTitle(verb))
 			}
 			if len(branches) == 1 && gate == "" {
@@ -1137,7 +1189,7 @@ func statFile(path string) bool {
 }
 
 // Run is the `machinery alloy <design> [out-dir]` entrypoint. One command
-// emits every relational layer the design opted into (policy, integrity), one
+// emits every relational layer the design opted into (policy, integrity, and isolation), one
 // artifact set per present annotation, in a fixed order. At least one
 // annotation must be present; each layer is independently skippable.
 func Run(design, outdir string) error {

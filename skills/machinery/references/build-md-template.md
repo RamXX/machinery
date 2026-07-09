@@ -56,6 +56,21 @@ rest of the document uses. The reader has no other source for these words.
   signal per residual failure state).
 - Source of truth: `design/workspace.dsl` and `design/ARCHITECTURE.md`.
 
+### Migration implementation plan (rebuild/hybrid only)
+Required when `design/migration.yaml` exists; otherwise write "N/A - no legacy/target transition".
+Turn the checked contract into build and test work without restating it incompletely:
+- Identify the read-only legacy adapter and the target-side migration boundary. Target domain code
+  must not import legacy internals directly.
+- Sequence asset salvage, transformation implementation, backfill, shadow, dual-write, cutover,
+  rollback-window, and retirement work according to `migration.yaml`.
+- Require one table test per data mapping and lifecycle mapping; characterization against both
+  adapters; duplicate/reorder/interruption replay tests; reconciliation drift and manifest-tamper
+  tests; either-side dual-write fault injection; rollback rehearsal; and evidence-gated cutover.
+- State stable identifier and signed-manifest rules, source-of-truth authority per phase, operator
+  ownership, and the exact conditions under which transition code may be removed.
+- Source of truth: `design/migration.yaml`; do not weaken its entry/exit, rollback, observability,
+  parity, idempotency, conflict-resolution, reconciliation, or maximum-data-loss commitments.
+
 ## 5. Behavior: the state machines (the logic)
 For each stateful component, one subsection:
 - A one-paragraph narration of its lifecycle in plain language.

@@ -22,8 +22,9 @@ suite of admissibility checks.
 The rung is **admissibility, not safety**. The policy layer asks "is anything bad permitted?" and
 answers with checks that must find no counterexample. The integrity layer asks "are the intended
 structures admissible, and do they scale?" and answers with runs that must find a satisfying
-instance. A green integrity model proves the whole constraint set is jointly satisfiable and each
-constraint is non-vacuous; it goes red the moment an edit makes two constraints incompatible, which
+instance (plus inverse cardinality checks where multiplicity requires exclusivity). A green
+integrity model proves the whole constraint set is jointly satisfiable and each constraint is
+non-vacuous; it goes red the moment an edit makes two constraints incompatible, which
 the linter cannot see. There is no oracle: integrity is a design-side property with no per-request
 decision function to conformance-test.
 
@@ -98,7 +99,9 @@ decision (Modelith cardinality cannot express whether a relationship is required
 `to`, optional `field` (the Alloy field name, default lowercased `to`), `mandatory` (bool), optional
 `invariant`. A relationship may omit `invariant` to model multiplicity structurally without binding
 a domain id. Multiplicity is derived: `n:1`/`1:1` become `one` (mandatory) or `lone`; `1:n`/`n:n`
-become `some` (mandatory) or `set`.
+become `some` (mandatory) or `set`. `1:1` and `1:n` also emit an inverse `lone` fact and an
+`Exclusive_<From>_<Field>` check: field multiplicity constrains how many targets one source holds,
+but only the inverse constraint prevents two sources from sharing a target that belongs to one.
 
 ### `unique`
 
@@ -119,7 +122,8 @@ layer's contract); it simply compiles what it names.
 
 ### `scope`
 
-Optional integer 2 to 12 (default 6): the Alloy search bound.
+Optional integer 3 to 12 (default 6): the Alloy search bound. Three is the minimum because the
+standard `Populatable` witness requires three records of every modeled entity.
 
 ## The generated checks, in plain language
 
@@ -130,6 +134,7 @@ Every design gets the same suite; none of it is authored per design.
 | `SomeWorld` (run) | is the whole constraint set jointly satisfiable? | the constraints contradict each other; a structural over-specification the linter cannot see |
 | `Populatable` (run) | can every entity reach a population target of 3 under all constraints? | a cardinality or uniqueness constraint starves the model (it admits a token world but cannot scale) |
 | `Distinct_<E>_<attr>` (run) | can two records with different values of a unique key coexist? | the unique key is vacuous over a value domain too small |
+| `Exclusive_<From>_<Field>` (check) | for a `1:1` or `1:n` relationship, can two sources share one exclusive target? | the inverse side of the declared multiplicity was weakened or omitted |
 
 `verify-formal` prints one PASS/FAIL line per command. Because the commands are runs, a FAIL is an
 empty search: the asserted world does not exist within the bound. The fix is always in the domain

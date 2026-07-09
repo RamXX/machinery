@@ -165,7 +165,7 @@ func VerifyFormal(design string, genOnly bool) int {
 		}
 	}
 
-	// static relational policy model (opt-in: present only when the design
+	// static relational policy layer (opt-in: present only when the design
 	// carries a policy annotation)
 	policyAnn := filepath.Join(fdir, alloy.AnnotationName)
 	havePolicy := false

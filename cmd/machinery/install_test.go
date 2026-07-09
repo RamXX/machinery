@@ -21,6 +21,9 @@ func assertTopology(t *testing.T, canon, secondary string) {
 	if _, err := os.Stat(filepath.Join(canonSkill, "SKILL.md")); err != nil {
 		t.Errorf("canonical skill has no SKILL.md: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(canonSkill, "references", "rebuild-guide.md")); err != nil {
+		t.Errorf("canonical skill has no installed rebuild reference: %v", err)
+	}
 
 	linkSkill := filepath.Join(secondary, "skills", "machinery")
 	if fi, err := os.Lstat(linkSkill); err != nil {

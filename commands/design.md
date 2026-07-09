@@ -1,6 +1,6 @@
 ---
 description: Start or resume a machinery design run (four phases, gated)
-argument-hint: "[greenfield|brownfield] what you want to design"
+argument-hint: "[greenfield|brownfield|rebuild|hybrid] what you want to design"
 ---
 
 Run a machinery design session in this repository.
@@ -14,7 +14,11 @@ Run a machinery design session in this repository.
 3. If the request or the repository indicates an existing system (code,
    schema, deployments already present), run the skill's brownfield
    (archaeology) mode: describe the system as it is, do not invent.
-4. Treat the user's request below as the Phase 0 frame input. If it is
+4. If the user wants a new production foundation while preserving selected behavior, data, tests,
+   or modules, run rebuild/hybrid mode instead: keep separate legacy and target domain models,
+   author `migration.yaml`, and hold it with Gm-transition. Do not collapse current and intended
+   truth into one model.
+5. Treat the user's request below as the Phase 0 frame input. If it is
    empty, open Phase 0 by asking for the frame.
 
 Request: $ARGUMENTS

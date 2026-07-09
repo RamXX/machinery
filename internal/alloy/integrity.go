@@ -147,6 +147,13 @@ func resolveMult(card string, mandatory bool) (string, bool) {
 	}
 }
 
+// inverseLone reports whether the left side of the domain cardinality is one.
+// Alloy field multiplicities constrain only the source -> target direction;
+// 1:1 and 1:n additionally require every target to be referenced by at most
+// one source. The lower bound remains an annotation decision on the source
+// side, so the inverse is lone rather than one.
+func inverseLone(card string) bool { return card == "1:1" || card == "1:n" }
+
 // LoadIntegrity parses and reconciles the integrity annotation against the
 // domain model. Every disagreement dies (the refine_gen rule).
 func LoadIntegrity(domainPath, annotationPath string) *Integrity {
@@ -345,8 +352,8 @@ func LoadIntegrity(domainPath, annotationPath string) *Integrity {
 	// scope bound
 	if sv := root.Get2("scope"); sv != nil {
 		n, err := sv.AsNumber().Int64()
-		if sv.Kind != ir.KindNumber || err != nil || n < 2 || n > 12 {
-			die("scope must be an integer between 2 and 12")
+		if sv.Kind != ir.KindNumber || err != nil || n < 3 || n > 12 {
+			die("scope must be an integer between 3 and 12 (the Populatable witness requires three records)")
 		}
 		p.Scope = int(n)
 	}
@@ -476,6 +483,23 @@ func (p *Integrity) emit() (string, IntegrityStats) {
 			w("  %s%s  // %s", f, sep, comments[i])
 		}
 		w("}")
+	}
+
+	// A field multiplicity describes only how many targets one source may
+	// reference. Cardinalities with a left-side one also need the inverse bound
+	// or a declared 1:1/1:n edge still admits two sources sharing one target.
+	for _, r := range p.Rels {
+		if !inverseLone(r.Card) {
+			continue
+		}
+		name := fmt.Sprintf("Exclusive_%s_%s", r.From, upperFirst(r.Field))
+		w("")
+		w("// %s: the %s side of %s -> %s is exclusive", r.Card, r.From, r.From, r.To)
+		w("fact Cardinality_%s_%s {", r.From, upperFirst(r.Field))
+		w("  all target: %s | lone target.~%s", r.To, r.Field)
+		w("}")
+		w("check %s { all target: %s | lone target.~%s } for %d", name, r.To, r.Field, p.Scope)
+		stats.Commands = append(stats.Commands, Command{Kind: "check", Name: name})
 	}
 
 	// Bool enum, if any singleton needs it
