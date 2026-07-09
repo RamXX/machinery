@@ -1,0 +1,58 @@
+# Dependabot opens PRs to keep dependencies and CI actions current, so a new
+# release (or a security advisory) reaches us as a reviewable PR in daylight
+# rather than a red scheduled run overnight. Config reference:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Note: version updates (below) track new releases. To also get automatic PRs
+# that bump the Go directive / a dependency when a CVE is disclosed, enable
+# "Dependabot security updates" in repo Settings > Code security. That toggle
+# is not expressible in this file.
+version: 2
+updates:
+  # Go modules for the main machinery module. The gomod ecosystem also proposes
+  # bumps to the `go` directive in go.mod when a newer toolchain is available,
+  # which is exactly the class of update that caused the crypto/tls red banner.
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+
+  # Go modules for the go-crm example application (separate go.mod).
+  - package-ecosystem: gomod
+    directory: "/examples/go-crm/impl"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+
+  # GitHub Actions pinned by SHA in the workflows. Keeps those pins current and
+  # clears the recurring "Node 20 deprecated" warnings by bumping action majors.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    groups:
+      github-actions:
+        patterns: ["*"]
