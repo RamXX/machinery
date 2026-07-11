@@ -13,7 +13,7 @@ import (
 // Makefile and the release workflow both inject it). The -dev default below is
 // what a bare `go build` without ldflags reports, so an ad-hoc build is never
 // mistaken for a released binary.
-var version = "v0.2.0-dev"
+var version = "v0.3.0-dev"
 
 func main() {
 	root := &cobra.Command{
