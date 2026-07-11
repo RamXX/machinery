@@ -736,7 +736,7 @@ section 3.4 invariants.
 
 **Test id scheme.** Transition tests key on the oracle's STABLE id column (e.g. `DEAL-eb0c40`), never on
 a row number: row numbers renumber whenever the design changes, stable ids do not. The oracle also emits
-a sequential `T-<MACHINE>-NN` id per row (MACHINE in DEAL, TASK, USER, SESS, CMD); those names are how
+a sequential `T-<MACHINE>-NN` id per row (MACHINE in DEAL, TASK, USER, SESS, COMM); those names are how
 sections 6 and 9 of this document cite individual rows. `C-<BOUNDARY>-NN` = a contract test
 at a section-4.6 boundary (REPO, AUTHZ, SESS) plus `C-ARCH-01` for the dependency contract. `P-<invariant>`
 = a property test, one per invariant.

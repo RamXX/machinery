@@ -61,48 +61,48 @@ func taskCases() []taskCase {
 
 	return []taskCase{
 		// --- Open ---
-		{"T-TASK-01", newTask(domain.TSOpen), start, domain.TSPersisting, []string{"setPendingStart"}},
-		{"T-TASK-02_notWritable", taskWith(domain.TSOpen, uReadOnly), start, domain.TSOpen, []string{"recordStartDenied"}},
-		{"T-TASK-03", newTask(domain.TSOpen), complete, domain.TSPersisting, []string{"setPendingComplete"}},
-		{"T-TASK-04_notWritable", taskWith(domain.TSOpen, uReadOnly), complete, domain.TSOpen, []string{"recordCompleteDenied"}},
-		{"T-TASK-05", newTask(domain.TSOpen), cancel, domain.TSPersisting, []string{"setPendingCancel"}},
-		{"T-TASK-06_notWritable", taskWith(domain.TSOpen, uReadOnly), cancel, domain.TSOpen, []string{"recordCancelDenied"}},
-		{"T-TASK-07", taskWith(domain.TSOpen, uMgrT1), reassignIn, domain.TSPersisting, []string{"setPendingReassign"}},
-		{"T-TASK-08a_assigneeOutOfScope", taskWith(domain.TSOpen, uMgrT1), reassignOut, domain.TSOpen, []string{"recordReassignDenied"}},
-		{"T-TASK-08b_callerNotAuthority", taskWith(domain.TSOpen, uRepOwner), reassignIn, domain.TSOpen, []string{"recordReassignDenied"}},
+		{"T-TASK-01_TASK-db41f8", newTask(domain.TSOpen), start, domain.TSPersisting, []string{"setPendingStart"}},
+		{"T-TASK-02_notWritable_TASK-2a7cdb", taskWith(domain.TSOpen, uReadOnly), start, domain.TSOpen, []string{"recordStartDenied"}},
+		{"T-TASK-03_TASK-2019ec", newTask(domain.TSOpen), complete, domain.TSPersisting, []string{"setPendingComplete"}},
+		{"T-TASK-04_notWritable_TASK-84d702", taskWith(domain.TSOpen, uReadOnly), complete, domain.TSOpen, []string{"recordCompleteDenied"}},
+		{"T-TASK-05_TASK-b819d1", newTask(domain.TSOpen), cancel, domain.TSPersisting, []string{"setPendingCancel"}},
+		{"T-TASK-06_notWritable_TASK-36d38a", taskWith(domain.TSOpen, uReadOnly), cancel, domain.TSOpen, []string{"recordCancelDenied"}},
+		{"T-TASK-07_TASK-7ab0ac", taskWith(domain.TSOpen, uMgrT1), reassignIn, domain.TSPersisting, []string{"setPendingReassign"}},
+		{"T-TASK-08a_assigneeOutOfScope_TASK-b179c7", taskWith(domain.TSOpen, uMgrT1), reassignOut, domain.TSOpen, []string{"recordReassignDenied"}},
+		{"T-TASK-08b_callerNotAuthority_TASK-b179c7", taskWith(domain.TSOpen, uRepOwner), reassignIn, domain.TSOpen, []string{"recordReassignDenied"}},
 
 		// --- InProgress ---
-		{"T-TASK-09", newTask(domain.TSInProgress), start, domain.TSInProgress, []string{"recordAlreadyStarted"}},
-		{"T-TASK-10", newTask(domain.TSInProgress), complete, domain.TSPersisting, []string{"setPendingComplete"}},
-		{"T-TASK-11_notWritable", taskWith(domain.TSInProgress, uReadOnly), complete, domain.TSInProgress, []string{"recordCompleteDenied"}},
-		{"T-TASK-12", newTask(domain.TSInProgress), cancel, domain.TSPersisting, []string{"setPendingCancel"}},
-		{"T-TASK-13_notWritable", taskWith(domain.TSInProgress, uReadOnly), cancel, domain.TSInProgress, []string{"recordCancelDenied"}},
-		{"T-TASK-14", taskWith(domain.TSInProgress, uMgrT1), reassignIn, domain.TSPersisting, []string{"setPendingReassign"}},
-		{"T-TASK-15a_assigneeOutOfScope", taskWith(domain.TSInProgress, uMgrT1), reassignOut, domain.TSInProgress, []string{"recordReassignDenied"}},
-		{"T-TASK-15b_callerNotAuthority", taskWith(domain.TSInProgress, uRepOwner), reassignIn, domain.TSInProgress, []string{"recordReassignDenied"}},
+		{"T-TASK-09_TASK-173f61", newTask(domain.TSInProgress), start, domain.TSInProgress, []string{"recordAlreadyStarted"}},
+		{"T-TASK-10_TASK-72ad76", newTask(domain.TSInProgress), complete, domain.TSPersisting, []string{"setPendingComplete"}},
+		{"T-TASK-11_notWritable_TASK-7d91c2", taskWith(domain.TSInProgress, uReadOnly), complete, domain.TSInProgress, []string{"recordCompleteDenied"}},
+		{"T-TASK-12_TASK-cdda50", newTask(domain.TSInProgress), cancel, domain.TSPersisting, []string{"setPendingCancel"}},
+		{"T-TASK-13_notWritable_TASK-d159c9", taskWith(domain.TSInProgress, uReadOnly), cancel, domain.TSInProgress, []string{"recordCancelDenied"}},
+		{"T-TASK-14_TASK-2f2bc8", taskWith(domain.TSInProgress, uMgrT1), reassignIn, domain.TSPersisting, []string{"setPendingReassign"}},
+		{"T-TASK-15a_assigneeOutOfScope_TASK-91fb4d", taskWith(domain.TSInProgress, uMgrT1), reassignOut, domain.TSInProgress, []string{"recordReassignDenied"}},
+		{"T-TASK-15b_callerNotAuthority_TASK-91fb4d", taskWith(domain.TSInProgress, uRepOwner), reassignIn, domain.TSInProgress, []string{"recordReassignDenied"}},
 
 		// --- persist success routing ---
-		{"T-TASK-18", taskPending(domain.TSOpen), taskSaveDone(), domain.TSOpen, []string{"commitStatus"}},
-		{"T-TASK-19", taskPending(domain.TSInProgress), taskSaveDone(), domain.TSInProgress, []string{"commitStatus"}},
-		{"T-TASK-20", taskPending(domain.TSDone), taskSaveDone(), domain.TSDone, []string{"commitStatus"}},
-		{"T-TASK-21", taskPending(domain.TSCancelled), taskSaveDone(), domain.TSCancelled, []string{"commitStatus"}},
-		{"T-TASK-22", taskPending(domain.TaskState("bogus")), taskSaveDone(), domain.TSRolledBack, []string{"recordRoutingError"}},
+		{"T-TASK-18_TASK-6d5eb1", taskPending(domain.TSOpen), taskSaveDone(), domain.TSOpen, []string{"commitStatus"}},
+		{"T-TASK-19_TASK-ae4260", taskPending(domain.TSInProgress), taskSaveDone(), domain.TSInProgress, []string{"commitStatus"}},
+		{"T-TASK-20_TASK-c56bd7", taskPending(domain.TSDone), taskSaveDone(), domain.TSDone, []string{"commitStatus"}},
+		{"T-TASK-21_TASK-67b0ff", taskPending(domain.TSCancelled), taskSaveDone(), domain.TSCancelled, []string{"commitStatus"}},
+		{"T-TASK-22_TASK-d5bcc8", taskPending(domain.TaskState("bogus")), taskSaveDone(), domain.TSRolledBack, []string{"recordRoutingError"}},
 
 		// --- persist error routing ---
-		{"T-TASK-23", newTask(domain.TSPersisting), taskSaveErr(model.ErrLocked), domain.TSPersistRetry, []string{"recordError"}},
-		{"T-TASK-24", newTask(domain.TSPersisting), taskSaveErr(model.ErrConstraint), domain.TSRolledBack, []string{"recordConstraint"}},
-		{"T-TASK-25", newTask(domain.TSPersisting), taskSaveErr(model.ErrDiskFull), domain.TSRolledBack, []string{"recordDiskFull"}},
-		{"T-TASK-26", newTask(domain.TSPersisting), taskSaveErr(model.ErrTimeout), domain.TSRolledBack, []string{"recordTimeout"}},
-		{"T-TASK-27", newTask(domain.TSPersisting), taskSaveErr(model.ErrConflict), domain.TSRolledBack, []string{"recordUnknownError"}},
-		{"T-TASK-28", newTask(domain.TSPersisting), domain.TaskEvent{Kind: domain.TEvPersistTimeout}, domain.TSRolledBack, []string{"recordTimeout"}},
+		{"T-TASK-23_TASK-8d6955", newTask(domain.TSPersisting), taskSaveErr(model.ErrLocked), domain.TSPersistRetry, []string{"recordError"}},
+		{"T-TASK-24_TASK-376b22", newTask(domain.TSPersisting), taskSaveErr(model.ErrConstraint), domain.TSRolledBack, []string{"recordConstraint"}},
+		{"T-TASK-25_TASK-dc5fe1", newTask(domain.TSPersisting), taskSaveErr(model.ErrDiskFull), domain.TSRolledBack, []string{"recordDiskFull"}},
+		{"T-TASK-26_TASK-21e793", newTask(domain.TSPersisting), taskSaveErr(model.ErrTimeout), domain.TSRolledBack, []string{"recordTimeout"}},
+		{"T-TASK-27_TASK-be8721", newTask(domain.TSPersisting), taskSaveErr(model.ErrConflict), domain.TSRolledBack, []string{"recordUnknownError"}},
+		{"T-TASK-28_TASK-b4999d", newTask(domain.TSPersisting), domain.TaskEvent{Kind: domain.TEvPersistTimeout}, domain.TSRolledBack, []string{"recordTimeout"}},
 
 		// --- persistRetry ---
-		{"T-TASK-29", taskRetries(3), domain.TaskEvent{Kind: domain.TEvAlways}, domain.TSRolledBack, []string{"recordRetriesExhausted"}},
-		{"T-TASK-30", taskRetries(0), domain.TaskEvent{Kind: domain.TEvRetryBackoff}, domain.TSPersisting, []string{"incrementRetries"}},
+		{"T-TASK-29_TASK-0dd646", taskRetries(3), domain.TaskEvent{Kind: domain.TEvAlways}, domain.TSRolledBack, []string{"recordRetriesExhausted"}},
+		{"T-TASK-30_TASK-168d9b", taskRetries(0), domain.TaskEvent{Kind: domain.TEvRetryBackoff}, domain.TSPersisting, []string{"incrementRetries"}},
 
 		// --- rolledBack routing (only non-terminal prior states persist) ---
-		{"T-TASK-31", taskPrior(domain.TSOpen), domain.TaskEvent{Kind: domain.TEvAlways}, domain.TSOpen, nil},
-		{"T-TASK-32", taskPrior(domain.TSInProgress), domain.TaskEvent{Kind: domain.TEvAlways}, domain.TSInProgress, nil},
+		{"T-TASK-31_TASK-3f585f", taskPrior(domain.TSOpen), domain.TaskEvent{Kind: domain.TEvAlways}, domain.TSOpen, nil},
+		{"T-TASK-32_TASK-98c3ba", taskPrior(domain.TSInProgress), domain.TaskEvent{Kind: domain.TEvAlways}, domain.TSInProgress, nil},
 	}
 }
 

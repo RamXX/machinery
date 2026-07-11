@@ -634,7 +634,7 @@ func CheckMachines(design string) *Gate {
 				" rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound")
 		}
 
-		opath := replaceExt(path, ".machine.json", ".oracle.md")
+		opath := machineSibling(path, ".oracle.md")
 		fresh := oracle.Render(m, path)
 		if _, err := os.Stat(opath); err != nil {
 			g.Errs = append(g.Errs, base+": no committed oracle ("+filepath.Base(opath)+"); run machinery oracle")
@@ -646,7 +646,7 @@ func CheckMachines(design string) *Gate {
 			g.Count("oracles fresh")
 		}
 
-		mpath := replaceExt(path, ".machine.json", ".matrix.md")
+		mpath := machineSibling(path, ".matrix.md")
 		if _, err := os.Stat(mpath); err != nil {
 			g.Warns = append(g.Warns, base+": no matrix file; named-unit contracts are unchecked (transitions are covered by the generated oracle)")
 			continue
@@ -696,8 +696,10 @@ func sortedGlob(dir, pattern string) []string {
 	return out
 }
 
-func replaceExt(path, oldExt, newExt string) string {
-	return path[:len(path)-len(oldExt)] + newExt
+// machineSibling swaps a *.machine.json path's suffix for a sibling
+// artifact's (".oracle.md", ".matrix.md").
+func machineSibling(path, newExt string) string {
+	return path[:len(path)-len(".machine.json")] + newExt
 }
 
 // --- traceability (Gx-trace) ---

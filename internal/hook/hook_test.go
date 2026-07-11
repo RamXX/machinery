@@ -431,7 +431,7 @@ func TestSelectGatesProgressiveOptional(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, "legacy"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	sel := selectGates(dir, Config{})
+	sel, _ := selectGates(dir, Config{})
 	for _, g := range []string{"gm", "gs", "gp", "gi", "gn"} {
 		if sel.Run[g] {
 			t.Errorf("%s must not run before its annotation exists", g)
@@ -442,7 +442,7 @@ func TestSelectGatesProgressiveOptional(t *testing.T) {
 	writeFile(t, filepath.Join(formal, "policy.relational.yaml"), "subjects: {}\n")
 	writeFile(t, filepath.Join(formal, "integrity.relational.yaml"), "entities: []\n")
 	writeFile(t, filepath.Join(formal, "isolation.relational.yaml"), "tenant: {}\n")
-	sel = selectGates(dir, Config{})
+	sel, _ = selectGates(dir, Config{})
 	for _, g := range []string{"gm", "gs", "gp", "gi", "gn"} {
 		if !sel.Run[g] {
 			t.Errorf("%s must run once its opt-in artifact exists", g)
@@ -470,7 +470,7 @@ func TestSelectGatesSkipsGxOnMachinelessDecomposedParent(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, "machines"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	sel := selectGates(dir, Config{})
+	sel, _ := selectGates(dir, Config{})
 	if sel.Run["gx"] || sel.Run["g3"] {
 		t.Errorf("machine-less decomposed parent must not select g3/gx: %v", sel.Run)
 	}
@@ -483,7 +483,7 @@ func TestSelectGatesSkipsGxOnMachinelessDecomposedParent(t *testing.T) {
 		}
 	}
 	writeFile(t, filepath.Join(dir, "machines", "Order.machine.json"), "{}\n")
-	sel = selectGates(dir, Config{})
+	sel, _ = selectGates(dir, Config{})
 	if !sel.Run["gx"] || !sel.Run["g3"] {
 		t.Errorf("with machines present g3,gx must return: %v", sel.Run)
 	}
@@ -551,6 +551,42 @@ func TestStopImportFindingsDisarmedThenArmed(t *testing.T) {
 	}
 	if !strings.Contains(got.Reason, "undeclared cross-boundary edge") {
 		t.Fatalf("the block must carry the gate output: %q", got.Reason)
+	}
+}
+
+// A staged gates list naming the impl-facing gates (gt, g4) with no impl
+// configured must not fail the stop, but the drop has to stay visible: a
+// silently skipped gate is a configured-but-never-run gate.
+func TestStopWarnsWhenStagedImplGatesLackImpl(t *testing.T) {
+	// green design, otherwise-silent stop: the warning must still surface
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, ConfigName), `{"gates":"g2,g3,gt"}`)
+	copyTree(t, crmDesign, filepath.Join(root, "design"))
+	sid := "s-dropped"
+	t.Cleanup(func() { clearState(root, sid) })
+	appendState(root, sid, "design")
+	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	var got stopOut
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("stop output is not JSON: %v (%q)", err, out)
+	}
+	if got.Decision == "block" {
+		t.Fatalf("a config gap must warn, never block: %+v", got)
+	}
+	if !strings.Contains(got.SystemMessage, "gt") || !strings.Contains(got.SystemMessage, "impl") {
+		t.Fatalf("the dropped gate and the missing impl setting must be named: %+v", got)
+	}
+
+	// the whole staged list impl-facing: nothing runs, the warning names both
+	writeFile(t, filepath.Join(root, ConfigName), `{"gates":"g4,gt"}`)
+	appendState(root, sid, "design")
+	out = runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	got = stopOut{}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("stop output is not JSON: %v (%q)", err, out)
+	}
+	if !strings.Contains(got.SystemMessage, "g4,gt") {
+		t.Fatalf("an all-dropped list must still warn: %+v", got)
 	}
 }
 
