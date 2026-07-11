@@ -88,7 +88,12 @@ section structure exactly.
    environment.
 10. **Sequence the build as a walking skeleton then vertical slices.** The first milestone is the thinnest
    end-to-end path through one real boundary. Then one component lifecycle per slice, each green before
-   the next.
+   the next. Write the Build plan in the template's checkable format (Gb-plan holds the structure):
+   `**M<n> - <title>**` milestones with unique numbers, the walking skeleton first (or the brownfield
+   waiver line `Walking skeleton: N/A - <reason>`), a `DoD:` line per milestone stating oracle-row and
+   test-id coverage, the skeleton DoD citing at least one committed oracle id whole-token, and the
+   skeleton naming which NFR-record mechanisms it instantiates (the pattern template every later
+   milestone copies).
 11. **State the hard-TDD protocol with its gate discipline explicit** (template section 11; write
     it out in full, never summarize it away). The RED side must be anchored to the deterministic
     gates so the suite provably tests the right things: `machinery check` green BEFORE deriving
@@ -113,8 +118,8 @@ template's sections. Fill every section; mark any as N/A only with a stated reas
 machinery check design
 ```
 
-Gate 4's deterministic part is not optional: fix every finding you can (typically Gx-trace findings against
-your own tables), and report verbatim any finding you cannot fix because it belongs to an upstream
+Gate 4's deterministic part is not optional: fix every finding you can (typically Gx-trace or Gb-plan
+findings against your own tables and plan), and report verbatim any finding you cannot fix because it belongs to an upstream
 artifact. Include the `checked:` counts in your report.
 
 ## Self-check before you return (Gate 4)
@@ -132,11 +137,16 @@ artifact. Include the `checked:` counts in your report.
 - For an isolated pack child, the `Neighbor stand-ins and test environment` section covers every
   neighboring boundary with a stand-in held to the neighbor-contract oracle (stable-id keyed), and
   the environment recipe is self-contained.
-- The build plan starts with a walking skeleton.
+- The build plan follows the checkable format Gb-plan holds: skeleton-first `**M<n> - <title>**`
+  milestones with unique numbers, a `DoD:` line per milestone, the skeleton DoD citing a committed
+  oracle id, and the skeleton naming its NFR-record mechanisms.
 - The hard-TDD protocol is stated and unambiguous, including the gate anchors: check-green before
   test derivation, the three-part RED exit gate (stable-id coverage, `machinery check --impl`
   green, red-on-assertions), the GREEN bar of tests plus gate together, and the sequential
   fallback for runtimes that cannot spawn a fresh-context test-writer.
+
+Before handing back, run the conductor's five-question phase-exit self-review (reality, depth,
+scope, coverage, consistency) over BUILD.md and include the verdicts in your summary.
 
 Return a short summary: the sections written, the `machinery check` result, the Gate 4 result, and any
 residual risk surfaced in the open-questions section. Do not paste the full BUILD.md back; it is on disk.

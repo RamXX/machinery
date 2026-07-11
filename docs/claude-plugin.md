@@ -68,7 +68,8 @@ Gate selection at stop time is progressive when no staged list is configured: Gm
 matching `formal/{policy,integrity,isolation}.relational.yaml` exists (the relational layers; see the
 [policy](policy-layer.md), [integrity](integrity-layer.md), and [isolation](isolation-layer.md)
 guides), G2 once `workspace.dsl` or `ARCHITECTURE.md` exists, G3
-once `machines/*.machine.json` exist, Gx once `BUILD.md` exists, G5 on decomposed designs, G4 only
+once `machines/*.machine.json` exist, Gx and Gb once `BUILD.md` exists, G5 on decomposed designs,
+G4 and Gt only
 when `impl` is configured. A phase you have
 not reached is not demanded of you; a phase you have reached is held.
 
@@ -96,13 +97,14 @@ machinery-managed. All fields optional:
 - `gates`: a staged `--gate` list, the brownfield adoption ratchet from the
   [team guide](brownfield-team-guide.md). Empty selects gates progressively by which artifacts
   exist.
-- `impl`: implementation directory for G4-import. Setting it turns on import-boundary enforcement
+- `impl`: implementation directory for the impl-facing gates, G4-import and Gt-tests. Setting it
+  turns on import-boundary enforcement
   for ordinary coding sessions, the "no drift" case: an undeclared cross-boundary import, or a new
   offender file on a baselined edge, blocks the turn that wrote it instead of waiting for CI.
   Requires the contract's boundaries to declare `code:` globs, and blocking arms only once
   `machinery baseline <design> --impl <dir>` has written `<design>/ratchet.json` (run it with zero
   findings on a greenfield repo; the empty snapshot is the arming marker). Until then import
-  findings warn. Unset, G4 never runs from hooks.
+  findings warn. Unset, G4 and Gt never run from hooks.
 - `strict`: block the end of any turn on ANY blocking finding, not only DRIFT and G4. Right for a
   repo whose design is complete; wrong mid-interrogation.
 - `hooks`: set `false` to keep the repo marked as machinery-managed while opting out of hook

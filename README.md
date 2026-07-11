@@ -132,7 +132,7 @@ Phase 3  XState       state machines
          tool: G3-machine (lint; every invoke has onError + timeout; oracle fresh; matrix reconciled)
          attested: each guard enforces the invariant it names; residual failure transitions kept
 Phase 4  BUILD.md     the blueprint
-         tool: Gx-trace (+ G4-import once code exists)
+         tool: Gx-trace + Gb-plan (+ G4-import and Gt-tests once code exists)
          attested: a zero-context coding agent could build it
 ```
 
@@ -582,7 +582,9 @@ make verify-formal   # regenerates and checks all 26 TLC proofs + the go-crm pol
 | G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, and every dependency has a mitigation row. |
 | G3-machine | machines pass structural lint, committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
 | Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows. |
+| Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, and the skeleton DoD cites a committed oracle id. |
 | G4-import | code imports respect the contract boundaries (Go, Python, TypeScript/JavaScript, Elixir, Rust). |
+| Gt-tests | with `--impl` only: every stable id in the committed oracles appears whole-token in a test file, or a test parses the committed oracle table (the conformance idiom); the hard-TDD RED-exit check made deterministic. |
 | G5-pack | decomposed designs only: packs fresh, children pinned to the current packs, refinement proofs fresh. |
 | ERROR / DRIFT / WARN | ERROR is blocking; DRIFT means a generated artifact is stale, also blocking; WARN is advisory. |
 
@@ -607,7 +609,7 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   `compose`, `check`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`, `install`,
   `update`, `uninstall`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
-  `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/G4/G5
+  `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/Gb/G4/Gt/G5
   suite), `pack/` (recursive decomposition via contract packs), `formal/` (TLC + Alloy
   orchestration), `install/` (skill placement behind `machinery install`), `experiments/` (the
   shared mutation-experiment table). Every package has unit tests.
@@ -680,7 +682,7 @@ full gate suite run against a synthesized design/impl fixture) runs as Go tests 
 | `internal/refine` | 83% | data-refinement (3 patterns) |
 | `internal/compose` | 81% | cross-aggregate composition |
 | `internal/install` | 80% | skill placement behind `machinery install` (fetch, extract, canonical+symlink layout) |
-| `internal/gates` | 69% | the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/G4/G5 gate suite (G5 also exercised via `internal/experiments`) |
+| `internal/gates` | 69% | the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/Gb/G4/Gt/G5 gate suite (G5 also exercised via `internal/experiments`) |
 | `internal/pack` | 58% | contract packs (the mutation suite lives in `internal/experiments`) |
 | `internal/ir` | 55% | shared IR (covered transitively via lint/gates) |
 | `internal/formal` | 41% | TLC/Alloy orchestration (solver-run paths need Java) |

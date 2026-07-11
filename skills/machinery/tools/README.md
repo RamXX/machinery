@@ -42,10 +42,12 @@ One line per subcommand:
 - `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
   `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate
   composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
-- `machinery check <design-dir> [--impl <code-dir>] [--gate gm,gs,gp,gi,gn,g2,g3,gx,g4,g5]` the deterministic
+- `machinery check <design-dir> [--impl <code-dir>] [--gate gm,gs,gp,gi,gn,g2,g3,gx,gb,g4,gt,g5]` the deterministic
   gate suite (Gm-transition on rebuild/hybrid contracts; Gs-surface on legacy surface ledgers;
   Gp/Gi/Gn relational gates; G2-c4,
-  G3-machine, Gx-trace, G4-import, G5-pack on decomposed designs). Gates fail on absence; every gate prints a `checked:`
+  G3-machine, Gx-trace; Gb-plan on build plan structure, artifact-activated on `design/BUILD.md`;
+  G4-import; Gt-tests on oracle ids in the test suite, runs only with `--impl`; G5-pack on
+  decomposed designs). Gates fail on absence; every gate prints a `checked:`
   line. Exit is non-zero on any ERROR or DRIFT.
 - `machinery pack generate <parent-design>` emits the frozen per-subsystem contract packs
   (`design/packs/<id>.pack/`) from `decomposition.yaml`: the owned domain slice, the boundary event
