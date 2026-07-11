@@ -35,7 +35,7 @@ Code and Codex plugin caches are refreshed through their CLIs when detected,
 never overwritten directly.
 
   machinery update
-  machinery update --version v0.3.1
+  machinery update --version v0.3.2
   machinery update --target all
   machinery update --home ~/.agents --target codex`,
 		Args: cobra.NoArgs,
