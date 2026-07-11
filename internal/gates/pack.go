@@ -97,6 +97,17 @@ func checkParentPacks(design string, g *Gate) {
 			g.Count("packs fresh")
 		}
 	}
+	// per-pack boundary-event visibility: a zero must be seen in every gate
+	// run, not discovered after empty packs ship (the H2 dogfood finding).
+	// Strict generation makes an unwaived zero unreachable here, but the
+	// counts stay printed so the evidence is in the output, not implied.
+	var evCounts []string
+	for _, id := range ids {
+		evCounts = append(evCounts, fmt.Sprintf("%s %d", id, pack.CountBoundaryEvents(fresh[id]["events.md"])))
+	}
+	if len(evCounts) > 0 {
+		g.CheckedExtra("boundary events: " + strings.Join(evCounts, ", "))
+	}
 	// two-way pinning: children built against the current pack
 	for _, s := range d.Subsystems {
 		if s.ChildDesign == "" {

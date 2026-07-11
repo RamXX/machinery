@@ -394,10 +394,14 @@ func selectGates(designDir string, cfg Config) gates.Selection {
 	if fileExists(filepath.Join(designDir, "workspace.dsl")) || fileExists(filepath.Join(designDir, "ARCHITECTURE.md")) {
 		run["g2"] = true
 	}
-	if ms, _ := filepath.Glob(filepath.Join(designDir, "machines", "*.machine.json")); len(ms) > 0 {
+	machines, _ := filepath.Glob(filepath.Join(designDir, "machines", "*.machine.json"))
+	if len(machines) > 0 {
 		run["g3"] = true
 	}
-	if fileExists(filepath.Join(designDir, "BUILD.md")) {
+	if fileExists(filepath.Join(designDir, "BUILD.md")) && (len(machines) > 0 || !pack.HasDecomposition(designDir)) {
+		// a machine-less decomposed parent has no behavior layer of its own
+		// (the children carry G3/Gx); running Gx against its BUILD.md would
+		// fail it for phases that live in the child designs
 		run["gx"] = true
 	}
 	if cfg.Impl != "" {

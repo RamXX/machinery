@@ -6,7 +6,7 @@ package gates
 
 import (
 	"fmt"
-	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -28,9 +28,12 @@ func Select(design, gateList string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
 	list := "gm,gs,gp,gi,gn,g2,g3,gx,g4,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
-		if fi, err := os.Stat(design + "/machines"); err != nil || !fi.IsDir() {
+		if ms, _ := filepath.Glob(filepath.Join(design, "machines", "*.machine.json")); len(ms) == 0 {
 			// a pure decomposed parent authors no machines: its behavior
 			// layer is the children's, held by the packs; G3/Gx run there.
+			// Machine-less means no *.machine.json, not no directory: an
+			// empty machines/ dir once defeated this narrowing and failed a
+			// decomposed parent on G3/Gx (the H2 dogfood finding).
 			// The note text is pinned byte for byte by the golden corpus.
 			list = "g2,g5"
 			if HasSurfaceLedger(design) {
