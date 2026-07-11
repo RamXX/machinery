@@ -450,6 +450,33 @@ func TestSelectGatesProgressiveOptional(t *testing.T) {
 	}
 }
 
+// A machine-less decomposed parent (decomposition.yaml, BUILD.md, an empty
+// machines/ directory) must not select Gx at stop time: its behavior layer is
+// the children's, and Gx against the parent's BUILD.md would fail it for
+// phases that live in the child designs. Once machines exist the full
+// selection returns.
+func TestSelectGatesSkipsGxOnMachinelessDecomposedParent(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "decomposition.yaml"), "decomposition_version: 1\n")
+	writeFile(t, filepath.Join(dir, "BUILD.md"), "Mode: full\n")
+	writeFile(t, filepath.Join(dir, "ARCHITECTURE.md"), "# arch\n")
+	if err := os.MkdirAll(filepath.Join(dir, "machines"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sel := selectGates(dir, Config{})
+	if sel.Run["gx"] || sel.Run["g3"] {
+		t.Errorf("machine-less decomposed parent must not select g3/gx: %v", sel.Run)
+	}
+	if !sel.Run["g2"] || !sel.Run["g5"] {
+		t.Errorf("machine-less decomposed parent must select g2,g5: %v", sel.Run)
+	}
+	writeFile(t, filepath.Join(dir, "machines", "Order.machine.json"), "{}\n")
+	sel = selectGates(dir, Config{})
+	if !sel.Run["gx"] || !sel.Run["g3"] {
+		t.Errorf("with machines present g3,gx must return: %v", sel.Run)
+	}
+}
+
 func TestStopMissingDesignDirWarns(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigName), `{"design":"blueprint"}`)

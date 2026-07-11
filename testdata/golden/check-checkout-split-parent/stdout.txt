@@ -3,7 +3,7 @@ note: decomposed parent with no machines/; running g2,g5 (G3/Gx/G4 run on the ch
   checked: 2 boundaries, 3 externals, 4 allow rules, 4 deny rules, 7 dsl elements, 2 boundaries bound to dsl, 3 mitigation rows, 6 dependencies with mitigation rows, 3 event contracts
   ok
 == G5-pack  contract packs ==
-  checked: 2 subsystems, 2 packs fresh, 2 children pinned
+  checked: 2 subsystems, 2 packs fresh, 2 children pinned, boundary events: orders 3, payments 3
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

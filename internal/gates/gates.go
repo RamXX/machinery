@@ -22,13 +22,14 @@ import (
 
 // Gate holds findings plus an explicit record of what was verified.
 type Gate struct {
-	Title      string
-	Errs       []string
-	Drift      []string
-	Warns      []string
-	Notes      []string
-	Counts     map[string]int
-	countOrder []string // insertion order of count keys (matches Python dict)
+	Title        string
+	Errs         []string
+	Drift        []string
+	Warns        []string
+	Notes        []string
+	Counts       map[string]int
+	countOrder   []string // insertion order of count keys (matches Python dict)
+	checkedExtra []string // preformatted checked: segments (zeros stay visible)
 }
 
 // NewGate builds an empty gate.
@@ -58,6 +59,14 @@ func (g *Gate) RequireNonzero(label, what string) {
 	}
 }
 
+// CheckedExtra appends a preformatted segment to the checked: line. Unlike
+// Count, the segment is emitted verbatim even when the numbers inside are
+// zero: a zero that must stay visible in every run (per-pack boundary-event
+// counts) would otherwise vanish with the zero-count suppression.
+func (g *Gate) CheckedExtra(segment string) {
+	g.checkedExtra = append(g.checkedExtra, segment)
+}
+
 // Emit prints the gate like Python (ERRS, DRIFT, warns, notes, checked:, ok).
 // Returns the number of blocking findings (errs + drift).
 func (g *Gate) Emit(out io.Writer) int {
@@ -81,6 +90,7 @@ func (g *Gate) Emit(out io.Writer) int {
 			parts = append(parts, fmt.Sprintf("%d %s", v, k))
 		}
 	}
+	parts = append(parts, g.checkedExtra...)
 	checked := strings.Join(parts, ", ")
 	if checked == "" {
 		fmt.Fprintln(out, "  checked: nothing")
