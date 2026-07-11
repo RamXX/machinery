@@ -453,13 +453,20 @@ func TestSelectGatesProgressiveOptional(t *testing.T) {
 // A machine-less decomposed parent (decomposition.yaml, BUILD.md, an empty
 // machines/ directory) must not select Gx at stop time: its behavior layer is
 // the children's, and Gx against the parent's BUILD.md would fail it for
-// phases that live in the child designs. Once machines exist the full
-// selection returns.
+// phases that live in the child designs. The artifact-activated gates
+// (gm/gs/gp/gi/gn) keep their auto-activation on that same parent (the v0.3.0
+// CLI narrowing regression dropped gp/gi/gn; the hook path must never copy
+// that). Once machines exist the full selection returns.
 func TestSelectGatesSkipsGxOnMachinelessDecomposedParent(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "decomposition.yaml"), "decomposition_version: 1\n")
 	writeFile(t, filepath.Join(dir, "BUILD.md"), "Mode: full\n")
 	writeFile(t, filepath.Join(dir, "ARCHITECTURE.md"), "# arch\n")
+	writeFile(t, filepath.Join(dir, "migration.yaml"), "contract_version: 1\n")
+	writeFile(t, filepath.Join(dir, "legacy", "surface.yaml"), "surface_version: 1\n")
+	writeFile(t, filepath.Join(dir, "formal", "policy.relational.yaml"), "subjects: {}\n")
+	writeFile(t, filepath.Join(dir, "formal", "integrity.relational.yaml"), "entities: []\n")
+	writeFile(t, filepath.Join(dir, "formal", "isolation.relational.yaml"), "tenant: {}\n")
 	if err := os.MkdirAll(filepath.Join(dir, "machines"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -469,6 +476,11 @@ func TestSelectGatesSkipsGxOnMachinelessDecomposedParent(t *testing.T) {
 	}
 	if !sel.Run["g2"] || !sel.Run["g5"] {
 		t.Errorf("machine-less decomposed parent must select g2,g5: %v", sel.Run)
+	}
+	for _, g := range []string{"gm", "gs", "gp", "gi", "gn"} {
+		if !sel.Run[g] {
+			t.Errorf("machine-less decomposed parent dropped artifact-activated gate %s: %v", g, sel.Run)
+		}
 	}
 	writeFile(t, filepath.Join(dir, "machines", "Order.machine.json"), "{}\n")
 	sel = selectGates(dir, Config{})

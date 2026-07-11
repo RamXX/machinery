@@ -1,7 +1,7 @@
 ---
 name: machinery
 metadata:
-  version: "0.3.0"
+  version: "0.3.1"
 description: >
   Design software as a build-ready blueprint, greenfield, brownfield, hybrid, or rebuild. Use when the user
   wants to design a new system, service, or app from scratch, produce a BUILD.md for a
@@ -647,8 +647,10 @@ stand-ins cannot prove stays named: the parent's residuals (end-to-end latency, 
 liveness, unmodeled channels) belong to the parent's cross-context assembly suite.
 
 **GATE 5:** `machinery check` runs G5-pack automatically on decomposed designs (a machine-less
-parent runs g2,g5, where machine-less means no `machines/*.machine.json`, an empty directory
-included; children run everything). Parent side: committed packs byte-match a fresh generation,
+parent skips only the machine-dependent gates G3/Gx/G4 and runs g2,g5 plus every
+artifact-activated gate whose source exists, gm/gs/gp/gi/gn; machine-less means no
+`machines/*.machine.json`, an empty directory included; children run everything). Parent side:
+committed packs byte-match a fresh generation,
 every pinned child was built against the CURRENT pack, and the `checked:` line prints per-pack
 boundary-event counts so an unexpected zero is visible in every run. Because G5 regenerates packs
 in memory, a lossy event-contract table fails the gate itself, not only `pack generate`. Child
