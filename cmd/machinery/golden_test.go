@@ -218,6 +218,20 @@ func TestGoldenCheckCheckoutSplit(t *testing.T) {
 	}
 }
 
+// surreal-crm is the store-swap rebuild example (the go-crm system moving to
+// SurrealDB): its check exercises Gm on an all-reuse contract plus Gs-surface
+// on the legacy surface ledger, so the corpus pins that output byte for byte.
+// Its machines and oracles are byte-identical to go-crm's, so the lint,
+// oracle, and gen cases would duplicate the go-crm corpus and are not pinned.
+func TestGoldenCheckSurrealCrm(t *testing.T) {
+	root := repoRootDir(t)
+	out, errS, code := runBin(t, "check", filepath.Join(root, "examples", "surreal-crm", "design"))
+	g := goldenDir(t, "check-surreal-crm")
+	compareOrUpdate(t, filepath.Join(g, "stdout.txt"), out)
+	compareOrUpdate(t, filepath.Join(g, "stderr.txt"), errS)
+	compareOrUpdate(t, filepath.Join(g, "exitcode.txt"), fmt.Sprintf("%d\n", code))
+}
+
 // The relational generators run on the examples that opted into a layer; the
 // corpus pins the CLI output and every generated model byte for byte. go-crm
 // carries both the policy and the integrity layers; fulfillment carries only

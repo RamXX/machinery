@@ -4,9 +4,14 @@ Keep current and intended truth separate:
 
 ```text
 design/legacy/domain.modelith.yaml  # current truth
+design/legacy/surface.yaml          # capability disposition ledger (see surface-ledger.md)
 design/domain.modelith.yaml         # target truth
 design/migration.yaml               # checked bridge
 ```
+
+Gm holds the declared domain truth; the surface ledger (Gs-surface, `references/surface-ledger.md`)
+holds the observable system: every legacy route, command, table, job, event, and integration mapped
+to a target design element or explicitly dropped/deferred. Author both; either alone leaves a hole.
 
 The target follows the ordinary four phases. `migration.yaml` activates Gm-transition and must use
 this strict root shape (unknown keys fail):

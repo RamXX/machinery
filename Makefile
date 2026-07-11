@@ -12,7 +12,7 @@
 
 AGENT_HOMES ?= $(HOME)/.agents $(HOME)/.claude
 SRC := $(CURDIR)
-INTERNAL_VERSION := v0.1.9-dev
+INTERNAL_VERSION := v0.2.0-dev
 MACH ?= $(CURDIR)/.bin/machinery
 # Single source of truth for the linter version, shared with CI (ci.yml reads
 # the same file) and the local preflight gate.
@@ -59,6 +59,7 @@ golden-update: ## Re-capture the golden corpus from the current binary (review t
 
 check: build ## Run the deterministic gate suite across the bundled examples
 	@$(MACH) check examples/go-crm/design --impl examples/go-crm/impl
+	@$(MACH) check examples/surreal-crm/design
 	@$(MACH) check examples/fulfillment/design
 	@$(MACH) check examples/portfolio-engine/design
 	@$(MACH) check examples/checkout-split/parent/design
@@ -67,6 +68,7 @@ check: build ## Run the deterministic gate suite across the bundled examples
 
 verify-formal: build ## Regenerate + TLC-check the whole formal suite across the examples (needs Java)
 	@echo "== go-crm =="; $(MACH) verify-formal examples/go-crm/design
+	@echo "== surreal-crm =="; $(MACH) verify-formal examples/surreal-crm/design
 	@echo "== fulfillment =="; $(MACH) verify-formal examples/fulfillment/design
 	@echo "== portfolio-engine =="; $(MACH) verify-formal examples/portfolio-engine/design
 	@echo "== checkout-split/orders =="; $(MACH) verify-formal examples/checkout-split/orders/design

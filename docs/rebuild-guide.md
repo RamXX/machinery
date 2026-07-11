@@ -17,6 +17,15 @@ salvage, and migration. The target model is normative for new implementation. Th
 contract prevents "save what can be saved" from becoming an unreviewed mixture of old assumptions
 and new architecture.
 
+A fourth artifact guards the three: `design/legacy/surface.yaml`, the capability disposition
+ledger (gate: Gs-surface). Gm proves every entity in the declared legacy model is disposed, but
+its coverage universe is that declaration; a subsystem the excavation missed never enters the
+model and Gm passes green. The ledger anchors coverage to the legacy system's mechanically
+enumerable surface instead: routes, CLI commands, tables, jobs, events, and integrations, each
+mapped to a target design element or explicitly dropped or deferred. It is independent of
+`migration.yaml` so a clean-break run that drops the migration machinery keeps its completeness
+anchor. Full guide: [surface-ledger.md](surface-ledger.md).
+
 ## When to choose each mode
 
 | mode | use it when | governing artifact |
@@ -37,6 +46,7 @@ adjudicating current behavior.
 design/
   legacy/
     domain.modelith.yaml    # current truth; keep focused on what must migrate or be retired
+    surface.yaml            # capability disposition ledger; source for Gs-surface
   domain.modelith.yaml      # target truth
   migration.yaml            # source for Gm-transition
   ARCHITECTURE.md           # includes a "Transition architecture" section
@@ -248,23 +258,30 @@ implementation plan` heading in BUILD.md. Gm requires both bridges.
 
 ## End-to-end workflow
 
-1. **Archaeology:** model current behavior and data from code, schema, runtime evidence, and owner
-   interviews. Write characterization tests before trusting a legacy behavior as intentional.
+1. **Archaeology and opening sweep:** model current behavior and data from code, schema, runtime
+   evidence, and owner interviews. Write characterization tests before trusting a legacy behavior
+   as intentional. Seed `legacy/surface.yaml` by mechanical enumeration (route tables, command
+   registrations, schema catalogs, cron and worker lists, outbound calls); most rows start
+   deferred, and the ledger becomes the interrogation's work list.
 2. **Target design:** run the ordinary four phases without inheriting legacy topology by default.
    The target model and architecture are normative.
 3. **Disposition:** decide every legacy entity and implementation asset. A missing decision is a
    Gm error, not a future TODO.
 4. **Mapping:** cover all replaced data and lifecycle values. Design stable identifiers and signed,
    repeatable manifests before writing import code.
-5. **Coexistence:** describe source of truth, reads, writes, reconciliation, observability, and
+5. **Closing sweep:** once the design stands, re-mine the legacy system against it and settle
+   every ledger row to covered, dropped, or a deliberate deferred. Whatever the docs-first pass
+   missed surfaces here as a row that cannot be honestly disposed; run
+   `machinery check design --gate gs` until it is green with no placeholder rationales.
+6. **Coexistence:** describe source of truth, reads, writes, reconciliation, observability, and
    rollback per phase. Model any stateful transition controller as an ordinary machine when it has
    retries, timeouts, or partial-failure behavior.
-6. **Hard TDD:** derive locked mapping, adapter, reconciliation, fault-injection, rollback, and
+7. **Hard TDD:** derive locked mapping, adapter, reconciliation, fault-injection, rollback, and
    cutover tests from BUILD.md. The target's ordinary oracle, boundary, invariant, and formal tests
    stay mandatory.
-7. **Advance by evidence:** a phase changes only when its checked entry and exit criteria are true.
+8. **Advance by evidence:** a phase changes only when its checked entry and exit criteria are true.
    Keep the previous rollback path operational through the declared window.
-8. **Retire deliberately:** remove transition code and legacy dependencies only after cutover exit
+9. **Retire deliberately:** remove transition code and legacy dependencies only after cutover exit
    criteria, reconciliation, backup retention, and owner approval are satisfied.
 
 ## Regression test checklist

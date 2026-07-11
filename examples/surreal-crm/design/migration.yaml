@@ -1,0 +1,141 @@
+contract_version: 1
+mode: rebuild
+legacy:
+  model: legacy/domain.modelith.yaml
+target:
+  model: domain.modelith.yaml
+_comment: >
+  Store swap, not a domain rewrite: the legacy and target domain truths are identical, so
+  every entity disposition is reuse and there are no data or state mappings (Gm requires
+  them only for replace). The risk lives in the implementation assets and the coexistence
+  phases; the legacy surface ledger (legacy/surface.yaml, gate Gs) anchors the capability
+  coverage that entity dispositions alone cannot see.
+
+dispositions:
+  - legacy: User
+    target: User
+    strategy: reuse
+    rationale: The domain shape is unchanged; only the persistence of the record moves.
+  - legacy: Team
+    target: Team
+    strategy: reuse
+    rationale: The domain shape is unchanged; only the persistence of the record moves.
+  - legacy: Account
+    target: Account
+    strategy: reuse
+    rationale: The domain shape is unchanged; only the persistence of the record moves.
+  - legacy: Contact
+    target: Contact
+    strategy: reuse
+    rationale: The domain shape is unchanged; only the persistence of the record moves.
+  - legacy: Deal
+    target: Deal
+    strategy: reuse
+    rationale: The domain shape is unchanged; only the persistence of the record moves.
+  - legacy: Pipeline
+    target: Pipeline
+    strategy: reuse
+    rationale: The domain shape is unchanged; only the persistence of the record moves.
+  - legacy: Activity
+    target: Activity
+    strategy: reuse
+    rationale: The domain shape is unchanged; only the persistence of the record moves.
+  - legacy: Task
+    target: Task
+    strategy: reuse
+    rationale: The domain shape is unchanged; only the persistence of the record moves.
+  - legacy: Tag
+    target: Tag
+    strategy: reuse
+    rationale: The domain shape is unchanged; only the persistence of the record moves.
+
+new_entities: []
+
+assets:
+  - name: domain, authz, session, and cli modules
+    kind: module
+    strategy: reuse
+    target: the same packages, unchanged
+    rationale: Nothing above the repository boundary knows the store exists; the contract tests prove it stays that way.
+    verification: Boundary tests and the full oracle suite pass unmodified against the new repository adapter.
+  - name: ladybug repository adapter
+    kind: module
+    strategy: replace
+    target: SurrealQL repository adapter behind the same Repo interface
+    rationale: The Cypher statements and the go-ladybug binding are the only store-specific code; the interface above them does not change.
+    verification: The repository contract suite runs against both adapters and every intentional delta is reviewed.
+  - name: embedded graph schema
+    kind: schema
+    strategy: replace
+    target: SurrealDB table-per-aggregate schema with record links
+    rationale: Node labels and relationships translate to tables and record links; uniqueness and mandatory links become schema assertions.
+    verification: Schema DDL tests assert every uniqueness and link constraint the domain invariants require.
+  - name: production records in the LadybugDB directory
+    kind: data
+    strategy: replace
+    target: SurrealDB data volume, populated by the signed export/import pipeline
+    rationale: The records are the product; they move byte-faithfully by stable id, never by hand.
+    verification: Import manifests reconcile counts, per-record field hashes, and link endpoints to zero drift, twice, before cutover.
+  - name: oracle and characterization test suites
+    kind: test
+    strategy: reuse
+    target: the same suites against the new adapter
+    rationale: The machines did not change, so every oracle row and characterization case is evidence for the swap.
+    verification: The suites run against the SurrealDB-backed build in shadow and must be green before dual reads begin.
+
+data_mappings: []
+state_mappings: []
+
+phases:
+  - id: baseline
+    source_of_truth: legacy
+    read_path: legacy
+    write_path: legacy
+    backfill: Produce signed, repeatable exports of the embedded store without changing production reads or writes.
+    entry_criteria: Characterization and oracle suites are green on the embedded build; volume snapshot rehearsed.
+    exit_criteria: Two consecutive exports have stable identifiers, counts, and content hashes.
+    rollback: Remain entirely on the embedded store and discard target imports.
+    observability: [legacy command success rate, export row counts, export content hashes]
+  - id: shadow
+    source_of_truth: legacy
+    read_path: shadow
+    write_path: legacy
+    backfill: Import the snapshot into the SurrealDB container, then replay incremental exports by stable id.
+    entry_criteria: Baseline exports are stable and the SurrealDB schema DDL tests are green.
+    exit_criteria: Read parity and reconciliation show zero unexplained drift for seven consecutive days.
+    rollback: Disable shadow reads, drop the container volume, and rebuild the target from the last signed export.
+    observability: [read parity mismatches, import replay lag, reconciliation drift, container restart count]
+    parity: Run every read against both stores, compare normalized rows and authorization decisions, always serve the legacy result.
+  - id: cutover
+    source_of_truth: target
+    read_path: target
+    write_path: target
+    backfill: Freeze legacy writes, run the final incremental import, reconcile to zero drift, then repoint the connection string.
+    entry_criteria: Zero unexplained drift, container healthcheck and restart policy verified, restore rehearsal green, approval recorded.
+    exit_criteria: The rollback window expires with target SLOs and reconciliation green.
+    rollback: Repoint the binary to the embedded store, replay target-side writes from the signed manifests, and re-enter shadow.
+    observability: [target command success rate, connect failure rate, reconciliation drift, rollback readiness]
+
+cutover:
+  phase: cutover
+  rollback_phase: shadow
+  decision_criteria: Zero unexplained reconciliation drift; the oracle, boundary, and schema suites green against the container; a named owner approves.
+  rollback_window: 72h
+  max_data_loss: zero acknowledged writes
+
+risks:
+  - dependency: LadybugDB export reader
+    detection: Export row-count or content-hash mismatch between repeated snapshots.
+    mitigation: Stop the transition, retain legacy authority, and repair the reader against characterized fixtures.
+    residual: Corrupt source records may require manual quarantine and an explicit exception manifest.
+    owner: migration data steward
+  - dependency: SurrealDB container and Docker Engine
+    detection: Connect failures, healthcheck flaps, or container restarts during import or shadow reads.
+    mitigation: Fix the container configuration before advancing; the embedded store remains authoritative until cutover.
+    residual: A daemon stopped by the operator is outside the restart policy and needs a documented manual start.
+    owner: migration platform owner
+  - dependency: shadow-read comparator
+    detection: Parity mismatch rate above zero, or comparator crashes leaving reads unverified.
+    mitigation: Serve legacy results unconditionally, quarantine and explain every mismatch before advancing.
+    residual: Normalization bugs in the comparator can mask real drift; its own fixture tests gate each phase advance.
+    owner: migration data steward

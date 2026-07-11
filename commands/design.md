@@ -17,7 +17,9 @@ Run a machinery design session in this repository.
 4. If the user wants a new production foundation while preserving selected behavior, data, tests,
    or modules, run rebuild/hybrid mode instead: keep separate legacy and target domain models,
    author `migration.yaml`, and hold it with Gm-transition. Do not collapse current and intended
-   truth into one model.
+   truth into one model. Whenever a legacy system exists, also author the surface ledger
+   (`design/legacy/surface.yaml`, held by Gs-surface): the opening sweep seeds it and the closing
+   sweep after Gate 4 settles every row.
 5. Treat the user's request below as the Phase 0 frame input. If it is
    empty, open Phase 0 by asking for the frame.
 

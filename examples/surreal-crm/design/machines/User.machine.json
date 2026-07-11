@@ -1,0 +1,81 @@
+{
+  "_comment": "User aggregate lifecycle machine, restricted to the disable/enable status lifecycle (states derived from Modelith enum UserStatus; events from User actions disable/enable). PLACEMENT (ARCHITECTURE.md section 7): ephemeral in-process, load-act-save inside the single write Tx the Command Layer owns; the status persists as the `status` field on its table in SurrealDB. CONCURRENCY SERIALIZATION: read-modify-write within one write Tx; cross-process writes serialize in SurrealDB's transaction engine (ErrLocked handled by CommandExecution/DBLocked). On load the runtime rehydrates to context.status; `initial` is the create-time status (Active). SCOPE NOTE: register/changePassword/assignRole/login/logout are owned elsewhere (crm.session and repo create paths); this machine covers only the Active<->Disabled status transitions the disable/enable actions drive. Disabling a User has a downstream effect on Sessions (session-active-user), enforced by the Session machine, not here.",
+  "_delays": {
+    "persistTimeout": "10000 ms - SurrealDB per-query timeout (ARCHITECTURE.md section 6)",
+    "persistRetryBackoff": "500 ms - ErrLocked backoff; retriesExhausted at 3 attempts (~1.5s total)"
+  },
+  "id": "user",
+  "initial": "Active",
+  "context": {
+    "userId": null,
+    "username": null,
+    "role": null,
+    "status": "Active",
+    "teamId": null,
+    "actor": null,
+    "pendingStatus": null,
+    "priorStatus": null,
+    "retries": 0,
+    "lastError": null
+  },
+  "states": {
+    "Active": {
+      "on": {
+        "disable": [
+          { "target": "persisting", "guard": "guardAdminAuthority", "actions": "setPendingDisable" },
+          { "actions": "recordAuthorityDenied" }
+        ],
+        "enable": { "actions": "recordAlreadyActive" }
+      }
+    },
+    "Disabled": {
+      "on": {
+        "enable": [
+          { "target": "persisting", "guard": "guardAdminAuthority", "actions": "setPendingEnable" },
+          { "actions": "recordAuthorityDenied" }
+        ],
+        "disable": { "actions": "recordAlreadyDisabled" }
+      }
+    },
+    "persisting": {
+      "invoke": {
+        "src": "saveUser",
+        "input": {
+          "userId": "context.userId",
+          "status": "context.pendingStatus",
+          "actor": "context.actor"
+        },
+        "onDone": [
+          { "target": "Active", "guard": "pendingIsActive", "actions": "commitStatus" },
+          { "target": "Disabled", "guard": "pendingIsDisabled", "actions": "commitStatus" },
+          { "target": "rolledBack", "actions": "recordRoutingError" }
+        ],
+        "onError": [
+          { "target": "persistRetry", "guard": "isErrLocked", "actions": "recordError" },
+          { "target": "rolledBack", "guard": "isErrConstraint", "actions": "recordConstraint" },
+          { "target": "rolledBack", "guard": "isErrDiskFull", "actions": "recordDiskFull" },
+          { "target": "rolledBack", "guard": "isErrTimeout", "actions": "recordTimeout" },
+          { "target": "rolledBack", "actions": "recordUnknownError" }
+        ]
+      },
+      "after": {
+        "persistTimeout": { "target": "rolledBack", "actions": "recordTimeout" }
+      }
+    },
+    "persistRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "retriesExhausted", "actions": "recordRetriesExhausted" }
+      ],
+      "after": {
+        "persistRetryBackoff": { "target": "persisting", "actions": "incrementRetries" }
+      }
+    },
+    "rolledBack": {
+      "_exhaustive": "both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present",
+      "always": [
+        { "target": "Active", "guard": "priorIsActive" },
+        { "target": "Disabled", "guard": "priorIsDisabled" }
+      ]
+    }
+  }
+}

@@ -119,6 +119,8 @@ jobs:
         run: make build
       - name: Gate suite - go-crm (design + impl)
         run: .bin/machinery check examples/go-crm/design --impl examples/go-crm/impl
+      - name: Gate suite - surreal-crm (store-swap rebuild, Gm + Gs)
+        run: .bin/machinery check examples/surreal-crm/design
       - name: Gate suite - fulfillment (design only)
         run: .bin/machinery check examples/fulfillment/design
       - name: Gate suite - portfolio-engine (design only)

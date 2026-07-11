@@ -67,7 +67,7 @@ shared `~/.agents` skill because another Agent Skills runtime may still use it. 
 
 ```bash
 machinery update
-machinery update --version v0.1.9
+machinery update --version v0.2.0
 ```
 
 It performs the following contract in order:

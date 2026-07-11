@@ -36,6 +36,8 @@ jobs:
         run: make build
       - name: Regenerate + TLC-check go-crm
         run: .bin/machinery verify-formal examples/go-crm/design
+      - name: Regenerate + TLC-check surreal-crm (store-swap rebuild)
+        run: .bin/machinery verify-formal examples/surreal-crm/design
       - name: Regenerate + TLC-check fulfillment
         run: .bin/machinery verify-formal examples/fulfillment/design
       - name: Regenerate + TLC-check portfolio-engine

@@ -26,7 +26,8 @@ jobs:
       - name: Regenerate oracles with Go
         run: |
           make build
-          for md in examples/go-crm/design/machines examples/fulfillment/design/machines \
+          for md in examples/go-crm/design/machines examples/surreal-crm/design/machines \
+                    examples/fulfillment/design/machines \
                     examples/portfolio-engine/design/machines \
                     examples/checkout-split/orders/design/machines \
                     examples/checkout-split/payments/design/machines; do
@@ -40,7 +41,8 @@ jobs:
       # single-sourcing it in the binary is the fix.
       - name: Regenerate formal specs with Go
         run: |
-          for d in examples/go-crm/design examples/fulfillment/design \
+          for d in examples/go-crm/design examples/surreal-crm/design \
+                   examples/fulfillment/design \
                    examples/portfolio-engine/design \
                    examples/checkout-split/orders/design \
                    examples/checkout-split/payments/design; do

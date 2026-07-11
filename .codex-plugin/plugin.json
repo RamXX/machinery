@@ -1,6 +1,6 @@
 {
   "name": "machinery",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "Design greenfield, brownfield, hybrid, and rebuild software as a build-ready, formally verified blueprint with deterministic gates.",
   "author": {
     "name": "RamXX",
