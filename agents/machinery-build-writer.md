@@ -129,6 +129,9 @@ artifact. Include the `checked:` counts in your report.
 - The state-migration section and the toolchain-and-versions subsection are present.
 - In rebuild/hybrid mode, the `Migration implementation plan` covers every contract phase and the
   mapping, characterization, replay, reconciliation, failure, rollback, and cutover regression nets.
+- For an isolated pack child, the `Neighbor stand-ins and test environment` section covers every
+  neighboring boundary with a stand-in held to the neighbor-contract oracle (stable-id keyed), and
+  the environment recipe is self-contained.
 - The build plan starts with a walking skeleton.
 - The hard-TDD protocol is stated and unambiguous, including the gate anchors: check-green before
   test derivation, the three-part RED exit gate (stable-id coverage, `machinery check --impl`
