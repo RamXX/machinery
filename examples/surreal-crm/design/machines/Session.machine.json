@@ -1,0 +1,177 @@
+{
+  "_role": "operational",
+  "_comment": "Session operational/auth machine (Session is not a Modelith entity with a status enum; it is the operational credential described in the glossary and ARCHITECTURE.md section 3). PLACEMENT (ARCHITECTURE.md section 7): in-process during a command; the token persists to ~/.crm/session as a user id + expiry, HMAC-signed. CONCURRENCY SERIALIZATION: last write wins; single local user, no cross-process contention on the token file. INVOKES map to C4 relationships: verifyCredentials -> crm.session -> crm.repo (loads the user and verifies the argon2id hash); readSessionFile/writeSessionFile/clearSessionFile -> crm.session -> crm.sessionfile. The store-backed verify can hit transient store contention (ErrLocked), so it carries the same bounded retry as CommandExecution. Token expiry is the HMAC-signed expiry compared on resume; represented declaratively as the `sessionTTL` named delay on Active. GUARDS: guardUserDisabled enforces disabled-cannot-auth at login; guardSessionUserActive enforces session-active-user on resume. Every state handles every event explicitly (a no-session state rejects useSession/logout rather than silently ignoring).",
+  "_delays": {
+    "verifyTimeout": "5000 ms - bound on verifyCredentials (argon2id is memory-hard but bounded)",
+    "verifyRetryBackoff": "500 ms - ErrLocked backoff on the repo-backed verify; retriesExhausted at 3 (~1.5s)",
+    "fileIoTimeout": "2000 ms - bound on session-file read/write/clear",
+    "loadUserTimeout": "10000 ms - SurrealDB query timeout for the resume-time user load (ARCHITECTURE.md section 6)",
+    "sessionTTL": "28800000 ms (8h) - token lifetime; the signed expiry is authoritative, this delay is its declarative representation"
+  },
+  "id": "session",
+  "initial": "Anonymous",
+  "context": {
+    "userId": null,
+    "username": null,
+    "role": null,
+    "userStatus": null,
+    "teamId": null,
+    "expiresAt": null,
+    "retries": 0,
+    "lastError": null
+  },
+  "states": {
+    "Anonymous": {
+      "on": {
+        "login": { "target": "Authenticating", "actions": "setCredentials" },
+        "resume": { "target": "Resolving" },
+        "logout": { "actions": "recordNoSessionToLogout" },
+        "useSession": { "actions": "recordNoActiveSession" }
+      }
+    },
+    "Authenticating": {
+      "invoke": {
+        "src": "verifyCredentials",
+        "input": { "username": "context.username", "password": "event.password" },
+        "onDone": [
+          { "target": "AuthDenied", "guard": "guardUserDisabled", "actions": "recordDisabled" },
+          { "target": "WritingSession", "actions": "captureUser" }
+        ],
+        "onError": [
+          { "target": "AuthFailed", "guard": "isErrBadCredentials", "actions": "recordBadCredentials" },
+          { "target": "AuthDenied", "guard": "isErrDisabled", "actions": "recordDisabled" },
+          { "target": "VerifyRetry", "guard": "isErrLocked", "actions": "recordError" },
+          { "target": "SessionUnavailable", "actions": "recordVerifyError" }
+        ]
+      },
+      "after": {
+        "verifyTimeout": { "target": "SessionUnavailable", "actions": "recordTimeout" }
+      }
+    },
+    "VerifyRetry": {
+      "always": [
+        { "target": "SessionUnavailable", "guard": "retriesExhausted", "actions": "recordRetriesExhausted" }
+      ],
+      "after": {
+        "verifyRetryBackoff": { "target": "Authenticating", "actions": "incrementRetries" }
+      }
+    },
+    "WritingSession": {
+      "invoke": {
+        "src": "writeSessionFile",
+        "input": { "userId": "context.userId", "expiresAt": "context.expiresAt" },
+        "onDone": { "target": "Active" },
+        "onError": { "target": "SessionUnavailable", "actions": "recordFileError" }
+      },
+      "after": {
+        "fileIoTimeout": { "target": "SessionUnavailable", "actions": "recordTimeout" }
+      }
+    },
+    "Resolving": {
+      "invoke": {
+        "src": "readSessionFile",
+        "input": {},
+        "onDone": [
+          { "target": "Expired", "guard": "guardSessionExpired", "actions": "recordExpired" },
+          { "target": "CheckingUser", "actions": "captureToken" }
+        ],
+        "onError": [
+          { "target": "Anonymous", "guard": "isErrNoSession", "actions": "recordNoSession" },
+          { "target": "Expired", "guard": "isErrExpired", "actions": "recordExpired" },
+          { "target": "SessionUnavailable", "actions": "recordFileError" }
+        ]
+      },
+      "after": {
+        "fileIoTimeout": { "target": "SessionUnavailable", "actions": "recordTimeout" }
+      }
+    },
+    "CheckingUser": {
+      "invoke": {
+        "src": "loadUser",
+        "input": { "userId": "context.userId" },
+        "onDone": [
+          { "target": "Active", "guard": "guardSessionUserActive", "actions": "captureUser" },
+          { "target": "Invalidated", "actions": "recordUserNotActive" }
+        ],
+        "onError": [
+          { "target": "VerifyRetry", "guard": "isErrLocked", "actions": "recordError" },
+          { "target": "Invalidated", "guard": "isErrNotFound", "actions": "recordUserMissing" },
+          { "target": "SessionUnavailable", "actions": "recordLoadError" }
+        ]
+      },
+      "after": {
+        "loadUserTimeout": { "target": "SessionUnavailable", "actions": "recordTimeout" }
+      }
+    },
+    "Active": {
+      "on": {
+        "logout": { "target": "LoggingOut" },
+        "useSession": { "actions": "recordSessionUsed" },
+        "login": { "actions": "recordAlreadyActive" },
+        "resume": { "actions": "recordAlreadyResolved" }
+      },
+      "after": {
+        "sessionTTL": { "target": "Expired", "actions": "recordExpired" }
+      }
+    },
+    "LoggingOut": {
+      "invoke": {
+        "src": "clearSessionFile",
+        "input": {},
+        "onDone": { "target": "LoggedOut" },
+        "onError": { "target": "LoggedOut", "actions": "recordLogoutWarning" }
+      },
+      "after": {
+        "fileIoTimeout": { "target": "LoggedOut", "actions": "recordLogoutWarning" }
+      }
+    },
+    "Expired": {
+      "on": {
+        "login": { "target": "Authenticating", "actions": "setCredentials" },
+        "resume": { "actions": "recordExpiredNeedsLogin" },
+        "logout": { "actions": "recordNoSessionToLogout" },
+        "useSession": { "actions": "recordSessionExpired" }
+      }
+    },
+    "LoggedOut": {
+      "on": {
+        "login": { "target": "Authenticating", "actions": "setCredentials" },
+        "resume": { "actions": "recordNoSession" },
+        "logout": { "actions": "recordNoSessionToLogout" },
+        "useSession": { "actions": "recordNoActiveSession" }
+      }
+    },
+    "AuthFailed": {
+      "on": {
+        "login": { "target": "Authenticating", "actions": "setCredentials" },
+        "resume": { "actions": "recordNoSession" },
+        "logout": { "actions": "recordNoSessionToLogout" },
+        "useSession": { "actions": "recordNoActiveSession" }
+      }
+    },
+    "AuthDenied": {
+      "on": {
+        "login": { "target": "Authenticating", "actions": "setCredentials" },
+        "resume": { "actions": "recordNoSession" },
+        "logout": { "actions": "recordNoSessionToLogout" },
+        "useSession": { "actions": "recordNoActiveSession" }
+      }
+    },
+    "Invalidated": {
+      "on": {
+        "login": { "target": "Authenticating", "actions": "setCredentials" },
+        "resume": { "actions": "recordNoSession" },
+        "logout": { "actions": "recordNoSessionToLogout" },
+        "useSession": { "actions": "recordNoActiveSession" }
+      }
+    },
+    "SessionUnavailable": {
+      "on": {
+        "login": { "target": "Authenticating", "actions": "setCredentials" },
+        "resume": { "target": "Resolving" },
+        "logout": { "actions": "recordNoSessionToLogout" },
+        "useSession": { "actions": "recordNoActiveSession" }
+      }
+    }
+  }
+}

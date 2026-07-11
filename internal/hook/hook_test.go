@@ -428,18 +428,22 @@ func TestSelectGatesProgressiveOptional(t *testing.T) {
 	if err := os.MkdirAll(formal, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(filepath.Join(dir, "legacy"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	sel := selectGates(dir, Config{})
-	for _, g := range []string{"gm", "gp", "gi", "gn"} {
+	for _, g := range []string{"gm", "gs", "gp", "gi", "gn"} {
 		if sel.Run[g] {
 			t.Errorf("%s must not run before its annotation exists", g)
 		}
 	}
 	writeFile(t, filepath.Join(dir, "migration.yaml"), "contract_version: 1\n")
+	writeFile(t, filepath.Join(dir, "legacy", "surface.yaml"), "surface_version: 1\n")
 	writeFile(t, filepath.Join(formal, "policy.relational.yaml"), "subjects: {}\n")
 	writeFile(t, filepath.Join(formal, "integrity.relational.yaml"), "entities: []\n")
 	writeFile(t, filepath.Join(formal, "isolation.relational.yaml"), "tenant: {}\n")
 	sel = selectGates(dir, Config{})
-	for _, g := range []string{"gm", "gp", "gi", "gn"} {
+	for _, g := range []string{"gm", "gs", "gp", "gi", "gn"} {
 		if !sel.Run[g] {
 			t.Errorf("%s must run once its opt-in artifact exists", g)
 		}

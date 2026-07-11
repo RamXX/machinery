@@ -112,9 +112,10 @@ Fittingly, machinery is itself built this way, a gated pipeline around a non-det
 
 ```
 Phase 0  Frame        what, who, purpose, target language
-Rebuild  Transition   legacy model + target model + migration.yaml (opt-in)
+Rebuild  Transition   legacy model + target model + migration.yaml + surface ledger (opt-in)
          tool: Gm-transition (complete disposition, mappings, phases, cutover, risks)
-         attested: what is worth saving; transformation and rollback semantics
+               Gs-surface (every legacy route/command/table/job disposed against the target)
+         attested: what is worth saving; transformation and rollback semantics; sweep completeness
 Phase 1  Modelith     domain model
          tool: modelith lint clean
          attested: lifecycle enums, action pre/post, invariant owners, scenario coverage
@@ -324,6 +325,15 @@ the migration implementation and transformations remain the responsibility of th
 BUILD.md. The [rebuild and hybrid guide](docs/rebuild-guide.md) contains the full contract reference,
 workflow, test checklist, and the worked Go CRM rebuild.
 
+Gm's coverage universe is the legacy model the run declared, so it cannot see a subsystem the
+excavation missed. `design/legacy/surface.yaml`, the capability disposition ledger, closes that
+hole: it inventories the legacy system's mechanically enumerable surface (routes, CLI commands,
+tables, jobs, events, integrations) and maps every item to a target design element or an explicit
+dropped/deferred disposition. The file activates **Gs-surface**, and it deliberately does not
+depend on `migration.yaml`: a clean-break rebuild that drops the migration machinery keeps its
+completeness anchor. The [surface ledger guide](docs/surface-ledger.md) has the schema, the
+opening/closing sweep protocol, and the worked SurrealDB CRM rebuild.
+
 ## Which model to use where
 
 The gates check structure, not substance: a shallow domain model with the wrong invariants gates
@@ -490,7 +500,7 @@ version matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.1.9        # force an exact release
+machinery update --version v0.2.0        # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
@@ -564,7 +574,11 @@ make verify-formal   # regenerates and checks all 26 TLC proofs + the go-crm pol
 | Gate | One line |
 |---|---|
 | Gate 1 | `modelith lint` on the domain model (Phase 1). The binary has no `g1`, by design: Phase 1's gate is modelith's own linter. |
+| Gm-transition | rebuild/hybrid designs only: every legacy entity disposed, replaced attributes and lifecycle values fully mapped, ordered source-of-truth phases with rollback, evidence-based cutover, owned transitional risks. |
+| Gs-surface | designs with a legacy surface ledger only: all six surface classes inventoried or waived, every route/command/table/job/event/integration covered, dropped, or deferred, and covered bindings resolve against the target design. |
 | Gp-policy | designs with a policy annotation only: it binds to the domain model, covers every top-level invariant, and the committed `Policy.als` and `Policy.oracle.md` byte-match a fresh generation. |
+| Gi-integrity | designs with an integrity annotation only: it binds to the domain model and the committed `Integrity.als` byte-matches a fresh generation. |
+| Gn-isolation | designs with an isolation annotation only: it binds to the domain model and the committed `Isolation.als` and `Isolation.oracle.md` byte-match a fresh generation. |
 | G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, and every dependency has a mitigation row. |
 | G3-machine | machines pass structural lint, committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
 | Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows. |
@@ -593,7 +607,7 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   `compose`, `check`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`, `install`,
   `update`, `uninstall`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
-  `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the Gm/Gp/Gi/Gn/G2/G3/Gx/G4/G5
+  `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/G4/G5
   suite), `pack/` (recursive decomposition via contract packs), `formal/` (TLC + Alloy
   orchestration), `install/` (skill placement behind `machinery install`), `experiments/` (the
   shared mutation-experiment table). Every package has unit tests.
@@ -618,6 +632,11 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 - `examples/go-crm/` the worked rebuild example: `design/legacy/` (the working prototype truth),
   `design/migration.yaml` (the checked transition), the target blueprint/formal models, and `impl/`
   (the verified Go build).
+- `examples/surreal-crm/` the store-swap rebuild example: the go-crm system moving from the
+  embedded store to SurrealDB in Docker. Exercises Gs-surface (the legacy surface ledger,
+  `design/legacy/surface.yaml`) and an all-reuse `migration.yaml`; its machines and oracles are
+  byte-identical to go-crm's, which is the point: mitigations reclassify failures, the domain
+  does not move.
 - `examples/fulfillment/` the distributed stress test: `design/` only (six machines, eight proofs,
   and `FINDINGS.md`, the record of what strained and what was fixed).
 - `examples/portfolio-engine/` a second design-only example in a different domain and language (a
@@ -661,7 +680,7 @@ full gate suite run against a synthesized design/impl fixture) runs as Go tests 
 | `internal/refine` | 83% | data-refinement (3 patterns) |
 | `internal/compose` | 81% | cross-aggregate composition |
 | `internal/install` | 80% | skill placement behind `machinery install` (fetch, extract, canonical+symlink layout) |
-| `internal/gates` | 69% | the Gm/Gp/Gi/Gn/G2/G3/Gx/G4/G5 gate suite (G5 also exercised via `internal/experiments`) |
+| `internal/gates` | 69% | the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/G4/G5 gate suite (G5 also exercised via `internal/experiments`) |
 | `internal/pack` | 58% | contract packs (the mutation suite lives in `internal/experiments`) |
 | `internal/ir` | 55% | shared IR (covered transitively via lint/gates) |
 | `internal/formal` | 41% | TLC/Alloy orchestration (solver-run paths need Java) |

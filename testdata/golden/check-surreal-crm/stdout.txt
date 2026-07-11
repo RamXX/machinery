@@ -1,0 +1,34 @@
+== Gm-transition  hybrid/rebuild migration contract ==
+  checked: 9 legacy entities, 9 target entities, 9 dispositions, 5 salvage decisions, 3 transition phases, 1 cutover contracts, 3 transition risks, 1 transition architecture sections, 1 migration implementation plans
+  ok
+== Gs-surface  legacy surface ledger ==
+  checked: 46 commands, 10 tables, 54 covered, 1 dropped, 1 deferred, 4 waived classes, 56 surface items
+  ok
+== Gp-policy static relational model ==
+  checked: 4 roles, 5 resources, 4 policy rules, 1 residuals (waived with reason), 12 invariants carried, 14 solver commands generated, 70 authz oracle rows generated, 2 committed artifacts fresh (byte-identical)
+  ok
+== Gi-integrity structural relational model ==
+  checked: 4 entities, 3 unique keys, 1 singleton flags, 4 invariants carried, 5 solver commands generated, 1 committed artifacts fresh (byte-identical)
+  ok
+== Gn-isolation multi-tenant relational model ==
+  checked: 4 records, 2 references, 2 invariants carried, 5 solver commands generated, 8 tenant oracle rows generated, 2 committed artifacts fresh (byte-identical)
+  ok
+== G2-c4  Architecture Contract ==
+  checked: 6 boundaries, 1 externals, 12 allow rules, 2 deny rules, 15 dsl elements, 6 boundaries bound to dsl, 9 mitigation rows, 4 dependencies with mitigation rows
+  ok
+== G3-machine  machines + oracle ==
+  warn   Deal.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
+  warn   Task.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
+  warn   User.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
+  note   Deal.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStage is set by every setPending* action to the current domain state, which is one of the six DealStage values; the six priorIs* guards cover DealStage totally
+  note   Task.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: only Open and InProgress have transitions into the persist overlay, so priorStatus ranges over {Open, InProgress}; both priorIs* guards are present
+  note   User.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present
+  checked: 5 machines, 194 transitions, 5 oracles fresh, 194 matrix rows reconciled, 186 named units covered, 3 states relying on unproven _exhaustive liveness
+== Gx-trace  cross-layer traceability ==
+  note   Deal: 3 operational-overlay states (persisting, persistRetry, rolledBack)
+  note   Task: 3 operational-overlay states (persisting, persistRetry, rolledBack)
+  note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
+  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 27 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 2 invariants attested (structural/prose), 13 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
+  ok
+
+0 blocking (ERROR/DRIFT) finding(s)

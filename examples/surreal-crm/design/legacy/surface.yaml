@@ -1,0 +1,92 @@
+surface_version: 1
+system: go-crm v1, a single-binary CLI CRM over an embedded LadybugDB graph store
+_comment: >
+  Opening sweep enumerated the cobra command tree and the store shape from the running
+  system (examples/go-crm: BUILD.md sections 4-5, impl/internal/cli, impl/internal/repo,
+  ARCHITECTURE.md section 6 for the operational commands). Closing sweep settled every
+  row against the SurrealDB target design. The domain surface carries over 1:1 (the
+  rebuild replaces the store, not the domain); the two operational store commands are
+  where the dispositions get interesting.
+classes:
+  routes:
+    none: The legacy system is a local CLI binary; it exposes no network API.
+  commands:
+    source: cobra command tree, one `crm <noun> <verb>` per domain action (impl/internal/cli; backup/restore from ARCHITECTURE.md section 6)
+    items:
+      - {name: crm login, disposition: covered, via: action, target: User.login}
+      - {name: crm logout, disposition: covered, via: action, target: User.logout}
+      - {name: crm user register, disposition: covered, via: action, target: User.register}
+      - {name: crm user change-password, disposition: covered, via: action, target: User.changePassword}
+      - {name: crm user disable, disposition: covered, via: action, target: User.disable}
+      - {name: crm user enable, disposition: covered, via: action, target: User.enable}
+      - {name: crm user assign-role, disposition: covered, via: action, target: User.assignRole}
+      - {name: crm user list, disposition: covered, via: entity, target: User}
+      - {name: crm team create, disposition: covered, via: action, target: Team.create}
+      - {name: crm team rename, disposition: covered, via: action, target: Team.rename}
+      - {name: crm team list, disposition: covered, via: entity, target: Team}
+      - {name: crm account create, disposition: covered, via: action, target: Account.create}
+      - {name: crm account update, disposition: covered, via: action, target: Account.update}
+      - {name: crm account reassign, disposition: covered, via: action, target: Account.reassign}
+      - {name: crm account delete, disposition: covered, via: action, target: Account.delete}
+      - {name: crm account list, disposition: covered, via: entity, target: Account}
+      - {name: crm contact create, disposition: covered, via: action, target: Contact.create}
+      - {name: crm contact update, disposition: covered, via: action, target: Contact.update}
+      - {name: crm contact reassign, disposition: covered, via: action, target: Contact.reassign}
+      - {name: crm contact delete, disposition: covered, via: action, target: Contact.delete}
+      - {name: crm contact list, disposition: covered, via: entity, target: Contact}
+      - {name: crm deal create, disposition: covered, via: action, target: Deal.create}
+      - {name: crm deal advance, disposition: covered, via: action, target: Deal.advanceStage}
+      - {name: crm deal win, disposition: covered, via: action, target: Deal.win}
+      - {name: crm deal lose, disposition: covered, via: action, target: Deal.lose}
+      - {name: crm deal reopen, disposition: covered, via: action, target: Deal.reopen}
+      - {name: crm deal reassign, disposition: covered, via: action, target: Deal.reassign}
+      - {name: crm deal list, disposition: covered, via: entity, target: Deal}
+      - {name: crm pipeline create, disposition: covered, via: action, target: Pipeline.create}
+      - {name: crm pipeline set-default, disposition: covered, via: action, target: Pipeline.setDefault}
+      - {name: crm pipeline list, disposition: covered, via: entity, target: Pipeline}
+      - {name: crm activity log, disposition: covered, via: action, target: Activity.log}
+      - {name: crm activity delete, disposition: covered, via: action, target: Activity.delete}
+      - {name: crm activity list, disposition: covered, via: entity, target: Activity}
+      - {name: crm task create, disposition: covered, via: action, target: Task.create}
+      - {name: crm task start, disposition: covered, via: action, target: Task.start}
+      - {name: crm task complete, disposition: covered, via: action, target: Task.complete}
+      - {name: crm task cancel, disposition: covered, via: action, target: Task.cancel}
+      - {name: crm task reassign, disposition: covered, via: action, target: Task.reassign}
+      - {name: crm task list, disposition: covered, via: entity, target: Task}
+      - {name: crm tag create, disposition: covered, via: action, target: Tag.create}
+      - {name: crm tag apply, disposition: covered, via: action, target: Tag.apply}
+      - {name: crm tag remove, disposition: covered, via: action, target: Tag.remove}
+      - {name: crm tag list, disposition: covered, via: entity, target: Tag}
+      - name: crm backup
+        disposition: dropped
+        rationale: >
+          Copied the embedded LadybugDB directory; meaningless against a client-server
+          store. Superseded by the SurrealDB export procedure in the target runbook
+          (ARCHITECTURE.md, dependency mitigation posture) and by the migration's signed
+          export manifests.
+      - name: crm restore
+        disposition: deferred
+        rationale: >
+          The target restore procedure depends on the SurrealDB backup/import runbook for
+          the Docker instance, deliberately deferred to the operations iteration and
+          tracked in BUILD.md section 12 (open questions). Until then, restore is the
+          documented docker-volume snapshot procedure, not a crm subcommand.
+  tables:
+    source: LadybugDB node labels (one per aggregate, impl/internal/repo and BUILD.md section 3) plus the session token file (impl/internal/session)
+    items:
+      - {name: node label User, disposition: covered, via: entity, target: User}
+      - {name: node label Team, disposition: covered, via: entity, target: Team}
+      - {name: node label Account, disposition: covered, via: entity, target: Account}
+      - {name: node label Contact, disposition: covered, via: entity, target: Contact}
+      - {name: node label Deal, disposition: covered, via: entity, target: Deal}
+      - {name: node label Pipeline, disposition: covered, via: entity, target: Pipeline}
+      - {name: node label Activity, disposition: covered, via: entity, target: Activity}
+      - {name: node label Task, disposition: covered, via: entity, target: Task}
+      - {name: node label Tag, disposition: covered, via: entity, target: Tag}
+      - {name: session token file ~/.crm/session, disposition: covered, via: component, target: sessionfile}
+  jobs:
+    none: No scheduled or background work; every effect is a synchronous command invocation.
+  events:
+    none: Single-process binary; no queues or topics consumed or produced.
+  integrations:
+    none: No outbound calls to external services; the only I/O is the local store and the session file.

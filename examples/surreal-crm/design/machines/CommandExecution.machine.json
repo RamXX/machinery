@@ -1,0 +1,132 @@
+{
+  "_role": "operational",
+  "_comment": "CommandExecution operational-envelope machine: the per-invocation lifecycle of the crm binary (ARCHITECTURE.md section 3, 'the operational envelope'). PLACEMENT (ARCHITECTURE.md section 7): ephemeral per invocation, no persistence of its own; it owns the single write Tx. CONCURRENCY SERIALIZATION: one invocation owns the write Tx; cross-process serialization is in SurrealDB's transaction engine; transient contention (container starting, commit conflict) is surfaced as ErrLocked on Opening (or on the write in Executing) and absorbed by the bounded-retry DBLocked state (<=3 attempts, ~1.5s, ARCHITECTURE.md section 6). This machine is the home of the SurrealDB connect/write/timeout failure rows from section 6: open-lock -> DBLocked, open-corrupt -> Corrupt, write-constraint -> ValidationFailed, disk-full/timeout/unavailable -> DBError, no-session/expired -> Denied. INVOKES map to C4 relationships: openDatabase -> crm.commands -> crm.repo -> store (Repo.Connect); resolveSession -> crm.commands -> crm.session (Sessions.Current, delegates to the Session machine); executeInTx -> crm.commands -> crm.repo (Tx boundary) composed with crm.domain -> crm.repo -> store (the aggregate machine + SaveX SurrealQL). Parsing, Authorizing, and Rendering are pure (no I/O), so they are `always`-guarded, not invokes; Authorizing is the single call site of the pure crm.authz decision (rbac-* invariants).",
+  "_delays": {
+    "openTimeout": "5000 ms - bound on Repo.Open",
+    "dbRetryBackoff": "500 ms - ErrLocked backoff; retriesExhausted at 3 attempts (~1.5s total, ARCHITECTURE.md section 6 open-lock bound)",
+    "sessionResolveTimeout": "5000 ms - bound on resolveSession",
+    "queryTimeout": "10000 ms - SurrealDB per-query timeout (ARCHITECTURE.md section 6)"
+  },
+  "id": "commandExecution",
+  "initial": "Parsing",
+  "context": {
+    "argv": null,
+    "verb": null,
+    "entityType": null,
+    "actor": null,
+    "targetOwnerId": null,
+    "targetTeamId": null,
+    "dbPath": null,
+    "phase": null,
+    "retries": 0,
+    "lastError": null,
+    "exitCode": null
+  },
+  "states": {
+    "Parsing": {
+      "always": [
+        { "target": "Opening", "guard": "guardParseOk", "actions": "captureArgs" },
+        { "target": "ValidationFailed", "actions": "recordParseError" }
+      ]
+    },
+    "Opening": {
+      "entry": "setPhaseOpen",
+      "invoke": {
+        "src": "openDatabase",
+        "input": { "dbPath": "context.dbPath" },
+        "onDone": { "target": "ResolvingSession", "actions": "captureTx" },
+        "onError": [
+          { "target": "DBLocked", "guard": "isErrLocked", "actions": "recordError" },
+          { "target": "Corrupt", "guard": "isErrCorrupt", "actions": "recordCorrupt" },
+          { "target": "DBError", "guard": "isErrUnavailable", "actions": "recordUnavailable" },
+          { "target": "DBError", "actions": "recordOpenError" }
+        ]
+      },
+      "after": {
+        "openTimeout": { "target": "DBError", "actions": "recordTimeout" }
+      }
+    },
+    "DBLocked": {
+      "always": [
+        { "target": "DBError", "guard": "retriesExhausted", "actions": "recordLockExhausted" }
+      ],
+      "after": {
+        "dbRetryBackoff": [
+          { "target": "Opening", "guard": "phaseIsOpen", "actions": "incrementRetries" },
+          { "target": "Executing", "guard": "phaseIsExecute", "actions": "incrementRetries" }
+        ]
+      }
+    },
+    "ResolvingSession": {
+      "invoke": {
+        "src": "resolveSession",
+        "input": { "argv": "context.argv" },
+        "onDone": { "target": "Authorizing", "actions": "captureActor" },
+        "onError": [
+          { "target": "Denied", "guard": "isErrNoSession", "actions": "recordNeedLogin" },
+          { "target": "Denied", "guard": "isErrExpired", "actions": "recordNeedLogin" },
+          { "target": "DBLocked", "guard": "isErrLocked", "actions": "recordError" },
+          { "target": "DBError", "actions": "recordSessionError" }
+        ]
+      },
+      "after": {
+        "sessionResolveTimeout": { "target": "DBError", "actions": "recordTimeout" }
+      }
+    },
+    "Authorizing": {
+      "always": [
+        { "target": "Executing", "guard": "guardAuthorized", "actions": "recordAllowed" },
+        { "target": "Denied", "actions": "recordDenyReason" }
+      ]
+    },
+    "Executing": {
+      "entry": "setPhaseExecute",
+      "invoke": {
+        "src": "executeInTx",
+        "input": {
+          "verb": "context.verb",
+          "entityType": "context.entityType",
+          "actor": "context.actor"
+        },
+        "onDone": { "target": "Rendering", "actions": "captureResult" },
+        "onError": [
+          { "target": "ValidationFailed", "guard": "isErrConstraint", "actions": ["ensureRolledBack", "recordConstraint"] },
+          { "target": "DBLocked", "guard": "isErrLocked", "actions": ["ensureRolledBack", "recordError"] },
+          { "target": "DBLocked", "guard": "isErrConflict", "actions": ["ensureRolledBack", "recordConflict"] },
+          { "target": "DBError", "guard": "isErrDiskFull", "actions": ["ensureRolledBack", "recordDiskFull"] },
+          { "target": "DBError", "guard": "isErrTimeout", "actions": ["ensureRolledBack", "recordTimeout"] },
+          { "target": "DBError", "actions": ["ensureRolledBack", "recordExecuteError"] }
+        ]
+      },
+      "after": {
+        "queryTimeout": { "target": "DBError", "actions": ["ensureRolledBack", "recordTimeout"] }
+      }
+    },
+    "Rendering": {
+      "entry": "renderOutput",
+      "always": [
+        { "target": "Done" }
+      ]
+    },
+    "Done": {
+      "type": "final",
+      "entry": "recordSuccessExit"
+    },
+    "Denied": {
+      "type": "final",
+      "entry": "recordDeniedExit"
+    },
+    "ValidationFailed": {
+      "type": "final",
+      "entry": "recordValidationExit"
+    },
+    "DBError": {
+      "type": "final",
+      "entry": "recordDBErrorExit"
+    },
+    "Corrupt": {
+      "type": "final",
+      "entry": "recordCorruptExit"
+    }
+  }
+}

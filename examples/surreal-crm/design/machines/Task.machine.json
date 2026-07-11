@@ -1,0 +1,113 @@
+{
+  "_comment": "Task aggregate lifecycle machine (states derived from Modelith enum TaskStatus; events from Task actions). PLACEMENT (ARCHITECTURE.md section 7): ephemeral in-process, load-act-save inside the single write Tx the Command Layer owns; the status persists as the `status` field on its table in SurrealDB. CONCURRENCY SERIALIZATION: read-modify-write within one write Tx; cross-process writes serialize in SurrealDB's transaction engine (ErrLocked handled by CommandExecution/DBLocked). On load the runtime rehydrates to context.status; `initial` is the create-time status (Open). `reassign` changes the owner but keeps the status (persist lands back on the same status). task-terminal is enforced STRUCTURALLY: Done and Cancelled are `final`, so they accept no events and cannot be left (no reopen exists for Task, unlike Deal). `persisting`/`persistRetry`/`rolledBack` are the operational overlay wrapping the crm.domain -> crm.repo -> store persist (SurrealQL SaveTask); atomic, so on error the machine returns to context.priorStatus.",
+  "_delays": {
+    "persistTimeout": "10000 ms - SurrealDB per-query timeout (ARCHITECTURE.md section 6)",
+    "persistRetryBackoff": "500 ms - ErrLocked backoff; retriesExhausted at 3 attempts (~1.5s total)"
+  },
+  "id": "task",
+  "initial": "Open",
+  "context": {
+    "taskId": null,
+    "title": null,
+    "dueDate": null,
+    "status": "Open",
+    "ownerId": null,
+    "actor": null,
+    "newAssigneeId": null,
+    "pendingStatus": null,
+    "priorStatus": null,
+    "retries": 0,
+    "lastError": null
+  },
+  "states": {
+    "Open": {
+      "on": {
+        "start": [
+          { "target": "persisting", "guard": "guardCanStart", "actions": "setPendingStart" },
+          { "actions": "recordStartDenied" }
+        ],
+        "complete": [
+          { "target": "persisting", "guard": "guardCanComplete", "actions": "setPendingComplete" },
+          { "actions": "recordCompleteDenied" }
+        ],
+        "cancel": [
+          { "target": "persisting", "guard": "guardCanCancel", "actions": "setPendingCancel" },
+          { "actions": "recordCancelDenied" }
+        ],
+        "reassign": [
+          { "target": "persisting", "guard": "guardCanReassign", "actions": "setPendingReassign" },
+          { "actions": "recordReassignDenied" }
+        ]
+      }
+    },
+    "InProgress": {
+      "on": {
+        "start": { "actions": "recordAlreadyStarted" },
+        "complete": [
+          { "target": "persisting", "guard": "guardCanComplete", "actions": "setPendingComplete" },
+          { "actions": "recordCompleteDenied" }
+        ],
+        "cancel": [
+          { "target": "persisting", "guard": "guardCanCancel", "actions": "setPendingCancel" },
+          { "actions": "recordCancelDenied" }
+        ],
+        "reassign": [
+          { "target": "persisting", "guard": "guardCanReassign", "actions": "setPendingReassign" },
+          { "actions": "recordReassignDenied" }
+        ]
+      }
+    },
+    "Done": {
+      "type": "final",
+      "entry": "recordTaskClosed"
+    },
+    "Cancelled": {
+      "type": "final",
+      "entry": "recordTaskClosed"
+    },
+    "persisting": {
+      "invoke": {
+        "src": "saveTask",
+        "input": {
+          "taskId": "context.taskId",
+          "status": "context.pendingStatus",
+          "ownerId": "context.ownerId",
+          "newAssigneeId": "context.newAssigneeId",
+          "actor": "context.actor"
+        },
+        "onDone": [
+          { "target": "Open", "guard": "pendingIsOpen", "actions": "commitStatus" },
+          { "target": "InProgress", "guard": "pendingIsInProgress", "actions": "commitStatus" },
+          { "target": "Done", "guard": "pendingIsDone", "actions": "commitStatus" },
+          { "target": "Cancelled", "guard": "pendingIsCancelled", "actions": "commitStatus" },
+          { "target": "rolledBack", "actions": "recordRoutingError" }
+        ],
+        "onError": [
+          { "target": "persistRetry", "guard": "isErrLocked", "actions": "recordError" },
+          { "target": "rolledBack", "guard": "isErrConstraint", "actions": "recordConstraint" },
+          { "target": "rolledBack", "guard": "isErrDiskFull", "actions": "recordDiskFull" },
+          { "target": "rolledBack", "guard": "isErrTimeout", "actions": "recordTimeout" },
+          { "target": "rolledBack", "actions": "recordUnknownError" }
+        ]
+      },
+      "after": {
+        "persistTimeout": { "target": "rolledBack", "actions": "recordTimeout" }
+      }
+    },
+    "persistRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "retriesExhausted", "actions": "recordRetriesExhausted" }
+      ],
+      "after": {
+        "persistRetryBackoff": { "target": "persisting", "actions": "incrementRetries" }
+      }
+    },
+    "rolledBack": {
+      "_exhaustive": "only Open and InProgress have transitions into the persist overlay, so priorStatus ranges over {Open, InProgress}; both priorIs* guards are present",
+      "always": [
+        { "target": "Open", "guard": "priorIsOpen" },
+        { "target": "InProgress", "guard": "priorIsInProgress" }
+      ]
+    }
+  }
+}

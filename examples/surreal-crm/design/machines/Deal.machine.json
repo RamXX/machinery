@@ -1,0 +1,162 @@
+{
+  "_comment": "Deal aggregate lifecycle machine (states derived from Modelith enum DealStage; events from Deal actions). PLACEMENT (ARCHITECTURE.md section 7): ephemeral in-process, load-act-save inside the single write Tx the Command Layer owns; the stage persists as the `stage` field on the `deal` table in SurrealDB. CONCURRENCY SERIALIZATION: read-modify-write within one write Tx; cross-process writes serialize in SurrealDB's transaction engine (a second concurrent writer is refused with ErrLocked, retried/handled by the CommandExecution machine's DBLocked state). On load the runtime rehydrates this machine to context.stage; `initial` is the create-time stage (Lead). The `persisting`/`persistRetry`/`rolledBack` states are the operational overlay that wraps the domain lifecycle transition in the crm.domain -> crm.repo -> store persist (SurrealQL SaveDeal). The persist is atomic: on any error the store is unchanged, so the machine returns to context.priorStage.",
+  "_delays": {
+    "persistTimeout": "10000 ms - SurrealDB per-query timeout (ARCHITECTURE.md section 6)",
+    "persistRetryBackoff": "500 ms - ErrLocked backoff; retriesExhausted at 3 attempts gives ~1.5s total (ARCHITECTURE.md section 6 open-lock bound)"
+  },
+  "id": "deal",
+  "initial": "Lead",
+  "context": {
+    "dealId": null,
+    "title": null,
+    "amountCents": 0,
+    "stage": "Lead",
+    "closeDate": null,
+    "ownerId": null,
+    "actor": null,
+    "pendingStage": null,
+    "priorStage": null,
+    "pendingCloseDate": null,
+    "retries": 0,
+    "lastError": null
+  },
+  "states": {
+    "Lead": {
+      "on": {
+        "advanceStage": [
+          { "target": "persisting", "guard": "guardCanAdvance", "actions": "setPendingAdvance" },
+          { "actions": "recordAdvanceDenied" }
+        ],
+        "win": [
+          { "target": "persisting", "guard": "guardCanWin", "actions": "setPendingWin" },
+          { "actions": "recordWinDenied" }
+        ],
+        "lose": [
+          { "target": "persisting", "guard": "guardCanLose", "actions": "setPendingLose" },
+          { "actions": "recordLoseDenied" }
+        ],
+        "reopen": { "actions": "recordReopenNotTerminal" }
+      }
+    },
+    "Qualified": {
+      "on": {
+        "advanceStage": [
+          { "target": "persisting", "guard": "guardCanAdvance", "actions": "setPendingAdvance" },
+          { "actions": "recordAdvanceDenied" }
+        ],
+        "win": [
+          { "target": "persisting", "guard": "guardCanWin", "actions": "setPendingWin" },
+          { "actions": "recordWinDenied" }
+        ],
+        "lose": [
+          { "target": "persisting", "guard": "guardCanLose", "actions": "setPendingLose" },
+          { "actions": "recordLoseDenied" }
+        ],
+        "reopen": { "actions": "recordReopenNotTerminal" }
+      }
+    },
+    "Proposal": {
+      "on": {
+        "advanceStage": [
+          { "target": "persisting", "guard": "guardCanAdvance", "actions": "setPendingAdvance" },
+          { "actions": "recordAdvanceDenied" }
+        ],
+        "win": [
+          { "target": "persisting", "guard": "guardCanWin", "actions": "setPendingWin" },
+          { "actions": "recordWinDenied" }
+        ],
+        "lose": [
+          { "target": "persisting", "guard": "guardCanLose", "actions": "setPendingLose" },
+          { "actions": "recordLoseDenied" }
+        ],
+        "reopen": { "actions": "recordReopenNotTerminal" }
+      }
+    },
+    "Negotiation": {
+      "on": {
+        "advanceStage": { "actions": "recordAdvanceDenied" },
+        "win": [
+          { "target": "persisting", "guard": "guardCanWin", "actions": "setPendingWin" },
+          { "actions": "recordWinDenied" }
+        ],
+        "lose": [
+          { "target": "persisting", "guard": "guardCanLose", "actions": "setPendingLose" },
+          { "actions": "recordLoseDenied" }
+        ],
+        "reopen": { "actions": "recordReopenNotTerminal" }
+      }
+    },
+    "Won": {
+      "on": {
+        "reopen": [
+          { "target": "persisting", "guard": "guardCanReopen", "actions": "setPendingReopen" },
+          { "actions": "recordReopenDenied" }
+        ],
+        "advanceStage": { "actions": "recordTerminalRejected" },
+        "win": { "actions": "recordTerminalRejected" },
+        "lose": { "actions": "recordTerminalRejected" }
+      }
+    },
+    "Lost": {
+      "on": {
+        "reopen": [
+          { "target": "persisting", "guard": "guardCanReopen", "actions": "setPendingReopen" },
+          { "actions": "recordReopenDenied" }
+        ],
+        "advanceStage": { "actions": "recordTerminalRejected" },
+        "win": { "actions": "recordTerminalRejected" },
+        "lose": { "actions": "recordTerminalRejected" }
+      }
+    },
+    "persisting": {
+      "invoke": {
+        "src": "saveDeal",
+        "input": {
+          "dealId": "context.dealId",
+          "stage": "context.pendingStage",
+          "amountCents": "context.amountCents",
+          "closeDate": "context.pendingCloseDate",
+          "ownerId": "context.ownerId",
+          "actor": "context.actor"
+        },
+        "onDone": [
+          { "target": "Qualified", "guard": "pendingIsQualified", "actions": "commitStage" },
+          { "target": "Proposal", "guard": "pendingIsProposal", "actions": "commitStage" },
+          { "target": "Negotiation", "guard": "pendingIsNegotiation", "actions": "commitStage" },
+          { "target": "Won", "guard": "pendingIsWon", "actions": ["commitStage", "commitCloseDate"] },
+          { "target": "Lost", "guard": "pendingIsLost", "actions": "commitStage" },
+          { "target": "rolledBack", "actions": "recordRoutingError" }
+        ],
+        "onError": [
+          { "target": "persistRetry", "guard": "isErrLocked", "actions": "recordError" },
+          { "target": "rolledBack", "guard": "isErrConstraint", "actions": "recordConstraint" },
+          { "target": "rolledBack", "guard": "isErrDiskFull", "actions": "recordDiskFull" },
+          { "target": "rolledBack", "guard": "isErrTimeout", "actions": "recordTimeout" },
+          { "target": "rolledBack", "actions": "recordUnknownError" }
+        ]
+      },
+      "after": {
+        "persistTimeout": { "target": "rolledBack", "actions": "recordTimeout" }
+      }
+    },
+    "persistRetry": {
+      "always": [
+        { "target": "rolledBack", "guard": "retriesExhausted", "actions": "recordRetriesExhausted" }
+      ],
+      "after": {
+        "persistRetryBackoff": { "target": "persisting", "actions": "incrementRetries" }
+      }
+    },
+    "rolledBack": {
+      "_exhaustive": "priorStage is set by every setPending* action to the current domain state, which is one of the six DealStage values; the six priorIs* guards cover DealStage totally",
+      "always": [
+        { "target": "Lead", "guard": "priorIsLead" },
+        { "target": "Qualified", "guard": "priorIsQualified" },
+        { "target": "Proposal", "guard": "priorIsProposal" },
+        { "target": "Negotiation", "guard": "priorIsNegotiation" },
+        { "target": "Won", "guard": "priorIsWon" },
+        { "target": "Lost", "guard": "priorIsLost" }
+      ]
+    }
+  }
+}

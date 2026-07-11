@@ -1,0 +1,53 @@
+# Declarative relational-policy semantics: the meaning the domain model's
+# prose access invariants carry, in a closed algebra machinery alloy compiles
+# to a bounded relational model (Alloy) plus the standard meta-checks.
+#
+# History note: the first version of this annotation was faithful to the
+# invariants as originally written (membership lone with no required roles,
+# reassign target any). The generated meta-checks failed exactly as the
+# hand-written experiment predicted (experiments/alloy-go-crm): a teamless
+# Manager could not write its own records (CapableWritesOwn), and a Manager
+# could reassign a record to an outsider (ReassignRetainsAuthority). The
+# domain model was amended (manager-has-team, the reassign target clause, the
+# task-assignee-visible definition) and this annotation carries the amended
+# invariants.
+subjects:
+  entity: User
+  role_attr: role
+  team:
+    entity: Team
+    membership: lone            # single-team: at most one, zero is legal...
+    required_for: [Manager]     # ...except a Manager: manager-has-team
+    invariant: [single-team, manager-has-team]
+resources: [Account, Contact, Deal, Task, Activity]
+owned_invariants: [account-owned, contact-owned, deal-owned, task-owned, activity-owned]
+rules:
+  - invariant: rbac-crud-verbs
+    grants:
+      Admin: [create, read, update, delete]
+      Manager: [create, read, update, delete]
+      Rep: [create, read, update, delete]
+      ReadOnly: [read]
+  - invariant: rbac-read-visibility
+    verbs: [read]
+    scope:
+      Admin: all
+      "*": own | team
+  - invariant: rbac-write-scope
+    verbs: [update, delete]
+    scope:
+      Admin: all
+      Manager: team
+      Rep: own
+      ReadOnly: none
+  - invariant: [rbac-reassign-authority, task-assignee-visible]
+    reassign:
+      scope:
+        Admin: all
+        Manager: team
+      target:
+        Admin: any
+        Manager: team
+residuals:
+  - invariant: session-active-user
+    reason: behavioral; enforced by the Session machine and checked at the TLC rung
