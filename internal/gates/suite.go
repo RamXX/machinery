@@ -30,18 +30,32 @@ func Select(design, gateList string) (Selection, error) {
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if ms, _ := filepath.Glob(filepath.Join(design, "machines", "*.machine.json")); len(ms) == 0 {
 			// a pure decomposed parent authors no machines: its behavior
-			// layer is the children's, held by the packs; G3/Gx run there.
-			// Machine-less means no *.machine.json, not no directory: an
-			// empty machines/ dir once defeated this narrowing and failed a
-			// decomposed parent on G3/Gx (the H2 dogfood finding).
-			// The note text is pinned byte for byte by the golden corpus.
-			list = "g2,g5"
-			if HasSurfaceLedger(design) {
-				list = "gs," + list
+			// layer is the children's, held by the packs; only the
+			// machine-dependent gates (G3, Gx, G4) narrow away. Every
+			// artifact-activated gate keeps its auto-activation: v0.3.0
+			// narrowed gp/gi/gn away too, silently skipping the relational
+			// layers on a decomposed parent that carried them. Machine-less
+			// means no *.machine.json, not no directory: an empty machines/
+			// dir once defeated this narrowing and failed a decomposed
+			// parent on G3/Gx (the H2 dogfood finding). The note lists what
+			// actually runs; the golden corpus pins its text byte for byte.
+			var parts []string
+			for _, opt := range []struct {
+				gate string
+				has  func(string) bool
+			}{
+				{"gm", HasMigrationContract},
+				{"gs", HasSurfaceLedger},
+				{"gp", HasPolicyAnnotation},
+				{"gi", HasIntegrityAnnotation},
+				{"gn", HasIsolationAnnotation},
+			} {
+				if opt.has(design) {
+					parts = append(parts, opt.gate)
+				}
 			}
-			if HasMigrationContract(design) {
-				list = "gm," + list
-			}
+			parts = append(parts, "g2", "g5")
+			list = strings.Join(parts, ",")
 			sel.Note = "note: decomposed parent with no machines/; running " + list + " (G3/Gx/G4 run on the child designs)"
 		}
 	}

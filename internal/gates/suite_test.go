@@ -41,6 +41,38 @@ func TestSelectNarrowsDecomposedParentWithEmptyMachinesDir(t *testing.T) {
 	}
 }
 
+// v0.3.0 regression (caught on H2): the machine-less narrowing dropped the
+// artifact-activated relational gates. Narrowing may only skip the
+// machine-dependent gates (g3, gx, g4); gm/gs/gp/gi/gn keep their
+// auto-activation whenever their source artifacts exist.
+func TestSelectNarrowingKeepsArtifactActivatedGates(t *testing.T) {
+	design := t.TempDir() // no machines/ directory at all
+	writeSuiteFile(t, filepath.Join(design, "decomposition.yaml"), "decomposition_version: 1\n")
+	writeSuiteFile(t, filepath.Join(design, "migration.yaml"), "contract_version: 1\n")
+	writeSuiteFile(t, filepath.Join(design, "legacy", "surface.yaml"), "surface_version: 1\n")
+	writeSuiteFile(t, filepath.Join(design, "formal", "policy.relational.yaml"), "subjects: {}\n")
+	writeSuiteFile(t, filepath.Join(design, "formal", "integrity.relational.yaml"), "entities: []\n")
+	writeSuiteFile(t, filepath.Join(design, "formal", "isolation.relational.yaml"), "tenant: {}\n")
+	sel, err := Select(design, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, g := range []string{"gm", "gs", "gp", "gi", "gn", "g2", "g5"} {
+		if !sel.Run[g] {
+			t.Errorf("narrowing dropped artifact-activated gate %s: %v", g, sel.Run)
+		}
+	}
+	for _, g := range []string{"g3", "gx", "g4"} {
+		if sel.Run[g] {
+			t.Errorf("narrowing must skip machine-dependent gate %s: %v", g, sel.Run)
+		}
+	}
+	want := "note: decomposed parent with no machines/; running gm,gs,gp,gi,gn,g2,g5 (G3/Gx/G4 run on the child designs)"
+	if sel.Note != want {
+		t.Errorf("note = %q\nwant %q (the note must list what actually runs)", sel.Note, want)
+	}
+}
+
 func TestSelectKeepsFullDefaultOnceMachinesExist(t *testing.T) {
 	design := t.TempDir()
 	writeSuiteFile(t, filepath.Join(design, "decomposition.yaml"), "decomposition_version: 1\n")
