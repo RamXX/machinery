@@ -27,8 +27,14 @@
   note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 27 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 2 invariants attested (structural/prose), 13 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
   ok
+== Gb-plan  build plan structure ==
+  checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 2 skeleton citations
+  ok
 == G4-import  code respects the contract ==
   checked: 3 files ignored by contract, 16 go files checked, 21 imports resolved, 14 test files skipped, 12 edges verified
+  ok
+== Gt-tests  oracle ids in the test suite ==
+  checked: 14 test files scanned, 5 machines, 272 oracle rows, 194 ids covered by literal, 2 formal oracles, 2 formal oracles covered
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

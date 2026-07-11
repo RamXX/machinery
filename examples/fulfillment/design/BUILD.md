@@ -93,11 +93,53 @@ Every invariant with where it is enforced. Formal entries are TLC-checked.
 
 ## 6. Build plan
 
-Elixir umbrella with four apps plus a shared contracts lib. Walking skeleton: `place order -> saga
-reserves (stub inventory) -> saga captures (stub gateway) -> saga dispatches (stub carrier) ->
-Delivered`, exercising one real message-bus round trip and the outbox. Then vertical slices per service,
-then the real gateway and carrier adapters. The saga is built against the verified machine: its
-`gen_statem` states and transitions mirror `FulfillmentSaga.machine.json` one to one.
+Elixir umbrella with four apps plus a shared contracts lib. Walking skeleton first (prove the
+topology through one real boundary), then one vertical slice per service, then the real gateway and
+carrier adapters. The saga is built against the verified machine: its `gen_statem` states and
+transitions mirror `FulfillmentSaga.machine.json` one to one. Definition of done (DoD) is stated per
+milestone; the global bar is section 7 (one transition test per oracle row keyed by stable id, one
+named-unit test per matrix row, every section 5 invariant enforced where the matrix says). This is a
+design-only example: the milestones bind the first implementer.
+
+**M0 - Walking skeleton (thinnest end-to-end thread).** `place order -> saga reserves (stub
+inventory) -> saga captures (stub gateway) -> saga dispatches (stub carrier) -> Delivered`,
+exercising one real message-bus round trip and the transactional outbox. DoD: green for the saga
+forward path `FULF-ee2ed2`, `FULF-bba0be`, `FULF-6ec4e1` (T-FULF-02,05,08); the Order happy chain
+T-ORDE-01,05,09,11,13 with its persist commits T-ORDE-16..20; one outbox row driven
+Pending -> Published -> Consumed (T-OUTB-01,04,07 then T-OUTB-02,08); the delivered order durably
+persisted (a re-read sees Delivered); the bus round trip and the outbox write are real (docker
+compose), the three step actors are stubs.
+
+**M1 - Order service slice (aggregate, saga, outbox).** Complete the Order lifecycle (cancel, fail,
+denial rows) and its persist overlay, every saga compensation path, and the outbox failure rows via
+the Oban poller. DoD: all 33 T-ORDE, 14 T-FULF, and 16 T-OUTB rows green; `order-forward`,
+`order-owned-by-customer`, `order-total-matches-items` (property over generated line-item lists),
+`order-delivered-terminal`, `saga-terminal`, `outbox-at-least-once`, `exactly-once-effect`
+(idempotent consumers keyed by message id), `customer-email-unique`, `product-price-nonneg`, and
+`line-item-quantity-positive` enforced per section 5; the FailedDirty residual pages an operator;
+`make verify-formal` still green (saga termination, `saga-compensation`).
+
+**M2 - Inventory service slice.** Reservation lifecycle end to end against the real Inventory
+Postgres. DoD: all 12 T-RESE rows green; `reserved-within-stock` guard tests green (DB check
+included) and `available-nonneg` guard tests green; `reservation-quantity-positive` validation and
+`reservation-terminal` structural tests green; `reserve-before-pay` still proven (`Checkout.tla`).
+
+**M3 - Payment service slice.** Payment lifecycle against the gateway fake (contract-tested per the
+matrix fixture). DoD: all 37 T-PAYM rows green including the gatewayRetry bound and gatewayResume
+routing; `payment-amount-nonneg`, `payment-terminal`, `refund-amount-positive`,
+`payment-idempotent` (idempotency key unique per capture), `capture-matches-total`, and
+`refund-within-capture` enforced per section 5.
+
+**M4 - Shipping service slice.** Shipment lifecycle against the carrier fake. DoD: all 26 T-SHIP
+rows green including the carrierRetry bound; `shipment-terminal` structural and
+`address-country-present` validation tests green; `no-ship-before-pay` still proven
+(`Checkout.tla`).
+
+**M5 - Real gateway and carrier adapters.** Swap the stub gateway and carrier for the real adapters
+behind the same ports. DoD: the `capturePayment` and `dispatchShipment` actor contracts green
+against the sandbox fixtures named in the matrices; a capture retried twice charges once
+(idempotency key end to end); the full compensation path green against the real adapters; no
+transition test changes (the machines are adapter-agnostic).
 
 ### Toolchain and versions
 

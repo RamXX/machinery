@@ -45,29 +45,29 @@ func userCases() []userCase {
 	disable := domain.UserEvent{Kind: domain.UEvDisable}
 	enable := domain.UserEvent{Kind: domain.UEvEnable}
 	return []userCase{
-		{"T-USER-01", newUserAgg(domain.USActive, uAdmin), disable, domain.USPersisting, []string{"setPendingDisable"}},
-		{"T-USER-02_notAdmin", newUserAgg(domain.USActive, uMgrT1), disable, domain.USActive, []string{"recordAuthorityDenied"}},
-		{"T-USER-03", newUserAgg(domain.USActive, uAdmin), enable, domain.USActive, []string{"recordAlreadyActive"}},
-		{"T-USER-04", newUserAgg(domain.USDisabled, uAdmin), enable, domain.USPersisting, []string{"setPendingEnable"}},
-		{"T-USER-05_notAdmin", newUserAgg(domain.USDisabled, uMgrT1), enable, domain.USDisabled, []string{"recordAuthorityDenied"}},
-		{"T-USER-06", newUserAgg(domain.USDisabled, uAdmin), disable, domain.USDisabled, []string{"recordAlreadyDisabled"}},
+		{"T-USER-01_USER-e20d04", newUserAgg(domain.USActive, uAdmin), disable, domain.USPersisting, []string{"setPendingDisable"}},
+		{"T-USER-02_notAdmin_USER-2b2218", newUserAgg(domain.USActive, uMgrT1), disable, domain.USActive, []string{"recordAuthorityDenied"}},
+		{"T-USER-03_USER-0ef83a", newUserAgg(domain.USActive, uAdmin), enable, domain.USActive, []string{"recordAlreadyActive"}},
+		{"T-USER-04_USER-e59219", newUserAgg(domain.USDisabled, uAdmin), enable, domain.USPersisting, []string{"setPendingEnable"}},
+		{"T-USER-05_notAdmin_USER-ffd41a", newUserAgg(domain.USDisabled, uMgrT1), enable, domain.USDisabled, []string{"recordAuthorityDenied"}},
+		{"T-USER-06_USER-799d7d", newUserAgg(domain.USDisabled, uAdmin), disable, domain.USDisabled, []string{"recordAlreadyDisabled"}},
 
-		{"T-USER-07", userPending(domain.USActive), userSaveDone(), domain.USActive, []string{"commitStatus"}},
-		{"T-USER-08", userPending(domain.USDisabled), userSaveDone(), domain.USDisabled, []string{"commitStatus"}},
-		{"T-USER-09", userPending(domain.UserState("bogus")), userSaveDone(), domain.USRolledBack, []string{"recordRoutingError"}},
+		{"T-USER-07_USER-930b15", userPending(domain.USActive), userSaveDone(), domain.USActive, []string{"commitStatus"}},
+		{"T-USER-08_USER-dd6c98", userPending(domain.USDisabled), userSaveDone(), domain.USDisabled, []string{"commitStatus"}},
+		{"T-USER-09_USER-7b324b", userPending(domain.UserState("bogus")), userSaveDone(), domain.USRolledBack, []string{"recordRoutingError"}},
 
-		{"T-USER-10", newUserAgg(domain.USPersisting, uAdmin), userSaveErr(model.ErrLocked), domain.USPersistRetry, []string{"recordError"}},
-		{"T-USER-11", newUserAgg(domain.USPersisting, uAdmin), userSaveErr(model.ErrConstraint), domain.USRolledBack, []string{"recordConstraint"}},
-		{"T-USER-12", newUserAgg(domain.USPersisting, uAdmin), userSaveErr(model.ErrDiskFull), domain.USRolledBack, []string{"recordDiskFull"}},
-		{"T-USER-13", newUserAgg(domain.USPersisting, uAdmin), userSaveErr(model.ErrTimeout), domain.USRolledBack, []string{"recordTimeout"}},
-		{"T-USER-14", newUserAgg(domain.USPersisting, uAdmin), userSaveErr(model.ErrConflict), domain.USRolledBack, []string{"recordUnknownError"}},
-		{"T-USER-15", newUserAgg(domain.USPersisting, uAdmin), domain.UserEvent{Kind: domain.UEvPersistTimeout}, domain.USRolledBack, []string{"recordTimeout"}},
+		{"T-USER-10_USER-dde0a6", newUserAgg(domain.USPersisting, uAdmin), userSaveErr(model.ErrLocked), domain.USPersistRetry, []string{"recordError"}},
+		{"T-USER-11_USER-d2cfe6", newUserAgg(domain.USPersisting, uAdmin), userSaveErr(model.ErrConstraint), domain.USRolledBack, []string{"recordConstraint"}},
+		{"T-USER-12_USER-8e0d4c", newUserAgg(domain.USPersisting, uAdmin), userSaveErr(model.ErrDiskFull), domain.USRolledBack, []string{"recordDiskFull"}},
+		{"T-USER-13_USER-388821", newUserAgg(domain.USPersisting, uAdmin), userSaveErr(model.ErrTimeout), domain.USRolledBack, []string{"recordTimeout"}},
+		{"T-USER-14_USER-838e85", newUserAgg(domain.USPersisting, uAdmin), userSaveErr(model.ErrConflict), domain.USRolledBack, []string{"recordUnknownError"}},
+		{"T-USER-15_USER-a986a8", newUserAgg(domain.USPersisting, uAdmin), domain.UserEvent{Kind: domain.UEvPersistTimeout}, domain.USRolledBack, []string{"recordTimeout"}},
 
-		{"T-USER-16", userRetries(3), domain.UserEvent{Kind: domain.UEvAlways}, domain.USRolledBack, []string{"recordRetriesExhausted"}},
-		{"T-USER-17", userRetries(0), domain.UserEvent{Kind: domain.UEvRetryBackoff}, domain.USPersisting, []string{"incrementRetries"}},
+		{"T-USER-16_USER-1c13da", userRetries(3), domain.UserEvent{Kind: domain.UEvAlways}, domain.USRolledBack, []string{"recordRetriesExhausted"}},
+		{"T-USER-17_USER-081a5d", userRetries(0), domain.UserEvent{Kind: domain.UEvRetryBackoff}, domain.USPersisting, []string{"incrementRetries"}},
 
-		{"T-USER-18", userPrior(domain.USActive), domain.UserEvent{Kind: domain.UEvAlways}, domain.USActive, nil},
-		{"T-USER-19", userPrior(domain.USDisabled), domain.UserEvent{Kind: domain.UEvAlways}, domain.USDisabled, nil},
+		{"T-USER-18_USER-adccd9", userPrior(domain.USActive), domain.UserEvent{Kind: domain.UEvAlways}, domain.USActive, nil},
+		{"T-USER-19_USER-7cf0fc", userPrior(domain.USDisabled), domain.UserEvent{Kind: domain.UEvAlways}, domain.USDisabled, nil},
 	}
 }
 

@@ -10,5 +10,8 @@
   note   RecommendationRun: 1 operational-overlay states (collectRetry)
   checked: 6 entities, 1 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 3 placement rows with machines, 5 placement rows waived, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 18 invariants enforced, 12 invariants attested (structural/prose), 6 invariants unit-backed (guard/action/actor)
   ok
+== Gb-plan  build plan structure ==
+  checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 3 skeleton citations
+  ok
 
 0 blocking (ERROR/DRIFT) finding(s)

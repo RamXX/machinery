@@ -26,5 +26,8 @@
   note   Shipment: 5 operational-overlay states (dispatching, carrierRetry, persisting, persistRetry, rolledBack)
   checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 3 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 15 invariants attested (structural/prose), 1 invariants integrity-checked (relational model), 9 invariants unit-backed (guard/action/actor)
   ok
+== Gb-plan  build plan structure ==
+  checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 8 skeleton citations
+  ok
 
 0 blocking (ERROR/DRIFT) finding(s)

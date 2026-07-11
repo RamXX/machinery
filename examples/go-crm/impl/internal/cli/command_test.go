@@ -74,46 +74,46 @@ type cmdCase struct {
 func cmdCases() []cmdCase {
 	return []cmdCase{
 		// --- Parsing ---
-		{"T-CMD-01", withArgs(cmd(cli.CParsing), validArgs), cmdAlways(), cli.COpening, []string{"captureArgs"}},
-		{"T-CMD-02", withArgs(cmd(cli.CParsing), invalidArgs), cmdAlways(), cli.CValidationFailed, []string{"recordParseError"}},
+		{"T-CMD-01_COMM-44671c", withArgs(cmd(cli.CParsing), validArgs), cmdAlways(), cli.COpening, []string{"captureArgs"}},
+		{"T-CMD-02_COMM-6f50f3", withArgs(cmd(cli.CParsing), invalidArgs), cmdAlways(), cli.CValidationFailed, []string{"recordParseError"}},
 
 		// --- Opening (openDatabase) ---
-		{"T-CMD-03", cmd(cli.COpening), cmdDone(), cli.CResolvingSession, []string{"captureTx"}},
-		{"T-CMD-04", cmd(cli.COpening), errE(model.ErrLocked), cli.CDBLocked, []string{"recordError"}},
-		{"T-CMD-05", cmd(cli.COpening), errE(model.ErrCorrupt), cli.CCorrupt, []string{"recordCorrupt"}},
-		{"T-CMD-06", cmd(cli.COpening), errE(model.ErrUnavailable), cli.CDBError, []string{"recordUnavailable"}},
-		{"T-CMD-07", cmd(cli.COpening), errE(model.ErrConflict), cli.CDBError, []string{"recordOpenError"}},
-		{"T-CMD-08", cmd(cli.COpening), cli.CmdEvent{Kind: cli.CEvOpenTimeout}, cli.CDBError, []string{"recordTimeout"}},
+		{"T-CMD-03_COMM-5bc5e0", cmd(cli.COpening), cmdDone(), cli.CResolvingSession, []string{"captureTx"}},
+		{"T-CMD-04_COMM-ea53cf", cmd(cli.COpening), errE(model.ErrLocked), cli.CDBLocked, []string{"recordError"}},
+		{"T-CMD-05_COMM-b9aee2", cmd(cli.COpening), errE(model.ErrCorrupt), cli.CCorrupt, []string{"recordCorrupt"}},
+		{"T-CMD-06_COMM-8a2a55", cmd(cli.COpening), errE(model.ErrUnavailable), cli.CDBError, []string{"recordUnavailable"}},
+		{"T-CMD-07_COMM-343b9c", cmd(cli.COpening), errE(model.ErrConflict), cli.CDBError, []string{"recordOpenError"}},
+		{"T-CMD-08_COMM-5e3106", cmd(cli.COpening), cli.CmdEvent{Kind: cli.CEvOpenTimeout}, cli.CDBError, []string{"recordTimeout"}},
 
 		// --- DBLocked ---
-		{"T-CMD-09", withRetries(cmd(cli.CDBLocked), 3), cmdAlways(), cli.CDBError, []string{"recordLockExhausted"}},
-		{"T-CMD-10", withPhase(cmd(cli.CDBLocked), "open", 0), cli.CmdEvent{Kind: cli.CEvDbRetryBackoff}, cli.COpening, []string{"incrementRetries"}},
-		{"T-CMD-11", withPhase(cmd(cli.CDBLocked), "execute", 0), cli.CmdEvent{Kind: cli.CEvDbRetryBackoff}, cli.CExecuting, []string{"incrementRetries"}},
+		{"T-CMD-09_COMM-00c530", withRetries(cmd(cli.CDBLocked), 3), cmdAlways(), cli.CDBError, []string{"recordLockExhausted"}},
+		{"T-CMD-10_COMM-215300", withPhase(cmd(cli.CDBLocked), "open", 0), cli.CmdEvent{Kind: cli.CEvDbRetryBackoff}, cli.COpening, []string{"incrementRetries"}},
+		{"T-CMD-11_COMM-71162c", withPhase(cmd(cli.CDBLocked), "execute", 0), cli.CmdEvent{Kind: cli.CEvDbRetryBackoff}, cli.CExecuting, []string{"incrementRetries"}},
 
 		// --- ResolvingSession (resolveSession) ---
-		{"T-CMD-12", cmd(cli.CResolvingSession), cmdDone(), cli.CAuthorizing, []string{"captureActor"}},
-		{"T-CMD-13", cmd(cli.CResolvingSession), errE(model.ErrNoSession), cli.CDenied, []string{"recordNeedLogin"}},
-		{"T-CMD-14", cmd(cli.CResolvingSession), errE(model.ErrExpired), cli.CDenied, []string{"recordNeedLogin"}},
-		{"T-CMD-15", cmd(cli.CResolvingSession), errE(model.ErrLocked), cli.CDBLocked, []string{"recordError"}},
-		{"T-CMD-16", cmd(cli.CResolvingSession), errE(model.ErrUnavailable), cli.CDBError, []string{"recordSessionError"}},
-		{"T-CMD-17", cmd(cli.CResolvingSession), cli.CmdEvent{Kind: cli.CEvSessionResolveTimeout}, cli.CDBError, []string{"recordTimeout"}},
+		{"T-CMD-12_COMM-968d17", cmd(cli.CResolvingSession), cmdDone(), cli.CAuthorizing, []string{"captureActor"}},
+		{"T-CMD-13_COMM-ed4f93", cmd(cli.CResolvingSession), errE(model.ErrNoSession), cli.CDenied, []string{"recordNeedLogin"}},
+		{"T-CMD-14_COMM-cc7919", cmd(cli.CResolvingSession), errE(model.ErrExpired), cli.CDenied, []string{"recordNeedLogin"}},
+		{"T-CMD-15_COMM-22d79f", cmd(cli.CResolvingSession), errE(model.ErrLocked), cli.CDBLocked, []string{"recordError"}},
+		{"T-CMD-16_COMM-2151b8", cmd(cli.CResolvingSession), errE(model.ErrUnavailable), cli.CDBError, []string{"recordSessionError"}},
+		{"T-CMD-17_COMM-35a500", cmd(cli.CResolvingSession), cli.CmdEvent{Kind: cli.CEvSessionResolveTimeout}, cli.CDBError, []string{"recordTimeout"}},
 
 		// --- Authorizing (pure authz decision, routed through domain) ---
-		{"T-CMD-18", withAuthorize(cmd(cli.CAuthorizing), true), cmdAlways(), cli.CExecuting, []string{"recordAllowed"}},
-		{"T-CMD-19", withAuthorize(cmd(cli.CAuthorizing), false), cmdAlways(), cli.CDenied, []string{"recordDenyReason"}},
+		{"T-CMD-18_COMM-8c204a", withAuthorize(cmd(cli.CAuthorizing), true), cmdAlways(), cli.CExecuting, []string{"recordAllowed"}},
+		{"T-CMD-19_COMM-7f1685", withAuthorize(cmd(cli.CAuthorizing), false), cmdAlways(), cli.CDenied, []string{"recordDenyReason"}},
 
 		// --- Executing (executeInTx) ---
-		{"T-CMD-20", cmd(cli.CExecuting), cmdDone(), cli.CRendering, []string{"captureResult"}},
-		{"T-CMD-21", cmd(cli.CExecuting), errE(model.ErrConstraint), cli.CValidationFailed, []string{"ensureRolledBack", "recordConstraint"}},
-		{"T-CMD-22", cmd(cli.CExecuting), errE(model.ErrLocked), cli.CDBLocked, []string{"ensureRolledBack", "recordError"}},
-		{"T-CMD-23", cmd(cli.CExecuting), errE(model.ErrConflict), cli.CDBLocked, []string{"ensureRolledBack", "recordConflict"}},
-		{"T-CMD-24", cmd(cli.CExecuting), errE(model.ErrDiskFull), cli.CDBError, []string{"ensureRolledBack", "recordDiskFull"}},
-		{"T-CMD-25", cmd(cli.CExecuting), errE(model.ErrTimeout), cli.CDBError, []string{"ensureRolledBack", "recordTimeout"}},
-		{"T-CMD-26", cmd(cli.CExecuting), errE(errors.New("boom")), cli.CDBError, []string{"ensureRolledBack", "recordExecuteError"}},
-		{"T-CMD-27", cmd(cli.CExecuting), cli.CmdEvent{Kind: cli.CEvQueryTimeout}, cli.CDBError, []string{"ensureRolledBack", "recordTimeout"}},
+		{"T-CMD-20_COMM-5d7be9", cmd(cli.CExecuting), cmdDone(), cli.CRendering, []string{"captureResult"}},
+		{"T-CMD-21_COMM-ec7aeb", cmd(cli.CExecuting), errE(model.ErrConstraint), cli.CValidationFailed, []string{"ensureRolledBack", "recordConstraint"}},
+		{"T-CMD-22_COMM-d6cfde", cmd(cli.CExecuting), errE(model.ErrLocked), cli.CDBLocked, []string{"ensureRolledBack", "recordError"}},
+		{"T-CMD-23_COMM-8be203", cmd(cli.CExecuting), errE(model.ErrConflict), cli.CDBLocked, []string{"ensureRolledBack", "recordConflict"}},
+		{"T-CMD-24_COMM-40743b", cmd(cli.CExecuting), errE(model.ErrDiskFull), cli.CDBError, []string{"ensureRolledBack", "recordDiskFull"}},
+		{"T-CMD-25_COMM-cb11e8", cmd(cli.CExecuting), errE(model.ErrTimeout), cli.CDBError, []string{"ensureRolledBack", "recordTimeout"}},
+		{"T-CMD-26_COMM-0b53b2", cmd(cli.CExecuting), errE(errors.New("boom")), cli.CDBError, []string{"ensureRolledBack", "recordExecuteError"}},
+		{"T-CMD-27_COMM-84ddf1", cmd(cli.CExecuting), cli.CmdEvent{Kind: cli.CEvQueryTimeout}, cli.CDBError, []string{"ensureRolledBack", "recordTimeout"}},
 
 		// --- Rendering ---
-		{"T-CMD-28", cmd(cli.CRendering), cmdAlways(), cli.CDone, nil},
+		{"T-CMD-28_COMM-121e81", cmd(cli.CRendering), cmdAlways(), cli.CDone, nil},
 	}
 }
 

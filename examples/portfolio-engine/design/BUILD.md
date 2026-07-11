@@ -364,25 +364,36 @@ Target language: Python.
 
 ## 13. Build plan
 
-1. **Walking skeleton (thinnest end-to-end slice through one real boundary).** `pf recommend` over a
-   tiny two-index fixture with cached prices: build a `CandidateSet` (dedup), start a
-   `RecommendationRun`, fetch prices through the feed (breaker closed), optimize a 16-of-N fixture,
-   reach Ready with a `Portfolio`. Prove the topology, one real DuckDB write, and one real optimizer
-   run. Done when `RECO-f89da8` then `RECO-d6fcf9` pass against a real store and a forced feed failure
-   drives `RECO-040944` then the bounded retry.
-2. **Run pipeline slice**: all RecommendationRun transitions, `run-ready-has-portfolio`,
-   `run-forward-only`, `run-terminal-absorbing`, and the collectRetry bound; green before the next.
-3. **Feed breaker slice**: MarketDataFeed closed/open/halfOpen, `feed-circuit-breaks`.
-4. **Optimizer slice**: `portfolio-size-16`, `portfolio-holdings-deduped`, `portfolio-from-candidates`,
-   `portfolio-has-drawdown`, `holding-weight-nonneg`, `holding-weights-sum-full` as property tests over
-   the pure optimizer.
-5. **Portfolio review slice**: all Portfolio transitions, `portfolio-review-forward`,
-   `portfolio-accept-role`, `portfolio-reopen-role`, `portfolio-accepted-has-date`, and the commit
-   overlay under a forced version conflict.
-6. **Reference-data and operations slice**: Index refresh (`index-top-30`), Security upsert
-   (`ticker-unique`), CandidateSet build (`candidate-deduped`, `candidate-from-top-30`), then `backup`/
-   `restore` and the corruption abort path.
+**M0 - Walking skeleton (thinnest end-to-end slice through one real boundary).** `pf recommend` over a
+tiny two-index fixture with cached prices: build a `CandidateSet` (dedup), start a
+`RecommendationRun`, fetch prices through the feed (breaker closed), optimize a 16-of-N fixture,
+reach Ready with a `Portfolio`. Prove the topology, one real DuckDB write, and one real optimizer
+run. DoD: `RECO-f89da8` then `RECO-d6fcf9` pass against a real store and a forced feed failure
+drives `RECO-040944` then the bounded retry; contract tests for the crossed boundaries green; no
+cross-boundary violation (G4-import clean); the formal suite still green.
 
-Definition of done per milestone: all its oracle transitions covered, all its invariants
-property-tested, its contract tests green, no cross-boundary violation (G4-import clean), and the
+**M1 - Run pipeline slice.** All RecommendationRun transitions, `run-ready-has-portfolio`,
+`run-forward-only`, `run-terminal-absorbing`, and the collectRetry bound; green before the next.
+DoD: all 8 RecommendationRun oracle rows covered, the three listed invariants property-tested, its
+contract tests green, G4-import clean, formal suite still green.
+
+**M2 - Feed breaker slice.** MarketDataFeed closed/open/halfOpen, `feed-circuit-breaks`. DoD: all 6
+MarketDataFeed oracle rows covered, `feed-circuit-breaks` property-tested, its contract tests green,
+G4-import clean, formal suite still green.
+
+**M3 - Optimizer slice.** `portfolio-size-16`, `portfolio-holdings-deduped`, `portfolio-from-candidates`,
+`portfolio-has-drawdown`, `holding-weight-nonneg`, `holding-weights-sum-full` as property tests over
+the pure optimizer. DoD: the six listed invariants property-tested over the pure optimizer, its
+contract tests green, G4-import clean, formal suite still green.
+
+**M4 - Portfolio review slice.** All Portfolio transitions, `portfolio-review-forward`,
+`portfolio-accept-role`, `portfolio-reopen-role`, `portfolio-accepted-has-date`, and the commit
+overlay under a forced version conflict. DoD: all 19 Portfolio oracle rows covered, the four listed
+invariants property-tested, the commit overlay verified under a forced version conflict, its
+contract tests green, G4-import clean, formal suite still green.
+
+**M5 - Reference-data and operations slice.** Index refresh (`index-top-30`), Security upsert
+(`ticker-unique`), CandidateSet build (`candidate-deduped`, `candidate-from-top-30`), then `backup`/
+`restore` and the corruption abort path. DoD: the listed invariants property-tested, a backup then
+restore round trip green, the corruption abort loud, its contract tests green, G4-import clean,
 formal suite still green.

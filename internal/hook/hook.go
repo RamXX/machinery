@@ -90,7 +90,7 @@ func Load(root string) (cfg Config, ok bool, warn string) {
 	if cfg.Gates != "" {
 		for _, tok := range strings.Split(strings.ToLower(cfg.Gates), ",") {
 			t := strings.TrimSpace(tok)
-			if t != "gp" && t != "g2" && t != "g3" && t != "gx" && t != "g4" && t != "g5" {
+			if !gates.KnownGate(t) {
 				warn = fmt.Sprintf("machinery: %s gates list has unknown gate %q; selecting gates automatically", ConfigName, t)
 				cfg.Gates = ""
 				break
@@ -299,9 +299,13 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 		return emitJSON(w, stopOut{SystemMessage: "machinery: project is machinery-managed but the design directory " +
 			design + "/ does not exist; gates skipped."})
 	}
-	sel := selectGates(designDir, cfg)
+	sel, selWarn := selectGates(designDir, cfg)
 	if len(sel.Run) == 0 {
 		clearState(root, in.SessionID)
+		if selWarn != "" {
+			// nothing ran, but the dropped-gates gap must stay visible
+			return emitJSON(w, stopOut{SystemMessage: selWarn})
+		}
 		return nil
 	}
 	implDir := ""
@@ -335,6 +339,9 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 			"\nFix the sources and regenerate the derived artifacts " +
 			"(machinery oracle | machinery verify-formal --gen-only | machinery pack generate); " +
 			"never hand-edit generated files."
+		if selWarn != "" {
+			reason = selWarn + "\n" + reason
+		}
 		if warn != "" {
 			reason = warn + "\n" + reason
 		}
@@ -342,9 +349,12 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 	case shouldBlock:
 		// already continued once for this stop: surface it, do not loop
 		clearState(root, in.SessionID)
-		return emitJSON(w, stopOut{SystemMessage: fmt.Sprintf(
-			"machinery: gates still red after a fix attempt (%d blocking finding(s), %d DRIFT). "+
-				"Stopping anyway; run 'machinery check %s' to review.", blocking, drift, design)})
+		msg := fmt.Sprintf("machinery: gates still red after a fix attempt (%d blocking finding(s), %d DRIFT). "+
+			"Stopping anyway; run 'machinery check %s' to review.", blocking, drift, design)
+		if selWarn != "" {
+			msg = selWarn + "\n" + msg
+		}
+		return emitJSON(w, stopOut{SystemMessage: msg})
 	case blocking > 0:
 		// ERRORs without DRIFT: normal for a design mid-interrogation
 		clearState(root, in.SessionID)
@@ -356,9 +366,16 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 				"'machinery baseline %s --impl <dir>' (paste the printed rules, commit the ratchet) to arm enforcement.",
 				blocking, g4Blocking, design, design)
 		}
+		if selWarn != "" {
+			msg = selWarn + "\n" + msg
+		}
 		return emitJSON(w, stopOut{SystemMessage: msg})
 	default:
 		clearState(root, in.SessionID)
+		if selWarn != "" {
+			// a green run still surfaces the config gap, or it never surfaces
+			return emitJSON(w, stopOut{SystemMessage: selWarn})
+		}
 		return nil
 	}
 }
@@ -366,13 +383,27 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 // selectGates picks the suite for a stop-time check: the staged list from
 // the config when present, otherwise whichever gates have artifacts to
 // check, so a half-built design is never failed for phases not yet reached.
-func selectGates(designDir string, cfg Config) gates.Selection {
+// The returned warning names any impl-facing gates (g4, gt) the staged list
+// requested but no impl setting backs: a stop-time hook must not hard-fail
+// the whole check for a config gap, but the drop has to stay visible.
+func selectGates(designDir string, cfg Config) (gates.Selection, string) {
 	if cfg.Gates != "" {
 		if sel, err := gates.Select(designDir, cfg.Gates); err == nil {
+			warn := ""
 			if cfg.Impl == "" {
-				delete(sel.Run, "g4")
+				var dropped []string
+				for _, gate := range []string{"g4", "gt"} {
+					if sel.Run[gate] {
+						delete(sel.Run, gate)
+						dropped = append(dropped, gate)
+					}
+				}
+				if len(dropped) > 0 {
+					warn = fmt.Sprintf("machinery: the %s gates list names %s but no impl is configured; those gates were skipped (set \"impl\" in %s to run them)",
+						ConfigName, strings.Join(dropped, ","), ConfigName)
+				}
 			}
-			return sel
+			return sel, warn
 		}
 	}
 	run := map[string]bool{}
@@ -404,13 +435,19 @@ func selectGates(designDir string, cfg Config) gates.Selection {
 		// fail it for phases that live in the child designs
 		run["gx"] = true
 	}
+	if fileExists(filepath.Join(designDir, "BUILD.md")) {
+		// unlike Gx, the plan-shape gate applies even on a machine-less
+		// decomposed parent: the manifest BUILD.md is still its artifact
+		run["gb"] = true
+	}
 	if cfg.Impl != "" {
 		run["g4"] = true
+		run["gt"] = true
 	}
 	if pack.HasDecomposition(designDir) || pack.HasPack(designDir) {
 		run["g5"] = true
 	}
-	return gates.Selection{Run: run, Explicit: true}
+	return gates.Selection{Run: run, Explicit: true}, ""
 }
 
 // --- SessionStart: announce governance so every session knows the contract ---

@@ -56,6 +56,10 @@ func walkSourceFiles(root string) ([]string, error) {
 			}
 			if _, ok := langExts[filepath.Ext(p)]; ok {
 				files = append(files, p)
+			} else if isTestFile(e.Name()) {
+				// *.test.mjs / *.test.cjs: test files in extensions langExts
+				// never maps for import parsing; Gt still needs them walked
+				files = append(files, p)
 			}
 		}
 		return nil
@@ -66,8 +70,12 @@ func walkSourceFiles(root string) ([]string, error) {
 	return files, nil
 }
 
+// testFilePatterns, isTestFile, and isTestContent are the ONE test-file
+// classifier, shared by G4 (which SKIPS test files, per its documented
+// semantics) and Gt (which scans exactly the files G4 skips): the two gates
+// can never disagree about what a test file is.
 var testFilePatterns = []string{"*_test.go", "*_test.py", "test_*.py", "*.test.ts", "*.test.tsx",
-	"*.test.js", "*_test.exs", "*_spec.rb"}
+	"*.test.js", "*.test.jsx", "*.test.mjs", "*.test.cjs", "*_test.exs", "*_spec.rb", "*_test.rs"}
 
 func isTestFile(rel string) bool {
 	base := filepath.Base(rel)
@@ -76,7 +84,21 @@ func isTestFile(rel string) bool {
 			return true
 		}
 	}
+	// Rust integration tests are any *.rs under a tests/ directory, at any depth
+	if strings.HasSuffix(base, ".rs") {
+		for _, seg := range strings.Split(filepath.ToSlash(filepath.Dir(rel)), "/") {
+			if seg == "tests" {
+				return true
+			}
+		}
+	}
 	return false
+}
+
+// isTestContent classifies the test files a path shape cannot: Rust unit
+// tests live in production-named .rs files as #[cfg(test)] modules.
+func isTestContent(rel, text string) bool {
+	return strings.HasSuffix(rel, ".rs") && strings.Contains(text, "#[cfg(test)]")
 }
 
 func matchGlob(rel, pattern string) bool {
@@ -397,6 +419,10 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 		lang := langExts[filepath.Ext(path)]
 		srcB := boundaryOf(rel, pkgmap)
 		text := readOrEmpty(path)
+		if isTestContent(rel, text) {
+			g.Count("test files skipped")
+			continue
+		}
 		if srcB == "" && lang == "elixir" {
 			for _, mod := range exDefmoduleRe.FindAllStringSubmatch(text, -1) {
 				for _, bm := range boundModules {
