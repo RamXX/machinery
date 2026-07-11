@@ -269,7 +269,11 @@ stateful component decide persistence and placement (in-memory actor vs persiste
 is the real bridge into Phase 3. For multi-component designs, also author the **event-contract
 table** (producer, consumer, payload by Modelith attribute reference, delivery guarantee, ordering
 assumption, dedupe key): coupling through shared DB tables or bus topics is invisible to G4-import,
-so this table is the governing artifact for it.
+so this table is the governing artifact for it. On a design that decomposes, the table must follow
+the machine-checkable format in `references/c4-standalone.md` (an event column, exactly one
+component per producer/consumer cell, annotations only in parentheses, fan-outs expanded to one
+row per pair): pack generation extracts from it by exact component name and fails loudly on any
+cell it cannot resolve.
 
 **GATE 2:** run `machinery check <design> --gate g2`. **G2-c4** verifies, deterministically:
 the contract parses (a yaml code fence starting with `contract_version` under a heading containing
@@ -582,7 +586,9 @@ two artifacts per subsystem it will NOT design itself:
 
 1. `design/decomposition.yaml`: the subsystems, each with `owns:` (every Modelith entity has
    exactly one owner), `components:`, `boundaries:`, `delegated_invariants:`, a `contract_machine`,
-   and (once the child exists) `child_design:`.
+   and (once the child exists) `child_design:`. A subsystem that genuinely has no boundary events
+   declares `boundary_events: {none: "<reason>"}`; without that waiver, extracting zero events for
+   a subsystem fails generation (it is almost always an event-table defect).
 2. `design/contracts/<Sub>Contract.machine.json`: the abstract protocol the neighbors rely on,
    restricted to plain on-transitions and finals. This is what the child must refine and all the
    parent ever assumes.
@@ -591,6 +597,14 @@ two artifacts per subsystem it will NOT design itself:
 owned domain slice, the boundary event rows, the contract machine plus its TLA+ module, the
 delegated invariants, and a content hash. The pack is generated and frozen: the parent's entire
 model of the child, and the child's entire view of the parent.
+
+Extraction from the event-contract table is strict: every producer/consumer cell must resolve to
+exactly one known participant (a subsystem component or an Architecture Contract boundary
+element), annotations only in parentheses, fan-outs expanded to one row per producer-consumer
+pair; the machine-checkable format contract is in the c4 reference. A cell that resolves to
+nothing or names several components fails generation loudly, naming the row and the offending
+cell text. Nothing non-empty is ever silently dropped: a lossy table once shipped near-empty
+packs whose events.md still claimed boundary completeness.
 
 Each child is a full, ordinary machinery run (all four phases, all gates) whose Phase 0 is the
 pack, copied to `design/pack/`. The child may add anything internal but the pack's public shape is
@@ -633,12 +647,15 @@ stand-ins cannot prove stays named: the parent's residuals (end-to-end latency, 
 liveness, unmodeled channels) belong to the parent's cross-context assembly suite.
 
 **GATE 5:** `machinery check` runs G5-pack automatically on decomposed designs (a machine-less
-parent runs g2,g5; children run everything). Parent side: committed packs byte-match a fresh
-generation, and every pinned child was built against the CURRENT pack. Child side: pack hash
-verified, packmap reconciled, refinement artifacts fresh, owned shape unchanged, delegated
-invariants traced, boundary events covered in both directions. A boundary change is therefore a
-PARENT edit: regenerate packs, re-copy, and the pack diff is the child's affected-obligation list,
-exactly as an oracle diff is the affected-test list.
+parent runs g2,g5, where machine-less means no `machines/*.machine.json`, an empty directory
+included; children run everything). Parent side: committed packs byte-match a fresh generation,
+every pinned child was built against the CURRENT pack, and the `checked:` line prints per-pack
+boundary-event counts so an unexpected zero is visible in every run. Because G5 regenerates packs
+in memory, a lossy event-contract table fails the gate itself, not only `pack generate`. Child
+side: pack hash verified, packmap reconciled, refinement artifacts fresh, owned shape unchanged,
+delegated invariants traced, boundary events covered in both directions. A boundary change is
+therefore a PARENT edit: regenerate packs, re-copy, and the pack diff is the child's
+affected-obligation list, exactly as an oracle diff is the affected-test list.
 
 Residuals to name in the parent's BUILD.md (the proofs do not cover them): properties not
 expressible in the contract-machine vocabulary (end-to-end latency, deadlock through resources
