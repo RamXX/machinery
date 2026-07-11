@@ -317,6 +317,29 @@ rule). Columns:
 |---|---|---|---|---|---|
 | `Order.ORDER_PAID` | `Shipment.PREPARE` | Order.id, Order.total | at-least-once (outbox -> `q`) | per-order FIFO (partition by Order.id) | Order.id + event type |
 
+### Machine-checkable format (mandatory on a decomposed parent)
+
+`machinery pack generate` extracts each subsystem's boundary events from this table by exact
+component name, so on a decomposed parent the table is a machine-read artifact with a format
+contract, enforced at generation time and again by G5 (which regenerates packs in memory):
+
+- an **event** column names every event; no row leaves it empty.
+- **producer** and **consumer** cells each hold exactly one component name: a `components:` entry
+  from `decomposition.yaml` or an Architecture Contract boundary `element` (a gateway or ui that
+  owns no entities and gets no pack is still a valid participant). Contract externals do not
+  qualify; an external system that genuinely produces or consumes events must be declared as a
+  boundary.
+- annotations are allowed only in parentheses: `gateway (SSE)` resolves to `gateway`. Backticks
+  are stripped the same way.
+- fan-outs are expanded explicitly: one row per producer-consumer pair, never `ALL components`, a
+  comma list, a slash, or an arrow.
+- rows between two non-pack participants (gateway to ui) are validated like every other row; they
+  emit no pack rows.
+- generation FAILS on any violation, naming the row and the offending cell text; nothing non-empty
+  is ever silently dropped. A subsystem extracting zero boundary events is also a generation error
+  unless `decomposition.yaml` waives it per subsystem with `boundary_events: {none: "<reason>"}`;
+  the generated events.md then carries the reason instead of the boundary-completeness claim.
+
 ## Gate 2 checklist
 
 Deterministic (run `machinery check <design> --gate g2`):
