@@ -10,7 +10,9 @@
   is an entry-point manifest over `design/` and the shards `design/BUILD/<context>.md`. The root
   carries the glossary, the Architecture Contract, the traceability matrix, and the cross-context
   test spec; each shard carries sections 5 to 9 for its context. The zero-context claim then applies
-  to the design tree as a whole, and self-containment applies per shard.
+  to the design tree as a whole, and self-containment applies per shard. A `README.md` or `index.md`
+  under `design/BUILD/` is a shard index for humans, not a plan shard; Gb exempts it from the plan
+  obligations.
 
 Two artifacts are never pasted by hand: the machine JSON (section 5 references the machine files)
 and the transition tables (section 7 references the generated oracles). Pasted copies drift; the
@@ -167,11 +169,25 @@ legacy persisted value to a modeled state, plus an explicit rule for unmapped va
 never silently coerce).
 
 ## 9. Build plan
-- Walking skeleton first: the thinnest end-to-end slice that exercises one real transition through one
-  real boundary. Prove the topology before adding breadth.
-- Then vertical slices, one component lifecycle at a time, each slice green before the next.
-- Milestone list with a definition of done per milestone (all transitions covered, all invariants
-  property-tested, contract tests green, no cross-boundary violations).
+Walking skeleton first: the thinnest end-to-end slice that exercises one real transition through one
+real boundary. Prove the topology before adding breadth. Then vertical slices, one component
+lifecycle at a time, each slice green before the next.
+
+Format contract, held deterministically by Gb-plan:
+- Each milestone is a bold marker `**M<n> - <title>**` with a unique number.
+- The first milestone (M0) is the walking skeleton: its title contains "walking skeleton". A
+  brownfield gap plan whose skeleton already exists in production waives it with the literal line
+  `Walking skeleton: N/A - <reason>`.
+- Every milestone block carries a `DoD:` line stating concrete oracle-row and test-id coverage
+  (transitions covered, invariants property-tested, contract tests green, no cross-boundary
+  violations).
+- The skeleton milestone's DoD cites at least one committed oracle id (test id or stable id) as a
+  whole token.
+
+One requirement Gb does not check: the skeleton milestone names which NFR-record mechanisms it
+instantiates (error envelope, config registration, observability hooks, auth posture; whichever
+the NFR record declares). The skeleton is the pattern template every later milestone copies; a
+cross-cutting mechanism absent from the skeleton tends to be absent everywhere.
 
 ## 10. Language realization notes
 Target language(s): <...>. How the machines become code:
@@ -199,7 +215,8 @@ tools (including how to run `machinery oracle` and `machinery check`).
    place of context isolation.
 3. RED exit gate, all three deterministic checks required before anything locks:
    a. Coverage of the spec: every oracle row's stable id appears whole-token somewhere in the
-      suite (verify with a grep per id; a missing id is a missing test), every guard-conjunction
+      suite (Gt-tests holds this deterministically in the step-b check run; a missing id is a
+      missing test), every guard-conjunction
       clause has its falsifying test (section 7), every invariant in section 3 has its property
       test.
    b. Architecture: `machinery check design --impl <impl-dir>` is green. G4-import skips test

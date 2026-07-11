@@ -107,7 +107,9 @@ For each component `<C>`:
     (real dependency or fake, and which). Idempotency and side-effect contracts are integration or
     property tests against the real dependency or a contract-tested fake; mark them so.
   - the **failure catalog** (per failure: detection, transition, recovery, bounding mitigation or
-    residual risk);
+    residual risk). When authoring it, sweep the unwanted-behavior category per component ("the
+    system shall not X, even when Y" prompts) to surface failures the happy-path interrogation
+    missed, and check each hit against the C4 mitigation postures;
   - optionally a hand transition table; if present, G3 reconciles it against the machine structurally,
     row by row, in both directions, so follow the reconciler's conventions (`!guardName`, `(else)`,
     or `-` for the unguarded fallback branch; `X (internal)` for internal transitions; rows marked
@@ -146,6 +148,9 @@ Your own judgment (the tools cannot check these; attest them explicitly):
 - Every Modelith invariant is guarded or structurally impossible; list any that are not.
 - Every dependency failure from the C4 mitigation table has its residual transition.
 - Every consumed external event has its event-contract row and a redelivery story.
+
+Before handing back, run the conductor's five-question phase-exit self-review (reality, depth,
+scope, coverage, consistency) over your artifacts and include the verdicts in your summary.
 
 Return a concise summary: the machines you wrote, the `machinery lint` and `machinery oracle` results, the Gate 3 result
 (pass or the exact gaps), and any invariant with no enforcement point. Do not restate the full files;

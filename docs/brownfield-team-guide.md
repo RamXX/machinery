@@ -173,6 +173,10 @@ nobody knowing which tests are load-bearing.
 
 ### Stage 4: full gates and revision mode as the operating loop
 
+On the way here two more gates join the staged list on their own triggers: `gb` once `BUILD.md`
+lands (it holds the Build plan structure), and `gt` once the adjudicated RED suite exists (it
+holds every committed oracle stable id to a test, whole-token).
+
 Once a slice is fully modeled (machines, matrices, oracles, formal annotations if you want
 the proofs), drop the `--gate` narrowing for that design and run the full
 `machinery check design --impl .`. New work inside the slice now follows the ordinary
