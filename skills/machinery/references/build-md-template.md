@@ -71,6 +71,27 @@ Turn the checked contract into build and test work without restating it incomple
 - Source of truth: `design/migration.yaml`; do not weaken its entry/exit, rollback, observability,
   parity, idempotency, conflict-resolution, reconciliation, or maximum-data-loss commitments.
 
+### Neighbor stand-ins and test environment (isolated pack children only)
+Required when this design is a pack child (`design/pack/` exists) and the delivery-topology
+decision in DECISIONS.md declared the team isolated; otherwise write "N/A - full multi-service
+test environment available" (or "N/A - not a pack child").
+- One contract stand-in per neighboring boundary: hand-built in the implementation stack,
+  specified by the pack's boundary event rows plus the neighbor's contract machine (a public
+  artifact the parent supplies alongside the pack). Not a mock: an executable of the signed,
+  frozen contract; the refinement proof licenses substituting the real neighbor at assembly.
+- Require the conformance suite: `machinery oracle` over the neighbor's contract machine is the
+  stand-in's transition spec; one locked test per row, keyed on stable ids. A pack regeneration
+  diffs that oracle, and the diff is the stand-in's affected-obligation list.
+- The event rows' delivery semantics are part of the stand-in's contract: delivery guarantee,
+  ordering assumption, and dedupe key per event, including duplicate and reordered delivery cases.
+- The self-contained environment recipe: how the team runs the entire suite with no platform
+  access (compose file or equivalent, seeded fixtures, disposable containers, the stand-ins).
+  Integration tests still run against the real dependencies the team owns (its own datastore,
+  queues); stand-ins cover only the neighbors.
+- State what stand-ins cannot prove and defer it explicitly: the parent's residuals (end-to-end
+  latency, cross-contract liveness, unmodeled channels) belong to the parent's cross-context
+  assembly suite, not to this shard.
+
 ## 5. Behavior: the state machines (the logic)
 For each stateful component, one subsection:
 - A one-paragraph narration of its lifecycle in plain language.
