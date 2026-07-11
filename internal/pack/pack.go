@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
@@ -38,6 +39,11 @@ type Subsystem struct {
 	ContractMachine     string   // path relative to the design dir (contracts/X.machine.json)
 	DelegatedInvariants []string
 	ChildDesign         string // optional: child design dir relative to the parent design dir
+	// BoundaryEventsNone is the boundary_events: {none: "<reason>"} waiver: a
+	// non-empty reason declares that NO event crosses this subsystem's
+	// boundary on purpose. Without it, extracting zero boundary events for a
+	// subsystem is a generation error (almost always a table defect).
+	BoundaryEventsNone string
 }
 
 // Decomposition is the parsed, validated decomposition.yaml.
@@ -46,9 +52,15 @@ type Decomposition struct {
 	Subsystems []Subsystem
 }
 
-// EventRow is one boundary event contract from the parent's event-contract table.
+// EventRow is one boundary event contract from the parent's event-contract
+// table. The named cells are cleaned (backticks and parentheticals stripped);
+// RawProducer/RawConsumer keep the original cell text so a validation finding
+// can quote exactly what the author wrote, and Row is the 1-based data-row
+// number for findings on rows whose event cell is empty.
 type EventRow struct {
 	Event, Producer, Consumer, Payload, Delivery, Ordering, Dedupe string
+	RawProducer, RawConsumer                                       string
+	Row                                                            int
 }
 
 // DecompositionPath returns the canonical location.
@@ -115,6 +127,10 @@ func LoadDecomposition(design string) (*Decomposition, error) {
 	if ver == nil || ver.Kind != ir.KindNumber || string(ver.AsNumber()) != "1" {
 		return nil, fmt.Errorf("pack: decomposition_version must be 1")
 	}
+	var errs []string
+	report := func(format string, args ...interface{}) {
+		errs = append(errs, fmt.Sprintf(format, args...))
+	}
 	var d Decomposition
 	d.Version = 1
 	for _, sv := range o.Get2("subsystems").AsArray() {
@@ -122,7 +138,7 @@ func LoadDecomposition(design string) (*Decomposition, error) {
 		if so == nil {
 			return nil, fmt.Errorf("pack: subsystems entries must be mappings")
 		}
-		d.Subsystems = append(d.Subsystems, Subsystem{
+		sub := Subsystem{
 			ID:                  so.GetString("id"),
 			Owns:                strList(so.Get2("owns")),
 			Components:          strList(so.Get2("components")),
@@ -130,12 +146,11 @@ func LoadDecomposition(design string) (*Decomposition, error) {
 			ContractMachine:     so.GetString("contract_machine"),
 			DelegatedInvariants: strList(so.Get2("delegated_invariants")),
 			ChildDesign:         so.GetString("child_design"),
-		})
-	}
-
-	var errs []string
-	report := func(format string, args ...interface{}) {
-		errs = append(errs, fmt.Sprintf(format, args...))
+		}
+		if be := so.Get2("boundary_events"); be != nil {
+			sub.BoundaryEventsNone = parseBoundaryEventsWaiver(be, sub.ID, report)
+		}
+		d.Subsystems = append(d.Subsystems, sub)
 	}
 	if len(d.Subsystems) < 2 {
 		report("a decomposition needs at least two subsystems (one subsystem is just the design itself)")
@@ -291,37 +306,101 @@ func invariantIDs(dm *ir.Value) map[string]bool {
 	return out
 }
 
-func contractBoundaryIDs(design string) map[string]bool {
-	out := map[string]bool{}
+// parseBoundaryEventsWaiver validates the boundary_events value of one
+// subsystem: the only accepted shape is a mapping with the single key none
+// and a non-empty string reason. Anything else is reported and ignored, so a
+// typo degrades into the strict default (zero events fail) instead of a
+// silent waiver.
+func parseBoundaryEventsWaiver(be *ir.Value, id string, report func(string, ...interface{})) string {
+	beo := be.AsObject()
+	if beo != nil && beo.Len() == 1 {
+		if rv := beo.Get2("none"); rv != nil && rv.Kind == ir.KindString && strings.TrimSpace(rv.AsString()) != "" {
+			return rv.AsString()
+		}
+	}
+	report("subsystem %s boundary_events must be a mapping with the single key none and a non-empty reason string (boundary_events: {none: \"<reason>\"})", ir.Repr(id))
+	return ""
+}
+
+// contractBoundaries parses the Architecture Contract fence (the same
+// heading-anchored locator G2 uses, ir.ContractFence; a laxer locator here
+// once rejected every boundary on a design G2 passed) and returns the
+// boundary mappings. Missing file or fence yields nil.
+func contractBoundaries(design string) []*ir.Object {
 	text, err := os.ReadFile(filepath.Join(design, "ARCHITECTURE.md"))
 	if err != nil {
-		return out
+		return nil
 	}
-	// the same heading-anchored locator G2 uses (ir.ContractFence); a laxer
-	// locator here once rejected every boundary on a design G2 passed
 	fence, ok := ir.ContractFence(string(text))
 	if !ok {
-		return out
+		return nil
 	}
 	v, err := ir.LoadYAML([]byte(fence))
 	if err != nil || v.AsObject() == nil {
-		return out
+		return nil
 	}
+	var out []*ir.Object
 	for _, b := range v.AsObject().Get2("boundaries").AsArray() {
-		if id := b.AsObject().GetString("id"); id != "" {
+		if bo := b.AsObject(); bo != nil {
+			out = append(out, bo)
+		}
+	}
+	return out
+}
+
+func contractBoundaryIDs(design string) map[string]bool {
+	out := map[string]bool{}
+	for _, b := range contractBoundaries(design) {
+		if id := b.GetString("id"); id != "" {
 			out[id] = true
 		}
 	}
 	return out
 }
 
-// EventRows parses the parent's event-contract table.
+// knownEventParticipants is every name a producer or consumer cell of the
+// event-contract table may resolve to: the union of every subsystem's
+// components: from decomposition.yaml and the Architecture Contract boundary
+// elements. The boundary elements cover the contract-bound participants that
+// own no entities and get no pack (a gateway, a ui). Contract externals do
+// not qualify: events are produced and consumed by components; an external
+// system that genuinely participates must be declared as a boundary.
+func knownEventParticipants(design string, d *Decomposition) map[string]bool {
+	out := map[string]bool{}
+	for _, s := range d.Subsystems {
+		for _, c := range s.Components {
+			out[c] = true
+		}
+	}
+	for _, b := range contractBoundaries(design) {
+		if el := b.GetString("element"); el != "" {
+			out[el] = true
+		}
+	}
+	return out
+}
+
+// eventTable is the parsed parent event-contract table plus what the strict
+// validation needs to know about its shape.
+type eventTable struct {
+	found    bool // a table with producer, consumer, and delivery columns exists
+	eventCol bool // that table has an event column
+	rows     []EventRow
+}
+
+// EventRows parses the parent's event-contract table leniently: cleaned
+// cells, no validation. `machinery scale` uses it as a size signal on designs
+// that may predate decomposition; pack generation goes through the strict
+// path (parseEventTable + validateEventTable) instead.
 func EventRows(design string) []EventRow {
+	return parseEventTable(design).rows
+}
+
+func parseEventTable(design string) eventTable {
 	data, err := os.ReadFile(filepath.Join(design, "ARCHITECTURE.md"))
 	if err != nil {
-		return nil
+		return eventTable{}
 	}
-	var out []EventRow
 	for _, tbl := range ir.ParseMdTables(string(data)) {
 		hl := strings.ToLower(strings.Join(tbl.Header, " "))
 		if !strings.Contains(hl, "producer") || !strings.Contains(hl, "consumer") || !strings.Contains(hl, "delivery") {
@@ -340,19 +419,113 @@ func EventRows(design string) []EventRow {
 			}
 			return ""
 		}
-		for _, r := range tbl.Rows {
-			out = append(out, EventRow{
+		raw := func(r []string, i int) string {
+			if i >= 0 && i < len(r) {
+				return r[i]
+			}
+			return ""
+		}
+		out := eventTable{found: true, eventCol: ei >= 0}
+		for n, r := range tbl.Rows {
+			out.rows = append(out.rows, EventRow{
 				Event: cell(r, ei), Producer: cell(r, pi), Consumer: cell(r, ci),
 				Payload: cell(r, yi), Delivery: cell(r, di), Ordering: cell(r, oi), Dedupe: cell(r, ki),
+				RawProducer: raw(r, pi), RawConsumer: raw(r, ci), Row: n + 1,
 			})
 		}
-		break
+		return out
+	}
+	return eventTable{}
+}
+
+// eventCellFormat states the machine-checkable format contract once, so every
+// finding teaches the same fix.
+const eventCellFormat = "the format contract is one row per producer-consumer pair, exactly one component per producer/consumer cell, annotations only in parentheses, fan-outs expanded to one row per pair"
+
+// validateEventTable enforces the format contract pack generation depends on.
+// Every producer and consumer cell must resolve (after ir.CleanCell) to
+// exactly one known participant; a cell that resolves to nothing or names
+// several components is a finding naming the row and the offending cell text.
+// Rows between two non-pack participants (a gateway publishing to a ui) are
+// validated like every other row; they simply emit no pack rows. There are no
+// silent drops of non-empty cells, ever: dropping them once shipped packs
+// asserting boundary completeness while most contracts were missing.
+func validateEventTable(design string, tbl eventTable, d *Decomposition) []string {
+	allWaived := len(d.Subsystems) > 0
+	for _, s := range d.Subsystems {
+		if s.BoundaryEventsNone == "" {
+			allWaived = false
+		}
+	}
+	if !tbl.found {
+		if allWaived {
+			return nil
+		}
+		return []string{"ARCHITECTURE.md has no event-contract table (a markdown table whose header names producer, consumer, and delivery); a decomposed parent must declare its boundary event contracts"}
+	}
+	var errs []string
+	if !tbl.eventCol {
+		errs = append(errs, "the event-contract table has no event column; pack extraction needs one ("+eventCellFormat+")")
+	}
+	known := knownEventParticipants(design, d)
+	names := make([]string, 0, len(known))
+	for n := range known {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, r := range tbl.rows {
+		where := fmt.Sprintf("event-contract row %d", r.Row)
+		if r.Event != "" {
+			where = fmt.Sprintf("%s (event %s)", where, ir.Repr(r.Event))
+		} else if tbl.eventCol {
+			errs = append(errs, where+": empty event cell; every row names its event")
+		}
+		for _, c := range []struct{ col, raw, clean string }{
+			{"producer", r.RawProducer, r.Producer},
+			{"consumer", r.RawConsumer, r.Consumer},
+		} {
+			if known[c.clean] {
+				continue
+			}
+			switch {
+			case c.clean == "":
+				errs = append(errs, fmt.Sprintf("%s: empty %s cell; %s", where, c.col, eventCellFormat))
+			case strings.ContainsAny(c.clean, ",/ \t") || strings.Contains(c.clean, "->") || strings.Contains(c.clean, "→"):
+				errs = append(errs, fmt.Sprintf("%s: %s cell %s names more than one component; %s", where, c.col, ir.Repr(c.raw), eventCellFormat))
+			default:
+				errs = append(errs, fmt.Sprintf("%s: %s cell %s is not a known component (subsystem components plus Architecture Contract boundary elements: %s); %s", where, c.col, ir.Repr(c.raw), strings.Join(names, ", "), eventCellFormat))
+			}
+		}
+	}
+	return errs
+}
+
+// subsystemEvents filters the table down to the rows this subsystem produces
+// or consumes.
+func subsystemEvents(events []EventRow, s Subsystem) []EventRow {
+	comp := map[string]bool{}
+	for _, c := range s.Components {
+		comp[c] = true
+	}
+	var out []EventRow
+	for _, e := range events {
+		if comp[e.Producer] || comp[e.Consumer] {
+			out = append(out, e)
+		}
 	}
 	return out
 }
 
 // GeneratePacks builds every subsystem's pack in memory:
 // subsystem id -> filename -> content. Pure given the design dir contents.
+//
+// Extraction from the event-contract table is strict: the table must satisfy
+// the format contract (validateEventTable) and every subsystem must extract
+// at least one boundary event unless decomposition.yaml waives it with
+// boundary_events: {none: "<reason>"}. A subsystem no event crosses into or
+// out of is almost always a table defect, and silently generating an empty
+// events.md that claims completeness is exactly the trust failure the gates
+// exist to prevent.
 func GeneratePacks(design string) (map[string]map[string]string, error) {
 	d, err := LoadDecomposition(design)
 	if err != nil {
@@ -362,7 +535,25 @@ func GeneratePacks(design string) (map[string]map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pack: %w", err)
 	}
-	events := EventRows(design)
+	tbl := parseEventTable(design)
+	if errs := validateEventTable(design, tbl, d); len(errs) > 0 {
+		return nil, fmt.Errorf("pack: %s", strings.Join(errs, "; "))
+	}
+	rowsBySub := map[string][]EventRow{}
+	var evErrs []string
+	for _, s := range d.Subsystems {
+		rows := subsystemEvents(tbl.rows, s)
+		rowsBySub[s.ID] = rows
+		switch {
+		case len(rows) == 0 && s.BoundaryEventsNone == "":
+			evErrs = append(evErrs, fmt.Sprintf("subsystem %s extracts zero boundary events from the event-contract table; a subsystem no event crosses into or out of is almost always a table defect. If it is intentional, waive it in decomposition.yaml with boundary_events: {none: \"<reason>\"}", ir.Repr(s.ID)))
+		case len(rows) > 0 && s.BoundaryEventsNone != "":
+			evErrs = append(evErrs, fmt.Sprintf("subsystem %s declares boundary_events: none but %d event-contract rows name its components; remove the stale waiver", ir.Repr(s.ID), len(rows)))
+		}
+	}
+	if len(evErrs) > 0 {
+		return nil, fmt.Errorf("pack: %s", strings.Join(evErrs, "; "))
+	}
 	out := map[string]map[string]string{}
 	for _, s := range d.Subsystems {
 		files := map[string]string{}
@@ -386,7 +577,7 @@ func GeneratePacks(design string) (map[string]map[string]string, error) {
 		files[mid+".cfg"] = cfgBody
 
 		// 3. the boundary event contracts (rows this subsystem produces or consumes)
-		files["events.md"] = eventsSlice(events, s)
+		files["events.md"] = eventsSlice(rowsBySub[s.ID], s)
 
 		// 4. the manifest, hash last: the content_hash covers every file
 		// including the manifest itself (normalized minus the hash line)
@@ -461,7 +652,21 @@ func manifestBody(s Subsystem, contractModule string) string {
 	return b.String()
 }
 
+// eventsSlice renders the subsystem's boundary event contracts. The
+// completeness sentence is a strong claim (there are no other cross-boundary
+// events) and extraction is strict, so the claim is earned; a waived-empty
+// subsystem gets the waiver reason instead, never an unearned claim over an
+// empty table.
 func eventsSlice(events []EventRow, s Subsystem) string {
+	if len(events) == 0 && s.BoundaryEventsNone != "" {
+		var b strings.Builder
+		b.WriteString("# Boundary event contracts: " + s.ID + "\n\n")
+		b.WriteString("GENERATED by machinery pack from the parent event-contract table. No event\n")
+		b.WriteString("crosses this subsystem's boundary; decomposition.yaml waives it with reason:\n")
+		b.WriteString(s.BoundaryEventsNone + "\n\n")
+		b.WriteString("Boundary events: 0 (waived)\n")
+		return b.String()
+	}
 	comp := map[string]bool{}
 	for _, c := range s.Components {
 		comp[c] = true
@@ -475,12 +680,8 @@ func eventsSlice(events []EventRow, s Subsystem) string {
 	b.WriteString("|---|---|---|---|---|---|---|\n")
 	n := 0
 	for _, e := range events {
-		prod, cons := comp[e.Producer], comp[e.Consumer]
-		if !prod && !cons {
-			continue
-		}
 		dir, peer := "consumes", e.Producer
-		if prod {
+		if comp[e.Producer] {
 			dir, peer = "produces", e.Consumer
 		}
 		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s |\n",
@@ -490,6 +691,25 @@ func eventsSlice(events []EventRow, s Subsystem) string {
 	b.WriteString("\n")
 	fmt.Fprintf(&b, "Boundary events: %d\n", n)
 	return b.String()
+}
+
+// boundaryCountRe matches the count line every generated events.md ends with
+// (waived files carry "0 (waived)"; the digits still parse).
+var boundaryCountRe = regexp.MustCompile(`(?m)^Boundary events: (\d+)`)
+
+// CountBoundaryEvents reads the count line of a generated events.md, so G5
+// can print per-pack boundary-event counts and a zero is visible in every
+// gate run. Returns -1 when the line is absent (not a generated events file).
+func CountBoundaryEvents(eventsMD string) int {
+	m := boundaryCountRe.FindStringSubmatch(eventsMD)
+	if m == nil {
+		return -1
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return -1
+	}
+	return n
 }
 
 // sliceModelith emits the subsystem's domain slice: owned entities verbatim,
@@ -522,7 +742,13 @@ func sliceModelith(dm *ir.Value, s Subsystem) string {
 	b.WriteString("# delegated invariants below are the frozen public shape. DO NOT EDIT.\n")
 	b.WriteString("kind: " + yamlScalar(o.Get2("kind")) + "\n")
 	b.WriteString("version: " + yamlScalar(o.Get2("version")) + "\n")
-	b.WriteString("title: " + yamlQuote(o.GetString("title")+" / "+s.ID) + "\n")
+	// a parent model without a title yields just the subsystem id; the old
+	// unconditional concatenation emitted the nonsense title " / core"
+	title := s.ID
+	if pt := o.GetString("title"); pt != "" {
+		title = pt + " / " + s.ID
+	}
+	b.WriteString("title: " + yamlQuote(title) + "\n")
 	b.WriteString("enums:\n")
 	for _, en := range enums.Keys() {
 		if !usedEnums[en] {

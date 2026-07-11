@@ -151,6 +151,18 @@ var PackExperiments = []Experiment{
 		ExpectSubstr: "owned by no subsystem", ExpectExit: true},
 	{Name: "contract-outside-subset", Tool: "pack", Mutation: "contract machine uses after:",
 		ExpectSubstr: "restricted to plain on-transitions", ExpectExit: true},
+	// 2026-07-11 H2 dogfood review: lossy event extraction. Cells the exact
+	// full-cell match could not resolve were silently dropped, shipping packs
+	// with near-empty events.md files that still claimed boundary
+	// completeness; G5 (freshness-only) could not see it.
+	{Name: "lossy-event-cell", Tool: "pack", Mutation: "a consumer cell names two components",
+		ExpectSubstr: "names more than one component", ExpectExit: true},
+	{Name: "unknown-event-participant", Tool: "pack", Mutation: "a producer cell names an undeclared component",
+		ExpectSubstr: "is not a known component", ExpectExit: true},
+	{Name: "zero-boundary-events", Tool: "pack", Mutation: "no table row names a subsystem",
+		ExpectSubstr: "extracts zero boundary events", ExpectExit: true},
+	{Name: "lossy-table-fails-g5", Tool: "check", Mutation: "G5 regenerates in memory over a lossy table",
+		ExpectSubstr: "names more than one component", ExpectExit: true},
 }
 
 // All returns every experiment across all tools.

@@ -20,7 +20,9 @@ func init() {
 		"edited-pack-fails-hash", "stale-child-pin", "dropped-consumed-event",
 		"dropped-produced-event", "frozen-enum-drift", "delegated-invariant-untraced",
 		"partial-packmap", "stale-refinement-artifact", "double-ownership",
-		"unowned-entity", "contract-outside-subset")
+		"unowned-entity", "contract-outside-subset",
+		"lossy-event-cell", "unknown-event-participant", "zero-boundary-events",
+		"lossy-table-fails-g5")
 }
 
 func copyTree(t *testing.T, src, dst string) {
@@ -349,6 +351,69 @@ func TestUnpinnedSubsystemWarnsButDoesNotBlock(t *testing.T) {
 	}
 	if g.Counts["children pinned"] != 1 || g.Counts["children unpinned"] != 1 {
 		t.Errorf("pin counts wrong: %v", g.Counts)
+	}
+}
+
+// ------------------- 2026-07-11 H2 dogfood: lossy event extraction --------
+
+// A consumer cell naming two components used to be silently dropped from
+// every pack; extraction must fail loudly instead.
+func TestLossyEventCellFailsGeneration(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	editFile(t, filepath.Join(parent, "ARCHITECTURE.md"),
+		"| request | orders | payments |",
+		"| request | orders | orders (drafts), payments (audit) |")
+	_, err := pack.GeneratePacks(parent)
+	if err == nil || !strings.Contains(err.Error(), "names more than one component") {
+		t.Fatalf("multi-component cell accepted: %v", err)
+	}
+	if !strings.Contains(err.Error(), "event 'request'") {
+		t.Errorf("finding does not name the row: %v", err)
+	}
+}
+
+// A producer naming a component neither decomposition.yaml nor the
+// Architecture Contract declares used to vanish; it must fail.
+func TestUnknownEventParticipantFailsGeneration(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	editFile(t, filepath.Join(parent, "ARCHITECTURE.md"),
+		"| markPaid | payments | orders |",
+		"| markPaid | warehouse | orders |")
+	_, err := pack.GeneratePacks(parent)
+	if err == nil || !strings.Contains(err.Error(), "is not a known component") {
+		t.Fatalf("unknown participant accepted: %v", err)
+	}
+}
+
+// A subsystem extracting zero boundary events is a generation error unless
+// decomposition.yaml waives it explicitly.
+func TestZeroBoundaryEventsFailsGeneration(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	for _, row := range []struct{ old, new string }{
+		{"| request | orders | payments |", "| request | orders | orders |"},
+		{"| markPaid | payments | orders |", "| markPaid | orders | orders |"},
+		{"| markDeclined | payments | orders |", "| markDeclined | orders | orders |"},
+	} {
+		editFile(t, filepath.Join(parent, "ARCHITECTURE.md"), row.old, row.new)
+	}
+	_, err := pack.GeneratePacks(parent)
+	if err == nil || !strings.Contains(err.Error(), "extracts zero boundary events") {
+		t.Fatalf("zero-event subsystem generated silently: %v", err)
+	}
+}
+
+// G5 regenerates packs in memory for the freshness diff, so strict
+// generation makes the gate itself fail on a lossy table: the class of
+// defect the H2 dogfood shipped (freshness-only G5 blessed byte-fresh packs
+// extracted from an unparseable table).
+func TestLossyTableFailsParentG5(t *testing.T) {
+	parent, _, _ := splitFixture(t)
+	editFile(t, filepath.Join(parent, "ARCHITECTURE.md"),
+		"| request | orders | payments |",
+		"| request | orders | orders (drafts), payments (audit) |")
+	g := gates.CheckPack(parent)
+	if !containsAny(g.Errs, "names more than one component") {
+		t.Errorf("G5 passed a lossy event-contract table: %v", g.Errs)
 	}
 }
 
