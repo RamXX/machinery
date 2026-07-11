@@ -500,7 +500,7 @@ version matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.3.0        # force an exact release
+machinery update --version v0.3.1        # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
