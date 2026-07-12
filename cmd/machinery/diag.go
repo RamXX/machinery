@@ -53,6 +53,20 @@ func preflightRun() {
 	} else {
 		fmt.Fprintln(out, "  optional structurizr-cli (C4 diagram EXPORT only; the DSL and every gate need only text) -- https://structurizr.com/cli")
 	}
+
+	// scorecard (optional)
+	if p, err := exec.LookPath("scorecard"); err == nil {
+		v := "present"
+		for _, line := range strings.Split(run(p, "version"), "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "GitVersion:") {
+				v = lastWord(line)
+				break
+			}
+		}
+		fmt.Fprintf(out, "  ok       scorecard %s (OpenSSF Scorecard: Phase 2 adoption-closure risk evidence; needs GITHUB_AUTH_TOKEN at run time)\n", v)
+	} else {
+		fmt.Fprintln(out, "  optional scorecard (OpenSSF Scorecard, Phase 2 adoption-closure risk evidence; public GitHub repos need NO install: curl https://api.securityscorecards.dev/projects/github.com/<org>/<repo>) -- install: go install github.com/ossf/scorecard/v5@latest (needs GITHUB_AUTH_TOKEN at run time)")
+	}
 }
 
 // doctorRun mirrors the Makefile `doctor` target: preflight + install status.
