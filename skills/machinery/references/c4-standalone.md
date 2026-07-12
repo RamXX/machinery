@@ -271,6 +271,35 @@ them. Format rules, checked by G2:
 | `pay` (Payments API) | 5xx, timeout, duplicate | none (third party) | timeout, partial charge, must be idempotent | timeout 10s, idempotency key | `payment_failed_dirty` alert per stuck order |
 | `q` (Queue) | unavailable, redeliver | clustered, at-least-once | duplicate delivery, must dedupe | dedupe by message id | dedupe-drop counter, redelivery log line |
 
+## Adoption closure (a technology choice is a closure, not a node)
+
+Adopting a technology adopts its operational closure: the stateful backends, sidecars, operators,
+credentials, and network egress it needs to run the way you will actually run it. The closure is
+invisible to code-level tools (no scanner reports that a WAF's cross-replica rate limiting needs a
+shared key-value store); it lives in deployment artifacts (Helm charts, operator docs, reference
+architectures), so it must be interrogated, not scanned. For every adopted technology, before the
+mitigation table is considered complete:
+
+1. **Enumerate the closure.** Ask "what does this bring with it?" against how it will actually be
+   deployed: stateful backends, sidecars and operators, required credentials or tokens, network
+   egress. Read the deployment artifacts, not just the project README.
+2. **Treat every closure member as a first-class dependency.** Each one gets the same treatment as
+   the technology that dragged it in: a license check, its own mitigation row, and a note on the
+   operational and evidence surface it adds (backup, monitoring, compliance evidence).
+3. **Ask the amortization question.** Now that the closure member is paid for, what else should it
+   do, and does it let you consolidate something out? Guard: amortization must never corrupt
+   boundaries. A dependency adopted as passive state does not thereby become a message bus or a
+   shared cross-component store.
+4. **Record risk evidence, not vibes.** Score each OSS adoption candidate with OpenSSF Scorecard
+   and put the number, dated, in its decision box (DECISIONS.md). Zero-install lane: public GitHub
+   repos are scanned weekly; `curl -s https://api.securityscorecards.dev/projects/github.com/<org>/<repo>`
+   returns the latest score. CLI lane (unscanned or non-GitHub repos): the `scorecard` binary
+   (`machinery preflight` reports it; needs `GITHUB_AUTH_TOKEN` at run time). A low score is a
+   discussion item with flip conditions, never an automatic veto.
+
+These are LLM-attested checks: G2 verifies mitigation coverage for what is declared; only the
+conversation catches what was never declared.
+
 ## NFR record (part of the Architecture Contract conversation)
 
 Record these during Phase 2, even when the answer is "out of scope, recorded as such":

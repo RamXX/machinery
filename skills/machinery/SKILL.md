@@ -285,6 +285,14 @@ component per producer/consumer cell, annotations only in parentheses, fan-outs 
 row per pair): pack generation extracts from it by exact component name and fails loudly on any
 cell it cannot resolve.
 
+A technology choice is a closure, not a node: adopting X adopts X's operational closure (stateful
+backends, sidecars, operators, credentials, egress), and the closure lives in deployment artifacts,
+not in anything a scanner reports. Enumerate it, give every member the full dependency treatment
+(license check, mitigation row, evidence surface), ask the amortization question ("now that we have
+it, what else should it do?") under the boundary guard (passive state never becomes a message bus),
+and record an OpenSSF Scorecard score in each OSS candidate's decision box. See "Adoption closure"
+in `references/c4-standalone.md`.
+
 **GATE 2:** run `machinery check <design> --gate g2`. **G2-c4** verifies, deterministically:
 the contract parses (a yaml code fence starting with `contract_version` under a heading containing
 "Architecture Contract"), every boundary binds to a `workspace.dsl` element, no duplicate ids, no
@@ -295,7 +303,8 @@ an error). Read the `checked:` counts; they tell you what was actually verified.
 LLM-attested (you check these; the tool cannot): every Modelith action maps to an owning component;
 every boundary crossing has an interface contract (shape, errors, idempotency); persistence and
 placement decided per stateful component (the machine-per-placement-row check runs later, in
-Gx-trace); and the **NFR record**: the Architecture Contract conversation must record security
+Gx-trace); every technology choice has its adoption closure enumerated, with closure members
+carried into the mitigation table (see the reference); and the **NFR record**: the Architecture Contract conversation must record security
 posture (authn/authz approach, secret handling), capacity assumptions (expected volume, latency
 budget where relevant), and observability requirements (what must be logged, metered, alerted, in
 particular for any FailedDirty-style residual state), even when the answer is "out of scope,
@@ -752,7 +761,10 @@ was consciously waived. A phase entry without a self-review line is not complete
   limits, compliance posture) and the runtime has web access and subagents, spawn research agents
   against primary sources and return a decision box per option: the evidence with sources, a
   recommendation, and the flip conditions under which it reverses. Record the box in
-  DECISIONS.md, flip conditions included; they are what makes a later revision defensible. When
+  DECISIONS.md, flip conditions included; they are what makes a later revision defensible. For
+  OSS adoption candidates, include a dated OpenSSF Scorecard score in the box (the adoption-closure
+  checklist in `references/c4-standalone.md` gives both the zero-install API lane and the CLI
+  lane). When
   the runtime lacks those capabilities, record the contest and its flip conditions as an open
   decision instead of silently picking. Reserve this for evidence-arbitrable questions, never
   preferences, and bound the fan-out to the decision at hand.
