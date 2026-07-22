@@ -8,6 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/lint"
 	"github.com/RamXX/machinery/internal/oracle"
 )
 
@@ -46,18 +48,49 @@ func oracleRun(mdir string) error {
 		exitFunc(1)
 		return fmt.Errorf("no *.machine.json under %s", mdir)
 	}
+	fail := func(err error) error {
+		fmt.Fprintln(stderrW, err)
+		exitFunc(1)
+		return err
+	}
+	// pass 1: load + lint every machine, and collect stable-id tags. A machine
+	// that fails lint must not generate (the oracle would encode the defects,
+	// e.g. an array target silently narrowed to its first element), and two
+	// machines with the same tag would mint identical stable ids for
+	// different transitions.
+	type mach struct {
+		path string
+		m    *ir.Value
+		tag  string
+	}
+	var machines []mach
+	tagOwner := map[string]string{}
 	for _, f := range files {
-		out := replaceExt(f, ".machine.json", ".oracle.md")
-		body, err := oracle.Generate(f)
+		m, err := ir.LoadMachineJSON(f)
 		if err != nil {
-			fmt.Fprintln(stderrW, err)
-			exitFunc(1)
-			return err
+			return fail(fmt.Errorf("oracle_gen: %w", err))
 		}
+		base := filepath.Base(f)
+		lintErrs, _, _, _ := lint.LintMachine(m, base)
+		if len(lintErrs) > 0 {
+			for _, e := range lintErrs {
+				fmt.Fprintf(stderrW, "  ERROR  %s\n", e)
+			}
+			return fail(fmt.Errorf("oracle_gen: %s fails lint (%d error(s) above); fix the machine before generating its oracle", base, len(lintErrs)))
+		}
+		tag := oracle.Tag(m, f)
+		if prev, dup := tagOwner[tag]; dup {
+			return fail(fmt.Errorf("oracle_gen: stable-id tag %s is derived for both %s and %s; set _oracle_tag on one of them to disambiguate", tag, prev, base))
+		}
+		tagOwner[tag] = base
+		machines = append(machines, mach{path: f, m: m, tag: tag})
+	}
+	// pass 2: everything is clean; generate
+	for _, mc := range machines {
+		out := replaceExt(mc.path, ".machine.json", ".oracle.md")
+		body := oracle.Render(mc.m, mc.path)
 		if err := os.WriteFile(out, []byte(body), 0644); err != nil {
-			fmt.Fprintf(stderrW, "oracle_gen: %s\n", err)
-			exitFunc(1)
-			return err
+			return fail(fmt.Errorf("oracle_gen: %w", err))
 		}
 		// count transition rows: body.count('| T-')
 		cnt := countSubstr(body, "| T-")

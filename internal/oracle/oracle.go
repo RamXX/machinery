@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // fmtActions mirrors oracle_gen._fmt: ", ".join(names) or "-".
@@ -38,6 +39,29 @@ func stableHash(tag, source, trig, guard string) string {
 	return hex.EncodeToString(h[:])
 }
 
+// Tag derives the stable-id tag for a machine: the `_oracle_tag` override
+// when present (validated by lint: 2-8 chars, [A-Z0-9]), else the uppercased
+// machine id truncated to 4 runes. Two machines in one design whose derived
+// tags collide (Deal vs DealAggregate) produce identical stable ids for
+// different transitions; the oracle CLI hard-errors on that and `_oracle_tag`
+// is the disambiguation lever. The hash input intentionally never changes
+// (that would churn every existing stable id).
+func Tag(m *ir.Value, sourceName string) string {
+	if t := m.AsObject().GetString("_oracle_tag"); t != "" {
+		return t
+	}
+	mid := m.AsObject().GetString("id")
+	if mid == "" {
+		base := filepath.Base(sourceName)
+		mid = strings.TrimSuffix(base, filepath.Ext(base))
+	}
+	tag := strings.ToUpper(mid)
+	if r := []rune(tag); len(r) > 4 {
+		tag = string(r[:4]) // rune-safe: a multibyte id must not be split mid-rune
+	}
+	return tag
+}
+
 // Render mirrors oracle_gen.render(m, source_name). Pure.
 // Returns the oracle markdown body (no trailing newline beyond what Python emits).
 func Render(m *ir.Value, sourceName string) string {
@@ -47,15 +71,13 @@ func Render(m *ir.Value, sourceName string) string {
 		mid = strings.TrimSuffix(base, filepath.Ext(base))
 	}
 	states := ir.WalkStates(m.AsObject().Get2("states"), "")
-	tag := strings.ToUpper(mid)
-	if r := []rune(tag); len(r) > 4 {
-		tag = string(r[:4]) // rune-safe: a multibyte id must not be split mid-rune
-	}
+	tag := Tag(m, sourceName)
 
 	var L []string
 	L = append(L, fmt.Sprintf("# Generated transition oracle: `%s`", mid))
 	L = append(L, "")
 	L = append(L, fmt.Sprintf("Generated from `%s` by `machinery oracle`. DO NOT EDIT BY HAND.", filepath.Base(sourceName)))
+	L = append(L, version.MarkdownStamp())
 	L = append(L, "Single source of truth for the hard-TDD transition tests: one transition row is one")
 	L = append(L, "test case. Key tests on the STABLE id, not the row number; row numbers renumber when")
 	L = append(L, "the design changes, stable ids do not.")
@@ -64,13 +86,15 @@ func Render(m *ir.Value, sourceName string) string {
 	L = append(L, "")
 	L = append(L, "| state | kind | entry | exit |")
 	L = append(L, "|---|---|---|---|")
+	// every state, nested included, keyed by its dotted path: a nested
+	// state's entry/exit actions are contract rows too, and a compound state
+	// is "compound", not "atomic"
 	for _, s := range states {
-		if strings.Contains(s.Path, ".") {
-			continue
-		}
 		o := s.Node.AsObject()
 		kind := o.GetString("type")
-		if kind == "" {
+		if o.Get2("states") != nil {
+			kind = "compound"
+		} else if kind == "" {
 			kind = "atomic"
 		}
 		L = append(L, fmt.Sprintf("| %s | %s | %s | %s |", s.Path, kind, fmtActions(o.Get2("entry")), fmtActions(o.Get2("exit"))))

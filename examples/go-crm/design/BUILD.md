@@ -210,7 +210,7 @@ and the ER `}o--|| User` edges); set at create, changed only by reassign.
 | | `color` | string | |
 | | (rel) deals | `Deal` n:n | |
 
-### 3.4 Invariants (24, non-negotiable)
+### 3.4 Invariants (27, non-negotiable)
 
 Enforcement point, component, and test ids are in the section 6 matrix; not duplicated here.
 
@@ -232,9 +232,11 @@ Enforcement point, component, and test ids are in the section 6 matrix; not dupl
 | `one-default-pipeline` | Exactly one `Pipeline` is marked default. | Pipeline |
 | `activity-immutable` | An `Activity` body and occurredAt never change after creation. | Activity |
 | `activity-owned` | Every `Activity` records the `User` who logged it. | Activity |
+| `activity-contact-same-tenant` | An `Activity` and the `Contact` it concerns are owned within the same `Team`; an `Activity` never references a `Contact` in another tenant, so following the link cannot cross a tenant boundary. | Activity |
 | `task-owned` | Every `Task` has exactly one owning `User`. | Task |
 | `task-terminal` | A `Task` in Done or Cancelled is terminal. | Task |
 | `task-assignee-visible` | A `Task` may be reassigned only to a `User` the assigner can see: Admin to any `User`, Manager to a member of the manager's `Team`. | Task |
+| `task-deal-same-tenant` | A `Task` and the `Deal` it is linked to are owned within the same `Team`; a `Task` never references a `Deal` in another tenant, so following the link cannot cross a tenant boundary. | Task |
 | `tag-name-unique` | No two `Tag` records share a name. | Tag |
 | `rbac-crud-verbs` | A verb is allowed only if the role grants it: Admin/Manager/Rep may create/read/update/delete; ReadOnly only read. | RBAC |
 | `rbac-read-visibility` | Read only within `VisibilityScope`: Admin all; others own or team-owned records. | RBAC |
@@ -687,9 +689,9 @@ is enforced in crm.domain, never in the command layer" rule. It gets a contract 
 
 ## 6. Traceability matrix
 
-Every one of the 24 invariants, with its enforcement point (machine guard / structural / DB-constraint /
-operation-level), owning component, the interface contract that carries it (section 4.6), and its test ids
-(section 7). No invariant is dropped. The one invariant enforced by neither a guard nor a structural
+Every one of the 27 invariants, with its enforcement point (machine guard / structural / DB-constraint /
+operation-level / isolation-layer), owning component, the interface contract that carries it (section 4.6),
+and its test ids (section 7). No invariant is dropped. The one invariant enforced by neither a guard nor a structural
 guarantee (`one-default-pipeline`) is called out as a named residual (also section 12).
 
 | invariant | enforced by (class) | in component | interface contract | test id(s) |
@@ -710,9 +712,11 @@ guarantee (`one-default-pipeline`) is called out as a named residual (also secti
 | `one-default-pipeline` | **operation-level** (setDefault atomic read-modify-write; NOT a guard, NOT structural) | crm.domain setDefault op / crm.repo | `Repo.SetDefaultPipeline` | P-one-default-pipeline, C-REPO-20 |
 | `activity-immutable` | structural (no update action exists; append-only) | crm.domain / crm.repo | `Repo.SaveActivity` (no update path) | P-activity-immutable, C-REPO-23 |
 | `activity-owned` | structural (`log` records the acting User) | crm.domain | `Repo.SaveActivity` | P-activity-owned |
+| `activity-contact-same-tenant` | isolation layer: pure link-authorization function (`Authorizer.AuthorizeLink`) called by the `log` write path before the Activity->Contact reference is established; design-time: relational isolation model (solver-checked, `formal/Isolation.als`) + generated tenant-scoping oracle rows (`design/formal/Isolation.oracle.md`) | crm.authz + crm.domain | `Authorizer.AuthorizeLink` | P-tenant-oracle |
 | `task-owned` | structural + machine guard (owner set at create; `guardCanReassign` admits one in-scope owner) | crm.domain | `saveTask` | T-TASK-07,08,14,15, P-task-owned |
 | `task-terminal` | structural (Done/Cancelled are `final`; no reopen) | crm.domain | `saveTask` | T-TASK-16,17, P-task-terminal |
 | `task-assignee-visible` | machine guard (`guardCanReassign` via `authz.AuthorizeReassign`, the complete reassign decision) + generated authz oracle rows (design/formal/Policy.oracle.md) | crm.authz + crm.domain | `Authorizer.AuthorizeReassign` | T-TASK-07,08,14,15, P-task-assignee-visible, P-authz-oracle |
+| `task-deal-same-tenant` | isolation layer: pure link-authorization function (`Authorizer.AuthorizeLink`) called by the Task `create` write path before the Task->Deal reference is established; design-time: relational isolation model (solver-checked, `formal/Isolation.als`) + generated tenant-scoping oracle rows (`design/formal/Isolation.oracle.md`) | crm.authz + crm.domain | `Authorizer.AuthorizeLink` | P-tenant-oracle |
 | `tag-name-unique` | DB-constraint (unique index on `Tag.name`) | crm.repo | `Repo.SaveTag` -> ErrConstraint | P-tag-name-unique, C-REPO-19 |
 | `rbac-crud-verbs` | machine guard (`guardAuthorized`; User `guardAdminAuthority`) + generated authz oracle rows | crm.authz + crm.domain | `Authorizer.Authorize` | T-CMD-18,19, T-USER-01,02,04,05, C-AUTHZ-01..03, P-rbac-crud-verbs, P-authz-oracle |
 | `rbac-read-visibility` | machine guard (`guardAuthorized`, reads authorized too) + generated authz oracle rows | crm.authz | `Authorizer.Authorize` | T-CMD-18,19, C-AUTHZ-04..07, P-rbac-read-visibility, P-authz-oracle |
@@ -856,9 +860,18 @@ One test per interface method x outcome. Repo tests run against a real temporary
 | C-SESS-09 | Logout then Current | token cleared; Current -> ErrNoSession |
 | C-SESS-10 | Inspect stored credential after register/login | only an argon2id encoded hash on disk; no plaintext (password-hashed) |
 
-### 7.3 Property tests (one per invariant, 24)
+### 7.3 Property tests (one per invariant) and the oracle conformance tests
 
 Each is a randomized/generative property over the relevant operation. Format: `P-<invariant>` - property.
+Two invariant families are held by generated decision tables instead of per-invariant generators: the
+four `rbac-*` invariants additionally require the ONE `P-authz-oracle` conformance test over
+`design/formal/Policy.oracle.md`, and the two tenant-isolation invariants
+(`activity-contact-same-tenant`, `task-deal-same-tenant`) require the ONE `P-tenant-oracle`
+conformance test that parses `design/formal/Isolation.oracle.md` and asserts the pure
+link-authorization function (`Authorizer.AuthorizeLink`) on every row, expanding each tenant case
+(same-tenant, cross-tenant, source-teamless, target-teamless) into its concrete owner-team pairs.
+The reference shape is `impl/internal/authz/tenant_oracle_test.go`; regenerate the oracle with
+`machinery alloy design`, keyed on stable TENANT-* ids.
 
 | test id | property |
 |---|---|
@@ -885,7 +898,9 @@ Each is a randomized/generative property over the relevant operation. Format: `P
 | P-rbac-read-visibility | For any read: Admin Allowed for all; others Allowed only for own or same-team records. |
 | P-rbac-write-scope | For any update/delete: Admin any; Manager only team members' records; Rep only own; ReadOnly none. |
 | P-rbac-reassign-authority | For any reassign: Allowed only for Admin, or Manager acting within the manager's team. |
+| P-manager-has-team | For any role assignment, a `User` holds role Manager only while belonging to exactly one `Team`; `assignRole` to Manager on a teamless user is refused (revision: impl predates this invariant; see section 6). |
 | P-authz-oracle | The pure Authorizer agrees with every reachable row of the generated decision table `design/formal/Policy.oracle.md` (every owner-case variant, every resource entity type); regenerated by `machinery alloy`, keyed on stable AUTHZ-* ids. |
+| P-tenant-oracle | The pure `Authorizer.AuthorizeLink` agrees with every row of the generated tenant-scoping table `design/formal/Isolation.oracle.md` (every tenant case expanded to its concrete owner-team pairs, both references: Task.deal and Activity.contact); regenerated by `machinery alloy`, keyed on stable TENANT-* ids. Covers `activity-contact-same-tenant` and `task-deal-same-tenant`. |
 | P-session-active-user | For any resume, the session resolves to Active only while the user's status is Active; a status flip to Disabled invalidates it. |
 
 ## 8. State migration
@@ -1034,23 +1049,44 @@ Pin the environment so two implementing agents cannot diverge. The source of tru
 
 ## 11. Hard-TDD protocol (read this before writing any code)
 
-1. **Test-writer agent** reads sections 6 and 7 only and writes the full test suite from the spec: one test
-   per T-row (7.1), one per C-row (7.2), one property test per P-row (7.3). It does not invent behavior; if
-   a needed fact is absent from sections 6-7, that is a spec gap to fix in this document, not a guess.
-2. **The tests are then LOCKED.** The implementer agent may not modify, weaken, skip, or delete them to make
+1. **RED precondition.** Run `machinery check design` and require ZERO blocking findings before deriving any
+   test. The oracles are the test spec; a red design means the spec itself cannot be trusted, and tests
+   derived from it test the wrong things with confidence. Fix the design first, never the tests.
+2. **Test-writer agent** reads sections 6 and 7 only and writes the full test suite from the spec: one test
+   per oracle row keyed on its STABLE id (7.1), one per C-row (7.2), one property test per P-row (7.3). It
+   does not invent behavior; if a needed fact is absent from sections 6-7, that is a spec gap to fix in this
+   document, not a guess. A runtime that cannot spawn a fresh-context test-writer (no subagents) runs RED
+   then GREEN sequentially with the same single agent; the derivation rule is unchanged (tests come from
+   sections 6-7 and the oracles, never from implementation intentions), and the gate runs in steps 1 and 3
+   separate the phases in place of context isolation.
+3. **RED exit gate**, all three deterministic checks required before anything locks:
+   a. Coverage of the spec: every oracle stable id appears whole-token somewhere in the suite (Gt-tests
+      holds this deterministically in the step-b check run; a missing id is a missing test); every
+      guard-conjunction clause has its falsifying test (the 7 intro a/b/c rule); every invariant in
+      section 3.4 has its property test. Use `@xstate/graph` covering paths (7 intro) to prove no edge was
+      dropped.
+   b. Architecture: `machinery check design --impl impl` is green. G4-import skips test files but checks
+      everything they import and every support file, so the compile skeleton, stubs, and scaffolding the
+      tests stand on already respect the section 4.5 Architecture Contract (C-ARCH-01).
+   c. The suite RUNS and is red for the right reason: failing assertions on missing behavior, never compile
+      or import errors inside the tests themselves.
+4. **The tests are then LOCKED.** The implementer agent may not modify, weaken, skip, or delete them to make
    them pass. Locking is structural (the test files are owned by the test-writer; changes require a design
    round-trip).
-3. **The implementer agent** writes production code until the locked tests pass, honoring the section 4.5
+5. **The implementer agent** writes production code until the locked tests pass, honoring the section 4.5
    Architecture Contract (C-ARCH-01) and the section 10 realization rules.
-4. **Completeness gates.** Every transition in section 5/7.1 has a T-test; every invariant in section 3.4 is
-   property-tested (7.3); every boundary in section 4.6 has contract tests (7.2). Coverage target and gates
-   per project conventions (>= 80% combined; integration tests use a real LadybugDB dir and no mocks; unit
-   tests may mock a single collaborator). Use `@xstate/graph` covering paths (7 intro) to prove no edge was
-   dropped.
-5. **A wrong test is a design defect, not a test to adjust.** If a locked test is wrong, stop: fix the design
-   (the machine JSON / matrix / this BUILD.md), then regenerate the affected tests from the corrected spec.
-   Never "adjust" a test to pass, and never edit a test to match code that drifted from the spec. The
-   round-trip is design -> BUILD.md -> tests -> code, always in that direction.
+6. **GREEN acceptance bar**, both together: the locked suite passes AND `machinery check design --impl impl`
+   is green again. Code that passes the tests by crossing a boundary fails the gate; code that respects the
+   boundaries but fails a test is not done. Coverage target and gates per project conventions (>= 80%
+   combined; integration tests use a real LadybugDB dir and no mocks; unit tests may mock a single
+   collaborator).
+7. **Generated tests live apart from hand-written tests** (a marker comment or a directory), so regenerating
+   them on a design change never clobbers hand-written ones.
+8. **A wrong test is a design defect, not a test to adjust.** If a locked test is wrong, stop: fix the design
+   (the machine JSON / matrix / this BUILD.md), rerun `machinery oracle design/machines`, and regenerate the
+   affected tests from the corrected spec (the stable-id diff is the affected-test list). Never "adjust" a
+   test to pass, and never edit a test to match code that drifted from the spec. The round-trip is
+   design -> BUILD.md -> tests -> code, always in that direction.
 
 ## 12. Open questions and residual risks
 

@@ -5,7 +5,7 @@ Five machines, one per stateful component from ARCHITECTURE.md section 7. Each h
 names implemented by the coding agent; delays are named) and a `<Component>.matrix.md`
 (named-unit contracts, failure catalog, and a transition table reconciled row by row against
 the machine by G3). The CANONICAL transition oracle is the generated `<Component>.oracle.md`
-(oracle_gen; stable test ids; G3 diffs it against a fresh generation).
+(`machinery oracle`; stable test ids; G3 diffs it against a fresh generation).
 
 | machine | kind | traces to |
 |---|---|---|

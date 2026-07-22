@@ -128,7 +128,7 @@ func TestCheckMigrationClean(t *testing.T) {
 			t.Errorf("Gm did not count %s: %+v", count, g.Counts)
 		}
 	}
-	sel, err := Select(design, "")
+	sel, err := Select(design, "", "")
 	if err != nil || !sel.Run["gm"] {
 		t.Fatalf("default gate selection omitted gm: sel=%+v err=%v", sel, err)
 	}
@@ -193,7 +193,7 @@ func TestCheckMigrationMutations(t *testing.T) {
 
 func TestExplicitMigrationGateRequiresContract(t *testing.T) {
 	design := t.TempDir()
-	sel, err := Select(design, "gm")
+	sel, err := Select(design, "gm", "")
 	if err != nil {
 		t.Fatal(err)
 	}

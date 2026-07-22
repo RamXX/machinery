@@ -187,13 +187,24 @@ func Uninstall(homes []string, out io.Writer) error {
 }
 
 // pluginInstalled reports whether the machinery Claude Code plugin is cached
-// under home (a ~/.claude-style config dir). The glob follows the plugin
-// cache layout <home>/plugins/cache/<marketplace>/<plugin>; if that layout
-// ever changes the worst case is a benign duplicate skill, exactly the
-// pre-plugin behavior.
+// under home (a ~/.claude-style config dir), following the plugin cache
+// layout <home>/plugins/cache/<marketplace>/<plugin>. It lists the cache
+// directory instead of filepath.Glob: a glob metacharacter in $HOME ("[",
+// "*", "?") turns the pattern into a character class and silently defeats
+// detection. If the layout ever changes the worst case is a benign duplicate
+// skill, exactly the pre-plugin behavior.
 func pluginInstalled(home string) bool {
-	m, _ := filepath.Glob(filepath.Join(home, "plugins", "cache", "*", "machinery"))
-	return len(m) > 0
+	cache := filepath.Join(home, "plugins", "cache")
+	entries, err := os.ReadDir(cache)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if _, err := os.Stat(filepath.Join(cache, e.Name(), "machinery")); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func absHomes(homes []string) ([]string, error) {

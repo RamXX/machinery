@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // AnnotationName is the policy annotation file name under design/formal/.
@@ -848,6 +849,7 @@ func (p *Policy) emit() (string, Stats) {
 	stats.Carried = len(carried)
 
 	w("// Code generated from %s + %s by machinery alloy. DO NOT EDIT.", p.DomainFile, p.AnnotationFile)
+	w("%s", version.AlloyStamp())
 	w("//")
 	w("// Static relational model of the policy invariants: which configurations of")
 	w("// subjects, teams, and record ownership the invariant set admits. Alloy")

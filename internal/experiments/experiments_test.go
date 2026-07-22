@@ -12,7 +12,8 @@ import (
 
 // minimalMachine reproduces tests/conftest.minimal_machine as an ordered *Value.
 func minimalMachine() *ir.Value {
-	m, _ := ir.LoadMachineJSONStr("w", `{"id":"widget","initial":"Draft","context":{"widgetId":null},"states":{
+	m, _ := ir.LoadMachineJSONStr("w", `{"id":"widget","initial":"Draft","context":{"widgetId":null},
+		"_delays":{"persistTimeout":"10000 ms - fixture persistence timeout bound"},"states":{
 		"Draft":{"on":{"publish":[
 			{"target":"persisting","guard":"guardCanPublish","actions":"setPending"},
 			{"actions":"recordDenied"}]}},

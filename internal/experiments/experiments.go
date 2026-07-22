@@ -44,8 +44,8 @@ var MachineLintExperiments = []Experiment{
 		ExpectSubstr: "unreachable", ExpectExit: true},
 	{Name: "guarded-always-no-escape", Tool: "lint", Mutation: "fully guarded always",
 		ExpectSubstr: "fully guarded always-list", ExpectExit: true},
-	{Name: "ambiguous-target", Tool: "lint", Mutation: "two states named Dup",
-		ExpectSubstr: "ambiguous target", ExpectExit: true},
+	{Name: "ambiguous-target", Tool: "lint", Mutation: "two nested states named Dup; a bare target that the removed simple-name fallback would have matched ambiguously must fail sibling-scoped resolution instead of guessing",
+		ExpectSubstr: "no sibling of A is named 'Dup'", ExpectExit: true},
 	{Name: "bad-initial", Tool: "lint", Mutation: "initial Nowhere",
 		ExpectSubstr: "initial 'Nowhere'", ExpectExit: true},
 	{Name: "resting-missing-event", Tool: "lint", Mutation: "Parked ignores publish",
@@ -165,9 +165,46 @@ var PackExperiments = []Experiment{
 		ExpectSubstr: "names more than one component", ExpectExit: true},
 }
 
+// PackReviewExperiments are the 2026-07-21 adversarial-review findings on the
+// recursive-decomposition mechanism (task MAC-sadm), run against a fixture
+// regenerated and re-pinned with the CURRENT generator in
+// pack_review_experiments_test.go. Entries with ExpectExit false guard a
+// positive property the review found silently violated (rows merged, ids
+// round-tripped) rather than an error message.
+var PackReviewExperiments = []Experiment{
+	{Name: "second-event-table-dropped", Tool: "pack", Mutation: "append a second event-contract table; every table's rows must merge into the packs",
+		ExpectSubstr: "| refundRequested | consumes | orders |", ExpectExit: false},
+	{Name: "duplicate-component-direction-flip", Tool: "pack", Mutation: "two subsystems claim one component (direction flips in the duplicating pack)",
+		ExpectSubstr: "claimed by both", ExpectExit: true},
+	{Name: "undelegated-invariant", Tool: "pack", Mutation: "a top-level invariant delegated to no subsystem and not retained",
+		ExpectSubstr: "delegated to no subsystem", ExpectExit: true},
+	{Name: "child-drops-owned-attribute", Tool: "check", Mutation: "child deletes a frozen pack attribute",
+		ExpectSubstr: "is missing from the child domain model", ExpectExit: true},
+	{Name: "child-weakens-entity-invariant", Tool: "check", Mutation: "child rewrites a frozen entity invariant's statement",
+		ExpectSubstr: "drifted from the pack", ExpectExit: true},
+	{Name: "stale-pack-dir-after-rename", Tool: "check", Mutation: "packs/<id>.pack survives a subsystem rename",
+		ExpectSubstr: "no current subsystem", ExpectExit: true},
+	{Name: "orphaned-child-green", Tool: "check", Mutation: "the renamed subsystem's child keeps validating its dead pack; only the parent can flag the orphan",
+		ExpectSubstr: "packs/payments.pack", ExpectExit: true},
+	{Name: "hash-laundering-window", Tool: "check", Mutation: "child edits its pack and recomputes the content hash; the parent pin catches it (unpinned children are the documented limit)",
+		ExpectSubstr: "was built against pack", ExpectExit: true},
+	{Name: "packmap-shim-machine", Tool: "pack", Mutation: "packmap binds a machine with no stake in the contract",
+		ExpectSubstr: "neither the lifecycle machine", ExpectExit: true},
+	{Name: "stale-packrefinement-extras", Tool: "check", Mutation: "a *PackRefinement.* artifact a fresh generation does not produce stays committed",
+		ExpectSubstr: "a refinement artifact a fresh generation does not produce", ExpectExit: true},
+	{Name: "pack-subdirectory-smuggling", Tool: "check", Mutation: "a subdirectory smuggled into the frozen child pack/ escapes the content hash",
+		ExpectSubstr: "contains a directory", ExpectExit: true},
+	{Name: "waiver-count-injection", Tool: "pack", Mutation: "a newline in a boundary_events waiver reason forges the events.md count line",
+		ExpectSubstr: "single line", ExpectExit: true},
+	{Name: "colon-id-roundtrip", Tool: "check", Mutation: "a delegated invariant id containing ': ' must survive the manifest round-trip; a non-string entry is an error, never a silent drop",
+		ExpectSubstr: "not a plain string", ExpectExit: true},
+	{Name: "child_design-nonexistent-dir", Tool: "check", Mutation: "child_design points at a directory that does not exist",
+		ExpectSubstr: "no readable packmap.yaml", ExpectExit: true},
+}
+
 // All returns every experiment across all tools.
 func All() []Experiment {
-	return concat(MachineLintExperiments, MachineryCheckExperiments, RefineExperiments, ComposeExperiments, PackExperiments)
+	return concat(MachineLintExperiments, MachineryCheckExperiments, RefineExperiments, ComposeExperiments, PackExperiments, PackReviewExperiments)
 }
 
 func concat(parts ...[]Experiment) []Experiment {

@@ -347,15 +347,20 @@ func TestNonPackToNonPackRowValidatesAndEmitsNothing(t *testing.T) {
 }
 
 // zeroEventPayments rewrites the table so no row names payments: extraction
-// yields zero boundary events for that subsystem.
+// yields zero boundary events for that subsystem. The rows route through a
+// declared non-pack boundary element (gw) because a row whose producer and
+// consumer belong to one subsystem is itself a generation error now.
 func zeroEventPayments(t *testing.T, design string) {
 	t.Helper()
 	editDesignFile(t, design, "ARCHITECTURE.md",
-		"| request | orders | payments |", "| request | orders | orders |")
+		"  - id: payments.svc",
+		"  - id: gw.svc\n    kind: container\n    element: gw\n    code: [ \"gw/**\" ]\n  - id: payments.svc")
 	editDesignFile(t, design, "ARCHITECTURE.md",
-		"| markPaid | payments | orders |", "| markPaid | orders | orders |")
+		"| request | orders | payments |", "| request | orders | gw |")
 	editDesignFile(t, design, "ARCHITECTURE.md",
-		"| markDeclined | payments | orders |", "| markDeclined | orders | orders |")
+		"| markPaid | payments | orders |", "| markPaid | gw | orders |")
+	editDesignFile(t, design, "ARCHITECTURE.md",
+		"| markDeclined | payments | orders |", "| markDeclined | gw | orders |")
 }
 
 // waivePayments declares the payments boundary_events waiver.
@@ -462,5 +467,61 @@ scenarios: []
 	}
 	if got := v.AsObject().GetString("title"); got != "orders" {
 		t.Errorf("title = %q, want %q", got, "orders")
+	}
+}
+
+// P-F10: pack files are covered by the content hash, so they must NEVER carry
+// a version stamp (it would churn the hash every release and re-red every
+// pinned child).
+func TestGeneratedPackFilesAreUnstamped(t *testing.T) {
+	packs, err := GeneratePacks(parentDesign())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id, files := range packs {
+		for name, body := range files {
+			if strings.Contains(body, "machinery-version:") {
+				t.Errorf("pack %s file %s carries a version stamp; the content hash covers it", id, name)
+			}
+		}
+	}
+}
+
+// P-F10: the refinement modules the child commits to design/formal DO carry
+// the stamp (G5 strips it before the freshness diff); the contract module
+// stays a byte-copy of the pack's hash-covered file.
+func TestGenerateRefinementStampsGeneratedModules(t *testing.T) {
+	design := filepath.Join("..", "..", "examples", "checkout-split", "orders", "design")
+	files, err := GenerateRefinement(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stamped := 0
+	for name, body := range files {
+		switch {
+		case strings.HasSuffix(name, "PackRefinement.tla"), strings.HasSuffix(name, "PackRefinement.cfg"):
+			if got := strings.Count(body, "machinery-version:"); got != 1 {
+				t.Errorf("%s carries %d stamp lines, want exactly 1", name, got)
+			}
+			if strings.HasSuffix(name, ".tla") && !strings.HasPrefix(body, "---- MODULE ") {
+				t.Errorf("%s no longer opens with the MODULE line", name)
+			}
+			stamped++
+		default:
+			// the contract module copied from the pack
+			if strings.Contains(body, "machinery-version:") {
+				t.Errorf("%s must stay byte-identical to the pack's copy (no stamp)", name)
+			}
+			packCopy, rerr := os.ReadFile(filepath.Join(design, "pack", name))
+			if rerr != nil {
+				t.Fatal(rerr)
+			}
+			if body != string(packCopy) {
+				t.Errorf("%s differs from the pack's copy", name)
+			}
+		}
+	}
+	if stamped != 2 {
+		t.Errorf("expected 2 stamped refinement artifacts, got %d", stamped)
 	}
 }

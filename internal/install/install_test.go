@@ -634,3 +634,27 @@ func TestExtractTarGzClampsTraversal(t *testing.T) {
 		t.Errorf("traversal entry escaped dest: %v", err)
 	}
 }
+
+// pluginInstalled must survive a home path containing glob metacharacters:
+// filepath.Glob treats "[...]" in $HOME as a character class and silently
+// reports no plugin, which re-enables the duplicate-skill fallback.
+func TestPluginInstalledSurvivesGlobMetacharHome(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "[claude] home")
+	cache := filepath.Join(home, "plugins", "cache", "machinery-marketplace", "machinery")
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if !pluginInstalled(home) {
+		t.Fatal("plugin cache present but not detected under a metachar home path")
+	}
+	empty := filepath.Join(t.TempDir(), "[claude] empty")
+	if err := os.MkdirAll(filepath.Join(empty, "plugins", "cache"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if pluginInstalled(empty) {
+		t.Fatal("empty cache reported as installed")
+	}
+	if pluginInstalled(filepath.Join(t.TempDir(), "nonexistent")) {
+		t.Fatal("missing home reported as installed")
+	}
+}

@@ -75,7 +75,7 @@ once prices are cached: a run only needs the provider while Collecting.
 
 ## 5. Architecture Contract
 
-Machine-checkable twin of the narrative; `machinery_check.py --gate g2` verifies it against
+Machine-checkable twin of the narrative; `machinery check design --gate g2` verifies it against
 `workspace.dsl`. `feed` is the sole importer of the provider client and `repo` the sole importer of
 the store client: the blanket denies with a single explicit allow each enforce that.
 

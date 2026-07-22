@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 func minimalMachine() *ir.Value {
@@ -176,6 +177,61 @@ func TestStableIDPrefixCollisionIsExtended(t *testing.T) {
 	}
 }
 
+func TestNestedStatesAppearInEntryExitTable(t *testing.T) {
+	// IR-F13: nested states' entry/exit actions were omitted and compound
+	// states were labeled "atomic".
+	src := `{"id":"m13","initial":"Grp","states":{
+		"Grp":{"initial":"Prep","onDone":{"target":"End"},"states":{
+			"Prep":{"entry":["armSensor"],"exit":["disarmSensor"],"on":{"GO":{"target":"Fin"}}},
+			"Fin":{"type":"final"}}},
+		"End":{"type":"final"}}}`
+	m, err := ir.LoadMachineJSONStr("w", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := Render(m, "w")
+	for _, want := range []string{
+		"| Grp | compound | - | - |",
+		"| Grp.Prep | atomic | armSensor | disarmSensor |",
+		"| Grp.Fin | final | - | - |",
+		"| End | final | - | - |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing entry/exit row %q in:\n%s", want, out)
+		}
+	}
+}
+
+func TestOracleTagOverride(t *testing.T) {
+	// IR-F12: _oracle_tag overrides the derived 4-rune tag so colliding
+	// designs (Deal vs DealAggregate) can disambiguate without renaming.
+	src := `{"id":"dealAggregate","_oracle_tag":"DEALAGG","initial":"Lead","states":{
+		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}}},
+		"Closed":{"type":"final"}}}`
+	m, err := ir.LoadMachineJSONStr("w", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tag := Tag(m, "DealAggregate.machine.json"); tag != "DEALAGG" {
+		t.Fatalf("Tag override not honored: %q", tag)
+	}
+	out := Render(m, "DealAggregate.machine.json")
+	if !strings.Contains(out, "| DEALAGG-") || !strings.Contains(out, "| T-DEALAGG-01 |") {
+		t.Fatalf("stable ids not tagged with the override:\n%s", out)
+	}
+}
+
+func TestDerivedTagsCollideWithoutOverride(t *testing.T) {
+	// The derived tag truncates to 4 runes; Deal and DealAggregate collide.
+	// The hash input intentionally stays unchanged (stable-id churn); the
+	// oracle CLI hard-errors on the collision instead.
+	deal, _ := ir.LoadMachineJSONStr("w", `{"id":"deal","initial":"A","states":{"A":{"type":"final"}}}`)
+	agg, _ := ir.LoadMachineJSONStr("w", `{"id":"dealAggregate","initial":"A","states":{"A":{"type":"final"}}}`)
+	if Tag(deal, "Deal.machine.json") != Tag(agg, "DealAggregate.machine.json") {
+		t.Fatal("expected the derived tags to collide (that is the CLI's job to catch)")
+	}
+}
+
 func TestTagTruncationIsRuneSafe(t *testing.T) {
 	src := `{"id":"багаж","initial":"A","states":{"A":{"on":{"x":{"target":"B"}}},"B":{"type":"final"}}}`
 	m, err := ir.LoadMachineJSONStr("w", src)
@@ -185,5 +241,20 @@ func TestTagTruncationIsRuneSafe(t *testing.T) {
 	out := Render(m, "w") // must not split a rune mid-byte
 	if !strings.Contains(out, "БАГА-") {
 		t.Fatalf("expected rune-safe 4-rune tag, got:\n%s", out)
+	}
+}
+
+// P-F10: the committed oracle records which machinery version generated it,
+// as a single markdown comment line the freshness gates strip before diffing.
+func TestRenderStampsGeneratorVersion(t *testing.T) {
+	text := Render(minimalMachine(), "Widget.machine.json")
+	if !strings.Contains(text, version.MarkdownStamp()) {
+		t.Fatalf("oracle carries no version stamp:\n%s", text)
+	}
+	if got := strings.Count(text, "machinery-version:"); got != 1 {
+		t.Errorf("oracle carries %d stamp lines, want exactly 1", got)
+	}
+	if version.StampOf(text) != version.Version {
+		t.Errorf("StampOf = %q, want %q", version.StampOf(text), version.Version)
 	}
 }

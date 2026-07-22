@@ -2,6 +2,7 @@
 # design and this subsystem's child design. DO NOT EDIT: regenerate at the
 # parent (machinery pack generate) and re-copy.
 pack_version: 1
+pack_revision: 1
 subsystem: payments
 contract_module: PaymentsContract
 owns:
@@ -11,4 +12,4 @@ components:
 boundaries:
   - payments.svc
 delegated_invariants: []
-content_hash: 176277444df9a017d7de5892e52ebeb1e0d675aa2c9173d8e85d548b1cd1d042
+content_hash: 9137d6bb05f63d71d3791d4eda020d293941ca69233458ce69d090b4e02040b2

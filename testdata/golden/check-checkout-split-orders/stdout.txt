@@ -11,7 +11,7 @@
   checked: 1 plans, 4 milestones, 4 DoD-bearing milestones, 1 skeleton citations
   ok
 == G5-pack  contract packs ==
-  checked: 6 pack files, 1 pack hash verified, 3 refinement artifacts fresh, 1 owned entities present, 1 owned enums shape-checked, 1 delegated invariants traced, 1 produced events emitted, 2 consumed events handled
+  checked: 6 pack files, 1 pack hash verified, 3 refinement artifacts fresh, 1 owned entities present, 3 owned attributes present, 1 owned enums shape-checked, 1 owned invariants intact, 1 delegated invariants traced, 1 produced events emitted, 2 consumed events handled, pack revision 1
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

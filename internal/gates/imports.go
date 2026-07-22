@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/RamXX/machinery/internal/ir"
 )
@@ -70,12 +71,12 @@ func walkSourceFiles(root string) ([]string, error) {
 	return files, nil
 }
 
-// testFilePatterns, isTestFile, and isTestContent are the ONE test-file
+// testFilePatterns, isTestFile, and rustSplitTests are the ONE test-file
 // classifier, shared by G4 (which SKIPS test files, per its documented
 // semantics) and Gt (which scans exactly the files G4 skips): the two gates
 // can never disagree about what a test file is.
 var testFilePatterns = []string{"*_test.go", "*_test.py", "test_*.py", "*.test.ts", "*.test.tsx",
-	"*.test.js", "*.test.jsx", "*.test.mjs", "*.test.cjs", "*_test.exs", "*_spec.rb", "*_test.rs"}
+	"*.test.js", "*.test.jsx", "*.test.mjs", "*.test.cjs", "*_test.exs", "*_spec.rb"}
 
 func isTestFile(rel string) bool {
 	base := filepath.Base(rel)
@@ -84,10 +85,13 @@ func isTestFile(rel string) bool {
 			return true
 		}
 	}
-	// Rust integration tests are any *.rs under a tests/ directory, at any depth
+	// a .rs file is test-only iff it lives under a tests/ or benches/
+	// directory (Rust integration tests and benchmarks), at any depth;
+	// every other .rs file is production code and rustSplitTests carves its
+	// #[cfg(test)] spans out for Gt
 	if strings.HasSuffix(base, ".rs") {
 		for _, seg := range strings.Split(filepath.ToSlash(filepath.Dir(rel)), "/") {
-			if seg == "tests" {
+			if seg == "tests" || seg == "benches" {
 				return true
 			}
 		}
@@ -95,10 +99,68 @@ func isTestFile(rel string) bool {
 	return false
 }
 
-// isTestContent classifies the test files a path shape cannot: Rust unit
-// tests live in production-named .rs files as #[cfg(test)] modules.
-func isTestContent(rel, text string) bool {
-	return strings.HasSuffix(rel, ".rs") && strings.Contains(text, "#[cfg(test)]")
+// cfgTestAttr marks the Rust unit-test idiom: a #[cfg(test)] item (usually
+// `mod tests { ... }`) inside a production .rs file.
+const cfgTestAttr = "#[cfg(test)]"
+
+// rustSplitTests carves a .rs file into its production text and its
+// #[cfg(test)] item spans. A .rs file is test-only iff it lives under tests/
+// or benches/ (isTestFile); every OTHER .rs file is production code: G4 scans
+// the production portion (a wholesale skip made production imports invisible,
+// NG-1) and Gt's corpus receives ONLY the cfg(test) spans, where Rust unit
+// tests actually live (production text once wholesale-covered oracles, NG-7).
+// The production text keeps its line structure: span bytes become spaces.
+func rustSplitTests(text string) (string, []string) {
+	var spans [][2]int
+	for i := 0; i < len(text); {
+		j := strings.Index(text[i:], cfgTestAttr)
+		if j < 0 {
+			break
+		}
+		start := i + j
+		end := rustItemEnd(text, start+len(cfgTestAttr))
+		spans = append(spans, [2]int{start, end})
+		i = end
+	}
+	if len(spans) == 0 {
+		return text, nil
+	}
+	prod := []byte(text)
+	var tests []string
+	for _, sp := range spans {
+		tests = append(tests, text[sp[0]:sp[1]])
+		for k := sp[0]; k < sp[1]; k++ {
+			if prod[k] != '\n' {
+				prod[k] = ' '
+			}
+		}
+	}
+	return string(prod), tests
+}
+
+// rustItemEnd returns the end offset of the item that follows a #[cfg(test)]
+// attribute: the matching close brace of its first block, the terminating
+// semicolon of a braceless item, or end of text. Brace counting is
+// lint-grade (a brace inside a string literal would miscount), matching the
+// regex-grade parsing of every other language here.
+func rustItemEnd(text string, from int) int {
+	depth := 0
+	for i := from; i < len(text); i++ {
+		switch text[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth <= 0 {
+				return i + 1
+			}
+		case ';':
+			if depth == 0 {
+				return i + 1
+			}
+		}
+	}
+	return len(text)
 }
 
 func matchGlob(rel, pattern string) bool {
@@ -331,9 +393,16 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 	allow := contractEdges(rules, "allow", nil)
 	deny := contractEdges(rules, "deny", nil)
 	baselineRules := contractEdges(rules, "baseline", nil)
+	// a wildcard baseline rule would amnesty the whole edge space, so it
+	// never matches here; G2 owns the hard ERROR on the rule itself (GATE-7),
+	// and the edges it would have covered stay undeclared/denied below
+	baselineRules = dropWildcardEdges(baselineRules)
 	ratchet, ratchetErr := LoadRatchet(design)
 	if ratchetErr != nil {
 		g.Errs = append(g.Errs, ratchetErr.Error())
+	}
+	if ratchet != nil && ratchet.Date != "" {
+		g.Notes = append(g.Notes, ratchetAgeNote(ratchet.Date, time.Now()))
 	}
 
 	matchRule := func(edges [][2]string, src, dst string) bool {
@@ -418,10 +487,12 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 		}
 		lang := langExts[filepath.Ext(path)]
 		srcB := boundaryOf(rel, pkgmap)
-		text := readOrEmpty(path)
-		if isTestContent(rel, text) {
-			g.Count("test files skipped")
-			continue
+		text := readFileOrErr(path, g)
+		if lang == "rust" {
+			// judge only the production portion: imports living inside a
+			// #[cfg(test)] module are test wiring (Gt's corpus), and a file
+			// carrying such a module is NOT thereby a test file (NG-1)
+			text, _ = rustSplitTests(text)
 		}
 		if srcB == "" && lang == "elixir" {
 			for _, mod := range exDefmoduleRe.FindAllStringSubmatch(text, -1) {
@@ -625,4 +696,33 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 	}
 	g.RequireNonzero("imports resolved", "no imports were resolved against the contract")
 	return g
+}
+
+// dropWildcardEdges removes rules with a wildcard on either side; used only
+// for baseline: rules, which are an enumerated-edges ratchet.
+func dropWildcardEdges(edges [][2]string) [][2]string {
+	var out [][2]string
+	for _, e := range edges {
+		if strings.Contains(e[0], "*") || strings.Contains(e[1], "*") {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
+// ratchetAgeNote makes tolerated debt visible: the snapshot date and its age
+// in days (GATE-8). Non-blocking by design: the ratchet has no expiry, but a
+// silent date hid year-old amnesties.
+func ratchetAgeNote(date string, now time.Time) string {
+	for _, layout := range []string{"2006-01-02", "2006-01"} {
+		if t, err := time.Parse(layout, date); err == nil {
+			days := int(now.Sub(t).Hours() / 24)
+			if days < 0 {
+				days = 0
+			}
+			return fmt.Sprintf("ratchet snapshot %s, %d day(s) old", date, days)
+		}
+	}
+	return fmt.Sprintf("ratchet snapshot dated %s (not a YYYY-MM or YYYY-MM-DD date)", ir.Repr(date))
 }

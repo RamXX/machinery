@@ -1,4 +1,5 @@
 ---- MODULE FulfillmentSaga ----
+\* machinery-version: v0.3.4-dev
 EXTENDS Naturals
 
 \* Generated from FulfillmentSaga.machine.json by machinery tla. Control-flow model.
@@ -17,6 +18,13 @@ EXTENDS Naturals
 \*   4. Context data, event payloads, action effects, and real time (the
 \*      _delays values) are not modeled at this rung; the data-refined rung
 \*      (refine_gen) and the implementation tests carry those.
+\*   5. Retry counters (rc*) reset to 0 on every transition that leaves from
+\*      or lands on a domain state; a counter surviving a domain hop is not
+\*      representable at this rung.
+\*   6. Retry-shaped states (fully guarded always + after) are modeled as the
+\*      concrete bounded loop: the guarded always list is replaced by the
+\*      exhaustion test rc >= MaxRetries and the after timer by the retry step
+\*      rc < MaxRetries; the guards themselves are erased (see 1).
 CONSTANT MaxRetries
 VARIABLES st, rc1
 vars == << st, rc1 >>

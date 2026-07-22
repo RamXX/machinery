@@ -3,6 +3,8 @@ package ir
 import (
 	"fmt"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Repr is a Python-style repr() over arbitrary Go values, used to reproduce the
@@ -72,11 +74,13 @@ func (o *Object) GetObject(key string) *Object {
 	return nil
 }
 
-// IsUpperFirst reports whether the first rune is ASCII uppercase (Python n[:1].isupper()).
+// IsUpperFirst reports whether the first rune is uppercase (Python
+// n[:1].isupper()). Unicode-aware: an ASCII-only check exempted non-ASCII
+// state names from every uppercase-keyed rule.
 func IsUpperFirst(s string) bool {
-	if s == "" {
+	r, size := utf8.DecodeRuneInString(s)
+	if size == 0 || r == utf8.RuneError && size == 1 {
 		return false
 	}
-	r := s[0]
-	return r >= 'A' && r <= 'Z'
+	return unicode.IsUpper(r)
 }

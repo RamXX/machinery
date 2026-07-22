@@ -20,10 +20,12 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/pack"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // CheckPack implements G5-pack. Applicable when the design is a decomposed
@@ -97,6 +99,21 @@ func checkParentPacks(design string, g *Gate) {
 			g.Count("packs fresh")
 		}
 	}
+	// stale pack directories: a packs/<id>.pack with no current subsystem
+	// (after a rename or removal) is a dead contract a child keeps trusting;
+	// the freshness loop above only walks CURRENT subsystems, so the orphan
+	// must be sought explicitly
+	if entries, rerr := os.ReadDir(filepath.Join(design, "packs")); rerr == nil {
+		current := map[string]bool{}
+		for _, id := range ids {
+			current[id+".pack"] = true
+		}
+		for _, e := range entries {
+			if e.IsDir() && !current[e.Name()] {
+				g.Errs = append(g.Errs, "packs/"+e.Name()+" corresponds to no current subsystem (stale after a rename or removal); its child keeps validating against a dead contract, remove the directory and re-issue the current pack")
+			}
+		}
+	}
 	// per-pack boundary-event visibility: a zero must be seen in every gate
 	// run, not discovered after empty packs ship (the H2 dogfood finding).
 	// Strict generation makes an unwaived zero unreachable here, but the
@@ -108,6 +125,8 @@ func checkParentPacks(design string, g *Gate) {
 	if len(evCounts) > 0 {
 		g.CheckedExtra("boundary events: " + strings.Join(evCounts, ", "))
 	}
+	// the amendment counter, visible in every run
+	g.CheckedExtra(fmt.Sprintf("pack revision %d", d.Revision))
 	// two-way pinning: children built against the current pack
 	for _, s := range d.Subsystems {
 		if s.ChildDesign == "" {
@@ -151,6 +170,14 @@ func checkChildPack(design string, g *Gate) {
 	}
 	g.Count("pack hash verified")
 
+	// pack_revision is the amendment-visibility counter (parent rev N -> N+1
+	// must be seen at the child); verify it and keep it in the output
+	if rev, ok := packRevisionOf(manifest); ok {
+		g.CheckedExtra("pack revision " + rev)
+	} else {
+		g.Errs = append(g.Errs, "the pack manifest declares no pack_revision (or it is not a positive integer); the pack predates the amendment counter or was edited, regenerate it at the parent and re-copy")
+	}
+
 	// packmap present, pinned, reconciled; refinement artifacts fresh
 	freshRef, err := pack.GenerateRefinement(design)
 	if err != nil {
@@ -165,10 +192,27 @@ func checkChildPack(design string, g *Gate) {
 			got, rerr := os.ReadFile(filepath.Join(design, "formal", n))
 			if rerr != nil {
 				g.Errs = append(g.Errs, "no committed refinement artifact formal/"+n+"; run machinery pack refine and commit it (verify-formal TLC-checks it)")
-			} else if string(got) != freshRef[n] {
+			} else if g.recordStamp(string(got)); version.Strip(string(got)) != version.Strip(freshRef[n]) {
+				// stamp lines stripped from both sides (P-F10): a version-only
+				// skew is a note, never DRIFT
 				g.Drift = append(g.Drift, "committed formal/"+n+" is stale (differs from a fresh generation); rerun machinery pack refine")
 			} else {
 				g.Count("refinement artifacts fresh")
+			}
+		}
+		// two-way diff: a *PackRefinement.* artifact a fresh generation does
+		// not produce is a stale binding from a previous packmap; the one-way
+		// diff above never looked, so a rebind left the old "proof" committed
+		// and green while nothing checked it anymore
+		if entries, rerr := os.ReadDir(filepath.Join(design, "formal")); rerr == nil {
+			for _, e := range entries {
+				n := e.Name()
+				if e.IsDir() || (!strings.HasSuffix(n, "PackRefinement.tla") && !strings.HasSuffix(n, "PackRefinement.cfg")) {
+					continue
+				}
+				if _, ok := freshRef[n]; !ok {
+					g.Errs = append(g.Errs, "committed formal/"+n+" is a refinement artifact a fresh generation does not produce (a stale binding from a previous packmap); remove it")
+				}
 			}
 		}
 	}
@@ -204,9 +248,26 @@ func checkOwnedShape(design string, slice *ir.Value, g *Gate) {
 			continue
 		}
 		g.Count("owned entities present")
-		// lifecycle enum values must match exactly
+		childEnt := childEntities.Get2(en).AsObject()
+		// frozen attributes must exist in the child by name (the child may
+		// add attributes, never drop these: boundary event payloads name them)
+		childAttrs := map[string]bool{}
+		for _, a := range childEnt.Get2("attributes").AsArray() {
+			if n := a.AsObject().GetString("name"); n != "" {
+				childAttrs[n] = true
+			}
+		}
 		for _, a := range entities.Get2(en).AsObject().Get2("attributes").AsArray() {
 			ao := a.AsObject()
+			name := ao.GetString("name")
+			if name != "" {
+				if childAttrs[name] {
+					g.Count("owned attributes present")
+				} else {
+					g.Errs = append(g.Errs, "owned entity "+en+" attribute "+name+" is missing from the child domain model; the pack's frozen attributes can be extended, never dropped (boundary event payloads name them)")
+				}
+			}
+			// lifecycle enum values must match exactly
 			t := ao.GetString("type")
 			if !sliceEnums.Has(t) {
 				continue
@@ -219,7 +280,59 @@ func checkOwnedShape(design string, slice *ir.Value, g *Gate) {
 				g.Count("owned enums shape-checked")
 			}
 		}
+		// frozen entity invariants: same id present, statement kept. The
+		// child may EXTEND the statement with enforcement detail (append),
+		// never rewrite or weaken it.
+		childInvs := map[string]string{}
+		for _, iv := range childEnt.Get2("invariants").AsArray() {
+			if io := iv.AsObject(); io != nil {
+				childInvs[io.GetString("id")] = io.GetString("definition")
+			}
+		}
+		for _, iv := range entities.Get2(en).AsObject().Get2("invariants").AsArray() {
+			io := iv.AsObject()
+			if io == nil {
+				continue
+			}
+			iid := io.GetString("id")
+			if iid == "" {
+				continue
+			}
+			got, ok := childInvs[iid]
+			switch {
+			case !ok:
+				g.Errs = append(g.Errs, "owned entity "+en+" invariant "+iid+" is missing from the child domain model; the pack's entity invariants are frozen")
+			case !statementKept(io.GetString("definition"), got):
+				g.Errs = append(g.Errs, "owned entity "+en+" invariant "+iid+" drifted from the pack: pack says "+ir.Repr(io.GetString("definition"))+" but the child says "+ir.Repr(got)+"; the frozen statement may gain appended enforcement detail, never be rewritten")
+			default:
+				g.Count("owned invariants intact")
+			}
+		}
 	}
+}
+
+// statementKept reports whether the child's invariant definition preserves
+// the pack's, comparing whitespace-normalized text. Equality passes; so does
+// the child APPENDING detail after the pack's full statement (the shipped
+// examples add "Structural: ..." enforcement notes); anything else is drift.
+func statementKept(pack, child string) bool {
+	p := strings.Join(strings.Fields(pack), " ")
+	c := strings.Join(strings.Fields(child), " ")
+	return c == p || strings.HasPrefix(c, p+" ")
+}
+
+// packRevisionOf reads the manifest's pack_revision as a positive integer,
+// returning its decimal text and whether it is valid.
+func packRevisionOf(manifest *ir.Object) (string, bool) {
+	rev := manifest.Get2("pack_revision")
+	if rev == nil || rev.Kind != ir.KindNumber {
+		return "", false
+	}
+	n, err := strconv.Atoi(string(rev.AsNumber()))
+	if err != nil || n < 1 {
+		return "", false
+	}
+	return string(rev.AsNumber()), true
 }
 
 func enumValues(v *ir.Value) []string {
@@ -235,10 +348,15 @@ func enumValues(v *ir.Value) []string {
 
 func checkDelegatedInvariants(design string, manifest *ir.Object, g *Gate) {
 	var ids []string
-	for _, v := range manifest.Get2("delegated_invariants").AsArray() {
+	for i, v := range manifest.Get2("delegated_invariants").AsArray() {
 		if v != nil && v.Kind == ir.KindString {
 			ids = append(ids, v.AsString())
+			continue
 		}
+		// a non-string entry (an unquoted colon-bearing id reparsed as a
+		// mapping) is an obligation the child would silently shed; nothing is
+		// ever dropped from the delegation list
+		g.Errs = append(g.Errs, fmt.Sprintf("pack manifest delegated_invariants entry %d is not a plain string (%s); a colon-bearing id must be quoted when the pack is generated, regenerate it at the parent", i+1, ir.Repr(v)))
 	}
 	if len(ids) == 0 {
 		g.Count("delegated invariants", 0)
@@ -246,14 +364,14 @@ func checkDelegatedInvariants(design string, manifest *ir.Object, g *Gate) {
 	}
 	var cells []string
 	for _, f := range sortedGlobExt(filepath.Join(design, "machines"), ".matrix.md") {
-		for _, tbl := range ir.ParseMdTables(readOrEmpty(f)) {
+		for _, tbl := range ir.ParseMdTables(readFileOrErr(f, g)) {
 			for _, r := range tbl.Rows {
 				cells = append(cells, r...)
 			}
 		}
 	}
 	if _, err := os.Stat(filepath.Join(design, "BUILD.md")); err == nil {
-		for _, tbl := range ir.ParseMdTables(readOrEmpty(filepath.Join(design, "BUILD.md"))) {
+		for _, tbl := range ir.ParseMdTables(readFileOrErr(filepath.Join(design, "BUILD.md"), g)) {
 			for _, r := range tbl.Rows {
 				cells = append(cells, r...)
 			}
@@ -323,7 +441,7 @@ func checkBoundaryEvents(design, eventsMD string, g *Gate) {
 		}
 	}
 	for _, f := range sortedGlobExt(filepath.Join(design, "machines"), ".matrix.md") {
-		for _, tbl := range ir.ParseMdTables(readOrEmpty(f)) {
+		for _, tbl := range ir.ParseMdTables(readFileOrErr(f, g)) {
 			for _, r := range tbl.Rows {
 				actionCells = append(actionCells, r...)
 			}

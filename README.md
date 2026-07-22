@@ -241,12 +241,12 @@ ownership-based access control, taken end to end:
 - **Designed** through all four phases as the production target of a checked rebuild. The legacy
   prototype and `migration.yaml` account for 4 legacy entities, 16 field mappings, 9 lifecycle
   mappings, 4 coexistence/cutover phases, and 3 transition risks. The target domain model lints
-  clean (9 entities, 25 invariants); C4 model
+  clean (9 entities, 27 invariants); C4 model
   with the dependency posture that an embedded store forces (corruption is fatal-until-restore, not a
-  transient); five state machines; a 1071-line `BUILD.md`.
+  transient); five state machines; a 1138-line `BUILD.md`.
 - **Built by a zero-context coding agent** under hard TDD: a test-writer wrote the suite from the
   blueprint, the tests were locked, and an implementer made them pass without touching a test. Result:
-  286 tests green, 83% coverage, architecture boundaries upheld in the source. The one impossible test
+  362 tests green, 83% coverage, architecture boundaries upheld in the source. The one impossible test
   was escalated as a design defect and fixed in the design, not the code.
 - **Gated** by `machinery check`: it certified the design consistent and caught a real contract defect
   the prose review had missed. The hardened gates verify it non-vacuously: 194 transitions reconciled
@@ -272,7 +272,8 @@ outbox, with six state machines (the saga plus the Order, Payment, Reservation, 
 OutboxMessage lifecycles). The same generators produced its formal models, and TLC checked them: the
 saga always terminates, and its data-refined model shows that money and stock are never silently
 lost, with compensation modeled per obligation so partial compensation is a real, checked state.
-Its integrity layer also proves the inverse side of the `Order.payment` 1:1 relationship, so two
+Its integrity layer also carries the inverse side of the `Order.payment` 1:1 relationship as an
+axiom of the model (a `Cardinality_*` fact), so two
 orders cannot share one payment - a constraint that forward field multiplicity alone does not imply.
 Building that proof caught a real bug in the saga as first drawn, where a single failed refund could
 leave a customer charged with nothing returned. TLC produced the exact counterexample and the fix is
@@ -500,7 +501,7 @@ version matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.3.3        # force an exact release
+machinery update --version v0.3.4        # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
@@ -568,7 +569,7 @@ verdict: `ok`, or findings at three severities defined in the table below. The f
 summarizes blocking findings; a zero there is a clean design. Then, if Java is present:
 
 ```bash
-make verify-formal   # regenerates and checks all 26 TLC proofs + the go-crm policy suite
+make verify-formal   # regenerates and checks all 34 TLC proofs + the relational (Alloy) suites
 ```
 
 | Gate | One line |
@@ -606,8 +607,8 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 - `skills/machinery/SKILL.md` the conductor, plus `references/` (XState format, C4 technique, BUILD.md
   template) and `tools/` (the TLC shell wrappers, `tlc.sh` and `verify_formal.sh`).
 - `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `alloy`, `refine`,
-  `compose`, `check`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`, `install`,
-  `update`, `uninstall`.
+  `compose`, `check`, `baseline`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`,
+  `install`, `update`, `uninstall`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
   `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/Gb/G4/Gt/G5
   suite), `pack/` (recursive decomposition via contract packs), `formal/` (TLC + Alloy
@@ -674,19 +675,20 @@ full gate suite run against a synthesized design/impl fixture) runs as Go tests 
 
 | Package | Coverage | Role |
 |---------|----------|------|
-| `internal/tla` | 90% | TLA+ control-flow generator |
+| `internal/version` | 96% | version stamps and skew detection |
+| `internal/tla` | 93% | TLA+ control-flow generator |
+| `internal/hook` | 89% | progressive governance and generated-artifact protection |
+| `internal/lint` | 89% | structural lint + matrix reconciliation |
 | `internal/alloy` | 88% | policy, integrity, and isolation generators/oracles |
-| `internal/oracle` | 86% | transition oracle (content-hashed ids) |
-| `internal/lint` | 85% | structural lint + matrix reconciliation |
-| `internal/hook` | 86% | progressive governance and generated-artifact protection |
-| `internal/refine` | 83% | data-refinement (3 patterns) |
-| `internal/compose` | 81% | cross-aggregate composition |
-| `internal/install` | 80% | skill placement behind `machinery install` (fetch, extract, canonical+symlink layout) |
-| `internal/gates` | 69% | the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/Gb/G4/Gt/G5 gate suite (G5 also exercised via `internal/experiments`) |
-| `internal/pack` | 58% | contract packs (the mutation suite lives in `internal/experiments`) |
-| `internal/ir` | 55% | shared IR (covered transitively via lint/gates) |
-| `internal/formal` | 41% | TLC/Alloy orchestration (solver-run paths need Java) |
-| **internal/ overall** | **75%** | own-package tests only; the cross-package adversarial suites in `internal/experiments` exercise gates and pack further (cmd/ is thin CLI plumbing) |
+| `internal/oracle` | 87% | transition oracle (content-hashed ids) |
+| `internal/refine` | 87% | data-refinement (3 patterns) |
+| `internal/compose` | 86% | cross-aggregate composition |
+| `internal/gates` | 75% | the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/Gb/G4/Gt/G5 gate suite (G5 also exercised via `internal/experiments`) |
+| `internal/install` | 75% | skill placement behind `machinery install` (fetch, extract, canonical+symlink layout) |
+| `internal/pack` | 72% | contract packs (the mutation suite lives in `internal/experiments`) |
+| `internal/ir` | 63% | shared IR (covered transitively via lint/gates) |
+| `internal/formal` | 52% | TLC/Alloy orchestration (solver-run paths need Java) |
+| **internal/ overall** | **79%** | own-package tests only; the cross-package adversarial suites in `internal/experiments` exercise gates and pack further (cmd/ is thin CLI plumbing) |
 
 Run `go test -coverprofile=cover.out ./internal/... && go tool cover -func=cover.out` locally.
 CI runs `go test -race ./...`. Beyond unit tests, two stronger nets are always green in CI:
@@ -698,8 +700,10 @@ CI runs `go test -race ./...`. Beyond unit tests, two stronger nets are always g
   re-captured with `make golden-update` after intended output changes). Environment-dependent
   commands (verify-formal, doctor, preflight) are exercised by the formal-verification and CI jobs
   instead.
-- **Formal verification**: `machinery verify-formal` regenerates and TLC-model-checks all 26 TLA+
-  proofs across the examples (including the checkout-split contract-refinement proofs).
+- **Formal verification**: `machinery verify-formal` regenerates and TLC-model-checks all 34 TLA+
+  proofs across the six example designs (8 in go-crm, 8 in surreal-crm, 8 in fulfillment, 6 in
+  portfolio-engine, and 4 in checkout-split, two per child including the contract-refinement
+  proofs).
 
 ## Built on
 

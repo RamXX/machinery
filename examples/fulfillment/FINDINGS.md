@@ -89,3 +89,11 @@ fixes landed here first:
 
 `make verify-formal` now checks 16 proofs across both examples, all green, and `machinery check`
 passes both designs with every count non-zero.
+
+## Correction (2026-07-22)
+
+The status line above was accurate when written and is preserved as history. Since then the
+example set has grown from two designs to six (go-crm, surreal-crm, fulfillment,
+portfolio-engine, and the two checkout-split children), the proof count with it, and the formal
+runner is the Go binary: `machinery verify-formal design` per example (the repo's
+`make verify-formal` target runs it across all six).

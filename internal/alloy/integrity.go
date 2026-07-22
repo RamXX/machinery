@@ -30,6 +30,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // IntegrityAnnotationName is the integrity annotation file under design/formal/.
@@ -422,6 +423,7 @@ func (p *Integrity) emit() (string, IntegrityStats) {
 	stats.Carried = len(carried)
 
 	w("// Code generated from %s + %s by machinery alloy. DO NOT EDIT.", p.DomainFile, p.AnnotationFile)
+	w("%s", version.AlloyStamp())
 	w("//")
 	w("// Static relational model of the STRUCTURAL invariants: which configurations")
 	w("// of entities, relationships, unique keys, and singleton flags the constraint")
@@ -438,6 +440,17 @@ func (p *Integrity) emit() (string, IntegrityStats) {
 	w("//      relationships, uniqueness of the listed attributes, and the listed")
 	w("//      singleton flags. Attribute values are abstract atoms (an injective")
 	w("//      relation into an unconstrained domain), never their concrete types.")
+	hasInverse := false
+	for _, r := range p.Rels {
+		if inverseLone(r.Card) {
+			hasInverse = true
+		}
+	}
+	if hasInverse {
+		w("//   4. Inverse exclusivity of the declared 1:1 / 1:n edges is enforced as a")
+		w("//      fact (Cardinality_*), an axiom of the model. No check command restates")
+		w("//      it: a check identical to a fact is a tautology that can never fail.")
+	}
 	if len(p.Residuals) > 0 {
 		w("//")
 		w("// RESIDUALS (structural invariants the algebra does not carry; enforced elsewhere):")
@@ -488,18 +501,18 @@ func (p *Integrity) emit() (string, IntegrityStats) {
 	// A field multiplicity describes only how many targets one source may
 	// reference. Cardinalities with a left-side one also need the inverse bound
 	// or a declared 1:1/1:n edge still admits two sources sharing one target.
+	// The bound is a FACT (an axiom of the model); no check command restates
+	// it: a check byte-identical to a fact is a tautology that can never fail
+	// and would inflate the pass count without proving anything.
 	for _, r := range p.Rels {
 		if !inverseLone(r.Card) {
 			continue
 		}
-		name := fmt.Sprintf("Exclusive_%s_%s", r.From, upperFirst(r.Field))
 		w("")
-		w("// %s: the %s side of %s -> %s is exclusive", r.Card, r.From, r.From, r.To)
+		w("// %s: the %s side of %s -> %s is exclusive (enforced as a fact)", r.Card, r.From, r.From, r.To)
 		w("fact Cardinality_%s_%s {", r.From, upperFirst(r.Field))
 		w("  all target: %s | lone target.~%s", r.To, r.Field)
 		w("}")
-		w("check %s { all target: %s | lone target.~%s } for %d", name, r.To, r.Field, p.Scope)
-		stats.Commands = append(stats.Commands, Command{Kind: "check", Name: name})
 	}
 
 	// Bool enum, if any singleton needs it

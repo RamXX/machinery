@@ -27,7 +27,8 @@ func init() {
 		"source-outside-contract")
 }
 
-const fixtureMachineJSON = `{"id":"widget","initial":"Draft","context":{"widgetId":null},"states":{
+const fixtureMachineJSON = `{"id":"widget","initial":"Draft","context":{"widgetId":null},
+ "_delays":{"persistTimeout":"10000 ms - fixture persistence timeout bound"},"states":{
  "Draft":{"on":{"publish":[
    {"target":"persisting","guard":"guardCanPublish","actions":"setPending"},
    {"actions":"recordDenied"}]}},

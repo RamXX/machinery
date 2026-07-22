@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // IsolationAnnotationName is the isolation annotation file under design/formal/.
@@ -307,6 +308,7 @@ func (p *Isolation) emit() (string, IsolationStats) {
 	stats.Carried = len(carried)
 
 	w("// Code generated from %s + %s by machinery alloy. DO NOT EDIT.", p.DomainFile, p.AnnotationFile)
+	w("%s", version.AlloyStamp())
 	w("//")
 	w("// Static relational model of multi-tenant ISOLATION: the tenant of a record")
 	w("// is its owner's tenant, and every reference the annotation names must stay")
@@ -369,12 +371,17 @@ func (p *Isolation) emit() (string, IsolationStats) {
 	w("// same-tenant.")
 	w("pred sameTenant[a, b: %s] { some a.%s and a.%s = b.%s }", p.SubjectEntity, p.TenantAttr, p.TenantAttr, p.TenantAttr)
 
-	// isolation facts: each named reference stays in-tenant
+	// isolation facts: each named reference stays in-tenant. Quantified PER
+	// ELEMENT of the reference field: for a set-valued field (1:n, n:n) the
+	// collapsed form sameTenant[x.owner, x.field.owner] compares the owner
+	// SET's tenants at once, which is satisfiable by cross-tenant referents
+	// (the reviewer's CrossTenantSharedReferent probe); per-element holds each
+	// referenced record to the source's tenant individually.
 	for _, r := range p.Refs {
 		w("")
-		w("// %s: %s %s and the %s it references are owned in the same tenant", strings.Join(r.Invariants, ", "), article(r.From), r.From, r.To)
+		w("// %s: %s %s and every %s it references are owned in the same tenant", strings.Join(r.Invariants, ", "), article(r.From), r.From, r.To)
 		w("fact Isolation_%s_%s_%s {", r.From, r.To, upperFirst(r.Field))
-		w("  all x: %s | some x.%s implies sameTenant[x.owner, x.%s.owner]", r.From, r.Field, r.Field)
+		w("  all x: %s | all t: x.%s | sameTenant[x.owner, t.owner]", r.From, r.Field)
 		w("}")
 		if r.InverseLone {
 			w("fact Cardinality_%s_%s_%s {", r.From, r.To, upperFirst(r.Field))
@@ -411,11 +418,13 @@ func (p *Isolation) emit() (string, IsolationStats) {
 		}
 		name := fmt.Sprintf("SharedReferent_%s_%s_%s", r.From, r.To, upperFirst(r.Field))
 		w("")
-		w("// PASS = no counterexample: two %s records that reference the same %s are", r.From, r.To)
-		w("// owned in the same tenant. A counterexample would be a %s referenced from", r.To)
-		w("// two tenants at once -- a shared referent bridging the boundary.")
+		w("// PASS = no counterexample: two %s records whose %s references OVERLAP in", r.From, r.Field)
+		w("// even one %s are owned in the same tenant. A counterexample would be a %s", r.To, r.To)
+		w("// referenced from two tenants at once -- a shared referent bridging the")
+		w("// boundary. Overlap, not whole-set equality: for a set-valued field the")
+		w("// equality form misses records that share only part of their referents.")
 		w("check %s {", name)
-		w("  all x, y: %s | (some x.%s and x.%s = y.%s) implies sameTenant[x.owner, y.owner]", r.From, r.Field, r.Field, r.Field)
+		w("  all x, y: %s | some (x.%s & y.%s) implies sameTenant[x.owner, y.owner]", r.From, r.Field, r.Field)
 		w("} for %d", p.Scope)
 		stats.Commands = append(stats.Commands, Command{Kind: "check", Name: name})
 	}
@@ -516,6 +525,7 @@ func (p *Isolation) generateOracle() (string, int) {
 	w("# Generated tenant-scoping oracle: isolation")
 	w("")
 	w("Generated from `%s` + `%s` by `machinery alloy`. DO NOT EDIT BY HAND.", p.DomainFile, p.AnnotationFile)
+	w("%s", version.MarkdownStamp())
 	w("Single source of truth for the link-authorization test: one row is one decision")
 	w("case for the pure tenant-scoping function that decides whether a reference may")
 	w("be established. Key tests on the STABLE id, not the row number; row numbers")

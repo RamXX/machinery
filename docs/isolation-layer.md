@@ -18,8 +18,12 @@ record and the records it references belong to one tenant. `tenant(record) = own
 reference is tenant-consistent when the two owners share a tenant. From one annotation,
 `machinery alloy` generates:
 
-1. **`design/formal/Isolation.als`**, a bounded relational model whose checks prove, most sharply,
-   that two records in different tenants can never share a referent (`SharedReferent`) -- a
+1. **`design/formal/Isolation.als`**, a bounded relational model. The enforcing facts are
+   quantified per element: every record a reference field names is held to the source's tenant
+   individually, so a set-valued field cannot hide a cross-tenant member behind the rest of the
+   set. Its checks prove, most sharply,
+   that two records whose reference fields overlap in even one target are owned in the same tenant
+   (`SharedReferent`: `some (x.field & y.field) implies` the owners share a tenant) -- a
    non-trivial consequence the single-hop facts do not give for free.
 2. **`design/formal/Isolation.oracle.md`**, the tenant-scoping decision table: for each reference and
    each tenant relationship between the two owners, the expected allow/deny verdict, with stable ids.
@@ -110,8 +114,12 @@ Optional integer 2 to 12 (default 6): the Alloy search bound.
 | check | question it answers | a FAIL means |
 |---|---|---|
 | `SomeWorld` (run) | can a genuinely multi-tenant world with a link still exist? | the isolation facts collapse tenancy (over-isolation: links force one tenant) |
-| `SharedReferent_<From>_<Field>_<To>` (check) | can two records of different tenants reference the same target? | a shared referent bridges the tenant boundary -- the sharp leak |
-| `Possible_<From>_<Field>_<To>` (run) | is a same-tenant link actually constructible? | the isolation fact is vacuous (it forbids the link entirely) |
+| `SharedReferent_<From>_<To>_<Field>` (check) | can the reference fields of two records in different tenants overlap in even one target (`some (x.field & y.field)`)? | a shared referent bridges the tenant boundary -- the sharp leak. Overlap, not whole-set equality: for a set-valued field the equality form misses records that share only part of their referents |
+| `Possible_<From>_<To>_<Field>` (run) | is a same-tenant link actually constructible? | the isolation fact is vacuous (it forbids the link entirely) |
+
+The enforcing `Isolation_*` facts are per element (`all x: From | all t: x.field | sameTenant`),
+so every referenced record is held to the source's tenant individually rather than comparing the
+whole referent set's tenants at once.
 
 The layer was mutation-verified during development: strip the enforcing facts and `SharedReferent`
 finds a `Deal` referenced from two tenants at once. With the facts (the invariants enforced), it

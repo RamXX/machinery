@@ -1,4 +1,4 @@
-note: decomposed parent with no machines/; running g2,gb,g5 (G3/Gx/G4/Gt run on the child designs)
+note: decomposed parent with no machines/; running g2,gb,g5 (G3/Gx run on the child designs; gt skipped: no machines)
 == G2-c4  Architecture Contract ==
   checked: 2 boundaries, 3 externals, 4 allow rules, 4 deny rules, 7 dsl elements, 2 boundaries bound to dsl, 3 mitigation rows, 6 dependencies with mitigation rows, 3 event contracts
   ok
@@ -6,7 +6,7 @@ note: decomposed parent with no machines/; running g2,gb,g5 (G3/Gx/G4/Gt run on 
   checked: 0 local plans (decomposed parent; the children carry the plans)
   ok
 == G5-pack  contract packs ==
-  checked: 2 subsystems, 2 packs fresh, 2 children pinned, boundary events: orders 3, payments 3
+  checked: 2 subsystems, 2 packs fresh, 2 children pinned, boundary events: orders 3, payments 3, pack revision 1
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

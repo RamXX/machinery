@@ -105,6 +105,92 @@ func TestG2BaselineReferencesDeclaredBoundaries(t *testing.T) {
 	}
 }
 
+// A wildcard baseline rule would amnesty the whole edge space: baseline is an
+// enumerated-edges ratchet, so G2 hard-errors on it (GATE-7).
+func TestG2WildcardBaselineRuleIsAnError(t *testing.T) {
+	design, _ := writeFixture(t, fixtureOpts{rules: "  baseline: [\"* -> *\"]"})
+	g := CheckC4(design)
+	if !hasErr(g, "wildcard") {
+		t.Fatalf("a wildcard baseline rule must be a hard G2 ERROR, got %v", g.Errs)
+	}
+}
+
+// G4 never honors a wildcard baseline rule: in a --gate g4 run (where G2's
+// finding is absent) the edges it would have amnestied stay undeclared.
+func TestG4WildcardBaselineDoesNotAmnesty(t *testing.T) {
+	design, impl := writeFixture(t, fixtureOpts{rules: "  baseline: [\"* -> *\"]"})
+	g := CheckImports(design, impl)
+	if !hasErr(g, "undeclared cross-boundary edge alpha -> beta") {
+		t.Fatalf("the wildcard-baselined edge must stay undeclared, got %v", g.Errs)
+	}
+	if g.Counts["baselined edges"] != 0 {
+		t.Errorf("no edge may count as baselined under a wildcard rule: %+v", g.Counts)
+	}
+}
+
+// The ratchet snapshot date is read back, not just recorded: G4 notes the
+// snapshot age so tolerated debt stays visible (GATE-8; non-blocking).
+func TestG4RatchetAgeNote(t *testing.T) {
+	design, impl := writeFixture(t, fixtureOpts{rules: "  baseline: [\"alpha -> beta\"]"})
+	if err := WriteRatchet(design, &Ratchet{Date: "2026-01-15", Edges: map[string][]string{"alpha -> beta": {"alpha/a.go"}}}); err != nil {
+		t.Fatal(err)
+	}
+	g := CheckImports(design, impl)
+	if len(g.Errs) != 0 {
+		t.Fatalf("G4 must stay green at snapshot: %v", g.Errs)
+	}
+	if !hasNote(g, "ratchet snapshot 2026-01-15") || !hasNote(g, "old") {
+		t.Fatalf("want a ratchet-age note naming the snapshot date, got %v", g.Notes)
+	}
+}
+
+// --- G4: Rust production scanning (NG-1) ---
+
+// A production .rs file with an inline #[cfg(test)] module is NOT a test
+// file: G4 scans its production portion, so cross-boundary imports and the
+// unmapped-file error stay visible.
+func TestG4RustInlineTestModuleStillScanned(t *testing.T) {
+	root := t.TempDir()
+	design, impl := filepath.Join(root, "design"), filepath.Join(root, "impl")
+	arch := "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
+		"  - id: app\n    code: [\"src/app/**\"]\n  - id: core\n    code: [\"src/core/**\"]\n```\n"
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
+	mustWrite(t, filepath.Join(impl, "src", "app", "main.rs"),
+		"use crate::core::engine;\n\npub fn run() {}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {}\n}\n")
+	mustWrite(t, filepath.Join(impl, "src", "core", "lib.rs"), "pub mod engine {}\n")
+	g := CheckImports(design, impl)
+	if !hasErr(g, "undeclared cross-boundary edge app -> core") {
+		t.Fatalf("the production import in a cfg(test)-bearing file must be judged: %v", g.Errs)
+	}
+	if g.Counts["rust files checked"] != 2 {
+		t.Errorf("rust files checked = %d, want 2: %+v", g.Counts["rust files checked"], g.Counts)
+	}
+	// an import that lives ONLY inside the cfg(test) module is not a
+	// production edge
+	mustWrite(t, filepath.Join(impl, "src", "app", "main.rs"),
+		"pub fn run() {}\n\n#[cfg(test)]\nmod tests {\n    use crate::core::engine;\n    #[test]\n    fn t() {}\n}\n")
+	if g2 := CheckImports(design, impl); hasErr(g2, "undeclared cross-boundary edge app -> core") {
+		t.Fatalf("a test-only import must not create a production edge: %v", g2.Errs)
+	}
+}
+
+// f1-g4rust: a .rs file outside every boundary used to vanish wholesale as a
+// "test file" because it contained #[cfg(test)], suppressing the
+// unmapped-file error.
+func TestG4RustUnmappedFileWithInlineTestsIsAnError(t *testing.T) {
+	root := t.TempDir()
+	design, impl := filepath.Join(root, "design"), filepath.Join(root, "impl")
+	arch := "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
+		"  - id: app\n    code: [\"app/**\"]\n```\n"
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
+	mustWrite(t, filepath.Join(impl, "rogue.rs"),
+		"use std::collections::HashMap;\n\npub fn production_logic() {}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {}\n}\n")
+	g := CheckImports(design, impl)
+	if !hasErr(g, "source file rogue.rs maps to no contract boundary") {
+		t.Fatalf("the unmapped production .rs file must be an ERROR: %v", g.Errs)
+	}
+}
+
 // --- G4: baseline toleration and the ratchet ---
 
 func TestG4BaselineWithoutRatchetFails(t *testing.T) {

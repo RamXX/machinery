@@ -210,6 +210,11 @@ func decodeToken(dec *json.Decoder, t json.Token) (*Value, error) {
 					return nil, err
 				}
 				key, _ := kt.(string)
+				if o.Has(key) {
+					// last-wins would silently drop the first definition; a
+					// duplicated state or event key is a hard parse error
+					return nil, fmt.Errorf("duplicate key %s in object", pyReprStr(key))
+				}
 				val, err := orderedDecode(dec)
 				if err != nil {
 					return nil, err

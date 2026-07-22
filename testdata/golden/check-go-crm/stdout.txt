@@ -1,6 +1,9 @@
 == Gm-transition  hybrid/rebuild migration contract ==
   checked: 4 legacy entities, 9 target entities, 4 dispositions, 5 new target entities, 4 salvage decisions, 16 data mappings, 9 state mappings, 4 transition phases, 1 cutover contracts, 3 transition risks, 1 transition architecture sections, 1 migration implementation plans
   ok
+== Gs-surface  legacy surface ledger ==
+  checked: 13 commands, 5 tables, 17 covered, 1 dropped, 4 waived classes, 18 surface items, as_of 2026-07-22, enumerated from the committed legacy model and the migration.yaml inventory (retrofit; the prototype binary is not in this repo)
+  ok
 == Gp-policy static relational model ==
   checked: 4 roles, 5 resources, 4 policy rules, 1 residuals (waived with reason), 12 invariants carried, 14 solver commands generated, 70 authz oracle rows generated, 2 committed artifacts fresh (byte-identical)
   ok

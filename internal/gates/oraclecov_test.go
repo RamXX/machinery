@@ -115,6 +115,106 @@ func TestCheckOracleCoverageNoTestFilesFailsLoudly(t *testing.T) {
 	}
 }
 
+// The wholesale (conformance-parse) citation is earned, not mentioned: the
+// oracle file name must sit inside a string literal, in a file that shows
+// parse evidence. A bare comment naming every oracle once wholesale-covered
+// 272 rows with zero assertions (GATE-4).
+func TestGtWholesaleNeedsStringLiteralAndParseEvidence(t *testing.T) {
+	t.Run("comment mention covers nothing", func(t *testing.T) {
+		design, impl := writeCovFixture(t, map[string]string{
+			"machines/Thing.oracle.md": covOracleMD,
+			"impl/x_test.go": "package x\n\n// TODO: see Thing.oracle.md for the table we should cover\n" +
+				"func nothing() {}\n",
+		})
+		g := CheckOracleCoverage(design, impl)
+		if !strings.Contains(strings.Join(g.Errs, "\n"), "2 of 2 stable ids appear in no test file") {
+			t.Fatalf("a comment mention must not wholesale-cover the oracle: %v", g.Errs)
+		}
+	})
+	t.Run("quoted mention without parse evidence covers nothing", func(t *testing.T) {
+		design, impl := writeCovFixture(t, map[string]string{
+			"machines/Thing.oracle.md": covOracleMD,
+			"impl/x_test.go": "package x\n\nconst oraclePath = " +
+				"\"../../design/machines/Thing.oracle.md\"\n",
+		})
+		g := CheckOracleCoverage(design, impl)
+		if !strings.Contains(strings.Join(g.Errs, "\n"), "2 of 2 stable ids appear in no test file") {
+			t.Fatalf("a path constant nothing parses must not wholesale-cover the oracle: %v", g.Errs)
+		}
+	})
+	t.Run("parse evidence must live in the citing file", func(t *testing.T) {
+		design, impl := writeCovFixture(t, map[string]string{
+			"machines/Thing.oracle.md": covOracleMD,
+			"impl/a_test.go": "package x\n\nconst oraclePath = " +
+				"\"../../design/machines/Thing.oracle.md\"\n",
+			"impl/b_test.go": "package x\n" + parseEvidence,
+		})
+		g := CheckOracleCoverage(design, impl)
+		if !strings.Contains(strings.Join(g.Errs, "\n"), "2 of 2 stable ids appear in no test file") {
+			t.Fatalf("evidence in another file must not launder the mention: %v", g.Errs)
+		}
+	})
+}
+
+// The file-name mention needs word boundaries on BOTH sides: [A-Za-z0-9_.-]
+// neighbors disqualify, so purchase-order.oracle.md never wholesale-covers
+// order.oracle.md (NG-2) and order.oracle.md.bak covers nothing (NG-3).
+func TestGtCitationBoundaries(t *testing.T) {
+	orderOracle := "| test id | stable id | source |\n|---|---|---|\n| T-ORD-01 | ORD-aaa111 | A |\n"
+	purchaseOracle := "| test id | stable id | source |\n|---|---|---|\n| T-PUR-01 | PUR-ccc333 | A |\n"
+	t.Run("hyphenated sibling does not cover", func(t *testing.T) {
+		design, impl := writeCovFixture(t, map[string]string{
+			"machines/order.oracle.md":          orderOracle,
+			"machines/purchase-order.oracle.md": purchaseOracle,
+			"impl/purchase_test.go": "package p\n\nconst oraclePath = " +
+				"\"../../design/machines/purchase-order.oracle.md\"\n" + parseEvidence,
+		})
+		g := CheckOracleCoverage(design, impl)
+		if !strings.Contains(strings.Join(g.Errs, "\n"), "order.oracle.md: 1 of 1 stable ids appear in no test file (ORD-aaa111)") {
+			t.Fatalf("order must stay uncovered by the purchase-order mention: %v", g.Errs)
+		}
+		if g.Counts["machines covered by conformance parse"] != 1 {
+			t.Errorf("machines covered by conformance parse = %d, want 1 (purchase-order): %+v",
+				g.Counts["machines covered by conformance parse"], g.Counts)
+		}
+	})
+	t.Run("a suffixed artifact is not the oracle", func(t *testing.T) {
+		design, impl := writeCovFixture(t, map[string]string{
+			"machines/order.oracle.md": orderOracle,
+			"impl/x_test.go": "package p\n\nconst notes = \"see order.oracle.md.bak and order.oracle.mdx for history\"\n" +
+				parseEvidence,
+		})
+		g := CheckOracleCoverage(design, impl)
+		if !strings.Contains(strings.Join(g.Errs, "\n"), "order.oracle.md: 1 of 1 stable ids appear in no test file (ORD-aaa111)") {
+			t.Fatalf(".bak/.mdx mentions must not cover the oracle: %v", g.Errs)
+		}
+	})
+}
+
+// Stable ids in PRODUCTION .rs text (a transition-table constant) prove
+// nothing about the tests: only the #[cfg(test)] module span of a production
+// .rs file feeds Gt's corpus (NG-7).
+func TestGtRustProductionTextIsNotTestCorpus(t *testing.T) {
+	design, impl := writeCovFixture(t, map[string]string{
+		"machines/Thing.oracle.md": covOracleMD,
+		"impl/src/machine.rs": "pub const T1: &str = \"THIN-aaa111\";\npub const T2: &str = \"THIN-bbb222\";\n\n" +
+			"pub fn transition() {}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn unrelated() { assert!(true); }\n}\n",
+	})
+	g := CheckOracleCoverage(design, impl)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "2 of 2 stable ids appear in no test file") {
+		t.Fatalf("production .rs text must not cover oracle ids: %v", g.Errs)
+	}
+	// the same ids INSIDE the cfg(test) module do cover
+	design2, impl2 := writeCovFixture(t, map[string]string{
+		"machines/Thing.oracle.md": covOracleMD,
+		"impl/src/machine.rs": "pub fn transition() {}\n\n" +
+			"#[cfg(test)]\nmod tests {\n    // exercises THIN-aaa111 and THIN-bbb222\n}\n",
+	})
+	if g2 := CheckOracleCoverage(design2, impl2); len(g2.Errs) != 0 {
+		t.Fatalf("ids in the cfg(test) span must cover: %v", g2.Errs)
+	}
+}
+
 // Rust test shapes: any *.rs under a tests/ directory and any .rs file with a
 // #[cfg(test)] module both feed the corpus.
 func TestCheckOracleCoverageRustTestShapes(t *testing.T) {
@@ -132,11 +232,16 @@ func TestCheckOracleCoverageRustTestShapes(t *testing.T) {
 	}
 }
 
+// parseEvidence is the conformance-parse fingerprint every real oracle test
+// carries: a string literal containing the markdown table-row delimiter (the
+// go-crm oracle tests split rows on "|").
+const parseEvidence = "\nfunc cells(line string) []string { return strings.Split(strings.Trim(line, \"|\"), \"|\") }\n"
+
 func TestCheckOracleCoverageConformanceParse(t *testing.T) {
 	design, impl := writeCovFixture(t, map[string]string{
 		"machines/Thing.oracle.md": covOracleMD,
 		"impl/oracle_test.go": "package thing\n\nconst oraclePath = " +
-			"\"../../design/machines/Thing.oracle.md\"\n",
+			"\"../../design/machines/Thing.oracle.md\"\n" + parseEvidence,
 	})
 	g := CheckOracleCoverage(design, impl)
 	if len(g.Errs) != 0 {
@@ -157,7 +262,7 @@ func TestCheckOracleCoverageConformanceParseIsNotSubstring(t *testing.T) {
 		"machines/Order.oracle.md":         orderOracle,
 		"machines/PurchaseOrder.oracle.md": purchaseOracle,
 		"impl/purchase_test.go": "package p\n\nconst oraclePath = " +
-			"\"../../design/machines/PurchaseOrder.oracle.md\"\n",
+			"\"../../design/machines/PurchaseOrder.oracle.md\"\n" + parseEvidence,
 	})
 	g := CheckOracleCoverage(design, impl)
 	if len(g.Errs) != 1 || !strings.Contains(g.Errs[0], "Order.oracle.md: 1 of 1 stable ids appear in no test file (ORD-aaa111)") {
@@ -218,7 +323,7 @@ func TestCheckOracleCoverageFormalOracles(t *testing.T) {
 		design, impl := writeCovFixture(t, map[string]string{
 			"formal/Policy.oracle.md": covPolicyOracleMD,
 			"impl/authz_test.go": "package authz\n\nconst oraclePath = " +
-				"\"../../design/formal/Policy.oracle.md\"\n",
+				"\"../../design/formal/Policy.oracle.md\"\n" + parseEvidence,
 		})
 		g := CheckOracleCoverage(design, impl)
 		if len(g.Errs) != 0 {
@@ -320,9 +425,12 @@ func TestIsTestFileShapes(t *testing.T) {
 		{"a.test.cjs", true},
 		{"a_test.exs", true},
 		{"a_spec.rb", true},
-		{"a_test.rs", true},
+		// a .rs file is test-only iff under tests/ or benches/: production
+		// files with inline #[cfg(test)] modules are split, never skipped
+		{"a_test.rs", false},
 		{"tests/foo.rs", true},
 		{"crate/tests/deep/foo.rs", true},
+		{"benches/bench.rs", true},
 		{"src/lib.rs", false},
 		{"tests/helper.go", false}, // the tests/ dir rule is Rust-only
 		{"a.go", false},
@@ -333,10 +441,35 @@ func TestIsTestFileShapes(t *testing.T) {
 			t.Errorf("isTestFile(%q) = %v, want %v", tc.rel, got, tc.want)
 		}
 	}
-	if !isTestContent("src/lib.rs", "#[cfg(test)]\nmod tests {}\n") {
-		t.Error("a .rs file with #[cfg(test)] is a test file by content")
+}
+
+// rustSplitTests carves a production .rs file into the production portion (what
+// G4 scans) and the #[cfg(test)] item spans (what Gt scans); the two never mix.
+func TestRustSplitTests(t *testing.T) {
+	src := "use std::fmt;\n\npub fn f() {}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    #[test]\n    fn t() { assert!(true); }\n}\n\npub fn g() {}\n"
+	prod, tests := rustSplitTests(src)
+	if strings.Contains(prod, "assert!(true)") || strings.Contains(prod, "use super::*") {
+		t.Errorf("production portion still carries test text:\n%s", prod)
 	}
-	if isTestContent("src/lib.go", "#[cfg(test)]") {
-		t.Error("the content rule is Rust-only")
+	if !strings.Contains(prod, "use std::fmt;") || !strings.Contains(prod, "pub fn g() {}") {
+		t.Errorf("production portion lost production text:\n%s", prod)
+	}
+	if len(tests) != 1 || !strings.Contains(tests[0], "assert!(true)") {
+		t.Errorf("test spans wrong: %q", tests)
+	}
+	if strings.Count(prod, "\n") != strings.Count(src, "\n") {
+		t.Error("masking must preserve the line structure")
+	}
+	// a braceless cfg(test) item ends at its semicolon
+	prod2, tests2 := rustSplitTests("#[cfg(test)]\nuse crate::mocks::fake;\nuse crate::real;\n")
+	if strings.Contains(prod2, "mocks") || !strings.Contains(prod2, "crate::real") {
+		t.Errorf("braceless span wrong: prod=%q", prod2)
+	}
+	if len(tests2) != 1 || !strings.Contains(tests2[0], "mocks") {
+		t.Errorf("braceless test span wrong: %q", tests2)
+	}
+	// no cfg(test): everything is production
+	if prod3, tests3 := rustSplitTests("pub fn f() {}\n"); prod3 != "pub fn f() {}\n" || tests3 != nil {
+		t.Errorf("split without cfg(test) must be identity: %q %q", prod3, tests3)
 	}
 }

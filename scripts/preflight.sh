@@ -64,11 +64,11 @@ fi
 # 6. docs gate (ci: docs job) ----------------------------------------------
 say "docs gate (no stale Python refs, no em dashes)"
 if grep -rnE "python3|PyYAML|pyyaml|uv run|oracle_gen\.py|machine_lint\.py|machinery_check\.py|tla_gen\.py|refine_gen\.py|compose_gen\.py|diff-all\.sh|capture-golden\.sh" \
-    README.md skills/ agents/ docs/ Makefile; then
+    README.md CONTRIBUTING.md install.sh skills/ agents/ docs/ examples/ commands/ adapters/ hooks/ Makefile; then
   fail "stale Python-toolchain reference in the doc surface"
 fi
 # Em dash spelled as an ANSI-C escape so this script stays free of the literal.
-if grep -rn $'\u2014' README.md skills/ agents/ docs/ Makefile .github/; then
+if grep -rn $'\u2014' README.md CONTRIBUTING.md install.sh skills/ agents/ docs/ examples/ commands/ adapters/ hooks/ Makefile .github/; then
   fail "em dash found in the doc surface (house style forbids it)"
 fi
 
@@ -86,8 +86,9 @@ go test -count=1 -run TestGolden ./cmd/machinery || fail "golden corpus drifted 
 go test -count=1 ./internal/experiments/ || fail "adversarial gate-experiment suite failed"
 
 # 10. example gate suites (ci: gates job) ----------------------------------
-say "machinery check (all 6 examples)"
+say "machinery check (all 7 example design suites)"
 .bin/machinery check examples/go-crm/design --impl examples/go-crm/impl || fail "gate suite: go-crm"
+.bin/machinery check examples/surreal-crm/design                       || fail "gate suite: surreal-crm"
 .bin/machinery check examples/fulfillment/design                       || fail "gate suite: fulfillment"
 .bin/machinery check examples/portfolio-engine/design                  || fail "gate suite: portfolio-engine"
 .bin/machinery check examples/checkout-split/parent/design             || fail "gate suite: checkout-split/parent"

@@ -49,6 +49,8 @@ type Subsystem struct {
 // Decomposition is the parsed, validated decomposition.yaml.
 type Decomposition struct {
 	Version    int
+	Revision   int               // monotonic amendment counter (optional, default 1)
+	Retained   map[string]string // top-level invariants the parent keeps enforcing, id -> reason
 	Subsystems []Subsystem
 }
 
@@ -78,6 +80,25 @@ func HasDecomposition(design string) bool {
 func HasPack(design string) bool {
 	_, err := os.Stat(filepath.Join(design, "pack", "pack.yaml"))
 	return err == nil
+}
+
+// LooksLikeDesignDir reports whether the directory contains any machinery
+// design signal: a *.modelith.yaml, a machines/ directory, or a
+// decomposition.yaml. `machinery scale` refuses to measure a directory with
+// none of these; measuring emptiness once produced a confident "single-run
+// design" recommendation for a directory that was not a design at all.
+func LooksLikeDesignDir(design string) bool {
+	if entries, err := os.ReadDir(design); err == nil {
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".modelith.yaml") {
+				return true
+			}
+		}
+	}
+	if st, err := os.Stat(filepath.Join(design, "machines")); err == nil && st.IsDir() {
+		return true
+	}
+	return HasDecomposition(design)
 }
 
 // subsystemIDRe restricts ids to a bare-name charset: they become path
@@ -133,6 +154,42 @@ func LoadDecomposition(design string) (*Decomposition, error) {
 	}
 	var d Decomposition
 	d.Version = 1
+	// revision is the amendment-visibility counter: it flows into every
+	// manifest as pack_revision so a child can see rev N -> N+1 without
+	// diffing bytes. Optional; a design without one is at revision 1.
+	d.Revision = 1
+	if rv := o.Get2("revision"); rv != nil {
+		n := -1
+		if rv.Kind == ir.KindNumber {
+			if parsed, perr := strconv.Atoi(string(rv.AsNumber())); perr == nil {
+				n = parsed
+			}
+		}
+		if n < 1 {
+			report("revision must be an integer >= 1 (the monotonic amendment counter emitted into every pack as pack_revision)")
+		} else {
+			d.Revision = n
+		}
+	}
+	// retained: the top-level invariants the parent keeps enforcing itself,
+	// each with a reason. Everything top-level that is neither delegated nor
+	// retained is enforced by nobody (a decomposed parent has no machines).
+	d.Retained = map[string]string{}
+	if rv := o.Get2("retained"); rv != nil {
+		ro := rv.AsObject()
+		if ro == nil {
+			report("retained must be a mapping of invariant id to a non-empty reason string")
+		} else {
+			for _, k := range ro.Keys() {
+				val := ro.Get2(k)
+				if val == nil || val.Kind != ir.KindString || strings.TrimSpace(val.AsString()) == "" {
+					report("retained invariant %s needs a non-empty reason string (why the parent keeps enforcing it)", ir.Repr(k))
+					continue
+				}
+				d.Retained[k] = val.AsString()
+			}
+		}
+	}
 	for _, sv := range o.Get2("subsystems").AsArray() {
 		so := sv.AsObject()
 		if so == nil {
@@ -182,6 +239,25 @@ func LoadDecomposition(design string) (*Decomposition, error) {
 		}
 	}
 
+	// components: claimed exactly once across subsystems. A duplicate claim
+	// makes the event-table direction test (comp[e.Producer]) true in both
+	// packs: the duplicating subsystem's pack flips a consumed event to
+	// produces, silently deleting the handling obligation.
+	compOwner := map[string]string{}
+	for _, s := range d.Subsystems {
+		for _, c := range s.Components {
+			if prev, ok := compOwner[c]; ok {
+				if prev == s.ID {
+					report("subsystem %s lists component %s twice", ir.Repr(s.ID), ir.Repr(c))
+				} else {
+					report("component %s is claimed by both %s and %s; components must be claimed exactly once across subsystems (a duplicate claim flips boundary event directions in the duplicating pack)", ir.Repr(c), ir.Repr(prev), ir.Repr(s.ID))
+				}
+				continue
+			}
+			compOwner[c] = s.ID
+		}
+	}
+
 	// ownership: every owned entity exists; every entity owned exactly once
 	dm, dmErr := loadModelith(design)
 	if dmErr != nil {
@@ -208,12 +284,40 @@ func LoadDecomposition(design string) (*Decomposition, error) {
 		}
 		// delegated invariants must exist (entity-level or top-level)
 		known := invariantIDs(dm)
+		delegatedTo := map[string]string{}
 		for _, s := range d.Subsystems {
 			for _, iid := range s.DelegatedInvariants {
 				if !known[iid] {
 					report("subsystem %s delegates unknown invariant %s", ir.Repr(s.ID), ir.Repr(iid))
 				}
+				delegatedTo[iid] = s.ID
 			}
+		}
+		// retained ids must exist and must not also be delegated (enforcement
+		// needs exactly one owner)
+		for iid := range d.Retained {
+			if !known[iid] {
+				report("retained names unknown invariant %s", ir.Repr(iid))
+			}
+			if sub, ok := delegatedTo[iid]; ok {
+				report("invariant %s is both retained and delegated to subsystem %s; enforcement must have exactly one owner", ir.Repr(iid), ir.Repr(sub))
+			}
+		}
+		// every top-level (cross-entity) invariant must be delegated or
+		// retained: a decomposed parent has no machines, so an invariant that
+		// enters no pack is enforced by nothing while every gate stays green
+		for _, iv := range dm.AsObject().Get2("invariants").AsArray() {
+			iid := iv.AsObject().GetString("id")
+			if iid == "" {
+				continue
+			}
+			if _, ok := delegatedTo[iid]; ok {
+				continue
+			}
+			if _, ok := d.Retained[iid]; ok {
+				continue
+			}
+			report("top-level invariant %s is delegated to no subsystem and not declared retained; a decomposed parent has no machines to enforce it. Delegate it via a subsystem's delegated_invariants or keep it parent-enforced with retained: {%s: \"<reason>\"}", ir.Repr(iid), iid)
 		}
 	}
 
@@ -315,6 +419,12 @@ func parseBoundaryEventsWaiver(be *ir.Value, id string, report func(string, ...i
 	beo := be.AsObject()
 	if beo != nil && beo.Len() == 1 {
 		if rv := beo.Get2("none"); rv != nil && rv.Kind == ir.KindString && strings.TrimSpace(rv.AsString()) != "" {
+			// the reason is written verbatim into the generated events.md; an
+			// embedded newline could forge its "Boundary events: N" count line
+			if strings.ContainsAny(rv.AsString(), "\n\r") {
+				report("subsystem %s boundary_events waiver reason must be a single line; an embedded newline can forge the generated events.md count line", ir.Repr(id))
+				return ""
+			}
 			return rv.AsString()
 		}
 	}
@@ -396,16 +506,25 @@ func EventRows(design string) []EventRow {
 	return parseEventTable(design).rows
 }
 
+// parseEventTable parses EVERY markdown table whose header names producer,
+// consumer, and delivery, and concatenates their rows (row numbers run
+// cumulatively across tables so findings stay addressable). Taking only the
+// first matching table once silently excluded every later event-contract
+// table from packs, validation, and the G5 regeneration while the packs still
+// claimed boundary completeness.
 func parseEventTable(design string) eventTable {
 	data, err := os.ReadFile(filepath.Join(design, "ARCHITECTURE.md"))
 	if err != nil {
 		return eventTable{}
 	}
+	out := eventTable{eventCol: true}
+	row := 0
 	for _, tbl := range ir.ParseMdTables(string(data)) {
 		hl := strings.ToLower(strings.Join(tbl.Header, " "))
 		if !strings.Contains(hl, "producer") || !strings.Contains(hl, "consumer") || !strings.Contains(hl, "delivery") {
 			continue
 		}
+		out.found = true
 		ei := ir.FindCol(tbl.Header, "event")
 		pi := ir.FindCol(tbl.Header, "producer")
 		ci := ir.FindCol(tbl.Header, "consumer")
@@ -413,6 +532,9 @@ func parseEventTable(design string) eventTable {
 		di := ir.FindCol(tbl.Header, "delivery")
 		oi := ir.FindCol(tbl.Header, "ordering")
 		ki := ir.FindCol(tbl.Header, "dedupe")
+		if ei < 0 {
+			out.eventCol = false
+		}
 		cell := func(r []string, i int) string {
 			if i >= 0 && i < len(r) {
 				return ir.CleanCell(r[i])
@@ -425,17 +547,19 @@ func parseEventTable(design string) eventTable {
 			}
 			return ""
 		}
-		out := eventTable{found: true, eventCol: ei >= 0}
-		for n, r := range tbl.Rows {
+		for _, r := range tbl.Rows {
+			row++
 			out.rows = append(out.rows, EventRow{
 				Event: cell(r, ei), Producer: cell(r, pi), Consumer: cell(r, ci),
 				Payload: cell(r, yi), Delivery: cell(r, di), Ordering: cell(r, oi), Dedupe: cell(r, ki),
-				RawProducer: raw(r, pi), RawConsumer: raw(r, ci), Row: n + 1,
+				RawProducer: raw(r, pi), RawConsumer: raw(r, ci), Row: row,
 			})
 		}
-		return out
 	}
-	return eventTable{}
+	if !out.found {
+		return eventTable{}
+	}
+	return out
 }
 
 // eventCellFormat states the machine-checkable format contract once, so every
@@ -541,6 +665,28 @@ func GeneratePacks(design string) (map[string]map[string]string, error) {
 	}
 	rowsBySub := map[string][]EventRow{}
 	var evErrs []string
+	// a row whose producer and consumer belong to the same subsystem has no
+	// boundary direction: the pack emitter would pick "produces" because the
+	// producer matches first, deleting a handling obligation. Reported
+	// together with the zero-event findings so a mutation that self-loops
+	// every row still names the subsystems it starved.
+	owner := map[string]string{}
+	for _, s := range d.Subsystems {
+		for _, c := range s.Components {
+			owner[c] = s.ID
+		}
+	}
+	for _, r := range tbl.rows {
+		po, co := owner[r.Producer], owner[r.Consumer]
+		if po == "" || po != co {
+			continue
+		}
+		where := fmt.Sprintf("event-contract row %d", r.Row)
+		if r.Event != "" {
+			where = fmt.Sprintf("%s (event %s)", where, ir.Repr(r.Event))
+		}
+		evErrs = append(evErrs, fmt.Sprintf("%s: producer %s and consumer %s both belong to subsystem %s; an intra-subsystem row is no boundary contract and its pack direction is ambiguous, fix the row or the components lists", where, ir.Repr(r.Producer), ir.Repr(r.Consumer), ir.Repr(po)))
+	}
 	for _, s := range d.Subsystems {
 		rows := subsystemEvents(tbl.rows, s)
 		rowsBySub[s.ID] = rows
@@ -581,7 +727,7 @@ func GeneratePacks(design string) (map[string]map[string]string, error) {
 
 		// 4. the manifest, hash last: the content_hash covers every file
 		// including the manifest itself (normalized minus the hash line)
-		body := manifestBody(s, mid)
+		body := manifestBody(s, mid, d.Revision)
 		files["pack.yaml"] = body
 		files["pack.yaml"] = body + "content_hash: " + ContentHash(files) + "\n"
 		out[s.ID] = files
@@ -627,14 +773,17 @@ func stripContentHashLine(manifest string) string {
 
 // manifestBody builds the manifest without its content_hash line; the caller
 // appends the line after hashing the full file set.
-func manifestBody(s Subsystem, contractModule string) string {
+func manifestBody(s Subsystem, contractModule string, revision int) string {
 	var b strings.Builder
 	b.WriteString("# GENERATED by machinery pack. The frozen interface between the parent\n")
 	b.WriteString("# design and this subsystem's child design. DO NOT EDIT: regenerate at the\n")
 	b.WriteString("# parent (machinery pack generate) and re-copy.\n")
 	b.WriteString("pack_version: 1\n")
+	fmt.Fprintf(&b, "pack_revision: %d\n", revision)
 	b.WriteString("subsystem: " + s.ID + "\n")
 	b.WriteString("contract_module: " + contractModule + "\n")
+	// list items go through yamlQuote: an id containing ": " left plain would
+	// reparse as a mapping and vanish from the child's delegation list
 	writeList := func(key string, xs []string) {
 		if len(xs) == 0 {
 			b.WriteString(key + ": []\n")
@@ -642,7 +791,7 @@ func manifestBody(s Subsystem, contractModule string) string {
 		}
 		b.WriteString(key + ":\n")
 		for _, x := range xs {
-			b.WriteString("  - " + x + "\n")
+			b.WriteString("  - " + yamlQuote(x) + "\n")
 		}
 	}
 	writeList("owns", s.Owns)
@@ -700,12 +849,14 @@ var boundaryCountRe = regexp.MustCompile(`(?m)^Boundary events: (\d+)`)
 // CountBoundaryEvents reads the count line of a generated events.md, so G5
 // can print per-pack boundary-event counts and a zero is visible in every
 // gate run. Returns -1 when the line is absent (not a generated events file).
+// Anchors on the LAST match: the generated count line always comes last, so
+// text injected earlier in the file (a forged waiver reason) cannot shadow it.
 func CountBoundaryEvents(eventsMD string) int {
-	m := boundaryCountRe.FindStringSubmatch(eventsMD)
-	if m == nil {
+	ms := boundaryCountRe.FindAllStringSubmatch(eventsMD, -1)
+	if len(ms) == 0 {
 		return -1
 	}
-	n, err := strconv.Atoi(m[1])
+	n, err := strconv.Atoi(ms[len(ms)-1][1])
 	if err != nil {
 		return -1
 	}

@@ -80,21 +80,21 @@ func TestCheckIsolationBrokenAnnotationErrors(t *testing.T) {
 
 func TestSelectIncludesGn(t *testing.T) {
 	design := filepath.Join(repoRoot(), "examples", "go-crm", "design")
-	sel, err := Select(design, "")
+	sel, err := Select(design, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !sel.Run["gn"] {
 		t.Error("default selection must include gn")
 	}
-	if _, err := Select(design, "gn,g3"); err != nil {
+	if _, err := Select(design, "gn,g3", ""); err != nil {
 		t.Errorf("explicit gn rejected: %v", err)
 	}
 }
 
 func TestRunSelectedSkipsGnWithoutAnnotation(t *testing.T) {
 	design := filepath.Join(repoRoot(), "examples", "fulfillment", "design")
-	sel, err := Select(design, "")
+	sel, err := Select(design, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

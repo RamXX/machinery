@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // ExitError carries a hard-error (maps to Python sys.exit).
@@ -79,6 +80,83 @@ func alwaysTargets(node *ir.Value) map[string]bool {
 		}
 	}
 	return out
+}
+
+// requireModeled enumerates the FULL transition set of a pattern-relevant
+// state and dies on the first targeted transition the emitted model does not
+// carry. allowed maps a trigger key to the set of targets the model represents
+// from this state; keys are "on:<event>" for on: handlers and the bare kind
+// ("after", "always", "onDone", "onError", "stateDone") otherwise. A trigger
+// absent from the map admits no targeted transition. Mirrors the tla_gen
+// retry-state rule: a silently dropped route leaves every proof green while
+// asserting the opposite of the real machine. Internal transitions (no
+// target) do not move the state and are not modeled by construction.
+func requireModeled(node *ir.Value, state, pattern string, allowed map[string]map[string]bool) {
+	for _, tr := range ir.TransitionsOf(node, nil, state) {
+		if tr.Target == "" {
+			continue
+		}
+		tgt := ir.Simple(tr.Target)
+		key := tr.Kind
+		if tr.Kind == "on" {
+			key = "on:" + tr.Event
+		}
+		if allowed[key][tgt] {
+			continue
+		}
+		die("state %s declares a transition the emitted model does not carry (%s -> %s); the %s pattern cannot model it, so the proof would silently assert the opposite of the machine; remove the transition or extend the pattern",
+			ir.Repr(state), key, ir.Repr(tgt), pattern)
+	}
+}
+
+// targets builds an allowed-target set literal.
+func targets(xs ...string) map[string]bool {
+	m := map[string]bool{}
+	for _, x := range xs {
+		m[x] = true
+	}
+	return m
+}
+
+// machineEffectiveMaxRetries mirrors tla_gen's _max_retries handling: the
+// machine's declared retry bound, defaulting to 3. declared reports whether
+// the machine carries the annotation.
+func machineEffectiveMaxRetries(machine *ir.Value) (value int, declared bool) {
+	v := machine.AsObject().Get2("_max_retries")
+	if v == nil {
+		return 3, false
+	}
+	n, err := v.AsNumber().Int64()
+	if v.Kind != ir.KindNumber || err != nil || n < 1 {
+		die("machine _max_retries must be a positive integer")
+	}
+	return int(n), true
+}
+
+// reconcileMaxRetries resolves the retry bound BOTH rungs must share. The
+// control-flow rung (tla_gen) proves the machine at its effective bound
+// (_max_retries, default 3); a data rung proving a different bound proves a
+// different system. Absent semantics max_retries inherits the machine's
+// effective value, never 0; an explicit mismatch is a hard generation error.
+// The returned source string is stated in the generated header.
+func reconcileMaxRetries(machine, sem *ir.Value) (int, string) {
+	mv, declared := machineEffectiveMaxRetries(machine)
+	machineSrc := "the machine default (no _max_retries declared)"
+	if declared {
+		machineSrc = "machine _max_retries"
+	}
+	sv := sem.AsObject().Get2("max_retries")
+	if sv == nil {
+		return mv, "inherited from " + machineSrc
+	}
+	n, err := sv.AsNumber().Int64()
+	if sv.Kind != ir.KindNumber || err != nil || n < 1 {
+		die("semantics max_retries must be a positive integer; omit it to inherit the machine's effective bound")
+	}
+	if int(n) != mv {
+		die("semantics max_retries = %d but the machine's effective bound is %d (%s); the two rungs would prove different systems; make them agree or drop max_retries from the semantics", n, mv, machineSrc)
+	}
+	return mv, "semantics max_retries, matching " + machineSrc
 }
 
 // --- lifecycle pattern ---
@@ -185,6 +263,17 @@ func ReconcileLifecycle(machine, sem *ir.Value) map[string]bool {
 			die("overlay state %s missing from the machine (declared under overlay:)", ir.Repr(ov))
 		}
 	}
+	// every top-level state must be part of the pattern: a state outside the
+	// vocabulary would be entirely unmodeled
+	expectedTop := map[string]bool{busy: true, retry: true, rollback: true}
+	for s := range domainExpected {
+		expectedTop[s] = true
+	}
+	for n := range top {
+		if !expectedTop[n] {
+			die("machine state %s is outside the linear-lifecycle vocabulary (stages, terminals, and the busy/retry/rollback overlay); the emitted model would not carry it", ir.Repr(n))
+		}
+	}
 	for _, s := range stages[:len(stages)-1] {
 		if !contains(onTargets(top[s], adv), busy) {
 			die("stage %s has no %s transition into %s", ir.Repr(s), ir.Repr(adv), ir.Repr(busy))
@@ -272,6 +361,42 @@ func ReconcileLifecycle(machine, sem *ir.Value) map[string]bool {
 	if !contains(stages, reopenTo) {
 		die("reopen_to %s is not a declared stage (%s)", ir.Repr(reopenTo), strings.Join(stages, ", "))
 	}
+	// bidirectional closure: the checks above prove every transition the
+	// pattern REQUIRES exists; now prove the machine carries NOTHING ELSE.
+	// A transition outside this vocabulary (an extra on:, after, invoke, or
+	// always route) would be silently unmodeled and every proof would stay
+	// green while asserting the opposite of the real machine.
+	for i, s := range stages {
+		allow := map[string]map[string]bool{
+			"on:" + wev: targets(busy),
+			"on:" + lev: targets(busy),
+		}
+		if i < len(stages)-1 {
+			allow["on:"+adv] = targets(busy)
+		}
+		requireModeled(top[s], s, "linear-lifecycle", allow)
+	}
+	for _, tt := range []string{win, lose} {
+		requireModeled(top[tt], tt, "linear-lifecycle", map[string]map[string]bool{
+			"on:" + rev: targets(busy),
+		})
+	}
+	busyCommits := targets(rollback)
+	for k := range expectedCommits {
+		busyCommits[k] = true
+	}
+	requireModeled(top[busy], busy, "linear-lifecycle", map[string]map[string]bool{
+		"onDone":  busyCommits,
+		"onError": targets(retry, rollback),
+		"after":   targets(retry, rollback),
+	})
+	requireModeled(top[retry], retry, "linear-lifecycle", map[string]map[string]bool{
+		"always": targets(rollback),
+		"after":  targets(busy),
+	})
+	requireModeled(top[rollback], rollback, "linear-lifecycle", map[string]map[string]bool{
+		"always": enters,
+	})
 	return enters
 }
 
@@ -316,7 +441,7 @@ func emitLifecycleImpl(machine, sem *ir.Value, sourceNames [2]string) (string, m
 	lose := so.GetString("lose_stage")
 	reopenTo := so.GetString("reopen_to")
 	closeOn := so.GetString("close_date_on")
-	maxr := intNum(so.Get2("max_retries"))
+	maxr, maxrSrc := reconcileMaxRetries(machine, sem)
 	initial := stages[0]
 
 	terminal := []string{win, lose}
@@ -360,7 +485,8 @@ func emitLifecycleImpl(machine, sem *ir.Value, sourceNames [2]string) (string, m
 \* hard generation error.
 \* STILL ASSUMED (outside the machine JSON, carried by the named-unit contracts
 \* and the implementation tests): the pending/prior context updates the actions
-\* perform, the retry bound MaxRetries = %d, and single-instance execution.`, sourceNames[0], sourceNames[1], maxr)
+\* perform, and single-instance execution.
+\* MaxRetries = %d (source: %s).`, sourceNames[0], sourceNames[1], maxr, maxrSrc)
 
 	data := fmt.Sprintf(`---- MODULE %sData ----
 %s
@@ -594,6 +720,20 @@ func ReconcileTerminal(machine, sem *ir.Value) (phases []string, success string,
 		}
 		retryOf[r.Serves] = r.State
 	}
+	// every top-level state must be part of the pattern: an undeclared state
+	// would be entirely unmodeled
+	expectedTop := map[string]bool{}
+	for s := range domainExpected {
+		expectedTop[s] = true
+	}
+	for _, r := range retries {
+		expectedTop[r.State] = true
+	}
+	for n := range top {
+		if !expectedTop[n] {
+			die("machine state %s is outside the terminal-lifecycle vocabulary (phases, terminals, and the declared retry overlays); the emitted model would not carry it", ir.Repr(n))
+		}
+	}
 	for i, p := range phases {
 		node := top[p]
 		no := node.AsObject()
@@ -654,18 +794,59 @@ func ReconcileTerminal(machine, sem *ir.Value) (phases []string, success string,
 			die("retry %s backoff (after) must return to %s, found %s", ir.Repr(r.State), ir.Repr(r.Serves), brSorted(back))
 		}
 	}
+	// bidirectional closure: the machine must carry NOTHING beyond the
+	// vocabulary just verified; an extra route would be silently unmodeled
+	for i, p := range phases {
+		var nxt string
+		if i+1 < len(phases) {
+			nxt = phases[i+1]
+		} else {
+			nxt = success
+		}
+		fail := targets()
+		if rs, ok := retryOf[p]; ok {
+			fail[rs] = true
+		} else {
+			for _, f := range failures {
+				fail[f] = true
+			}
+		}
+		requireModeled(top[p], p, "terminal-lifecycle", map[string]map[string]bool{
+			"onDone":  targets(nxt),
+			"onError": fail,
+			"after":   fail,
+		})
+	}
+	for _, r := range retries {
+		requireModeled(top[r.State], r.State, "terminal-lifecycle", map[string]map[string]bool{
+			"always": alwaysTargets(top[r.State]),
+			"after":  targets(r.Serves),
+		})
+	}
+	for _, t := range append([]string{success}, failures...) {
+		requireModeled(top[t], t, "terminal-lifecycle", nil)
+	}
 	return phases, success, failures, retries, failRoutes, nil
 }
 
 // EmitTerminal mirrors refine_gen.emit_terminal.
-func EmitTerminal(machine, sem *ir.Value, sourceNames [2]string) (string, map[string]string, error) {
+func EmitTerminal(machine, sem *ir.Value, sourceNames [2]string) (mid string, files map[string]string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if ee, ok := r.(*ExitError); ok {
+				mid, files, err = "", nil, ee
+			} else {
+				panic(r)
+			}
+		}
+	}()
 	so := sem.AsObject()
-	mid := ir.Title(so.GetString("machine"))
+	mid = ir.Title(so.GetString("machine"))
 	phases, success, failures, retries, failRoutes, err := ReconcileTerminal(machine, sem)
 	if err != nil {
 		return "", nil, err
 	}
-	maxr := intNum(so.Get2("max_retries"))
+	maxr, maxrSrc := reconcileMaxRetries(machine, sem)
 	flag := so.GetString("success_flag")
 	if flag == "" {
 		flag = "completed"
@@ -731,7 +912,8 @@ func EmitTerminal(machine, sem *ir.Value, sourceNames [2]string) (string, map[st
 \* no partial success), terminal absorption, and termination. The domain-progress
 \* proof is separate from the persistence mechanism: no persist overlay is baked in.
 \* STILL ASSUMED: the effect the completion flag stands for is really established
-\* on the success path, MaxRetries = %d, and single-instance execution.`, sourceNames[0], sourceNames[1], maxr)
+\* on the success path, and single-instance execution.
+\* MaxRetries = %d (source: %s).`, sourceNames[0], sourceNames[1], maxr, maxrSrc)
 
 	var L []string
 	L = append(L, fmt.Sprintf("---- MODULE %sData ----", mid))
@@ -915,6 +1097,41 @@ func ReconcileSaga(machine, sem *ir.Value) (err error) {
 			die("%s must be a final state", f)
 		}
 	}
+	// bidirectional closure: the machine must carry NOTHING beyond the saga
+	// vocabulary just verified; an extra route (e.g. an on: escape hatch from
+	// a forward step) would be silently unmodeled and the no-silent-loss proof
+	// would assert the opposite of the machine
+	for i, s := range states {
+		var nxt string
+		if i+1 < len(states) {
+			nxt = states[i+1]
+		} else {
+			nxt = "Completed"
+		}
+		var failTo string
+		if i == 0 {
+			failTo = "Failed"
+		} else {
+			failTo = "Compensating"
+		}
+		requireModeled(top[s], s, "saga", map[string]map[string]bool{
+			"onDone":  targets(nxt),
+			"onError": targets(failTo),
+			"after":   targets(failTo),
+		})
+	}
+	requireModeled(top["Compensating"], "Compensating", "saga", map[string]map[string]bool{
+		"onDone":  targets("Failed"),
+		"onError": targets("compensateRetry"),
+		"after":   targets("compensateRetry", "Failed"),
+	})
+	requireModeled(top["compensateRetry"], "compensateRetry", "saga", map[string]map[string]bool{
+		"always": targets("FailedDirty"),
+		"after":  targets("Compensating"),
+	})
+	for _, f := range []string{"Completed", "Failed", "FailedDirty"} {
+		requireModeled(top[f], f, "saga", nil)
+	}
 	for _, s := range states[:len(states)-1] {
 		oo := oblObj.Get2(s).AsObject()
 		if oo.GetString("sets") == "" || oo.GetString("undo") == "" {
@@ -958,15 +1175,24 @@ func alwaysBranchTargets(node *ir.Value) []string {
 }
 
 // EmitSaga mirrors refine_gen.emit_saga.
-func EmitSaga(machine, sem *ir.Value, sourceNames [2]string) (string, map[string]string, error) {
+func EmitSaga(machine, sem *ir.Value, sourceNames [2]string) (mid string, files map[string]string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if ee, ok := r.(*ExitError); ok {
+				mid, files, err = "", nil, ee
+			} else {
+				panic(r)
+			}
+		}
+	}()
 	if err := ReconcileSaga(machine, sem); err != nil {
 		return "", nil, err
 	}
 	so := sem.AsObject()
-	mid := ir.Title(so.GetString("machine"))
+	mid = ir.Title(so.GetString("machine"))
 	states := strSlice(so.Get2("states"))
 	oblObj := so.Get2("obligations").AsObject()
-	maxr := intNum(so.Get2("max_retries"))
+	maxr, maxrSrc := reconcileMaxRetries(machine, sem)
 	initial := states[0]
 
 	var flags []string
@@ -1027,7 +1253,8 @@ func EmitSaga(machine, sem *ir.Value, sourceNames [2]string) (string, map[string
 	L = append(L, "\\* Compensation here is PER OBLIGATION (each undo its own step), refining the")
 	L = append(L, "\\* machine's single idempotent compensate invoke, so partial compensation is")
 	L = append(L, "\\* representable. STILL ASSUMED: the obligation flags mirror what the real")
-	L = append(L, fmt.Sprintf("\\* actors commit and undo, the retry bound MaxRetries = %d, single instance.", maxr))
+	L = append(L, "\\* actors commit and undo, and single-instance execution.")
+	L = append(L, fmt.Sprintf("\\* MaxRetries = %d (source: %s).", maxr, maxrSrc))
 	L = append(L, "EXTENDS Naturals")
 	L = append(L, "")
 	L = append(L, "CONSTANT MaxRetries")
@@ -1140,18 +1367,6 @@ func sagaUnch(flags []string, exclude []string) string {
 
 // --- helpers ---
 
-func intNum(v *ir.Value) int {
-	if v == nil {
-		return 0
-	}
-	n := v.AsNumber()
-	var i int
-	if _, err := fmt.Sscanf(string(n), "%d", &i); err != nil {
-		return 0
-	}
-	return i
-}
-
 func setEq(a, b map[string]bool) bool {
 	if len(a) != len(b) {
 		return false
@@ -1215,20 +1430,28 @@ func filterOut(xs []string, x string) []string {
 
 // Run is the `machinery refine <machine.json> <semantics.yaml> [out-dir]` entrypoint.
 func Run(machinePath, semPath, outdir string) error {
+	_, err := RunWritten(machinePath, semPath, outdir)
+	return err
+}
+
+// RunWritten is Run, reporting the basenames of the files it wrote so callers
+// (verify-formal) can distinguish freshly generated pairs from committed
+// orphans.
+func RunWritten(machinePath, semPath, outdir string) ([]string, error) {
 	machine, err := ir.LoadMachineJSON(machinePath)
 	if err != nil {
-		return &ExitError{Msg: "refine_gen: " + err.Error()}
+		return nil, &ExitError{Msg: "refine_gen: " + err.Error()}
 	}
 	data, err := os.ReadFile(semPath)
 	if err != nil {
-		return &ExitError{Msg: "refine_gen: " + err.Error()}
+		return nil, &ExitError{Msg: "refine_gen: " + err.Error()}
 	}
 	sem, err := ir.LoadYAML(data)
 	if err != nil {
-		return &ExitError{Msg: "refine_gen: " + err.Error()}
+		return nil, &ExitError{Msg: "refine_gen: " + err.Error()}
 	}
 	if sem.Kind != ir.KindObject {
-		return &ExitError{Msg: "refine_gen: semantics file is not a mapping"}
+		return nil, &ExitError{Msg: "refine_gen: semantics file is not a mapping"}
 	}
 	names := [2]string{filepath.Base(machinePath), filepath.Base(semPath)}
 	pat := sem.AsObject().GetString("pattern")
@@ -1243,25 +1466,35 @@ func Run(machinePath, semPath, outdir string) error {
 	case "saga":
 		mid, files, genErr = EmitSaga(machine, sem, names)
 	default:
-		return &ExitError{Msg: fmt.Sprintf("refine_gen: unsupported pattern %s (linear-lifecycle, terminal-lifecycle, saga)", ir.Repr(pat))}
+		return nil, &ExitError{Msg: fmt.Sprintf("refine_gen: unsupported pattern %s (linear-lifecycle, terminal-lifecycle, saga)", ir.Repr(pat))}
 	}
 	if genErr != nil {
-		return genErr
+		return nil, genErr
 	}
 	if len(files) == 0 {
-		return &ExitError{Msg: "refine_gen: " + mid + ": generation produced no files"}
+		return nil, &ExitError{Msg: "refine_gen: " + mid + ": generation produced no files"}
 	}
 	if outdir == "" {
 		outdir = filepath.Dir(semPath)
 	}
 	if mkErr := os.MkdirAll(outdir, 0755); mkErr != nil {
-		return mkErr
+		return nil, mkErr
 	}
+	var written []string
 	for name, body := range files {
-		if wErr := os.WriteFile(filepath.Join(outdir, name), []byte(body), 0644); wErr != nil {
-			return wErr
+		// Stamp at write time (P-F10): the committed artifact records which
+		// machinery version produced it; freshness diffs strip the line.
+		switch {
+		case strings.HasSuffix(name, ".tla"):
+			body = version.StampTLAModule(body)
+		case strings.HasSuffix(name, ".cfg"):
+			body = version.StampCfg(body)
 		}
+		if wErr := os.WriteFile(filepath.Join(outdir, name), []byte(body), 0644); wErr != nil {
+			return nil, wErr
+		}
+		written = append(written, name)
 	}
 	fmt.Fprintf(os.Stdout, "generated %d files for %s (%s)\n", len(files), mid, pat)
-	return nil
+	return written, nil
 }

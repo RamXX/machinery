@@ -1,4 +1,5 @@
 // Code generated from fulfillment.modelith.yaml + integrity.relational.yaml by machinery alloy. DO NOT EDIT.
+// machinery-version: v0.3.4-dev
 //
 // Static relational model of the STRUCTURAL invariants: which configurations
 // of entities, relationships, unique keys, and singleton flags the constraint
@@ -15,6 +16,9 @@
 //      relationships, uniqueness of the listed attributes, and the listed
 //      singleton flags. Attribute values are abstract atoms (an injective
 //      relation into an unconstrained domain), never their concrete types.
+//   4. Inverse exclusivity of the declared 1:1 / 1:n edges is enforced as a
+//      fact (Cardinality_*), an axiom of the model. No check command restates
+//      it: a check identical to a fact is a tautology that can never fail.
 
 module Integrity
 
@@ -29,11 +33,10 @@ sig Order {
 
 sig Payment {}
 
-// 1:1: the Order side of Order -> Payment is exclusive
+// 1:1: the Order side of Order -> Payment is exclusive (enforced as a fact)
 fact Cardinality_Order_Payment {
   all target: Payment | lone target.~payment
 }
-check Exclusive_Order_Payment { all target: Payment | lone target.~payment } for 6
 
 // value domains: one atom per distinct attribute value (bounded types
 // get exactly as many atoms as the type admits)

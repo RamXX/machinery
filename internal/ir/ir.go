@@ -80,6 +80,17 @@ func ActionNames(v *Value, problems *[]string, where string) []string {
 			o := a.AsObject()
 			if t := o.Get2("type"); t != nil && t.Kind == KindString {
 				names = append(names, t.AsString())
+				// unknown keys (params, typos) are hard errors, as documented:
+				// an action object carries a name only; parameters belong in
+				// the implementation, not the design
+				if problems != nil {
+					for _, k := range o.Keys() {
+						if k != "type" {
+							*problems = append(*problems, fmt.Sprintf("unsupported key %s in action object %s%s (only 'type' is supported)",
+								pyReprStr(k), goRepr(a), whereSuffix(where)))
+						}
+					}
+				}
 			} else if problems != nil {
 				*problems = append(*problems, fmt.Sprintf("unsupported action value %s%s (use a name string or {\"type\": name})",
 					goRepr(a), whereSuffix(where)))
@@ -302,6 +313,40 @@ type MdTable struct {
 
 var parenRe = regexp.MustCompile(`\([^)]*\)`)
 
+// splitRowCells splits a markdown table row into cells, honoring the GFM
+// `\|` escape (a literal pipe inside a cell). Mirrors the previous
+// TrimPrefix("|") / TrimSuffix("|") / Split("|") semantics otherwise: one
+// leading delimiter pipe and one trailing delimiter pipe are consumed, and a
+// trailing `\|` belongs to the last cell instead of being eaten as the
+// closing delimiter.
+func splitRowCells(s string) []string {
+	s = strings.TrimPrefix(s, "|")
+	var cells []string
+	var b strings.Builder
+	endsWithDelim := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '\\' && i+1 < len(s) && s[i+1] == '|' {
+			b.WriteByte('|')
+			i++
+			endsWithDelim = false
+			continue
+		}
+		if c == '|' {
+			cells = append(cells, b.String())
+			b.Reset()
+			endsWithDelim = i == len(s)-1
+			continue
+		}
+		b.WriteByte(c)
+	}
+	cells = append(cells, b.String())
+	if n := len(cells); n > 1 && endsWithDelim {
+		cells = cells[:n-1] // the closing delimiter pipe, not an empty cell
+	}
+	return cells
+}
+
 // ParseMdTables mirrors machine_lint.parse_md_tables.
 func ParseMdTables(text string) []MdTable {
 	var blocks [][]string
@@ -322,9 +367,7 @@ func ParseMdTables(text string) []MdTable {
 	for _, b := range blocks {
 		var rows [][]string
 		for _, r := range b {
-			s := strings.TrimSpace(r)
-			s = strings.TrimSuffix(strings.TrimPrefix(s, "|"), "|")
-			cells := strings.Split(s, "|")
+			cells := splitRowCells(strings.TrimSpace(r))
 			for i := range cells {
 				cells[i] = strings.TrimSpace(cells[i])
 			}
@@ -382,13 +425,17 @@ func ContractFence(text string) (string, bool) {
 	return m[1], true
 }
 
-// FindCol mirrors machine_lint.find_col: first header cell whose lowercased
-// text contains any of names.
+// FindCol locates the first header cell labeled with any of names. Matching is
+// per-cell label-prefix (cell == name, or cell starts with "name "), after
+// stripping backticks and parentheticals, never substring-in-cell: "resource"
+// is not a "source" column and "retarget" is not a "target" column. A prose
+// table whose cells merely contain the words must not be mistaken for a
+// transition table (same hardening as the lint's raw-header detector).
 func FindCol(header []string, names ...string) int {
 	for i, h := range header {
-		hl := strings.ToLower(h)
+		cell := strings.ToLower(strings.TrimSpace(CleanCell(h)))
 		for _, n := range names {
-			if strings.Contains(hl, n) {
+			if cell == n || strings.HasPrefix(cell, n+" ") {
 				return i
 			}
 		}

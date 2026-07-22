@@ -1,5 +1,5 @@
 # Declarative semantics for the Deal aggregate: the meaning the machine JSON omits
-# (guards, action effects, ordering). refine_gen.py turns this plus the machine into
+# (guards, action effects, ordering). `machinery refine` turns this plus the machine into
 # a data-refined TLA+ model, an abstract contract, and a checked refinement mapping,
 # so Parts 1 and 3 are generated per subsystem instead of hand-written.
 machine: deal

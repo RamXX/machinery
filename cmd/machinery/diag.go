@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -88,6 +89,7 @@ func doctorRun(targets []string) error {
 				fmt.Fprintf(out, "  MISSING  [%s] %s at %s -- run machinery install --target %s\n", artifact.Target, artifact.Label, artifact.Path, strings.Join(targets, " --target "))
 			}
 		}
+		reportHookWiring(out)
 		reportUpdateReceipt(out)
 		return nil
 	}
@@ -113,8 +115,72 @@ func doctorRun(targets []string) error {
 			fmt.Fprintf(out, "  MISSING  build-writer role at %s/agents -- run make install\n", home)
 		}
 	}
+	reportHookWiring(out)
 	reportUpdateReceipt(out)
 	return nil
+}
+
+// reportHookWiring checks the machinery plugin hook plumbing wherever a
+// plugin layout exists (a .claude-plugin/plugin.json with a hooks/ sibling):
+// hooks.json must be present and the shim executable, or every governance
+// hook silently never fires (GATE-11 doctor check).
+func reportHookWiring(out io.Writer) {
+	roots := pluginRoots()
+	if len(roots) == 0 {
+		fmt.Fprintln(out, "  auto     no machinery plugin layout found (.claude-plugin/ + hooks/); governance hooks run only where the plugin is installed")
+		return
+	}
+	for _, root := range roots {
+		manifest := filepath.Join(root, "hooks", "hooks.json")
+		if _, err := os.Stat(manifest); err == nil {
+			fmt.Fprintf(out, "  ok       hook manifest at %s\n", manifest)
+		} else {
+			fmt.Fprintf(out, "  MISSING  hook manifest at %s -- the plugin layout exists but no governance hook will fire\n", manifest)
+		}
+		shim := filepath.Join(root, "hooks", "machinery-hook.sh")
+		if fi, err := os.Stat(shim); err != nil {
+			fmt.Fprintf(out, "  MISSING  hook shim at %s -- the hooks.json entries point at nothing\n", shim)
+		} else if fi.Mode()&0o111 == 0 {
+			fmt.Fprintf(out, "  WARN     hook shim at %s is not executable -- chmod +x it or every hook invocation fails silently\n", shim)
+		} else {
+			fmt.Fprintf(out, "  ok       hook shim at %s (executable)\n", shim)
+		}
+	}
+}
+
+// pluginRoots finds machinery plugin layouts: $CLAUDE_PLUGIN_ROOT, the
+// current directory, and any ~/.claude/plugins entry that carries a
+// machinery hook shim. A root qualifies when .claude-plugin/plugin.json and
+// a hooks/ directory both exist.
+func pluginRoots() []string {
+	var roots []string
+	seen := map[string]bool{}
+	add := func(dir string) {
+		if dir == "" || seen[dir] {
+			return
+		}
+		if _, err := os.Stat(filepath.Join(dir, ".claude-plugin", "plugin.json")); err != nil {
+			return
+		}
+		if fi, err := os.Stat(filepath.Join(dir, "hooks")); err != nil || !fi.IsDir() {
+			return
+		}
+		seen[dir] = true
+		roots = append(roots, dir)
+	}
+	add(os.Getenv("CLAUDE_PLUGIN_ROOT"))
+	if wd, err := os.Getwd(); err == nil {
+		add(wd)
+	}
+	plugins := filepath.Join(os.Getenv("HOME"), ".claude", "plugins")
+	if entries, err := os.ReadDir(plugins); err == nil {
+		for _, e := range entries {
+			if e.IsDir() && strings.Contains(strings.ToLower(e.Name()), "machinery") {
+				add(filepath.Join(plugins, e.Name()))
+			}
+		}
+	}
+	return roots
 }
 
 func reportUpdateReceipt(out io.Writer) {

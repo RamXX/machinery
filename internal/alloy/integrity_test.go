@@ -63,9 +63,17 @@ func TestGenerateIntegrityFulfillment(t *testing.T) {
 		t.Errorf("mandatory 1:1 not rendered as 'one':\n%s", als)
 	}
 	if !strings.Contains(als, "fact Cardinality_Order_Payment {") ||
-		!strings.Contains(als, "all target: Payment | lone target.~payment") ||
-		!strings.Contains(als, "check Exclusive_Order_Payment") {
-		t.Errorf("1:1 inverse cardinality is not enforced and checked:\n%s", als)
+		!strings.Contains(als, "all target: Payment | lone target.~payment") {
+		t.Errorf("1:1 inverse cardinality is not enforced:\n%s", als)
+	}
+	// FORMAL-F4: the Exclusive_* check commands were byte-identical to the
+	// facts preceding them: tautologies that could never fail, inflating the
+	// pass count. The fact stays; the check must not be emitted.
+	if strings.Contains(als, "check Exclusive_") {
+		t.Errorf("tautological Exclusive_* check emitted (a check restating a fact can never fail):\n%s", als)
+	}
+	if !strings.Contains(als, "enforced as a fact") {
+		t.Errorf("header does not note that inverse exclusivity is enforced as a fact:\n%s", als)
 	}
 	if !strings.Contains(als, "fact Unique_Customer_Email {") {
 		t.Error("email uniqueness fact missing")
@@ -147,13 +155,21 @@ func TestIntegrityMultiplicities(t *testing.T) {
 		"b: set B",               // n:n optional -> set
 		"fact Cardinality_B_C {", // 1:1 inverse exclusivity
 		"all target: C | lone target.~c",
-		"check Exclusive_B_C",
 		"fact Cardinality_C_A {", // 1:n inverse exclusivity
 		"all target: A | lone target.~a",
-		"check Exclusive_C_A",
 	} {
 		if !strings.Contains(als, want) {
 			t.Errorf("multiplicity rendering missing %q:\n%s", want, als)
+		}
+	}
+	// FORMAL-F4: no tautological check may restate a Cardinality_* fact
+	if strings.Contains(als, "check Exclusive_") {
+		t.Errorf("tautological Exclusive_* check emitted:\n%s", als)
+	}
+	// stats must not count checks that cannot fail
+	for _, c := range stats.Commands {
+		if strings.HasPrefix(c.Name, "Exclusive_") {
+			t.Errorf("Exclusive_* still counted as a command: %+v", c)
 		}
 	}
 }

@@ -14,6 +14,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // OwnerCase is one algebra-distinguishable relationship between the acting
@@ -258,6 +260,7 @@ func (p *Policy) GenerateOracle() (string, int) {
 	w("# Generated authorization oracle: policy")
 	w("")
 	w("Generated from `%s` + `%s` by `machinery alloy`. DO NOT EDIT BY HAND.", p.DomainFile, p.AnnotationFile)
+	w("%s", version.MarkdownStamp())
 	w("Single source of truth for the authorization tests: one row is one decision case")
 	w("for the pure authz function. Key tests on the STABLE id, not the row number; row")
 	w("numbers renumber when the design changes, stable ids do not. A design revision")
