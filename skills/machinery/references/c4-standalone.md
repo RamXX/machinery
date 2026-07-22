@@ -214,7 +214,10 @@ Field semantics:
   code). Staged brownfield adoption leans on this too: start with broad ignore globs over the
   unmodeled remainder and ratchet them down as slices come under the gates (see
   `docs/brownfield-team-guide.md` in the machinery repo).
-- **dependency_rules**: `allow`, `deny`, and `baseline` edges, `src -> dest`, with `*` globs.
+- **dependency_rules**: `allow`, `deny`, and `baseline` edges, `src -> dest`. `*` globs are legal
+  in `allow` and `deny` only: `baseline:` is an enumerated-edges ratchet, and a wildcard baseline
+  rule (which would amnesty the whole edge space) is a G2 ERROR; run `machinery baseline` to
+  enumerate today's edges instead.
   Precedence: an explicit (literal) allow overrides a matching deny GLOB, which is how "deny the
   pattern, allow the one sanctioned edge" is written; but a literal allow and a literal deny of
   the same edge is a G2 error, not an override. Deny rules cannot reference boundaries that do
@@ -228,7 +231,9 @@ Field semantics:
   records the intent, the baseline the debt; the deny takes over when the baseline entry is
   deleted); `allow` plus `baseline` is a G2 contradiction (an allowed edge is not a violation).
   `ratchet.json` is generated: never hand-edit it, rerun `machinery baseline` (which also
-  tightens the snapshot after debt is burned down).
+  tightens the snapshot after debt is burned down). G4 prints the ratchet snapshot's date and age
+  in days as a non-blocking note on every run, so tolerated debt stays visible instead of
+  quietly aging.
 - **Ids** (boundary and external) are dot-separated segments; each segment starts with a letter
   or underscore and continues with letters, digits, underscores, and hyphens
   (`crm.api`, `external.rest-of-monolith`). A segment starting with a digit or a hyphen never
@@ -237,7 +242,8 @@ Field semantics:
 - `contract_version: 2` names this format.
 
 G2 verifies: boundaries bind to `workspace.dsl` elements, no duplicate ids, no edge both literally
-allowed and literally denied, no edge both allowed and baselined, no rule referencing an
+allowed and literally denied, no edge both allowed and baselined, no wildcard in a baseline rule,
+no rule referencing an
 undeclared boundary or external, and the mitigation coverage below. G4-import later enforces the
 rules against the code, including the ratchet on baselined edges.
 
@@ -333,7 +339,11 @@ persisted-state plus lock pattern, or an event-sourced log, because there is no 
 Coupling through shared DB tables or bus topics is **invisible to G4-import**; this table is the
 governing artifact for it. One row per event that crosses a component boundary (every external event
 a machine consumes in a choreography must appear here; see the xstate reference for the redelivery
-rule). Columns:
+rule). Like the surface ledger's `source:` lines, state where the rows were enumerated FROM,
+publisher-first: sweep the code for emit/publish call sites AND the broker or infra configuration
+(topic definitions, subscriptions, queue bindings), plus any API spec; name both lanes in a source
+note, or waive one with a reason. A table with no named enumeration source is a completeness claim
+with no evidence, and the gates can only check the rows that are declared. Columns:
 
 - **producer**: `machine.event` or component.
 - **consumer**: `machine.event`.
@@ -352,6 +362,9 @@ rule). Columns:
 component name, so on a decomposed parent the table is a machine-read artifact with a format
 contract, enforced at generation time and again by G5 (which regenerates packs in memory):
 
+- EVERY markdown table whose header names producer, consumer, and delivery is an event-contract
+  table: pack generation parses all of them and concatenates their rows (row numbers run
+  cumulatively), so splitting the contract across several tables hides nothing.
 - an **event** column names every event; no row leaves it empty.
 - **producer** and **consumer** cells each hold exactly one component name: a `components:` entry
   from `decomposition.yaml` or an Architecture Contract boundary `element` (a gateway or ui that
@@ -367,7 +380,18 @@ contract, enforced at generation time and again by G5 (which regenerates packs i
 - generation FAILS on any violation, naming the row and the offending cell text; nothing non-empty
   is ever silently dropped. A subsystem extracting zero boundary events is also a generation error
   unless `decomposition.yaml` waives it per subsystem with `boundary_events: {none: "<reason>"}`;
-  the generated events.md then carries the reason instead of the boundary-completeness claim.
+  the reason must be a single line (an embedded newline could forge the generated events.md count
+  line), and the generated events.md then carries the reason instead of the boundary-completeness
+  claim.
+
+`decomposition.yaml` also carries two root keys the packs reflect: `revision:` (integer >= 1,
+default 1), the monotonic amendment counter emitted into every pack manifest as `pack_revision`
+(bump it on any pack amendment, so children see rev N -> N+1 on the G5 checked line), and
+`retained: {<invariant-id>: "<reason>"}`, the top-level invariants the parent keeps enforcing
+itself. Every top-level invariant must be delegated to exactly one subsystem or retained with a
+reason; both at once, or neither, fails generation. The full decomposition protocol, including the
+pack amendment steps and the unpinned-child hash limit, is in the skill's "Recursive
+decomposition" section.
 
 ## Gate 2 checklist
 
@@ -376,7 +400,9 @@ Deterministic (run `machinery check <design> --gate g2`):
 - The contract parses, boundaries bind to `workspace.dsl` elements, ids are unique, no edge is both
   literally allowed and literally denied, no rule references an undeclared boundary or external.
 - Every contract external and every Database/Queue/External-tagged element has a mitigation row
-  naming it backticked in the first column.
+  naming it backticked in the first column. Coverage is over DECLARED dependencies only: a
+  dependency never declared in the DSL or the contract carries no obligation, so completeness of
+  the declaration itself is attested, not checked.
 - Read the `checked:` counts; an empty check is an ERROR, never a silent pass.
 
 LLM-attested (you verify; the tool cannot):
@@ -386,5 +412,8 @@ LLM-attested (you verify; the tool cannot):
 - Every boundary crossing has an interface contract (shape, errors, idempotency).
 - Every stateful component has a persistence-and-placement decision (the machine-per-row check runs
   in Gx-trace once machines exist).
-- The event-contract table exists for multi-component designs and covers every cross-component event.
+- The event-contract table exists for multi-component designs, covers every cross-component event,
+  and names its enumeration sources (emit/publish call sites, broker/infra config, API specs).
+- The dependency declaration is complete: everything the deployment actually talks to appears in
+  the DSL or the contract (the mitigation-coverage check runs only over what is declared).
 - The NFR record is filled (security, capacity, observability).

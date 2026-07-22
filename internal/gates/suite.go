@@ -6,6 +6,7 @@ package gates
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -31,18 +32,42 @@ var knownGateSet = map[string]bool{
 // KnownGate reports whether name names a gate this suite can run.
 func KnownGate(name string) bool { return knownGateSet[name] }
 
+// HasMachines reports whether design/machines holds any *.machine.json. It
+// lists the directory (sortedGlob) rather than filepath.Glob: a design PATH
+// containing glob metacharacters ([ ] * ?) must never defeat machine
+// detection, which once silently dropped gates (GATE-2).
+func HasMachines(design string) bool {
+	return len(sortedGlob(filepath.Join(design, "machines"), "*.machine.json")) > 0
+}
+
+// HasModelith reports whether the design carries a *.modelith.yaml domain
+// model (the Gx source artifact; the hook's stop-time selection keys on it).
+func HasModelith(design string) bool {
+	entries, _ := os.ReadDir(design)
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".modelith.yaml") {
+			return true
+		}
+	}
+	return false
+}
+
 // Select resolves a --gate list (or, when gateList is empty, the default
-// suite) for design: the default narrows to g2,g5 (plus the artifact-activated
-// gates whose sources exist) on a decomposed parent with no machines/
-// directory, and an unknown gate name is an error.
-func Select(design, gateList string) (Selection, error) {
+// suite) for design. impl is the implementation directory ("" when none was
+// supplied); it decides whether the machine-less-parent narrowing keeps G4.
+// The default narrows on a decomposed parent with no machines/, and an
+// unknown or empty gate name is an error.
+func Select(design, gateList, impl string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
 	list := "gm,gs,gp,gi,gn,g2,g3,gx,gb,g4,gt,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
-		if ms, _ := filepath.Glob(filepath.Join(design, "machines", "*.machine.json")); len(ms) == 0 {
+		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
 			// layer is the children's, held by the packs; only the
-			// machine-dependent gates (G3, Gx, G4, Gt) narrow away. Every
+			// machine-dependent gates (G3, Gx, Gt) narrow away. G4 is NOT
+			// machine-dependent (the contract and the code suffice), so an
+			// explicit --impl keeps it: v0.3.x silently dropped G4 here and
+			// exited 0 over contract-DENIED edges (GATE-1). Every
 			// artifact-activated gate keeps its auto-activation: v0.3.0
 			// narrowed gp/gi/gn away too, silently skipping the relational
 			// layers on a decomposed parent that carried them. Gb stays too:
@@ -71,16 +96,24 @@ func Select(design, gateList string) (Selection, error) {
 			if HasBuildDoc(design) {
 				parts = append(parts, "gb")
 			}
+			if impl != "" {
+				parts = append(parts, "g4")
+			}
 			parts = append(parts, "g5")
 			list = strings.Join(parts, ",")
-			sel.Note = "note: decomposed parent with no machines/; running " + list + " (G3/Gx/G4/Gt run on the child designs)"
+			sel.Note = "note: decomposed parent with no machines/; running " + list + " (G3/Gx run on the child designs; gt skipped: no machines)"
 		}
 	}
 	if sel.Explicit {
 		list = gateList
 	}
 	for _, g := range strings.Split(strings.ToLower(list), ",") {
-		sel.Run[strings.TrimSpace(g)] = true
+		tok := strings.TrimSpace(g)
+		if tok == "" {
+			// "g2," once yielded `unknown gate(s): ` with an empty name
+			return sel, fmt.Errorf("gate list %q contains an empty gate name (doubled or trailing comma)", gateList)
+		}
+		sel.Run[tok] = true
 	}
 	var unknown []string
 	for g := range sel.Run {

@@ -133,18 +133,33 @@ func VerifyFormal(design string, genOnly bool) int {
 		fmt.Fprintln(os.Stderr, err)
 		genFail++
 	}
-	for _, mj := range globExt(mdir, ".machine.json") {
-		if err := tla.Run(mj, fdir); err != nil {
+	// written tracks the basenames generated THIS run, so the report can
+	// distinguish fresh pairs from committed orphans no source produces
+	written := map[string]bool{}
+	record := func(names []string) {
+		for _, n := range names {
+			written[n] = true
+		}
+	}
+	machineSrcs := globExt(mdir, ".machine.json")
+	semSrcs := globExt(fdir, ".semantics.yaml")
+	compSrcs := globExt(fdir, ".composition.yaml")
+	for _, mj := range machineSrcs {
+		names, err := tla.RunWritten(mj, fdir)
+		record(names)
+		if err != nil {
 			genErr(err)
 		}
 	}
-	for _, sem := range globExt(fdir, ".semantics.yaml") {
+	for _, sem := range semSrcs {
 		m := strings.TrimSuffix(filepath.Base(sem), ".semantics.yaml")
-		if err := refine.Run(filepath.Join(mdir, m+".machine.json"), sem, fdir); err != nil {
+		names, err := refine.RunWritten(filepath.Join(mdir, m+".machine.json"), sem, fdir)
+		record(names)
+		if err != nil {
 			genErr(err)
 		}
 	}
-	for _, comp := range globExt(fdir, ".composition.yaml") {
+	for _, comp := range compSrcs {
 		data, err := os.ReadFile(comp)
 		if err != nil {
 			genErr(fmt.Errorf("compose_gen: %w", err))
@@ -160,7 +175,9 @@ func VerifyFormal(design string, genOnly bool) int {
 			genErr(fmt.Errorf("compose_gen: %s declares no coordinator", comp))
 			continue
 		}
-		if err := compose.Run(comp, filepath.Join(mdir, coord+".machine.json"), fdir); err != nil {
+		names, err := compose.RunWritten(comp, filepath.Join(mdir, coord+".machine.json"), fdir)
+		record(names)
+		if err != nil {
 			genErr(err)
 		}
 	}
@@ -237,13 +254,34 @@ func VerifyFormal(design string, genOnly bool) int {
 		}
 	}
 
-	if genOnly {
-		pairs := 0
-		for _, tlaF := range globExt(fdir, ".tla") {
-			if _, err := os.Stat(strings.TrimSuffix(tlaF, ".tla") + ".cfg"); err == nil {
-				pairs++
-			}
+	// zero machines AND zero relational annotations: nothing can be generated,
+	// so nothing can be verified as fresh; committed orphan pairs must not
+	// masquerade as a regenerated (or checkable) suite
+	if len(machineSrcs)+len(semSrcs)+len(compSrcs) == 0 && !havePolicy && !haveIntegrity && !haveIsolation && genFail == 0 {
+		fmt.Fprintf(os.Stderr, "verify-formal: nothing to generate: no machines under %s and no semantics/composition/relational annotations under %s\n", mdir, fdir)
+		return 1
+	}
+
+	// committed .tla/.cfg pairs a fresh generation did not produce: report
+	// them, never count them as regenerated (reviewer fixture exp-c: an orphan
+	// pair inflated the gen-only count and a zero-machine design exited 0)
+	pairs := 0
+	var orphans []string
+	for _, tlaF := range globExt(fdir, ".tla") {
+		if _, err := os.Stat(strings.TrimSuffix(tlaF, ".tla") + ".cfg"); err != nil {
+			continue
 		}
+		if written[filepath.Base(tlaF)] {
+			pairs++
+		} else {
+			orphans = append(orphans, strings.TrimSuffix(filepath.Base(tlaF), ".tla"))
+		}
+	}
+	for _, o := range orphans {
+		fmt.Fprintf(os.Stderr, "verify-formal: WARN: %s.tla/.cfg committed but not regenerated (no source); a fresh generation would not produce it\n", o)
+	}
+
+	if genOnly {
 		fmt.Fprintf(os.Stdout, "%d spec pair(s) regenerated from source; TLC skipped (--gen-only)\n", pairs)
 		if havePolicy {
 			fmt.Fprintf(os.Stdout, "relational policy model + authz oracle regenerated (%s, %d commands; %s); Alloy skipped (--gen-only)\n", alloy.OutputName, len(policyCommands), alloy.OracleName)
@@ -279,6 +317,12 @@ func VerifyFormal(design string, genOnly bool) int {
 			pass++
 		} else {
 			fmt.Fprintf(os.Stdout, "  FAIL  %s\n", name)
+			// an infrastructure failure (missing jar, missing java, timeout)
+			// produces little or no TLC output; the error object is the only
+			// diagnostic and must never be discarded
+			if err != nil {
+				fmt.Fprintf(os.Stdout, "        error: %v\n", err)
+			}
 			lines := strings.Split(out, "\n")
 			start := 0
 			if len(lines) > 40 {

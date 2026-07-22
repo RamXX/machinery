@@ -459,6 +459,7 @@ func TestSelectGatesProgressiveOptional(t *testing.T) {
 // that). Once machines exist the full selection returns.
 func TestSelectGatesSkipsGxOnMachinelessDecomposedParent(t *testing.T) {
 	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "checkout.modelith.yaml"), "entities: {}\n")
 	writeFile(t, filepath.Join(dir, "decomposition.yaml"), "decomposition_version: 1\n")
 	writeFile(t, filepath.Join(dir, "BUILD.md"), "Mode: full\n")
 	writeFile(t, filepath.Join(dir, "ARCHITECTURE.md"), "# arch\n")
@@ -486,6 +487,81 @@ func TestSelectGatesSkipsGxOnMachinelessDecomposedParent(t *testing.T) {
 	sel, _ = selectGates(dir, Config{})
 	if !sel.Run["gx"] || !sel.Run["g3"] {
 		t.Errorf("with machines present g3,gx must return: %v", sel.Run)
+	}
+}
+
+// The stop hook selects Gx as soon as the model and machines exist: BUILD.md
+// is not a precondition, or phase-3 Gx DRIFT (a stale maps-to reference)
+// escapes the drift-blocking contract until Phase 4 (GATE-6).
+func TestSelectGatesGxWithoutBuildDoc(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "domain.modelith.yaml"), "entities: {}\n")
+	writeFile(t, filepath.Join(dir, "machines", "Order.machine.json"), "{}\n")
+	sel, _ := selectGates(dir, Config{})
+	if !sel.Run["gx"] {
+		t.Errorf("modelith + machines must select gx even without BUILD.md: %v", sel.Run)
+	}
+	if sel.Run["gb"] {
+		t.Errorf("gb still needs BUILD.md: %v", sel.Run)
+	}
+}
+
+// Machine detection must survive glob metacharacters in the project path: a
+// design under "pr[1]" once defeated filepath.Glob, silently dropping g3 and
+// letting committed-oracle DRIFT pass at stop time (GATE-3/GATE-7 hook half).
+func TestSelectGatesMetacharDesignPath(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "pr[1]", "design")
+	writeFile(t, filepath.Join(dir, "domain.modelith.yaml"), "entities: {}\n")
+	writeFile(t, filepath.Join(dir, "machines", "Order.machine.json"), "{}\n")
+	sel, _ := selectGates(dir, Config{})
+	if !sel.Run["g3"] || !sel.Run["gx"] {
+		t.Errorf("a metachar path must not defeat machine detection: %v", sel.Run)
+	}
+}
+
+// The governance configuration itself is agent-read-only: a Write of
+// {"hooks": false} to .machinery.json is how an agent would switch machinery
+// off (GATE-10).
+func TestPreDeniesGovernanceConfigEdits(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, ConfigName), "{}\n")
+	for _, tool := range []string{"Write", "Edit"} {
+		out := runEvent(t, root, editEvent("PreToolUse", tool, "s-gov", filepath.Join(root, ConfigName)))
+		var got preOut
+		if err := json.Unmarshal([]byte(out), &got); err != nil {
+			t.Fatalf("%s deny output is not JSON: %v (%q)", tool, err, out)
+		}
+		if got.HookSpecificOutput.PermissionDecision != "deny" {
+			t.Fatalf("%s of %s must be denied: %+v", tool, ConfigName, got)
+		}
+		if !strings.Contains(got.HookSpecificOutput.PermissionDecisionReason, "governance") {
+			t.Fatalf("the reason must say why: %+v", got)
+		}
+	}
+}
+
+// Deleting a governance marker via a Codex apply_patch switches machinery off
+// for the whole repo; updating the domain model is Phase 1 authoring and
+// stays allowed (GATE-10).
+func TestCodexDeleteOfGovernanceMarkerDenied(t *testing.T) {
+	root := managedRoot(t)
+	deny := codexPatchEvent("PreToolUse", "s-del", "*** Begin Patch\n"+
+		"*** Delete File: design/domain.modelith.yaml\n"+
+		"*** End Patch")
+	out := runEvent(t, root, deny)
+	var got preOut
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("deny output is not JSON: %v (%q)", err, out)
+	}
+	if got.HookSpecificOutput.PermissionDecision != "deny" {
+		t.Fatalf("deleting the design marker must be denied: %+v", got)
+	}
+	allow := codexPatchEvent("PreToolUse", "s-upd", "*** Begin Patch\n"+
+		"*** Update File: design/domain.modelith.yaml\n"+
+		"@@\n-old\n+new\n"+
+		"*** End Patch")
+	if out := runEvent(t, root, allow); out != "" {
+		t.Fatalf("updating the domain model is Phase 1 authoring and must stay allowed, got %q", out)
 	}
 }
 

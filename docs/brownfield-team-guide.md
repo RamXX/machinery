@@ -4,7 +4,9 @@ This guide is for a small team (roughly 2 to 8 developers) adopting machinery on
 existing repository that has grown messy, with the goal of clawing back to a sustainable,
 gated model. The greenfield pipeline in `skills/machinery/SKILL.md` still applies; this
 document covers what changes when the code already exists and when more than one person
-works the design at once. Every recipe here was verified against machinery v0.1.7.
+works the design at once. The recipes here track the current release (v0.3.4 at this writing);
+pin that version or later, since several staged gates (gs, gb, gt) shipped after the early
+releases.
 
 This guide assumes the current implementation remains the implementation. If you are building a
 new production foundation while preserving selected behavior, data, tests, or modules, use the
@@ -53,8 +55,9 @@ team gets a ratchet, not a big bang. The stage you are on is encoded in one plac
 
 ### Stage 0: pin the toolchain, create the design directory
 
-- Install a pinned machinery release (`MACHINERY_VERSION=v0.1.7`) or
-  `go install github.com/RamXX/machinery/cmd/machinery@v0.1.7`. Pin modelith too
+- Install a pinned machinery release (`MACHINERY_VERSION=v0.3.4` or the current release) or
+  `go install github.com/RamXX/machinery/cmd/machinery@v0.3.4`. Pin v0.3.4 or later: the hardened gate semantics (strict Gt citations, Rust cfg(test) scanning, wildcard-baseline rejection) ship there, and the gs, gb,
+  and gt gates this ladder stages do not exist in earlier releases. Pin modelith too
   (`v0.4.0`; `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` installs the pinned release, and
   `machinery preflight` warns when the installed version does not match the pin. Keep the
   pin in your CI file as well).
@@ -98,7 +101,10 @@ domain claim, and the code alone cannot tell you what they should be.
      files. Commit it; it is generated, so never hand-edit it (machinery host adapters
      deny such edits where their edit API permits), and review its diff in PRs like any
      contract change.
-4. CI runs `machinery check design --impl . --gate g2,g4`. From this moment two things
+4. CI runs `machinery check design --impl . --gate g2,g4`. Recommended on day one as well: author
+   `design/legacy/surface.yaml` (the surface ledger; see [surface-ledger.md](surface-ledger.md))
+   and add `gs` to the list, so the archaeology has a coverage anchor from the start. From this
+   moment two things
    fail the build: a new undeclared cross-boundary edge, and a new offender file on a
    baselined edge (the ratchet). Committing `ratchet.json` is also what arms the machinery
    blocking stop hooks in supported host adapters, so those agent sessions are held to the
@@ -112,7 +118,11 @@ What the ratchet does and does not close: a baselined edge can no longer grow si
 matters, just with better instruments: a recurring slot (monthly works) on shrinking the
 `baseline:` list and the `ignore:` globs, rerunning `machinery baseline` after each
 burn-down so the "ratchet can tighten" notes become the agenda, and treating a quarter
-with zero shrinkage as the gate becoming wallpaper.
+with zero shrinkage as the gate becoming wallpaper. G4 prints the ratchet snapshot's date and
+age in days as a note on every run, so an aging amnesty is visible in every gate output, not
+only in the review slot. Two related G2 rules hold the ratchet's shape: wildcards are forbidden
+in `baseline:` rules (a wildcard would amnesty the whole edge space; they belong in allow/deny
+only), and `allow` plus `baseline` on one edge is a contradiction.
 
 ### Stage 2: domain archaeology and the first machines (add gate g3)
 
@@ -193,6 +203,14 @@ from the PARENT side (the child pins its own copied pack and is green by constru
 the parent's `machinery check` must run in CI somewhere, on a schedule if the repos are
 separate.
 
+**Multi-design governance.** Prefer keeping the parent and every child design in the same
+repository (or assembling them with a meta-checkout) so one CI run can see all of them, and run
+the parent's check in CI on every PR, not on a schedule. Define **platform-green** as all three
+together: the parent's check green, AND every child's check green, AND zero unpinned-subsystem
+warnings (a subsystem without a `child_design:` link is a pin the parent cannot verify, and an
+unpinned child can rewrite its pack copy undetected). Anything less is component-green, not
+platform-green, and must not be reported as the platform passing.
+
 ## 4. Team workflow: ownership, PRs, merges
 
 machinery's docs assume one conductor and one user. With five people, add these rules.
@@ -239,8 +257,8 @@ jobs:
       - uses: actions/checkout@<pinned-sha>
       - name: Install machinery (pinned)
         run: |
-          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.1.7/machinery-linux-amd64
-          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.1.7/checksums-sha256.txt
+          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.3.4/machinery-linux-amd64
+          curl -fsSLO https://github.com/RamXX/machinery/releases/download/v0.3.4/checksums-sha256.txt
           grep machinery-linux-amd64 checksums-sha256.txt | sha256sum -c -
           install -m 0755 machinery-linux-amd64 /usr/local/bin/machinery
       - name: Install modelith (pinned)

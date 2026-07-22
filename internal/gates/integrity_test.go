@@ -92,21 +92,21 @@ func TestCheckIntegrityBrokenAnnotationErrors(t *testing.T) {
 
 func TestSelectIncludesGi(t *testing.T) {
 	design := filepath.Join(repoRoot(), "examples", "go-crm", "design")
-	sel, err := Select(design, "")
+	sel, err := Select(design, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !sel.Run["gi"] {
 		t.Error("default selection must include gi")
 	}
-	if _, err := Select(design, "gi,g3"); err != nil {
+	if _, err := Select(design, "gi,g3", ""); err != nil {
 		t.Errorf("explicit gi rejected: %v", err)
 	}
 }
 
 func TestRunSelectedSkipsGiWithoutAnnotation(t *testing.T) {
 	design := filepath.Join(repoRoot(), "examples", "portfolio-engine", "design")
-	sel, err := Select(design, "")
+	sel, err := Select(design, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

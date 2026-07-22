@@ -26,7 +26,7 @@ func newCheckCmd() *cobra.Command {
 			exitFunc(1)
 			return nil
 		}
-		sel, err := gates.Select(design, gateList)
+		sel, err := gates.Select(design, gateList, implDir)
 		if sel.Note != "" {
 			fmt.Fprintln(stdoutW, sel.Note)
 		}
@@ -46,8 +46,14 @@ func newCheckCmd() *cobra.Command {
 		}
 
 		fail := 0
-		for _, g := range gates.RunSelected(design, implDir, sel) {
+		run := gates.RunSelected(design, implDir, sel)
+		for _, g := range run {
 			fail += g.Emit(stdoutW)
+		}
+		// P-F10: committed artifacts stamped by another machinery version are
+		// worth one non-blocking INFO line; a missing stamp says nothing.
+		if note := gates.VersionSkewNote(run); note != "" {
+			fmt.Fprintln(stdoutW, note)
 		}
 		fmt.Fprintf(stdoutW, "\n%d blocking (ERROR/DRIFT) finding(s)\n", fail)
 		if fail > 0 {
@@ -60,11 +66,15 @@ func newCheckCmd() *cobra.Command {
 
 func quote(s string) string { return "'" + s + "'" }
 
-// checkIsDir mirrors the Python "design directory does not exist" error.
+// checkIsDir mirrors the Python "design directory does not exist" error, and
+// tells a present-but-not-a-directory path apart from a missing one.
 func checkIsDir(design string) error {
 	fi, err := os.Stat(design)
-	if err != nil || !fi.IsDir() {
+	if err != nil {
 		return fmt.Errorf("machinery_check: design directory %s does not exist", quote(design))
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("machinery_check: design path %s is not a directory", quote(design))
 	}
 	return nil
 }

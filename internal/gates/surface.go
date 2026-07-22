@@ -15,7 +15,7 @@ import (
 const SurfaceLedgerName = "legacy/surface.yaml"
 
 var (
-	surfaceRootKeys  = stringSet("surface_version", "system", "classes", "_comment")
+	surfaceRootKeys  = stringSet("surface_version", "system", "classes", "as_of", "_comment")
 	surfaceClassKeys = stringSet("none", "source", "items")
 	surfaceItemKeys  = stringSet("name", "disposition", "via", "target", "rationale")
 	// surfaceClasses is the fixed enumeration vocabulary: every class must be
@@ -87,7 +87,7 @@ func CheckSurface(design string) *Gate {
 	dslPath := filepath.Join(design, "workspace.dsl")
 	if fi, statErr := os.Stat(dslPath); statErr == nil && !fi.IsDir() {
 		v.dslExists = true
-		v.dslEls = dslElements(dslPath)
+		v.dslEls = dslElements(dslPath, g)
 	}
 	v.validateClasses()
 	v.g.Count("covered", v.covered)
@@ -95,6 +95,11 @@ func CheckSurface(design string) *Gate {
 	v.g.Count("deferred", v.deferred)
 	v.g.Count("waived classes", v.waived)
 	v.g.Count("surface items", v.covered+v.dropped+v.deferred)
+	if asOf := strings.TrimSpace(v.root.GetString("as_of")); asOf != "" {
+		// the ledger's anchor: which legacy revision or date the enumeration
+		// held for; surfacing it keeps a stale ledger reviewable (P-F3)
+		g.CheckedExtra("as_of " + asOf)
+	}
 	g.RequireNonzero("surface items", "no legacy surface item was inventoried; a ledger of only waivers has nothing to hold the design to")
 	return g
 }
@@ -120,6 +125,11 @@ func (v *surfaceValidator) validateRoot() {
 	}
 	if v.root.GetString("system") == "" {
 		v.errf("system is required: one line naming the legacy system and its shape")
+	}
+	if asOf := v.root.Get2("as_of"); asOf != nil {
+		if asOf.Kind != ir.KindString || strings.TrimSpace(asOf.AsString()) == "" {
+			v.errf("as_of must be a non-empty string: the legacy revision or date the surface was enumerated against")
+		}
 	}
 	classes := v.root.GetObject("classes")
 	if classes.Len() == 0 {

@@ -280,7 +280,12 @@ implementation plan` heading in BUILD.md. Gm requires both bridges.
    cutover tests from BUILD.md. The target's ordinary oracle, boundary, invariant, and formal tests
    stay mandatory.
 8. **Advance by evidence:** a phase changes only when its checked entry and exit criteria are true.
-   Keep the previous rollback path operational through the declared window.
+   Keep the previous rollback path operational through the declared window. `migration.yaml` has
+   an operational twin: the **migration log**, a dated log recording each phase transition as it
+   happens, with the evidence that satisfied the entry/exit criteria (the parity report, the
+   reconciliation run, the drift query) and who made the call. The Migration implementation plan
+   in BUILD.md names the log's location and its owner; a phase transition with no log entry did
+   not happen, whatever the calendar says.
 9. **Retire deliberately:** remove transition code and legacy dependencies only after cutover exit
    criteria, reconciliation, backup retention, and owner approval are satisfied.
 

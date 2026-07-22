@@ -112,8 +112,13 @@ For each component `<C>`:
     missed, and check each hit against the C4 mitigation postures;
   - optionally a hand transition table; if present, G3 reconciles it against the machine structurally,
     row by row, in both directions, so follow the reconciler's conventions (`!guardName`, `(else)`,
-    or `-` for the unguarded fallback branch; `X (internal)` for internal transitions; rows marked
-    `(final)` or `(any event)` are documentation-only and skipped). The generated oracle already
+    or `-` for the unguarded fallback branch; `X (internal)` for internal transitions). A row is
+    documentation-only, excluded from reconciliation, ONLY when its entire trimmed trigger cell is
+    exactly `(final)` or `(any event)`; a `(final)` annotation anywhere else in the row still
+    reconciles, so a contradicting row cannot hide behind the marker. State cells may use a simple
+    state name only while it is unambiguous in the machine; the moment two states share a simple
+    name, write the full dotted path (`persisting.writing`), or the reconciler errors on the
+    ambiguity. The generated oracle already
     covers the transitions, so most machines do not need one.
 - `design/machines/<C>.oracle.md` - GENERATED: run `machinery oracle design/machines`
   and commit the output. Never hand-edit it; G3 regenerates it in memory and diffs, so a stale or

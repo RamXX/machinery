@@ -1,4 +1,5 @@
 // Code generated from domain.modelith.yaml + isolation.relational.yaml by machinery alloy. DO NOT EDIT.
+// machinery-version: v0.3.4-dev
 //
 // Static relational model of multi-tenant ISOLATION: the tenant of a record
 // is its owner's tenant, and every reference the annotation names must stay
@@ -48,14 +49,14 @@ sig Contact {
 // same-tenant.
 pred sameTenant[a, b: User] { some a.team and a.team = b.team }
 
-// task-deal-same-tenant: a Task and the Deal it references are owned in the same tenant
+// task-deal-same-tenant: a Task and every Deal it references are owned in the same tenant
 fact Isolation_Task_Deal_Deal {
-  all x: Task | some x.deal implies sameTenant[x.owner, x.deal.owner]
+  all x: Task | all t: x.deal | sameTenant[x.owner, t.owner]
 }
 
-// activity-contact-same-tenant: an Activity and the Contact it references are owned in the same tenant
+// activity-contact-same-tenant: an Activity and every Contact it references are owned in the same tenant
 fact Isolation_Activity_Contact_Contact {
-  all x: Activity | some x.contact implies sameTenant[x.owner, x.contact.owner]
+  all x: Activity | all t: x.contact | sameTenant[x.owner, t.owner]
 }
 
 // --- Generated meta-checks: the standard suite, identical for every design ---
@@ -69,18 +70,22 @@ run SomeWorld {
   and ((some x: Task | some x.deal) or (some x: Activity | some x.contact))
 } for 6
 
-// PASS = no counterexample: two Task records that reference the same Deal are
-// owned in the same tenant. A counterexample would be a Deal referenced from
-// two tenants at once -- a shared referent bridging the boundary.
+// PASS = no counterexample: two Task records whose deal references OVERLAP in
+// even one Deal are owned in the same tenant. A counterexample would be a Deal
+// referenced from two tenants at once -- a shared referent bridging the
+// boundary. Overlap, not whole-set equality: for a set-valued field the
+// equality form misses records that share only part of their referents.
 check SharedReferent_Task_Deal_Deal {
-  all x, y: Task | (some x.deal and x.deal = y.deal) implies sameTenant[x.owner, y.owner]
+  all x, y: Task | some (x.deal & y.deal) implies sameTenant[x.owner, y.owner]
 } for 6
 
-// PASS = no counterexample: two Activity records that reference the same Contact are
-// owned in the same tenant. A counterexample would be a Contact referenced from
-// two tenants at once -- a shared referent bridging the boundary.
+// PASS = no counterexample: two Activity records whose contact references OVERLAP in
+// even one Contact are owned in the same tenant. A counterexample would be a Contact
+// referenced from two tenants at once -- a shared referent bridging the
+// boundary. Overlap, not whole-set equality: for a set-valued field the
+// equality form misses records that share only part of their referents.
 check SharedReferent_Activity_Contact_Contact {
-  all x, y: Activity | (some x.contact and x.contact = y.contact) implies sameTenant[x.owner, y.owner]
+  all x, y: Activity | some (x.contact & y.contact) implies sameTenant[x.owner, y.owner]
 } for 6
 
 // PASS = instance found: a Task referencing a Deal exists, so the isolation

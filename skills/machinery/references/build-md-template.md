@@ -18,7 +18,9 @@ Two artifacts are never pasted by hand: the machine JSON (section 5 references t
 and the transition tables (section 7 references the generated oracles). Pasted copies drift; the
 files are what the deterministic gates check.
 
-Fill every section. Omit a section only by writing "N/A" with a reason.
+Fill every section. Omit a section only by writing the literal waiver form `N/A - <reason>`
+(capital N/A, a hyphen, a reason; Gb holds the Build plan section to exactly this form as its
+first non-blank line, and a bare or misshapen N/A fails loudly instead of waiving).
 
 ---
 
@@ -70,6 +72,8 @@ Turn the checked contract into build and test work without restating it incomple
   tests; either-side dual-write fault injection; rollback rehearsal; and evidence-gated cutover.
 - State stable identifier and signed-manifest rules, source-of-truth authority per phase, operator
   ownership, and the exact conditions under which transition code may be removed.
+- Name the migration log and its owner: the dated operational twin of `migration.yaml`, recording
+  each phase transition with the evidence that satisfied its entry/exit criteria.
 - Source of truth: `design/migration.yaml`; do not weaken its entry/exit, rollback, observability,
   parity, idempotency, conflict-resolution, reconciliation, or maximum-data-loss commitments.
 
@@ -130,6 +134,15 @@ restate the transition tables here; reference the oracles. Tests key on each row
 the sequential test id: row numbers renumber when the design changes, stable ids survive unrelated
 insertions and change only when that transition's stimulus changes.
 
+The conformance-test shape is doctrine, not style: a conformance test parses the COMMITTED oracle
+table at runtime and asserts, per row, the next state AND the expected actions (or, for decision
+oracles, the verdict), keyed on the stable id. The go-crm example's
+`impl/internal/authz/oracle_test.go` is the normative reference shape. Gt credits an oracle as
+covered wholesale only when a single test file passes its citation rule: the oracle file name with
+word boundaries on both sides, inside a string literal, in a file that also carries parse evidence
+(a string literal containing the `|` table delimiter). A mention in a comment does not count; a
+test that names the file but never parses it does not count.
+
 When the design carries a policy annotation, the authorization test spec IS the generated
 `design/formal/Policy.oracle.md` the same way: require ONE conformance test that parses the table
 and asserts the pure authorization function on every reachable row, expanding each abstract owner
@@ -174,7 +187,8 @@ real boundary. Prove the topology before adding breadth. Then vertical slices, o
 lifecycle at a time, each slice green before the next.
 
 Format contract, held deterministically by Gb-plan:
-- Each milestone is a bold marker `**M<n> - <title>**` with a unique number.
+- Each milestone is a bold marker `**M<n> - <title>**` with a unique number. Numbers compare
+  numerically: M1 and M01 are the same milestone, and declaring both is a duplicate.
 - The first milestone (M0) is the walking skeleton: its title contains "walking skeleton". A
   brownfield gap plan whose skeleton already exists in production waives it with the literal line
   `Walking skeleton: N/A - <reason>`.
@@ -182,7 +196,13 @@ Format contract, held deterministically by Gb-plan:
   (transitions covered, invariants property-tested, contract tests green, no cross-boundary
   violations).
 - The skeleton milestone's DoD cites at least one committed oracle id (test id or stable id) as a
-  whole token.
+  whole token, at or after the DoD token (pre-DoD prose does not count).
+- The whole section may be waived only with the literal `N/A - <reason>` (case-sensitive) as its
+  first non-blank line; any other N/A shape fails loudly instead of waiving.
+- Every Gb scan runs on fence-masked text (the Mode-line sniff included): fenced code blocks are
+  blanked first, with fences closed by the CommonMark run-length rule (a fence opened with N
+  delimiters closes only on >= N of the same character), so a fenced example `**M9 - ...**`,
+  `DoD:`, or `Mode:` line is never plan structure.
 
 One requirement Gb does not check: the skeleton milestone names which NFR-record mechanisms it
 instantiates (error envelope, config registration, observability hooks, auth posture; whichever
@@ -244,4 +264,17 @@ tools (including how to run `machinery oracle` and `machinery check`).
 ## 12. Open questions and residual risks
 Anything deferred, any dependency with no mitigation, any invariant not structurally guaranteed.
 Be explicit. A named risk is cheaper than a surprise.
+
+### What the gates do not verify
+Include this block verbatim in every BUILD.md, so a green check is never read as more than it is.
+Not covered by any deterministic check or proof, by construction: whether the interrogation
+extracted the RIGHT invariants (a shallow domain model gates clean); guard and action semantics in
+code (the named-unit contracts carry them into tests; a wrong implementation of a correctly-named
+guard is caught by tests, not proofs); races between concurrent machine instances, and message
+loss, duplication, or reordering between machines (the models are single-instance; the
+event-contract table and the idempotency contracts govern those seams, and the tests exercise
+them); whether migration transformations preserve real production data (Gm proves decision
+coverage, not the implementation or a database run); coupling through shared database tables or
+bus topics (invisible to import analysis; the event-contract table governs it); and security,
+capacity, and observability beyond what the Phase 2 NFR record captures.
 ```

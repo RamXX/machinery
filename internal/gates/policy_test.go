@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/RamXX/machinery/internal/alloy"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 func TestCheckPolicyCleanOnGoCRM(t *testing.T) {
@@ -108,24 +109,24 @@ func TestCheckPolicyBrokenAnnotationErrors(t *testing.T) {
 
 func TestSelectIncludesGp(t *testing.T) {
 	design := filepath.Join(repoRoot(), "examples", "go-crm", "design")
-	sel, err := Select(design, "")
+	sel, err := Select(design, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !sel.Run["gp"] {
 		t.Error("default selection must include gp")
 	}
-	if _, err := Select(design, "gp,g3"); err != nil {
+	if _, err := Select(design, "gp,g3", ""); err != nil {
 		t.Errorf("explicit gp rejected: %v", err)
 	}
-	if _, err := Select(design, "gq"); err == nil {
+	if _, err := Select(design, "gq", ""); err == nil {
 		t.Error("unknown gate must error")
 	}
 }
 
 func TestRunSelectedSkipsGpWithoutAnnotation(t *testing.T) {
 	design := filepath.Join(repoRoot(), "examples", "fulfillment", "design")
-	sel, err := Select(design, "")
+	sel, err := Select(design, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,5 +134,34 @@ func TestRunSelectedSkipsGpWithoutAnnotation(t *testing.T) {
 		if strings.Contains(g.Title, "Gp-policy") {
 			t.Error("Gp must not run on a design without the annotation")
 		}
+	}
+}
+
+// P-F10: a committed Policy.als stamped by another machinery version, content
+// otherwise fresh, is not drift; the skew surfaces through VersionSkewNote.
+func TestCheckPolicyVersionOnlySkewIsNotDrift(t *testing.T) {
+	design := copyDesign(t)
+	path := filepath.Join(design, "formal", alloy.OutputName)
+	// normalize to the CURRENT generation first (the committed example may be
+	// pre-stamp), then rewrite the stamp to a different version
+	dm := filepath.Join(design, "domain.modelith.yaml")
+	als, _, _, err := alloy.GenerateAll(dm, filepath.Join(design, "formal", alloy.AnnotationName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stamped := strings.Replace(als, version.AlloyStamp(), "// machinery-version: v0.0.9", 1)
+	if stamped == als {
+		t.Fatal("fresh generation carries no stamp to rewrite")
+	}
+	if err := os.WriteFile(path, []byte(stamped), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g := CheckPolicy(design)
+	if len(g.Drift) != 0 || len(g.Errs) != 0 {
+		t.Fatalf("version-only skew reported as drift: errs=%v drift=%v", g.Errs, g.Drift)
+	}
+	note := VersionSkewNote([]*Gate{g})
+	if !strings.Contains(note, "v0.0.9") {
+		t.Errorf("skew note = %q, want v0.0.9 named", note)
 	}
 }

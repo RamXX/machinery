@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/pack"
@@ -41,6 +42,9 @@ var (
 	// skeletonWaiverRe is the explicit skeleton waiver line; the reason is
 	// mandatory (an unexplained waiver is an unanswered planning question).
 	skeletonWaiverRe = regexp.MustCompile(`(?i)walking skeleton:\s*n/a\s*-\s*\S`)
+	// planWaiverRe is the documented section-waiver literal: N/A, a hyphen,
+	// a reason (case-sensitive; NG-6).
+	planWaiverRe = regexp.MustCompile(`^N/A\s+-\s+\S`)
 	// planHeadingNumRe strips the template's "N. " section-number prefix.
 	planHeadingNumRe = regexp.MustCompile(`^\d+\.\s+`)
 )
@@ -72,29 +76,43 @@ func isIDTokenChar(b byte) bool {
 	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '-'
 }
 
-// maskFences blanks fenced code blocks (``` and ~~~, tracking open/close)
-// line by line, preserving the line structure so byte offsets stay valid.
-// Every Gb scan runs on the masked text: a bash "# comment" inside a fence is
-// not a heading, and a fenced fake "**M9 - ...**" or "DoD:" is not plan
-// structure. Neither ir.ParseMdTables nor Gx's BUILD scans are fence-aware;
-// this helper is Gb's own.
+// maskFences blanks fenced code blocks (``` and ~~~) line by line, preserving
+// the line structure so byte offsets stay valid. The CommonMark run-length
+// rule applies: a fence opened with N delimiter characters closes only on a
+// line of >= N of the SAME character, so a 4-backtick documentation fence
+// swallows its inner ``` lines instead of leaking example content as plan
+// structure (NG-5). Every Gb scan runs on the masked text: a bash "# comment"
+// inside a fence is not a heading, and a fenced fake "**M9 - ...**" or
+// "DoD:" is not plan structure. Neither ir.ParseMdTables nor Gx's BUILD
+// scans are fence-aware; this helper is Gb's own.
 func maskFences(text string) string {
 	lines := strings.Split(text, "\n")
-	var fence string // the active fence delimiter, "" when outside a fence
+	fenceChar := byte(0) // the active fence character, 0 when outside a fence
+	fenceLen := 0
 	for i, line := range lines {
 		t := strings.TrimLeft(line, " \t")
 		switch {
-		case fence == "" && (strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~")):
-			fence = t[:3]
+		case fenceChar == 0 && (strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~")):
+			fenceChar = t[0]
+			fenceLen = leadingRun(t, fenceChar)
 			lines[i] = ""
-		case fence != "":
-			if strings.HasPrefix(t, fence) {
-				fence = ""
+		case fenceChar != 0:
+			if t != "" && t[0] == fenceChar && leadingRun(t, fenceChar) >= fenceLen {
+				fenceChar, fenceLen = 0, 0
 			}
 			lines[i] = ""
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// leadingRun counts the leading run of c in s.
+func leadingRun(s string, c byte) int {
+	n := 0
+	for n < len(s) && s[n] == c {
+		n++
+	}
+	return n
 }
 
 // headingText parses a markdown ATX heading line into level and text; level 0
@@ -140,10 +158,10 @@ func buildPlanSection(text string) (string, bool) {
 // ids) of every committed machines/*.oracle.md table, as read from the
 // files: the id shapes are never assumed. The committed files are the source
 // here; G3 separately holds them fresh against the machines.
-func planOracleIDs(design string) []string {
+func planOracleIDs(design string, g *Gate) []string {
 	var ids []string
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.oracle.md") {
-		testIDs, stableIDs := oracleTableIDs(readOrEmpty(path))
+		testIDs, stableIDs := oracleTableIDs(readFileOrErr(path, g))
 		ids = append(ids, testIDs...)
 		ids = append(ids, stableIDs...)
 	}
@@ -158,11 +176,13 @@ func CheckBuildPlan(design string) *Gate {
 		g.Errs = append(g.Errs, "no BUILD.md in the design; the build-plan gate was requested but Phase 4 never produced a build document (author BUILD.md, or drop gb from the gate list)")
 		return g
 	}
-	text := readOrEmpty(filepath.Join(design, "BUILD.md"))
+	text := readFileOrErr(filepath.Join(design, "BUILD.md"), g)
 	// Gx owns findings about the Mode line itself; an absent declaration
-	// falls back to full so a pre-Gx draft still gets its plan checked.
+	// falls back to full so a pre-Gx draft still gets its plan checked. The
+	// sniff runs on fence-masked text: a fenced example "Mode:" line must
+	// not override the real declaration (NG-4).
 	mode := "full"
-	if m := modeRe.FindStringSubmatch(text); m != nil {
+	if m := modeRe.FindStringSubmatch(maskFences(text)); m != nil {
 		mode = m[1]
 	}
 	if mode == "manifest" {
@@ -197,13 +217,13 @@ func CheckBuildPlan(design string) *Gate {
 		// the design-wide committed oracle ids: a shard plans work on the same
 		// machines the root design committed. The manifest ROOT itself carries
 		// no plan obligation.
-		ids := planOracleIDs(design)
+		ids := planOracleIDs(design, g)
 		for _, shard := range shards {
-			checkPlanDoc(g, filepath.Base(shard), readOrEmpty(shard), ids)
+			checkPlanDoc(g, filepath.Base(shard), readFileOrErr(shard, g), ids)
 		}
 		return g
 	}
-	checkPlanDoc(g, "BUILD.md", text, planOracleIDs(design))
+	checkPlanDoc(g, "BUILD.md", text, planOracleIDs(design, g))
 	return g
 }
 
@@ -220,13 +240,19 @@ func checkPlanDoc(g *Gate, name, text string, oracleIDs []string) {
 		g.Errs = append(g.Errs, name+": no Build plan section (need a ## or ### heading titled 'Build plan'; a numeric 'N. ' prefix is fine)")
 		return
 	}
-	// section waiver: "N/A - <reason>" as the first non-blank line waives
-	// the structural checks; a bare N/A explains nothing and stays an error
+	// section waiver: ONLY the documented literal form "N/A - <reason>" as
+	// the first non-blank line waives the structural checks (NG-6: any line
+	// merely starting with N/A once waived everything). A first line that
+	// looks like a waiver attempt but misses the form fails loudly instead
+	// of silently un-waiving into confusing structural errors.
 	if first := firstNonBlankLine(body); strings.HasPrefix(strings.ToUpper(first), "N/A") {
-		if strings.TrimLeft(first[len("N/A"):], " \t-:.,") == "" {
-			g.Errs = append(g.Errs, name+": the build plan is waived with a bare N/A; a waiver needs a reason (N/A - <reason>)")
-		} else {
+		switch {
+		case planWaiverRe.MatchString(first):
 			g.Count("waived plans")
+		case strings.TrimLeft(first[len("N/A"):], " \t-:.,") == "":
+			g.Errs = append(g.Errs, name+": the build plan is waived with a bare N/A; a waiver needs a reason (N/A - <reason>)")
+		default:
+			g.Errs = append(g.Errs, name+": the build plan starts with N/A but not in the waiver form; a waiver is the literal 'N/A - <reason>' (or write the plan)")
 		}
 		return
 	}
@@ -262,9 +288,22 @@ func checkPlanDoc(g *Gate, name, text string, oracleIDs []string) {
 		})
 		nums = append(nums, body[m[2]:m[3]])
 	}
-	for _, n := range uniqueDuplicates(nums) {
-		if c := countStr(nums, n); c > 1 {
-			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%s is declared %d times; milestone numbers must be unique", name, n, c))
+	// numbers compare numerically: M1 and M01 are the same milestone (NG-8)
+	numCount := map[int]int{}
+	var numOrder []int
+	for _, n := range nums {
+		v, err := strconv.Atoi(n)
+		if err != nil {
+			continue // \d+ can only overflow; an absurd number is its own review finding
+		}
+		if numCount[v] == 0 {
+			numOrder = append(numOrder, v)
+		}
+		numCount[v]++
+	}
+	for _, v := range numOrder {
+		if c := numCount[v]; c > 1 {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%d is declared %d times; milestone numbers must be unique", name, v, c))
 		}
 	}
 

@@ -12,16 +12,48 @@ and array transition targets are rejected. Do not author outside the subset.
 ## The enforced subset
 
 - **root keys**: `id`, `initial`, `context`, `states`, `description`, `meta`, `version`, plus the
-  underscore annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_component`.
+  underscore annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_component`,
+  `_max_retries`, `_oracle_tag`.
 - **state keys**: `on`, `after`, `always`, `invoke`, `entry`, `exit`, `states`, `initial`, `type`,
   `id`, `meta`, `description`, `tags`, `onDone`, `output`, plus `_comment`, `_exhaustive`, `_ignores`.
-- **invoke keys**: `src`, `input`, `id`, `onDone`, `onError`, `_comment`.
+- **transition keys**: `target`, `guard`, `actions`, `description`, `_comment`. Anything else (a
+  typo like `tagret`) is a hard error, never a silent internal self-transition.
+- **invoke keys**: `src`, `input`, `id`, `onDone`, `onError`, `_comment`. `src` is **mandatory**: a
+  non-empty string naming the invoked actor.
 - **state types**: atomic (default), compound (has `states`), final. **Parallel and history are
   rejected.** Model an orthogonal concern as its own operational machine, or as context flags read
   by guards; model "resume where we left off" as an explicit context field plus guarded routing.
-- **guards must be strings** naming a boolean predicate. **targets must be single strings** (a
-  sibling name or `#id.path.to.state`); array targets are unsupported.
+- **state and event names** must match `^[A-Za-z][A-Za-z0-9_]*$`: they become oracle stable-id
+  hash inputs (joined with `|`) and TLA+ identifiers, so a pipe, space, or hyphen is rejected.
+  Wildcard events (`*`) and platform events (`done.*`, `error.*`) are outside the subset; use
+  explicit events and invoke `onDone`/`onError`.
+- **guards must be strings** naming a boolean predicate. **targets must be single strings**; array
+  targets are unsupported. Target resolution is strict (see "Targets and state ids" below).
+- **`onDone` needs somewhere to fire from**: a state carrying `onDone` must be compound AND have a
+  final descendant, or the transition could never fire (a phantom row that would mask true
+  unreachability of its target).
+- **action values** are name strings or `{"type": "<name>"}` objects; an action object carries
+  ONLY `type` (parameters belong in the implementation, not the design), and any other key is a
+  hard error.
+- **empty containers are hard errors**: an empty branch array under `on:<event>`, `after:<delay>`,
+  `always`, or an invoke `onDone`/`onError` parses clean, counts as handled, and silently swallows
+  its trigger; an empty `after: {}` on an invoking state declares no timeout. The lint rejects all
+  of them.
 - **no root-level `on`**: every transition belongs to a state.
+
+## Targets and state ids (strict resolution)
+
+- A **bare-name target** resolves ONLY among siblings of the source state (the source itself
+  included, for explicit self-transitions). It never falls back to a cousin or an ancestor.
+- **`#id.path.to.state`** resolves the head against the machine id or a declared state-level `id:`,
+  then every following segment strictly as a child of the previous node; any segment that does not
+  exist is a dangling target, named in the error.
+- **`.child` relative targets are rejected** (outside the subset): use a sibling name or the
+  `#id.path` form.
+- A **dotted target without `#`** is rejected: dotted paths must use the `#id.path.to.state` form.
+- **State-level `id:` values are registered**: each must be a non-empty identifier
+  (`[A-Za-z_][A-Za-z0-9_]*`), unique across the machine, and must not collide with the machine id
+  (a dotted or symbolic id could never be referenced by `#id.path`).
 
 ## What goes in the JSON
 
@@ -76,7 +108,7 @@ and array transition targets are rejected. Do not author outside the subset.
 
 ## Machine annotations (checked, not decorative)
 
-Three annotations carry meaning the deterministic gates consume. Every machine must be classifiable
+These annotations carry meaning the deterministic gates consume. Every machine must be classifiable
 as either a lifecycle machine or an operational machine; a filename matching a Modelith entity
 counts as the lifecycle claim.
 
@@ -126,6 +158,25 @@ fallback branch, which TLC does check:
 }
 ```
 
+**`_max_retries: <n>`** (root, optional): the machine's effective retry bound, a positive integer,
+default 3 when absent. The TLA+ generation and the data-refinement rung both bound their retry
+counters with it. When a `<M>.semantics.yaml` refinement annotation declares its own
+`max_retries`, it must equal the machine's effective bound or generation fails (two rungs proving
+different bounds prove different systems); omit it in the semantics to inherit the machine's.
+
+**`_oracle_tag: "<TAG>"`** (root, optional): 2 to 8 characters matching `[A-Z0-9]`, overriding the
+derived stable-id tag (the uppercased machine id truncated to 4 runes). Two machines in one design
+whose derived tags collide (`Deal` vs `DealAggregate`) would mint identical stable ids for
+different transitions; the oracle CLI hard-errors on that collision, and `_oracle_tag` is the
+disambiguation lever that avoids renaming the machines. Choose it once; changing it churns every
+stable id of that machine.
+
+**`_delays: {name: "<ms> - <rationale>"}`** (root, **mandatory for every `after` key**): every
+delay name used in any `after` block must be declared here with its millisecond bound and
+rationale; an undeclared delay name is a lint error. Raw numeric `after` keys (`"5000"`) are
+rejected outright: name the delay and declare its bound, so the config stays declarative and the
+bound traces to C4.
+
 ## Explicit ignores and event completeness (deterministically checked)
 
 A **resting state** is a top-level, non-final state with no `invoke` and no `always`: it sits
@@ -165,8 +216,10 @@ failure modes. Standard shapes:
 - **degrade** -> when the breaker is open, route to a `degraded` state serving a fallback rather than
   hard-failing.
 
-Delays (`PAYMENT_TIMEOUT`, `RETRY_BACKOFF`) are **named**; their millisecond values live in the
-`delays` implementation map, so the config stays declarative and the bounds come from C4.
+Delays (`PAYMENT_TIMEOUT`, `RETRY_BACKOFF`) are **named**; every one must be declared in the
+machine's `_delays` map with its millisecond bound and rationale (numeric `after` keys are
+rejected), so the config stays declarative and the bounds come from C4. The implementation's
+`delays` map takes its values from there.
 
 ## Choreography (machines reacting to each other over a bus)
 
@@ -206,13 +259,14 @@ against the real dependency or a contract-tested fake; they are never derivable 
 
 ## Helper keys, and importing into Stately or @xstate/graph
 
-For humans, a machine file also carries two underscore-prefixed helper keys that are NOT part of the
-XState config schema (the lint accepts exactly these plus the annotations above):
+A machine file also carries underscore-prefixed keys that are NOT part of the
+XState config schema (the lint accepts exactly the set documented above, nothing more):
 
 - `_comment` - a header note stating placement and concurrency serialization (from the
   persistence-and-placement table in the C4 reference).
 - `_delays` - the named delays with their millisecond bounds and rationale, for example
-  `"persistTimeout": "10000 ms - LadybugDB write timeout"`. The `after` blocks reference these by name.
+  `"persistTimeout": "10000 ms - LadybugDB write timeout"`. The `after` blocks reference these by
+  name, and every `after` key MUST be declared here (see the annotations section).
 
 Before loading a machine into Stately Studio or `@xstate/graph`, strip every `_`-prefixed key and
 supply the real implementations via `setup({ actors, guards, actions, delays })`: the string-named
@@ -223,9 +277,10 @@ there. The state graph itself imports unchanged.
 
 Deterministic (run the tools; do not eyeball):
 
-- `machinery lint design/machines` checks subset conformance, reachability, dead ends,
-  `invoke` with `onError` plus `after`, shadowed branches, guarded-always exhaustiveness
-  (`_exhaustive`), and resting-state event completeness (`_ignores`).
+- `machinery lint design/machines` checks subset conformance, name and id patterns, strict target
+  resolution, named-delay declaration (`_delays`), empty-container errors, reachability, dead ends,
+  `invoke` with a `src`, `onError`, and a non-empty `after`, shadowed branches, guarded-always
+  exhaustiveness (`_exhaustive`), and resting-state event completeness (`_ignores`).
 - `machinery oracle design/machines` generates `<M>.oracle.md`; commit it. G3 regenerates it in
   memory and diffs; a stale committed oracle is DRIFT. Tests key on the oracle's stable ids.
 

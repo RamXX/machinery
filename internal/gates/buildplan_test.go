@@ -1,6 +1,7 @@
 package gates
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -384,6 +385,133 @@ func TestCheckBuildPlanSkeletonCitationMustFollowDoD(t *testing.T) {
 	if g.Counts["skeleton citations"] != 1 {
 		t.Errorf("skeleton citations = %d, want 1: %+v", g.Counts["skeleton citations"], g.Counts)
 	}
+}
+
+// The mode sniff runs on fence-masked text: a fenced example "Mode: manifest"
+// line must not override the real declaration (NG-4, both directions).
+func TestCheckBuildPlanModeSniffIsFenceMasked(t *testing.T) {
+	t.Run("fenced manifest does not hide a full plan", func(t *testing.T) {
+		build := "# B\n\nAn example of the sharded declaration:\n\n" +
+			"```text\nMode: manifest (shards under BUILD/)\n```\n\n" +
+			"Mode: full (single BUILD.md)\n\n## 9. Build plan\n\n" +
+			"**M0 - Data layer.** No definition of done here and not a walking skeleton.\n"
+		design := writeBuildPlanFixture(t, build, map[string]string{
+			"decomposition.yaml": "decomposition_version: 1\n",
+		})
+		g := CheckBuildPlan(design)
+		if g.Counts["milestones"] != 1 {
+			t.Fatalf("the real Mode: full plan must be structurally checked: %+v", g.Counts)
+		}
+		joined := strings.Join(g.Errs, "\n")
+		if !strings.Contains(joined, "states no definition of done") || !strings.Contains(joined, "is not the walking skeleton") {
+			t.Fatalf("the broken full plan must fail its structural checks: %v", g.Errs)
+		}
+	})
+	t.Run("fenced full does not hide a manifest declaration", func(t *testing.T) {
+		build := "# B\n\n```text\nMode: full (single BUILD.md)\n```\n\nMode: manifest\n"
+		design := writeBuildPlanFixture(t, build, nil)
+		g := CheckBuildPlan(design)
+		if !strings.Contains(strings.Join(g.Errs, "\n"), "a manifest with nothing behind it") {
+			t.Fatalf("the real Mode: manifest must govern: %v", g.Errs)
+		}
+	})
+}
+
+// Fences follow the CommonMark run-length rule: a fence opened with N
+// backticks closes only on a line of >= N backticks of the same character, so
+// a 4-backtick documentation fence swallows its inner ``` lines instead of
+// leaking phantom DoD lines (NG-5).
+func TestMaskFencesRunLength(t *testing.T) {
+	build := "# B\n\nMode: full\n\n## Build plan\n\n" +
+		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n\n" +
+		"**M1 - Breadth slice.** This milestone has NO real DoD. Example snippet:\n\n" +
+		"````markdown\n```text\nDoD: example text inside a documentation fence, not a commitment.\n```\n````\n\n" +
+		"More prose, still no definition of done for M1.\n"
+	design := writeBuildPlanFixture(t, build, nil)
+	g := CheckBuildPlan(design)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "milestone M1 (Breadth slice) states no definition of done") {
+		t.Fatalf("the fenced example DoD must not satisfy M1: %v", g.Errs)
+	}
+	masked := maskFences("````\ncontent\n```\nstill content\n````\nvisible\n")
+	if strings.Contains(masked, "content") {
+		t.Errorf("inner ``` must not close a 4-backtick fence: %q", masked)
+	}
+	if !strings.Contains(masked, "visible") {
+		t.Errorf("text after the true closer must survive: %q", masked)
+	}
+}
+
+// The section waiver is the documented literal form 'N/A - <reason>': prose
+// that merely starts with N/A must not waive the whole structural check
+// (NG-6).
+func TestCheckBuildPlanNAWaiverLiteralFormOnly(t *testing.T) {
+	cases := []struct{ name, first string }{
+		{"prose starting with N/A", "N/A rows in the oracle table are excluded from milestone scoping."},
+		{"colon separator", "N/A: the plan lives in the parent manifest"},
+		{"lowercase", "n/a - the plan lives in the parent manifest"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			build := "# B\n\nMode: full\n\n## Build plan\n\n" + tc.first + "\n"
+			design := writeBuildPlanFixture(t, build, nil)
+			g := CheckBuildPlan(design)
+			if len(g.Errs) == 0 {
+				t.Fatalf("a non-literal waiver form must not pass silently: %+v", g.Counts)
+			}
+			if g.Counts["waived plans"] != 0 {
+				t.Errorf("no waiver may be counted for %q: %+v", tc.first, g.Counts)
+			}
+		})
+	}
+}
+
+// Milestone numbers are compared numerically: M1 and M01 are the same
+// milestone declared twice (NG-8).
+func TestCheckBuildPlanDuplicateMilestoneNumbersNumeric(t *testing.T) {
+	build := "# B\n\nMode: full\n\n## Build plan\n\n" +
+		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n\n" +
+		"**M1 - First slice.** DoD: rows green.\n\n" +
+		"**M01 - Also the first slice.** DoD: rows green.\n"
+	design := writeBuildPlanFixture(t, build, nil)
+	g := CheckBuildPlan(design)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "milestone M1 is declared 2 times") {
+		t.Fatalf("M1 and M01 must collide numerically: %v", g.Errs)
+	}
+}
+
+// An artifact that exists but cannot be read is a hard ERROR naming the
+// file, never silently treated as empty (NG-9).
+func TestUnreadableArtifactsAreHardErrors(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: chmod 000 does not deny reads")
+	}
+	t.Run("Gb BUILD.md", func(t *testing.T) {
+		design := writeBuildPlanFixture(t, goCrmStylePlan, nil)
+		path := filepath.Join(design, "BUILD.md")
+		if err := os.Chmod(path, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
+		g := CheckBuildPlan(design)
+		if !strings.Contains(strings.Join(g.Errs, "\n"), "BUILD.md is unreadable") {
+			t.Fatalf("an unreadable BUILD.md must be a hard error naming the file: %v", g.Errs)
+		}
+	})
+	t.Run("Gt committed oracle", func(t *testing.T) {
+		design, impl := writeCovFixture(t, map[string]string{
+			"machines/Thing.oracle.md": covOracleMD,
+			"impl/thing_test.go":       "package thing\n\n// THIN-aaa111 THIN-bbb222\n",
+		})
+		path := filepath.Join(design, "machines", "Thing.oracle.md")
+		if err := os.Chmod(path, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
+		g := CheckOracleCoverage(design, impl)
+		if !strings.Contains(strings.Join(g.Errs, "\n"), "Thing.oracle.md is unreadable") {
+			t.Fatalf("an unreadable oracle must be a hard error naming the file: %v", g.Errs)
+		}
+	})
 }
 
 func TestIDTokenIn(t *testing.T) {

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/RamXX/machinery/internal/version"
 )
 
 func repoRoot() string {
@@ -458,5 +460,38 @@ func TestRunEndToEnd(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "formal", OutputName)); err != nil {
 		t.Errorf("Policy.als not written: %v", err)
+	}
+}
+
+// P-F10: every generated relational artifact carries exactly one version
+// stamp line in its format's comment syntax; the gates strip it before their
+// freshness byte-diff.
+func TestGeneratedArtifactsStampGeneratorVersion(t *testing.T) {
+	dm := filepath.Join(repoRoot(), "examples/go-crm/design/domain.modelith.yaml")
+	polAls, polOracle, _, err := GenerateAll(dm, filepath.Join(repoRoot(), "examples/go-crm/design/formal/policy.relational.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	intAls, _, err := GenerateIntegrity(dm, filepath.Join(repoRoot(), "examples/go-crm/design/formal/integrity.relational.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	isoAls, isoOracle, _, err := GenerateIsolation(dm, filepath.Join(repoRoot(), "examples/go-crm/design/formal/isolation.relational.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]struct{ body, stamp string }{
+		"Policy.als":    {polAls, version.AlloyStamp()},
+		"authz oracle":  {polOracle, version.MarkdownStamp()},
+		"Integrity.als": {intAls, version.AlloyStamp()},
+		"Isolation.als": {isoAls, version.AlloyStamp()},
+		"tenant oracle": {isoOracle, version.MarkdownStamp()},
+	} {
+		if !strings.Contains(c.body, c.stamp) {
+			t.Errorf("%s carries no version stamp", name)
+		}
+		if got := strings.Count(c.body, "machinery-version:"); got != 1 {
+			t.Errorf("%s carries %d stamp lines, want exactly 1", name, got)
+		}
 	}
 }

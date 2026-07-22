@@ -1,4 +1,5 @@
 ---- MODULE DealContract ----
+\* machinery-version: v0.3.4-dev
 \* GENERATED. The abstract contract the big picture assumes of the deal
 \* aggregate: resting or busy, atomic while busy, and every busy period terminates.
 VARIABLES phase, kind

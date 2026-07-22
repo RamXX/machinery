@@ -158,24 +158,49 @@ type preSpecific struct {
 	PermissionDecisionReason string `json:"permissionDecisionReason"`
 }
 
+// conventionalMarker is the fallback governance marker: with no ConfigName
+// present, its existence alone is what keeps the hooks armed.
+const conventionalMarker = "design/domain.modelith.yaml"
+
 func pre(w io.Writer, root string, cfg Config, in Input) error {
 	if !fileTools[in.ToolName] {
 		return nil
+	}
+	deny := func(reason string) error {
+		return emitJSON(w, preOut{HookSpecificOutput: preSpecific{
+			HookEventName:            "PreToolUse",
+			PermissionDecision:       "deny",
+			PermissionDecisionReason: reason,
+		}})
+	}
+	// governance must not be switchable from inside a session (GATE-10):
+	// a Write of {"hooks": false} to the config, or an apply_patch DELETE of
+	// either marker, turns every hook off. Editing the domain model itself
+	// stays allowed: design/domain.modelith.yaml is the Phase 1 source, and
+	// only its deletion (which disarms detection) is denied. The Bash
+	// escape hatch remains a documented residual.
+	for _, deleted := range deletedPaths(in) {
+		rel := relToRoot(root, deleted)
+		if rel == ConfigName || rel == conventionalMarker {
+			return deny("deleting " + rel + " switches machinery governance off for this repository. " +
+				"If governance must be disabled, a human sets {\"hooks\": false} in " + ConfigName + ".")
+		}
 	}
 	for _, edited := range editedPaths(in) {
 		rel := relToRoot(root, edited)
 		if rel == "" {
 			continue
 		}
+		if rel == ConfigName {
+			return deny(rel + " is the machinery governance configuration; an agent edit here can switch " +
+				"governance off ({\"hooks\": false}) or silently reroute the gates. A human maintains this file " +
+				"(or 'machinery init' regenerates it).")
+		}
 		reason := generatedReason(designRel(cfg), rel)
 		if reason == "" {
 			continue
 		}
-		return emitJSON(w, preOut{HookSpecificOutput: preSpecific{
-			HookEventName:            "PreToolUse",
-			PermissionDecision:       "deny",
-			PermissionDecisionReason: reason,
-		}})
+		return deny(reason)
 	}
 	return nil
 }
@@ -388,7 +413,7 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 // the whole check for a config gap, but the drop has to stay visible.
 func selectGates(designDir string, cfg Config) (gates.Selection, string) {
 	if cfg.Gates != "" {
-		if sel, err := gates.Select(designDir, cfg.Gates); err == nil {
+		if sel, err := gates.Select(designDir, cfg.Gates, cfg.Impl); err == nil {
 			warn := ""
 			if cfg.Impl == "" {
 				var dropped []string
@@ -425,14 +450,19 @@ func selectGates(designDir string, cfg Config) (gates.Selection, string) {
 	if fileExists(filepath.Join(designDir, "workspace.dsl")) || fileExists(filepath.Join(designDir, "ARCHITECTURE.md")) {
 		run["g2"] = true
 	}
-	machines, _ := filepath.Glob(filepath.Join(designDir, "machines", "*.machine.json"))
-	if len(machines) > 0 {
+	// machine detection never uses filepath.Glob: a project path carrying
+	// glob metacharacters ([ ] * ?) once defeated it, silently dropping g3
+	// and letting committed-oracle DRIFT pass at stop time (GATE-3)
+	hasMachines := gates.HasMachines(designDir)
+	if hasMachines {
 		run["g3"] = true
 	}
-	if fileExists(filepath.Join(designDir, "BUILD.md")) && (len(machines) > 0 || !pack.HasDecomposition(designDir)) {
-		// a machine-less decomposed parent has no behavior layer of its own
-		// (the children carry G3/Gx); running Gx against its BUILD.md would
-		// fail it for phases that live in the child designs
+	if hasMachines && gates.HasModelith(designDir) {
+		// Gx activates on its sources (model + machines), NOT on BUILD.md:
+		// waiting for Phase 4 left a window where phase-3 Gx DRIFT (a stale
+		// maps-to reference) escaped the drift-blocking contract (GATE-6).
+		// A machine-less decomposed parent still skips it: the children
+		// carry G3/Gx.
 		run["gx"] = true
 	}
 	if fileExists(filepath.Join(designDir, "BUILD.md")) {
@@ -548,6 +578,27 @@ func clearState(root, sessionID string) { _ = os.Remove(statePath(root, sessionI
 
 var patchPathLine = regexp.MustCompile(`(?m)^\*\*\* (?:Add|Update|Delete) File: (.+)$`)
 var patchMoveLine = regexp.MustCompile(`(?m)^\*\*\* Move to: (.+)$`)
+var patchDeleteLine = regexp.MustCompile(`(?m)^\*\*\* Delete File: (.+)$`)
+
+// deletedPaths returns the paths an apply_patch-style tool input deletes.
+// Claude's file tools (Write/Edit) never delete, so only the patch protocols
+// contribute here.
+func deletedPaths(in Input) []string {
+	patchText := in.ToolInput.Command
+	if patchText == "" {
+		patchText = in.ToolInput.Patch
+	}
+	if patchText == "" {
+		return nil
+	}
+	var paths []string
+	for _, match := range patchDeleteLine.FindAllStringSubmatch(patchText, -1) {
+		if p := strings.TrimSpace(match[1]); p != "" {
+			paths = append(paths, p)
+		}
+	}
+	return paths
+}
 
 // editedPaths normalizes the two supported hook protocols. Claude file tools
 // provide file_path/notebook_path. Codex apply_patch provides the complete

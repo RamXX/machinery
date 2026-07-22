@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/RamXX/machinery/internal/alloy"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // HasIsolationAnnotation reports whether the design opted into the isolation
@@ -52,10 +53,14 @@ func CheckIsolation(design string) *Gate {
 	fresh := func(name, want, label string) {
 		committed := filepath.Join(design, "formal", name)
 		raw, rerr := os.ReadFile(committed)
+		if rerr == nil {
+			g.recordStamp(string(raw))
+		}
 		switch {
 		case rerr != nil:
 			g.Drift = append(g.Drift, fmt.Sprintf("formal/%s is not committed; the annotation compiles but the %s was never generated. Run 'machinery alloy %s' and commit the output.", name, label, design))
-		case string(raw) != want:
+		case version.Strip(string(raw)) != version.Strip(want):
+			// version stamps stripped from both sides: skew is a note, not DRIFT
 			g.Drift = append(g.Drift, fmt.Sprintf("formal/%s is stale: it does not match a fresh generation from the domain model + annotation. Run 'machinery alloy %s' and commit the regenerated file; never hand-edit it.", name, design))
 		default:
 			g.Count("committed artifacts fresh (byte-identical)")

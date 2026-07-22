@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // ExitError carries a hard-error message that maps to Python's sys.exit(msg).
@@ -267,10 +268,18 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	for _, s := range states {
 		if _, ok := rcOf[s.Name]; ok {
 			// a retry-shaped state's transitions are generated from its loop
-			// shape below; extra on: handlers would be silently dropped from
-			// the model, so they are an unsupported shape, not a skip
-			if onV := s.Node.AsObject().Get2("on"); onV.AsObject().Len() > 0 {
+			// shape below; any other transition source would be silently
+			// dropped from the model, so each is an unsupported shape, not a
+			// skip: on: handlers, invoke onDone/onError, and state-level onDone
+			so := s.Node.AsObject()
+			if onV := so.Get2("on"); onV.AsObject().Len() > 0 {
 				die("tla_gen: %s: retry state %s declares on: handlers, which rung 3 would silently drop; route the events through a non-retry state or extend the generator", mid, s.Name)
+			}
+			if so.Get2("invoke") != nil {
+				die("tla_gen: %s: retry state %s declares an invoke, whose onDone/onError transitions rung 3 would silently drop; route the completion through a non-retry state or extend the generator", mid, s.Name)
+			}
+			if so.Get2("onDone") != nil {
+				die("tla_gen: %s: retry state %s declares a state-level onDone, which rung 3 would silently drop; route it through a non-retry state or extend the generator", mid, s.Name)
 			}
 			continue
 		}
@@ -377,6 +386,15 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	lines = append(lines, "\\*   4. Context data, event payloads, action effects, and real time (the")
 	lines = append(lines, "\\*      _delays values) are not modeled at this rung; the data-refined rung")
 	lines = append(lines, "\\*      (refine_gen) and the implementation tests carry those.")
+	if len(counters) > 0 {
+		lines = append(lines, "\\*   5. Retry counters (rc*) reset to 0 on every transition that leaves from")
+		lines = append(lines, "\\*      or lands on a domain state; a counter surviving a domain hop is not")
+		lines = append(lines, "\\*      representable at this rung.")
+		lines = append(lines, "\\*   6. Retry-shaped states (fully guarded always + after) are modeled as the")
+		lines = append(lines, "\\*      concrete bounded loop: the guarded always list is replaced by the")
+		lines = append(lines, "\\*      exhaustion test rc >= MaxRetries and the after timer by the retry step")
+		lines = append(lines, "\\*      rc < MaxRetries; the guards themselves are erased (see 1).")
+	}
 	lines = append(lines, "CONSTANT MaxRetries")
 	lines = append(lines, fmt.Sprintf("VARIABLES %s", varlist))
 	lines = append(lines, fmt.Sprintf("vars == << %s >>", varlist))
@@ -451,22 +469,33 @@ func setOf(xs []string) map[string]bool {
 
 // Run is the `machinery tla <machine.json> [out-dir]` entrypoint.
 func Run(path, outdir string) error {
+	_, err := RunWritten(path, outdir)
+	return err
+}
+
+// RunWritten is Run, reporting the basenames of the files it wrote so callers
+// (verify-formal) can distinguish freshly generated pairs from committed
+// orphans.
+func RunWritten(path, outdir string) ([]string, error) {
 	mid, tla, cfg, err := Generate(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if outdir == "" {
 		outdir = filepath.Dir(path)
 	}
 	if mkErr := os.MkdirAll(outdir, 0755); mkErr != nil {
-		return mkErr
+		return nil, mkErr
 	}
-	if wErr := os.WriteFile(filepath.Join(outdir, mid+".tla"), []byte(tla), 0644); wErr != nil {
-		return wErr
+	// Stamp at write time, not in Generate: the pack generator embeds
+	// Generate's output in hash-covered pack files, where a version stamp
+	// would churn the content hash on every release (P-F10).
+	if wErr := os.WriteFile(filepath.Join(outdir, mid+".tla"), []byte(version.StampTLAModule(tla)), 0644); wErr != nil {
+		return nil, wErr
 	}
-	if wErr := os.WriteFile(filepath.Join(outdir, mid+".cfg"), []byte(cfg), 0644); wErr != nil {
-		return wErr
+	if wErr := os.WriteFile(filepath.Join(outdir, mid+".cfg"), []byte(version.StampCfg(cfg)), 0644); wErr != nil {
+		return nil, wErr
 	}
 	fmt.Fprintf(os.Stdout, "wrote %s.tla and %s.cfg to %s\n", mid, mid, outdir)
-	return nil
+	return []string{mid + ".tla", mid + ".cfg"}, nil
 }

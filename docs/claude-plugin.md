@@ -58,24 +58,36 @@ exits 0: governance degrades loudly to absent, it never breaks a session.
 | Event | Behavior |
 |---|---|
 | SessionStart | Injects the governance contract into context: design dir, staged gates, the read-only artifact list, and `design/STATE.md` (the session ledger) when present. Every session in the repo knows the rules, whether or not the skill ever triggers. |
-| PreToolUse | Denies Edit/Write/MultiEdit/NotebookEdit on generated artifacts: `<design>/**/*.oracle.md`, `<design>/formal/*.tla`, `*.cfg` and `*.als`, `<design>/packs/**` (generated packs), `<design>/pack/**` (the frozen pack a child was built against), `<design>/ratchet.json` (the baseline snapshot). The refusal names the regeneration command. |
+| PreToolUse | Denies Edit/Write/MultiEdit/NotebookEdit on generated artifacts: `<design>/**/*.oracle.md`, `<design>/formal/*.tla`, `*.cfg` and `*.als`, `<design>/packs/**` (generated packs), `<design>/pack/**` (the frozen pack a child was built against), `<design>/ratchet.json` (the baseline snapshot), and `.machinery.json` itself (an agent edit there could switch governance off or reroute the gates; a human maintains it). The refusal names the regeneration command. |
 | PostToolUse | Silently records that the session touched the design (or watched sources, when `impl` is configured). No gates run mid-edit; authoring stays fluid. |
 | Stop / SubagentStop | If the session touched anything watched, runs `machinery check` (in-process; same suite semantics as the CLI). DRIFT findings block the stop with the gate output as the reason; the model fixes and the check re-runs. G4 import-boundary findings block only when they are ARMED: `<design>/ratchet.json` exists, written by `machinery baseline`. Before that snapshot exists, import findings warn with the arming instruction instead of blocking, because blocking a session on pre-existing boundary debt it did not create invites the model to "fix" the debt by adding allow rules, which is silent amnesty. Plain ERRORs only warn, because a half-built design is a normal interrogation state. After one blocked-and-continued attempt, the hook warns instead of blocking again, so it can never loop. |
 
 Gate selection at stop time is progressive when no staged list is configured: Gm once
 `migration.yaml` exists (rebuild/hybrid transition contract; see the
-[rebuild guide](rebuild-guide.md)); Gp / Gi / Gn once the
+[rebuild guide](rebuild-guide.md)); Gs once `legacy/surface.yaml` exists (the surface ledger; see
+the [surface ledger guide](surface-ledger.md)); Gp / Gi / Gn once the
 matching `formal/{policy,integrity,isolation}.relational.yaml` exists (the relational layers; see the
 [policy](policy-layer.md), [integrity](integrity-layer.md), and [isolation](isolation-layer.md)
 guides), G2 once `workspace.dsl` or `ARCHITECTURE.md` exists, G3
-once `machines/*.machine.json` exist, Gx and Gb once `BUILD.md` exists, G5 on decomposed designs,
-G4 and Gt only
+once `machines/*.machine.json` exist, Gx once the domain model and machines both exist, Gb once
+`BUILD.md` exists, G5 on decomposed designs, G4 and Gt only
 when `impl` is configured. A phase you have
 not reached is not demanded of you; a phase you have reached is held.
 
+One narrowing difference from the CLI, stated plainly: on a machine-less decomposed parent,
+`machinery check`'s default selection skips Gt with a note ("gt skipped: no machines"), while the
+hook, whenever `impl` is configured, still runs Gt; with zero machines it has nothing to hold and
+reports vacuously green ("0 machines" on its checked line). Same fact, two renderings: the CLI
+names the skip, the hook shows the empty count; neither run hides it.
+
 What the hooks deliberately do not do: they cannot make the interrogation good, they do not check
 guard semantics, and a `sed` through the Bash tool can still touch an oracle; that lands as DRIFT
-at the next stop. Users can disable hooks; the consuming repo's CI `machinery check` remains the
+at the next stop. The PreToolUse wall guards the FILE tools only: Bash can still bypass it
+entirely, for example `rm .machinery.json` (governance off) or a `machinery baseline` rerun that
+accepts current debt. Oracle tampering through Bash surfaces as DRIFT at the next stop;
+config removal and baseline reruns do not, so those two stay review items (watch `.machinery.json`
+and `ratchet.json` in PR diffs). Users can disable hooks; the consuming repo's CI `machinery
+check` remains the
 non-negotiable backstop (see the [brownfield team guide](brownfield-team-guide.md)).
 
 ## `.machinery.json`

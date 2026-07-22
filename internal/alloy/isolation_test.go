@@ -30,7 +30,7 @@ func TestGenerateIsolationGoCRM(t *testing.T) {
 		"contact: lone Contact",
 		"pred sameTenant[a, b: User] { some a.team and a.team = b.team }",
 		"fact Isolation_Task_Deal_Deal {",
-		"all x: Task | some x.deal implies sameTenant[x.owner, x.deal.owner]",
+		"all x: Task | all t: x.deal | sameTenant[x.owner, t.owner]",
 		"run SomeWorld {",
 		"check SharedReferent_Task_Deal_Deal {",
 		"check SharedReferent_Activity_Contact_Contact {",
@@ -125,6 +125,58 @@ func TestIsolationSynthetic(t *testing.T) {
 	}
 	if !strings.Contains(als, "org: lone Org") {
 		t.Errorf("tenant attr not rendered:\n%s", als)
+	}
+}
+
+// FORMAL-F2: for set-valued references (1:n, n:n) the fact must quantify per
+// element (never over the owner SET, where equality collapses), and the
+// SharedReferent check must test referent OVERLAP, not whole-set equality.
+// Reproduced by the reviewer's exp-e probes: with the collapsed forms,
+// CrossTenantSharedReferent was SAT in scope 6 while the check stayed green.
+func TestIsolationSetValuedReferencePerElement(t *testing.T) {
+	domain := `
+entities:
+  Org:
+    relationships:
+      - {entity: Member, cardinality: "1:n"}
+  Member:
+    relationships:
+      - {entity: Org, cardinality: "n:1"}
+  Deal:
+    relationships:
+      - {entity: Member, cardinality: "n:1"}
+      - {entity: Contact, cardinality: "n:n"}
+    invariants:
+      - {id: deal-contact-tenant, statement: s}
+  Contact:
+    relationships:
+      - {entity: Member, cardinality: "n:1"}
+`
+	annotation := `
+tenant:
+  entity: Org
+subject:
+  entity: Member
+  tenant_attr: org
+  membership: lone
+references:
+  - {from: Deal, to: Contact, field: contacts, invariant: deal-contact-tenant}
+`
+	als, _, _, err := genIso(t, domain, annotation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(als, "all x: Deal | all t: x.contacts | sameTenant[x.owner, t.owner]") {
+		t.Errorf("set-valued isolation fact is not per element:\n%s", als)
+	}
+	if strings.Contains(als, "x.contacts.owner") {
+		t.Errorf("isolation fact still collapses tenant equality over the owner set:\n%s", als)
+	}
+	if !strings.Contains(als, "some (x.contacts & y.contacts) implies sameTenant[x.owner, y.owner]") {
+		t.Errorf("SharedReferent check does not test overlap:\n%s", als)
+	}
+	if strings.Contains(als, "x.contacts = y.contacts") {
+		t.Errorf("SharedReferent check still tests whole-set equality:\n%s", als)
 	}
 }
 

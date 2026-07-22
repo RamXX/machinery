@@ -55,6 +55,11 @@ One line per subcommand:
 - `machinery pack refine <child-design>` reconciles the child's `packmap.yaml` against the pack's
   contract machine and the child's exposed machine, then generates the pack-refinement proof that
   `verify-formal` TLC-checks. Reconciliation failure is a hard error.
+- `machinery baseline <design> --impl <dir>` scans the implementation exactly as G4-import does,
+  prints the `baseline:` rules that would tolerate today's violating edges (paste into the
+  contract's `dependency_rules` after review), suggests `ignore:` globs, and writes
+  `design/ratchet.json`, the snapshot G4 ratchets baselined edges against. `--date` overrides the
+  snapshot and rule-comment stamp (default: current YYYY-MM).
 - `machinery scale <design>` measures a design's size (stateful components, bounded contexts,
   synthesis input) and recommends sharding or recursive decomposition.
 - `machinery verify-formal <design-dir>` regenerates the tla/refine/compose specs into
@@ -64,7 +69,13 @@ One line per subcommand:
   Java-free environments such as a nightly regen gate.
 - `machinery doctor` checks dependencies and install status.
 - `machinery preflight` the same check, for use before a design session.
+- `machinery install` / `machinery uninstall` place or remove the skill and role docs in the agent
+  homes (`--target claude|codex|opencode|all` for native host adapters).
+- `machinery update [--version <tag>]` checksum-verifies and force-refreshes the binary plus every
+  recorded agent harness from one release.
 - `machinery version` prints the build version.
+
+(`machinery help` and `machinery completion` are the standard cobra built-ins.)
 
 The binary is the whole generation and deterministic-gate toolchain: no interpreter or runtime
 dependencies. Java 11+ is needed only for solver execution by `verify-formal` (TLC and, when a
@@ -81,8 +92,9 @@ relational annotation exists, Alloy) and the TLC shell wrappers.
 
 ## The formal suite
 
-`make verify-formal` runs the full ladder across the example designs: 26 TLA+ proofs, all green
-(8 in `examples/go-crm`, 8 in `examples/fulfillment`, 6 in `examples/portfolio-engine`, and 4 in
+`make verify-formal` runs the full ladder across the six example designs: 34 TLA+ proofs, all green
+(8 in `examples/go-crm`, 8 in `examples/surreal-crm`, 8 in `examples/fulfillment`, 6 in
+`examples/portfolio-engine`, and 4 in
 `examples/checkout-split`, two per child incl. the contract-refinement proofs), regenerated
 from source on every run. The `*.semantics.yaml` and `*.composition.yaml` annotations are trust
 points, so they are reconciled against the machine before anything is emitted: a design change that

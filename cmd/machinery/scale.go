@@ -36,6 +36,13 @@ func newScaleCmd() *cobra.Command {
 			exitFunc(1)
 			return nil
 		}
+		// refuse to measure a directory that is not a design: an empty dir
+		// once produced a confident "single-run design" recommendation
+		if !pack.LooksLikeDesignDir(design) {
+			fmt.Fprintf(stderrW, "scale: %s contains no *.modelith.yaml, no machines/, and no decomposition.yaml; not a machinery design directory, nothing to measure\n", design)
+			exitFunc(1)
+			return nil
+		}
 		out := stdoutW
 		fmt.Fprintln(out, "== scale  design size and decomposition signals ==")
 

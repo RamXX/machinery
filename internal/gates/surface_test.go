@@ -105,7 +105,7 @@ func TestCheckSurfaceClean(t *testing.T) {
 			t.Errorf("Gs counted %s=%d, want %d: %+v", count, g.Counts[count], n, g.Counts)
 		}
 	}
-	sel, err := Select(design, "")
+	sel, err := Select(design, "", "")
 	if err != nil || !sel.Run["gs"] {
 		t.Fatalf("default gate selection omitted gs: sel=%+v err=%v", sel, err)
 	}
@@ -116,6 +116,34 @@ func TestCheckSurfaceClean(t *testing.T) {
 	if !found {
 		t.Error("RunSelected skipped an authored surface ledger")
 	}
+}
+
+// as_of is the optional revision/date anchor of the ledger (P-F3): accepted
+// by the strict-key schema, surfaced on the checked line, and validated as a
+// non-empty string when present.
+func TestCheckSurfaceAsOfAnchor(t *testing.T) {
+	t.Run("accepted and surfaced", func(t *testing.T) {
+		design := writeSurfaceFixture(t, "as_of: legacy@a1b2c3 (2026-06-30)\n"+surfaceLedger)
+		g := CheckSurface(design)
+		if len(g.Errs) != 0 {
+			t.Fatalf("as_of is a legal root key: %v", g.Errs)
+		}
+		if !strings.Contains(strings.Join(g.checkedExtra, ", "), "as_of legacy@a1b2c3 (2026-06-30)") {
+			t.Errorf("as_of must appear on the checked line: %v", g.checkedExtra)
+		}
+	})
+	t.Run("absent stays silent", func(t *testing.T) {
+		g := CheckSurface(writeSurfaceFixture(t, surfaceLedger))
+		if strings.Contains(strings.Join(g.checkedExtra, ", "), "as_of") {
+			t.Errorf("no as_of, no checked-line segment: %v", g.checkedExtra)
+		}
+	})
+	t.Run("non-string errors", func(t *testing.T) {
+		g := CheckSurface(writeSurfaceFixture(t, "as_of: 20260630\n"+surfaceLedger))
+		if !strings.Contains(strings.Join(g.Errs, "\n"), "as_of must be a non-empty string") {
+			t.Fatalf("a non-string as_of must error: %v", g.Errs)
+		}
+	})
 }
 
 func TestCheckSurfaceMutations(t *testing.T) {
@@ -182,7 +210,7 @@ classes:
 
 func TestExplicitSurfaceGateRequiresLedger(t *testing.T) {
 	design := t.TempDir()
-	sel, err := Select(design, "gs")
+	sel, err := Select(design, "gs", "")
 	if err != nil {
 		t.Fatal(err)
 	}

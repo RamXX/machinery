@@ -1,11 +1,21 @@
 # BUILD: Drawdown Portfolio Recommender
 
-Mode: full (self-contained).
+Mode: manifest (root of a sharded design; shards in design/BUILD/<Component>.md).
 
-A coding agent with no prior context can implement this system from this document under hard TDD.
-It inlines every term, invariant, and contract it uses and references the `design/` files for full
-source. The machine JSON (section 5) and the transition tables (section 7) are referenced, never
-pasted; those files are what the gates check.
+This root is the entry-point manifest over `design/` and the shards under `design/BUILD/`. It
+carries what every shard shares: the glossary, the domain model, the Architecture Contract, the
+traceability matrix, the cross-context test spec, the shared toolchain and pins, the
+state-migration protocol, and the milestone map. Each shard carries the behavior, the test
+specification, and the build plan for one stateful component:
+
+- `BUILD/RecommendationRun.md` (the run pipeline, plus the optimizer and reference-data logic it
+  drives)
+- `BUILD/Portfolio.md` (the review lifecycle and its commit overlay)
+- `BUILD/MarketDataFeed.md` (the circuit breaker)
+
+The zero-context claim applies to the design tree as a whole; self-containment applies per shard.
+The machine JSON and the transition tables are referenced, never pasted; those files are what the
+deterministic gates check.
 
 ## 1. Purpose and scope
 
@@ -167,44 +177,31 @@ denies are overridden only by the feed and repo allows.
 ### Interface contracts, event-contract, persistence and placement, NFR record
 
 See `design/ARCHITECTURE.md` sections 6-10. Summary: interface contracts pin request/response shape,
-enumerated errors, and idempotency for each boundary (these are the `onError` branches in section 5).
-The event-contract table is N/A (one synchronous process per command; no bus). Persistence: Portfolio
-is a versioned row under an optimistic lock (two managers may review at once), realized with the
-commit overlay; RecommendationRun is single-writer (no lock overlay); the optimizer is a pure
-transform; Index/Security/CandidateSet/Holding are versioned rows without a lifecycle machine. NFR:
-role-based authz for portfolio decisions; market-data key from env, never logged; store file 0600;
-thousands of securities not millions; correctness over speed; residual failures print a loud, distinct
-message with a distinct exit code.
+enumerated errors, and idempotency for each boundary (these are the `onError` branches in the shard
+behavior sections). The event-contract table is N/A (one synchronous process per command; no bus).
+Persistence: Portfolio is a versioned row under an optimistic lock (two managers may review at once),
+realized with the commit overlay; RecommendationRun is single-writer (no lock overlay); the optimizer
+is a pure transform; Index/Security/CandidateSet/Holding are versioned rows without a lifecycle
+machine. NFR: role-based authz for portfolio decisions; market-data key from env, never logged; store
+file 0600; thousands of securities not millions; correctness over speed; residual failures print a
+loud, distinct message with a distinct exit code.
 
-## 5. Behavior: the state machines (the logic)
+## 5. Behavior: the component shards
 
-Three machines. The JSON files are the source; do not paste them.
+Three machines, one shard each. The JSON files are the source; neither this root nor any shard
+pastes them. Each shard carries its component's lifecycle narration, named-unit contract references,
+test specification (oracle rows by stable id, guard-branch completeness, named-unit plan), and
+build-plan milestones.
 
-### RecommendationRun (`design/machines/RecommendationRun.machine.json`)
+| component | machine (source) | oracle (generated) | matrix | shard |
+|---|---|---|---|---|
+| RecommendationRun | `machines/RecommendationRun.machine.json` | `machines/RecommendationRun.oracle.md` (8 rows) | `machines/RecommendationRun.matrix.md` | `BUILD/RecommendationRun.md` |
+| Portfolio | `machines/Portfolio.machine.json` | `machines/Portfolio.oracle.md` (19 rows) | `machines/Portfolio.matrix.md` | `BUILD/Portfolio.md` |
+| MarketDataFeed | `machines/MarketDataFeed.machine.json` | `machines/MarketDataFeed.oracle.md` (6 rows) | `machines/MarketDataFeed.matrix.md` | `BUILD/MarketDataFeed.md` |
 
-A forward pipeline: Collecting invokes the price fetch (through the feed breaker); on success it moves
-to Optimizing, which invokes the optimizer; success records the portfolio and reaches Ready. A fetch
-failure or timeout retries a bounded number of times (collectRetry) then fails; an optimizer failure
-or timeout fails directly. Ready and Failed are terminal. Single writer, so no persist overlay on the
-run. Named-unit contracts and failure catalog: `design/machines/RecommendationRun.matrix.md`
-(1 guard, 4 actions, 2 actors). The `fetchPrices` and `optimize` actors are integration/side-effect
-contracts, not derivable from transition tests.
-
-### Portfolio (`design/machines/Portfolio.machine.json`)
-
-A review lifecycle: Proposed advances to UnderReview, then a Manager or Admin accepts or rejects it; a
-decided portfolio may be reopened to UnderReview. Every state change is written through the commit
-overlay (committing invokes the versioned write; a retriable conflict retries with backoff up to
-MaxRetries via commitRetry, then rolls back to the prior stage via reverted). Accepting records
-acceptedAt. Named-unit contracts and failure catalog: `design/machines/Portfolio.matrix.md`
-(11 guards, 7 actions, 1 actor). `canDecide` enforces `portfolio-accept-role`; `canReopen` enforces
-`portfolio-reopen-role`; `recordAccepted` enforces `portfolio-accepted-has-date`.
-
-### MarketDataFeed (`design/machines/MarketDataFeed.machine.json`, `_role: operational`)
-
-A circuit breaker over the provider: closed (calls flow, failures counted), open (calls fast-fail
-after a threshold trip), halfOpen (one trial probe recloses or reopens). Enforces `feed-circuit-breaks`.
-Named-unit contracts: `design/machines/MarketDataFeed.matrix.md` (2 guards, 3 actions, no actors).
+Pure logic with no machine: the optimizer (a pure transform under a contract spec) and the
+reference-data builds (Index refresh, Security upsert, CandidateSet dedup). Their plan and tests
+live in the RecommendationRun shard, because the run pipeline is what invokes them.
 
 ## 6. Traceability matrix
 
@@ -236,48 +233,36 @@ tests. Gx-trace reports the split (unit-backed vs attested).
 No invariant is left unenforced. The structural rows are made true by the optimizer contract or the
 build/upsert logic rather than a runtime guard; each is property-tested (section 7).
 
-## 7. Test specification (the hard-TDD oracle)
+## 7. Cross-context test spec
 
-The transition test spec IS the generated `design/machines/<Component>.oracle.md` files:
-`RecommendationRun.oracle.md` (8 rows), `Portfolio.oracle.md` (19 rows), `MarketDataFeed.oracle.md`
-(6 rows). Do not restate them. Tests key on the STABLE id (e.g. `PORT-d1647b`), never the row number.
+Per-component transition tests, guard-branch completeness, and named-unit plans live in the shards.
+This section fixes what crosses components: the shared test-id conventions, the contract tests at
+every boundary, and the property tests.
 
-### 7.1 Guard-branch completeness (falsifying-clause tests)
+### 7.1 Conventions
 
-The guards here are single-clause or disjunctions, not conjunctions, so there are no A-AND-B-AND-C
-falsifying triples; the falsifying tests are:
+Transition tests key on the oracle STABLE id (e.g. `PORT-d1647b`), never the row number; row numbers
+renumber when the design changes, stable ids do not. Property tests are named `PROP-<invariant-id>`,
+one per invariant in section 3. Generated tests live under `test/generated/`, apart from
+hand-written ones.
 
-- `canDecide` = (role is Manager) OR (role is Admin). Falsifying: an Analyst attempts accept or
-  reject; the guard is false and the decision does not fire (AuthzError). Covers `portfolio-accept-role`.
-- `canReopen` = (role is Manager) OR (role is Admin). Falsifying: an Analyst attempts reopen on a
-  decided portfolio; refused. Covers `portfolio-reopen-role`.
-- `atThreshold` = (failures + 1 >= threshold). One test just below the threshold stays closed
-  (`MARK-9e6205`), one at the threshold trips to open (`MARK-acc7d7`). Covers `feed-circuit-breaks`.
-- `retriesExhausted` = (retries >= MaxRetries). One test below the bound retries, one at the bound
-  routes to the failure/rollback state (RECO-61506b, PORT-cba032).
+### 7.2 Contract tests per boundary
 
-### 7.2 Named-unit test plan
+- cli->app: result and exit-code mapping.
+- app->repo: Save/Load under version guards (ConflictError on a stale version).
+- feed->mkt: error mapping and breaker behavior (breaker specifics in `BUILD/MarketDataFeed.md`).
+- app->optimizer: shape and InfeasibleError.
 
-Per the matrix files (section 5): guards and pending/prior/commit actions are unit tests over
-context; `recordAccepted` uses a fake clock; `canDecide`/`canReopen` use fake roles. The actors are
-integration tests: `persistDecision` idempotency (writes once per `(portfolioId, version)`) against a
-contract-tested DuckDB fake plus one real-store test; `fetchPrices` against a contract-tested
-market-data fake plus a breaker-open fixture; `optimize` runs the real optimizer on a fixed,
-deterministic price fixture.
+### 7.3 Property tests
 
-### 7.3 Contract tests and property tests
-
-- Contract tests per boundary (section 4): cli->app result/exit-code mapping; app->repo Save/Load
-  under version guards (ConflictError on a stale version); feed->mkt error mapping and breaker
-  behavior; app->optimizer shape and InfeasibleError.
-- Property tests, one per invariant, named `PROP-<invariant-id>` (section 6): generate random valid
-  and invalid inputs and assert the invariant holds or the operation is rejected. Notably
-  `portfolio-size-16`, `portfolio-holdings-deduped`, `portfolio-from-candidates`,
-  `holding-weight-nonneg`, and `holding-weights-sum-full` are properties of the optimizer output over
-  random candidate universes and price matrices. The machine-enforced invariants also carry formal
-  proofs: `PortfolioData.tla` (`StageForward`, `Inv_CloseDate`), `RecommendationRunData.tla`
-  (`Inv_Complete`, `Inv_TerminalAbsorbing`, `Live_Terminates`), and the control-flow
-  `Live_OverlayResolves` for each machine.
+One per invariant, named `PROP-<invariant-id>` (section 6): generate random valid and invalid
+inputs and assert the invariant holds or the operation is rejected. Notably `portfolio-size-16`,
+`portfolio-holdings-deduped`, `portfolio-from-candidates`, `holding-weight-nonneg`, and
+`holding-weights-sum-full` are properties of the optimizer output over random candidate universes
+and price matrices. The machine-enforced invariants also carry formal proofs: `PortfolioData.tla`
+(`StageForward`, `Inv_CloseDate`), `RecommendationRunData.tla` (`Inv_Complete`,
+`Inv_TerminalAbsorbing`, `Live_Terminates`), and the control-flow `Live_OverlayResolves` for each
+machine.
 
 ## 8. State migration
 
@@ -292,9 +277,20 @@ reverted for Portfolio; collectRetry for the run) are never persisted (they exis
 command's execution), so renaming them needs no migration. Regenerate the oracles after any machine
 change; the stable-id diff is the affected-test list.
 
-## 9. (folded into sections 4 and 5)
+## 9. Milestone map
 
-Architecture and behavior are in sections 4 and 5; not duplicated.
+The milestones are numbered globally (M0 to M5) and live in the shards; each shard's build plan
+carries the full milestone blocks with their DoD lines. Build them in numeric order; every milestone
+is green before the next starts.
+
+| milestone | title | shard |
+|---|---|---|
+| M0 | Walking skeleton | `BUILD/RecommendationRun.md` |
+| M1 | Run pipeline slice | `BUILD/RecommendationRun.md` |
+| M2 | Feed breaker slice | `BUILD/MarketDataFeed.md` |
+| M3 | Optimizer slice | `BUILD/RecommendationRun.md` |
+| M4 | Portfolio review slice | `BUILD/Portfolio.md` |
+| M5 | Reference-data and operations slice | `BUILD/RecommendationRun.md` |
 
 ## 10. Language realization notes
 
@@ -323,27 +319,47 @@ Target language: Python.
   `pf.optimizer`.
 - Tests: `pytest`; property tests with `hypothesis`; the transition tests read the oracle rows.
 - Lint/type: `ruff` and `mypy` (pin versions in CI).
-- Design gates (from the repo root; design in `design/`): `python3 <tools>/oracle_gen.py
-  design/machines` (regenerate + commit oracles); `python3 <tools>/machinery_check.py design --impl .`
-  (all gates once code exists; needs PyYAML); `bash <tools>/verify_formal.sh design` (regenerate +
-  TLC-check; needs Java 11+).
+- Design gates (the `machinery` binary, from the example root; design in `design/`):
+  `machinery oracle design/machines` (regenerate and commit the oracles after any machine change);
+  `machinery check design` (all design gates; add `--impl .` once code exists);
+  `machinery verify-formal design` (regenerate and TLC-check the formal suite; needs Java 11+).
 
 ## 11. Hard-TDD protocol (read before writing any code)
 
-1. A test-writer agent reads sections 6 and 7 and writes the suite from the spec, keying transition
-   tests on the oracle STABLE id (e.g. `PORT-d1647b`), plus the falsifying-clause tests (7.1), the
-   named-unit tests (7.2), and the contract and property tests (7.3).
-2. The tests are then LOCKED; the implementer may not modify them to pass.
-3. The implementer writes `pf.model`, `pf.repo`, `pf.feed`, `pf.optimizer`, `pf.domain`, `pf.app`,
-   `pf.cli` until the locked tests pass, honoring the Architecture Contract (feed is the sole importer
-   of the provider client; repo the sole importer of DuckDB; no cross-boundary edge outside `allow`).
-4. Every oracle row has a test on its stable id; every guard's falsifying case has a test (7.1); every
-   invariant in section 3 is property-tested (7.3). Coverage target: >= 80% combined; integration
-   tests use the real store, no mocks.
-5. Generated tests live apart from hand-written tests (a `test/generated/` directory), so regeneration
-   never clobbers hand-written ones.
-6. A wrong test is a design defect: fix the design and this BUILD.md, rerun `oracle_gen.py` and
-   `machinery_check.py`, and regenerate the affected tests. Do not adjust a test to pass.
+1. **RED precondition.** Run `machinery check design` and require ZERO blocking findings before
+   deriving any test. The oracles are the test spec; a red design means the spec itself cannot be
+   trusted, and tests derived from it test the wrong things with confidence. Fix the design first,
+   never the tests.
+2. **Derivation.** A test-writer agent reads section 6, section 7, and the shard test
+   specifications, and writes the full suite from the spec: transition tests keyed on the oracle
+   STABLE id (e.g. `PORT-d1647b`), the falsifying-clause tests (per shard), the named-unit tests
+   (per shard), and the contract and property tests (7.2, 7.3). A runtime that cannot spawn a
+   fresh-context test-writer runs RED then GREEN sequentially with the same single agent; the
+   derivation rule is unchanged (tests come from the spec, never from implementation intentions),
+   and the gate runs in steps 1 and 3 separate the phases in place of context isolation.
+3. **RED exit gate**, all three checks required before anything locks:
+   a. Coverage of the spec: every oracle row's stable id appears whole-token somewhere in the suite
+      (Gt-tests holds this deterministically once `--impl` points at the suite), every guard's
+      falsifying case has a test, every invariant in section 3 has its `PROP-` property test.
+   b. Architecture: `machinery check design --impl .` is green over the compile skeleton, stubs,
+      and scaffolding the tests stand on (G4-import skips test files but checks everything they
+      import), so the suite never forces the implementer to reproduce a boundary violation.
+   c. The suite RUNS and is red for the right reason: failing assertions on missing behavior, never
+      import or syntax errors inside the tests themselves.
+4. **The tests are then LOCKED.** The implementer may not modify them to pass.
+5. **The implementer** writes `pf.model`, `pf.repo`, `pf.feed`, `pf.optimizer`, `pf.domain`,
+   `pf.app`, `pf.cli` until the locked tests pass, honoring the Architecture Contract (feed is the
+   sole importer of the provider client; repo the sole importer of DuckDB; no cross-boundary edge
+   outside `allow`).
+6. **GREEN acceptance bar**, both together: the locked suite passes AND
+   `machinery check design --impl .` is green again. Code that passes the tests by crossing a
+   boundary fails the gate; code that respects the boundaries but fails a test is not done.
+   Coverage target: >= 80% combined; integration tests use the real store, no mocks.
+7. Generated tests live apart from hand-written tests (a `test/generated/` directory), so
+   regeneration never clobbers hand-written ones.
+8. A wrong test is a design defect: fix the design and this document, rerun `machinery oracle
+   design/machines` and `machinery check design`, and regenerate the affected tests (the stable-id
+   diff is the affected-test list). Do not adjust a test to pass.
 
 ## 12. Open questions and residual risks
 
@@ -361,39 +377,3 @@ Target language: Python.
 - **maxDrawdown stored in basis points as an integer** to keep the model integer-typed; if
   sub-basis-point precision is ever needed, widen the unit rather than switching to float in the
   persisted schema.
-
-## 13. Build plan
-
-**M0 - Walking skeleton (thinnest end-to-end slice through one real boundary).** `pf recommend` over a
-tiny two-index fixture with cached prices: build a `CandidateSet` (dedup), start a
-`RecommendationRun`, fetch prices through the feed (breaker closed), optimize a 16-of-N fixture,
-reach Ready with a `Portfolio`. Prove the topology, one real DuckDB write, and one real optimizer
-run. DoD: `RECO-f89da8` then `RECO-d6fcf9` pass against a real store and a forced feed failure
-drives `RECO-040944` then the bounded retry; contract tests for the crossed boundaries green; no
-cross-boundary violation (G4-import clean); the formal suite still green.
-
-**M1 - Run pipeline slice.** All RecommendationRun transitions, `run-ready-has-portfolio`,
-`run-forward-only`, `run-terminal-absorbing`, and the collectRetry bound; green before the next.
-DoD: all 8 RecommendationRun oracle rows covered, the three listed invariants property-tested, its
-contract tests green, G4-import clean, formal suite still green.
-
-**M2 - Feed breaker slice.** MarketDataFeed closed/open/halfOpen, `feed-circuit-breaks`. DoD: all 6
-MarketDataFeed oracle rows covered, `feed-circuit-breaks` property-tested, its contract tests green,
-G4-import clean, formal suite still green.
-
-**M3 - Optimizer slice.** `portfolio-size-16`, `portfolio-holdings-deduped`, `portfolio-from-candidates`,
-`portfolio-has-drawdown`, `holding-weight-nonneg`, `holding-weights-sum-full` as property tests over
-the pure optimizer. DoD: the six listed invariants property-tested over the pure optimizer, its
-contract tests green, G4-import clean, formal suite still green.
-
-**M4 - Portfolio review slice.** All Portfolio transitions, `portfolio-review-forward`,
-`portfolio-accept-role`, `portfolio-reopen-role`, `portfolio-accepted-has-date`, and the commit
-overlay under a forced version conflict. DoD: all 19 Portfolio oracle rows covered, the four listed
-invariants property-tested, the commit overlay verified under a forced version conflict, its
-contract tests green, G4-import clean, formal suite still green.
-
-**M5 - Reference-data and operations slice.** Index refresh (`index-top-30`), Security upsert
-(`ticker-unique`), CandidateSet build (`candidate-deduped`, `candidate-from-top-30`), then `backup`/
-`restore` and the corruption abort path. DoD: the listed invariants property-tested, a backup then
-restore round trip green, the corruption abort loud, its contract tests green, G4-import clean,
-formal suite still green.

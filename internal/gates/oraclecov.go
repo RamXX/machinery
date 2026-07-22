@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -97,7 +98,7 @@ func CheckOracleCoverage(design, impl string) *Gate {
 	if testFiles == 0 && len(oraclePaths)+len(formalPaths) > 0 {
 		// one loud error instead of per-machine missing-id errors whose
 		// remedy ("key the tests on the ids") is impossible without tests
-		g.Errs = append(g.Errs, fmt.Sprintf("no test files under %s; Gt has nothing to hold to the oracles (recognized test files: %s, any .rs under a tests/ directory, or a .rs file containing #[cfg(test)])", impl, strings.Join(testFilePatterns, ", ")))
+		g.Errs = append(g.Errs, fmt.Sprintf("no test files under %s; Gt has nothing to hold to the oracles (recognized test files: %s, any .rs under a tests/ or benches/ directory, or the #[cfg(test)] modules of any .rs file)", impl, strings.Join(testFilePatterns, ", ")))
 	}
 	for _, path := range oraclePaths {
 		g.Count("machines")
@@ -105,7 +106,7 @@ func CheckOracleCoverage(design, impl string) *Gate {
 			continue // the single no-test-files error above already blocks
 		}
 		base := filepath.Base(path)
-		wholesale, _ := coverOracle(g, base, base, readOrEmpty(path), corpus)
+		wholesale, _ := coverOracle(g, base, base, readFileOrErr(path, g), corpus)
 		if wholesale {
 			g.Count("machines covered by conformance parse")
 		}
@@ -116,7 +117,7 @@ func CheckOracleCoverage(design, impl string) *Gate {
 			continue // covered by the single no-test-files error
 		}
 		name := filepath.Base(path)
-		if _, covered := coverOracle(g, "formal/"+name, name, readOrEmpty(path), corpus); covered {
+		if _, covered := coverOracle(g, "formal/"+name, name, readFileOrErr(path, g), corpus); covered {
 			g.Count("formal oracles covered")
 		}
 	}
@@ -124,12 +125,12 @@ func CheckOracleCoverage(design, impl string) *Gate {
 }
 
 // coverOracle checks one committed oracle against the test corpus: covered
-// wholesale when some test file names the oracle file (the test then reads
-// the committed table at runtime and covers every row by construction),
-// otherwise row by row on the stable-id column with the whole-token id
-// semantics. Returns whether the wholesale idiom applied and whether the
-// oracle ended fully covered.
-func coverOracle(g *Gate, label, base, text, corpus string) (wholesale, covered bool) {
+// wholesale when some test file earns the conformance-parse citation (see
+// fileNameCited: the test then reads the committed table at runtime and
+// covers every row by construction), otherwise row by row on the stable-id
+// column with the whole-token id semantics. Returns whether the wholesale
+// idiom applied and whether the oracle ended fully covered.
+func coverOracle(g *Gate, label, base, text string, corpus testCorpusData) (wholesale, covered bool) {
 	_, stableIDs := oracleTableIDs(text)
 	g.Count("oracle rows", len(stableIDs))
 	if len(stableIDs) == 0 {
@@ -141,7 +142,7 @@ func coverOracle(g *Gate, label, base, text, corpus string) (wholesale, covered 
 	}
 	var missing []string
 	for _, id := range stableIDs {
-		if idTokenIn(id, corpus) {
+		if idTokenIn(id, corpus.joined) {
 			g.Count("ids covered by literal")
 		} else {
 			missing = append(missing, id)
@@ -158,12 +159,27 @@ func coverOracle(g *Gate, label, base, text, corpus string) (wholesale, covered 
 	return false, true
 }
 
+// testCorpusData is the scanned test suite: per-file texts (the wholesale
+// citation is judged per file) plus the joined text for whole-token id
+// lookups.
+type testCorpusData struct {
+	files  []corpusFile
+	joined string
+}
+
+type corpusFile struct {
+	rel  string
+	text string
+}
+
 // testCorpus gathers the impl's test files, classified per language exactly
 // as G4 classifies them to SKIP (one classifier, two gates), and honors the
 // contract's ignore globs the same way G4 does when the contract loads; a
 // missing or broken contract just means no ignore filtering here, because
-// contract findings belong to G2/G4, not Gt.
-func testCorpus(design, impl string, g *Gate) string {
+// contract findings belong to G2/G4, not Gt. A production .rs file
+// contributes ONLY its #[cfg(test)] spans: its production text (transition
+// tables, constants) proves nothing about the tests (NG-7).
+func testCorpus(design, impl string, g *Gate) testCorpusData {
 	var ignore []string
 	if c := loadContract(filepath.Join(design, "ARCHITECTURE.md"), NewGate("_")); c != nil {
 		for _, ig := range objSlice(c.AsObject().Get2("ignore")) {
@@ -175,6 +191,7 @@ func testCorpus(design, impl string, g *Gate) string {
 		g.Errs = append(g.Errs, "walking "+impl+": "+walkErr.Error())
 	}
 	sort.Strings(files)
+	var corpus testCorpusData
 	var texts []string
 	for _, path := range files {
 		rel, _ := filepath.Rel(impl, path)
@@ -188,36 +205,110 @@ func testCorpus(design, impl string, g *Gate) string {
 		if ignored {
 			continue
 		}
-		text := readOrEmpty(path)
-		if !isTestFile(rel) && !isTestContent(rel, text) {
+		text := readFileOrErr(path, g)
+		switch {
+		case isTestFile(rel):
+			// the whole file is test text
+		case strings.HasSuffix(rel, ".rs"):
+			_, spans := rustSplitTests(text)
+			if len(spans) == 0 {
+				continue
+			}
+			text = strings.Join(spans, "\n")
+		default:
 			continue
 		}
 		g.Count("test files scanned")
+		corpus.files = append(corpus.files, corpusFile{rel: rel, text: text})
 		texts = append(texts, text)
 	}
-	return strings.Join(texts, "\n")
+	corpus.joined = strings.Join(texts, "\n")
+	return corpus
 }
 
-// fileNameCited reports whether base ("<Component>.oracle.md") occurs in the
-// corpus as a file-name mention: the character immediately before the match
-// must not be alphanumeric (start-of-corpus, path separators, quotes, and
-// spaces all qualify), so a test naming PurchaseOrder.oracle.md never covers
-// a machine named Order.
-func fileNameCited(base, corpus string) bool {
+// fileNameCited reports whether some SINGLE test file cites base
+// ("<Component>.oracle.md") as a real conformance-parse target. Three
+// conditions, all in the same file (the Gt citation rule):
+//  1. word boundaries on BOTH sides of the file name: an adjacent
+//     [A-Za-z0-9_.-] byte disqualifies, so purchase-order.oracle.md never
+//     covers order.oracle.md and order.oracle.md.bak covers nothing;
+//  2. the mention lies inside a string literal on its line (an odd number of
+//     the same quote character ' " ` before it, that character again after
+//     it): a parser holds the path as a string, prose in a comment does not;
+//  3. the file carries parse evidence: some string literal containing the |
+//     character, the markdown table-row delimiter every conformance parser
+//     splits on (go-crm's oracle_test.go and tenant_oracle_test.go satisfy
+//     this via their row-splitting literals; a bare comment cannot).
+func fileNameCited(base string, corpus testCorpusData) bool {
+	for _, f := range corpus.files {
+		if fileNameMentionedInString(base, f.text) && hasParseEvidence(f.text) {
+			return true
+		}
+	}
+	return false
+}
+
+// fileNameMentionedInString finds a whole-token, string-literal mention of
+// base in text (conditions 1 and 2 of the citation rule).
+func fileNameMentionedInString(base, text string) bool {
 	idx := 0
 	for {
-		i := strings.Index(corpus[idx:], base)
+		i := strings.Index(text[idx:], base)
 		if i < 0 {
 			return false
 		}
 		pos := idx + i
-		if pos == 0 || !isAlphaNum(corpus[pos-1]) {
+		idx = pos + 1
+		if pos > 0 && isFileNameChar(text[pos-1]) {
+			continue
+		}
+		if end := pos + len(base); end < len(text) && isFileNameChar(text[end]) {
+			continue
+		}
+		if mentionInsideQuotes(text, pos, pos+len(base)) {
 			return true
 		}
-		idx = pos + 1
 	}
 }
 
-func isAlphaNum(b byte) bool {
-	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9')
+// mentionInsideQuotes reports whether text[start:end] lies inside a
+// single-line string literal: on its line, an odd number of some quote
+// character precedes start and that character appears again at or after end.
+func mentionInsideQuotes(text string, start, end int) bool {
+	ls := strings.LastIndexByte(text[:start], '\n') + 1
+	le := len(text)
+	if i := strings.IndexByte(text[end:], '\n'); i >= 0 {
+		le = end + i
+	}
+	before, after := text[ls:start], text[end:le]
+	for _, q := range []string{`"`, "'", "`"} {
+		if strings.Count(before, q)%2 == 1 && strings.Contains(after, q) {
+			return true
+		}
+	}
+	return false
+}
+
+var parseEvidenceRes = []*regexp.Regexp{
+	regexp.MustCompile(`"[^"\n]*\|[^"\n]*"`),
+	regexp.MustCompile(`'[^'\n]*\|[^'\n]*'`),
+	regexp.MustCompile("`[^`\n]*\\|[^`\n]*`"),
+}
+
+// hasParseEvidence reports whether text carries a string literal containing
+// the markdown table-row delimiter (condition 3 of the citation rule).
+func hasParseEvidence(text string) bool {
+	for _, re := range parseEvidenceRes {
+		if re.MatchString(text) {
+			return true
+		}
+	}
+	return false
+}
+
+// isFileNameChar is the boundary class of the citation rule: characters that
+// glue a mention into a longer file name.
+func isFileNameChar(b byte) bool {
+	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') ||
+		b == '_' || b == '.' || b == '-'
 }

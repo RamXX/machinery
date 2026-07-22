@@ -7,15 +7,22 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	machversion "github.com/RamXX/machinery/internal/version"
 )
 
 // version is set at link time via -ldflags "-X main.version=<release tag>" (the
 // Makefile and the release workflow both inject it). The -dev default below is
 // what a bare `go build` without ldflags reports, so an ad-hoc build is never
 // mistaken for a released binary.
-var version = "v0.3.3-dev"
+var version = "v0.3.4-dev"
 
 func main() {
+	// propagate the (possibly ldflags-injected) binary version to the
+	// generators and gates, which stamp and compare `machinery-version:`
+	// lines in committed artifacts (P-F10)
+	machversion.Version = version
+
 	root := &cobra.Command{
 		Use:           "machinery",
 		Short:         "machinery deterministic design tooling",

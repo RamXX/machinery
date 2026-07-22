@@ -692,13 +692,13 @@ func (v *migrationValidator) validateRisks() {
 }
 
 func (v *migrationValidator) validateNarrativeBridges() {
-	arch := readOrEmpty(filepath.Join(v.design, "ARCHITECTURE.md"))
+	arch := readFileOrErr(filepath.Join(v.design, "ARCHITECTURE.md"), v.g)
 	if !headingContains(arch, "transition architecture") {
 		v.errf("ARCHITECTURE.md needs a 'Transition architecture' heading describing the temporary coexistence topology and dependency failure posture")
 	} else {
 		v.g.Count("transition architecture sections")
 	}
-	build := readOrEmpty(filepath.Join(v.design, "BUILD.md"))
+	build := readFileOrErr(filepath.Join(v.design, "BUILD.md"), v.g)
 	if !headingContains(build, "migration implementation plan") {
 		v.errf("BUILD.md needs a 'Migration implementation plan' heading that turns migration.yaml into build and test work")
 	} else {

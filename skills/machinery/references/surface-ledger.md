@@ -15,11 +15,22 @@ most rows start `deferred`; the opening ledger is the interrogation's work list.
 (after Gate 4):** re-mine the legacy system against the finished design and settle every row;
 whatever the docs-first pass missed surfaces as a row that cannot be honestly disposed.
 
+**Re-sweeps (when the legacy system keeps shipping).** In a rebuild or hybrid where legacy keeps
+releasing during the build, the closing sweep is not one event: repeat it on every legacy release,
+or on a declared cadence recorded in DECISIONS.md, until cutover. Record each re-sweep in STATE.md
+(date, legacy revision swept, rows changed). The `as_of:` key anchors what the ledger was last
+swept against, so a ledger older than the legacy system it claims to cover is visible.
+
+For the `events` class, enumerate publisher-first: sweep the code for emit/publish call sites AND
+the broker or infra configuration (topic definitions, subscriptions, queue bindings); the class's
+`source:` line names both lanes, or waives one with a reason.
+
 Strict root shape (unknown keys fail):
 
 ```yaml
 surface_version: 1
 system: <one line naming the legacy system and its shape>
+as_of: <legacy commit or date the surface was enumerated against>   # optional; printed on the Gs checked line
 classes:
   routes:                            # network API surface
     source: <where the enumeration came from>

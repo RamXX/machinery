@@ -1,0 +1,56 @@
+surface_version: 1
+system: >
+  Go CRM prototype: a single-process working prototype over an embedded schema
+  (legacy/domain.modelith.yaml) that proved the CRM workflow but is not suitable as the
+  production foundation.
+as_of: 2026-07-22, enumerated from the committed legacy model and the migration.yaml inventory (retrofit; the prototype binary is not in this repo)
+_comment: >
+  Retrofit ledger, authored 2026-07-22: the rebuild's design run predates the surface-ledger
+  discipline, so this enumeration is derived from the two committed legacy sources rather
+  than from a running prototype: legacy/domain.modelith.yaml (entities, states, and the
+  'Prototype sales workflow' scenario) and migration.yaml (assets, data_mappings, and
+  state_mappings; every mapped attribute or state names the prototype operation or table
+  that produces it). Every disposition below is consistent with the migration.yaml
+  mappings: mapped capabilities are covered by their mapping's target, and the one dropped
+  item carries migration.yaml's own retirement rationale.
+classes:
+  routes:
+    none: The prototype is a local single-process tool with no network API; migration.yaml names no route, endpoint, or server asset.
+  commands:
+    source: legacy/domain.modelith.yaml scenario 'Prototype sales workflow' plus the operations implied by migration.yaml data_mappings and state_mappings (each mapped attribute or state names the prototype operation that writes it)
+    items:
+      - {name: create prototype user, disposition: covered, via: action, target: User.register}
+      - {name: sign in, disposition: covered, via: action, target: User.login}
+      - {name: assign prototype role (Admin/Sales), disposition: covered, via: action, target: User.assignRole}
+      - {name: block a user (Enabled to Blocked), disposition: covered, via: action, target: User.disable}
+      - {name: re-enable a blocked user, disposition: covered, via: action, target: User.enable}
+      - {name: create deal, disposition: covered, via: action, target: Deal.create}
+      - {name: work a deal (New to Working), disposition: covered, via: action, target: Deal.advanceStage}
+      - {name: close deal won, disposition: covered, via: action, target: Deal.win}
+      - {name: close deal lost, disposition: covered, via: action, target: Deal.lose}
+      - {name: create follow-up task, disposition: covered, via: action, target: Task.create}
+      - {name: start a task (Todo to Doing), disposition: covered, via: action, target: Task.start}
+      - {name: complete a task, disposition: covered, via: action, target: Task.complete}
+      - {name: record a note or interaction, disposition: covered, via: action, target: Activity.log}
+  tables:
+    source: the embedded prototype schema (migration.yaml asset 'embedded prototype schema'), one store per legacy entity in legacy/domain.modelith.yaml, plus the developer seed database from the migration.yaml asset inventory
+    items:
+      - {name: LegacyUser store, disposition: covered, via: entity, target: User}
+      - {name: LegacyDeal store, disposition: covered, via: entity, target: Deal}
+      - {name: LegacyTask store, disposition: covered, via: entity, target: Task}
+      - {name: LegacyNote store, disposition: covered, via: entity, target: Activity}
+      - name: developer seed database
+        disposition: dropped
+        rationale: >
+          migration.yaml classifies it as disposable local fixtures rather than customer
+          records (strategy retire); the inventory excludes it from migration manifests
+          and nothing in the target design replaces it.
+  jobs:
+    none: The prototype is a synchronous single-process tool; migration.yaml names no scheduled or background work.
+  events:
+    none: No queues or topics consumed or produced; the prototype's only I/O is its embedded store.
+  integrations:
+    none: >
+      No outbound calls to external services. The prototype export module is an internal
+      reader of the prototype's own files, salvaged per migration.yaml (strategy wrap,
+      target 'migration exporter adapter'), not an external integration.

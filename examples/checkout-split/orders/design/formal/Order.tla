@@ -1,4 +1,5 @@
 ---- MODULE Order ----
+\* machinery-version: v0.3.4-dev
 EXTENDS Naturals
 
 \* Generated from Order.machine.json by machinery tla. Control-flow model.

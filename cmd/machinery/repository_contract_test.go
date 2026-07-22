@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	machversion "github.com/RamXX/machinery/internal/version"
 )
 
 // TestRepositoryVersionContracts prevents the documentation/tool metadata
@@ -104,4 +106,14 @@ func mustRepositoryFile(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(raw)
+}
+
+// The stamp default in internal/version must match the binary's -dev default:
+// main() copies the ldflags value over at startup, but in-process library use
+// (tests, gates) sees the internal default, and a drift between the two would
+// stamp artifacts with a version the binary never reports.
+func TestInternalVersionDefaultMatchesBinaryDefault(t *testing.T) {
+	if machversion.Version != version {
+		t.Fatalf("internal/version default %q != cmd/machinery default %q", machversion.Version, version)
+	}
 }

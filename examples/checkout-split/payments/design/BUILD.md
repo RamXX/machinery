@@ -191,6 +191,41 @@ Events serialize on the row lock; there is no in-memory actor.
 - Capacity: toy example; out of scope, recorded as such.
 - Observability: log every decline and every dedupe drop with the order id.
 
+### 4.7 Neighbor stand-ins and test environment
+
+This design is a pack child and the parent's delivery-topology decision (parent
+`design/DECISIONS.md`, 2026-07-22) declares the team isolated: no full multi-service environment.
+One neighboring boundary, one contract stand-in.
+
+**The orders stand-in.** A small executable in the implementation stack (Go) specified by two
+public artifacts: the boundary event rows in `design/pack/events.md` and the neighbor's contract
+machine, `OrdersContract.machine.json`, which the parent supplies alongside the pack (parent
+`design/contracts/`). It produces `request` (one stand-in order instance at Open per fixture;
+dedupe key `Payment.orderId`, redeliverable on demand) and consumes `markPaid` / `markDeclined`
+(deduped by `Payment.id`; a settled stand-in order ignores redelivery, per the contract's
+`_ignores`). Not a mock: an executable of the signed, frozen contract; the refinement proof
+(`machinery pack refine` at the orders child) is what licenses substituting the real orders
+service at assembly. A stand-in that drifts from the contract oracle is a defect, not a
+convenience.
+
+**Conformance suite.** `machinery oracle` over the neighbor's `OrdersContract.machine.json` is
+the stand-in's transition spec: one locked test per row, keyed on stable ids. When the parent
+regenerates packs, the diff of that oracle is the stand-in's affected-obligation list.
+
+**Delivery semantics are part of the stand-in's contract** (the event rows in section 4.3):
+at-least-once delivery, no ordering guarantee, dedupe keys as stated. The suite includes duplicate
+delivery of `request` (one Payment row; the second delivery dropped by `Payment.orderId` dedupe)
+and reordered settlement outcomes observed by the stand-in.
+
+**Self-contained environment recipe.** One compose file runs the entire suite with no platform
+access: the payments Postgres, a NATS broker, the orders stand-in, and seeded request fixtures,
+all as disposable containers. Integration tests still run against the real dependencies this team
+owns (its own Postgres and broker instance); the stand-in covers only the neighbor.
+
+**What stand-ins cannot prove, deferred explicitly:** the parent's residuals (end-to-end checkout
+latency, liveness across the two contracts, channels outside the three modeled events) belong to
+the parent's cross-context assembly suite (parent BUILD.md), not to this shard.
+
 ## 5. Behavior: the state machines (the logic)
 
 One stateful component: the Payment machine, `design/machines/Payment.machine.json` (XState v5,
@@ -311,10 +346,21 @@ libraries beyond the drivers named in the Architecture Contract (`example.com/pg
 
 ## 11. Hard-TDD protocol (read this before writing any code)
 
-Test-writer derives tests from sections 6 and 7 keyed on oracle stable ids; tests lock; the
-implementer makes them pass without editing them. Generated tests live apart from hand-written
-ones, so regenerating on a design change never clobbers them. A wrong test is a design defect: fix
-the design, regenerate (`machinery oracle`, `machinery pack refine`), rerun.
+RED precondition: `machinery check design` reports ZERO blocking findings (G5-pack included)
+before any test is derived; a red design means the oracle spec cannot be trusted, so fix the
+design first, never the tests. A test-writer then derives the suite from sections 6 and 7 keyed on
+oracle stable ids (a runtime without subagents runs RED then GREEN sequentially with one agent;
+the derivation rule and the gate runs below are unchanged and separate the phases in place of
+context isolation). RED exits only when all three hold: every oracle stable id appears whole-token
+in the suite (Gt-tests holds this in the check run), `machinery check design --impl <dir>` is
+green over the scaffolding and stubs the tests compile against, and the suite runs red on
+assertions, never on its own compile or import errors. The tests then lock; the implementer makes
+them pass without editing them. GREEN is accepted only when the locked suite passes AND
+`machinery check design --impl <dir>` is green again: no green path exists that crosses a
+boundary. Generated tests live apart from hand-written ones, so regenerating on a design change
+never clobbers them. A wrong test is a design defect: fix the design, regenerate
+(`machinery oracle`, `machinery pack refine`), rerun; the stable-id diff is the affected-test
+list.
 
 ## 12. Open questions and residual risks
 

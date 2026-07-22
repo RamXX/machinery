@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // ExitError carries a hard-error (maps to Python sys.exit).
@@ -57,6 +58,17 @@ func ForwardChain(machine *ir.Value) ForwardChainResult {
 			}
 			if (tr.Kind == "onError" || tr.Kind == "after") && tr.Target != "" {
 				errs[ir.Simple(tr.Target)] = true
+			}
+			// a targeted route from any other trigger (on:, always, state-level
+			// onDone) is outside the composition vocabulary; silently dropping
+			// it would leave the model proving the opposite of the coordinator
+			if tr.Kind != "onDone" && tr.Kind != "onError" && tr.Kind != "after" && tr.Target != "" {
+				trig := tr.Kind
+				if tr.Event != "" {
+					trig = tr.Kind + ":" + tr.Event
+				}
+				die("coordinator step %s declares a transition the composition model does not carry (%s -> %s); remove it or extend the composition template",
+					ir.Repr(cur), trig, ir.Repr(ir.Simple(tr.Target)))
 			}
 		}
 		if len(dones) != 1 {
@@ -417,37 +429,47 @@ func bracketStr(xs []string) string {
 
 // Run is the `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` entrypoint.
 func Run(compPath, machinePath, outdir string) error {
+	_, err := RunWritten(compPath, machinePath, outdir)
+	return err
+}
+
+// RunWritten is Run, reporting the basenames of the files it wrote so callers
+// (verify-formal) can distinguish freshly generated pairs from committed
+// orphans.
+func RunWritten(compPath, machinePath, outdir string) ([]string, error) {
 	data, err := os.ReadFile(compPath)
 	if err != nil {
-		return &ExitError{Msg: "compose_gen: " + err.Error()}
+		return nil, &ExitError{Msg: "compose_gen: " + err.Error()}
 	}
 	comp, err := ir.LoadYAML(data)
 	if err != nil {
-		return &ExitError{Msg: "compose_gen: " + err.Error()}
+		return nil, &ExitError{Msg: "compose_gen: " + err.Error()}
 	}
 	if comp.Kind != ir.KindObject {
-		return &ExitError{Msg: "compose_gen: composition file is not a mapping"}
+		return nil, &ExitError{Msg: "compose_gen: composition file is not a mapping"}
 	}
 	machine, err := ir.LoadMachineJSON(machinePath)
 	if err != nil {
-		return &ExitError{Msg: "compose_gen: " + err.Error()}
+		return nil, &ExitError{Msg: "compose_gen: " + err.Error()}
 	}
 	name, tla, cfg, genErr := Generate(comp, machine, filepath.Base(machinePath))
 	if genErr != nil {
-		return genErr
+		return nil, genErr
 	}
 	if outdir == "" {
 		outdir = filepath.Dir(compPath)
 	}
 	if mkErr := os.MkdirAll(outdir, 0755); mkErr != nil {
-		return mkErr
+		return nil, mkErr
 	}
-	if wErr := os.WriteFile(filepath.Join(outdir, name+".tla"), []byte(tla), 0644); wErr != nil {
-		return wErr
+	// Stamp at write time (P-F10): the committed artifact records which
+	// machinery version produced it; freshness diffs strip the line.
+	if wErr := os.WriteFile(filepath.Join(outdir, name+".tla"), []byte(version.StampTLAModule(tla)), 0644); wErr != nil {
+		return nil, wErr
 	}
-	if wErr := os.WriteFile(filepath.Join(outdir, name+".cfg"), []byte(cfg), 0644); wErr != nil {
-		return wErr
+	if wErr := os.WriteFile(filepath.Join(outdir, name+".cfg"), []byte(version.StampCfg(cfg)), 0644); wErr != nil {
+		return nil, wErr
 	}
 	fmt.Fprintf(os.Stdout, "generated %s.tla + %s.cfg\n", name, name)
-	return nil
+	return []string{name + ".tla", name + ".cfg"}, nil
 }

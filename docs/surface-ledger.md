@@ -30,6 +30,13 @@ The ledger is authored by two named sweeps that bracket the design run:
    the opening and closing ledgers is the sweep's work product; anything the docs-first
    interrogation missed surfaces here as a row that cannot be honestly disposed.
 
+When the legacy system keeps shipping during the build (rebuild and hybrid runs usually do), the
+closing sweep is not a single event: repeat it on every legacy release, or on a declared cadence
+recorded in DECISIONS.md, until cutover. Record each re-sweep in STATE.md with the date, the
+legacy revision swept, and the rows that changed. The optional `as_of:` root key anchors what the
+ledger was last swept against; it is printed on the Gs `checked:` line, so a ledger that has
+fallen behind the system it claims to cover is visible in every gate run.
+
 The gate holds the ledger's internal consistency and its bindings at every stage. What it
 cannot prove is that the enumeration itself is complete; that stays with the conductor, and
 the ledger's structure is designed to force the question: every surface class must be either
@@ -78,6 +85,7 @@ classes:
 |---|---|---|
 | `surface_version` | yes | the integer `1` |
 | `system` | yes | one line naming the legacy system and its shape |
+| `as_of` | no | the legacy commit or date the surface was enumerated against; non-empty string, printed on the Gs `checked:` line |
 | `classes` | yes | the six surface classes, all of them (see below) |
 | `_comment` | no | free text |
 
@@ -97,6 +105,12 @@ an error, never a silent pass. The classes map to what is mechanically enumerabl
 network API surface (`routes`), CLI surface (`commands`), persistent shape (`tables`, meaning
 tables, collections, node labels, or file stores), scheduled and background work (`jobs`),
 async topics consumed or produced (`events`), and outbound dependencies (`integrations`).
+
+Enumerate the `events` class publisher-first: sweep the code for emit/publish call sites AND the
+broker or infra configuration (topic definitions, subscriptions, queue bindings). Consumers alone
+under-count (a topic nobody in this repo consumes is still surface), and config alone misses
+dynamically named topics. The class's `source:` line names both lanes, or waives one with a
+reason.
 
 ### Items
 
@@ -136,7 +150,8 @@ It verifies, deterministically: the schema is strict (unknown keys fail), all si
 present and well-formed, every item is disposed exactly once with its required fields, every
 covered binding resolves against the target design, and names are unique per class. The
 `checked:` line reports per-class item counts plus the covered, dropped, deferred, and waived
-totals, so a handoff review sees the disposition profile at a glance. An empty ledger (six
+totals, and the `as_of` anchor when declared, so a handoff review sees the disposition profile
+at a glance. An empty ledger (six
 waivers, zero items) is an error: a legacy system with no enumerable surface at all is not a
 legacy system.
 

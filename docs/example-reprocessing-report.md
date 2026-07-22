@@ -25,12 +25,18 @@ full Go suite.
 | example | before | after | assessment |
 |---|---|---|---|
 | Go CRM | One target model; policy, integrity, and isolation artifacts; 8 TLC + 24 Alloy commands | Separate legacy and target models plus a Gm transition contract; target machine/TLA/policy/integrity outputs unchanged; isolation artifacts are field-qualified; 32 solver checks pass | Better transition coverage without behavioral churn in the target. Stable tenant-oracle ids intentionally change once because field identity is now part of the case. |
-| Fulfillment | Integrity encoded the forward `Order.payment` field multiplicity but did not prevent two orders sharing one payment; 8 TLC + 3 Alloy commands | `Cardinality_Order_Payment` and `Exclusive_Order_Payment` enforce and check the inverse side; 8 TLC + 4 Alloy commands, all pass | The declared 1:1 relationship is now represented completely. This is the only generated proof-semantic change in this example. |
+| Fulfillment | Integrity encoded the forward `Order.payment` field multiplicity but did not prevent two orders sharing one payment; 8 TLC + 3 Alloy commands | `Cardinality_Order_Payment` enforces the inverse side as a fact; 8 TLC + 3 Alloy commands, all pass (update note below) | The declared 1:1 relationship is now represented completely. This is the only generated proof-semantic change in this example. |
 | Portfolio engine | 3 machine oracles and 6 TLA+/refinement checks | Generated Modelith, machine, oracle, and formal outputs are byte-identical; the same 6 checks pass | No churn: an example outside the changed relational/rebuild surfaces remains stable. |
 
-Across the three examples, solver checks increase from 49 to 50 because fulfillment gains the
-missing exclusivity check. Go CRM's solver count stays constant while isolation command names and
+Across the three examples, the fulfillment fix originally landed as a `Cardinality_*` fact plus an
+`Exclusive_Order_Payment` check restating it (solver checks 49 to 50). Go CRM's solver count stays
+constant while isolation command names and
 oracle identities become collision-safe (`Task.deal -> Deal`, not merely `Task -> Deal`).
+
+Update (2026-07): the `Exclusive_*` check commands were later removed as tautological (a check
+byte-identical to a fact can never fail); inverse exclusivity for `1:1`/`1:n` relationships is
+enforced solely as the `Cardinality_*` fact. Fulfillment's solver total is therefore 11 (8 TLC +
+3 Alloy), not 12.
 
 ## Go CRM transition result
 
@@ -59,7 +65,8 @@ reconciliation, rollback, observability, and maximum-data-loss obligations.
 - Modelith: all three target models and the legacy Go CRM model lint with zero errors and zero
   warnings.
 - Deterministic gates: zero ERROR or DRIFT findings in all three examples.
-- Solver checks: Go CRM 32/32, fulfillment 12/12, portfolio engine 6/6.
+- Solver checks: Go CRM 32/32, fulfillment 12/12 at the time of this report (11/11 after the
+  tautological `Exclusive_*` check removal; see the update note above), portfolio engine 6/6.
 - Generated machine oracles and behavioral formal models: no unintended diffs.
 - Golden and Go test suites: green after reviewing and accepting only the intended output changes.
 

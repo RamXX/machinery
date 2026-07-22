@@ -16,6 +16,7 @@ import (
 
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/tla"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // PackMap is the parsed design/packmap.yaml.
@@ -66,7 +67,9 @@ func LoadPackManifest(design string) (*ir.Object, error) {
 }
 
 // PackFilesOnDisk reads the committed pack files of a child design (for hash
-// verification and freshness diffs).
+// verification and freshness diffs). A directory inside pack/ is a hard
+// error: the content hash covers files only, so a smuggled subdirectory would
+// carry unhashed content under the pack's authority.
 func PackFilesOnDisk(design string) (map[string]string, error) {
 	dir := filepath.Join(design, "pack")
 	entries, err := os.ReadDir(dir)
@@ -76,7 +79,7 @@ func PackFilesOnDisk(design string) (map[string]string, error) {
 	files := map[string]string{}
 	for _, e := range entries {
 		if e.IsDir() {
-			continue
+			return nil, fmt.Errorf("pack: pack/ contains a directory %s; a pack is a flat generated file set and a subdirectory escapes the content hash entirely; remove it and re-copy the pack", ir.Repr(e.Name()))
 		}
 		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
 		if err != nil {
@@ -85,6 +88,75 @@ func PackFilesOnDisk(design string) (map[string]string, error) {
 		files[e.Name()] = string(data)
 	}
 	return files, nil
+}
+
+// BoundaryEventNames parses the pack's generated events.md and returns the
+// event names (any table with event and direction columns).
+func BoundaryEventNames(eventsMD string) []string {
+	var out []string
+	for _, tbl := range ir.ParseMdTables(eventsMD) {
+		ei := ir.FindCol(tbl.Header, "event")
+		di := ir.FindCol(tbl.Header, "direction")
+		if ei < 0 || di < 0 {
+			continue
+		}
+		for _, r := range tbl.Rows {
+			if ei < len(r) {
+				if n := ir.CleanCell(r[ei]); n != "" {
+					out = append(out, n)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// checkRefinementBinding refuses a packmap that binds a machine with no stake
+// in the contract. The map's type checks pass for ANY machine whose top
+// states cover the contract states, so a byte-copied shim of the contract
+// machine used to prove "refinement" trivially. The bound machine must either
+// be the lifecycle machine of a pack-owned entity (declared _lifecycle_of or
+// named after the entity) or touch at least one of the pack's boundary events
+// (handle, ignore, or emit it).
+func checkRefinementBinding(pm *PackMap, manifest *ir.Object, files map[string]string, child *ir.Value) error {
+	owns := map[string]bool{}
+	for _, v := range manifest.Get2("owns").AsArray() {
+		if v != nil && v.Kind == ir.KindString {
+			owns[v.AsString()] = true
+		}
+	}
+	if owns[child.AsObject().GetString("_lifecycle_of")] || owns[pm.Machine] {
+		return nil
+	}
+	touched := map[string]bool{}
+	for _, s := range ir.WalkStates(child.AsObject().Get2("states"), "") {
+		so := s.Node.AsObject()
+		if so == nil {
+			continue
+		}
+		for _, k := range so.GetObject("on").Keys() {
+			touched[k] = true
+		}
+		for _, k := range so.GetObject("_ignores").Keys() {
+			touched[k] = true
+		}
+		for a := range ir.ActionsOf(s.Node, nil, s.Path) {
+			touched[a] = true
+		}
+		for _, inv := range ir.InvokesOf(s.Node) {
+			if io := inv.AsObject(); io != nil {
+				if src := io.GetString("src"); src != "" {
+					touched[src] = true
+				}
+			}
+		}
+	}
+	for _, ev := range BoundaryEventNames(files["events.md"]) {
+		if touched[ev] {
+			return nil
+		}
+	}
+	return fmt.Errorf("pack: packmap binds machine %s, which is neither the lifecycle machine of a pack-owned entity (_lifecycle_of or the entity's name) nor handles, ignores, or emits any of the pack's boundary events; a machine with no stake in the contract proves nothing, bind the machine that realizes it", ir.Repr(pm.Machine))
 }
 
 func topStateNames(m *ir.Value) []string {
@@ -175,6 +247,9 @@ func GenerateRefinement(design string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pack: %w", err)
 	}
+	if err := checkRefinementBinding(pm, manifest, files, child); err != nil {
+		return nil, err
+	}
 	if err := ReconcileMap(pm, child, contract); err != nil {
 		return nil, err
 	}
@@ -209,7 +284,10 @@ func GenerateRefinement(design string) (map[string]string, error) {
 	fmt.Fprintf(&b, "\nC == INSTANCE %s WITH st <- Map(st)\n", cmod)
 	b.WriteString("CSpecHolds == C!Spec\n")
 	b.WriteString("====\n")
-	out[mod+".tla"] = b.String()
+	// Stamp the GENERATED modules only (P-F10): the contract module above
+	// stays a byte-copy of the pack's hash-covered file, so it never carries
+	// a stamp. G5 strips the stamp line before its freshness diff.
+	out[mod+".tla"] = version.StampTLAModule(b.String())
 
 	// cfg: same constants as the child spec, property = the contract spec
 	var cfg strings.Builder
@@ -219,7 +297,7 @@ func GenerateRefinement(design string) (map[string]string, error) {
 		}
 	}
 	cfg.WriteString("SPECIFICATION Spec\nPROPERTY CSpecHolds\n")
-	out[mod+".cfg"] = cfg.String()
+	out[mod+".cfg"] = version.StampCfg(cfg.String())
 	return out, nil
 }
 
