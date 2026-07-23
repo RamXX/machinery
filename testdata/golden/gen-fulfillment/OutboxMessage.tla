@@ -1,5 +1,5 @@
 ---- MODULE OutboxMessage ----
-\* machinery-version: v0.3.4-dev
+\* machinery-version: v0.3.5-dev
 EXTENDS Naturals
 
 \* Generated from OutboxMessage.machine.json by machinery tla. Control-flow model.

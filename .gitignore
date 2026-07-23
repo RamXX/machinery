@@ -29,6 +29,11 @@ __pycache__/
 # TLC scratch (tlc.sh runs with -cleanup, but interrupted runs leave these)
 states/
 
+# External-checker registry: machine-local binding of checker id -> command,
+# resolved outside the design so no tool name leaks into a committed artifact.
+# Examples ship a committed *.example.yaml; the live file stays untracked.
+.machinery/checkers.local.yaml
+
 # Paivot runtime state (managed by pvg)
 .vault/issues/
 .vault/.nd.yaml

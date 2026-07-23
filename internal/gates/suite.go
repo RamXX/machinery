@@ -26,7 +26,7 @@ type Selection struct {
 // KnownGate; two hand-kept lists once drifted.
 var knownGateSet = map[string]bool{
 	"gm": true, "gs": true, "gp": true, "gi": true, "gn": true, "g2": true,
-	"g3": true, "gx": true, "gb": true, "g4": true, "gt": true, "g5": true,
+	"g3": true, "gx": true, "gk": true, "gb": true, "g4": true, "gt": true, "g5": true,
 }
 
 // KnownGate reports whether name names a gate this suite can run.
@@ -59,7 +59,7 @@ func HasModelith(design string) bool {
 // unknown or empty gate name is an error.
 func Select(design, gateList, impl string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
-	list := "gm,gs,gp,gi,gn,g2,g3,gx,gb,g4,gt,g5"
+	list := "gm,gs,gp,gi,gn,g2,g3,gx,gk,gb,g4,gt,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
@@ -93,6 +93,9 @@ func Select(design, gateList, impl string) (Selection, error) {
 				}
 			}
 			parts = append(parts, "g2")
+			if HasCheckers(design) {
+				parts = append(parts, "gk")
+			}
 			if HasBuildDoc(design) {
 				parts = append(parts, "gb")
 			}
@@ -159,6 +162,9 @@ func RunSelected(design, impl string, sel Selection) []*Gate {
 	}
 	if sel.Run["gx"] {
 		out = append(out, CheckTraceability(design))
+	}
+	if sel.Run["gk"] && (sel.Explicit || HasCheckers(design)) {
+		out = append(out, CheckExternalCheckers(design)...)
 	}
 	if sel.Run["gb"] && (sel.Explicit || HasBuildDoc(design)) {
 		out = append(out, CheckBuildPlan(design))

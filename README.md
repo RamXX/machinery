@@ -125,6 +125,10 @@ Phase 1.5 Relational  static relational models (opt-in, per invariant shape):
            isolation multi-tenant refs   -> Gn-isolation (Isolation.als + Isolation.oracle.md)
          tool: each gate binds + covers; committed models fresh; solver via verify-formal
          attested: the annotations state what the prose invariants mean
+Opt-in   External     bring-your-own deterministic checker (SAST, AST, Datalog, graph reasoner):
+           checkers   -> Gk-checkers (input_hash binds, coverage holds; engine via verify-checkers)
+         tool: projection is fresh; committed evidence binds to it; verdict is pass; coverage complete
+         attested: the manifest claims the elements the checker is responsible for
 Phase 2  C4           architecture + contract
          tool: G2-c4 (contract parses and binds; mitigation coverage)
          attested: every action owned; interface contracts; NFR record
@@ -501,7 +505,7 @@ version matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.3.4        # force an exact release
+machinery update --version v0.3.5        # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
@@ -630,6 +634,10 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   [Claude Code plugin guide](docs/claude-plugin.md) (hooks, `.machinery.json` reference, commands),
   the [agent portability guide](docs/agent-portability.md) (Claude Code, Codex, OpenCode, and
   capability fallbacks),
+  the [external checkers guide](docs/external-checkers.md) (the pluggable-checker contract: the
+  projection and evidence schemas, the tool-neutral manifest, the git-ignored resolution registry,
+  the pure `gk` gate plus the `verify-checkers` engine phase, and how to adapt a signed-artifact or
+  probabilistic engine you cannot modify),
   and the [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft
   rung-4 design note, not yet implemented).
 - `examples/go-crm/` the worked rebuild example: `design/legacy/` (the working prototype truth),

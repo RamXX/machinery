@@ -13,7 +13,7 @@ import "strings"
 // version; the default here mirrors the binary's own -dev default so
 // in-process library use (tests, gates) stamps what a bare build reports.
 // A contract test in cmd/machinery pins the two defaults together.
-var Version = "v0.3.4-dev"
+var Version = "v0.3.5-dev"
 
 // marker is the stamp key: every stamp line contains exactly
 // "machinery-version: <version>" inside the format's comment syntax.

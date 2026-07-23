@@ -1,0 +1,23 @@
+// Sensitive-data flow: a sink leaks if tainted data reaches it. Taint does not
+// propagate INTO a redacted node, so anything downstream of a redactor is clean.
+.decl attr_of(e:symbol, a:symbol)
+.decl flows(x:symbol, y:symbol)
+.decl sensitive(a:symbol)
+.decl sink(e:symbol)
+.decl redacted(e:symbol)
+.input attr_of
+.input flows
+.input sensitive
+.input sink
+.input redacted
+
+.decl holds_sensitive(e:symbol)
+holds_sensitive(E) :- attr_of(E, A), sensitive(A).
+
+.decl tainted(e:symbol)
+tainted(E) :- holds_sensitive(E).
+tainted(F) :- tainted(E), flows(E, F), !redacted(F).
+
+.decl leak(e:symbol)
+.output leak
+leak(E) :- tainted(E), sink(E).

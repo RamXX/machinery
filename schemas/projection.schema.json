@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RamXX/machinery/schemas/projection.schema.json",
+  "title": "Machinery design projection (machinery -> checker)",
+  "description": "The canonical, deterministic slice of a machinery design that machinery hands to an external checker. Machinery generates it (Go, keys sorted, arrays sorted by stable_id, byte-stable) and owns its freshness: the committed copy must byte-match a fresh generation or the gate reports DRIFT. A checker, or a thin adapter the checker author ships, consumes this file. Every element is keyed by a Modelith stable id so verdicts bind to identities, not positions. The `generated` object is the only non-binding part: machinery excludes it from the canonical bytes it hashes into the input_hash the evidence must echo.",
+  "type": "object",
+  "required": ["projection_schema", "machinery_version", "design_id", "checker_id", "include", "model"],
+  "additionalProperties": false,
+  "properties": {
+    "projection_schema": {
+      "const": "1.0",
+      "description": "Contract version. A checker pins this. Machinery bumps it only on a breaking change to the shape below; additive fields keep 1.x."
+    },
+    "machinery_version": {
+      "type": "string",
+      "description": "Version of the machinery binary that produced this projection. Provenance only; lives under the umbrella of `generated` semantics and is excluded from the input hash."
+    },
+    "design_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Content hash over the design SOURCE artifacts (domain model, C4, machines, relational annotations) this projection derives from. Traceability back to the design. This is NOT the binding hash; the binding hash is machinery's sha256 over this whole object minus `generated`."
+    },
+    "checker_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The id of the checker this projection was rendered for (from its manifest). One projection per checker: two checkers with different `include` sets receive different, independently hashed inputs."
+    },
+    "include": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "The layers this projection carries, in a fixed canonical order. Lets a checker assert it received exactly what its manifest declared it needs. A layer named here has its corresponding collection populated; a layer absent here is absent from the object entirely.",
+      "items": {
+        "enum": ["model", "invariants", "actions", "relationships", "scenarios", "machines", "c4", "oracles"]
+      }
+    },
+    "model": {
+      "type": "object",
+      "description": "The domain layer. `entities` is always present when `model` is included; the other collections appear only when their name is also in `include`.",
+      "additionalProperties": false,
+      "required": ["entities"],
+      "properties": {
+        "entities": { "type": "array", "items": { "$ref": "#/$defs/entity" } },
+        "invariants": { "type": "array", "items": { "$ref": "#/$defs/invariant" } },
+        "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
+        "relationships": { "type": "array", "items": { "$ref": "#/$defs/relationship" } },
+        "scenarios": { "type": "array", "items": { "$ref": "#/$defs/scenario" } }
+      }
+    },
+    "machines": {
+      "type": "array",
+      "description": "The behavior layer (present when `machines` is in `include`): one entry per stateful component.",
+      "items": { "$ref": "#/$defs/machine" }
+    },
+    "c4": {
+      "$ref": "#/$defs/c4",
+      "description": "The architecture layer (present when `c4` is in `include`)."
+    },
+    "oracles": {
+      "type": "array",
+      "description": "References to machinery-generated decision tables (authorization, isolation, transition) the checker may consume by hash, present when `oracles` is in `include`. Machinery does not inline the table; it names it and pins its sha256 so the checker reads the committed file and the binding still fails on drift.",
+      "items": { "$ref": "#/$defs/oracleRef" }
+    },
+    "generated": {
+      "type": "object",
+      "description": "NON-BINDING provenance (timestamps, host, tool versions). Machinery EXCLUDES this object from the canonical bytes it hashes into input_hash, so a regenerated projection with a fresh timestamp is never spurious DRIFT.",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The join key every downstream artifact and every evidence coverage row uses. v1 emits natural composite ids derived from Modelith names (entity:<Name>, attr:<Entity>.<name>, inv:<id>, rel:<From>-><To>:<card>); a later revision may switch to content-derived ids without changing the contract, since evidence binds by whatever id the projection emits."
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "name"],
+      "properties": {
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "status_enum": {
+          "type": "array",
+          "description": "The lifecycle enum values, when the entity carries a status. These are the states the machine layer traces to.",
+          "items": { "type": "string" }
+        },
+        "attributes": { "type": "array", "items": { "$ref": "#/$defs/attribute" } }
+      }
+    },
+    "attribute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "name", "type"],
+      "properties": {
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "description": "The Modelith type, verbatim (scalar, money, enum ref, etc.)." },
+        "cardinality": { "enum": ["one", "optional", "many"] },
+        "unique": { "type": "boolean" },
+        "description": { "type": "string" }
+      }
+    },
+    "invariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "id", "text", "owner"],
+      "properties": {
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "id": { "type": "string", "description": "The human invariant id (e.g. priv-consent-required), the token a coverage claim globs over." },
+        "polarity": { "enum": ["positive", "negative"], "description": "Reserved: positive (must always hold) vs negative (must never happen). Modelith does not yet carry polarity, so v1 projections omit it." },
+        "text": { "type": "string", "description": "The prose statement of the invariant (Modelith's invariant `statement`)." },
+        "owner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["entity", "top"] },
+            "entity": { "$ref": "#/$defs/stableId" }
+          }
+        },
+        "preserved_by": {
+          "type": "array",
+          "description": "Stable ids of the actions that name this invariant in their `preserves` list.",
+          "items": { "$ref": "#/$defs/stableId" }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "name"],
+      "properties": {
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "name": { "type": "string" },
+        "owner_entity": { "$ref": "#/$defs/stableId" },
+        "preconditions": { "type": "array", "items": { "type": "string" } },
+        "postconditions": { "type": "array", "items": { "type": "string" } },
+        "preserves": {
+          "type": "array",
+          "description": "Ids of the invariants this action preserves.",
+          "items": { "type": "string" }
+        },
+        "emits": {
+          "type": "array",
+          "description": "Named side effects the action implies (events, external calls). The join to the C4 relationship layer.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "from", "to", "cardinality"],
+      "properties": {
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "name": { "type": "string" },
+        "from": { "$ref": "#/$defs/stableId" },
+        "to": { "$ref": "#/$defs/stableId" },
+        "cardinality": { "enum": ["1:1", "1:n", "n:1", "n:m"] }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "id", "invariants_touched"],
+      "properties": {
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "invariants_touched": { "type": "array", "items": { "type": "string" } },
+        "path": {
+          "type": "array",
+          "description": "The ordered steps of the scenario, each an action name or a state token.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "states", "transitions"],
+      "properties": {
+        "component": { "type": "string", "description": "The stateful component this machine governs." },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind"],
+            "properties": {
+              "id": { "type": "string" },
+              "kind": { "enum": ["atomic", "compound", "final"] },
+              "traces_enum_value": { "type": "string", "description": "The entity status enum value this state realizes, when it does." }
+            }
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "event", "target"],
+            "properties": {
+              "from": { "type": "string" },
+              "event": { "type": "string" },
+              "guard": { "type": "string", "description": "The invariant id this transition's guard enforces, when guarded." },
+              "target": { "type": "string" },
+              "invoke": { "type": "string", "description": "The actor invoked, joining to a C4 relationship; carries onError/timeout in the source machine." }
+            }
+          }
+        }
+      }
+    },
+    "c4": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["elements"],
+      "properties": {
+        "elements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "kind"],
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "kind": { "type": "string", "description": "person | softwareSystem | container | component, per the C4 model." }
+            }
+          }
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to"],
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "technology": { "type": "string" },
+              "mitigation": { "type": "string", "description": "The declared failure-and-mitigation posture for this dependency edge." }
+            }
+          }
+        },
+        "event_contract": {
+          "type": "array",
+          "description": "The event-contract rows (producer, consumer, payload, delivery, ordering, dedupe), one per producer/consumer pair.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["event", "producer", "consumer", "delivery"],
+            "properties": {
+              "event": { "type": "string" },
+              "producer": { "type": "string" },
+              "consumer": { "type": "string" },
+              "delivery": { "type": "string" },
+              "ordering": { "type": "string" },
+              "dedupe_key": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "oracleRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "path", "sha256"],
+      "properties": {
+        "name": { "type": "string" },
+        "kind": { "enum": ["policy", "integrity", "isolation", "machine"] },
+        "path": { "type": "string", "description": "Path to the committed oracle file, relative to the design directory." },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}

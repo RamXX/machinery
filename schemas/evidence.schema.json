@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RamXX/machinery/schemas/evidence.schema.json",
+  "title": "Machinery external-checker evidence (checker -> machinery)",
+  "description": "What an external checker, or an adapter the checker author ships, writes back for machinery to verify. Machinery's PURE check phase (`machinery check --gate gk`) reads ONLY this file: it never parses the checker's native output, so a checker may emit anything internally (a SARIF report, a signed decision, a converged interval graph) and map it here. The verdict is trusted in the pure phase only because `input_hash` binds it to an exact projection; the separate external phase (`machinery verify-checkers`) re-runs or replays the engine to confirm the verdict was earned. Fields under `generated` are non-binding.",
+  "type": "object",
+  "required": ["evidence_schema", "checker", "input_hash", "verdict", "coverage"],
+  "additionalProperties": false,
+  "properties": {
+    "evidence_schema": {
+      "const": "1.0",
+      "description": "Contract version, paired with projection_schema 1.x."
+    },
+    "checker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "MUST equal the manifest checker id and the projection `checker_id`. A mismatch is an ERROR: this evidence was produced for a different checker."
+        },
+        "version": {
+          "type": "string",
+          "description": "The engine and/or ruleset version. Surfaced in a non-blocking skew note when it changes between runs; not part of the binding."
+        }
+      }
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "THE BINDING. MUST equal machinery's sha256 over the canonical projection bytes (the projection's `generated` object excluded). A verdict whose input_hash does not match a fresh projection is DRIFT: it was computed over a different design. This single field is what makes a verdict from an opaque engine safe to trust in the pure phase."
+    },
+    "verdict": {
+      "enum": ["pass", "fail"],
+      "description": "pass: the checker affirms every claimed element it decided, with no blocking finding. fail: at least one blocking finding. An element the checker could NOT decide is not expressed here; it becomes a coverage gap, resolved by machinery against the manifest claim."
+    },
+    "coverage": {
+      "type": "array",
+      "description": "One row per design element the checker actually decided, each keyed by a projection stable_id. Machinery cross-checks this list against the manifest's coverage.claim: a claimed element that is absent here and is not a declared residual FAILS the gate. This is the 'every feature, every time' hard rule, reused from the relational-layer residuals pattern. May be empty only when the manifest claims nothing.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["element", "verdict"],
+        "properties": {
+          "element": {
+            "type": "string",
+            "description": "A stable_id present in the projection this evidence binds to."
+          },
+          "verdict": { "enum": ["pass", "fail"] },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Machinery surfaces these: `blocking` severities become ERRORs on a fail verdict; `advisory` become warns; `info` become notes. Empty on a clean pass.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "message"],
+        "properties": {
+          "severity": { "enum": ["blocking", "advisory", "info"] },
+          "code": {
+            "type": "string",
+            "description": "A stable checker-defined code: a control id, a rule name, a lint id. Lets machinery de-duplicate and lets you triage."
+          },
+          "element": {
+            "type": "string",
+            "description": "Optional projection stable_id this finding is about."
+          },
+          "message": { "type": "string" },
+          "locator": {
+            "type": "string",
+            "description": "Optional pointer into the checker's own source (rule file:line, a norm id, an AST path). Machinery treats it as opaque text."
+          }
+        }
+      }
+    },
+    "input_signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "OPTIONAL. A detached signature OVER the ASCII bytes of `input_hash`, in a scheme the registry declares, that machinery's PURE phase verifies (crypto is deterministic, so this strengthens `check` without running the engine). Present only for checkers that sign their input binding directly. A checker that signs its own NATIVE artifact instead, in a format machinery does not parse, leaves this ABSENT and carries provenance under `attestation`, verified in the external phase by the checker's own verify command.",
+      "required": ["scheme", "value"],
+      "properties": {
+        "scheme": { "enum": ["ed25519"] },
+        "value": { "type": "string", "description": "Base64 detached signature over the exact ASCII bytes of input_hash." },
+        "key_id": { "type": "string", "description": "Which public key, from the registry entry's declared keys, verifies this." }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "description": "OPTIONAL and OPAQUE to the pure phase. A free-form reference to the checker's native, possibly-signed artifacts: a compiled-ruleset hash, a signed decision, a replayable trace, an approval record. Machinery does NOT interpret it. The registry's `verify` command consumes it in the external phase to re-run or replay the engine. This is how a checker that emits what it emits, and cannot be changed, carries its own provenance without machinery ever learning its format.",
+      "additionalProperties": true
+    },
+    "trace_ref": {
+      "type": "string",
+      "description": "OPTIONAL path (relative to this evidence file) to the checker's native trace or proof artifact, for the external verify phase to replay. Opaque to the pure phase."
+    },
+    "generated": {
+      "type": "object",
+      "description": "NON-BINDING provenance (timestamps, host, wall-clock). Excluded from every freshness comparison.",
+      "additionalProperties": true
+    }
+  }
+}
