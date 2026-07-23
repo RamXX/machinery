@@ -1,0 +1,21 @@
+checker:
+  id: pii-flow
+  description: "Sensitive-data flow: no sensitive attribute reaches an export sink without redaction."
+projection:
+  include: [model, invariants, relationships]
+  requires: [gx]
+coverage:
+  claim: ["priv-*"]
+  residuals:
+    - id: priv-consent-required
+      reason: "Consent is a process and record control, not a static data-flow property; enforced elsewhere."
+    - id: priv-minimal-collection
+      reason: "Collection minimality is a design-review judgment, not decidable from the flow graph."
+config:
+  enforces_invariant: priv-no-unredacted-export
+  sensitive: ["attr:DataSubject.email", "attr:DataSubject.nationalId"]
+  sinks: ["entity:AnalyticsExport"]
+  redacted: ["entity:Redactor"]
+evidence:
+  projection_out: checkers/pii-flow/projection.json
+  evidence_in: checkers/pii-flow/evidence.json

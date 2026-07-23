@@ -1,0 +1,8 @@
+# Copy to <repo-root>/.machinery/checkers.local.yaml (git-ignored) to enable
+# `machinery verify-checkers`. The design stays tool-neutral; the engine binary
+# is resolved here, outside the design.
+checkers:
+  pii-flow:
+    run: ["python3", "examples/pii-flow/design/checkers/pii-flow/adapter.py", "{projection}", "{config}", "{out}"]
+    verify: ["souffle", "--version"]
+    timeout: "120s"

@@ -1,0 +1,74 @@
+# yaml-language-server: $schema=https://modelith.sh/schema/domain-model/v1.json
+kind: DomainModel
+version: v1
+title: PII Flow
+description: >
+  A minimal data-processing pipeline used as the reference example for a
+  bring-your-own Datalog external checker. A `DataSubject` supplies personal
+  data that a `ProcessingActivity` handles for a stated purpose; the result is
+  redacted before it reaches an `AnalyticsExport` sink, so no sensitive
+  attribute ever leaves the system unredacted. The example exists to
+  demonstrate the sensitive-data-flow checker, not to model a full privacy
+  program: consent and collection-minimality remain outside what a static
+  flow graph can decide, and are carried as declared residuals on the
+  checker's coverage claim.
+
+glossary:
+  DataSubject: "The natural person whose personal data is collected and processed."
+  ProcessingActivity: "A defined operation performed on a `DataSubject` record for a stated purpose."
+  Redactor: "A processing step that strips or masks sensitive attributes before data moves further downstream."
+  AnalyticsExport: "The sink where processed data leaves the system, for example to a reporting or analytics destination."
+
+enums:
+  SubjectStatus:
+    values:
+      - {name: Active, definition: "The subject's data is live and may be processed."}
+      - {name: Erased, definition: "The subject's data has been erased and may not be processed further."}
+
+entities:
+  DataSubject:
+    definition: >
+      A natural person about whom personal data is held. A `DataSubject`
+      originates one or more `ProcessingActivity` records; its status governs
+      whether further processing is permitted.
+    attributes:
+      - {name: email, type: string}
+      - {name: nationalId, type: string}
+      - {name: status, type: SubjectStatus}
+    relationships:
+      - {entity: ProcessingActivity, cardinality: 1:n}
+    invariants:
+      - {id: priv-consent-required, statement: "Personal data is processed only with recorded consent."}
+      - {id: priv-minimal-collection, statement: "Only attributes necessary for the stated purpose are collected."}
+
+  ProcessingActivity:
+    definition: >
+      A defined operation carried out on a `DataSubject` record for a stated
+      purpose, for example onboarding or billing. Every `ProcessingActivity`
+      routes its output through exactly one `Redactor` before the data can
+      move further downstream.
+    attributes:
+      - {name: purpose, type: string}
+    relationships:
+      - {entity: Redactor, cardinality: 1:1}
+
+  Redactor:
+    definition: >
+      A processing step that strips or masks sensitive attributes (email,
+      national identifiers) before data reaches an export sink. Taint
+      analysis treats a `Redactor` as a boundary: what flows out of it is no
+      longer sensitive for the purposes of the flow checker.
+    attributes:
+      - {name: method, type: string}
+    relationships:
+      - {entity: AnalyticsExport, cardinality: 1:1}
+
+  AnalyticsExport:
+    definition: >
+      The sink where processed data leaves the system, for example to a
+      reporting or analytics destination outside the processing boundary.
+    attributes:
+      - {name: destination, type: string}
+
+invariants:
+  - {id: priv-no-unredacted-export, statement: "No sensitive attribute reaches an export sink without passing through redaction."}

@@ -1,0 +1,124 @@
+{
+  "projection_schema": "1.0",
+  "machinery_version": "v0.3.5-dev",
+  "design_id": "sha256:a278b467d1401cb9a273266ad51d19da9faee073bb0ce6de5ae97ddfa3292cb5",
+  "checker_id": "pii-flow",
+  "include": [
+    "model",
+    "invariants",
+    "relationships"
+  ],
+  "model": {
+    "entities": [
+      {
+        "stable_id": "entity:AnalyticsExport",
+        "name": "AnalyticsExport",
+        "attributes": [
+          {
+            "stable_id": "attr:AnalyticsExport.destination",
+            "name": "destination",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "stable_id": "entity:DataSubject",
+        "name": "DataSubject",
+        "status_enum": [
+          "Active",
+          "Erased"
+        ],
+        "attributes": [
+          {
+            "stable_id": "attr:DataSubject.email",
+            "name": "email",
+            "type": "string"
+          },
+          {
+            "stable_id": "attr:DataSubject.nationalId",
+            "name": "nationalId",
+            "type": "string"
+          },
+          {
+            "stable_id": "attr:DataSubject.status",
+            "name": "status",
+            "type": "SubjectStatus"
+          }
+        ]
+      },
+      {
+        "stable_id": "entity:ProcessingActivity",
+        "name": "ProcessingActivity",
+        "attributes": [
+          {
+            "stable_id": "attr:ProcessingActivity.purpose",
+            "name": "purpose",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "stable_id": "entity:Redactor",
+        "name": "Redactor",
+        "attributes": [
+          {
+            "stable_id": "attr:Redactor.method",
+            "name": "method",
+            "type": "string"
+          }
+        ]
+      }
+    ],
+    "invariants": [
+      {
+        "stable_id": "inv:priv-consent-required",
+        "id": "priv-consent-required",
+        "text": "Personal data is processed only with recorded consent.",
+        "owner": {
+          "kind": "entity",
+          "entity": "entity:DataSubject"
+        }
+      },
+      {
+        "stable_id": "inv:priv-minimal-collection",
+        "id": "priv-minimal-collection",
+        "text": "Only attributes necessary for the stated purpose are collected.",
+        "owner": {
+          "kind": "entity",
+          "entity": "entity:DataSubject"
+        }
+      },
+      {
+        "stable_id": "inv:priv-no-unredacted-export",
+        "id": "priv-no-unredacted-export",
+        "text": "No sensitive attribute reaches an export sink without passing through redaction.",
+        "owner": {
+          "kind": "top"
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "stable_id": "rel:DataSubject->ProcessingActivity:1:n",
+        "from": "entity:DataSubject",
+        "to": "entity:ProcessingActivity",
+        "cardinality": "1:n"
+      },
+      {
+        "stable_id": "rel:ProcessingActivity->Redactor:1:1",
+        "from": "entity:ProcessingActivity",
+        "to": "entity:Redactor",
+        "cardinality": "1:1"
+      },
+      {
+        "stable_id": "rel:Redactor->AnalyticsExport:1:1",
+        "from": "entity:Redactor",
+        "to": "entity:AnalyticsExport",
+        "cardinality": "1:1"
+      }
+    ]
+  },
+  "generated": {
+    "input_hash": "sha256:5ef63024f91187a7c4a331261e95fdc35c13b479856bda74a7be2394a70f4cba"
+  }
+}

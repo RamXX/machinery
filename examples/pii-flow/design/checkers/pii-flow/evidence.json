@@ -1,0 +1,16 @@
+{
+  "evidence_schema": "1.0",
+  "checker": {
+    "id": "pii-flow",
+    "version": "souffle"
+  },
+  "input_hash": "sha256:5ef63024f91187a7c4a331261e95fdc35c13b479856bda74a7be2394a70f4cba",
+  "verdict": "pass",
+  "coverage": [
+    {
+      "element": "inv:priv-no-unredacted-export",
+      "verdict": "pass"
+    }
+  ],
+  "findings": []
+}

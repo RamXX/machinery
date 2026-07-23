@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RamXX/machinery/internal/checker"
 	"github.com/RamXX/machinery/internal/install"
 )
 
@@ -81,6 +82,7 @@ func doctorRun(targets []string) error {
 		}
 		preflightRun()
 		out := stdoutW
+		reportCheckerBinaries(out)
 		fmt.Fprintln(out, "install status:")
 		for _, artifact := range artifacts {
 			if _, err := os.Stat(artifact.Path); err == nil {
@@ -96,6 +98,7 @@ func doctorRun(targets []string) error {
 
 	preflightRun()
 	out := stdoutW
+	reportCheckerBinaries(out)
 	fmt.Fprintln(out, "install status:")
 	homes := []string{os.Getenv("HOME") + "/.claude", os.Getenv("HOME") + "/.agents"}
 	for _, home := range homes {
@@ -118,6 +121,37 @@ func doctorRun(targets []string) error {
 	reportHookWiring(out)
 	reportUpdateReceipt(out)
 	return nil
+}
+
+// reportCheckerBinaries checks that every checker configured in the local
+// registry has its run binary on PATH, mirroring the java/structurizr/scorecard
+// prerequisite style. It runs ONLY when a registry exists in the current
+// directory; with no registry the doctor output is byte-for-byte unchanged, so
+// a design that never opted into external checkers sees nothing new.
+func reportCheckerBinaries(out io.Writer) {
+	path := checker.DefaultRegistryPath
+	if _, err := os.Stat(path); err != nil {
+		return
+	}
+	reg, err := checker.LoadRegistry(path)
+	if err != nil {
+		fmt.Fprintf(out, "  MISSING  checker registry %s is unreadable: %v\n", path, err)
+		return
+	}
+	ids := reg.IDs()
+	if len(ids) == 0 {
+		fmt.Fprintf(out, "  auto     checker registry %s has no checkers configured\n", path)
+		return
+	}
+	for _, id := range ids {
+		entry, _ := reg.Resolve(id)
+		bin := entry.Run[0]
+		if p, err := exec.LookPath(bin); err == nil {
+			fmt.Fprintf(out, "  ok       checker %s adapter %s (%s)\n", id, bin, p)
+		} else {
+			fmt.Fprintf(out, "  MISSING  checker %s adapter %s not on PATH -- 'machinery verify-checkers' cannot run it\n", id, bin)
+		}
+	}
 }
 
 // reportHookWiring checks the machinery plugin hook plumbing wherever a

@@ -1,0 +1,5 @@
+== Gk-pii-flow external checker ==
+  checked: 3 layers projected, 3 invariants claimed, 2 residuals (waived with reason), 1 committed projection fresh, 1 evidence bound to design, 1 elements covered
+  ok
+
+0 blocking (ERROR/DRIFT) finding(s)

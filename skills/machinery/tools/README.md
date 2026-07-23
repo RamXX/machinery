@@ -42,13 +42,18 @@ One line per subcommand:
 - `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
   `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate
   composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
-- `machinery check <design-dir> [--impl <code-dir>] [--gate gm,gs,gp,gi,gn,g2,g3,gx,gb,g4,gt,g5]` the deterministic
+- `machinery check <design-dir> [--impl <code-dir>] [--gate gm,gs,gp,gi,gn,g2,g3,gx,gk,gb,g4,gt,g5]` the deterministic
   gate suite (Gm-transition on rebuild/hybrid contracts; Gs-surface on legacy surface ledgers;
   Gp/Gi/Gn relational gates; G2-c4,
-  G3-machine, Gx-trace; Gb-plan on build plan structure, artifact-activated on `design/BUILD.md`;
+  G3-machine, Gx-trace; Gk-checkers on external-checker manifests, artifact-activated on
+  `design/checkers/*.checker.yaml`; Gb-plan on build plan structure, artifact-activated on `design/BUILD.md`;
   G4-import; Gt-tests on oracle ids in the test suite, runs only with `--impl`; G5-pack on
   decomposed designs). Gates fail on absence; every gate prints a `checked:`
   line. Exit is non-zero on any ERROR or DRIFT.
+- `machinery project <design-dir>` writes the committed projection for every external-checker
+  manifest (`design/checkers/*.checker.yaml`): the design slice a checker consumes, keyed by Modelith
+  stable id, with the binding `input_hash` mirrored under `generated` for adapters. The write side of
+  the Gk contract; see `docs/external-checkers.md`.
 - `machinery pack generate <parent-design>` emits the frozen per-subsystem contract packs
   (`design/packs/<id>.pack/`) from `decomposition.yaml`: the owned domain slice, the boundary event
   rows, the contract machine plus its TLA+ module, the delegated invariants, and a content hash.
@@ -67,6 +72,11 @@ One line per subcommand:
   zero pairs, so an empty formal directory can never read as a green suite. `--gen-only`
   regenerates without running TLC (no Java needed): the freshness half of the check for
   Java-free environments such as a nightly regen gate.
+- `machinery verify-checkers <design-dir> [--registry <path>] [--checker <id>]` the external-checker
+  engine phase (sibling of verify-formal): resolves each checker's binary through the git-ignored
+  `.machinery/checkers.local.yaml` registry, re-runs the adapter, and confirms the committed evidence
+  reproduces (verdict, `input_hash`, coverage). Needs the committed projection present; runs where the
+  checker's runtime is available, exactly as verify-formal needs Java.
 - `machinery doctor` checks dependencies and install status.
 - `machinery preflight` the same check, for use before a design session.
 - `machinery install` / `machinery uninstall` place or remove the skill and role docs in the agent

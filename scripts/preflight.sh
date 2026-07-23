@@ -63,8 +63,12 @@ fi
 
 # 6. docs gate (ci: docs job) ----------------------------------------------
 say "docs gate (no stale Python refs, no em dashes)"
+# The Python gate polices the machinery TOOLCHAIN surface (the same set ci.yml
+# scans), not examples/: an external-checker example adapter is user-supplied and
+# any-language by design (the pii-flow reference uses a Python + Souffle adapter),
+# so examples/ is excluded here to match the authoritative CI gate.
 if grep -rnE "python3|PyYAML|pyyaml|uv run|oracle_gen\.py|machine_lint\.py|machinery_check\.py|tla_gen\.py|refine_gen\.py|compose_gen\.py|diff-all\.sh|capture-golden\.sh" \
-    README.md CONTRIBUTING.md install.sh skills/ agents/ docs/ examples/ commands/ adapters/ hooks/ Makefile; then
+    README.md CONTRIBUTING.md install.sh skills/ agents/ docs/ commands/ adapters/ hooks/ Makefile; then
   fail "stale Python-toolchain reference in the doc surface"
 fi
 # Em dash spelled as an ANSI-C escape so this script stays free of the literal.
