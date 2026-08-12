@@ -1,5 +1,5 @@
 ---- MODULE MarketDataFeed ----
-\* machinery-version: v0.3.5-dev
+\* machinery-version: v0.3.6-dev
 EXTENDS Naturals
 
 \* Generated from MarketDataFeed.machine.json by machinery tla. Control-flow model.

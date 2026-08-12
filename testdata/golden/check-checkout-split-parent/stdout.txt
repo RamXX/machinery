@@ -1,6 +1,6 @@
 note: decomposed parent with no machines/; running g2,gb,g5 (G3/Gx run on the child designs; gt skipped: no machines)
 == G2-c4  Architecture Contract ==
-  checked: 2 boundaries, 3 externals, 4 allow rules, 4 deny rules, 7 dsl elements, 2 boundaries bound to dsl, 3 mitigation rows, 6 dependencies with mitigation rows, 3 event contracts
+  checked: 2 boundaries, 3 externals, 4 allow rules, 4 transitive pairs, 4 deny rules, 7 dsl elements, 2 boundaries bound to dsl, 3 mitigation rows, 6 dependencies with mitigation rows, 3 event contracts
   ok
 == Gb-plan  build plan structure ==
   checked: 0 local plans (decomposed parent; the children carry the plans)

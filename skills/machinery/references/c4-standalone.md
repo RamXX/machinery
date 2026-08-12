@@ -218,6 +218,10 @@ Field semantics:
   in `allow` and `deny` only: `baseline:` is an enumerated-edges ratchet, and a wildcard baseline
   rule (which would amnesty the whole edge space) is a G2 ERROR; run `machinery baseline` to
   enumerate today's edges instead.
+  The allow graph must be acyclic: a dependency cycle among boundaries is a G2 ERROR (one finding
+  per cycle, naming the members and a representative path); a cycle that closes only once
+  `baseline:` edges are unioned in is tolerated debt, reported as a warning until the ratchet
+  burns it down.
   Precedence: an explicit (literal) allow overrides a matching deny GLOB, which is how "deny the
   pattern, allow the one sanctioned edge" is written; but a literal allow and a literal deny of
   the same edge is a G2 error, not an override. Deny rules cannot reference boundaries that do

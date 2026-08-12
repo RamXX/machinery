@@ -1,5 +1,5 @@
 == G2-c4  Architecture Contract ==
-  checked: 1 boundaries, 2 externals, 2 allow rules, 4 dsl elements, 1 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 event contracts
+  checked: 1 boundaries, 2 externals, 2 allow rules, 2 transitive pairs, 4 dsl elements, 1 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 event contracts
   ok
 == G3-machine  machines + oracle ==
   checked: 1 machines, 3 transitions, 1 oracles fresh, 3 named units covered

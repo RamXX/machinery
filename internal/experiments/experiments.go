@@ -84,6 +84,10 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "maps to no Modelith entity", ExpectExit: true},
 	{Name: "placement-row-no-machine", Tool: "check", Mutation: "Gizmo placement",
 		ExpectSubstr: "`Gizmo` has no machine", ExpectExit: true},
+	// 2026-08-11 review: G2 validated the contract's rules but never the shape
+	// of the dependency graph they declare; a -> b plus b -> a passed clean.
+	{Name: "contract-cycle", Tool: "check", Mutation: "allow rules close widget.store -> widget.app into a cycle",
+		ExpectSubstr: "dependency cycle among widget.app, widget.store", ExpectExit: true},
 	{Name: "single-form-import-bypass", Tool: "check", Mutation: "import dbdriver",
 		ExpectSubstr: "widget.app -> external.db is denied", ExpectExit: true},
 	{Name: "undeclared-cross-boundary", Tool: "check", Mutation: "store imports app",

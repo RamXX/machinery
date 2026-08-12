@@ -420,7 +420,11 @@ func CheckC4(design string) *Gate {
 	allow := contractEdges(rules, "allow", g)
 	deny := contractEdges(rules, "deny", g)
 	baseline := contractEdges(rules, "baseline", g)
+	// wildcard rules resolve to no concrete node, so the graph checks below
+	// (acyclicity, transitive reach) run on the concrete edges only
+	allowConcrete := dropWildcardEdges(allow)
 	g.Count("allow rules", len(allow))
+	g.Count("transitive pairs", transitivePairs(allowConcrete))
 	g.Count("deny rules", len(deny))
 	g.Count("baseline rules", len(baseline))
 	// baseline is an enumerated-edges ratchet: a wildcard rule would amnesty
@@ -462,6 +466,32 @@ func CheckC4(design string) *Gate {
 			g.Errs = append(g.Errs, fmt.Sprintf("edge %s -> %s is both allowed and baselined; baseline marks tolerated violations, an allowed edge needs no amnesty", e[0], e[1]))
 			baseSet[e] = false
 		}
+	}
+	// the allow graph must be acyclic: a dependency cycle between boundaries
+	// destroys modularity and makes atomic change impossible, and a declared
+	// cycle cannot be an accident, so it is a hard ERROR. A cycle that closes
+	// only once baseline: edges are unioned in is the ratchet's tolerated
+	// debt, warned rather than errored so the burn-down stays visible.
+	_, allowAdj := depGraph(allowConcrete)
+	allowCycles := cyclicSCCs(allowConcrete)
+	reportedCycles := map[string]bool{}
+	for _, scc := range allowCycles {
+		members := strings.Join(scc, ", ")
+		reportedCycles[members] = true
+		if len(scc) == 1 {
+			g.Errs = append(g.Errs, fmt.Sprintf("allow rule %s -> %s is a self-cycle; a boundary cannot depend on itself; remove the rule or split the boundary", scc[0], scc[0]))
+			continue
+		}
+		g.Errs = append(g.Errs, fmt.Sprintf("dependency cycle among %s in allow rules (%s); break the cycle by extracting the shared dependency into its own boundary, or by inverting one edge", members, cyclePath(scc, allowAdj)))
+	}
+	unionEdges := append(append([][2]string{}, allowConcrete...), dropWildcardEdges(baseline)...)
+	_, unionAdj := depGraph(unionEdges)
+	for _, scc := range cyclicSCCs(unionEdges) {
+		members := strings.Join(scc, ", ")
+		if reportedCycles[members] {
+			continue
+		}
+		g.Warns = append(g.Warns, fmt.Sprintf("dependency cycle among %s closes only through baseline edges (%s); this is ratchet debt to burn down, not declared intent; the cycle disappears with the baselined edge", members, cyclePath(scc, unionAdj)))
 	}
 
 	dslPath := filepath.Join(design, "workspace.dsl")
@@ -620,6 +650,166 @@ func edgeSet(edges [][2]string) map[[2]string]bool {
 		m[e] = true
 	}
 	return m
+}
+
+// depGraph builds a deterministic adjacency view of concrete rule edges:
+// sorted unique node list, sorted deduplicated successor lists. Everything
+// downstream iterates these slices, never a map, so output never varies.
+func depGraph(edges [][2]string) ([]string, map[string][]string) {
+	nodeSet := map[string]bool{}
+	for _, e := range edges {
+		nodeSet[e[0]], nodeSet[e[1]] = true, true
+	}
+	var nodes []string
+	for n := range nodeSet {
+		nodes = append(nodes, n)
+	}
+	sort.Strings(nodes)
+	adj := map[string][]string{}
+	seen := map[[2]string]bool{}
+	for _, e := range edges {
+		if seen[e] {
+			continue
+		}
+		seen[e] = true
+		adj[e[0]] = append(adj[e[0]], e[1])
+	}
+	for k := range adj {
+		sort.Strings(adj[k])
+	}
+	return nodes, adj
+}
+
+// cyclicSCCs returns the cyclic strongly connected components of the edge
+// graph: every SCC of size > 1, plus every self-loop. Members are sorted and
+// the components are sorted by member list, so identical input always
+// produces byte-identical findings.
+func cyclicSCCs(edges [][2]string) [][]string {
+	nodes, adj := depGraph(edges)
+	index := map[string]int{}
+	low := map[string]int{}
+	onStack := map[string]bool{}
+	var stack []string
+	next := 0
+	var out [][]string
+	var connect func(v string)
+	connect = func(v string) {
+		index[v], low[v] = next, next
+		next++
+		stack = append(stack, v)
+		onStack[v] = true
+		for _, w := range adj[v] {
+			if _, visited := index[w]; !visited {
+				connect(w)
+				if low[w] < low[v] {
+					low[v] = low[w]
+				}
+			} else if onStack[w] && index[w] < low[v] {
+				low[v] = index[w]
+			}
+		}
+		if low[v] != index[v] {
+			return
+		}
+		var scc []string
+		for {
+			w := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			onStack[w] = false
+			scc = append(scc, w)
+			if w == v {
+				break
+			}
+		}
+		selfLoop := false
+		for _, w := range adj[v] {
+			if w == v {
+				selfLoop = true
+			}
+		}
+		if len(scc) > 1 || selfLoop {
+			sort.Strings(scc)
+			out = append(out, scc)
+		}
+	}
+	for _, v := range nodes {
+		if _, visited := index[v]; !visited {
+			connect(v)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return strings.Join(out[i], ", ") < strings.Join(out[j], ", ")
+	})
+	return out
+}
+
+// cyclePath renders one representative cycle through the SCC, starting and
+// ending at its first (sorted) member. BFS restricted to the SCC with sorted
+// successor order finds a shortest such cycle deterministically.
+func cyclePath(scc []string, adj map[string][]string) string {
+	start := scc[0]
+	members := setOf(scc)
+	for _, w := range adj[start] {
+		if w == start {
+			return start + " -> " + start
+		}
+	}
+	parent := map[string]string{}
+	visited := map[string]bool{start: true}
+	queue := []string{start}
+	for len(queue) > 0 {
+		u := queue[0]
+		queue = queue[1:]
+		if u != start {
+			for _, w := range adj[u] {
+				if w != start {
+					continue
+				}
+				var rev []string
+				for v := u; v != start; v = parent[v] {
+					rev = append(rev, v)
+				}
+				path := []string{start}
+				for i := len(rev) - 1; i >= 0; i-- {
+					path = append(path, rev[i])
+				}
+				return strings.Join(append(path, start), " -> ")
+			}
+		}
+		for _, w := range adj[u] {
+			if members[w] && !visited[w] {
+				visited[w] = true
+				parent[w] = u
+				queue = append(queue, w)
+			}
+		}
+	}
+	return start // unreachable: an SCC member always closes back to start
+}
+
+// transitivePairs counts the ordered boundary pairs (src, dst) connected by a
+// path of one or more concrete allow edges. Reported next to the declared
+// allow-rule count: when the closure materially exceeds the declared rules, a
+// shared boundary is laundering dependencies between boundaries the contract
+// claims are independent. A reported fact, never a finding.
+func transitivePairs(edges [][2]string) int {
+	nodes, adj := depGraph(edges)
+	n := 0
+	for _, src := range nodes {
+		reach := map[string]bool{}
+		frontier := append([]string{}, adj[src]...)
+		for len(frontier) > 0 {
+			v := frontier[len(frontier)-1]
+			frontier = frontier[:len(frontier)-1]
+			if reach[v] {
+				continue
+			}
+			reach[v] = true
+			frontier = append(frontier, adj[v]...)
+		}
+		n += len(reach)
+	}
+	return n
 }
 
 // uniqueDuplicates returns the unique values in first-occurrence order (the

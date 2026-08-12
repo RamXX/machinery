@@ -14,7 +14,7 @@
   checked: 4 records, 2 references, 2 invariants carried, 5 solver commands generated, 8 tenant oracle rows generated, 2 committed artifacts fresh (byte-identical)
   ok
 == G2-c4  Architecture Contract ==
-  checked: 6 boundaries, 1 externals, 12 allow rules, 2 deny rules, 15 dsl elements, 6 boundaries bound to dsl, 9 mitigation rows, 4 dependencies with mitigation rows
+  checked: 6 boundaries, 1 externals, 12 allow rules, 16 transitive pairs, 2 deny rules, 15 dsl elements, 6 boundaries bound to dsl, 9 mitigation rows, 4 dependencies with mitigation rows
   ok
 == G3-machine  machines + oracle ==
   warn   Deal.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound

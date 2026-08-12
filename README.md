@@ -130,7 +130,7 @@ Opt-in   External     bring-your-own deterministic checker (SAST, AST, Datalog, 
          tool: projection is fresh; committed evidence binds to it; verdict is pass; coverage complete
          attested: the manifest claims the elements the checker is responsible for
 Phase 2  C4           architecture + contract
-         tool: G2-c4 (contract parses and binds; mitigation coverage)
+         tool: G2-c4 (contract parses and binds; allow graph acyclic; mitigation coverage)
          attested: every action owned; interface contracts; NFR record
 Phase 3  XState       state machines
          tool: G3-machine (lint; every invoke has onError + timeout; oracle fresh; matrix reconciled)
@@ -505,7 +505,7 @@ version matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.3.5        # force an exact release
+machinery update --version v0.3.6        # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
@@ -584,7 +584,7 @@ make verify-formal   # regenerates and checks all 34 TLC proofs + the relational
 | Gp-policy | designs with a policy annotation only: it binds to the domain model, covers every top-level invariant, and the committed `Policy.als` and `Policy.oracle.md` byte-match a fresh generation. |
 | Gi-integrity | designs with an integrity annotation only: it binds to the domain model and the committed `Integrity.als` byte-matches a fresh generation. |
 | Gn-isolation | designs with an isolation annotation only: it binds to the domain model and the committed `Isolation.als` and `Isolation.oracle.md` byte-match a fresh generation. |
-| G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, and every dependency has a mitigation row. |
+| G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, the allow graph is acyclic (cycles closing only through `baseline:` edges warn as ratchet debt), and every dependency has a mitigation row. |
 | G3-machine | machines pass structural lint, committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
 | Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows. |
 | Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, and the skeleton DoD cites a committed oracle id. |

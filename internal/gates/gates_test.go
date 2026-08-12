@@ -95,6 +95,128 @@ func TestG2EventContractTablesConcatenate(t *testing.T) {
 	}
 }
 
+// c4GraphFixture builds a minimal design whose contract declares the given
+// boundary ids and dependency_rules block, and runs G2 over it.
+func c4GraphFixture(t *testing.T, ids []string, rules string) *Gate {
+	t.Helper()
+	design := t.TempDir()
+	var comps, bounds strings.Builder
+	for _, id := range ids {
+		el := id[strings.LastIndex(id, ".")+1:]
+		comps.WriteString("      " + el + " = component \"" + el + "\" \"logic\" \"Go\"\n")
+		bounds.WriteString("  - id: " + id + "\n    code: [\"" + el + "/**\"]\n")
+	}
+	dsl := "workspace \"W\" \"sys\" {\n  model {\n    sys = softwareSystem \"S\" \"sys\" {\n" +
+		comps.String() + "    }\n  }\n}\n"
+	arch := "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
+		bounds.String() + rules + "```\n"
+	mustWrite(t, filepath.Join(design, "workspace.dsl"), dsl)
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
+	return CheckC4(design)
+}
+
+// G2 must reject a cyclic allow graph: a declared cycle destroys modularity
+// and cannot be an accident. Cycles closing only through baseline edges are
+// the ratchet's tolerated debt: a warn, never a gate failure.
+func TestG2AllowGraphAcyclicity(t *testing.T) {
+	cases := []struct {
+		name  string
+		ids   []string
+		rules string
+		errs  []string // required substrings, one per expected cycle finding
+		warns []string // required substrings, one per expected warn
+	}{
+		{
+			name: "clean DAG has no findings",
+			ids:  []string{"p.a", "p.b", "p.c"},
+			rules: "dependency_rules:\n  allow:\n" +
+				"    - p.a -> p.b\n    - p.b -> p.c\n    - p.a -> p.c\n",
+		},
+		{
+			name: "two-node cycle is one error naming both members",
+			ids:  []string{"p.a", "p.b"},
+			rules: "dependency_rules:\n  allow:\n" +
+				"    - p.a -> p.b\n    - p.b -> p.a\n",
+			errs: []string{"dependency cycle among p.a, p.b in allow rules (p.a -> p.b -> p.a)"},
+		},
+		{
+			name:  "self-loop is an error",
+			ids:   []string{"p.a"},
+			rules: "dependency_rules:\n  allow:\n    - p.a -> p.a\n",
+			errs:  []string{"allow rule p.a -> p.a is a self-cycle"},
+		},
+		{
+			name: "three-node cycle is one SCC, not three findings",
+			ids:  []string{"p.a", "p.b", "p.c"},
+			rules: "dependency_rules:\n  allow:\n" +
+				"    - p.a -> p.b\n    - p.b -> p.c\n    - p.c -> p.a\n",
+			errs: []string{"dependency cycle among p.a, p.b, p.c in allow rules (p.a -> p.b -> p.c -> p.a)"},
+		},
+		{
+			name: "two independent cycles are two findings, deterministically ordered",
+			ids:  []string{"p.a", "p.b", "p.c", "p.d"},
+			rules: "dependency_rules:\n  allow:\n" +
+				"    - p.b -> p.a\n    - p.a -> p.b\n    - p.d -> p.c\n    - p.c -> p.d\n",
+			errs: []string{
+				"dependency cycle among p.a, p.b in allow rules (p.a -> p.b -> p.a)",
+				"dependency cycle among p.c, p.d in allow rules (p.c -> p.d -> p.c)",
+			},
+		},
+		{
+			name: "cycle closing only via baseline is a warn, not an error",
+			ids:  []string{"p.a", "p.b"},
+			rules: "dependency_rules:\n  allow:\n    - p.a -> p.b\n" +
+				"  deny:\n    - \"p.b -> p.a\"\n  baseline:\n    - p.b -> p.a\n",
+			warns: []string{"dependency cycle among p.a, p.b closes only through baseline edges (p.a -> p.b -> p.a)"},
+		},
+		{
+			name: "wildcard edges fabricate no cycle",
+			ids:  []string{"platform.a", "platform.b"},
+			rules: "dependency_rules:\n  allow:\n" +
+				"    - platform.a -> platform.b\n    - \"platform.* -> platform.*\"\n",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := c4GraphFixture(t, tc.ids, tc.rules)
+			if len(g.Errs) != len(tc.errs) {
+				t.Fatalf("errs = %v, want %d finding(s) %v", g.Errs, len(tc.errs), tc.errs)
+			}
+			for i, want := range tc.errs {
+				if !strings.Contains(g.Errs[i], want) {
+					t.Errorf("errs[%d] = %q, want substring %q", i, g.Errs[i], want)
+				}
+			}
+			if len(g.Warns) != len(tc.warns) {
+				t.Fatalf("warns = %v, want %d warn(s) %v", g.Warns, len(tc.warns), tc.warns)
+			}
+			for i, want := range tc.warns {
+				if !strings.Contains(g.Warns[i], want) {
+					t.Errorf("warns[%d] = %q, want substring %q", i, g.Warns[i], want)
+				}
+			}
+		})
+	}
+}
+
+// The transitive-pairs count is the allow graph's reachable ordered pairs:
+// a reported fact next to the declared-edge count, never a finding.
+func TestG2TransitivePairsCount(t *testing.T) {
+	g := c4GraphFixture(t, []string{"p.a", "p.b", "p.c", "p.d"},
+		"dependency_rules:\n  allow:\n"+
+			"    - p.a -> p.b\n    - p.b -> p.c\n    - p.a -> p.d\n")
+	if len(g.Errs) != 0 {
+		t.Fatalf("unexpected errors: %v", g.Errs)
+	}
+	// a->b, a->c (via b), a->d, b->c
+	if got := g.Counts["transitive pairs"]; got != 4 {
+		t.Errorf("transitive pairs = %d, want 4: %+v", got, g.Counts)
+	}
+	if g.Counts["allow rules"] != 3 {
+		t.Errorf("allow rules = %d, want 3", g.Counts["allow rules"])
+	}
+}
+
 // The Gx placement waiver must sit in the component or machine-placement
 // cell and carry a non-empty reason: '(no machine:)' with an empty reason, or
 // the token buried elsewhere in the row, waives nothing (GATE-5).

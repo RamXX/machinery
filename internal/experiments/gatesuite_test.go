@@ -23,7 +23,7 @@ func init() {
 		"retargeted-transition-drift", "unit-without-namedunit-row", "unenforced-invariant",
 		"invariant-not-whole-token", "machine-state-not-in-enum", "enum-value-without-state",
 		"machine-event-not-action", "unmapped-machine", "placement-row-no-machine",
-		"single-form-import-bypass", "undeclared-cross-boundary", "import-unexposed-internals",
+		"contract-cycle", "single-form-import-bypass", "undeclared-cross-boundary", "import-unexposed-internals",
 		"source-outside-contract")
 }
 
@@ -562,6 +562,21 @@ func TestPlacementWaiverIsAccepted(t *testing.T) {
 			"| `Gizmo` | pure function (no machine: stateless transform) | - | - |")
 	if containsAny(gates.CheckTraceability(design).Errs, "Gizmo") {
 		t.Error("placement waiver rejected")
+	}
+}
+
+// ------------------- experiment: contract dependency cycle -----------------
+
+// A declared allow cycle (a -> b plus b -> a) is a G2 error: the contract's
+// own dependency graph must be a DAG, not only rule-consistent.
+func TestContractCycleIsError(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"),
+		"- widget.app -> widget.store",
+		"- widget.app -> widget.store\n    - widget.store -> widget.app")
+	if !containsAny(gates.CheckC4(design).Errs,
+		"dependency cycle among widget.app, widget.store") {
+		t.Error("contract allow cycle passed G2")
 	}
 }
 
