@@ -39,14 +39,19 @@ var (
 
 // Options configures Install.
 type Options struct {
-	Homes   []string  // target agent homes; the first is canonical (real files)
-	Targets []string  // optional first-class host adapters: claude, codex, opencode, all
-	From    string    // local source dir (contains skills/ and agents/); skips download
-	Copy    bool      // copy into every home instead of symlinking the non-canonical ones
-	Version string    // release tag to fetch when From is empty; "", "latest", or a non-release tag -> newest release
-	Repo    string    // source repo owner/name (default RamXX/machinery)
-	Out     io.Writer // progress messages (nil -> discarded)
-	Record  bool      // persist this successful topology for `machinery update`
+	Homes   []string // target agent homes; the first is canonical (real files)
+	Targets []string // optional first-class host adapters: claude, codex, opencode, all
+	From    string   // local source dir (contains skills/ and agents/); skips download
+	Copy    bool     // copy into every home instead of symlinking the non-canonical ones
+	Version string   // release tag to fetch when From is empty; "", "latest", or a non-release tag -> newest release
+	// VersionExplicit records that the user asked for Version (--version)
+	// rather than it defaulting to the binary's own version. An explicit tag
+	// with no published release fails loudly; the binary's own version falls
+	// back to the newest release (a local build ahead of its tag).
+	VersionExplicit bool
+	Repo            string    // source repo owner/name (default RamXX/machinery)
+	Out             io.Writer // progress messages (nil -> discarded)
+	Record          bool      // persist this successful topology for `machinery update`
 }
 
 // DefaultHomes is the canonical-first default target list: ~/.agents then ~/.claude.
@@ -147,7 +152,7 @@ func resolveInstallSource(opts Options, out io.Writer) (string, func(), error) {
 	if repo == "" {
 		repo = defaultRepo
 	}
-	src, cleanup, err := fetchSource(repo, opts.Version, out)
+	src, cleanup, err := fetchSource(repo, opts.Version, opts.VersionExplicit, out)
 	if err != nil {
 		return "", func() {}, err
 	}
@@ -333,9 +338,11 @@ func copyFile(src, dst string) error {
 }
 
 // fetchSource downloads and extracts the source tarball for the resolved tag,
-// returning the extracted top-level directory and a cleanup func.
-func fetchSource(repo, version string, out io.Writer) (string, func(), error) {
-	tag, err := resolveTag(repo, version)
+// returning the extracted top-level directory and a cleanup func. explicit
+// says the version was requested by the user rather than defaulted from the
+// binary (see resolveTag).
+func fetchSource(repo, version string, explicit bool, out io.Writer) (string, func(), error) {
+	tag, err := resolveTag(repo, version, explicit)
 	if err != nil {
 		return "", nil, err
 	}
@@ -364,14 +371,20 @@ func fetchSource(repo, version string, out io.Writer) (string, func(), error) {
 	return top, cleanup, nil
 }
 
-// resolveTag returns an explicit release tag as-is, otherwise the newest release.
-func resolveTag(repo, version string) (string, error) {
+// resolveTag maps a requested version to a release tag. A well-formed release
+// tag the user asked for explicitly is returned as-is: an explicit request is
+// never substituted, so a missing release fails loudly downstream. The same
+// tag arriving implicitly (the binary's own version, no --version flag) is
+// used when its release exists and otherwise falls back to the newest release,
+// so a locally built binary ahead of its tag still installs. Anything else
+// (blank, "latest", a non-release string) resolves to the newest release.
+func resolveTag(repo, version string, explicit bool) (string, error) {
 	v := strings.TrimSpace(version)
 	if releaseTag.MatchString(v) {
-		return v, nil
+		if explicit || releaseExists(repo, v) {
+			return v, nil
+		}
 	}
-	// A blank, "latest", or non-release version (e.g. a -dev binary) resolves
-	// to the newest published release.
 	tmp, err := os.CreateTemp("", "machinery-rel-*.json")
 	if err != nil {
 		return "", err
@@ -395,6 +408,19 @@ func resolveTag(repo, version string) (string, error) {
 		return "", fmt.Errorf("no published release found for %s", repo)
 	}
 	return rel.TagName, nil
+}
+
+// releaseExists reports whether the repo has a published release for the tag.
+// Every failure (404 included) reports false: the caller then falls back to
+// the newest release, where a genuine network failure still surfaces loudly.
+func releaseExists(repo, tag string) bool {
+	tmp, err := os.CreateTemp("", "machinery-tag-*.json")
+	if err != nil {
+		return false
+	}
+	defer os.Remove(tmp.Name())
+	tmp.Close()
+	return download(apiBase+"/repos/"+repo+"/releases/tags/"+tag, tmp.Name()) == nil
 }
 
 func download(url, dst string) error {

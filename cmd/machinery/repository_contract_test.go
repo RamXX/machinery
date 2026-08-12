@@ -31,7 +31,10 @@ func TestRepositoryVersionContracts(t *testing.T) {
 	if err := json.Unmarshal([]byte(mustRepositoryFile(t, filepath.Join(root, ".claude-plugin", "plugin.json"))), &plugin); err != nil {
 		t.Fatal(err)
 	}
-	wantDev := "v" + plugin.Version + "-dev"
+	// Versions are numeric only: the binary's bare-build default is the plain
+	// plugin version, with no -dev or other pre-release suffix, so a local
+	// build reports the same version as the release it corresponds to.
+	want := "v" + plugin.Version
 	var codexPlugin struct {
 		Version string `json:"version"`
 		Skills  string `json:"skills"`
@@ -42,12 +45,15 @@ func TestRepositoryVersionContracts(t *testing.T) {
 	if codexPlugin.Version != plugin.Version || codexPlugin.Skills != "./skills/" {
 		t.Fatalf("Codex manifest = %+v, want Claude version %s and shared skills path", codexPlugin, plugin.Version)
 	}
-	if version != wantDev {
-		t.Fatalf("binary dev version = %q, plugin metadata requires %q", version, wantDev)
+	if version != want {
+		t.Fatalf("binary default version = %q, plugin metadata requires %q", version, want)
+	}
+	if strings.Contains(version, "-") {
+		t.Fatalf("binary default version %q carries a suffix; versions are numeric only", version)
 	}
 	makefile := mustRepositoryFile(t, filepath.Join(root, "Makefile"))
-	if !strings.Contains(makefile, "INTERNAL_VERSION := "+wantDev) {
-		t.Fatalf("Makefile INTERNAL_VERSION must be %s", wantDev)
+	if !strings.Contains(makefile, "INTERNAL_VERSION := "+want+"\n") {
+		t.Fatalf("Makefile INTERNAL_VERSION must be %s", want)
 	}
 }
 
@@ -108,7 +114,7 @@ func mustRepositoryFile(t *testing.T, path string) string {
 	return string(raw)
 }
 
-// The stamp default in internal/version must match the binary's -dev default:
+// The stamp default in internal/version must match the binary's default:
 // main() copies the ldflags value over at startup, but in-process library use
 // (tests, gates) sees the internal default, and a drift between the two would
 // stamp artifacts with a version the binary never reports.

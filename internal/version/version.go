@@ -10,10 +10,12 @@ import "strings"
 
 // Version is the machinery build version stamped into generated artifacts.
 // cmd/machinery overwrites it at startup with the ldflags-injected binary
-// version; the default here mirrors the binary's own -dev default so
-// in-process library use (tests, gates) stamps what a bare build reports.
-// A contract test in cmd/machinery pins the two defaults together.
-var Version = "v0.3.6-dev"
+// version; the default here mirrors the binary's own default so in-process
+// library use (tests, gates) stamps what a bare build reports. Versions are
+// numeric only (no -dev or other pre-release suffix): a local build reports
+// the same plain version as the release it corresponds to. A contract test
+// in cmd/machinery pins the two defaults together.
+var Version = "v0.3.6"
 
 // marker is the stamp key: every stamp line contains exactly
 // "machinery-version: <version>" inside the format's comment syntax.
