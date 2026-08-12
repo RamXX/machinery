@@ -120,9 +120,11 @@ matters, just with better instruments: a recurring slot (monthly works) on shrin
 burn-down so the "ratchet can tighten" notes become the agenda, and treating a quarter
 with zero shrinkage as the gate becoming wallpaper. G4 prints the ratchet snapshot's date and
 age in days as a note on every run, so an aging amnesty is visible in every gate output, not
-only in the review slot. Two related G2 rules hold the ratchet's shape: wildcards are forbidden
+only in the review slot. Three related G2 rules hold the ratchet's shape: wildcards are forbidden
 in `baseline:` rules (a wildcard would amnesty the whole edge space; they belong in allow/deny
-only), and `allow` plus `baseline` on one edge is a contradiction.
+only), `allow` plus `baseline` on one edge is a contradiction, and a dependency cycle that closes
+only through `baseline:` edges is a warning (debt to burn down), while a cycle declared in
+`allow:` alone is a hard error.
 
 ### Stage 2: domain archaeology and the first machines (add gate g3)
 

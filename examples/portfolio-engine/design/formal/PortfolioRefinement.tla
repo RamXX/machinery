@@ -1,5 +1,5 @@
 ---- MODULE PortfolioRefinement ----
-\* machinery-version: v0.3.5-dev
+\* machinery-version: v0.3.6-dev
 \* GENERATED. Proof that PortfolioData refines PortfolioContract under a refinement mapping.
 EXTENDS PortfolioData
 

@@ -1,7 +1,7 @@
 ---
 name: machinery
 metadata:
-  version: "0.3.5"
+  version: "0.3.6"
 description: >
   Design software as a build-ready blueprint, greenfield, brownfield, hybrid, or rebuild. Use when the user
   wants to design a new system, service, or app from scratch, produce a BUILD.md for a
@@ -354,7 +354,10 @@ in `references/c4-standalone.md`.
 **GATE 2:** run `machinery check <design> --gate g2`. **G2-c4** verifies, deterministically:
 the contract parses (a yaml code fence starting with `contract_version` under a heading containing
 "Architecture Contract"), every boundary binds to a `workspace.dsl` element, no duplicate ids, no
-edge both allowed and denied, no rule referencing an undeclared boundary or external, and mitigation
+edge both allowed and denied, no rule referencing an undeclared boundary or external, the allow
+graph is acyclic (a declared dependency cycle is a hard error; a cycle that closes only through
+`baseline:` edges is ratchet debt, reported as a warning; the `checked:` line also reports the
+allow graph's transitive reachable pairs next to the declared-rule count), and mitigation
 coverage: every contract external plus every DSL element tagged Database, Queue, or External has a
 mitigation row naming it backticked in the first column (a backticked name that matches nothing is
 an error). Mitigation obligations exist only for DECLARED dependencies: a dependency never declared

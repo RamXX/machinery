@@ -15,7 +15,7 @@ import (
 // Makefile and the release workflow both inject it). The -dev default below is
 // what a bare `go build` without ldflags reports, so an ad-hoc build is never
 // mistaken for a released binary.
-var version = "v0.3.5-dev"
+var version = "v0.3.6-dev"
 
 func main() {
 	// propagate the (possibly ldflags-injected) binary version to the
