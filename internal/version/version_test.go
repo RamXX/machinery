@@ -61,6 +61,9 @@ func TestStampOf(t *testing.T) {
 	cases := []struct{ doc, want string }{
 		{"<!-- machinery-version: v0.1.2 -->\nbody\n", "v0.1.2"},
 		{`\* machinery-version: v9.9.9` + "\nCONSTANT X = 1\n", "v9.9.9"},
+		// suffixed stamps predate the numeric-only convention; artifacts
+		// stamped by older binaries exist in the wild, so parsing them must
+		// keep working even though new stamps never carry a suffix
 		{"// machinery-version: v0.3.3-dev\nsig S {}\n", "v0.3.3-dev"},
 		{"no stamp\n", ""},
 	}

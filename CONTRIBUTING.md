@@ -55,6 +55,11 @@ read by CI, `make lint-install`, and preflight. To bump it: edit that file, run
 `make lint-install`, then `make preflight`. If it is clean locally, CI's lint job
 runs the identical binary.
 
+## Versioning
+
+Versions are numeric only (`vX.Y.Z`); local builds are not marked, so a bare
+`go build` reports the same plain version as the release it corresponds to.
+
 ## Everything else
 
 `make help` lists the contributor targets (build, test, golden, check,

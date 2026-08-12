@@ -367,13 +367,121 @@ func TestUninstallFailsOnUnwritableHome(t *testing.T) {
 }
 
 func TestResolveTagExplicitIsOffline(t *testing.T) {
-	// A well-formed release tag returns as-is with no network call.
-	got, err := resolveTag("RamXX/machinery", "v0.1.1")
+	// An explicitly requested release tag returns as-is with no network call:
+	// an explicit request is never substituted, so a missing release fails
+	// loudly at download time instead of resolving to something else.
+	got, err := resolveTag("RamXX/machinery", "v0.1.1", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got != "v0.1.1" {
 		t.Errorf("resolveTag = %q, want v0.1.1", got)
+	}
+}
+
+// An implicit version (the binary's own default) whose release exists
+// resolves to itself, not to the latest release.
+func TestResolveTagImplicitUsesExistingRelease(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/releases/tags/v0.1.1"):
+			_, _ = w.Write([]byte(`{"tag_name":"v0.1.1"}`))
+		case strings.HasSuffix(r.URL.Path, "/releases/latest"):
+			_, _ = w.Write([]byte(`{"tag_name":"v9.9.9"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	old := apiBase
+	apiBase = srv.URL
+	defer func() { apiBase = old }()
+	got, err := resolveTag("a/b", "v0.1.1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "v0.1.1" {
+		t.Errorf("resolveTag = %q, want the binary's own published release v0.1.1", got)
+	}
+}
+
+// An implicit version with no published release falls back to the latest
+// release: a locally built binary ahead of its tag must still install.
+func TestResolveTagImplicitFallsBackWhenUnpublished(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/releases/latest") {
+			_, _ = w.Write([]byte(`{"tag_name":"v9.9.9"}`))
+			return
+		}
+		http.NotFound(w, r) // the tag probe 404s
+	}))
+	defer srv.Close()
+	old := apiBase
+	apiBase = srv.URL
+	defer func() { apiBase = old }()
+	got, err := resolveTag("a/b", "v0.0.9", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "v9.9.9" {
+		t.Errorf("resolveTag = %q, want fallback to latest v9.9.9", got)
+	}
+}
+
+// An explicit --version whose release does not exist must fail loudly, never
+// be silently substituted with the latest release.
+func TestInstallExplicitMissingVersionFailsLoudly(t *testing.T) {
+	tarball := sourceTarball(t, "machinery-9.9.9")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/releases/latest"):
+			_, _ = w.Write([]byte(`{"tag_name":"v9.9.9"}`))
+		case strings.HasSuffix(r.URL.Path, "/archive/refs/tags/v9.9.9.tar.gz"):
+			_, _ = w.Write(tarball)
+		default:
+			http.NotFound(w, r) // v0.0.9 has no release and no tarball
+		}
+	}))
+	defer srv.Close()
+	oldGH, oldAPI := githubBase, apiBase
+	githubBase, apiBase = srv.URL, srv.URL
+	defer func() { githubBase, apiBase = oldGH, oldAPI }()
+
+	root := t.TempDir()
+	err := Install(Options{Homes: []string{filepath.Join(root, ".a")}, Repo: "a/b", Version: "v0.0.9", VersionExplicit: true})
+	if err == nil {
+		t.Fatal("explicit missing version must fail, not fall back to latest")
+	}
+	if !strings.Contains(err.Error(), "v0.0.9") {
+		t.Errorf("error should name the requested version: %v", err)
+	}
+}
+
+// The same missing version arriving implicitly (the binary's own default)
+// installs from the latest release instead.
+func TestInstallImplicitUnpublishedVersionFallsBackToLatest(t *testing.T) {
+	tarball := sourceTarball(t, "machinery-9.9.9")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/releases/latest"):
+			_, _ = w.Write([]byte(`{"tag_name":"v9.9.9"}`))
+		case strings.HasSuffix(r.URL.Path, "/archive/refs/tags/v9.9.9.tar.gz"):
+			_, _ = w.Write(tarball)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	oldGH, oldAPI := githubBase, apiBase
+	githubBase, apiBase = srv.URL, srv.URL
+	defer func() { githubBase, apiBase = oldGH, oldAPI }()
+
+	home := filepath.Join(t.TempDir(), ".a")
+	if err := Install(Options{Homes: []string{home}, Repo: "a/b", Version: "v0.0.9"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(home, "skills", "machinery", "SKILL.md")); err != nil {
+		t.Errorf("fallback install missing skill: %v", err)
 	}
 }
 
@@ -496,7 +604,7 @@ func TestResolveTagRejectsEmpty(t *testing.T) {
 	old := apiBase
 	apiBase = srv.URL
 	defer func() { apiBase = old }()
-	if _, err := resolveTag("a/b", "latest"); err == nil {
+	if _, err := resolveTag("a/b", "latest", false); err == nil {
 		t.Fatal("expected an error for an empty tag_name")
 	}
 }
@@ -509,7 +617,7 @@ func TestResolveTagRejectsBadJSON(t *testing.T) {
 	old := apiBase
 	apiBase = srv.URL
 	defer func() { apiBase = old }()
-	if _, err := resolveTag("a/b", ""); err == nil {
+	if _, err := resolveTag("a/b", "", false); err == nil {
 		t.Fatal("expected an error for malformed release JSON")
 	}
 }

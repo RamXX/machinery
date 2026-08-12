@@ -26,7 +26,8 @@ With no --target, the first home holds the real files and the rest are
 symlinked to it, preserving the original ~/.agents + ~/.claude behavior. Use
 --target to install the host-specific assets machinery supports for that host.
 With no --from, files are fetched from the release that matches this binary's
-version (a -dev binary uses the latest release).
+version, falling back to the latest release when that version has no
+published release yet; an explicit --version is fetched exactly or fails.
 
   machinery install
   machinery install --target codex
@@ -41,14 +42,15 @@ version (a -dev binary uses the latest release).
 				v = version // this binary's version (main.version)
 			}
 			return install.Install(install.Options{
-				Homes:   homes,
-				Targets: targets,
-				From:    from,
-				Copy:    copyAll,
-				Version: v,
-				Repo:    repo,
-				Out:     cmd.OutOrStdout(),
-				Record:  true,
+				Homes:           homes,
+				Targets:         targets,
+				From:            from,
+				Copy:            copyAll,
+				Version:         v,
+				VersionExplicit: verFlag != "",
+				Repo:            repo,
+				Out:             cmd.OutOrStdout(),
+				Record:          true,
 			})
 		},
 	}

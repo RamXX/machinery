@@ -69,7 +69,9 @@ func Update(opts UpdateOptions) (UpdateResult, error) {
 	if err != nil {
 		return UpdateResult{}, err
 	}
-	tag, err := resolveTag(repo, opts.Version)
+	// update pins "latest" by default and treats any pinned tag as an explicit
+	// request: it is never substituted, a missing release fails loudly
+	tag, err := resolveTag(repo, opts.Version, true)
 	if err != nil {
 		return UpdateResult{}, err
 	}
@@ -86,7 +88,7 @@ func Update(opts UpdateOptions) (UpdateResult, error) {
 	var source string
 	if len(plan.HomeInstalls) > 0 || len(plan.Targets) > 0 {
 		var cleanupSource func()
-		source, cleanupSource, err = fetchSource(repo, tag, out)
+		source, cleanupSource, err = fetchSource(repo, tag, true, out) // tag is already resolved
 		if err != nil {
 			return UpdateResult{}, err
 		}
