@@ -18,6 +18,7 @@ glossary:
   ProcessingActivity: "A defined operation performed on a `DataSubject` record for a stated purpose."
   Redactor: "A processing step that strips or masks sensitive attributes before data moves further downstream."
   AnalyticsExport: "The sink where processed data leaves the system, for example to a reporting or analytics destination."
+  Controller: "The operator of the processing system, responsible for registering subjects and honoring erasure."
 
 enums:
   SubjectStatus:
@@ -37,9 +38,13 @@ entities:
       - {name: status, type: SubjectStatus}
     relationships:
       - {entity: ProcessingActivity, cardinality: 1:n}
+    actions:
+      - {name: register, actor: Controller, description: "Record a new subject whose data may be processed. Postcondition: status Active."}
+      - {name: erase, actor: Controller, description: "Honor an erasure request: destroy the subject's data and record the erasure evidence. Precondition: status Active. Postcondition: status Erased.", preserves: [subject-erased-terminal]}
     invariants:
       - {id: priv-consent-required, statement: "Personal data is processed only with recorded consent."}
       - {id: priv-minimal-collection, statement: "Only attributes necessary for the stated purpose are collected."}
+      - {id: subject-erased-terminal, statement: "A `DataSubject` in Erased accepts no further lifecycle actions and is never processed again; erasure is terminal."}
 
   ProcessingActivity:
     definition: >
@@ -72,3 +77,14 @@ entities:
 
 invariants:
   - {id: priv-no-unredacted-export, statement: "No sensitive attribute reaches an export sink without passing through redaction."}
+
+scenarios:
+  - name: Erasure is honored and exports stay redacted
+    description: "The pipeline end to end: registration, processing through redaction, export, then terminal erasure."
+    actors: [Controller]
+    steps:
+      - "A `Controller` registers a `DataSubject`; its status is Active."
+      - "A `ProcessingActivity` handles the subject's record for its stated purpose and routes the output through its `Redactor`."
+      - "The redacted output reaches the `AnalyticsExport` sink; no sensitive attribute leaves unredacted."
+      - "The `Controller` erases the subject; its status becomes Erased, the erasure evidence is recorded, and no further processing occurs."
+    invariants_touched: [priv-no-unredacted-export, subject-erased-terminal]

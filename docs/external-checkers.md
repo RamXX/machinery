@@ -333,7 +333,11 @@ Each checker is fully independent and shares nothing but the design:
 - **Its own coverage claim.** Checkers can partition the invariant space (above, `pii-flow` waives
   `priv-minimal-collection` as a residual and `minimality` picks it up) or deliberately overlap for
   redundant assurance. The union of all claims is what gets gated; an invariant no checker claims is
-  simply ungated, a legitimate choice rather than a hole the gate invents.
+  simply ungated, a legitimate choice rather than a hole the gate invents. A claim is also a
+  **carrier**: Gc-carrier credits a checker-claimed invariant as carried (Gk reconciles the evidence
+  behind the claim), and a checker's declared residuals count as waivers-with-reason, so the checker
+  layer participates in the same invariant-carrier reconciliation as `preserves`, the relational
+  layers, and the machine matrices.
 - **Its own engine, in any language.** One `.machinery/checkers.local.yaml` holds one `run`/`verify`
   entry per id, so a Datalog checker, a SAST, a units checker, and a proprietary rule engine each
   resolve to their own binary. `machinery verify-checkers` runs them all (or `--checker <id>` for one),
@@ -426,7 +430,9 @@ design remain neutral.
 
 ### The reference: a Datalog sensitive-data-flow checker
 
-[`examples/pii-flow/`](../examples/pii-flow/) is a complete checker wired into a small design, worth
+[`examples/pii-flow/`](../examples/pii-flow/) is a complete checker wired into a small but complete
+design (the full default gate suite passes on it: model, lifecycle machine, Architecture Contract
+with a checked `no_path` assertion, and the checker), worth
 reading end to end rather than taking on faith:
 
 - **the model**, `examples/pii-flow/design/pii-flow.modelith.yaml`: a `DataSubject` who supplies

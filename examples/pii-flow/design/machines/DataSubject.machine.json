@@ -1,0 +1,17 @@
+{
+ "id": "datasubject",
+ "_comment": "DataSubject lifecycle. Placement: db row in pii.pipeline, single writer per subject id. Erasure is terminal (subject-erased-terminal): Erased is final, so no event can process the subject further; that is a structural property, not a guard.",
+ "initial": "Active",
+ "context": {"subjectId": null},
+ "states": {
+  "Active": {
+   "on": {
+    "erase": {"target": "Erased", "actions": "recordErasure"}
+   },
+   "_ignores": {
+    "register": "creation event; a duplicate registration is deduped by DataSubject id, never a transition"
+   }
+  },
+  "Erased": {"type": "final"}
+ }
+}
