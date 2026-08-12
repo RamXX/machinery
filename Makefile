@@ -65,6 +65,7 @@ check: build ## Run the deterministic gate suite across the bundled examples
 	@$(MACH) check examples/checkout-split/parent/design
 	@$(MACH) check examples/checkout-split/orders/design
 	@$(MACH) check examples/checkout-split/payments/design
+	@$(MACH) check examples/pii-flow/design
 
 verify-formal: build ## Regenerate + TLC-check the whole formal suite across the examples (needs Java)
 	@echo "== go-crm =="; $(MACH) verify-formal examples/go-crm/design

@@ -1,8 +1,9 @@
 # ci.yml - the required pipeline. Every push and PR must pass this.
 # Coverage: build, lint (golangci-lint + gofmt + vet), unit tests (including
 # the adversarial gate-experiment suite and the golden-corpus regression net),
-# the example gate suites (all six design roots), and the go-crm impl tests. A single failure
-# blocks merge.
+# the example gate suites (all eight design suites: go-crm, surreal-crm,
+# fulfillment, portfolio-engine, the three checkout-split roots, pii-flow),
+# and the go-crm impl tests. A single failure blocks merge.
 name: ci
 
 on:
@@ -130,6 +131,8 @@ jobs:
           .bin/machinery check examples/checkout-split/parent/design
           .bin/machinery check examples/checkout-split/orders/design
           .bin/machinery check examples/checkout-split/payments/design
+      - name: Gate suite - pii-flow (external checker, hermetic Gk)
+        run: .bin/machinery check examples/pii-flow/design
 
   # ----------------------------------------------------- go-crm impl tests ---
   # The example Go application has its own hermetic test suite (separate go.mod).

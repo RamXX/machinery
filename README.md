@@ -663,9 +663,17 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   refinement-proof freshness). Designs scale by verifying parts against contracts, never against
   the flattened system; this is that principle applied to the design process itself. When to
   escalate: `machinery scale` measures a design and recommends sharding or recursion.
+- `examples/pii-flow/` the external-checker reference: a small but complete design (model with a
+  `DataSubject` lifecycle machine, an Architecture Contract whose export-never-reaches-back claim
+  is a checked `no_path` assertion) whose central invariant, no sensitive attribute reaches the
+  export sink unredacted, is decided by a bring-your-own Soufflé Datalog checker under the Gk
+  contract. The full default gate suite passes on it; the checker's coverage claim is the carrier
+  Gc credits for the flow invariant, and its declared residuals carry the two process controls no
+  static flow graph can decide.
 - `testdata/golden/` the byte-for-byte golden corpus: expected stdout, stderr, exit code, and every
-  generated artifact for the deterministic subcommands (lint, oracle, tla, refine, and compose on
-  the three standalone examples; check on all four; pack generate and scale on checkout-split),
+  generated artifact for the deterministic subcommands (lint, oracle, and tla on the four
+  standalone examples, refine and compose where semantics annotations exist; check on every
+  example design root; pack generate and scale on checkout-split),
   checked by `go test ./cmd/machinery -run TestGolden`; the Go experiment
   table lives in `internal/experiments/`.
 
@@ -703,16 +711,18 @@ Run `go test -coverprofile=cover.out ./internal/... && go tool cover -func=cover
 CI runs `go test -race ./...`. Beyond unit tests, two stronger nets are always green in CI:
 
 - **Golden corpus**: `testdata/golden` byte-compares stdout, stderr, exit code, and every generated
-  artifact for the deterministic subcommands: lint, oracle, tla, refine, and compose on the three
-  standalone examples; check on all four (the checkout-split runs pin the G5-pack output); and
+  artifact for the deterministic subcommands: lint, oracle, and tla on the four standalone
+  examples (go-crm, fulfillment, portfolio-engine, pii-flow), refine and compose where semantics
+  annotations exist; check on every example design root (the checkout-split runs pin the G5-pack
+  output, the pii-flow runs pin the full default suite and the hermetic Gk gate); and
   pack generate and scale on checkout-split (`make golden`;
   re-captured with `make golden-update` after intended output changes). Environment-dependent
   commands (verify-formal, doctor, preflight) are exercised by the formal-verification and CI jobs
   instead.
 - **Formal verification**: `machinery verify-formal` regenerates and TLC-model-checks all 34 TLA+
-  proofs across the six example designs (8 in go-crm, 8 in surreal-crm, 8 in fulfillment, 6 in
-  portfolio-engine, and 4 in checkout-split, two per child including the contract-refinement
-  proofs).
+  proofs across the six example designs that carry formal suites (8 in go-crm, 8 in surreal-crm,
+  8 in fulfillment, 6 in portfolio-engine, and 4 in checkout-split, two per child including the
+  contract-refinement proofs; pii-flow carries none by design, its formal half is the checker).
 
 ## Built on
 

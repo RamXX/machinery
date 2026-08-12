@@ -122,6 +122,7 @@ var goldenExamples = []struct {
 	{"go-crm", "check-go-crm", true},
 	{"fulfillment", "check-fulfillment", false},
 	{"portfolio-engine", "check-portfolio", false},
+	{"pii-flow", "check-pii-flow", false},
 }
 
 func TestGoldenLint(t *testing.T) {

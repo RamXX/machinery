@@ -1,0 +1,20 @@
+== Gc-carrier  invariant carrier reconciliation ==
+  note   relational layers not opted in: policy, integrity, isolation
+  checked: 4 invariants declared, 1 preserves references, 2 waived with reason, 1 carried by an external checker, 1 carried by preserves
+  ok
+== G2-c4  Architecture Contract ==
+  note   exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)
+  note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
+  checked: 2 boundaries, 1 externals, 2 allow rules, 3 transitive pairs, 1 deny rules, 1 no_path assertions, 4 dsl elements, 2 boundaries bound to dsl, 1 mitigation rows, 2 dependencies with mitigation rows
+  ok
+== G3-machine  machines + oracle ==
+  checked: 1 machines, 1 transitions, 1 oracles fresh, 1 named units covered
+  ok
+== Gx-trace  cross-layer traceability ==
+  warn   BUILD.md not present; invariant enforcement is checked against the matrices only (fine before Phase 4)
+  checked: 4 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 2 invariants waived with reason, 2 invariants enforced, 1 invariants checker-claimed (external checker), 1 invariants unit-backed (guard/action/actor)
+== Gk-pii-flow external checker ==
+  checked: 3 layers projected, 3 invariants claimed, 2 residuals (waived with reason), 1 committed projection fresh, 1 evidence bound to design, 1 elements covered
+  ok
+
+0 blocking (ERROR/DRIFT) finding(s)

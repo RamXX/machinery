@@ -4,7 +4,7 @@
     "id": "pii-flow",
     "version": "souffle"
   },
-  "input_hash": "sha256:5ef63024f91187a7c4a331261e95fdc35c13b479856bda74a7be2394a70f4cba",
+  "input_hash": "sha256:6368783b81e5c7a0280190034298c8715d9e90cbc23bf87a1cfbb57ad77de95d",
   "verdict": "pass",
   "coverage": [
     {

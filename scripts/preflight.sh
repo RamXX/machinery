@@ -90,7 +90,7 @@ go test -count=1 -run TestGolden ./cmd/machinery || fail "golden corpus drifted 
 go test -count=1 ./internal/experiments/ || fail "adversarial gate-experiment suite failed"
 
 # 10. example gate suites (ci: gates job) ----------------------------------
-say "machinery check (all 7 example design suites)"
+say "machinery check (all 8 example design suites)"
 .bin/machinery check examples/go-crm/design --impl examples/go-crm/impl || fail "gate suite: go-crm"
 .bin/machinery check examples/surreal-crm/design                       || fail "gate suite: surreal-crm"
 .bin/machinery check examples/fulfillment/design                       || fail "gate suite: fulfillment"
@@ -98,6 +98,7 @@ say "machinery check (all 7 example design suites)"
 .bin/machinery check examples/checkout-split/parent/design             || fail "gate suite: checkout-split/parent"
 .bin/machinery check examples/checkout-split/orders/design             || fail "gate suite: checkout-split/orders"
 .bin/machinery check examples/checkout-split/payments/design           || fail "gate suite: checkout-split/payments"
+.bin/machinery check examples/pii-flow/design                          || fail "gate suite: pii-flow"
 
 # 11. go-crm impl hermetic suite (ci: go-crm-impl job) ---------------------
 say "go-crm impl tests (separate module)"
