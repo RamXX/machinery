@@ -1,12 +1,19 @@
+== Gc-carrier  invariant carrier reconciliation ==
+  note   relational layers not opted in: policy, integrity, isolation
+  checked: 2 invariants declared, 2 preserves references, 2 carried by preserves
+  ok
 == G2-c4  Architecture Contract ==
+  note   exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)
+  note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
+  note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
   checked: 1 boundaries, 2 externals, 2 allow rules, 2 transitive pairs, 5 dsl elements, 1 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 event contracts
   ok
 == G3-machine  machines + oracle ==
   checked: 1 machines, 4 transitions, 1 oracles fresh, 3 named units covered
   ok
 == Gx-trace  cross-layer traceability ==
-  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 2 invariants enforced, 1 invariants unit-backed (guard/action/actor), 1 invariants attested (structural/prose)
-  ok
+  warn   invariant 'order-total-positive' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
+  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor), 1 invariants attested only (prose)
 == Gb-plan  build plan structure ==
   checked: 1 plans, 4 milestones, 4 DoD-bearing milestones, 1 skeleton citations
   ok

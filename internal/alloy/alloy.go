@@ -1159,6 +1159,45 @@ func CarriedIDs(annotationPath string) map[string]bool {
 	return ids
 }
 
+// ResidualIDs extracts the invariant ids a relational annotation waives in
+// its residuals: section, WITHOUT validating them; the layer's own gate and
+// generator own validation (id + reason both required, each id claimed
+// once). The residuals shape is shared by all three layers, so one reader
+// serves policy, integrity, and isolation. Gc-carrier and Gx-trace use this
+// to credit an explicit waiver-with-reason; a missing or malformed
+// annotation yields nil.
+func ResidualIDs(annotationPath string) map[string]bool {
+	data, err := os.ReadFile(annotationPath)
+	if err != nil {
+		return nil
+	}
+	v, err := ir.LoadYAML(data)
+	if err != nil || v.AsObject() == nil {
+		return nil
+	}
+	ids := map[string]bool{}
+	for _, rv := range listOf(v.AsObject().Get2("residuals")) {
+		ro := rv.AsObject()
+		if ro == nil {
+			continue
+		}
+		iv := ro.Get2("invariant")
+		if iv == nil {
+			continue
+		}
+		items := []*ir.Value{iv}
+		if iv.Kind == ir.KindArray {
+			items = iv.AsArray()
+		}
+		for _, it := range items {
+			if it != nil && it.Kind == ir.KindString {
+				ids[it.AsString()] = true
+			}
+		}
+	}
+	return ids
+}
+
 // --- CLI entrypoints ---
 
 // Paths resolves the domain model and annotation for a design dir.

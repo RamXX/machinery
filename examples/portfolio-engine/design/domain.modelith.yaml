@@ -90,7 +90,8 @@ entities:
     actions:
       - name: upsert
         actor: Analyst
-        description: "Create or update a security's reference data."
+        preserves: [ticker-unique]
+        description: "Create or update a security's reference data; an existing ticker updates in place rather than duplicating."
     invariants:
       - id: ticker-unique
         statement: "Every `Security` has a ticker that is unique across all securities."

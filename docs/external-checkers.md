@@ -63,7 +63,7 @@ the three commands you actually run.
   names. This is the write side of the contract: run it, then `git commit` the result, before your
   adapter ever consumes the projection. It needs no registry and no engine.
 - **`machinery check <design> --gate gk`** is the pure, hermetic gate (`Gk-<id>` per checker), one of
-  the names in `--gate`'s vocabulary: `gm,gs,gp,gi,gn,g2,g3,gx,gk,gb,g4,gt,g5`. It never runs an
+  the names in `--gate`'s vocabulary: `gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,g4,gt,g5`. It never runs an
   engine and never touches the registry; it reconciles the manifest, byte-matches the committed
   projection, and checks that the committed evidence binds and covers the claim.
 - **`machinery verify-checkers <design> [--registry <path>] [--checker <id>]`** is the engine phase,
@@ -309,6 +309,70 @@ to scope a run to one checker, or `--registry <path>` to point at a registry oth
 The split keeps `check` dependency-free (no Rust, Python, Java, or your engine on the CI box) while
 `verify-checkers` runs where your runtime is available, exactly as `verify-formal` needs Java only
 where the proofs run.
+
+## Composing multiple checkers
+
+Nothing about the gate is single-checker. Drop as many `design/checkers/*.checker.yaml` manifests as
+you like: `machinery check --gate gk` discovers them all in id order and emits one `Gk-<id>` gate per
+manifest, in a single run. Two checkers on one design look like this:
+
+```
+== Gk-minimality external checker ==
+  checked: 2 layers projected, 1 invariants claimed, 1 committed projection fresh, 1 evidence bound to design, 1 elements covered
+  ok
+== Gk-pii-flow external checker ==
+  checked: 3 layers projected, 3 invariants claimed, 2 residuals (waived with reason), 1 committed projection fresh, 1 evidence bound to design, 1 elements covered
+  ok
+```
+
+Each checker is fully independent and shares nothing but the design:
+
+- **Its own projection.** A checker declares only the layers it reads (`minimality` above projected
+  `model, invariants`; `pii-flow` also needed `relationships`), gets its own `projection.json`, and
+  binds its evidence to that slice's own `input_hash`. One checker cannot be fooled by another's input.
+- **Its own coverage claim.** Checkers can partition the invariant space (above, `pii-flow` waives
+  `priv-minimal-collection` as a residual and `minimality` picks it up) or deliberately overlap for
+  redundant assurance. The union of all claims is what gets gated; an invariant no checker claims is
+  simply ungated, a legitimate choice rather than a hole the gate invents.
+- **Its own engine, in any language.** One `.machinery/checkers.local.yaml` holds one `run`/`verify`
+  entry per id, so a Datalog checker, a SAST, a units checker, and a proprietary rule engine each
+  resolve to their own binary. `machinery verify-checkers` runs them all (or `--checker <id>` for one),
+  and because they are independent, the engine phase can run them concurrently.
+
+They compose as a **set, not a pipeline.** No checker sees another's verdict, output, or evidence, and
+that is deliberate: wiring checker B to depend on checker A's result would reintroduce exactly the
+ordering-and-drift fragility the whole design exists to remove. Composition lives at the invariant
+level instead. Each checker attaches to the invariants it can decide; you add coverage by adding
+checkers, never by chaining them. An auditor reads each `Gk-<id>` line on its own, and a failure in one
+checker is isolated to that checker while the rest still report.
+
+### Checkers worth stacking
+
+The Datalog PII-flow checker is one shape among many. Each of these is one more manifest and one more
+registry line, attaching to a different slice of the same design:
+
+- **Authorization beyond the policy layer.** The built-in policy algebra covers role, ownership, and
+  team scope; a checker can add what it does not: attribute-based conditions, role hierarchies, or
+  time-of-day and purpose constraints. A Datalog or rule engine over `model` + `invariants`.
+- **Separation of duties.** No single role may both create and approve a record (a toxic combination).
+  Transitive closure over the role-to-action relationships, a natural fit for Datalog.
+- **Retention and lifecycle.** Every entity holding personal data must declare a bounded retention and
+  a reachable erasure state. A checker over the lifecycle enum (`status_enum`) plus the sensitive-attr
+  `config`, one verdict per entity.
+- **Data residency and cross-border flow.** The PII taint pattern, but over geography: sensitive data
+  may not reach a sink in a disallowed region. The same reachability engine with a different `config`.
+- **Units and dimensions.** Attributes typed as money or quantity must stay dimensionally consistent
+  across the relationships that move them. A structural checker over `model` + `relationships`.
+- **Regulatory control catalog.** Bind named framework controls (a privacy statute, a security
+  baseline) to the invariants that satisfy them, and fail when a claimed control has no covering
+  invariant. A rule engine that encodes the catalog; its coverage report is the auditor's traceability
+  matrix.
+- **Probabilistic risk.** A graph reasoner over trust or influence propagation whose verdict is a
+  thresholded proposition (see the next section for how a float-sensitive engine still yields a
+  reproducible verdict).
+
+Run one, or run all of them side by side. The gate treats a design with ten checkers exactly as it
+treats a design with one.
 
 ## Determinism across an opaque engine
 

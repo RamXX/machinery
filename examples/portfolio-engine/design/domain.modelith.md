@@ -194,7 +194,7 @@ A tradable stock identified by a unique ticker. A security may belong to several
 
 **Actions**
 
-- `upsert` - actor `Analyst` - Create or update a security's reference data.
+- `upsert` - actor `Analyst`; preserves ticker-unique - Create or update a security's reference data; an existing ticker updates in place rather than duplicating.
 
 **Invariants**
 

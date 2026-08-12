@@ -25,7 +25,7 @@ type Selection struct {
 // validator (internal/hook) must agree on it, so both read this set through
 // KnownGate; two hand-kept lists once drifted.
 var knownGateSet = map[string]bool{
-	"gm": true, "gs": true, "gp": true, "gi": true, "gn": true, "g2": true,
+	"gm": true, "gs": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
 	"g3": true, "gx": true, "gk": true, "gb": true, "g4": true, "gt": true, "g5": true,
 }
 
@@ -59,7 +59,7 @@ func HasModelith(design string) bool {
 // unknown or empty gate name is an error.
 func Select(design, gateList, impl string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
-	list := "gm,gs,gp,gi,gn,g2,g3,gx,gk,gb,g4,gt,g5"
+	list := "gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,g4,gt,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
@@ -87,6 +87,12 @@ func Select(design, gateList, impl string) (Selection, error) {
 				{"gp", HasPolicyAnnotation},
 				{"gi", HasIntegrityAnnotation},
 				{"gn", HasIsolationAnnotation},
+				// Gc is NOT machine-dependent: the parent's model declares
+				// the invariants, so the parent carries the reconciliation.
+				// Narrowing it away here would repeat the original defect
+				// (no gate looked at invariants until the children built
+				// machines, months after the declarations were authored).
+				{"gc", HasModelith},
 			} {
 				if opt.has(design) {
 					parts = append(parts, opt.gate)
@@ -132,7 +138,7 @@ func Select(design, gateList, impl string) (Selection, error) {
 }
 
 // RunSelected runs the selected gates in canonical order (Gm, Gs, Gp, Gi, Gn,
-// G2, G3, Gx, Gb, G4, Gt, G5) with `machinery check`'s applicability rules:
+// Gc, G2, G3, Gx, Gb, G4, Gt, G5) with `machinery check`'s applicability rules:
 // opt-in gates run only when their source exists (or when explicitly
 // requested), G4 and Gt only with an impl dir, and G5 only when explicitly
 // requested or when the design is decomposed. The returned gates carry their
@@ -153,6 +159,9 @@ func RunSelected(design, impl string, sel Selection) []*Gate {
 	}
 	if sel.Run["gn"] && (sel.Explicit || HasIsolationAnnotation(design)) {
 		out = append(out, CheckIsolation(design))
+	}
+	if sel.Run["gc"] && (sel.Explicit || HasModelith(design)) {
+		out = append(out, CheckCarriers(design))
 	}
 	if sel.Run["g2"] {
 		out = append(out, CheckC4(design))
