@@ -91,7 +91,7 @@ A postal destination for a `Shipment`. Part of the `Shipment` it belongs to.
 
 **Actions**
 
-- `capture` - actor `Customer`
+- `capture` - actor `Customer`; preserves address-country-present
 
 **Invariants**
 
@@ -261,7 +261,7 @@ The money movement for an `Order`, handled through the `PaymentGateway`. A `Paym
 **Actions**
 
 - `authorize` - actor `PaymentGateway`
-- `capture` - actor `PaymentGateway`; preserves payment-idempotent
+- `capture` - actor `PaymentGateway`; preserves payment-idempotent, reserve-before-pay
 - `fail` - actor `PaymentGateway`; preserves payment-terminal
 - `refund` - actor `PaymentGateway`; preserves payment-terminal
 
@@ -308,7 +308,7 @@ A return of captured funds on a `Payment`, issued during compensation.
 
 **Actions**
 
-- `issue` - actor `PaymentGateway`
+- `issue` - actor `PaymentGateway`; preserves refund-amount-positive
 
 **Invariants**
 

@@ -176,7 +176,7 @@ entities:
       - {id: payment-terminal, statement: "A `Payment` in Failed or Refunded is terminal."}
     actions:
       - {name: authorize, actor: PaymentGateway}
-      - {name: capture, actor: PaymentGateway, preserves: [payment-idempotent]}
+      - {name: capture, actor: PaymentGateway, preserves: [payment-idempotent, reserve-before-pay]}
       - {name: fail, actor: PaymentGateway, preserves: [payment-terminal]}
       - {name: refund, actor: PaymentGateway, preserves: [payment-terminal]}
 
@@ -190,7 +190,7 @@ entities:
     invariants:
       - {id: refund-amount-positive, statement: "A `Refund` amount is positive."}
     actions:
-      - {name: issue, actor: PaymentGateway}
+      - {name: issue, actor: PaymentGateway, preserves: [refund-amount-positive]}
 
   Shipment:
     definition: >
@@ -220,7 +220,7 @@ entities:
     invariants:
       - {id: address-country-present, statement: "An `Address` has a non-empty country."}
     actions:
-      - {name: capture, actor: Customer}
+      - {name: capture, actor: Customer, preserves: [address-country-present]}
 
   FulfillmentSaga:
     definition: >

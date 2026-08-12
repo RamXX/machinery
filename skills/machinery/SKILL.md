@@ -1,7 +1,7 @@
 ---
 name: machinery
 metadata:
-  version: "0.3.6"
+  version: "0.3.7"
 description: >
   Design software as a build-ready blueprint, greenfield, brownfield, hybrid, or rebuild. Use when the user
   wants to design a new system, service, or app from scratch, produce a BUILD.md for a
@@ -128,10 +128,13 @@ design/
 
 Never advance until the current gate passes. State the gate result to the user before moving on.
 
-The deterministic gates live in `machinery check <design> [--impl <dir>] [--gate gm,gs,gp,gi,gn,g2,g3,gx,gk,gb,g4,gt,g5]`
+The deterministic gates live in `machinery check <design> [--impl <dir>] [--gate gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,g4,gt,g5]`
 (g5 runs automatically on decomposed designs; gm runs once `migration.yaml` exists; gs once
 `legacy/surface.yaml` exists; gp, gi, and gn each run automatically once the matching
-`formal/{policy,integrity,isolation}.relational.yaml` exists; gk once any
+`formal/{policy,integrity,isolation}.relational.yaml` exists; gc once any `*.modelith.yaml`
+exists, so invariant-carrier reconciliation runs from Phase 1 (every declared invariant needs an
+action's `preserves`, a relational layer, a machine unit, a checker claim, or a waiver with a
+reason in `formal/waivers.yaml`); gk once any
 `checkers/*.checker.yaml` exists; gb once `design/BUILD.md` exists;
 gt, like g4, only with `--impl`; see Recursive decomposition, the
 legacy surface ledger, the Phase 1 relational layers, and External checkers).
@@ -184,7 +187,11 @@ not a required syntax for the model file.
 After `modelith render`, strip em dashes from the generated `*.modelith.md` (the renderer emits them,
 house style forbids them): `perl -CSD -i -pe 's/\x{2014}/-/g' design/*.modelith.md`.
 
-**GATE 1:** `modelith lint design/domain.modelith.yaml` is clean (no errors). Every entity that has
+**GATE 1:** `modelith lint design/domain.modelith.yaml` is clean (no errors), and
+`machinery check design --gate gc` is green: every declared invariant has a carrier (an action's
+`preserves`, a relational layer, or a waiver with a reason in `formal/waivers.yaml`). Declaring is
+nearly free and carrying costs something; Gc-carrier forces that trade at declaration time instead
+of letting the gap surface months later. Every entity that has
 a lifecycle has a status enum. Every action has its pre/post captured (`description` and `preserves`).
 Every invariant has an owner (entity-level or top-level). Scenarios cover happy plus edge paths.
 
@@ -357,7 +364,10 @@ the contract parses (a yaml code fence starting with `contract_version` under a 
 edge both allowed and denied, no rule referencing an undeclared boundary or external, the allow
 graph is acyclic (a declared dependency cycle is a hard error; a cycle that closes only through
 `baseline:` edges is ratchet debt, reported as a warning; the `checked:` line also reports the
-allow graph's transitive reachable pairs next to the declared-rule count), and mitigation
+allow graph's transitive reachable pairs next to the declared-rule count), every
+`dependency_rules.assert` `no_path` claim holds over the transitive closure (a reachable pair
+fails with its witness path; write an assertion for every independence the contract's prose
+claims), and mitigation
 coverage: every contract external plus every DSL element tagged Database, Queue, or External has a
 mitigation row naming it backticked in the first column (a backticked name that matches nothing is
 an error). Mitigation obligations exist only for DECLARED dependencies: a dependency never declared

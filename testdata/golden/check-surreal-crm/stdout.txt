@@ -13,8 +13,13 @@
 == Gn-isolation multi-tenant relational model ==
   checked: 4 records, 2 references, 2 invariants carried, 5 solver commands generated, 8 tenant oracle rows generated, 2 committed artifacts fresh (byte-identical)
   ok
+== Gc-carrier  invariant carrier reconciliation ==
+  checked: 27 invariants declared, 22 preserves references, 18 carried by preserves, 8 carried by a relational layer, 1 carried by a machine unit
+  ok
 == G2-c4  Architecture Contract ==
-  checked: 6 boundaries, 1 externals, 12 allow rules, 16 transitive pairs, 2 deny rules, 15 dsl elements, 6 boundaries bound to dsl, 9 mitigation rows, 4 dependencies with mitigation rows
+  note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
+  note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
+  checked: 6 boundaries, 1 externals, 12 allow rules, 16 transitive pairs, 2 deny rules, 5 boundaries with exposes, 15 dsl elements, 6 boundaries bound to dsl, 9 mitigation rows, 4 dependencies with mitigation rows
   ok
 == G3-machine  machines + oracle ==
   warn   Deal.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
@@ -25,11 +30,12 @@
   note   User.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present
   checked: 5 machines, 194 transitions, 5 oracles fresh, 194 matrix rows reconciled, 186 named units covered, 3 states relying on unproven _exhaustive liveness
 == Gx-trace  cross-layer traceability ==
+  warn   invariant 'activity-immutable' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
+  warn   invariant 'deal-terminal' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
   note   Deal: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   Task: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
-  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 27 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 2 invariants attested (structural/prose), 13 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
-  ok
+  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 2 invariants attested only (prose), 13 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
 == Gb-plan  build plan structure ==
   checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 2 skeleton citations
   ok

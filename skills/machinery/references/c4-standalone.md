@@ -222,6 +222,12 @@ Field semantics:
   per cycle, naming the members and a representative path); a cycle that closes only once
   `baseline:` edges are unioned in is tolerated debt, reported as a warning until the ratchet
   burns it down.
+- **dependency_rules.assert**: negative reachability claims, proven over the transitive closure of
+  the allow graph on every check. `assert: [{no_path: src -> dst}]` fails with the witness path
+  the moment any chain of allow edges reaches `dst` from `src`; a path that closes only through
+  `baseline:` edges warns as ratchet debt. Concrete boundary ids only (no globs). Whenever the
+  contract's prose claims an independence ("domains never import each other"), write the
+  assertion; a note is a claim nothing traverses.
   Precedence: an explicit (literal) allow overrides a matching deny GLOB, which is how "deny the
   pattern, allow the one sanctioned edge" is written; but a literal allow and a literal deny of
   the same edge is a G2 error, not an override. Deny rules cannot reference boundaries that do

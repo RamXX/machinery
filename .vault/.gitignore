@@ -1,0 +1,10 @@
+# nd runtime state -- do not track
+# Default mode keeps .nd.yaml and issues/ local; use `nd init --track-issues` to track them in git
+.nd.yaml
+issues/
+.vlt.lock
+.trash/
+.guard/
+.piv-loop-state.json
+.piv-loop-snapshot.json
+.dispatcher-state.json

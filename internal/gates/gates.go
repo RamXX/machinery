@@ -494,6 +494,80 @@ func CheckC4(design string) *Gate {
 		g.Warns = append(g.Warns, fmt.Sprintf("dependency cycle among %s closes only through baseline edges (%s); this is ratchet debt to burn down, not declared intent; the cycle disappears with the baselined edge", members, cyclePath(scc, unionAdj)))
 	}
 
+	// dependency assertions: the contract states negative reachability
+	// claims and this gate proves them against the same closure the
+	// acyclicity check walks. A prose note ("domains never import each
+	// other") is a claim nothing traverses; an assertion fails the moment
+	// it stops being true. A path in the allow graph is a hard ERROR
+	// (declared intent contradicts the claim); a path that closes only
+	// through baseline edges is the ratchet's tolerated debt, warned like
+	// baseline-closed cycles.
+	asserts := objSlice(rules.Get2("assert"))
+	for _, a := range asserts {
+		ao := a.AsObject()
+		if ao == nil {
+			g.Errs = append(g.Errs, "unparseable assert rule: "+goReprValue(a)+" (expected '- no_path: src -> dst')")
+			continue
+		}
+		for _, kind := range ao.Keys() {
+			if kind == "_comment" {
+				continue
+			}
+			if kind != "no_path" {
+				g.Errs = append(g.Errs, fmt.Sprintf("unknown assertion kind %s (supported: no_path)", ir.Repr(kind)))
+				continue
+			}
+			val := ao.GetString(kind)
+			m := edgeRuleRe.FindStringSubmatch(val)
+			if m == nil {
+				g.Errs = append(g.Errs, fmt.Sprintf("unparseable no_path assertion: %s (expected 'src -> dst')", ir.Repr(val)))
+				continue
+			}
+			src, dst := m[1], m[2]
+			if strings.Contains(src, "*") || strings.Contains(dst, "*") {
+				g.Errs = append(g.Errs, fmt.Sprintf("no_path assertion %s -> %s contains a wildcard; an assertion is a concrete claim about named boundaries", src, dst))
+				continue
+			}
+			undeclared := false
+			for _, side := range [2]string{src, dst} {
+				if !declared[side] {
+					g.Errs = append(g.Errs, fmt.Sprintf("no_path assertion references undeclared boundary %s", ir.Repr(side)))
+					undeclared = true
+				}
+			}
+			if undeclared {
+				continue
+			}
+			g.Count("no_path assertions")
+			if p := reachPath(allowAdj, src, dst); p != nil {
+				g.Errs = append(g.Errs, fmt.Sprintf("no_path assertion %s -> %s fails: the allow graph reaches it (%s); remove an edge on the path or retract the assertion", src, dst, strings.Join(p, " -> ")))
+			} else if p := reachPath(unionAdj, src, dst); p != nil {
+				g.Warns = append(g.Warns, fmt.Sprintf("no_path assertion %s -> %s holds in allow rules but closes through baseline edges (%s); ratchet debt to burn down, not declared intent", src, dst, strings.Join(p, " -> ")))
+			}
+		}
+	}
+
+	// unused-mechanism coverage facts (notes, never findings): a zero is
+	// invisible in the zero-suppressed counts, and an unengaged mechanism
+	// has a way of being depended on by prose notes anyway. One line per
+	// declared capacity that is zero.
+	exposing := 0
+	for _, b := range boundaries {
+		if bo := b.AsObject(); bo != nil && len(objSlice(bo.Get2("exposes"))) > 0 {
+			exposing++
+		}
+	}
+	g.Count("boundaries with exposes", exposing)
+	if exposing == 0 {
+		g.Notes = append(g.Notes, "exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)")
+	}
+	if len(baseline) == 0 {
+		g.Notes = append(g.Notes, "baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)")
+	}
+	if len(asserts) == 0 {
+		g.Notes = append(g.Notes, "assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)")
+	}
+
 	dslPath := filepath.Join(design, "workspace.dsl")
 	if _, err := os.Stat(dslPath); err != nil {
 		g.Errs = append(g.Errs, "workspace.dsl does not exist; the contract has no model to bind to")
@@ -787,6 +861,49 @@ func cyclePath(scc []string, adj map[string][]string) string {
 	return start // unreachable: an SCC member always closes back to start
 }
 
+// reachPath returns a shortest src -> ... -> dst path of one or more edges
+// over adj, or nil when dst is unreachable from src. BFS with the sorted
+// successor lists depGraph builds, so identical input always produces the
+// same witness path.
+func reachPath(adj map[string][]string, src, dst string) []string {
+	parent := map[string]string{}
+	visited := map[string]bool{}
+	var queue []string
+	for _, w := range adj[src] {
+		if !visited[w] {
+			visited[w] = true
+			parent[w] = src
+			queue = append(queue, w)
+		}
+	}
+	for len(queue) > 0 {
+		u := queue[0]
+		queue = queue[1:]
+		if u == dst {
+			var rev []string
+			for v := u; v != src; v = parent[v] {
+				rev = append(rev, v)
+			}
+			path := []string{src}
+			for i := len(rev) - 1; i >= 0; i-- {
+				path = append(path, rev[i])
+			}
+			if len(path) == 1 { // src == dst through a self-loop
+				path = append(path, dst)
+			}
+			return path
+		}
+		for _, w := range adj[u] {
+			if !visited[w] {
+				visited[w] = true
+				parent[w] = u
+				queue = append(queue, w)
+			}
+		}
+	}
+	return nil
+}
+
 // transitivePairs counts the ordered boundary pairs (src, dst) connected by a
 // path of one or more concrete allow edges. Reported next to the declared
 // allow-rule count: when the closure materially exceeds the declared rules, a
@@ -1036,12 +1153,16 @@ func CheckTraceability(design string) *Gate {
 	actionsByEntity := map[string]map[string]bool{}
 	enumByEntity := map[string]string{}
 	allActions := map[string]bool{}
+	preservedIDs := map[string]bool{}
 	for _, ename := range entities.Keys() {
 		e := entities.Get2(ename).AsObject()
 		acts := map[string]bool{}
 		for _, a := range objSlice(e.Get2("actions")) {
 			if a.Kind == ir.KindObject {
 				acts[a.AsObject().GetString("name")] = true
+				for _, pv := range listStrings(a.AsObject().Get2("preserves")) {
+					preservedIDs[pv] = true
+				}
 			} else {
 				acts[a.AsString()] = true
 			}
@@ -1290,27 +1411,63 @@ func CheckTraceability(design string) *Gate {
 	policyIDs := alloy.CarriedIDs(filepath.Join(design, "formal", alloy.AnnotationName))
 	integrityIDs := alloy.CarriedIntegrityIDs(filepath.Join(design, "formal", alloy.IntegrityAnnotationName))
 	isolationIDs := alloy.CarriedIsolationIDs(filepath.Join(design, "formal", alloy.IsolationAnnotationName))
+	// an explicit waiver-with-reason (a layer residual, a checker coverage
+	// residual, or the formal/waivers.yaml annex) is a recorded
+	// disposition, not a gap; Gc-carrier and Gk own validating the waivers
+	// themselves. A checker's coverage claim is an enforcement artifact
+	// (Gk reconciles the evidence behind it).
+	waivedIDs := map[string]bool{}
+	for _, ann := range []string{alloy.AnnotationName, alloy.IntegrityAnnotationName, alloy.IsolationAnnotationName} {
+		for iid := range alloy.ResidualIDs(filepath.Join(design, "formal", ann)) {
+			waivedIDs[iid] = true
+		}
+	}
+	for iid := range annexWaiverIDs(design) {
+		waivedIDs[iid] = true
+	}
+	checkerIDs, checkerWaived := checkerClaims(design, invIDs)
+	for iid := range checkerWaived {
+		waivedIDs[iid] = true
+	}
 	var invSorted []string
 	for iid := range invIDs {
 		invSorted = append(invSorted, iid)
 	}
 	sort.Strings(invSorted)
 	for _, iid := range invSorted {
-		if tokenIn(iid, corpus) || policyIDs[iid] || integrityIDs[iid] || isolationIDs[iid] {
+		switch {
+		case tokenIn(iid, unitCorpus):
 			g.Count("invariants enforced")
-			switch {
-			case tokenIn(iid, unitCorpus):
-				g.Count("invariants unit-backed (guard/action/actor)")
-			case policyIDs[iid]:
-				g.Count("invariants policy-checked (relational model)")
-			case integrityIDs[iid]:
-				g.Count("invariants integrity-checked (relational model)")
-			case isolationIDs[iid]:
-				g.Count("invariants isolation-checked (relational model)")
-			default:
-				g.Count("invariants attested (structural/prose)")
+			g.Count("invariants unit-backed (guard/action/actor)")
+		case policyIDs[iid]:
+			g.Count("invariants enforced")
+			g.Count("invariants policy-checked (relational model)")
+		case integrityIDs[iid]:
+			g.Count("invariants enforced")
+			g.Count("invariants integrity-checked (relational model)")
+		case isolationIDs[iid]:
+			g.Count("invariants enforced")
+			g.Count("invariants isolation-checked (relational model)")
+		case checkerIDs[iid]:
+			g.Count("invariants enforced")
+			g.Count("invariants checker-claimed (external checker)")
+		case waivedIDs[iid]:
+			g.Count("invariants waived with reason")
+		case tokenIn(iid, corpus):
+			// a prose table row is a claim, not a carrier: it satisfies a
+			// reader, never a machine. Counted and warned as a residual so
+			// hand-maintained rows cannot silently stand in for enforcement.
+			// The two texts differ because the fixes differ: a
+			// preserves-carried invariant must NOT be waived (Gc-carrier
+			// would flag the waiver as stale); one carried by nothing must
+			// be, or mapped.
+			g.Count("invariants attested only (prose)")
+			if preservedIDs[iid] {
+				g.Warns = append(g.Warns, "invariant "+ir.Repr(iid)+" is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)")
+			} else {
+				g.Warns = append(g.Warns, "invariant "+ir.Repr(iid)+" is attested only by prose table rows; map it to a machine unit or a relational layer, or waive it in formal/"+WaiverAnnexName)
 			}
-		} else {
+		default:
 			g.Errs = append(g.Errs, "invariant "+ir.Repr(iid)+" is referenced by no matrix or BUILD.md table; it is enforced by nothing")
 		}
 	}

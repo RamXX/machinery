@@ -1,8 +1,14 @@
 == Gi-integrity structural relational model ==
   checked: 3 entities, 2 relationships, 1 unique keys, 2 invariants carried, 3 solver commands generated, 1 committed artifacts fresh (byte-identical)
   ok
+== Gc-carrier  invariant carrier reconciliation ==
+  note   relational layers not opted in: policy, isolation
+  checked: 25 invariants declared, 29 preserves references, 20 carried by preserves, 5 carried by a machine unit
+  ok
 == G2-c4  Architecture Contract ==
-  checked: 5 boundaries, 4 allow rules, 4 transitive pairs, 3 deny rules, 19 dsl elements, 5 boundaries bound to dsl, 5 mitigation rows, 7 dependencies with mitigation rows, 8 event contracts
+  note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
+  note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
+  checked: 5 boundaries, 4 allow rules, 4 transitive pairs, 3 deny rules, 1 boundaries with exposes, 19 dsl elements, 5 boundaries bound to dsl, 5 mitigation rows, 7 dependencies with mitigation rows, 8 event contracts
   ok
 == G3-machine  machines + oracle ==
   warn   Order.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
@@ -18,14 +24,21 @@
   note   Shipment.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStatus is set on every path into the overlay from a domain state; only Pending, Dispatched, and InTransit reach the overlay (Delivered and Lost are final), and all three priorIs* guards are present
   checked: 6 machines, 138 transitions, 6 oracles fresh, 168 named units covered, 6 states relying on unproven _exhaustive liveness
 == Gx-trace  cross-layer traceability ==
+  warn   invariant 'address-country-present' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
+  warn   invariant 'line-item-quantity-positive' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
+  warn   invariant 'order-delivered-terminal' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
+  warn   invariant 'product-price-nonneg' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
+  warn   invariant 'refund-amount-positive' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
+  warn   invariant 'reservation-quantity-positive' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
+  warn   invariant 'reserve-before-pay' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
+  warn   invariant 'saga-terminal' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
   note   FulfillmentSaga: 1 operational-overlay states (compensateRetry)
   note   Order: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   OutboxMessage: 4 operational-overlay states (publishing, persisting, persistRetry, rolledBack)
   note   Payment: 8 operational-overlay states (authorizing, capturing, refunding, gatewayRetry, gatewayResume, persisting, persistRetry, rolledBack)
   note   Reservation: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   Shipment: 5 operational-overlay states (dispatching, carrierRetry, persisting, persistRetry, rolledBack)
-  checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 3 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 8 invariants attested (structural/prose), 16 invariants unit-backed (guard/action/actor), 1 invariants integrity-checked (relational model)
-  ok
+  checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 3 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 8 invariants attested only (prose), 17 invariants enforced, 16 invariants unit-backed (guard/action/actor), 1 invariants integrity-checked (relational model)
 == Gb-plan  build plan structure ==
   checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 8 skeleton citations
   ok
