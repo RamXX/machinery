@@ -173,8 +173,8 @@ jobs:
   # agent prompts, template, tools README, and the team guide in docs/). This
   # gate fails on any reference to the deleted Python toolchain so the surfaces
   # cannot drift apart again (the exact class of rot the Go port shipped with).
-  # Historical mentions are allowed only in internal/README-contract.md and Go
-  # package docs.
+  # Historical mentions are allowed only in Go package docs; the golden corpus
+  # under testdata/golden is the behavior contract.
   docs:
     runs-on: ubuntu-latest
     steps:
