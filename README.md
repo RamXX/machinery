@@ -413,7 +413,7 @@ anything missing; it installs nothing.
   machinery install                        # fetches the matching skill + role docs into your agent homes
   ```
 
-  **Build from source** (if you have [Go](https://go.dev/dl/) 1.26+; `go.mod` pins 1.26.5):
+  **Build from source** (if you have [Go](https://go.dev/dl/) 1.26+; `go.mod` pins 1.26.6):
   ```bash
   go build -o machinery ./cmd/machinery    # then: machinery install --from .
   ```
