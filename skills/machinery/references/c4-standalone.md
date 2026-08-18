@@ -206,7 +206,8 @@ Field semantics:
   defaults to the last segment of the id, so set it explicitly when they differ), `code` (globs,
   required; G4 cannot map the boundary without them), `exposes` (optional: a file entry exposes
   exactly its package directory, a glob entry matches imports), `modules` (Elixir: module-name
-  prefixes belonging to the boundary).
+  prefixes belonging to the boundary), `provides` and `consumes` (optional: kebab-case capability
+  keys; see composability below).
 - **externals**: `{id, element (optional dsl element), imports: [import-path prefixes],
   modules: [module-name prefixes, for Elixir]}`. Any `dependency_rules` reference to `external.*`
   must be declared here.
@@ -222,6 +223,16 @@ Field semantics:
   per cycle, naming the members and a representative path); a cycle that closes only once
   `baseline:` edges are unioned in is tolerated debt, reported as a warning until the ratchet
   burns it down.
+- **provides / consumes (composability over capability keys)**: a boundary may declare the
+  capability keys it provides and consumes. Two laws are then checked at design time: provisions
+  are DISJOINT (a key with two providers is a G2 ERROR: which one a consumer binds to would be an
+  accident of wiring), and consumption is SATISFIED (a consumed key must have a provider, and the
+  consumer must hold a direct `allow` edge to that provider; a capability the dependency graph
+  cannot reach is a contradiction between the two views of the same architecture). A boundary
+  providing and consuming the same key is an error. Runtime lifecycle laws (activation ordering,
+  a provider withdrawing a key only after its dependents deactivate) are deliberately NOT modeled
+  by this static vocabulary and are not covered by these checks. Contracts without
+  `provides`/`consumes` check exactly as before.
 - **dependency_rules.assert**: negative reachability claims, proven over the transitive closure of
   the allow graph on every check. `assert: [{no_path: src -> dst}]` fails with the witness path
   the moment any chain of allow edges reaches `dst` from `src`; a path that closes only through

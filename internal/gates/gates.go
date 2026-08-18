@@ -427,6 +427,7 @@ func CheckC4(design string) *Gate {
 	g.Count("transitive pairs", transitivePairs(allowConcrete))
 	g.Count("deny rules", len(deny))
 	g.Count("baseline rules", len(baseline))
+	checkProvisions(boundaries, declared, allowConcrete, g)
 	// baseline is an enumerated-edges ratchet: a wildcard rule would amnesty
 	// the whole edge space (a `* -> *` once silently passed contract-DENIED
 	// edges, GATE-7). Wildcards belong in allow/deny only.
