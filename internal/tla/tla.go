@@ -22,11 +22,20 @@ func die(format string, args ...interface{}) {
 	panic(&ExitError{Msg: fmt.Sprintf(format, args...)})
 }
 
-// Classify mirrors tla_gen.classify: domain = has `on` or is final; else overlay.
+// Classify mirrors tla_gen.classify: domain = has `on` or is final; else
+// overlay. Retry shape wins over the `on` heuristic: a bounded retry loop
+// stays overlay even when it carries event handlers (an invariant may oblige
+// an event to act during the backoff), because reclassifying it as domain
+// would reset retry counters on its transitions and move it out of the
+// overlay liveness class.
 func Classify(states []ir.StateEntry) (domain, overlay map[string]bool) {
 	domain, overlay = map[string]bool{}, map[string]bool{}
 	for _, s := range states {
 		o := s.Node.AsObject()
+		if retryShaped(o) {
+			overlay[s.Name] = true
+			continue
+		}
 		if (o != nil && o.Get2("on") != nil) || o.GetString("type") == "final" {
 			domain[s.Name] = true
 		} else {
@@ -34,6 +43,24 @@ func Classify(states []ir.StateEntry) (domain, overlay map[string]bool) {
 		}
 	}
 	return
+}
+
+// retryShaped reports the bounded-retry loop shape: a fully guarded always
+// plus an after.
+func retryShaped(o *ir.Object) bool {
+	if o == nil || o.Get2("always") == nil || o.Get2("after") == nil {
+		return false
+	}
+	branches := normAlways(o.Get2("always"))
+	if len(branches) == 0 {
+		return false
+	}
+	for _, b := range branches {
+		if !b.HasGuard {
+			return false
+		}
+	}
+	return true
 }
 
 // RetryState is a state with a guarded always plus an after: a bounded retry loop.
@@ -45,20 +72,8 @@ type RetryState struct {
 func RetryStates(states []ir.StateEntry) []RetryState {
 	var out []RetryState
 	for _, s := range states {
-		o := s.Node.AsObject()
-		if o.Get2("always") != nil && o.Get2("after") != nil {
-			branches := normAlways(o.Get2("always"))
-			if len(branches) > 0 {
-				allGuarded := true
-				for _, b := range branches {
-					if !b.HasGuard {
-						allGuarded = false
-					}
-				}
-				if allGuarded {
-					out = append(out, RetryState{Name: s.Name, Node: s.Node})
-				}
-			}
+		if retryShaped(s.Node.AsObject()) {
+			out = append(out, RetryState{Name: s.Name, Node: s.Node})
 		}
 	}
 	return out
@@ -265,6 +280,37 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 
 	var domActions, ovlActions, defs, comments []string
 	idx := 0
+	emit := func(s ir.StateEntry, tr ir.Transition) {
+		idx++
+		tgt := ir.Simple(tr.Target)
+		if tgt == "" {
+			tgt = s.Name
+		}
+		name := fmt.Sprintf("T%d", idx)
+		ups := counterUpdates(s.Name, tgt)
+		parts := []string{fmt.Sprintf(`st = "%s"`, s.Name), fmt.Sprintf(`st' = "%s"`, tgt)}
+		var upKeys []string
+		for k := range ups {
+			upKeys = append(upKeys, k)
+		}
+		sort.Strings(upKeys)
+		for _, v := range upKeys {
+			parts = append(parts, fmt.Sprintf("%s' = %s", v, ups[v]))
+		}
+		defs = append(defs, name+" == "+strings.Join(parts, " /\\ "))
+		var trig string
+		if tr.Event != "" {
+			trig = tr.Kind + ":" + tr.Event
+		} else {
+			trig = tr.Kind
+		}
+		comments = append(comments, fmt.Sprintf("  \\* %s: %s -%s-> %s", name, s.Name, trig, tgt))
+		if domain[s.Name] {
+			domActions = append(domActions, name)
+		} else {
+			ovlActions = append(ovlActions, name)
+		}
+	}
 	for _, s := range states {
 		if _, ok := rcOf[s.Name]; ok {
 			// a retry-shaped state's transitions are generated from its loop
@@ -272,8 +318,17 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 			// dropped from the model, so each is an unsupported shape, not a
 			// skip: on: handlers, invoke onDone/onError, and state-level onDone
 			so := s.Node.AsObject()
-			if onV := so.Get2("on"); onV.AsObject().Len() > 0 {
-				die("tla_gen: %s: retry state %s declares on: handlers, which rung 3 would silently drop; route the events through a non-retry state or extend the generator", mid, s.Name)
+			// Event handlers on a retry state are legitimate (an invariant may
+			// oblige an event to act during the backoff: the ignore-consistency
+			// law makes handling, not ignoring, the required shape). They emit
+			// as ordinary actions: a self-loop leaves every retry counter
+			// unchanged and an exit follows the domain rule, both by the same
+			// counterUpdates the rest of the model uses. The loop shape
+			// (always + after) stays with the retry template below.
+			for _, tr := range ir.TransitionsOf(s.Node, nil, s.Name) {
+				if tr.Kind == "on" {
+					emit(s, tr)
+				}
 			}
 			if so.Get2("invoke") != nil {
 				die("tla_gen: %s: retry state %s declares an invoke, whose onDone/onError transitions rung 3 would silently drop; route the completion through a non-retry state or extend the generator", mid, s.Name)
@@ -284,35 +339,7 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 			continue
 		}
 		for _, tr := range ir.TransitionsOf(s.Node, nil, s.Name) {
-			idx++
-			tgt := ir.Simple(tr.Target)
-			if tgt == "" {
-				tgt = s.Name
-			}
-			name := fmt.Sprintf("T%d", idx)
-			ups := counterUpdates(s.Name, tgt)
-			parts := []string{fmt.Sprintf(`st = "%s"`, s.Name), fmt.Sprintf(`st' = "%s"`, tgt)}
-			var upKeys []string
-			for k := range ups {
-				upKeys = append(upKeys, k)
-			}
-			sort.Strings(upKeys)
-			for _, v := range upKeys {
-				parts = append(parts, fmt.Sprintf("%s' = %s", v, ups[v]))
-			}
-			defs = append(defs, name+" == "+strings.Join(parts, " /\\ "))
-			var trig string
-			if tr.Event != "" {
-				trig = tr.Kind + ":" + tr.Event
-			} else {
-				trig = tr.Kind
-			}
-			comments = append(comments, fmt.Sprintf("  \\* %s: %s -%s-> %s", name, s.Name, trig, tgt))
-			if domain[s.Name] {
-				domActions = append(domActions, name)
-			} else {
-				ovlActions = append(ovlActions, name)
-			}
+			emit(s, tr)
 		}
 	}
 
