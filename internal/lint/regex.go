@@ -22,4 +22,7 @@ var (
 	regexpOracleTag = regexp.MustCompile(`^[A-Z0-9]{2,8}$`)
 	// A raw-millisecond after key ("5000") bypasses the named-delay contract.
 	regexpAllDigits = regexp.MustCompile(`^[0-9]+$`)
+	// Invariant ids are kebab-case: they name laws in prose, tables, and
+	// reports, never TLA+ identifiers or stable-id hash inputs.
+	regexpInvariantID = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 )

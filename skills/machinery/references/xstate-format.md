@@ -13,7 +13,7 @@ and array transition targets are rejected. Do not author outside the subset.
 
 - **root keys**: `id`, `initial`, `context`, `states`, `description`, `meta`, `version`, plus the
   underscore annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_component`,
-  `_max_retries`, `_oracle_tag`.
+  `_max_retries`, `_oracle_tag`, `_invariants`.
 - **state keys**: `on`, `after`, `always`, `invoke`, `entry`, `exit`, `states`, `initial`, `type`,
   `id`, `meta`, `description`, `tags`, `onDone`, `output`, plus `_comment`, `_exhaustive`, `_ignores`.
 - **transition keys**: `target`, `guard`, `actions`, `description`, `_comment`. Anything else (a
@@ -176,6 +176,31 @@ delay name used in any `after` block must be declared here with its millisecond 
 rationale; an undeclared delay name is a lint error. Raw numeric `after` keys (`"5000"`) are
 rejected outright: name the delay and declare its bound, so the config stays declarative and the
 bound traces to C4.
+
+**`_invariants: [...]`** (root, optional): the machine's declared laws, each with a kebab-case
+`id`, a prose `statement`, and optionally a formal `requires` list that makes one class of
+obligation lint-checkable:
+
+```json
+"_invariants": [
+  {"id": "liveness-always-recorded",
+   "statement": "a heartbeat refreshes lastSeen in every non-terminal state",
+   "requires": [
+     {"event": "heartbeat", "in": "all", "except": ["Closed"], "effect": "context"}]}
+]
+```
+
+A `requires` entry states that `event` must MUTATE CONTEXT in its scope (`in` is `"all"` with an
+optional `except` list, or an explicit list of state paths; `effect` is `"context"`, the only
+checkable effect; `when` optionally names the guard when the obligation is conditional, and an
+undeclared guard name is a warning). Lint then enforces the consistency law this vocabulary
+exists for: a state in scope must not declare the event in `_ignores`, because a strict ignore
+(same state, unchanged context, no actions) forbids exactly the mutation the invariant demands.
+That contradiction otherwise hides in prose or in test-fixture conventions, and code generated
+from the formal artifact implements the ignore and violates the law. Resolve a finding by
+declaring the handling arm in `on:` (guarded, with its complement, when conditional) and
+dropping the `_ignores` entry, or by narrowing the invariant's scope. Machines without
+`_invariants` lint exactly as before.
 
 ## Explicit ignores and event completeness (deterministically checked)
 

@@ -17,7 +17,7 @@ var RootKeys = map[string]bool{
 	"id": true, "initial": true, "context": true, "states": true, "description": true,
 	"meta": true, "version": true, "_comment": true, "_delays": true,
 	"_lifecycle_of": true, "_role": true, "_component": true, "_max_retries": true,
-	"_oracle_tag": true,
+	"_oracle_tag": true, "_invariants": true,
 }
 
 // TransitionKeys whitelists transition-object members. A typo ("tagret") used
@@ -615,6 +615,27 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 					base, p, ir.Repr(ev)))
 			}
 		}
+	}
+
+	// declared invariants: block validity plus ignore-consistency (an event an
+	// invariant obliges to mutate context must not be declared ignored in a
+	// state the invariant covers). The event universe includes ignored-only
+	// events: an invariant may legitimately govern an event the machine
+	// currently ignores everywhere, and that is exactly the conflict to name.
+	{
+		eventUniverse := map[string]bool{}
+		for ev := range allEvents {
+			eventUniverse[ev] = true
+		}
+		for _, ig := range igOf {
+			for ev := range ig {
+				eventUniverse[ev] = true
+			}
+		}
+		guardSet, _, _ := MachineUnitNames(m)
+		invErrs, invWarns := lintInvariants(base, ro, states, onOf, igOf, pathSet, guardSet, eventUniverse)
+		errs = append(errs, invErrs...)
+		warns = append(warns, invWarns...)
 	}
 
 	// initial + reachability
