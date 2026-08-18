@@ -91,17 +91,34 @@ func TestTLAModelsMultiTargetRetryResume(t *testing.T) {
 	}
 }
 
-func TestTLARejectsRetryStateWithOnHandlers(t *testing.T) {
-	// A retry-shaped state's on: handlers used to be silently dropped from the
-	// model (and the state reclassified out of the liveness property).
+func TestTLAModelsRetryStateOnHandlers(t *testing.T) {
+	// Event handlers on a retry state are legitimate (an invariant may oblige
+	// an event to act during the backoff; the ignore-consistency law makes
+	// handling, not ignoring, the required shape). They emit as ordinary
+	// actions: an exit transition appears in the model with the counter reset
+	// the domain rule prescribes, and a self-loop keeps every counter.
 	src := `{"id":"widget","initial":"Draft","states":{
 	  "Draft":{"invoke":{"src":"save","onDone":{"target":"Done"},"onError":{"target":"retrying"}},"after":{"t":{"target":"retrying"}}},
-	  "retrying":{"always":[{"guard":"retriesLeft","target":"Draft"}],"after":{"backoff":{"target":"Failed"}},"on":{"CANCEL":{"target":"Failed"}},"_exhaustive":"retriesLeft is total"},
+	  "retrying":{"always":[{"guard":"retriesLeft","target":"Draft"}],"after":{"backoff":{"target":"Failed"}},"on":{"CANCEL":{"target":"Failed"},"PING":{"actions":"recordPing"}},"_exhaustive":"retriesLeft is total"},
 	  "Done":{"type":"final"},
 	  "Failed":{"type":"final"}}}`
-	_, _, _, err := Generate(writeSrc(t, src))
-	if err == nil || !strings.Contains(err.Error(), "retry state") {
-		t.Fatalf("expected retry-state on: handlers to be rejected, got %v", err)
+	_, tlaText, _, err := Generate(writeSrc(t, src))
+	if err != nil {
+		t.Fatalf("retry-state on: handlers must be modeled, got %v", err)
+	}
+	if !strings.Contains(tlaText, `retrying -on:CANCEL-> Failed`) {
+		t.Fatalf("the exit handler must appear in the model:\n%s", tlaText)
+	}
+	if !strings.Contains(tlaText, `retrying -on:PING-> retrying`) {
+		t.Fatalf("the self-loop handler must appear in the model:\n%s", tlaText)
+	}
+	// The self-loop leaves the retry counter unchanged (rc1' = rc1): a burst
+	// of PINGs must not extend the retry budget in the model.
+	for _, line := range strings.Split(tlaText, "\n") {
+		if strings.Contains(line, `st = "retrying" /\ st' = "retrying"`) &&
+			!strings.Contains(line, "rc1' = rc1") {
+			t.Fatalf("self-loop must keep the retry counter: %s", line)
+		}
 	}
 }
 
