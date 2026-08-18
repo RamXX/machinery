@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/LadybugDB/go-ladybug v0.17.0
-	golang.org/x/crypto v0.54.0
+	golang.org/x/crypto v0.55.0
 )
 
 require (
