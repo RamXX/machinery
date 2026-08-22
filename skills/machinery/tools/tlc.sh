@@ -29,8 +29,12 @@ if [ ! -f "$JAR" ]; then
 fi
 
 dir="$(cd "$(dirname "$tla")" && pwd)"
-# TLC writes a states/ working directory; remove it on exit so a direct run does
-# not litter the design tree (verify_formal.sh also relies on this staying clean).
-trap 'rm -rf "$dir/states"' EXIT
-java -XX:+UseParallelGC -cp "$JAR" tlc2.TLC -cleanup \
+# TLC names its scratch directory from the wall clock at second resolution and
+# defaults it to <spec-dir>/states/, so concurrent runs collide and litter the
+# design tree. Give this run a private metadir outside the tree and remove it
+# on exit (the JVM temp dir too: TLC extracts its standard modules there);
+# the states/ sweep only clears leftovers from older layouts.
+meta="$(mktemp -d "${TMPDIR:-/tmp}/machinery-tlc.XXXXXX")"
+trap 'rm -rf "$meta" "$dir/states"' EXIT
+java -XX:+UseParallelGC -Djava.io.tmpdir="$meta" -cp "$JAR" tlc2.TLC -cleanup -metadir "$meta" \
   -config "$dir/$(basename "$cfg")" "$dir/$(basename "$tla")"

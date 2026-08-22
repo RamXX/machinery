@@ -90,20 +90,50 @@ func fetchJar(dest, url, label, wantSHA string) (string, error) {
 	return dest, nil
 }
 
+// newTLCMetaDir creates the private scratch directory for one TLC
+// invocation. TLC names its metadata directory from the wall clock at second
+// resolution (<metadir>/<yy-mm-dd-hh-mm-ss>/) and refuses to start when that
+// name already exists, so two runs sharing a metadir root and a start second
+// collide, and one run's cleanup deletes the other's state files. TLC also
+// extracts its standard modules (Naturals.tla and friends) into the JVM's
+// java.io.tmpdir, which every concurrent JVM shares, so one run's write can
+// race another's parse. A fresh MkdirTemp root per invocation, used for both,
+// makes every name unique whatever the clock says and keeps every byte of
+// TLC scratch out of the design tree. The caller removes the root when TLC
+// exits.
+func newTLCMetaDir() (string, error) {
+	return os.MkdirTemp("", "machinery-tlc-")
+}
+
+// tlcArgs builds the java argument list for one .tla/.cfg pair, with TLC's
+// metadata routed to metaDir instead of its default <spec-dir>/states/ and
+// the JVM's temp dir pointed at the same private root.
+func tlcArgs(jar, metaDir, cfgPath, tlaPath string) []string {
+	return []string{"-XX:+UseParallelGC", "-Djava.io.tmpdir=" + metaDir, "-cp", jar, "tlc2.TLC", "-cleanup",
+		"-metadir", metaDir,
+		"-config", filepath.Base(cfgPath), filepath.Base(tlaPath)}
+}
+
 // runTLC mirrors tlc.sh: java -cp jar tlc2.TLC on a .tla/.cfg pair.
 func runTLC(tlaPath, cfgPath string) (string, error) {
 	jar, err := ensureJar()
 	if err != nil {
 		return "", err
 	}
+	metaDir, err := newTLCMetaDir()
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(metaDir)
 	dir := filepath.Dir(tlaPath)
-	// TLC writes a states/ working directory; remove it on exit.
+	// Nothing is written under the spec directory any more (see
+	// newTLCMetaDir); this sweep only removes a states/ directory that an
+	// older layout or an interrupted direct tlc.sh run may have left behind.
 	defer os.RemoveAll(filepath.Join(dir, "states"))
 	// TLC is exhaustive model-checking; give it a generous but bounded budget.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "java", "-XX:+UseParallelGC", "-cp", jar, "tlc2.TLC", "-cleanup",
-		"-config", filepath.Base(cfgPath), filepath.Base(tlaPath))
+	cmd := exec.CommandContext(ctx, "java", tlcArgs(jar, metaDir, cfgPath, tlaPath)...)
 	cmd.Dir = dir
 	var buf strings.Builder
 	cmd.Stdout = &buf
