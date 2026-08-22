@@ -11,7 +11,8 @@ not a requirement.
 - `tlc.sh <spec.tla>` runs TLC on one `.tla`/`.cfg` pair. On first use it fetches
   `tla2tools.jar` v1.7.4 from the TLA+ releases, verifies it against the pinned sha256
   (`936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`), caches it under
-  `~/.cache/machinery/`, and cleans TLC's `states/` working directory on exit. Override the pin
+  `~/.cache/machinery/`, and keeps TLC's scratch (metadata and extracted standard modules) in a
+  private temp directory removed on exit, never under the design tree. Override the pin
   with `TLA_TOOLS_VERSION` plus `TLA_TOOLS_SHA256` (both, deliberately). Needs Java 11+.
 - `verify_formal.sh <design-dir>` regenerates the whole formal suite from source (via the
   `machinery` binary) into `design/formal/` and TLC-checks every `.tla`/`.cfg` pair through
