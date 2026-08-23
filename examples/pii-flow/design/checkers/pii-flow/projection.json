@@ -1,6 +1,6 @@
 {
   "projection_schema": "1.0",
-  "machinery_version": "v0.3.7",
+  "machinery_version": "v0.3.8",
   "design_id": "sha256:b0e124b78c45020f4258ad3a3d3de9bc76d5d75ee2cbcb008edd438e6341c082",
   "checker_id": "pii-flow",
   "include": [
