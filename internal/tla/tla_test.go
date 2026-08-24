@@ -256,3 +256,40 @@ func TestGenerateOutputIsUnstamped(t *testing.T) {
 		t.Error("Generate output must stay unstamped: packs embed it under the content hash")
 	}
 }
+
+// A perpetual envelope (timer-driven breaker with no `on` handlers and no
+// final) has an empty Domain set; Overlay ~> Domain would be unsatisfiable on
+// a correct machine, so the property is emitted vacuously true and liveness
+// is TLC's deadlock check.
+const perpetualSrc = `{"id":"breaker","_role":"operational","initial":"closed",
+  "_delays":{"pollInterval":"60000 ms - poll cadence","probeTimeout":"2000 ms - probe","cooldown":"60000 ms - cooldown"},
+  "states":{
+  "closed":{"after":{"pollInterval":{"target":"probing"}}},
+  "probing":{"invoke":{"src":"probe","onDone":{"target":"closed"},"onError":{"target":"open"}},"after":{"probeTimeout":{"target":"open"}}},
+  "open":{"after":{"cooldown":{"target":"probing"}}}}}`
+
+func TestTLAPerpetualEnvelopeHasVacuousLiveness(t *testing.T) {
+	_, tla, cfg, err := Generate(writeSrc(t, perpetualSrc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(tla, "Domain == {}") {
+		t.Errorf("expected an empty Domain set, got:\n%s", tla)
+	}
+	if !strings.Contains(tla, "Live_OverlayResolves == TRUE") {
+		t.Errorf("expected the vacuous liveness property, got:\n%s", tla)
+	}
+	if !strings.Contains(tla, "Perpetual envelope") {
+		t.Errorf("expected the perpetual-envelope comment")
+	}
+	if !strings.Contains(cfg, "PROPERTY Live_OverlayResolves") {
+		t.Errorf("cfg must keep the property declaration, got:\n%s", cfg)
+	}
+	_, tla2, _, err := Generate(writeSrc(t, minimalSrc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(tla2, "Live_OverlayResolves == (st \\in Overlay) ~> (st \\in Domain)") {
+		t.Errorf("machines with a domain state keep the real property")
+	}
+}

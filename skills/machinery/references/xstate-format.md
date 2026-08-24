@@ -306,7 +306,11 @@ Deterministic (run the tools; do not eyeball):
   resolution, named-delay declaration (`_delays`), empty-container errors, reachability, dead ends,
   `invoke` with a `src`, `onError`, and a non-empty `after`, shadowed branches, guarded-always
   exhaustiveness (`_exhaustive`), and resting-state event completeness (`_ignores`).
-- `machinery oracle design/machines` generates `<M>.oracle.md`; commit it. G3 regenerates it in
+- `machinery oracle design/machines` generates `<M>.oracle.md`; commit it.
+- `machinery tla` derives the rung-3 liveness property `Overlay ~> Domain` (a domain state has
+  `on` handlers or is final). A perpetual operational envelope with neither (a timer-driven
+  breaker or poller) has an empty Domain, so the property is emitted vacuously true and its
+  liveness is TLC's deadlock check; give such a machine an `on` handler only if the code has one. G3 regenerates it in
   memory and diffs; a stale committed oracle is DRIFT. Tests key on the oracle's stable ids.
 
 Judgment (the lint cannot check these; you must):
