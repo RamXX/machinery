@@ -296,6 +296,7 @@ contract, and no impl configuration, so it can arrive before G2/G3 on the gate l
 | symptom | meaning |
 |---|---|
 | `alloy_gen: top-level invariant(s) X are neither compiled by a rule nor waived by a residual` | the coverage rule: classify X as a rule or a residual-with-reason |
+| a role value named after the subject entity (`User.role` value `User`) | the value becomes an Alloy atom that collides with the `User` signature; name the enum value differently in the model (`Member`) and record the persisted value in its definition |
 | `alloy_gen: subjects.team.membership must be 'lone' or 'one'` | the multiplicity decision cannot be inherited from Modelith cardinality; state it |
 | `alloy_gen: reassign.target is required` | where a record may go must be stated per role with authority |
 | `alloy_gen: resource X declares no n:1 relationship to Y` | the domain model does not say X is owned by Y; add the relationship or drop the resource |

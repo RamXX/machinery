@@ -174,5 +174,10 @@ never. `--gate gn` forces it.
   function bypasses all of it. Keep link authorization at one call site.
 - **One tenant dimension, single-owner tenancy.** `tenant(record) = owner's tenant`. Hierarchical
   tenants, records with multiple tenants, or tenancy not derived from ownership are residuals.
+- **A record's tenant is its owner's tenant, so every record in a reference needs an n:1
+  relationship to the subject.** Systems that stamp `tenant_id` directly on every row (Ash
+  attribute multitenancy plus RLS, as in TIXX) have records with no owning subject (a link row,
+  a label, a project whose lead is optional); those cannot enter the layer today. A direct
+  per-record `tenant_attr` is the open follow-up.
 - **The references are the ones you name.** A reference not listed in the annotation is not held to a
   tenant. The annotation is the enumeration of what must stay in-tenant; keep it complete.
