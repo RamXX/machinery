@@ -470,7 +470,17 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	lines = append(lines, "")
 	lines = append(lines, "Spec == Init /\\ [][Next]_vars /\\ WF_vars(OverlayNext)")
 	lines = append(lines, "")
-	lines = append(lines, "Live_OverlayResolves == (st \\in Overlay) ~> (st \\in Domain)")
+	if len(domain) == 0 {
+		// A perpetual envelope (timer-driven breaker, poller, health monitor)
+		// has no resting domain state and no final: Overlay ~> Domain would be
+		// unsatisfiable on a correct machine. Liveness reduces to deadlock
+		// freedom, which TLC checks by default; the property stays declared so
+		// the .cfg keeps one shape.
+		lines = append(lines, "\\* Perpetual envelope: no domain state to resolve into; liveness is deadlock freedom.")
+		lines = append(lines, "Live_OverlayResolves == TRUE")
+	} else {
+		lines = append(lines, "Live_OverlayResolves == (st \\in Overlay) ~> (st \\in Domain)")
+	}
 	lines = append(lines, "====")
 	tlaOut := strings.Join(lines, "\n") + "\n"
 
