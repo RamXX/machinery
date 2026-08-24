@@ -25,7 +25,7 @@ the ratchet.`,
 	}
 	var implDir, date string
 	c.Flags().StringVar(&implDir, "impl", "", "implementation directory to scan (required)")
-	c.Flags().StringVar(&date, "date", "", "stamp for the snapshot and rule comments (default: current YYYY-MM)")
+	c.Flags().StringVar(&date, "date", "", "stamp for the snapshot and rule comments (default: today, YYYY-MM-DD; older YYYY-MM snapshots stay readable)")
 	c.RunE = func(cmd *cobra.Command, args []string) error {
 		design := args[0]
 		if err := checkIsDir(design); err != nil {
@@ -39,7 +39,7 @@ the ratchet.`,
 			return nil
 		}
 		if date == "" {
-			date = time.Now().Format("2006-01")
+			date = time.Now().Format("2006-01-02")
 		}
 		rep, err := gates.BuildBaseline(design, implDir, date)
 		if err != nil {

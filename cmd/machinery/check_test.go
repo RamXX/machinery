@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/oracle"
@@ -222,5 +223,49 @@ func TestCheckOmitsVersionSkewNote(t *testing.T) {
 				t.Fatalf("fixture not green:\n%s", got)
 			}
 		})
+	}
+}
+
+// `machinery baseline` stamps the full date so the age note reads 0 days on
+// the day the snapshot is taken (a YYYY-MM stamp aged from the first of the
+// month).
+func TestBaselineDefaultStampIsFullDate(t *testing.T) {
+	out, _, codes := withCapturedIO(t)
+	root := t.TempDir()
+	design := filepath.Join(root, "design")
+	impl := filepath.Join(root, "impl")
+	writeText(t, filepath.Join(design, "ARCHITECTURE.md"), "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n"+
+		"  - id: alpha\n    code: [\"alpha/**\"]\n  - id: beta\n    code: [\"beta/**\"]\ndependency_rules:\n  allow: []\n  deny: []\n```\n")
+	writeText(t, filepath.Join(impl, "go.mod"), "module example.com/m\n")
+	writeText(t, filepath.Join(impl, "alpha", "a.go"), "package alpha\n\nimport \"example.com/m/beta\"\n")
+	writeText(t, filepath.Join(impl, "beta", "b.go"), "package beta\n")
+	cmd := newBaselineCmd()
+	cmd.SetArgs([]string{design, "--impl", impl})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if len(*codes) != 0 {
+		t.Fatalf("exit codes %v, want none", *codes)
+	}
+	today := time.Now().Format("2006-01-02")
+	if !strings.Contains(out.String(), "# "+today+" seen in") {
+		t.Fatalf("rule comment must carry today's full date %s, got:\n%s", today, out.String())
+	}
+	data, err := os.ReadFile(filepath.Join(design, "ratchet.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"date": "`+today+`"`) && !strings.Contains(string(data), `"date":"`+today+`"`) {
+		t.Fatalf("ratchet.json must stamp %s, got %s", today, data)
+	}
+}
+
+func writeText(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

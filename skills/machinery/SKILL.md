@@ -471,9 +471,10 @@ In manifest mode the checks apply per shard in `design/BUILD/*.md` (a `README.md
 there is a shard index, not a plan shard, and is exempt); a manifest root over a
 decomposition with no local shards has no plan obligations of its own (the children carry them).
 Once code
-exists, **G4-import** (`--impl <dir>`) parses imports (Go single and block forms via the go.mod
-module name, Python, TypeScript/JavaScript, Elixir alias/import/use against boundary `modules:`,
-Rust crate-relative use), enforces `exposes` and `deny` rules, and flags any undeclared
+exists, **G4-import** (`--impl <dir>`) parses imports (Go single and block forms via every go.mod
+module under `--impl`, Python, TypeScript/JavaScript, Elixir alias/import/use/require lines plus
+fully-qualified inline references (`Mod.Sub.fun(`, `%Mod.Sub{`, `&Mod.Sub.fun/1`; doc heredocs
+and comments stripped) against boundary `modules:`, Rust crate-relative use), enforces `exposes` and `deny` rules, and flags any undeclared
 cross-boundary edge or any source file outside every boundary (use the contract `ignore:` list for
 test scaffolding); test files are skipped.
 **Gt-tests** (also `--impl` only) holds the suite to the oracles: every stable id in the committed
