@@ -320,6 +320,20 @@ the other half is somebody's memory" and a design history you can audit.
   state-migration-when-persisted conformance check will hold you to having the section;
   the brownfield content is on you.
 
+### The remainder boundary (verified on a 626-file Elixir monolith)
+
+When the modeled slice is a fraction of the repo, model the unmodeled contexts as ONE ordinary
+boundary (`<app>.remainder`, with every unmodeled directory under its `code:` globs and every
+unmodeled module prefix under `modules:`), not as an external and not as `ignore:` globs. Then
+declare the direction once: `deny: "<app>.* -> <app>.remainder"` plus
+`allow: "<app>.remainder -> <app>.*"`. The unmodeled code keeps compiling against the modeled
+core, the core cannot lean on unmodeled code, and `machinery baseline` enumerates exactly the
+places where it does today (on TIXX: five edges, the custom-field and notification seams). An
+`ignore:` glob would have amnestied the same directories unratcheted; an external would have
+demanded `imports:` prefixes for code that is ours. Give the OTP application root (the module
+that supervises every context) its own boundary with `allow: <app>.approot -> <app>.*`;
+folding it into a substrate boundary manufactures allow-graph cycles.
+
 ## 8. Sharp edges (verified, work around until fixed)
 
 - The ratchet is scoped to baselined edges: it catches every new offender file on an
@@ -335,6 +349,9 @@ the other half is somebody's memory" and a design history you can audit.
   The same holds for tampering: a child-side edit that rewrites the pack copy and
   recomputes its hash is self-consistent and passes the child's own gate; the parent's
   check is the authority, so it must run in CI wherever the parent design lives.
+- Elixir string literals are not stripped by the reference scanner: a string that spells a
+  module call (`"default adapter: My.App.Adapter.Req"`) yields an edge. Baseline it with the
+  reason; a sigil-aware string stripper is the open follow-up.
 - `deny:` rules cannot reference boundaries that do not exist yet; planned-but-unbuilt
   boundaries live in comments until they have DSL elements.
 - Elixir references are found by regex, not by the compiler: alias/import/use/require lines
