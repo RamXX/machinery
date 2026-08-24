@@ -337,6 +337,17 @@ the other half is somebody's memory" and a design history you can audit.
   check is the authority, so it must run in CI wherever the parent design lives.
 - `deny:` rules cannot reference boundaries that do not exist yet; planned-but-unbuilt
   boundaries live in comments until they have DSL elements.
+- Elixir references are found by regex, not by the compiler: alias/import/use/require lines
+  plus fully-qualified inline forms (`Mod.Sub.fun(`, `%Mod.Sub{`, `&Mod.Sub.fun/1`). Doc
+  heredocs and `#` comments are stripped first; plain string literals are not, so a string
+  that spells a qualified call still counts. Single-segment references (`Enum.map(`) never
+  count: they cannot match a dotted `modules:` prefix. Dynamic dispatch (`apply/3`,
+  `Module.concat`) is invisible.
+- Go resolution discovers every `go.mod` under `--impl` (dot, `vendor`, and `ignore:`
+  directories skipped); an import path no discovered module names is dropped as external
+  unless an `externals` prefix claims it, with no finding.
+- `ratchet.json` snapshots taken before the full-date stamp carry `YYYY-MM` and age from the
+  first of that month; rerun `machinery baseline` to restamp.
 
 ## 9. What "sustainable" looks like (the exit criteria)
 

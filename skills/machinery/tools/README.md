@@ -65,7 +65,8 @@ One line per subcommand:
   prints the `baseline:` rules that would tolerate today's violating edges (paste into the
   contract's `dependency_rules` after review), suggests `ignore:` globs, and writes
   `design/ratchet.json`, the snapshot G4 ratchets baselined edges against. `--date` overrides the
-  snapshot and rule-comment stamp (default: current YYYY-MM).
+  snapshot and rule-comment stamp (default: today, YYYY-MM-DD; older YYYY-MM snapshots stay
+  readable and age from the first of that month).
 - `machinery scale <design>` measures a design's size (stateful components, bounded contexts,
   synthesis input) and recommends sharding or recursive decomposition.
 - `machinery verify-formal <design-dir>` regenerates the tla/refine/compose specs into

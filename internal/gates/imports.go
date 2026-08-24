@@ -191,16 +191,65 @@ func boundaryOf(rel string, pkgmap [][2]string) string {
 	return bestBid
 }
 
-func goModuleName(impl string) string {
-	data, err := os.ReadFile(filepath.Join(impl, "go.mod"))
-	if err != nil {
-		return ""
+// goModule is one go.mod under impl: its module path and the directory
+// (impl-relative, "." for the root) whose packages it names.
+type goModule struct {
+	path, dir string
+}
+
+var goModuleLineRe = regexp.MustCompile(`(?m)^module\s+(\S+)`)
+
+// goModules discovers every go.mod under impl (a repo may hold several
+// modules and no root one), skipping dot, vendor, and contract-ignored
+// directories. Longer module paths sort first so a nested module wins over
+// an enclosing one whose path is its prefix.
+func goModules(impl string, ignore []string) ([]goModule, error) {
+	var mods []goModule
+	err := filepath.WalkDir(impl, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(impl, path)
+		if d.IsDir() {
+			if rel == "." {
+				return nil
+			}
+			name := d.Name()
+			if strings.HasPrefix(name, ".") || name == "vendor" {
+				return filepath.SkipDir
+			}
+			for _, ig := range ignore {
+				if matchGlob(rel, ig) || matchGlob(rel+"/", ig) {
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+		if d.Name() != "go.mod" {
+			return nil
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		if m := goModuleLineRe.FindSubmatch(data); m != nil {
+			mods = append(mods, goModule{path: string(m[1]), dir: filepath.Dir(rel)})
+		}
+		return nil
+	})
+	sort.SliceStable(mods, func(i, j int) bool { return len(mods[i].path) > len(mods[j].path) })
+	return mods, err
+}
+
+// goModuleFor returns the module owning an import path and the impl-relative
+// package directory, or ok=false when no discovered module names it.
+func goModuleFor(mods []goModule, ref string) (mod goModule, rel string, ok bool) {
+	for _, m := range mods {
+		if ref == m.path || strings.HasPrefix(ref, m.path+"/") {
+			return m, filepath.Join(m.dir, strings.TrimLeft(ref[len(m.path):], "/")), true
+		}
 	}
-	m := regexp.MustCompile(`(?m)^module\s+(\S+)`).FindSubmatch(data)
-	if m != nil {
-		return string(m[1])
-	}
-	return ""
+	return goModule{}, "", false
 }
 
 var (
@@ -210,10 +259,23 @@ var (
 	pyImportRe      = regexp.MustCompile(`(?m)^\s*import\s+([\w.]+(?:\s+as\s+\w+)?(?:\s*,\s*[\w.]+(?:\s+as\s+\w+)?)*)`)
 	pyFromRe        = regexp.MustCompile(`(?m)^\s*from\s+([\w.]+)\s+import\b`)
 	// from/import/dynamic import()/require() forms
-	tsImportRe    = regexp.MustCompile(`(?:from|import\s*\(|import|require\()\s*['"]([^'"]+)['"]`)
-	exModRe       = regexp.MustCompile(`(?m)^\s*(?:alias|import|use|require)\s+([A-Z][\w.]*)`)
-	rustUseRe     = regexp.MustCompile(`(?m)^\s*use\s+([\w:]+)`)
-	exDefmoduleRe = regexp.MustCompile(`(?m)^\s*defmodule\s+([A-Z][\w.]*)`)
+	tsImportRe = regexp.MustCompile(`(?:from|import\s*\(|import|require\()\s*['"]([^'"]+)['"]`)
+	exModRe    = regexp.MustCompile(`(?m)^\s*(?:alias|import|use|require)\s+([A-Z][\w.]*)`)
+	// Fully-qualified inline references, which idiomatic Elixir uses without
+	// an alias line: a qualified call with parens (Mod.Sub.fun(, Mod.Sub.fun!(),
+	// a struct literal (%Mod.Sub{), and a function capture (&Mod.Sub.fun/1).
+	// The module path must have at least two segments: a single-segment
+	// reference (Enum.map() is almost always stdlib and never maps to a
+	// boundary modules: prefix that carries a dot, so it is excluded on
+	// purpose rather than resolved and dropped.
+	exQualCallRe = regexp.MustCompile(`([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.[a-z_][A-Za-z0-9_]*[!?]?\(`)
+	exStructRe   = regexp.MustCompile(`%([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\{`)
+	exCaptureRe  = regexp.MustCompile(`&([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.`)
+	// @moduledoc/@doc/@typedoc heredocs: prose mentions of a module are not
+	// dependencies. Each alternative pairs its own delimiter.
+	exDocHeredocRe = regexp.MustCompile(`(?s)@(?:moduledoc|doc|typedoc)\s+(?:""".*?"""|'''.*?''')`)
+	rustUseRe      = regexp.MustCompile(`(?m)^\s*use\s+([\w:]+)`)
+	exDefmoduleRe  = regexp.MustCompile(`(?m)^\s*defmodule\s+([A-Z][\w.]*)`)
 )
 
 func goImports(text string) []string {
@@ -270,12 +332,55 @@ func tsImports(text, rel string) []string {
 	return out
 }
 
+// exModules returns every module a file references, deduplicated in first-seen
+// order: the alias/import/use/require lines plus fully-qualified inline
+// references (see exQualCallRe). Doc heredocs and line comments are stripped
+// first so a prose mention never becomes an edge. Ordinary string literals
+// are NOT stripped: a string containing Mod.Sub.fun( does yield a reference
+// (rare in practice, and stripping strings reliably would need a sigil-aware
+// lexer).
 func exModules(text string) []string {
 	var out []string
+	seen := map[string]bool{}
+	add := func(mod string) {
+		if !seen[mod] {
+			seen[mod] = true
+			out = append(out, mod)
+		}
+	}
 	for _, m := range exModRe.FindAllStringSubmatch(text, -1) {
-		out = append(out, m[1])
+		add(m[1])
+	}
+	code := exStripComments(exDocHeredocRe.ReplaceAllString(text, ""))
+	for _, re := range []*regexp.Regexp{exQualCallRe, exStructRe, exCaptureRe} {
+		for _, m := range re.FindAllStringSubmatch(code, -1) {
+			add(m[1])
+		}
 	}
 	return out
+}
+
+// exStripComments drops Elixir line comments. Heuristic: a # starts a comment
+// when an even number of double quotes precede it on the line (so "#{x}"
+// interpolation and "#" inside a string survive); escaped quotes and
+// multi-line strings are not tracked.
+func exStripComments(text string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		quotes := 0
+		for j := 0; j < len(line); j++ {
+			switch line[j] {
+			case '"':
+				quotes++
+			case '#':
+				if quotes%2 == 0 {
+					lines[i] = line[:j]
+					j = len(line)
+				}
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func rustImports(text string) []string {
@@ -416,11 +521,13 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 		return false
 	}
 
-	goModule := goModuleName(impl)
+	goMods, goModErr := goModules(impl, ignore)
+	if goModErr != nil {
+		g.Errs = append(g.Errs, "discovering go modules under "+impl+": "+goModErr.Error())
+	}
 
 	internalTarget := func(ref string) (string, string) {
-		if goModule != "" && (ref == goModule || strings.HasPrefix(ref, goModule+"/")) {
-			rel := strings.TrimLeft(ref[len(goModule):], "/")
+		if _, rel, ok := goModuleFor(goMods, ref); ok {
 			return boundaryOf(rel, pkgmap), rel
 		}
 		for _, bm := range boundModules {
@@ -532,7 +639,7 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 				dstB = externalTarget(ref)
 				norm = ref
 				if dstB == "" {
-					if goModule != "" && strings.HasPrefix(ref, goModule+"/") {
+					if mod, _, inModule := goModuleFor(goMods, ref); inModule && ref != mod.path {
 						g.Errs = append(g.Errs, rel+": imports "+ref+", which maps to no contract boundary (code outside the contract)")
 						if scan != nil {
 							if scan.OrphanRefs == nil {
