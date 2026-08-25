@@ -268,14 +268,11 @@ var (
 	// reference (Enum.map() is almost always stdlib and never maps to a
 	// boundary modules: prefix that carries a dot, so it is excluded on
 	// purpose rather than resolved and dropped.
-	exQualCallRe = regexp.MustCompile(`([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.[a-z_][A-Za-z0-9_]*[!?]?\(`)
-	exStructRe   = regexp.MustCompile(`%([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\{`)
-	exCaptureRe  = regexp.MustCompile(`&([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.`)
-	// @moduledoc/@doc/@typedoc heredocs: prose mentions of a module are not
-	// dependencies. Each alternative pairs its own delimiter.
-	exDocHeredocRe = regexp.MustCompile(`(?s)@(?:moduledoc|doc|typedoc)\s+(?:""".*?"""|'''.*?''')`)
-	rustUseRe      = regexp.MustCompile(`(?m)^\s*use\s+([\w:]+)`)
-	exDefmoduleRe  = regexp.MustCompile(`(?m)^\s*defmodule\s+([A-Z][\w.]*)`)
+	exQualCallRe  = regexp.MustCompile(`([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.[a-z_][A-Za-z0-9_]*[!?]?\(`)
+	exStructRe    = regexp.MustCompile(`%([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\{`)
+	exCaptureRe   = regexp.MustCompile(`&([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.`)
+	rustUseRe     = regexp.MustCompile(`(?m)^\s*use\s+([\w:]+)`)
+	exDefmoduleRe = regexp.MustCompile(`(?m)^\s*defmodule\s+([A-Z][\w.]*)`)
 )
 
 func goImports(text string) []string {
@@ -334,11 +331,11 @@ func tsImports(text, rel string) []string {
 
 // exModules returns every module a file references, deduplicated in first-seen
 // order: the alias/import/use/require lines plus fully-qualified inline
-// references (see exQualCallRe). Doc heredocs and line comments are stripped
-// first so a prose mention never becomes an edge. Ordinary string literals
-// are NOT stripped: a string containing Mod.Sub.fun( does yield a reference
-// (rare in practice, and stripping strings reliably would need a sigil-aware
-// lexer).
+// references (see exQualCallRe). String-like literals (heredocs, strings,
+// charlists, sigils) and line comments are stripped before the inline scan
+// (see exStripStrings), so neither a prose mention nor a string that spells
+// a module call becomes an edge. A module referenced only inside #{...}
+// interpolation is dropped with its surrounding string: an accepted miss.
 func exModules(text string) []string {
 	var out []string
 	seen := map[string]bool{}
@@ -351,7 +348,7 @@ func exModules(text string) []string {
 	for _, m := range exModRe.FindAllStringSubmatch(text, -1) {
 		add(m[1])
 	}
-	code := exStripComments(exDocHeredocRe.ReplaceAllString(text, ""))
+	code := exStripStrings(text)
 	for _, re := range []*regexp.Regexp{exQualCallRe, exStructRe, exCaptureRe} {
 		for _, m := range re.FindAllStringSubmatch(code, -1) {
 			add(m[1])
@@ -360,27 +357,106 @@ func exModules(text string) []string {
 	return out
 }
 
-// exStripComments drops Elixir line comments. Heuristic: a # starts a comment
-// when an even number of double quotes precede it on the line (so "#{x}"
-// interpolation and "#" inside a string survive); escaped quotes and
-// multi-line strings are not tracked.
-func exStripComments(text string) string {
-	lines := strings.Split(text, "\n")
-	for i, line := range lines {
-		quotes := 0
-		for j := 0; j < len(line); j++ {
-			switch line[j] {
-			case '"':
-				quotes++
-			case '#':
-				if quotes%2 == 0 {
-					lines[i] = line[:j]
-					j = len(line)
+// exStripStrings blanks the contents of Elixir string-like literals and
+// drops line comments in a single pass, so the inline-reference regexes
+// never match inside either. Delimiters are kept and inner bytes become
+// spaces (newlines survive), so line and offset positions stay stable.
+// Handled forms:
+//
+//   - heredocs """...""" and ”'...”' (doc attributes included)
+//   - double-quoted strings and single-quoted charlists, where a backslash
+//     escapes the next byte (so an escaped quote does not terminate)
+//   - sigils: ~ plus any ASCII letter plus a delimiter pair from (), [],
+//     {}, <>, "", ”, ||, //, including the heredoc forms ~x"""...""" and
+//     ~x”'...”'; lowercase sigils honor backslash escapes, uppercase do
+//     not (they have no escapes in Elixir)
+//
+// Deliberate simplifications: the scan runs to the first unescaped closing
+// delimiter with no nesting tracking (nesting is not needed to keep the
+// reference regexes out of string contents), #{...} interpolation is blanked
+// with its surrounding string (a module referenced only there is an accepted
+// miss), and ? char literals are not special-cased (a bare ?" reads as a
+// string opener). Comments are handled after strings by construction: a #
+// reached in code state starts a comment that runs to end of line, so a #
+// inside a string never truncates the line.
+func exStripStrings(text string) string {
+	src := []byte(text)
+	out := make([]byte, 0, len(src))
+	n := len(src)
+
+	closerFor := map[byte]byte{
+		'(': ')', '[': ']', '{': '}', '<': '>',
+		'"': '"', '\'': '\'', '|': '|', '/': '/',
+	}
+	isLetter := func(b byte) bool {
+		return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+	}
+	blank := func(b byte) byte {
+		if b == '\n' {
+			return '\n'
+		}
+		return ' '
+	}
+	// blankUntil emits spaces (newlines kept) from i to the first unescaped
+	// occurrence of closer, emits the closer verbatim, and returns the
+	// position after it. An unterminated literal blanks to EOF.
+	blankUntil := func(i int, closer string, escapes bool) int {
+		for i < n {
+			if escapes && src[i] == '\\' {
+				out = append(out, ' ')
+				i++
+				if i < n {
+					out = append(out, blank(src[i]))
+					i++
 				}
+				continue
 			}
+			if src[i] == closer[0] && i+len(closer) <= n && string(src[i:i+len(closer)]) == closer {
+				out = append(out, closer...)
+				return i + len(closer)
+			}
+			out = append(out, blank(src[i]))
+			i++
+		}
+		return i
+	}
+
+	for i := 0; i < n; {
+		c := src[i]
+		switch {
+		case c == '#':
+			// code state: comment to end of line (the newline itself is
+			// emitted by the default case on the next iteration)
+			for i < n && src[i] != '\n' {
+				i++
+			}
+		case c == '~' && i+2 < n && isLetter(src[i+1]):
+			closer, ok := closerFor[src[i+2]]
+			if !ok {
+				out = append(out, c)
+				i++
+				continue
+			}
+			escapes := src[i+1] >= 'a' && src[i+1] <= 'z'
+			width := 1
+			if (src[i+2] == '"' || src[i+2] == '\'') && i+4 < n && src[i+3] == src[i+2] && src[i+4] == src[i+2] {
+				width = 3
+			}
+			out = append(out, src[i:i+2+width]...)
+			i = blankUntil(i+2+width, strings.Repeat(string(closer), width), escapes)
+		case c == '"' || c == '\'':
+			width := 1
+			if i+2 < n && src[i+1] == c && src[i+2] == c {
+				width = 3
+			}
+			out = append(out, src[i:i+width]...)
+			i = blankUntil(i+width, strings.Repeat(string(c), width), true)
+		default:
+			out = append(out, c)
+			i++
 		}
 	}
-	return strings.Join(lines, "\n")
+	return string(out)
 }
 
 func rustImports(text string) []string {
