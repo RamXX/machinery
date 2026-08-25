@@ -20,13 +20,26 @@ func TestExModules(t *testing.T) {
 		{"struct literal", "%Foo.Bar{id: 1}\n", []string{"Foo.Bar"}},
 		{"function capture", "Enum.map(xs, &Foo.Bar.baz/1)\n", []string{"Foo.Bar"}},
 		{"comment mention excluded", "# see Foo.Bar.baz( for details\nx = 1\n", nil},
-		{"interpolation is not a comment", "s = \"#{Foo.Bar.baz(1)}\"\n", []string{"Foo.Bar"}},
+		// #{...} interpolation is blanked with its surrounding string: a
+		// module referenced only there is a documented, accepted miss.
+		{"interpolation dropped with its string", "s = \"#{Foo.Bar.baz(1)}\"\n", nil},
 		{"moduledoc heredoc excluded", "@moduledoc \"\"\"\nCalls Foo.Bar.baz( and builds %Foo.Bar{}.\n\"\"\"\nx = 1\n", nil},
 		{"doc heredoc single quotes excluded", "@doc '''\nCalls Foo.Bar.baz(.\n'''\nx = 1\n", nil},
 		{"single-segment stdlib call excluded", "Enum.map(xs, fn x -> x end)\n", nil},
-		// Plain strings are not stripped (documented on exModules): a
-		// qualified call inside a string literal still counts.
-		{"string containing a qualified call is included", "s = \"run Foo.Bar.baz(\"\n", []string{"Foo.Bar"}},
+		// Strings, charlists, and sigils are stripped (documented on
+		// exModules and exStripStrings): a qualified call spelled inside
+		// one never counts.
+		{"string spelling a qualified call excluded", "s = \"run Foo.Bar.baz(\"\n", nil},
+		{"tuple string excluded (TIXX config.ex false-positive shape)", "cfg = {:vcs_github_module,\n  \"GitHub VCS adapter module (default: Tixx.Integrations.Github.Req.new())\"}\n", nil},
+		{"plain heredoc excluded", "s = \"\"\"\nFoo.Bar.baz(1)\n\"\"\"\nx = 1\n", nil},
+		{"charlist excluded", "c = 'Foo.Bar.baz('\n", nil},
+		{"sigil with pipe delimiter excluded", "s = ~s|Foo.Bar.baz(|\n", nil},
+		{"uppercase sigil heredoc excluded", "s = ~S\"\"\"\nFoo.Bar.baz(1)\n\"\"\"\nx = 1\n", nil},
+		{"regex sigil excluded", "ok = Regex.match?(~r/Foo.Bar.baz(/, s)\n", nil},
+		{"escaped quote then real call on the same line", "s = \"say \\\" it\"; Foo.Bar.baz(1)\n", []string{"Foo.Bar"}},
+		{"hash inside a string does not truncate the line", "s = \"x # y\"; Foo.Bar.baz(1)\n", []string{"Foo.Bar"}},
+		{"lowercase sigil honors escaped closer", "s = ~s(Foo.Bar.baz\\() ; x = 1\n", nil},
+		{"uppercase sigil does not escape its closer", "s = ~S(a\\); Foo.Bar.baz(1)\n", []string{"Foo.Bar"}},
 		{"mixed file dedupes", "defmodule A.B do\n  alias Foo.Bar\n  @doc \"\"\"\n  Ignore Zed.Doc.only(\n  \"\"\"\n  def f, do: Foo.Bar.baz() # Comment.Only.here(\n  def g, do: %Foo.Bar{} |> Baz.Qux.run!(&Foo.Bar.h/1)\nend\n", []string{"Foo.Bar", "Baz.Qux"}},
 	}
 	for _, c := range cases {

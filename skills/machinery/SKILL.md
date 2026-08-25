@@ -473,8 +473,8 @@ decomposition with no local shards has no plan obligations of its own (the child
 Once code
 exists, **G4-import** (`--impl <dir>`) parses imports (Go single and block forms via every go.mod
 module under `--impl`, Python, TypeScript/JavaScript, Elixir alias/import/use/require lines plus
-fully-qualified inline references (`Mod.Sub.fun(`, `%Mod.Sub{`, `&Mod.Sub.fun/1`; doc heredocs
-and comments stripped) against boundary `modules:`, Rust crate-relative use), enforces `exposes` and `deny` rules, and flags any undeclared
+fully-qualified inline references (`Mod.Sub.fun(`, `%Mod.Sub{`, `&Mod.Sub.fun/1`; strings,
+charlists, sigils, doc heredocs, and comments stripped) against boundary `modules:`, Rust crate-relative use), enforces `exposes` and `deny` rules, and flags any undeclared
 cross-boundary edge or any source file outside every boundary (use the contract `ignore:` list for
 test scaffolding); test files are skipped.
 **Gt-tests** (also `--impl` only) holds the suite to the oracles: every stable id in the committed
