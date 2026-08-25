@@ -356,12 +356,35 @@ folding it into a substrate boundary manufactures allow-graph cycles.
   accepted miss; dynamic dispatch stays invisible either way.
 - `deny:` rules cannot reference boundaries that do not exist yet; planned-but-unbuilt
   boundaries live in comments until they have DSL elements.
-- Elixir references are found by regex, not by the compiler: alias/import/use/require lines
-  plus fully-qualified inline forms (`Mod.Sub.fun(`, `%Mod.Sub{`, `&Mod.Sub.fun/1`). Strings,
-  charlists, sigils (doc heredocs included), and `#` comments are stripped first, so neither
-  a prose mention nor a string that spells a qualified call counts. Single-segment references (`Enum.map(`) never
-  count: they cannot match a dotted `modules:` prefix. Dynamic dispatch (`apply/3`,
-  `Module.concat`) is invisible.
+- References are found by regex, not by a compiler, in every language, and every scanner
+  strips comments and string-like literals before matching. The per-language outcome:
+  - **Elixir**: alias/import/use/require lines plus fully-qualified inline forms
+    (`Mod.Sub.fun(`, `%Mod.Sub{`, `&Mod.Sub.fun/1`). Strings, charlists, sigils (doc
+    heredocs included), and `#` comments are stripped first. Single-segment references
+    (`Enum.map(`) never count: they cannot match a dotted `modules:` prefix. Dynamic
+    dispatch (`apply/3`, `Module.concat`) is invisible.
+  - **Rust**: `use` lines plus use-free inline qualified references (`path::to::item(`,
+    `path::to::macro!(`, `path::To::Type {`, turbofish `path::to::item::<T>`), scanned on
+    text with line and nested block comments, strings, raw strings (`r#"..."#`, any hash
+    count), and char literals stripped; `#[cfg(test)]` spans are carved out first
+    (production code only). `crate::` maps to `src/`-relative paths; `std`/`core`/`alloc`
+    heads are excluded on purpose (they never map to a boundary), and `self::`/`super::`
+    are excluded because resolving them needs module context a regex does not have. A path
+    in pure type or bare-const position (`let x: a::B = a::C;`) is not matched: a
+    documented limitation.
+  - **Python**: line-anchored `import`/`from` lines, with triple-quoted strings stripped
+    first so a docstring that spells an import at line start never counts (a single-line
+    string or `#` comment could never host a line-anchored import). Dynamic imports
+    (`importlib.import_module`, `__import__`) are invisible.
+  - **TypeScript/JavaScript**: `from`/`import`/`import()`/`require()` specifiers, with
+    comments, strings, and template literals stripped first (the specifier string of a
+    real import form survives the strip). A specifier spelled inside any other string or a
+    comment never counts; a `require` embedded in a template literal, or `require` of a
+    template literal, produces no edge (documented choice). Regex literals are not
+    modeled: a quote inside one can desync the strip for that line.
+  - **Go**: import declarations only. Go has no import-free qualified reference form
+    (every cross-package reference requires an import), so Go deliberately has no inline
+    scan, and Go strings cannot host a line-anchored import declaration.
 - The source walk follows directory symlinks but prunes contract-`ignore:`d directories
   before descending into them (a `node_modules` symlink into a foreign package store is
   never entered once ignored). An unreadable subtree no longer aborts the walk: the gate
@@ -375,7 +398,12 @@ folding it into a substrate boundary manufactures allow-graph cycles.
   classification, so the suite itself needs no ignore glob.
 - Go resolution discovers every `go.mod` under `--impl` (dot, `vendor`, and `ignore:`
   directories skipped); an import path no discovered module names is dropped as external
-  unless an `externals` prefix claims it, with no finding.
+  unless an `externals` prefix claims it, with no finding. TS/JS workspaces get the same
+  treatment: every named `package.json` under `--impl` (dot, `vendor`, `node_modules`,
+  and `ignore:` directories skipped) maps its package name to its directory, so
+  `import {x} from "@org/b"` resolves to the boundary owning `packages/b`, longest name
+  first; an import into a discovered package that no boundary owns is reported as code
+  outside the contract.
 - `ratchet.json` snapshots taken before the full-date stamp carry `YYYY-MM` and age from the
   first of that month; rerun `machinery baseline` to restamp.
 

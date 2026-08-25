@@ -472,9 +472,13 @@ there is a shard index, not a plan shard, and is exempt); a manifest root over a
 decomposition with no local shards has no plan obligations of its own (the children carry them).
 Once code
 exists, **G4-import** (`--impl <dir>`) parses imports (Go single and block forms via every go.mod
-module under `--impl`, Python, TypeScript/JavaScript, Elixir alias/import/use/require lines plus
-fully-qualified inline references (`Mod.Sub.fun(`, `%Mod.Sub{`, `&Mod.Sub.fun/1`; strings,
-charlists, sigils, doc heredocs, and comments stripped) against boundary `modules:`, Rust crate-relative use), enforces `exposes` and `deny` rules, and flags any undeclared
+module under `--impl`; Python import/from lines with docstrings stripped; TypeScript/JavaScript
+from/import/import()/require() with comments, strings, and template literals stripped, package
+names resolved via every named package.json under `--impl`; Elixir alias/import/use/require lines
+plus fully-qualified inline references (`Mod.Sub.fun(`, `%Mod.Sub{`, `&Mod.Sub.fun/1`; strings,
+charlists, sigils, doc heredocs, and comments stripped) against boundary `modules:`; Rust use
+lines plus inline qualified references (`path::to::item(`, `path::To::Type {`) with comments,
+strings, and raw strings stripped, crate:: mapped src/-relative), enforces `exposes` and `deny` rules, and flags any undeclared
 cross-boundary edge or any source file outside every boundary (use the contract `ignore:` list for
 test scaffolding); test files are skipped.
 **Gt-tests** (also `--impl` only) holds the suite to the oracles: every stable id in the committed
