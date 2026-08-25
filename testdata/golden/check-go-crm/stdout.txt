@@ -40,7 +40,7 @@
   checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 2 skeleton citations
   ok
 == G4-import  code respects the contract ==
-  checked: 3 files ignored by contract, 16 go files checked, 21 imports resolved, 14 test files skipped, 12 edges verified
+  checked: 2 dirs pruned by contract ignore, 16 go files checked, 21 imports resolved, 14 test files skipped, 12 edges verified
   ok
 == Gt-tests  oracle ids in the test suite ==
   checked: 14 test files scanned, 5 machines, 272 oracle rows, 194 ids covered by literal, 2 formal oracles, 2 formal oracles covered

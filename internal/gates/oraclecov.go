@@ -186,9 +186,12 @@ func testCorpus(design, impl string, g *Gate) testCorpusData {
 			ignore = append(ignore, ig.AsString())
 		}
 	}
-	files, walkErr := walkSourceFiles(impl)
+	files, _, walkWarns, walkErr := walkSourceFiles(impl, ignore)
 	if walkErr != nil {
 		g.Errs = append(g.Errs, "walking "+impl+": "+walkErr.Error())
+	}
+	for _, w := range walkWarns {
+		g.Errs = append(g.Errs, "walk incomplete, subtree skipped: "+w)
 	}
 	sort.Strings(files)
 	var corpus testCorpusData

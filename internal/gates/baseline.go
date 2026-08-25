@@ -98,6 +98,11 @@ func BuildBaseline(design, impl, date string) (*BaselineReport, error) {
 	if !scan.Complete {
 		return nil, fmt.Errorf("baseline needs a scannable design and impl: %s", strings.Join(g.Errs, "; "))
 	}
+	if len(scan.WalkWarns) > 0 {
+		// a ratchet snapshotted from a truncated corpus would amnesty less
+		// than the real debt and then scream on the next full walk
+		return nil, fmt.Errorf("baseline refuses a partial scan; make these subtrees readable or add them to the contract ignore list: %s", strings.Join(scan.WalkWarns, "; "))
+	}
 	rep := &BaselineReport{
 		Date:          date,
 		EdgesObserved: len(scan.Edges),
