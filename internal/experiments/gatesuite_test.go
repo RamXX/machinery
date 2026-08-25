@@ -639,8 +639,9 @@ func TestContractIgnoreGlobsAreRespected(t *testing.T) {
 	if containsAny(g.Errs, "scaffold") {
 		t.Errorf("ignore glob not respected: %v", g.Errs)
 	}
-	if g.Counts["files ignored by contract"] != 1 {
-		t.Errorf("ignored count=%d", g.Counts["files ignored by contract"])
+	// the ignored directory is pruned during the walk, never scanned
+	if g.Counts["dirs pruned by contract ignore"] != 1 {
+		t.Errorf("pruned count=%d", g.Counts["dirs pruned by contract ignore"])
 	}
 }
 

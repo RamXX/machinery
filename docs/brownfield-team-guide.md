@@ -362,6 +362,17 @@ folding it into a substrate boundary manufactures allow-graph cycles.
   a prose mention nor a string that spells a qualified call counts. Single-segment references (`Enum.map(`) never
   count: they cannot match a dotted `modules:` prefix. Dynamic dispatch (`apply/3`,
   `Module.concat`) is invisible.
+- The source walk follows directory symlinks but prunes contract-`ignore:`d directories
+  before descending into them (a `node_modules` symlink into a foreign package store is
+  never entered once ignored). An unreadable subtree no longer aborts the walk: the gate
+  reports each skipped subtree by name ("walk incomplete, subtree skipped: ...") and scans
+  everything else, and `machinery baseline` refuses to snapshot from such a partial scan.
+  Treat those errors as corpus truncation and fix or ignore the named directories.
+- `ignore:` globs bound BOTH gates: G4 stops judging the files and Gt stops scanning the
+  test files under them. Ignoring a whole test tree (`test/**`) blinds Gt and every oracle
+  id reports uncovered; ignore only the non-test scaffolding instead (`test/support/**`,
+  `test/fixtures/**`, `test/test_helper.exs`): G4 already skips `*_test.*` files by
+  classification, so the suite itself needs no ignore glob.
 - Go resolution discovers every `go.mod` under `--impl` (dot, `vendor`, and `ignore:`
   directories skipped); an import path no discovered module names is dropped as external
   unless an `externals` prefix claims it, with no finding.

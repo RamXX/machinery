@@ -19,40 +19,60 @@ import (
 // boundary code globs via symlinks, and skipping them makes the code
 // invisible to the gate). Cycles are broken by tracking resolved paths.
 // Dangling symlinks are skipped.
-func walkSourceFiles(root string) ([]string, error) {
-	var files []string
+//
+// Directories whose root-relative path matches a contract ignore glob are
+// pruned BEFORE descent (symlinked or not): everything under them is
+// excluded post-walk anyway, and descending a huge ignored tree (a
+// node_modules symlink into a foreign pnpm store) wastes the walk at best
+// and used to abort it at worst. The prune keys on the walk path, so a
+// non-ignored symlink into an ignored directory stays followable.
+//
+// A directory that cannot be resolved or read is recorded in warns and its
+// SIBLINGS are still walked: a partial walk must be loud (the caller reports
+// every skipped subtree), never a silent truncation of everything sorting
+// after the failing directory. Only a failure on root itself is fatal.
+//
+// pruned lists the root-relative directories the ignore globs pruned, so the
+// caller can keep the skipped volume visible in its counts.
+func walkSourceFiles(root string, ignore []string) (files, pruned, warns []string, err error) {
 	visited := map[string]bool{}
-	var walk func(dir string) error
-	walk = func(dir string) error {
-		real, err := filepath.EvalSymlinks(dir)
-		if err != nil {
-			return err
+	var walk func(dir string, isRoot bool) error
+	walk = func(dir string, isRoot bool) error {
+		fail := func(e error) error {
+			if isRoot {
+				return e
+			}
+			warns = append(warns, dir+": "+e.Error())
+			return nil
+		}
+		real, evalErr := filepath.EvalSymlinks(dir)
+		if evalErr != nil {
+			return fail(evalErr)
 		}
 		if visited[real] {
 			return nil // symlink cycle
 		}
 		visited[real] = true
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			return err
+		entries, readErr := os.ReadDir(dir)
+		if readErr != nil {
+			return fail(readErr)
 		}
 		for _, e := range entries {
 			p := filepath.Join(dir, e.Name())
+			isDir := e.IsDir()
 			if e.Type()&os.ModeSymlink != 0 {
 				fi, statErr := os.Stat(p) // follow the link
 				if statErr != nil {
 					continue // dangling symlink
 				}
-				if fi.IsDir() {
-					if err := walk(p); err != nil {
-						return err
-					}
+				isDir = fi.IsDir()
+			}
+			if isDir {
+				if rel, relErr := filepath.Rel(root, p); relErr == nil && dirIgnored(rel, ignore) {
+					pruned = append(pruned, rel)
 					continue
 				}
-			} else if e.IsDir() {
-				if err := walk(p); err != nil {
-					return err
-				}
+				_ = walk(p, false) // non-root failures land in warns
 				continue
 			}
 			if _, ok := langExts[filepath.Ext(p)]; ok {
@@ -65,10 +85,25 @@ func walkSourceFiles(root string) ([]string, error) {
 		}
 		return nil
 	}
-	if err := walk(root); err != nil {
-		return files, err
+	if walkErr := walk(root, true); walkErr != nil {
+		return files, pruned, warns, walkErr
 	}
-	return files, nil
+	return files, pruned, warns, nil
+}
+
+// dirIgnored reports whether a directory (root-relative rel) is excluded by
+// the contract's ignore globs, so the walk can prune it before descending.
+// Semantics match the post-walk file filters (matchGlob): the glob
+// "mock-ui/**" prunes the directory "mock-ui" (its static prefix), while
+// "lib/tixx/**" does NOT prune "lib". File-level globs ("mix.exs") never
+// match a directory prefix and stay a post-walk concern.
+func dirIgnored(rel string, ignore []string) bool {
+	for _, ig := range ignore {
+		if matchGlob(rel, ig) || matchGlob(rel+"/", ig) {
+			return true
+		}
+	}
+	return false
 }
 
 // testFilePatterns, isTestFile, and rustSplitTests are the ONE test-file
@@ -202,12 +237,19 @@ var goModuleLineRe = regexp.MustCompile(`(?m)^module\s+(\S+)`)
 // goModules discovers every go.mod under impl (a repo may hold several
 // modules and no root one), skipping dot, vendor, and contract-ignored
 // directories. Longer module paths sort first so a nested module wins over
-// an enclosing one whose path is its prefix.
-func goModules(impl string, ignore []string) ([]goModule, error) {
+// an enclosing one whose path is its prefix. A subtree that cannot be read
+// is recorded in warns and the walk continues with its siblings; only a
+// failure on impl itself is fatal.
+func goModules(impl string, ignore []string) ([]goModule, []string, error) {
 	var mods []goModule
+	var warns []string
 	err := filepath.WalkDir(impl, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return err
+			if path == impl {
+				return err
+			}
+			warns = append(warns, path+": "+err.Error())
+			return nil //nolint:nilerr // recorded in warns; keep walking siblings
 		}
 		rel, _ := filepath.Rel(impl, path)
 		if d.IsDir() {
@@ -218,10 +260,8 @@ func goModules(impl string, ignore []string) ([]goModule, error) {
 			if strings.HasPrefix(name, ".") || name == "vendor" {
 				return filepath.SkipDir
 			}
-			for _, ig := range ignore {
-				if matchGlob(rel, ig) || matchGlob(rel+"/", ig) {
-					return filepath.SkipDir
-				}
+			if dirIgnored(rel, ignore) {
+				return filepath.SkipDir
 			}
 			return nil
 		}
@@ -230,7 +270,8 @@ func goModules(impl string, ignore []string) ([]goModule, error) {
 		}
 		data, readErr := os.ReadFile(path)
 		if readErr != nil {
-			return readErr
+			warns = append(warns, path+": "+readErr.Error())
+			return nil //nolint:nilerr // recorded in warns; keep walking siblings
 		}
 		if m := goModuleLineRe.FindSubmatch(data); m != nil {
 			mods = append(mods, goModule{path: string(m[1]), dir: filepath.Dir(rel)})
@@ -238,7 +279,7 @@ func goModules(impl string, ignore []string) ([]goModule, error) {
 		return nil
 	})
 	sort.SliceStable(mods, func(i, j int) bool { return len(mods[i].path) > len(mods[j].path) })
-	return mods, err
+	return mods, warns, err
 }
 
 // goModuleFor returns the module owning an import path and the impl-relative
@@ -493,6 +534,7 @@ type importScan struct {
 	Edges         []scanEdge
 	UnmappedFiles []string            // source files outside every boundary (rel)
 	OrphanRefs    map[string][]string // module-internal import -> referencing files
+	WalkWarns     []string            // subtrees the walk could not read (the scan is partial)
 	Complete      bool                // the walk and judgment actually ran
 }
 
@@ -597,9 +639,12 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 		return false
 	}
 
-	goMods, goModErr := goModules(impl, ignore)
+	goMods, goModWarns, goModErr := goModules(impl, ignore)
 	if goModErr != nil {
 		g.Errs = append(g.Errs, "discovering go modules under "+impl+": "+goModErr.Error())
+	}
+	for _, w := range goModWarns {
+		g.Errs = append(g.Errs, "go module discovery incomplete, subtree skipped: "+w)
 	}
 
 	internalTarget := func(ref string) (string, string) {
@@ -645,9 +690,18 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 	}
 	edgeHits := map[[2]string]*edgeRec{}
 	var edgeOrder [][2]string
-	files, walkErr := walkSourceFiles(impl)
+	files, walkPruned, walkWarns, walkErr := walkSourceFiles(impl, ignore)
 	if walkErr != nil {
 		g.Errs = append(g.Errs, "walking "+impl+": "+walkErr.Error())
+	}
+	for range walkPruned {
+		g.Count("dirs pruned by contract ignore")
+	}
+	for _, w := range walkWarns {
+		g.Errs = append(g.Errs, "walk incomplete, subtree skipped: "+w)
+	}
+	if scan != nil {
+		scan.WalkWarns = append(append([]string{}, goModWarns...), walkWarns...)
 	}
 	sort.Strings(files)
 
