@@ -169,3 +169,164 @@ func TestRatchetAgeNoteBothFormats(t *testing.T) {
 		t.Fatalf("month form: %q", got)
 	}
 }
+
+// --- extractor parity: Rust (P1 inline references, P2 string/comment strips) ---
+
+func TestRustImports(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"use line", "use foo::bar::Baz;\n", []string{"foo"}},
+		{"use crate line", "use crate::repo::Item;\n", []string{"src/repo/Item"}},
+		// P1: idiomatic use-free inline qualified references must count.
+		{"inline crate call", "fn f() { crate::repo::save(); }\n", []string{"src/repo/save"}},
+		{"inline foreign crate call", "fn f() { other_crate::api::call(1); }\n", []string{"other_crate"}},
+		{"inline struct literal", "fn f() { let c = other_crate::config::Config { x: 1 }; }\n", []string{"other_crate"}},
+		{"inline turbofish", "fn f() { helper::parse::<u32>(\"1\"); }\n", []string{"helper"}},
+		// Deliberate exclusions, mirroring the Elixir single-segment rule:
+		// std/core/alloc never map to a boundary, self/super need module
+		// context a regex does not have.
+		{"std core alloc excluded", "fn f() { std::mem::swap(&mut a, &mut b); core::hint::spin_loop(); alloc::vec::Vec::new(); }\n", nil},
+		{"self and super excluded", "fn f() { self::helper::run(); super::util::go(); }\n", nil},
+		// P2: the use-line scan was line-anchored on RAW text; a use line
+		// inside a block comment was a real pre-existing false positive.
+		{"use inside block comment excluded", "/*\nuse foo::bar;\n*/\nfn f() {}\n", nil},
+		{"inline in line comment excluded", "// crate::repo::save(\nfn f() {}\n", nil},
+		{"inline in string excluded", "fn f() { let s = \"crate::repo::save(\"; }\n", nil},
+		{"inline in raw string excluded", "fn f() { let s = r#\"other_crate::api::call(\"#; }\n", nil},
+		{"inline in raw byte string excluded", "fn f() { let s = br##\"helper::run(\"##; }\n", nil},
+		{"nested block comment excluded", "/* outer /* use foo::bar; */ still comment crate::repo::save( */\nfn f() {}\n", nil},
+		{"lifetime does not open a string", "fn f<'a>(x: &'a str) { crate::repo::save(x); }\n", []string{"src/repo/save"}},
+		{"char literal with quote stripped", "fn f() { let c = '\"'; crate::repo::save(); }\n", []string{"src/repo/save"}},
+		{"escaped char literal stripped", "fn f() { let c = '\\''; crate::repo::save(); }\n", []string{"src/repo/save"}},
+		{"use and inline dedupe", "use foo::bar;\nfn f() { foo::bar::run(); }\n", []string{"foo"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := rustImports(c.src); !reflect.DeepEqual(got, c.want) {
+				t.Fatalf("rustImports(%q) = %v, want %v", c.src, got, c.want)
+			}
+		})
+	}
+}
+
+// --- extractor parity: Python (H3 docstring false positives) ---
+
+func TestPyImports(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"plain import", "import foo.bar\n", []string{"foo/bar"}},
+		{"from import", "from foo.bar import baz\n", []string{"foo/bar"}},
+		{"relative from", "from .sib import x\n", []string{"pkg/sib"}},
+		{"comma imports", "import a as x, b.c\n", []string{"a", "b/c"}},
+		{"indented import kept", "def f():\n    import inner\n", []string{"inner"}},
+		// H3: docstrings are line-start text; a line-anchored regex matched
+		// an import spelled inside one.
+		{"docstring import excluded", "\"\"\"\nimport secretdep\nfrom other import x\n\"\"\"\nimport real\n", []string{"real"}},
+		{"single-quote docstring excluded", "'''\nimport hidden\n'''\n", nil},
+		{"prefixed docstring excluded", "x = r\"\"\"\nimport hidden\n\"\"\"\n", nil},
+		{"fstring docstring excluded", "x = f\"\"\"\nimport hidden\n\"\"\"\n", nil},
+		// Pin: a # comment could never match the line-anchored regex.
+		{"hash comment pin", "# import commented\nimport real\n", []string{"real"}},
+		{"triple quote inside single-line string does not open", "s = '\"\"\"'\nimport real\n", []string{"real"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := pyImports(c.src, "pkg/mod.py"); !reflect.DeepEqual(got, c.want) {
+				t.Fatalf("pyImports(%q) = %v, want %v", c.src, got, c.want)
+			}
+		})
+	}
+}
+
+// --- extractor parity: TS/JS (H4 string/comment false positives) ---
+
+func TestTsImports(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"static import", "import x from 'y';\n", []string{"y"}},
+		{"side-effect import", "import './setup';\n", []string{"src/setup"}},
+		{"require call", "const l = require('lodash');\n", []string{"lodash"}},
+		{"dynamic import", "const m = await import('mod');\n", []string{"mod"}},
+		{"export from", "export { a } from './a';\n", []string{"src/a"}},
+		{"import after comment still counts", "// setup\nimport x from 'y';\n", []string{"y"}},
+		// H4: tsImportRe is not line-anchored; strings and comments matched.
+		{"string spelling require excluded", "const s = \"require('lodash')\";\n", nil},
+		{"single-quoted string spelling import excluded", "const s = 'import(\"x\")';\n", nil},
+		{"line comment excluded", "// import('x')\nconst a = 1;\n", nil},
+		{"block comment excluded", "/* require('y') */\nconst a = 1;\n", nil},
+		// Documented choice: template literals are blanked whole, so an
+		// embedded ${require('y')} does not produce an edge.
+		{"template-embedded require dropped", "const s = `${require('y')}`;\n", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := tsImports(c.src, "src/app.ts"); !reflect.DeepEqual(got, c.want) {
+				t.Fatalf("tsImports(%q) = %v, want %v", c.src, got, c.want)
+			}
+		})
+	}
+}
+
+// --- extractor parity: Rust inline edges reach the gate (P1 end to end) ---
+
+func TestG4RustInlineQualifiedCallIsAnEdge(t *testing.T) {
+	root := t.TempDir()
+	design, impl := filepath.Join(root, "design"), filepath.Join(root, "impl")
+	arch := "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
+		"  - id: core\n    code: [\"src/core/**\"]\n  - id: repo\n    code: [\"src/repo/**\"]\n" +
+		"dependency_rules:\n  allow: []\n  deny: [\"core -> repo\"]\n```\n"
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
+	// no use line: the reference is a use-free fully-qualified call
+	mustWrite(t, filepath.Join(impl, "src", "core", "svc.rs"),
+		"pub fn run() { crate::repo::store::save(1); let x = crate::core::util::id(); }\n")
+	mustWrite(t, filepath.Join(impl, "src", "core", "util.rs"), "pub fn id() -> u32 { 1 }\n")
+	mustWrite(t, filepath.Join(impl, "src", "repo", "store.rs"), "pub fn save(_x: u32) {}\n")
+	g := CheckImports(design, impl)
+	if !hasErr(g, "core -> repo") {
+		t.Fatalf("a use-free qualified call must produce the denied core -> repo edge, got %v", g.Errs)
+	}
+}
+
+// --- extractor parity: TS workspace package names resolve to boundaries (H5) ---
+
+func TestG4TsWorkspacePackagesResolve(t *testing.T) {
+	root := t.TempDir()
+	design, impl := filepath.Join(root, "design"), filepath.Join(root, "impl")
+	arch := "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
+		"  - id: pkga\n    code: [\"packages/a/**\"]\n  - id: pkgb\n    code: [\"packages/b/**\"]\n" +
+		"ignore: [\"scratch/**\"]\ndependency_rules:\n  allow: []\n  deny: [\"pkga -> pkgb\"]\n```\n"
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
+	mustWrite(t, filepath.Join(impl, "packages", "a", "package.json"), "{\"name\": \"@org/a\"}\n")
+	mustWrite(t, filepath.Join(impl, "packages", "b", "package.json"), "{\"name\": \"@org/b\"}\n")
+	mustWrite(t, filepath.Join(impl, "packages", "c", "package.json"), "{\"name\": \"@org/c\"}\n")
+	mustWrite(t, filepath.Join(impl, "scratch", "package.json"), "{\"name\": \"@org/scratch\"}\n")
+	mustWrite(t, filepath.Join(impl, "node_modules", "leftpad", "package.json"), "{\"name\": \"leftpad\"}\n")
+	mustWrite(t, filepath.Join(impl, "packages", "a", "src", "index.ts"),
+		"import { b } from '@org/b';\nimport { u } from '@org/b/src/util';\n"+
+			"import { g } from '@org/c/lib';\nimport lp from 'leftpad';\nimport sc from '@org/scratch';\n")
+	mustWrite(t, filepath.Join(impl, "packages", "b", "src", "index.ts"), "export const b = 1;\n")
+	mustWrite(t, filepath.Join(impl, "packages", "b", "src", "util.ts"), "export const u = 1;\n")
+	scan := &importScan{}
+	g := checkImports(design, impl, scan)
+	if !hasErr(g, "pkga -> pkgb") {
+		t.Fatalf("a package-name import must resolve to the owning boundary and trip the deny, got %v", g.Errs)
+	}
+	if len(scan.OrphanRefs["@org/c/lib"]) != 1 {
+		t.Fatalf("an import into a discovered package outside every boundary is an orphan: %+v", scan.OrphanRefs)
+	}
+	if hasErr(g, "leftpad") {
+		t.Fatalf("a node_modules package.json must not be discovered, got %v", g.Errs)
+	}
+	if hasErr(g, "scratch") {
+		t.Fatalf("a package.json under an ignored glob must not be discovered, got %v", g.Errs)
+	}
+}

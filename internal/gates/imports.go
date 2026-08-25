@@ -1,6 +1,7 @@
 package gates
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -293,6 +294,82 @@ func goModuleFor(mods []goModule, ref string) (mod goModule, rel string, ok bool
 	return goModule{}, "", false
 }
 
+// tsPackage is one named package.json under impl: the workspace package name
+// and the directory (impl-relative, "." for the root) it owns.
+type tsPackage struct {
+	name, dir string
+}
+
+// tsPackages discovers every named package.json under impl (a JS/TS
+// workspace holds one per package), mirroring goModules: dot, vendor,
+// node_modules, and contract-ignored directories are skipped, longer names
+// sort first so a package whose name prefixes another's never shadows it,
+// and an unreadable subtree is recorded in warns while the walk continues
+// with its siblings; only a failure on impl itself is fatal. A package.json
+// without a name (or unparseable) is skipped silently: it names nothing an
+// import specifier could reference.
+func tsPackages(impl string, ignore []string) ([]tsPackage, []string, error) {
+	var pkgs []tsPackage
+	var warns []string
+	err := filepath.WalkDir(impl, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			if path == impl {
+				return err
+			}
+			warns = append(warns, path+": "+err.Error())
+			return nil //nolint:nilerr // recorded in warns; keep walking siblings
+		}
+		rel, _ := filepath.Rel(impl, path)
+		if d.IsDir() {
+			if rel == "." {
+				return nil
+			}
+			name := d.Name()
+			if strings.HasPrefix(name, ".") || name == "vendor" || name == "node_modules" {
+				return filepath.SkipDir
+			}
+			if dirIgnored(rel, ignore) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Name() != "package.json" {
+			return nil
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			warns = append(warns, path+": "+readErr.Error())
+			return nil //nolint:nilerr // recorded in warns; keep walking siblings
+		}
+		var pj struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(data, &pj) == nil && pj.Name != "" {
+			pkgs = append(pkgs, tsPackage{name: pj.Name, dir: filepath.Dir(rel)})
+		}
+		return nil
+	})
+	sort.SliceStable(pkgs, func(i, j int) bool { return len(pkgs[i].name) > len(pkgs[j].name) })
+	return pkgs, warns, err
+}
+
+// tsPackageFor returns the impl-relative path an import specifier resolves
+// to through the discovered workspace packages, or ok=false when no package
+// names it. A bare-name import resolves to the package directory itself
+// (entry-point resolution through main/exports is not modeled: the
+// directory is enough to name the owning boundary).
+func tsPackageFor(pkgs []tsPackage, ref string) (rel string, ok bool) {
+	for _, p := range pkgs {
+		if ref == p.name {
+			return p.dir, true
+		}
+		if strings.HasPrefix(ref, p.name+"/") {
+			return filepath.Join(p.dir, ref[len(p.name)+1:]), true
+		}
+	}
+	return "", false
+}
+
 var (
 	goBlockImportRe = regexp.MustCompile(`(?ms)^import\s*\((.*?)\)`)
 	goLineImportRe  = regexp.MustCompile(`(?m)^import\s+(?:[\w.]+\s+)?"([^"]+)"`)
@@ -309,10 +386,20 @@ var (
 	// reference (Enum.map() is almost always stdlib and never maps to a
 	// boundary modules: prefix that carries a dot, so it is excluded on
 	// purpose rather than resolved and dropped.
-	exQualCallRe  = regexp.MustCompile(`([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.[a-z_][A-Za-z0-9_]*[!?]?\(`)
-	exStructRe    = regexp.MustCompile(`%([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\{`)
-	exCaptureRe   = regexp.MustCompile(`&([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.`)
-	rustUseRe     = regexp.MustCompile(`(?m)^\s*use\s+([\w:]+)`)
+	exQualCallRe = regexp.MustCompile(`([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.[a-z_][A-Za-z0-9_]*[!?]?\(`)
+	exStructRe   = regexp.MustCompile(`%([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\{`)
+	exCaptureRe  = regexp.MustCompile(`&([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.`)
+	rustUseRe    = regexp.MustCompile(`(?m)^\s*use\s+([\w:]+)`)
+	// Use-free fully-qualified Rust references in expression position: a
+	// call path::to::item(, a macro call path::to::name!(, a struct literal
+	// path::To::Type {, and a turbofish path::to::item::<T>. The head
+	// segment is lowercase (crate and module names), the path has at least
+	// one :: (mirroring the Elixir multi-segment rule), and the leading
+	// guard keeps a match from starting mid-path. A path in pure type,
+	// trait-bound, or bare-const position (let x: a::B = a::C;) is not
+	// matched: telling that apart from noise needs a parser, a documented
+	// limitation.
+	rustQualRe    = regexp.MustCompile(`(?:^|[^:\w])([a-z_][a-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)+)\s*(?:!?\(|\{|::<)`)
 	exDefmoduleRe = regexp.MustCompile(`(?m)^\s*defmodule\s+([A-Z][\w.]*)`)
 )
 
@@ -329,7 +416,16 @@ func goImports(text string) []string {
 	return out
 }
 
+// pyImports returns the imports of a Python file: line-anchored import and
+// from lines, scanned on pyStripStrings output so a docstring that spells
+// an import at line start never counts. Ordinary single-line strings could
+// never host a line-anchored import (their opening quote precedes the
+// keyword on the same line), and a # comment can never precede a
+// line-anchored match either; both are stripped anyway for scan stability.
+// Dynamic imports (importlib.import_module, __import__) are invisible,
+// matching the Elixir apply/3 limitation.
 func pyImports(text, rel string) []string {
+	text = pyStripStrings(text)
 	var out []string
 	for _, m := range pyImportRe.FindAllStringSubmatch(text, -1) {
 		// "import a as x, b.c" imports every listed module, not just the first
@@ -355,7 +451,15 @@ func pyImports(text, rel string) []string {
 	return out
 }
 
+// tsImports returns the module specifiers of a TS/JS file: static
+// from/import forms plus dynamic import() and require() calls, scanned on
+// tsStripStrings output (tsImportRe is not line-anchored, so unstripped
+// comments and strings used to produce edges). Specifier strings of real
+// import forms survive the strip verbatim (keepImportArg); a specifier
+// spelled inside any other string, a comment, or a template literal never
+// counts.
 func tsImports(text, rel string) []string {
+	text = tsStripStrings(text)
 	var out []string
 	for _, m := range tsImportRe.FindAllStringSubmatch(text, -1) {
 		spec := m[1]
@@ -500,19 +604,373 @@ func exStripStrings(text string) string {
 	return string(out)
 }
 
+// rustImports returns the crate-level references of a .rs file: use lines
+// plus use-free fully-qualified inline references (rustQualRe), both scanned
+// on rustStripStrings output (the line-anchored use scan on raw text used to
+// match a use line inside a block comment), deduplicated in first-seen
+// order. crate:: paths map to src/-relative paths as before; the std, core,
+// and alloc heads are excluded on purpose (they never map to a boundary,
+// like the Elixir single-segment rule), and self/super are excluded because
+// resolving them needs module context a regex does not have.
 func rustImports(text string) []string {
+	code := rustStripStrings(text)
 	var out []string
-	for _, m := range rustUseRe.FindAllStringSubmatch(text, -1) {
-		path := m[1]
-		if strings.HasPrefix(path, "crate::") {
-			out = append(out, "src/"+strings.ReplaceAll(path[len("crate::"):], "::", "/"))
-		} else {
-			out = append(out, strings.SplitN(path, "::", 2)[0])
+	seen := map[string]bool{}
+	add := func(path string) {
+		var ref string
+		switch strings.SplitN(path, "::", 2)[0] {
+		case "std", "core", "alloc", "self", "super":
+			return
+		case "crate":
+			rest := strings.TrimPrefix(path, "crate::")
+			if rest == path { // a bare `crate` reference crosses nothing
+				return
+			}
+			ref = "src/" + strings.ReplaceAll(rest, "::", "/")
+		default:
+			ref = strings.SplitN(path, "::", 2)[0]
 		}
+		if !seen[ref] {
+			seen[ref] = true
+			out = append(out, ref)
+		}
+	}
+	for _, m := range rustUseRe.FindAllStringSubmatch(code, -1) {
+		add(m[1])
+	}
+	for _, m := range rustQualRe.FindAllStringSubmatch(code, -1) {
+		add(m[1])
 	}
 	return out
 }
 
+// rustStripStrings blanks Rust comments and string-like literals in a single
+// pass so the reference regexes never match inside either. Delimiters are
+// kept and inner bytes become spaces (newlines survive), so line positions
+// stay stable. Handled forms:
+//
+//   - line comments // to end of line, and block comments /* */, which NEST
+//     per Rust rules
+//   - string literals "..." and byte strings b"...", where a backslash
+//     escapes the next byte
+//   - raw strings r"..." and br"...", with any hash count (r#"..."#,
+//     r##"..."##, ...); raw strings have no escapes
+//   - char literals 'x' and '\x' (escape forms included); a lone ' is a
+//     lifetime and passes through untouched
+//
+// Lint-grade like the other languages here: no macro or attribute awareness.
+func rustStripStrings(text string) string {
+	src := []byte(text)
+	out := make([]byte, 0, len(src))
+	n := len(src)
+	blank := func(b byte) byte {
+		if b == '\n' {
+			return '\n'
+		}
+		return ' '
+	}
+	identByte := func(b byte) bool {
+		return b == '_' || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+	}
+	// blankQuoted blanks from i to the closing quote, honoring backslash
+	// escapes when escapes is true; returns the position after the closer.
+	blankQuoted := func(i int, quote byte, escapes bool) int {
+		for i < n {
+			if escapes && src[i] == '\\' {
+				out = append(out, ' ')
+				i++
+				if i < n {
+					out = append(out, blank(src[i]))
+					i++
+				}
+				continue
+			}
+			if src[i] == quote {
+				out = append(out, quote)
+				return i + 1
+			}
+			out = append(out, blank(src[i]))
+			i++
+		}
+		return i
+	}
+	for i := 0; i < n; {
+		c := src[i]
+		switch {
+		case c == '/' && i+1 < n && src[i+1] == '/':
+			for i < n && src[i] != '\n' {
+				out = append(out, ' ')
+				i++
+			}
+		case c == '/' && i+1 < n && src[i+1] == '*':
+			depth := 1
+			out = append(out, ' ', ' ')
+			i += 2
+			for i < n && depth > 0 {
+				if src[i] == '/' && i+1 < n && src[i+1] == '*' {
+					depth++
+					out = append(out, ' ', ' ')
+					i += 2
+					continue
+				}
+				if src[i] == '*' && i+1 < n && src[i+1] == '/' {
+					depth--
+					out = append(out, ' ', ' ')
+					i += 2
+					continue
+				}
+				out = append(out, blank(src[i]))
+				i++
+			}
+		case (c == 'r' || c == 'b') && (i == 0 || !identByte(src[i-1])):
+			j := i + 1
+			if c == 'b' && j < n && src[j] == 'r' {
+				j++
+			}
+			if c == 'b' && j == i+1 { // b"...": byte string, escapes apply
+				if j < n && src[j] == '"' {
+					out = append(out, src[i:j+1]...)
+					i = blankQuoted(j+1, '"', true)
+					continue
+				}
+				out = append(out, c)
+				i++
+				continue
+			}
+			hashes := 0
+			for j+hashes < n && src[j+hashes] == '#' {
+				hashes++
+			}
+			if j+hashes < n && src[j+hashes] == '"' { // raw string, no escapes
+				open := j + hashes + 1
+				out = append(out, src[i:open]...)
+				closer := `"` + strings.Repeat("#", hashes)
+				k := open
+				for k < n {
+					if src[k] == '"' && k+len(closer) <= n && string(src[k:k+len(closer)]) == closer {
+						out = append(out, closer...)
+						k += len(closer)
+						break
+					}
+					out = append(out, blank(src[k]))
+					k++
+				}
+				i = k
+				continue
+			}
+			out = append(out, c)
+			i++
+		case c == '"':
+			out = append(out, c)
+			i = blankQuoted(i+1, '"', true)
+		case c == '\'':
+			// a char literal iff '\... or 'x'; otherwise a lifetime
+			if i+1 < n && src[i+1] == '\\' {
+				out = append(out, c)
+				i = blankQuoted(i+1, '\'', true)
+			} else if i+2 < n && src[i+2] == '\'' && src[i+1] != '\'' {
+				out = append(out, '\'', ' ', '\'')
+				i += 3
+			} else {
+				out = append(out, c)
+				i++
+			}
+		default:
+			out = append(out, c)
+			i++
+		}
+	}
+	return string(out)
+}
+
+// pyStripStrings blanks Python triple-quoted strings, single-line strings,
+// and # comments in a single pass. Delimiters are kept and inner bytes
+// become spaces (newlines survive). Only a triple-quoted string can host a
+// line-anchored import (a single-line string keeps its opening quote on the
+// import's line), but singles are blanked too so a quote inside one never
+// opens a phantom triple. A backslash escapes the next byte in every form:
+// Python raw strings still treat a backslash-quote as non-terminating, so
+// prefix letters (r, b, f, u, combinations) need no special handling and
+// pass through as ordinary code bytes.
+func pyStripStrings(text string) string {
+	src := []byte(text)
+	out := make([]byte, 0, len(src))
+	n := len(src)
+	blank := func(b byte) byte {
+		if b == '\n' {
+			return '\n'
+		}
+		return ' '
+	}
+	for i := 0; i < n; {
+		c := src[i]
+		switch c {
+		case '#':
+			for i < n && src[i] != '\n' {
+				out = append(out, ' ')
+				i++
+			}
+		case '"', '\'':
+			width := 1
+			if i+2 < n && src[i+1] == c && src[i+2] == c {
+				width = 3
+			}
+			closer := strings.Repeat(string(c), width)
+			out = append(out, src[i:i+width]...)
+			i += width
+			for i < n {
+				if src[i] == '\\' {
+					out = append(out, ' ')
+					i++
+					if i < n {
+						out = append(out, blank(src[i]))
+						i++
+					}
+					continue
+				}
+				if width == 1 && src[i] == '\n' {
+					break // a single-line string cannot span lines; recover
+				}
+				if src[i] == c && i+width <= n && string(src[i:i+width]) == closer {
+					out = append(out, closer...)
+					i += width
+					break
+				}
+				out = append(out, blank(src[i]))
+				i++
+			}
+		default:
+			out = append(out, c)
+			i++
+		}
+	}
+	return string(out)
+}
+
+// tsStripStrings blanks TS/JS comments, string literals, and template
+// literals in a single pass so tsImportRe (which is not line-anchored)
+// never matches inside them. Delimiters are kept and inner bytes become
+// spaces (newlines survive). A string that is the specifier of a real
+// import form survives verbatim: when the code emitted so far ends with the
+// from or import keyword, or with an import( / require( call opener, the
+// string IS the reference (keepImportArg). Template literals are always
+// blanked, ${...} included: a require inside one, or a require(`...`) call,
+// produces no edge (documented choice). Regex literals are not modeled; a
+// quote inside one can desync the scan until the line ends (lint-grade,
+// like every other language here).
+func tsStripStrings(text string) string {
+	src := []byte(text)
+	out := make([]byte, 0, len(src))
+	n := len(src)
+	blank := func(b byte) byte {
+		if b == '\n' {
+			return '\n'
+		}
+		return ' '
+	}
+	for i := 0; i < n; {
+		c := src[i]
+		switch {
+		case c == '/' && i+1 < n && src[i+1] == '/':
+			for i < n && src[i] != '\n' {
+				out = append(out, ' ')
+				i++
+			}
+		case c == '/' && i+1 < n && src[i+1] == '*':
+			out = append(out, ' ', ' ')
+			i += 2
+			for i < n {
+				if src[i] == '*' && i+1 < n && src[i+1] == '/' {
+					out = append(out, ' ', ' ')
+					i += 2
+					break
+				}
+				out = append(out, blank(src[i]))
+				i++
+			}
+		case c == '\'' || c == '"' || c == '`':
+			keep := c != '`' && keepImportArg(out)
+			emit := func(b byte) {
+				if keep {
+					out = append(out, b)
+				} else {
+					out = append(out, blank(b))
+				}
+			}
+			out = append(out, c)
+			i++
+			for i < n {
+				if src[i] == '\\' {
+					emit(src[i])
+					i++
+					if i < n {
+						emit(src[i])
+						i++
+					}
+					continue
+				}
+				if c != '`' && src[i] == '\n' {
+					break // a quoted string cannot span lines; recover
+				}
+				if src[i] == c {
+					out = append(out, c)
+					i++
+					break
+				}
+				emit(src[i])
+				i++
+			}
+		default:
+			out = append(out, c)
+			i++
+		}
+	}
+	return string(out)
+}
+
+// keepImportArg reports whether the code emitted so far ends where an
+// import specifier string begins: after the from or import keyword, or
+// after the opening paren of an import(...) or require(...) call.
+func keepImportArg(out []byte) bool {
+	i := len(out)
+	skipWS := func() {
+		for i > 0 && (out[i-1] == ' ' || out[i-1] == '\t' || out[i-1] == '\n' || out[i-1] == '\r') {
+			i--
+		}
+	}
+	identByte := func(b byte) bool {
+		return b == '_' || b == '$' || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+	}
+	word := func(w string) bool {
+		if i < len(w) || string(out[i-len(w):i]) != w {
+			return false
+		}
+		return i == len(w) || !identByte(out[i-len(w)-1])
+	}
+	skipWS()
+	if i > 0 && out[i-1] == '(' {
+		i--
+		skipWS()
+		return word("require") || word("import")
+	}
+	return word("from") || word("import")
+}
+
+// Per-language reference extraction (all lint-grade regex scans; none run
+// a compiler):
+//
+//	go      goImports: import declarations only. Go has no import-free
+//	        qualified reference form (every cross-package reference
+//	        requires an import), so Go deliberately has no inline scan.
+//	python  pyImports: line-anchored import/from lines on pyStripStrings
+//	        output. Dynamic imports are invisible.
+//	ts      tsImports: from/import/import()/require() specifiers on
+//	        tsStripStrings output.
+//	elixir  exModules: alias/import/use/require lines plus inline
+//	        qualified references on exStripStrings output.
+//	rust    rustImports: use lines plus inline qualified references on
+//	        rustStripStrings output, production spans only
+//	        (rustSplitTests).
 var langExts = map[string]string{
 	".go": "go", ".py": "python", ".ts": "ts", ".tsx": "ts", ".js": "ts",
 	".jsx": "ts", ".ex": "elixir", ".exs": "elixir", ".rs": "rust",
@@ -646,9 +1104,19 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 	for _, w := range goModWarns {
 		g.Errs = append(g.Errs, "go module discovery incomplete, subtree skipped: "+w)
 	}
+	tsPkgs, tsPkgWarns, tsPkgErr := tsPackages(impl, ignore)
+	if tsPkgErr != nil {
+		g.Errs = append(g.Errs, "discovering workspace packages under "+impl+": "+tsPkgErr.Error())
+	}
+	for _, w := range tsPkgWarns {
+		g.Errs = append(g.Errs, "workspace package discovery incomplete, subtree skipped: "+w)
+	}
 
 	internalTarget := func(ref string) (string, string) {
 		if _, rel, ok := goModuleFor(goMods, ref); ok {
+			return boundaryOf(rel, pkgmap), rel
+		}
+		if rel, ok := tsPackageFor(tsPkgs, ref); ok {
 			return boundaryOf(rel, pkgmap), rel
 		}
 		for _, bm := range boundModules {
@@ -701,7 +1169,7 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 		g.Errs = append(g.Errs, "walk incomplete, subtree skipped: "+w)
 	}
 	if scan != nil {
-		scan.WalkWarns = append(append([]string{}, goModWarns...), walkWarns...)
+		scan.WalkWarns = append(append(append([]string{}, goModWarns...), tsPkgWarns...), walkWarns...)
 	}
 	sort.Strings(files)
 
@@ -769,7 +1237,16 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 				dstB = externalTarget(ref)
 				norm = ref
 				if dstB == "" {
+					orphaned := false
 					if mod, _, inModule := goModuleFor(goMods, ref); inModule && ref != mod.path {
+						orphaned = true
+					} else if _, inPkg := tsPackageFor(tsPkgs, ref); inPkg {
+						// bare-name imports included: importing a discovered
+						// workspace package whose directory no boundary owns
+						// is code outside the contract
+						orphaned = true
+					}
+					if orphaned {
 						g.Errs = append(g.Errs, rel+": imports "+ref+", which maps to no contract boundary (code outside the contract)")
 						if scan != nil {
 							if scan.OrphanRefs == nil {
