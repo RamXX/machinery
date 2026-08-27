@@ -55,7 +55,10 @@ section structure exactly.
    the root BUILD.md is an entry-point manifest over `design/` and `design/BUILD/<context>.md`; the
    root carries glossary, contract, traceability, and the cross-context test spec; self-containment
    applies per shard, and the zero-context claim applies to the design tree as a whole). State the
-   mode at the top of the document.
+   mode at the top of the document. Self-containment means shards COPY rows from the root. Mark every
+   copied table with a `machinery:embed` marker naming its source, selection, and claims (subset,
+   complete) so Ge-embed holds the copy byte for byte; the grammar is in the template reference. A
+   copy carrying only a prose promise is the shape this project has already paid for three times.
 2. **Write for zero context.** Inline every term, invariant, and contract the document uses. Reference
    the `design/` source files for full detail.
 3. **Never paste the generated or linted artifacts.** Section 5 references the machine JSON files, it

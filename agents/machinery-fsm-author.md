@@ -81,7 +81,12 @@ target entity lifecycles with temporary legacy states.
    For choreography, consuming a stale at-least-once redelivery is an `_ignores` entry with the dedupe
    reasoning, not an accident. A state whose `always` list is fully guarded with no unguarded escape
    needs `_exhaustive: "<reason>"` stating why the guard set is total; prefer an unguarded fallback
-   branch instead.
+   branch instead. The same question applies to HANDLERS: an `on:` event, an `after:` timer, an
+   `invoke` `onDone`/`onError`, or a state `onDone` whose every branch is guarded silently absorbs
+   its trigger when no guard is true. Declare what happens then in
+   `_refusal: {"<handler>": "<disposition>"}` (a command-boundary refusal, an audited ignore, or a
+   totality argument), or give the handler an unguarded fallback. Answer it while authoring: it is
+   the question that catches a lifecycle whose first instance can never pass its own entry guard.
 
 6. **Enforce invariants as guards.** Every Modelith invariant must be enforced by a guard or made
    structurally impossible by the state graph. If neither, record it as a hole in the failure catalog.
@@ -97,7 +102,9 @@ For each component `<C>`:
   subset (guards and targets as single strings; no parallel or history states; no root-level `on`;
   named delays). `_comment` states the placement and how concurrent events are serialized (actor
   mailbox vs row lock), from the C4 table. Carry the classification (`_role` or `_lifecycle_of` where
-  needed) and the `_exhaustive` / `_ignores` annotations.
+  needed) and the `_exhaustive` / `_refusal` / `_ignores` annotations. Every `_delays` entry must be
+  consumed by an `after` edge, and every `after` delay declared there: both directions are lint
+  errors.
 - `design/machines/<C>.matrix.md` - the named-unit contract and failure-catalog document:
   - the **named-unit contract table**: one row per guard, action, and actor (invoke src) the machine
     fires (G3 reports DRIFT for any missing row). Unit names MUST be identifiers matching
@@ -143,7 +150,8 @@ Deterministic (the tools check these; run them, do not eyeball):
 - Reachability: every non-initial state is a transition target. No dead-end non-final state.
 - Every `invoke` has `onError` and an `after` timeout.
 - No branch shadowed by an earlier unguarded branch.
-- Fully guarded `always` lists have an unguarded escape or an `_exhaustive` justification.
+- Fully guarded `always` lists have an unguarded escape or an `_exhaustive` justification, and
+  fully guarded handlers (`on`, `after`, `invoke` results, `onDone`) have a `_refusal` disposition.
 - Event completeness: every resting state handles or `_ignores` every event, with reasons.
 - Oracles generated and committed.
 
