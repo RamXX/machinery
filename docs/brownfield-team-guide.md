@@ -175,7 +175,11 @@ design; the tool's contribution is the oracle and its stable ids.
      schedule.
 4. A test becomes LOCKED (the hard-TDD rule: implementers never edit it) at the moment its
    row is adjudicated, not at the moment it is generated. Record verdicts in the PR that
-   introduces the tests. An unadjudicated red test is a question, not a gate.
+   introduces the tests. An unadjudicated red test is a question, not a gate. A file only
+   locks once it is born clean under this project's own formatter and linters and the commit
+   carrying it is green under every non-test gate the project enforces; after the lock there
+   is no legal remedy for a gate the file fails, short of an owner-sanctioned
+   formatting-only amendment with a token-identity proof.
 
 This is the one place this guide deliberately extends SKILL.md: the hard-TDD handoff
 describes greenfield, where every oracle row is normative from birth. On brownfield, rows
