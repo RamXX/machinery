@@ -1,5 +1,5 @@
 ---- MODULE Task ----
-\* machinery-version: v0.3.10
+\* machinery-version: v0.3.11
 EXTENDS Naturals
 
 \* Generated from Task.machine.json by machinery tla. Control-flow model.
