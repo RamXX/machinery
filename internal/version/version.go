@@ -15,7 +15,7 @@ import "strings"
 // numeric only (no -dev or other pre-release suffix): a local build reports
 // the same plain version as the release it corresponds to. A contract test
 // in cmd/machinery pins the two defaults together.
-var Version = "v0.3.9"
+var Version = "v0.3.10"
 
 // marker is the stamp key: every stamp line contains exactly
 // "machinery-version: <version>" inside the format's comment syntax.

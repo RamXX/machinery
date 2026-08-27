@@ -15,7 +15,7 @@ import (
 // Makefile and the release workflow both inject it). Versions are numeric
 // only: the plain default below is what a bare `go build` without ldflags
 // reports, identical to the released binary of the same version.
-var version = "v0.3.9"
+var version = "v0.3.10"
 
 func main() {
 	// propagate the (possibly ldflags-injected) binary version to the

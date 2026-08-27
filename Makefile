@@ -12,7 +12,7 @@
 
 AGENT_HOMES ?= $(HOME)/.agents $(HOME)/.claude
 SRC := $(CURDIR)
-INTERNAL_VERSION := v0.3.9
+INTERNAL_VERSION := v0.3.10
 MACH ?= $(CURDIR)/.bin/machinery
 # Single source of truth for the linter version, shared with CI (ci.yml reads
 # the same file) and the local preflight gate.
