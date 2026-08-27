@@ -103,6 +103,19 @@ var machineLintRunners = map[string]func(*ir.Value){
 		ig := strObj(`{"publish":"never mind"}`)
 		m.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Set("_ignores", ig)
 	},
+	"unconsumed-delay": func(m *ir.Value) {
+		m.AsObject().Get2("_delays").AsObject().Set("ghostTimeout", ir.StringValue("5000 ms - nothing waits on this"))
+	},
+	"guard-false-undeclared": func(m *ir.Value) {
+		// drop the unguarded fallback: publish is then fully guarded and a
+		// false guard silently absorbs the event
+		m.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Set("on",
+			strObj(`{"publish":[{"target":"persisting","guard":"guardCanPublish","actions":"setPending"}]}`))
+	},
+	"stale-refusal": func(m *ir.Value) {
+		m.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Set("_refusal",
+			strObj(`{"publish":"stale: publish still has an unguarded fallback"}`))
+	},
 	"kebab-case-unit-name": func(m *ir.Value) {
 		m.AsObject().Get2("states").AsObject().Get2("Draft").AsObject().Get2("on").AsObject().Get2("publish").AsArray()[0].AsObject().Set("guard", ir.StringValue("guard-can-publish"))
 	},

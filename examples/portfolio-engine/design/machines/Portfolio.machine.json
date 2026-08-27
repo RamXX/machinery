@@ -20,6 +20,10 @@
         "accept": { "target": "committing", "guard": "canDecide", "actions": "setPendingAccept" },
         "reject": { "target": "committing", "guard": "canDecide", "actions": "setPendingReject" }
       },
+      "_refusal": {
+        "accept": "canDecide false is an authorization refusal at the command boundary: pf.app returns AuthzError, the portfolio is untouched, and no transition is recorded (portfolio-accept-role). The absorption is deliberate, not a stall: the caller learns why.",
+        "reject": "canDecide false is an authorization refusal at the command boundary: pf.app returns AuthzError, the portfolio is untouched, and no transition is recorded (portfolio-accept-role)."
+      },
       "_ignores": {
         "reopen": "reopen applies to decided portfolios only; a Proposed portfolio has not been decided"
       }
@@ -28,6 +32,10 @@
       "on": {
         "accept": { "target": "committing", "guard": "canDecide", "actions": "setPendingAccept" },
         "reject": { "target": "committing", "guard": "canDecide", "actions": "setPendingReject" }
+      },
+      "_refusal": {
+        "accept": "canDecide false is an authorization refusal at the command boundary: pf.app returns AuthzError, the portfolio is untouched, and no transition is recorded (portfolio-accept-role). The absorption is deliberate, not a stall: the caller learns why.",
+        "reject": "canDecide false is an authorization refusal at the command boundary: pf.app returns AuthzError, the portfolio is untouched, and no transition is recorded (portfolio-accept-role)."
       },
       "_ignores": {
         "advance": "UnderReview is the last open stage; the next step is accept or reject",
@@ -38,6 +46,9 @@
       "on": {
         "reopen": { "target": "committing", "guard": "canReopen", "actions": "setPendingReopen" }
       },
+      "_refusal": {
+        "reopen": "canReopen false is an authorization refusal at the command boundary: pf.app returns AuthzError and the decided portfolio is untouched (portfolio-reopen-role)."
+      },
       "_ignores": {
         "advance": "Accepted is decided; it does not advance",
         "accept": "Accepted is already accepted",
@@ -47,6 +58,9 @@
     "Rejected": {
       "on": {
         "reopen": { "target": "committing", "guard": "canReopen", "actions": "setPendingReopen" }
+      },
+      "_refusal": {
+        "reopen": "canReopen false is an authorization refusal at the command boundary: pf.app returns AuthzError and the decided portfolio is untouched (portfolio-reopen-role)."
       },
       "_ignores": {
         "advance": "Rejected is decided; it does not advance",
@@ -70,6 +84,9 @@
       },
       "after": {
         "COMMIT_TIMEOUT": { "target": "commitRetry" }
+      },
+      "_refusal": {
+        "persistDecision.onDone": "Unreachable by construction: context.pending is set by one of setPendingAdvance/Accept/Reject/Reopen before the invoke starts, and its codomain is exactly the three target stages the three guards cover. A fourth value would strand a committed write, so the guard set is total by the same argument the reverted always-list makes."
       }
     },
     "commitRetry": {

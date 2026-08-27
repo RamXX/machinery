@@ -473,6 +473,12 @@ func selectGates(designDir string, cfg Config) (gates.Selection, string) {
 		// decomposed parent: the manifest BUILD.md is still its artifact
 		run["gb"] = true
 	}
+	if gates.EmbedActive(designDir) {
+		// a declared embed is checkable from the documents alone, so the
+		// stop hook holds it at every turn end: a copy edited on one side is
+		// exactly the drift that survives a review
+		run["ge"] = true
+	}
 	if gates.AcceptanceActive(designDir) {
 		// the acceptance directory, or a milestone marked closed: either is a
 		// claim that a milestone was discharged, and the claim is checkable

@@ -134,10 +134,12 @@ Phase 2  C4           architecture + contract
                an interface contract per allowed edge, and no row for an edge nobody allows)
          attested: every action owned; each contract's shape is the right one; NFR record
 Phase 3  XState       state machines
-         tool: G3-machine (lint; every invoke has onError + timeout; oracle fresh; matrix reconciled)
+         tool: G3-machine (lint; every invoke has onError + timeout; every fully guarded handler
+               declares its guard-false disposition; delays consumed both ways; oracle fresh;
+               matrix reconciled)
          attested: each guard enforces the invariant it names; residual failure transitions kept
 Phase 4  BUILD.md     the blueprint
-         tool: Gx-trace + Gb-plan (+ G4-import and Gt-tests once code exists)
+         tool: Gx-trace + Gb-plan + Ge-embed (+ G4-import and Gt-tests once code exists)
          attested: a zero-context coding agent could build it
 Build    Acceptance   discharging a milestone (once the build starts)
          tool: Ga-accept (committed evidence per closed milestone, bound to the
@@ -594,6 +596,7 @@ make verify-formal   # regenerates and checks all 34 TLC proofs + the relational
 | G3-machine | machines pass structural lint, committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
 | Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows, and entities to persistence-placement rows (every declared entity has a row or a `(not placed: <reason>)` waiver; the entity list is closed, so the table's completeness is checked, not attested). |
 | Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, and the skeleton DoD cites a committed oracle id. |
+| Ge-embed | designs carrying a `machinery:embed` marker only: every marked table is held to the source it declares (`subset`: each row is byte-identical to a source row; `complete`: every selected source row is present), with `(shard-local: <reason>)` exempting exactly the row or cell it names. The sanctioned shard-copy duplication, checked instead of promised. |
 | G4-import | code imports respect the contract boundaries (Go, Python, TypeScript/JavaScript, Elixir, Rust). |
 | Gt-tests | with `--impl` only: every stable id in the committed oracles appears whole-token in a test file, or a test parses the committed oracle table (the conformance idiom); the hard-TDD RED-exit check made deterministic. |
 | G5-pack | decomposed designs only: packs fresh, children pinned to the current packs, refinement proofs fresh. |

@@ -30,7 +30,7 @@ var StateKeys = map[string]bool{
 	"on": true, "after": true, "always": true, "invoke": true, "entry": true, "exit": true,
 	"states": true, "initial": true, "type": true, "id": true, "meta": true,
 	"description": true, "tags": true, "onDone": true, "output": true, "_comment": true,
-	"_exhaustive": true, "_ignores": true,
+	"_exhaustive": true, "_ignores": true, "_refusal": true,
 }
 
 var InvokeKeys = map[string]bool{
@@ -50,6 +50,9 @@ type Result struct {
 type Counts struct {
 	States      int
 	Transitions int
+	// Refusals counts fully guarded handlers whose guard-false disposition the
+	// author declared in _refusal.
+	Refusals int
 }
 
 // resolver implements XState-v5-correct target resolution over one machine.
@@ -240,6 +243,7 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 	}
 	delaysVal := ro.Get2("_delays")
 	declaredDelays := map[string]bool{}
+	usedDelays := map[string]bool{}
 	if delaysVal != nil && delaysVal.Kind == ir.KindObject {
 		for _, k := range delaysVal.AsObject().Keys() {
 			declaredDelays[k] = true
@@ -368,6 +372,7 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 		}
 		if after := o.Get2("after"); after != nil && after.Kind == ir.KindObject {
 			for _, delay := range after.AsObject().Keys() {
+				usedDelays[delay] = true
 				if regexpAllDigits.MatchString(delay) {
 					errs = append(errs, fmt.Sprintf("%s: state %s after key %s is a raw millisecond value; name the delay and declare its bound in _delays", base, p, ir.Repr(delay)))
 				} else if !declaredDelays[delay] {
@@ -377,6 +382,52 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 		}
 		ir.ActionNames(o.Get2("entry"), &problems, p+" entry")
 		ir.ActionNames(o.Get2("exit"), &problems, p+" exit")
+
+		// _refusal: the disposition when a fully guarded handler admits nothing.
+		// The sibling of _exhaustive (which answers the same question for
+		// always-lists), and the authoring-time forcing function for the
+		// first-instance deadlock class: writing down what happens when no
+		// guard is true makes "can the first instance ever pass?" a question
+		// the author cannot skip.
+		refusal := map[string]string{}
+		consumedRefusal := map[string]bool{}
+		if rv := o.Get2("_refusal"); rv != nil {
+			if rv.Kind != ir.KindObject {
+				errs = append(errs, base+": state "+p+" _refusal must map handler names to disposition strings")
+			} else {
+				for _, k := range rv.AsObject().Keys() {
+					v := rv.AsObject().Get2(k)
+					if v == nil || v.Kind != ir.KindString || strings.TrimSpace(v.AsString()) == "" {
+						errs = append(errs, fmt.Sprintf("%s: state %s _refusal[%s] has no disposition; state what happens when no guard admits", base, p, ir.Repr(k)))
+						continue
+					}
+					refusal[k] = v.AsString()
+				}
+			}
+		}
+		// checkGuardFalse holds one handler: a fully guarded branch list with
+		// no unguarded sibling silently absorbs its trigger when every guard is
+		// false, and the machine sits where it was. The absorption may be
+		// correct (a command-boundary refusal, an audited ignore) or a
+		// deadlock; either way the author must say which.
+		checkGuardFalse := func(key, label, trigger string, t *ir.Value) {
+			branches := normBranches(t)
+			if len(branches) == 0 {
+				return
+			}
+			for _, b := range branches {
+				if !b.HasGuard {
+					return // an unguarded sibling always admits: nothing to declare
+				}
+			}
+			consumedRefusal[key] = true
+			if strings.TrimSpace(refusal[key]) == "" {
+				errs = append(errs, fmt.Sprintf("%s: state %s %s is fully guarded, so %s that satisfies no guard is silently absorbed. Declare the disposition: _refusal: {%s: \"<what happens when no guard admits>\"}, or add an unguarded branch",
+					base, p, label, trigger, ir.Repr(key)))
+			} else {
+				counts.Refusals++
+			}
+		}
 
 		// branch shadowing + duplicate guards (uniform across every branch list)
 		checkShadow := func(label string, t *ir.Value) {
@@ -417,21 +468,28 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 						base, p, ir.Repr(ev)))
 				}
 				checkShadow("on:"+ev, on.AsObject().Get2(ev))
+				checkGuardFalse(ev, "on:"+ev, "an event", on.AsObject().Get2(ev))
 			}
 		}
 		if after := o.Get2("after"); after != nil {
 			for _, delay := range after.AsObject().Keys() {
 				checkShadow("after:"+delay, after.AsObject().Get2(delay))
+				checkGuardFalse("after:"+delay, "after:"+delay, "a timer", after.AsObject().Get2(delay))
 			}
 		}
 		if od := o.Get2("onDone"); od != nil {
 			checkShadow("onDone", od)
+			checkGuardFalse("onDone", "onDone", "a completion", od)
 		}
 		for _, iv := range ir.InvokesOf(node) {
 			ivObj := iv.AsObject()
+			src := ivObj.GetString("src")
 			for _, key := range []string{"onDone", "onError"} {
 				if ivObj.Get2(key) != nil {
 					checkShadow("invoke."+key, ivObj.Get2(key))
+					// keyed by src so a state invoking two services names
+					// which one it is talking about
+					checkGuardFalse(src+"."+key, "invoke "+src+"."+key, "a result", ivObj.Get2(key))
 				}
 			}
 		}
@@ -464,6 +522,33 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 				errs = append(errs, base+": "+why+" from "+p+" ("+tr.Kind+":"+tr.Event+")")
 			}
 		}
+		// a disposition for a handler that is not fully guarded (or no longer
+		// exists) is a stale claim: it reads as coverage nobody has
+		var staleRefusal []string
+		for k := range refusal {
+			if !consumedRefusal[k] {
+				staleRefusal = append(staleRefusal, k)
+			}
+		}
+		sort.Strings(staleRefusal)
+		for _, k := range staleRefusal {
+			errs = append(errs, fmt.Sprintf("%s: state %s declares _refusal[%s] but no fully guarded handler of that name exists; drop the entry or fix the name", base, p, ir.Repr(k)))
+		}
+	}
+
+	// a declared delay no after edge consumes is a cadence nothing implements:
+	// the bound and its rationale read as governance, but no transition is
+	// held to them. The inverse (an after naming an undeclared delay) is an
+	// error above; both directions must hold or the _delays block is decor.
+	var unconsumed []string
+	for d := range declaredDelays {
+		if !usedDelays[d] {
+			unconsumed = append(unconsumed, d)
+		}
+	}
+	sort.Strings(unconsumed)
+	for _, d := range unconsumed {
+		errs = append(errs, fmt.Sprintf("%s: _delays declares %s but no after edge consumes it; a declared cadence nothing implements is not a bound (wire it to an after, or drop it)", base, ir.Repr(d)))
 	}
 
 	for _, pr := range problems {

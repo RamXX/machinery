@@ -22,6 +22,51 @@ Two artifacts are never pasted by hand: the machine JSON (section 5 references t
 and the transition tables (section 7 references the generated oracles). Pasted copies drift; the
 files are what the deterministic gates check.
 
+## Declared embeds (the one sanctioned copy, and how it is held)
+
+Self-containment per shard means the OTHER copies are deliberate: a shard restates the root's
+matrix rows, a child restates its parent's event rows, so each document can be read alone. That
+duplication has no generator, so it used to be held by a prose promise. Mark it instead, and
+Ge-embed checks it. The marker goes on the line before the table it describes (HTML comment, so it
+renders invisibly):
+
+```
+<!-- machinery:embed from="<path>" table="<col>,<col>" where="<col>[|<col>]=<token>" claims="subset,complete" -->
+```
+
+- **from** (required): the source artifact, resolved relative to the embedding document. It may
+  point outside the design (a child embedding its parent's table is the motivating case). A source
+  that does not resolve is an ERROR.
+- **table** (required): the source table, identified by its header row: a comma-separated list of
+  column names the source table's header must contain (the same locator idiom every other table in
+  this reference uses). It must resolve to exactly ONE table; zero or several is an ERROR, because
+  a selector the tool has to guess at is a promise again.
+- **where** (optional): keep only the source rows whose named column contains the token as a WHOLE
+  token. Several columns may be named with `|` and the row is kept when any of them matches
+  (`producer|consumer=orders` selects every row that names this subsystem on either side). An
+  unknown column or a malformed filter is an ERROR. Absent, every source row is selected.
+- **claims** (required): `subset`, `complete`, or both.
+  - **subset**: every row in THIS table appears byte-identical among the selected source rows.
+  - **complete**: every selected source row appears in THIS table.
+  They are independent: a shard that deliberately carries part of a table claims `subset` only.
+
+The embedded table carries the source's columns unchanged (same count, same header cells); an embed
+is a copy, not a projection, and comparing rows across different column sets would compare nothing.
+
+**Localization.** A shard that must adapt a copied row says so where the difference is:
+
+- `(shard-local: <reason>)` in the row's FIRST cell exempts the whole row (a shard addition, or a
+  row rewritten beyond recognition).
+- `(shard-local: <reason>)` in any other cell exempts THAT CELL only; the rest of the row must
+  still match a source row byte-identically.
+
+An empty reason is an ERROR, exactly as with the other waivers. The token is deliberately distinct
+from `(no machine:)`, `(not placed:)`, and `(no contract:)`: each answers a different question, and
+one generic token would let an answer to one discharge another.
+
+Adoption is per table: an unmarked table carries no obligation, so a design adopts this where the
+copying actually happens. What is not optional is a marker that cannot be resolved.
+
 Fill every section. Omit a section only by writing the literal waiver form `N/A - <reason>`
 (capital N/A, a hyphen, a reason; Gb holds the Build plan section to exactly this form as its
 first non-blank line, and a bare or misshapen N/A fails loudly instead of waiving).

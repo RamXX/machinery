@@ -964,3 +964,131 @@ func TestSameNamedNestedStatesDoNotCrossMatch(t *testing.T) {
 		t.Fatalf("qualified paths did not reconcile: errs=%v drift=%v", errs, drift)
 	}
 }
+
+// --- unconsumed declarations: _delays (both directions) ---
+
+// A declared delay no after edge consumes is a cadence nothing implements.
+func TestUnconsumedDelayIsError(t *testing.T) {
+	m, _ := ir.LoadMachineJSONStr("w", `{"id":"widget","initial":"Draft",
+		"_delays":{"persistTimeout":"10000 ms - store write timeout","ghostTimeout":"5000 ms - nothing waits on this"},
+		"states":{
+		"Draft":{"on":{"publish":{"target":"persisting"}}},
+		"Published":{"type":"final"},
+		"persisting":{"invoke":{"src":"saveWidget","onDone":{"target":"Published"},"onError":{"target":"Draft"}},
+		              "after":{"persistTimeout":{"target":"Draft"}}}}}`)
+	errs := errsOf(t, m, "")
+	if !contains(errs, `_delays declares 'ghostTimeout' but no after edge consumes it`) {
+		t.Fatalf("an unconsumed delay must be an error: %v", errs)
+	}
+	if contains(errs, "'persistTimeout' but no after edge") {
+		t.Fatalf("the consumed delay must not be reported: %v", errs)
+	}
+}
+
+// The inverse direction was already held; it stays held.
+func TestAfterNamingUndeclaredDelayIsError(t *testing.T) {
+	m, _ := ir.LoadMachineJSONStr("w", `{"id":"widget","initial":"Draft",
+		"_delays":{"persistTimeout":"10000 ms - store write timeout"},
+		"states":{
+		"Draft":{"on":{"publish":{"target":"persisting"}}},
+		"Published":{"type":"final"},
+		"persisting":{"invoke":{"src":"saveWidget","onDone":{"target":"Published"},"onError":{"target":"Draft"}},
+		              "after":{"persistTimeout":{"target":"Draft"},"mysteryDelay":{"target":"Draft"}}}}}`)
+	errs := errsOf(t, m, "")
+	if !contains(errs, `after delay 'mysteryDelay' is not declared in _delays`) {
+		t.Fatalf("an undeclared delay must be an error: %v", errs)
+	}
+}
+
+// --- guard-false disposition (_refusal) ---
+
+// guardedMachine builds a machine whose Draft state handles publish with one
+// guarded branch and no unguarded sibling, plus whatever extra state keys the
+// caller injects (the _refusal block under test).
+func guardedMachine(extra string) *ir.Value {
+	if extra != "" {
+		extra = "," + extra
+	}
+	m, _ := ir.LoadMachineJSONStr("w", `{"id":"widget","initial":"Draft","states":{
+		"Draft":{"on":{"publish":{"target":"Published","guard":"guardCanPublish"}}`+extra+`},
+		"Published":{"type":"final"}}}`)
+	return m
+}
+
+func TestFullyGuardedEventNeedsRefusal(t *testing.T) {
+	errs := errsOf(t, guardedMachine(""), "")
+	if !contains(errs, "state Draft on:publish is fully guarded") {
+		t.Fatalf("a fully guarded event handler must demand a disposition: %v", errs)
+	}
+}
+
+func TestFullyGuardedEventWithRefusalPasses(t *testing.T) {
+	errs := errsOf(t, guardedMachine(`"_refusal":{"publish":"the command boundary refuses with ErrDenied; the aggregate is untouched"}`), "")
+	if contains(errs, "fully guarded") {
+		t.Fatalf("a declared disposition must satisfy the check: %v", errs)
+	}
+}
+
+func TestRefusalWithNoDispositionIsError(t *testing.T) {
+	errs := errsOf(t, guardedMachine(`"_refusal":{"publish":"   "}`), "")
+	if !contains(errs, "_refusal['publish'] has no disposition") {
+		t.Fatalf("an empty disposition must fail: %v", errs)
+	}
+}
+
+// The tuning that keeps this lint honest: a guarded branch with an unguarded
+// fallback always admits, so it needs nothing.
+func TestGuardedBranchWithFallbackNeedsNothing(t *testing.T) {
+	errs := errsOf(t, minimalMachine(), "")
+	if contains(errs, "fully guarded") {
+		t.Fatalf("an unguarded fallback branch answers the question already: %v", errs)
+	}
+}
+
+// Every handler kind absorbs the same way, so every handler kind is held.
+func TestFullyGuardedHandlerKinds(t *testing.T) {
+	cases := []struct{ name, machine, want string }{
+		{"after", `{"id":"w","initial":"A","_delays":{"backoff":"500 ms - retry backoff"},"states":{
+			"A":{"after":{"backoff":[{"target":"B","guard":"phaseIsOne"}]}},
+			"B":{"type":"final"}}}`, "state A after:backoff is fully guarded"},
+		{"invoke onError", `{"id":"w","initial":"A","_delays":{"t":"1000 ms - call timeout"},"states":{
+			"A":{"invoke":{"src":"save","onDone":{"target":"B"},"onError":[{"target":"B","guard":"isRetriable"}]},
+			     "after":{"t":{"target":"B"}}},
+			"B":{"type":"final"}}}`, "state A invoke save.onError is fully guarded"},
+		{"state onDone", `{"id":"w","initial":"A","states":{
+			"A":{"initial":"A1","states":{"A1":{"type":"final"}},"onDone":[{"target":"B","guard":"ok"}]},
+			"B":{"type":"final"}}}`, "state A onDone is fully guarded"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m, _ := ir.LoadMachineJSONStr("w", tc.machine)
+			errs := errsOf(t, m, "")
+			if !contains(errs, tc.want) {
+				t.Fatalf("want %q, got %v", tc.want, errs)
+			}
+		})
+	}
+}
+
+// A disposition for a handler that is not fully guarded (or does not exist)
+// is a stale claim, the same defect class as an unconsumed delay.
+func TestStaleRefusalEntryIsError(t *testing.T) {
+	m, _ := ir.LoadMachineJSONStr("w", `{"id":"widget","initial":"Draft","states":{
+		"Draft":{"on":{"publish":[{"target":"Published","guard":"g"},{"actions":"deny"}]},
+		         "_refusal":{"publish":"stale: publish has an unguarded fallback"}},
+		"Published":{"type":"final"}}}`)
+	errs := errsOf(t, m, "")
+	if !contains(errs, "declares _refusal['publish'] but no fully guarded handler of that name exists") {
+		t.Fatalf("a stale disposition must be reported: %v", errs)
+	}
+}
+
+func TestRefusalMustBeAnObject(t *testing.T) {
+	m, _ := ir.LoadMachineJSONStr("w", `{"id":"widget","initial":"Draft","states":{
+		"Draft":{"on":{"publish":{"target":"Published","guard":"g"}},"_refusal":"a string"},
+		"Published":{"type":"final"}}}`)
+	errs := errsOf(t, m, "")
+	if !contains(errs, "_refusal must map handler names to disposition strings") {
+		t.Fatalf("a malformed _refusal must fail: %v", errs)
+	}
+}

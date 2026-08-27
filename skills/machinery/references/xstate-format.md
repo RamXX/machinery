@@ -15,7 +15,8 @@ and array transition targets are rejected. Do not author outside the subset.
   underscore annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_component`,
   `_max_retries`, `_oracle_tag`, `_invariants`.
 - **state keys**: `on`, `after`, `always`, `invoke`, `entry`, `exit`, `states`, `initial`, `type`,
-  `id`, `meta`, `description`, `tags`, `onDone`, `output`, plus `_comment`, `_exhaustive`, `_ignores`.
+  `id`, `meta`, `description`, `tags`, `onDone`, `output`, plus `_comment`, `_exhaustive`,
+  `_ignores`, `_refusal`.
 - **transition keys**: `target`, `guard`, `actions`, `description`, `_comment`. Anything else (a
   typo like `tagret`) is a hard error, never a silent internal self-transition.
 - **invoke keys**: `src`, `input`, `id`, `onDone`, `onError`, `_comment`. `src` is **mandatory**: a
@@ -149,6 +150,33 @@ fallback branch, which TLC does check:
 }
 ```
 
+**`_refusal: {"<handler>": "<disposition>"}`** on a state with a fully guarded HANDLER: an `on:`
+event, an `after:` timer, an `invoke` `onDone`/`onError`, or a state `onDone` whose every branch
+carries a guard, with no unguarded sibling. When no guard is true the trigger is silently absorbed
+and the machine sits exactly where it was. That may be correct (an authorization refusal raised at
+the command boundary, an audited ignore) or a deadlock, and the difference is invisible in the
+config, so the author declares which. Without the annotation, that shape is a lint ERROR. This is
+the sibling of `_exhaustive`, which answers the same question for `always` lists, and it is the
+authoring-time forcing function for the first-instance deadlock class: writing the disposition down
+makes "can the first instance ever pass this guard?" a question you cannot walk past.
+
+Handler names: the event name for `on:`, `after:<delay>` for a timer, `<src>.onDone` /
+`<src>.onError` for an invoke (keyed by src, so a state invoking two services names which one), and
+`onDone` for a state's own completion. An entry naming no fully guarded handler is a stale claim and
+an ERROR, the same rule that holds `_delays`. A handler with an unguarded fallback branch always
+admits and needs no annotation: prefer that shape when a fallback is honest.
+
+```jsonc
+"Proposed": {
+  "on": {
+    "accept": { "target": "committing", "guard": "canDecide", "actions": "setPendingAccept" }
+  },
+  "_refusal": {
+    "accept": "canDecide false is an authorization refusal at the command boundary: the app layer returns AuthzError, the aggregate is untouched, and no transition is recorded"
+  }
+}
+```
+
 **`_ignores: {event: reason}`** on a resting state, for event completeness (next section):
 
 ```jsonc
@@ -173,7 +201,9 @@ stable id of that machine.
 
 **`_delays: {name: "<ms> - <rationale>"}`** (root, **mandatory for every `after` key**): every
 delay name used in any `after` block must be declared here with its millisecond bound and
-rationale; an undeclared delay name is a lint error. Raw numeric `after` keys (`"5000"`) are
+rationale; an undeclared delay name is a lint error. The rule runs both ways: a declared delay that
+no `after` edge consumes is a lint error too, because a cadence nothing implements is not a bound,
+it is decor that reads like governance. Raw numeric `after` keys (`"5000"`) are
 rejected outright: name the delay and declare its bound, so the config stays declarative and the
 bound traces to C4.
 
@@ -291,7 +321,8 @@ XState config schema (the lint accepts exactly the set documented above, nothing
   persistence-and-placement table in the C4 reference).
 - `_delays` - the named delays with their millisecond bounds and rationale, for example
   `"persistTimeout": "10000 ms - LadybugDB write timeout"`. The `after` blocks reference these by
-  name, and every `after` key MUST be declared here (see the annotations section).
+  name, and every `after` key MUST be declared here, and every declared delay MUST be consumed by
+  one (see the annotations section).
 
 Before loading a machine into Stately Studio or `@xstate/graph`, strip every `_`-prefixed key and
 supply the real implementations via `setup({ actors, guards, actions, delays })`: the string-named
@@ -305,7 +336,8 @@ Deterministic (run the tools; do not eyeball):
 - `machinery lint design/machines` checks subset conformance, name and id patterns, strict target
   resolution, named-delay declaration (`_delays`), empty-container errors, reachability, dead ends,
   `invoke` with a `src`, `onError`, and a non-empty `after`, shadowed branches, guarded-always
-  exhaustiveness (`_exhaustive`), and resting-state event completeness (`_ignores`).
+  exhaustiveness (`_exhaustive`), guard-false disposition on every fully guarded handler
+  (`_refusal`), and resting-state event completeness (`_ignores`).
 - `machinery oracle design/machines` generates `<M>.oracle.md`; commit it.
 - `machinery tla` derives the rung-3 liveness property `Overlay ~> Domain` (a domain state has
   `on` handlers or is final). A perpetual operational envelope with neither (a timer-driven

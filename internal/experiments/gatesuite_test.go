@@ -25,6 +25,7 @@ func init() {
 		"machine-event-not-action", "unmapped-machine", "placement-row-no-machine",
 		"entity-with-no-placement-row", "placement-table-deleted",
 		"allow-edge-with-no-interface-contract", "interface-contract-for-unallowed-edge",
+		"embed-row-edited", "embed-row-dropped", "embed-source-unresolvable",
 		"contract-cycle", "single-form-import-bypass", "undeclared-cross-boundary", "import-unexposed-internals",
 		"source-outside-contract")
 }
@@ -164,6 +165,14 @@ Mode: full (self-contained).
 |---|---|
 | widget-owned | guardCanPublish |
 
+## Dependency mitigation posture (embedded from the architecture)
+
+<!-- machinery:embed from="ARCHITECTURE.md" table="dependency,failure,mitigation" claims="subset,complete" -->
+
+| dependency | failure modes | mitigation | residual | bound |
+|---|---|---|---|---|
+| ` + "`db`" + ` | unavailable, corrupt | retry, backup | surface after retries | retry <= 3 |
+
 ## State migration
 
 No persisted instances yet.
@@ -258,6 +267,7 @@ func TestSyntheticDesignPassesAllGates(t *testing.T) {
 	for _, g := range []*gates.Gate{
 		gates.CheckC4(design), gates.CheckMachines(design),
 		gates.CheckTraceability(design), gates.CheckImports(design, impl),
+		gates.CheckEmbeds(design),
 	} {
 		if len(g.Errs) != 0 || len(g.Drift) != 0 {
 			t.Errorf("%s: errs=%v drift=%v", g.Title, g.Errs, g.Drift)
@@ -610,6 +620,39 @@ func TestDeletedPlacementTableIsError(t *testing.T) {
 		"| component | placement | persistence | concurrency |", "| component | notes |")
 	if !containsAny(gates.CheckTraceability(design).Errs, "no persistence-and-placement table") {
 		t.Error("a design with no placement table passed Gx")
+	}
+}
+
+// ------------------- experiment: declared-embed fidelity -------------------
+
+// The shard-embed duplication class: a copied row edited on one side only.
+func TestEmbedRowEditedIsError(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "BUILD.md"),
+		"| `db` | unavailable, corrupt | retry, backup | surface after retries | retry <= 3 |",
+		"| `db` | unavailable, corrupt | retry, backup | surface after retries | retry <= 5 |")
+	if !containsAny(gates.CheckEmbeds(design).Errs, "is not a byte-identical copy of any source row") {
+		t.Error("an edited embed row passed Ge")
+	}
+}
+
+// The other half of the claim: a source row that never made it into the copy.
+func TestEmbedRowDroppedIsError(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "BUILD.md"),
+		"\n| `db` | unavailable, corrupt | retry, backup | surface after retries | retry <= 3 |", "")
+	if !containsAny(gates.CheckEmbeds(design).Errs, "is selected but absent here") {
+		t.Error("a dropped embed row passed Ge")
+	}
+}
+
+// A marker nobody can resolve reads exactly like a promise nobody checks, so
+// it fails loudly rather than skipping.
+func TestEmbedUnresolvableSourceIsError(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "BUILD.md"), `from="ARCHITECTURE.md"`, `from="GONE.md"`)
+	if !containsAny(gates.CheckEmbeds(design).Errs, "does not exist or is empty") {
+		t.Error("an unresolvable embed source passed Ge")
 	}
 }
 

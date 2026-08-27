@@ -17,6 +17,9 @@
 == Gb-plan  build plan structure ==
   checked: 1 plans, 3 milestones, 3 DoD-bearing milestones, 1 skeleton citations
   ok
+== Ge-embed  declared-embed fidelity ==
+  checked: 1 embed markers, 1 embed tables verified, 1 subset claims, 3 rows compared, 1 complete claims
+  ok
 == G5-pack  contract packs ==
   checked: 6 pack files, 1 pack hash verified, 3 refinement artifacts fresh, 1 owned entities present, 4 owned attributes present, 1 owned enums shape-checked, 1 owned invariants intact, 1 consumed events handled, 2 produced events emitted, pack revision 1
   ok

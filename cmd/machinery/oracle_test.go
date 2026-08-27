@@ -43,10 +43,10 @@ func TestOracleTagCollisionIsError(t *testing.T) {
 	_, errB, codes := withCapturedIO(t)
 	d := t.TempDir()
 	writeMachine(t, d, "Deal.machine.json", `{"id":"deal","initial":"Lead","states":{
-		"Lead":{"on":{"advance":{"target":"Won","guard":"canAdvance"}}},
+		"Lead":{"on":{"advance":{"target":"Won","guard":"canAdvance"}},"_refusal":{"advance":"fixture: the command boundary refuses when canAdvance is false"}},
 		"Won":{"type":"final"}}}`)
 	writeMachine(t, d, "DealAggregate.machine.json", `{"id":"dealAggregate","initial":"Lead","states":{
-		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}}},
+		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}},"_refusal":{"advance":"fixture: the command boundary refuses when canAdvance is false"}},
 		"Closed":{"type":"final"}}}`)
 	_ = oracleRun(d)
 	if len(*codes) == 0 || (*codes)[0] != 1 {
@@ -61,10 +61,10 @@ func TestOracleTagOverrideDisambiguates(t *testing.T) {
 	out, _, codes := withCapturedIO(t)
 	d := t.TempDir()
 	writeMachine(t, d, "Deal.machine.json", `{"id":"deal","initial":"Lead","states":{
-		"Lead":{"on":{"advance":{"target":"Won","guard":"canAdvance"}}},
+		"Lead":{"on":{"advance":{"target":"Won","guard":"canAdvance"}},"_refusal":{"advance":"fixture: the command boundary refuses when canAdvance is false"}},
 		"Won":{"type":"final"}}}`)
 	writeMachine(t, d, "DealAggregate.machine.json", `{"id":"dealAggregate","_oracle_tag":"DEALAGG","initial":"Lead","states":{
-		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}}},
+		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}},"_refusal":{"advance":"fixture: the command boundary refuses when canAdvance is false"}},
 		"Closed":{"type":"final"}}}`)
 	if err := oracleRun(d); err != nil {
 		t.Fatalf("oracleRun: %v (stdout %q)", err, out.String())

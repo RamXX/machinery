@@ -37,6 +37,11 @@ dependency_rules:
 
 ## 5. Event contracts (from the pack; do not widen)
 
+The rows are copied from the parent's table, and the copy is checked rather than promised: every row
+here is byte-identical to a parent row, and every parent row that names this subsystem is here.
+
+<!-- machinery:embed from="../../parent/design/ARCHITECTURE.md" table="event,producer,consumer,delivery" where="producer|consumer=orders" claims="subset,complete" -->
+
 | event | producer | consumer | payload | delivery | ordering | dedupe |
 |---|---|---|---|---|---|---|
 | request | orders | payments | Payment.orderId, Payment.amount | at-least-once | none | Payment.orderId |

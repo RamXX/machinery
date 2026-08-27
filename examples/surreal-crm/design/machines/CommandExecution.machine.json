@@ -55,6 +55,9 @@
           { "target": "Opening", "guard": "phaseIsOpen", "actions": "incrementRetries" },
           { "target": "Executing", "guard": "phaseIsExecute", "actions": "incrementRetries" }
         ]
+      },
+      "_refusal": {
+        "after:dbRetryBackoff": "Unreachable by construction: only Opening and Executing route into DBLocked, and each sets the phase it departed from, so exactly one of phaseIsOpen/phaseIsExecute holds on every backoff. If a third phase ever routes here without setting the phase, the timer would fire into nothing and the command would hang until retriesExhausted, which is why the two guards must stay total."
       }
     },
     "ResolvingSession": {

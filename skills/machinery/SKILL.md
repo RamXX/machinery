@@ -129,7 +129,7 @@ design/
 
 Never advance until the current gate passes. State the gate result to the user before moving on.
 
-The deterministic gates live in `machinery check <design> [--impl <dir>] [--commit <sha>] [--gate gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ga,g4,gt,g5]`
+The deterministic gates live in `machinery check <design> [--impl <dir>] [--commit <sha>] [--gate gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ge,ga,g4,gt,g5]`
 (g5 runs automatically on decomposed designs; gm runs once `migration.yaml` exists; gs once
 `legacy/surface.yaml` exists; gp, gi, and gn each run automatically once the matching
 `formal/{policy,integrity,isolation}.relational.yaml` exists; gc once any `*.modelith.yaml`
@@ -414,8 +414,19 @@ giant machine. See `references/xstate-format.md`.
 Machine JSON conventions (enforced by the lint): every machine is either an entity lifecycle
 (filename matching the entity counts, or `_lifecycle_of: "<Entity>"` when it does not) or carries
 `_role: "operational"`. A state whose `always` list is fully guarded with no unguarded escape needs
-an `_exhaustive: "<reason>"` justification. Resting states declare `_ignores: {event: reason}` for
-every reacted-to event they do not handle. After authoring, `machinery oracle design/machines`
+an `_exhaustive: "<reason>"` justification. A HANDLER (an `on:` event, an `after:` timer, an
+`invoke` `onDone`/`onError`, a state `onDone`) whose branch list is fully guarded needs the sibling
+annotation `_refusal: {"<handler>": "<what happens when no guard admits>"}`: when every guard is
+false the trigger is silently absorbed and the machine sits where it was, which is either a
+deliberate refusal (a command-boundary AuthzError, an audited ignore) or a deadlock, and only the
+author can say which. Writing it down is the forcing function: it makes "can the first instance
+ever pass?" a question the author cannot walk past. A handler with an unguarded fallback branch
+always admits and needs nothing. Handler names are the event name, `after:<delay>`,
+`<src>.onDone`/`<src>.onError`, or `onDone`; a `_refusal` entry naming no fully guarded handler is
+a stale claim and an error. Declarations must be consumed in both directions: an `after` naming a
+delay `_delays` does not declare is an error, and a `_delays` entry no `after` edge consumes is one
+too (a cadence nothing implements is not a bound). Resting states declare `_ignores: {event: reason}`
+for every reacted-to event they do not handle. After authoring, `machinery oracle design/machines`
 must be run and the generated `<M>.oracle.md` files committed; they are canonical, never hand-edited.
 
 #### Formal annotations (rungs 3 and 4)
@@ -448,7 +459,8 @@ matrix; those errors are expected until BUILD.md exists, so run bare `--gate g3`
 check at Gate 4). **G3-machine** verifies, deterministically: structural lint (only the supported
 XState subset; unknown keys, parallel/history states, root-level `on`, and non-string guards are
 hard errors; reachability; no dead-end non-final state; every `invoke` has `onError` and an `after`
-timeout; no shadowed branch; guarded-always exhaustiveness), the committed oracle byte-identical to
+timeout; no shadowed branch; guarded-always exhaustiveness; a declared guard-false disposition on
+every fully guarded handler; `_delays` consumed in both directions), the committed oracle byte-identical to
 a fresh in-memory generation (a stale oracle is DRIFT), any transition table in the hand matrix
 reconciled against the machine structurally, row by row, in both directions, and a named-unit
 contract row for every guard, action, and actor the machine fires.
@@ -787,6 +799,24 @@ BUILD.md shards into `design/BUILD.md` (root: glossary, contract, traceability, 
 spec) plus `design/BUILD/<context>.md` per context; the root document states the sharding
 explicitly. Gate 4's self-containment then applies per shard.
 
+Self-containment means shards COPY rows: a shard restates the root's matrix rows, a child restates
+the parent's event rows, so each document stands alone. This is the one sanctioned duplication in
+machinery, and it is the only one with no generator behind it. Do not hold it with a prose promise
+("byte-identical; a diff is a defect"): mark the copy and let Ge-embed check it. Put a marker on the
+line before the copied table:
+
+```
+<!-- machinery:embed from="../BUILD.md" table="invariant id,enforced by,in component" where="in component=pf.feed" claims="subset,complete" -->
+```
+
+`subset` claims every row here is byte-identical to a source row; `complete` claims every source row
+the filter selects is here; each is independently declarable. A row the shard genuinely adapts marks
+what differs with `(shard-local: <reason>)`, in the first cell to exempt the whole row or in one cell
+to exempt that cell alone, and the rest of the row is still held. Unmarked tables carry no
+obligation, so adoption is per table; but a marker that cannot be resolved (missing source, a
+selector matching no table or several) is an error, never a silent skip. The grammar is in
+`references/build-md-template.md`.
+
 ## Recursive decomposition (contract packs)
 
 Sharding splits the synthesis; recursion splits the DESIGN. Escalate to recursion only when the
@@ -941,6 +971,11 @@ was consciously waived. A phase entry without a self-review line is not complete
   change; a change that edits a machine without its regenerated oracle is malformed.
 - Never hand-resolve a merge conflict in a generated file: take either side, regenerate, and
   re-run the gates.
+- A copied table is a promise until it is marked. When one document restates another's rows (a
+  shard restating the root, a child restating its parent), put a `machinery:embed` marker on it so
+  Ge-embed holds the copy; the reviewer who notices the divergence three sprints later is not a
+  process. Editing a source table means re-running the check, not remembering which documents
+  copied it.
 - `STATE.md` is single-writer: the active conductor.
 - `design/DECISIONS.md` is required once interrogation starts: one line per binding decision in
   the form `<date> <who>: <decision>` (mode, transition posture, tech choices, invariant
@@ -1013,7 +1048,7 @@ was consciously waived. A phase entry without a self-review line is not complete
   dependency-mitigation, persistence-placement, and event-contract table formats, and the NFR record.
 - `references/build-md-template.md` - the full `BUILD.md` skeleton (full and manifest modes).
 - `machinery check` - the deterministic gate suite (Gm-transition, Gs-surface, Gp/Gi/Gn
-  relational gates, G2-c4, G3-machine, Gx-trace, Gb-plan, Ga-accept, G4-import, Gt-tests,
+  relational gates, G2-c4, G3-machine, Gx-trace, Gb-plan, Ge-embed, Ga-accept, G4-import, Gt-tests,
   G5-pack for decomposed designs).
   Single Go binary. Run it at each gate with `--gate` so correctness does not
   rely on the model getting every cross-reference right. See `tools/README.md`.

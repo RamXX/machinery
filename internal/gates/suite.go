@@ -36,7 +36,7 @@ type RunOptions struct {
 // KnownGate; two hand-kept lists once drifted.
 var knownGateSet = map[string]bool{
 	"gm": true, "gs": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
-	"g3": true, "gx": true, "gk": true, "gb": true, "ga": true, "g4": true, "gt": true, "g5": true,
+	"g3": true, "gx": true, "gk": true, "gb": true, "ge": true, "ga": true, "g4": true, "gt": true, "g5": true,
 }
 
 // KnownGate reports whether name names a gate this suite can run.
@@ -69,7 +69,7 @@ func HasModelith(design string) bool {
 // unknown or empty gate name is an error.
 func Select(design, gateList, impl string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
-	list := "gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ga,g4,gt,g5"
+	list := "gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ge,ga,g4,gt,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
@@ -115,6 +115,9 @@ func Select(design, gateList, impl string) (Selection, error) {
 			if HasBuildDoc(design) {
 				parts = append(parts, "gb")
 			}
+			if EmbedActive(design) {
+				parts = append(parts, "ge")
+			}
 			if AcceptanceActive(design) {
 				parts = append(parts, "ga")
 			}
@@ -151,7 +154,7 @@ func Select(design, gateList, impl string) (Selection, error) {
 }
 
 // RunSelected runs the selected gates in canonical order (Gm, Gs, Gp, Gi, Gn,
-// Gc, G2, G3, Gx, Gb, Ga, G4, Gt, G5) with `machinery check`'s applicability
+// Gc, G2, G3, Gx, Gb, Ge, Ga, G4, Gt, G5) with `machinery check`'s applicability
 // rules: opt-in gates run only when their source exists (or when explicitly
 // requested), G4 and Gt only with an impl dir, and G5 only when explicitly
 // requested or when the design is decomposed. opt carries the run-time inputs
@@ -191,6 +194,9 @@ func RunSelected(design, impl string, sel Selection, opt RunOptions) []*Gate {
 	}
 	if sel.Run["gb"] && (sel.Explicit || HasBuildDoc(design)) {
 		out = append(out, CheckBuildPlan(design))
+	}
+	if sel.Run["ge"] && (sel.Explicit || EmbedActive(design)) {
+		out = append(out, CheckEmbeds(design))
 	}
 	if sel.Run["ga"] && (sel.Explicit || AcceptanceActive(design)) {
 		out = append(out, CheckAcceptance(design, opt.Commit))

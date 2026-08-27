@@ -54,6 +54,15 @@ var MachineLintExperiments = []Experiment{
 		ExpectSubstr: "both handles and ignores event 'publish'", ExpectExit: true},
 	{Name: "kebab-case-unit-name", Tool: "lint", Mutation: "rename a guard to kebab-case",
 		ExpectSubstr: "is not a valid identifier", ExpectExit: true},
+	// 2026-08-27: unconsumed declarations and undeclared guard-false
+	// dispositions. Both are the same shape of hole: a machine that reads as
+	// governed while nothing implements or answers the declaration.
+	{Name: "unconsumed-delay", Tool: "lint", Mutation: "declare a delay no after edge consumes",
+		ExpectSubstr: "no after edge consumes it", ExpectExit: true},
+	{Name: "guard-false-undeclared", Tool: "lint", Mutation: "drop the unguarded fallback branch",
+		ExpectSubstr: "is fully guarded, so an event that satisfies no guard is silently absorbed", ExpectExit: true},
+	{Name: "stale-refusal", Tool: "lint", Mutation: "declare a disposition for a handler that is not fully guarded",
+		ExpectSubstr: "but no fully guarded handler of that name exists", ExpectExit: true},
 }
 
 // MachineryCheckExperiments are the gate-suite review findings.
@@ -99,6 +108,14 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "allow edge `widget.store -> external.db` has no interface-contract row", ExpectExit: true},
 	{Name: "interface-contract-for-unallowed-edge", Tool: "check", Mutation: "write a contract row for a denied edge",
 		ExpectSubstr: "which no allow rule declares", ExpectExit: true},
+	// 2026-08-27: the sanctioned duplication class (a shard copying rows so it
+	// stands alone) had no generator and no gate; it was held by prose.
+	{Name: "embed-row-edited", Tool: "check", Mutation: "edit one row of a declared embed",
+		ExpectSubstr: "is not a byte-identical copy of any source row", ExpectExit: true},
+	{Name: "embed-row-dropped", Tool: "check", Mutation: "drop one row of a complete-claiming embed",
+		ExpectSubstr: "is selected but absent here", ExpectExit: true},
+	{Name: "embed-source-unresolvable", Tool: "check", Mutation: "point an embed at a source that does not exist",
+		ExpectSubstr: "does not exist or is empty", ExpectExit: true},
 	// 2026-08-11 review: G2 validated the contract's rules but never the shape
 	// of the dependency graph they declare; a -> b plus b -> a passed clean.
 	{Name: "contract-cycle", Tool: "check", Mutation: "allow rules close widget.store -> widget.app into a cycle",
