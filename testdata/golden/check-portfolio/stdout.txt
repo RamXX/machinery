@@ -21,7 +21,7 @@
   warn   invariant 'ticker-unique' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
   note   Portfolio: 3 operational-overlay states (committing, commitRetry, reverted)
   note   RecommendationRun: 1 operational-overlay states (collectRetry)
-  checked: 6 entities, 1 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 3 placement rows with machines, 5 placement rows waived, 3 build shards scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 7 invariants attested only (prose), 6 invariants enforced, 6 invariants unit-backed (guard/action/actor), 5 invariants waived with reason
+  checked: 6 entities, 1 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 3 placement rows with machines, 5 placement rows waived, 6 entities placed, 3 build shards scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 7 invariants attested only (prose), 6 invariants enforced, 6 invariants unit-backed (guard/action/actor), 5 invariants waived with reason
 == Gb-plan  build plan structure ==
   checked: 3 plans, 6 milestones, 6 DoD-bearing milestones, 2 skeleton waivers, 3 skeleton citations, skeleton citation skipped (skeleton waived), skeleton citation skipped (skeleton waived)
   ok

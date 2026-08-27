@@ -219,6 +219,8 @@ aggregate is loaded, acted on, and saved inside the one transaction the Command 
 | `User` aggregate | ephemeral in-process; load-act-save in the Tx | `user` table `status` field | as above |
 | `Session` | in-process during a command; token on disk | `~/.crm/session` (user id + expiry, HMAC-signed) | last write wins; single local user |
 | `CommandExecution` | ephemeral per invocation (the operational envelope) | none | one invocation, one transaction |
+| `Account` `Contact` `Team` `Pipeline` `Tag` (no machine: CRUD records with no lifecycle enum) | ephemeral in-process; written in the command's transaction | one table per record type; a `Tag` application is a graph edge | read-modify-write in one transaction; cross-process by the store's transaction engine |
+| `Activity` (no machine: an append-only log entry, never updated) | ephemeral in-process; inserted in the command's transaction | `activity` table record written once (`activity-immutable`) | insert-only; no update contention |
 
 ## 8. NFR record
 

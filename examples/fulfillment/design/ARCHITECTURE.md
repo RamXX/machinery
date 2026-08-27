@@ -84,6 +84,11 @@ model `formal/FulfillmentSagaData.tla` proves that money and stock are never sil
 | `FulfillmentSaga` | a persistent process per order (`gen_statem` under a `Registry`) | saga state row plus the outbox in the Order DB | one process per order (actor mailbox) |
 | `Order` `Payment` `Reservation` `Shipment` | per-service DB rows | status columns per aggregate | optimistic lock per row |
 | `OutboxMessage` | a table in each service DB, drained by a poller | rows marked Published then Consumed; the machine models one publish attempt, the poller supplies the at-least-once re-drive | at-least-once; consumers dedupe by message id |
+| `Customer` (no machine: a registered party record with no lifecycle) | none; rows in the Order Service DB | one row per customer, unique by email (`customer-email-unique`) | last write wins per customer row |
+| `Product` `Inventory` (no machine: stock is a counter pair held by invariants, not by states) | none; rows in the Inventory Service DB | catalog row per product; onHand and reserved counters per stock position | optimistic lock per inventory row |
+| `LineItem` (no machine: rows owned by their `Order`, written with it) | none; rows in the Order Service DB | rows keyed by order id | written inside the order's own write |
+| `Refund` (no machine: the outcome record of a compensating capture) | none; rows in the Payment Service DB | one row per issued refund | written inside the payment's compensation step |
+| `Address` (not placed: a value object stored inline in the `Shipment` row it belongs to) | n/a | n/a | n/a |
 
 ## 5. Event-contract table
 

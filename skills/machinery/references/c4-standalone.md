@@ -341,16 +341,36 @@ Record these during Phase 2, even when the answer is "out of scope, recorded as 
 For every **stateful** component, decide and record. This determines how the Phase 3 machine is realized
 and how concurrent events are serialized. Format rules, checked by Gx-trace once machines exist:
 
-- The table header must contain **placement** and **persistence**.
-- The **first column** names each stateful component in backticks.
+- The table header must contain **placement** and **persistence**. The design has exactly one such
+  table; deleting it is an ERROR, not a way to have no obligations.
+- The **first column** names its components in backticks. A row may name several components that
+  share one placement decision; the machine rule below binds the first. A name written inside a
+  parenthetical annotation is prose about another row's component, never a placement of its own.
 - Every named component must have a `machines/<Name>.machine.json`, or the row must contain the
   waiver text `(no machine: <reason>)`.
+- **Completeness**: every entity the domain model declares must appear in some row's first column,
+  or carry the waiver `(not placed: <reason>)` in a row of its own. Nothing is demanded for enums or
+  scenarios, entities only.
 
 | component | machine placement | persistence | concurrency serialization |
 |---|---|---|---|
 | `Order` aggregate | in-memory actor (Elixir GenServer per id via Registry) | event-sourced to Postgres, rehydrate on start | actor mailbox (one process per order) |
 | `Order` (Go/Rust/Python alt) | none; load-act-save | `state` column + `version` | optimistic lock (`WHERE version = ?`) or `SELECT ... FOR UPDATE` |
 | `Pricing` (no machine: pure transform, contract spec instead) | n/a | none | n/a |
+| `Address` (not placed: a value object stored inline in the `Order` row) | n/a | n/a | n/a |
+
+The two waivers answer different questions, so keep them apart. `(no machine: <reason>)` says the
+component IS placed and its row records that placement, but no state machine realizes it.
+`(not placed: <reason>)` says the entity has no placement of its own at all (it is value-like, or
+its persistence rides another aggregate's row), and therefore no machine either.
+
+Why completeness is checked here and only attested for dependencies: the universe of dependencies is
+open, so a dependency nobody declared carries no obligation and only the conversation can catch it.
+The entity list is CLOSED, enumerable from the domain model, so an entity that never got a row is a
+hole a tool can see. It is a real one: a persisted entity outside this table is invisible to every
+gate, including the machine rule above, which only ever holds the rows that exist. Prefer an honest
+row over a waiver. A persisted record with no lifecycle is a row (`(no machine: ...)`), not a
+waiver; the waiver is for the genuinely unplaced.
 
 Elixir maps almost 1:1 to a supervised process per aggregate. Go, Rust, and Python need the explicit
 persisted-state plus lock pattern, or an event-sourced log, because there is no cheap per-entity process.
@@ -431,8 +451,10 @@ LLM-attested (you verify; the tool cannot):
 - The `workspace.dsl` compiles under `structurizr-cli export` (run it; fix syntax errors).
 - Every Modelith action maps to an owning component in `workspace.dsl`.
 - Every boundary crossing has an interface contract (shape, errors, idempotency).
-- Every stateful component has a persistence-and-placement decision (the machine-per-row check runs
-  in Gx-trace once machines exist).
+- Every stateful component has a persistence-and-placement decision, and each decision is the RIGHT
+  one (whether a row's placement, persistence, and serialization actually hold is judgment). Two
+  deterministic halves run in Gx-trace once machines exist: a machine per row, and a row per
+  declared entity.
 - The event-contract table exists for multi-component designs, covers every cross-component event,
   and names its enumeration sources (emit/publish call sites, broker/infra config, API specs).
 - The dependency declaration is complete: everything the deployment actually talks to appears in

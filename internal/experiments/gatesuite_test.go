@@ -23,6 +23,7 @@ func init() {
 		"retargeted-transition-drift", "unit-without-namedunit-row", "unenforced-invariant",
 		"invariant-not-whole-token", "machine-state-not-in-enum", "enum-value-without-state",
 		"machine-event-not-action", "unmapped-machine", "placement-row-no-machine",
+		"entity-with-no-placement-row", "placement-table-deleted",
 		"contract-cycle", "single-form-import-bypass", "undeclared-cross-boundary", "import-unexposed-internals",
 		"source-outside-contract")
 }
@@ -562,6 +563,45 @@ func TestPlacementWaiverIsAccepted(t *testing.T) {
 			"| `Gizmo` | pure function (no machine: stateless transform) | - | - |")
 	if containsAny(gates.CheckTraceability(design).Errs, "Gizmo") {
 		t.Error("placement waiver rejected")
+	}
+}
+
+// A declared entity with no row in the persistence-and-placement table is an
+// ERROR naming it. The entity list is closed and enumerable from the model, so
+// the table's own completeness is checkable rather than attested; without this
+// a persisted entity could sit outside the table unseen by every gate.
+func TestEntityWithNoPlacementRowIsError(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "widget.modelith.yaml"), "invariants: []",
+		"  Sprocket:\n    actions:\n      - name: tighten\ninvariants: []")
+	if !containsAny(gates.CheckTraceability(design).Errs,
+		"entity `Sprocket` appears in no persistence-and-placement row") {
+		t.Error("an entity outside the placement table passed Gx")
+	}
+}
+
+// The escape hatch: an entity that genuinely has no placement of its own
+// (value-like, or riding another aggregate's row) says so with a reason.
+func TestEntityPlacementWaiverIsAccepted(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "widget.modelith.yaml"), "invariants: []",
+		"  Sprocket:\n    actions:\n      - name: tighten\ninvariants: []")
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"),
+		"| `Widget` | in-process | db row | single writer |",
+		"| `Widget` | in-process | db row | single writer |\n"+
+			"| `Sprocket` (not placed: a value object stored inline in the widget row) | n/a | n/a | n/a |")
+	if containsAny(gates.CheckTraceability(design).Errs, "Sprocket") {
+		t.Error("a reasoned '(not placed: <reason>)' waiver was rejected")
+	}
+}
+
+// Deleting the table must not waive every entity in it.
+func TestDeletedPlacementTableIsError(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"),
+		"| component | placement | persistence | concurrency |", "| component | notes |")
+	if !containsAny(gates.CheckTraceability(design).Errs, "no persistence-and-placement table") {
+		t.Error("a design with no placement table passed Gx")
 	}
 }
 

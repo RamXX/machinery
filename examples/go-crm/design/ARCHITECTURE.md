@@ -190,6 +190,8 @@ aggregate is loaded, acted on, and saved inside the one write transaction the Co
 | `User` aggregate | ephemeral in-process; load-act-save in the Tx | graph node `status` attribute | as above |
 | `Session` | in-process during a command; token on disk | `~/.crm/session` (user id + expiry, HMAC-signed) | last write wins; single local user |
 | `CommandExecution` | ephemeral per invocation (the operational envelope) | none | one invocation owns the write Tx |
+| `Account` `Contact` `Team` `Pipeline` `Tag` (no machine: CRUD records with no lifecycle enum) | ephemeral in-process; written in the command's write Tx | graph nodes carrying their attributes; a `Tag` application is an edge | read-modify-write in one write Tx; cross-process by the store's single-writer lock |
+| `Activity` (no machine: an append-only log entry, never updated) | ephemeral in-process; inserted in the command's write Tx | graph node written once (`activity-immutable`) | insert-only; no update contention |
 
 ## 8. NFR record
 

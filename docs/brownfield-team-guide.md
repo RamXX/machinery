@@ -135,10 +135,15 @@ only through `baseline:` edges is a warning (debt to burn down), while a cycle d
   record the incoherence as an open question in the model rather than silently picking a
   winner. Use the codebase graph (codebase-memory-mcp or equivalent, indexed first) to
   excavate lifecycles and call chains instead of grepping.
-- Keep the domain model trimmed to the slice you are gating. Gx has no per-entity waiver:
-  every entity with a lifecycle enum must have a machine before Gx passes. Machine-at-a-time
-  adoption therefore means the domain model grows entity by entity alongside the machines.
-  Add `gx` to the CI gate list only when every lifecycle enum in the model has its machine.
+- Keep the domain model trimmed to the slice you are gating. Gx has no per-entity waiver for
+  lifecycles: every entity with a lifecycle enum must have a machine before Gx passes.
+  Machine-at-a-time adoption therefore means the domain model grows entity by entity alongside the
+  machines. Add `gx` to the CI gate list only when every lifecycle enum in the model has its machine.
+- Every entity you add to the model also needs a row in the persistence-and-placement table, or a
+  `(not placed: <reason>)` waiver: Gx checks that table against the model, because the entity list
+  is closed. In brownfield that is a feature rather than a tax. Excavating where a record actually
+  lives is the work adoption is for, and an entity nobody can place is a finding worth writing into
+  the reason.
 - After each machine: run `machinery oracle design/machines` and commit the generated
   oracle in the same PR. G3 fails on stale oracles, which is the drift protection working.
 - Keep matrix markdown well-formed. A table that looks like a transition table but fails
@@ -351,7 +356,8 @@ folding it into a substrate boundary manufactures allow-graph cycles.
   deliberate `machinery baseline` rerun accepts growth by design. Review `ratchet.json`
   diffs in PRs; an unexplained regrowth in that diff is the tell.
 - Gx requires a machine for every lifecycle enum in the domain model, with no per-entity
-  waiver; trim the model to the gated slice instead.
+  waiver; trim the model to the gated slice instead. It also requires a persistence-placement
+  row per declared entity, which DOES have a per-entity waiver: `(not placed: <reason>)`.
 - G4 reports violations per edge, naming one witness file plus a count of additional
   offenders; budget remediation by the count, not by the number of error lines.
 - A stale child in a decomposed design is only visible to the parent's check (the parent

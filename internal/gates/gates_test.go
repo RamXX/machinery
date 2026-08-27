@@ -265,6 +265,126 @@ func TestGxPlacementWaiverColumnAndReason(t *testing.T) {
 	})
 }
 
+// --- Gx placement completeness (the entity list is closed, so it is checked) ---
+
+// gxCompletenessModel declares two entities whose names overlap (Order is a
+// substring of OrderLine), one enum with two values, and one scenario: the
+// completeness check must demand rows for the two ENTITIES only, and must not
+// credit `Order` from a row that names `OrderLine`.
+const gxCompletenessModel = `kind: modelith
+version: 1
+enums:
+  OrderKind:
+    values:
+      - name: Retail
+      - name: Wholesale
+entities:
+  Order:
+    attributes:
+      - name: kind
+        type: OrderKind
+    actions:
+      - name: place
+    invariants:
+      - id: order-owned
+  OrderLine:
+    actions:
+      - name: add
+scenarios:
+  - name: Retail flow
+`
+
+// writeGxCompletenessFixture builds a design whose ARCHITECTURE.md carries the
+// given placement rows (or no table at all when rows is "").
+func writeGxCompletenessFixture(t *testing.T, rows string) *Gate {
+	t.Helper()
+	design := t.TempDir()
+	mustWrite(t, filepath.Join(design, "domain.modelith.yaml"), gxCompletenessModel)
+	mustWrite(t, filepath.Join(design, "machines", "Ops.machine.json"),
+		`{"id":"ops","_role":"operational","initial":"A","states":{"A":{}}}`)
+	arch := "# A\n"
+	if rows != "" {
+		arch += "\n## Placement\n\n| component | machine placement | persistence | concurrency |\n|---|---|---|---|\n" + rows + "\n"
+	}
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
+	return CheckTraceability(design)
+}
+
+func TestGxPlacementCompleteness(t *testing.T) {
+	t.Run("every entity in a row passes", func(t *testing.T) {
+		g := writeGxCompletenessFixture(t,
+			"| `Order` (no machine: CRUD record) | none | db row | single writer |\n"+
+				"| `OrderLine` (no machine: rows owned by their order) | none | db rows | with the order |")
+		if hasErr(g, "appears in no persistence-and-placement row") {
+			t.Fatalf("a complete table must pass: %v", g.Errs)
+		}
+		if g.Counts["entities placed"] != 2 {
+			t.Errorf("entities placed = %d, want 2: %+v", g.Counts["entities placed"], g.Counts)
+		}
+	})
+	t.Run("an entity with no row is an error naming it", func(t *testing.T) {
+		g := writeGxCompletenessFixture(t,
+			"| `OrderLine` (no machine: rows owned by their order) | none | db rows | with the order |")
+		if !hasErr(g, "entity `Order` appears in no persistence-and-placement row") {
+			t.Fatalf("a model entity outside the table must fail, named: %v", g.Errs)
+		}
+		if hasErr(g, "entity `OrderLine` appears in no") {
+			t.Fatalf("the row's own entity must be credited: %v", g.Errs)
+		}
+		// whole-token: `Order` must not be credited by the `OrderLine` row
+		if g.Counts["entities placed"] != 1 {
+			t.Errorf("entities placed = %d, want 1 (OrderLine only): %+v", g.Counts["entities placed"], g.Counts)
+		}
+	})
+	t.Run("a reasoned '(not placed:)' waiver passes and demands no machine", func(t *testing.T) {
+		g := writeGxCompletenessFixture(t,
+			"| `OrderLine` (no machine: rows owned by their order) | none | db rows | with the order |\n"+
+				"| `Order` (not placed: a value object folded into the line row) | n/a | n/a | n/a |")
+		if hasErr(g, "appears in no persistence-and-placement row") {
+			t.Fatalf("a reasoned placement waiver must waive: %v", g.Errs)
+		}
+		if hasErr(g, "has no machine") {
+			t.Fatalf("a not-placed entity has no placement and so no machine to demand: %v", g.Errs)
+		}
+		if g.Counts["entities placement-waived"] != 1 {
+			t.Errorf("entities placement-waived = %d, want 1: %+v", g.Counts["entities placement-waived"], g.Counts)
+		}
+	})
+	t.Run("a waiver with no reason is an error", func(t *testing.T) {
+		g := writeGxCompletenessFixture(t,
+			"| `OrderLine` (no machine: rows owned by their order) | none | db rows | with the order |\n"+
+				"| `Order` (not placed:) | n/a | n/a | n/a |")
+		if !hasErr(g, "placement waiver for `Order` names no reason") {
+			t.Fatalf("an empty waiver reason must not waive: %v", g.Errs)
+		}
+	})
+	t.Run("enum and scenario names are never demanded", func(t *testing.T) {
+		g := writeGxCompletenessFixture(t,
+			"| `Order` (no machine: CRUD record) | none | db row | single writer |\n"+
+				"| `OrderLine` (no machine: rows owned by their order) | none | db rows | with the order |")
+		for _, name := range []string{"OrderKind", "Retail", "Wholesale", "Retail flow"} {
+			if hasErr(g, name) {
+				t.Errorf("%s is not an entity; no placement row may be demanded for it: %v", name, g.Errs)
+			}
+		}
+	})
+	t.Run("no placement table at all is an error", func(t *testing.T) {
+		g := writeGxCompletenessFixture(t, "")
+		if !hasErr(g, "has no persistence-and-placement table") {
+			t.Fatalf("a missing table must fail: deleting it would otherwise waive every entity: %v", g.Errs)
+		}
+	})
+}
+
+// A name mentioned only inside a row's parenthetical annotation is prose about
+// another component, never a placement of its own.
+func TestGxPlacementSubjectsIgnoreAnnotations(t *testing.T) {
+	got := placementSubjects("`Holding` (no machine: rows written with their `Portfolio`)")
+	if len(got) != 1 || got[0] != "Holding" {
+		t.Errorf("placementSubjects = %v, want [Holding]", got)
+	}
+}
+
 func TestTokenInWholeToken(t *testing.T) {
 	if !tokenIn("inv-1", "foo inv-1 bar") {
 		t.Error("inv-1 should match standalone")

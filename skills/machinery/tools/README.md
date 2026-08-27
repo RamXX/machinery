@@ -46,7 +46,10 @@ One line per subcommand:
 - `machinery check <design-dir> [--impl <code-dir>] [--commit <sha>] [--gate gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ga,g4,gt,g5]` the deterministic
   gate suite (Gm-transition on rebuild/hybrid contracts; Gs-surface on legacy surface ledgers;
   Gp/Gi/Gn relational gates; G2-c4,
-  G3-machine, Gx-trace; Gk-checkers on external-checker manifests, artifact-activated on
+  G3-machine, Gx-trace (machine states against the lifecycle enum, machine events against the
+  entity's actions, a machine or a `(no machine: <reason>)` waiver per persistence-placement row, a
+  placement row or a `(not placed: <reason>)` waiver per declared entity, an enforcement row per
+  invariant); Gk-checkers on external-checker manifests, artifact-activated on
   `design/checkers/*.checker.yaml`; Gb-plan on build plan structure, artifact-activated on `design/BUILD.md`;
   Ga-accept on milestone acceptance evidence, artifact-activated on `design/acceptance/` or any
   milestone marked `Status: closed`, and binding that evidence to `--commit`;

@@ -84,6 +84,13 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "maps to no Modelith entity", ExpectExit: true},
 	{Name: "placement-row-no-machine", Tool: "check", Mutation: "Gizmo placement",
 		ExpectSubstr: "`Gizmo` has no machine", ExpectExit: true},
+	// 2026-08-27 production finding: every placement ROW was held to a machine
+	// or a waiver, but nothing held the TABLE to the model. A persisted entity
+	// that simply never got a row was invisible to every gate.
+	{Name: "entity-with-no-placement-row", Tool: "check", Mutation: "declare entity Sprocket, give it no placement row",
+		ExpectSubstr: "entity `Sprocket` appears in no persistence-and-placement row", ExpectExit: true},
+	{Name: "placement-table-deleted", Tool: "check", Mutation: "drop the persistence-and-placement table",
+		ExpectSubstr: "no persistence-and-placement table", ExpectExit: true},
 	// 2026-08-11 review: G2 validated the contract's rules but never the shape
 	// of the dependency graph they declare; a -> b plus b -> a passed clean.
 	{Name: "contract-cycle", Tool: "check", Mutation: "allow rules close widget.store -> widget.app into a cycle",

@@ -55,6 +55,9 @@ dependency_rules:
 | component | machine placement | persistence | concurrency |
 |---|---|---|---|
 | `DataSubject` | pii.pipeline | db row | single writer per subject id |
+| `ProcessingActivity` (no machine: a purpose record with no lifecycle) | pii.pipeline | db row per activity | single writer per activity id |
+| `AnalyticsExport` (no machine: a spooled delivery record) | pii.export | spool row per export, retained until the destination acknowledges | single writer per export id |
+| `Redactor` (not placed: a pure transform inside pii.pipeline; its method is configuration, not a stored record) | n/a | n/a | n/a |
 
 ## NFR record
 

@@ -12,7 +12,7 @@
   ok
 == Gx-trace  cross-layer traceability ==
   warn   BUILD.md not present; invariant enforcement is checked against the matrices only (fine before Phase 4)
-  checked: 4 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 2 invariants waived with reason, 2 invariants enforced, 1 invariants checker-claimed (external checker), 1 invariants unit-backed (guard/action/actor)
+  checked: 4 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 2 placement rows waived, 3 entities placed, 1 entities placement-waived, 2 invariants waived with reason, 2 invariants enforced, 1 invariants checker-claimed (external checker), 1 invariants unit-backed (guard/action/actor)
 == Gk-pii-flow external checker ==
   checked: 3 layers projected, 3 invariants claimed, 2 residuals (waived with reason), 1 committed projection fresh, 1 evidence bound to design, 1 elements covered
   ok

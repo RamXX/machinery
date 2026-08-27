@@ -1308,45 +1308,7 @@ func CheckTraceability(design string) *Gate {
 	}
 
 	// placement table
-	persistedPlacements := 0
-	arch := filepath.Join(design, "ARCHITECTURE.md")
-	if _, err := os.Stat(arch); err == nil {
-		text := readFileOrErr(arch, g)
-		for _, tbl := range ir.ParseMdTables(text) {
-			hl := strings.ToLower(strings.Join(tbl.Header, " "))
-			if strings.Contains(hl, "placement") && strings.Contains(hl, "persistence") {
-				pi := ir.FindCol(tbl.Header, "persistence")
-				mp := ir.FindCol(tbl.Header, "machine placement", "placement", "machine")
-				for _, r := range tbl.Rows {
-					if len(r) == 0 {
-						continue
-					}
-					if pi >= 0 && pi < len(r) && isPersisted(r[pi]) {
-						persistedPlacements++
-					}
-					// only a backticked token names a component; a bare word is
-					// prose, and accepting it lets de-backticked rows pass silently
-					var named []string
-					if bt := backtickTokens(r[0]); len(bt) > 0 {
-						named = []string{bt[0]}
-					}
-					if len(named) == 0 {
-						g.Errs = append(g.Errs, "placement row names no component in backticks: "+ir.Repr(r[0]))
-					}
-					for _, comp := range named {
-						if machineNames[comp] {
-							g.Count("placement rows with machines")
-						} else if placementWaived(r, mp) {
-							g.Count("placement rows waived")
-						} else {
-							g.Errs = append(g.Errs, "placement row component `"+comp+"` has no machine and no '(no machine: <reason>)' waiver in its component or machine-placement cell")
-						}
-					}
-				}
-				break
-			}
-		}
-	}
+	persistedPlacements := checkPlacement(g, design, machineNames, entities)
 
 	// invariants enforcement
 	var cells, unitCells []string
@@ -1512,8 +1474,124 @@ func CheckTraceability(design string) *Gate {
 	return g
 }
 
+// checkPlacement holds the persistence-and-placement table in ARCHITECTURE.md
+// and returns how many rows persist their state (the BUILD.md state-migration
+// trigger). Two obligations, opposite directions:
+//
+//   - every ROW names a component in backticks that has a machine, or carries
+//     a '(no machine: <reason>)' waiver;
+//   - every ENTITY the domain model declares appears in some row's component
+//     cell, or carries a '(not placed: <reason>)' waiver.
+//
+// The second is the completeness half. Unlike the dependency declaration,
+// whose universe is open (a dependency nobody declared carries no obligation,
+// so completeness there is attested), the entity list is CLOSED and
+// enumerable from the model: an entity that simply never got a row is a hole
+// no other gate can see, so it is checked here rather than trusted.
+func checkPlacement(g *Gate, design string, machineNames map[string]bool, entities *ir.Object) int {
+	persisted := 0
+	arch := filepath.Join(design, "ARCHITECTURE.md")
+	if _, err := os.Stat(arch); err != nil {
+		return persisted
+	}
+	text := readFileOrErr(arch, g)
+	placedEntities := map[string]bool{}
+	waivedEntities := map[string]bool{}
+	tableFound := false
+	for _, tbl := range ir.ParseMdTables(text) {
+		hl := strings.ToLower(strings.Join(tbl.Header, " "))
+		if !strings.Contains(hl, "placement") || !strings.Contains(hl, "persistence") {
+			continue
+		}
+		tableFound = true
+		pi := ir.FindCol(tbl.Header, "persistence")
+		mp := ir.FindCol(tbl.Header, "machine placement", "placement", "machine")
+		for _, r := range tbl.Rows {
+			if len(r) == 0 {
+				continue
+			}
+			if pi >= 0 && pi < len(r) && isPersisted(r[pi]) {
+				persisted++
+			}
+			// only a backticked token outside the annotation parentheses names
+			// a component; a bare word is prose, and accepting it lets
+			// de-backticked rows pass silently
+			named := placementSubjects(r[0])
+			if len(named) == 0 {
+				g.Errs = append(g.Errs, "placement row names no component in backticks: "+ir.Repr(r[0]))
+				continue
+			}
+			if m := notPlacedWaiverRe.FindStringSubmatch(r[0]); m != nil {
+				// the row states the entity has no placement of its own (it
+				// rides another aggregate's row, or is value-like): there is no
+				// placement decision to record and so no machine to demand. An
+				// empty reason is an unanswered design question, not a waiver;
+				// the subjects still count as seen, so one defect never
+				// cascades into a second finding against the same entity.
+				for _, comp := range named {
+					waivedEntities[comp] = true
+				}
+				if strings.TrimSpace(m[1]) == "" {
+					g.Errs = append(g.Errs, "placement waiver for `"+named[0]+"` names no reason; write '(not placed: <reason>)'")
+				}
+				continue
+			}
+			for _, comp := range named {
+				placedEntities[comp] = true
+			}
+			// the machine obligation binds the row's first component: the rest
+			// are co-located subjects of the same placement decision
+			comp := named[0]
+			if machineNames[comp] {
+				g.Count("placement rows with machines")
+			} else if placementWaived(r, mp) {
+				g.Count("placement rows waived")
+			} else {
+				g.Errs = append(g.Errs, "placement row component `"+comp+"` has no machine and no '(no machine: <reason>)' waiver in its component or machine-placement cell")
+			}
+		}
+		break
+	}
+	if !tableFound {
+		g.Errs = append(g.Errs, fmt.Sprintf("ARCHITECTURE.md has no persistence-and-placement table (a header naming both placement and persistence); the model's %d entities can be traced to no placement decision", entities.Len()))
+		return persisted
+	}
+	names := append([]string(nil), entities.Keys()...)
+	sort.Strings(names)
+	for _, ename := range names {
+		switch {
+		case placedEntities[ename]:
+			g.Count("entities placed")
+		case waivedEntities[ename]:
+			g.Count("entities placement-waived")
+		default:
+			g.Errs = append(g.Errs, "entity `"+ename+"` appears in no persistence-and-placement row and carries no '(not placed: <reason>)' waiver; the placement table is incomplete")
+		}
+	}
+	return persisted
+}
+
 // noMachineWaiverRe is the placement waiver token with its reason captured.
 var noMachineWaiverRe = regexp.MustCompile(`\(no machine:\s*([^)]*)\)`)
+
+// notPlacedWaiverRe is the placement-completeness waiver token with its reason
+// captured: a declared entity that deliberately has no placement row of its
+// own. Distinct from '(no machine: <reason>)', which waives the MACHINE of a
+// component that is placed.
+var notPlacedWaiverRe = regexp.MustCompile(`\(not placed:\s*([^)]*)\)`)
+
+// parenAnnotationRe matches a parenthesized annotation in a placement
+// component cell.
+var parenAnnotationRe = regexp.MustCompile(`\([^)]*\)`)
+
+// placementSubjects returns the components a placement row's first cell names:
+// the backticked tokens OUTSIDE any parenthetical annotation. A name mentioned
+// inside a waiver reason is prose about another row's component, never a
+// placement of its own ("`Holding` (no machine: rows written with their
+// `Portfolio`)" places Holding, not Portfolio).
+func placementSubjects(cell string) []string {
+	return backtickTokens(parenAnnotationRe.ReplaceAllString(cell, " "))
+}
 
 // placementWaived recognizes the '(no machine: <reason>)' waiver only in the
 // cells that name what is waived: the component cell (the portfolio-engine

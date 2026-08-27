@@ -38,7 +38,7 @@
   note   Payment: 8 operational-overlay states (authorizing, capturing, refunding, gatewayRetry, gatewayResume, persisting, persistRetry, rolledBack)
   note   Reservation: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   Shipment: 5 operational-overlay states (dispatching, carrierRetry, persisting, persistRetry, rolledBack)
-  checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 3 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 8 invariants attested only (prose), 17 invariants enforced, 16 invariants unit-backed (guard/action/actor), 1 invariants integrity-checked (relational model)
+  checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 3 placement rows with machines, 4 placement rows waived, 1 entities placement-waived, 11 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 8 invariants attested only (prose), 17 invariants enforced, 16 invariants unit-backed (guard/action/actor), 1 invariants integrity-checked (relational model)
 == Gb-plan  build plan structure ==
   checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 8 skeleton citations
   ok

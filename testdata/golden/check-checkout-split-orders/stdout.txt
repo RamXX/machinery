@@ -13,7 +13,7 @@
   ok
 == Gx-trace  cross-layer traceability ==
   warn   invariant 'order-total-positive' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
-  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor), 1 invariants attested only (prose)
+  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor), 1 invariants attested only (prose)
 == Gb-plan  build plan structure ==
   checked: 1 plans, 4 milestones, 4 DoD-bearing milestones, 1 skeleton citations
   ok

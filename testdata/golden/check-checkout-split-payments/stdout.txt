@@ -12,7 +12,7 @@
   checked: 1 machines, 3 transitions, 1 oracles fresh, 3 named units covered
   ok
 == Gx-trace  cross-layer traceability ==
-  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor)
+  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor)
   ok
 == Gb-plan  build plan structure ==
   checked: 1 plans, 3 milestones, 3 DoD-bearing milestones, 1 skeleton citations

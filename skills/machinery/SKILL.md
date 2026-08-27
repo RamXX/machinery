@@ -338,7 +338,9 @@ Architecture Contract (v2 format: `element` bindings, `externals`, `ignore`; see
 `references/c4-standalone.md`). Decide deployment topology and tech stack. For **every** external
 dependency (datastore, queue, external API) declare a failure-and-mitigation posture. For **every**
 stateful component decide persistence and placement (in-memory actor vs persisted aggregate). This
-is the real bridge into Phase 3. For multi-component designs, also author the **event-contract
+is the real bridge into Phase 3. The placement table is held to the domain model at Gate 4: every
+declared entity needs a row, or a `(not placed: <reason>)` waiver, so walk the entity list while
+authoring it rather than discovering the gap later. For multi-component designs, also author the **event-contract
 table** (producer, consumer, payload by Modelith attribute reference, delivery guarantee, ordering
 assumption, dedupe key): coupling through shared DB tables or bus topics is invisible to G4-import,
 so this table is the governing artifact for it. Like the surface ledger's `source:` lines, the
@@ -374,12 +376,16 @@ claims), and mitigation
 coverage: every contract external plus every DSL element tagged Database, Queue, or External has a
 mitigation row naming it backticked in the first column (a backticked name that matches nothing is
 an error). Mitigation obligations exist only for DECLARED dependencies: a dependency never declared
-in the DSL or the contract carries no obligation, so completeness of the declaration itself is
-attested, not checked. Read the `checked:` counts; they tell you what was actually verified.
+in the DSL or the contract carries no obligation, so completeness of the DEPENDENCY declaration is
+attested, not checked; that universe is open, and only the conversation catches what was never
+declared. Completeness of the PERSISTENCE-PLACEMENT table is the opposite case and IS checked: the
+entity list is closed and enumerable from the domain model, so Gx-trace demands a placement row, or
+a reasoned `(not placed: <reason>)` waiver, for every declared entity. Read the `checked:` counts;
+they tell you what was actually verified.
 LLM-attested (you check these; the tool cannot): every Modelith action maps to an owning component;
-every boundary crossing has an interface contract (shape, errors, idempotency); persistence and
-placement decided per stateful component (the machine-per-placement-row check runs later, in
-Gx-trace); every technology choice has its adoption closure enumerated, with closure members
+every boundary crossing has an interface contract (shape, errors, idempotency); whether each
+persistence-and-placement decision is the RIGHT one (both deterministic halves, a machine per row
+and a row per entity, run later in Gx-trace); every technology choice has its adoption closure enumerated, with closure members
 carried into the mitigation table (see the reference); the event-contract table names its
 enumeration sources and the dependency declaration is complete (see above); and the **NFR record**: the Architecture Contract conversation must record security
 posture (authn/authz approach, secret handling), capacity assumptions (expected volume, latency
@@ -458,7 +464,10 @@ deterministically: lifecycle machine TitleCase states are exactly the entity's l
 (the enum-typed attribute named status, stage, or state; lowerCamel states are the operational
 overlay), machine `on` events are Modelith actions of that entity, every entity with a lifecycle
 enum has a machine, every placement-table component has a machine or a "(no machine: <reason>)"
-waiver, and every invariant id appears whole-token in a matrix or BUILD.md table cell (an invariant
+waiver, every entity the domain model declares appears whole-token in some placement row's component
+column or carries a "(not placed: <reason>)" waiver of its own (the table's completeness, checkable
+because the entity list is closed; a design with no placement table at all fails here rather than
+passing empty), and every invariant id appears whole-token in a matrix or BUILD.md table cell (an invariant
 compiled by the policy annotation is credited as policy-checked without a matrix row; the
 relational model is an enforcement artifact). Token presence is exactly what Gx proves: the id
 appears in an enforcement row; whether that row's guard or mechanism semantically enforces the
