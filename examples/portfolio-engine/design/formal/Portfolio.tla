@@ -1,5 +1,5 @@
 ---- MODULE Portfolio ----
-\* machinery-version: v0.3.11
+\* machinery-version: v0.3.12
 EXTENDS Naturals
 
 \* Generated from Portfolio.machine.json by machinery tla. Control-flow model.

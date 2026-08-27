@@ -1,5 +1,5 @@
 ---- MODULE FulfillmentSaga ----
-\* machinery-version: v0.3.11
+\* machinery-version: v0.3.12
 EXTENDS Naturals
 
 \* Generated from FulfillmentSaga.machine.json by machinery tla. Control-flow model.
