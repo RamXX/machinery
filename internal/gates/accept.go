@@ -1,0 +1,459 @@
+// Ga-accept: the milestone acceptance gate. Gb-plan holds the SHAPE of the
+// build plan; until now nothing held a milestone being DISCHARGED, so a
+// milestone was closed by assertion and the assertion was checked by nobody.
+// Ga closes that: a milestone marked "Status: closed" in the plan must have
+// committed acceptance evidence, design/acceptance/M<n>.yaml, whose verdict
+// is ACCEPTED, which names the commit the review ran on and lists every
+// oracle id that milestone's DoD cites.
+//
+// The split is machinery's standing one. Deterministic here: the evidence
+// exists, parses, binds to a declared milestone, carries every required
+// field, covers the DoD's ids, and names the commit under review (the same
+// binding discipline as Gk's input_hash and Gt's stable ids). Attested, like
+// every other LLM-attested half: whether the reviewer judged well. What Ga
+// proves is that an acceptance review happened, on this commit, against
+// these obligations.
+//
+// One file per milestone: git history is the record of prior attempts, so a
+// milestone never accumulates numbered rounds in the tree.
+
+package gates
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/RamXX/machinery/internal/ir"
+)
+
+// AcceptanceDirName is the committed acceptance-evidence directory under the
+// design; Ga auto-activates on it.
+const AcceptanceDirName = "acceptance"
+
+// minCommitPrefix is the shortest commit prefix that binds. Git's own default
+// abbreviation is 7 characters; anything shorter names too many commits to be
+// evidence of anything.
+const minCommitPrefix = 7
+
+var (
+	// acceptanceFileRe matches the one legal evidence file name.
+	acceptanceFileRe = regexp.MustCompile(`^M(\d+)\.yaml$`)
+	// acceptanceDateRe pins the date shape before the calendar check.
+	acceptanceDateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	// acceptanceKeys pins the evidence schema; an unknown key is a typo that
+	// would otherwise silently contribute nothing.
+	acceptanceKeys = map[string]bool{
+		"milestone": true, "commit": true, "verdict": true, "dod_ids": true,
+		"attestations": true, "findings": true, "reviewer": true, "date": true,
+		"_comment": true,
+	}
+	// acceptanceRequired is every field the evidence must carry, in schema
+	// order. findings is required but may be empty: an empty list says the
+	// reviewer found nothing, an absent key says nobody looked.
+	acceptanceRequired = []string{"milestone", "commit", "verdict", "dod_ids", "attestations", "findings", "reviewer", "date"}
+)
+
+// HasAcceptanceDir reports whether the design carries the acceptance
+// directory at all.
+func HasAcceptanceDir(design string) bool {
+	fi, err := os.Stat(filepath.Join(design, AcceptanceDirName))
+	return err == nil && fi.IsDir()
+}
+
+// AcceptanceActive reports whether Ga auto-activates on this design: the
+// acceptance directory exists, or some milestone carries the closed marker.
+// Either alone is a claim that a milestone is being discharged, and a claim
+// with nothing behind it is exactly what the gate is for. Read errors are
+// dropped here (the gate run itself reports them on the real gate).
+func AcceptanceActive(design string) bool {
+	if HasAcceptanceDir(design) {
+		return true
+	}
+	for _, doc := range planDocuments(design, NewGate("")) {
+		for _, m := range doc.milestones {
+			if m.closed() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// milestoneRef is one declared milestone plus the plan document declaring it.
+type milestoneRef struct {
+	doc string
+	m   planMilestone
+}
+
+// acceptRecord is one parsed acceptance-evidence file.
+type acceptRecord struct {
+	label        string // "acceptance/M1.yaml", the path as the findings name it
+	milestone    int    // the milestone: field
+	commit       string
+	verdict      string
+	dodIDs       []string
+	attestations []string
+	findings     []string
+	reviewer     string
+	date         string
+}
+
+// CheckAcceptance implements Ga-accept. commit is the VCS commit under review
+// (--commit or MACHINERY_COMMIT); "" leaves commit binding unchecked with a
+// non-blocking note, because CI is where the commit is known.
+func CheckAcceptance(design, commit string) *Gate {
+	g := NewGate("Ga-accept  milestone acceptance evidence")
+	g.startOrder()
+	if !HasBuildDoc(design) {
+		g.Errs = append(g.Errs, "no BUILD.md in the design; acceptance evidence is keyed to the build plan's milestones and this design declares none (author BUILD.md, or drop ga from the gate list)")
+		return g
+	}
+	docs := planDocuments(design, g)
+	byNum, closed := acceptanceMilestones(g, docs)
+	hasDir := HasAcceptanceDir(design)
+	if !hasDir && len(closed) == 0 {
+		g.Errs = append(g.Errs, "no "+AcceptanceDirName+"/ directory and no milestone marked 'Status: closed' in the build plan; the acceptance gate was requested but this design has discharged no milestone (close a milestone with a 'Status: closed' line and commit "+AcceptanceDirName+"/M<n>.yaml, or drop ga from the gate list)")
+		return g
+	}
+	g.Count("plan documents", len(docs))
+	g.Count("declared milestones", len(byNum))
+	g.Count("closed milestones", len(closed))
+
+	present, records := scanAcceptanceDir(design, g)
+	if hasDir && len(present) == 0 && len(closed) == 0 {
+		g.Errs = append(g.Errs, AcceptanceDirName+"/ exists but holds no acceptance evidence (M<n>.yaml) and no milestone is marked 'Status: closed'; an empty check is a failure, not a pass")
+		return g
+	}
+	g.Count("acceptance files", len(records))
+
+	ids := acceptanceOracleIDs(design, g)
+	for _, num := range sortedRecordNums(records) {
+		rec := records[num]
+		ref, ok := byNum[num]
+		if !ok {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: names milestone M%d, which no build-plan document declares; acceptance evidence binds to a planned milestone", rec.label, num))
+			continue
+		}
+		checkDoDCoverage(g, rec, ref, ids)
+	}
+
+	for _, num := range closed {
+		ref := byNum[num]
+		rec, ok := records[num]
+		switch {
+		case !ok:
+			if present[num] {
+				continue // the parse error above already blocks; do not double-report
+			}
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%s (%s) is marked closed but %s/M%d.yaml is not committed; closing a milestone takes committed acceptance evidence", ref.doc, ref.m.numRaw, ref.m.title, AcceptanceDirName, num))
+		case rec.verdict == "REJECTED":
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%s (%s) is marked closed but %s records verdict REJECTED; a rejected review does not close a milestone (reopen the milestone, or land the fixes and re-review)", ref.doc, ref.m.numRaw, ref.m.title, rec.label))
+		case rec.verdict == "ACCEPTED":
+			g.Count("closed milestones with accepted evidence")
+			checkCommitBinding(g, rec, commit)
+		}
+	}
+	if commit == "" && len(closed) > 0 {
+		g.Notes = append(g.Notes, "commit binding not checked: no --commit and no MACHINERY_COMMIT; CI is expected to pass the reviewed commit")
+	}
+	return g
+}
+
+// acceptanceMilestones indexes every declared milestone by number and returns
+// the closed ones in ascending order. Milestone numbers must be unique across
+// ALL plan-bearing documents, not only within one: acceptance evidence is
+// keyed by number alone, so a number declared twice makes the evidence
+// ambiguous about which milestone it discharges. Gb owns duplicates inside a
+// single document; this is the cross-document rule.
+func acceptanceMilestones(g *Gate, docs []planDoc) (map[int]milestoneRef, []int) {
+	byNum := map[int]milestoneRef{}
+	var closed []int
+	for _, doc := range docs {
+		for _, m := range doc.milestones {
+			if !m.numOK {
+				continue
+			}
+			if prev, dup := byNum[m.num]; dup {
+				if prev.doc != doc.name {
+					g.Errs = append(g.Errs, fmt.Sprintf("milestone M%d is declared in both %s and %s; acceptance evidence is keyed by milestone number alone, so numbers must be unique across every plan-bearing document (renumber one of them)", m.num, prev.doc, doc.name))
+				}
+				continue // Gb reports the same-document duplicate
+			}
+			byNum[m.num] = milestoneRef{doc: doc.name, m: m}
+			if m.closed() {
+				closed = append(closed, m.num)
+			}
+		}
+	}
+	sort.Ints(closed)
+	return byNum, closed
+}
+
+// scanAcceptanceDir reads design/acceptance/, returning which milestone
+// numbers have an evidence FILE (parsed or not) and the records that parsed.
+// Anything else in the directory is a finding: a gate that quietly ignores an
+// unrecognized artifact teaches people to leave unrecognized artifacts.
+func scanAcceptanceDir(design string, g *Gate) (map[int]bool, map[int]*acceptRecord) {
+	present := map[int]bool{}
+	records := map[int]*acceptRecord{}
+	dir := filepath.Join(design, AcceptanceDirName)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return present, records
+	}
+	indexFiles := 0
+	for _, e := range entries {
+		name := e.Name()
+		label := AcceptanceDirName + "/" + name
+		switch {
+		case e.IsDir():
+			g.Errs = append(g.Errs, label+" is a directory; acceptance evidence is one flat "+AcceptanceDirName+"/M<n>.yaml per milestone")
+		case strings.EqualFold(name, "README.md"), strings.EqualFold(name, "index.md"):
+			indexFiles++
+		case acceptanceFileRe.MatchString(name):
+			num, _ := strconv.Atoi(acceptanceFileRe.FindStringSubmatch(name)[1])
+			present[num] = true
+			if rec := parseAcceptance(g, filepath.Join(dir, name), label, num); rec != nil {
+				records[num] = rec
+			}
+		default:
+			g.Errs = append(g.Errs, label+" is not acceptance evidence; the gate reads exactly "+AcceptanceDirName+"/M<n>.yaml (one per milestone; git history is the record of prior attempts)")
+		}
+	}
+	if indexFiles > 0 {
+		g.CheckedExtra(fmt.Sprintf("%d index files exempt", indexFiles))
+	}
+	return present, records
+}
+
+// parseAcceptance reads and validates one evidence file. nil means the file
+// could not be trusted; every reason was recorded as an ERROR first.
+func parseAcceptance(g *Gate, path, label string, fileNum int) *acceptRecord {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		g.Errs = append(g.Errs, label+" is unreadable: "+err.Error())
+		return nil
+	}
+	v, err := ir.LoadYAML(data)
+	if err != nil {
+		g.Errs = append(g.Errs, label+": invalid YAML: "+err.Error())
+		return nil
+	}
+	root := v.AsObject()
+	if root == nil {
+		g.Errs = append(g.Errs, label+": not a yaml mapping (empty file?)")
+		return nil
+	}
+	for _, k := range root.Keys() {
+		if !acceptanceKeys[k] {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: unknown key %s (the evidence fields are %s)", label, ir.Repr(k), strings.Join(acceptanceRequired, ", ")))
+		}
+	}
+	var missing []string
+	for _, k := range acceptanceRequired {
+		if !root.Has(k) {
+			missing = append(missing, k)
+		}
+	}
+	if len(missing) > 0 {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: missing required field(s): %s; incomplete evidence is not evidence", label, strings.Join(missing, ", ")))
+		return nil
+	}
+
+	rec := &acceptRecord{
+		label:        label,
+		commit:       strings.TrimSpace(root.GetString("commit")),
+		verdict:      strings.TrimSpace(root.GetString("verdict")),
+		reviewer:     strings.TrimSpace(root.GetString("reviewer")),
+		date:         strings.TrimSpace(root.GetString("date")),
+		dodIDs:       acceptStringList(g, label, root, "dod_ids"),
+		attestations: acceptStringList(g, label, root, "attestations"),
+		findings:     acceptStringList(g, label, root, "findings"),
+	}
+	ok := true
+	num, numOK := acceptInt(root, "milestone")
+	switch {
+	case !numOK:
+		g.Errs = append(g.Errs, label+": milestone must be an integer (the plan's M<n> number)")
+		ok = false
+	case num != fileNum:
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone is %d but the file names M%d; the file name and the field must agree", label, num, fileNum))
+		ok = false
+	}
+	rec.milestone = num
+	switch rec.verdict {
+	case "ACCEPTED", "REJECTED":
+	default:
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: verdict is %s; it is exactly ACCEPTED or REJECTED (upper case)", label, ir.Repr(root.GetString("verdict"))))
+		ok = false
+	}
+	if rec.commit == "" || strings.ContainsAny(rec.commit, " \t") {
+		g.Errs = append(g.Errs, label+": commit must name the single VCS commit the review ran on (quote a purely numeric revision so it reads as a string)")
+		ok = false
+	}
+	if rec.reviewer == "" {
+		g.Errs = append(g.Errs, label+": reviewer must name who or what produced the review; evidence without provenance is anonymous")
+		ok = false
+	}
+	if !acceptanceDateRe.MatchString(rec.date) {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: date %s is not YYYY-MM-DD", label, ir.Repr(rec.date)))
+		ok = false
+	} else if _, derr := time.Parse("2006-01-02", rec.date); derr != nil {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: date %s is not a real calendar date", label, ir.Repr(rec.date)))
+		ok = false
+	}
+	if rec.verdict == "ACCEPTED" && len(rec.attestations) == 0 {
+		g.Errs = append(g.Errs, label+": an ACCEPTED verdict with no attestations attests nothing; list what the review checked by judgment")
+		ok = false
+	}
+	if !ok {
+		return nil
+	}
+	return rec
+}
+
+// acceptStringList reads a list-of-strings field. An absent or null value is
+// an empty list (the required-field check owns absence); a non-list, or an
+// entry that is not a non-empty string, is a finding.
+func acceptStringList(g *Gate, label string, o *ir.Object, key string) []string {
+	v := o.Get2(key)
+	if v == nil || v.Kind == ir.KindNull {
+		return nil
+	}
+	arr := v.AsArray()
+	if arr == nil {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: %s must be a list of strings", label, key))
+		return nil
+	}
+	var out []string
+	for i, e := range arr {
+		s := ""
+		if e != nil && e.Kind == ir.KindString {
+			s = strings.TrimSpace(e.AsString())
+		}
+		if s == "" {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: %s[%d] is not a non-empty string", label, key, i))
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// acceptInt reads an integer field.
+func acceptInt(o *ir.Object, key string) (int, bool) {
+	v := o.Get2(key)
+	if v == nil || v.Kind != ir.KindNumber {
+		return 0, false
+	}
+	n, ok := v.Data.(json.Number)
+	if !ok {
+		return 0, false
+	}
+	i, err := strconv.Atoi(n.String())
+	if err != nil {
+		return 0, false
+	}
+	return i, true
+}
+
+// acceptanceOracleIDs is the id corpus the DoD-coverage rule matches against:
+// both id columns of every committed transition oracle plus the relational
+// decision oracles Gt also holds (Policy, Isolation). The committed files are
+// the source; G3, Gp, and Gn hold them fresh.
+func acceptanceOracleIDs(design string, g *Gate) []string {
+	ids := planOracleIDs(design, g)
+	for _, name := range formalOracleNames {
+		path := filepath.Join(design, "formal", name)
+		if fi, err := os.Stat(path); err != nil || fi.IsDir() {
+			continue // the relational layers are opt-in; Gp/Gn own their health
+		}
+		testIDs, stableIDs := oracleTableIDs(readFileOrErr(path, g))
+		ids = append(ids, testIDs...)
+		ids = append(ids, stableIDs...)
+	}
+	return ids
+}
+
+// checkDoDCoverage holds the evidence to the obligations: every committed
+// oracle id the milestone's DoD cites whole-token must appear in dod_ids.
+// That is the deterministic proof the review looked at the right rows, the
+// same way Gk's input_hash proves a verdict covered the right design.
+func checkDoDCoverage(g *Gate, rec *acceptRecord, ref milestoneRef, ids []string) {
+	listed := map[string]bool{}
+	for _, id := range rec.dodIDs {
+		listed[id] = true
+	}
+	dod := ref.m.dodText()
+	seen := map[string]bool{}
+	var cited []string
+	for _, id := range ids {
+		if seen[id] || !idTokenIn(id, dod) {
+			continue
+		}
+		seen[id] = true
+		cited = append(cited, id)
+	}
+	bound := 0
+	for _, id := range cited {
+		if listed[id] {
+			bound++
+			continue
+		}
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: dod_ids omits %s, which milestone M%d's DoD in %s cites; the evidence must list every committed oracle id its DoD names", rec.label, ir.Repr(id), rec.milestone, ref.doc))
+	}
+	if bound > 0 {
+		g.Count("DoD ids bound", bound)
+	}
+}
+
+// checkCommitBinding holds accepted evidence to the commit under review.
+func checkCommitBinding(g *Gate, rec *acceptRecord, commit string) {
+	if commit == "" {
+		return
+	}
+	if !commitBinds(rec.commit, commit) {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s does not name the commit under review (%s); the review was performed on a different commit (an exact match, or either value an unambiguous prefix of the other of at least %d characters, binds)", rec.label, ir.Repr(rec.commit), ir.Repr(commit), minCommitPrefix))
+		return
+	}
+	g.Count("commit bindings verified")
+}
+
+// commitBinds reports whether an evidence commit names the commit under
+// review: an exact match, or either value an unambiguous prefix of the other.
+// Prefixes shorter than minCommitPrefix never bind; they name too many
+// commits to be evidence.
+func commitBinds(evidence, given string) bool {
+	e := strings.ToLower(strings.TrimSpace(evidence))
+	got := strings.ToLower(strings.TrimSpace(given))
+	switch {
+	case e == "" || got == "":
+		return false
+	case e == got:
+		return true
+	case len(e) < minCommitPrefix || len(got) < minCommitPrefix:
+		return false
+	case len(e) < len(got):
+		return strings.HasPrefix(got, e)
+	default:
+		return strings.HasPrefix(e, got)
+	}
+}
+
+// sortedRecordNums returns the evidence milestone numbers in ascending
+// order, so every finding order is deterministic.
+func sortedRecordNums(m map[int]*acceptRecord) []int {
+	out := make([]int, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Ints(out)
+	return out
+}

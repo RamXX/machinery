@@ -87,7 +87,7 @@ func TestReviewNarrowedParentWithImplRunsG4(t *testing.T) {
 	if !strings.Contains(sel.Note, "gt skipped: no machines") {
 		t.Fatalf("the note must name the skipped gt explicitly: %q", sel.Note)
 	}
-	out := gates.RunSelected(design, impl, sel)
+	out := gates.RunSelected(design, impl, sel, gates.RunOptions{})
 	if !hasGate(out, "G4-import") {
 		t.Fatal("G4 did not run on the narrowed parent although --impl was supplied")
 	}
@@ -261,5 +261,55 @@ func TestReviewUnreadableOracleIsHardError(t *testing.T) {
 	g := gates.CheckOracleCoverage(design, impl)
 	if !strings.Contains(strings.Join(g.Errs, "\n"), "Thing.oracle.md is unreadable") {
 		t.Fatalf("the unreadable oracle must be named in a hard error: %v", g.Errs)
+	}
+}
+
+// GA-1 (the 7-shard dogfood finding): a manifest design whose every shard
+// waives its Build plan toward the root's section 9. Before the fix Gb
+// checked only the shards, reported "7 plans, 7 waived plans", and the real
+// plan (milestones, DoD lines, oracle citations) was checked by nothing. The
+// root plan must now be checked, and Ga must bind acceptance evidence to the
+// milestones it declares.
+func TestReviewManifestRootPlanIsHeldAndAccepted(t *testing.T) {
+	design := t.TempDir()
+	writeReviewFile(t, filepath.Join(design, "machines", "Thing.oracle.md"),
+		"# o\n\n| test id | stable id | source |\n|---|---|---|\n| T-THIN-01 | THIN-aaa111 | A |\n")
+	writeReviewFile(t, filepath.Join(design, "BUILD.md"), "# B\n\nMode: manifest\n\n## 9. Build plan\n\n"+
+		"**M0 - Walking skeleton.** DoD: THIN-aaa111 green end to end.\nStatus: closed\n\n"+
+		"**M1 - Breadth slice.** DoD: every remaining row green.\n")
+	for _, shard := range []string{"orders", "payments"} {
+		writeReviewFile(t, filepath.Join(design, "BUILD", shard+".md"),
+			"# "+shard+"\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n")
+	}
+
+	gb := gates.CheckBuildPlan(design)
+	if len(gb.Errs) != 0 {
+		t.Fatalf("Gb must accept a root-plan manifest: %v", gb.Errs)
+	}
+	if gb.Counts["milestones"] != 2 || gb.Counts["skeleton citations"] != 1 || gb.Counts["closed milestones"] != 1 {
+		t.Fatalf("the root plan must be structurally checked, not waived away: %+v", gb.Counts)
+	}
+
+	// closed with no evidence at all: Ga activates on the marker alone
+	sel, err := gates.Select(design, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := gates.RunSelected(design, "", sel, gates.RunOptions{Commit: "9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345"})
+	if !hasGate(out, "Ga-accept") {
+		t.Fatal("a milestone marked closed must activate Ga")
+	}
+	if !strings.Contains(strings.Join(gateErrs(out, "Ga-accept"), "\n"), "acceptance/M0.yaml is not committed") {
+		t.Fatalf("closing a milestone with no evidence must fail: %v", gateErrs(out, "Ga-accept"))
+	}
+
+	// with evidence bound to the reviewed commit, the whole suite is clean
+	writeReviewFile(t, filepath.Join(design, "acceptance", "M0.yaml"),
+		"milestone: 0\ncommit: 9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345\nverdict: ACCEPTED\n"+
+			"dod_ids:\n  - THIN-aaa111\nattestations:\n  - the skeleton crosses every boundary once\n"+
+			"findings: []\nreviewer: conductor\ndate: 2026-08-27\n")
+	out = gates.RunSelected(design, "", sel, gates.RunOptions{Commit: "9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345"})
+	if errs := gateErrs(out, "Ga-accept"); len(errs) != 0 {
+		t.Fatalf("committed evidence must discharge the milestone: %v", errs)
 	}
 }

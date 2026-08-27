@@ -2,9 +2,11 @@
 // is what a coding agent actually schedules from, so its shape is held like
 // any other artifact: the section exists, milestones are marked and uniquely
 // numbered, the walking skeleton comes first, every milestone carries a
-// definition of done, and the skeleton's DoD cites at least one committed
-// oracle id. Gx owns the Mode line and the Toolchain / State-migration
-// sections; Gb never re-checks them.
+// definition of done, an optional status line parses, and the skeleton's DoD
+// cites at least one committed oracle id. Gx owns the Mode line and the
+// Toolchain / State-migration sections; Gb never re-checks them. Ga-accept
+// reads the same parsed milestones (accept.go) and owns what a closed one
+// must have behind it.
 
 package gates
 
@@ -16,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/pack"
 )
 
@@ -45,6 +48,13 @@ var (
 	// planWaiverRe is the documented section-waiver literal: N/A, a hyphen,
 	// a reason (case-sensitive; NG-6).
 	planWaiverRe = regexp.MustCompile(`^N/A\s+-\s+\S`)
+	// milestoneStatusRe matches a milestone's optional status line. The shape
+	// mirrors the DoD line convention (one labeled line inside the milestone
+	// block) and tolerates the same bullet and bold decorations the milestone
+	// markers use: "Status: closed", "- Status: closed", "**Status:** closed".
+	// The value is captured so an unrecognized token fails loudly in Gb
+	// instead of silently reading as "not closed" and disarming Ga.
+	milestoneStatusRe = regexp.MustCompile(`(?mi)^[ \t]*(?:[-*][ \t]+|\d+\.[ \t]+)?\*{0,2}Status:\*{0,2}[ \t]*([A-Za-z][A-Za-z-]*)`)
 	// planHeadingNumRe strips the template's "N. " section-number prefix.
 	planHeadingNumRe = regexp.MustCompile(`^\d+\.\s+`)
 )
@@ -168,6 +178,33 @@ func planOracleIDs(design string, g *Gate) []string {
 	return ids
 }
 
+// planMode returns the BUILD.md mode declaration ("full" or "manifest").
+// Gx owns findings about the Mode line itself; an absent declaration falls
+// back to full so a pre-Gx draft still gets its plan checked. The sniff runs
+// on fence-masked text: a fenced example "Mode:" line must not override the
+// real declaration (NG-4).
+func planMode(text string) string {
+	if m := modeRe.FindStringSubmatch(maskFences(text)); m != nil {
+		return m[1]
+	}
+	return "full"
+}
+
+// planShards lists a manifest design's plan shards under BUILD/ plus the
+// number of shard-index files exempted. README.md and index.md there are
+// navigation for humans, not plan shards; they carry no plan obligation.
+func planShards(design string) (shards []string, indexFiles int) {
+	for _, shard := range sortedGlobExt(filepath.Join(design, "BUILD"), ".md") {
+		switch strings.ToLower(filepath.Base(shard)) {
+		case "readme.md", "index.md":
+			indexFiles++
+		default:
+			shards = append(shards, shard)
+		}
+	}
+	return shards, indexFiles
+}
+
 // CheckBuildPlan implements Gb-plan.
 func CheckBuildPlan(design string) *Gate {
 	g := NewGate("Gb-plan  build plan structure")
@@ -177,47 +214,41 @@ func CheckBuildPlan(design string) *Gate {
 		return g
 	}
 	text := readFileOrErr(filepath.Join(design, "BUILD.md"), g)
-	// Gx owns findings about the Mode line itself; an absent declaration
-	// falls back to full so a pre-Gx draft still gets its plan checked. The
-	// sniff runs on fence-masked text: a fenced example "Mode:" line must
-	// not override the real declaration (NG-4).
-	mode := "full"
-	if m := modeRe.FindStringSubmatch(maskFences(text)); m != nil {
-		mode = m[1]
-	}
-	if mode == "manifest" {
-		// README.md and index.md under BUILD/ are navigation for humans, not
-		// plan shards; they carry no plan obligation, and the exemption stays
-		// visible in the checked line
-		var shards []string
-		indexFiles := 0
-		for _, shard := range sortedGlobExt(filepath.Join(design, "BUILD"), ".md") {
-			switch strings.ToLower(filepath.Base(shard)) {
-			case "readme.md", "index.md":
-				indexFiles++
-			default:
-				shards = append(shards, shard)
-			}
-		}
+	if planMode(text) == "manifest" {
+		shards, indexFiles := planShards(design)
 		if indexFiles > 0 {
 			g.CheckedExtra(fmt.Sprintf("%d index files exempt", indexFiles))
 		}
+		ids := planOracleIDs(design, g)
+		// The manifest ROOT carries a plan obligation exactly when it declares
+		// a Build plan section of its own. Checking only the shards left the
+		// real plan unchecked whenever every shard waived its section toward
+		// the root ("N/A - the plan is the root's section 9"): the run reported
+		// "N plans, N waived plans" and no milestone, DoD, or skeleton rule ran
+		// anywhere (the 7-shard dogfood finding). A root with no plan section
+		// keeps its old freedom: the shards carry the plans.
+		rootPlanned := false
+		if _, ok := buildPlanSection(maskFences(text)); ok {
+			rootPlanned = true
+			checkPlanDoc(g, "BUILD.md", text, ids)
+		}
 		if len(shards) == 0 {
-			if pack.HasDecomposition(design) {
+			switch {
+			case rootPlanned:
+				// the root itself carried the plan; it was just checked
+			case pack.HasDecomposition(design):
 				// the checkout-split parent shape: the manifest fixes the
 				// shared artifacts and the children carry the buildable
 				// plans; the zero must stay visible in every run
 				g.CheckedExtra("0 local plans (decomposed parent; the children carry the plans)")
-				return g
+			default:
+				g.Errs = append(g.Errs, "BUILD.md declares manifest mode but BUILD/ holds no shards and the design has no decomposition; a manifest with nothing behind it plans nothing")
 			}
-			g.Errs = append(g.Errs, "BUILD.md declares manifest mode but BUILD/ holds no shards and the design has no decomposition; a manifest with nothing behind it plans nothing")
 			return g
 		}
 		// each shard gets the full check, skeleton citation included, against
 		// the design-wide committed oracle ids: a shard plans work on the same
-		// machines the root design committed. The manifest ROOT itself carries
-		// no plan obligation.
-		ids := planOracleIDs(design, g)
+		// machines the root design committed.
 		for _, shard := range shards {
 			checkPlanDoc(g, filepath.Base(shard), readFileOrErr(shard, g), ids)
 		}
@@ -225,6 +256,117 @@ func CheckBuildPlan(design string) *Gate {
 	}
 	checkPlanDoc(g, "BUILD.md", text, planOracleIDs(design, g))
 	return g
+}
+
+// planMilestone is one parsed milestone block of a build-plan document. Gb
+// holds its shape; Ga reads the same parse to decide what a closed milestone
+// owes in acceptance evidence.
+type planMilestone struct {
+	numRaw string // the number exactly as written (M01 stays M01 in messages)
+	num    int    // the parsed number; numOK reports whether it parsed
+	numOK  bool
+	title  string
+	block  string
+	status string // the lowercased Status: value; "" when the block states none
+	dod    int    // offset of the DoD token in block; -1 when the block states none
+}
+
+// closed reports whether the milestone block marks the milestone closed.
+func (m planMilestone) closed() bool { return m.status == "closed" }
+
+// dodText returns the milestone's definition of done: the block from the DoD
+// token to its end ("" when the block states none). Pre-DoD prose never
+// counts, in Gb's skeleton citation and in Ga's id coverage alike.
+func (m planMilestone) dodText() string {
+	if m.dod < 0 {
+		return ""
+	}
+	return m.block[m.dod:]
+}
+
+// parsePlanMilestones parses the milestone blocks of a Build plan section
+// body (already fence-masked). A milestone block ends at the next milestone
+// marker, the next heading of ANY level (a trailing "### Notes" subsection is
+// not part of the last milestone), or the section end, whichever comes first.
+func parsePlanMilestones(body string) []planMilestone {
+	matches := milestoneRe.FindAllStringSubmatchIndex(body, -1)
+	headings := headingOffsets(body)
+	var ms []planMilestone
+	for i, m := range matches {
+		end := len(body)
+		if i+1 < len(matches) {
+			end = matches[i+1][0]
+		}
+		for _, h := range headings {
+			if h > m[0] && h < end {
+				end = h
+				break
+			}
+		}
+		block := body[m[0]:end]
+		pm := planMilestone{
+			numRaw: body[m[2]:m[3]],
+			title:  strings.TrimSpace(body[m[4]:m[5]]),
+			block:  block,
+			dod:    dodIndex(block),
+		}
+		// \d+ can only overflow; an absurd number is its own review finding
+		if v, err := strconv.Atoi(pm.numRaw); err == nil {
+			pm.num, pm.numOK = v, true
+		}
+		if sm := milestoneStatusRe.FindStringSubmatch(block); sm != nil {
+			pm.status = strings.ToLower(sm[1])
+		}
+		ms = append(ms, pm)
+	}
+	return ms
+}
+
+// planMilestonesOf parses one plan-bearing document: its milestones and
+// whether the document declares a checkable plan at all. ok is false when the
+// document has no Build plan section or waives it (a waived section declares
+// no milestones by definition, and a shard that waives toward the root plan
+// is a legal waiver).
+func planMilestonesOf(text string) (ms []planMilestone, ok bool) {
+	body, found := buildPlanSection(maskFences(text))
+	if !found {
+		return nil, false
+	}
+	if first := firstNonBlankLine(body); strings.HasPrefix(strings.ToUpper(first), "N/A") {
+		return nil, false
+	}
+	return parsePlanMilestones(body), true
+}
+
+// planDoc is one plan-bearing document of a design with its milestones.
+type planDoc struct {
+	name       string
+	milestones []planMilestone
+}
+
+// planDocuments returns every plan-bearing document of the design: the root
+// BUILD.md whenever it declares a non-waived Build plan section, plus every
+// non-waived shard of a manifest design. It mirrors Gb's document selection
+// exactly, so Ga can never bind evidence to a milestone Gb does not hold.
+func planDocuments(design string, g *Gate) []planDoc {
+	if !HasBuildDoc(design) {
+		return nil
+	}
+	text := readFileOrErr(filepath.Join(design, "BUILD.md"), g)
+	var out []planDoc
+	if ms, ok := planMilestonesOf(text); ok {
+		out = append(out, planDoc{name: "BUILD.md", milestones: ms})
+	}
+	if planMode(text) != "manifest" {
+		return out
+	}
+	shards, _ := planShards(design)
+	for _, shard := range shards {
+		if ms, ok := planMilestonesOf(readFileOrErr(shard, g)); ok {
+			out = append(out, planDoc{name: filepath.Base(shard), milestones: ms})
+		}
+	}
+	return out
 }
 
 // checkPlanDoc runs the structural checks on one build-plan document (the
@@ -257,49 +399,23 @@ func checkPlanDoc(g *Gate, name, text string, oracleIDs []string) {
 		return
 	}
 
-	matches := milestoneRe.FindAllStringSubmatchIndex(body, -1)
-	if len(matches) == 0 {
+	ms := parsePlanMilestones(body)
+	if len(ms) == 0 {
 		g.Errs = append(g.Errs, name+": the build plan has no milestone markers (**M<n> - <title>**); without milestones there is no walking skeleton and no DoD to hold")
 		return
 	}
-	g.Count("milestones", len(matches))
-	type milestone struct{ num, title, block string }
-	var ms []milestone
-	var nums []string
-	// a milestone block ends at the next milestone marker, the next heading
-	// of ANY level (a trailing "### Notes" subsection is not part of the last
-	// milestone), or the section end, whichever comes first
-	headings := headingOffsets(body)
-	for i, m := range matches {
-		end := len(body)
-		if i+1 < len(matches) {
-			end = matches[i+1][0]
-		}
-		for _, h := range headings {
-			if h > m[0] && h < end {
-				end = h
-				break
-			}
-		}
-		ms = append(ms, milestone{
-			num:   body[m[2]:m[3]],
-			title: strings.TrimSpace(body[m[4]:m[5]]),
-			block: body[m[0]:end],
-		})
-		nums = append(nums, body[m[2]:m[3]])
-	}
+	g.Count("milestones", len(ms))
 	// numbers compare numerically: M1 and M01 are the same milestone (NG-8)
 	numCount := map[int]int{}
 	var numOrder []int
-	for _, n := range nums {
-		v, err := strconv.Atoi(n)
-		if err != nil {
-			continue // \d+ can only overflow; an absurd number is its own review finding
+	for _, m := range ms {
+		if !m.numOK {
+			continue
 		}
-		if numCount[v] == 0 {
-			numOrder = append(numOrder, v)
+		if numCount[m.num] == 0 {
+			numOrder = append(numOrder, m.num)
 		}
-		numCount[v]++
+		numCount[m.num]++
 	}
 	for _, v := range numOrder {
 		if c := numCount[v]; c > 1 {
@@ -308,10 +424,20 @@ func checkPlanDoc(g *Gate, name, text string, oracleIDs []string) {
 	}
 
 	for _, m := range ms {
-		if dodIndex(m.block) >= 0 {
+		if m.dod >= 0 {
 			g.Count("DoD-bearing milestones")
 		} else {
-			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%s (%s) states no definition of done; add 'DoD:' to its block", name, m.num, m.title))
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%s (%s) states no definition of done; add 'DoD:' to its block", name, m.numRaw, m.title))
+		}
+		// the status line is optional, but a typo in it must not read as
+		// "not closed" and silently disarm Ga-accept
+		switch m.status {
+		case "", "open", "closed":
+		default:
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%s (%s) has an unrecognized status %s; the milestone status line is 'Status: open' or 'Status: closed' (omit it for open)", name, m.numRaw, m.title, ir.Repr(m.status)))
+		}
+		if m.closed() {
+			g.Count("closed milestones")
 		}
 	}
 
@@ -322,7 +448,7 @@ func checkPlanDoc(g *Gate, name, text string, oracleIDs []string) {
 	case skeletonWaived:
 		g.Count("skeleton waivers")
 	default:
-		g.Errs = append(g.Errs, fmt.Sprintf("%s: the first milestone (M%s - %s) is not the walking skeleton; plan the skeleton first, or waive it with 'walking skeleton: N/A - <reason>'", name, ms[0].num, ms[0].title))
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: the first milestone (M%s - %s) is not the walking skeleton; plan the skeleton first, or waive it with 'walking skeleton: N/A - <reason>'", name, ms[0].numRaw, ms[0].title))
 	}
 
 	switch {
@@ -337,10 +463,7 @@ func checkPlanDoc(g *Gate, name, text string, oracleIDs []string) {
 	default:
 		// the DoD is what cites the id: pre-DoD prose does not count, so the
 		// search runs from the first DoD token to the block end
-		corpus := ""
-		if d := dodIndex(ms[0].block); d >= 0 {
-			corpus = ms[0].block[d:]
-		}
+		corpus := ms[0].dodText()
 		found := 0
 		for _, id := range oracleIDs {
 			if idTokenIn(id, corpus) {
@@ -348,7 +471,7 @@ func checkPlanDoc(g *Gate, name, text string, oracleIDs []string) {
 			}
 		}
 		if found == 0 {
-			g.Errs = append(g.Errs, fmt.Sprintf("%s: the walking-skeleton milestone (M%s) cites no committed oracle id at or after its DoD (no test id or stable id from machines/*.oracle.md appears whole-token there); the skeleton's DoD must name the transitions it proves", name, ms[0].num))
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: the walking-skeleton milestone (M%s) cites no committed oracle id at or after its DoD (no test id or stable id from machines/*.oracle.md appears whole-token there); the skeleton's DoD must name the transitions it proves", name, ms[0].numRaw))
 		} else {
 			g.Count("skeleton citations", found)
 		}

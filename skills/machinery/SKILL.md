@@ -120,6 +120,7 @@ design/
   packmap.yaml              # pack child only: exposed-machine states onto the contract machine, pinned to the pack hash
   BUILD.md                  # Phase 4 (the blueprint; manifest over BUILD/ when sharded; Build plan held by Gb)
   BUILD/<context>.md        # only for sharded designs (see "Sharding large designs")
+  acceptance/M<n>.yaml      # one per CLOSED milestone: the committed acceptance evidence Gb marks and Ga binds (see Milestone acceptance)
   DECISIONS.md              # dated binding decisions; required once interrogation starts (see Operating discipline)
   STATE.md                  # session ledger for multi-session runs (see "Session ledger")
 ```
@@ -128,16 +129,18 @@ design/
 
 Never advance until the current gate passes. State the gate result to the user before moving on.
 
-The deterministic gates live in `machinery check <design> [--impl <dir>] [--gate gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,g4,gt,g5]`
+The deterministic gates live in `machinery check <design> [--impl <dir>] [--commit <sha>] [--gate gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ga,g4,gt,g5]`
 (g5 runs automatically on decomposed designs; gm runs once `migration.yaml` exists; gs once
 `legacy/surface.yaml` exists; gp, gi, and gn each run automatically once the matching
 `formal/{policy,integrity,isolation}.relational.yaml` exists; gc once any `*.modelith.yaml`
 exists, so invariant-carrier reconciliation runs from Phase 1 (every declared invariant needs an
 action's `preserves`, a relational layer, a machine unit, a checker claim, or a waiver with a
 reason in `formal/waivers.yaml`); gk once any
-`checkers/*.checker.yaml` exists; gb once `design/BUILD.md` exists;
+`checkers/*.checker.yaml` exists; gb once `design/BUILD.md` exists; ga once
+`design/acceptance/` exists or any milestone is marked `Status: closed`;
 gt, like g4, only with `--impl`; see Recursive decomposition, the
-legacy surface ledger, the Phase 1 relational layers, and External checkers).
+legacy surface ledger, the Phase 1 relational layers, External checkers, and
+Milestone acceptance).
 It is a single Go binary; install it with the one-line installer
 (`curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh`) or
 `go build ./cmd/machinery`.
@@ -467,9 +470,15 @@ section carries the explicit waiver line `Walking skeleton: N/A - <reason>` (bro
 whose skeleton already exists in production); every milestone block carries a `DoD:` line; and the
 skeleton milestone's DoD cites at least one committed oracle id (test id or stable id) as a whole
 token. The section itself may be waived only as `N/A - <reason>` per the template's omission rule.
+Each milestone block may carry one optional status line, `Status: closed` (or `Status: open`, the
+default); an unrecognized value is an ERROR, because reading it as "not closed" would silently
+disarm Ga-accept.
 In manifest mode the checks apply per shard in `design/BUILD/*.md` (a `README.md` or `index.md`
-there is a shard index, not a plan shard, and is exempt); a manifest root over a
-decomposition with no local shards has no plan obligations of its own (the children carry them).
+there is a shard index, not a plan shard, and is exempt) AND to the manifest root itself whenever
+the root declares its own Build plan section: a shard may legally waive its section toward the root
+(`N/A - the plan is the root's section 9`), and before that rule the real plan went unchecked by
+anything. A manifest root with no Build plan section has no plan obligations of its own (the shards
+or, over a decomposition with no local shards, the children carry them).
 Once code
 exists, **G4-import** (`--impl <dir>`) parses imports (Go single and block forms via every go.mod
 module under `--impl`; Python import/from lines with docstrings stripped; TypeScript/JavaScript
@@ -496,6 +505,55 @@ oracle table and assert, per row, the next state AND the expected actions (go-cr
 `impl/internal/authz/oracle_test.go` is the normative reference shape); Gt verifies the citation
 and the ids, never the assertions. And the zero-context claim itself: a coding agent with no prior
 context could build the system from `BUILD.md` alone (per shard, when sharded).
+**Ga-accept** holds milestone closure; it belongs to the build, not to Gate 4, and is described in
+Milestone acceptance below.
+
+## Milestone acceptance (Ga-accept)
+
+Gb holds the SHAPE of the build plan. Closing a milestone is a different claim, and until Ga
+nothing held it: a milestone was discharged by assertion and the assertion was checked by nobody.
+The protocol, deterministic end to end:
+
+1. **Mark the closure in the plan.** The milestone block gains a status line, `Status: closed`,
+   alongside its `DoD:` line. Nothing else about the plan changes; Gb keeps holding its shape.
+2. **Commit the evidence.** `design/acceptance/M<n>.yaml`, one file per milestone (git history is
+   the record of prior attempts; a milestone never accumulates numbered rounds in the tree):
+
+```yaml
+milestone: 3                     # integer; must be a milestone the build plan declares
+commit: 9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345   # the commit the review was performed on
+verdict: ACCEPTED                # exactly ACCEPTED or REJECTED
+dod_ids:                         # every oracle id this milestone's DoD line cites, whole-token
+  - T-DEAL-04
+  - DEAL-eb0c40
+attestations:                    # what the review checked by judgment; required for ACCEPTED
+  - integration tests run against the real datastore; no mocks below the boundary
+  - every guard conjunction has its falsifying-clause test
+findings: []                     # may be empty; the key is required (empty means none were found)
+reviewer: milestone acceptance review, conductor + owner sign-off
+date: 2026-08-27
+```
+
+3. **Run the gate with the commit.** `machinery check design --commit $(git rev-parse HEAD)` (or
+   export `MACHINERY_COMMIT`; the flag wins). CI is expected to pass it. Without it the gate still
+   runs and prints a non-blocking note that commit binding was not checked, never a silent pass.
+
+Ga activates automatically once `design/acceptance/` exists or any milestone is marked closed, and
+verifies: every closed milestone has an acceptance file whose verdict is ACCEPTED (a missing file
+or a REJECTED one is an ERROR); every file parses, names a declared milestone, and carries every
+field; `dod_ids` lists every committed oracle id that milestone's DoD cites whole-token (the
+deterministic proof the review looked at the right obligations, exactly as Gk's `input_hash` proves
+a verdict covered the right design); and, with `--commit`, that every accepted closure names the
+commit under review (an exact match, or either value an unambiguous prefix of the other of at least
+7 characters). Milestone numbers must be unique across every plan-bearing document, root and
+shards: evidence is keyed by number alone, so a repeated number makes it ambiguous which milestone
+was discharged.
+
+LLM-attested (you check these; the tool cannot): whether the reviewer judged WELL. Ga proves that
+an acceptance review happened, on this commit, against these obligations; that the DoD was really
+met, that the attestations are true, and that the findings list is complete are judgment, held the
+same way every other attested gate half is. The `attestations` and `findings` lists exist to make
+that judgment reviewable by a human later.
 
 ## Rebuild and hybrid mode
 
@@ -934,7 +992,7 @@ was consciously waived. A phase entry without a self-review line is not complete
   dependency-mitigation, persistence-placement, and event-contract table formats, and the NFR record.
 - `references/build-md-template.md` - the full `BUILD.md` skeleton (full and manifest modes).
 - `machinery check` - the deterministic gate suite (Gm-transition, Gs-surface, Gp/Gi/Gn
-  relational gates, G2-c4, G3-machine, Gx-trace, Gb-plan, G4-import, Gt-tests,
+  relational gates, G2-c4, G3-machine, Gx-trace, Gb-plan, Ga-accept, G4-import, Gt-tests,
   G5-pack for decomposed designs).
   Single Go binary. Run it at each gate with `--gate` so correctness does not
   rely on the model getting every cross-reference right. See `tools/README.md`.

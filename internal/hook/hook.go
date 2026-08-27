@@ -340,7 +340,10 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 
 	var buf bytes.Buffer
 	blocking, drift, g4Blocking := 0, 0, 0
-	for _, g := range gates.RunSelected(designDir, implDir, sel) {
+	// A stop-time run binds no commit: the working tree is mid-change and the
+	// commit under review does not exist yet, so Ga states that non-check
+	// rather than guessing. CI passes --commit and stays the outer wall.
+	for _, g := range gates.RunSelected(designDir, implDir, sel, gates.RunOptions{}) {
 		n := g.Emit(&buf)
 		blocking += n
 		drift += len(g.Drift)
@@ -469,6 +472,11 @@ func selectGates(designDir string, cfg Config) (gates.Selection, string) {
 		// unlike Gx, the plan-shape gate applies even on a machine-less
 		// decomposed parent: the manifest BUILD.md is still its artifact
 		run["gb"] = true
+	}
+	if gates.AcceptanceActive(designDir) {
+		// the acceptance directory, or a milestone marked closed: either is a
+		// claim that a milestone was discharged, and the claim is checkable
+		run["ga"] = true
 	}
 	if cfg.Impl != "" {
 		run["g4"] = true

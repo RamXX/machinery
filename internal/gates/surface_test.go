@@ -110,7 +110,7 @@ func TestCheckSurfaceClean(t *testing.T) {
 		t.Fatalf("default gate selection omitted gs: sel=%+v err=%v", sel, err)
 	}
 	found := false
-	for _, gate := range RunSelected(design, "", sel) {
+	for _, gate := range RunSelected(design, "", sel, RunOptions{}) {
 		found = found || strings.Contains(gate.Title, "Gs-surface")
 	}
 	if !found {
@@ -214,7 +214,7 @@ func TestExplicitSurfaceGateRequiresLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gates := RunSelected(design, "", sel)
+	gates := RunSelected(design, "", sel, RunOptions{})
 	if len(gates) != 1 || !strings.Contains(strings.Join(gates[0].Errs, "\n"), "no "+SurfaceLedgerName) {
 		t.Fatalf("explicit gs on a design without a ledger must fail loudly: %+v", gates)
 	}

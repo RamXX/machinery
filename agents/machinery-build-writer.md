@@ -93,7 +93,10 @@ section structure exactly.
    waiver line `Walking skeleton: N/A - <reason>`), a `DoD:` line per milestone stating oracle-row and
    test-id coverage, the skeleton DoD citing at least one committed oracle id whole-token, and the
    skeleton naming which NFR-record mechanisms it instantiates (the pattern template every later
-   milestone copies).
+   milestone copies). Milestone numbers are global across a sharded design (acceptance evidence is
+   keyed by number alone), and the plan states the milestone-acceptance protocol from the template:
+   a milestone gets its `Status: closed` line only once `design/acceptance/M<n>.yaml` is committed,
+   which Ga-accept binds to the reviewed commit and to the oracle ids that milestone's DoD cites.
 11. **State the hard-TDD protocol with its gate discipline explicit** (template section 11; write
     it out in full, never summarize it away). The RED side must be anchored to the deterministic
     gates so the suite provably tests the right things: `machinery check` green BEFORE deriving
@@ -143,8 +146,10 @@ artifact. Include the `checked:` counts in your report.
   neighboring boundary with a stand-in held to the neighbor-contract oracle (stable-id keyed), and
   the environment recipe is self-contained.
 - The build plan follows the checkable format Gb-plan holds: skeleton-first `**M<n> - <title>**`
-  milestones with unique numbers, a `DoD:` line per milestone, the skeleton DoD citing a committed
-  oracle id, and the skeleton naming its NFR-record mechanisms.
+  milestones with unique numbers (unique across the whole design, shards included), a `DoD:` line
+  per milestone, the skeleton DoD citing a committed oracle id, and the skeleton naming its
+  NFR-record mechanisms. The milestone-acceptance protocol (evidence first, `Status: closed`
+  second) is stated in the plan section.
 - The hard-TDD protocol is stated and unambiguous, including the gate anchors: check-green before
   test derivation, the four-part RED exit gate (stable-id coverage, `machinery check --impl`
   green, red-on-assertions, born clean under the project's own format and lint gates), the GREEN

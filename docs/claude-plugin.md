@@ -70,7 +70,8 @@ matching `formal/{policy,integrity,isolation}.relational.yaml` exists (the relat
 [policy](policy-layer.md), [integrity](integrity-layer.md), and [isolation](isolation-layer.md)
 guides), G2 once `workspace.dsl` or `ARCHITECTURE.md` exists, G3
 once `machines/*.machine.json` exist, Gx once the domain model and machines both exist, Gb once
-`BUILD.md` exists, G5 on decomposed designs, G4 and Gt only
+`BUILD.md` exists, Ga once `acceptance/` exists or a milestone is marked `Status: closed` (see the
+[milestone acceptance guide](acceptance-gate.md)), G5 on decomposed designs, G4 and Gt only
 when `impl` is configured. A phase you have
 not reached is not demanded of you; a phase you have reached is held.
 
@@ -79,6 +80,10 @@ One narrowing difference from the CLI, stated plainly: on a machine-less decompo
 hook, whenever `impl` is configured, still runs Gt; with zero machines it has nothing to hold and
 reports vacuously green ("0 machines" on its checked line). Same fact, two renderings: the CLI
 names the skip, the hook shows the empty count; neither run hides it.
+
+Ga is the same shape: the hook runs it, but never binds a commit, because mid-turn the commit the
+review ran on does not exist yet. The gate says so on its own note line, and CI (which passes
+`--commit`) is where that binding is actually held.
 
 What the hooks deliberately do not do: they cannot make the interrogation good, they do not check
 guard semantics, and a `sed` through the Bash tool can still touch an oracle; that lands as DRIFT

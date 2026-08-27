@@ -21,12 +21,22 @@ type Selection struct {
 	Note     string // decomposed-parent narrowing note (default selection only)
 }
 
+// RunOptions carries the run-time inputs a gate needs beyond the committed
+// artifacts. They come from the caller's environment, never from the design,
+// so a gate that reads one degrades to a stated non-check when it is absent
+// instead of passing silently.
+type RunOptions struct {
+	// Commit is the VCS commit under review (--commit, or MACHINERY_COMMIT).
+	// "" leaves Ga's commit binding unchecked, with a non-blocking note.
+	Commit string
+}
+
 // knownGateSet is the full gate vocabulary. Select and the hook-config
 // validator (internal/hook) must agree on it, so both read this set through
 // KnownGate; two hand-kept lists once drifted.
 var knownGateSet = map[string]bool{
 	"gm": true, "gs": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
-	"g3": true, "gx": true, "gk": true, "gb": true, "g4": true, "gt": true, "g5": true,
+	"g3": true, "gx": true, "gk": true, "gb": true, "ga": true, "g4": true, "gt": true, "g5": true,
 }
 
 // KnownGate reports whether name names a gate this suite can run.
@@ -59,7 +69,7 @@ func HasModelith(design string) bool {
 // unknown or empty gate name is an error.
 func Select(design, gateList, impl string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
-	list := "gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,g4,gt,g5"
+	list := "gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ga,g4,gt,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
@@ -105,6 +115,9 @@ func Select(design, gateList, impl string) (Selection, error) {
 			if HasBuildDoc(design) {
 				parts = append(parts, "gb")
 			}
+			if AcceptanceActive(design) {
+				parts = append(parts, "ga")
+			}
 			if impl != "" {
 				parts = append(parts, "g4")
 			}
@@ -138,12 +151,13 @@ func Select(design, gateList, impl string) (Selection, error) {
 }
 
 // RunSelected runs the selected gates in canonical order (Gm, Gs, Gp, Gi, Gn,
-// Gc, G2, G3, Gx, Gb, G4, Gt, G5) with `machinery check`'s applicability rules:
-// opt-in gates run only when their source exists (or when explicitly
+// Gc, G2, G3, Gx, Gb, Ga, G4, Gt, G5) with `machinery check`'s applicability
+// rules: opt-in gates run only when their source exists (or when explicitly
 // requested), G4 and Gt only with an impl dir, and G5 only when explicitly
-// requested or when the design is decomposed. The returned gates carry their
-// findings; the caller emits them.
-func RunSelected(design, impl string, sel Selection) []*Gate {
+// requested or when the design is decomposed. opt carries the run-time inputs
+// (the commit under review); the zero value checks nothing that needs one.
+// The returned gates carry their findings; the caller emits them.
+func RunSelected(design, impl string, sel Selection, opt RunOptions) []*Gate {
 	var out []*Gate
 	if sel.Run["gm"] && (sel.Explicit || HasMigrationContract(design)) {
 		out = append(out, CheckMigration(design))
@@ -177,6 +191,9 @@ func RunSelected(design, impl string, sel Selection) []*Gate {
 	}
 	if sel.Run["gb"] && (sel.Explicit || HasBuildDoc(design)) {
 		out = append(out, CheckBuildPlan(design))
+	}
+	if sel.Run["ga"] && (sel.Explicit || AcceptanceActive(design)) {
+		out = append(out, CheckAcceptance(design, opt.Commit))
 	}
 	if sel.Run["g4"] && impl != "" {
 		out = append(out, CheckImports(design, impl))

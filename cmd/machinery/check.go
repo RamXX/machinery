@@ -11,14 +11,16 @@ import (
 
 func newCheckCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "check <design-dir> [--impl d] [--gate gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,g4,gt,g5]",
+		Use:   "check <design-dir> [--impl d] [--commit sha] [--gate gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ga,g4,gt,g5]",
 		Short: "Run the deterministic verification gates on a design",
 		Args:  cobra.ExactArgs(1),
 	}
 	var implDir string
 	var gateList string
+	var commit string
 	c.Flags().StringVar(&implDir, "impl", "", "implementation directory for G4-import and Gt-tests")
-	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,g4,gt,g5")
+	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ga,g4,gt,g5")
+	c.Flags().StringVar(&commit, "commit", "", "commit under review, bound by Ga-accept's evidence (env MACHINERY_COMMIT; the flag wins)")
 	c.RunE = func(cmd *cobra.Command, args []string) error {
 		design := args[0]
 		if err := checkIsDir(design); err != nil {
@@ -45,8 +47,14 @@ func newCheckCmd() *cobra.Command {
 			}
 		}
 
+		// the flag wins over the environment, so a CI job's exported commit
+		// never silently overrides what the operator typed
+		if commit == "" {
+			commit = os.Getenv("MACHINERY_COMMIT")
+		}
+
 		fail := 0
-		run := gates.RunSelected(design, implDir, sel)
+		run := gates.RunSelected(design, implDir, sel, gates.RunOptions{Commit: commit})
 		for _, g := range run {
 			fail += g.Emit(stdoutW)
 		}

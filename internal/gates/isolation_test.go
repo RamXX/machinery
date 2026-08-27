@@ -98,7 +98,7 @@ func TestRunSelectedSkipsGnWithoutAnnotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, g := range RunSelected(design, "", sel) {
+	for _, g := range RunSelected(design, "", sel, RunOptions{}) {
 		if strings.Contains(g.Title, "Gn-isolation") {
 			t.Error("Gn must not run on a design without the annotation")
 		}

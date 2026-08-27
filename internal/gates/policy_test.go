@@ -130,7 +130,7 @@ func TestRunSelectedSkipsGpWithoutAnnotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, g := range RunSelected(design, "", sel) {
+	for _, g := range RunSelected(design, "", sel, RunOptions{}) {
 		if strings.Contains(g.Title, "Gp-policy") {
 			t.Error("Gp must not run on a design without the annotation")
 		}

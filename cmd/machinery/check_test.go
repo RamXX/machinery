@@ -269,3 +269,78 @@ func writeText(t *testing.T, path, content string) {
 		t.Fatal(err)
 	}
 }
+
+// --- Ga-accept: the commit under review ---
+
+// writeAcceptanceDesign builds the smallest design that closes a milestone
+// with committed acceptance evidence naming commit.
+func writeAcceptanceDesign(t *testing.T, commit string) string {
+	t.Helper()
+	design := t.TempDir()
+	files := map[string]string{
+		"BUILD.md": "# B\n\nMode: full\n\n## Build plan\n\n" +
+			"**M0 - Walking skeleton.** DoD: green end to end.\nStatus: closed\n",
+		"acceptance/M0.yaml": "milestone: 0\ncommit: " + commit + "\nverdict: ACCEPTED\n" +
+			"dod_ids: []\nattestations:\n  - the suite ran against real dependencies\n" +
+			"findings: []\nreviewer: conductor\ndate: 2026-08-27\n",
+	}
+	for name, content := range files {
+		p := filepath.Join(design, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return design
+}
+
+func runCheckGa(t *testing.T, design string, args ...string) (string, int) {
+	t.Helper()
+	out, _, codes := withCapturedIO(t)
+	cmd := newCheckCmd()
+	cmd.SetArgs(append([]string{design, "--gate", "ga"}, args...))
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	code := 0
+	if len(*codes) > 0 {
+		code = (*codes)[0]
+	}
+	return out.String(), code
+}
+
+// The reviewed commit reaches Ga from --commit and from MACHINERY_COMMIT,
+// and the flag wins over the environment.
+func TestCheckCommitFlagAndEnvironmentReachGa(t *testing.T) {
+	const reviewed = "9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345"
+	const other = "dead0000beef1111222233334444555566667777"
+	design := writeAcceptanceDesign(t, reviewed)
+
+	if out, code := runCheckGa(t, design, "--commit", reviewed); code != 0 || !strings.Contains(out, "1 commit bindings verified") {
+		t.Fatalf("--commit must bind: code=%d out=%s", code, out)
+	}
+
+	t.Setenv("MACHINERY_COMMIT", reviewed)
+	if out, code := runCheckGa(t, design); code != 0 || !strings.Contains(out, "1 commit bindings verified") {
+		t.Fatalf("MACHINERY_COMMIT must bind: code=%d out=%s", code, out)
+	}
+
+	t.Setenv("MACHINERY_COMMIT", other)
+	out, code := runCheckGa(t, design, "--commit", reviewed)
+	if code != 0 || !strings.Contains(out, "1 commit bindings verified") {
+		t.Fatalf("the flag must win over the environment: code=%d out=%s", code, out)
+	}
+
+	t.Setenv("MACHINERY_COMMIT", "")
+	out, code = runCheckGa(t, design, "--commit", other)
+	if code != 1 || !strings.Contains(out, "does not name the commit under review") {
+		t.Fatalf("a wrong commit must block: code=%d out=%s", code, out)
+	}
+
+	out, code = runCheckGa(t, design)
+	if code != 0 || !strings.Contains(out, "commit binding not checked") {
+		t.Fatalf("no commit must state the non-check: code=%d out=%s", code, out)
+	}
+}

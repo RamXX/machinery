@@ -923,3 +923,30 @@ func runShim(t *testing.T, projectDir, stdin string) (stdout, stderr string, cod
 	}
 	return so.String(), se.String(), code
 }
+
+// The stop-time selection matches `machinery check`'s default activation for
+// Ga: neither artifact, no gate; the acceptance directory or a milestone
+// marked closed, gate.
+func TestSelectGatesActivatesGaOnAcceptanceArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "BUILD.md"),
+		"# B\n\nMode: full\n\n## Build plan\n\n**M0 - Walking skeleton.** DoD: T-X-01 green.\n")
+	sel, _ := selectGates(dir, Config{})
+	if sel.Run["ga"] {
+		t.Error("ga must not run before a milestone is closed or evidence exists")
+	}
+
+	writeFile(t, filepath.Join(dir, "acceptance", "M0.yaml"), "milestone: 0\n")
+	sel, _ = selectGates(dir, Config{})
+	if !sel.Run["ga"] {
+		t.Error("committed acceptance evidence must activate ga")
+	}
+
+	bare := t.TempDir()
+	writeFile(t, filepath.Join(bare, "BUILD.md"),
+		"# B\n\nMode: full\n\n## Build plan\n\n**M0 - Walking skeleton.** DoD: T-X-01 green.\nStatus: closed\n")
+	sel, _ = selectGates(bare, Config{})
+	if !sel.Run["ga"] {
+		t.Error("a milestone marked closed must activate ga on its own")
+	}
+}

@@ -133,7 +133,7 @@ func TestCheckMigrationClean(t *testing.T) {
 		t.Fatalf("default gate selection omitted gm: sel=%+v err=%v", sel, err)
 	}
 	found := false
-	for _, gate := range RunSelected(design, "", sel) {
+	for _, gate := range RunSelected(design, "", sel, RunOptions{}) {
 		found = found || strings.Contains(gate.Title, "Gm-transition")
 	}
 	if !found {
@@ -197,7 +197,7 @@ func TestExplicitMigrationGateRequiresContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gates := RunSelected(design, "", sel)
+	gates := RunSelected(design, "", sel, RunOptions{})
 	if len(gates) != 1 || len(gates[0].Errs) == 0 || !strings.Contains(gates[0].Errs[0], "no migration.yaml") {
 		t.Fatalf("explicit gm did not fail on absence: %+v", gates)
 	}

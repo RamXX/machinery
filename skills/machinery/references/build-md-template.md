@@ -12,7 +12,11 @@
   test spec; each shard carries sections 5 to 9 for its context. The zero-context claim then applies
   to the design tree as a whole, and self-containment applies per shard. A `README.md` or `index.md`
   under `design/BUILD/` is a shard index for humans, not a plan shard; Gb exempts it from the plan
-  obligations.
+  obligations. The build plan may live in the shards (each with its own section 9) or in the root's
+  own section 9 with each shard waiving toward it (`N/A - the build plan is the root BUILD.md
+  section 9`); Gb checks whichever documents actually declare a plan, root included. Milestone
+  numbers are global across the whole design either way: acceptance evidence is keyed by number
+  alone, so a number declared in two documents is ambiguous and fails Ga-accept.
 
 Two artifacts are never pasted by hand: the machine JSON (section 5 references the machine files)
 and the transition tables (section 7 references the generated oracles). Pasted copies drift; the
@@ -197,12 +201,28 @@ Format contract, held deterministically by Gb-plan:
   violations).
 - The skeleton milestone's DoD cites at least one committed oracle id (test id or stable id) as a
   whole token, at or after the DoD token (pre-DoD prose does not count).
+- A milestone that has been accepted carries one status line in its block, `Status: closed`
+  (`Status: open` is the default and may be written explicitly; any other value fails the gate).
+  Closing a milestone takes committed acceptance evidence: see "Milestone acceptance" below.
 - The whole section may be waived only with the literal `N/A - <reason>` (case-sensitive) as its
   first non-blank line; any other N/A shape fails loudly instead of waiving.
 - Every Gb scan runs on fence-masked text (the Mode-line sniff included): fenced code blocks are
   blanked first, with fences closed by the CommonMark run-length rule (a fence opened with N
   delimiters closes only on >= N of the same character), so a fenced example `**M9 - ...**`,
   `DoD:`, or `Mode:` line is never plan structure.
+
+### Milestone acceptance
+Every milestone in this plan is discharged the same way, held by Ga-accept:
+- The review runs on one commit and produces `design/acceptance/M<n>.yaml`, one file per milestone:
+  `milestone` (the number here), `commit` (the reviewed commit), `verdict` (`ACCEPTED` or
+  `REJECTED`), `dod_ids` (every committed oracle id this milestone's DoD line cites), `attestations`
+  (what the review checked by judgment; required for an ACCEPTED verdict), `findings` (may be
+  empty), `reviewer`, and `date` (YYYY-MM-DD).
+- Only then does the milestone block get its `Status: closed` line. A closed milestone with no
+  evidence, or with a REJECTED verdict, is a blocking finding.
+- CI runs `machinery check design --commit $(git rev-parse HEAD)`, which binds the evidence to the
+  commit under review; without a commit the gate says so instead of checking it.
+- Prior attempts are not kept in the tree: one file per milestone, and git history is the record.
 
 One requirement Gb does not check: the skeleton milestone names which NFR-record mechanisms it
 instantiates (error envelope, config registration, observability hooks, auth posture; whichever

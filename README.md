@@ -138,6 +138,10 @@ Phase 3  XState       state machines
 Phase 4  BUILD.md     the blueprint
          tool: Gx-trace + Gb-plan (+ G4-import and Gt-tests once code exists)
          attested: a zero-context coding agent could build it
+Build    Acceptance   discharging a milestone (once the build starts)
+         tool: Ga-accept (committed evidence per closed milestone, bound to the
+               reviewed commit and to the oracle ids its DoD cites)
+         attested: whether the reviewer judged well
 ```
 
 An interrogation, not a form. The conductor pushes on naming and on "what must always be true," and
@@ -639,6 +643,8 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   projection and evidence schemas, the tool-neutral manifest, the git-ignored resolution registry,
   the pure `gk` gate plus the `verify-checkers` engine phase, and how to adapt a signed-artifact or
   probabilistic engine you cannot modify),
+  the [milestone acceptance guide](docs/acceptance-gate.md) (the closed marker, the acceptance
+  evidence schema, the `ga` gate's DoD-id and commit bindings, and the CI recipe),
   and the [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft
   rung-4 design note, not yet implemented).
 - `examples/go-crm/` the worked rebuild example: `design/legacy/` (the working prototype truth),

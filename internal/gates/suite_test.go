@@ -189,7 +189,7 @@ func TestRunSelectedActivatesGbAndGt(t *testing.T) {
 	}
 	titles := func(impl string) string {
 		var out []string
-		for _, g := range RunSelected(design, impl, sel) {
+		for _, g := range RunSelected(design, impl, sel, RunOptions{}) {
 			out = append(out, g.Title)
 		}
 		return strings.Join(out, "\n")

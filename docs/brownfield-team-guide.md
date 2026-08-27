@@ -189,9 +189,11 @@ nobody knowing which tests are load-bearing.
 
 ### Stage 4: full gates and revision mode as the operating loop
 
-On the way here two more gates join the staged list on their own triggers: `gb` once `BUILD.md`
-lands (it holds the Build plan structure), and `gt` once the adjudicated RED suite exists (it
-holds every committed oracle stable id to a test, whole-token).
+On the way here three more gates join the staged list on their own triggers: `gb` once `BUILD.md`
+lands (it holds the Build plan structure), `gt` once the adjudicated RED suite exists (it
+holds every committed oracle stable id to a test, whole-token), and `ga` the first time a
+milestone is closed (it holds the committed acceptance evidence behind that closure; see
+`docs/acceptance-gate.md`).
 
 Once a slice is fully modeled (machines, matrices, oracles, formal annotations if you want
 the proofs), drop the `--gate` narrowing for that design and run the full
@@ -300,6 +302,10 @@ real, BUILD.md is buildable with zero context). On a team, "you" must resolve to
 - An attestation is invalidated by any change to the artifact it covered; re-attest in the
   PR that changes it. Cheap rule: if the PR touches a machine, the guard-semantics line
   gets re-checked for that machine, and nothing else.
+- Milestone closure is the one attestation with a committed artifact instead of a PR
+  checkbox: `design/acceptance/M<n>.yaml` names the reviewer, the commit reviewed, and what
+  was checked by judgment, and `Ga-accept` binds it (`docs/acceptance-gate.md`). Its
+  `reviewer` field is where the named-owner rule above lands.
 
 This is bookkeeping, but it is the difference between "the deterministic half is green and
 the other half is somebody's memory" and a design history you can audit.

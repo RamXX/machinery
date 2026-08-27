@@ -533,3 +533,98 @@ func TestIDTokenIn(t *testing.T) {
 		}
 	}
 }
+
+// The manifest ROOT carries a plan obligation once it declares a Build plan
+// section of its own. The production shape that went unchecked: every shard
+// waived its section toward the root ("N/A - the plan is the root's section
+// 9"), so the run reported "N plans, N waived plans" and no milestone, DoD,
+// or skeleton rule ran anywhere.
+func TestCheckBuildPlanManifestRootPlanIsChecked(t *testing.T) {
+	waived := "# Shard\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n"
+	root := "# B\n\nMode: manifest\n\n## 9. Build plan\n\n" +
+		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n\n" +
+		"**M1 - Breadth slice.** DoD: all rows green.\n"
+	design := writeBuildPlanFixture(t, root, map[string]string{
+		"BUILD/core.md": waived,
+		"BUILD/edge.md": strings.Replace(waived, "# Shard", "# Edge", 1),
+	})
+	g := CheckBuildPlan(design)
+	if len(g.Errs) != 0 {
+		t.Fatalf("Gb not clean on a root-plan manifest: %v", g.Errs)
+	}
+	if g.Counts["plans"] != 3 || g.Counts["waived plans"] != 2 {
+		t.Errorf("the root plan plus two waived shards: %+v", g.Counts)
+	}
+	if g.Counts["milestones"] != 2 || g.Counts["DoD-bearing milestones"] != 2 || g.Counts["skeleton citations"] != 1 {
+		t.Errorf("the root plan must get the full structural check: %+v", g.Counts)
+	}
+}
+
+// The same shape, with a defective root plan: the finding names BUILD.md.
+func TestCheckBuildPlanManifestRootPlanFindingsNameTheRoot(t *testing.T) {
+	waived := "# Shard\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n"
+	root := "# B\n\nMode: manifest\n\n## 9. Build plan\n\n" +
+		"**M0 - Walking skeleton.** No definition here.\n"
+	design := writeBuildPlanFixture(t, root, map[string]string{"BUILD/core.md": waived})
+	g := CheckBuildPlan(design)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "BUILD.md: milestone M0") {
+		t.Fatalf("the root plan's findings must name BUILD.md: %v", g.Errs)
+	}
+}
+
+// A manifest root that declares the plan itself needs no shards behind it:
+// the plan is checked, so the "manifest with nothing behind it" error would
+// be wrong.
+func TestCheckBuildPlanManifestRootPlanWithoutShards(t *testing.T) {
+	root := "# B\n\nMode: manifest\n\n## 9. Build plan\n\n" +
+		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n"
+	design := writeBuildPlanFixture(t, root, nil)
+	g := CheckBuildPlan(design)
+	if len(g.Errs) != 0 {
+		t.Fatalf("a manifest root that carries the plan is not empty: %v", g.Errs)
+	}
+	if g.Counts["plans"] != 1 || g.Counts["milestones"] != 1 {
+		t.Errorf("the root plan must be the checked plan: %+v", g.Counts)
+	}
+}
+
+// A manifest root with no Build plan section keeps its old freedom: the
+// shards carry the plans and the root has no obligation of its own.
+func TestCheckBuildPlanManifestRootWithoutPlanSectionUnchanged(t *testing.T) {
+	shard := "# Core\n\n## Build plan\n\n**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n"
+	design := writeBuildPlanFixture(t, "# B\n\nMode: manifest\n\n## 9. Milestone map\n\nSee the shards.\n",
+		map[string]string{"BUILD/core.md": shard})
+	g := CheckBuildPlan(design)
+	if len(g.Errs) != 0 {
+		t.Fatalf("a root with no plan section carries no plan obligation: %v", g.Errs)
+	}
+	if g.Counts["plans"] != 1 {
+		t.Errorf("plans = %d, want 1 (the shard only): %+v", g.Counts["plans"], g.Counts)
+	}
+}
+
+// The milestone status line is optional, parses in the decorated forms the
+// markers themselves use, and counts. A typo in it is an ERROR: reading an
+// unrecognized value as "not closed" would silently disarm Ga-accept.
+func TestCheckBuildPlanMilestoneStatusLine(t *testing.T) {
+	closed := strings.Replace(goCrmStylePlan,
+		"**M1 - Breadth slice.** Everything else. DoD: all rows green.",
+		"**M1 - Breadth slice.** Everything else. DoD: all rows green.\n\n**Status:** closed", 1)
+	g := CheckBuildPlan(writeBuildPlanFixture(t, closed, nil))
+	if len(g.Errs) != 0 {
+		t.Fatalf("a bold status line must parse: %v", g.Errs)
+	}
+	if g.Counts["closed milestones"] != 1 {
+		t.Errorf("closed milestones = %d, want 1: %+v", g.Counts["closed milestones"], g.Counts)
+	}
+
+	open := strings.Replace(closed, "**Status:** closed", "Status: open", 1)
+	if g := CheckBuildPlan(writeBuildPlanFixture(t, open, nil)); len(g.Errs) != 0 || g.Counts["closed milestones"] != 0 {
+		t.Errorf("an explicit open status is clean and closes nothing: errs=%v counts=%+v", g.Errs, g.Counts)
+	}
+
+	typo := strings.Replace(closed, "**Status:** closed", "Status: cloesd", 1)
+	if g := CheckBuildPlan(writeBuildPlanFixture(t, typo, nil)); !strings.Contains(strings.Join(g.Errs, "\n"), "unrecognized status 'cloesd'") {
+		t.Errorf("a typo in the status line must fail loudly: %v", g.Errs)
+	}
+}
