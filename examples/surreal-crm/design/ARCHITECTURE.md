@@ -140,6 +140,17 @@ dependency_rules:
 
 ## 5. Interface contracts (boundary shapes for the hard-TDD contract tests)
 
+One row per allowed boundary crossing; the signatures below the table are the elaboration.
+
+| edge | shape | errors | idempotency |
+|---|---|---|---|
+| `crm.commands -> crm.session` | `Sessions` interface: `Login(name, password)`, `Current()`, `Logout()` | `ErrBadCredentials`, `ErrDisabled`, `ErrLocked`, `ErrNoSession`, `ErrExpired` | `Current`/`Logout` are safe to repeat; `Login` is never retried on `ErrBadCredentials` |
+| `crm.commands -> crm.domain` | pure transition functions per aggregate: `(actor, aggregate, event) -> (aggregate, Decision)`; no I/O | `ErrDenied`, `ErrInvalidTransition` | pure: same inputs, same result, always safe to repeat |
+| `crm.commands -> crm.repo`, `crm.session -> crm.repo`, `crm.domain -> crm.repo` | `Repo` interface: `Connect`, `BeginWrite`, `Commit`, `Rollback`, `Get*`/`Save*` per aggregate, all inside the caller's open transaction | `ErrLocked`, `ErrCorrupt`, `ErrUnavailable`, `ErrNotFound`, `ErrConstraint`, `ErrConflict`, `ErrDiskFull`, `ErrTimeout` (the eight legacy classes, remapped to store conditions) | reads are safe to retry; a write runs in one transaction and is retried once on `ErrLocked` or `ErrConflict`, neither of which leaves a partial commit |
+| `crm.domain -> crm.authz` | `Authorizer.Authorize(actor, verb, entity, ownerID, teamID) -> Decision` (pure, no I/O) | none; a refusal is `Decision{Allowed: false, Reason: ...}`, never an error | pure: safe to repeat, no state touched |
+| `crm.repo -> external.surrealdb` | surrealdb.go client against `127.0.0.1:8000`: connect with namespace and database, SurrealQL statements, one transaction per invocation | driver and store conditions mapped at this boundary to the typed `Err*` set above; no driver type escapes `crm.repo` | writes are idempotent per transaction: a rolled-back transaction leaves no trace, so a retried transaction repeats the whole unit |
+| `crm.commands -> crm.model`, `crm.session -> crm.model`, `crm.authz -> crm.model`, `crm.domain -> crm.model`, `crm.repo -> crm.model` | type-only: the shared vocabulary (aggregate structs, enums, the typed `Err*` values); no functions with side effects | none; the package performs no operation that can fail | n/a: no calls cross this edge, only type references |
+
 Signatures are Go-flavored pseudocode; the types reference `domain.modelith.yaml`. The Repo
 interface is unchanged from the legacy system except at the edges the store swap touches: `Open`
 becomes `Connect`, and the error vocabulary trades the file-lock class for the availability and

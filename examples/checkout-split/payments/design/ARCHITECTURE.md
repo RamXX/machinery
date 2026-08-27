@@ -27,6 +27,13 @@ dependency_rules:
   deny: []
 ```
 
+## 4b. Interface contracts
+
+| edge | shape | errors | idempotency |
+|---|---|---|---|
+| `payments.svc -> external.bus` | busdriver publish and subscribe on the payments topic; payloads are exactly the section 5 event rows | `ErrBusUnavailable`, `ErrPublishRejected`, mapped here so no driver type escapes the service | publishes ride the outbox, so a retried publish repeats one message id and the consumer dedupes it |
+| `payments.svc -> external.paydb` | pgdriver SQL over the payments schema: load the payment row, write it back together with its outbox rows in one transaction | `ErrDbUnavailable`, `ErrConflict`, `ErrCorrupt` | the state change and its outbox rows commit together, so a retried transaction repeats the whole unit or none of it |
+
 ## 5. Event contracts (from the pack; do not widen)
 
 | event | producer | consumer | payload | delivery | ordering | dedupe |

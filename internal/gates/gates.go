@@ -675,6 +675,8 @@ func CheckC4(design string) *Gate {
 		}
 	}
 
+	checkInterfaceContracts(g, text, allowConcrete, declared)
+
 	// bus/queue coupling is invisible to G4-import; the event-contract table
 	// is the governing artifact, so a queue-coupled design must have one
 	queueCoupled := false
@@ -708,6 +710,180 @@ func CheckC4(design string) *Gate {
 	g.RequireNonzero("boundaries", "no boundaries parsed")
 	g.RequireNonzero("dsl elements", "no workspace.dsl elements parsed")
 	return g
+}
+
+// --- interface contracts (G2-c4) ---
+
+var (
+	// noContractWaiverRe waives the interface contract of one edge, with its
+	// reason captured. Distinct from '(no machine: ...)' and
+	// '(not placed: ...)': one generic waiver token would let an answer to one
+	// question silently discharge another.
+	noContractWaiverRe = regexp.MustCompile(`\(no contract:\s*([^)]*)\)`)
+	// ifaceEdgeRe is the whole-segment edge grammar: exactly one
+	// 'from -> to' pair, ids in the contract's own vocabulary. Anchored, so a
+	// chain ("a -> b -> c") or a stray word fails loudly instead of being
+	// half-read.
+	ifaceEdgeRe = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_.\-]*)\s*->\s*([A-Za-z_][A-Za-z0-9_.\-]*)$`)
+)
+
+// edgeText renders an edge the way the contract writes it.
+func edgeText(e [2]string) string { return e[0] + " -> " + e[1] }
+
+// parseEdgeCell reads an interface-contract edge cell. Grammar: one or more
+// 'from -> to' pairs separated by commas, ids optionally backticked,
+// annotations (including the waiver) only in parentheses. Everything that is
+// not an exact pair comes back as malformed rather than being skipped: a cell
+// the parser half-understands is the way a table starts lying.
+func parseEdgeCell(cell string) (pairs [][2]string, malformed []string) {
+	s := parenAnnotationRe.ReplaceAllString(cell, " ")
+	s = strings.ReplaceAll(s, "`", " ")
+	for _, seg := range strings.Split(s, ",") {
+		seg = strings.Join(strings.Fields(seg), " ")
+		if seg == "" {
+			continue
+		}
+		if m := ifaceEdgeRe.FindStringSubmatch(seg); m != nil {
+			pairs = append(pairs, [2]string{m[1], m[2]})
+			continue
+		}
+		malformed = append(malformed, seg)
+	}
+	return pairs, malformed
+}
+
+// checkInterfaceContracts holds the interface-contract table against the
+// contract's own allow rules. Both directions, and both are checkable because
+// the obliged set is CLOSED: dependency_rules.allow enumerates every boundary
+// crossing the design permits.
+//
+//   - every concrete allow edge has a contract row (shape, errors,
+//     idempotency, all answered) or a '(no contract: <reason>)' waiver;
+//   - every edge a row names is an allow edge. A contract for an edge the
+//     design denies, never declared, or only baselined is drift: the table
+//     would describe an interface the architecture does not have.
+//
+// A wildcard allow rule names no concrete pair and so carries no obligation,
+// exactly as it carries none in the acyclicity and reachability checks.
+// What stays attested: whether the stated shape, error set, and idempotency
+// rule are semantically RIGHT. The gate holds the row and its columns.
+func checkInterfaceContracts(g *Gate, text string, allow [][2]string, declared map[string]bool) {
+	contracted := map[[2]string]bool{}
+	waived := map[[2]string]bool{}
+	var namedOrder [][2]string
+	named := map[[2]string]bool{}
+	found := false
+	for _, tbl := range ir.ParseMdTables(text) {
+		hl := strings.ToLower(strings.Join(tbl.Header, " "))
+		if !strings.Contains(hl, "edge") || !strings.Contains(hl, "shape") ||
+			!strings.Contains(hl, "error") || !strings.Contains(hl, "idempot") {
+			continue
+		}
+		// EVERY header-matching table counts, as with the event contract: a
+		// design may split its interfaces across sections, and a first-match
+		// locator would silently ignore the rest
+		found = true
+		ei := colContaining(tbl.Header, "edge")
+		cols := map[string]int{
+			"shape":       colContaining(tbl.Header, "shape"),
+			"errors":      colContaining(tbl.Header, "error"),
+			"idempotency": colContaining(tbl.Header, "idempot"),
+		}
+		for _, r := range tbl.Rows {
+			if len(r) == 0 {
+				continue
+			}
+			cell := ""
+			if ei >= 0 && ei < len(r) {
+				cell = r[ei]
+			}
+			pairs, malformed := parseEdgeCell(cell)
+			for _, bad := range malformed {
+				if strings.Contains(bad, "*") {
+					g.Errs = append(g.Errs, "interface-contract row edge "+ir.Repr(bad)+" uses a wildcard; a contract is a concrete claim about one named pair")
+				} else {
+					g.Errs = append(g.Errs, "interface-contract row edge "+ir.Repr(bad)+" is not a 'from -> to' pair; the edge cell holds one or more pairs separated by commas")
+				}
+			}
+			if len(pairs) == 0 {
+				if len(malformed) == 0 {
+					g.Errs = append(g.Errs, "interface-contract row names no edge; the edge column holds one or more 'from -> to' pairs")
+				}
+				continue
+			}
+			for _, p := range pairs {
+				if !named[p] {
+					named[p] = true
+					namedOrder = append(namedOrder, p)
+				}
+			}
+			if m := noContractWaiverRe.FindStringSubmatch(cell); m != nil {
+				// the row states the crossing needs no interface contract here
+				// (the child design carries it, say). There is no shape to
+				// demand, so the other columns are not read. An empty reason is
+				// an unanswered design question, reported once so one defect
+				// never cascades into a second finding on the same edge.
+				for _, p := range pairs {
+					waived[p] = true
+				}
+				if strings.TrimSpace(m[1]) == "" {
+					g.Errs = append(g.Errs, "interface-contract waiver for edge `"+edgeText(pairs[0])+"` names no reason; write '(no contract: <reason>)'")
+				}
+				continue
+			}
+			for _, col := range []string{"shape", "errors", "idempotency"} {
+				i := cols[col]
+				if i < 0 || i >= len(r) || strings.TrimSpace(r[i]) == "" {
+					g.Errs = append(g.Errs, "interface-contract row for edge `"+edgeText(pairs[0])+"` leaves "+col+" empty; an unanswered column is not a contract")
+				}
+			}
+			for _, p := range pairs {
+				contracted[p] = true
+			}
+		}
+	}
+	if !found {
+		if len(allow) > 0 {
+			g.Errs = append(g.Errs, fmt.Sprintf("ARCHITECTURE.md has no interface-contract table (a header naming edge, shape, errors, and idempotency); the contract's %d allow edge(s) can be traced to no interface contract", len(allow)))
+		}
+		return
+	}
+	allowSet := edgeSet(allow)
+	for _, p := range namedOrder {
+		if allowSet[p] {
+			continue
+		}
+		hint := ""
+		for _, side := range p {
+			if !declared[side] {
+				hint = " (`" + side + "` is not a declared boundary or external)"
+				break
+			}
+		}
+		g.Errs = append(g.Errs, "interface-contract row names edge `"+edgeText(p)+"`, which no allow rule declares"+hint+"; a contract for an edge the design forbids, never declared, or only baselined describes an interface the architecture does not have")
+	}
+	for _, e := range allow { // slice order, not map order: deterministic output
+		switch {
+		case contracted[e]:
+			g.Count("edges contracted")
+		case waived[e]:
+			g.Count("edges waived")
+		default:
+			g.Errs = append(g.Errs, "allow edge `"+edgeText(e)+"` has no interface-contract row and no '(no contract: <reason>)' waiver; every boundary crossing states its shape, errors, and idempotency")
+		}
+	}
+}
+
+// colContaining locates a column by substring, the same forgiving rule the
+// table-detection header scan uses, so a header that names a column can always
+// find it.
+func colContaining(header []string, needle string) int {
+	for i, h := range header {
+		if strings.Contains(strings.ToLower(h), needle) {
+			return i
+		}
+	}
+	return -1
 }
 
 func objSlice(v *ir.Value) []*ir.Value {

@@ -7,7 +7,7 @@ note: decomposed parent with no machines/; running gc,g2,gb,g5 (G3/Gx run on the
   note   exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 2 boundaries, 3 externals, 4 allow rules, 4 transitive pairs, 4 deny rules, 7 dsl elements, 2 boundaries bound to dsl, 3 mitigation rows, 6 dependencies with mitigation rows, 3 event contracts
+  checked: 2 boundaries, 3 externals, 4 allow rules, 4 transitive pairs, 4 deny rules, 7 dsl elements, 2 boundaries bound to dsl, 3 mitigation rows, 6 dependencies with mitigation rows, 4 edges waived, 3 event contracts
   ok
 == Gb-plan  build plan structure ==
   checked: 0 local plans (decomposed parent; the children carry the plans)

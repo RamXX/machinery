@@ -152,7 +152,18 @@ dependency_rules:
 ## 6. Interface contracts at each boundary
 
 For each boundary crossing: request/response shape, enumerated errors (these become `onError`
-branches in Phase 3), and idempotency.
+branches in Phase 3), and idempotency. One row per allowed edge; the sections below elaborate.
+
+| edge | shape | errors | idempotency |
+|---|---|---|---|
+| `pf.cli -> pf.app` | `Command{ verb, args, actorRole } -> Result{ stdout, exitCode, err }` | `AuthzError`, `NotFoundError`, `ConflictError`, `FeedError`, `InfeasibleError`, `CorruptError`, `ValidationError`, `InternalError` | `recommend` is not idempotent (each run is a new record); review commands are idempotent under the portfolio `version` |
+| `pf.app -> pf.domain` | `RunTransition(state, trigger, ctx) -> (next, actions, err)`, `PortfolioTransition(state, event, ctx) -> (next, actions, RejectedError)`; guards are pure `(ctx, event) -> bool` | `RejectedError` when no guarded transition applies | pure functions: safe to repeat |
+| `pf.app -> pf.optimizer` | `optimize(candidates, prices, k=16, lookbackDays) -> Portfolio{ holdings, maxDrawdown }` | `InfeasibleError` when fewer than 16 candidates have full price history | pure and deterministic for a given (candidates, prices, k, lookback) |
+| `pf.app -> pf.feed` | `fetchPrices(tickers, lookbackDays) -> PriceMatrix`, `fetchConstituents(index) -> [rankedTicker]` | `FeedError` (provider 5xx, timeout, rate-limit), `CircuitOpenError` (breaker open, fast-fail) | reads are idempotent; safe to retry within the run's bounded retry count |
+| `pf.app -> pf.repo` | `Load<T>(id) -> (T, version, err)`, `Save<T>(value, expectedVersion) -> err`, `Open() -> err` (integrity check), `Backup(path)`, `Restore(path)` | `NotFoundError`, `ConflictError` (version moved), `CorruptError`, `IOError` | `Save` is idempotent under `(id, expectedVersion)`: a repeat with a stale version refuses rather than double-writing |
+| `pf.feed -> external.marketdata` | HTTPS calls to the provider, behind the circuit breaker that owns the failure classification | provider 5xx, timeout, and 429 mapped here onto `FeedError`; no provider type escapes `pf.feed` | reads only; retried under the breaker, which fast-fails with `CircuitOpenError` once open |
+| `pf.repo -> external.duckdb` | SQL through the DuckDB client, wrapped so no store type escapes `pf.repo` | store errors mapped here onto `ConflictError`, `CorruptError`, `IOError` | writes carry the optimistic `version` predicate, so a retried write is a no-op once the version moved |
+| `pf.cli -> pf.model`, `pf.app -> pf.model`, `pf.domain -> pf.model`, `pf.optimizer -> pf.model`, `pf.feed -> pf.model`, `pf.repo -> pf.model` | type-only: the canonical entity types and enums; no functions with side effects | none; the module performs no operation that can fail | n/a: no calls cross this edge, only type references |
 
 ### cli -> app
 

@@ -358,6 +358,10 @@ folding it into a substrate boundary manufactures allow-graph cycles.
 - Gx requires a machine for every lifecycle enum in the domain model, with no per-entity
   waiver; trim the model to the gated slice instead. It also requires a persistence-placement
   row per declared entity, which DOES have a per-entity waiver: `(not placed: <reason>)`.
+- G2 requires an interface-contract row per ALLOW edge, or a `(no contract: <reason>)` waiver:
+  the one obligation that grows with the contract you write. Baselined edges carry no such
+  obligation and may not take a row either, so the burn-down list and the designed-interface
+  table never blur into each other.
 - G4 reports violations per edge, naming one witness file plus a count of additional
   offenders; budget remediation by the count, not by the number of error lines.
 - A stale child in a decomposed design is only visible to the parent's check (the parent

@@ -6,7 +6,7 @@
   note   exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 1 boundaries, 2 externals, 2 allow rules, 2 transitive pairs, 5 dsl elements, 1 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 event contracts
+  checked: 1 boundaries, 2 externals, 2 allow rules, 2 transitive pairs, 5 dsl elements, 1 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 2 edges contracted, 3 event contracts
   ok
 == G3-machine  machines + oracle ==
   checked: 1 machines, 4 transitions, 1 oracles fresh, 3 named units covered

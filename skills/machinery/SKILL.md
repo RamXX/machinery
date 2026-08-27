@@ -340,7 +340,10 @@ dependency (datastore, queue, external API) declare a failure-and-mitigation pos
 stateful component decide persistence and placement (in-memory actor vs persisted aggregate). This
 is the real bridge into Phase 3. The placement table is held to the domain model at Gate 4: every
 declared entity needs a row, or a `(not placed: <reason>)` waiver, so walk the entity list while
-authoring it rather than discovering the gap later. For multi-component designs, also author the **event-contract
+authoring it rather than discovering the gap later. Author the **interface-contract table** in the
+same pass (columns: edge, shape, errors, idempotency): Gate 2 holds it to the contract's own allow
+rules in both directions, a row per allowed crossing and no row for a crossing the design does not
+allow, so write it from the allow list rather than from memory. For multi-component designs, also author the **event-contract
 table** (producer, consumer, payload by Modelith attribute reference, delivery guarantee, ordering
 assumption, dedupe key): coupling through shared DB tables or bus topics is invisible to G4-import,
 so this table is the governing artifact for it. Like the surface ledger's `source:` lines, the
@@ -378,12 +381,19 @@ mitigation row naming it backticked in the first column (a backticked name that 
 an error). Mitigation obligations exist only for DECLARED dependencies: a dependency never declared
 in the DSL or the contract carries no obligation, so completeness of the DEPENDENCY declaration is
 attested, not checked; that universe is open, and only the conversation catches what was never
-declared. Completeness of the PERSISTENCE-PLACEMENT table is the opposite case and IS checked: the
-entity list is closed and enumerable from the domain model, so Gx-trace demands a placement row, or
-a reasoned `(not placed: <reason>)` waiver, for every declared entity. Read the `checked:` counts;
-they tell you what was actually verified.
+declared. Two other tables are the opposite case, closed sets, and both ARE checked. The
+PERSISTENCE-PLACEMENT table: the entity list is enumerable from the domain model, so Gx-trace demands
+a placement row, or a reasoned `(not placed: <reason>)` waiver, for every declared entity. The
+INTERFACE-CONTRACT table: `dependency_rules.allow` enumerates every crossing the design permits, so
+G2 demands, for every concrete allow edge, a row whose edge cell names it as `from -> to` with shape,
+errors, and idempotency all answered, or a `(no contract: <reason>)` waiver. The obligation runs both
+ways: an edge a row names but no allow rule declares is an ERROR, because a contract for a denied,
+undeclared, or merely baselined edge describes an interface the architecture does not have. Read the
+`checked:` counts; they tell you what was actually verified.
 LLM-attested (you check these; the tool cannot): every Modelith action maps to an owning component;
-every boundary crossing has an interface contract (shape, errors, idempotency); whether each
+whether each interface contract is the RIGHT one (that the shape matches what the code will actually
+exchange, the error list is exhaustive, and the idempotency claim survives a retry; that every
+crossing HAS a contract row is checked, as above); whether each
 persistence-and-placement decision is the RIGHT one (both deterministic halves, a machine per row
 and a row per entity, run later in Gx-trace); every technology choice has its adoption closure enumerated, with closure members
 carried into the mitigation table (see the reference); the event-contract table names its

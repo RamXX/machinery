@@ -45,7 +45,9 @@ One line per subcommand:
   composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
 - `machinery check <design-dir> [--impl <code-dir>] [--commit <sha>] [--gate gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ga,g4,gt,g5]` the deterministic
   gate suite (Gm-transition on rebuild/hybrid contracts; Gs-surface on legacy surface ledgers;
-  Gp/Gi/Gn relational gates; G2-c4,
+  Gp/Gi/Gn relational gates; G2-c4 (the contract parses and binds, the allow graph is acyclic,
+  mitigation coverage, and an interface-contract row per allowed edge with no row for an edge no
+  allow rule declares);
   G3-machine, Gx-trace (machine states against the lifecycle enum, machine events against the
   entity's actions, a machine or a `(no machine: <reason>)` waiver per persistence-placement row, a
   placement row or a `(not placed: <reason>)` waiver per declared entity, an enforcement row per

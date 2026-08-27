@@ -277,6 +277,47 @@ which is what the test-writer needs for contract tests. For every relationship c
 - **errors**: the enumerated error responses (these become `onError` branches in Phase 3).
 - **idempotency**: is the call safe to retry, and keyed by what.
 
+Format rules, checked by G2. The obliged set is `dependency_rules.allow`: the contract already
+enumerates every crossing the design permits, so coverage of that closed list is checked rather than
+attested (the same reasoning that makes the placement table's completeness checkable).
+
+- The table header must name **edge**, **shape**, **errors**, and **idempotency**. Every
+  header-matching table in the document is an interface-contract table and their rows are read
+  together, so splitting the contracts across sections hides nothing.
+- The **edge cell** names one or more edges as `from -> to`, written with the contract's own boundary
+  and external ids, optionally backticked, separated by commas. Ids are matched whole: a row for
+  `a.x -> b.y` credits that pair and nothing else, so a longer id never satisfies a shorter one.
+  Annotations, the waiver included, go in parentheses. Anything else in the cell fails loudly rather
+  than being half-read: a chain (`a -> b -> c`) is not a pair, and a wildcard is not a contract.
+- **One row may cover several edges** when they genuinely share one interface: several consumers of
+  the same provider (`app -> store`, `jobs -> store`), or several importers of one shared type
+  module. Every pair the cell names is credited with that row's shape, errors, and idempotency, so
+  group edges only when all three answers hold for each of them.
+- **Every column is answered.** An empty shape, errors, or idempotency cell is an unanswered
+  question, not a contract. "none" and "n/a (pure)" are answers; blank is not.
+- **Coverage**: every concrete allow edge needs a row, or the waiver `(no contract: <reason>)` in its
+  edge cell. A wildcard allow rule names no concrete pair and so carries no obligation, exactly as it
+  carries none in the acyclicity and reachability checks.
+- **No drift the other way**: every edge a row names must be an allow edge. A contract for a denied,
+  undeclared, or merely baselined edge describes an interface the architecture does not have (a
+  baselined edge is tolerated debt to burn down, never a designed interface).
+
+| edge | shape | errors | idempotency |
+|---|---|---|---|
+| `app -> store`, `jobs -> store` | `Store` interface: `Load(id) -> (T, version)`, `Save(T, expectedVersion)` | `ErrNotFound`, `ErrConflict`, `ErrUnavailable` | `Save` is idempotent under `(id, expectedVersion)` |
+| `store -> external.db` | pgdriver connection plus SQL; no driver type escapes `store` | driver errors mapped here onto the typed set above | one transaction per save, so a retry repeats the whole unit |
+| `app -> model` | type-only: the shared vocabulary; no functions with side effects | none; nothing here can fail | n/a: no calls cross this edge |
+| `svc -> external.bus` (no contract: authored in the child design that owns this subsystem) | n/a | n/a | n/a |
+
+Three waiver tokens now live in this document and each answers a different question, so never
+substitute one for another: `(no machine: <reason>)` waives a placement row's MACHINE,
+`(not placed: <reason>)` waives an entity's PLACEMENT, and `(no contract: <reason>)` waives an
+edge's INTERFACE CONTRACT.
+
+What stays attested: whether the stated shape, error set, and idempotency rule are the RIGHT ones.
+The gate holds the row and its columns; only a reader can tell whether the shape matches what the
+code will actually exchange.
+
 ## Dependency mitigation posture (drives Phase 3 failure transitions)
 
 For every external dependency, fill one row. This is what reclassifies failures rather than deleting
@@ -444,13 +485,17 @@ Deterministic (run `machinery check <design> --gate g2`):
   naming it backticked in the first column. Coverage is over DECLARED dependencies only: a
   dependency never declared in the DSL or the contract carries no obligation, so completeness of
   the declaration itself is attested, not checked.
+- Every concrete allow edge has an interface-contract row with shape, errors, and idempotency all
+  answered, or a `(no contract: <reason>)` waiver; and every edge a row names is an allow edge.
 - Read the `checked:` counts; an empty check is an ERROR, never a silent pass.
 
 LLM-attested (you verify; the tool cannot):
 
 - The `workspace.dsl` compiles under `structurizr-cli export` (run it; fix syntax errors).
 - Every Modelith action maps to an owning component in `workspace.dsl`.
-- Every boundary crossing has an interface contract (shape, errors, idempotency).
+- Whether each interface contract is the RIGHT one: that the shape matches what the code will
+  actually exchange, the error list is exhaustive, and the idempotency claim survives a retry. That
+  every crossing HAS one is now checked (see above).
 - Every stateful component has a persistence-and-placement decision, and each decision is the RIGHT
   one (whether a row's placement, persistence, and serialization actually hold is judgment). Two
   deterministic halves run in Gx-trace once machines exist: a machine per row, and a row per

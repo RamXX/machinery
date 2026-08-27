@@ -44,6 +44,13 @@ dependency_rules:
     - "The pipeline never talks to the analytics destination directly: the deny pins it, and the only allowed route is through pii.export, which holds no subject records."
 ```
 
+## Interface contracts
+
+| edge | shape | errors | idempotency |
+|---|---|---|---|
+| `pii.pipeline -> pii.export` | `Export(redacted RedactedRecord) -> ExportId`; the argument type carries redacted fields only, so the type system, not a review, keeps subject data on the pipeline side | `ErrSpoolFull`, `ErrRejected` (the destination refused the batch) | idempotent by export id: re-exporting the same id is a no-op |
+| `pii.export -> external.analytics` | analytics-sdk batch delivery over HTTPS, one call per spooled export | transport failures and destination rejections mapped here onto `ErrRejected`; no SDK type escapes `pii.export` | at-least-once with the export id as the dedupe key; the destination collapses repeats |
+
 ## Dependency mitigation posture
 
 | dependency | failure modes | mitigation | residual | bound |

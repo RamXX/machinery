@@ -95,6 +95,35 @@ func TestG2EventContractTablesConcatenate(t *testing.T) {
 	}
 }
 
+// coveringInterfaceTable renders one interface-contract row per concrete allow
+// edge in a fixture's rules block, so a fixture built to exercise the
+// dependency GRAPH is a coherent design and reports graph findings only.
+func coveringInterfaceTable(rules string) string {
+	var rows []string
+	key := ""
+	for _, line := range strings.Split(rules, "\n") {
+		if t := strings.TrimRight(line, " "); strings.HasPrefix(t, "  ") && strings.HasSuffix(t, ":") &&
+			!strings.HasPrefix(strings.TrimSpace(t), "-") {
+			key = strings.TrimSuffix(strings.TrimSpace(t), ":")
+			continue
+		}
+		t := strings.TrimSpace(line)
+		if key != "allow" || !strings.HasPrefix(t, "- ") {
+			continue
+		}
+		edge := strings.Trim(strings.TrimPrefix(t, "- "), `"`)
+		if strings.Contains(edge, "*") {
+			continue // a wildcard rule names no concrete pair, so it needs no row
+		}
+		rows = append(rows, "| `"+edge+"` | fixture shape | none | n/a |")
+	}
+	if len(rows) == 0 {
+		return ""
+	}
+	return "\n## Interface contracts\n\n| edge | shape | errors | idempotency |\n|---|---|---|---|\n" +
+		strings.Join(rows, "\n") + "\n"
+}
+
 // c4GraphFixture builds a minimal design whose contract declares the given
 // boundary ids and dependency_rules block, and runs G2 over it.
 func c4GraphFixture(t *testing.T, ids []string, rules string) *Gate {
@@ -109,7 +138,7 @@ func c4GraphFixture(t *testing.T, ids []string, rules string) *Gate {
 	dsl := "workspace \"W\" \"sys\" {\n  model {\n    sys = softwareSystem \"S\" \"sys\" {\n" +
 		comps.String() + "    }\n  }\n}\n"
 	arch := "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
-		bounds.String() + rules + "```\n"
+		bounds.String() + rules + "```\n" + coveringInterfaceTable(rules)
 	mustWrite(t, filepath.Join(design, "workspace.dsl"), dsl)
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
 	return CheckC4(design)
@@ -261,6 +290,184 @@ func TestGxPlacementWaiverColumnAndReason(t *testing.T) {
 		}
 		if g.Counts["placement rows waived"] != 1 {
 			t.Errorf("placement rows waived = %d, want 1: %+v", g.Counts["placement rows waived"], g.Counts)
+		}
+	})
+}
+
+// --- G2 interface-contract completeness (the allow list is closed) ---
+
+// ifaceFixture builds a design whose contract declares the given boundary ids
+// and rules, and whose ARCHITECTURE.md carries the given interface-contract
+// table rows (no table at all when rows is "").
+func ifaceFixture(t *testing.T, ids []string, rules, rows string) *Gate {
+	t.Helper()
+	design := t.TempDir()
+	var comps, bounds strings.Builder
+	for _, id := range ids {
+		el := id[strings.LastIndex(id, ".")+1:]
+		comps.WriteString("      " + el + " = component \"" + el + "\" \"logic\" \"Go\"\n")
+		bounds.WriteString("  - id: " + id + "\n    code: [\"" + el + "/**\"]\n")
+	}
+	dsl := "workspace \"W\" \"sys\" {\n  model {\n    sys = softwareSystem \"S\" \"sys\" {\n" +
+		comps.String() + "    }\n  }\n}\n"
+	arch := "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
+		bounds.String() + rules + "```\n"
+	if rows != "" {
+		arch += "\n## Interface contracts\n\n| edge | shape | errors | idempotency |\n|---|---|---|---|\n" + rows + "\n"
+	}
+	mustWrite(t, filepath.Join(design, "workspace.dsl"), dsl)
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
+	return CheckC4(design)
+}
+
+const twoEdgeRules = "dependency_rules:\n  allow:\n    - p.a -> p.b\n    - p.a -> p.c\n"
+
+func TestG2InterfaceContractCompleteness(t *testing.T) {
+	t.Run("a row per allow edge passes", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| `p.a -> p.b` | Store interface | ErrNotFound | reads safe to retry |\n"+
+				"| `p.a -> p.c` | Clock.Now() | none | pure |")
+		if len(g.Errs) != 0 {
+			t.Fatalf("a complete interface table must pass: %v", g.Errs)
+		}
+		if g.Counts["edges contracted"] != 2 {
+			t.Errorf("edges contracted = %d, want 2: %+v", g.Counts["edges contracted"], g.Counts)
+		}
+	})
+	t.Run("an allow edge with no row is an error naming the edge", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| `p.a -> p.b` | Store interface | ErrNotFound | reads safe to retry |")
+		if !hasErr(g, "allow edge `p.a -> p.c` has no interface-contract row") {
+			t.Fatalf("an uncontracted allow edge must fail, named: %v", g.Errs)
+		}
+		if hasErr(g, "allow edge `p.a -> p.b`") {
+			t.Fatalf("the contracted edge must be credited: %v", g.Errs)
+		}
+	})
+	t.Run("one row may cover several edges", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| `p.a -> p.b`, `p.a -> p.c` | the same Store interface | ErrNotFound | reads safe to retry |")
+		if len(g.Errs) != 0 {
+			t.Fatalf("a multi-edge row must cover every pair it names: %v", g.Errs)
+		}
+		if g.Counts["edges contracted"] != 2 {
+			t.Errorf("edges contracted = %d, want 2: %+v", g.Counts["edges contracted"], g.Counts)
+		}
+	})
+	t.Run("a reasoned '(no contract:)' waiver passes", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| `p.a -> p.b` | Store interface | ErrNotFound | reads safe to retry |\n"+
+				"| `p.a -> p.c` (no contract: authored in the child design) | n/a | n/a | n/a |")
+		if len(g.Errs) != 0 {
+			t.Fatalf("a reasoned waiver must waive: %v", g.Errs)
+		}
+		if g.Counts["edges waived"] != 1 || g.Counts["edges contracted"] != 1 {
+			t.Errorf("counts = %+v, want 1 contracted and 1 waived", g.Counts)
+		}
+	})
+	t.Run("a waiver with no reason is an error", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| `p.a -> p.b` | Store interface | ErrNotFound | reads safe to retry |\n"+
+				"| `p.a -> p.c` (no contract:) | n/a | n/a | n/a |")
+		if !hasErr(g, "interface-contract waiver for edge `p.a -> p.c` names no reason") {
+			t.Fatalf("an empty waiver reason must not waive: %v", g.Errs)
+		}
+	})
+	t.Run("an empty column is an error", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| `p.a -> p.b` | Store interface |  | reads safe to retry |\n"+
+				"| `p.a -> p.c` | Clock.Now() | none | pure |")
+		if !hasErr(g, "leaves errors empty") {
+			t.Fatalf("an unanswered column must fail: %v", g.Errs)
+		}
+	})
+	t.Run("no interface table at all is one error, not silence", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules, "")
+		if !hasErr(g, "has no interface-contract table") {
+			t.Fatalf("a missing table must fail: %v", g.Errs)
+		}
+	})
+}
+
+// Drift: the table may only describe edges the contract allows. A row for a
+// denied, undeclared, or merely baselined edge documents an interface the
+// architecture does not have.
+func TestG2InterfaceContractDrift(t *testing.T) {
+	t.Run("a row for a non-allowed declared edge is drift", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| `p.a -> p.b` | Store | ErrNotFound | retry |\n"+
+				"| `p.a -> p.c` | Clock | none | pure |\n"+
+				"| `p.b -> p.c` | a shape for an edge nobody allowed | none | pure |")
+		if !hasErr(g, "interface-contract row names edge `p.b -> p.c`, which no allow rule declares") {
+			t.Fatalf("a contract for an unallowed edge must be drift: %v", g.Errs)
+		}
+	})
+	t.Run("a row naming an undeclared boundary says so", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| `p.a -> p.b` | Store | ErrNotFound | retry |\n"+
+				"| `p.a -> p.c` | Clock | none | pure |\n"+
+				"| `p.a -> p.ghost` | a shape for a boundary that does not exist | none | pure |")
+		if !hasErr(g, "(`p.ghost` is not a declared boundary or external)") {
+			t.Fatalf("an undeclared side must be named: %v", g.Errs)
+		}
+	})
+	t.Run("a baselined edge is not an allow edge", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"},
+			"dependency_rules:\n  allow:\n    - p.a -> p.b\n    - p.a -> p.c\n"+
+				"  deny:\n    - p.b -> p.c\n  baseline:\n    - p.b -> p.c\n",
+			"| `p.a -> p.b` | Store | ErrNotFound | retry |\n"+
+				"| `p.a -> p.c` | Clock | none | pure |\n"+
+				"| `p.b -> p.c` | documenting tolerated debt as if it were designed | none | pure |")
+		if !hasErr(g, "interface-contract row names edge `p.b -> p.c`, which no allow rule declares") {
+			t.Fatalf("a baselined edge is tolerated debt, not a designed interface: %v", g.Errs)
+		}
+	})
+}
+
+// Whole-edge matching: an edge is credited only by a row naming that exact
+// pair. A longer id must never satisfy a shorter one, in either position.
+func TestG2InterfaceContractWholeEdge(t *testing.T) {
+	g := ifaceFixture(t, []string{"p.a", "p.ab", "p.b", "p.bb"},
+		"dependency_rules:\n  allow:\n    - p.a -> p.b\n    - p.ab -> p.bb\n",
+		"| `p.ab -> p.bb` | the longer pair only | none | pure |")
+	if !hasErr(g, "allow edge `p.a -> p.b` has no interface-contract row") {
+		t.Fatalf("`p.a -> p.b` must not be credited by the `p.ab -> p.bb` row: %v", g.Errs)
+	}
+	if g.Counts["edges contracted"] != 1 {
+		t.Errorf("edges contracted = %d, want 1: %+v", g.Counts["edges contracted"], g.Counts)
+	}
+}
+
+// The edge cell is read whole or not at all: a chain or a stray word is a
+// loud format error, never a half-understood row.
+func TestG2InterfaceContractEdgeCellGrammar(t *testing.T) {
+	t.Run("a chain is malformed", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| `p.a -> p.b -> p.c` | a chain, not a pair | none | pure |")
+		if !hasErr(g, "is not a 'from -> to' pair") {
+			t.Fatalf("a chain must be reported: %v", g.Errs)
+		}
+	})
+	t.Run("a wildcard is refused", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| `p.a -> p.*` | one shape for a whole class | none | pure |")
+		if !hasErr(g, "uses a wildcard; a contract is a concrete claim") {
+			t.Fatalf("a wildcard row must be refused: %v", g.Errs)
+		}
+	})
+	t.Run("a row with no edge at all is reported", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"}, twoEdgeRules,
+			"| the store boundary | prose in the edge column | none | pure |")
+		if !hasErr(g, "is not a 'from -> to' pair") {
+			t.Fatalf("a row naming no pair must be reported: %v", g.Errs)
+		}
+	})
+	t.Run("a wildcard allow rule carries no obligation", func(t *testing.T) {
+		g := ifaceFixture(t, []string{"p.a", "p.b", "p.c"},
+			"dependency_rules:\n  allow:\n    - p.a -> p.b\n    - \"p.a -> p.*\"\n",
+			"| `p.a -> p.b` | Store | ErrNotFound | retry |")
+		if len(g.Errs) != 0 {
+			t.Fatalf("a wildcard allow rule names no concrete pair, so it demands no row: %v", g.Errs)
 		}
 	})
 }

@@ -19,7 +19,7 @@
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 6 boundaries, 1 externals, 12 allow rules, 16 transitive pairs, 2 deny rules, 5 boundaries with exposes, 14 dsl elements, 6 boundaries bound to dsl, 6 mitigation rows, 3 dependencies with mitigation rows
+  checked: 6 boundaries, 1 externals, 12 allow rules, 16 transitive pairs, 2 deny rules, 5 boundaries with exposes, 14 dsl elements, 6 boundaries bound to dsl, 6 mitigation rows, 3 dependencies with mitigation rows, 12 edges contracted
   ok
 == G3-machine  machines + oracle ==
   warn   Deal.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound

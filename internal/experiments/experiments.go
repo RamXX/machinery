@@ -91,6 +91,14 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "entity `Sprocket` appears in no persistence-and-placement row", ExpectExit: true},
 	{Name: "placement-table-deleted", Tool: "check", Mutation: "drop the persistence-and-placement table",
 		ExpectSubstr: "no persistence-and-placement table", ExpectExit: true},
+	// 2026-08-27: the same class of hole, one table over. dependency_rules.allow
+	// is a closed list of boundary crossings, so "every crossing has an
+	// interface contract" is checkable; it had been attested since the contract
+	// format existed.
+	{Name: "allow-edge-with-no-interface-contract", Tool: "check", Mutation: "drop one edge's interface-contract row",
+		ExpectSubstr: "allow edge `widget.store -> external.db` has no interface-contract row", ExpectExit: true},
+	{Name: "interface-contract-for-unallowed-edge", Tool: "check", Mutation: "write a contract row for a denied edge",
+		ExpectSubstr: "which no allow rule declares", ExpectExit: true},
 	// 2026-08-11 review: G2 validated the contract's rules but never the shape
 	// of the dependency graph they declare; a -> b plus b -> a passed clean.
 	{Name: "contract-cycle", Tool: "check", Mutation: "allow rules close widget.store -> widget.app into a cycle",

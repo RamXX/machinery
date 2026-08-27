@@ -5,7 +5,7 @@
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 7 boundaries, 2 externals, 13 allow rules, 21 transitive pairs, 2 deny rules, 6 boundaries with exposes, 12 dsl elements, 7 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows
+  checked: 7 boundaries, 2 externals, 13 allow rules, 21 transitive pairs, 2 deny rules, 6 boundaries with exposes, 12 dsl elements, 7 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 13 edges contracted
   ok
 == G3-machine  machines + oracle ==
   warn   Portfolio.machine.json: liveness for reverted rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound

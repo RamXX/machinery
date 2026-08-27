@@ -24,6 +24,7 @@ func init() {
 		"invariant-not-whole-token", "machine-state-not-in-enum", "enum-value-without-state",
 		"machine-event-not-action", "unmapped-machine", "placement-row-no-machine",
 		"entity-with-no-placement-row", "placement-table-deleted",
+		"allow-edge-with-no-interface-contract", "interface-contract-for-unallowed-edge",
 		"contract-cycle", "single-form-import-bypass", "undeclared-cross-boundary", "import-unexposed-internals",
 		"source-outside-contract")
 }
@@ -125,6 +126,13 @@ dependency_rules:
 | component | placement | persistence | concurrency |
 |---|---|---|---|
 | ` + "`Widget`" + ` | in-process | db row | single writer |
+
+## 8. Interface contracts
+
+| edge | shape | errors | idempotency |
+|---|---|---|---|
+| ` + "`widget.app -> widget.store`" + ` | Store.Open plus Save/Load per widget | ErrNotFound, ErrConflict | Save is idempotent under the widget id |
+| ` + "`widget.store -> external.db`" + ` | dbdriver connection and SQL statements | driver errors mapped here onto the typed set above | one transaction per save |
 `
 
 const fixtureMatrix = "# Widget machine - contract and oracle\n\n" +
@@ -602,6 +610,44 @@ func TestDeletedPlacementTableIsError(t *testing.T) {
 		"| component | placement | persistence | concurrency |", "| component | notes |")
 	if !containsAny(gates.CheckTraceability(design).Errs, "no persistence-and-placement table") {
 		t.Error("a design with no placement table passed Gx")
+	}
+}
+
+// ---------------- experiment: interface-contract completeness --------------
+
+// dependency_rules.allow is a closed list of boundary crossings, so an edge
+// with no interface contract is a checkable hole, not an attested one.
+func TestAllowEdgeWithoutInterfaceContractIsError(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"),
+		"| `widget.store -> external.db` | dbdriver connection and SQL statements | driver errors mapped here onto the typed set above | one transaction per save |\n", "")
+	if !containsAny(gates.CheckC4(design).Errs,
+		"allow edge `widget.store -> external.db` has no interface-contract row") {
+		t.Error("an allow edge with no interface contract passed G2")
+	}
+}
+
+// The table describes the interfaces the architecture HAS. A row for an edge
+// the contract denies (or never declared) is drift in the other direction.
+func TestInterfaceContractForUnallowedEdgeIsError(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"),
+		"| `widget.store -> external.db` |",
+		"| `widget.app -> external.db` | a shape for the denied edge | none | n/a |\n| `widget.store -> external.db` |")
+	if !containsAny(gates.CheckC4(design).Errs, "which no allow rule declares") {
+		t.Error("an interface contract for a denied edge passed G2")
+	}
+}
+
+// The escape hatch, distinct from the machine and placement waivers.
+func TestInterfaceContractWaiverIsAccepted(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"),
+		"| `widget.store -> external.db` | dbdriver connection and SQL statements | driver errors mapped here onto the typed set above | one transaction per save |",
+		"| `widget.store -> external.db` (no contract: the driver's own published API is the contract) | n/a | n/a | n/a |")
+	g := gates.CheckC4(design)
+	if containsAny(g.Errs, "widget.store -> external.db") {
+		t.Errorf("a reasoned '(no contract: <reason>)' waiver was rejected: %v", g.Errs)
 	}
 }
 

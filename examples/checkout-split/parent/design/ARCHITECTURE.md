@@ -46,6 +46,17 @@ dependency_rules:
     - "payments.svc -> external.ordersdb"
 ```
 
+## 4b. Interface contracts
+
+This root decomposes: each subsystem's infrastructure interfaces are authored in its own child
+design, exactly as its machines are (see the placement rows in section 7). What the parent keeps is
+what crosses BETWEEN subsystems, and here that is bus messaging only, governed by section 5.
+
+| edge | shape | errors | idempotency |
+|---|---|---|---|
+| `orders.svc -> external.bus`, `orders.svc -> external.ordersdb` (no contract: authored in the orders child design, which owns its subsystem's infrastructure shapes) | n/a | n/a | n/a |
+| `payments.svc -> external.bus`, `payments.svc -> external.paydb` (no contract: authored in the payments child design, which owns its subsystem's infrastructure shapes) | n/a | n/a | n/a |
+
 ## 5. Event contracts (the governing artifact for the bus)
 
 | event | producer | consumer | payload | delivery | ordering | dedupe |

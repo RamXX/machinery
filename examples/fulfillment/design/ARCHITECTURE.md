@@ -77,7 +77,17 @@ The saga's compensation is a single idempotent step (refund if captured, release
 if it cannot complete within the bound the saga ends in the explicit residual FailedDirty. The data-refined
 model `formal/FulfillmentSagaData.tla` proves that money and stock are never silently lost.
 
-## 4. Persistence and placement
+## 4. Interface contracts
+
+The contract allows exactly four crossings, all into the shared contracts library. Everything else
+between services is asynchronous and governed by the event-contract table in section 6: a bus message
+is not an edge in the dependency graph, which is precisely why that table exists.
+
+| edge | shape | errors | idempotency |
+|---|---|---|---|
+| `order.service -> shared.contracts`, `inventory.service -> shared.contracts`, `payment.service -> shared.contracts`, `shipping.service -> shared.contracts` | type-only: the `Contracts` modules holding the event structs and their encode/decode functions, built from `fulfillment.modelith.yaml` attributes; no I/O and no process | a decode failure surfaces at the consuming service's own poison-message path, never inside the library | pure: encoding the same event twice yields the same bytes, so a redelivered message decodes identically |
+
+## 5. Persistence and placement
 
 | component | placement | persistence | concurrency serialization |
 |---|---|---|---|
@@ -90,7 +100,7 @@ model `formal/FulfillmentSagaData.tla` proves that money and stock are never sil
 | `Refund` (no machine: the outcome record of a compensating capture) | none; rows in the Payment Service DB | one row per issued refund | written inside the payment's compensation step |
 | `Address` (not placed: a value object stored inline in the `Shipment` row it belongs to) | n/a | n/a | n/a |
 
-## 5. Event-contract table
+## 6. Event-contract table
 
 Bus coupling is invisible to import-level checking, so this table is the governing artifact for
 every message that crosses a service boundary. Every row rides the transactional outbox of the
@@ -111,7 +121,7 @@ and the API starts the saga in-process; the saga's first outbox emission is the 
 | `captured` / `refunded` / `failed` events | Payment Service (via its outbox) | Order Service (saga) | order id, `Payment.status`, `Payment.amountCents` | at-least-once via outbox | per order; as above | message id |
 | `dispatched` / `delivered` / `lost` events | Shipping Service (via its outbox) | Order Service (saga) | order id, `Shipment.status`, `Shipment.trackingId` | at-least-once via outbox | per order; as above; `delivered` / `lost` drive the Order's `markDelivered` / `fail` | message id |
 
-## 6. NFR record
+## 7. NFR record
 
 - **Security posture**: the customer-facing API and the operator's stock management are HTTPS. The
   payment gateway credential lives only in the Payment Service and is never logged; the platform
@@ -131,7 +141,7 @@ and the API starts the saga in-process; the saga's first outbox emission is the 
   is broken. Metrics and log tooling choices are deferred to implementation; the signals above are
   not.
 
-## 7. Gate 2 result
+## 8. Gate 2 result
 
 Every Modelith action maps to an owning service; every external dependency has a mitigation-posture row;
 the contract is consistent and the services are forbidden from calling each other directly; persistence

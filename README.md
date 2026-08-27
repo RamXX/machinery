@@ -130,8 +130,9 @@ Opt-in   External     bring-your-own deterministic checker (SAST, AST, Datalog, 
          tool: projection is fresh; committed evidence binds to it; verdict is pass; coverage complete
          attested: the manifest claims the elements the checker is responsible for
 Phase 2  C4           architecture + contract
-         tool: G2-c4 (contract parses and binds; allow graph acyclic; mitigation coverage)
-         attested: every action owned; interface contracts; NFR record
+         tool: G2-c4 (contract parses and binds; allow graph acyclic; mitigation coverage;
+               an interface contract per allowed edge, and no row for an edge nobody allows)
+         attested: every action owned; each contract's shape is the right one; NFR record
 Phase 3  XState       state machines
          tool: G3-machine (lint; every invoke has onError + timeout; oracle fresh; matrix reconciled)
          attested: each guard enforces the invariant it names; residual failure transitions kept
@@ -589,7 +590,7 @@ make verify-formal   # regenerates and checks all 34 TLC proofs + the relational
 | Gi-integrity | designs with an integrity annotation only: it binds to the domain model and the committed `Integrity.als` byte-matches a fresh generation. |
 | Gn-isolation | designs with an isolation annotation only: it binds to the domain model and the committed `Isolation.als` and `Isolation.oracle.md` byte-match a fresh generation. |
 | Gc-carrier | every declared invariant has a named carrier: an action's `preserves`, a relational layer, a machine matrix unit, an external checker's coverage claim, or an explicit waiver with a reason (`formal/waivers.yaml` or a layer's residuals). Needs only the domain model, so it runs from Phase 1; declaring an obligation the design does not carry fails the moment it is written, not months later. |
-| G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, the allow graph is acyclic (cycles closing only through `baseline:` edges warn as ratchet debt), `assert: no_path` claims hold over the transitive closure, and every dependency has a mitigation row. |
+| G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, the allow graph is acyclic (cycles closing only through `baseline:` edges warn as ratchet debt), `assert: no_path` claims hold over the transitive closure, every dependency has a mitigation row, and every allowed boundary crossing has an interface-contract row (edge, shape, errors, idempotency) or a `(no contract: <reason>)` waiver, with no row for an edge no allow rule declares. |
 | G3-machine | machines pass structural lint, committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
 | Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows, and entities to persistence-placement rows (every declared entity has a row or a `(not placed: <reason>)` waiver; the entity list is closed, so the table's completeness is checked, not attested). |
 | Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, and the skeleton DoD cites a committed oracle id. |
