@@ -1089,7 +1089,7 @@ implementation `go.mod` and the compose file.
    then GREEN sequentially with the same single agent; the derivation rule is unchanged (tests come from
    sections 6-7 and the oracles, never from implementation intentions), and the gate runs in steps 1 and 3
    separate the phases in place of context isolation.
-3. **RED exit gate**, all three deterministic checks required before anything locks:
+3. **RED exit gate**, all four deterministic checks required before anything locks:
    a. Coverage of the spec: every oracle stable id appears whole-token somewhere in the suite (Gt-tests
       holds this deterministically in the step-b check run; a missing id is a missing test); every
       guard-conjunction clause has its falsifying test (the 7 intro a/b/c rule); every invariant in
@@ -1100,9 +1100,16 @@ implementation `go.mod` and the compose file.
       the tests stand on already respect the section 4.5 Architecture Contract (C-ARCH-01).
    c. The suite RUNS and is red for the right reason: failing assertions on missing behavior, never compile
       or import errors inside the tests themselves.
+   d. Born clean: the new test files and their scaffolding already satisfy every gate that will ever be
+      applied to them. `gofmt -l` reports nothing over them, `go vet ./...` is clean, and the RED commit
+      itself is green under every non-test gate this project runs. A locked file has no legal remedy for a
+      gate it fails later, because nobody is allowed to touch it; before the lock is the only time to
+      satisfy those gates.
 4. **The tests are then LOCKED.** The implementer agent may not modify, weaken, skip, or delete them to make
    them pass. Locking is structural (the test files are owned by the test-writer; changes require a design
-   round-trip).
+   round-trip). If a gate later demands a change to a locked file, that is a RED-phase defect and not
+   license to edit: it takes an owner-sanctioned amendment that changes formatting only and carries a
+   token-identity proof (the file's token stream is identical before and after).
 5. **The implementer agent** writes production code until the locked tests pass, honoring the section 4.5
    Architecture Contract (C-ARCH-01) and the section 10 realization rules.
 6. **GREEN acceptance bar**, both together: the locked suite passes AND
