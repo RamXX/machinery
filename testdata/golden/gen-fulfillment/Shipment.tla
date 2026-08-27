@@ -1,5 +1,5 @@
 ---- MODULE Shipment ----
-\* machinery-version: v0.3.8
+\* machinery-version: v0.3.9
 EXTENDS Naturals
 
 \* Generated from Shipment.machine.json by machinery tla. Control-flow model.
