@@ -652,7 +652,12 @@ The protocol is gate-anchored at both ends, and the BUILD.md you produce must sa
 RED is complete only when every oracle stable id appears whole-token in the suite (Gt-tests holds
 this deterministically once `--impl` points at the suite), when
 `machinery check <design> --impl <dir>` is green over the scaffolding and stubs the tests compile
-against, and when the suite is red on assertions rather than its own errors; GREEN is accepted only
+against, when the suite is red on assertions rather than its own errors, and when the new test
+files are born clean under the project's own formatter and linters, with the RED commit itself
+green under every non-test gate the project enforces (a locked file has no legal remedy for a gate
+it fails later, because nobody may touch it; a gate that does demand a change to a locked file is
+a RED-phase defect, remedied by an owner-sanctioned formatting-only amendment carrying a
+token-identity proof, never a silent edit); GREEN is accepted only
 when the locked tests and that same check pass together. This is what makes the discipline hold on
 runtimes that cannot spawn a fresh-context test-writer (Codex and other single-context agents): the
 same agent runs RED then GREEN sequentially, and the deterministic gate runs separate the phases in

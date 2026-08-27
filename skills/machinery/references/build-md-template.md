@@ -233,7 +233,7 @@ tools (including how to run `machinery oracle` and `machinery check`).
    derivation rule is unchanged (tests come from sections 6 and 7 and the oracles, never from
    implementation intentions), and the gate runs in steps 1 and 3 are what separate the phases in
    place of context isolation.
-3. RED exit gate, all three deterministic checks required before anything locks:
+3. RED exit gate, all four deterministic checks required before anything locks:
    a. Coverage of the spec: every oracle row's stable id appears whole-token somewhere in the
       suite (Gt-tests holds this deterministically in the step-b check run; a missing id is a
       missing test), every guard-conjunction
@@ -246,10 +246,21 @@ tools (including how to run `machinery oracle` and `machinery check`).
       a boundary violation would force the implementer to reproduce that violation to go green.
    c. The suite RUNS and is red for the right reason: failing assertions on missing behavior,
       never compile or import errors inside the tests themselves.
+   d. Born clean: the new test files and their scaffolding satisfy every project gate that will
+      ever be applied to them. Run this project's formatter and every linter it enforces over the
+      new files, and require the RED commit itself to be green under every non-test gate the
+      project runs (format check, lint, license or copyright headers, encoding and naming rules).
+      A locked file has no legal remedy for a gate it fails later, because nobody is allowed to
+      touch it; the only time to satisfy those gates is before the lock.
    Together these are the guarantee: the spec is gate-checked, the suite's coverage of the spec is
-   id-checked, and the suite's own skeleton respects the architecture, so the implementer has no
-   correct move except delivering the designed behavior inside the designed boundaries.
-4. The tests are then LOCKED. The implementer agent may not modify them to make them pass.
+   id-checked, the suite's own skeleton respects the architecture, and the files are already clean
+   under the project's own gates, so the implementer has no correct move except delivering the
+   designed behavior inside the designed boundaries.
+4. The tests are then LOCKED. The implementer agent may not modify them to make them pass. If a
+   gate later demands a change to a locked file, that is a RED-phase defect and not license to
+   edit: it takes an owner-sanctioned amendment that changes formatting only and carries a
+   token-identity proof (the file's token stream is identical before and after). Anything a
+   formatting-only amendment cannot fix is a design round-trip, per step 8.
 5. The implementer agent writes the code until the locked tests pass.
 6. GREEN acceptance bar, both together: the locked suite passes AND
    `machinery check design --impl <impl-dir>` is green again. Code that passes the tests by

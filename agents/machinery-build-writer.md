@@ -100,7 +100,12 @@ section structure exactly.
     tests (a red design is an untrustworthy spec), and a RED exit gate of (a) every oracle stable
     id whole-token in the suite plus every guard-falsifying clause and invariant property test,
     (b) `machinery check --impl` green over the scaffolding and stubs, (c) the suite red on
-    assertions, not on its own compile errors. Only then do the tests lock; the implementer makes
+    assertions, not on its own compile errors, (d) the new files born clean under the project's
+    own formatter and linters, with the RED commit green under every non-test gate the project
+    enforces (a locked file has no legal remedy for a gate it fails later, because nobody may
+    touch it; a gate that does demand a change to a locked file is a RED-phase defect, remedied by
+    an owner-sanctioned formatting-only amendment carrying a token-identity proof, never a silent
+    edit). Only then do the tests lock; the implementer makes
     them pass without editing them; GREEN is accepted only with the locked tests AND
     `machinery check --impl` green together. Include the fallback for runtimes without subagents:
     the same agent runs RED then GREEN sequentially, and the two gate runs are what separate the
@@ -141,9 +146,10 @@ artifact. Include the `checked:` counts in your report.
   milestones with unique numbers, a `DoD:` line per milestone, the skeleton DoD citing a committed
   oracle id, and the skeleton naming its NFR-record mechanisms.
 - The hard-TDD protocol is stated and unambiguous, including the gate anchors: check-green before
-  test derivation, the three-part RED exit gate (stable-id coverage, `machinery check --impl`
-  green, red-on-assertions), the GREEN bar of tests plus gate together, and the sequential
-  fallback for runtimes that cannot spawn a fresh-context test-writer.
+  test derivation, the four-part RED exit gate (stable-id coverage, `machinery check --impl`
+  green, red-on-assertions, born clean under the project's own format and lint gates), the GREEN
+  bar of tests plus gate together, and the sequential fallback for runtimes that cannot spawn a
+  fresh-context test-writer.
 
 Before handing back, run the conductor's five-question phase-exit self-review (reality, depth,
 scope, coverage, consistency) over BUILD.md and include the verdicts in your summary.
