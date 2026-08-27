@@ -775,7 +775,8 @@ func checkInterfaceContracts(g *Gate, text string, allow [][2]string, declared m
 	found := false
 	for _, tbl := range ir.ParseMdTables(text) {
 		hl := strings.ToLower(strings.Join(tbl.Header, " "))
-		if !strings.Contains(hl, "edge") || !strings.Contains(hl, "shape") ||
+		subject := strings.Contains(hl, "edge") || strings.Contains(hl, "crossing")
+		if !subject || !strings.Contains(hl, "shape") ||
 			!strings.Contains(hl, "error") || !strings.Contains(hl, "idempot") {
 			continue
 		}
@@ -784,6 +785,9 @@ func checkInterfaceContracts(g *Gate, text string, allow [][2]string, declared m
 		// locator would silently ignore the rest
 		found = true
 		ei := colContaining(tbl.Header, "edge")
+		if ei < 0 {
+			ei = colContaining(tbl.Header, "crossing")
+		}
 		cols := map[string]int{
 			"shape":       colContaining(tbl.Header, "shape"),
 			"errors":      colContaining(tbl.Header, "error"),

@@ -389,6 +389,30 @@ func TestG2InterfaceContractCompleteness(t *testing.T) {
 	})
 }
 
+// A table headed "crossing" is an interface-contract table too. Designs
+// authored against the pre-table wording call the column that, and telling
+// such a design it "has no interface-contract table" while it visibly has one
+// is a false diagnosis: the rows are then read and their cells reported.
+func TestG2InterfaceContractCrossingHeaderSynonym(t *testing.T) {
+	design := t.TempDir()
+	dsl := "workspace \"W\" \"sys\" {\n  model {\n    sys = softwareSystem \"S\" \"sys\" {\n" +
+		"      a = component \"a\" \"logic\" \"Go\"\n      b = component \"b\" \"logic\" \"Go\"\n    }\n  }\n}\n"
+	arch := "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
+		"  - id: p.a\n    code: [\"a/**\"]\n  - id: p.b\n    code: [\"b/**\"]\n" +
+		"dependency_rules:\n  allow:\n    - p.a -> p.b\n```\n\n" +
+		"## Interface contracts\n\n| crossing | shape | errors | idempotency |\n|---|---|---|---|\n" +
+		"| `p.a -> p.b` | Store interface | ErrNotFound | reads safe to retry |\n"
+	mustWrite(t, filepath.Join(design, "workspace.dsl"), dsl)
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
+	g := CheckC4(design)
+	if hasErr(g, "has no interface-contract table") {
+		t.Fatalf("a table headed 'crossing' is an interface-contract table: %v", g.Errs)
+	}
+	if g.Counts["edges contracted"] != 1 {
+		t.Errorf("edges contracted = %d, want 1: %+v", g.Counts["edges contracted"], g.Counts)
+	}
+}
+
 // Drift: the table may only describe edges the contract allows. A row for a
 // denied, undeclared, or merely baselined edge documents an interface the
 // architecture does not have.

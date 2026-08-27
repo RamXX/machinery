@@ -281,9 +281,11 @@ Format rules, checked by G2. The obliged set is `dependency_rules.allow`: the co
 enumerates every crossing the design permits, so coverage of that closed list is checked rather than
 attested (the same reasoning that makes the placement table's completeness checkable).
 
-- The table header must name **edge**, **shape**, **errors**, and **idempotency**. Every
-  header-matching table in the document is an interface-contract table and their rows are read
-  together, so splitting the contracts across sections hides nothing.
+- The table header must name **edge** (or **crossing**, the older wording, accepted so a design that
+  already uses it is told what its rows lack rather than that it has no table), plus **shape**,
+  **errors**, and **idempotency**. Every header-matching table in the document is an
+  interface-contract table and their rows are read together, so splitting the contracts across
+  sections hides nothing.
 - The **edge cell** names one or more edges as `from -> to`, written with the contract's own boundary
   and external ids, optionally backticked, separated by commas. Ids are matched whole: a row for
   `a.x -> b.y` credits that pair and nothing else, so a longer id never satisfies a shorter one.
