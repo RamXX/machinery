@@ -499,3 +499,21 @@ func TestSelectNarrowingKeepsGaWhenAcceptanceExists(t *testing.T) {
 		t.Errorf("the note must list ga after gb: %q", sel.Note)
 	}
 }
+
+// Ga reads the plan through the same heading matcher: a decorated section
+// heading must not leave a closed milestone unbindable.
+func TestCheckAcceptanceDecoratedPlanHeading(t *testing.T) {
+	plan := strings.Replace(acceptPlan, "## 9. Build plan",
+		"## 9. Build plan (sealed trust layers; user directive 2026-08-04)", 1)
+	design := writeAcceptFixture(t, map[string]string{"BUILD.md": plan})
+	if !AcceptanceActive(design) {
+		t.Fatal("a closed milestone under a decorated heading must still activate Ga")
+	}
+	g := CheckAcceptance(design, acceptedCommit)
+	if len(g.Errs) != 0 {
+		t.Fatalf("Ga not clean under a decorated plan heading: %v", g.Errs)
+	}
+	if g.Counts["declared milestones"] != 2 || g.Counts["closed milestones with accepted evidence"] != 1 {
+		t.Errorf("the decorated plan's milestones must bind: %+v", g.Counts)
+	}
+}

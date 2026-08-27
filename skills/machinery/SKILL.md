@@ -463,8 +463,10 @@ compiled by the policy annotation is credited as policy-checked without a matrix
 relational model is an enforcement artifact). Token presence is exactly what Gx proves: the id
 appears in an enforcement row; whether that row's guard or mechanism semantically enforces the
 invariant is attested, not proven.
-**Gb-plan** (active once `design/BUILD.md` exists) verifies the Build plan section (any section
-number, heading text "Build plan") deterministically: milestones are bold `**M<n> - <title>**`
+**Gb-plan** (active once `design/BUILD.md` exists) verifies the Build plan section (any `##` or
+`###` heading carrying the phrase "Build plan": a section number and trailing decoration are fine,
+`## 9. Build plan (sealed trust layers)` included, but the phrase must be whole, so "Build planning
+notes" and "Milestone map" are not plan sections) deterministically: milestones are bold `**M<n> - <title>**`
 markers with unique numbers; the first milestone's title contains "walking skeleton", or the
 section carries the explicit waiver line `Walking skeleton: N/A - <reason>` (brownfield gap plans
 whose skeleton already exists in production); every milestone block carries a `DoD:` line; and the

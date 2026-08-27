@@ -191,6 +191,9 @@ real boundary. Prove the topology before adding breadth. Then vertical slices, o
 lifecycle at a time, each slice green before the next.
 
 Format contract, held deterministically by Gb-plan:
+- The section is any `##` or `###` heading carrying the phrase "Build plan". A section number and
+  trailing decoration are fine (`## 9. Build plan (sealed trust layers)`); the phrase must be whole,
+  so "Build planning notes" and "Milestone map" name no plan section.
 - Each milestone is a bold marker `**M<n> - <title>**` with a unique number. Numbers compare
   numerically: M1 and M01 are the same milestone, and declaring both is a duplicate.
 - The first milestone (M0) is the walking skeleton: its title contains "walking skeleton". A

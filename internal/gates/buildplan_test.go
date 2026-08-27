@@ -628,3 +628,70 @@ func TestCheckBuildPlanMilestoneStatusLine(t *testing.T) {
 		t.Errorf("a typo in the status line must fail loudly: %v", g.Errs)
 	}
 }
+
+// The plan heading carries a section number and whatever decoration the
+// design adds; the phrase "Build plan" is what names the section. A real
+// design titled it "## 9. Build plan (sealed trust layers; user directive
+// 2026-08-04)": under an exact-title match the manifest root's plan was
+// found by nothing, and a standalone design would have been told its plan
+// section does not exist. One matcher holds both paths.
+func TestCheckBuildPlanDecoratedHeadingStandalone(t *testing.T) {
+	build := strings.Replace(goCrmStylePlan, "## 9. Build plan",
+		"## 9. Build plan (sealed trust layers; user directive 2026-08-04)", 1)
+	g := CheckBuildPlan(writeBuildPlanFixture(t, build, nil))
+	if len(g.Errs) != 0 {
+		t.Fatalf("a decorated plan heading must still be the plan section: %v", g.Errs)
+	}
+	want := map[string]int{"plans": 1, "milestones": 2, "DoD-bearing milestones": 2, "skeleton citations": 1}
+	for count, n := range want {
+		if g.Counts[count] != n {
+			t.Errorf("Gb counted %s=%d, want %d: %+v", count, g.Counts[count], n, g.Counts)
+		}
+	}
+}
+
+func TestCheckBuildPlanDecoratedHeadingManifestRoot(t *testing.T) {
+	waived := "# Shard\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n"
+	root := "# B\n\nMode: manifest\n\n## 9. Build plan (sealed trust layers; user directive 2026-08-04)\n\n" +
+		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n\n" +
+		"**M1 - Breadth slice.** DoD: all rows green.\n"
+	design := writeBuildPlanFixture(t, root, map[string]string{
+		"BUILD/core.md": waived,
+		"BUILD/edge.md": strings.Replace(waived, "# Shard", "# Edge", 1),
+	})
+	g := CheckBuildPlan(design)
+	if len(g.Errs) != 0 {
+		t.Fatalf("Gb not clean on a decorated root plan heading: %v", g.Errs)
+	}
+	if g.Counts["plans"] != 3 || g.Counts["waived plans"] != 2 || g.Counts["milestones"] != 2 {
+		t.Errorf("the decorated root plan must be counted and checked: %+v", g.Counts)
+	}
+}
+
+// The phrase must be whole, and only headings name a section: a "Build
+// planning" heading, or the words in body prose, create no phantom plan.
+func TestCheckBuildPlanHeadingPhraseIsWhole(t *testing.T) {
+	cases := []struct {
+		name  string
+		build string
+	}{
+		{"Build planning heading",
+			strings.Replace(goCrmStylePlan, "## 9. Build plan", "## 9. Build planning notes", 1)},
+		{"Rebuild plan heading",
+			strings.Replace(goCrmStylePlan, "## 9. Build plan", "## 9. Rebuild plan", 1)},
+		{"prose only",
+			strings.Replace(goCrmStylePlan, "## 9. Build plan",
+				"## 9. Rollout\n\nBuild planning happens weekly; the build plan lives elsewhere.\n\n### Notes", 1)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := CheckBuildPlan(writeBuildPlanFixture(t, tc.build, nil))
+			if !strings.Contains(strings.Join(g.Errs, "\n"), "no Build plan section") {
+				t.Fatalf("a near-miss heading must not become the plan section: %v", g.Errs)
+			}
+			if g.Counts["milestones"] != 0 {
+				t.Errorf("no milestones may be parsed from a phantom section: %+v", g.Counts)
+			}
+		})
+	}
+}

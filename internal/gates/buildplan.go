@@ -55,8 +55,17 @@ var (
 	// The value is captured so an unrecognized token fails loudly in Gb
 	// instead of silently reading as "not closed" and disarming Ga.
 	milestoneStatusRe = regexp.MustCompile(`(?mi)^[ \t]*(?:[-*][ \t]+|\d+\.[ \t]+)?\*{0,2}Status:\*{0,2}[ \t]*([A-Za-z][A-Za-z-]*)`)
-	// planHeadingNumRe strips the template's "N. " section-number prefix.
-	planHeadingNumRe = regexp.MustCompile(`^\d+\.\s+`)
+	// planHeadingRe matches a Build plan heading. The phrase "Build plan" may
+	// sit anywhere in the heading text, so the template's "N. " section number
+	// and any trailing decoration still name the plan section: a real design
+	// titled its section "## 9. Build plan (sealed trust layers; user
+	// directive 2026-08-04)" and an exact-title match silently found no plan
+	// at all (manifest mode reported "7 plans, 7 waived plans" and checked
+	// nothing; full mode would have claimed the section was absent).
+	// "Build plan" must appear as a WHOLE phrase: "Milestone map" and
+	// "Build planning notes" are not plan sections, and neither is "Rebuild
+	// plan".
+	planHeadingRe = regexp.MustCompile(`(?i)(^|[^a-z])build[ \t]+plan([^a-z]|$)`)
 )
 
 // idTokenIn reports whether an oracle or test id occurs in text as a whole
@@ -139,9 +148,10 @@ func headingText(line string) (int, string) {
 }
 
 // buildPlanSection returns the body of the Build plan section: a ## or ###
-// heading whose text, minus an optional "N. " prefix, is exactly "Build
-// plan" (case-insensitive). The body runs to the next heading of the same or
-// higher level, so subheadings stay inside the section.
+// heading whose text carries the phrase "Build plan", whatever the section
+// number and whatever trailing decoration the heading adds. The body runs to
+// the next heading of the same or higher level, so subheadings stay inside
+// the section.
 func buildPlanSection(text string) (string, bool) {
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
@@ -149,7 +159,7 @@ func buildPlanSection(text string) (string, bool) {
 		if level != 2 && level != 3 {
 			continue
 		}
-		if !strings.EqualFold(planHeadingNumRe.ReplaceAllString(title, ""), "Build plan") {
+		if !planHeadingRe.MatchString(title) {
 			continue
 		}
 		end := len(lines)
@@ -379,7 +389,7 @@ func checkPlanDoc(g *Gate, name, text string, oracleIDs []string) {
 	text = maskFences(text)
 	body, ok := buildPlanSection(text)
 	if !ok {
-		g.Errs = append(g.Errs, name+": no Build plan section (need a ## or ### heading titled 'Build plan'; a numeric 'N. ' prefix is fine)")
+		g.Errs = append(g.Errs, name+": no Build plan section (need a ## or ### heading carrying the phrase 'Build plan'; a section number and trailing decoration are fine)")
 		return
 	}
 	// section waiver: ONLY the documented literal form "N/A - <reason>" as
