@@ -357,3 +357,30 @@ coverage, not the implementation or a database run); coupling through shared dat
 bus topics (invisible to import analysis; the event-contract table governs it); and security,
 capacity, and observability beyond what the Phase 2 NFR record captures.
 ```
+
+## Clause-test id suffixes and clause declarations (normative, 2026-08-28)
+
+- A falsifying-clause test id is the base oracle stable id plus a lowercase
+  letter (`COVE-90c3cea`), with ranges as `a..c`. The suffixed form is
+  NEITHER dangling (its base resolves) NOR a citation of the base for
+  coverage purposes; the design-side citation gate (Gd) enforces exactly
+  that reading, so do not invent another.
+- A guard whose refusal dispositions or falsifying tables ENUMERATE its
+  clauses should declare them once, on its matrix row:
+  `CLAUSES{resolved-task, applied-record} RETIRED{sop-coverage}`. Every
+  hand-written line naming the guard is then held to the vocabulary: a
+  partial enumeration and a retired-clause survivor both warn, which is the
+  sibling-artifact drift class (a recorded narrowing reaching four homes and
+  missing the fifth) made mechanical. Declare clauses only where an artifact
+  enumerates them; a single-clause guard gains nothing from the ceremony.
+- Event consumption rows may declare `READS{field, ...}` beside the
+  backticked event name; every declared field must ride some event-table
+  row for that event, which is the payload-sufficiency drift check.
+- Incident-derived invariants and fixtures carry a PROVENANCE pointer to the
+  primary record (the customer report, the post-mortem document), so the
+  attested re-derivation set is enumerable; a fixture named after an
+  incident is a claim that it reproduces the incident's SHAPE
+  (section-inside-an-operative-manual, unmapped-document), which only the
+  primary record can verify. Consistency gates converge on the artifacts'
+  fixed point; they cannot discover that the fixed point mis-transcribed
+  the world.

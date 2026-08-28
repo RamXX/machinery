@@ -355,3 +355,46 @@ Judgment (the lint cannot check these; you must):
 
 Per-instance concurrency is out of the machine's scope and lives in C4 (actor mailbox vs row lock).
 Note it in the machine's `_comment` so the coding agent serializes events correctly.
+
+## The stamped-absolute-deadline idiom (normative since 2026-08-28)
+
+A per-state `after` is silently cancelled when its state exits, so a bound the
+narrative treats as an absolute deadline must never be realized as one state's
+timer: two designs hit the same defect (an answer bound, then a trial window)
+before the idiom settled. The standard realization of an absolute bound:
+
+1. STAMP the deadline instant once, in the action that admits the episode
+   (`stampAnswerDeadline`: `deadlineAt := now + bound`).
+2. DERIVE a remaining delay from it (`_delays` entry named `<x>Remaining`,
+   description stating it is the derived remaining of the stamped absolute
+   deadline) and consume that derived delay with an `after` on EVERY
+   non-final state between the stamp and the terminal the bound governs.
+3. Retry siblings carry exactly one `after` (their backoff; the TLA retry
+   template admits no second), so their re-entries re-check the deadline
+   GUARD-FIRST: the first branch of the sibling's `always` list tests the
+   deadline before the retry decision.
+
+The lint warns on a hole in a derived deadline's span (a dwelling non-final
+state between consumers with no consuming `after`); retry siblings and
+pure-`always` routers are exempt for the reasons above.
+
+## Declared budgets and IO (opt-in annotations, 2026-08-28)
+
+- **`_counters`** (root): maps a context counter to its
+  one-budget-per-instance PROOF where no reset action exists by design
+  ("the leg exhausts into a final and a re-run is a new row"). The lint
+  warns on a counter with an increment and an exhaustion guard but no reset
+  on any edge; the leg-entry rule is the norm (every edge entering a bounded
+  leg from outside its retry siblings carries the reset), and the annotation
+  is the reasoned exception, never a silencer: an unproven waiver is an
+  error, and a waiver beside an existing reset warns as stale.
+- **`_io`** (root): maps unit names to `{reads, writes}` CONTEXT-field lists
+  (`create` is a pseudo-unit; a non-null initial value counts as creation).
+  The lint validates names as errors and warns when a guard reads a field no
+  writer can reach without crossing that guard's own edges: the
+  first-instance-refuses-forever class. DB-state reads stay in the actor
+  contract, not here.
+- **`_branch_order`** (state): one sentence on why a multi-guard branch
+  list's order is correct. Required (as a warning) when two guarded branches
+  of one list cite overlapping non-ambient invariants in their matrix
+  maps-to columns.

@@ -1048,8 +1048,14 @@ was consciously waived. A phase entry without a self-review line is not complete
   dependency-mitigation, persistence-placement, and event-contract table formats, and the NFR record.
 - `references/build-md-template.md` - the full `BUILD.md` skeleton (full and manifest modes).
 - `machinery check` - the deterministic gate suite (Gm-transition, Gs-surface, Gp/Gi/Gn
-  relational gates, G2-c4, G3-machine, Gx-trace, Gb-plan, Ge-embed, Ga-accept, G4-import, Gt-tests,
-  G5-pack for decomposed designs).
+  relational gates, G2-c4, G3-machine, Gd-idcite, Gx-trace, Gb-plan, Ge-embed, Ga-accept, G4-import,
+  Gt-tests, G5-pack for decomposed designs). G3 also runs the TLA generator's own admissibility pass
+  (one validator, one truth), the counter and derived-deadline accounting, the dotted-reference
+  name-rot audit, and the branch-order check; Gd resolves every design-side stable-id citation
+  against the committed oracles and carries the rule-15 row-count, clause-drift, and payload-READS
+  checks. `machinery sweep <name> <design>` lists every hand-written mention of a unit, guard,
+  event, or knob for propagation review. `machinery oracle` accepts named machine files and
+  regenerates valid machines past a broken sibling.
   Single Go binary. Run it at each gate with `--gate` so correctness does not
   rely on the model getting every cross-reference right. See `tools/README.md`.
 - `machinery baseline <design> --impl <dir>` - the brownfield Stage-1 generator: proposes
@@ -1061,3 +1067,22 @@ was consciously waived. A phase entry without a self-review line is not complete
 - `machinery update [--version <tag>]` - checksum-verifies and force-refreshes the CLI plus every
   recorded direct agent home and native host adapter from one release. Host plugin caches remain
   host-owned and are refreshed through the Claude Code/Codex CLIs when detected.
+
+## Multi-agent remediation waves (process guidance, 2026-08-28)
+
+Two lessons from the first large remediation cycle run under this skill:
+
+- **Charter machine-first.** Fix agents chartered on one or a few
+  machine/matrix pairs complete quickly; agents chartered across
+  ARCHITECTURE plus multi-thousand-line BUILD shards stall in reading.
+  Partition waves by disjoint machine sets, and keep shard alignment and
+  root-row/embed propagation as a conductor-executed pass (the `machinery
+  sweep` subcommand exists for exactly that propagation review).
+- **Open a wave sentinel.** A wave necessarily passes through states where
+  one agent's machine edit is on disk while its matrix and regenerated
+  oracle are seconds behind; per-turn stop gating then blocks every sibling
+  on DRIFT that is not theirs. Touch `<design>/.machinery-wave` (first line:
+  TTL in minutes, default 45) when the wave opens; red gates surface as
+  messages while it is fresh, and DELETING it closes the wave and gates
+  normally. A stale sentinel is ignored, so a forgotten file cannot disarm
+  gating.

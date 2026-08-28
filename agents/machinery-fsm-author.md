@@ -168,3 +168,19 @@ scope, coverage, consistency) over your artifacts and include the verdicts in yo
 Return a concise summary: the machines you wrote, the `machinery lint` and `machinery oracle` results, the Gate 3 result
 (pass or the exact gaps), and any invariant with no enforcement point. Do not restate the full files;
 the conductor has them on disk.
+
+Order-sensitive branch lists (added 2026-08-28): for every multi-guard branch
+list whose guards are not mutually exclusive by construction, state why the
+order is correct, in a `_branch_order` note on the state. When two guards of
+one list cite the same non-ambient invariant, the gate warns until the note
+exists. The round-7 archetype: `guardCascadeComplete` ordered before
+`guardEntireScopeHoldBlocked` certified a fully hold-blocked cascade; the
+order was the defect and nothing but prose could have said so.
+
+Guard-input producibility (added 2026-08-28): for every guard you write, ask
+WHO PRODUCES what it reads. A context read belongs in `_io` with its writer
+declared; a DB-state read belongs in the actor contract; and a HUMAN-recorded
+fact must name its producing surface (a model action, or a typed
+review-resolution block). A guard whose evidence only its own guarded
+transition can produce refuses its first instance forever, and four of them
+shipped before the lint existed.
