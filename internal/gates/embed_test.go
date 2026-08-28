@@ -1,6 +1,7 @@
 package gates
 
 import (
+	"github.com/RamXX/machinery/internal/ir"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -270,5 +271,37 @@ func TestEmbedSourceMayBeOutsideTheDesign(t *testing.T) {
 	g := CheckEmbeds(design)
 	if len(g.Errs) != 0 {
 		t.Fatalf("a relative source outside the design must resolve: %v", g.Errs)
+	}
+}
+
+func TestWhereFilterDenotesNotSubstring(t *testing.T) {
+	// S15: prose inside a parenthetical annotation must not change selection.
+	tbl := ir.MdTable{
+		Header: []string{"event", "producer", "consumer"},
+		Rows: [][]string{
+			{"`usage.metered`", "ingest (intake front door: documents_intaken; the batch_rows site MOVED to ops 2026-08-27)", "core (MeterReading append)"},
+			{"`usage.metered`", "ops (watched-source sweeps: connector_sweeps)", "core (MeterReading append)"},
+			{"`audit.append`", "`AuditEvent` (trust) (no machine: append-only)", "trust (audit sink)"},
+			{"`inv-row`", "answer + core", "x"},
+		},
+	}
+	sel, msg := filterRows(tbl, "producer=ops")
+	if msg != "" {
+		t.Fatal(msg)
+	}
+	if len(sel) != 1 || !strings.Contains(sel[0][1], "watched-source") {
+		t.Fatalf("producer=ops selected %d rows: %v", len(sel), sel)
+	}
+	sel, _ = filterRows(tbl, "producer=trust")
+	if len(sel) != 1 || !strings.Contains(sel[0][0], "audit.append") {
+		t.Fatalf("single-identifier parenthetical marker not honored: %v", sel)
+	}
+	sel, _ = filterRows(tbl, "producer=core")
+	if len(sel) != 1 || !strings.Contains(sel[0][0], "inv-row") {
+		t.Fatalf("plus-list member not honored: %v", sel)
+	}
+	sel, _ = filterRows(tbl, "producer|consumer=core")
+	if len(sel) != 3 {
+		t.Fatalf("multi-column filter over consumer leading names selected %d rows, want 3", len(sel))
 	}
 }

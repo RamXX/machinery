@@ -386,6 +386,23 @@ func firstCell(row []string) string {
 // the rows whose named column(s) contain the token as a whole token, the same
 // matching rule the rest of the suite uses for ids. Returns a message on a
 // malformed filter or an unknown column.
+
+// cellDenotes reports whether a cell DENOTES the component named by token,
+// under the shared cell grammar (ir.CellNames): the leading name of each
+// plus-separated part, plus single-identifier parenthetical markers. Prose
+// inside an annotation never matches, so a producer cell reading "ingest
+// (... the batch_rows site MOVED to ops ...)" does not become an ops row
+// (S15; the substring semantics this replaces did exactly that, and every
+// complete-claim embed under the filter failed on a wording change).
+func cellDenotes(cell, token string) bool {
+	for _, n := range ir.CellNames(cell) {
+		if n == token {
+			return true
+		}
+	}
+	return false
+}
+
 func filterRows(t ir.MdTable, where string) ([][]string, string) {
 	parts := strings.SplitN(where, "=", 2)
 	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
@@ -403,7 +420,7 @@ func filterRows(t ir.MdTable, where string) ([][]string, string) {
 	var out [][]string
 	for _, r := range t.Rows {
 		for _, i := range idx {
-			if i < len(r) && tokenIn(token, r[i]) {
+			if i < len(r) && cellDenotes(r[i], token) {
 				out = append(out, r)
 				break
 			}

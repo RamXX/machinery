@@ -450,6 +450,41 @@ func CleanCell(cell string) string {
 	return strings.TrimSpace(cell)
 }
 
+// CellNames resolves the COMPONENT NAMES a table cell denotes, under the one
+// cell grammar the pack extractor and the Ge where-filter share (S15 of the
+// dogfood systemic findings: Ge once matched by whole-token containment over the
+// full cell, so prose inside an annotation, "the batch_rows site MOVED to
+// ops", made an ingest row match producer=ops and every complete-claim embed
+// under that filter failed). Candidates are: the first identifier of each
+// "+"-separated part of the CleanCell head (backticks and parentheticals
+// stripped), plus the content of any parenthetical that holds EXACTLY ONE
+// identifier (the owning-domain marker form: "`AuditEvent` (trust) (no
+// machine: ...)" denotes trust). A multi-word parenthetical is annotation
+// prose and denotes nothing.
+func CellNames(cell string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(n string) {
+		if n != "" && !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	for _, part := range strings.Split(CleanCell(cell), "+") {
+		if ids := identRe.FindAllString(part, 1); len(ids) > 0 {
+			add(ids[0])
+		}
+	}
+	for _, p := range parenRe.FindAllString(cell, -1) {
+		inner := strings.Trim(p, "()")
+		ids := identRe.FindAllString(inner, -1)
+		if len(ids) == 1 && strings.TrimSpace(inner) == ids[0] {
+			add(ids[0])
+		}
+	}
+	return out
+}
+
 // FindAllIdent is a helper wrapping the IDENT regex (returns all matches).
 func FindAllIdent(s string) []string {
 	return identRe.FindAllString(s, -1)
