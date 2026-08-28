@@ -1,6 +1,7 @@
 package gates
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -306,5 +307,56 @@ func TestGxCheckerClaimCountsAsEnforced(t *testing.T) {
 	}
 	if g.Counts["invariants checker-claimed (external checker)"] != 1 {
 		t.Fatalf("checker claim not credited: %v", g.Counts)
+	}
+}
+
+func TestCarriersDuplicateDeclarations(t *testing.T) {
+	// S13 compensating check: modelith lint upstream tolerates duplicate
+	// attribute names; a duplicate invariant id or enum value shares the gap.
+	d := t.TempDir()
+	model := `kind: modelith
+version: 1
+enums:
+  Status:
+    values:
+      - {name: Open, definition: open}
+      - {name: Open, definition: again}
+invariants:
+  - id: inv-one
+    statement: s
+entities:
+  Thing:
+    definition: d
+    attributes:
+      - {name: content_hash, type: string}
+      - {name: content_hash, type: string}
+    invariants:
+      - id: inv-one
+        statement: duplicate
+    actions:
+      - name: touch
+        actor: System
+        description: d
+        preserves: [inv-one]
+`
+	if err := os.WriteFile(filepath.Join(d, "domain.modelith.yaml"), []byte(model), 0644); err != nil {
+		t.Fatal(err)
+	}
+	g := CheckCarriers(d)
+	wantSubstrings := []string{
+		"invariant id 'inv-one' is declared more than once",
+		"attribute 'content_hash' is declared more than once",
+		"enum Status: value 'Open' is declared more than once",
+	}
+	for _, want := range wantSubstrings {
+		found := false
+		for _, e := range g.Errs {
+			if strings.Contains(e, want) {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("missing error %q in %v", want, g.Errs)
+		}
 	}
 }

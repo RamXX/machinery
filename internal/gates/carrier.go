@@ -155,19 +155,59 @@ func CheckCarriers(design string) *Gate {
 	}
 	dmo := dm.AsObject()
 
-	// declared invariants: top-level plus per-entity, one global id space
+	// declared invariants: top-level plus per-entity, one global id space.
+	// A DUPLICATE id, attribute name, or enum value is an error (S13 of the
+	// dogfood systemic findings: a record declared content_hash twice and
+	// every gate passed for weeks; modelith lint upstream tolerates it, so
+	// this is the compensating check until it does not).
 	declared := map[string]bool{}
-	for _, i := range objSlice(dmo.Get2("invariants")) {
-		if id := i.AsObject().GetString("id"); id != "" {
-			declared[id] = true
+	recordInv := func(where string, iv *ir.Value) {
+		id := iv.AsObject().GetString("id")
+		if id == "" {
+			return
 		}
+		if declared[id] {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: invariant id %s is declared more than once; ids are one global space and a duplicate silently splits the carrier record", where, ir.Repr(id)))
+		}
+		declared[id] = true
+	}
+	for _, i := range objSlice(dmo.Get2("invariants")) {
+		recordInv("model", i)
 	}
 	entities := dmo.GetObject("entities")
 	for _, ename := range entities.Keys() {
 		e := entities.Get2(ename).AsObject()
 		for _, i := range objSlice(e.Get2("invariants")) {
-			if id := i.AsObject().GetString("id"); id != "" {
-				declared[id] = true
+			recordInv(ename, i)
+		}
+		seenAttr := map[string]bool{}
+		for _, a := range objSlice(e.Get2("attributes")) {
+			name := a.AsObject().GetString("name")
+			if name == "" {
+				continue
+			}
+			if seenAttr[name] {
+				g.Errs = append(g.Errs, fmt.Sprintf("%s: attribute %s is declared more than once; a duplicate row survives every rendering as silent drift", ename, ir.Repr(name)))
+			}
+			seenAttr[name] = true
+		}
+	}
+	if enums := dmo.GetObject("enums"); enums != nil {
+		for _, ename := range enums.Keys() {
+			eo := enums.Get2(ename)
+			if eo == nil || eo.Kind != ir.KindObject {
+				continue
+			}
+			seenVal := map[string]bool{}
+			for _, v := range objSlice(eo.AsObject().Get2("values")) {
+				name := v.AsObject().GetString("name")
+				if name == "" {
+					continue
+				}
+				if seenVal[name] {
+					g.Errs = append(g.Errs, fmt.Sprintf("enum %s: value %s is declared more than once", ename, ir.Repr(name)))
+				}
+				seenVal[name] = true
 			}
 		}
 	}
