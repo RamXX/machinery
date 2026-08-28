@@ -2,6 +2,7 @@ package gates
 
 import (
 	"github.com/RamXX/machinery/internal/ir"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -303,5 +304,38 @@ func TestWhereFilterDenotesNotSubstring(t *testing.T) {
 	sel, _ = filterRows(tbl, "producer|consumer=core")
 	if len(sel) != 3 {
 		t.Fatalf("multi-column filter over consumer leading names selected %d rows, want 3", len(sel))
+	}
+}
+
+func TestEmbedFromModelRendering(t *testing.T) {
+	// S7: a shard schema dictionary may embed from the committed model
+	// rendering (domain.modelith.md), making schema staleness DRIFT instead
+	// of attested prose. No special-casing: the rendering is a markdown
+	// source like any other; this test pins that the path keeps working.
+	d := t.TempDir()
+	render := "# Model\n\n| attribute | type |\n|---|---|\n| `content_hash` | string |\n| `status` | CustodyState |\n"
+	if err := os.MkdirAll(filepath.Join(d, "BUILD"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(d, "domain.modelith.md"), []byte(render), 0644); err != nil {
+		t.Fatal(err)
+	}
+	shard := "<!-- machinery:embed from=\"../domain.modelith.md\" table=\"attribute,type\" claims=\"subset\" -->\n\n" +
+		"| attribute | type |\n|---|---|\n| `content_hash` | string |\n"
+	if err := os.WriteFile(filepath.Join(d, "BUILD", "core.md"), []byte(shard), 0644); err != nil {
+		t.Fatal(err)
+	}
+	g := CheckEmbeds(d)
+	if len(g.Errs) != 0 || len(g.Drift) != 0 {
+		t.Fatalf("model-rendering embed failed: errs %v drift %v", g.Errs, g.Drift)
+	}
+	// staleness becomes DRIFT: change the shard copy by one byte
+	stale := strings.Replace(shard, "string", "text", 1)
+	if err := os.WriteFile(filepath.Join(d, "BUILD", "core.md"), []byte(stale), 0644); err != nil {
+		t.Fatal(err)
+	}
+	g = CheckEmbeds(d)
+	if len(g.Errs)+len(g.Drift) == 0 {
+		t.Fatal("stale schema copy not flagged")
 	}
 }
