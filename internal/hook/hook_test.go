@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // --- helpers ---
@@ -948,5 +949,31 @@ func TestSelectGatesActivatesGaOnAcceptanceArtifacts(t *testing.T) {
 	sel, _ = selectGates(bare, Config{})
 	if !sel.Run["ga"] {
 		t.Error("a milestone marked closed must activate ga on its own")
+	}
+}
+
+func TestWaveSentinel(t *testing.T) {
+	d := t.TempDir()
+	if _, _, active := waveSentinel(d); active {
+		t.Fatal("absent sentinel reported active")
+	}
+	p := filepath.Join(d, ".machinery-wave")
+	if err := os.WriteFile(p, []byte("wave open\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	left, stale, active := waveSentinel(d)
+	if !active || stale || left == "" {
+		t.Fatalf("fresh sentinel: left=%q stale=%v active=%v", left, stale, active)
+	}
+	if err := os.WriteFile(p, []byte("1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * time.Minute)
+	if err := os.Chtimes(p, old, old); err != nil {
+		t.Fatal(err)
+	}
+	_, stale, active = waveSentinel(d)
+	if !active || !stale {
+		t.Fatalf("expired sentinel: stale=%v active=%v", stale, active)
 	}
 }

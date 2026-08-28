@@ -32,6 +32,8 @@ import (
 
 	"github.com/RamXX/machinery/internal/gates"
 	"github.com/RamXX/machinery/internal/pack"
+	"strconv"
+	"time"
 )
 
 // ConfigName is the project-root marker and configuration file.
@@ -257,6 +259,33 @@ func alloySource(base string) string {
 	}
 }
 
+// waveSentinel inspects <design>/.machinery-wave: active reports presence,
+// stale whether its TTL has passed (mtime plus the TTL in minutes read from
+// the file's first line; default 45, capped at 240), left the remaining time.
+func waveSentinel(designDir string) (left string, stale, active bool) {
+	p := filepath.Join(designDir, ".machinery-wave")
+	fi, err := os.Stat(p)
+	if err != nil {
+		return "", false, false
+	}
+	ttl := 45
+	if body, err := os.ReadFile(p); err == nil {
+		first := strings.TrimSpace(strings.SplitN(string(body), "\n", 2)[0])
+		if n, err := strconv.Atoi(first); err == nil && n > 0 {
+			ttl = n
+		}
+	}
+	if ttl > 240 {
+		ttl = 240
+	}
+	deadline := fi.ModTime().Add(time.Duration(ttl) * time.Minute)
+	rem := time.Until(deadline)
+	if rem <= 0 {
+		return "", true, true
+	}
+	return rem.Round(time.Minute).String(), false, true
+}
+
 // --- PostToolUse: record what the session touched (the stop gates read it) ---
 
 var sourceExt = map[string]bool{
@@ -360,6 +389,26 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 	// allow rules, which is silent amnesty. Strict mode overrides.
 	armed := fileExists(filepath.Join(designDir, "ratchet.json"))
 	shouldBlock := drift > 0 || (g4Blocking > 0 && armed) || (cfg.Strict && blocking > 0)
+	// S10 (wave sentinel): a multi-agent wave necessarily passes through
+	// states where one agent's machine edit is on disk while its matrix and
+	// regenerated oracle are seconds behind, and per-turn gating then blocks
+	// every sibling on DRIFT that is not theirs. While <design>/.machinery-wave
+	// is FRESH (younger than its TTL: first line of the file in minutes,
+	// default 45, capped at 240), red gates surface as a message instead of a
+	// block, and they bind at wave close (delete the sentinel; the touched
+	// state is kept so the next stop re-runs the gates). A stale sentinel is
+	// reported and ignored: a forgotten file must not disarm gating forever.
+	if shouldBlock {
+		if left, stale, active := waveSentinel(designDir); active {
+			if stale {
+				fmt.Fprintf(&buf, "\nmachinery: wave sentinel %s/.machinery-wave is STALE (TTL passed); gating normally. Delete it, or touch it to extend the wave.\n", design)
+			} else {
+				msg := fmt.Sprintf("machinery: wave sentinel active (%s left); %d blocking finding(s), %d DRIFT are deferred to wave close. "+
+					"Delete %s/.machinery-wave to close the wave and gate.", left, blocking, drift, design)
+				return emitJSON(w, stopOut{SystemMessage: capString(msg+"\n"+buf.String(), reasonCap)})
+			}
+		}
+	}
 	switch {
 	case shouldBlock && !in.StopHookActive:
 		// keep the state so the re-check runs when the fix attempt finishes
