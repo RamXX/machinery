@@ -180,5 +180,8 @@ func CheckIDCitations(design string) *Gate {
 	g.Count("committed oracle ids", len(committed))
 	// S4: count claims beside tables, checked against the table itself.
 	checkProseCounts(g, design)
+	// S17: clause-declared guards hold every line naming them to their
+	// clause vocabulary.
+	checkClauseDrift(g, design)
 	return g
 }
