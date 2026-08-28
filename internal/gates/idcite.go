@@ -178,5 +178,7 @@ func CheckIDCitations(design string) *Gate {
 	}
 	g.Count("files scanned", filesScanned)
 	g.Count("committed oracle ids", len(committed))
+	// S4: count claims beside tables, checked against the table itself.
+	checkProseCounts(g, design)
 	return g
 }

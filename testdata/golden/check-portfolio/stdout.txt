@@ -14,7 +14,7 @@
   note   Portfolio.machine.json: state reverted always-list is fully guarded; liveness rests on the declared exhaustiveness: prior is set by every setPending action to the review stage the operation departed from; its codomain is exactly the four PortfolioStatus values, so one guarded branch per stage is total
   checked: 3 machines, 33 transitions, 3 tla-generable, 3 oracles fresh, 31 named units covered, 1 states relying on unproven _exhaustive liveness
 == Gd-idcite  design-side stable-id citations ==
-  checked: 65 citations resolved, 19 files scanned, 33 committed oracle ids
+  checked: 65 citations resolved, 19 files scanned, 33 committed oracle ids, 3 row-count claims beside tables
   ok
 == Gx-trace  cross-layer traceability ==
   warn   invariant 'candidate-deduped' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
