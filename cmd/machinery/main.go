@@ -45,6 +45,7 @@ func main() {
 	root.AddCommand(newVerifyFormalCmd())
 	root.AddCommand(newPackCmd())
 	root.AddCommand(newScaleCmd())
+	root.AddCommand(newSweepCmd())
 	root.AddCommand(newDoctorCmd())
 	root.AddCommand(newPreflightCmd())
 	root.AddCommand(newInstallCmd())
