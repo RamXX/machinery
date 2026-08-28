@@ -75,3 +75,17 @@ func TestClauseFullOrZeroEnumerationSilent(t *testing.T) {
 		}
 	}
 }
+
+func TestClauseLedgersExempt(t *testing.T) {
+	d := clauseDesign(t)
+	body := "the old guardCloseEvidenced read resolved-task alone here\n"
+	if err := os.WriteFile(filepath.Join(d, "STATE.md"), []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+	g := CheckIDCitations(d)
+	for _, w := range g.Warns {
+		if strings.Contains(w, "STATE.md") {
+			t.Fatalf("ledger judged for clause drift: %v", g.Warns)
+		}
+	}
+}

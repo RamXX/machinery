@@ -94,6 +94,12 @@ func checkClauseDrift(g *Gate, design string) {
 		if idciteSkips(rel) || !idciteScannable(fi.Name()) {
 			return nil
 		}
+		// DECISIONS.md and STATE.md narrate history: an entry describing the
+		// pre-re-cut world beside a guard's name is the record, not drift,
+		// exactly as with stable-id citations.
+		if base := filepath.Base(rel); base == "DECISIONS.md" || base == "STATE.md" {
+			return nil
+		}
 		body, ok := readTextOK(path)
 		if !ok {
 			return nil
