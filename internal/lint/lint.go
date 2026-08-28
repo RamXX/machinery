@@ -17,7 +17,7 @@ var RootKeys = map[string]bool{
 	"id": true, "initial": true, "context": true, "states": true, "description": true,
 	"meta": true, "version": true, "_comment": true, "_delays": true,
 	"_lifecycle_of": true, "_role": true, "_component": true, "_max_retries": true,
-	"_oracle_tag": true, "_invariants": true,
+	"_oracle_tag": true, "_invariants": true, "_counters": true,
 }
 
 // TransitionKeys whitelists transition-object members. A typo ("tagret") used
@@ -810,6 +810,10 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 			}
 		}
 	}
+
+	cerrs, cwarns := LintCounters(m, base)
+	errs = append(errs, cerrs...)
+	warns = append(warns, cwarns...)
 
 	return errs, warns, notes, counts
 }

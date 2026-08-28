@@ -8,7 +8,9 @@
   checked: 7 boundaries, 2 externals, 13 allow rules, 21 transitive pairs, 2 deny rules, 6 boundaries with exposes, 12 dsl elements, 7 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 13 edges contracted
   ok
 == G3-machine  machines + oracle ==
+  warn   Portfolio.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
   warn   Portfolio.machine.json: liveness for reverted rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
+  warn   RecommendationRun.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
   note   Portfolio.machine.json: state reverted always-list is fully guarded; liveness rests on the declared exhaustiveness: prior is set by every setPending action to the review stage the operation departed from; its codomain is exactly the four PortfolioStatus values, so one guarded branch per stage is total
   checked: 3 machines, 33 transitions, 3 tla-generable, 3 oracles fresh, 31 named units covered, 1 states relying on unproven _exhaustive liveness
 == Gd-idcite  design-side stable-id citations ==

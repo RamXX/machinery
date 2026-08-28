@@ -1,12 +1,15 @@
 == CommandExecution.machine.json: 12 states ==
-  ok
+  warn   CommandExecution.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
 == Deal.machine.json: 9 states ==
+  warn   Deal.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
   warn   Deal.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStage is set by every setPending* action to the current domain state, which is one of the six DealStage values; the six priorIs* guards cover DealStage totally
 == Session.machine.json: 14 states ==
-  ok
+  warn   Session.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
 == Task.machine.json: 7 states ==
+  warn   Task.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
   warn   Task.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: only Open and InProgress have transitions into the persist overlay, so priorStatus ranges over {Open, InProgress}; both priorIs* guards are present
 == User.machine.json: 5 states ==
+  warn   User.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
   warn   User.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present
 
 0 error/drift finding(s) across 5 machine(s)
