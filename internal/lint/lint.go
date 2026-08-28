@@ -31,6 +31,7 @@ var StateKeys = map[string]bool{
 	"states": true, "initial": true, "type": true, "id": true, "meta": true,
 	"description": true, "tags": true, "onDone": true, "output": true, "_comment": true,
 	"_exhaustive": true, "_ignores": true, "_refusal": true,
+	"_branch_order": true,
 }
 
 var InvokeKeys = map[string]bool{

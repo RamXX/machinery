@@ -1228,6 +1228,9 @@ func CheckMachines(design string) *Gate {
 		g.Errs = append(g.Errs, merrs...)
 		g.Drift = append(g.Drift, drift...)
 		g.Count("matrix rows reconciled", nrows)
+		// S8: overlapping guards on one branch list argue about the same
+		// invariant, so their order carries meaning the state must state.
+		CheckBranchOrder(g, m, mtext, base)
 		declared := lint.NamedUnitNames(mtext)
 		guards, actions, actors := lint.MachineUnitNames(m)
 		for _, pair := range []struct {
