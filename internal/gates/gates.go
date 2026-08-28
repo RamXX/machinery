@@ -1250,6 +1250,10 @@ func CheckMachines(design string) *Gate {
 	}
 	g.RequireNonzero("machines", "no machines parsed")
 	g.RequireNonzero("transitions", "no transitions parsed")
+	// S5 (v1 scope): dotted `Machine.state` references in annotation strings
+	// and matrix prose must name real states, events, or units; the
+	// narrative layer rots silently otherwise. Warnings only.
+	CheckNameRot(g, design)
 	return g
 }
 
