@@ -8,7 +8,10 @@
   checked: 2 boundaries, 1 externals, 2 allow rules, 3 transitive pairs, 1 deny rules, 1 no_path assertions, 4 dsl elements, 2 boundaries bound to dsl, 1 mitigation rows, 2 dependencies with mitigation rows, 2 edges contracted
   ok
 == G3-machine  machines + oracle ==
-  checked: 1 machines, 1 transitions, 1 oracles fresh, 1 named units covered
+  checked: 1 machines, 1 transitions, 1 tla-generable, 1 oracles fresh, 1 named units covered
+  ok
+== Gd-idcite  design-side stable-id citations ==
+  checked: 8 files scanned, 1 committed oracle ids
   ok
 == Gx-trace  cross-layer traceability ==
   warn   BUILD.md not present; invariant enforcement is checked against the matrices only (fine before Phase 4)

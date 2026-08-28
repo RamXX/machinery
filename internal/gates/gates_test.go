@@ -734,3 +734,54 @@ func TestOracleCurrentStampIsSilent(t *testing.T) {
 		t.Errorf("current stamp must not be skew: %q", note)
 	}
 }
+
+func TestG3RefusesTLAUngenerable(t *testing.T) {
+	// S11: a machine the TLA generator refuses must fail G3 with the
+	// generator's own message, not surface later at verify-formal.
+	d := t.TempDir()
+	md := filepath.Join(d, "machines")
+	if err := os.MkdirAll(md, 0755); err != nil {
+		t.Fatal(err)
+	}
+	two := `{"id":"m","initial":"Working","_delays":{"A":"1s","B":"2s"},"states":{
+		"Working":{"on":{"go":{"target":"workRetry"}}},
+		"workRetry":{"always":[{"target":"Failed","guard":"guardRetriesExhausted"}],
+			"after":{"A":{"target":"Working"},"B":{"target":"Working"}}},
+		"Failed":{"type":"final"}}}`
+	if err := os.WriteFile(filepath.Join(md, "Two.machine.json"), []byte(two), 0644); err != nil {
+		t.Fatal(err)
+	}
+	g := CheckMachines(d)
+	found := false
+	for _, e := range g.Errs {
+		if strings.Contains(e, "retry state") && strings.Contains(e, "after entries") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("G3 did not surface the generator refusal; errs: %v", g.Errs)
+	}
+}
+
+func TestG3CountsTLAGenerable(t *testing.T) {
+	d := t.TempDir()
+	md := filepath.Join(d, "machines")
+	if err := os.MkdirAll(md, 0755); err != nil {
+		t.Fatal(err)
+	}
+	ok := `{"id":"m","initial":"Lead","states":{
+		"Lead":{"on":{"advance":{"target":"Won","guard":"canAdvance"}},"_refusal":{"advance":"fixture: refused when canAdvance is false"}},
+		"Won":{"type":"final"}}}`
+	if err := os.WriteFile(filepath.Join(md, "Ok.machine.json"), []byte(ok), 0644); err != nil {
+		t.Fatal(err)
+	}
+	g := CheckMachines(d)
+	for _, e := range g.Errs {
+		if strings.Contains(e, "tla") {
+			t.Fatalf("valid machine refused: %v", g.Errs)
+		}
+	}
+	if g.Counts["tla-generable"] != 1 {
+		t.Fatalf("tla-generable count: %v", g.Counts)
+	}
+}

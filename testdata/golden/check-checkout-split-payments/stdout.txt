@@ -9,8 +9,11 @@
   checked: 1 boundaries, 2 externals, 2 allow rules, 2 transitive pairs, 4 dsl elements, 1 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 2 edges contracted, 3 event contracts
   ok
 == G3-machine  machines + oracle ==
-  checked: 1 machines, 3 transitions, 1 oracles fresh, 3 named units covered
+  checked: 1 machines, 3 transitions, 1 tla-generable, 1 oracles fresh, 3 named units covered
   ok
+== Gd-idcite  design-side stable-id citations ==
+  warn   BUILD.md:273: T-PAYM-01 is a positional row citation; rows renumber, so cite the stable id instead
+  checked: 6 citations resolved, 7 files scanned, 3 committed oracle ids
 == Gx-trace  cross-layer traceability ==
   checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor)
   ok

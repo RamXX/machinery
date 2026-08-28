@@ -22,7 +22,22 @@
   note   Payment.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStatus is set on every path into the overlay from a domain state; only Pending, Authorized, and Captured reach the overlay (Failed and Refunded are final), and all three priorIs* guards are present
   note   Reservation.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: only Held has transitions into the persist overlay (Committed and Released are final), so priorStatus is always Held and the single priorIsHeld guard is total
   note   Shipment.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStatus is set on every path into the overlay from a domain state; only Pending, Dispatched, and InTransit reach the overlay (Delivered and Lost are final), and all three priorIs* guards are present
-  checked: 6 machines, 138 transitions, 6 oracles fresh, 168 named units covered, 6 states relying on unproven _exhaustive liveness
+  checked: 6 machines, 138 transitions, 6 tla-generable, 6 oracles fresh, 168 named units covered, 6 states relying on unproven _exhaustive liveness
+== Gd-idcite  design-side stable-id citations ==
+  warn   BUILD.md:123: T-ORDE-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:124: T-ORDE-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:129: T-PAYM-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:134: T-FULF-02 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:136: T-OUTB-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:137: T-FULF-08 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:140: T-FULF-05 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:141: T-FULF-14 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:157: T-FULF-02 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:158: T-ORDE-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:158: T-ORDE-16 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:159: T-OUTB-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:159: T-OUTB-02 is a positional row citation; rows renumber, so cite the stable id instead
+  checked: 3 citations resolved, 20 files scanned, 138 committed oracle ids
 == Gx-trace  cross-layer traceability ==
   warn   invariant 'address-country-present' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
   warn   invariant 'line-item-quantity-positive' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)

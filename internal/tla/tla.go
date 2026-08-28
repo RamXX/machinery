@@ -176,6 +176,19 @@ func setExpr(s map[string]bool) string {
 	return "{" + strings.Join(parts, ", ") + "}"
 }
 
+// Check runs the generator's full admissibility pass over one machine and
+// reports the refusal without writing anything: the G3 gate calls it so the
+// structural lint and the formal generator admit the SAME machine subset
+// (S11 of the dogfood systemic findings: G3 once passed a retry state carrying
+// two after entries that verify-formal then refused, so a wave went
+// G3-green and formally ungenerable). Deliberately a thin wrapper over
+// Generate rather than a copied constraint list: one validator, one truth;
+// the copies were the bug one level up.
+func Check(path string) error {
+	_, _, _, err := Generate(path)
+	return err
+}
+
 // Generate mirrors tla_gen.generate(path) -> (mid, tla, cfg).
 func Generate(path string) (mid, tla, cfg string, err error) {
 	m, loadErr := ir.LoadMachineJSON(path)

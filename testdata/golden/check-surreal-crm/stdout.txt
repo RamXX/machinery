@@ -28,7 +28,26 @@
   note   Deal.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStage is set by every setPending* action to the current domain state, which is one of the six DealStage values; the six priorIs* guards cover DealStage totally
   note   Task.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: only Open and InProgress have transitions into the persist overlay, so priorStatus ranges over {Open, InProgress}; both priorIs* guards are present
   note   User.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present
-  checked: 5 machines, 194 transitions, 5 oracles fresh, 194 matrix rows reconciled, 186 named units covered, 3 states relying on unproven _exhaustive liveness
+  checked: 5 machines, 194 transitions, 5 tla-generable, 5 oracles fresh, 194 matrix rows reconciled, 186 named units covered, 3 states relying on unproven _exhaustive liveness
+== Gd-idcite  design-side stable-id citations ==
+  warn   BUILD.md:719: T-SESS-05 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:719: T-SESS-08 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:726: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:727: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:728: T-DEAL-30 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:729: T-DEAL-03 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:734: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:735: T-TASK-16 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:736: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:739: T-USER-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:742: T-DEAL-28 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:742: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:743: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:969: T-SESS-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:969: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:1154: T-SESS-35 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:1156: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
+  checked: 2 citations resolved, 24 files scanned, 272 committed oracle ids
 == Gx-trace  cross-layer traceability ==
   warn   invariant 'activity-immutable' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
   warn   invariant 'deal-terminal' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)

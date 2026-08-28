@@ -16,6 +16,7 @@ import (
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/lint"
 	"github.com/RamXX/machinery/internal/oracle"
+	"github.com/RamXX/machinery/internal/tla"
 	"github.com/RamXX/machinery/internal/version"
 )
 
@@ -1174,6 +1175,18 @@ func CheckMachines(design string) *Gate {
 		g.Warns = append(g.Warns, warns...)
 		g.Notes = append(g.Notes, notes...)
 		g.Count("transitions", counts.Transitions)
+
+		// S11: the structural lint and the TLA generator must admit the same
+		// machine subset, so G3 runs the generator's own admissibility pass
+		// (tla.Check, a thin wrapper over Generate: one validator, one
+		// truth). A machine G3 passes is a machine verify-formal can
+		// generate; the refusal carries the generator's own message so the
+		// operator sees one vocabulary at either phase.
+		if err := tla.Check(path); err != nil {
+			g.Errs = append(g.Errs, base+": "+err.Error())
+		} else {
+			g.Count("tla-generable")
+		}
 
 		var exhaustive []string
 		for _, s := range ir.WalkStates(m.AsObject().Get2("states"), "") {
