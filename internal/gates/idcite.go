@@ -183,5 +183,7 @@ func CheckIDCitations(design string) *Gate {
 	// S17: clause-declared guards hold every line naming them to their
 	// clause vocabulary.
 	checkClauseDrift(g, design)
+	// S2 stage one: declared event reads must ride some payload row.
+	checkPayloadReads(g, design)
 	return g
 }
