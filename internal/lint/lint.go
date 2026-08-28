@@ -814,6 +814,7 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 	cerrs, cwarns := LintCounters(m, base)
 	errs = append(errs, cerrs...)
 	warns = append(warns, cwarns...)
+	warns = append(warns, LintDerivedDeadlines(m, base)...)
 
 	return errs, warns, notes, counts
 }
