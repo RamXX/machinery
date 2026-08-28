@@ -1,5 +1,5 @@
 // Code generated from domain.modelith.yaml + isolation.relational.yaml by machinery alloy. DO NOT EDIT.
-// machinery-version: v0.4.0
+// machinery-version: v0.4.1
 //
 // Static relational model of multi-tenant ISOLATION: the tenant of a record
 // is its owner's tenant, and every reference the annotation names must stay
