@@ -21,6 +21,7 @@
 // downstream of the guard is the deadlock. Declarations are validated as
 // errors (a present declaration is a contract); producibility findings are
 // warnings, since the declaration coverage is partial by design.
+
 package lint
 
 import (

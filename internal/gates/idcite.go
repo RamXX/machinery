@@ -6,6 +6,7 @@
 // gate makes a dangling citation a deterministic ERROR: every token in a
 // hand-written design file that looks like a stable id under a KNOWN tag must
 // resolve to a committed oracle row.
+
 package gates
 
 import (
@@ -54,6 +55,16 @@ func idciteScannable(base string) bool {
 	return false
 }
 
+// readTextOK reads a file, reporting failure as a skip: the walking checks
+// audit what is readable and never fail a design on one unreadable file.
+func readTextOK(path string) (string, bool) {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+	return string(body), true
+}
+
 // loadCommittedIDs walks the design for every *.oracle.md (machine oracles
 // under machines/, alloy oracles under formal/) and returns the committed
 // stable-id set plus the tag vocabulary. The tag set is the false-positive
@@ -63,14 +74,17 @@ func loadCommittedIDs(design string) (ids map[string]bool, tags map[string]bool)
 	ids = map[string]bool{}
 	tags = map[string]bool{}
 	_ = filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
-		if err != nil || fi.IsDir() || !strings.HasSuffix(fi.Name(), ".oracle.md") {
+		if err != nil {
+			return nil //nolint:nilerr // keep walking; an unreadable entry mints no ids
+		}
+		if fi.IsDir() || !strings.HasSuffix(fi.Name(), ".oracle.md") {
 			return nil
 		}
-		body, rerr := os.ReadFile(path)
-		if rerr != nil {
+		body, ok := readTextOK(path)
+		if !ok {
 			return nil
 		}
-		for _, m := range stableIDToken.FindAllStringSubmatch(string(body), -1) {
+		for _, m := range stableIDToken.FindAllStringSubmatch(body, -1) {
 			if m[4] != "" {
 				continue // a suffixed form in an oracle would be noise, not a minted id
 			}

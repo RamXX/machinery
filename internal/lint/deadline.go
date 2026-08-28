@@ -10,6 +10,7 @@
 // states but does not itself consume the delay is a window where the
 // deadline silently stops ticking. Warnings tier: span membership is
 // derived from the state graph, and the idiom is a convention.
+
 package lint
 
 import (
@@ -35,9 +36,7 @@ func derivedDeadlineDelay(name, desc string) bool {
 func stateGraph(m *ir.Value) map[string][]string {
 	adj := map[string][]string{}
 	addTargets := func(from string, v *ir.Value) {
-		for _, t := range transitionTargets(v) {
-			adj[from] = append(adj[from], t)
-		}
+		adj[from] = append(adj[from], transitionTargets(v)...)
 	}
 	for _, s := range ir.WalkStates(m.AsObject().Get2("states"), "") {
 		if s.Node == nil || s.Node.Kind != ir.KindObject {

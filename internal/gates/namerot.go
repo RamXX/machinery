@@ -8,6 +8,7 @@
 // Single-token names stay unchecked in v1: prose legitimately backticks
 // fields, knobs and other files' vocabulary, and a warning tier that cannot
 // be held at zero teaches readers to ignore it.
+
 package gates
 
 import (

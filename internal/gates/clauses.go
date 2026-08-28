@@ -14,6 +14,7 @@
 // the stale semantics surviving. Proportionality (conductor qualification):
 // declarations are opt-in, wanted only where a refusal or falsifying table
 // enumerates clauses; an undeclared guard is untouched. Warnings tier.
+
 package gates
 
 import (
@@ -47,11 +48,11 @@ func splitClauses(s string) []string {
 func collectClauseDecls(design string) []clauseSet {
 	var out []clauseSet
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
-		body, err := os.ReadFile(path)
-		if err != nil {
+		body, ok := readTextOK(path)
+		if !ok {
 			continue
 		}
-		for _, line := range strings.Split(string(body), "\n") {
+		for _, line := range strings.Split(body, "\n") {
 			m := clauseDecl.FindStringSubmatch(line)
 			if m == nil {
 				continue
@@ -80,7 +81,10 @@ func checkClauseDrift(g *Gate, design string) {
 	}
 	g.Count("guards with clause declarations", len(decls))
 	_ = filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
-		if err != nil || fi.IsDir() {
+		if err != nil {
+			return nil //nolint:nilerr // keep walking; the audit covers what is readable
+		}
+		if fi.IsDir() {
 			return nil
 		}
 		rel, rerr := filepath.Rel(design, path)
@@ -90,11 +94,11 @@ func checkClauseDrift(g *Gate, design string) {
 		if idciteSkips(rel) || !idciteScannable(fi.Name()) {
 			return nil
 		}
-		body, rerr := os.ReadFile(path)
-		if rerr != nil {
+		body, ok := readTextOK(path)
+		if !ok {
 			return nil
 		}
-		for lineNo, line := range strings.Split(string(body), "\n") {
+		for lineNo, line := range strings.Split(body, "\n") {
 			for _, d := range decls {
 				if !tokenIn(d.guard, line) || clauseDecl.MatchString(line) {
 					continue

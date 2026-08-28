@@ -6,6 +6,7 @@
 // rows. WARNING tier with a historical exemption ("read 162, then 166"):
 // heuristics that flag correct content teach readers to ignore them, so a
 // dated history note is never flagged.
+
 package gates
 
 import (
@@ -41,11 +42,11 @@ func historicalCountLine(line string) bool {
 // markdown table disagrees with that table's data-row count.
 func checkProseCounts(g *Gate, design string) {
 	walk := func(path, rel string) {
-		body, err := os.ReadFile(path)
-		if err != nil {
+		body, ok := readTextOK(path)
+		if !ok {
 			return
 		}
-		lines := strings.Split(string(body), "\n")
+		lines := strings.Split(body, "\n")
 		isSep := func(i int) bool {
 			if i >= len(lines) {
 				return false
@@ -103,7 +104,10 @@ func checkProseCounts(g *Gate, design string) {
 		}
 	}
 	_ = filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
-		if err != nil || fi.IsDir() {
+		if err != nil {
+			return nil //nolint:nilerr // keep walking; the audit covers what is readable
+		}
+		if fi.IsDir() {
 			return nil
 		}
 		rel, rerr := filepath.Rel(design, path)

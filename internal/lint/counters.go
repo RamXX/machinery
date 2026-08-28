@@ -11,6 +11,7 @@
 // check is heuristic (naming conventions identify the counter family), so it
 // lives in the WARNINGS tier; the `_counters` annotation is validated as an
 // error, since a present declaration is a contract.
+
 package lint
 
 import (

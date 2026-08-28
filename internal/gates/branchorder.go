@@ -8,6 +8,7 @@
 // argue about the same law and their order carries meaning, so the state
 // must say why the order is correct in a `_branch_order` annotation.
 // Warnings tier.
+
 package gates
 
 import (
