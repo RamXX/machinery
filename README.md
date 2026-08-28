@@ -461,7 +461,9 @@ machinery preflight                   # check prerequisites (warns; installs not
 machinery check <your-design>         # run the deterministic gate suite
 machinery baseline <design> --impl .  # brownfield Stage 1: propose baseline rules, write the ratchet
 machinery verify-formal <your-design> # regenerate + TLC-check the proofs (needs Java)
-machinery oracle <machines-dir>       # regenerate the transition oracles from the machine JSON
+machinery oracle <dir|files...>       # regenerate transition oracles (a directory, or named machine files;
+                                      #   valid machines regenerate past a broken sibling)
+machinery sweep <name> <design>       # list every hand-written mention of a unit/guard/event/knob
 ```
 
 The `Makefile` is contributor-only (building and testing machinery itself); `make help` lists those
@@ -512,7 +514,7 @@ version matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.3.14        # force an exact release
+machinery update --version v0.4.0         # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
@@ -548,7 +550,9 @@ In a machinery-managed project (a `.machinery.json` at the root, or the conventi
 hand-edits to generated artifacts (`*.oracle.md`, `formal/*.tla` and `*.cfg`, `packs/`, `pack/`),
 and run `machinery check` before any turn that touched the design (or watched sources, with
 `"impl"` configured) is allowed to end; DRIFT and import-boundary violations block, mid-phase
-ERRORs only warn. In every other repository the hooks are a strict no-op: they exit before reading
+ERRORs only warn. During a deliberate multi-agent wave, touch `<design>/.machinery-wave` (first
+line: TTL in minutes, default 45) and red gates surface as messages instead of blocking until the
+sentinel is deleted or its TTL lapses; a stale sentinel is reported and ignored. In every other repository the hooks are a strict no-op: they exit before reading
 anything, so the plugin never disturbs other projects or plugins. Details, including the
 `.machinery.json` reference: the [Claude Code plugin guide](docs/claude-plugin.md).
 
@@ -593,7 +597,8 @@ make verify-formal   # regenerates and checks all 34 TLC proofs + the relational
 | Gn-isolation | designs with an isolation annotation only: it binds to the domain model and the committed `Isolation.als` and `Isolation.oracle.md` byte-match a fresh generation. |
 | Gc-carrier | every declared invariant has a named carrier: an action's `preserves`, a relational layer, a machine matrix unit, an external checker's coverage claim, or an explicit waiver with a reason (`formal/waivers.yaml` or a layer's residuals). Needs only the domain model, so it runs from Phase 1; declaring an obligation the design does not carry fails the moment it is written, not months later. |
 | G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, the allow graph is acyclic (cycles closing only through `baseline:` edges warn as ratchet debt), `assert: no_path` claims hold over the transitive closure, every dependency has a mitigation row, and every allowed boundary crossing has an interface-contract row (edge, shape, errors, idempotency) or a `(no contract: <reason>)` waiver, with no row for an edge no allow rule declares. |
-| G3-machine | machines pass structural lint, committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
+| G3-machine | machines pass structural lint, the TLA generator's own admissibility pass (a machine G3 passes is a machine `verify-formal` can generate), retry-counter accounting (leg-entry resets, or a proof-carrying `_counters` waiver), derived-deadline span checks (the stamped-absolute-deadline idiom), the dotted-reference name-rot audit, and the `_branch_order` requirement for overlapping guarded branches; committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
+| Gd-idcite | designs with machines only: every stable-id citation in hand-written files resolves to a committed oracle row (letter-suffixed forms are falsifying-clause derivatives; `design/removed-ids.txt` is the dated allowance; DECISIONS.md and STATE.md are historical ledgers, counted not judged), positional `T-<TAG>-NN` citations warn, rule-15 form-b row counts are verified against their tables, and opt-in `CLAUSES{...}`/`READS{...}` declarations catch clause drift and payload-sufficiency drift. |
 | Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows, and entities to persistence-placement rows (every declared entity has a row or a `(not placed: <reason>)` waiver; the entity list is closed, so the table's completeness is checked, not attested). |
 | Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, and the skeleton DoD cites a committed oracle id. |
 | Ge-embed | designs carrying a `machinery:embed` marker only: every marked table is held to the source it declares (`subset`: each row is byte-identical to a source row; `complete`: every selected source row is present), with `(shard-local: <reason>)` exempting exactly the row or cell it names. The sanctioned shard-copy duplication, checked instead of promised. |
@@ -710,7 +715,7 @@ full gate suite run against a synthesized design/impl fixture) runs as Go tests 
 | `internal/oracle` | 87% | transition oracle (content-hashed ids) |
 | `internal/refine` | 87% | data-refinement (3 patterns) |
 | `internal/compose` | 86% | cross-aggregate composition |
-| `internal/gates` | 75% | the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/Gb/G4/Gt/G5 gate suite (G5 also exercised via `internal/experiments`) |
+| `internal/gates` | 75% | the Gm/Gs/Gp/Gi/Gn/G2/G3/Gd/Gx/Gb/G4/Gt/G5 gate suite (G5 also exercised via `internal/experiments`) |
 | `internal/install` | 75% | skill placement behind `machinery install` (fetch, extract, canonical+symlink layout) |
 | `internal/pack` | 72% | contract packs (the mutation suite lives in `internal/experiments`) |
 | `internal/ir` | 63% | shared IR (covered transitively via lint/gates) |

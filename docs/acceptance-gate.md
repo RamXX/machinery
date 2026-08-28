@@ -112,6 +112,6 @@ intended behavior, not a bug to work around.
 
 ## Where this sits in the suite
 
-Ga runs after Gb in the default suite ordering (`gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ge,ga,g4,gt,g5`):
+Ga runs after Gb in the default suite ordering (`gm,gs,gp,gi,gn,gc,g2,g3,gd,gx,gk,gb,ge,ga,g4,gt,g5`):
 the plan's shape is settled before its discharge is judged. It is a build-time gate, not a
 design-phase one; a design that has closed no milestone never sees it.

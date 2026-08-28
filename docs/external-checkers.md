@@ -63,7 +63,7 @@ the three commands you actually run.
   names. This is the write side of the contract: run it, then `git commit` the result, before your
   adapter ever consumes the projection. It needs no registry and no engine.
 - **`machinery check <design> --gate gk`** is the pure, hermetic gate (`Gk-<id>` per checker), one of
-  the names in `--gate`'s vocabulary: `gm,gs,gp,gi,gn,gc,g2,g3,gx,gk,gb,ge,ga,g4,gt,g5`. It never runs an
+  the names in `--gate`'s vocabulary: `gm,gs,gp,gi,gn,gc,g2,g3,gd,gx,gk,gb,ge,ga,g4,gt,g5`. It never runs an
   engine and never touches the registry; it reconciles the manifest, byte-matches the committed
   projection, and checks that the committed evidence binds and covers the claim.
 - **`machinery verify-checkers <design> [--registry <path>] [--checker <id>]`** is the engine phase,
