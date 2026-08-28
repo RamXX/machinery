@@ -36,7 +36,7 @@ type RunOptions struct {
 // KnownGate; two hand-kept lists once drifted.
 var knownGateSet = map[string]bool{
 	"gm": true, "gs": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
-	"g3": true, "gx": true, "gk": true, "gb": true, "ge": true, "ga": true, "g4": true, "gt": true, "g5": true,
+	"g3": true, "gd": true, "gx": true, "gk": true, "gb": true, "ge": true, "ga": true, "g4": true, "gt": true, "g5": true,
 }
 
 // KnownGate reports whether name names a gate this suite can run.
@@ -185,6 +185,9 @@ func RunSelected(design, impl string, sel Selection, opt RunOptions) []*Gate {
 	}
 	if sel.Run["g3"] {
 		out = append(out, CheckMachines(design))
+	}
+	if sel.Run["gd"] && (sel.Explicit || HasMachines(design)) {
+		out = append(out, CheckIDCitations(design))
 	}
 	if sel.Run["gx"] {
 		out = append(out, CheckTraceability(design))
