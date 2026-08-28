@@ -25,7 +25,7 @@ func readsDesign(t *testing.T, matrixLine, archRow string) string {
 	return d
 }
 
-const archSettledRow = "| `order.settled` | billing | ledger | Order id, settlementClass, declineCause | at-least-once | FIFO | query id |"
+const archSettledRow = "| `order.settled` | billing | ledger | Order id, settlementClass, declineCause | at-least-once | FIFO | order id |"
 
 func TestPayloadReadsCarriedSilent(t *testing.T) {
 	d := readsDesign(t, "| `order.settled` (consumed) | routes on it READS{settlementClass, declineCause} |", archSettledRow)
