@@ -1,14 +1,15 @@
 ---
 id: MAC-6ylh
 title: "Gu-surfaces: target-side surface ledger gate"
-status: open
+status: in_progress
 priority: 1
 type: feature
 labels: [story]
 created_at: 2026-08-29T23:49:02Z
 created_by: ramirosalas
-updated_at: 2026-08-29T23:49:02Z
-content_hash: "sha256:bbc39420f5b58e8437b63162ed64ab92c29758b290857a91b8d7417958487b61"
+updated_at: 2026-08-29T23:49:33Z
+content_hash: "sha256:5f6caef5602744b1b8c9600be99aa4f6d08ab4b7a5ed25438fc57a28f8af660f"
+assignee: ramirosalas
 ---
 
 ## Description
@@ -43,7 +44,8 @@ CONSTRAINTS: no version bump, no tag, no push (the maintainer will land more cha
 
 
 ## History
-
+- 2026-08-29T23:49:33Z status: open -> in_progress
+- 2026-08-29T23:49:33Z claimed by ramirosalas
 
 ## Links
 
