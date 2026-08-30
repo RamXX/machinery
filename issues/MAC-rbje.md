@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:50:42Z
-content_hash: "sha256:54148e68a837508ae75cff80791264c73b3b53f969148707640d923cf263d3a8"
+updated_at: 2026-08-30T08:52:58Z
+content_hash: "sha256:cc07b1ce44bf49eea9c9014c19dff9074f0f6b4e029a94f480733eaa52527400"
 assignee: ramirosalas
 labels: [delivered]
 ---
@@ -143,6 +143,7 @@ LEARNINGS (full history across both rounds):
 - Protocol-level proof beat unit-level proof here. The new unit test cannot compile against the old code (it names editedOps), so it could not by itself demonstrate the regression. Building the binary at c594b09 and at 9c81aa6 and feeding both the same PreToolUse JSON showed allow-then-deny with no code coupling at all, which is the evidence that actually settles it.
 - A carve-out documented as 'deleting it stays allowed' is under-specified prose. Saying 'allowed as a delete on its own' in SKILL.md and docs/claude-plugin.md costs one clause and removes the reading that let the bypass look legitimate.
 - ENVIRONMENT: the dispatcher-provisioned worktree removed the concurrent-checkout hazard reported in round one. Worktree isolation worked; the whole ladder ran clean without touching the shared checkout.
+ACCEPTED (re-review, commit 9c81aa6, branch story/MAC-rbje-wave-sentinel): the delete+add bypass I found in c594b09 is fixed. patchPathLine now captures the operation keyword (Add/Update/Delete); editedOps() returns (Path, Op) pairs deduplicated by path AND op; pre() now exempts the wave-sentinel deny only for the specific entry whose Op is opDelete (blanket per-path 'dropped' map removed). Re-verified independently in the worktree: (1) my original probe patch (Delete File + Add File for design/.machinery-wave in one apply_patch call) now denies with the standard sentinel reason -- reproduced live, not just trusted from proof; (2) a pure Delete File still allows (wave-close path intact); (3) editedPaths() survives as the path-only, path-deduplicated view and stop-time post() at hook.go:320 is unchanged/unaffected -- confirmed via TestEditedOpsReportsOperationPerPath and by reading post()'s call site directly; (4) go test ./... 16/16 packages ok (internal/hook 0.585s including new TestCodexPatchWaveSentinelDeleteDoesNotLaunderRewrite [4 subcases: delete+add, add+delete, delete+update, delete-one-add-another, all deny] and TestEditedOpsReportsOperationPerPath), golangci-lint run ./... 0 issues, gofmt -l . clean -- all reproduced independently, matching the developer's proof. pvg verify's 6 stub hits on hook.go are the same pre-existing generatedReason()/relToRoot() not-applicable returns as before (line numbers shifted, count unchanged), not new. pvg gates PASS (only pre-existing file_loc WARNs). No em dashes or emojis in the fix diff. Deletion-stays-allowed judgment call reconfirmed sound (stop-hook's own remedy text instructs deletion to close the wave). AC1 now genuinely met including the apply_patch multi-op edge case. Environment note: story branch still based on f1dc685; main has moved to 64bbd17 (MAC-v16q landed) -- dispatcher rebases at landing per its own note.
 
 ## History
 - 2026-08-30T08:35:01Z status: open -> in_progress
