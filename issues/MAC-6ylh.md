@@ -7,7 +7,7 @@ type: feature
 labels: [story, accepted]
 created_at: 2026-08-29T23:49:02Z
 created_by: ramirosalas
-updated_at: 2026-08-30T00:19:52Z
+updated_at: 2026-08-30T00:19:57Z
 content_hash: "sha256:beb1095c369046e5e93d37b7e3ea8368a5b913e0948c58f3ea7eee2751e5128d"
 assignee: ramirosalas
 closed_at: 2026-08-30T00:19:51Z
