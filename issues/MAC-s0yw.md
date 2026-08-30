@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
-updated_at: 2026-08-30T19:26:19Z
-content_hash: "sha256:1e887e45016ab2033e5a962a82875ac17af8f1957fa7e7056d88b03a1ed51619"
+updated_at: 2026-08-30T19:28:08Z
+content_hash: "sha256:50045bfd77b700ced9fc0cd81f34e37e036054e3d672730439677dbd35d2bc78"
 assignee: ramirosalas
 labels: [delivered]
 ---
@@ -312,6 +312,7 @@ DOCS
 Constraints held: internal/gates/gates.go, eventsource.go, internal/hook/hook.go untouched;
 internal/gates/pack.go untouched by this commit; no em dashes or emojis; no merge, no push; the
 worktree stays in place. Story remains in_progress with the delivered label.
+ACCEPTED (dispatcher QC, 2026-08-30): hunk-by-hunk review of accept.go, pack.go, surface.go, targetsurface.go; ancestry adjudication implemented as ruled (explicit=identity, derived=ancestry, dash-injection refused, provenance names the rule); independent go test ./... 16/16 ok and gofmt clean in wt-s0yw. Golden movement limited to the one Gs checked: line as recorded.
 
 ## History
 - 2026-08-30T18:54:50Z status: open -> in_progress
