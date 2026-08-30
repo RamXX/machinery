@@ -1,15 +1,17 @@
 ---
 id: MAC-fbeo
 title: "Zero-artifact checks A: G2/G3 cluster (DSL edges, event wiring, every-match, cell quality)"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
 updated_at: 2026-08-30T19:33:00Z
-content_hash: "sha256:54df0a2db28cfcfd3cbc92c99fc469fe20a71f920dba04d998bb9c11202475f0"
+content_hash: "sha256:cceda10654c3c129d7a485e25967f30c508b980d9c58fec7b28b59259b6e1134"
 assignee: ramirosalas
 labels: [delivered]
+closed_at: 2026-08-30T19:33:00Z
+close_reason: "accepted: eight-check story A (drawn edges vs contract, Gx event wiring, every-match locators, event cell quality)"
 ---
 
 ## Description
@@ -162,6 +164,7 @@ status: delivered
 - 2026-08-30T18:54:34Z status: open -> in_progress
 - 2026-08-30T18:54:34Z claimed by ramirosalas
 - 2026-08-30T19:30:20Z status: in_progress -> in_progress
+- 2026-08-30T19:33:00Z status: in_progress -> closed
 
 ## Links
 
