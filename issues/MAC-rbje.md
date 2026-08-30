@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:50:33Z
-content_hash: "sha256:c7e1f34e224631d7f5e91e5621e2da7354b90fead69a913c2d0415762c98fe84"
+updated_at: 2026-08-30T08:50:42Z
+content_hash: "sha256:54148e68a837508ae75cff80791264c73b3b53f969148707640d923cf263d3a8"
 assignee: ramirosalas
 labels: [delivered]
 ---
@@ -175,3 +175,6 @@ produces empty stdout (allow), confirmed by unmarshal failure / assertion in the
 FIX: Stop treating "this path was deleted somewhere in the patch" as license to allow every other edit to that path in the same patch. Track the operation type per editedPaths entry (Add/Update/Delete) instead of reusing the deletedPaths()-derived path set as a blanket exemption -- deny should be skipped only for the editedPaths entry that IS itself the delete operation on that path, never for a co-occurring Add/Update of the same path in the same patch. Concretely: extend editedPaths (or add a sibling helper) to report each match's operation kind from patchPathLine's own capture group (it already distinguishes Add|Update|Delete), and in pre() only exempt the wave-sentinel deny when the specific edited-path entry's operation is Delete. Add a regression test for the delete+add (and delete+update) combo in one apply_patch call targeting .machinery-wave, expecting deny. Re-run the full verification ladder (go test ./..., golangci-lint run ./...) after the fix and re-paste PROOF with the new test included.
 
 Everything else in this delivery checked out: go test ./... (16/16 packages ok, matches proof), golangci-lint run ./... (0 issues) and gofmt -l . (clean) both reproduced independently; pvg gates PASS (only pre-existing file_loc WARNs, lizard/jscpd skipped); pvg verify's 6 "stub" hits on `return ""` in hook.go are pre-existing (identical count at f1dc685 and c594b09), not introduced by this diff, and are legitimate not-applicable sentinel returns in generatedReason()/relToRoot(), not incomplete implementation. Docs (README.md, docs/claude-plugin.md, skills/machinery/SKILL.md) all correctly describe the human-only rule; SKILL.md frontmatter version untouched. No em dashes or emojis found in any added line. Please rework the dropped/exemption logic per FIX above and redeliver.
+
+### 2026-08-30T08:50:42Z ramirosalas
+REDELIVERED for acceptance review after rework. Branch story/MAC-rbje-wave-sentinel at 9c81aa6 (parent c594b09; not merged, not pushed). The rejection's finding is closed: the wave-sentinel exemption is now per operation, not per path, so a single apply_patch that both deletes and re-adds design/.machinery-wave is DENIED for the add while a pure delete stays allowed. Verified through the built binary at both commits: the delete+add patch is allowed at c594b09 and denied at 9c81aa6; the pure delete is allowed at both. Committed regression test TestCodexPatchWaveSentinelDeleteDoesNotLaunderRewrite (delete+add, add+delete, delete+update, delete-one-add-another) plus TestEditedOpsReportsOperationPerPath. go test ./... 16/16 ok, 0 failures, 0 skips; golangci-lint 2.13.2 0 issues; gofmt clean; pvg gates PASS. Full proof and AC table in Notes. Status in_progress with the delivered label; rejected label removed.
