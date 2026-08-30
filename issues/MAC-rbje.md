@@ -6,10 +6,10 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:50:14Z
+updated_at: 2026-08-30T08:50:33Z
 content_hash: "sha256:c7e1f34e224631d7f5e91e5621e2da7354b90fead69a913c2d0415762c98fe84"
 assignee: ramirosalas
-labels: [rejected]
+labels: [delivered]
 ---
 
 ## Description
