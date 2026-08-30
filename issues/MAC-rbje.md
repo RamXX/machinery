@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:35:01Z
-content_hash: "sha256:d763bf3770ed21c8a751ef82c78b084932577738270608ef8f4b03b6044e1e00"
+updated_at: 2026-08-30T08:40:18Z
+content_hash: "sha256:d37b563892d8ecb872ba29e6c83f4c9e9c02c8be16a32d5ddf8f8f1d5eab8326"
 assignee: ramirosalas
 ---
 
@@ -51,7 +51,52 @@ Paste the go test summary line(s) and lint result into the story notes.
 
 
 ## Notes
+PROOF (commit c594b09, branch story/MAC-rbje-wave-sentinel, built off f1dc685)
 
+Tests (make test == go test ./...), all 16 packages ok:
+  ok github.com/RamXX/machinery/cmd/machinery 7.320s
+  ok github.com/RamXX/machinery/internal/alloy 0.634s
+  ok github.com/RamXX/machinery/internal/checker 0.346s
+  ok github.com/RamXX/machinery/internal/compose 0.792s
+  ok github.com/RamXX/machinery/internal/experiments 2.502s
+  ok github.com/RamXX/machinery/internal/formal 5.360s
+  ok github.com/RamXX/machinery/internal/gates 4.292s
+  ok github.com/RamXX/machinery/internal/hook 3.966s
+  ok github.com/RamXX/machinery/internal/install 4.702s
+  ok github.com/RamXX/machinery/internal/ir 2.311s
+  ok github.com/RamXX/machinery/internal/lint 2.085s
+  ok github.com/RamXX/machinery/internal/oracle 2.669s
+  ok github.com/RamXX/machinery/internal/pack 3.071s
+  ok github.com/RamXX/machinery/internal/refine 3.252s
+  ok github.com/RamXX/machinery/internal/tla 2.541s
+  ok github.com/RamXX/machinery/internal/version 3.466s
+  0 failures, 0 skips.
+
+Lint: golangci-lint 2.13.2 (matches .golangci-version v2.13.2), 'golangci-lint run ./...' -> 0 issues. gofmt -l . -> clean.
+
+New tests (all PASS): TestPreDeniesWaveSentinelWrites (8 subcases: Write/Edit/MultiEdit on design/.machinery-wave, nested design/children/billing/.machinery-wave, ops/.machinery-wave outside the design dir, plus 3 controls: .machinery-wave.bak, wave.md, Bash tool) and TestCodexPatchWaveSentinel (apply_patch Add denied, apply_patch Delete allowed). Regression: TestPreDeniesGeneratedArtifacts unchanged and green (16 subcases), TestWaveSentinel and TestSessionStartAnnouncesGovernance green.
+
+End-to-end through the built binary (go build ./cmd/machinery, real PreToolUse JSON on stdin, temp managed repo):
+  Write design/.machinery-wave -> {"permissionDecision":"deny","permissionDecisionReason":"design/.machinery-wave is the wave sentinel, and it is operator-created: ..."}
+  apply_patch Delete File: design/.machinery-wave -> no output (allowed; deleting closes the wave)
+  Write design/machines/Deal.machine.json -> no output (allowed)
+
+AC verification:
+  AC1 PreToolUse denies file-tool create/edit of .machinery-wave with a clear reason; existing denials unchanged -> MET (hook.go pre(); TestPreDeniesGeneratedArtifacts unchanged and green)
+  AC2 New hook tests cover deny + control; go test ./internal/hook/... green -> MET
+  AC3 make test and golangci green at repo root -> MET
+  AC4 Docs mention the human-only rule -> MET (README.md, docs/claude-plugin.md PreToolUse + Stop rows, skills/machinery/SKILL.md wave-sentinel bullet, and the SessionStart governance announcement in hook.go)
+  AC5 No em dashes or emojis in added text -> MET (regex scan over added diff lines found none)
+
+Non-goals honored: TTL/cap/stop-block logic untouched; Bash residual not addressed; SKILL.md frontmatter version untouched (TestPluginManifests green).
+
+Design note: deletion of the sentinel stays ALLOWED. The stop message itself instructs 'Delete <design>/.machinery-wave to close the wave and gate', and deletion re-arms gating, so denying it would contradict the documented remedy. pre() collects deletedPaths first and skips the sentinel deny for a path the same patch deletes.
+
+LEARNINGS:
+- editedPaths() also matches '*** Delete File:' lines in an apply_patch, so a naive basename deny would have blocked wave CLOSE as well as wave open. Any new deny keyed on editedPaths needs to decide explicitly what it means for a delete.
+- Denying by base name anywhere in the repo (not scoped under <design>/) is the right net here: child designs and decomposed packs each have their own design dir, and the sentinel is a fixed dotfile name with no legitimate agent-authored twin.
+- A deny that is not announced at SessionStart reads as a tool malfunction to the agent that hits it. Adding the rule to the governance contract in sessionStart() cost one line and makes the wall self-documenting.
+- ENVIRONMENT HAZARD: the shared checkout at /Users/ramirosalas/workspace/machinery had another agent's uncommitted, non-compiling edits (internal/gates/ledger.go, then internal/gates/ledger_test.go) appearing mid-session, and a second story branch story/MAC-v16q-prompt-dedup exists. My first 'go test' failed on THEIR broken build, not mine. I moved to a git worktree and restored the main checkout to 'main' with their edits intact. Concurrent developers on this repo need worktrees; the dispatcher should provision them.
 
 ## History
 - 2026-08-30T08:35:01Z status: open -> in_progress
