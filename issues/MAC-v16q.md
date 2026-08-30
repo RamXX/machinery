@@ -1,14 +1,15 @@
 ---
 id: MAC-v16q
 title: "Remove prompt prose that restates deterministic gate checks"
-status: open
+status: in_progress
 priority: 1
 type: chore
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:34:37Z
-content_hash: "sha256:fe3967d878887b99666757e894998ff14bd8a22da86bd1d15334345bbdb80101"
+updated_at: 2026-08-30T08:35:09Z
+content_hash: "sha256:ceaf423cfbad5467ce7bb7152d5d81d972f917852c9226f25d5790b6d1fac206"
 blocks: [MAC-ug4h]
+assignee: ramirosalas
 ---
 
 ## Description
@@ -60,6 +61,8 @@ Paste go test + lint summaries and the grep(s) showing removal into the story no
 
 ## History
 - 2026-08-30T08:34:40Z dep_added: blocks MAC-ug4h
+- 2026-08-30T08:35:09Z status: open -> in_progress
+- 2026-08-30T08:35:09Z claimed by ramirosalas
 
 ## Links
 - Blocks: [[MAC-ug4h]]
