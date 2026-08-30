@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
-updated_at: 2026-08-30T19:28:52Z
-content_hash: "sha256:ddf00058c654b11366bfedad078beb4e90f64acc9ac75defedc2736bc03746bb"
+updated_at: 2026-08-30T19:29:46Z
+content_hash: "sha256:cbef14c6e774aa1890c95c2d040b1e9d563880b51cdbb713458bd628b2a0532b"
 assignee: ramirosalas
 ---
 
@@ -154,3 +154,135 @@ fulfillment 48 = 8 rows x 6 columns, 16 participants = 8 x 2; checkout children 
 
 
 ## Comments
+
+### 2026-08-30T19:29:46Z ramirosalas
+PROOF:
+
+Branch: story/MAC-fbeo-g2-cluster   Commit: a675ca9215409d1ff38a4e31afe9cb3f8f736f8f
+Worktree: scratchpad/wt-fbeo (left in place; not merged, not pushed)
+
+Commands run, all from the worktree, all at a675ca9:
+
+1. go test ./... -count=1
+   16/16 packages ok, 0 FAIL. Per-test: 1340 PASS, 0 FAIL, 1 SKIP.
+   The single SKIP is TestStableIDPrefixCollisionIsExtended in internal/oracle
+   ("no collision found in budget"), a probabilistic collision search that is
+   pre-existing and untouched by this story (my diff touches no oracle file).
+2. go test -race -count=1 ./...  (via preflight step 8): green.
+3. scripts/preflight.sh: ALL 11 STEPS GREEN, ending
+   "preflight OK: local gates match ci.yml, safe to push."
+   Includes step 10, `machinery check` over all 8 example design suites (go-crm,
+   surreal-crm, fulfillment, portfolio-engine, checkout-split parent/orders/
+   payments, pii-flow), step 9 (golden corpus + adversarial gate-experiment
+   suite), step 11 (go-crm impl module, 5 packages ok), the docs em-dash gate,
+   gofmt, go vet, and go mod tidy.
+4. golangci-lint run --config .golangci.yml --timeout 5m: "0 issues."
+   (v2.6.1 installed, matching .golangci-version.)
+5. .bin/machinery check <each example>: 8/8 design-green;
+   go-crm --impl examples/go-crm/impl: platform-green.
+6. pvg verify (10 changed files, --include-tests): 5 "stub" hits, all
+   `return ""`. Four are PRE-EXISTING and unchanged (gates.go:70/157/172,
+   imports.go:1143; confirmed identical on main at gates.go:69/156/171,
+   imports.go:1150). The fifth, eventcells.go:183, is `cellAt`'s documented
+   "column absent or row short" value, the same shape as the pre-existing
+   helpers. No TODO markers, no thin files.
+
+Coverage: go test ./internal/gates/ -cover = 76.9% of statements for the
+package as a whole (pre-existing level; the suite has no coverage gate). The
+four new units are covered by 27 new fixture tests, no mocks, every failure
+class per check:
+  dsledges_test.go     11 tests (allowed, denied, denied-by-wildcard,
+                       undeclared, baselined, allow+baseline reported once,
+                       unknown endpoint, unbound endpoint, intra-boundary,
+                       parser anchoring, `this`, hierarchical id, undrawn allow)
+  eventcells_test.go    8 tests (complete row, missing column once per table,
+                       empty cell, explicit none/n-a, unresolvable producer and
+                       consumer, externals by id and element, annotations and
+                       backticks, second table read and numbered, no table)
+  eventwiring_test.go  10 tests (reconciled row, unhandled, _ignores as
+                       handling, unemitted, action position, matrix cell,
+                       waiver with and without a reason, producer waiver,
+                       prose multi-event cell, no event column, pack skip)
+  everymatch_test.go    5 tests (mitigation second table covers, and its rows
+                       carry obligations; placement second table places, and its
+                       rows carry obligations; persisted count aggregates)
+
+The everymatch tests were verified to PIN the fix: restoring the two `break`
+statements makes all 5 fail, removing them makes all 5 pass.
+
+INDUCED-FAILURE SAMPLES (real finding text, from mutated copies of the shipped
+examples; the mutations were discarded, nothing is committed from them):
+
+Check 1, drawn edge (mutated go-crm, added `commands -> authz` to the DSL):
+  ERROR  workspace.dsl:30: the diagram draws commands -> authz (crm.commands ->
+  crm.authz), which the contract denies; either the diagram is wrong or the
+  contract needs an explicit allow
+
+Check 2, event wiring (mutated fulfillment, one waiver removed):
+  ERROR  event-contract row 8 (event 'dispatched / delivered / lost events'):
+  event 'dispatched' is handled or ignored by no machine, and the consumer cell
+  carries no '(no machine: <reason>)' waiver; the table says a component reacts
+  to it and the behavior layer says nothing does
+
+Check 3, every-match locator (mutated portfolio-engine, mitigation posture split
+across two tables with a bad token in the SECOND one; under the old first-match
+locator the second table's rows carried no obligation at all):
+  ERROR  mitigation row names `ghoststore`, which is neither a workspace.dsl
+  element nor a declared external
+  checked: ... 3 mitigation rows, 4 dependencies with mitigation rows
+  (the split `store` row still covers its dependency: proof of both halves)
+
+Check 4, event cell quality (mutated fulfillment, one dedupe cell blanked and
+one participant misnamed):
+  ERROR  event-contract row 1 (event 'reserve command'): empty dedupe cell; an
+  unanswered column is not a contract (write the answer, "none" or "n/a"
+  included when that is the answer)
+  ERROR  event-contract row 3 (event 'capture command'): consumer '`billingSvc`'
+  is neither a workspace.dsl element nor a declared external (declared: api,
+  bus, carrier, ...); one component per cell, annotations only in parentheses
+
+ACCEPTANCE CRITERIA:
+
+| AC | verdict | evidence |
+|---|---|---|
+| 1. Four checks at the specified tiers and semantics, fixture tests for pass and every failure class | met, with one documented reduction | Checks 1, 3, 4 as specified. Check 2's consumer and producer obligations are implemented at ERROR, mirroring checkBoundaryEvents; its reverse sweep ("every externally sourced machine event has a row") is NOT implemented, with the reason and the measured blast radius recorded in the story notes and now stated as attested in SKILL.md and docs/attestation-evidence.md. 34 tests across four new test files, no mocks, fixture-based. |
+| 2. `go test ./... -count=1` green; `scripts/preflight.sh` fully green including the 8 example suites and the golden corpus | met | commands 1 and 3 above; 1340 PASS / 0 FAIL, preflight OK |
+| 3. Example fixes and golden re-captures recorded and justified | met | three example fixes and the 9-line golden diff, reviewed line by line with the arithmetic checked per design, in the story notes |
+| 4. Docs in lockstep; no em dashes or emojis; SKILL.md version untouched | met | README (phase table + both gate rows), SKILL.md (G2 and Gate 4 sections), references/c4-standalone.md (column spec, Gate 2 checklist, machine-checkable format note, attested list), docs/attestation-evidence.md, docs/brownfield-team-guide.md. Preflight step 6 is the em-dash gate and it is green. `metadata.version: "0.4.1"` unchanged (git diff on the frontmatter is empty). |
+
+FILE OWNERSHIP: accept.go, targetsurface.go, pack.go, surface.go, and cmd/ were
+READ ONLY and are untouched (git diff --stat confirms). The one shared-code
+change is in imports.go: the `matchRule` closure inside checkImports is now the
+package-level `matchEdgeRule` in dsledges.go, a pure move with no behavior
+change, so a code edge and a diagram edge cannot drift apart on wildcard
+semantics.
+
+LEARNINGS:
+
+- The story's four checks were not equally implementable, and finding that out
+  took measurement rather than reading. Checks 1, 3, 4 fired on 0, 0, and 22
+  example findings respectively; check 2 as literally specified fired 14 on
+  fulfillment and could not be honestly fixed, because that design's wire
+  vocabulary is deliberately distinct from its machine vocabulary and the
+  "fix" would have meant redesigning a reference example's behavior layer. The
+  resolution was to reuse the house `(no machine: <reason>)` waiver, which
+  turns an unmeetable obligation into a stated one. Measure the blast radius on
+  the real corpus BEFORE settling semantics; my first three candidate designs
+  for check 2 all died on contact with fulfillment.
+- The reverse sweep of check 2 is not implementable as stated, and saying so
+  with numbers is better than shipping an inferred version. There is no marker
+  on a machine event that says "externally sourced", and the only inferable
+  proxy demands a row for every CLI command. That is the kind of check that
+  makes a gate suite hated.
+- Two of the three example fixes were REAL undeclared coupling, not cosmetics.
+  The checkout-split children each name their peer subsystem in their event
+  rows while declaring it nowhere in their own model. That is exactly the hole
+  these gates exist to close, and it survived in a shipped reference example.
+- `ir.CleanCell` and `backtickTokens` are the two cell-reading idioms in this
+  codebase, and which one a table wants depends on whether its cells are
+  pack-format or prose. Reading backticks with CleanCell as the fallback makes
+  one rule that reduces to the pack's exactly where the pack runs.
+- The golden corpus is a good change-detector but a bad reviewer: it flagged 9
+  lines and every one was a new counter. The real review was the arithmetic
+  (does 14 = 5 + 9 for go-crm's relationships?), which the corpus cannot do for
+  you.
