@@ -1,17 +1,19 @@
 ---
 id: MAC-ug4h
 title: "Class C: attestation-evidence gate (generalize Ga pattern)"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T09:15:31Z
-content_hash: "sha256:93eb416fa7191c47e688143d8fef0c12118a647fcad5a452c1c352ec58367695"
+updated_at: 2026-08-30T09:15:36Z
+content_hash: "sha256:bcda2d74cd78c0358f025b6bd8e02c8e906af23bc841409b55128d358a0d45a1"
 was_blocked_by: [MAC-v16q]
 assignee: ramirosalas
 follows: [MAC-v16q]
 labels: [delivered]
+closed_at: 2026-08-30T09:15:36Z
+close_reason: "Accepted via pvg story accept"
 ---
 
 ## Description
@@ -260,6 +262,7 @@ LEARNINGS
 - 2026-08-30T08:52:03Z auto-follows: linked to predecessor MAC-v16q
 - 2026-08-30T08:52:03Z claimed by ramirosalas
 - 2026-08-30T09:10:12Z status: in_progress -> in_progress
+- 2026-08-30T09:15:36Z status: in_progress -> closed
 
 ## Links
 - Was blocked by: [[MAC-v16q]]
