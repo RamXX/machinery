@@ -9,6 +9,7 @@ created_by: ramirosalas
 updated_at: 2026-08-30T19:30:20Z
 content_hash: "sha256:aedf7b6e1e4d5203fa5d2da4b58c1ca89e1307bfd5c2a5740458d3553cc3d15f"
 assignee: ramirosalas
+labels: [delivered]
 ---
 
 ## Description
