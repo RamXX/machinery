@@ -1,13 +1,13 @@
 ---
 id: MAC-rbje
 title: "Deny agent writes to the wave sentinel (human-only .machinery-wave)"
-status: open
+status: in_progress
 priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:45:18Z
-content_hash: "sha256:566f2ae487d6dc7208ec470d62a46813ba4238d5e6c06b2ecebd2b9e3e768883"
+updated_at: 2026-08-30T08:46:11Z
+content_hash: "sha256:f2343b28a3eb29ff00b306d3516d166936e0f064099890406442ed64855c8d0c"
 assignee: ramirosalas
 labels: [rejected]
 ---
@@ -103,6 +103,8 @@ LEARNINGS:
 - 2026-08-30T08:35:01Z status: open -> in_progress
 - 2026-08-30T08:35:01Z claimed by ramirosalas
 - 2026-08-30T08:44:50Z status: in_progress -> open
+- 2026-08-30T08:46:11Z status: open -> in_progress
+- 2026-08-30T08:46:11Z claimed by ramirosalas
 
 ## Links
 
