@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:46:11Z
-content_hash: "sha256:f2343b28a3eb29ff00b306d3516d166936e0f064099890406442ed64855c8d0c"
+updated_at: 2026-08-30T08:50:14Z
+content_hash: "sha256:c7e1f34e224631d7f5e91e5621e2da7354b90fead69a913c2d0415762c98fe84"
 assignee: ramirosalas
 labels: [rejected]
 ---
@@ -98,6 +98,51 @@ LEARNINGS:
 - Denying by base name anywhere in the repo (not scoped under <design>/) is the right net here: child designs and decomposed packs each have their own design dir, and the sentinel is a fixed dotfile name with no legitimate agent-authored twin.
 - A deny that is not announced at SessionStart reads as a tool malfunction to the agent that hits it. Adding the rule to the governance contract in sessionStart() cost one line and makes the wall self-documenting.
 - ENVIRONMENT HAZARD: the shared checkout at /Users/ramirosalas/workspace/machinery had another agent's uncommitted, non-compiling edits (internal/gates/ledger.go, then internal/gates/ledger_test.go) appearing mid-session, and a second story branch story/MAC-v16q-prompt-dedup exists. My first 'go test' failed on THEIR broken build, not mine. I moved to a git worktree and restored the main checkout to 'main' with their edits intact. Concurrent developers on this repo need worktrees; the dispatcher should provision them.
+REDELIVERY (rework after PM rejection). Commit 9c81aa6 on story/MAC-rbje-wave-sentinel (parent c594b09). Not merged, not pushed.
+
+ROOT CAUSE (as the PM found it): pre() built a `dropped` set from deletedPaths(in) and skipped the wave-sentinel deny for ANY editedPaths entry whose rel was in that set. editedPaths() deduplicates by path and its regex matched Add|Update|Delete alike, so one apply_patch carrying both '*** Delete File: design/.machinery-wave' and '*** Add File: design/.machinery-wave' collapsed to a single entry that the delete had already exempted. Result: no deny, fresh full-TTL sentinel in one governed call.
+
+FIX (per the prescribed shape): the exemption is now per operation, not per path.
+- patchPathLine now captures the operation keyword (Add|Update|Delete) as well as the path.
+- New editedOps(in) []editedPath returns (Path, Op) pairs, deduplicated by path AND op, in patch order; file tools report opWrite, move lines report opMove.
+- pre() iterates editedOps and skips the sentinel deny only when that entry's own Op == opDelete. The `dropped` map is gone; the config/marker deletion deny loop is unchanged.
+- editedPaths() is retained as the path-only, path-deduplicated view of editedOps, so the stop-time touched-class caller keeps its contract.
+
+BYPASS-DENY EVIDENCE (end to end, built binaries, real PreToolUse JSON on stdin, temp managed repo with design/domain.modelith.yaml):
+  patch = '*** Begin Patch\n*** Delete File: design/.machinery-wave\n*** Add File: design/.machinery-wave\n+240\n*** End Patch'
+  binary built from c594b09 (pre-fix) -> empty stdout (ALLOW). Bypass reproduced.
+  binary built from 9c81aa6 (fixed)   -> {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"design/.machinery-wave is the wave sentinel, and it is operator-created: ..."}}
+PURE-DELETE-ALLOWED EVIDENCE (same fixed binary):
+  patch = '*** Begin Patch\n*** Delete File: design/.machinery-wave\n*** End Patch' -> empty stdout (ALLOW). Deleting still closes the wave, matching the stop hook's own remedy text at hook.go:424.
+
+NEW COMMITTED TESTS (all PASS):
+  TestCodexPatchWaveSentinelDeleteDoesNotLaunderRewrite, 4 subcases, each expecting deny: 'delete then add', 'add then delete', 'delete then update', 'delete one sentinel, add another'.
+  TestEditedOpsReportsOperationPerPath: pins that one patch deleting and re-adding a path reports BOTH ops in patch order, that editedPaths stays deduplicated by path (2 paths from 3 ops), and that a file-tool write reports opWrite and never opDelete.
+PINNED REGRESSIONS, unchanged and green: TestCodexPatchWaveSentinel (add denied, pure delete allowed), TestPreDeniesWaveSentinelWrites (8 subcases incl. 3 controls), TestPreDeniesGeneratedArtifacts (16 subcases), TestPreDeniesGovernanceConfigEdits, TestCodexDeleteOfGovernanceMarkerDenied, TestEditedPathsParsesCodexPatchOperations, TestCodexApplyPatchRecordsAllTouchedClasses, TestWaveSentinel, TestSessionStartAnnouncesGovernance.
+
+TEST SUITE: 'go test ./...' at 9c81aa6, 16/16 packages ok, 0 failures, 0 skips:
+  cmd/machinery, internal/alloy, internal/checker, internal/compose, internal/experiments, internal/formal, internal/gates, internal/hook, internal/install, internal/ir, internal/lint, internal/oracle, internal/pack, internal/refine, internal/tla, internal/version.
+LINT: golangci-lint 2.13.2 (matches .golangci-version v2.13.2), 'golangci-lint run ./...' -> 0 issues. 'gofmt -l .' -> clean.
+pvg gates -> GATES: PASS (37 warn, 2 skipped); all warns are pre-existing file_loc, lizard/jscpd skipped (not installed).
+pvg verify internal/hook/hook.go internal/hook/hook_test.go --include-tests -> 6 'stub' hits, all 'return \"\"' in hook.go, identical count to c594b09 and f1dc685 (PM already adjudicated these as pre-existing not-applicable sentinel returns in generatedReason()/relToRoot()). No new ones introduced.
+
+DOCS: added the per-operation clarification in the two places that state the delete carve-out, so the rule reads the same in code and prose: skills/machinery/SKILL.md wave-sentinel bullet and docs/claude-plugin.md PreToolUse row. SKILL.md frontmatter version untouched (TestPluginManifests green).
+Non-goals still honored: TTL/cap/stop-block logic untouched; the Bash residual not addressed.
+No em dashes or emojis: regex scan over every added diff line (U+2014 plus emoji blocks) found none.
+
+AC verification at 9c81aa6:
+  AC1 PreToolUse denies file-tool create/edit of .machinery-wave with a clear reason; existing denials unchanged -> MET, now including the delete+add-in-one-patch shape that the rejection identified.
+  AC2 New hook tests cover deny + control; go test ./internal/hook/... green -> MET.
+  AC3 make test and golangci green at repo root -> MET.
+  AC4 Docs mention the human-only rule -> MET, and now the per-operation nuance too.
+  AC5 No em dashes or emojis in added text -> MET.
+
+LEARNINGS (full history across both rounds):
+- The original round got the policy right and the parsing wrong. The bug was not in the deny rule but in the shape of the data it consumed: a set of paths cannot express 'this path was deleted AND re-added', so any exemption keyed on a path set is a blanket amnesty for every other operation on that path in the same call. Exemptions belong on operations.
+- editedPaths() deduplicating by path actively hid the bypass: the delete and the add of the same file collapsed into one entry, so even reading pre() carefully the second operation was invisible. Deduplication upstream of a security decision is a trap; dedupe by the full key the decision uses.
+- Protocol-level proof beat unit-level proof here. The new unit test cannot compile against the old code (it names editedOps), so it could not by itself demonstrate the regression. Building the binary at c594b09 and at 9c81aa6 and feeding both the same PreToolUse JSON showed allow-then-deny with no code coupling at all, which is the evidence that actually settles it.
+- A carve-out documented as 'deleting it stays allowed' is under-specified prose. Saying 'allowed as a delete on its own' in SKILL.md and docs/claude-plugin.md costs one clause and removes the reading that let the bypass look legitimate.
+- ENVIRONMENT: the dispatcher-provisioned worktree removed the concurrent-checkout hazard reported in round one. Worktree isolation worked; the whole ladder ran clean without touching the shared checkout.
 
 ## History
 - 2026-08-30T08:35:01Z status: open -> in_progress
