@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
-updated_at: 2026-08-30T19:17:27Z
-content_hash: "sha256:f8865f979d8add9172d046581f23d0a2c39b8de144b5ce49dc539ad3340a1dde"
+updated_at: 2026-08-30T19:26:19Z
+content_hash: "sha256:1e887e45016ab2033e5a962a82875ac17af8f1957fa7e7056d88b03a1ed51619"
 assignee: ramirosalas
 labels: [delivered]
 ---
@@ -198,6 +198,120 @@ RISK FOR REVIEW (not a defect in this change; reported per the Own All Errors ru
   specifies; whether the derived lane (or both lanes) should accept an ANCESTOR of the commit
   under review, e.g. `git merge-base --is-ancestor`, is a semantics decision above my pay grade
   and I did not invent it. Flagging for Sr PM triage.
+REWORK DELIVERED at 30c4244 (branch story/MAC-s0yw-edge-gates; d9017d4 is the original delivery,
+30c4244 the adjudicated rework). Both commits stand; nothing was amended or rebased.
+
+DECISION RECORD
+  Dispatcher QC adjudication, 2026-08-30. The Ga risk raised in the d9017d4 delivery note is
+  UPHELD. Ga's commit binding now has two modes:
+    Explicit (--commit or MACHINERY_COMMIT supplied): strict identity, unchanged. CI's contract
+      does not move.
+    Derived (commit obtained from git HEAD of the design's repository): the evidence commit must
+      (a) resolve to a known object in that repository and (b) be an ancestor of, or equal to,
+      HEAD. Unknown object or non-ancestor is an ERROR; ancestor-or-equal passes.
+  Rationale, per the adjudication: identity is right for a commit a caller NAMED and wrong for one
+  the gate went looking for, because the commit that ADDS an evidence file already differs from the
+  commit the evidence names. A derived identity rule would go red one commit after every closure
+  and stay red for the milestone's life. Ancestry still closes the note-tier hole (typo'd,
+  fabricated, and unmerged shas are caught on every local run and at stop time) without failing the
+  ordinary case where history has simply moved on. The caveat paragraph added to
+  docs/acceptance-gate.md at d9017d4 is removed and replaced by a two-mode contract section.
+
+IMPLEMENTATION (internal/gates/accept.go only; no new files, no new dependencies)
+  runGit(dir, args...) factors the subprocess hygiene gitHeadAt already carried: `git -C <abs
+  design path>` so the process working directory can never decide which repository answers, a 5s
+  context timeout, and GIT_OPTIONAL_LOCKS=0 / GIT_PAGER=cat / GIT_TERMINAL_PROMPT=0.
+  gitHeadAt, gitCommitOf (rev-parse --verify --quiet <rev>^{commit}), and gitIsAncestor
+  (merge-base --is-ancestor) all go through it.
+  checkCommitBinding takes the provenance and routes: commitFromGit to checkCommitAncestry,
+  everything else to the unchanged commitBinds identity path.
+  gitCommitOf refuses a value with a leading dash before it reaches git: an evidence field is data,
+  and data must never arrive as an option.
+  Provenance segments now name the RULE as well as the source, and state the rule rather than the
+  outcome (the outcome is the count beside them and the findings above them):
+    "commit under review supplied by --commit or MACHINERY_COMMIT; evidence commit bound by identity"
+    "commit under review derived from git HEAD of the repository holding the design; evidence
+     commit bound by ancestry"
+
+PROOF (all from 30c4244, run in the worktree)
+  go build ./...            clean
+  go vet ./...              clean
+  gofmt -l cmd/ internal/   empty
+  go test ./... -count=1    16/16 packages ok
+  go test ./... -count=1 -v 1355 PASS, 0 FAIL (was 1349 at d9017d4; +6 net), 1 SKIP
+                            (TestStableIDPrefixCollisionIsExtended, pre-existing, internal/oracle)
+  scripts/preflight.sh      "preflight OK: local gates match ci.yml, safe to push" (all 11 steps,
+                            including go test -race ./..., the golden corpus, all 8 example check
+                            suites, and the go-crm impl module)
+  Golden corpus UNAFFECTED, verified two ways: `go test -run TestGolden ./cmd/machinery` passes
+  without -update, and `git status --short testdata/` is empty (the corpus has not moved since
+  d9017d4). Same reason as before: Ga activates on no bundled example, because none carries
+  design/acceptance/ or a "Status: closed" milestone.
+
+  Derived-mode tests (all four cases the adjudication names, plus two more):
+    TestCheckAcceptanceDerivedModeAncestry, a table over a real git fixture built by
+    initGitHistory (root commit, a second commit on the main line = HEAD, and one commit on a
+    branch never merged; the initial branch name is read with rev-parse --abbrev-ref rather than
+    assumed, and the fixture asserts it left HEAD where it meant to):
+      equal to HEAD                   passes, 1 commit bindings verified
+      an ancestor of HEAD             passes  (the shape every real design has)
+      an abbreviated ancestor         passes  (proves (a) is resolution, not string matching)
+      a sha no object answers to      ERROR "names no commit in the repository holding the design"
+      a commit on an unmerged branch  ERROR "is not an ancestor of the commit under review"
+      Each failing case also asserts "commit bindings verified" stayed 0, so a failed binding can
+      never be counted as a verified one.
+    TestCheckAcceptanceModesDifferOnADescendantHead pins the adjudication itself: on ONE tree, the
+      same evidence naming an ancestor passes derived and fails explicit against that same HEAD.
+    TestCheckAcceptanceDerivedModeRefusesOptionShapedCommits: an evidence commit of
+      "--output=/tmp/machinery-gate-escape" is refused as data, and the test asserts the file was
+      never created.
+  Explicit-mode identity cases untouched, as instructed: TestCheckAcceptanceCommitBinding (exact,
+    both prefix directions, case-insensitive, mismatch, too-short prefix) and
+    TestCheckAcceptanceExplicitCommitWinsInsideRepo (now also asserting the identity binding is
+    counted). TestCheckCommitFlagAndEnvironmentReachGa (flag-wins, env-wins, flag-beats-env,
+    wrong-commit-blocks) is byte-identical to what it was before this story.
+  CLI wiring: TestCheckDefaultsCommitToGitHeadOfTheDesignRepo is renamed
+    TestCheckDefaultsCommitToGitHistoryOfTheDesignRepo and now exercises all four derived outcomes
+    through the cobra command (ancestor passes, HEAD passes, unmerged branch exits 1, unknown sha
+    exits 1), with MACHINERY_COMMIT cleared explicitly.
+  Isolation unchanged and still asserted: git resolves from the design path, never the process cwd
+    (TestResolveReviewCommit/derived asserts the resolved sha differs from gitHeadAt("."), the
+    machinery repo the tests run inside), and the no-repo case asserts gitHeadAt(design)=="" before
+    running the gate.
+
+INDUCED-FAILURE SAMPLES, from .bin/machinery on a throwaway repo (root = reviewed commit, a second
+commit after it, and an unmerged side branch):
+  derived PASS   checked: ... 1 commit bindings verified, commit under review derived from git HEAD
+                 of the repository holding the design; evidence commit bound by ancestry
+                 (evidence names root, HEAD is the second commit: exactly the case that used to go
+                 red under identity)
+  derived (a)    ERROR acceptance/M0.yaml: commit '9f3c1a2b...12345' names no commit in the
+                 repository holding the design (HEAD is '4c67e218...'); a reviewed commit that the
+                 history does not contain is a typo, a fabrication, or evidence from another
+                 repository
+  derived (b)    ERROR acceptance/M0.yaml: commit '0a521ec3...' is not an ancestor of the commit
+                 under review (HEAD is '4c67e218...'); the review ran on a commit this history
+                 never took (an unmerged branch, or a rewritten one), so it says nothing about this
+                 tree (pass --commit to bind a specific commit by identity instead)
+  explicit       ERROR acceptance/M0.yaml: commit '0d54c66e...' does not name the commit under
+                 review ('4c67e218...'); ... checked line ends "supplied by --commit or
+                 MACHINERY_COMMIT; evidence commit bound by identity"  (identity preserved)
+
+DOCS
+  docs/acceptance-gate.md: the "binds to the commit" bullet is now a one-line pointer; a new
+    section "The two binding modes" states explicit/identity, derived/ancestry with both git
+    conditions, why they differ (the argument above, in the file's own voice), and the
+    outside-a-repository note tier. The d9017d4 caveat paragraph is gone. The CI section now says
+    why passing the commit is what puts CI in the explicit mode.
+  skills/machinery/SKILL.md: Milestone acceptance step 3 and the verification paragraph carry both
+    modes. metadata.version still "0.4.1", untouched.
+  commands/check.md: --commit binds by identity, the default by ancestry.
+  README, docs/target-surfaces.md, docs/surface-ledger.md and the two skills/references mirrors are
+  unchanged by this rework (checks 6, 7, 8 did not move).
+
+Constraints held: internal/gates/gates.go, eventsource.go, internal/hook/hook.go untouched;
+internal/gates/pack.go untouched by this commit; no em dashes or emojis; no merge, no push; the
+worktree stays in place. Story remains in_progress with the delivered label.
 
 ## History
 - 2026-08-30T18:54:50Z status: open -> in_progress
