@@ -1,14 +1,16 @@
 ---
 id: MAC-ug4h
 title: "Class C: attestation-evidence gate (generalize Ga pattern)"
-status: open
+status: in_progress
 priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:34:37Z
-content_hash: "sha256:89409d9712cb7360ae2500dcd8f35c8e4de5694b82d50e5a69414011cfb76490"
+updated_at: 2026-08-30T08:52:03Z
+content_hash: "sha256:b5baf39dd1b9f407996d6e4c47fbac9416c17c28bd6fb60b6e1e79ffde107e1a"
 was_blocked_by: [MAC-v16q]
+assignee: ramirosalas
+follows: [MAC-v16q]
 ---
 
 ## Description
@@ -75,8 +77,12 @@ Paste go test + lint summaries and a sample gate run (pass + one induced STALE f
 ## History
 - 2026-08-30T08:34:40Z dep_added: blocked_by MAC-v16q
 - 2026-08-30T08:48:02Z dep_removed: was_blocked_by MAC-v16q
+- 2026-08-30T08:52:03Z status: open -> in_progress
+- 2026-08-30T08:52:03Z auto-follows: linked to predecessor MAC-v16q
+- 2026-08-30T08:52:03Z claimed by ramirosalas
 
 ## Links
 - Was blocked by: [[MAC-v16q]]
+- Follows: [[MAC-v16q]]
 
 ## Comments

@@ -7,11 +7,12 @@ type: chore
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
 updated_at: 2026-08-30T08:48:02Z
-content_hash: "sha256:951ed84326f6a7eef84bbab85dccee9b7a1b3154482dc5499239acf2ac3d4409"
+content_hash: "sha256:0eed412b4cffd6459fed0f5e1e281280b395237e9fb07e1690b03883aaef3256"
 assignee: ramirosalas
 labels: [accepted]
 closed_at: 2026-08-30T08:48:02Z
 close_reason: "accepted: all six fidelity edits verified against gate source, Gl em-dash promotion verified with fresh test run (23/23 pass), full test suite and preflight green, greps confirmed removal and adapter parity"
+led_to: [MAC-ug4h]
 ---
 
 ## Description
@@ -125,6 +126,8 @@ status: accepted
 - 2026-08-30T08:48:02Z dep_removed: no_longer_blocks MAC-ug4h
 
 ## Links
+- Led to: [[MAC-ug4h]]
+
 ## Comments
 
 ### 2026-08-30T08:47:57Z ramirosalas
