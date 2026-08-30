@@ -490,6 +490,9 @@ func selectGates(designDir string, cfg Config) (gates.Selection, string) {
 	if fileExists(filepath.Join(designDir, "legacy", "surface.yaml")) {
 		run["gs"] = true
 	}
+	if fileExists(filepath.Join(designDir, gates.TargetSurfacesName)) {
+		run["gu"] = true
+	}
 	if fileExists(filepath.Join(designDir, "formal", "policy.relational.yaml")) {
 		run["gp"] = true
 	}

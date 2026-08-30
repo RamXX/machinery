@@ -19,7 +19,9 @@ Run a machinery design session in this repository.
    author `migration.yaml`, and hold it with Gm-transition. Do not collapse current and intended
    truth into one model. Whenever a legacy system exists, also author the surface ledger
    (`design/legacy/surface.yaml`, held by Gs-surface): the opening sweep seeds it and the closing
-   sweep after Gate 4 settles every row.
+   sweep after Gate 4 settles every row. In every mode, author the target surface ledger
+   (`design/surfaces.yaml`, held by Gu-surfaces) during Phase 2: walk each human persona's complete
+   action list into named surfaces before Gate 2.
 5. Treat the user's request below as the Phase 0 frame input. If it is
    empty, open Phase 0 by asking for the frame.
 

@@ -35,7 +35,7 @@ type RunOptions struct {
 // validator (internal/hook) must agree on it, so both read this set through
 // KnownGate; two hand-kept lists once drifted.
 var knownGateSet = map[string]bool{
-	"gm": true, "gs": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
+	"gm": true, "gs": true, "gu": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
 	"g3": true, "gd": true, "gx": true, "gk": true, "gb": true, "ge": true, "ga": true, "g4": true, "gt": true, "g5": true,
 }
 
@@ -69,7 +69,7 @@ func HasModelith(design string) bool {
 // unknown or empty gate name is an error.
 func Select(design, gateList, impl string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
-	list := "gm,gs,gp,gi,gn,gc,g2,g3,gd,gx,gk,gb,ge,ga,g4,gt,g5"
+	list := "gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gx,gk,gb,ge,ga,g4,gt,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
@@ -94,6 +94,7 @@ func Select(design, gateList, impl string) (Selection, error) {
 			}{
 				{"gm", HasMigrationContract},
 				{"gs", HasSurfaceLedger},
+				{"gu", HasTargetSurfaces},
 				{"gp", HasPolicyAnnotation},
 				{"gi", HasIntegrityAnnotation},
 				{"gn", HasIsolationAnnotation},
@@ -153,8 +154,8 @@ func Select(design, gateList, impl string) (Selection, error) {
 	return sel, nil
 }
 
-// RunSelected runs the selected gates in canonical order (Gm, Gs, Gp, Gi, Gn,
-// Gc, G2, G3, Gx, Gb, Ge, Ga, G4, Gt, G5) with `machinery check`'s applicability
+// RunSelected runs the selected gates in canonical order (Gm, Gs, Gu, Gp, Gi,
+// Gn, Gc, G2, G3, Gx, Gb, Ge, Ga, G4, Gt, G5) with `machinery check`'s applicability
 // rules: opt-in gates run only when their source exists (or when explicitly
 // requested), G4 and Gt only with an impl dir, and G5 only when explicitly
 // requested or when the design is decomposed. opt carries the run-time inputs
@@ -167,6 +168,9 @@ func RunSelected(design, impl string, sel Selection, opt RunOptions) []*Gate {
 	}
 	if sel.Run["gs"] && (sel.Explicit || HasSurfaceLedger(design)) {
 		out = append(out, CheckSurface(design))
+	}
+	if sel.Run["gu"] && (sel.Explicit || HasTargetSurfaces(design)) {
+		out = append(out, CheckTargetSurfaces(design))
 	}
 	if sel.Run["gp"] && (sel.Explicit || HasPolicyAnnotation(design)) {
 		out = append(out, CheckPolicy(design))

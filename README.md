@@ -129,10 +129,12 @@ Opt-in   External     bring-your-own deterministic checker (SAST, AST, Datalog, 
            checkers   -> Gk-checkers (input_hash binds, coverage holds; engine via verify-checkers)
          tool: projection is fresh; committed evidence binds to it; verdict is pass; coverage complete
          attested: the manifest claims the elements the checker is responsible for
-Phase 2  C4           architecture + contract
+Phase 2  C4           architecture + contract (+ surfaces.yaml, the target surface ledger)
          tool: G2-c4 (contract parses and binds; allow graph acyclic; mitigation coverage;
                an interface contract per allowed edge, and no row for an edge nobody allows)
-         attested: every action owned; each contract's shape is the right one; NFR record
+               Gu-surfaces (every act a person performs has a named surface or a deferral)
+         attested: every action owned; each contract's shape is the right one; NFR record;
+                   the persona walk is complete and every model action names its actor
 Phase 3  XState       state machines
          tool: G3-machine (lint; every invoke has onError + timeout; every fully guarded handler
                declares its guard-false disposition; delays consumed both ways; oracle fresh;
@@ -345,6 +347,15 @@ dropped/deferred disposition. The file activates **Gs-surface**, and it delibera
 depend on `migration.yaml`: a clean-break rebuild that drops the migration machinery keeps its
 completeness anchor. The [surface ledger guide](docs/surface-ledger.md) has the schema, the
 opening/closing sweep protocol, and the worked SurrealDB CRM rebuild.
+
+The forward twin of that question is asked by `design/surfaces.yaml`, the target surface ledger.
+Every gate before it looks at the design's internals; none of them asks how a person actually
+reaches an act. A model can declare that an administrator suspends a tenant, the architecture can
+place it, a machine can encode it, and the whole design can pass green while nothing names the
+screen, admin command, API route, or config release the administrator uses. The ledger maps every
+action whose actor is a person to a named surface, or defers it with a reason, and **Gu-surfaces**
+holds that set closed against the domain model. The [target surface guide](docs/target-surfaces.md)
+has the schema, the persona-walk sweep, and the gate's checks.
 
 ## Which model to use where
 
@@ -592,6 +603,7 @@ make verify-formal   # regenerates and checks all 34 TLC proofs + the relational
 | Gate 1 | `modelith lint` on the domain model (Phase 1). The binary has no `g1`, by design: Phase 1's gate is modelith's own linter. |
 | Gm-transition | rebuild/hybrid designs only: every legacy entity disposed, replaced attributes and lifecycle values fully mapped, ordered source-of-truth phases with rollback, evidence-based cutover, owned transitional risks. |
 | Gs-surface | designs with a legacy surface ledger only: all six surface classes inventoried or waived, every route/command/table/job/event/integration covered, dropped, or deferred, and covered bindings resolve against the target design. |
+| Gu-surfaces | designs with a target surface ledger only (`design/surfaces.yaml`): every action whose actor is a person is mapped to a named surface (screen, admin command, API route, config release) or explicitly deferred with a reason, each mapped act resolves against the domain model and matches the actor it declares, every act is stated exactly once, and persona-level deferrals name an actor the model actually declares. |
 | Gp-policy | designs with a policy annotation only: it binds to the domain model, covers every top-level invariant, and the committed `Policy.als` and `Policy.oracle.md` byte-match a fresh generation. |
 | Gi-integrity | designs with an integrity annotation only: it binds to the domain model and the committed `Integrity.als` byte-matches a fresh generation. |
 | Gn-isolation | designs with an isolation annotation only: it binds to the domain model and the committed `Isolation.als` and `Isolation.oracle.md` byte-match a fresh generation. |

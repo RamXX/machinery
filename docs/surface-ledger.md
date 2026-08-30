@@ -177,6 +177,9 @@ as the phases land.
   every *capability* disposed. Together they close both ends; either alone leaves a hole. Gm
   without Gs trusts the legacy model to be complete; Gs without Gm has no data-migration
   contract.
+- **Gu-surfaces** is the forward twin: `design/surfaces.yaml` maps every act a person performs in
+  the TARGET design to a named surface. Gs proves nothing was dropped by accident; Gu proves the
+  replacement is reachable. See [target-surfaces.md](target-surfaces.md).
 - Gs carries no generated artifacts, so it has no DRIFT class; the ledger is a source file.
 - In **brownfield** adoption the ledger works unchanged (the "legacy" system is the current
   one) and gives the staged `--gate` list a coverage anchor from day one: add `gs` to the

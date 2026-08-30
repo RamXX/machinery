@@ -103,7 +103,9 @@ domain claim, and the code alone cannot tell you what they should be.
      contract change.
 4. CI runs `machinery check design --impl . --gate g2,g4`. Recommended on day one as well: author
    `design/legacy/surface.yaml` (the surface ledger; see [surface-ledger.md](surface-ledger.md))
-   and add `gs` to the list, so the archaeology has a coverage anchor from the start. From this
+   and add `gs` to the list, so the archaeology has a coverage anchor from the start. Add `gu`
+   alongside it once `design/surfaces.yaml` names the human acts of the system under gates (see
+   [target-surfaces.md](target-surfaces.md)). From this
    moment two things
    fail the build: a new undeclared cross-boundary edge, and a new offender file on a
    baselined edge (the ratchet). Committing `ratchet.json` is also what arms the machinery

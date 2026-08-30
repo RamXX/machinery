@@ -86,5 +86,9 @@ Required for rebuild, hybrid, and greenfield-with-corpus (the migration machiner
 the completeness anchor must not be). Recommended for brownfield: add `gs` to the day-one staged
 gate list alongside g2,g4. Not applicable to pure greenfield.
 
+The forward twin of this ledger is `design/surfaces.yaml`, the TARGET surface ledger held by
+Gu-surfaces: Gs proves nothing was dropped by accident, Gu proves the replacement is reachable.
+See `references/target-surfaces.md`.
+
 The repository's expanded guide is `docs/surface-ledger.md`; the worked ledger is
 `examples/surreal-crm/design/legacy/surface.yaml`.
