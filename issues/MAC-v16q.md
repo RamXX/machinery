@@ -9,7 +9,7 @@ created_by: ramirosalas
 updated_at: 2026-08-30T08:48:02Z
 content_hash: "sha256:f26558296363c4f8779fec6a7eabc04b193fae438840fd61058d14830ba17761"
 assignee: ramirosalas
-labels: [delivered]
+labels: [delivered, accepted]
 closed_at: 2026-08-30T08:48:02Z
 close_reason: "accepted: all six fidelity edits verified against gate source, Gl em-dash promotion verified with fresh test run (23/23 pass), full test suite and preflight green, greps confirmed removal and adapter parity"
 ---
