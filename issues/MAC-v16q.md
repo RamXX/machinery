@@ -6,8 +6,8 @@ priority: 1
 type: chore
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:42:07Z
-content_hash: "sha256:cd425ceed0dcdbf55aa962523063aee0f067bcc7f1f8a0800b62696c5e4f1e56"
+updated_at: 2026-08-30T08:47:57Z
+content_hash: "sha256:349fbc1e738d9b4251fb7a36a00031e06c725740dd5f07f0d5319ae469ad151c"
 blocks: [MAC-ug4h]
 assignee: ramirosalas
 labels: [delivered]
@@ -114,3 +114,6 @@ LEARNINGS
 - Blocks: [[MAC-ug4h]]
 
 ## Comments
+
+### 2026-08-30T08:47:57Z ramirosalas
+ACCEPTED: Verified all 6 fidelity edits against source (Gx toolchain/state-migration at gates.go:1562-1573, whole-token invariant coverage at :1614-1650; Gb per-document milestone checks in checkPlanDoc/buildplan.go:390-471, confirmed uniqueness is per-document not global-across-shards and acceptance-protocol ordering is not Gb-checked, matching the two gaps the developer left stated in build-writer.md step 10 lines 92-102; lint.go invoke/onError/guard-shadow/refusal/event-subset checks matching the deleted fsm-author enumeration). Gl promotion confirmed: em dashes error only in *.modelith.md (isModelithRender suffix match), warn tier unchanged elsewhere including emojis, via internal/gates/ledger.go diff. Re-ran go test ./internal/gates -run TestLedger -v: 23/23 PASS matching proof exactly (including the 3 new tests). Re-ran go test ./... : all 16 packages ok, 0 failures, matching proof. Re-ran gofmt -l (clean), go vet ./... (clean), and the full scripts/preflight.sh (CI mirror): preflight OK, 0 blocking findings, matching proof. pvg verify and pvg gates --changed f1dc685 both PASS (gates: 2 pre-existing file_loc WARNs on README.md/SKILL.md, not introduced by this diff; complexity/duplication SKIPPED, tools absent). Re-grepped all 6 removed-restatement strings repo-wide (agents/commands/skills/adapters): 0 hits, matching proof. Re-grepped adapters/opencode for both restatement and Gl-tier phrasing: 0 hits, confirming no lockstep edit needed. Confirmed SKILL.md frontmatter version: line untouched in diff. Confirmed no em dashes/emojis introduced in any edited prose file. Checked MAC-rbje (rejected, open) for overlap risk: its README.md hunk is at line ~575-580 (wave sentinel section) and SKILL.md hunk at EOF ~1162+ (wave sentinel lessons); this story's hunks are at README.md 157-160/626-629 and SKILL.md 141-145/191-196/1034-1040. No line-range overlap, no merge conflict risk between the two branches on these shared files.
