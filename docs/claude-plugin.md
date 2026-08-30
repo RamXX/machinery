@@ -71,7 +71,10 @@ matching `formal/{policy,integrity,isolation}.relational.yaml` exists (the relat
 guides), G2 once `workspace.dsl` or `ARCHITECTURE.md` exists, G3
 once `machines/*.machine.json` exist, Gx once the domain model and machines both exist, Gb once
 `BUILD.md` exists, Ga once `acceptance/` exists or a milestone is marked `Status: closed` (see the
-[milestone acceptance guide](acceptance-gate.md)), G5 on decomposed designs, G4 and Gt only
+[milestone acceptance guide](acceptance-gate.md)), Gv once `attestations.yaml` exists (the
+committed attested-claim rows; see the [attestation evidence guide](attestation-evidence.md), and
+note that the stop hook is exactly where staleness must surface, since the turn that edited a
+covered artifact is the turn that invalidated the judgment over it), G5 on decomposed designs, G4 and Gt only
 when `impl` is configured. A phase you have
 not reached is not demanded of you; a phase you have reached is held.
 

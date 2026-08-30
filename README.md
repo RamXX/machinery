@@ -156,6 +156,11 @@ Brownfld Adjudication characterization verdicts (design/adjudications/, activate
          tool: Gj-adjudication (every verdict binds to a committed oracle row; a
                model-is-truth verdict names its filed defect)
          attested: whether each verdict is right
+Any      Attestation  the attested halves themselves (design/attestations.yaml, on presence)
+         tool: Gv-attest (each row names a claim from a closed vocabulary, an attestor,
+               and the covered artifacts with their content hashes; an edited artifact
+               makes the judgment STALE)
+         attested: whether each judgment is true, which is the point of the split
 Always   Ledgers      STATE.md / DECISIONS.md formats + house style
          tool: Gl-ledger (self-review grammar; dated entries; em-dash/emoji scan, warn
                tier, except em dashes in a *.modelith.md render, which error)
@@ -630,6 +635,7 @@ make verify-formal   # regenerates and checks all 34 TLC proofs + the relational
 | Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, the skeleton DoD cites a committed oracle id, and the skeleton block carries an `NFR:` line naming the NFR-record mechanisms it instantiates. |
 | Gl-ledger | always: every STATE.md `self-review:` line parses (five keys, `clean`/`fixed`/`fixed(<reason>)`/`accepted(<reason>)`), DECISIONS.md dated entries are real dates, author-proposed unconfirmed items are counted as a note, and the house-style scan warns on em dashes and emojis across the hand-written design tree. An em dash in a generated `*.modelith.md` render is an ERROR instead: the renderer emits them and the post-render strip is mechanical, so a survivor is a skipped step, not a style opinion. |
 | Gj-adjudication | designs with `adjudications/` only: every characterization verdict file parses, binds to a committed oracle stable id (one verdict per id), carries verdict/date/note, and every model-is-truth verdict names its filed defect. |
+| Gv-attest | designs with `attestations.yaml` only: every attested-claim row resolves to the closed claim vocabulary (no id twice), names an attestor and a real date, and covers artifacts the design carries whose content hashes still match, so an artifact edited after the judgment makes the row STALE and blocks. A claim whose artifact exists but carries no row warns. Whether a judgment is true is never checked, by design. `machinery attest <path>` prints the hash the gate expects. |
 | Ge-embed | designs carrying a `machinery:embed` marker only: every marked table is held to the source it declares (`subset`: each row is byte-identical to a source row; `complete`: every selected source row is present), with `(shard-local: <reason>)` exempting exactly the row or cell it names. The sanctioned shard-copy duplication, checked instead of promised. |
 | G4-import | code imports respect the contract boundaries (Go, Python, TypeScript/JavaScript, Elixir, Rust). |
 | Gt-tests | with `--impl` only: every stable id in the committed oracles appears whole-token in a test file, or a test parses the committed oracle table (the conformance idiom); for every `CLAUSES{...}`-declared guard, each governed oracle row also owes one suffixed falsifying-clause id per active clause (the conformance parse never discharges those); the hard-TDD RED-exit check made deterministic. |
@@ -683,6 +689,9 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   probabilistic engine you cannot modify),
   the [milestone acceptance guide](docs/acceptance-gate.md) (the closed marker, the acceptance
   evidence schema, the `ga` gate's DoD-id and commit bindings, and the CI recipe),
+  the [attestation evidence guide](docs/attestation-evidence.md) (the `attestations.yaml` schema,
+  the closed claim vocabulary, staleness by content hash, `machinery attest`, and how the `gv` gate
+  relates to `ga` and to the superseded PR-checklist idea),
   and the [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft
   rung-4 design note, not yet implemented).
 - `examples/go-crm/` the worked rebuild example: `design/legacy/` (the working prototype truth),

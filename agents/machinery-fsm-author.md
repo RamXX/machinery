@@ -147,12 +147,22 @@ Deterministic: `machinery lint` and `machinery oracle` above are the whole list.
 eyeball, and do not deliver with a lint ERROR outstanding or an oracle ungenerated. Enumerating
 their checks here would only drift from them.
 
-Your own judgment (the tools cannot check these; attest them explicitly):
+Your own judgment (the tools cannot check these; attest them explicitly). Write each one as a
+row in `design/attestations.yaml` before you hand back, covering the machines it ranges over;
+a verdict that appears only in your summary is not recorded, and `Gv-attest` holds the rows to
+their artifacts' content hashes:
 
-- Whether each guard's semantics actually enforce the invariant it names.
-- Every Modelith invariant is guarded or structurally impossible; list any that are not.
-- Every dependency failure from the C4 mitigation table has its residual transition.
-- Every consumed external event has its event-contract row and a redelivery story.
+- `g3.guard-semantics`: whether each guard's semantics actually enforce the invariant it names.
+- `g3.invariant-enforcement`: every Modelith invariant is guarded or structurally impossible;
+  list any that are not.
+- `g3.residual-transitions`: every dependency failure from the C4 mitigation table has its
+  residual transition.
+- `g3.event-redelivery`: every consumed external event has its event-contract row and a
+  redelivery story.
+
+Each row carries `claim`, `attestor` (name yourself), `date`, and `covers` with one
+`{path, hash}` per machine you judged. Get the hash from `machinery attest <path>`; re-attesting
+after an edit means updating that row's hash and date, never adding a second row for the claim.
 
 Before handing back, run the conductor's five-question phase-exit self-review (reality, depth,
 scope, coverage, consistency) over your artifacts and include the verdicts in your summary.

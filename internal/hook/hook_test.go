@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/RamXX/machinery/internal/gates"
 )
 
 // --- helpers ---
@@ -1102,6 +1104,25 @@ func TestSelectGatesActivatesGaOnAcceptanceArtifacts(t *testing.T) {
 	sel, _ = selectGates(bare, Config{})
 	if !sel.Run["ga"] {
 		t.Error("a milestone marked closed must activate ga on its own")
+	}
+}
+
+// The stop-time selection matches `machinery check`'s default activation for
+// Gv: no evidence file, no gate; a committed attestations.yaml, gate. The
+// stop hook is where staleness must surface, because the turn that edited a
+// covered artifact is the turn that invalidated the judgment over it.
+func TestSelectGatesActivatesGvOnAttestationEvidence(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "ARCHITECTURE.md"), "# A\n")
+	sel, _ := selectGates(dir, Config{})
+	if sel.Run["gv"] {
+		t.Error("gv must not run before attestation evidence is committed")
+	}
+
+	writeFile(t, filepath.Join(dir, gates.AttestationsFileName), "attestation_version: 1\nattestations: []\n")
+	sel, _ = selectGates(dir, Config{})
+	if !sel.Run["gv"] {
+		t.Error("committed attestation evidence must activate gv")
 	}
 }
 

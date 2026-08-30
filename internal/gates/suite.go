@@ -36,7 +36,7 @@ type RunOptions struct {
 // KnownGate; two hand-kept lists once drifted.
 var knownGateSet = map[string]bool{
 	"gm": true, "gs": true, "gu": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
-	"g3": true, "gd": true, "gl": true, "gx": true, "gk": true, "gb": true, "ge": true, "ga": true, "gj": true, "g4": true, "gt": true, "g5": true,
+	"g3": true, "gd": true, "gl": true, "gx": true, "gk": true, "gb": true, "ge": true, "ga": true, "gj": true, "gv": true, "g4": true, "gt": true, "g5": true,
 }
 
 // KnownGate reports whether name names a gate this suite can run.
@@ -69,7 +69,7 @@ func HasModelith(design string) bool {
 // unknown or empty gate name is an error.
 func Select(design, gateList, impl string) (Selection, error) {
 	sel := Selection{Run: map[string]bool{}, Explicit: gateList != ""}
-	list := "gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,g4,gt,g5"
+	list := "gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,gv,g4,gt,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
@@ -125,6 +125,9 @@ func Select(design, gateList, impl string) (Selection, error) {
 			if AdjudicationActive(design) {
 				parts = append(parts, "gj")
 			}
+			if AttestationActive(design) {
+				parts = append(parts, "gv")
+			}
 			if impl != "" {
 				parts = append(parts, "g4")
 			}
@@ -158,7 +161,7 @@ func Select(design, gateList, impl string) (Selection, error) {
 }
 
 // RunSelected runs the selected gates in canonical order (Gm, Gs, Gu, Gp, Gi,
-// Gn, Gc, G2, G3, Gd, Gl, Gx, Gk, Gb, Ge, Ga, Gj, G4, Gt, G5) with `machinery check`'s applicability
+// Gn, Gc, G2, G3, Gd, Gl, Gx, Gk, Gb, Ge, Ga, Gj, Gv, G4, Gt, G5) with `machinery check`'s applicability
 // rules: opt-in gates run only when their source exists (or when explicitly
 // requested), G4 and Gt only with an impl dir, and G5 only when explicitly
 // requested or when the design is decomposed. opt carries the run-time inputs
@@ -216,6 +219,9 @@ func RunSelected(design, impl string, sel Selection, opt RunOptions) []*Gate {
 	}
 	if sel.Run["gj"] && (sel.Explicit || AdjudicationActive(design)) {
 		out = append(out, CheckAdjudications(design))
+	}
+	if sel.Run["gv"] && (sel.Explicit || AttestationActive(design)) {
+		out = append(out, CheckAttestations(design))
 	}
 	if sel.Run["g4"] && impl != "" {
 		out = append(out, CheckImports(design, impl))

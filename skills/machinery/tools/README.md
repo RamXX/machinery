@@ -43,7 +43,7 @@ One line per subcommand:
 - `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
   `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate
   composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
-- `machinery check <design-dir> [--impl <code-dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,g4,gt,g5]` the deterministic
+- `machinery check <design-dir> [--impl <code-dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,gv,g4,gt,g5]` the deterministic
   gate suite (Gm-transition on rebuild/hybrid contracts; Gs-surface on legacy surface ledgers;
   Gu-surfaces on the target surface ledger `surfaces.yaml` (every action whose actor is a person is
   mapped to a named surface or explicitly deferred, and every mapped act resolves against the domain
@@ -60,9 +60,16 @@ One line per subcommand:
   `design/checkers/*.checker.yaml`; Gb-plan on build plan structure, artifact-activated on `design/BUILD.md`;
   Ga-accept on milestone acceptance evidence, artifact-activated on `design/acceptance/` or any
   milestone marked `Status: closed`, and binding that evidence to `--commit`;
+  Gv-attest on the attested halves themselves, artifact-activated on `design/attestations.yaml`
+  (every row resolves to the closed claim vocabulary, names an attestor, and binds to the content
+  hash of each artifact it covers; an edited artifact makes the judgment STALE);
   G4-import; Gt-tests on oracle ids in the test suite, runs only with `--impl`; G5-pack on
   decomposed designs). Gates fail on absence; every gate prints a `checked:`
   line. Exit is non-zero on any ERROR or DRIFT.
+- `machinery attest <path> [<path> ...]` prints the `sha256:<hex>` content hash Gv-attest records
+  for each path, one line per file, so an attestor pastes the hash instead of hand-rolling it.
+  `machinery attest --claims` prints the closed attested-claim vocabulary from the binary. See
+  `docs/attestation-evidence.md`.
 - `machinery project <design-dir>` writes the committed projection for every external-checker
   manifest (`design/checkers/*.checker.yaml`): the design slice a checker consumes, keyed by Modelith
   stable id, with the binding `input_hash` mirrored under `generated` for adapters. The write side of

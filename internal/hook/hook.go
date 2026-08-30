@@ -558,6 +558,13 @@ func selectGates(designDir string, cfg Config) (gates.Selection, string) {
 		// claim that a milestone was discharged, and the claim is checkable
 		run["ga"] = true
 	}
+	if gates.AttestationActive(designDir) {
+		// committed attestation evidence is checkable from the design tree
+		// alone, and its whole value is freshness: an artifact edited this
+		// turn invalidates the judgment recorded over it, so the stop hook is
+		// exactly where that must surface
+		run["gv"] = true
+	}
 	if cfg.Impl != "" {
 		run["g4"] = true
 		run["gt"] = true

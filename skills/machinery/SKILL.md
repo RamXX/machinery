@@ -123,6 +123,7 @@ design/
   BUILD/<context>.md        # only for sharded designs (see "Sharding large designs")
   acceptance/M<n>.yaml      # one per CLOSED milestone: the committed acceptance evidence Gb marks and Ga binds (see Milestone acceptance)
   adjudications/<M>.yaml    # brownfield only: committed characterization verdicts per machine, held by Gj (see Brownfield mode)
+  attestations.yaml         # the attested halves themselves: claim id, attestor, covered artifacts + content hashes, held by Gv (see Attestation evidence)
   DECISIONS.md              # dated binding decisions; required once interrogation starts (see Operating discipline)
   STATE.md                  # session ledger for multi-session runs (see "Session ledger")
 ```
@@ -131,7 +132,7 @@ design/
 
 Never advance until the current gate passes. State the gate result to the user before moving on.
 
-The deterministic gates live in `machinery check <design> [--impl <dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,g4,gt,g5]`
+The deterministic gates live in `machinery check <design> [--impl <dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,gv,g4,gt,g5]`
 (g5 runs automatically on decomposed designs; gm runs once `migration.yaml` exists; gs once
 `legacy/surface.yaml` exists; gu once `surfaces.yaml` exists; gp, gi, and gn each run automatically once the matching
 `formal/{policy,integrity,isolation}.relational.yaml` exists; gc once any `*.modelith.yaml`
@@ -140,7 +141,9 @@ action's `preserves`, a relational layer, a machine unit, a checker claim, or a 
 reason in `formal/waivers.yaml`); gk once any
 `checkers/*.checker.yaml` exists; gb once `design/BUILD.md` exists; ga once
 `design/acceptance/` exists or any milestone is marked `Status: closed`;
-gj once `design/adjudications/` exists (the brownfield characterization verdicts); gl always
+gj once `design/adjudications/` exists (the brownfield characterization verdicts); gv once
+`design/attestations.yaml` exists (the committed attested-claim rows; see Attestation
+evidence); gl always
 (session-ledger formats plus the house-style scan, warn tier except em dashes in a
 `*.modelith.md` render, which error);
 gt, like g4, only with `--impl`; see Recursive decomposition, the
@@ -448,7 +451,10 @@ closure member is checked; a member nobody declared is invisible, so enumerate a
 deployment artifacts and carry the members into the closure table); the event-contract table covers
 every cross-component event and the dependency declaration is complete (see above); and the NFR
 record's CONTENT: presence and topic coverage are checked, whether the recorded posture is true is
-judgment.
+judgment. Record these six as rows in `design/attestations.yaml` before declaring the gate passed:
+`g2.action-ownership`, `g2.interface-contract-rightness`, `g2.placement-rightness`,
+`g2.adoption-closure-discovery`, `g2.event-contract-completeness`, `g2.nfr-content`, each covering
+`ARCHITECTURE.md` (see Attestation evidence).
 
 ### Phase 3 - State machines (the behavior)
 
@@ -516,7 +522,10 @@ every C4 dependency failure has its residual transition, reclassified by its mit
 deleted (see below). The residual binding has an opt-in deterministic shell: give the mitigation
 table a **handled by** column naming, backticked, the machine or invoke actor that carries each
 row's residual transitions (waiver `(no residual: <reason>)`), and Gx resolves every name against
-the committed machines; whether the named transitions are semantically adequate stays attested. When formal annotations exist under `design/formal/`, a green
+the committed machines; whether the named transitions are semantically adequate stays attested.
+Record the Gate 3 judgments as rows in `design/attestations.yaml` covering the machines they
+range over: `g3.guard-semantics`, `g3.invariant-enforcement`, `g3.residual-transitions`,
+`g3.event-redelivery` (see Attestation evidence). When formal annotations exist under `design/formal/`, a green
 `machinery verify-formal design` is part of this gate (deterministic when Java is present; without
 Java, run it with `--gen-only` and record in STATE.md that the formal suite is generated but
 unchecked).
@@ -593,7 +602,9 @@ LLM-attested: the conformance test shape: a wholesale-conformance test must pars
 oracle table and assert, per row, the next state AND the expected actions (go-crm's
 `impl/internal/authz/oracle_test.go` is the normative reference shape); Gt verifies the citation
 and the ids, never the assertions. And the zero-context claim itself: a coding agent with no prior
-context could build the system from `BUILD.md` alone (per shard, when sharded).
+context could build the system from `BUILD.md` alone (per shard, when sharded). Record both as
+rows in `design/attestations.yaml` covering `BUILD.md` (and its shards):
+`gt.conformance-test-shape` and `g4.zero-context` (see Attestation evidence).
 **Ga-accept** holds milestone closure; it belongs to the build, not to Gate 4, and is described in
 Milestone acceptance below.
 
@@ -642,7 +653,43 @@ LLM-attested (you check these; the tool cannot): whether the reviewer judged WEL
 an acceptance review happened, on this commit, against these obligations; that the DoD was really
 met, that the attestations are true, and that the findings list is complete are judgment, held the
 same way every other attested gate half is. The `attestations` and `findings` lists exist to make
-that judgment reviewable by a human later.
+that judgment reviewable by a human later, and the standing form of that judgment is the
+`ga.review-quality` row in `design/attestations.yaml` (see Attestation evidence); where an
+`attestations:` entry restates a Class C claim, write the claim id and carry the detail there.
+
+## Attestation evidence (Gv-attest)
+
+Ga gave one attested half a committed record. Every other one lived in a summary that scrolled
+away, so "who judged this, and is the judgment still current?" had no answer a tool could give.
+`design/attestations.yaml` is that answer for all of them, and **writing the rows is part of
+passing the gate, not a report about having passed it**. A verdict stated only in your summary
+is not recorded.
+
+```yaml
+attestation_version: 1
+attestations:
+  - claim: g2.interface-contract-rightness   # a claim id from the closed vocabulary
+    attestor: Ramiro Salas                   # who or what judged; never blank
+    date: 2026-08-30
+    note: the payment edge's error list was extended after the PSP retry review   # optional
+    covers:
+      - path: ARCHITECTURE.md                # design-relative
+        hash: sha256:3f786850e387550fdab836ed7e6dc881de23001b42caa1de5c1bd8e56c0a1a3b
+```
+
+Run `machinery attest <path> [<path> ...]` to get the hash (paste what it prints);
+`machinery attest --claims` prints the vocabulary. One row per claim: re-attesting edits the
+row and its date, because git history is the record of prior rounds.
+
+Gv activates on the file and verifies, deterministically: the schema, that every claim resolves
+to the closed vocabulary and appears once, that every row names an attestor and a real date,
+that every covered path is a file the design carries, and that every hash still matches that
+file's current bytes. A covered artifact edited after the attestation makes the row **STALE**,
+a blocking ERROR: nothing regenerates a judgment, so the remedy is reading the changed artifact
+and judging again. A claim whose artifact exists but carries no row is a WARN, so a design can
+adopt the record mid-flight without the first commit of it failing everything not yet re-judged.
+Whether a judgment is TRUE is never checked; that is the point of the split. Full schema, the
+vocabulary table, and the Ga tie-in: `docs/attestation-evidence.md` in the machinery repository.
 
 ## Rebuild and hybrid mode
 
@@ -967,7 +1014,9 @@ the no-mocks rule for integration tests, and why the pattern must not dilute int
 stand-in that drifts from the contract oracle is a defect, not a convenience. Gate 4 for an
 isolated child attests, alongside the zero-context claim: the section exists, every neighboring
 boundary has a stand-in held to its oracle, and the environment recipe is self-contained (the team
-can run the entire suite with nothing beyond the pack, the stand-ins, and the recipe). What
+can run the entire suite with nothing beyond the pack, the stand-ins, and the recipe). Record it as
+the `g4.standin-coverage` row in `design/attestations.yaml`, covering the build document that
+carries the section (see Attestation evidence). What
 stand-ins cannot prove stays named: the parent's residuals (end-to-end latency, cross-contract
 liveness, unmodeled channels) belong to the parent's cross-context assembly suite.
 
@@ -996,7 +1045,8 @@ affected-obligation list BEFORE that child merges further work; (4) the child re
 new pack in, updates `packmap.yaml`) and runs its full gates. Boundary-change requests flow the
 other way as dated rows in the parent's DECISIONS.md, arbitrated by the parent steward. A child
 must not implement an emitter or handler for any event absent from its pack; that rule is a named
-item on the child's Gate 4 attested list.
+item on the child's Gate 4 attested list, recorded as the `g4.pack-event-discipline` row in the
+child's `design/attestations.yaml`.
 
 One limit, stated plainly: the pack hash pins content, not authorship. A child of an UNPINNED
 subsystem (no `child_design:` link at the parent yet) can locally rewrite its `pack/` copy and
@@ -1125,7 +1175,7 @@ means it was skipped); the ledgers' CONTENT stays unjudged, as everywhere.
 - `references/build-md-template.md` - the full `BUILD.md` skeleton (full and manifest modes).
 - `machinery check` - the deterministic gate suite (Gm-transition, Gs-surface, Gu-surfaces, Gp/Gi/Gn
   relational gates, G2-c4, G3-machine, Gd-idcite, Gl-ledger, Gx-trace, Gb-plan, Ge-embed, Ga-accept,
-  Gj-adjudication, G4-import, Gt-tests, G5-pack for decomposed designs). G3 also runs the TLA generator's own admissibility pass
+  Gj-adjudication, Gv-attest, G4-import, Gt-tests, G5-pack for decomposed designs). G3 also runs the TLA generator's own admissibility pass
   (one validator, one truth), the counter and derived-deadline accounting, the dotted-reference
   name-rot audit, and the branch-order check; Gd resolves every design-side stable-id citation
   against the committed oracles and carries the rule-15 row-count, clause-drift, and payload-READS

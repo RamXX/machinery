@@ -157,6 +157,21 @@ says rather than re-reading for them here.
   bar of tests plus gate together, and the sequential fallback for runtimes that cannot spawn a
   fresh-context test-writer.
 
+Three items on that list are judgments no gate can reach, so record them as rows in
+`design/attestations.yaml` before you hand back rather than only asserting them in your summary
+(`Gv-attest` holds each row to the content hash of what it covers):
+
+- `g4.zero-context`: a coding agent with zero context could build the system from BUILD.md alone.
+- `gt.conformance-test-shape`: the wholesale-conformance test parses the committed oracle table
+  and asserts, per row, the next state AND the expected actions.
+- `g4.standin-coverage`: for an isolated pack child only, the stand-in section and self-contained
+  environment recipe above.
+
+Each row carries `claim`, `attestor` (name yourself), `date`, and `covers` with one
+`{path, hash}` per build document you judged (the root plus each shard, in manifest mode). Get the
+hash from `machinery attest <path>`; a later BUILD.md edit makes the row STALE, which is the
+signal to judge it again, not to delete it.
+
 Before handing back, run the conductor's five-question phase-exit self-review (reality, depth,
 scope, coverage, consistency) over BUILD.md and include the verdicts in your summary.
 

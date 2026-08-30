@@ -11,7 +11,7 @@ import (
 
 func newCheckCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "check <design-dir> [--impl d] [--commit sha] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,g4,gt,g5]",
+		Use:   "check <design-dir> [--impl d] [--commit sha] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,gv,g4,gt,g5]",
 		Short: "Run the deterministic verification gates on a design",
 		Args:  cobra.ExactArgs(1),
 	}
@@ -19,7 +19,7 @@ func newCheckCmd() *cobra.Command {
 	var gateList string
 	var commit string
 	c.Flags().StringVar(&implDir, "impl", "", "implementation directory for G4-import and Gt-tests")
-	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,g4,gt,g5")
+	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,gv,g4,gt,g5")
 	c.Flags().StringVar(&commit, "commit", "", "commit under review, bound by Ga-accept's evidence (env MACHINERY_COMMIT; the flag wins)")
 	c.RunE = func(cmd *cobra.Command, args []string) error {
 		design := args[0]

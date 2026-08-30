@@ -98,6 +98,15 @@ Everything else is attested: whether the DoD was really met, whether the attesta
 whether the findings list is complete. Ga is the record that someone with a name looked, on a
 commit that is written down, at the obligations the plan itself declared.
 
+That last judgment now has a committed home of its own. `Gv-attest` generalizes this file's
+pattern to every attested gate half, including this one, as the `ga.review-quality` claim in
+`design/attestations.yaml` (`docs/attestation-evidence.md`). The `attestations:` list here stays
+exactly as it is: it is scoped to one milestone review at one commit, while a Gv row is the
+standing judgment over an artifact, invalidated the moment that artifact's bytes move. Where an
+entry in this list restates a Class C claim, write the claim id and carry the detail in
+`attestations.yaml`, so the acceptance file reads as this milestone's own findings rather than a
+second copy of a standing judgment.
+
 ## CI
 
 ```yaml
@@ -112,6 +121,6 @@ intended behavior, not a bug to work around.
 
 ## Where this sits in the suite
 
-Ga runs after Gb in the default suite ordering (`gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,g4,gt,g5`):
+Ga runs after Gb in the default suite ordering (`gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,gv,g4,gt,g5`):
 the plan's shape is settled before its discharge is judged. It is a build-time gate, not a
 design-phase one; a design that has closed no milestone never sees it.

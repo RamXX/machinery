@@ -39,6 +39,7 @@ func main() {
 	root.AddCommand(newRefineCmd())
 	root.AddCommand(newComposeCmd())
 	root.AddCommand(newCheckCmd())
+	root.AddCommand(newAttestCmd())
 	root.AddCommand(newProjectCmd())
 	root.AddCommand(newVerifyCheckersCmd())
 	root.AddCommand(newBaselineCmd())

@@ -308,18 +308,26 @@ a decomposed design, add a job that runs the parent design's check.
 
 SKILL.md marks, per gate, what the tool verifies and what "you" attest (guard semantics
 match the invariants they name, every action has an owning component, the NFR record is
-real, BUILD.md is buildable with zero context). On a team, "you" must resolve to a name:
+real, BUILD.md is buildable with zero context). On a team, "you" must resolve to a name.
 
-- The design PR description carries an attestation checklist per gate, copied from
-  SKILL.md's LLM-attested lists, each item checked by a named reviewer (steward by
-  default, any second dev otherwise).
-- An attestation is invalidated by any change to the artifact it covered; re-attest in the
-  PR that changes it. Cheap rule: if the PR touches a machine, the guard-semantics line
-  gets re-checked for that machine, and nothing else.
-- Milestone closure is the one attestation with a committed artifact instead of a PR
-  checkbox: `design/acceptance/M<n>.yaml` names the reviewer, the commit reviewed, and what
-  was checked by judgment, and `Ga-accept` binds it (`docs/acceptance-gate.md`). Its
-  `reviewer` field is where the named-owner rule above lands.
+Commit the record: `design/attestations.yaml`, one row per attested claim, naming the
+attestor, the covered artifacts, and each artifact's content hash at attestation time.
+`Gv-attest` activates on the file, resolves every claim against a closed vocabulary, and
+fails the moment a covered artifact's bytes move, because that is the moment the judgment
+stopped covering anything. Full schema and vocabulary: `docs/attestation-evidence.md`.
+Re-attesting is `machinery attest <path>` plus a new date on the row.
+
+- Earlier editions of this guide proposed a per-gate attestation checklist in every design
+  PR description, checked by a named reviewer and invalidated by any change to the covered
+  artifact. `Gv-attest` supersedes it: the checklist becomes rows, the named reviewer
+  becomes `attestor`, and the invalidation rule becomes a hash a PR description could never
+  enforce.
+- Cheap rule, unchanged: if the PR touches a machine, the guard-semantics attestation gets
+  re-checked for that machine, and nothing else. The gate now tells you which rows that is.
+- Milestone closure keeps its own committed artifact: `design/acceptance/M<n>.yaml` names
+  the reviewer, the commit reviewed, and what was checked by judgment, and `Ga-accept`
+  binds it (`docs/acceptance-gate.md`). Its `reviewer` field is where the named-owner rule
+  lands for that one review.
 
 This is bookkeeping, but it is the difference between "the deterministic half is green and
 the other half is somebody's memory" and a design history you can audit.
