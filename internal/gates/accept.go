@@ -20,9 +20,11 @@
 package gates
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -42,11 +44,30 @@ const AcceptanceDirName = "acceptance"
 // evidence of anything.
 const minCommitPrefix = 7
 
+// gitHeadTimeout bounds the one subprocess the gate suite runs. A gate that
+// can hang is a gate people disable.
+const gitHeadTimeout = 5 * time.Second
+
+// commitProvenance records where the commit under review came from. It is
+// printed on the checked: line, because a binding whose source the reader
+// cannot trace is half an audit trail.
+type commitProvenance int
+
+const (
+	commitAbsent commitProvenance = iota
+	commitFromCaller
+	commitFromGit
+)
+
 var (
 	// acceptanceFileRe matches the one legal evidence file name.
 	acceptanceFileRe = regexp.MustCompile(`^M(\d+)\.yaml$`)
 	// acceptanceDateRe pins the date shape before the calendar check.
 	acceptanceDateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	// gitObjectNameRe pins what a derived HEAD may look like before it is
+	// treated as a commit; git prints nothing else, and a gate must not bind
+	// evidence to whatever a subprocess happened to write.
+	gitObjectNameRe = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 	// acceptanceKeys pins the evidence schema; an unknown key is a typo that
 	// would otherwise silently contribute nothing.
 	acceptanceKeys = map[string]bool{
@@ -106,8 +127,9 @@ type acceptRecord struct {
 }
 
 // CheckAcceptance implements Ga-accept. commit is the VCS commit under review
-// (--commit or MACHINERY_COMMIT); "" leaves commit binding unchecked with a
-// non-blocking note, because CI is where the commit is known.
+// (--commit or MACHINERY_COMMIT); when it is empty the gate defaults to the
+// HEAD of the git repository the design sits in, and only outside a
+// repository does the binding degrade to a non-blocking note.
 func CheckAcceptance(design, commit string) *Gate {
 	g := NewGate("Ga-accept  milestone acceptance evidence")
 	g.startOrder()
@@ -144,6 +166,10 @@ func CheckAcceptance(design, commit string) *Gate {
 		checkDoDCoverage(g, rec, ref, ids)
 	}
 
+	reviewed, provenance := "", commitAbsent
+	if len(closed) > 0 {
+		reviewed, provenance = resolveReviewCommit(design, commit)
+	}
 	for _, num := range closed {
 		ref := byNum[num]
 		rec, ok := records[num]
@@ -157,13 +183,70 @@ func CheckAcceptance(design, commit string) *Gate {
 			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%s (%s) is marked closed but %s records verdict REJECTED; a rejected review does not close a milestone (reopen the milestone, or land the fixes and re-review)", ref.doc, ref.m.numRaw, ref.m.title, rec.label))
 		case rec.verdict == "ACCEPTED":
 			g.Count("closed milestones with accepted evidence")
-			checkCommitBinding(g, rec, commit)
+			checkCommitBinding(g, rec, reviewed)
 		}
 	}
-	if commit == "" && len(closed) > 0 {
-		g.Notes = append(g.Notes, "commit binding not checked: no --commit and no MACHINERY_COMMIT; CI is expected to pass the reviewed commit")
+	// the provenance is stated, never the sha: the source is what a reader
+	// cannot recover from the artifacts, while the sha is already in the
+	// evidence file and in the mismatch finding when the binding fails
+	switch provenance {
+	case commitFromCaller:
+		g.CheckedExtra("commit under review supplied by --commit or MACHINERY_COMMIT")
+	case commitFromGit:
+		g.CheckedExtra("commit under review derived from git HEAD of the repository holding the design")
+	case commitAbsent:
+		if len(closed) > 0 {
+			g.Notes = append(g.Notes, "commit binding not checked: no --commit and no MACHINERY_COMMIT, and the design is not inside a git repository this binary can read; CI is expected to pass the reviewed commit")
+		}
 	}
 	return g
+}
+
+// resolveReviewCommit resolves the commit accepted evidence binds to. An
+// explicit --commit or MACHINERY_COMMIT always wins, because the caller knows
+// which commit the review ran on and a local checkout may have moved since.
+// Otherwise the commit defaults to the HEAD of the git repository the design
+// sits in: a local run then binds as tightly as CI does, instead of printing a
+// note and proving nothing on every developer machine.
+func resolveReviewCommit(design, given string) (string, commitProvenance) {
+	if g := strings.TrimSpace(given); g != "" {
+		return g, commitFromCaller
+	}
+	if head := gitHeadAt(design); head != "" {
+		return head, commitFromGit
+	}
+	return "", commitAbsent
+}
+
+// gitHeadAt returns the HEAD commit of the git repository containing dir, or
+// "" when dir is outside a repository, git is unavailable, or the repository
+// carries no commit yet. The repository is resolved FROM DIR with `git -C`,
+// never from the process working directory: `machinery check some/other/design`
+// is routinely run from an unrelated repository, and binding a design's
+// evidence to whatever repository the shell happened to sit in would be worse
+// than not binding at all.
+func gitHeadAt(dir string) string {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return ""
+	}
+	if fi, statErr := os.Stat(abs); statErr != nil || !fi.IsDir() {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), gitHeadTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "-C", abs, "rev-parse", "HEAD")
+	// a gate reads; it never takes a lock, opens a pager, or runs a hook
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "GIT_PAGER=cat", "GIT_TERMINAL_PROMPT=0")
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	head := strings.ToLower(strings.TrimSpace(string(out)))
+	if !gitObjectNameRe.MatchString(head) {
+		return ""
+	}
+	return head
 }
 
 // acceptanceMilestones indexes every declared milestone by number and returns
@@ -382,14 +465,27 @@ func acceptanceOracleIDs(design string, g *Gate) []string {
 	return ids
 }
 
-// checkDoDCoverage holds the evidence to the obligations: every committed
-// oracle id the milestone's DoD cites whole-token must appear in dod_ids.
+// checkDoDCoverage holds the evidence to the obligations, in both directions:
+// every committed oracle id the milestone's DoD cites whole-token must appear
+// in dod_ids, and every dod_ids entry must resolve to a committed oracle id.
 // That is the deterministic proof the review looked at the right rows, the
-// same way Gk's input_hash proves a verdict covered the right design.
+// same way Gk's input_hash proves a verdict covered the right design. The
+// reverse direction is the half that was missing: a list that resolves to
+// nothing reads as coverage and proves nothing.
 func checkDoDCoverage(g *Gate, rec *acceptRecord, ref milestoneRef, ids []string) {
 	listed := map[string]bool{}
 	for _, id := range rec.dodIDs {
 		listed[id] = true
+	}
+	committed := map[string]bool{}
+	for _, id := range ids {
+		committed[id] = true
+	}
+	for _, id := range rec.dodIDs {
+		if committed[id] {
+			continue
+		}
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: dod_ids names %s, which no committed oracle declares (neither a test id nor a stable id of machines/*.oracle.md or the relational decision oracles); a typo, or an id a regeneration left behind, binds the evidence to no obligation at all", rec.label, ir.Repr(id)))
 	}
 	dod := ref.m.dodText()
 	seen := map[string]bool{}

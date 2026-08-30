@@ -21,6 +21,7 @@ plan claims it says.
 3. **Only then is the milestone marked closed** in the build plan, with a `Status: closed` line
    in its block.
 4. **CI runs the gate with the commit**: `machinery check design --commit $(git rev-parse HEAD)`.
+   A local run needs no flag: inside a git repository the gate defaults to that repository's HEAD.
 
 Steps 2 and 3 are deliberately in that order. A closed milestone with no evidence behind it is
 an ERROR, so the marker cannot land first and be reconciled later.
@@ -78,18 +79,31 @@ things, the way forcing `gp`, `gi`, or `gn` is.
 - **The evidence is well formed.** It parses, carries every field, names a milestone the build
   plan declares, and matches its own file name. An ACCEPTED verdict with no attestations attests
   nothing and fails: the attestation lines are what make the judgment reviewable later.
-- **The review looked at the right obligations.** `dod_ids` must list every committed oracle id
-  (test id or stable id, from `machines/*.oracle.md` plus `formal/Policy.oracle.md` and
-  `formal/Isolation.oracle.md` when they exist) that the milestone's DoD cites whole-token, at
-  or after the `DoD:` token. This is the same discipline as Gk binding evidence to a projection
-  by `input_hash`: it does not prove the review was good, it proves the review was about this
-  work.
+- **The review looked at the right obligations, in both directions.** `dod_ids` must list every
+  committed oracle id (test id or stable id, from `machines/*.oracle.md` plus
+  `formal/Policy.oracle.md` and `formal/Isolation.oracle.md` when they exist) that the milestone's
+  DoD cites whole-token, at or after the `DoD:` token. And every id `dod_ids` lists must itself
+  resolve to a committed oracle id: an entry that resolves to nothing (a typo, or an id a
+  regeneration renamed out from under the file) is an ERROR naming it. Only the forward rule was
+  checked at first, so a list could be padded with ids that existed nowhere and still read as
+  coverage. This is the same discipline as Gk binding evidence to a projection by `input_hash`: it
+  does not prove the review was good, it proves the review was about this work.
 - **The evidence binds to the commit.** With `--commit <sha>` (or `MACHINERY_COMMIT`; the flag
   wins), every accepted closure must name that commit: an exact match, or either value an
   unambiguous prefix of the other of at least 7 characters (git's own abbreviation floor).
-  Without a commit the gate prints a non-blocking note that the binding was not checked. CI is
-  expected to pass it; the stop-time hook never does, because mid-turn the commit under review
-  does not exist yet.
+  With neither, the gate defaults the commit to `git rev-parse HEAD` of the repository the DESIGN
+  directory sits in, resolved from the design path rather than the shell's working directory, so
+  running `machinery check` from somewhere else can never bind a design to an unrelated
+  repository. A plain local run therefore proves what CI proves. Outside a git repository (or with
+  no usable git) the binding still degrades to a non-blocking note, never to a silent pass. The
+  `checked:` line states which of the two happened, `commit under review supplied by --commit or
+  MACHINERY_COMMIT` or `commit under review derived from git HEAD of the repository holding the
+  design`, so the provenance is never guessed from the absence of a note. The binding is an
+  identity, not an ancestry: evidence names the one commit its review ran on, so once the history
+  moves past that commit the closure is re-reviewed or the reviewed commit is passed explicitly.
+  That was already true of `--commit`; the default makes it true of a plain run too, which is the
+  point (a gate that proved nothing unless someone remembered a flag proved nothing most of the
+  time) and also its cost, so plan the closure and its evidence to land together.
 - **Milestone numbers are unambiguous.** Evidence is keyed by number alone, so a number declared
   in two plan-bearing documents (the manifest root and a shard, or two shards) is an ERROR
   naming both. Milestone numbers are global across a sharded design.

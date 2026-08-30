@@ -3,7 +3,7 @@ system: >
   Go CRM prototype: a single-process working prototype over an embedded schema
   (legacy/domain.modelith.yaml) that proved the CRM workflow but is not suitable as the
   production foundation.
-as_of: 2026-07-22, enumerated from the committed legacy model and the migration.yaml inventory (retrofit; the prototype binary is not in this repo)
+as_of: 2026-07-22
 _comment: >
   Retrofit ledger, authored 2026-07-22: the rebuild's design run predates the surface-ledger
   discipline, so this enumeration is derived from the two committed legacy sources rather

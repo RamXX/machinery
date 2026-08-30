@@ -385,7 +385,11 @@ wholesale). Name the concrete thing: `Admin console > Tenants > Suspend tenant`,
 suspend <id>`, `POST /v1/tenants/{id}/suspend`. **Gu-surfaces** (`machinery check <design> --gate
 gu`, automatic once the file exists) holds the obligated set closed: every action whose `actor` is
 a person is mapped or deferred, each mapped act resolves against the model and matches the actor
-the model declares, and every act is stated exactly once. Its `checked:` line prints the actorless
+the model declares, and every act is stated exactly once. Once BUILD.md declares milestones, an
+optional `milestone:` must resolve to one of them (by number, however spelled, or by title): a
+milestone name that survived a replan reads like a commitment and names nothing. Before the plan
+exists the key is only held non-empty, because the ledger is authored in Phase 2 and the plan in
+Phase 4. Its `checked:` line prints the actorless
 action count, so a model where nobody filled in `actor` yet reads as an unarmed gate rather than
 full coverage; if that number is high, the fix is back in Phase 1. The ledger's `sources:`
 list is required: name where the act list was enumerated FROM (the per-persona walk of the model's
@@ -635,17 +639,20 @@ date: 2026-08-27
 ```
 
 3. **Run the gate with the commit.** `machinery check design --commit $(git rev-parse HEAD)` (or
-   export `MACHINERY_COMMIT`; the flag wins). CI is expected to pass it. Without it the gate still
-   runs and prints a non-blocking note that commit binding was not checked, never a silent pass.
+   export `MACHINERY_COMMIT`; the flag wins). CI is expected to pass it. With neither, the gate
+   defaults the commit to the HEAD of the git repository the DESIGN sits in (resolved from the
+   design path, never from the shell's working directory), so a plain local run binds exactly as
+   CI does. Only outside a repository does the binding degrade to a non-blocking note, never to a
+   silent pass. The `checked:` line says which of the two it was.
 
 Ga activates automatically once `design/acceptance/` exists or any milestone is marked closed, and
 verifies: every closed milestone has an acceptance file whose verdict is ACCEPTED (a missing file
 or a REJECTED one is an ERROR); every file parses, names a declared milestone, and carries every
-field; `dod_ids` lists every committed oracle id that milestone's DoD cites whole-token (the
-deterministic proof the review looked at the right obligations, exactly as Gk's `input_hash` proves
-a verdict covered the right design); and, with `--commit`, that every accepted closure names the
-commit under review (an exact match, or either value an unambiguous prefix of the other of at least
-7 characters). Milestone numbers must be unique across every plan-bearing document, root and
+field; `dod_ids` resolves in BOTH directions against the committed oracles (it lists every id that
+milestone's DoD cites whole-token, and every id it lists is a real committed oracle id, so a typo
+or an id a regeneration left behind cannot pose as coverage); and that every accepted closure names
+the commit under review (an exact match, or either value an unambiguous prefix of the other of at
+least 7 characters). Milestone numbers must be unique across every plan-bearing document, root and
 shards: evidence is keyed by number alone, so a repeated number makes it ambiguous which milestone
 was discharged.
 
@@ -725,6 +732,12 @@ named sweeps author it:
   interrogation missed surfaces here as a row that cannot be honestly disposed. At handoff no
   deferred rationale may be an opening placeholder; the gate's `checked:` line prints the
   disposition counts so this attestation is reviewable.
+
+The optional `as_of:` root key anchors what the ledger was last swept against, and is printed on
+the `checked:` line so a ledger that has fallen behind its system is visible in every run. Keep it
+an anchor: an ISO date, a VCS revision, or a tag-like token. Anything else warns (the schema types
+it as a plain string, so this never blocks) because prose there compares against nothing; the
+narrative belongs in `_comment`.
 
 The ledger is independent of `migration.yaml` by design: a clean-break run that drops the
 migration machinery keeps its completeness anchor. Full guide: `references/surface-ledger.md`
@@ -1030,7 +1043,9 @@ every pinned child was built against the CURRENT pack, and the `checked:` line p
 boundary-event counts so an unexpected zero is visible in every run. Because G5 regenerates packs
 in memory, a lossy event-contract table fails the gate itself, not only `pack generate`. Child
 side: pack hash verified, packmap reconciled, refinement artifacts fresh, owned shape unchanged,
-delegated invariants traced, boundary events covered in both directions. The delegated-invariant
+delegated invariants traced, boundary events covered in both directions. The `direction` cell is
+exactly `consumes` or `produces`; any other value is an ERROR naming it, because a row the switch
+does not recognize is held to neither rule and disappears from the run. The delegated-invariant
 tracing is a token-presence check (the id appears in the child's enforcement artifacts); that the
 child's enforcement is semantically real stays attested at the child's own gates. A boundary change is
 therefore a PARENT edit: regenerate packs, re-copy, and the pack diff is the child's

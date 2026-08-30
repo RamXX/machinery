@@ -64,7 +64,8 @@ ledger's classes to), `acts` (required), `deferrals` (optional), `_comment` (opt
 
 `acts` rows: `act` (required, `Entity.action` or `knob:<key>`), `actor` (required), `surface`
 (required, the screen, admin command, API route, or config release), `milestone` (optional,
-non-empty when present), `_comment` (optional).
+non-empty when present, and once BUILD.md declares milestones it must resolve to one of them by
+number or title), `_comment` (optional).
 
 `deferrals` rows: `act` (required, `Entity.action`, `knob:<key>`, or `actor:<Name>` to defer one
 persona wholesale), `reason` (required), `_comment` (optional). `actor:<Name>` is the honest form
@@ -80,13 +81,16 @@ anything else is an ERROR naming the act; every `Entity.action` row resolves aga
 model AND matches the actor the model declares (a ledger that misattributes an act closes the
 review question with the wrong answer); every act value is stated exactly once across `acts` and
 `deferrals` together; a `knob:` row resolves against nothing, since configuration is an open set,
-so only its shape and uniqueness are held; and an `actor:<Name>` deferral must name an actor some
-action in the model declares.
+so only its shape and uniqueness are held; an `actor:<Name>` deferral must name an actor some
+action in the model declares; and, once BUILD.md declares milestones, every `milestone:` resolves
+to one of them (by number, however the plan spells it, or by title), read through the same plan
+parse Gb and Ga use. A ledger authored before the plan exists is untouched by that rule.
 
-The `checked:` line prints six numbers, zeros included:
+The `checked:` line prints six numbers, zeros included, and a seventh once a plan declares
+milestones:
 
 ```text
-checked: 12 obligated actions, 10 covered, 1 deferred acts, 1 deferred personas, 3 knob rows, 4 actorless actions
+checked: 12 obligated actions, 10 covered, 1 deferred acts, 1 deferred personas, 3 knob rows, 4 actorless actions, 6 milestone references resolved
 ```
 
 `covered` counts obligated actions satisfied by an `acts` row, so it reads against `obligated

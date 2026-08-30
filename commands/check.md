@@ -12,8 +12,10 @@ Run `machinery check` for this repository and interpret the result.
    arguments override them:
    `machinery check <design> [--gate <list>] [--impl <dir>]`.
    Pass `--commit <sha>` (or export `MACHINERY_COMMIT`) when a milestone is
-   being closed: Ga-accept binds the committed acceptance evidence to that
-   commit, and without it says so instead of checking it.
+   being closed and the reviewed commit is not the current HEAD: Ga-accept
+   binds the committed acceptance evidence to that commit. Without either, it
+   defaults to the HEAD of the git repository the design sits in, and only
+   outside a repository does it say so instead of checking it.
 3. Report the result plainly: every ERROR and DRIFT finding, the artifact it
    points at, and the concrete fix. Read the `checked:` counts and state
    what was actually verified.

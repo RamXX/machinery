@@ -108,7 +108,7 @@ deferrals:
 | `act` | yes | `Entity.action` as the domain model spells it, or `knob:<key>` for a configuration knob |
 | `actor` | yes | who performs it; for an `Entity.action` row it must equal the actor the model declares |
 | `surface` | yes | the screen, admin command, API route, or config release that carries the act |
-| `milestone` | no | when the surface lands; non-empty when present |
+| `milestone` | no | when the surface lands; non-empty when present, and once BUILD.md declares milestones it must resolve to one of them by number (`M2`, `m2`, `2`, or the padded form as the plan writes it) or by title |
 | `_comment` | no | free text |
 
 ### `deferrals` rows
@@ -148,11 +148,20 @@ It verifies, deterministically:
    declares, so a deferral for a persona who does not exist cannot silently discharge nothing.
 6. **Knob rows** resolve against nothing (configuration is an open set by design), so the gate
    holds their shape and their uniqueness only.
+7. **Milestones resolve.** Once `BUILD.md` declares milestones, a row's optional `milestone:` must
+   name one of them: its number in any of the spellings the plan admits (`M2`, `m2`, `2`, and the
+   padded form as written) or its title. An unresolvable name is an ERROR that lists the declared
+   milestones, because "M2" surviving a replan that renumbered the plan reads like a commitment
+   and points at nothing. The milestones come from the same plan parse Gb and Ga use, root
+   document and manifest shards alike, so the ledger can never bind to a milestone Gb does not
+   hold. Before a plan exists the key is only held non-empty: the ledger is authored in Phase 2
+   and the plan in Phase 4, so a ledger legitimately runs ahead of it.
 
-The `checked:` line prints six numbers, zeros included:
+The `checked:` line prints six numbers, zeros included, plus a seventh once a plan declares
+milestones:
 
 ```
-checked: 12 obligated actions, 10 covered, 1 deferred acts, 1 deferred personas, 3 knob rows, 4 actorless actions
+checked: 12 obligated actions, 10 covered, 1 deferred acts, 1 deferred personas, 3 knob rows, 4 actorless actions, 6 milestone references resolved
 ```
 
 `covered` counts obligated actions satisfied by an `acts` row, so it reads against `obligated

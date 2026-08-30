@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
@@ -81,10 +82,28 @@ func (m targetActModel) actorless() int {
 	return n
 }
 
+// planMilestoneIndex is the set of spellings a surfaces.yaml row may use to
+// name a milestone the build plan declares, plus the declared milestones as a
+// reader would list them. declared is false when the design has no BUILD.md,
+// or its plan declares no milestone: the ledger is authored in Phase 2 and the
+// plan in Phase 4, so a ledger that legitimately precedes the plan must not be
+// failed for naming a milestone nothing has written down yet.
+type planMilestoneIndex struct {
+	declared bool
+	tokens   map[string]bool // accepted spellings, lower-cased
+	labels   []string        // "M<n> - <title>", in plan order, for the finding
+}
+
+// resolves reports whether name is one of the declared milestones.
+func (p planMilestoneIndex) resolves(name string) bool {
+	return p.tokens[strings.ToLower(strings.TrimSpace(name))]
+}
+
 type targetSurfaceValidator struct {
 	g     *Gate
 	root  *ir.Object
 	model targetActModel
+	plan  planMilestoneIndex
 	// seen records every act value the ledger names, anywhere, so a value
 	// written twice is an error even when the two rows disagree about what to
 	// do with it.
@@ -95,6 +114,7 @@ type targetSurfaceValidator struct {
 	knobRows         int
 	deferralRows     int
 	personaRows      int
+	milestoneRefs    int
 }
 
 // CheckTargetSurfaces implements Gu-surfaces. The obligated set is closed and
@@ -139,6 +159,7 @@ func CheckTargetSurfaces(design string) *Gate {
 		v.errf("%v; the obligated act set is every target-model action performed by a person", err)
 		return g
 	}
+	v.plan = readPlanMilestones(design, g)
 	v.validateActs()
 	v.validateDeferrals()
 	obligated := v.model.obligated()
@@ -158,6 +179,9 @@ func CheckTargetSurfaces(design string) *Gate {
 	g.CheckedExtra(fmt.Sprintf("%d deferred personas", v.personaRows))
 	g.CheckedExtra(fmt.Sprintf("%d knob rows", v.knobRows))
 	g.CheckedExtra(fmt.Sprintf("%d actorless actions", v.model.actorless()))
+	if v.plan.declared {
+		g.CheckedExtra(fmt.Sprintf("%d milestone references resolved", v.milestoneRefs))
+	}
 	if len(obligated) == 0 {
 		g.Notes = append(g.Notes, "no target-model action names a human actor; the ledger holds nothing to a surface (add actor: to the model's actions to arm this gate)")
 	}
@@ -246,8 +270,8 @@ func (v *targetSurfaceValidator) validateActs() {
 		if surface == "" {
 			v.errf("%s (%s) names no surface; an act with no named interface is exactly the gap this ledger exists to catch", where, act)
 		}
-		if milestone := obj.Get2("milestone"); milestone != nil && strings.TrimSpace(milestone.AsString()) == "" {
-			v.errf("%s (%s) has an empty milestone; drop the key or name the milestone", where, act)
+		if milestone := obj.Get2("milestone"); milestone != nil {
+			v.checkMilestone(where, act, strings.TrimSpace(milestone.AsString()))
 		}
 		if !v.record(act, where) {
 			continue
@@ -264,6 +288,60 @@ func (v *targetSurfaceValidator) validateActs() {
 		}
 		v.resolveAct(where, act, actor)
 	}
+}
+
+// checkMilestone holds an acts row's milestone to the build plan. A milestone
+// name that resolves to nothing is exactly as useless as no milestone at all,
+// and worse than none, because it reads like a commitment: "M2" surviving a
+// replan that renumbered the plan tells a reader the surface lands in a
+// milestone that no longer exists. The check arms itself only once the plan
+// declares milestones; before Phase 4 the ledger legitimately runs ahead.
+func (v *targetSurfaceValidator) checkMilestone(where, act, name string) {
+	switch {
+	case name == "":
+		v.errf("%s (%s) has an empty milestone; drop the key or name the milestone", where, act)
+	case !v.plan.declared:
+		// no BUILD.md, or a plan that declares no milestone: nothing to resolve against
+	case !v.plan.resolves(name):
+		v.errf("%s (%s) names milestone %s, which the build plan does not declare; the declared milestones are %s", where, act, ir.Repr(name), strings.Join(v.plan.labels, "; "))
+	default:
+		v.milestoneRefs++
+	}
+}
+
+// readPlanMilestones indexes the milestones of every plan-bearing document.
+// It reads them through planDocuments, the parse Gb and Ga already share,
+// rather than scanning BUILD.md a third way: a ledger resolving against a
+// different reading of the plan than the plan gate uses could bind to a
+// milestone Gb does not hold. A milestone answers to its number written any
+// documented way (M2, m2, 2, and M02 as authored) or to its own title.
+func readPlanMilestones(design string, g *Gate) planMilestoneIndex {
+	idx := planMilestoneIndex{tokens: map[string]bool{}}
+	if !HasBuildDoc(design) {
+		return idx
+	}
+	seen := map[string]bool{}
+	for _, doc := range planDocuments(design, g) {
+		for _, m := range doc.milestones {
+			label := "M" + m.numRaw + " - " + m.title
+			if seen[label] {
+				continue
+			}
+			seen[label] = true
+			idx.labels = append(idx.labels, label)
+			for _, tok := range []string{"m" + m.numRaw, m.numRaw, m.title} {
+				if tok = strings.ToLower(strings.TrimSpace(tok)); tok != "" {
+					idx.tokens[tok] = true
+				}
+			}
+			if m.numOK {
+				idx.tokens["m"+strconv.Itoa(m.num)] = true
+				idx.tokens[strconv.Itoa(m.num)] = true
+			}
+		}
+	}
+	idx.declared = len(idx.labels) > 0
+	return idx
 }
 
 // resolveAct holds an Entity.action row to the target model: the act must

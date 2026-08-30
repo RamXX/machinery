@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -343,6 +344,57 @@ func TestCheckCommitFlagAndEnvironmentReachGa(t *testing.T) {
 	if code != 0 || !strings.Contains(out, "commit binding not checked") {
 		t.Fatalf("no commit must state the non-check: code=%d out=%s", code, out)
 	}
+}
+
+// With neither flag nor environment, a design that sits inside a git
+// repository binds to that repository's HEAD instead of printing the
+// non-check note: a local run then proves what CI proves. The environment is
+// cleared explicitly, because the flag-and-env test above sets it.
+func TestCheckDefaultsCommitToGitHeadOfTheDesignRepo(t *testing.T) {
+	t.Setenv("MACHINERY_COMMIT", "")
+	repo := t.TempDir()
+	head := initTestGitRepo(t, repo)
+	design := filepath.Join(repo, "design")
+	writeText(t, filepath.Join(design, "BUILD.md"),
+		"# B\n\nMode: full\n\n## Build plan\n\n**M0 - Walking skeleton.** DoD: green end to end.\nStatus: closed\n")
+	writeText(t, filepath.Join(design, "acceptance", "M0.yaml"),
+		"milestone: 0\ncommit: "+head+"\nverdict: ACCEPTED\ndod_ids: []\n"+
+			"attestations:\n  - the suite ran against real dependencies\n"+
+			"findings: []\nreviewer: conductor\ndate: 2026-08-27\n")
+
+	out, code := runCheckGa(t, design)
+	if code != 0 || !strings.Contains(out, "1 commit bindings verified") {
+		t.Fatalf("the derived HEAD must bind: code=%d out=%s", code, out)
+	}
+	if !strings.Contains(out, "commit under review derived from git HEAD") {
+		t.Errorf("the provenance must be visible: %s", out)
+	}
+	if strings.Contains(out, "commit binding not checked") {
+		t.Errorf("a derived binding is a checked binding: %s", out)
+	}
+}
+
+// initTestGitRepo makes dir a git repository with one commit and returns its
+// HEAD. Identity and signing are passed on the command line so the developer's
+// global git configuration cannot change the result.
+func initTestGitRepo(t *testing.T, dir string) string {
+	t.Helper()
+	git := func(args ...string) string {
+		t.Helper()
+		base := []string{"-C", dir,
+			"-c", "user.name=machinery test", "-c", "user.email=test@example.invalid",
+			"-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"}
+		out, err := exec.CommandContext(t.Context(), "git", append(base, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	git("init", "-q")
+	writeText(t, filepath.Join(dir, ".gitkeep"), "x\n")
+	git("add", ".gitkeep")
+	git("commit", "-q", "-m", "root commit")
+	return git("rev-parse", "HEAD")
 }
 
 // The green-summary line: a default full run earns platform-green with an

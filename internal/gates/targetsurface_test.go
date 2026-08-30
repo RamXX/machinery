@@ -3,6 +3,7 @@ package gates
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -410,5 +411,140 @@ func TestCheckTargetSurfacesSourcesRequired(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("an empty sources list must error: %v", g.Errs)
+	}
+}
+
+// --- milestone resolution ------------------------------------------------
+
+// targetSurfacePlan is the build plan the ledger's milestone references
+// resolve against: M0 the skeleton and M2 the slice the fixture ledger names.
+const targetSurfacePlan = `# BUILD: target
+
+Mode: full
+
+## 9. Build plan
+
+**M0 - Walking skeleton.** One real act end to end.
+DoD: the create path green.
+
+**M2 - Approvals slice.** The admin console.
+DoD: the approval path green.
+`
+
+// writeTargetSurfacePlanFixture is the ledger fixture plus a BUILD.md, so the
+// milestone references have something to resolve against.
+func writeTargetSurfacePlanFixture(t *testing.T, ledger, plan string) string {
+	t.Helper()
+	design := writeTargetSurfaceFixture(t, ledger)
+	if plan != "" {
+		if err := os.WriteFile(filepath.Join(design, "BUILD.md"), []byte(plan), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return design
+}
+
+// A milestone the plan declares resolves, and the resolution is counted on
+// the checked line so a ledger nobody bound stays visible.
+func TestCheckTargetSurfacesMilestoneResolves(t *testing.T) {
+	design := writeTargetSurfacePlanFixture(t, targetSurfacesLedger, targetSurfacePlan)
+	g := CheckTargetSurfaces(design)
+	if len(g.Errs) != 0 {
+		t.Fatalf("a declared milestone must resolve: %v", g.Errs)
+	}
+	if !strings.Contains(checkedLine(g), "1 milestone references resolved") {
+		t.Errorf("the resolution must be counted: %q", checkedLine(g))
+	}
+}
+
+// The finding this check exists for: a milestone name that survived a replan
+// reads like a commitment and names nothing.
+func TestCheckTargetSurfacesMilestoneDoesNotResolve(t *testing.T) {
+	ledger := strings.Replace(targetSurfacesLedger, "milestone: M2", "milestone: M7", 1)
+	g := CheckTargetSurfaces(writeTargetSurfacePlanFixture(t, ledger, targetSurfacePlan))
+	joined := strings.Join(g.Errs, "\n")
+	if !strings.Contains(joined, "names milestone 'M7', which the build plan does not declare") {
+		t.Fatalf("an unresolvable milestone must be named: %v", g.Errs)
+	}
+	if !strings.Contains(joined, "M0 - Walking skeleton; M2 - Approvals slice") {
+		t.Errorf("the finding must list what IS declared: %v", g.Errs)
+	}
+}
+
+// The documented spellings of one milestone all resolve to it, and its title
+// does too: the ledger is hand-authored beside the plan.
+func TestCheckTargetSurfacesMilestoneSpellings(t *testing.T) {
+	for _, spelling := range []string{"M2", "m2", "2", "Approvals slice", "approvals slice"} {
+		t.Run(spelling, func(t *testing.T) {
+			ledger := strings.Replace(targetSurfacesLedger, "milestone: M2", "milestone: "+strconv.Quote(spelling), 1)
+			g := CheckTargetSurfaces(writeTargetSurfacePlanFixture(t, ledger, targetSurfacePlan))
+			if len(g.Errs) != 0 {
+				t.Fatalf("%q must resolve to M2: %v", spelling, g.Errs)
+			}
+		})
+	}
+}
+
+// A milestone number written with a leading zero in the plan answers to the
+// spelling the plan used and to its bare number.
+func TestCheckTargetSurfacesMilestonePaddedNumber(t *testing.T) {
+	plan := strings.ReplaceAll(targetSurfacePlan, "**M2 -", "**M02 -")
+	for _, spelling := range []string{"M02", "M2"} {
+		t.Run(spelling, func(t *testing.T) {
+			ledger := strings.Replace(targetSurfacesLedger, "milestone: M2", "milestone: "+spelling, 1)
+			g := CheckTargetSurfaces(writeTargetSurfacePlanFixture(t, ledger, plan))
+			if len(g.Errs) != 0 {
+				t.Fatalf("%q must resolve to the padded M02: %v", spelling, g.Errs)
+			}
+		})
+	}
+}
+
+// The ledger is authored in Phase 2 and the plan in Phase 4: with no BUILD.md
+// (or a plan that declares no milestone) the rule stays disarmed and the
+// non-empty check is all there is, exactly as before.
+func TestCheckTargetSurfacesMilestoneWithoutPlan(t *testing.T) {
+	cases := []struct{ name, plan string }{
+		{"no BUILD.md", ""},
+		{"a plan with no milestone", "# BUILD: target\n\n## 9. Build plan\n\nProse, no milestone markers yet.\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ledger := strings.Replace(targetSurfacesLedger, "milestone: M2", "milestone: M7", 1)
+			g := CheckTargetSurfaces(writeTargetSurfacePlanFixture(t, ledger, tc.plan))
+			if len(g.Errs) != 0 {
+				t.Fatalf("a ledger ahead of the plan is not a finding: %v", g.Errs)
+			}
+			if strings.Contains(checkedLine(g), "milestone references") {
+				t.Errorf("nothing was resolved, so nothing may be counted: %q", checkedLine(g))
+			}
+		})
+	}
+}
+
+// The empty milestone stays an error with a plan in the tree: the two rules
+// are separate, and the empty key is still the sloppier mistake.
+func TestCheckTargetSurfacesEmptyMilestoneWithPlan(t *testing.T) {
+	ledger := strings.Replace(targetSurfacesLedger, "milestone: M2", `milestone: ""`, 1)
+	g := CheckTargetSurfaces(writeTargetSurfacePlanFixture(t, ledger, targetSurfacePlan))
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "has an empty milestone") {
+		t.Fatalf("an empty milestone must still error: %v", g.Errs)
+	}
+}
+
+// Milestones declared in a manifest's shards resolve too: the index is built
+// from planDocuments, the same document selection Gb and Ga use.
+func TestCheckTargetSurfacesMilestoneFromManifestShard(t *testing.T) {
+	root := "# BUILD: target\n\nMode: manifest\n\n## 1. Purpose\n\nProse.\n"
+	ledger := strings.Replace(targetSurfacesLedger, "milestone: M2", "milestone: M4", 1)
+	design := writeTargetSurfacePlanFixture(t, ledger, root)
+	shard := "# BUILD: orders\n\n## 9. Build plan\n\nWalking skeleton: N/A - it lives in the root.\n\n**M4 - Orders slice.**\nDoD: green.\n"
+	writeSuiteFile(t, filepath.Join(design, "BUILD", "orders.md"), shard)
+	g := CheckTargetSurfaces(design)
+	if len(g.Errs) != 0 {
+		t.Fatalf("a shard milestone must resolve: %v", g.Errs)
+	}
+	if !strings.Contains(checkedLine(g), "1 milestone references resolved") {
+		t.Errorf("the shard resolution must be counted: %q", checkedLine(g))
 	}
 }

@@ -31,6 +31,7 @@ Strict root shape (unknown keys fail):
 surface_version: 1
 system: <one line naming the legacy system and its shape>
 as_of: <legacy commit or date the surface was enumerated against>   # optional; printed on the Gs checked line
+                                     # an ISO date, a 7-40 character revision, or a tag-like token; prose warns
 classes:
   routes:                            # network API surface
     source: <where the enumeration came from>
@@ -76,7 +77,11 @@ settle rows as phases land.
 `Gs-surface` (`machinery check <design> --gate gs`) activates automatically when the file exists.
 Deterministic: strict schema, all six classes addressed, every item disposed exactly once with
 required fields, covered bindings resolve, names unique. The `checked:` line prints per-class item
-counts plus covered/dropped/deferred/waived totals. LLM-attested: the enumeration is complete per
+counts plus covered/dropped/deferred/waived totals, and the `as_of` anchor when declared. A
+declared `as_of` that is neither an ISO date, a 7 to 40 character revision, nor a tag-like token
+WARNS (never blocks: the schema types it as a plain string): an anchor is compared against the
+legacy system, and prose compares against nothing, so keep the narrative in `_comment`.
+LLM-attested: the enumeration is complete per
 class, the waivers are true, and at Gate 4 every `deferred` rationale is deliberate, never an
 opening placeholder; review the deferred count for exactly that.
 

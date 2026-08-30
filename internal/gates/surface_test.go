@@ -123,12 +123,12 @@ func TestCheckSurfaceClean(t *testing.T) {
 // non-empty string when present.
 func TestCheckSurfaceAsOfAnchor(t *testing.T) {
 	t.Run("accepted and surfaced", func(t *testing.T) {
-		design := writeSurfaceFixture(t, "as_of: legacy@a1b2c3 (2026-06-30)\n"+surfaceLedger)
+		design := writeSurfaceFixture(t, "as_of: legacy@a1b2c3\n"+surfaceLedger)
 		g := CheckSurface(design)
-		if len(g.Errs) != 0 {
-			t.Fatalf("as_of is a legal root key: %v", g.Errs)
+		if len(g.Errs) != 0 || len(g.Warns) != 0 {
+			t.Fatalf("as_of is a legal root key: errs=%v warns=%v", g.Errs, g.Warns)
 		}
-		if !strings.Contains(strings.Join(g.checkedExtra, ", "), "as_of legacy@a1b2c3 (2026-06-30)") {
+		if !strings.Contains(strings.Join(g.checkedExtra, ", "), "as_of legacy@a1b2c3") {
 			t.Errorf("as_of must appear on the checked line: %v", g.checkedExtra)
 		}
 	})
@@ -142,6 +142,73 @@ func TestCheckSurfaceAsOfAnchor(t *testing.T) {
 		g := CheckSurface(writeSurfaceFixture(t, "as_of: 20260630\n"+surfaceLedger))
 		if !strings.Contains(strings.Join(g.Errs, "\n"), "as_of must be a non-empty string") {
 			t.Fatalf("a non-string as_of must error: %v", g.Errs)
+		}
+	})
+}
+
+// The anchor's SHAPE. docs/surface-ledger.md documents as_of as "the legacy
+// commit or date the surface was enumerated against; non-empty string": the
+// meaning is pinned, the format is not, so a shape the docs never demanded is
+// a WARN and never blocks. What it catches is the anchor that quietly stopped
+// being one, which is the whole reason the field is printed on every run.
+func TestCheckSurfaceAsOfShape(t *testing.T) {
+	accepted := []string{
+		"2026-07-22", // ISO date
+		"a1b2c3d",    // the shortest binding revision
+		"9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345", // a full sha
+		"v1.4.2",          // a release tag
+		"release/2026-06", // a branch
+		"legacy@a1b2c3",   // system@revision
+		"svn:41207",       // a non-git revision
+	}
+	for _, asOf := range accepted {
+		t.Run("accepted "+asOf, func(t *testing.T) {
+			g := CheckSurface(writeSurfaceFixture(t, "as_of: "+asOf+"\n"+surfaceLedger))
+			if len(g.Errs) != 0 || len(g.Warns) != 0 {
+				t.Fatalf("%q is an anchor a reviewer can act on: errs=%v warns=%v", asOf, g.Errs, g.Warns)
+			}
+		})
+	}
+
+	// prose where an anchor belongs: the value the go-crm example carried,
+	// which reads as documentation and compares against nothing
+	t.Run("prose warns and stays surfaced", func(t *testing.T) {
+		const prose = "2026-07-22, enumerated from the committed legacy model and the migration.yaml inventory"
+		g := CheckSurface(writeSurfaceFixture(t, "as_of: "+prose+"\n"+surfaceLedger))
+		if len(g.Errs) != 0 {
+			t.Fatalf("the shape rule must never block: %v", g.Errs)
+		}
+		joined := strings.Join(g.Warns, "\n")
+		if !strings.Contains(joined, "is none of the shapes an anchor takes") {
+			t.Fatalf("prose in as_of must warn: %v", g.Warns)
+		}
+		for _, want := range []string{"an ISO date (YYYY-MM-DD)", "a VCS revision (7 to 40 hex characters)", "a tag-like token"} {
+			if !strings.Contains(joined, want) {
+				t.Errorf("the warning must name the expected shape %q: %v", want, g.Warns)
+			}
+		}
+		if !strings.Contains(strings.Join(g.checkedExtra, ", "), "as_of "+prose) {
+			t.Errorf("a warned anchor is still surfaced verbatim: %v", g.checkedExtra)
+		}
+	})
+
+	t.Run("date shape that is not a day", func(t *testing.T) {
+		g := CheckSurface(writeSurfaceFixture(t, "as_of: 2026-02-31\n"+surfaceLedger))
+		if !strings.Contains(strings.Join(g.Warns, "\n"), "names no real calendar day") {
+			t.Fatalf("an impossible date must warn: %v", g.Warns)
+		}
+		if len(g.Errs) != 0 {
+			t.Errorf("the shape rule must never block: %v", g.Errs)
+		}
+	})
+
+	t.Run("a hex string too short to name a commit", func(t *testing.T) {
+		// 'a1b2c' is under git's own 7-character abbreviation floor, but it is
+		// still one token, so it lands in the tag lane rather than warning:
+		// the gate does not invent a rule the documentation never stated
+		g := CheckSurface(writeSurfaceFixture(t, "as_of: a1b2c\n"+surfaceLedger))
+		if len(g.Warns) != 0 {
+			t.Errorf("a single token is an anchor shape: %v", g.Warns)
 		}
 	})
 }

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/RamXX/machinery/internal/ir"
 )
@@ -22,6 +24,14 @@ var (
 	// inventoried or explicitly waived, so a forgotten class is an error, not
 	// a silent pass.
 	surfaceClasses = []string{"routes", "commands", "tables", "jobs", "events", "integrations"}
+	// the three shapes an as_of anchor may take. surfaceAsOfDateRe pins the
+	// date shape before the calendar check; surfaceAsOfRevRe is a git-style
+	// object name; surfaceAsOfTagRe is any single revision-like token, wide
+	// enough for the forms real VCSs produce (v1.4.2, release/2026-06,
+	// legacy@a1b2c3, svn:41207, HEAD@{2}). What none of them admits is prose.
+	surfaceAsOfDateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	surfaceAsOfRevRe  = regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
+	surfaceAsOfTagRe  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+/@:~^{}-]{0,63}$`)
 )
 
 // HasSurfaceLedger reports whether a design opted into legacy surface
@@ -108,6 +118,35 @@ func (v *surfaceValidator) errf(format string, args ...any) {
 	v.g.Errs = append(v.g.Errs, fmt.Sprintf(format, args...))
 }
 
+func (v *surfaceValidator) warnf(format string, args ...any) {
+	v.g.Warns = append(v.g.Warns, fmt.Sprintf(format, args...))
+}
+
+// checkAsOfShape holds the ledger's anchor to a shape a reviewer can act on.
+// This is a WARN, not an ERROR, and deliberately: docs/surface-ledger.md
+// documents as_of as "the legacy commit or date the surface was enumerated
+// against; non-empty string", which pins the MEANING and leaves the FORMAT
+// open, so a design cannot be blocked for a spelling the documentation never
+// asked for. What the warning catches is the anchor that quietly stopped being
+// one. as_of exists so a stale ledger is visible in every gate run (P-F3), and
+// a sentence of prose where a revision belongs is not something a reviewer can
+// compare against the legacy system: the narrative belongs in _comment, the
+// anchor here.
+func (v *surfaceValidator) checkAsOfShape(asOf string) {
+	switch {
+	case surfaceAsOfDateRe.MatchString(asOf):
+		if _, err := time.Parse("2006-01-02", asOf); err != nil {
+			v.warnf("as_of %s has the shape of an ISO date but names no real calendar day", ir.Repr(asOf))
+		}
+	case surfaceAsOfRevRe.MatchString(asOf):
+		// a VCS object name
+	case surfaceAsOfTagRe.MatchString(asOf):
+		// a tag or branch name: one whitespace-free token
+	default:
+		v.warnf("as_of %s is none of the shapes an anchor takes: an ISO date (YYYY-MM-DD), a VCS revision (7 to 40 hex characters), or a tag-like token; a reviewer compares this value against the legacy system, so keep it an anchor and put the narrative in _comment", ir.Repr(asOf))
+	}
+}
+
 func (v *surfaceValidator) checkKeys(obj *ir.Object, allowed map[string]bool, where string) {
 	for _, key := range obj.Keys() {
 		if !allowed[key] {
@@ -129,6 +168,8 @@ func (v *surfaceValidator) validateRoot() {
 	if asOf := v.root.Get2("as_of"); asOf != nil {
 		if asOf.Kind != ir.KindString || strings.TrimSpace(asOf.AsString()) == "" {
 			v.errf("as_of must be a non-empty string: the legacy revision or date the surface was enumerated against")
+		} else {
+			v.checkAsOfShape(strings.TrimSpace(asOf.AsString()))
 		}
 	}
 	classes := v.root.GetObject("classes")

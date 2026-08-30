@@ -465,6 +465,10 @@ func checkBoundaryEvents(design, eventsMD string, g *Gate) {
 			} else {
 				g.Errs = append(g.Errs, "boundary event "+ir.Repr(e.name)+" (produced) appears in no machine action (entry, exit, transition, invoke src) and no matrix cell; a neighbor relies on this subsystem emitting it. If the emitting action is named differently, name the event whole-token in that action's matrix row")
 			}
+		default:
+			// no default once meant a misspelled direction dropped the row in
+			// silence: the event was counted by nobody and checked by nobody
+			g.Errs = append(g.Errs, "boundary event "+ir.Repr(e.name)+" has direction "+ir.Repr(e.dir)+"; the direction vocabulary is exactly consumes or produces, and a row with any other value is held to neither the consumption nor the emission rule")
 		}
 	}
 }

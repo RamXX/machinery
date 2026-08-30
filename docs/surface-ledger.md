@@ -85,7 +85,7 @@ classes:
 |---|---|---|
 | `surface_version` | yes | the integer `1` |
 | `system` | yes | one line naming the legacy system and its shape |
-| `as_of` | no | the legacy commit or date the surface was enumerated against; non-empty string, printed on the Gs `checked:` line |
+| `as_of` | no | the legacy commit or date the surface was enumerated against; non-empty string, printed on the Gs `checked:` line. Keep it an anchor: an ISO date (`2026-07-22`), a VCS revision (7 to 40 hex characters), or a tag-like token (`v1.4.2`, `release/2026-06`, `legacy@a1b2c3`). Anything else warns |
 | `classes` | yes | the six surface classes, all of them (see below) |
 | `_comment` | no | free text |
 
@@ -151,7 +151,11 @@ present and well-formed, every item is disposed exactly once with its required f
 covered binding resolves against the target design, and names are unique per class. The
 `checked:` line reports per-class item counts plus the covered, dropped, deferred, and waived
 totals, and the `as_of` anchor when declared, so a handoff review sees the disposition profile
-at a glance. An empty ledger (six
+at a glance. A declared `as_of` is also held to its SHAPE, as a WARN and never a block: the
+schema types the field as a plain string, so a format the documentation never demanded must not
+fail a design, but an anchor exists to be compared against the legacy system and a sentence of
+prose compares against nothing. Put the narrative in `_comment` and leave the date or revision
+here. An empty ledger (six
 waivers, zero items) is an error: a legacy system with no enumerable surface at all is not a
 legacy system.
 

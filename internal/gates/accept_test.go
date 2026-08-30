@@ -2,6 +2,7 @@ package gates
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -53,7 +54,13 @@ const acceptedCommit = "9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345"
 // evidence. An entry with an empty value removes that file.
 func writeAcceptFixture(t *testing.T, files map[string]string) string {
 	t.Helper()
-	design := t.TempDir()
+	return writeAcceptFixtureIn(t, t.TempDir(), files)
+}
+
+// writeAcceptFixtureIn is writeAcceptFixture with the design directory chosen
+// by the caller, so a test can place the design inside a git repository.
+func writeAcceptFixtureIn(t *testing.T, design string, files map[string]string) string {
+	t.Helper()
 	all := map[string]string{
 		"BUILD.md":                 acceptPlan,
 		"machines/Thing.oracle.md": acceptOracleMD,
@@ -327,6 +334,183 @@ func TestCheckAcceptanceEvidenceForOpenMilestone(t *testing.T) {
 	}
 	if g.Counts["closed milestones"] != 0 || g.Counts["acceptance files"] != 1 {
 		t.Errorf("counts must show evidence with nothing closed: %+v", g.Counts)
+	}
+}
+
+// The reverse direction of the coverage rule: a dod_ids entry that resolves
+// to no committed oracle id (a typo, or an id a regeneration left behind) is
+// an ERROR naming it. Without this the list could be pure fiction and the
+// gate would still report coverage.
+func TestCheckAcceptanceDoDIDsMustResolve(t *testing.T) {
+	phantom := strings.Replace(acceptEvidenceM0, "  - CMD-abc123\n", "  - CMD-abc123\n  - CMD-999999\n", 1)
+	design := writeAcceptFixture(t, map[string]string{"acceptance/M0.yaml": phantom})
+	g := CheckAcceptance(design, acceptedCommit)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "dod_ids names 'CMD-999999', which no committed oracle declares") {
+		t.Fatalf("an unresolvable dod_ids entry must be named: %v", g.Errs)
+	}
+	if g.Counts["DoD ids bound"] != 2 {
+		t.Errorf("the ids that DO resolve must still bind: %+v", g.Counts)
+	}
+}
+
+// A typo in an otherwise complete list is the exact failure the reverse rule
+// exists for: forward coverage reports the omission, reverse resolution names
+// the id that replaced it, and the reviewer sees both halves of the story.
+func TestCheckAcceptanceDoDIDTypoFailsBothWays(t *testing.T) {
+	typo := strings.Replace(acceptEvidenceM0, "  - CMD-abc123\n", "  - CMD-abc124\n", 1)
+	design := writeAcceptFixture(t, map[string]string{"acceptance/M0.yaml": typo})
+	g := CheckAcceptance(design, acceptedCommit)
+	joined := strings.Join(g.Errs, "\n")
+	for _, want := range []string{"dod_ids omits 'CMD-abc123'", "dod_ids names 'CMD-abc124'"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("want an error containing %q, got %v", want, g.Errs)
+		}
+	}
+}
+
+// --- the default commit binding ------------------------------------------
+
+// initGitRepo turns dir into a git repository carrying exactly one commit and
+// returns its HEAD. Every identity and signing input is passed on the command
+// line, so the developer's global git configuration cannot change the result.
+func initGitRepo(t *testing.T, dir string) string {
+	t.Helper()
+	git := func(args ...string) string {
+		t.Helper()
+		base := []string{"-C", dir,
+			"-c", "user.name=machinery test", "-c", "user.email=test@example.invalid",
+			"-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"}
+		cmd := exec.CommandContext(t.Context(), "git", append(base, args...)...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	git("init", "-q")
+	if err := os.WriteFile(filepath.Join(dir, ".gitkeep"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git("add", ".gitkeep")
+	git("commit", "-q", "-m", "root commit")
+	return git("rev-parse", "HEAD")
+}
+
+// The three provenances of the commit under review, plus the one case that
+// has none. The derivation resolves from the DESIGN PATH: the test process
+// runs inside the machinery repository, so a derivation that read the working
+// directory would bind the fixture to machinery's own HEAD.
+func TestResolveReviewCommit(t *testing.T) {
+	repo := t.TempDir()
+	head := initGitRepo(t, repo)
+	design := filepath.Join(repo, "design")
+	if err := os.MkdirAll(design, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+
+	t.Run("flag or env wins over git", func(t *testing.T) {
+		got, prov := resolveReviewCommit(design, "  "+acceptedCommit+"  ")
+		if got != acceptedCommit || prov != commitFromCaller {
+			t.Fatalf("the caller's commit must win: got %q prov=%d", got, prov)
+		}
+	})
+	t.Run("derived from the design's repository", func(t *testing.T) {
+		got, prov := resolveReviewCommit(design, "")
+		if got != head || prov != commitFromGit {
+			t.Fatalf("want the fixture repo HEAD %s, got %q prov=%d", head, got, prov)
+		}
+		if cwdHead := gitHeadAt("."); cwdHead != "" && cwdHead == got {
+			t.Fatal("the commit was resolved from the process working directory, not the design path")
+		}
+	})
+	t.Run("no repository leaves it unresolved", func(t *testing.T) {
+		got, prov := resolveReviewCommit(outside, "")
+		if got != "" || prov != commitAbsent {
+			t.Fatalf("outside a repository nothing may be derived: got %q prov=%d", got, prov)
+		}
+	})
+}
+
+// End to end: with no --commit and no MACHINERY_COMMIT, a design inside a git
+// repository binds its accepted evidence to that repository's HEAD, and the
+// checked line says where the commit came from.
+func TestCheckAcceptanceDefaultsToGitHead(t *testing.T) {
+	repo := t.TempDir()
+	head := initGitRepo(t, repo)
+	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), map[string]string{
+		"acceptance/M0.yaml": strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: "+head, 1),
+	})
+	g := CheckAcceptance(design, "")
+	if len(g.Errs) != 0 {
+		t.Fatalf("evidence naming the repository HEAD must bind: %v", g.Errs)
+	}
+	if g.Counts["commit bindings verified"] != 1 {
+		t.Errorf("the derived commit must be bound, not merely resolved: %+v", g.Counts)
+	}
+	if len(g.Notes) != 0 {
+		t.Errorf("a derived commit is a checked binding, not an unchecked one: %v", g.Notes)
+	}
+	if want := "commit under review derived from git HEAD"; !strings.Contains(checkedLine(g), want) {
+		t.Errorf("the provenance must be visible: %q", checkedLine(g))
+	}
+}
+
+// The derived commit is a real binding: evidence naming some other commit
+// fails on a plain local run, which is the whole point of the default.
+func TestCheckAcceptanceDerivedCommitBlocksStaleEvidence(t *testing.T) {
+	repo := t.TempDir()
+	initGitRepo(t, repo)
+	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), nil)
+	g := CheckAcceptance(design, "")
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "does not name the commit under review") {
+		t.Fatalf("evidence for another commit must fail against the derived HEAD: %v", g.Errs)
+	}
+}
+
+// An explicit commit still wins inside a repository, and says so.
+func TestCheckAcceptanceExplicitCommitWinsInsideRepo(t *testing.T) {
+	repo := t.TempDir()
+	initGitRepo(t, repo)
+	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), nil)
+	g := CheckAcceptance(design, acceptedCommit)
+	if len(g.Errs) != 0 {
+		t.Fatalf("the supplied commit must win over the repository HEAD: %v", g.Errs)
+	}
+	if want := "commit under review supplied by --commit or MACHINERY_COMMIT"; !strings.Contains(checkedLine(g), want) {
+		t.Errorf("the provenance must be visible: %q", checkedLine(g))
+	}
+}
+
+// Outside a repository the binding still degrades to the stated non-check:
+// the default adds a lane, it does not remove the honest note.
+func TestCheckAcceptanceOutsideRepoKeepsTheNote(t *testing.T) {
+	design := writeAcceptFixture(t, nil)
+	if head := gitHeadAt(design); head != "" {
+		t.Fatalf("the fixture must sit outside a git repository, got HEAD %s", head)
+	}
+	g := CheckAcceptance(design, "")
+	if !strings.Contains(strings.Join(g.Notes, "\n"), "not inside a git repository") {
+		t.Fatalf("the unchecked binding must state itself: %v", g.Notes)
+	}
+	if strings.Contains(checkedLine(g), "commit under review") {
+		t.Errorf("nothing was resolved, so nothing may claim provenance: %q", checkedLine(g))
+	}
+}
+
+// A design with nothing closed resolves no commit at all: the gate must not
+// shell out, and must not claim a provenance for a binding it never made.
+func TestCheckAcceptanceNoClosedMilestoneResolvesNoCommit(t *testing.T) {
+	repo := t.TempDir()
+	initGitRepo(t, repo)
+	plan := strings.Replace(acceptPlan, "Status: closed\n", "", 1)
+	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), map[string]string{"BUILD.md": plan})
+	g := CheckAcceptance(design, "")
+	if len(g.Errs) != 0 {
+		t.Fatalf("evidence for an open milestone is not a finding: %v", g.Errs)
+	}
+	if strings.Contains(checkedLine(g), "commit under review") || len(g.Notes) != 0 {
+		t.Errorf("nothing is bound, so nothing is said: checked=%q notes=%v", checkedLine(g), g.Notes)
 	}
 }
 
