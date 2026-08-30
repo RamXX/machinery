@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
-updated_at: 2026-08-30T19:30:20Z
-content_hash: "sha256:5e29deb68634142e09c61604f66202ab93f6dc508c5ac2406767c65ca99cbd38"
+updated_at: 2026-08-30T19:33:00Z
+content_hash: "sha256:54df0a2db28cfcfd3cbc92c99fc469fe20a71f920dba04d998bb9c11202475f0"
 assignee: ramirosalas
 labels: [delivered]
 ---
@@ -146,7 +146,7 @@ design: go-crm 14 = 5 unbound + 9 verified; surreal-crm 15 = 6 + 9; portfolio 15
 boundaries are containers while its relationships connect components and infra). Event cells:
 fulfillment 48 = 8 rows x 6 columns, 16 participants = 8 x 2; checkout children 18 = 3 x 6, 6 = 3 x
 2. Gx: fulfillment 4 reactions waived + 4 traced = 8 rows, 3 emissions waived + 5 traced = 8 rows.
-
+ACCEPTED (dispatcher QC, 2026-08-30): reviewed dsledges.go, eventwiring.go, eventcells.go, gates.go and imports.go hunks line by line; matchEdgeRule extraction confirmed a pure move; Gx host-gate choice and the attested reverse-sweep scope call upheld (existing claim ids untouched, descriptions delimited); example fixes are real defects. Independent go test 16/16 and full preflight green on the branch rebased onto main with MAC-s0yw combined.
 
 ## nd_contract
 status: delivered
