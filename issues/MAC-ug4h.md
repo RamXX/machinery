@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T09:09:48Z
-content_hash: "sha256:f5b4bff65c0c244440bf3a74b3321ce7b4a7331ea1331a4d28fa1cbcff8b5cdb"
+updated_at: 2026-08-30T09:09:49Z
+content_hash: "sha256:27c7a7a9a92e69b1e1c96ba23f40408d1bd6a345e2f8f374224060aeda4fc303"
 was_blocked_by: [MAC-v16q]
 assignee: ramirosalas
 follows: [MAC-v16q]
@@ -219,6 +219,14 @@ AC3 SKILL.md (design tree, activation paragraph, gate roll-call, the four attest
     adapters/opencode carries no gate list or attested-block paraphrase, so nothing to mirror.
 AC4 make test and make lint green (see preflight stages 3, 4, 8 above).
 AC5 no em dashes or emojis: scanned every changed and added file, zero hits.
+
+WIRING EVIDENCE: Gv is mounted in three places, each with a test that exercises it THROUGH the
+wiring, not in isolation. (1) CLI gate list: TestCheckGateGvRunsAndCatchesStaleness drives
+newCheckCmd() with --gate gv end to end, green then blocking. (2) Suite default selection and the
+machine-less-parent narrowing: TestAttestationSuiteWiring runs Select+RunSelected and asserts the
+gate is absent without the artifact and present with it; TestAttestationSurvivesDecomposedParentNarrowing
+asserts the narrowing note lists gv. (3) Stop-time hook auto-selection:
+TestSelectGatesActivatesGvOnAttestationEvidence calls selectGates the same way the hook does.
 
 ## History
 - 2026-08-30T08:34:40Z dep_added: blocked_by MAC-v16q
