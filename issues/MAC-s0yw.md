@@ -1,15 +1,17 @@
 ---
 id: MAC-s0yw
 title: "Zero-artifact checks B: edge gates (Ga, Gu, G5, Gs)"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
 updated_at: 2026-08-30T19:28:08Z
-content_hash: "sha256:50045bfd77b700ced9fc0cd81f34e37e036054e3d672730439677dbd35d2bc78"
+content_hash: "sha256:03d3febadcbb741b79402b7cde0c42af7fe15db034d6307a3a77c6a39732f79d"
 assignee: ramirosalas
 labels: [delivered]
+closed_at: 2026-08-30T19:28:08Z
+close_reason: "accepted: eight-check story B (Ga both-directions + ancestry-bound derived commit, Gu milestone resolution, G5 direction vocab, Gs as_of shape)"
 ---
 
 ## Description
@@ -317,6 +319,7 @@ ACCEPTED (dispatcher QC, 2026-08-30): hunk-by-hunk review of accept.go, pack.go,
 ## History
 - 2026-08-30T18:54:50Z status: open -> in_progress
 - 2026-08-30T18:54:50Z claimed by ramirosalas
+- 2026-08-30T19:28:08Z status: in_progress -> closed
 
 ## Links
 
