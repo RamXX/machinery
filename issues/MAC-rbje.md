@@ -1,13 +1,14 @@
 ---
 id: MAC-rbje
 title: "Deny agent writes to the wave sentinel (human-only .machinery-wave)"
-status: open
+status: in_progress
 priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:34:37Z
-content_hash: "sha256:80a447eaafa2c8d4048078c7744e74e4f8f7e9bd70471fa0ae698c0125350bd0"
+updated_at: 2026-08-30T08:35:01Z
+content_hash: "sha256:d763bf3770ed21c8a751ef82c78b084932577738270608ef8f4b03b6044e1e00"
+assignee: ramirosalas
 ---
 
 ## Description
@@ -53,7 +54,8 @@ Paste the go test summary line(s) and lint result into the story notes.
 
 
 ## History
-
+- 2026-08-30T08:35:01Z status: open -> in_progress
+- 2026-08-30T08:35:01Z claimed by ramirosalas
 
 ## Links
 
