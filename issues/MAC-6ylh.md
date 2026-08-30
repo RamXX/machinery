@@ -8,7 +8,7 @@ labels: [story, accepted]
 created_at: 2026-08-29T23:49:02Z
 created_by: ramirosalas
 updated_at: 2026-08-30T00:19:52Z
-content_hash: "sha256:14ca64dc88489fedfc2c4753fe650fd3edd21b06b5ea97b3516163d11aad9f35"
+content_hash: "sha256:beb1095c369046e5e93d37b7e3ea8368a5b913e0948c58f3ea7eee2751e5128d"
 assignee: ramirosalas
 closed_at: 2026-08-30T00:19:51Z
 close_reason: "Accepted: Gu-surfaces target surface ledger gate lands exactly to spec. Full suite verified independently (go test ./... -json: 1177 pass/0 fail/1 skip matching proof exactly), targetsurface tests pass standalone, pvg verify clean (6 pre-existing hook.go stubs confirmed identical on origin/main), pvg gates PASS (no BLOCK), suite.go wiring matches spec (gu beside gs in activation table, run block, knownGateSet, default list, decomposed-parent narrowing), no mocks in integration-shaped tests, no push/tag/version bump confirmed via git. Both dispatcher-sanctioned deviations (gd restoration in 3 gate-vocab lists, zero-human-actor non-blocking note) verified as described and treated in-scope."
@@ -50,6 +50,17 @@ CONSTRAINTS: no version bump, no tag, no push (the maintainer will land more cha
 ### AC Verification
 
 (Formatting note added by PM-Acceptor: this heading anchors the "Acceptance-criteria verification" table already recorded above, mapping every story requirement to its implementation location and verifying test. No content added; heading added to satisfy pvg story verify-delivery's schema check.)
+
+
+## nd_contract
+status: accepted
+
+### evidence
+- PM closeout applied via pvg story accept on 2026-08-29.
+
+### proof
+- [x] Story closed after accepted label was applied.
+
 
 ## Implementation Evidence
 
