@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:44:50Z
-content_hash: "sha256:3c7b048dea9bf1924e4bb6658158339b35b082ad798d798e368c59492d339ec3"
+updated_at: 2026-08-30T08:45:18Z
+content_hash: "sha256:566f2ae487d6dc7208ec470d62a46813ba4238d5e6c06b2ecebd2b9e3e768883"
 assignee: ramirosalas
 labels: [rejected]
 ---
@@ -111,3 +111,20 @@ LEARNINGS:
 
 ### 2026-08-30T08:40:34Z ramirosalas
 DELIVERED for acceptance review. Branch story/MAC-rbje-wave-sentinel at c594b09 (not merged, not pushed). Proof in Notes. Status left in_progress: this vault has no 'delivered' status (open/in_progress/blocked/deferred/closed only), so the 'delivered' label carries the signal.
+
+### 2026-08-30T08:45:18Z ramirosalas
+EXPECTED: PreToolUse denies every agent file-tool create/edit of any path whose basename is .machinery-wave (AC1), with deletion staying allowed only because it closes the wave and re-arms gating (the developer's documented judgment call, which I confirmed is sound: the stop-hook's own remedy text at hook.go:424 literally instructs "Delete <design>/.machinery-wave to close the wave and gate", so denying deletion would contradict the hook's own documented remedy, and deletion cannot be used to defer gating since it re-arms it immediately -- ACCEPTED as correct reasoning).
+
+DELIVERED: internal/hook/hook.go pre() (lines ~184-210) builds a `dropped` map from deletedPaths(in) (paths that appear on a "*** Delete File:" line anywhere in an apply_patch/OpenCode patch), then for every path in editedPaths(in) skips the wave-sentinel deny whenever `dropped[rel]` is true for that path -- regardless of what kind of edit produced that editedPaths entry.
+
+GAP: This exempts more than deletion. editedPaths() is built from patchPathLine, which matches "*** Add File:", "*** Update File:", AND "*** Delete File:" lines (hook.go:670). So a single apply_patch tool call containing BOTH a "*** Delete File: design/.machinery-wave" line and an "*** Add File: design/.machinery-wave" line (with a fresh TTL body) for the SAME path sails through with NO deny at all: the delete populates dropped[rel]=true, and the add's editedPaths entry for that same rel is then skipped because dropped[rel] is true. I reproduced this live in the worktree with a probe test (not committed, removed after verification): a patch shaped
+  *** Begin Patch
+  *** Delete File: design/.machinery-wave
+  *** Add File: design/.machinery-wave
+  +240
+  *** End Patch
+produces empty stdout (allow), confirmed by unmarshal failure / assertion in the probe. This is precisely the threat model the story exists to close: a single governed tool call lets an agent open a fresh wave sentinel (TTL up to 240) and defer stop-time gating indefinitely, using the exact tool (apply_patch) this story's own tests (TestCodexPatchWaveSentinel) exercise. AC1 ("PreToolUse denies file-tool create/edit of .machinery-wave with a clear reason") is not met for this input shape. Not a Bash-escape-class residual (that's a different, explicitly accepted class per the story's Non-goals) -- this is a bypass of the governed apply_patch tool itself.
+
+FIX: Stop treating "this path was deleted somewhere in the patch" as license to allow every other edit to that path in the same patch. Track the operation type per editedPaths entry (Add/Update/Delete) instead of reusing the deletedPaths()-derived path set as a blanket exemption -- deny should be skipped only for the editedPaths entry that IS itself the delete operation on that path, never for a co-occurring Add/Update of the same path in the same patch. Concretely: extend editedPaths (or add a sibling helper) to report each match's operation kind from patchPathLine's own capture group (it already distinguishes Add|Update|Delete), and in pre() only exempt the wave-sentinel deny when the specific edited-path entry's operation is Delete. Add a regression test for the delete+add (and delete+update) combo in one apply_patch call targeting .machinery-wave, expecting deny. Re-run the full verification ladder (go test ./..., golangci-lint run ./...) after the fix and re-paste PROOF with the new test included.
+
+Everything else in this delivery checked out: go test ./... (16/16 packages ok, matches proof), golangci-lint run ./... (0 issues) and gofmt -l . (clean) both reproduced independently; pvg gates PASS (only pre-existing file_loc WARNs, lizard/jscpd skipped); pvg verify's 6 "stub" hits on `return ""` in hook.go are pre-existing (identical count at f1dc685 and c594b09), not introduced by this diff, and are legitimate not-applicable sentinel returns in generatedReason()/relToRoot(), not incomplete implementation. Docs (README.md, docs/claude-plugin.md, skills/machinery/SKILL.md) all correctly describe the human-only rule; SKILL.md frontmatter version untouched. No em dashes or emojis found in any added line. Please rework the dropped/exemption logic per FIX above and redeliver.
