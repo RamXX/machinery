@@ -4,10 +4,10 @@ title: "Gu-surfaces: target-side surface ledger gate"
 status: closed
 priority: 1
 type: feature
-labels: [story, delivered, accepted]
+labels: [story, accepted]
 created_at: 2026-08-29T23:49:02Z
 created_by: ramirosalas
-updated_at: 2026-08-30T00:19:51Z
+updated_at: 2026-08-30T00:19:52Z
 content_hash: "sha256:14ca64dc88489fedfc2c4753fe650fd3edd21b06b5ea97b3516163d11aad9f35"
 assignee: ramirosalas
 closed_at: 2026-08-30T00:19:51Z
