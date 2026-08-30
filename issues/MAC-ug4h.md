@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:52:03Z
-content_hash: "sha256:b5baf39dd1b9f407996d6e4c47fbac9416c17c28bd6fb60b6e1e79ffde107e1a"
+updated_at: 2026-08-30T09:09:09Z
+content_hash: "sha256:9714b815d4ddb9d519b3573a300a149e3062e951ef9daa44c99471dde33f9882"
 was_blocked_by: [MAC-v16q]
 assignee: ramirosalas
 follows: [MAC-v16q]
@@ -72,7 +72,66 @@ Paste go test + lint summaries and a sample gate run (pass + one induced STALE f
 
 
 ## Notes
+DESIGN DECISIONS (delegated by the story; the repo has no DECISIONS.md for its own development, so they live here and in the code comments they annotate)
 
+1. Evidence-file granularity: ONE FILE PER DESIGN, design/attestations.yaml, rows keyed by claim id.
+   Rationale: the attested halves are halves of the design's own gates and are keyed by nothing else.
+   Ga keys per milestone number and Gj per machine name because those are natural partitions of their
+   evidence; there is no analogous key here, so a per-gate split would buy five files to keep in sync
+   and five activation stats instead of one. It also matches the single-top-level-file taste of
+   migration.yaml, surfaces.yaml, and decomposition.yaml. Recorded at internal/gates/attest.go, the
+   AttestationsFileName doc comment.
+
+2. Claim-id vocabulary: CLOSED, enumerated in code as attestVocabulary (internal/gates/attest.go),
+   exported for the CLI and docs via AttestationClaimIDs() so it is never transcribed. 15 ids:
+     g2.action-ownership, g2.interface-contract-rightness, g2.placement-rightness,
+     g2.adoption-closure-discovery, g2.event-contract-completeness, g2.nfr-content,
+     g3.guard-semantics, g3.invariant-enforcement, g3.residual-transitions, g3.event-redelivery,
+     gt.conformance-test-shape, g4.zero-context, g4.standin-coverage, g4.pack-event-discipline,
+     ga.review-quality
+   Sources: the four SKILL.md LLM-attested blocks (G2, G3, Gt/Gate 4, Ga) plus the isolated-child and
+   pack-event items, plus the attestation list in agents/machinery-fsm-author.md. Unknown ids are
+   ERRORs: an open vocabulary would let a design invent a claim, attest it, and pass a gate that never
+   asked for it, which records diligence instead of holding it.
+
+3. Gate letter: Gv-attest. Free in the used set (gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,
+   g4,gt,g5); a for accept and t for tests were already taken, so v (vouching) carries the mnemonic.
+   Placed after gj and before g4 in the canonical order: it is evidence like Ga/Gj, and it belongs
+   before the impl-facing gates.
+
+4. Staleness severity: ERROR, not DRIFT, with the literal word STALE in the message. DRIFT in
+   machinery means a GENERATED artifact fell behind its source and is fixed by regenerating; nothing
+   regenerates a judgment. Calling it DRIFT would misdescribe the remedy, which is a person reading
+   the changed artifact and deciding again.
+
+5. Coverage posture: WARN for an owed-but-unattested claim, ERROR for a record that is WRONG (unknown
+   claim, missing attestor, dangling referent, stale hash, duplicate claim), ERROR for an evidence
+   file with zero rows. Rationale: the file is opt-in and adopted mid-design. If its first commit
+   failed the gate for every claim not yet re-judged, adopting the record would cost more than not
+   adopting it, which guarantees the attested halves stay in conversation forever. The absence rule
+   still bites at the file level (an empty check is a failure, not a pass), and a misleading record
+   always blocks, because it is worse than a missing one. Recorded at checkAttestationCoverage.
+
+6. Owed-when predicates: g2.* once ARCHITECTURE.md exists; g3.* once machines/*.machine.json exist;
+   gt.conformance-test-shape and g4.zero-context once BUILD.md exists; g4.standin-coverage once the
+   build document declares a "Neighbor stand-ins" section (the posture itself, so a full-environment
+   child owes nothing); g4.pack-event-discipline once pack/ exists; ga.review-quality once
+   acceptance/ exists.
+
+7. Hash helper: `machinery attest <path> [<path> ...]` prints "sha256:<hex>  <path>" per file;
+   `machinery attest --claims` prints the vocabulary from the binary. Positional paths rather than a
+   --hash flag: one form, least surprise, smallest thing that works. gates.ContentHash is the single
+   definition of the digest, used by both the gate and the command, so the value the attestor pastes
+   is the value the gate compares.
+
+8. Ga tie-in: acceptance/M<n>.yaml keeps its free-prose attestations: list unchanged (no existing
+   acceptance file breaks). Documented preference: where an entry restates a Class C claim, write the
+   claim id and carry the detail in attestations.yaml. Noted in docs/acceptance-gate.md and SKILL.md.
+
+9. adapters/opencode: checked. adapters/opencode/commands/check.md carries no gate list and no
+   paraphrase of the attested blocks (it delegates to `machinery check` and .machinery.json), and
+   adapters/opencode/plugins/machinery.js has no gate vocabulary. Nothing to mirror; TestOpenCodeAdapterContracts
+   stays green.
 
 ## History
 - 2026-08-30T08:34:40Z dep_added: blocked_by MAC-v16q
