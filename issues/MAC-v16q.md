@@ -1,16 +1,17 @@
 ---
 id: MAC-v16q
 title: "Remove prompt prose that restates deterministic gate checks"
-status: in_progress
+status: closed
 priority: 1
 type: chore
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:47:57Z
-content_hash: "sha256:349fbc1e738d9b4251fb7a36a00031e06c725740dd5f07f0d5319ae469ad151c"
-blocks: [MAC-ug4h]
+updated_at: 2026-08-30T08:48:02Z
+content_hash: "sha256:f26558296363c4f8779fec6a7eabc04b193fae438840fd61058d14830ba17761"
 assignee: ramirosalas
 labels: [delivered]
+closed_at: 2026-08-30T08:48:02Z
+close_reason: "accepted: all six fidelity edits verified against gate source, Gl em-dash promotion verified with fresh test run (23/23 pass), full test suite and preflight green, greps confirmed removal and adapter parity"
 ---
 
 ## Description
@@ -109,10 +110,10 @@ LEARNINGS
 - 2026-08-30T08:34:40Z dep_added: blocks MAC-ug4h
 - 2026-08-30T08:35:09Z status: open -> in_progress
 - 2026-08-30T08:35:09Z claimed by ramirosalas
+- 2026-08-30T08:48:02Z status: in_progress -> closed
+- 2026-08-30T08:48:02Z dep_removed: no_longer_blocks MAC-ug4h
 
 ## Links
-- Blocks: [[MAC-ug4h]]
-
 ## Comments
 
 ### 2026-08-30T08:47:57Z ramirosalas
