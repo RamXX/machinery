@@ -17,8 +17,11 @@ func eventSourceFixture(t *testing.T, eventSection string) *Gate {
 	return CheckC4(design)
 }
 
-const eventTable = "| event | producer | consumer | payload | delivery |\n|---|---|---|---|---|\n" +
-	"| paid | app | app | Order.id | at-least-once |\n"
+// eventTable is a COMPLETE event-contract table (every column the format
+// contract names, every cell answered, participants declared), so a fixture
+// built to exercise the source-note check reports only that check's findings.
+const eventTable = "| event | producer | consumer | payload | delivery | ordering | dedupe |\n|---|---|---|---|---|---|---|\n" +
+	"| paid | app | app | Order.id | at-least-once | none | Order.id |\n"
 
 func TestEventTableSourceNotePasses(t *testing.T) {
 	g := eventSourceFixture(t, "\n## Events\n\nSource: swept the emit call sites and the topic bindings.\n\n"+eventTable)

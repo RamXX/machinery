@@ -5,7 +5,7 @@
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 7 boundaries, 2 externals, 13 allow rules, 21 transitive pairs, 2 deny rules, 6 boundaries with exposes, 12 dsl elements, 7 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 nfr topics recorded, 13 edges contracted
+  checked: 7 boundaries, 2 externals, 13 allow rules, 21 transitive pairs, 2 deny rules, 6 boundaries with exposes, 12 dsl elements, 15 drawn relationships, 2 drawn edges outside the contract vocabulary, 13 drawn edges verified, 7 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 nfr topics recorded, 13 edges contracted
   ok
 == G3-machine  machines + oracle ==
   warn   Portfolio.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters

@@ -20,6 +20,11 @@ externals:
   - id: external.paydb
     element: paydb
     imports: [ "example.com/pgdriver" ]
+  # the peer subsystem is a declared participant, not an undeclared name in the
+  # event rows: it originates every settlement request and its outage is a
+  # failure mode this design has to hold a posture on
+  - id: external.orders
+    element: orders
 dependency_rules:
   allow:
     - payments.svc -> external.bus
@@ -53,6 +58,7 @@ here is byte-identical to a parent row, and every parent row that names this sub
 |---|---|---|---|---|
 | `bus` | down, redelivery, reorder | outbox + idempotent consumers (dedupe by `Payment.orderId`) | duplicate `request` creates no second payment | ack window |
 | `paydb` | unavailable, corrupt | retry with backoff, PITR restore | transient unavailability surfaces after retries | retry <= 3 |
+| `orders` | down, slow, requests replayed | requests ride the peer's outbox, so a replay repeats one `Payment.orderId` and is deduped into the existing payment | a settled payment whose reply was lost is re-settled idempotently, never twice | ack window |
 
 ## 7. Persistence and placement
 

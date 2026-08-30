@@ -16,6 +16,7 @@ import (
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/lint"
 	"github.com/RamXX/machinery/internal/oracle"
+	"github.com/RamXX/machinery/internal/pack"
 	"github.com/RamXX/machinery/internal/tla"
 	"github.com/RamXX/machinery/internal/version"
 )
@@ -316,8 +317,15 @@ func contractEdges(rules *ir.Object, key string, g *Gate) [][2]string {
 }
 
 func dslElements(dslPath string, g *Gate) map[string]dslEl {
+	return dslElementsOf(readFileOrErr(dslPath, g))
+}
+
+// dslElementsOf parses element declarations out of a workspace.dsl text.
+// dslElements reads the file (and reports a read error) and delegates here, so
+// a caller that already holds the text (the drawn-edge check needs the same
+// text for its relationship lines) parses the model the one way.
+func dslElementsOf(text string) map[string]dslEl {
 	els := map[string]dslEl{}
-	text := readFileOrErr(dslPath, g)
 	for _, line := range strings.Split(text, "\n") {
 		m := dslDeclRe.FindStringSubmatch(line)
 		if m == nil {
@@ -575,11 +583,15 @@ func CheckC4(design string) *Gate {
 		g.Errs = append(g.Errs, "workspace.dsl does not exist; the contract has no model to bind to")
 		return g
 	}
-	els := dslElements(dslPath, g)
+	dslText := readFileOrErr(dslPath, g)
+	els := dslElementsOf(dslText)
 	g.Count("dsl elements", len(els))
 	if len(els) == 0 {
 		g.Errs = append(g.Errs, "workspace.dsl parsed but no elements found")
 	}
+	// the relationships the diagram DRAWS are held to the same dependency
+	// rules G4 holds the code's imports to (see dsledges.go)
+	checkDrawnEdges(g, dslText, els, boundaries, externals, allow, deny, baseline)
 
 	for _, b := range boundaries {
 		bo := b.AsObject()
@@ -627,12 +639,18 @@ func CheckC4(design string) *Gate {
 		}
 	}
 	text := readFileOrErr(arch, g)
+	// EVERY header-matching table counts, as with the event and interface
+	// contracts: a design may split its mitigation posture across sections
+	// (transition-only dependencies in their own table, say), and the
+	// first-match locator silently discharged every later table's rows of
+	// their obligation (PACK-1 shared-locator semantics). Rows aggregate the
+	// way the event scan's do: counts accumulate across tables and coverage is
+	// a set, so a dependency named in either table is covered once.
 	var mitRows [][]string
 	for _, tbl := range ir.ParseMdTables(text) {
 		hl := strings.ToLower(strings.Join(tbl.Header, " "))
 		if strings.Contains(hl, "failure") && strings.Contains(hl, "mitigation") {
-			mitRows = tbl.Rows
-			break
+			mitRows = append(mitRows, tbl.Rows...)
 		}
 	}
 	covered := map[string]bool{}
@@ -682,6 +700,9 @@ func CheckC4(design string) *Gate {
 	// every event-contract table states where its rows were enumerated from,
 	// the same rule Gs holds the legacy surface ledger to (see eventsource.go)
 	checkEventTableSources(g, text)
+	// and every row answers its columns and names participants the model
+	// declares; the rows were counted and never read (see eventcells.go)
+	checkEventCells(g, text, els, required)
 	// opt-in artifacts: the adoption-closure and action-ownership tables
 	// activate on their own presence, like the declared embeds
 	checkAdoptionClosure(g, text, els, required, covered)
@@ -703,12 +724,9 @@ func CheckC4(design string) *Gate {
 		// event contract into several tables, and the first-match locator
 		// silently ignored the rest (PACK-1 shared-locator semantics)
 		found := false
-		for _, tbl := range ir.ParseMdTables(text) {
-			hl := strings.ToLower(strings.Join(tbl.Header, " "))
-			if strings.Contains(hl, "producer") && strings.Contains(hl, "consumer") && strings.Contains(hl, "delivery") {
-				found = true
-				g.Count("event contracts", len(tbl.Rows))
-			}
+		for _, tbl := range eventContractTables(text) {
+			found = true
+			g.Count("event contracts", len(tbl.Rows))
 		}
 		if !found {
 			g.Errs = append(g.Errs, "the model has a Queue-tagged element but ARCHITECTURE.md has no event-contract table (columns: producer, consumer, payload, delivery, ordering, dedupe); bus coupling is invisible to G4-import, so this table is its governing artifact")
@@ -1525,6 +1543,13 @@ func CheckTraceability(design string) *Gate {
 	// column (see residual.go)
 	checkResidualHandling(g, design, machineNames)
 
+	// event-contract rows against the machines: the pack side of this check
+	// runs only where a pack exists, so a design that carries one is left to
+	// G5 rather than reported twice for one defect (see eventwiring.go)
+	if !pack.HasPack(design) {
+		checkEventWiring(g, design, readOrEmpty(filepath.Join(design, "ARCHITECTURE.md")))
+	}
+
 	// invariants enforcement
 	var cells, unitCells []string
 	matrixFiles := globExt(mdir, ".matrix.md")
@@ -1713,6 +1738,14 @@ func checkPlacement(g *Gate, design string, machineNames map[string]bool, entiti
 	placedEntities := map[string]bool{}
 	waivedEntities := map[string]bool{}
 	tableFound := false
+	// EVERY header-matching table counts, as with the event, interface, and
+	// mitigation tables: a design may split placement across sections (the
+	// aggregates in one, the operational machines in another), and the
+	// first-match locator silently excluded every later table's rows from both
+	// obligations while the completeness half still demanded a row per entity.
+	// Rows aggregate: the persisted count and the per-row findings accumulate,
+	// and placement and waiver coverage are sets, so an entity placed in
+	// either table is placed once.
 	for _, tbl := range ir.ParseMdTables(text) {
 		hl := strings.ToLower(strings.Join(tbl.Header, " "))
 		if !strings.Contains(hl, "placement") || !strings.Contains(hl, "persistence") {
@@ -1765,7 +1798,6 @@ func checkPlacement(g *Gate, design string, machineNames map[string]bool, entiti
 				g.Errs = append(g.Errs, "placement row component `"+comp+"` has no machine and no '(no machine: <reason>)' waiver in its component or machine-placement cell")
 			}
 		}
-		break
 	}
 	if !tableFound {
 		g.Errs = append(g.Errs, fmt.Sprintf("ARCHITECTURE.md has no persistence-and-placement table (a header naming both placement and persistence); the model's %d entities can be traced to no placement decision", entities.Len()))

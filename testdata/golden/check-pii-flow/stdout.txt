@@ -5,7 +5,7 @@
 == G2-c4  Architecture Contract ==
   note   exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
-  checked: 2 boundaries, 1 externals, 2 allow rules, 3 transitive pairs, 1 deny rules, 1 no_path assertions, 4 dsl elements, 2 boundaries bound to dsl, 1 mitigation rows, 2 dependencies with mitigation rows, 3 nfr topics recorded, 2 edges contracted
+  checked: 2 boundaries, 1 externals, 2 allow rules, 3 transitive pairs, 1 deny rules, 1 no_path assertions, 4 dsl elements, 2 drawn relationships, 2 drawn edges verified, 2 boundaries bound to dsl, 1 mitigation rows, 2 dependencies with mitigation rows, 3 nfr topics recorded, 2 edges contracted
   ok
 == G3-machine  machines + oracle ==
   checked: 1 machines, 1 transitions, 1 tla-generable, 1 oracles fresh, 1 named units covered

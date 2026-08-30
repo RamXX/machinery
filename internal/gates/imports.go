@@ -1086,16 +1086,9 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 		g.Notes = append(g.Notes, ratchetAgeNote(ratchet.Date, time.Now()))
 	}
 
-	matchRule := func(edges [][2]string, src, dst string) bool {
-		for _, e := range edges {
-			ok1, _ := filepath.Match(e[0], src)
-			ok2, _ := filepath.Match(e[1], dst)
-			if ok1 && ok2 {
-				return true
-			}
-		}
-		return false
-	}
+	// matchEdgeRule (dsledges.go) is the shared rule matcher: the drawn-edge
+	// check in G2 judges a diagram edge with the same wildcard semantics
+	matchRule := matchEdgeRule
 
 	goMods, goModWarns, goModErr := goModules(impl, ignore)
 	if goModErr != nil {

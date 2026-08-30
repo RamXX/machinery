@@ -21,6 +21,11 @@ externals:
   - id: external.ordersdb
     element: ordersdb
     imports: [ "example.com/pgdriver" ]
+  # the peer subsystem is a declared participant, not an undeclared name in the
+  # event rows: it settles this subsystem's orders and its outage is a failure
+  # mode this design has to hold a posture on
+  - id: external.payments
+    element: payments
 dependency_rules:
   allow:
     - orders.svc -> external.bus
@@ -54,6 +59,7 @@ here is byte-identical to a parent row, and every parent row that names this sub
 |---|---|---|---|---|
 | `bus` | down, redelivery, reorder | outbox + idempotent consumers (dedupe keys above) | duplicates land as `_ignores` on every resting state | ack window |
 | `ordersdb` | unavailable, corrupt | retry with backoff, PITR restore | transient unavailability surfaces after retries | retry <= 3 |
+| `payments` | down, slow, replies lost | the order waits in its awaiting-settlement state; the bus re-drives `request` until a reply lands | an order can sit unsettled for as long as the peer is down; nothing times it out | ack window |
 
 ## 7. Persistence and placement
 

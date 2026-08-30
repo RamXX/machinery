@@ -477,16 +477,23 @@ presence: every event-contract table (a header naming producer, consumer, and de
 `Source:` line (or the phrase "enumerated from", or a `machinery:embed` marker) within the five
 lines above its header. Columns:
 
-- **producer**: `machine.event` or component.
-- **consumer**: `machine.event`.
+- **event**: the event name, as the machines spell it. In prose the cell names it backticked
+  ("`reserved` / `released` events"); in the machine-checkable format below it is the bare name.
+- **producer**: one component, named as the `workspace.dsl` element names it.
+- **consumer**: one component, same rule.
 - **payload**: by Modelith attribute reference, never redefined shapes.
 - **delivery**: at-least-once / at-most-once / exactly-once-effect, and the mechanism.
 - **ordering assumption**.
 - **dedupe key**.
 
-| producer | consumer | payload | delivery | ordering | dedupe key |
-|---|---|---|---|---|---|
-| `Order.ORDER_PAID` | `Shipment.PREPARE` | Order.id, Order.total | at-least-once (outbox -> `q`) | per-order FIFO (partition by Order.id) | Order.id + event type |
+G2 holds every ROW to those columns: an empty cell is an unanswered question and an ERROR, while
+an explicit "none" or "n/a" is an answer and passes, and the producer and consumer must resolve to
+a declared `workspace.dsl` element or a declared external, the same resolution a mitigation row
+gets. Once machines exist, Gx-trace reconciles the rows against them (see the Gate 4 checklist).
+
+| event | producer | consumer | payload | delivery | ordering | dedupe key |
+|---|---|---|---|---|---|---|
+| `ORDER_PAID` | `orderSvc` | `shipmentSvc` | Order.id, Order.total | at-least-once (outbox -> `q`) | per-order FIFO (partition by Order.id) | Order.id + event type |
 
 ### Machine-checkable format (mandatory on a decomposed parent)
 
@@ -509,6 +516,10 @@ contract, enforced at generation time and again by G5 (which regenerates packs i
   comma list, a slash, or an arrow.
 - rows between two non-pack participants (gateway to ui) are validated like every other row; they
   emit no pack rows.
+- G2's row check (above) is the looser sibling of this one: it accepts a declared external as a
+  participant and does not require the event column, because an ordinary design's table is not a
+  generation input. Where the two differ the pack is stricter, so nothing G2 accepts makes pack
+  generation pass silently.
 - generation FAILS on any violation, naming the row and the offending cell text; nothing non-empty
   is ever silently dropped. A subsystem extracting zero boundary events is also a generation error
   unless `decomposition.yaml` waives it per subsystem with `boundary_events: {none: "<reason>"}`;
@@ -531,6 +542,13 @@ Deterministic (run `machinery check <design> --gate g2`):
 
 - The contract parses, boundaries bind to `workspace.dsl` elements, ids are unique, no edge is both
   literally allowed and literally denied, no rule references an undeclared boundary or external.
+- Every relationship `workspace.dsl` DRAWS is judged by the same allow/deny/baseline rules
+  G4-import judges a code edge by: a drawn edge the contract denies, or that no rule covers, is an
+  ERROR, and an endpoint no element declares is an ERROR. An endpoint the contract never claimed (a
+  person, a system-context box, a container outside the contract) is outside the dependency
+  vocabulary and carries no obligation; the `checked:` line counts it so the unjudged remainder
+  stays visible. The converse is NOT required: a diagram is legitimately partial, so an allow rule
+  nothing draws is no finding.
 - Every contract external and every Database/Queue/External-tagged element has a mitigation row
   naming it backticked in the first column. Coverage is over DECLARED dependencies only: a
   dependency never declared in the DSL or the contract carries no obligation, so completeness of
@@ -539,7 +557,11 @@ Deterministic (run `machinery check <design> --gate g2`):
   answered, or a `(no contract: <reason>)` waiver; and every edge a row names is an allow edge.
 - The NFR record exists and mentions security, capacity, and observability.
 - Every event-contract table names its enumeration source (a `Source:` note or an embed marker
-  directly above the header).
+  directly above the header), and every ROW answers its columns and names participants the model
+  declares (see the column list above).
+- Every table of each kind counts, never just the first: the event, interface, mitigation, and
+  placement locators all take EVERY header match and aggregate their rows, so a design that splits
+  a table across sections hides no row from its obligation.
 - When the design authors them (opt-in by presence): the action-ownership table is closed in both
   directions, every adoption-closure member is a declared and mitigated dependency (scorecard cells
   well-shaped), and every mitigation `handled by` name resolves against the committed machines
@@ -561,7 +583,13 @@ LLM-attested (you verify; the tool cannot):
   deterministic halves run in Gx-trace once machines exist: a machine per row, and a row per
   declared entity.
 - The event-contract table covers every cross-component event (its rows are open-world; the source
-  note's presence is checked, its truth is not).
+  note's presence is checked, its truth is not). Each row's SHAPE is now checked (columns answered,
+  participants declared), and once machines exist Gx-trace reconciles each row's event against them:
+  a consumed event is handled or `_ignores`-ed by some machine, a produced event appears whole-token
+  in some machine action or matrix cell, or the cell that owes the obligation carries a
+  `(no machine: <reason>)` waiver. The reverse sweep stays attested: nothing in a machine marks an
+  event as externally sourced, so "every external event a machine consumes appears here" is a claim
+  the source note evidences rather than a checked set.
 - The dependency declaration is complete: everything the deployment actually talks to appears in
   the DSL or the contract (the mitigation-coverage check runs only over what is declared).
 - The NFR record's content is true (presence and topic coverage are checked).

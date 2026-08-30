@@ -19,7 +19,7 @@
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 6 boundaries, 1 externals, 12 allow rules, 16 transitive pairs, 2 deny rules, 5 boundaries with exposes, 14 dsl elements, 6 boundaries bound to dsl, 6 mitigation rows, 3 dependencies with mitigation rows, 3 nfr topics recorded, 2 adoption rows, 1 closure members with mitigation rows, 2 scorecard entries, 1 closures waived, 9 action-ownership rows, 35 actions owned, 12 edges contracted
+  checked: 6 boundaries, 1 externals, 12 allow rules, 16 transitive pairs, 2 deny rules, 5 boundaries with exposes, 14 dsl elements, 14 drawn relationships, 5 drawn edges outside the contract vocabulary, 9 drawn edges verified, 6 boundaries bound to dsl, 6 mitigation rows, 3 dependencies with mitigation rows, 3 nfr topics recorded, 2 adoption rows, 1 closure members with mitigation rows, 2 scorecard entries, 1 closures waived, 9 action-ownership rows, 35 actions owned, 12 edges contracted
   ok
 == G3-machine  machines + oracle ==
   warn   CommandExecution.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters

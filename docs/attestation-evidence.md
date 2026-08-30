@@ -130,12 +130,12 @@ Adding an attested half to SKILL.md means adding its id here; that coupling is t
 | `g2.interface-contract-rightness` | each interface contract is the RIGHT one: the shape matches what the code will exchange, the error list is exhaustive, the idempotency claim survives a retry | `ARCHITECTURE.md` |
 | `g2.placement-rightness` | each persistence-and-placement decision is the RIGHT one | `ARCHITECTURE.md` |
 | `g2.adoption-closure-discovery` | the adoption closure is fully DISCOVERED: a member nobody declared is invisible to the gate | `ARCHITECTURE.md` |
-| `g2.event-contract-completeness` | the event-contract table covers every cross-component event and the dependency declaration itself is complete | `ARCHITECTURE.md` |
+| `g2.event-contract-completeness` | the event-contract table covers every cross-component event and the dependency declaration itself is complete (each row's columns and participants are checked by G2, and its wiring to the machines by Gx; what stays attested is that no cross-component event is MISSING) | `ARCHITECTURE.md` |
 | `g2.nfr-content` | the NFR record's CONTENT is true (presence and topic coverage are checked; the posture is judgment) | `ARCHITECTURE.md` |
 | `g3.guard-semantics` | each guard's semantics actually enforce the invariant it names | `machines/*.machine.json` |
 | `g3.invariant-enforcement` | every Modelith invariant is guarded or structurally impossible; any that is neither is listed | `machines/*.machine.json` |
 | `g3.residual-transitions` | every C4 dependency failure has its residual transition, reclassified by its mitigation rather than deleted | `machines/*.machine.json` |
-| `g3.event-redelivery` | every consumed external event has its event-contract row and a redelivery story | `machines/*.machine.json` |
+| `g3.event-redelivery` | every consumed external event has its event-contract row and a redelivery story (the row-to-machine direction is checked by Gx; the machine-to-row direction has no deterministic marker and stays here) | `machines/*.machine.json` |
 | `gt.conformance-test-shape` | a wholesale-conformance test parses the committed oracle table and asserts, per row, the next state AND the expected actions | `BUILD.md` |
 | `g4.zero-context` | a coding agent with no prior context could build the system from `BUILD.md` alone (per shard, when sharded) | `BUILD.md` |
 | `g4.standin-coverage` | isolated child only: the neighbor stand-in section exists, every neighboring boundary has a stand-in held to its oracle, and the environment recipe is self-contained | a `Neighbor stand-ins` section in the build document |

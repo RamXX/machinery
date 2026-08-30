@@ -33,7 +33,8 @@ Three consequences:
   the real code (section 3, stage 3).
 - G4 cannot see coupling through shared database tables or bus topics. The event-contract
   table in ARCHITECTURE.md is the governing artifact for those seams, and it is maintained
-  by hand.
+  by hand. Its rows are held to their columns and participants by G2 and reconciled against
+  the machines by Gx, but whether a seam has a row at all is still yours to notice.
 - Every gate has an LLM-attested half, spelled out per gate in SKILL.md. On a team, those
   attestations need a named owner (section 6), or they silently become checked by nobody.
 

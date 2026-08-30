@@ -432,7 +432,19 @@ checks: the **NFR record** exists (a heading containing "NFR" or "non-functional
 three topics, security, capacity, and observability ("out of scope, recorded as such" satisfies the
 check; only the content stays attested); every **event-contract table** names its enumeration
 source in a `Source:` note within the five lines above its header, or carries its rows via a
-`machinery:embed` marker (the same rule Gs holds the legacy ledger to). Three opt-in artifacts
+`machinery:embed` marker (the same rule Gs holds the legacy ledger to), and every event-contract
+ROW answers each of its columns (producer, consumer, payload, delivery, ordering, dedupe; an empty
+cell is an unanswered question, while an explicit "none" or "n/a" is an answer) with its producer
+and consumer resolving to a declared `workspace.dsl` element or external, the same resolution a
+mitigation row gets. The DRAWN EDGES of `workspace.dsl` are held to the contract too: every
+relationship line the DSL draws is judged by the same allow/deny/baseline rules G4-import judges a
+code edge by, so the picture can no longer show an edge the contract denies or covers with no rule
+at all. An endpoint no element declares is an ERROR; an endpoint the contract never claimed (a
+person, a context box) carries no obligation and stays visible in the `checked:` counts; the
+converse is deliberately not required, because a diagram is legitimately partial. Every
+header-matching table of each kind is read, never just the first: the event, interface, mitigation,
+and placement locators all take EVERY match and aggregate, so splitting a table across sections
+hides no row. Three opt-in artifacts
 activate on their own presence, like the declared embeds: the **action-ownership table** (a header
 naming an action column and an owning-component column; every model action appears exactly once and
 resolves, every owner is a `workspace.dsl` element or contract id, waiver `(unowned: <reason>)`),
@@ -557,6 +569,18 @@ compiled by the policy annotation is credited as policy-checked without a matrix
 relational model is an enforcement artifact). Token presence is exactly what Gx proves: the id
 appears in an enforcement row; whether that row's guard or mechanism semantically enforces the
 invariant is attested, not proven.
+Gx also reconciles the EVENT-CONTRACT rows against the machines, with the semantics the pack gate
+already applies to a subsystem's boundary events: a consumed event is handled (`on:`) or explicitly
+ignored (`_ignores`) by some machine, and a produced event appears whole-token in some machine
+action position (entry, exit, transition, invoke src) or matrix cell. A row the design cannot meet
+says so in the row: `(no machine: <reason>)` in the consumer cell waives the reaction, in the
+producer cell the emission, and an empty reason is not a waiver. The event cell names its events
+backticked when it is prose ("`reserved` / `released` events"); a bare pack-format cell is the
+event. A design that carries a pack is left to G5, which reconciles the same rows from the
+generated `events.md` where direction is explicit, so one defect never earns two findings. What
+stays attested is the reverse sweep: whether every externally sourced machine event HAS a row
+(nothing in a machine marks an event as externally sourced, so the table's coverage is a claim the
+source note evidences, not a checked set).
 **Gb-plan** (active once `design/BUILD.md` exists) verifies the Build plan section (any `##` or
 `###` heading carrying the phrase "Build plan": a section number and trailing decoration are fine,
 `## 9. Build plan (sealed trust layers)` included, but the phrase must be whole, so "Build planning
