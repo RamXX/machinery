@@ -7,8 +7,8 @@ type: feature
 labels: [story]
 created_at: 2026-08-29T23:49:02Z
 created_by: ramirosalas
-updated_at: 2026-08-29T23:49:33Z
-content_hash: "sha256:5f6caef5602744b1b8c9600be99aa4f6d08ab4b7a5ed25438fc57a28f8af660f"
+updated_at: 2026-08-30T00:06:22Z
+content_hash: "sha256:95c39769c64e099948beee53a7577f6270a9b7fc34a1868932456740afad1932"
 assignee: ramirosalas
 ---
 
@@ -46,6 +46,7 @@ CONSTRAINTS: no version bump, no tag, no push (the maintainer will land more cha
 ## History
 - 2026-08-29T23:49:33Z status: open -> in_progress
 - 2026-08-29T23:49:33Z claimed by ramirosalas
+- 2026-08-30T00:06:22Z status: in_progress -> in_progress
 
 ## Links
 
