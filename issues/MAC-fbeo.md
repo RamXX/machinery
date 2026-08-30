@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
-updated_at: 2026-08-30T18:54:34Z
-content_hash: "sha256:47b55bc9103aa127ea5d5e4c45889645e46cb172102fee6d7bbbe11698944daa"
+updated_at: 2026-08-30T19:28:52Z
+content_hash: "sha256:ddf00058c654b11366bfedad078beb4e90f64acc9ac75defedc2736bc03746bb"
 assignee: ramirosalas
 ---
 
@@ -60,7 +60,91 @@ Test and preflight summaries; for each check, one induced-failure sample (the fi
 
 
 ## Notes
+DELIVERED on branch story/MAC-fbeo-g2-cluster at a675ca9 (worktree left in place, not merged, not pushed).
 
+DECISIONS AND DISAGREEMENT RESOLUTIONS (the story asked these be recorded):
+
+Check 2 host gate: Gx-trace, not G2. Rationale: Gx is where every existing check that joins an
+ARCHITECTURE.md table to the committed machines already lives (checkPlacement's machine obligation,
+checkResidualHandling's "handled by" column, which the skill documents as running "in Gx-trace once
+machines exist"). G2 must stay green at Phase 2, when the architecture is authored and no machines
+exist yet; a machine-dependent check there would fail a design that is correctly mid-phase. Gx also
+narrows itself away on a decomposed parent with no machines, which is exactly where the pack side
+owns the question.
+
+Check 2 vs the pack check, three documented differences (pack wins each time, per the story's rule):
+1. DIRECTION. The pack reads an explicit direction column because a pack is written from one
+   subsystem's point of view. An ordinary design has none and needs none: every participant in its
+   table is a component of that design, so it owes BOTH the emission and the reaction on every row.
+   This is the pack rule with its point of view set to "all of it".
+2. EVENT NAMES. The pack CleanCell's the event column, exact because its format contract forbids
+   anything but a bare name. An ordinary table's event cell is prose that names its events
+   backticked ("`reserved` / `released` events"), the same idiom mitigation and placement rows use,
+   so backticked tokens are read when present with CleanCell as the fallback. On a pack-format cell
+   this reduces to exactly the pack rule.
+3. MACHINE SCOPE. The pack asks whether ANY machine handles the event, never which one; so does
+   this. Requiring the machine NAMED by the consumer cell would be stricter than the pack.
+Additionally, a design that carries a pack is SKIPPED here: G5 reconciles the same rows from the
+generated events.md where direction is explicit, so one defect never earns two findings.
+
+Check 2, the half NOT implemented and why: "every machine event whose source is external must have
+a row." Nothing in a machine marks an event as externally sourced, the pack check has no such
+sweep, and the only inferable rule (an event no local action fires) is false by construction: it
+would demand an event-contract row for every human-initiated event. Measured on the examples, it
+would have demanded rows for markDelivered, deliver, commit, authorize, markInTransit, markLost,
+markConsumed, publish, cancel, and confirm on fulfillment alone, and on go-crm (which has no event
+table at all) for every one of ~194 transitions' events. The rule stays attested, as the skill's
+choreography section states it, and both SKILL.md and docs/attestation-evidence.md now say so
+explicitly rather than leaving it implied.
+
+Check 4 vs the pack check: the pack is the stricter sibling (it also requires an event column and
+rejects a declared external as a participant). Nothing G2 accepts can make pack generation pass
+silently, so the looser G2 rule cannot hide a pack-format defect. Recorded in
+references/c4-standalone.md next to the machine-checkable format.
+
+Check 4 placeholders: SKILL.md and the c4 reference document NO placeholder token for the event
+table's columns, so only an EMPTY cell is a finding; an explicit "none" or "n/a" is an answer and
+passes. Pinned by TestEventCellsExplicitNoneIsAnAnswer.
+
+Check 3 duplicate-row semantics: resolved the way the event scan resolves them. Counts accumulate
+across tables (a row counted twice is two rows of obligation) and coverage is a set (a dependency
+or entity named in either table is covered once). No dedup of identical findings, matching the
+event scan, which counts a repeated row twice as well.
+
+EXAMPLE-DESIGN FIXES (each is a defect a new check caught; no check was weakened):
+
+1. examples/fulfillment/design/ARCHITECTURE.md, event table participants. The producer and consumer
+   cells named DISPLAY names ("Order Service", "Inventory Service"), which the documented format
+   never allowed (c4-standalone: the cell holds an Architecture Contract boundary `element`).
+   Rewritten to element identifiers (`orderSvc`, `inventorySvc`, `paymentSvc`, `shippingSvc`),
+   16 cells. The table now conforms to the format that pack generation would enforce if this design
+   ever decomposed.
+2. examples/fulfillment/design/ARCHITECTURE.md, four `(no machine: <reason>)` waivers. Rows 1, 6, 7,
+   and 8 state a reaction the behavior layer does not implement, and rows 6, 7, 8 an emission it
+   does not fire: fulfillment is an ORCHESTRATION design whose saga consumes bus replies through
+   invoke onDone, not as machine events, and whose wire vocabulary (`reserved`, `captured`,
+   `dispatched`) is deliberately distinct from its machine vocabulary (`markReserved`, `markPaid`,
+   `markShipped`). The waivers state that in the row, with the reason. This is what FINDINGS.md
+   already admits in prose ("that phase of this design is not yet authored"); the gate now makes it
+   visible in the counts (4 reactions waived, 3 emissions waived) instead of invisible.
+3. examples/checkout-split/orders and .../payments, peer subsystem declared. Each child's embedded
+   event rows name the peer subsystem (`payments` / `orders`) while the child's own workspace.dsl
+   and contract declared it nowhere: the coupling was entirely undeclared. Both now declare the peer
+   as a contract external with a bound DSL element and a mitigation posture row (outage behavior,
+   residual, bound). The embedded table itself is untouched, so Ge-embed's byte-identical claim
+   still holds.
+
+GOLDEN RE-CAPTURE (make golden-update), reviewed line by line: 9 changed lines across 8 files, all
+of them `checked:` count lines. Eight are G2 lines gaining `N drawn relationships`, `N drawn edges
+verified`, `N drawn edges outside the contract vocabulary`, and (where a design has an event table)
+`N event-contract cells answered` and `N event-contract participants resolved`. One is
+fulfillment's Gx line gaining the event-wiring counters. NO finding text changed anywhere, no
+warn/note/error appeared or disappeared, and no gate changed verdict. Arithmetic verified per
+design: go-crm 14 = 5 unbound + 9 verified; surreal-crm 15 = 6 + 9; portfolio 15 = 2 + 13; pii-flow
+2 = 2; checkout parent 5 = 1 + 4; orders 3 = 1 + 2; payments 2 = 2; fulfillment 20 = 20 unbound (its
+boundaries are containers while its relationships connect components and infra). Event cells:
+fulfillment 48 = 8 rows x 6 columns, 16 participants = 8 x 2; checkout children 18 = 3 x 6, 6 = 3 x
+2. Gx: fulfillment 4 reactions waived + 4 traced = 8 rows, 3 emissions waived + 5 traced = 8 rows.
 
 ## History
 - 2026-08-30T18:54:34Z status: open -> in_progress
