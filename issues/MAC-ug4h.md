@@ -11,7 +11,7 @@ content_hash: "sha256:bcda2d74cd78c0358f025b6bd8e02c8e906af23bc841409b55128d358a
 was_blocked_by: [MAC-v16q]
 assignee: ramirosalas
 follows: [MAC-v16q]
-labels: [delivered]
+labels: [delivered, accepted]
 closed_at: 2026-08-30T09:15:36Z
 close_reason: "Accepted via pvg story accept"
 ---
