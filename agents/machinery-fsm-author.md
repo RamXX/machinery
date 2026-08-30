@@ -143,17 +143,9 @@ lint is a protocol violation.
 
 ## Self-check before you return (Gate 3)
 
-Deterministic (the tools check these; run them, do not eyeball):
-
-- Only the supported XState subset; unknown keys, parallel/history, root-level `on`, non-string
-  guards are errors.
-- Reachability: every non-initial state is a transition target. No dead-end non-final state.
-- Every `invoke` has `onError` and an `after` timeout.
-- No branch shadowed by an earlier unguarded branch.
-- Fully guarded `always` lists have an unguarded escape or an `_exhaustive` justification, and
-  fully guarded handlers (`on`, `after`, `invoke` results, `onDone`) have a `_refusal` disposition.
-- Event completeness: every resting state handles or `_ignores` every event, with reasons.
-- Oracles generated and committed.
+Deterministic: `machinery lint` and `machinery oracle` above are the whole list. Run them, do not
+eyeball, and do not deliver with a lint ERROR outstanding or an oracle ungenerated. Enumerating
+their checks here would only drift from them.
 
 Your own judgment (the tools cannot check these; attest them explicitly):
 

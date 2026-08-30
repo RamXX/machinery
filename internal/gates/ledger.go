@@ -6,7 +6,11 @@
 // unjudged (they narrate history, exactly as Gd/Gc treat them). The same gate
 // carries the house-style scan (no em dashes, no emojis in design artifacts):
 // a typography rule stated twice in the skill and enforced by nobody. Style
-// findings are warnings; the tracked corpus holds them at zero.
+// findings are warnings; the tracked corpus holds them at zero. The one
+// exception is an em dash in a `*.modelith.md` render: the renderer emits them
+// and the post-processing strip is a known, mechanical obligation, so that
+// case is an ERROR (the gate now owns the obligation the skill used to spell
+// out as a perl one-liner).
 
 package gates
 
@@ -193,12 +197,17 @@ func emojiRune(r rune) bool {
 // judging historical content, and typography is not content. Generated
 // artifacts are skipped exactly as Gd skips them; the committed modelith
 // render is scanned deliberately, because stripping its em dashes is the
-// post-processing step this warning exists to catch.
+// post-processing step this check exists to catch. There the finding is an
+// ERROR, not a warning: the render is generated from a known renderer with a
+// known mechanical fix, so a surviving em dash is a skipped step rather than a
+// style opinion. Every other file, and every emoji anywhere, stays at the warn
+// tier.
 func checkHouseStyle(g *Gate, design string) {
 	type finding struct {
-		rel  string
-		line int
-		msg  string
+		rel   string
+		line  int
+		msg   string
+		isErr bool
 	}
 	var findings []finding
 	_ = filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
@@ -220,13 +229,18 @@ func checkHouseStyle(g *Gate, design string) {
 			return nil
 		}
 		g.Count("files style-scanned")
+		render := isModelithRender(fi.Name())
 		for lineNo, line := range strings.Split(body, "\n") {
 			if strings.ContainsRune(line, '\u2014') {
-				findings = append(findings, finding{rel, lineNo + 1, "em dash (U+2014); house style forbids it (use a hyphen, colon, or parentheses; for a fresh modelith render, strip with perl -CSD -i -pe 's/\\x{2014}/-/g')"})
+				if render {
+					findings = append(findings, finding{rel, lineNo + 1, "em dash (U+2014) in a generated modelith render; the post-render strip was skipped: perl -CSD -i -pe 's/\\x{2014}/-/g' " + filepath.ToSlash(rel), true})
+				} else {
+					findings = append(findings, finding{rel, lineNo + 1, "em dash (U+2014); house style forbids it (use a hyphen, colon, or parentheses)", false})
+				}
 			}
 			for _, r := range line {
 				if emojiRune(r) {
-					findings = append(findings, finding{rel, lineNo + 1, fmt.Sprintf("emoji %q; house style forbids emojis in design artifacts (plain Unicode symbols are fine)", r)})
+					findings = append(findings, finding{rel, lineNo + 1, fmt.Sprintf("emoji %q; house style forbids emojis in design artifacts (plain Unicode symbols are fine)", r), false})
 					break
 				}
 			}
@@ -240,8 +254,21 @@ func checkHouseStyle(g *Gate, design string) {
 		return findings[i].line < findings[j].line
 	})
 	for _, f := range findings {
-		g.Warns = append(g.Warns, f.rel+":"+strconv.Itoa(f.line)+": "+f.msg)
+		text := f.rel + ":" + strconv.Itoa(f.line) + ": " + f.msg
+		if f.isErr {
+			g.Errs = append(g.Errs, text)
+		} else {
+			g.Warns = append(g.Warns, text)
+		}
 	}
+}
+
+// isModelithRender reports whether a file name is a generated modelith render
+// (`<name>.modelith.md`). The render is the one hand-committed file in the
+// design whose em dashes come from a generator rather than an author, which is
+// what earns it the error tier above.
+func isModelithRender(base string) bool {
+	return strings.HasSuffix(strings.ToLower(base), ".modelith.md")
 }
 
 // balancedParen scans a string beginning with '(' to its balanced closing

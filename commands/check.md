@@ -16,8 +16,7 @@ Run `machinery check` for this repository and interpret the result.
    commit, and without it says so instead of checking it.
 3. Report the result plainly: every ERROR and DRIFT finding, the artifact it
    points at, and the concrete fix. Read the `checked:` counts and state
-   what was actually verified; a gate that checked nothing failed for that
-   reason, not passed.
+   what was actually verified.
 4. DRIFT always means a generated artifact is stale. The fix is to
    regenerate (`machinery oracle` | `machinery verify-formal --gen-only` |
    `machinery pack generate`), never to hand-edit the generated file.

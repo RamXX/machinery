@@ -135,24 +135,22 @@ artifact. Include the `checked:` counts in your report.
 
 ## Self-check before you return (Gate 4)
 
+This list holds only what no gate can. The structural obligations of method steps 5, 7, 9, and 10
+(traceability coverage with whole-token ids, the state-migration and toolchain sections, and the
+build-plan format) are Gx-trace's and Gb-plan's to check: run `machinery check` and fix what it
+says rather than re-reading for them here.
+
 - `machinery check` ran; findings fixed or reported.
 - The mode is declared, and in manifest mode the root states the sharding explicitly.
 - A coding agent with zero context could build the system from BUILD.md alone (per shard when sharded).
 - The data dictionary appears exactly once and is the single source of truth.
-- The traceability matrix covers every invariant, ids as whole tokens in table cells.
 - Section 7 references the oracles by stable id and adds the guard-falsifying-clause tests, the
   named-unit test plan, contract tests, and property tests.
-- The state-migration section and the toolchain-and-versions subsection are present.
 - In rebuild/hybrid mode, the `Migration implementation plan` covers every contract phase and the
   mapping, characterization, replay, reconciliation, failure, rollback, and cutover regression nets.
 - For an isolated pack child, the `Neighbor stand-ins and test environment` section covers every
   neighboring boundary with a stand-in held to the neighbor-contract oracle (stable-id keyed), and
   the environment recipe is self-contained.
-- The build plan follows the checkable format Gb-plan holds: skeleton-first `**M<n> - <title>**`
-  milestones with unique numbers (unique across the whole design, shards included), a `DoD:` line
-  per milestone, the skeleton DoD citing a committed oracle id, and the skeleton naming its
-  NFR-record mechanisms. The milestone-acceptance protocol (evidence first, `Status: closed`
-  second) is stated in the plan section.
 - The hard-TDD protocol is stated and unambiguous, including the gate anchors: check-green before
   test derivation, the four-part RED exit gate (stable-id coverage, `machinery check --impl`
   green, red-on-assertions, born clean under the project's own format and lint gates), the GREEN

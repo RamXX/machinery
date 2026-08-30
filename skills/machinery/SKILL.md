@@ -141,7 +141,8 @@ reason in `formal/waivers.yaml`); gk once any
 `checkers/*.checker.yaml` exists; gb once `design/BUILD.md` exists; ga once
 `design/acceptance/` exists or any milestone is marked `Status: closed`;
 gj once `design/adjudications/` exists (the brownfield characterization verdicts); gl always
-(session-ledger formats plus the house-style scan, warn tier);
+(session-ledger formats plus the house-style scan, warn tier except em dashes in a
+`*.modelith.md` render, which error);
 gt, like g4, only with `--impl`; see Recursive decomposition, the
 legacy surface ledger, the target surface ledger, the Phase 1 relational layers, External
 checkers, and Milestone acceptance).
@@ -191,8 +192,8 @@ falsifying-clause tests later; state-driven conditions become lifecycle states a
 Phase 3. This is an elicitation sweep, a writing discipline for the interrogation, not a gate and
 not a required syntax for the model file.
 
-After `modelith render`, strip em dashes from the generated `*.modelith.md` (the renderer emits them,
-house style forbids them): `perl -CSD -i -pe 's/\x{2014}/-/g' design/*.modelith.md`.
+After `modelith render`, strip em dashes from the generated `*.modelith.md`: the renderer emits them,
+house style forbids them, and Gl-ledger errors on any that survive (its finding names the one-liner).
 
 **GATE 1:** `modelith lint design/domain.modelith.yaml` is clean (no errors), and
 `machinery check design --gate gc` is green: every declared invariant has a carrier (an action's
@@ -1034,8 +1035,9 @@ was consciously waived (`fixed(<reason>)` is also legal; `clean` never carries a
 entry without a self-review line is not complete. **Gl-ledger** holds every `self-review:` line in
 STATE.md to exactly this grammar (all five keys, valid verdicts), validates the dated openers of
 DECISIONS.md entries, counts author-proposed unconfirmed items as a note, and carries the
-house-style scan (em dashes and emojis warn across the hand-written design tree); the ledgers'
-CONTENT stays unjudged, as everywhere.
+house-style scan (em dashes and emojis warn across the hand-written design tree; an em dash in a
+generated `*.modelith.md` render errors, because the post-render strip is mechanical and a survivor
+means it was skipped); the ledgers' CONTENT stays unjudged, as everywhere.
 
 ## Working as a team
 
