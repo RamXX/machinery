@@ -7,7 +7,7 @@ type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
 updated_at: 2026-08-30T19:30:20Z
-content_hash: "sha256:aedf7b6e1e4d5203fa5d2da4b58c1ca89e1307bfd5c2a5740458d3553cc3d15f"
+content_hash: "sha256:5e29deb68634142e09c61604f66202ab93f6dc508c5ac2406767c65ca99cbd38"
 assignee: ramirosalas
 labels: [delivered]
 ---
@@ -146,6 +146,17 @@ design: go-crm 14 = 5 unbound + 9 verified; surreal-crm 15 = 6 + 9; portfolio 15
 boundaries are containers while its relationships connect components and infra). Event cells:
 fulfillment 48 = 8 rows x 6 columns, 16 participants = 8 x 2; checkout children 18 = 3 x 6, 6 = 3 x
 2. Gx: fulfillment 4 reactions waived + 4 traced = 8 rows, 3 emissions waived + 5 traced = 8 rows.
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-08-30.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
 
 ## History
 - 2026-08-30T18:54:34Z status: open -> in_progress
