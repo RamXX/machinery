@@ -11,7 +11,7 @@ import (
 
 func newCheckCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "check <design-dir> [--impl d] [--commit sha] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gx,gk,gb,ge,ga,g4,gt,g5]",
+		Use:   "check <design-dir> [--impl d] [--commit sha] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,g4,gt,g5]",
 		Short: "Run the deterministic verification gates on a design",
 		Args:  cobra.ExactArgs(1),
 	}
@@ -19,7 +19,7 @@ func newCheckCmd() *cobra.Command {
 	var gateList string
 	var commit string
 	c.Flags().StringVar(&implDir, "impl", "", "implementation directory for G4-import and Gt-tests")
-	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gx,gk,gb,ge,ga,g4,gt,g5")
+	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,g4,gt,g5")
 	c.Flags().StringVar(&commit, "commit", "", "commit under review, bound by Ga-accept's evidence (env MACHINERY_COMMIT; the flag wins)")
 	c.RunE = func(cmd *cobra.Command, args []string) error {
 		design := args[0]
@@ -64,6 +64,18 @@ func newCheckCmd() *cobra.Command {
 			fmt.Fprintln(stdoutW, note)
 		}
 		fmt.Fprintf(stdoutW, "\n%d blocking (ERROR/DRIFT) finding(s)\n", fail)
+		// the platform-green summary (brownfield guide section 5): design
+		// gates, G4-import, and Gt-tests together are platform-green; less is
+		// component-green and must not be reported as the platform passing.
+		// Only a default (non-explicit) run earns the claim: an explicit
+		// --gate subset verified only what it named.
+		if fail == 0 && !sel.Explicit {
+			if implDir != "" {
+				fmt.Fprintln(stdoutW, "platform-green: design gates, G4-import, and Gt-tests all green")
+			} else {
+				fmt.Fprintln(stdoutW, "design-green: all applicable design gates green (add --impl for G4-import and Gt-tests toward platform-green)")
+			}
+		}
 		if fail > 0 {
 			exitFunc(1)
 		}

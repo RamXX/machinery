@@ -119,7 +119,7 @@ func writeMigrationFixture(t *testing.T, contract string) string {
 
 func TestCheckMigrationClean(t *testing.T) {
 	design := writeMigrationFixture(t, migrationContract)
-	g := CheckMigration(design)
+	g := CheckMigration(design, "")
 	if len(g.Errs) != 0 || len(g.Drift) != 0 {
 		t.Fatalf("Gm not clean: errs=%v drift=%v", g.Errs, g.Drift)
 	}
@@ -183,7 +183,7 @@ func TestCheckMigrationMutations(t *testing.T) {
 			if tc.mutate != nil {
 				tc.mutate(t, design)
 			}
-			g := CheckMigration(design)
+			g := CheckMigration(design, "")
 			if !strings.Contains(strings.Join(g.Errs, "\n"), tc.want) {
 				t.Fatalf("want error containing %q, got %v", tc.want, g.Errs)
 			}
@@ -200,5 +200,62 @@ func TestExplicitMigrationGateRequiresContract(t *testing.T) {
 	gates := RunSelected(design, "", sel, RunOptions{})
 	if len(gates) != 1 || len(gates[0].Errs) == 0 || !strings.Contains(gates[0].Errs[0], "no migration.yaml") {
 		t.Fatalf("explicit gm did not fail on absence: %+v", gates)
+	}
+}
+
+// A mapping row may opt in to regression binding with `tests:`; with an impl
+// the identifiers are held to the test corpus, without one they degrade to a
+// stated non-check.
+func TestCheckMigrationDeclaredRegressionTests(t *testing.T) {
+	contract := strings.Replace(migrationContract,
+		"  - {source: LegacyThing.id, target: Thing.id, transform: identity, validation: exact id equality, rollback: restore snapshot}",
+		"  - {source: LegacyThing.id, target: Thing.id, transform: identity, validation: exact id equality, rollback: restore snapshot, tests: [TestThingIDMapping]}", 1)
+	design := writeMigrationFixture(t, contract)
+
+	// no impl: a note, never a silent pass and never an error
+	g := CheckMigration(design, "")
+	if len(g.Errs) != 0 {
+		t.Fatalf("no-impl run must not error: %v", g.Errs)
+	}
+	found := false
+	for _, n := range g.Notes {
+		if strings.Contains(n, "1 regression-test citation(s) declared") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("declared-but-unchecked note missing: %v", g.Notes)
+	}
+
+	// impl with the test present
+	impl := t.TempDir()
+	if err := os.WriteFile(filepath.Join(impl, "mapping_test.go"), []byte("package x\n\nfunc TestThingIDMapping(t *testing.T) {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g = CheckMigration(design, impl)
+	if len(g.Errs) != 0 {
+		t.Fatalf("resolved citation must pass: %v", g.Errs)
+	}
+	if g.Counts["mapping regression tests resolved"] != 1 {
+		t.Fatalf("resolved citation not counted: %+v", g.Counts)
+	}
+
+	// impl without the test
+	empty := t.TempDir()
+	if err := os.WriteFile(filepath.Join(empty, "other_test.go"), []byte("package x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g = CheckMigration(design, empty)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), `cites regression test "TestThingIDMapping"`) {
+		t.Fatalf("a dangling citation must error: %v", g.Errs)
+	}
+
+	// malformed declarations
+	bad := strings.Replace(migrationContract,
+		"reason: old records enter the ready state}",
+		"reason: old records enter the ready state, tests: []}", 1)
+	g = CheckMigration(writeMigrationFixture(t, bad), "")
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "tests must be a non-empty list") {
+		t.Fatalf("an empty tests list must error: %v", g.Errs)
 	}
 }

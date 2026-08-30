@@ -676,6 +676,17 @@ func CheckC4(design string) *Gate {
 		}
 	}
 
+	// the NFR record's shell is a three-item closed list; its content stays
+	// attested (see nfr.go)
+	checkNFRRecord(g, text)
+	// every event-contract table states where its rows were enumerated from,
+	// the same rule Gs holds the legacy surface ledger to (see eventsource.go)
+	checkEventTableSources(g, text)
+	// opt-in artifacts: the adoption-closure and action-ownership tables
+	// activate on their own presence, like the declared embeds
+	checkAdoptionClosure(g, text, els, required, covered)
+	checkActionOwnership(g, design, text, els, declared)
+
 	checkInterfaceContracts(g, text, allowConcrete, declared)
 
 	// bus/queue coupling is invisible to G4-import; the event-contract table
@@ -1509,6 +1520,10 @@ func CheckTraceability(design string) *Gate {
 
 	// placement table
 	persistedPlacements := checkPlacement(g, design, machineNames, entities)
+
+	// residual-handler binding: opt-in on the mitigation table's "handled by"
+	// column (see residual.go)
+	checkResidualHandling(g, design, machineNames)
 
 	// invariants enforcement
 	var cells, unitCells []string

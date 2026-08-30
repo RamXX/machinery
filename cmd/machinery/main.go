@@ -43,6 +43,7 @@ func main() {
 	root.AddCommand(newVerifyCheckersCmd())
 	root.AddCommand(newBaselineCmd())
 	root.AddCommand(newVerifyFormalCmd())
+	root.AddCommand(newVerifyC4Cmd())
 	root.AddCommand(newPackCmd())
 	root.AddCommand(newScaleCmd())
 	root.AddCommand(newSweepCmd())

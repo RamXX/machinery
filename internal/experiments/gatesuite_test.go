@@ -134,6 +134,12 @@ dependency_rules:
 |---|---|---|---|
 | ` + "`widget.app -> widget.store`" + ` | Store.Open plus Save/Load per widget | ErrNotFound, ErrConflict | Save is idempotent under the widget id |
 | ` + "`widget.store -> external.db`" + ` | dbdriver connection and SQL statements | driver errors mapped here onto the typed set above | one transaction per save |
+
+## 9. NFR record
+
+- security: out of scope (test fixture).
+- capacity: out of scope (test fixture).
+- observability: out of scope (test fixture).
 `
 
 const fixtureMatrix = "# Widget machine - contract and oracle\n\n" +

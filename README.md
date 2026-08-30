@@ -131,15 +131,20 @@ Opt-in   External     bring-your-own deterministic checker (SAST, AST, Datalog, 
          attested: the manifest claims the elements the checker is responsible for
 Phase 2  C4           architecture + contract (+ surfaces.yaml, the target surface ledger)
          tool: G2-c4 (contract parses and binds; allow graph acyclic; mitigation coverage;
-               an interface contract per allowed edge, and no row for an edge nobody allows)
-               Gu-surfaces (every act a person performs has a named surface or a deferral)
-         attested: every action owned; each contract's shape is the right one; NFR record;
-                   the persona walk is complete and every model action names its actor
+               an interface contract per allowed edge, and no row for an edge nobody allows;
+               NFR record present with all three topics; every event table names its source;
+               opt-in tables held closed: action ownership, adoption closure)
+               Gu-surfaces (every act a person performs has a named surface or a deferral;
+               sources: names where the act list was enumerated from)
+               engine: verify-c4 (workspace.dsl compiles under structurizr-cli)
+         attested: each contract's shape is the right one; the NFR record's content; the
+                   dependency declaration and the persona walk are complete
 Phase 3  XState       state machines
          tool: G3-machine (lint; every invoke has onError + timeout; every fully guarded handler
                declares its guard-false disposition; delays consumed both ways; oracle fresh;
                matrix reconciled)
          attested: each guard enforces the invariant it names; residual failure transitions kept
+                   (bindable: the mitigation table's opt-in "handled by" column resolves per row)
 Phase 4  BUILD.md     the blueprint
          tool: Gx-trace + Gb-plan + Ge-embed (+ G4-import and Gt-tests once code exists)
          attested: a zero-context coding agent could build it
@@ -147,6 +152,13 @@ Build    Acceptance   discharging a milestone (once the build starts)
          tool: Ga-accept (committed evidence per closed milestone, bound to the
                reviewed commit and to the oracle ids its DoD cites)
          attested: whether the reviewer judged well
+Brownfld Adjudication characterization verdicts (design/adjudications/, activates on presence)
+         tool: Gj-adjudication (every verdict binds to a committed oracle row; a
+               model-is-truth verdict names its filed defect)
+         attested: whether each verdict is right
+Always   Ledgers      STATE.md / DECISIONS.md formats + house style
+         tool: Gl-ledger (self-review grammar; dated entries; em-dash/emoji scan, warn tier)
+         attested: the ledgers' content; which phases owe a self-review line
 ```
 
 An interrogation, not a form. The conductor pushes on naming and on "what must always be true," and
@@ -601,21 +613,23 @@ make verify-formal   # regenerates and checks all 34 TLC proofs + the relational
 | Gate | One line |
 |---|---|
 | Gate 1 | `modelith lint` on the domain model (Phase 1). The binary has no `g1`, by design: Phase 1's gate is modelith's own linter. |
-| Gm-transition | rebuild/hybrid designs only: every legacy entity disposed, replaced attributes and lifecycle values fully mapped, ordered source-of-truth phases with rollback, evidence-based cutover, owned transitional risks. |
+| Gm-transition | rebuild/hybrid designs only: every legacy entity disposed, replaced attributes and lifecycle values fully mapped, ordered source-of-truth phases with rollback, evidence-based cutover, owned transitional risks; mapping rows may declare `tests:` and with `--impl` every named regression identifier must appear in the test corpus. |
 | Gs-surface | designs with a legacy surface ledger only: all six surface classes inventoried or waived, every route/command/table/job/event/integration covered, dropped, or deferred, and covered bindings resolve against the target design. |
-| Gu-surfaces | designs with a target surface ledger only (`design/surfaces.yaml`): every action whose actor is a person is mapped to a named surface (screen, admin command, API route, config release) or explicitly deferred with a reason, each mapped act resolves against the domain model and matches the actor it declares, every act is stated exactly once, and persona-level deferrals name an actor the model actually declares. |
+| Gu-surfaces | designs with a target surface ledger only (`design/surfaces.yaml`): every action whose actor is a person is mapped to a named surface (screen, admin command, API route, config release) or explicitly deferred with a reason, each mapped act resolves against the domain model and matches the actor it declares, every act is stated exactly once, persona-level deferrals name an actor the model actually declares, and `sources:` (required) names where the act list was enumerated from. |
 | Gp-policy | designs with a policy annotation only: it binds to the domain model, covers every top-level invariant, and the committed `Policy.als` and `Policy.oracle.md` byte-match a fresh generation. |
 | Gi-integrity | designs with an integrity annotation only: it binds to the domain model and the committed `Integrity.als` byte-matches a fresh generation. |
 | Gn-isolation | designs with an isolation annotation only: it binds to the domain model and the committed `Isolation.als` and `Isolation.oracle.md` byte-match a fresh generation. |
 | Gc-carrier | every declared invariant has a named carrier: an action's `preserves`, a relational layer, a machine matrix unit, an external checker's coverage claim, or an explicit waiver with a reason (`formal/waivers.yaml` or a layer's residuals). Needs only the domain model, so it runs from Phase 1; declaring an obligation the design does not carry fails the moment it is written, not months later. |
-| G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, the allow graph is acyclic (cycles closing only through `baseline:` edges warn as ratchet debt), `assert: no_path` claims hold over the transitive closure, every dependency has a mitigation row, and every allowed boundary crossing has an interface-contract row (edge, shape, errors, idempotency) or a `(no contract: <reason>)` waiver, with no row for an edge no allow rule declares. |
+| G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, the allow graph is acyclic (cycles closing only through `baseline:` edges warn as ratchet debt), `assert: no_path` claims hold over the transitive closure, every dependency has a mitigation row, the NFR record exists and mentions security, capacity, and observability, every event-contract table names its enumeration source, and every allowed boundary crossing has an interface-contract row (edge, shape, errors, idempotency) or a `(no contract: <reason>)` waiver, with no row for an edge no allow rule declares. Opt-in by table presence: the action-ownership table (every model action owned exactly once by a resolvable component) and the adoption-closure table (every closure member declared and mitigated, scorecard cells dated). `machinery verify-c4` is the engine phase: workspace.dsl compiles under structurizr-cli export. |
 | G3-machine | machines pass structural lint, the TLA generator's own admissibility pass (a machine G3 passes is a machine `verify-formal` can generate), retry-counter accounting (leg-entry resets, or a proof-carrying `_counters` waiver), derived-deadline span checks (the stamped-absolute-deadline idiom), the dotted-reference name-rot audit, and the `_branch_order` requirement for overlapping guarded branches; committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
 | Gd-idcite | designs with machines only: every stable-id citation in hand-written files resolves to a committed oracle row (letter-suffixed forms are falsifying-clause derivatives; `design/removed-ids.txt` is the dated allowance; DECISIONS.md and STATE.md are historical ledgers, counted not judged), positional `T-<TAG>-NN` citations warn, rule-15 form-b row counts are verified against their tables, and opt-in `CLAUSES{...}`/`READS{...}` declarations catch clause drift and payload-sufficiency drift. |
-| Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows, and entities to persistence-placement rows (every declared entity has a row or a `(not placed: <reason>)` waiver; the entity list is closed, so the table's completeness is checked, not attested). |
-| Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, and the skeleton DoD cites a committed oracle id. |
+| Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows, and entities to persistence-placement rows (every declared entity has a row or a `(not placed: <reason>)` waiver; the entity list is closed, so the table's completeness is checked, not attested). When the mitigation table carries a `handled by` column, every name resolves to a committed machine or one of its invoke actors, or waives with `(no residual: <reason>)`. |
+| Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, the skeleton DoD cites a committed oracle id, and the skeleton block carries an `NFR:` line naming the NFR-record mechanisms it instantiates. |
+| Gl-ledger | always: every STATE.md `self-review:` line parses (five keys, `clean`/`fixed`/`fixed(<reason>)`/`accepted(<reason>)`), DECISIONS.md dated entries are real dates, author-proposed unconfirmed items are counted as a note, and the house-style scan warns on em dashes and emojis across the hand-written design tree. |
+| Gj-adjudication | designs with `adjudications/` only: every characterization verdict file parses, binds to a committed oracle stable id (one verdict per id), carries verdict/date/note, and every model-is-truth verdict names its filed defect. |
 | Ge-embed | designs carrying a `machinery:embed` marker only: every marked table is held to the source it declares (`subset`: each row is byte-identical to a source row; `complete`: every selected source row is present), with `(shard-local: <reason>)` exempting exactly the row or cell it names. The sanctioned shard-copy duplication, checked instead of promised. |
 | G4-import | code imports respect the contract boundaries (Go, Python, TypeScript/JavaScript, Elixir, Rust). |
-| Gt-tests | with `--impl` only: every stable id in the committed oracles appears whole-token in a test file, or a test parses the committed oracle table (the conformance idiom); the hard-TDD RED-exit check made deterministic. |
+| Gt-tests | with `--impl` only: every stable id in the committed oracles appears whole-token in a test file, or a test parses the committed oracle table (the conformance idiom); for every `CLAUSES{...}`-declared guard, each governed oracle row also owes one suffixed falsifying-clause id per active clause (the conformance parse never discharges those); the hard-TDD RED-exit check made deterministic. |
 | G5-pack | decomposed designs only: packs fresh, children pinned to the current packs, refinement proofs fresh. |
 | ERROR / DRIFT / WARN | ERROR is blocking; DRIFT means a generated artifact is stale, also blocking; WARN is advisory. |
 
@@ -637,7 +651,7 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 - `skills/machinery/SKILL.md` the conductor, plus `references/` (XState format, C4 technique, BUILD.md
   template) and `tools/` (the TLC shell wrappers, `tlc.sh` and `verify_formal.sh`).
 - `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `alloy`, `refine`,
-  `compose`, `check`, `baseline`, `verify-formal`, `pack`, `scale`, `doctor`, `preflight`,
+  `compose`, `check`, `baseline`, `verify-formal`, `verify-c4`, `pack`, `scale`, `doctor`, `preflight`,
   `install`, `update`, `uninstall`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
   `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the Gm/Gs/Gp/Gi/Gn/G2/G3/Gx/Gb/G4/Gt/G5

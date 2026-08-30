@@ -23,7 +23,7 @@ Adoption fails fastest on miscalibrated expectations, so start here.
 | Committed oracles and formal artifacts fresh | G3 and `verify-formal`, deterministic |
 | Code respects declared import boundaries | G4, deterministic, **imports only** |
 | Code behavior matches the machines (states, events, guards) | **Characterization tests you write from the oracles. No gate reads your code's behavior.** |
-| Guard semantics, action ownership, NFRs, zero-context claim | A person or agent attests; the tool cannot |
+| Guard semantics, NFR content, zero-context claim | A person or agent attests; the tool cannot (action ownership and NFR presence are now checkable: the action-ownership table and the NFR-record shell are held by G2) |
 
 Three consequences:
 
@@ -181,8 +181,12 @@ design; the tool's contribution is the oracle and its stable ids.
      with a marker naming the stable id and the ticket, and fix the code on its own
      schedule.
 4. A test becomes LOCKED (the hard-TDD rule: implementers never edit it) at the moment its
-   row is adjudicated, not at the moment it is generated. Record verdicts in the PR that
-   introduces the tests. An unadjudicated red test is a question, not a gate. A file only
+   row is adjudicated, not at the moment it is generated. Record verdicts as committed
+   evidence in `design/adjudications/<Machine>.yaml` (one row per stable id: `verdict`
+   `code-is-truth` or `model-is-truth`, `date`, `note`, and `defect:` naming the filed
+   ticket on every model-is-truth row); **Gj-adjudication** activates on the directory and
+   holds every verdict to a committed oracle row, so the record is checkable instead of
+   living in PR prose. Summarize the round in the PR as before. An unadjudicated red test is a question, not a gate. A file only
    locks once it is born clean under this project's own formatter and linters and the commit
    carrying it is green under every non-test gate the project enforces; after the lock there
    is no legal remedy for a gate the file fails, short of an owner-sanctioned
@@ -224,7 +228,10 @@ the parent's check in CI on every PR, not on a schedule. Define **platform-green
 together: the parent's check green, AND every child's check green, AND zero unpinned-subsystem
 warnings (a subsystem without a `child_design:` link is a pin the parent cannot verify, and an
 unpinned child can rewrite its pack copy undetected). Anything less is component-green, not
-platform-green, and must not be reported as the platform passing.
+platform-green, and must not be reported as the platform passing. (`machinery check` prints its
+own per-design summary line on a default full run: `platform-green` with `--impl`, `design-green`
+without; the multi-design definition above is the aggregation of those lines plus the pin check,
+and the single-design line never stands in for it.)
 
 ## 4. Team workflow: ownership, PRs, merges
 

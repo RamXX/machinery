@@ -275,7 +275,7 @@ func TestReviewManifestRootPlanIsHeldAndAccepted(t *testing.T) {
 	writeReviewFile(t, filepath.Join(design, "machines", "Thing.oracle.md"),
 		"# o\n\n| test id | stable id | source |\n|---|---|---|\n| T-THIN-01 | THIN-aaa111 | A |\n")
 	writeReviewFile(t, filepath.Join(design, "BUILD.md"), "# B\n\nMode: manifest\n\n## 9. Build plan\n\n"+
-		"**M0 - Walking skeleton.** DoD: THIN-aaa111 green end to end.\nStatus: closed\n\n"+
+		"**M0 - Walking skeleton.** NFR: error envelope. DoD: THIN-aaa111 green end to end.\nStatus: closed\n\n"+
 		"**M1 - Breadth slice.** DoD: every remaining row green.\n")
 	for _, shard := range []string{"orders", "payments"} {
 		writeReviewFile(t, filepath.Join(design, "BUILD", shard+".md"),

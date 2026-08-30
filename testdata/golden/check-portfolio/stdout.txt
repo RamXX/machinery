@@ -5,7 +5,7 @@
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 7 boundaries, 2 externals, 13 allow rules, 21 transitive pairs, 2 deny rules, 6 boundaries with exposes, 12 dsl elements, 7 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 13 edges contracted
+  checked: 7 boundaries, 2 externals, 13 allow rules, 21 transitive pairs, 2 deny rules, 6 boundaries with exposes, 12 dsl elements, 7 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 nfr topics recorded, 13 edges contracted
   ok
 == G3-machine  machines + oracle ==
   warn   Portfolio.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
@@ -15,6 +15,9 @@
   checked: 3 machines, 33 transitions, 3 tla-generable, 3 oracles fresh, 31 named units covered, 1 states relying on unproven _exhaustive liveness
 == Gd-idcite  design-side stable-id citations ==
   checked: 65 citations resolved, 19 files scanned, 33 committed oracle ids, 3 row-count claims beside tables
+  ok
+== Gl-ledger  session ledgers + house style ==
+  checked: 4 self-review lines, 2 dated decision entries, 19 files style-scanned
   ok
 == Gx-trace  cross-layer traceability ==
   warn   invariant 'candidate-deduped' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
@@ -28,7 +31,8 @@
   note   RecommendationRun: 1 operational-overlay states (collectRetry)
   checked: 6 entities, 1 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 3 placement rows with machines, 5 placement rows waived, 6 entities placed, 3 build shards scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 7 invariants attested only (prose), 6 invariants enforced, 6 invariants unit-backed (guard/action/actor), 5 invariants waived with reason
 == Gb-plan  build plan structure ==
-  checked: 3 plans, 6 milestones, 6 DoD-bearing milestones, 2 skeleton waivers, 3 skeleton citations, skeleton citation skipped (skeleton waived), skeleton citation skipped (skeleton waived)
+  checked: 3 plans, 6 milestones, 6 DoD-bearing milestones, 2 skeleton waivers, 1 skeleton NFR lines, 3 skeleton citations, skeleton citation skipped (skeleton waived), skeleton citation skipped (skeleton waived)
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)
+design-green: all applicable design gates green (add --impl for G4-import and Gt-tests toward platform-green)

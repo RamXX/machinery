@@ -125,7 +125,9 @@ with no solver work at all.
   structural (everything reaching an outcome transitively) or declaration
   anchored, and expect the waiver idiom to carry the difference.
 - **Naming.** `determinism` describes what it protects; `influence`
-  describes what it declares. Gate letter `gd` is free.
+  describes what it declares. Gate letter `gd` has since been taken by
+  Gd-idcite (design-side stable-id citations), so this layer needs another
+  letter when it lands.
 - **Second falsification.** The shape came from one design. Author a
   declaration for a bundled example before the format hardens, because a
   format that fits only the design that invented it is not a format.

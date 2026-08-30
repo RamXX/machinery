@@ -195,14 +195,19 @@ func (v *targetSurfaceValidator) validateRoot() {
 	if version == nil || version.Kind != ir.KindNumber || err != nil || n != 1 {
 		v.errf("surface_version must be the integer 1")
 	}
-	if sources := v.root.Get2("sources"); sources != nil {
-		if sources.Kind != ir.KindArray {
-			v.errf("sources must be a list of strings naming where the act list was enumerated from")
-		} else {
-			for i, item := range sources.AsArray() {
-				if item == nil || item.Kind != ir.KindString || strings.TrimSpace(item.AsString()) == "" {
-					v.errf("sources[%d] must be a non-empty string naming where the act list was enumerated from", i)
-				}
+	// sources is required, the same rule Gs holds the legacy ledger's classes
+	// to: an enumeration with no named source is a completeness claim with no
+	// evidence, and the persona walk is exactly a completeness claim.
+	sources := v.root.Get2("sources")
+	switch {
+	case sources == nil:
+		v.errf("sources is required: a list naming where the act list was enumerated from (the model's per-persona action walk, plus any route or command sweep)")
+	case sources.Kind != ir.KindArray || len(sources.AsArray()) == 0:
+		v.errf("sources must be a non-empty list of strings naming where the act list was enumerated from")
+	default:
+		for i, item := range sources.AsArray() {
+			if item == nil || item.Kind != ir.KindString || strings.TrimSpace(item.AsString()) == "" {
+				v.errf("sources[%d] must be a non-empty string naming where the act list was enumerated from", i)
 			}
 		}
 	}

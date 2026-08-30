@@ -43,7 +43,7 @@ One line per subcommand:
 - `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
   `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate
   composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
-- `machinery check <design-dir> [--impl <code-dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gx,gk,gb,ge,ga,g4,gt,g5]` the deterministic
+- `machinery check <design-dir> [--impl <code-dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,g4,gt,g5]` the deterministic
   gate suite (Gm-transition on rebuild/hybrid contracts; Gs-surface on legacy surface ledgers;
   Gu-surfaces on the target surface ledger `surfaces.yaml` (every action whose actor is a person is
   mapped to a named surface or explicitly deferred, and every mapped act resolves against the domain

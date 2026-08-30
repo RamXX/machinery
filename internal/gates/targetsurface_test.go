@@ -96,6 +96,8 @@ func TestCheckTargetSurfacesDeferrals(t *testing.T) {
 			name: "act level deferral",
 			ledger: `
 surface_version: 1
+sources:
+  - domain.modelith.yaml action list, walked persona by persona
 acts:
   - {act: Deal.create, actor: Seller, surface: "Deals > New deal screen"}
   - {act: Deal.approve, actor: TenantAdmin, surface: "Admin console > Approvals queue"}
@@ -108,6 +110,8 @@ deferrals:
 			name: "actor level deferral covers the persona",
 			ledger: `
 surface_version: 1
+sources:
+  - domain.modelith.yaml action list, walked persona by persona
 acts:
   - {act: Deal.create, actor: Seller, surface: "Deals > New deal screen"}
 deferrals:
@@ -119,6 +123,8 @@ deferrals:
 			name: "knob deferral counts as a deferred act",
 			ledger: `
 surface_version: 1
+sources:
+  - domain.modelith.yaml action list, walked persona by persona
 acts:
   - {act: Deal.create, actor: Seller, surface: "Deals > New deal screen"}
   - {act: Deal.approve, actor: TenantAdmin, surface: "Admin console > Approvals queue"}
@@ -245,7 +251,7 @@ func TestCheckTargetSurfacesMutations(t *testing.T) {
 			targetSurfacesLedger + "deferrals:\n  - {act: whatever, reason: later}\n",
 			nil, `act "whatever" is not an Entity.action, a knob:<key>, or an actor:<Name>`,
 		},
-		{"acts row is not a mapping", "surface_version: 1\nacts:\n  - just a string\n", nil, "acts[0] is not a mapping"},
+		{"acts row is not a mapping", "surface_version: 1\nsources: [model action list]\nacts:\n  - just a string\n", nil, "acts[0] is not a mapping"},
 		{"deferral row is not a mapping", targetSurfacesLedger + "deferrals:\n  - just a string\n", nil, "deferrals[0] is not a mapping"},
 		{"missing target model", targetSurfacesLedger, func(t *testing.T, design string) {
 			if err := os.Remove(filepath.Join(design, "domain.modelith.yaml")); err != nil {
@@ -294,7 +300,7 @@ func TestCheckTargetSurfacesActorlessCarryNoObligation(t *testing.T) {
 func TestCheckTargetSurfacesNoHumanActs(t *testing.T) {
 	design := t.TempDir()
 	model := "kind: DomainModel\nversion: v1\nentities:\n  Deal:\n    definition: d\n    actions:\n      - {name: create}\n"
-	write := map[string]string{"domain.modelith.yaml": model, TargetSurfacesName: "surface_version: 1\nacts: []\n"}
+	write := map[string]string{"domain.modelith.yaml": model, TargetSurfacesName: "surface_version: 1\nsources: [model action list]\nacts: []\n"}
 	for name, content := range write {
 		if err := os.WriteFile(filepath.Join(design, name), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
@@ -376,5 +382,33 @@ func TestCheckTargetSurfacesShardedModel(t *testing.T) {
 	}
 	if strings.Contains(joined, "Ghost.haunt") {
 		t.Errorf("the legacy model must not contribute obligations: %v", g.Errs)
+	}
+}
+
+// sources is mandatory: an enumeration with no named source is a completeness
+// claim with no evidence (the same rule Gs holds the legacy ledger to).
+func TestCheckTargetSurfacesSourcesRequired(t *testing.T) {
+	ledger := strings.Replace(targetSurfacesLedger,
+		"sources:\n  - domain.modelith.yaml action list, walked persona by persona\n", "", 1)
+	g := CheckTargetSurfaces(writeTargetSurfaceFixture(t, ledger))
+	found := false
+	for _, e := range g.Errs {
+		if strings.Contains(e, "sources is required") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("a ledger without sources must error: %v", g.Errs)
+	}
+	g = CheckTargetSurfaces(writeTargetSurfaceFixture(t,
+		strings.Replace(targetSurfacesLedger, "sources:\n  - domain.modelith.yaml action list, walked persona by persona", "sources: []", 1)))
+	found = false
+	for _, e := range g.Errs {
+		if strings.Contains(e, "non-empty list") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("an empty sources list must error: %v", g.Errs)
 	}
 }

@@ -55,6 +55,11 @@ var (
 	// The value is captured so an unrecognized token fails loudly in Gb
 	// instead of silently reading as "not closed" and disarming Ga.
 	milestoneStatusRe = regexp.MustCompile(`(?mi)^[ \t]*(?:[-*][ \t]+|\d+\.[ \t]+)?\*{0,2}Status:\*{0,2}[ \t]*([A-Za-z][A-Za-z-]*)`)
+	// skeletonNFRRe matches the skeleton milestone's NFR line: the literal
+	// token "NFR:" (bold decoration tolerated, like the status line) with the
+	// rest of the line captured, so an empty declaration fails loudly. Not
+	// anchored to line starts, matching the DoD-token convention.
+	skeletonNFRRe = regexp.MustCompile(`\*{0,2}NFR:\*{0,2}[ \t]*([^\n]*)`)
 	// planHeadingRe matches a Build plan heading. The phrase "Build plan" may
 	// sit anywhere in the heading text, so the template's "N. " section number
 	// and any trailing decoration still name the plan section: a real design
@@ -459,6 +464,22 @@ func checkPlanDoc(g *Gate, name, text string, oracleIDs []string) {
 		g.Count("skeleton waivers")
 	default:
 		g.Errs = append(g.Errs, fmt.Sprintf("%s: the first milestone (M%s - %s) is not the walking skeleton; plan the skeleton first, or waive it with 'walking skeleton: N/A - <reason>'", name, ms[0].numRaw, ms[0].title))
+	}
+
+	// the skeleton is the pattern template every later milestone copies, so
+	// its block names the NFR-record mechanisms it instantiates on an `NFR:`
+	// line (error envelope, config registration, observability hooks, auth
+	// posture; 'NFR: none - <reason>' when the record leaves nothing to
+	// instantiate). The template stated this requirement and, until now,
+	// stated that Gb does not check it.
+	if skeletonFirst {
+		if m := skeletonNFRRe.FindStringSubmatch(ms[0].block); m == nil {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: the walking-skeleton milestone (M%s) has no 'NFR:' line; name the NFR-record mechanisms the skeleton instantiates (or 'NFR: none - <reason>')", name, ms[0].numRaw))
+		} else if strings.TrimSpace(m[1]) == "" {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: the walking-skeleton milestone (M%s) has an empty 'NFR:' line; name the mechanisms, or 'NFR: none - <reason>'", name, ms[0].numRaw))
+		} else {
+			g.Count("skeleton NFR lines")
+		}
 	}
 
 	switch {

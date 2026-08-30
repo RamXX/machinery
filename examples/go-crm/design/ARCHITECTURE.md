@@ -28,6 +28,14 @@ design treats that refusal as a first-class, recoverable failure rather than a c
 | store | LadybugDB via `github.com/LadybugDB/go-ladybug` | embedded property graph; CRM is relationship-shaped |
 | query | Cypher (through `Connection.Query` / `Prepare` + `Execute`) | LadybugDB's query language; parameterized statements |
 
+Adoption closures (G2 holds every backticked member to a declared dependency with a mitigation
+row):
+
+| technology | closure members | scorecard |
+|---|---|---|
+| LadybugDB via `go-ladybug` | `store` (the on-disk graph directory the binding manages) | n/a - example design; score the real candidate at adoption time |
+| argon2id via `golang.org/x/crypto` | (no closure: a pure in-process library; no backends, sidecars, credentials, or egress) | n/a - maintained by the Go team; no separate adoption decision |
+
 ## Transition architecture
 
 This is a rebuild of a working prototype, not an in-place refactor. The two domain truths are explicit:
@@ -180,14 +188,17 @@ Embedded, so there is no operator and no HA. The contrast with a networked store
 that would be transient-and-bounded behind a Kubernetes operator are here either serialized (single
 writer) or fatal-until-restore (corruption). The state machines must handle them accordingly.
 
-| dependency | failure modes | mitigation (deployment) | residual behavior the FSM must handle | bound |
-|---|---|---|---|---|
-| `store` (LadybugDB open) | file locked by another `crm` process | none (single-file embedded) | `ErrLocked` on open: retry with backoff, then exit with a clear message | retry <= 3, ~1.5s total |
-| `store` (LadybugDB open) | corrupt or version-incompatible directory | none (no HA); backup via `crm backup` / restore via `crm restore` | `ErrCorrupt`: fail loudly, tell the user to restore from backup | fatal, no auto-recovery |
-| `store` (LadybugDB write) | Cypher/constraint violation | one write transaction per invocation | `ErrConstraint`: roll back, surface as a domain validation error | atomic, no partial write |
-| `store` (LadybugDB write) | disk full | none | `ErrDiskFull`: roll back, fail loudly; DB stays consistent | atomic |
-| `store` (LadybugDB query) | runaway query | `Connection.SetTimeout` + `Interrupt` | `ErrTimeout`: abort, surface, roll back | timeout 10s |
-| `sessionfile` | missing / expired / unreadable | none | `ErrNoSession` / `ErrExpired`: require `crm login` | user re-authenticates |
+The `handled by` column binds each row to the machine or invoke actor that carries its residual
+transitions; Gx-trace resolves every name against the committed machines.
+
+| dependency | failure modes | mitigation (deployment) | residual behavior the FSM must handle | bound | handled by |
+|---|---|---|---|---|---|
+| `store` (LadybugDB open) | file locked by another `crm` process | none (single-file embedded) | `ErrLocked` on open: retry with backoff, then exit with a clear message | retry <= 3, ~1.5s total | `openDatabase` |
+| `store` (LadybugDB open) | corrupt or version-incompatible directory | none (no HA); backup via `crm backup` / restore via `crm restore` | `ErrCorrupt`: fail loudly, tell the user to restore from backup | fatal, no auto-recovery | `openDatabase` |
+| `store` (LadybugDB write) | Cypher/constraint violation | one write transaction per invocation | `ErrConstraint`: roll back, surface as a domain validation error | atomic, no partial write | `saveDeal`, `saveTask`, `saveUser` |
+| `store` (LadybugDB write) | disk full | none | `ErrDiskFull`: roll back, fail loudly; DB stays consistent | atomic | `saveDeal`, `saveTask`, `saveUser` |
+| `store` (LadybugDB query) | runaway query | `Connection.SetTimeout` + `Interrupt` | `ErrTimeout`: abort, surface, roll back | timeout 10s | `executeInTx` |
+| `sessionfile` | missing / expired / unreadable | none | `ErrNoSession` / `ErrExpired`: require `crm login` | user re-authenticates | `readSessionFile` |
 
 ## 7. Persistence and placement (the C4 to FSM bridge)
 
@@ -203,6 +214,23 @@ aggregate is loaded, acted on, and saved inside the one write transaction the Co
 | `CommandExecution` | ephemeral per invocation (the operational envelope) | none | one invocation owns the write Tx |
 | `Account` `Contact` `Team` `Pipeline` `Tag` (no machine: CRUD records with no lifecycle enum) | ephemeral in-process; written in the command's write Tx | graph nodes carrying their attributes; a `Tag` application is an edge | read-modify-write in one write Tx; cross-process by the store's single-writer lock |
 | `Activity` (no machine: an append-only log entry, never updated) | ephemeral in-process; inserted in the command's write Tx | graph node written once (`activity-immutable`) | insert-only; no update contention |
+
+## 7a. Action ownership
+
+Every Modelith action names its owning component; G2 holds the mapping closed in both directions
+against the domain model and `workspace.dsl`.
+
+| action | owning component |
+|---|---|
+| `User.login`, `User.logout`, `User.changePassword` | `session` |
+| `User.register`, `User.disable`, `User.enable`, `User.assignRole` | `domain` |
+| `Deal.create`, `Deal.advanceStage`, `Deal.win`, `Deal.lose`, `Deal.reopen`, `Deal.reassign` | `domain` |
+| `Task.create`, `Task.start`, `Task.complete`, `Task.cancel`, `Task.reassign` | `domain` |
+| `Team.create`, `Team.rename`, `Pipeline.create`, `Pipeline.setDefault` | `domain` |
+| `Account.create`, `Account.update`, `Account.reassign`, `Account.delete` | `domain` |
+| `Contact.create`, `Contact.update`, `Contact.reassign`, `Contact.delete` | `domain` |
+| `Activity.log`, `Activity.delete` | `domain` |
+| `Tag.create`, `Tag.apply`, `Tag.remove` | `domain` |
 
 ## 8. NFR record
 

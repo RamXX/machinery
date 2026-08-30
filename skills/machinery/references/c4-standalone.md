@@ -136,7 +136,9 @@ reads cleanly on both light and dark backgrounds:
 
 ### Validate and export
 
-After authoring, always validate the DSL compiles and exports before committing:
+After authoring, always validate the DSL compiles and exports before committing.
+`machinery verify-c4 <design>` runs exactly this as the C4 engine phase (exit 0 iff the export
+succeeds; `MACHINERY_STRUCTURIZR_CLI` overrides the binary lookup); the raw commands:
 
 ```bash
 # Validate + export to Mermaid (renders inline in GitHub README/PRs):
@@ -334,6 +336,12 @@ them. Format rules, checked by G2:
 - Every residual failure state, in particular any FailedDirty-style one, must say how an operator
   learns about it: add a detection/alerting column, or an operator-signal note in the residual column
   (log line, metric, alert).
+- **Optional `handled by` column (opt-in, resolved by Gx-trace once machines exist)**: each row
+  names, backticked, the machine or invoke actor that carries its residual transitions
+  (`` `Deal` ``, `` `saveDeal` ``), or waives with `(no residual: <reason>)` (a fatal-and-loud
+  posture needs no machine transition). Every name must resolve against the committed machines and
+  their invoke actors; whether the named transitions are semantically adequate stays attested. A
+  table without the column carries no obligation.
 
 | dependency | failure modes | deployment mitigation | residual behavior the FSM must handle | bound | operator signal |
 |---|---|---|---|---|---|
@@ -367,17 +375,54 @@ mitigation table is considered complete:
    (`machinery preflight` reports it; needs `GITHUB_AUTH_TOKEN` at run time). A low score is a
    discussion item with flip conditions, never an automatic veto.
 
-These are LLM-attested checks: G2 verifies mitigation coverage for what is declared; only the
-conversation catches what was never declared.
+Carrying a discovered closure is checkable; author the **adoption-closure table** (opt-in,
+activated by its own presence) and G2 holds it:
+
+| technology | closure members | scorecard |
+|---|---|---|
+| PG operator | `store`, `external.vault` | 7.5 (2026-08-01) |
+| argon2id via x/crypto | (no closure: a pure in-process library; no backends, credentials, or egress) | n/a - maintained by the Go team |
+
+- The header names **technology** and **closure** columns; a **scorecard** column is optional.
+- Every backticked closure member must be a declared `workspace.dsl` element or contract external
+  AND have a mitigation row: a closure member is a first-class dependency, so it gets the full
+  dependency treatment or the row fails.
+- An empty closure cell needs `(no closure: <reason>)`; an empty reason is an error.
+- When the scorecard column exists, every cell is `<score> (YYYY-MM-DD)` or `n/a - <reason>`; an
+  empty or misshapen cell is an error, so the dated-evidence rule stops being a vibe.
+
+What stays LLM-attested: DISCOVERING the closure. G2 verifies mitigation coverage and closure
+carry for what is declared; only the conversation catches what was never declared.
 
 ## NFR record (part of the Architecture Contract conversation)
 
-Record these during Phase 2, even when the answer is "out of scope, recorded as such":
+G2 checks the shell deterministically: a heading containing "NFR" (or "non-functional") must exist
+and its section must mention all three topics below ("out of scope, recorded as such" satisfies the
+check by construction). The CONTENT stays attested. Record these during Phase 2, even when the
+answer is "out of scope, recorded as such":
 
 - **security posture**: authn/authz approach, secret handling.
 - **capacity assumptions**: expected volume, latency budget where relevant.
 - **observability**: what must be logged, metered, alerted; in particular, every FailedDirty-style
   residual state needs a stated operator signal (see the mitigation table rule above).
+
+## Action ownership (opt-in, checked by G2 when the table exists)
+
+"Every Modelith action maps to an owning component" was an attested line; both sides are closed
+sets, so give the mapping an artifact and G2 holds it in both directions. The header names an
+**action** column and an **owning component** (or **owner**) column; rows group freely:
+
+| action | owning component |
+|---|---|
+| `Deal.create`, `Deal.win` | `domain` |
+| `User.login`, `User.logout` | `session` |
+
+- Every action cell entry is an `Entity.action` key resolved against the domain model.
+- Every model action appears exactly once across all rows, or is waived with
+  `(unowned: <reason>)` in the owner cell; a missing or doubly-owned action is an error.
+- Every owner is a backticked `workspace.dsl` element identifier or Architecture Contract
+  boundary/external id.
+- A design without the table keeps the old posture: the mapping is attested.
 
 ## Persistence and placement (the C4 to FSM bridge)
 
@@ -427,7 +472,10 @@ rule). Like the surface ledger's `source:` lines, state where the rows were enum
 publisher-first: sweep the code for emit/publish call sites AND the broker or infra configuration
 (topic definitions, subscriptions, queue bindings), plus any API spec; name both lanes in a source
 note, or waive one with a reason. A table with no named enumeration source is a completeness claim
-with no evidence, and the gates can only check the rows that are declared. Columns:
+with no evidence, and the gates can only check the rows that are declared. G2 enforces the note's
+presence: every event-contract table (a header naming producer, consumer, and delivery) must have a
+`Source:` line (or the phrase "enumerated from", or a `machinery:embed` marker) within the five
+lines above its header. Columns:
 
 - **producer**: `machine.event` or component.
 - **consumer**: `machine.event`.
@@ -489,12 +537,22 @@ Deterministic (run `machinery check <design> --gate g2`):
   the declaration itself is attested, not checked.
 - Every concrete allow edge has an interface-contract row with shape, errors, and idempotency all
   answered, or a `(no contract: <reason>)` waiver; and every edge a row names is an allow edge.
+- The NFR record exists and mentions security, capacity, and observability.
+- Every event-contract table names its enumeration source (a `Source:` note or an embed marker
+  directly above the header).
+- When the design authors them (opt-in by presence): the action-ownership table is closed in both
+  directions, every adoption-closure member is a declared and mitigated dependency (scorecard cells
+  well-shaped), and every mitigation `handled by` name resolves against the committed machines
+  (that one runs in Gx-trace once machines exist).
 - Read the `checked:` counts; an empty check is an ERROR, never a silent pass.
+
+Engine phase (needs Java, like verify-formal): `machinery verify-c4 <design>` compiles
+`workspace.dsl` under `structurizr-cli export`; a design is not done with Phase 2 until it passes.
 
 LLM-attested (you verify; the tool cannot):
 
-- The `workspace.dsl` compiles under `structurizr-cli export` (run it; fix syntax errors).
-- Every Modelith action maps to an owning component in `workspace.dsl`.
+- Every Modelith action maps to an owning component in `workspace.dsl`, when the design declines
+  the action-ownership table (author the table and this is checked instead).
 - Whether each interface contract is the RIGHT one: that the shape matches what the code will
   actually exchange, the error list is exhaustive, and the idempotency claim survives a retry. That
   every crossing HAS one is now checked (see above).
@@ -502,8 +560,8 @@ LLM-attested (you verify; the tool cannot):
   one (whether a row's placement, persistence, and serialization actually hold is judgment). Two
   deterministic halves run in Gx-trace once machines exist: a machine per row, and a row per
   declared entity.
-- The event-contract table exists for multi-component designs, covers every cross-component event,
-  and names its enumeration sources (emit/publish call sites, broker/infra config, API specs).
+- The event-contract table covers every cross-component event (its rows are open-world; the source
+  note's presence is checked, its truth is not).
 - The dependency declaration is complete: everything the deployment actually talks to appears in
   the DSL or the contract (the mitigation-coverage check runs only over what is declared).
-- The NFR record is filled (security, capacity, observability).
+- The NFR record's content is true (presence and topic coverage are checked).

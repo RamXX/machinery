@@ -31,7 +31,7 @@ Mode: full (single BUILD.md)
 Walking skeleton first, then vertical slices.
 
 **M0 - Walking skeleton (thinnest end-to-end thread).** Implement exactly one
-path through every boundary once. DoD: green for T-CMD-01,03,12; the token is
+path through every boundary once. NFR: error envelope, logging. DoD: green for T-CMD-01,03,12; the token is
 written and re-resolved on the next command.
 
 **M1 - Breadth slice.** Everything else. DoD: all rows green.
@@ -52,7 +52,7 @@ Mode: full
 Walking skeleton first, then vertical slices, each fully green before the next.
 
 - **M0 - Walking skeleton.** One real transition through one real boundary
-  (stable id CMD-abc123). DoD: C-DB-01, C-BUS-01, and CMD-abc123 green.
+  (stable id CMD-abc123). NFR: error envelope. DoD: C-DB-01, C-BUS-01, and CMD-abc123 green.
 - **M1 - Settlement slice.** DoD: all oracle rows green by stable id.
 `
 
@@ -211,8 +211,8 @@ func TestCheckBuildPlanNoModeLineIsFullMode(t *testing.T) {
 }
 
 func TestCheckBuildPlanManifestShards(t *testing.T) {
-	shardOK := "# Shard\n\n## Build plan\n\n**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n"
-	shardBad := "# Shard\n\n## Build plan\n\n**M0 - Walking skeleton.** No definition here.\n"
+	shardOK := "# Shard\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n"
+	shardBad := "# Shard\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope. No definition here.\n"
 	design := writeBuildPlanFixture(t, "# B\n\nMode: manifest\n", map[string]string{
 		"BUILD/core.md": shardOK,
 		"BUILD/edge.md": shardBad,
@@ -233,8 +233,8 @@ func TestCheckBuildPlanManifestShards(t *testing.T) {
 // Manifest shards get the full check including the skeleton citation, held
 // against the design-wide committed oracle ids (the same corpus as full mode).
 func TestCheckBuildPlanManifestShardsRequireSkeletonCitation(t *testing.T) {
-	shardCiting := "# Core\n\n## Build plan\n\n**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n"
-	shardBare := "# Edge\n\n## Build plan\n\n**M0 - Walking skeleton.** DoD: skeleton green.\n"
+	shardCiting := "# Core\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n"
+	shardBare := "# Edge\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: skeleton green.\n"
 	design := writeBuildPlanFixture(t, "# B\n\nMode: manifest\n", map[string]string{
 		"BUILD/core.md": shardCiting,
 		"BUILD/edge.md": shardBare,
@@ -256,7 +256,7 @@ func TestCheckBuildPlanManifestShardsRequireSkeletonCitation(t *testing.T) {
 // shards: they carry no plan obligation, the exemption is visible in the
 // checked line, and the real shard is still fully checked.
 func TestCheckBuildPlanManifestExemptsIndexFiles(t *testing.T) {
-	shard := "# Core\n\n## Build plan\n\n**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n"
+	shard := "# Core\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n"
 	design := writeBuildPlanFixture(t, "# B\n\nMode: manifest\n", map[string]string{
 		"BUILD/README.md": "# Shard index\n\nWho builds what.\n",
 		"BUILD/core.md":   shard,
@@ -303,7 +303,7 @@ func TestCheckBuildPlanExplicitWithoutBuildDoc(t *testing.T) {
 // line is not plan structure.
 func TestCheckBuildPlanFenceAware(t *testing.T) {
 	build := "# B\n\nMode: full\n\n## Build plan\n\n" +
-		"**M0 - Walking skeleton.** Run the smoke script:\n\n" +
+		"**M0 - Walking skeleton.** NFR: error envelope. Run the smoke script:\n\n" +
 		"```bash\n# comment that is not a heading\n**M9 - fake milestone**\nDoD: fake\n```\n\n" +
 		"DoD: T-CMD-01 green.\n\n" +
 		"**M1 - Breadth slice.** DoD: all rows green.\n"
@@ -330,7 +330,7 @@ func TestCheckBuildPlanFenceAware(t *testing.T) {
 // above") is not a milestone declaration: markers are anchored per line.
 func TestCheckBuildPlanBoldCrossReferenceIsNotAMilestone(t *testing.T) {
 	build := "# B\n\nMode: full\n\n## Build plan\n\n" +
-		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n\n" +
+		"**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n\n" +
 		"**M1 - Breadth slice.** Reuses the fixtures built by **M0 - Walking skeleton** above. DoD: all rows green.\n"
 	design := writeBuildPlanFixture(t, build, nil)
 	g := CheckBuildPlan(design)
@@ -347,7 +347,7 @@ func TestCheckBuildPlanBoldCrossReferenceIsNotAMilestone(t *testing.T) {
 // done" without a colon is not a DoD token.
 func TestCheckBuildPlanDoDTokenAndBlockEnd(t *testing.T) {
 	build := "# B\n\nMode: full\n\n## Build plan\n\n" +
-		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n\n" +
+		"**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n\n" +
 		"**M1 - Breadth slice.** Everything else, following the team's definition of done conventions.\n\n" +
 		"### Notes\n\nDoD: this subsection is not part of M1.\n"
 	design := writeBuildPlanFixture(t, build, nil)
@@ -370,7 +370,7 @@ func TestCheckBuildPlanDoDTokenAndBlockEnd(t *testing.T) {
 // rejects.
 func TestCheckBuildPlanSkeletonCitationMustFollowDoD(t *testing.T) {
 	bad := "# B\n\nMode: full\n\n## Build plan\n\n" +
-		"**M0 - Walking skeleton.** Proves T-CMD-01 and CMD-abc123 end to end. DoD: it works.\n\n" +
+		"**M0 - Walking skeleton.** NFR: error envelope. Proves T-CMD-01 and CMD-abc123 end to end. DoD: it works.\n\n" +
 		"**M1 - Breadth slice.** DoD: all rows green.\n"
 	design := writeBuildPlanFixture(t, bad, nil)
 	g := CheckBuildPlan(design)
@@ -423,7 +423,7 @@ func TestCheckBuildPlanModeSniffIsFenceMasked(t *testing.T) {
 // leaking phantom DoD lines (NG-5).
 func TestMaskFencesRunLength(t *testing.T) {
 	build := "# B\n\nMode: full\n\n## Build plan\n\n" +
-		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n\n" +
+		"**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n\n" +
 		"**M1 - Breadth slice.** This milestone has NO real DoD. Example snippet:\n\n" +
 		"````markdown\n```text\nDoD: example text inside a documentation fence, not a commitment.\n```\n````\n\n" +
 		"More prose, still no definition of done for M1.\n"
@@ -469,7 +469,7 @@ func TestCheckBuildPlanNAWaiverLiteralFormOnly(t *testing.T) {
 // milestone declared twice (NG-8).
 func TestCheckBuildPlanDuplicateMilestoneNumbersNumeric(t *testing.T) {
 	build := "# B\n\nMode: full\n\n## Build plan\n\n" +
-		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n\n" +
+		"**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n\n" +
 		"**M1 - First slice.** DoD: rows green.\n\n" +
 		"**M01 - Also the first slice.** DoD: rows green.\n"
 	design := writeBuildPlanFixture(t, build, nil)
@@ -542,7 +542,7 @@ func TestIDTokenIn(t *testing.T) {
 func TestCheckBuildPlanManifestRootPlanIsChecked(t *testing.T) {
 	waived := "# Shard\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n"
 	root := "# B\n\nMode: manifest\n\n## 9. Build plan\n\n" +
-		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n\n" +
+		"**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n\n" +
 		"**M1 - Breadth slice.** DoD: all rows green.\n"
 	design := writeBuildPlanFixture(t, root, map[string]string{
 		"BUILD/core.md": waived,
@@ -564,7 +564,7 @@ func TestCheckBuildPlanManifestRootPlanIsChecked(t *testing.T) {
 func TestCheckBuildPlanManifestRootPlanFindingsNameTheRoot(t *testing.T) {
 	waived := "# Shard\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n"
 	root := "# B\n\nMode: manifest\n\n## 9. Build plan\n\n" +
-		"**M0 - Walking skeleton.** No definition here.\n"
+		"**M0 - Walking skeleton.** NFR: error envelope. No definition here.\n"
 	design := writeBuildPlanFixture(t, root, map[string]string{"BUILD/core.md": waived})
 	g := CheckBuildPlan(design)
 	if !strings.Contains(strings.Join(g.Errs, "\n"), "BUILD.md: milestone M0") {
@@ -577,7 +577,7 @@ func TestCheckBuildPlanManifestRootPlanFindingsNameTheRoot(t *testing.T) {
 // be wrong.
 func TestCheckBuildPlanManifestRootPlanWithoutShards(t *testing.T) {
 	root := "# B\n\nMode: manifest\n\n## 9. Build plan\n\n" +
-		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n"
+		"**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n"
 	design := writeBuildPlanFixture(t, root, nil)
 	g := CheckBuildPlan(design)
 	if len(g.Errs) != 0 {
@@ -591,7 +591,7 @@ func TestCheckBuildPlanManifestRootPlanWithoutShards(t *testing.T) {
 // A manifest root with no Build plan section keeps its old freedom: the
 // shards carry the plans and the root has no obligation of its own.
 func TestCheckBuildPlanManifestRootWithoutPlanSectionUnchanged(t *testing.T) {
-	shard := "# Core\n\n## Build plan\n\n**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n"
+	shard := "# Core\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n"
 	design := writeBuildPlanFixture(t, "# B\n\nMode: manifest\n\n## 9. Milestone map\n\nSee the shards.\n",
 		map[string]string{"BUILD/core.md": shard})
 	g := CheckBuildPlan(design)
@@ -653,7 +653,7 @@ func TestCheckBuildPlanDecoratedHeadingStandalone(t *testing.T) {
 func TestCheckBuildPlanDecoratedHeadingManifestRoot(t *testing.T) {
 	waived := "# Shard\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n"
 	root := "# B\n\nMode: manifest\n\n## 9. Build plan (sealed trust layers; user directive 2026-08-04)\n\n" +
-		"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n\n" +
+		"**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n\n" +
 		"**M1 - Breadth slice.** DoD: all rows green.\n"
 	design := writeBuildPlanFixture(t, root, map[string]string{
 		"BUILD/core.md": waived,
@@ -693,5 +693,30 @@ func TestCheckBuildPlanHeadingPhraseIsWhole(t *testing.T) {
 				t.Errorf("no milestones may be parsed from a phantom section: %+v", g.Counts)
 			}
 		})
+	}
+}
+
+// The skeleton milestone names the NFR mechanisms it instantiates on an
+// 'NFR:' line; a missing or empty line is a plan defect (the template stated
+// the requirement and, until now, that Gb did not check it).
+func TestCheckBuildPlanSkeletonNFRLine(t *testing.T) {
+	base := "# BUILD\n\nMode: full\n\n## 9. Build plan\n\n"
+	design := writeBuildPlanFixture(t, base+"**M0 - Walking skeleton.** DoD: T-CMD-01 green.\n", nil)
+	g := CheckBuildPlan(design)
+	if !hasErr(g, "has no 'NFR:' line") {
+		t.Fatalf("a skeleton without an NFR line must error: %v", g.Errs)
+	}
+	design = writeBuildPlanFixture(t, base+"**M0 - Walking skeleton.** NFR:\nDoD: T-CMD-01 green.\n", nil)
+	g = CheckBuildPlan(design)
+	if !hasErr(g, "empty 'NFR:' line") {
+		t.Fatalf("an empty NFR line must error: %v", g.Errs)
+	}
+	design = writeBuildPlanFixture(t, base+"**M0 - Walking skeleton.** NFR: none - the record is all out of scope. DoD: T-CMD-01 green.\n", nil)
+	g = CheckBuildPlan(design)
+	if hasErr(g, "NFR") {
+		t.Fatalf("a reasoned 'NFR: none' must pass: %v", g.Errs)
+	}
+	if g.Counts["skeleton NFR lines"] != 1 {
+		t.Fatalf("NFR line not counted: %+v", g.Counts)
 	}
 }

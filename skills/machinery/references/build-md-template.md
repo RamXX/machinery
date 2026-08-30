@@ -249,6 +249,11 @@ Format contract, held deterministically by Gb-plan:
   violations).
 - The skeleton milestone's DoD cites at least one committed oracle id (test id or stable id) as a
   whole token, at or after the DoD token (pre-DoD prose does not count).
+- The skeleton milestone's block carries an `NFR:` line naming the NFR-record mechanisms it
+  instantiates (error envelope, config registration, observability hooks, auth posture; whichever
+  the record declares), or `NFR: none - <reason>` when the record leaves nothing to instantiate.
+  The skeleton is the pattern template every later milestone copies; a cross-cutting mechanism
+  absent from the skeleton tends to be absent everywhere.
 - A milestone that has been accepted carries one status line in its block, `Status: closed`
   (`Status: open` is the default and may be written explicitly; any other value fails the gate).
   Closing a milestone takes committed acceptance evidence: see "Milestone acceptance" below.
@@ -272,10 +277,9 @@ Every milestone in this plan is discharged the same way, held by Ga-accept:
   commit under review; without a commit the gate says so instead of checking it.
 - Prior attempts are not kept in the tree: one file per milestone, and git history is the record.
 
-One requirement Gb does not check: the skeleton milestone names which NFR-record mechanisms it
-instantiates (error envelope, config registration, observability hooks, auth posture; whichever
-the NFR record declares). The skeleton is the pattern template every later milestone copies; a
-cross-cutting mechanism absent from the skeleton tends to be absent everywhere.
+The skeleton's `NFR:` line (the format contract above) is what carries the NFR-record mechanisms
+into the plan; Gb holds its presence and non-emptiness, and only whether the named mechanisms are
+the record's actual mechanisms stays attested.
 
 ## 10. Language realization notes
 Target language(s): <...>. How the machines become code:
@@ -371,7 +375,11 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   hand-written line naming the guard is then held to the vocabulary: a
   partial enumeration and a retired-clause survivor both warn, which is the
   sibling-artifact drift class (a recorded narrowing reaching four homes and
-  missing the fifth) made mechanical. Declare clauses only where an artifact
+  missing the fifth) made mechanical. Declaring also arms Gt-tests: once an
+  impl exists, every committed oracle row the declared guard governs owes one
+  suffixed falsifying-clause id per active clause in the test corpus, and the
+  wholesale conformance parse does not discharge them (they are what the
+  table cannot derive). Declare clauses only where an artifact
   enumerates them; a single-clause guard gains nothing from the ceremony.
 - Event consumption rows may declare `READS{field, ...}` beside the
   backticked event name; every declared field must ride some event-table

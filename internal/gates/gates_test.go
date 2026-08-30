@@ -80,10 +80,10 @@ func TestG2EventContractTablesConcatenate(t *testing.T) {
 		"      bus = container \"Bus\" \"events\" \"NATS\" \"Queue\"\n    }\n  }\n}\n"
 	arch := "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
 		"  - id: app\n    code: [\"app/**\"]\n```\n\n" +
-		"## Events (orders)\n\n| producer | consumer | payload | delivery |\n|---|---|---|---|\n" +
+		"## Events (orders)\n\nSource: fixture emit sites.\n\n| producer | consumer | payload | delivery |\n|---|---|---|---|\n" +
 		"| app | bus | OrderPlaced | at-least-once |\n| app | bus | OrderPaid | at-least-once |\n\n" +
-		"## Events (payments)\n\n| producer | consumer | payload | delivery |\n|---|---|---|---|\n" +
-		"| bus | app | PaymentSettled | at-least-once |\n"
+		"## Events (payments)\n\nSource: fixture emit sites.\n\n| producer | consumer | payload | delivery |\n|---|---|---|---|\n" +
+		"| bus | app | PaymentSettled | at-least-once |\n" + nfrStub
 	mustWrite(t, filepath.Join(design, "workspace.dsl"), dsl)
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
 	g := CheckC4(design)
@@ -94,6 +94,10 @@ func TestG2EventContractTablesConcatenate(t *testing.T) {
 		t.Fatalf("the tables exist and must be found: %v", g.Errs)
 	}
 }
+
+// nfrStub is the minimal NFR record a coherent G2 fixture carries, so
+// fixtures built to exercise other checks report only their own findings.
+const nfrStub = "\n## NFR record\n\n- security: out of scope (fixture)\n- capacity: out of scope (fixture)\n- observability: out of scope (fixture)\n"
 
 // coveringInterfaceTable renders one interface-contract row per concrete allow
 // edge in a fixture's rules block, so a fixture built to exercise the
@@ -138,7 +142,7 @@ func c4GraphFixture(t *testing.T, ids []string, rules string) *Gate {
 	dsl := "workspace \"W\" \"sys\" {\n  model {\n    sys = softwareSystem \"S\" \"sys\" {\n" +
 		comps.String() + "    }\n  }\n}\n"
 	arch := "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n" +
-		bounds.String() + rules + "```\n" + coveringInterfaceTable(rules)
+		bounds.String() + rules + "```\n" + coveringInterfaceTable(rules) + nfrStub
 	mustWrite(t, filepath.Join(design, "workspace.dsl"), dsl)
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
 	return CheckC4(design)
@@ -315,6 +319,7 @@ func ifaceFixture(t *testing.T, ids []string, rules, rows string) *Gate {
 	if rows != "" {
 		arch += "\n## Interface contracts\n\n| edge | shape | errors | idempotency |\n|---|---|---|---|\n" + rows + "\n"
 	}
+	arch += nfrStub
 	mustWrite(t, filepath.Join(design, "workspace.dsl"), dsl)
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
 	return CheckC4(design)
@@ -401,7 +406,7 @@ func TestG2InterfaceContractCrossingHeaderSynonym(t *testing.T) {
 		"  - id: p.a\n    code: [\"a/**\"]\n  - id: p.b\n    code: [\"b/**\"]\n" +
 		"dependency_rules:\n  allow:\n    - p.a -> p.b\n```\n\n" +
 		"## Interface contracts\n\n| crossing | shape | errors | idempotency |\n|---|---|---|---|\n" +
-		"| `p.a -> p.b` | Store interface | ErrNotFound | reads safe to retry |\n"
+		"| `p.a -> p.b` | Store interface | ErrNotFound | reads safe to retry |\n" + nfrStub
 	mustWrite(t, filepath.Join(design, "workspace.dsl"), dsl)
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
 	g := CheckC4(design)

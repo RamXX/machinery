@@ -110,6 +110,10 @@ dedupes by message id (`exactly-once-effect`). Payloads name `fulfillment.modeli
 attributes. Order placement itself does not cross the bus: the customer reaches the API over HTTPS
 and the API starts the saga in-process; the saga's first outbox emission is the `reserve` command.
 
+Source: enumerated from the saga's outbox emissions (`FulfillmentSaga` invoke actors) and the
+consumers' machine events; the broker lane is the single outbox topic per service, no other
+subscriptions exist to sweep.
+
 | event | producer | consumer | payload (Modelith attributes) | delivery | ordering | dedupe |
 |---|---|---|---|---|---|---|
 | `reserve` command | Order Service (saga, via its outbox) | Inventory Service | order id; per line: `LineItem.quantity`, `Product.sku`; the hold creates `Reservation.quantity`, `Reservation.status` | at-least-once via outbox | first saga step; no cross-order ordering assumed | consumer dedupes by message id; hold idempotent per order and line item |

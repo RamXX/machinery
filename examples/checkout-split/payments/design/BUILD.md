@@ -319,7 +319,9 @@ Walking skeleton first, then vertical slices, each fully green before the next.
 - **M0 - Walking skeleton.** Consume a real `request` from the broker fixture, create the Payment
   row (deduped by `Payment.orderId`), fire `capture`, and land on Captured with the outbox
   `markPaid` row written in the same Postgres transaction (stable id PAYM-975859). One real
-  transition through one real boundary. DoD: C-DB-01, C-BUS-01, C-BUS-02, and PAYM-975859 green.
+  transition through one real boundary. NFR: dedupe-drop and decline logging keyed by
+  Payment.orderId, broker-credential-only security posture (section 8; every later milestone
+  copies these). DoD: C-DB-01, C-BUS-01, C-BUS-02, and PAYM-975859 green.
 - **M1 - Settlement breadth.** `decline` (PAYM-36d434) and `refund` (PAYM-8835f6) paths plus the
   duplicate-capture and stale-decline `_ignores`. DoD: all 3 oracle rows green by stable id; the
   redelivery property green.

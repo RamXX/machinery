@@ -62,7 +62,7 @@ func TestSelectNarrowingKeepsGbWhenBuildDocExists(t *testing.T) {
 	if sel.Run["gt"] {
 		t.Errorf("gt is never part of the narrowed parent list: %v", sel.Run)
 	}
-	want := "note: decomposed parent with no machines/; running g2,gb,g5 (G3/Gx run on the child designs; gt skipped: no machines)"
+	want := "note: decomposed parent with no machines/; running g2,gl,gb,g5 (G3/Gx run on the child designs; gt skipped: no machines)"
 	if sel.Note != want {
 		t.Errorf("note = %q\nwant %q", sel.Note, want)
 	}
@@ -84,7 +84,7 @@ func TestSelectNarrowedParentKeepsG4WithImpl(t *testing.T) {
 	if sel.Run["gt"] || sel.Run["g3"] || sel.Run["gx"] {
 		t.Errorf("gt/g3/gx stay machine-dependent: %v", sel.Run)
 	}
-	want := "note: decomposed parent with no machines/; running g2,g4,g5 (G3/Gx run on the child designs; gt skipped: no machines)"
+	want := "note: decomposed parent with no machines/; running g2,gl,g4,g5 (G3/Gx run on the child designs; gt skipped: no machines)"
 	if sel.Note != want {
 		t.Errorf("note = %q\nwant %q", sel.Note, want)
 	}
@@ -152,7 +152,7 @@ func TestSelectNarrowingKeepsArtifactActivatedGates(t *testing.T) {
 			t.Errorf("without --impl the narrowed parent must not select %s: %v", g, sel.Run)
 		}
 	}
-	want := "note: decomposed parent with no machines/; running gm,gs,gp,gi,gn,g2,g5 (G3/Gx run on the child designs; gt skipped: no machines)"
+	want := "note: decomposed parent with no machines/; running gm,gs,gp,gi,gn,g2,gl,g5 (G3/Gx run on the child designs; gt skipped: no machines)"
 	if sel.Note != want {
 		t.Errorf("note = %q\nwant %q (the note must list what actually runs)", sel.Note, want)
 	}

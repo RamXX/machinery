@@ -96,7 +96,7 @@ deferrals:
 | key | required | meaning |
 |---|---|---|
 | `surface_version` | yes | the integer `1` |
-| `sources` | no | list of non-empty strings naming where the act list was enumerated from |
+| `sources` | yes | non-empty list of strings naming where the act list was enumerated from (an enumeration with no named source is a completeness claim with no evidence) |
 | `acts` | yes | the list of acts and the surfaces that carry them |
 | `deferrals` | no | acts and personas deliberately left without a surface, with reasons |
 | `_comment` | no | free text |

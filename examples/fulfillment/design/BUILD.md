@@ -153,7 +153,9 @@ design-only example: the milestones bind the first implementer.
 
 **M0 - Walking skeleton (thinnest end-to-end thread).** `place order -> saga reserves (stub
 inventory) -> saga captures (stub gateway) -> saga dispatches (stub carrier) -> Delivered`,
-exercising one real message-bus round trip and the transactional outbox. DoD: green for the saga
+exercising one real message-bus round trip and the transactional outbox. NFR: transition logging
+keyed by order id and message id, the FailedDirty paging hook, and the outbox-lag gauge (section
+7's operator signals; every later milestone copies them). DoD: green for the saga
 forward path `FULF-ee2ed2`, `FULF-bba0be`, `FULF-6ec4e1` (T-FULF-02,05,08); the Order happy chain
 T-ORDE-01,05,09,11,13 with its persist commits T-ORDE-16..20; one outbox row driven
 Pending -> Published -> Consumed (T-OUTB-01,04,07 then T-OUTB-02,08); the delivered order durably

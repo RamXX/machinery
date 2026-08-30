@@ -121,6 +121,11 @@ func CheckOracleCoverage(design, impl string) *Gate {
 			g.Count("formal oracles covered")
 		}
 	}
+	// opt-in via CLAUSES{...} declarations: the falsifying-clause tests the
+	// oracle cannot derive, held per governed row (see clausecov.go)
+	if testFiles > 0 {
+		checkClauseCoverage(g, design, corpus)
+	}
 	return g
 }
 

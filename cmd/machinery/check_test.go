@@ -344,3 +344,104 @@ func TestCheckCommitFlagAndEnvironmentReachGa(t *testing.T) {
 		t.Fatalf("no commit must state the non-check: code=%d out=%s", code, out)
 	}
 }
+
+// The green-summary line: a default full run earns platform-green with an
+// impl, design-green without one; an explicit --gate subset claims neither.
+func TestCheckGreenSummaryLines(t *testing.T) {
+	out, _, codes := withCapturedIO(t)
+	cmd := newCheckCmd()
+	cmd.SetArgs([]string{"../../examples/go-crm/design", "--impl", "../../examples/go-crm/impl"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if len(*codes) != 0 {
+		t.Fatalf("green run must exit 0: %v\n%s", *codes, out.String())
+	}
+	if !strings.Contains(out.String(), "platform-green: design gates, G4-import, and Gt-tests all green") {
+		t.Fatalf("platform-green line missing:\n%s", out.String())
+	}
+
+	out2, _, codes2 := withCapturedIO(t)
+	cmd = newCheckCmd()
+	cmd.SetArgs([]string{"../../examples/fulfillment/design"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if len(*codes2) != 0 {
+		t.Fatalf("green run must exit 0: %v\n%s", *codes2, out2.String())
+	}
+	if !strings.Contains(out2.String(), "design-green: all applicable design gates green") {
+		t.Fatalf("design-green line missing:\n%s", out2.String())
+	}
+
+	out3, _, _ := withCapturedIO(t)
+	cmd = newCheckCmd()
+	cmd.SetArgs([]string{"../../examples/fulfillment/design", "--gate", "g2"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out3.String(), "-green:") {
+		t.Fatalf("an explicit subset must claim no green summary:\n%s", out3.String())
+	}
+}
+
+// verify-c4 fails loudly when the engine is absent and succeeds through a
+// stand-in binary, so the engine contract is pinned without Java in CI.
+func TestVerifyC4(t *testing.T) {
+	_, errB, codes := withCapturedIO(t)
+	design := t.TempDir()
+	cmd := newVerifyC4Cmd()
+	cmd.SetArgs([]string{design})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if len(*codes) == 0 || (*codes)[0] != 1 || !strings.Contains(errB.String(), "does not exist") {
+		t.Fatalf("missing workspace.dsl must fail: codes=%v stderr=%q", *codes, errB.String())
+	}
+
+	if err := os.WriteFile(filepath.Join(design, "workspace.dsl"), []byte("workspace \"W\" \"d\" {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, errB2, codes2 := withCapturedIO(t)
+	t.Setenv("MACHINERY_STRUCTURIZR_CLI", filepath.Join(t.TempDir(), "missing-binary"))
+	cmd = newVerifyC4Cmd()
+	cmd.SetArgs([]string{design})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if len(*codes2) == 0 || (*codes2)[0] != 1 {
+		t.Fatalf("a missing engine must fail: codes=%v stderr=%q", *codes2, errB2.String())
+	}
+
+	fake := filepath.Join(t.TempDir(), "structurizr-cli")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out3, _, codes3 := withCapturedIO(t)
+	t.Setenv("MACHINERY_STRUCTURIZR_CLI", fake)
+	cmd = newVerifyC4Cmd()
+	cmd.SetArgs([]string{design})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if len(*codes3) != 0 || !strings.Contains(out3.String(), "verify-c4: ok") {
+		t.Fatalf("a passing export must report ok: codes=%v out=%q", *codes3, out3.String())
+	}
+
+	failing := filepath.Join(t.TempDir(), "structurizr-cli")
+	if err := os.WriteFile(failing, []byte("#!/bin/sh\necho 'parse error at line 1'\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out4, errB4, codes4 := withCapturedIO(t)
+	t.Setenv("MACHINERY_STRUCTURIZR_CLI", failing)
+	cmd = newVerifyC4Cmd()
+	cmd.SetArgs([]string{design})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if len(*codes4) == 0 || (*codes4)[0] != 1 ||
+		!strings.Contains(out4.String(), "parse error at line 1") ||
+		!strings.Contains(errB4.String(), "does not compile") {
+		t.Fatalf("a failing export must pass the engine output through: codes=%v out=%q stderr=%q", *codes4, out4.String(), errB4.String())
+	}
+}

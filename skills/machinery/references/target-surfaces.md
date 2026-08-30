@@ -58,8 +58,9 @@ deferrals:
 ```
 
 Root keys (strict; unknown keys fail): `surface_version` (the integer `1`, required), `sources`
-(optional list of non-empty strings naming where the act list was enumerated from), `acts`
-(required), `deferrals` (optional), `_comment` (optional).
+(required non-empty list of strings naming where the act list was enumerated from; an enumeration
+with no named source is a completeness claim with no evidence, the same rule Gs holds the legacy
+ledger's classes to), `acts` (required), `deferrals` (optional), `_comment` (optional).
 
 `acts` rows: `act` (required, `Entity.action` or `knob:<key>`), `actor` (required), `surface`
 (required, the screen, admin command, API route, or config release), `milestone` (optional,

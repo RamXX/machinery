@@ -6,7 +6,7 @@
   note   exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 1 boundaries, 2 externals, 2 allow rules, 2 transitive pairs, 4 dsl elements, 1 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 2 edges contracted, 3 event contracts
+  checked: 1 boundaries, 2 externals, 2 allow rules, 2 transitive pairs, 4 dsl elements, 1 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 nfr topics recorded, 1 event tables with sources, 2 edges contracted, 3 event contracts
   ok
 == G3-machine  machines + oracle ==
   checked: 1 machines, 3 transitions, 1 tla-generable, 1 oracles fresh, 3 named units covered, 4 dotted references checked
@@ -14,11 +14,14 @@
 == Gd-idcite  design-side stable-id citations ==
   warn   BUILD.md:273: T-PAYM-01 is a positional row citation; rows renumber, so cite the stable id instead
   checked: 6 citations resolved, 7 files scanned, 3 committed oracle ids
+== Gl-ledger  session ledgers + house style ==
+  checked: 7 files style-scanned
+  ok
 == Gx-trace  cross-layer traceability ==
   checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor)
   ok
 == Gb-plan  build plan structure ==
-  checked: 1 plans, 3 milestones, 3 DoD-bearing milestones, 1 skeleton citations
+  checked: 1 plans, 3 milestones, 3 DoD-bearing milestones, 1 skeleton NFR lines, 1 skeleton citations
   ok
 == Ge-embed  declared-embed fidelity ==
   checked: 1 embed markers, 1 embed tables verified, 1 subset claims, 3 rows compared, 1 complete claims
@@ -28,3 +31,4 @@
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)
+design-green: all applicable design gates green (add --impl for G4-import and Gt-tests toward platform-green)

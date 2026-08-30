@@ -78,6 +78,9 @@ a `Migration implementation plan` heading.
 ## Required implementation regressions
 
 - One table test per field mapping and lifecycle mapping, including malformed input and drain rules.
+  Bind them deterministically: declare `tests: [<identifier>, ...]` on the mapping rows in
+  `migration.yaml`, and `machinery check <design> --impl <dir>` holds every named identifier to the
+  test corpus whole-token (without an impl, the declarations print as a stated non-check).
 - Characterization against legacy and target adapters with adjudicated deltas.
 - Stable operation ids and signed manifests; duplicate, reorder, interruption, and replay tests.
 - Reconciliation tests for missing/extra rows, field/state/ownership/authz drift, and tampering.

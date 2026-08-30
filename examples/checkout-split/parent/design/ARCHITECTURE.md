@@ -59,6 +59,10 @@ what crosses BETWEEN subsystems, and here that is bus messaging only, governed b
 
 ## 5. Event contracts (the governing artifact for the bus)
 
+Source: enumerated from the two contract machines' transitions (`OrdersContract`,
+`PaymentsContract`); the bus lane is the single shared topic pair, declared in section 2, with no
+other bindings to sweep.
+
 | event | producer | consumer | payload | delivery | ordering | dedupe |
 |---|---|---|---|---|---|---|
 | request | orders | payments | Payment.orderId, Payment.amount | at-least-once | none | Payment.orderId |

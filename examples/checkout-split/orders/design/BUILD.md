@@ -321,7 +321,9 @@ Walking skeleton first, then vertical slices, each fully green before the next.
 - **M0 - Walking skeleton.** `place` runs one real Postgres transaction inserting the Order row
   and the outbox `request` row; the dispatcher publishes to the broker fixture; a consumed
   `markPaid` lands the order on Paid (stable id ORDE-33e568). One real transition through one real
-  boundary. DoD: C-DB-01, C-BUS-01, and ORDE-33e568 green.
+  boundary. NFR: markDeclined and dedupe-drop logging keyed by order id, broker-credential-only
+  security posture (section 8; every later milestone copies these). DoD: C-DB-01, C-BUS-01, and
+  ORDE-33e568 green.
 - **M1 - Settlement slice.** `markDeclined` and `cancel` paths plus consumer dedupe. DoD: all 4
   oracle rows green by stable id; C-BUS-02 and the redelivery property green.
 - **M2 - Ship and invariants.** `ship` from Paid only; the property tests. DoD:

@@ -505,6 +505,12 @@ func selectGates(designDir string, cfg Config) (gates.Selection, string) {
 	if fileExists(filepath.Join(designDir, "workspace.dsl")) || fileExists(filepath.Join(designDir, "ARCHITECTURE.md")) {
 		run["g2"] = true
 	}
+	// ledger-format and house-style findings are checkable from turn one and
+	// never block on their own (warn tier plus rare format errors)
+	run["gl"] = true
+	if gates.AdjudicationActive(designDir) {
+		run["gj"] = true
+	}
 	// machine detection never uses filepath.Glob: a project path carrying
 	// glob metacharacters ([ ] * ?) once defeated it, silently dropping g3
 	// and letting committed-oracle DRIFT pass at stop time (GATE-3)

@@ -122,6 +122,7 @@ design/
   BUILD.md                  # Phase 4 (the blueprint; manifest over BUILD/ when sharded; Build plan held by Gb)
   BUILD/<context>.md        # only for sharded designs (see "Sharding large designs")
   acceptance/M<n>.yaml      # one per CLOSED milestone: the committed acceptance evidence Gb marks and Ga binds (see Milestone acceptance)
+  adjudications/<M>.yaml    # brownfield only: committed characterization verdicts per machine, held by Gj (see Brownfield mode)
   DECISIONS.md              # dated binding decisions; required once interrogation starts (see Operating discipline)
   STATE.md                  # session ledger for multi-session runs (see "Session ledger")
 ```
@@ -130,7 +131,7 @@ design/
 
 Never advance until the current gate passes. State the gate result to the user before moving on.
 
-The deterministic gates live in `machinery check <design> [--impl <dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gx,gk,gb,ge,ga,g4,gt,g5]`
+The deterministic gates live in `machinery check <design> [--impl <dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,g4,gt,g5]`
 (g5 runs automatically on decomposed designs; gm runs once `migration.yaml` exists; gs once
 `legacy/surface.yaml` exists; gu once `surfaces.yaml` exists; gp, gi, and gn each run automatically once the matching
 `formal/{policy,integrity,isolation}.relational.yaml` exists; gc once any `*.modelith.yaml`
@@ -139,6 +140,8 @@ action's `preserves`, a relational layer, a machine unit, a checker claim, or a 
 reason in `formal/waivers.yaml`); gk once any
 `checkers/*.checker.yaml` exists; gb once `design/BUILD.md` exists; ga once
 `design/acceptance/` exists or any milestone is marked `Status: closed`;
+gj once `design/adjudications/` exists (the brownfield characterization verdicts); gl always
+(session-ledger formats plus the house-style scan, warn tier);
 gt, like g4, only with `--impl`; see Recursive decomposition, the
 legacy surface ledger, the target surface ledger, the Phase 1 relational layers, External
 checkers, and Milestone acceptance).
@@ -380,7 +383,10 @@ gu`, automatic once the file exists) holds the obligated set closed: every actio
 a person is mapped or deferred, each mapped act resolves against the model and matches the actor
 the model declares, and every act is stated exactly once. Its `checked:` line prints the actorless
 action count, so a model where nobody filled in `actor` yet reads as an unarmed gate rather than
-full coverage; if that number is high, the fix is back in Phase 1. Schema and full check list:
+full coverage; if that number is high, the fix is back in Phase 1. The ledger's `sources:`
+list is required: name where the act list was enumerated FROM (the per-persona walk of the model's
+actions, plus any route or command sweep); an enumeration with no named source is a completeness
+claim with no evidence. Schema and full check list:
 `references/target-surfaces.md`.
 
 A technology choice is a closure, not a node: adopting X adopts X's operational closure (stateful
@@ -413,20 +419,35 @@ INTERFACE-CONTRACT table: `dependency_rules.allow` enumerates every crossing the
 G2 demands, for every concrete allow edge, a row whose edge cell names it as `from -> to` with shape,
 errors, and idempotency all answered, or a `(no contract: <reason>)` waiver. The obligation runs both
 ways: an edge a row names but no allow rule declares is an ERROR, because a contract for a denied,
-undeclared, or merely baselined edge describes an interface the architecture does not have. Read the
+undeclared, or merely baselined edge describes an interface the architecture does not have. Further deterministic
+checks: the **NFR record** exists (a heading containing "NFR" or "non-functional") and mentions all
+three topics, security, capacity, and observability ("out of scope, recorded as such" satisfies the
+check; only the content stays attested); every **event-contract table** names its enumeration
+source in a `Source:` note within the five lines above its header, or carries its rows via a
+`machinery:embed` marker (the same rule Gs holds the legacy ledger to). Three opt-in artifacts
+activate on their own presence, like the declared embeds: the **action-ownership table** (a header
+naming an action column and an owning-component column; every model action appears exactly once and
+resolves, every owner is a `workspace.dsl` element or contract id, waiver `(unowned: <reason>)`),
+the **adoption-closure table** (a header naming technology and closure; every backticked closure
+member must be a declared dependency WITH a mitigation row, waiver `(no closure: <reason>)`; an
+optional scorecard column holds `<score> (YYYY-MM-DD)` or `n/a - <reason>`), and the mitigation
+table's **handled by** column (resolved at Gate 3/Gx; see below). `machinery verify-c4 <design>`
+is the C4 engine phase: it compiles `workspace.dsl` under `structurizr-cli export` (needs Java),
+the same pure-gate/engine split as verify-formal. Read the
 `checked:` counts; they tell you what was actually verified.
-LLM-attested (you check these; the tool cannot): every Modelith action maps to an owning component;
+LLM-attested (you check these; the tool cannot): every Modelith action maps to an owning component
+when the design declines the action-ownership table (author the table and the mapping is checked
+closed instead);
 whether each interface contract is the RIGHT one (that the shape matches what the code will actually
 exchange, the error list is exhaustive, and the idempotency claim survives a retry; that every
 crossing HAS a contract row is checked, as above); whether each
 persistence-and-placement decision is the RIGHT one (both deterministic halves, a machine per row
-and a row per entity, run later in Gx-trace); every technology choice has its adoption closure enumerated, with closure members
-carried into the mitigation table (see the reference); the event-contract table names its
-enumeration sources and the dependency declaration is complete (see above); and the **NFR record**: the Architecture Contract conversation must record security
-posture (authn/authz approach, secret handling), capacity assumptions (expected volume, latency
-budget where relevant), and observability requirements (what must be logged, metered, alerted, in
-particular for any FailedDirty-style residual state), even when the answer is "out of scope,
-recorded as such".
+and a row per entity, run later in Gx-trace); the adoption closure is fully DISCOVERED (a declared
+closure member is checked; a member nobody declared is invisible, so enumerate against the
+deployment artifacts and carry the members into the closure table); the event-contract table covers
+every cross-component event and the dependency declaration is complete (see above); and the NFR
+record's CONTENT: presence and topic coverage are checked, whether the recorded posture is true is
+judgment.
 
 ### Phase 3 - State machines (the behavior)
 
@@ -491,7 +512,10 @@ reconciled against the machine structurally, row by row, in both directions, and
 contract row for every guard, action, and actor the machine fires.
 LLM-attested: whether each guard's semantics actually enforce the invariant it names, and whether
 every C4 dependency failure has its residual transition, reclassified by its mitigation rather than
-deleted (see below). When formal annotations exist under `design/formal/`, a green
+deleted (see below). The residual binding has an opt-in deterministic shell: give the mitigation
+table a **handled by** column naming, backticked, the machine or invoke actor that carries each
+row's residual transitions (waiver `(no residual: <reason>)`), and Gx resolves every name against
+the committed machines; whether the named transitions are semantically adequate stays attested. When formal annotations exist under `design/formal/`, a green
 `machinery verify-formal design` is part of this gate (deterministic when Java is present; without
 Java, run it with `--gen-only` and record in STATE.md that the formal suite is generated but
 unchecked).
@@ -527,7 +551,9 @@ markers with unique numbers; the first milestone's title contains "walking skele
 section carries the explicit waiver line `Walking skeleton: N/A - <reason>` (brownfield gap plans
 whose skeleton already exists in production); every milestone block carries a `DoD:` line; and the
 skeleton milestone's DoD cites at least one committed oracle id (test id or stable id) as a whole
-token. The section itself may be waived only as `N/A - <reason>` per the template's omission rule.
+token; and the skeleton block carries an `NFR:` line naming the NFR-record mechanisms it
+instantiates (`NFR: none - <reason>` when the record leaves nothing to instantiate), because the
+skeleton is the pattern template every later milestone copies. The section itself may be waived only as `N/A - <reason>` per the template's omission rule.
 Each milestone block may carry one optional status line, `Status: closed` (or `Status: open`, the
 default); an unrecognized value is an ERROR, because reading it as "not closed" would silently
 disarm Ga-accept.
@@ -556,7 +582,11 @@ rule is strict, all three conditions in the SAME test file: (1) the oracle file 
 word boundaries on both sides (so `purchase-order.oracle.md` never covers `order.oracle.md`), (2)
 inside a string literal (a parser holds the path as a string; a mention in a comment no longer
 counts), and (3) the file carries parse evidence: some string literal containing the `|` table
-delimiter every conformance parser splits on. It is the
+delimiter every conformance parser splits on. When a matrix
+row declares a guard's clause vocabulary (`CLAUSES{...}`), every committed oracle row that guard
+governs additionally owes one falsifying-clause test per active clause, keyed as the base stable id
+plus a letter (`base`a, `base`b, ...), held whole-token in the corpus; the conformance parse never
+discharges these, because they are exactly the tests the oracle table cannot derive. It is the
 hard-TDD RED-exit check (template section 11.3a) made deterministic: a missing id is a missing test.
 LLM-attested: the conformance test shape: a wholesale-conformance test must parse the committed
 oracle table and assert, per row, the next state AND the expected actions (go-crm's
@@ -672,6 +702,10 @@ Gate 4's full `machinery check` must be green before handoff. Gm proves coverage
 consistency of the transition contract; it does not execute a migration or prove transformation
 code. BUILD.md must require mapping-table, characterization, idempotent replay, reconciliation,
 fault-injection, rollback, and cutover tests in addition to the target's ordinary hard-TDD suite.
+Mapping rows may bind those regressions deterministically: a `tests:` list on a data or state
+mapping names the table tests that cover it, and `machinery check <design> --impl <dir>` holds
+every named identifier to the test corpus whole-token (without an impl the declarations print as a
+stated non-check, never a silent pass).
 
 Full installed reference: `references/rebuild-guide.md`. The expanded repository guide is
 `docs/rebuild-guide.md`. The complete
@@ -724,7 +758,13 @@ Two standing rules for every archaeology session:
 - **Phase 3** machines describe current behavior. Oracle-derived tests run as characterization
   tests, and each failing row is adjudicated: code-is-truth means the model is wrong archaeology,
   fix it; model-is-truth means the code has a defect, file it and quarantine the test with its
-  stable id. A test locks (the hard-TDD rule) at adjudication, not at generation.
+  stable id. A test locks (the hard-TDD rule) at adjudication, not at generation. Record the
+  verdicts as committed evidence, one file per machine at `design/adjudications/<Machine>.yaml`
+  (`adjudication_version: 1`, `machine:`, and `rows:` of `{id, verdict, date, note}` with
+  `defect:` naming the filed defect on every model-is-truth row); **Gj-adjudication** activates on
+  the directory and verifies every verdict binds to a committed oracle stable id, so the
+  adjudication record is checkable evidence instead of PR prose. Whether each verdict is RIGHT
+  stays attested, exactly like Ga's review quality.
 - **Phase 4**'s zero-context claim applies to the new work carved out of the modeled slice, not to
   the legacy remainder.
 
@@ -990,7 +1030,12 @@ under the phase entry:
 `self-review: reality=clean depth=fixed scope=clean coverage=accepted(<short reason>) consistency=clean`
 
 where `fixed` means the pass found and fixed something and `accepted(<reason>)` means a finding
-was consciously waived. A phase entry without a self-review line is not complete.
+was consciously waived (`fixed(<reason>)` is also legal; `clean` never carries a reason). A phase
+entry without a self-review line is not complete. **Gl-ledger** holds every `self-review:` line in
+STATE.md to exactly this grammar (all five keys, valid verdicts), validates the dated openers of
+DECISIONS.md entries, counts author-proposed unconfirmed items as a note, and carries the
+house-style scan (em dashes and emojis warn across the hand-written design tree); the ledgers'
+CONTENT stays unjudged, as everywhere.
 
 ## Working as a team
 
@@ -1077,8 +1122,8 @@ was consciously waived. A phase entry without a self-review line is not complete
   dependency-mitigation, persistence-placement, and event-contract table formats, and the NFR record.
 - `references/build-md-template.md` - the full `BUILD.md` skeleton (full and manifest modes).
 - `machinery check` - the deterministic gate suite (Gm-transition, Gs-surface, Gu-surfaces, Gp/Gi/Gn
-  relational gates, G2-c4, G3-machine, Gd-idcite, Gx-trace, Gb-plan, Ge-embed, Ga-accept, G4-import,
-  Gt-tests, G5-pack for decomposed designs). G3 also runs the TLA generator's own admissibility pass
+  relational gates, G2-c4, G3-machine, Gd-idcite, Gl-ledger, Gx-trace, Gb-plan, Ge-embed, Ga-accept,
+  Gj-adjudication, G4-import, Gt-tests, G5-pack for decomposed designs). G3 also runs the TLA generator's own admissibility pass
   (one validator, one truth), the counter and derived-deadline accounting, the dotted-reference
   name-rot audit, and the branch-order check; Gd resolves every design-side stable-id citation
   against the committed oracles and carries the rule-15 row-count, clause-drift, and payload-READS
@@ -1087,6 +1132,9 @@ was consciously waived. A phase entry without a self-review line is not complete
   regenerates valid machines past a broken sibling.
   Single Go binary. Run it at each gate with `--gate` so correctness does not
   rely on the model getting every cross-reference right. See `tools/README.md`.
+- `machinery verify-c4 <design>` - the C4 engine phase: compiles `workspace.dsl` under
+  `structurizr-cli export` (needs Java 17+; `MACHINERY_STRUCTURIZR_CLI` overrides the binary
+  lookup). The pure G2 gate stays dependency-free; this is the same split as verify-formal.
 - `machinery baseline <design> --impl <dir>` - the brownfield Stage-1 generator: proposes
   `baseline:` rules for today's violating edges, suggests `ignore:` globs, and writes
   `design/ratchet.json` (generated; never hand-edit), the snapshot G4 ratchets baselined

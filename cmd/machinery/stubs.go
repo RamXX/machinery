@@ -6,8 +6,9 @@ import (
 	"github.com/RamXX/machinery/internal/formal"
 )
 
-// Phase-1 stubs. Each subcommand exits 2 with "not implemented" until its phase
-// replaces the body. The differential harness depends on these existing.
+// Once the Phase-1 stub file; every body below has long been implemented
+// (verify-formal, doctor, preflight, and the hidden ir-dump). The file name
+// survives for history.
 
 func newVerifyFormalCmd() *cobra.Command {
 	var genOnly bool

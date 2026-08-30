@@ -19,7 +19,7 @@
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 6 boundaries, 1 externals, 12 allow rules, 16 transitive pairs, 2 deny rules, 5 boundaries with exposes, 15 dsl elements, 6 boundaries bound to dsl, 9 mitigation rows, 4 dependencies with mitigation rows, 12 edges contracted
+  checked: 6 boundaries, 1 externals, 12 allow rules, 16 transitive pairs, 2 deny rules, 5 boundaries with exposes, 15 dsl elements, 6 boundaries bound to dsl, 9 mitigation rows, 4 dependencies with mitigation rows, 3 nfr topics recorded, 12 edges contracted
   ok
 == G3-machine  machines + oracle ==
   warn   CommandExecution.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
@@ -48,11 +48,14 @@
   warn   BUILD.md:742: T-DEAL-28 is a positional row citation; rows renumber, so cite the stable id instead
   warn   BUILD.md:742: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
   warn   BUILD.md:743: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:969: T-SESS-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:969: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:1154: T-SESS-35 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:1156: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:972: T-SESS-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:972: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:1157: T-SESS-35 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:1159: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
   checked: 2 citations resolved, 24 files scanned, 272 committed oracle ids
+== Gl-ledger  session ledgers + house style ==
+  checked: 24 files style-scanned
+  ok
 == Gx-trace  cross-layer traceability ==
   warn   invariant 'activity-immutable' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
   warn   invariant 'deal-terminal' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
@@ -61,7 +64,8 @@
   note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 2 placement rows waived, 9 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 2 invariants attested only (prose), 13 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
 == Gb-plan  build plan structure ==
-  checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 2 skeleton citations
+  checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 2 skeleton citations
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)
+design-green: all applicable design gates green (add --impl for G4-import and Gt-tests toward platform-green)

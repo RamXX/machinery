@@ -21,8 +21,8 @@ var (
 	migrationModelKeys       = stringSet("model")
 	migrationDispositionKeys = stringSet("legacy", "target", "strategy", "rationale")
 	migrationAssetKeys       = stringSet("name", "kind", "strategy", "target", "rationale", "verification")
-	migrationDataKeys        = stringSet("source", "target", "transform", "validation", "rollback")
-	migrationStateKeys       = stringSet("source", "target", "reason")
+	migrationDataKeys        = stringSet("source", "target", "transform", "validation", "rollback", "tests")
+	migrationStateKeys       = stringSet("source", "target", "reason", "tests")
 	migrationPhaseKeys       = stringSet(
 		"id", "source_of_truth", "read_path", "write_path", "backfill",
 		"entry_criteria", "exit_criteria", "rollback", "observability",
@@ -84,6 +84,57 @@ type migrationValidator struct {
 	newEntities  map[string]bool
 	phases       map[string]migrationPhase
 	phaseOrder   map[string]int
+	// declaredTests are the opt-in regression bindings mapping rows declared
+	// via `tests:`, resolved against the impl's test corpus when one is given.
+	declaredTests []migrationTestClaim
+}
+
+// migrationTestClaim is one declared regression-test identifier of one
+// mapping row.
+type migrationTestClaim struct {
+	where string
+	token string
+}
+
+// collectMappingTests validates a mapping row's optional `tests:` list (each
+// entry a non-empty string) and records the claims for resolution.
+func (v *migrationValidator) collectMappingTests(obj *ir.Object, where string) {
+	tests := obj.Get2("tests")
+	if tests == nil {
+		return
+	}
+	if tests.Kind != ir.KindArray || len(tests.AsArray()) == 0 {
+		v.errf("%s.tests must be a non-empty list of test identifiers", where)
+		return
+	}
+	for i, item := range tests.AsArray() {
+		if item == nil || item.Kind != ir.KindString || strings.TrimSpace(item.AsString()) == "" {
+			v.errf("%s.tests[%d] must be a non-empty test identifier", where, i)
+			continue
+		}
+		v.declaredTests = append(v.declaredTests, migrationTestClaim{where: where, token: strings.TrimSpace(item.AsString())})
+	}
+}
+
+// checkDeclaredTests resolves the declared regression-test identifiers
+// against the impl's test corpus (whole-token, the Gt id boundary rule). With
+// no impl the declarations are a stated non-check, never a silent pass.
+func (v *migrationValidator) checkDeclaredTests(impl string) {
+	if len(v.declaredTests) == 0 {
+		return
+	}
+	if impl == "" {
+		v.g.Notes = append(v.g.Notes, fmt.Sprintf("%d regression-test citation(s) declared by mapping rows but unchecked: no --impl was given", len(v.declaredTests)))
+		return
+	}
+	corpus := testCorpus(v.design, impl, v.g)
+	for _, claim := range v.declaredTests {
+		if idTokenIn(claim.token, corpus.joined) {
+			v.g.Count("mapping regression tests resolved")
+		} else {
+			v.errf("%s cites regression test %q, which appears in no test file under the impl; write the test or fix the citation", claim.where, claim.token)
+		}
+	}
 }
 
 // CheckMigration implements Gm-transition. It reconciles two domain truths
@@ -91,8 +142,12 @@ type migrationValidator struct {
 // coverage gate: every legacy entity is disposed, every target entity is
 // mapped or new, replace mappings cover data and lifecycle states, and the
 // coexistence phases name their source of truth, rollback, observability, and
-// transitional failure posture.
-func CheckMigration(design string) *Gate {
+// transitional failure posture. impl is the implementation directory ("" when
+// none was supplied): a mapping row may opt in to regression binding by
+// declaring `tests:` (the identifiers of the table tests that cover it), and
+// with an impl those identifiers are held to the test corpus the way Gt holds
+// oracle ids; without one the declarations degrade to a stated non-check.
+func CheckMigration(design, impl string) *Gate {
 	g := NewGate("Gm-transition  hybrid/rebuild migration contract")
 	g.startOrder()
 	path := filepath.Join(design, MigrationContractName)
@@ -136,6 +191,7 @@ func CheckMigration(design string) *Gate {
 	v.validateCutover()
 	v.validateRisks()
 	v.validateNarrativeBridges()
+	v.checkDeclaredTests(impl)
 	g.RequireNonzero("dispositions", "no legacy entity disposition was checked")
 	g.RequireNonzero("salvage decisions", "no reusable/replaceable implementation asset was inventoried")
 	g.RequireNonzero("transition phases", "no coexistence/cutover phases were checked")
@@ -425,6 +481,7 @@ func (v *migrationValidator) validateDataMappings() {
 			continue
 		}
 		v.checkKeys(obj, migrationDataKeys, where)
+		v.collectMappingTests(obj, where)
 		source, target := obj.GetString("source"), obj.GetString("target")
 		if source == "" || target == "" || (source == "-" && target == "-") {
 			v.errf("%s needs source and target; exactly one may be '-' for derive/drop", where)
@@ -503,6 +560,7 @@ func (v *migrationValidator) validateStateMappings() {
 			continue
 		}
 		v.checkKeys(obj, migrationStateKeys, where)
+		v.collectMappingTests(obj, where)
 		source, target := obj.GetString("source"), obj.GetString("target")
 		if source == "" || target == "" || obj.GetString("reason") == "" {
 			v.errf("%s needs source, target, and reason", where)

@@ -945,7 +945,10 @@ end through every boundary once. This crosses `crm.commands` (CommandExecution P
 ResolvingSession->Authorizing->Executing->Rendering->Done), `crm.session` (login: Anonymous->Authenticating
 ->WritingSession->Active; resume: Resolving->CheckingUser->Active), `crm.authz` (one Allowed decision),
 `crm.domain` (Deal create at Lead; advanceStage Lead->persisting->Qualified), and `crm.repo` (Open,
-BeginWrite, SaveDeal, Commit against a real temp DB dir). DoD: green for T-CMD-01,03,12,18,20,28,29;
+BeginWrite, SaveDeal, Commit against a real temp DB dir). NFR: the classified stderr error envelope
+and per-terminal-state exit codes, 0600 permissions on the session and DB files, and the single
+authorization call site in crm.domain (section 8's mechanisms; every later milestone copies them).
+DoD: green for T-CMD-01,03,12,18,20,28,29;
 T-SESS-01,06,14,02,18,23; T-DEAL-01,38; contract C-REPO-01,05,06,12, C-SESS-01,05, C-AUTHZ-02, C-ARCH-01;
 the login token is written and re-resolved on the next command; the advance is durably persisted (re-Open
 sees Qualified); one real write Tx is opened and committed.

@@ -293,6 +293,10 @@ implementation plan` heading in BUILD.md. Gm requires both bridges.
 
 - One table test covers every `data_mappings` row, including invalid and malformed source values.
 - One table test covers every `state_mappings` row and proves drained values cannot cross cutover.
+- Bind the two rules above deterministically: declare `tests: [<identifier>, ...]` on the mapping
+  rows in `migration.yaml`; `machinery check <design> --impl <dir>` then holds every named
+  identifier to the test corpus whole-token, and a dangling citation is an ERROR (without an impl
+  the declarations print as a stated non-check, never a silent pass).
 - Characterization cases run against legacy and target adapters; intentional deltas are recorded.
 - Import and replay are idempotent under duplicate, reordered, interrupted, and resumed delivery.
 - Reconciliation detects missing rows, extra rows, field drift, lifecycle drift, ownership drift,

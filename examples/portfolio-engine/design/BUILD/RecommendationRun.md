@@ -75,7 +75,7 @@ section 8; collectRetry is never persisted, so renaming it needs no migration.
 tiny two-index fixture with cached prices: build a `CandidateSet` (dedup), start a
 `RecommendationRun`, fetch prices through the feed (breaker closed), optimize a 16-of-N fixture,
 reach Ready with a `Portfolio`. Prove the topology, one real DuckDB write, and one real optimizer
-run. The skeleton instantiates the NFR-record mechanisms every later milestone copies: the distinct
+run. NFR: the skeleton instantiates the record's mechanisms every later milestone copies: the distinct
 exit code and loud message per residual failure, the market-data key read from env (never logged),
 and the 0600 store file. DoD: `RECO-f89da8` then `RECO-d6fcf9` pass against a real store and a
 forced feed failure drives `RECO-040944` then the bounded retry; contract tests for the crossed
