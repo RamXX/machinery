@@ -4,7 +4,7 @@ title: "Gu-surfaces: target-side surface ledger gate"
 status: closed
 priority: 1
 type: feature
-labels: [story, delivered]
+labels: [story, delivered, accepted]
 created_at: 2026-08-29T23:49:02Z
 created_by: ramirosalas
 updated_at: 2026-08-30T00:19:51Z
