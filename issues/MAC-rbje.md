@@ -6,9 +6,10 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:40:18Z
-content_hash: "sha256:d37b563892d8ecb872ba29e6c83f4c9e9c02c8be16a32d5ddf8f8f1d5eab8326"
+updated_at: 2026-08-30T08:40:34Z
+content_hash: "sha256:c83b6e5fd5a5c67c335cc3c363633c3294f9978118ee1ac4e49e62d0c2663ddc"
 assignee: ramirosalas
+labels: [delivered]
 ---
 
 ## Description
@@ -106,3 +107,6 @@ LEARNINGS:
 
 
 ## Comments
+
+### 2026-08-30T08:40:34Z ramirosalas
+DELIVERED for acceptance review. Branch story/MAC-rbje-wave-sentinel at c594b09 (not merged, not pushed). Proof in Notes. Status left in_progress: this vault has no 'delivered' status (open/in_progress/blocked/deferred/closed only), so the 'delivered' label carries the signal.
