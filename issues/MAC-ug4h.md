@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T09:09:49Z
-content_hash: "sha256:27c7a7a9a92e69b1e1c96ba23f40408d1bd6a345e2f8f374224060aeda4fc303"
+updated_at: 2026-08-30T09:10:04Z
+content_hash: "sha256:1ea3eb91e85a8b98c78b7fb5a503942edca6eaa19903f87ff0115e6c9d73017a"
 was_blocked_by: [MAC-v16q]
 assignee: ramirosalas
 follows: [MAC-v16q]
@@ -227,6 +227,30 @@ machine-less-parent narrowing: TestAttestationSuiteWiring runs Select+RunSelecte
 gate is absent without the artifact and present with it; TestAttestationSurvivesDecomposedParentNarrowing
 asserts the narrowing note lists gv. (3) Stop-time hook auto-selection:
 TestSelectGatesActivatesGvOnAttestationEvidence calls selectGates the same way the hook does.
+
+LEARNINGS
+- The generalization was cheaper than expected because Ga and Gj had already settled the shape:
+  activation-on-artifact, ir.LoadYAML plus a closed key set, per-row findings that name the file and
+  the row index. The only genuinely new decision was the severity of staleness, and reading Gk's
+  input_hash (Drift) next to Ga's commit binding (Errs) is what settled it: DRIFT is for artifacts a
+  generator can refresh, and a judgment has no generator.
+- Coverage posture was the one place where machinery's usual 'absence is an ERROR' rule had to be
+  argued against rather than applied. The deciding question was adoption cost: a gate whose first
+  commit turns the tree red is a gate nobody commits. Warn on missing coverage, error on a wrong
+  record, error on an empty file, keeps the principle where it bites and removes it where it would
+  have prevented the record from ever existing.
+- Exporting the vocabulary (AttestationClaimIDs) instead of documenting it twice paid for itself
+  immediately: the CLI --claims flag, the gate's own 'the ids are ...' error text, and the CLI test
+  all read the same slice, so the docs table is the only transcription and it is the one a reader
+  can check against 'machinery attest --claims'.
+- Gotcha for future gate stories: golangci-lint's staticcheck QF1002 rejects a bare 'switch { case
+  x == "": ... default: ... }' over a single variable and wants a tagged switch or an if/else. Cheap
+  to fix, but it only surfaces at preflight stage 4, well after go test is green, so run
+  scripts/preflight.sh before believing a gate is done.
+- The gate-list string 'gm,gs,...,g5' is duplicated across seven files (CLI Use line, CLI flag help,
+  suite.go default, three docs, one command frontmatter). A single perl -pi over the exact old
+  substring caught them all; grepping for the whole list rather than for individual letters is the
+  reliable way to find every copy.
 
 ## History
 - 2026-08-30T08:34:40Z dep_added: blocked_by MAC-v16q
