@@ -6,10 +6,11 @@ priority: 1
 type: chore
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:42:03Z
+updated_at: 2026-08-30T08:42:07Z
 content_hash: "sha256:cd425ceed0dcdbf55aa962523063aee0f067bcc7f1f8a0800b62696c5e4f1e56"
 blocks: [MAC-ug4h]
 assignee: ramirosalas
+labels: [delivered]
 ---
 
 ## Description
