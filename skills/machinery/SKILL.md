@@ -364,7 +364,10 @@ row per pair): pack generation extracts from it by exact component name and fail
 cell it cannot resolve. Every markdown table whose header names producer, consumer, and delivery
 is an event-contract table (G2's presence check and pack generation share the header rule); pack
 generation and G5's in-memory regeneration parse ALL of them and merge their rows, so splitting
-the contract across several tables hides nothing.
+the contract across several tables hides nothing. Where a payload's sufficiency for the declared
+reaction matters, arm the consumer-READS completeness tier with a `<!-- machinery:reads-complete -->`
+marker in the document (see `references/c4-standalone.md`): every row then states what its consumer
+reads, and Gx-trace holds each declared field to the row's payload.
 
 **The persona-walk sweep (author `design/surfaces.yaml` before Gate 2).** Every other artifact in
 this phase looks at the design's internals. None of them asks how a PERSON reaches an act. That
@@ -577,8 +580,19 @@ says so in the row: `(no machine: <reason>)` in the consumer cell waives the rea
 producer cell the emission, and an empty reason is not a waiver. The event cell names its events
 backticked when it is prose ("`reserved` / `released` events"); a bare pack-format cell is the
 event. A design that carries a pack is left to G5, which reconciles the same rows from the
-generated `events.md` where direction is explicit, so one defect never earns two findings. What
-stays attested is the reverse sweep: whether every externally sourced machine event HAS a row
+generated `events.md` where direction is explicit, so one defect never earns two findings.
+A design may go one step further and arm the CONSUMER-READS COMPLETENESS TIER with a
+`<!-- machinery:reads-complete -->` marker in ARCHITECTURE.md. Armed, every event-contract row owes
+a `READS{field, ...}` declaration on a matrix row naming its event (the same stage-one syntax, now
+required rather than optional), and every declared field must appear whole-token in THAT ROW's
+payload cell. A consumer that genuinely reads nothing off the payload (a pure signal it reacts to,
+refetching by id) says so with `(no reads: <reason>)` in the consumer cell; an empty reason is not a
+waiver, and a `(no machine: <reason>)` waiver answers a different question and never discharges the
+reads obligation. Arm it where the payload's sufficiency for the declared reaction matters: an
+undeclared consumer is exactly the shape that let a row claim it drafts a new entity from an event
+whose payload carried nothing that entity's creation invariant needs, with every other gate green.
+An unarmed design carries no obligation, and Gd's opt-in warn tier is unchanged there.
+What stays attested is the reverse sweep: whether every externally sourced machine event HAS a row
 (nothing in a machine marks an event as externally sourced, so the table's coverage is a claim the
 source note evidences, not a checked set).
 **Gb-plan** (active once `design/BUILD.md` exists) verifies the Build plan section (any `##` or

@@ -495,6 +495,40 @@ gets. Once machines exist, Gx-trace reconciles the rows against them (see the Ga
 |---|---|---|---|---|---|---|
 | `ORDER_PAID` | `orderSvc` | `shipmentSvc` | Order.id, Order.total | at-least-once (outbox -> `q`) | per-order FIFO (partition by Order.id) | Order.id + event type |
 
+### Consumer-READS completeness (opt-in)
+
+The payload column says what the event CARRIES. Nothing says what the consumer READS, so a row can
+declare a reaction the payload cannot support and every gate passes: the cells are answered, the
+reaction is declared, the consumer's invariants have enforcement rows, and the insufficiency is
+invisible. A design closes that by putting a marker in ARCHITECTURE.md:
+
+```
+<!-- machinery:reads-complete -->
+```
+
+Anywhere in the document, by convention directly above the event-contract section. It is a claim
+about the whole contract, so it arms EVERY event-contract row the document carries (the contract is
+legitimately split across several tables). Armed, Gx-trace holds each row to two obligations:
+
+- some matrix line naming the event whole-token declares `READS{field, ...}` (the same declaration
+  syntax the opt-in payload-sufficiency check has always read; the natural home is a "consumed
+  events" section of the consuming machine's matrix). No declaration is an ERROR naming the row and
+  the event.
+- every declared field appears whole-token in THAT ROW's payload cell. A field the payload does not
+  carry is an ERROR: the payload-sufficiency drift, which is a warning while unarmed.
+
+A consumer that genuinely reads nothing off the payload (a pure signal: it reacts, then refetches by
+id) waives with `(no reads: <reason>)` in the consumer cell. The reason is mandatory, as with every
+house waiver. A `(no machine: <reason>)` waiver does NOT discharge the reads obligation: it answers
+whether anything reacts as a machine event, and a consumer reacting through an invoke actor still
+reads the payload. The `checked:` line reports the tier: reads declared, waived, missing, and the
+declared fields carried.
+
+Arming is per design document, so on a decomposed child the embedded rows include the ones its peer
+consumes; a shard arms the tier only once it can answer for every row it carries (a cell it must
+answer differently from the parent is `(shard-local: <reason>)` territory, the Ge escape). An
+unarmed design carries no obligation at all.
+
 ### Machine-checkable format (mandatory on a decomposed parent)
 
 `machinery pack generate` extracts each subsystem's boundary events from this table by exact

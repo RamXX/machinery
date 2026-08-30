@@ -32,3 +32,16 @@ the named-unit contract table and the failure catalog.
 Formal note: `formal/FulfillmentSagaData.tla` (generated from `FulfillmentSaga.semantics.yaml`)
 proves that a terminal saga never silently holds an obligation: refunds what it captured and
 releases what it reserved, or ends FailedDirty explicitly.
+
+## (c) Consumed events
+
+The event-contract table (ARCHITECTURE.md 6) arms the consumer-READS completeness tier. The saga
+consumes each reply through the invoke actor that emitted the command rather than as a machine
+event (which is what its `(no machine: ...)` consumer waivers state), and the reads obligation
+binds all the same: what the handler reads off the payload is stated here.
+
+| event | reacting unit | payload reads |
+|---|---|---|
+| `reserved` / `released` replies | `reserveInventory` (routes to `markReserved`) | READS{Reservation.status} |
+| `captured` / `refunded` / `failed` replies | `capturePayment` (routes to `markPaid` or the failure legs) | READS{Payment.status} |
+| `dispatched` / `delivered` / `lost` replies | `dispatchShipment` (routes to `markShipped`, `markDelivered`, or the failure legs) | READS{Shipment.status, Shipment.trackingId} |

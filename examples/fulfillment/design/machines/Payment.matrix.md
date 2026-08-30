@@ -38,3 +38,14 @@ Structural: `payment-terminal` is enforced by Failed and Refunded being final st
 | Refund exhausted | `gatewayRetriesExhausted` in refunding path | `gatewayRetry -> rolledBack -> Captured`, `recordRefundFailed` | the payment stays truthfully Captured; the saga retries compensation and owns FailedDirty | inv `refund-within-capture` holds; residual owned by the saga |
 | Payment DB unavailable / conflict | `persistPayment` onError | `persisting -> persistRetry -> persisting` then `rolledBack` at 3 | bounded retry; the gateway outcome is re-persisted on the bus redelivery | C4 3. Residual: gateway state ahead of the row until redelivery lands |
 | Write timeout | `after persistTimeout` (5s) | `persisting -> rolledBack -> priorStatus` | abort; outbox guarantees no half-published event | C4 3. Residual: none |
+
+## (c) Consumed events
+
+The event-contract table (ARCHITECTURE.md 6) arms the consumer-READS completeness tier, so each
+command this aggregate consumes states which payload fields it reads; Gx-trace holds every declared
+field to the payload cell of the row that carries the event.
+
+| event | reacting unit | payload reads |
+|---|---|---|
+| `capture` command | `setGatewayCapture`, then `gatewayCapture` | READS{Payment.amountCents, Payment.idempotencyKey} |
+| `refund` command | `setGatewayRefund`, then `gatewayRefund` | READS{Refund.amountCents, Payment.idempotencyKey} |

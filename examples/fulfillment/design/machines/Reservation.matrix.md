@@ -28,3 +28,14 @@ Structural: `reservation-terminal` is enforced by Committed and Released being f
 |---|---|---|---|---|
 | Inventory DB unavailable / conflict | `persistReservation` onError | `persisting -> persistRetry -> persisting` then `rolledBack` at 3 | bounded retry; the saga command is redelivered by the bus | C4 3. Residual: reservation lags until redelivery lands |
 | Write timeout | `after persistTimeout` (5s) | `persisting -> rolledBack -> Held` | abort; nothing committed | C4 3. Residual: none |
+
+## (c) Consumed events
+
+The event-contract table (ARCHITECTURE.md 6) arms the consumer-READS completeness tier, so each
+command this aggregate consumes states which payload fields it reads; Gx-trace holds every declared
+field to the payload cell of the row that carries the event.
+
+| event | reacting unit | payload reads |
+|---|---|---|
+| `reserve` command | receipt creates the hold, then `persistReservation` | READS{LineItem.quantity, Product.sku} |
+| `release` command | `setPendingReleased`, then `persistReservation` | READS{Reservation} |

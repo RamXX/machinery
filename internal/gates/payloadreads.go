@@ -12,6 +12,11 @@
 // row for that event somewhere in the hand-written design. Opt-in: an
 // undeclared consumption is untouched; a declared read that no payload cell
 // carries is the drift, and warns.
+//
+// A design that wants the obligation the other way round (every consumer row
+// MUST declare) arms the completeness tier in readscomplete.go, which judges
+// the same declarations at ERROR strength in Gx-trace. This tier stands down
+// for the events an armed contract names, so one defect earns one finding.
 
 package gates
 
@@ -26,6 +31,7 @@ import (
 
 var readsDecl = regexp.MustCompile(`READS\{([^}]*)\}`)
 var leadingEventName = regexp.MustCompile("^\\s*\\|\\s*`([a-z][a-z0-9_]*\\.[a-z][a-z0-9_.]*)`")
+var backtickedEventName = regexp.MustCompile("`([a-z][a-z0-9_]*\\.[a-z][a-z0-9_.]*)`")
 
 type readsClaim struct {
 	event  string
@@ -33,11 +39,20 @@ type readsClaim struct {
 	where  string
 }
 
-// collectReadsDecls finds READS declarations on matrix lines that name an
-// event in backticks.
-func collectReadsDecls(design string) []readsClaim {
-	var out []readsClaim
-	eventToken := regexp.MustCompile("`([a-z][a-z0-9_]*\\.[a-z][a-z0-9_.]*)`")
+// readsLine is one matrix line carrying a READS declaration, with the fields
+// it declares and where it sits. The line itself is kept because the two
+// tiers key declarations differently: this tier by the backticked dotted
+// event name in it, the completeness tier by whichever event name the row
+// under judgment spells (see readscomplete.go).
+type readsLine struct {
+	line   string
+	fields []string
+	where  string
+}
+
+// collectReadsLines finds every READS declaration under design/machines.
+func collectReadsLines(design string) []readsLine {
+	var out []readsLine
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
 		body, ok := readTextOK(path)
 		if !ok {
@@ -49,18 +64,28 @@ func collectReadsDecls(design string) []readsClaim {
 			if m == nil {
 				continue
 			}
-			ev := eventToken.FindStringSubmatch(line)
-			if ev == nil {
-				continue
-			}
-			out = append(out, readsClaim{
-				event:  ev[1],
+			out = append(out, readsLine{
+				line:   line,
 				fields: splitClauses(m[1]),
 				where:  base + ":" + strconv.Itoa(lineNo+1),
 			})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].where < out[j].where })
+	return out
+}
+
+// collectReadsDecls keeps the READS declarations on matrix lines that name an
+// event in backticks, which is what this tier can resolve payloads for.
+func collectReadsDecls(design string) []readsClaim {
+	var out []readsClaim
+	for _, l := range collectReadsLines(design) {
+		ev := backtickedEventName.FindStringSubmatch(l.line)
+		if ev == nil {
+			continue
+		}
+		out = append(out, readsClaim{event: ev[1], fields: l.fields, where: l.where})
+	}
 	return out
 }
 
@@ -105,6 +130,23 @@ func checkPayloadReads(g *Gate, design string) {
 	decls := collectReadsDecls(design)
 	if len(decls) == 0 {
 		return
+	}
+	// A design that arms the completeness tier hands those events to Gx-trace,
+	// which judges the same declarations against the same payloads at ERROR
+	// strength (readscomplete.go). Standing down here is per event, not
+	// wholesale: a declaration naming an event the armed contract never lists
+	// is nobody else's, and keeps its opt-in warn.
+	if armed := armedReadsEvents(design); len(armed) > 0 {
+		var kept []readsClaim
+		for _, d := range decls {
+			if !armed[d.event] {
+				kept = append(kept, d)
+			}
+		}
+		decls = kept
+		if len(decls) == 0 {
+			return
+		}
 	}
 	g.Count("payload READS declarations", len(decls))
 	payloads := payloadTextFor(design)

@@ -36,3 +36,13 @@ Structural: `shipment-terminal` is enforced by Delivered and Lost being final st
 | Lost parcel | tracking event `markLost` | `Dispatched/InTransit -> persisting -> Lost` | terminal Lost; the order receives fail | C4 3: explicit terminal. Residual: manual claim with the carrier |
 | Shipping DB unavailable / conflict | `persistShipment` onError | `persisting -> persistRetry -> persisting` then `rolledBack` at 3 | bounded retry; tracking events are redelivered by the bus | C4 3. Residual: row lags until redelivery lands |
 | Write timeout | `after persistTimeout` (5s) | `persisting -> rolledBack -> priorStatus` | abort; outbox guarantees no half-published event | C4 3. Residual: none |
+
+## (c) Consumed events
+
+The event-contract table (ARCHITECTURE.md 6) arms the consumer-READS completeness tier, so each
+command this aggregate consumes states which payload fields it reads; Gx-trace holds every declared
+field to the payload cell of the row that carries the event.
+
+| event | reacting unit | payload reads |
+|---|---|---|
+| `dispatch` command | `setCarrierDispatch`, then `carrierDispatch` | READS{Address.line1, Address.city, Address.postalCode, Address.country} |

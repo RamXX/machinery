@@ -1546,9 +1546,15 @@ func CheckTraceability(design string) *Gate {
 	// event-contract rows against the machines: the pack side of this check
 	// runs only where a pack exists, so a design that carries one is left to
 	// G5 rather than reported twice for one defect (see eventwiring.go)
+	archText := readOrEmpty(filepath.Join(design, "ARCHITECTURE.md"))
 	if !pack.HasPack(design) {
-		checkEventWiring(g, design, readOrEmpty(filepath.Join(design, "ARCHITECTURE.md")))
+		checkEventWiring(g, design, archText)
 	}
+	// the consumer-READS completeness tier, armed by the design's own marker.
+	// It runs on a packed design too: G5 reconciles boundary-event DIRECTION
+	// from the generated events.md and has no notion of READS, so nothing
+	// double-reports (see readscomplete.go)
+	checkReadsComplete(g, design, archText)
 
 	// invariants enforcement
 	var cells, unitCells []string

@@ -110,6 +110,12 @@ dedupes by message id (`exactly-once-effect`). Payloads name `fulfillment.modeli
 attributes. Order placement itself does not cross the bus: the customer reaches the API over HTTPS
 and the API starts the saga in-process; the saga's first outbox emission is the `reserve` command.
 
+This contract arms the consumer-READS completeness tier: every row below states what its consumer
+reads off the payload, in section (c) of the consuming machine's matrix, and Gx-trace holds each
+declared field to the payload cell of the row that carries it.
+
+<!-- machinery:reads-complete -->
+
 Source: enumerated from the saga's outbox emissions (`FulfillmentSaga` invoke actors) and the
 consumers' machine events; the broker lane is the single outbox topic per service, no other
 subscriptions exist to sweep.

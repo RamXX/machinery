@@ -383,7 +383,12 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   enumerates them; a single-clause guard gains nothing from the ceremony.
 - Event consumption rows may declare `READS{field, ...}` beside the
   backticked event name; every declared field must ride some event-table
-  row for that event, which is the payload-sufficiency drift check.
+  row for that event, which is the payload-sufficiency drift check. A design
+  that arms the completeness tier (a `machinery:reads-complete` marker in
+  ARCHITECTURE.md) makes the same declaration required rather than optional:
+  every event-contract row then owes one, or a `(no reads: <reason>)` waiver
+  in its consumer cell, and a declared field the row's payload does not carry
+  is an ERROR in Gx-trace instead of a warning here.
 - Incident-derived invariants and fixtures carry a PROVENANCE pointer to the
   primary record (the customer report, the post-mortem document), so the
   attested re-derivation set is enumerable; a fixture named after an
