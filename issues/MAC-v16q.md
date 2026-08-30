@@ -7,7 +7,7 @@ type: chore
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
 updated_at: 2026-08-30T08:48:02Z
-content_hash: "sha256:f26558296363c4f8779fec6a7eabc04b193fae438840fd61058d14830ba17761"
+content_hash: "sha256:951ed84326f6a7eef84bbab85dccee9b7a1b3154482dc5499239acf2ac3d4409"
 assignee: ramirosalas
 labels: [accepted]
 closed_at: 2026-08-30T08:48:02Z
@@ -105,6 +105,17 @@ LEARNINGS
 - Promoting a warn to an error is cheap only if the error message absorbs the guidance the prose was carrying. Moving the perl one-liner into Gl's finding is what made the SKILL.md deletion fidelity-preserving rather than a quiet loss.
 - Tier changes ripple into docs: Gl is described in four places (SKILL.md twice, README.md twice). A grep for the old tier wording ('warn tier', 'house-style') found all of them; without it the docs would have drifted the same way the prompts had.
 - The working tree was switched back to main under me mid-session (another agent shares this checkout; story/MAC-rbje-wave-sentinel also exists here). Re-verify 'git branch --show-current' before every stage and commit when agents share one checkout.
+
+
+## nd_contract
+status: accepted
+
+### evidence
+- PM closeout applied via pvg story accept on 2026-08-30.
+
+### proof
+- [x] Story closed after accepted label was applied.
+
 
 ## History
 - 2026-08-30T08:34:40Z dep_added: blocks MAC-ug4h
