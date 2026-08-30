@@ -7,7 +7,8 @@ type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
 updated_at: 2026-08-30T08:34:37Z
-content_hash: "sha256:b7ad75df9b4bc8a2e01b2dea141a6cb17f1b18a5ae9c4ab669271c5dfad64467"
+content_hash: "sha256:6e719cad9e79a515fa755de9f943189845b8b3633b8375ae302a05ec483a0eb7"
+blocked_by: [MAC-v16q]
 ---
 
 ## Description
@@ -72,9 +73,9 @@ Paste go test + lint summaries and a sample gate run (pass + one induced STALE f
 
 
 ## History
-
+- 2026-08-30T08:34:40Z dep_added: blocked_by MAC-v16q
 
 ## Links
-
+- Blocked by: [[MAC-v16q]]
 
 ## Comments

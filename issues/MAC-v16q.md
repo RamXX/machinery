@@ -7,7 +7,8 @@ type: chore
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
 updated_at: 2026-08-30T08:34:37Z
-content_hash: "sha256:88ac128ad4b933ac4f1b6857e6185306738c4fd704bfd9c7c52cbe97d62e5d72"
+content_hash: "sha256:fe3967d878887b99666757e894998ff14bd8a22da86bd1d15334345bbdb80101"
+blocks: [MAC-ug4h]
 ---
 
 ## Description
@@ -58,9 +59,9 @@ Paste go test + lint summaries and the grep(s) showing removal into the story no
 
 
 ## History
-
+- 2026-08-30T08:34:40Z dep_added: blocks MAC-ug4h
 
 ## Links
-
+- Blocks: [[MAC-ug4h]]
 
 ## Comments
