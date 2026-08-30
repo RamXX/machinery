@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T09:10:12Z
-content_hash: "sha256:81ff32463caf0cca1bdf77e428d27a8e94bc11ab116e7e721df754814fbb6ac8"
+updated_at: 2026-08-30T09:15:31Z
+content_hash: "sha256:93eb416fa7191c47e688143d8fef0c12118a647fcad5a452c1c352ec58367695"
 was_blocked_by: [MAC-v16q]
 assignee: ramirosalas
 follows: [MAC-v16q]
@@ -266,3 +266,6 @@ LEARNINGS
 - Follows: [[MAC-v16q]]
 
 ## Comments
+
+### 2026-08-30T09:15:31Z ramirosalas
+ACCEPTED: Reviewed diff 64bbd17..08f7f85 (single commit) in worktree wt-ug4h. Tier 1: pvg verify clean (the 6 hook.go 'return ""' stub hits are pre-existing lines outside the diff, not part of this delivery); pvg gates PASS (7 file_loc WARN, 0 BLOCK). Tier 2: go test ./... 16/16 packages ok; scripts/preflight.sh full 11-stage run green, matching proof exactly. Re-ran the sample gate independently against a fresh copy of examples/go-crm/design: machinery attest printed the hash, machinery check --gate gv passed clean (6 covered artifacts current, 6 attested claims, exit 0), then an appended sentence to ARCHITECTURE.md reproduced the STALE ERROR on all 6 covering rows with exit 1, matching the developer's proof transcript. Design-call rulings: Gv-attest letter, one-file-per-design (attestations.yaml), the 15-id closed vocabulary, STALE-as-ERROR-not-DRIFT, and WARN-for-owed-missing/ERROR-for-wrong-record/ERROR-for-empty-file coverage posture are all well justified and consistently implemented (checkAttestationCoverage, checkAttestationFreshness). Vocabulary spot-check: all ids referenced in SKILL.md's four attested blocks (g2.*, g3.*, gt.conformance-test-shape, g4.zero-context, g4.standin-coverage, g4.pack-event-discipline, ga.review-quality) and in agents/machinery-fsm-author.md and agents/machinery-build-writer.md match attestVocabulary in internal/gates/attest.go exactly; nothing dropped or invented. Wiring confirmed in three places with tests exercising each: CLI --gate flag (cmd/machinery/check.go + TestCheckGateGvRunsAndCatchesStaleness), suite.go default list/activation (TestAttestationSuiteWiring, TestAttestationSurvivesDecomposedParentNarrowing), and hook.go auto-selection (TestSelectGatesActivatesGvOnAttestationEvidence). Confirmed via a throwaway local rebase onto current main (b235fc7, the wave-sentinel story) that the hook.go hunk (an 8-line addition inside selectGates only) rebases cleanly with zero conflicts against the wave-sentinel deny-code changes in pre()/editedOps(), and the rebased tree builds and passes internal/hook, internal/gates, cmd/machinery tests. Grepped the whole repo for the old 19-gate list string: zero stale copies remain, all 7 known copies (CLI Use/flag help, suite.go, 3 docs, 1 command frontmatter) updated to include gv. No em dashes or emojis in any added/changed line (regex-scanned the full diff). SKILL.md frontmatter version: line untouched. adapters/opencode confirmed to carry no gate list or attested-block paraphrase (no diff needed, none produced). Test suite is fixture-based (t.TempDir, real files), no mock libraries found. Docs (attestation-evidence.md, acceptance-gate.md Ga tie-in, brownfield-team-guide.md section 6 pointer, claude-plugin.md, external-checkers.md, tools/README.md, commands/check.md, README.md) are complete, consistent, and cross-referenced correctly. No out-of-scope changes found (dialog-register and decision-lifecycle-pattern.md untouched, as required). Decision: ACCEPT.
