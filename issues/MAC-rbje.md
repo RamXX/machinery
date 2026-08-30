@@ -1,15 +1,17 @@
 ---
 id: MAC-rbje
 title: "Deny agent writes to the wave sentinel (human-only .machinery-wave)"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:52:58Z
-content_hash: "sha256:cc07b1ce44bf49eea9c9014c19dff9074f0f6b4e029a94f480733eaa52527400"
+updated_at: 2026-08-30T08:52:59Z
+content_hash: "sha256:fdfaf0a86cc5815842a292cd58e7994b099689dbe22990ae8c45bb537fc95ab9"
 assignee: ramirosalas
 labels: [delivered]
+closed_at: 2026-08-30T08:52:59Z
+close_reason: "accepted: wave-sentinel deny fixed to be per-operation, closes the delete+add TTL-refresh bypass found in the prior review"
 ---
 
 ## Description
@@ -151,6 +153,7 @@ ACCEPTED (re-review, commit 9c81aa6, branch story/MAC-rbje-wave-sentinel): the d
 - 2026-08-30T08:44:50Z status: in_progress -> open
 - 2026-08-30T08:46:11Z status: open -> in_progress
 - 2026-08-30T08:46:11Z claimed by ramirosalas
+- 2026-08-30T08:52:59Z status: in_progress -> closed
 
 ## Links
 
