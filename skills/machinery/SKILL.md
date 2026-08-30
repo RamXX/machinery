@@ -639,20 +639,25 @@ date: 2026-08-27
 ```
 
 3. **Run the gate with the commit.** `machinery check design --commit $(git rev-parse HEAD)` (or
-   export `MACHINERY_COMMIT`; the flag wins). CI is expected to pass it. With neither, the gate
-   defaults the commit to the HEAD of the git repository the DESIGN sits in (resolved from the
-   design path, never from the shell's working directory), so a plain local run binds exactly as
-   CI does. Only outside a repository does the binding degrade to a non-blocking note, never to a
-   silent pass. The `checked:` line says which of the two it was.
+   export `MACHINERY_COMMIT`; the flag wins). CI is expected to pass it, and a supplied commit
+   binds by IDENTITY: the evidence must name that commit. With neither, the gate defaults to the
+   HEAD of the git repository the DESIGN sits in (resolved from the design path, never from the
+   shell's working directory) and binds by ANCESTRY instead: the evidence commit must resolve to a
+   commit that repository holds and be reachable from HEAD. Ancestry is the honest rule for a
+   commit nobody named, because the commit that ADDS the evidence file already differs from the
+   commit the evidence names; it still catches the typo'd, fabricated, or unmerged sha the old
+   note tier let through. Only outside a repository does the binding degrade to a non-blocking
+   note, never to a silent pass. The `checked:` line names the mode and its rule.
 
 Ga activates automatically once `design/acceptance/` exists or any milestone is marked closed, and
 verifies: every closed milestone has an acceptance file whose verdict is ACCEPTED (a missing file
 or a REJECTED one is an ERROR); every file parses, names a declared milestone, and carries every
 field; `dod_ids` resolves in BOTH directions against the committed oracles (it lists every id that
 milestone's DoD cites whole-token, and every id it lists is a real committed oracle id, so a typo
-or an id a regeneration left behind cannot pose as coverage); and that every accepted closure names
-the commit under review (an exact match, or either value an unambiguous prefix of the other of at
-least 7 characters). Milestone numbers must be unique across every plan-bearing document, root and
+or an id a regeneration left behind cannot pose as coverage); and that every accepted closure binds
+to the commit under review, by identity when one was supplied (an exact match, or either value an
+unambiguous prefix of the other of at least 7 characters) and by ancestry when the gate derived it
+from git HEAD. Milestone numbers must be unique across every plan-bearing document, root and
 shards: evidence is keyed by number alone, so a repeated number makes it ambiguous which milestone
 was discharged.
 

@@ -347,37 +347,57 @@ func TestCheckCommitFlagAndEnvironmentReachGa(t *testing.T) {
 }
 
 // With neither flag nor environment, a design that sits inside a git
-// repository binds to that repository's HEAD instead of printing the
-// non-check note: a local run then proves what CI proves. The environment is
-// cleared explicitly, because the flag-and-env test above sets it.
-func TestCheckDefaultsCommitToGitHeadOfTheDesignRepo(t *testing.T) {
+// repository binds to that repository's history instead of printing the
+// non-check note: a local run then proves something. Derived mode is ancestry
+// (dispatcher QC adjudication, 2026-08-30), so the ancestor case is the one
+// that matters at the CLI: it is the shape every real design has, the evidence
+// having been committed after the commit it names. The environment is cleared
+// explicitly, because the flag-and-env test above sets it.
+func TestCheckDefaultsCommitToGitHistoryOfTheDesignRepo(t *testing.T) {
 	t.Setenv("MACHINERY_COMMIT", "")
 	repo := t.TempDir()
-	head := initTestGitRepo(t, repo)
+	root, head, side := initTestGitRepo(t, repo)
 	design := filepath.Join(repo, "design")
 	writeText(t, filepath.Join(design, "BUILD.md"),
 		"# B\n\nMode: full\n\n## Build plan\n\n**M0 - Walking skeleton.** DoD: green end to end.\nStatus: closed\n")
-	writeText(t, filepath.Join(design, "acceptance", "M0.yaml"),
-		"milestone: 0\ncommit: "+head+"\nverdict: ACCEPTED\ndod_ids: []\n"+
-			"attestations:\n  - the suite ran against real dependencies\n"+
-			"findings: []\nreviewer: conductor\ndate: 2026-08-27\n")
+	evidence := func(commit string) {
+		t.Helper()
+		writeText(t, filepath.Join(design, "acceptance", "M0.yaml"),
+			"milestone: 0\ncommit: "+commit+"\nverdict: ACCEPTED\ndod_ids: []\n"+
+				"attestations:\n  - the suite ran against real dependencies\n"+
+				"findings: []\nreviewer: conductor\ndate: 2026-08-27\n")
+	}
 
-	out, code := runCheckGa(t, design)
-	if code != 0 || !strings.Contains(out, "1 commit bindings verified") {
-		t.Fatalf("the derived HEAD must bind: code=%d out=%s", code, out)
+	for _, commit := range []struct{ name, sha string }{{"an ancestor of HEAD", root}, {"HEAD itself", head}} {
+		evidence(commit.sha)
+		out, code := runCheckGa(t, design)
+		if code != 0 || !strings.Contains(out, "1 commit bindings verified") {
+			t.Fatalf("%s must bind: code=%d out=%s", commit.name, code, out)
+		}
+		if !strings.Contains(out, "derived from git HEAD of the repository holding the design; evidence commit bound by ancestry") {
+			t.Errorf("%s: the provenance and its rule must be visible: %s", commit.name, out)
+		}
+		if strings.Contains(out, "commit binding not checked") {
+			t.Errorf("%s: a derived binding is a checked binding: %s", commit.name, out)
+		}
 	}
-	if !strings.Contains(out, "commit under review derived from git HEAD") {
-		t.Errorf("the provenance must be visible: %s", out)
+
+	evidence(side)
+	if out, code := runCheckGa(t, design); code != 1 || !strings.Contains(out, "is not an ancestor of the commit under review") {
+		t.Fatalf("a commit from an unmerged branch must block: code=%d out=%s", code, out)
 	}
-	if strings.Contains(out, "commit binding not checked") {
-		t.Errorf("a derived binding is a checked binding: %s", out)
+	evidence("9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345")
+	if out, code := runCheckGa(t, design); code != 1 || !strings.Contains(out, "names no commit in the repository holding the design") {
+		t.Fatalf("a sha this repository does not hold must block: code=%d out=%s", code, out)
 	}
 }
 
-// initTestGitRepo makes dir a git repository with one commit and returns its
-// HEAD. Identity and signing are passed on the command line so the developer's
-// global git configuration cannot change the result.
-func initTestGitRepo(t *testing.T, dir string) string {
+// initTestGitRepo makes dir a git repository with a two-commit main line and
+// one commit on a branch that is never merged, returning root (an ancestor of
+// head), head, and side (not an ancestor of head). Identity and signing are
+// passed on the command line so the developer's global git configuration
+// cannot change the result.
+func initTestGitRepo(t *testing.T, dir string) (root, head, side string) {
 	t.Helper()
 	git := func(args ...string) string {
 		t.Helper()
@@ -390,11 +410,22 @@ func initTestGitRepo(t *testing.T, dir string) string {
 		}
 		return strings.TrimSpace(string(out))
 	}
+	commit := func(name, msg string) string {
+		t.Helper()
+		writeText(t, filepath.Join(dir, name), msg+"\n")
+		git("add", name)
+		git("commit", "-q", "-m", msg)
+		return git("rev-parse", "HEAD")
+	}
 	git("init", "-q")
-	writeText(t, filepath.Join(dir, ".gitkeep"), "x\n")
-	git("add", ".gitkeep")
-	git("commit", "-q", "-m", "root commit")
-	return git("rev-parse", "HEAD")
+	root = commit(".gitkeep", "root commit")
+	main := git("rev-parse", "--abbrev-ref", "HEAD")
+	git("branch", "side")
+	head = commit("second.txt", "second commit on the main line")
+	git("checkout", "-q", "side")
+	side = commit("side.txt", "a commit on a branch that is never merged")
+	git("checkout", "-q", main)
+	return root, head, side
 }
 
 // The green-summary line: a default full run earns platform-green with an

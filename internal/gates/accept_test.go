@@ -370,30 +370,61 @@ func TestCheckAcceptanceDoDIDTypoFailsBothWays(t *testing.T) {
 
 // --- the default commit binding ------------------------------------------
 
+// gitFixture is a repository with a two-commit main line and one commit on a
+// branch that was never merged: root is an ancestor of head, side is not.
+type gitFixture struct {
+	dir  string
+	root string
+	head string
+	side string
+}
+
 // initGitRepo turns dir into a git repository carrying exactly one commit and
 // returns its HEAD. Every identity and signing input is passed on the command
 // line, so the developer's global git configuration cannot change the result.
 func initGitRepo(t *testing.T, dir string) string {
+	t.Helper()
+	return initGitHistory(t, dir).head
+}
+
+// initGitHistory builds the gitFixture history in dir.
+func initGitHistory(t *testing.T, dir string) gitFixture {
 	t.Helper()
 	git := func(args ...string) string {
 		t.Helper()
 		base := []string{"-C", dir,
 			"-c", "user.name=machinery test", "-c", "user.email=test@example.invalid",
 			"-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"}
-		cmd := exec.CommandContext(t.Context(), "git", append(base, args...)...)
-		out, err := cmd.CombinedOutput()
+		out, err := exec.CommandContext(t.Context(), "git", append(base, args...)...).CombinedOutput()
 		if err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 		return strings.TrimSpace(string(out))
 	}
-	git("init", "-q")
-	if err := os.WriteFile(filepath.Join(dir, ".gitkeep"), []byte("x\n"), 0o644); err != nil {
-		t.Fatal(err)
+	commit := func(name, msg string) string {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(msg+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		git("add", name)
+		git("commit", "-q", "-m", msg)
+		return git("rev-parse", "HEAD")
 	}
-	git("add", ".gitkeep")
-	git("commit", "-q", "-m", "root commit")
-	return git("rev-parse", "HEAD")
+	git("init", "-q")
+	f := gitFixture{dir: dir}
+	f.root = commit(".gitkeep", "root commit")
+	// the initial branch name is whatever this git installation defaults to;
+	// read it rather than assume main or master
+	main := git("rev-parse", "--abbrev-ref", "HEAD")
+	git("branch", "side")
+	f.head = commit("second.txt", "second commit on the main line")
+	git("checkout", "-q", "side")
+	f.side = commit("side.txt", "a commit on a branch that is never merged")
+	git("checkout", "-q", main)
+	if got := git("rev-parse", "HEAD"); got != f.head {
+		t.Fatalf("fixture left HEAD at %s, want %s", got, f.head)
+	}
+	return f
 }
 
 // The three provenances of the commit under review, plus the one case that
@@ -432,43 +463,111 @@ func TestResolveReviewCommit(t *testing.T) {
 	})
 }
 
-// End to end: with no --commit and no MACHINERY_COMMIT, a design inside a git
-// repository binds its accepted evidence to that repository's HEAD, and the
-// checked line says where the commit came from.
-func TestCheckAcceptanceDefaultsToGitHead(t *testing.T) {
-	repo := t.TempDir()
-	head := initGitRepo(t, repo)
-	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), map[string]string{
-		"acceptance/M0.yaml": strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: "+head, 1),
+// --- derived mode: ancestry ----------------------------------------------
+//
+// Dispatcher QC adjudication, 2026-08-30. The derived lane binds by ANCESTRY,
+// not identity. Identity is right when a caller names the commit under review;
+// it is wrong when the gate went looking for one, because the commit that adds
+// the evidence file already differs from the commit the evidence names, so an
+// identity rule would go red one commit later and stay red. Ancestry still
+// catches what the note tier let through: a sha that resolves to nothing, and
+// a sha from a history this tree never took.
+
+// writeAncestryFixture lays the standard design inside repo's design/ with its
+// evidence naming evidenceCommit.
+func writeAncestryFixture(t *testing.T, repo, evidenceCommit string) string {
+	t.Helper()
+	return writeAcceptFixtureIn(t, filepath.Join(repo, "design"), map[string]string{
+		"acceptance/M0.yaml": strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: "+evidenceCommit, 1),
 	})
-	g := CheckAcceptance(design, "")
-	if len(g.Errs) != 0 {
-		t.Fatalf("evidence naming the repository HEAD must bind: %v", g.Errs)
+}
+
+func TestCheckAcceptanceDerivedModeAncestry(t *testing.T) {
+	cases := []struct {
+		name     string
+		evidence func(gitFixture) string
+		wantErr  string // "" means the binding must hold
+	}{
+		{
+			name:     "equal to HEAD",
+			evidence: func(f gitFixture) string { return f.head },
+		},
+		{
+			name:     "an ancestor of HEAD",
+			evidence: func(f gitFixture) string { return f.root },
+		},
+		{
+			name: "an abbreviated ancestor",
+			// (a) is resolution, not string matching: an abbreviation that
+			// names one commit in this repository is that commit
+			evidence: func(f gitFixture) string { return f.root[:10] },
+		},
+		{
+			name:     "a sha no object answers to",
+			evidence: func(gitFixture) string { return acceptedCommit },
+			wantErr:  "names no commit in the repository holding the design",
+		},
+		{
+			name:     "a commit on an unmerged branch",
+			evidence: func(f gitFixture) string { return f.side },
+			wantErr:  "is not an ancestor of the commit under review",
+		},
 	}
-	if g.Counts["commit bindings verified"] != 1 {
-		t.Errorf("the derived commit must be bound, not merely resolved: %+v", g.Counts)
-	}
-	if len(g.Notes) != 0 {
-		t.Errorf("a derived commit is a checked binding, not an unchecked one: %v", g.Notes)
-	}
-	if want := "commit under review derived from git HEAD"; !strings.Contains(checkedLine(g), want) {
-		t.Errorf("the provenance must be visible: %q", checkedLine(g))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			f := initGitHistory(t, repo)
+			g := CheckAcceptance(writeAncestryFixture(t, repo, tc.evidence(f)), "")
+			joined := strings.Join(g.Errs, "\n")
+			if tc.wantErr != "" {
+				if !strings.Contains(joined, tc.wantErr) {
+					t.Fatalf("want an error containing %q, got %v", tc.wantErr, g.Errs)
+				}
+				if g.Counts["commit bindings verified"] != 0 {
+					t.Errorf("a failed binding may not be counted as verified: %+v", g.Counts)
+				}
+				return
+			}
+			if len(g.Errs) != 0 {
+				t.Fatalf("the reviewed commit is in this history: %v", g.Errs)
+			}
+			if g.Counts["commit bindings verified"] != 1 {
+				t.Errorf("the derived commit must be bound, not merely resolved: %+v", g.Counts)
+			}
+			if len(g.Notes) != 0 {
+				t.Errorf("a derived binding is a checked binding, not an unchecked one: %v", g.Notes)
+			}
+			if want := "derived from git HEAD of the repository holding the design; evidence commit bound by ancestry"; !strings.Contains(checkedLine(g), want) {
+				t.Errorf("the provenance and its rule must be visible: %q", checkedLine(g))
+			}
+		})
 	}
 }
 
-// The derived commit is a real binding: evidence naming some other commit
-// fails on a plain local run, which is the whole point of the default.
-func TestCheckAcceptanceDerivedCommitBlocksStaleEvidence(t *testing.T) {
+// The two modes are genuinely different rules on the same tree: the commit
+// that merely FOLLOWS the evidence passes derived (it is a descendant) and
+// fails explicit (it is not that commit). This is the adjudication, pinned.
+func TestCheckAcceptanceModesDifferOnADescendantHead(t *testing.T) {
 	repo := t.TempDir()
-	initGitRepo(t, repo)
-	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), nil)
-	g := CheckAcceptance(design, "")
-	if !strings.Contains(strings.Join(g.Errs, "\n"), "does not name the commit under review") {
-		t.Fatalf("evidence for another commit must fail against the derived HEAD: %v", g.Errs)
+	f := initGitHistory(t, repo)
+	design := writeAncestryFixture(t, repo, f.root)
+
+	derived := CheckAcceptance(design, "")
+	if len(derived.Errs) != 0 {
+		t.Fatalf("derived mode must accept an ancestor: %v", derived.Errs)
+	}
+
+	explicit := CheckAcceptance(design, f.head)
+	if !strings.Contains(strings.Join(explicit.Errs, "\n"), "does not name the commit under review") {
+		t.Fatalf("explicit mode must still demand identity: %v", explicit.Errs)
+	}
+	if want := "supplied by --commit or MACHINERY_COMMIT; evidence commit bound by identity"; !strings.Contains(checkedLine(explicit), want) {
+		t.Errorf("the explicit rule must be named on the checked line: %q", checkedLine(explicit))
 	}
 }
 
-// An explicit commit still wins inside a repository, and says so.
+// An explicit commit still wins inside a repository, whatever HEAD says, and
+// is held to identity against the value supplied rather than to the history.
 func TestCheckAcceptanceExplicitCommitWinsInsideRepo(t *testing.T) {
 	repo := t.TempDir()
 	initGitRepo(t, repo)
@@ -479,6 +578,23 @@ func TestCheckAcceptanceExplicitCommitWinsInsideRepo(t *testing.T) {
 	}
 	if want := "commit under review supplied by --commit or MACHINERY_COMMIT"; !strings.Contains(checkedLine(g), want) {
 		t.Errorf("the provenance must be visible: %q", checkedLine(g))
+	}
+	if g.Counts["commit bindings verified"] != 1 {
+		t.Errorf("identity against the supplied commit must bind: %+v", g.Counts)
+	}
+}
+
+// An evidence value that could be read as a git option is data, and must
+// never reach git as a flag.
+func TestCheckAcceptanceDerivedModeRefusesOptionShapedCommits(t *testing.T) {
+	repo := t.TempDir()
+	initGitHistory(t, repo)
+	g := CheckAcceptance(writeAncestryFixture(t, repo, "--output=/tmp/machinery-gate-escape"), "")
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "names no commit in the repository holding the design") {
+		t.Fatalf("an option-shaped commit must be refused as data: %v", g.Errs)
+	}
+	if _, err := os.Stat("/tmp/machinery-gate-escape"); err == nil {
+		t.Fatal("the value reached git as an option")
 	}
 }
 

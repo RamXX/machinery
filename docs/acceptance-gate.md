@@ -88,25 +88,53 @@ things, the way forcing `gp`, `gi`, or `gn` is.
   checked at first, so a list could be padded with ids that existed nowhere and still read as
   coverage. This is the same discipline as Gk binding evidence to a projection by `input_hash`: it
   does not prove the review was good, it proves the review was about this work.
-- **The evidence binds to the commit.** With `--commit <sha>` (or `MACHINERY_COMMIT`; the flag
-  wins), every accepted closure must name that commit: an exact match, or either value an
-  unambiguous prefix of the other of at least 7 characters (git's own abbreviation floor).
-  With neither, the gate defaults the commit to `git rev-parse HEAD` of the repository the DESIGN
-  directory sits in, resolved from the design path rather than the shell's working directory, so
-  running `machinery check` from somewhere else can never bind a design to an unrelated
-  repository. A plain local run therefore proves what CI proves. Outside a git repository (or with
-  no usable git) the binding still degrades to a non-blocking note, never to a silent pass. The
-  `checked:` line states which of the two happened, `commit under review supplied by --commit or
-  MACHINERY_COMMIT` or `commit under review derived from git HEAD of the repository holding the
-  design`, so the provenance is never guessed from the absence of a note. The binding is an
-  identity, not an ancestry: evidence names the one commit its review ran on, so once the history
-  moves past that commit the closure is re-reviewed or the reviewed commit is passed explicitly.
-  That was already true of `--commit`; the default makes it true of a plain run too, which is the
-  point (a gate that proved nothing unless someone remembered a flag proved nothing most of the
-  time) and also its cost, so plan the closure and its evidence to land together.
+- **The evidence binds to the commit**, under one of two rules. Which one applies depends on where
+  the commit under review came from, and the `checked:` line always names it, so the rule in force
+  is never inferred from the absence of a note. See "The two binding modes" below.
 - **Milestone numbers are unambiguous.** Evidence is keyed by number alone, so a number declared
   in two plan-bearing documents (the manifest root and a shard, or two shards) is an ERROR
   naming both. Milestone numbers are global across a sharded design.
+
+## The two binding modes
+
+The evidence names the commit its review ran on. What the gate can fairly demand of that name
+depends on whether a caller told the gate which commit is under review, or the gate had to go
+find one, so there are two rules and the `checked:` line always says which is in force.
+
+**Explicit (identity).** `--commit <sha>`, or `MACHINERY_COMMIT` when the flag is absent. The
+caller has named the one commit this closure is being judged against, so the evidence must name
+it too: an exact match, or either value an unambiguous prefix of the other of at least 7
+characters (git's own abbreviation floor). This is CI's contract. On a pull request the commit
+under review is the head commit, which is what an acceptance review runs against; a merge commit
+that did not exist when the review ran will not bind, and that is the intended behavior, not a
+bug to work around. The `checked:` line reads `commit under review supplied by --commit or
+MACHINERY_COMMIT; evidence commit bound by identity`.
+
+**Derived (ancestry).** No flag and no environment variable, and the design directory sits inside
+a git repository. The gate defaults the commit to `git rev-parse HEAD` of THAT repository,
+resolved from the design path rather than the shell's working directory, so running `machinery
+check some/other/design` from an unrelated checkout can never bind a design to a history that is
+not its own. The evidence commit must then
+
+1. resolve to a commit that repository holds (`git rev-parse --verify`), and
+2. be reachable from HEAD, equality included (`git merge-base --is-ancestor`).
+
+Either failure is an ERROR. The `checked:` line reads `commit under review derived from git HEAD
+of the repository holding the design; evidence commit bound by ancestry`.
+
+Ancestry, not identity, is the honest question here, and the difference is not a softening. When
+a caller names a commit, identity asks "was the review run on exactly this commit"; when nobody
+names one, the same question has a guaranteed wrong answer, because the commit that ADDS the
+evidence file already has a different sha than the commit the evidence names. An identity rule on
+a derived commit would go red on the very next commit and stay red for the life of the milestone,
+which teaches people to turn the gate off. What ancestry still catches is exactly what the old
+note tier let through: a sha with a typo in it, a fabricated one, and one from a branch this
+history never took. Those are caught now on every local run and at stop time, without a flag
+anyone has to remember.
+
+**Neither.** Outside a git repository, or with no usable git, the binding degrades to a
+non-blocking note naming what was not checked, never to a silent pass. CI is expected to pass the
+reviewed commit; the note says so.
 
 Everything else is attested: whether the DoD was really met, whether the attestations are true,
 whether the findings list is complete. Ga is the record that someone with a name looked, on a
@@ -128,10 +156,10 @@ second copy of a standing judgment.
   run: machinery check design --impl impl --commit "${{ github.sha }}"
 ```
 
-or, equivalently, `MACHINERY_COMMIT=$GITHUB_SHA machinery check design --impl impl`. On a
-pull request the commit under review is the head commit, which is what an acceptance review runs
-against; a merge commit that did not exist when the review ran will not bind, and that is the
-intended behavior, not a bug to work around.
+or, equivalently, `MACHINERY_COMMIT=$GITHUB_SHA machinery check design --impl impl`. Passing the
+commit is what puts CI in the explicit mode, and the identity rule there is deliberate: see "The
+two binding modes" above. A CI job that passes no commit falls into the derived mode against
+whatever the runner checked out, which is a weaker claim than CI should be making, so pass it.
 
 ## Where this sits in the suite
 
