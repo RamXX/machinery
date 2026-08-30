@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
-updated_at: 2026-08-30T19:29:46Z
-content_hash: "sha256:cbef14c6e774aa1890c95c2d040b1e9d563880b51cdbb713458bd628b2a0532b"
+updated_at: 2026-08-30T19:30:15Z
+content_hash: "sha256:970bbfd752efec56efc8193903db29eac92a98e54deec4b6df7bb4ad6e222d20"
 assignee: ramirosalas
 ---
 
@@ -286,3 +286,17 @@ LEARNINGS:
   lines and every one was a new counter. The real review was the arithmetic
   (does 14 = 5 + 9 for go-crm's relationships?), which the corpus cannot do for
   you.
+
+### 2026-08-30T19:30:15Z ramirosalas
+CORRECTION to the PROOF comment above, coverage line.
+
+I wrote '76.9% of statements' for internal/gates. That number was not measured before I wrote it and it is wrong. The measured figures, from `go test ./internal/gates/ -count=1 -coverprofile` at a675ca9:
+
+  package internal/gates total: 85.9% of statements
+
+  per new unit (go tool cover -func):
+    dsledges.go     dslRelationships 100.0%  matchEdgeRule 100.0%  elementBindings 81.2%  checkDrawnEdges 100.0%
+    eventcells.go   Cell 100.0%  Clean 100.0%  Where 100.0%  eventContractTables 100.0%  eventContractRows 88.9%  checkEventCells 97.1%  cellAt 100.0%
+    eventwiring.go  machineEventCorpus 92.3%  eventNamesOf 80.0%  checkEventWiring 95.7%
+
+Everything else in that comment was run before it was written; this one line was not, and I am flagging it rather than leaving it to be discovered. The rest of the proof stands as reported.
