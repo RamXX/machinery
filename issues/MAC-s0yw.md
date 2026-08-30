@@ -6,9 +6,10 @@ priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
-updated_at: 2026-08-30T19:17:17Z
+updated_at: 2026-08-30T19:17:27Z
 content_hash: "sha256:f8865f979d8add9172d046581f23d0a2c39b8de144b5ce49dc539ad3340a1dde"
 assignee: ramirosalas
+labels: [delivered]
 ---
 
 ## Description
