@@ -111,6 +111,79 @@ func TestLedgerSelfReviewDuplicateKey(t *testing.T) {
 	}
 }
 
+func TestLedgerSelfReviewTableCellTrailingPipe(t *testing.T) {
+	d := ledgerDesign(t, map[string]string{
+		"STATE.md": "| 3 | done | `self-review: reality=clean depth=clean scope=clean coverage=clean consistency=clean` |\n",
+	})
+	g := CheckLedger(d)
+	if len(g.Errs) != 0 {
+		t.Fatalf("table-cell line errored: %v", g.Errs)
+	}
+	if g.Counts["self-review lines"] != 1 {
+		t.Fatalf("line not counted: %v", g.Counts)
+	}
+}
+
+func TestLedgerSelfReviewNestedParenReason(t *testing.T) {
+	d := ledgerDesign(t, map[string]string{
+		"STATE.md": "self-review: reality=clean depth=accepted(deferred (see M6); revisit after split (Oct)) scope=clean coverage=fixed(re-derived (twice)) consistency=clean\n",
+	})
+	g := CheckLedger(d)
+	if len(g.Errs) != 0 {
+		t.Fatalf("nested-paren reason errored: %v", g.Errs)
+	}
+}
+
+func TestLedgerSelfReviewNestedParenReasonInTableCell(t *testing.T) {
+	d := ledgerDesign(t, map[string]string{
+		"STATE.md": "| 5 | `self-review: reality=clean depth=clean scope=clean coverage=clean consistency=accepted(narrowed (admin only); disclosure stands)` |\n",
+	})
+	g := CheckLedger(d)
+	if len(g.Errs) != 0 {
+		t.Fatalf("nested-paren reason in table cell errored: %v", g.Errs)
+	}
+}
+
+func TestLedgerSelfReviewBadKeyInTableCell(t *testing.T) {
+	d := ledgerDesign(t, map[string]string{
+		"STATE.md": "| 2 | `self-review: realty=clean depth=clean scope=clean coverage=clean consistency=clean` |\n",
+	})
+	g := CheckLedger(d)
+	if !hasFinding(g.Errs, "does not parse") {
+		t.Fatalf("bad key in table cell not flagged: %v", g.Errs)
+	}
+}
+
+func TestLedgerSelfReviewCleanWithNestedParenReason(t *testing.T) {
+	d := ledgerDesign(t, map[string]string{
+		"STATE.md": "self-review: reality=clean(fine (really)) depth=clean scope=clean coverage=clean consistency=clean\n",
+	})
+	g := CheckLedger(d)
+	if !hasFinding(g.Errs, "clean carries a reason") {
+		t.Fatalf("clean with nested-paren reason not flagged: %v", g.Errs)
+	}
+}
+
+func TestLedgerSelfReviewMissingKeyInTableCell(t *testing.T) {
+	d := ledgerDesign(t, map[string]string{
+		"STATE.md": "| 4 | `self-review: reality=clean depth=clean scope=clean coverage=clean` |\n",
+	})
+	g := CheckLedger(d)
+	if !hasFinding(g.Errs, "missing consistency") {
+		t.Fatalf("missing key in table cell not flagged: %v", g.Errs)
+	}
+}
+
+func TestLedgerSelfReviewUnbalancedParenReason(t *testing.T) {
+	d := ledgerDesign(t, map[string]string{
+		"STATE.md": "self-review: reality=clean depth=fixed(open (never closed scope=clean coverage=clean consistency=clean\n",
+	})
+	g := CheckLedger(d)
+	if !hasFinding(g.Errs, "does not parse") {
+		t.Fatalf("unbalanced paren not flagged: %v", g.Errs)
+	}
+}
+
 func TestLedgerDecisionDates(t *testing.T) {
 	d := ledgerDesign(t, map[string]string{
 		"DECISIONS.md": "# DECISIONS\n\n- 2026-08-29 user: chose Go.\n- 2026-13-40 user: impossible date.\n",

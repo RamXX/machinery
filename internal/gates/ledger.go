@@ -22,11 +22,13 @@ import (
 )
 
 var (
-	// selfReviewKeyRe matches one verdict segment of a self-review line. The
-	// grammar (skill, "Phase-exit self-review"): clean, fixed, fixed(<reason>),
-	// accepted(<reason>). clean never carries a reason (a clean verdict with an
-	// explanation is a contradiction, reported below).
-	selfReviewKeyRe = regexp.MustCompile(`^(reality|depth|scope|coverage|consistency)=(clean|fixed|accepted)(\(([^()]*)\))?`)
+	// selfReviewKeyRe matches the key=verdict head of one segment of a
+	// self-review line. The grammar (skill, "Phase-exit self-review"): clean,
+	// fixed, fixed(<reason>), accepted(<reason>). clean never carries a reason
+	// (a clean verdict with an explanation is a contradiction, reported below).
+	// The optional (<reason>) group is scanned separately with balanced-paren
+	// tracking, because real reasons routinely nest parentheses.
+	selfReviewKeyRe = regexp.MustCompile(`^(reality|depth|scope|coverage|consistency)=(clean|fixed|accepted)`)
 	selfReviewKeys  = []string{"reality", "depth", "scope", "coverage", "consistency"}
 	// decisionDateRe matches the dated-entry opener of a DECISIONS.md line:
 	// an optional bullet, then YYYY-MM-DD.
@@ -74,9 +76,11 @@ func checkSelfReviewLines(g *Gate, design string) {
 		g.Count("self-review lines")
 		loc := "STATE.md:" + strconv.Itoa(lineNo+1)
 		rest := strings.TrimSpace(after)
-		// the line often sits inside an inline code span; the closing backtick
-		// (and any trailing prose punctuation) is not part of the grammar
-		rest = strings.TrimRight(rest, "` \t.")
+		// the line often sits inside an inline code span, itself often inside a
+		// markdown table cell; the closing backtick, the cell's trailing pipe,
+		// and any trailing prose punctuation are not part of the grammar (a raw
+		// pipe cannot appear inside a table cell anyway: it would split the cell)
+		rest = strings.TrimRight(rest, "`| \t.")
 		seen := map[string]bool{}
 		bad := false
 		for rest != "" {
@@ -87,18 +91,33 @@ func checkSelfReviewLines(g *Gate, design string) {
 				bad = true
 				break
 			}
-			key, verdict, parens, reason := m[1], m[2], m[3], m[4]
+			key, verdict := m[1], m[2]
+			consumed := len(m[0])
+			hasReason := false
+			reason := ""
+			if consumed < len(rest) && rest[consumed] == '(' {
+				interior, n, balanced := balancedParen(rest[consumed:])
+				if !balanced {
+					g.Errs = append(g.Errs, loc+": self-review segment "+strconv.Quote(firstWord(rest))+
+						" does not parse (its reason's parentheses never balance); the grammar is key=clean|fixed|fixed(<reason>)|accepted(<reason>)")
+					bad = true
+					break
+				}
+				hasReason = true
+				reason = interior
+				consumed += n
+			}
 			if seen[key] {
 				g.Errs = append(g.Errs, loc+": self-review states "+key+" twice")
 			}
 			seen[key] = true
 			switch {
-			case verdict == "clean" && parens != "":
+			case verdict == "clean" && hasReason:
 				g.Errs = append(g.Errs, loc+": self-review "+key+"=clean carries a reason; clean means the pass found nothing (use fixed(<reason>) or accepted(<reason>))")
 			case verdict == "accepted" && strings.TrimSpace(reason) == "":
 				g.Errs = append(g.Errs, loc+": self-review "+key+"=accepted names no reason; an unexplained waiver is not a verdict")
 			}
-			rest = strings.TrimLeft(rest[len(m[0]):], " \t")
+			rest = strings.TrimLeft(rest[consumed:], " \t")
 		}
 		if bad {
 			continue
@@ -223,6 +242,26 @@ func checkHouseStyle(g *Gate, design string) {
 	for _, f := range findings {
 		g.Warns = append(g.Warns, f.rel+":"+strconv.Itoa(f.line)+": "+f.msg)
 	}
+}
+
+// balancedParen scans a string beginning with '(' to its balanced closing
+// paren. It returns the interior (the reason text, nested parens intact), the
+// byte length of the whole group including both delimiters, and whether a
+// balanced close was found at all.
+func balancedParen(s string) (interior string, length int, balanced bool) {
+	depth := 0
+	for i, r := range s {
+		switch r {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return s[1:i], i + 1, true
+			}
+		}
+	}
+	return "", 0, false
 }
 
 // firstWord returns the first whitespace-delimited token of s, for error
