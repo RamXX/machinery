@@ -1,13 +1,14 @@
 ---
 id: MAC-fbeo
 title: "Zero-artifact checks A: G2/G3 cluster (DSL edges, event wiring, every-match, cell quality)"
-status: open
+status: in_progress
 priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
-updated_at: 2026-08-30T18:54:10Z
-content_hash: "sha256:6b81fe65ee5552a0f1a3f15a72ebc0df2cf8e9d133f7dfac4024df3064fdbfbf"
+updated_at: 2026-08-30T18:54:34Z
+content_hash: "sha256:47b55bc9103aa127ea5d5e4c45889645e46cb172102fee6d7bbbe11698944daa"
+assignee: ramirosalas
 ---
 
 ## Description
@@ -62,7 +63,8 @@ Test and preflight summaries; for each check, one induced-failure sample (the fi
 
 
 ## History
-
+- 2026-08-30T18:54:34Z status: open -> in_progress
+- 2026-08-30T18:54:34Z claimed by ramirosalas
 
 ## Links
 
