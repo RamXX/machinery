@@ -7,8 +7,8 @@ type: feature
 labels: [story, delivered]
 created_at: 2026-08-29T23:49:02Z
 created_by: ramirosalas
-updated_at: 2026-08-30T00:11:01Z
-content_hash: "sha256:06de06b95e07c1a7d8721f6ca73cf8df04a900d7096151bc82592e87391b75ae"
+updated_at: 2026-08-30T00:15:06Z
+content_hash: "sha256:26d4a53272530e7ce057950cb858bf2b572b6abacdcf3f362225bb2ee84ef135"
 assignee: ramirosalas
 ---
 
@@ -41,6 +41,14 @@ CONSTRAINTS: no version bump, no tag, no push (the maintainer will land more cha
 
 
 ## Notes
+### CI/Test Results
+
+(Formatting note added by PM-Acceptor: this heading anchors the "CI/Test Results:" section already recorded above under Implementation Evidence -- full suite 1177 passed / 0 failed / 1 skipped from commit 158ace6, race suite pass, golden corpus pass, lint 0 issues, per-function coverage above the 80 percent floor. No content added; heading added to satisfy pvg story verify-delivery's schema check.)
+
+### AC Verification
+
+(Formatting note added by PM-Acceptor: this heading anchors the "Acceptance-criteria verification" table already recorded above, mapping every story requirement to its implementation location and verifying test. No content added; heading added to satisfy pvg story verify-delivery's schema check.)
+
 ## Implementation Evidence
 
 Summary: Gu-surfaces, the target-side surface ledger gate, lands on branch `mac-6ylh-gu-surfaces` at commit 158ace6. New gate `internal/gates/targetsurface.go` with table-driven tests, wired into the suite activation table, the default gate list, the decomposed-parent narrowing, `RunSelected`, and the stop-time hook fallback; `docs/target-surfaces.md` and `skills/machinery/references/target-surfaces.md` written; `surfaces.yaml`, the persona-walk sweep, the self-review coverage question, and `gu` added to every gate enumeration across the repo. Not pushed, no tag, no version bump.
