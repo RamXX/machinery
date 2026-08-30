@@ -6,11 +6,12 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T09:10:04Z
-content_hash: "sha256:1ea3eb91e85a8b98c78b7fb5a503942edca6eaa19903f87ff0115e6c9d73017a"
+updated_at: 2026-08-30T09:10:12Z
+content_hash: "sha256:81ff32463caf0cca1bdf77e428d27a8e94bc11ab116e7e721df754814fbb6ac8"
 was_blocked_by: [MAC-v16q]
 assignee: ramirosalas
 follows: [MAC-v16q]
+labels: [delivered]
 ---
 
 ## Description
@@ -258,6 +259,7 @@ LEARNINGS
 - 2026-08-30T08:52:03Z status: open -> in_progress
 - 2026-08-30T08:52:03Z auto-follows: linked to predecessor MAC-v16q
 - 2026-08-30T08:52:03Z claimed by ramirosalas
+- 2026-08-30T09:10:12Z status: in_progress -> in_progress
 
 ## Links
 - Was blocked by: [[MAC-v16q]]
