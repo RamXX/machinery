@@ -8,7 +8,7 @@ labels: [story, delivered]
 created_at: 2026-08-29T23:49:02Z
 created_by: ramirosalas
 updated_at: 2026-08-30T00:06:22Z
-content_hash: "sha256:95c39769c64e099948beee53a7577f6270a9b7fc34a1868932456740afad1932"
+content_hash: "sha256:8fb8d06bb1dbf027d00840fbe6d51930693ed7c6a8a6fbdd5f3e52a200520b80"
 assignee: ramirosalas
 ---
 
@@ -41,6 +41,16 @@ CONSTRAINTS: no version bump, no tag, no push (the maintainer will land more cha
 
 
 ## Notes
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-08-29.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
 
 
 ## History
