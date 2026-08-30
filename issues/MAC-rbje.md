@@ -6,10 +6,10 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T08:52:59Z
+updated_at: 2026-08-30T08:53:09Z
 content_hash: "sha256:fdfaf0a86cc5815842a292cd58e7994b099689dbe22990ae8c45bb537fc95ab9"
 assignee: ramirosalas
-labels: [delivered]
+labels: [delivered, accepted]
 closed_at: 2026-08-30T08:52:59Z
 close_reason: "accepted: wave-sentinel deny fixed to be per-operation, closes the delete+add TTL-refresh bypass found in the prior review"
 ---
