@@ -1,0 +1,3 @@
+# nd shared-worktree state
+mode: git_common_dir
+path: paivot/nd-vault

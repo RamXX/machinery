@@ -1,5 +1,4 @@
 # nd runtime state -- do not track
-# Default mode keeps .nd.yaml and issues/ local; use `nd init --track-issues` to track them in git
 .nd.yaml
 issues/
 .vlt.lock
@@ -8,3 +7,5 @@ issues/
 .piv-loop-state.json
 .piv-loop-snapshot.json
 .dispatcher-state.json
+
+# Default mode keeps .nd.yaml and issues/ out of code branches; `nd sync` persists them on the backlog branch
