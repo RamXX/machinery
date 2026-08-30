@@ -6,8 +6,8 @@ priority: 1
 type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
-updated_at: 2026-08-30T09:09:09Z
-content_hash: "sha256:9714b815d4ddb9d519b3573a300a149e3062e951ef9daa44c99471dde33f9882"
+updated_at: 2026-08-30T09:09:48Z
+content_hash: "sha256:f5b4bff65c0c244440bf3a74b3321ce7b4a7331ea1331a4d28fa1cbcff8b5cdb"
 was_blocked_by: [MAC-v16q]
 assignee: ramirosalas
 follows: [MAC-v16q]
@@ -132,6 +132,93 @@ DESIGN DECISIONS (delegated by the story; the repo has no DECISIONS.md for its o
    paraphrase of the attested blocks (it delegates to `machinery check` and .machinery.json), and
    adapters/opencode/plugins/machinery.js has no gate vocabulary. Nothing to mirror; TestOpenCodeAdapterContracts
    stays green.
+
+PROOF (commit 08f7f85, branch story/MAC-ug4h-class-c-attest, worktree off main 64bbd17)
+
+Commands run and results:
+
+1) go test ./... -count=1
+   16/16 packages ok, 0 FAIL. Verbose pass count: 1286 --- PASS lines, 0 failures, 0 skips.
+
+2) scripts/preflight.sh  (the repo's own CI mirror; 11 stages)
+   [1] git diff --check                   clean
+   [2] gofmt                              clean
+   [3] go vet ./...                       clean
+   [4] golangci-lint (pinned v2.13.2)     0 issues
+   [5..7] schema/manifest checks + build .bin/machinery   ok
+   [8] go test -race ./...                16/16 ok
+   [9] golden corpus + gate-experiment suite   ok (cmd/machinery, internal/experiments)
+   [10] machinery check on all 8 example design suites    0 blocking findings
+   [11] go-crm impl tests (separate module)                6/6 ok
+   Final line: "preflight OK: local gates match ci.yml, safe to push."
+
+3) New tests added (all passing):
+   internal/gates/attest_test.go   TestAttestationClean, TestAttestationInactiveWithoutFile,
+     TestAttestationMutations (16 subtests), TestAttestationGoesStaleWhenTheArtifactMoves,
+     TestAttestationRejectsDirectoryReferent, TestAttestationCoverageWarnsRatherThanBlocks,
+     TestAttestationOwesOnlyWhatTheDesignReached, TestAttestationVocabularyIsClosedAndOrdered,
+     TestContentHashShapeAndStability, TestAttestationSuiteWiring,
+     TestAttestationSurvivesDecomposedParentNarrowing
+   cmd/machinery/attest_test.go    TestAttestPrintsTheHashTheGateDemands, TestAttestHashesEveryPath,
+     TestAttestClaimsPrintsTheVocabulary, TestAttestFailsOnAnAbsentPath,
+     TestAttestWithoutArgumentsFails, TestCheckGateGvRunsAndCatchesStaleness
+   internal/hook/hook_test.go      TestSelectGatesActivatesGvOnAttestationEvidence
+   Fixture-based, real files under t.TempDir(), no mocks.
+
+SAMPLE GATE RUN (real binary built from 08f7f85, real design dir on disk)
+
+Helper:
+  $ machinery attest $D/ARCHITECTURE.md
+  sha256:82d657598c1bf13f3e3698b94b244a67580e703bb03f8d9f2f480b1b9f602ffa  $D/ARCHITECTURE.md
+
+Pass (six g2 rows bound to that hash):
+  $ machinery check $D --gate gv ; echo exit=$?
+  == Gv-attest  attestation evidence ==
+    checked: 6 covered artifacts current, 6 attested claims, 6 claims owed
+    ok
+
+  0 blocking (ERROR/DRIFT) finding(s)
+  exit=0
+
+Induced STALE (one sentence appended to ARCHITECTURE.md, nothing else touched):
+  $ printf '\nOne more sentence.\n' >> $D/ARCHITECTURE.md
+  $ machinery check $D --gate gv ; echo exit=$?
+  == Gv-attest  attestation evidence ==
+    ERROR  attestations.yaml: g2.action-ownership is STALE: ARCHITECTURE.md changed since it was
+           attested (recorded sha256:82d6575..., current sha256:4d7528d...); re-read the artifact,
+           judge it again, and update the row with 'machinery attest <design>/ARCHITECTURE.md'
+    ERROR  attestations.yaml: g2.interface-contract-rightness is STALE: ... (same shape)
+    ERROR  attestations.yaml: g2.placement-rightness is STALE: ...
+    ERROR  attestations.yaml: g2.adoption-closure-discovery is STALE: ...
+    ERROR  attestations.yaml: g2.event-contract-completeness is STALE: ...
+    ERROR  attestations.yaml: g2.nfr-content is STALE: ...
+    checked: 6 attested claims, 6 claims owed
+
+  6 blocking (ERROR/DRIFT) finding(s)
+  exit=1
+
+ACCEPTANCE CRITERIA
+
+AC1 gate implemented + wired: internal/gates/attest.go (CheckAttestations, AttestationActive);
+    suite.go knownGateSet, default list gm..gj,gv,g4,gt,g5, RunSelected, and the machine-less-parent
+    narrowing; internal/hook/hook.go selectGates. Activates only on design/attestations.yaml.
+    Pinned by TestAttestationSuiteWiring, TestAttestationSurvivesDecomposedParentNarrowing,
+    TestSelectGatesActivatesGvOnAttestationEvidence, TestCheckGateGvRunsAndCatchesStaleness.
+AC2 gate tests: valid file passes (TestAttestationClean); unknown claim id, missing attestor,
+    missing covered path, hash mismatch STALE, duplicate claim each produce the intended finding
+    (TestAttestationMutations subtests "unknown claim id", "missing attestor"/"empty attestor",
+    "missing covered path", "hash mismatch is STALE", "duplicate claim"), plus 11 further shape
+    mutations. Fixture-based, real files, no mocks.
+AC3 SKILL.md (design tree, activation paragraph, gate roll-call, the four attested blocks, and a
+    new "Attestation evidence (Gv-attest)" section), agents/machinery-fsm-author.md,
+    agents/machinery-build-writer.md, docs/attestation-evidence.md (new),
+    docs/acceptance-gate.md (Ga tie-in), docs/brownfield-team-guide.md section 6 (PR-checklist
+    superseded, pointer added), docs/claude-plugin.md (stop-hook selection),
+    skills/machinery/tools/README.md, commands/check.md, README.md (gate table + phase map + docs
+    index). SKILL.md frontmatter version: untouched (TestPluginManifests green). Adapter checked:
+    adapters/opencode carries no gate list or attested-block paraphrase, so nothing to mirror.
+AC4 make test and make lint green (see preflight stages 3, 4, 8 above).
+AC5 no em dashes or emojis: scanned every changed and added file, zero hits.
 
 ## History
 - 2026-08-30T08:34:40Z dep_added: blocked_by MAC-v16q
