@@ -1,5 +1,5 @@
 // Code generated from fulfillment.modelith.yaml + integrity.relational.yaml by machinery alloy. DO NOT EDIT.
-// machinery-version: v0.4.1
+// machinery-version: v0.5.0
 //
 // Static relational model of the STRUCTURAL invariants: which configurations
 // of entities, relationships, unique keys, and singleton flags the constraint
