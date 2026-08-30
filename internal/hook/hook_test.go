@@ -635,6 +635,90 @@ func TestCodexPatchWaveSentinel(t *testing.T) {
 	}
 }
 
+// A delete of the sentinel is allowed because it closes the wave, but the
+// delete must not launder any other write to the same path in the same tool
+// call: a patch that deletes and re-adds .machinery-wave reopens a fresh
+// full-TTL wave in one call and must be denied.
+func TestCodexPatchWaveSentinelDeleteDoesNotLaunderRewrite(t *testing.T) {
+	root := managedRoot(t)
+	cases := []struct {
+		name  string
+		patch string
+	}{
+		{"delete then add", "*** Begin Patch\n" +
+			"*** Delete File: design/.machinery-wave\n" +
+			"*** Add File: design/.machinery-wave\n" +
+			"+240\n" +
+			"*** End Patch"},
+		{"add then delete", "*** Begin Patch\n" +
+			"*** Add File: design/.machinery-wave\n" +
+			"+240\n" +
+			"*** Delete File: design/.machinery-wave\n" +
+			"*** End Patch"},
+		{"delete then update", "*** Begin Patch\n" +
+			"*** Delete File: design/.machinery-wave\n" +
+			"*** Update File: design/.machinery-wave\n" +
+			"@@\n-45\n+240\n" +
+			"*** End Patch"},
+		{"delete one sentinel, add another", "*** Begin Patch\n" +
+			"*** Delete File: design/.machinery-wave\n" +
+			"*** Add File: design/children/billing/.machinery-wave\n" +
+			"+240\n" +
+			"*** End Patch"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out := runEvent(t, root, codexPatchEvent("PreToolUse", "s-wave-relaunder", c.patch))
+			var got preOut
+			if err := json.Unmarshal([]byte(out), &got); err != nil {
+				t.Fatalf("deny output is not JSON: %v (%q)", err, out)
+			}
+			if got.HookSpecificOutput.PermissionDecision != "deny" {
+				t.Fatalf("re-creating the sentinel in the same patch that deletes it must be denied: %+v", got)
+			}
+			reason := got.HookSpecificOutput.PermissionDecisionReason
+			for _, want := range []string{"wave sentinel", "operator-created"} {
+				if !strings.Contains(reason, want) {
+					t.Fatalf("reason %q missing %q", reason, want)
+				}
+			}
+		})
+	}
+}
+
+// editedOps is the substrate the per-operation deny rests on: a single patch
+// that deletes and re-adds one path must report both operations, and a plain
+// file-tool write must never be classified as a delete.
+func TestEditedOpsReportsOperationPerPath(t *testing.T) {
+	patch := "*** Begin Patch\n" +
+		"*** Delete File: design/.machinery-wave\n" +
+		"*** Add File: design/.machinery-wave\n" +
+		"+240\n" +
+		"*** Update File: design/notes.md\n" +
+		"*** End Patch"
+	got := editedOps(Input{ToolName: "apply_patch", ToolInput: toolInput{Command: patch}})
+	want := []editedPath{
+		{Path: "design/.machinery-wave", Op: opDelete},
+		{Path: "design/.machinery-wave", Op: opAdd},
+		{Path: "design/notes.md", Op: opUpdate},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("editedOps = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("editedOps[%d] = %v, want %v", i, got[i], want[i])
+		}
+	}
+	if paths := editedPaths(Input{ToolName: "apply_patch", ToolInput: toolInput{Command: patch}}); len(paths) != 2 {
+		t.Fatalf("editedPaths must stay deduplicated by path, got %v", paths)
+	}
+	write := editedOps(Input{ToolName: "Write", ToolInput: toolInput{FilePath: "design/.machinery-wave"}})
+	if len(write) != 1 || write[0].Op != opWrite {
+		t.Fatalf("a file-tool write must report opWrite, got %v", write)
+	}
+}
+
 func TestStopMissingDesignDirWarns(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigName), `{"design":"blueprint"}`)

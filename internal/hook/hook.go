@@ -181,19 +181,18 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 	// stays allowed: design/domain.modelith.yaml is the Phase 1 source, and
 	// only its deletion (which disarms detection) is denied. The Bash
 	// escape hatch remains a documented residual.
-	dropped := map[string]bool{}
 	for _, deleted := range deletedPaths(in) {
 		rel := relToRoot(root, deleted)
 		if rel == ConfigName || rel == conventionalMarker {
 			return deny("deleting " + rel + " switches machinery governance off for this repository. " +
 				"If governance must be disabled, a human sets {\"hooks\": false} in " + ConfigName + ".")
 		}
-		if rel != "" {
-			dropped[rel] = true
-		}
 	}
-	for _, edited := range editedPaths(in) {
-		rel := relToRoot(root, edited)
+	// Exemptions are per operation, never per path: one apply_patch that both
+	// deletes and re-adds the sentinel must still be denied for the add, so
+	// the delete cannot launder a fresh full-TTL wave through the same call.
+	for _, edited := range editedOps(in) {
+		rel := relToRoot(root, edited.Path)
 		if rel == "" {
 			continue
 		}
@@ -202,7 +201,7 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 				"governance off ({\"hooks\": false}) or silently reroute the gates. A human maintains this file " +
 				"(or 'machinery init' regenerates it).")
 		}
-		if path.Base(rel) == waveSentinelName && !dropped[rel] {
+		if path.Base(rel) == waveSentinelName && edited.Op != opDelete {
 			return deny(rel + " is the wave sentinel, and it is operator-created: while it is fresh the stop " +
 				"gates surface red findings as a message instead of blocking, so an agent that creates or " +
 				"re-touches it defers gating for as long as it likes. Ask the human running the wave to open " +
@@ -667,7 +666,7 @@ func clearState(root, sessionID string) { _ = os.Remove(statePath(root, sessionI
 
 // --- small helpers ---
 
-var patchPathLine = regexp.MustCompile(`(?m)^\*\*\* (?:Add|Update|Delete) File: (.+)$`)
+var patchPathLine = regexp.MustCompile(`(?m)^\*\*\* (Add|Update|Delete) File: (.+)$`)
 var patchMoveLine = regexp.MustCompile(`(?m)^\*\*\* Move to: (.+)$`)
 var patchDeleteLine = regexp.MustCompile(`(?m)^\*\*\* Delete File: (.+)$`)
 
@@ -691,15 +690,40 @@ func deletedPaths(in Input) []string {
 	return paths
 }
 
-// editedPaths normalizes the two supported hook protocols. Claude file tools
-// provide file_path/notebook_path. Codex apply_patch provides the complete
-// patch in tool_input.command; the OpenCode adapter may use command or patch.
-func editedPaths(in Input) []string {
+// patchOp is the kind of edit a single tool input performs on a single path.
+// A path can carry more than one op in one apply_patch (a delete plus an add
+// of the same file), which is why the deny rules key on the op and not on the
+// set of paths the patch happens to touch.
+type patchOp string
+
+const (
+	opWrite  patchOp = "write"
+	opAdd    patchOp = "add"
+	opUpdate patchOp = "update"
+	opDelete patchOp = "delete"
+	opMove   patchOp = "move"
+)
+
+// editedPath is one path together with the operation that reached it.
+type editedPath struct {
+	Path string
+	Op   patchOp
+}
+
+var patchOpByKeyword = map[string]patchOp{"Add": opAdd, "Update": opUpdate, "Delete": opDelete}
+
+// editedOps normalizes the two supported hook protocols into per-operation
+// entries. Claude file tools provide file_path/notebook_path and only ever
+// write. Codex apply_patch provides the complete patch in tool_input.command;
+// the OpenCode adapter may use command or patch. Entries are deduplicated by
+// path AND op, so a patch that deletes and then re-adds the same file yields
+// both operations in the order the patch states them.
+func editedOps(in Input) []editedPath {
 	if in.ToolInput.FilePath != "" {
-		return []string{in.ToolInput.FilePath}
+		return []editedPath{{Path: in.ToolInput.FilePath, Op: opWrite}}
 	}
 	if in.ToolInput.NotebookPath != "" {
-		return []string{in.ToolInput.NotebookPath}
+		return []editedPath{{Path: in.ToolInput.NotebookPath, Op: opWrite}}
 	}
 	patchText := in.ToolInput.Command
 	if patchText == "" {
@@ -709,17 +733,41 @@ func editedPaths(in Input) []string {
 		return nil
 	}
 
+	seen := map[editedPath]bool{}
+	var edits []editedPath
+	add := func(p string, op patchOp) {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			return
+		}
+		e := editedPath{Path: p, Op: op}
+		if seen[e] {
+			return
+		}
+		seen[e] = true
+		edits = append(edits, e)
+	}
+	for _, match := range patchPathLine.FindAllStringSubmatch(patchText, -1) {
+		add(match[2], patchOpByKeyword[match[1]])
+	}
+	for _, match := range patchMoveLine.FindAllStringSubmatch(patchText, -1) {
+		add(match[1], opMove)
+	}
+	return edits
+}
+
+// editedPaths is the path-only view of editedOps, deduplicated by path and
+// preserving the order the operations appear in. Callers that must reason
+// about what an operation means (a delete is not a create) use editedOps.
+func editedPaths(in Input) []string {
 	seen := map[string]bool{}
 	var paths []string
-	for _, re := range []*regexp.Regexp{patchPathLine, patchMoveLine} {
-		for _, match := range re.FindAllStringSubmatch(patchText, -1) {
-			p := strings.TrimSpace(match[1])
-			if p == "" || seen[p] {
-				continue
-			}
-			seen[p] = true
-			paths = append(paths, p)
+	for _, e := range editedOps(in) {
+		if seen[e.Path] {
+			continue
 		}
+		seen[e.Path] = true
+		paths = append(paths, e.Path)
 	}
 	return paths
 }

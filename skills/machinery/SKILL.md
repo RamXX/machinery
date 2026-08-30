@@ -1167,4 +1167,6 @@ Two lessons from the first large remediation cycle run under this skill:
   gating. The sentinel is created by the operator, never by an agent: the
   PreToolUse hook denies agent file-tool writes to `.machinery-wave`, because
   a session that could re-touch it would defer its own gates indefinitely.
-  Deleting it, which closes the wave, stays allowed.
+  Deleting it, which closes the wave, stays allowed, but only as a delete on
+  its own: a patch that deletes and re-creates the sentinel in the same call
+  is still denied, because that would reopen a full-TTL wave in one tool use.
