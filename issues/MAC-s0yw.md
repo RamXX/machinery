@@ -1,13 +1,14 @@
 ---
 id: MAC-s0yw
 title: "Zero-artifact checks B: edge gates (Ga, Gu, G5, Gs)"
-status: open
+status: in_progress
 priority: 1
 type: feature
 created_at: 2026-08-30T18:54:10Z
 created_by: ramirosalas
-updated_at: 2026-08-30T18:54:10Z
-content_hash: "sha256:65fad4b6f63d32566903a9934e79574dc7378096a928fa547e6692b77f1f7d56"
+updated_at: 2026-08-30T18:54:50Z
+content_hash: "sha256:4cdeec569245f5cabc7e444475a27ac09c8c9eb2b0258f34ce7dce8b7889ff38"
+assignee: ramirosalas
 ---
 
 ## Description
@@ -63,7 +64,8 @@ Test and preflight summaries; per check, one induced-failure sample finding; the
 
 
 ## History
-
+- 2026-08-30T18:54:50Z status: open -> in_progress
+- 2026-08-30T18:54:50Z claimed by ramirosalas
 
 ## Links
 
