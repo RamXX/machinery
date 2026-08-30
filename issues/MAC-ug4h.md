@@ -7,7 +7,7 @@ type: feature
 created_at: 2026-08-30T08:34:37Z
 created_by: ramirosalas
 updated_at: 2026-08-30T09:15:36Z
-content_hash: "sha256:bcda2d74cd78c0358f025b6bd8e02c8e906af23bc841409b55128d358a0d45a1"
+content_hash: "sha256:ae86746a855a380d17dde6c5af75c9328925041ee8726d68537272ab0fe04b27"
 was_blocked_by: [MAC-v16q]
 assignee: ramirosalas
 follows: [MAC-v16q]
@@ -254,6 +254,17 @@ LEARNINGS
   suite.go default, three docs, one command frontmatter). A single perl -pi over the exact old
   substring caught them all; grepping for the whole list rather than for individual letters is the
   reliable way to find every copy.
+
+
+## nd_contract
+status: accepted
+
+### evidence
+- PM closeout applied via pvg story accept on 2026-08-30.
+
+### proof
+- [x] Story closed after accepted label was applied.
+
 
 ## History
 - 2026-08-30T08:34:40Z dep_added: blocked_by MAC-v16q
