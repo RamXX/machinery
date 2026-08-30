@@ -576,7 +576,9 @@ and run `machinery check` before any turn that touched the design (or watched so
 `"impl"` configured) is allowed to end; DRIFT and import-boundary violations block, mid-phase
 ERRORs only warn. During a deliberate multi-agent wave, touch `<design>/.machinery-wave` (first
 line: TTL in minutes, default 45) and red gates surface as messages instead of blocking until the
-sentinel is deleted or its TTL lapses; a stale sentinel is reported and ignored. In every other repository the hooks are a strict no-op: they exit before reading
+sentinel is deleted or its TTL lapses; a stale sentinel is reported and ignored. The sentinel is
+operator-created, never agent-created: the PreToolUse hook denies agent file-tool writes to it, so
+a session cannot defer its own gates (deleting it, which closes the wave, stays allowed). In every other repository the hooks are a strict no-op: they exit before reading
 anything, so the plugin never disturbs other projects or plugins. Details, including the
 `.machinery.json` reference: the [Claude Code plugin guide](docs/claude-plugin.md).
 

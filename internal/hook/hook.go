@@ -181,11 +181,15 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 	// stays allowed: design/domain.modelith.yaml is the Phase 1 source, and
 	// only its deletion (which disarms detection) is denied. The Bash
 	// escape hatch remains a documented residual.
+	dropped := map[string]bool{}
 	for _, deleted := range deletedPaths(in) {
 		rel := relToRoot(root, deleted)
 		if rel == ConfigName || rel == conventionalMarker {
 			return deny("deleting " + rel + " switches machinery governance off for this repository. " +
 				"If governance must be disabled, a human sets {\"hooks\": false} in " + ConfigName + ".")
+		}
+		if rel != "" {
+			dropped[rel] = true
 		}
 	}
 	for _, edited := range editedPaths(in) {
@@ -197,6 +201,12 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 			return deny(rel + " is the machinery governance configuration; an agent edit here can switch " +
 				"governance off ({\"hooks\": false}) or silently reroute the gates. A human maintains this file " +
 				"(or 'machinery init' regenerates it).")
+		}
+		if path.Base(rel) == waveSentinelName && !dropped[rel] {
+			return deny(rel + " is the wave sentinel, and it is operator-created: while it is fresh the stop " +
+				"gates surface red findings as a message instead of blocking, so an agent that creates or " +
+				"re-touches it defers gating for as long as it likes. Ask the human running the wave to open " +
+				"or extend it. Deleting it (which closes the wave and re-arms the gates) stays allowed.")
 		}
 		reason := generatedReason(designRel(cfg), rel)
 		if reason == "" {
@@ -259,11 +269,18 @@ func alloySource(base string) string {
 	}
 }
 
+// waveSentinelName is the operator-owned wave sentinel. Its freshness is what
+// downgrades a red stop from a block to a message, so opening and extending it
+// is a human act: pre() denies agent file-tool writes to any path with this
+// base name. Deleting it closes the wave and re-arms the gates, so deletion
+// stays open to agent and human alike.
+const waveSentinelName = ".machinery-wave"
+
 // waveSentinel inspects <design>/.machinery-wave: active reports presence,
 // stale whether its TTL has passed (mtime plus the TTL in minutes read from
 // the file's first line; default 45, capped at 240), left the remaining time.
 func waveSentinel(designDir string) (left string, stale, active bool) {
-	p := filepath.Join(designDir, ".machinery-wave")
+	p := filepath.Join(designDir, waveSentinelName)
 	fi, err := os.Stat(p)
 	if err != nil {
 		return "", false, false
@@ -574,6 +591,8 @@ func sessionStart(w io.Writer, root string, cfg Config, warn string) error {
 	}
 	fmt.Fprintf(&b, "- Generated artifacts are read-only and hooks deny edits to them: %s/**/*.oracle.md, %s/formal/*.tla, *.cfg and *.als, %s/packs/**, %s/pack/**, %s/ratchet.json. Edit the sources, then regenerate (machinery oracle | machinery verify-formal --gen-only | machinery alloy | machinery pack generate | machinery baseline).\n",
 		design, design, design, design, design)
+	fmt.Fprintf(&b, "- The wave sentinel %s/%s is operator-created: hooks deny agent writes to it, because a session that could touch it would defer its own gates. Deleting it (closing the wave) stays allowed.\n",
+		design, waveSentinelName)
 	mode := "stale generated artifacts (DRIFT) or import-boundary violations block"
 	if cfg.Strict {
 		mode = "strict mode: any blocking finding blocks"

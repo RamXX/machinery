@@ -566,6 +566,75 @@ func TestCodexDeleteOfGovernanceMarkerDenied(t *testing.T) {
 	}
 }
 
+// The wave sentinel defers stop-time gating while it is fresh, so an agent
+// that could touch it would defer the gates indefinitely. It is operator-only:
+// file-tool creates and edits are denied wherever the base name appears, while
+// deleting it (the documented way to close a wave) stays allowed.
+func TestPreDeniesWaveSentinelWrites(t *testing.T) {
+	root := managedRoot(t)
+	cases := []struct {
+		name string
+		rel  string
+		tool string
+		deny bool
+	}{
+		{"root design dir, Write", "design/.machinery-wave", "Write", true},
+		{"root design dir, Edit", "design/.machinery-wave", "Edit", true},
+		{"root design dir, MultiEdit", "design/.machinery-wave", "MultiEdit", true},
+		{"nested child design", "design/children/billing/.machinery-wave", "Write", true},
+		{"outside the design dir", "ops/.machinery-wave", "Write", true},
+		{"lookalike suffix is not the sentinel", "design/.machinery-wave.bak", "Write", false},
+		{"lookalike prefix is not the sentinel", "design/wave.md", "Write", false},
+		{"Bash is not a governed file tool", "design/.machinery-wave", "Bash", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out := runEvent(t, root, editEvent("PreToolUse", c.tool, "s-wave", filepath.Join(root, c.rel)))
+			if !c.deny {
+				if out != "" {
+					t.Fatalf("expected allow (no output), got %q", out)
+				}
+				return
+			}
+			var got preOut
+			if err := json.Unmarshal([]byte(out), &got); err != nil {
+				t.Fatalf("deny output is not JSON: %v (%q)", err, out)
+			}
+			if got.HookSpecificOutput.PermissionDecision != "deny" {
+				t.Fatalf("writing the wave sentinel must be denied: %+v", got)
+			}
+			reason := got.HookSpecificOutput.PermissionDecisionReason
+			for _, want := range []string{c.rel, "wave sentinel", "operator-created"} {
+				if !strings.Contains(reason, want) {
+					t.Fatalf("reason %q missing %q", reason, want)
+				}
+			}
+		})
+	}
+}
+
+func TestCodexPatchWaveSentinel(t *testing.T) {
+	root := managedRoot(t)
+	add := codexPatchEvent("PreToolUse", "s-wave-add", "*** Begin Patch\n"+
+		"*** Add File: design/.machinery-wave\n"+
+		"+240\n"+
+		"*** End Patch")
+	out := runEvent(t, root, add)
+	var got preOut
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("deny output is not JSON: %v (%q)", err, out)
+	}
+	if got.HookSpecificOutput.PermissionDecision != "deny" {
+		t.Fatalf("an apply_patch that creates the sentinel must be denied: %+v", got)
+	}
+	del := codexPatchEvent("PreToolUse", "s-wave-del", "*** Begin Patch\n"+
+		"*** Delete File: design/.machinery-wave\n"+
+		"*** End Patch")
+	if out := runEvent(t, root, del); out != "" {
+		t.Fatalf("deleting the sentinel closes the wave and must stay allowed, got %q", out)
+	}
+}
+
 func TestStopMissingDesignDirWarns(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigName), `{"design":"blueprint"}`)

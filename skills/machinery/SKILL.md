@@ -1164,4 +1164,7 @@ Two lessons from the first large remediation cycle run under this skill:
   TTL in minutes, default 45) when the wave opens; red gates surface as
   messages while it is fresh, and DELETING it closes the wave and gates
   normally. A stale sentinel is ignored, so a forgotten file cannot disarm
-  gating.
+  gating. The sentinel is created by the operator, never by an agent: the
+  PreToolUse hook denies agent file-tool writes to `.machinery-wave`, because
+  a session that could re-touch it would defer its own gates indefinitely.
+  Deleting it, which closes the wave, stays allowed.
