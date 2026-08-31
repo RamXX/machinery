@@ -71,12 +71,34 @@ func TestEventCellsEmptyCellErrors(t *testing.T) {
 }
 
 // The format documents no placeholder token, so an explicit "none" or "n/a"
-// is an ANSWER and passes; only an empty cell is an unanswered question.
+// is an ANSWER and passes; only an empty cell is an unanswered question. The
+// one exception is the dedupe cell under at-least-once delivery, pinned
+// separately below.
 func TestEventCellsExplicitNoneIsAnAnswer(t *testing.T) {
 	g := eventCellFixture(t, fullEventHeader+
-		"| paid | app | gw | Order.id | at-least-once | none | n/a |\n")
+		"| paid | app | gw | Order.id | exactly-once | none | n/a |\n")
 	if len(g.Errs) != 0 {
 		t.Fatalf("an explicit none/n-a is an answer: %v", g.Errs)
+	}
+}
+
+// At-least-once delivery promises duplicates, so a bare no-answer dedupe cell
+// contradicts the row; a reasoned "none (...)" or a named key passes.
+func TestEventCellsAtLeastOnceBareDedupe(t *testing.T) {
+	g := eventCellFixture(t, fullEventHeader+
+		"| paid | app | gw | Order.id | at-least-once | none | n/a |\n")
+	if !hasErr(g, "delivery is at-least-once but dedupe is a bare") {
+		t.Fatalf("a bare dedupe under at-least-once must error: %v", g.Errs)
+	}
+	g = eventCellFixture(t, fullEventHeader+
+		"| paid | app | gw | Order.id | at-least-once | none | none (idempotent consumer: upsert by Order.id) |\n")
+	if len(g.Errs) != 0 {
+		t.Fatalf("a reasoned none is an answer: %v", g.Errs)
+	}
+	g = eventCellFixture(t, fullEventHeader+
+		"| paid | app | gw | Order.id | at-least-once | none | Order.id |\n")
+	if len(g.Errs) != 0 {
+		t.Fatalf("a named dedupe key passes: %v", g.Errs)
 	}
 }
 

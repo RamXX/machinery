@@ -390,6 +390,9 @@ activated by its own presence) and G2 holds it:
 - An empty closure cell needs `(no closure: <reason>)`; an empty reason is an error.
 - When the scorecard column exists, every cell is `<score> (YYYY-MM-DD)` or `n/a - <reason>`; an
   empty or misshapen cell is an error, so the dated-evidence rule stops being a vibe.
+- A **license** column is optional in the same way: when it exists, every cell is an SPDX id or
+  expression (`Apache-2.0`, `GPL-3.0-or-later OR MIT`) or `n/a - <reason>`; an empty or prose cell
+  is an error, so the license check the adoption step asks for has a checkable home.
 
 What stays LLM-attested: DISCOVERING the closure. G2 verifies mitigation coverage and closure
 carry for what is declared; only the conversation catches what was never declared.
@@ -489,7 +492,12 @@ lines above its header. Columns:
 G2 holds every ROW to those columns: an empty cell is an unanswered question and an ERROR, while
 an explicit "none" or "n/a" is an answer and passes, and the producer and consumer must resolve to
 a declared `workspace.dsl` element or a declared external, the same resolution a mitigation row
-gets. Once machines exist, Gx-trace reconciles the rows against them (see the Gate 4 checklist).
+gets. One consistency rule crosses cells: a row whose delivery is at-least-once with a BARE
+"none"/"n/a" dedupe cell is an ERROR, because duplicates will arrive; name the key, or state the
+reason in the cell (`none (idempotent consumer: upsert by Order.id)`). Once machines exist,
+Gx-trace reconciles the rows against them (see the Gate 4 checklist), and a machine that declares
+`_external_events` arms the reverse direction: each declared externally-sourced event must have a
+row here.
 
 | event | producer | consumer | payload | delivery | ordering | dedupe key |
 |---|---|---|---|---|---|---|

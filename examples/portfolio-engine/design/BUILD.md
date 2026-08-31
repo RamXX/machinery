@@ -385,3 +385,16 @@ Target language: Python.
 - **maxDrawdown stored in basis points as an integer** to keep the model integer-typed; if
   sub-basis-point precision is ever needed, widen the unit rather than switching to float in the
   persisted schema.
+
+### What the gates do not verify
+
+Not covered by any deterministic check or proof, by construction: whether the interrogation
+extracted the RIGHT invariants (a shallow domain model gates clean); guard and action semantics in
+code (the named-unit contracts carry them into tests; a wrong implementation of a correctly-named
+guard is caught by tests, not proofs); races between concurrent machine instances, and message
+loss, duplication, or reordering between machines (the models are single-instance; the
+event-contract table and the idempotency contracts govern those seams, and the tests exercise
+them); whether migration transformations preserve real production data (Gm proves decision
+coverage, not the implementation or a database run); coupling through shared database tables or
+bus topics (invisible to import analysis; the event-contract table governs it); and security,
+capacity, and observability beyond what the Phase 2 NFR record captures.

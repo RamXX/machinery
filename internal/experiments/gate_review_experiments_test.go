@@ -16,6 +16,30 @@ import (
 	"github.com/RamXX/machinery/internal/gates"
 )
 
+// reviewTemplateStub satisfies Gb's template-section and disclaimer
+// obligations for fixtures that assert zero errors; the disclaimer text is
+// read from the reference template so the fixture never drifts from it.
+func reviewTemplateStub(t *testing.T) string {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join("..", "..", "skills", "machinery", "references", "build-md-template.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	txt := string(body)
+	i := strings.Index(txt, "Not covered by any deterministic check")
+	if i < 0 {
+		t.Fatal("build-md-template.md lost its disclaimer block")
+	}
+	j := strings.Index(txt[i:], "```")
+	if j < 0 {
+		t.Fatal("disclaimer block is unterminated in build-md-template.md")
+	}
+	return "\n## Purpose and scope\ns\n## Glossary\ns\n## Domain model\ns\n## Architecture\ns\n" +
+		"## Behavior\ns\n## Traceability matrix\ns\n## Test specification\ns\n## State migration\ns\n" +
+		"## Language realization notes\ns\n## Hard-TDD protocol\ns\n## Open questions and residual risks\ns\n" +
+		"### What the gates do not verify\n" + txt[i:i+j] + "\n"
+}
+
 func writeReviewFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -276,7 +300,7 @@ func TestReviewManifestRootPlanIsHeldAndAccepted(t *testing.T) {
 		"# o\n\n| test id | stable id | source |\n|---|---|---|\n| T-THIN-01 | THIN-aaa111 | A |\n")
 	writeReviewFile(t, filepath.Join(design, "BUILD.md"), "# B\n\nMode: manifest\n\n## 9. Build plan\n\n"+
 		"**M0 - Walking skeleton.** NFR: error envelope. DoD: THIN-aaa111 green end to end.\nStatus: closed\n\n"+
-		"**M1 - Breadth slice.** DoD: every remaining row green.\n")
+		"**M1 - Breadth slice.** DoD: every remaining row green.\n"+reviewTemplateStub(t))
 	for _, shard := range []string{"orders", "payments"} {
 		writeReviewFile(t, filepath.Join(design, "BUILD", shard+".md"),
 			"# "+shard+"\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n")

@@ -24,6 +24,12 @@ var (
 	// scorecardCellRe is the checkable evidence shape: a score with the date
 	// it was read ("7.5 (2026-08-01)"), or an explained n/a.
 	scorecardCellRe = regexp.MustCompile(`^(?:\d+(?:\.\d+)?\s*\(\d{4}-\d{2}-\d{2}\)|(?i:n/a)\s*-\s*\S.*)$`)
+	// licenseCellRe is the checkable license shape: an SPDX id or expression
+	// ("Apache-2.0", "GPL-3.0-or-later OR MIT"), or an explained n/a. The id
+	// grammar is deliberately loose (the SPDX list is open); what is held is
+	// that the cell is an identifier-shaped answer or a reasoned waiver, never
+	// prose and never blank.
+	licenseCellRe = regexp.MustCompile(`^(?:[A-Za-z0-9][A-Za-z0-9.+-]*(?:\s+(?:OR|AND|WITH)\s+[A-Za-z0-9][A-Za-z0-9.+-]*)*|(?i:n/a)\s*-\s*\S.*)$`)
 )
 
 // checkAdoptionClosure holds every adoption-closure table in ARCHITECTURE.md:
@@ -38,6 +44,7 @@ func checkAdoptionClosure(g *Gate, text string, els map[string]dslEl, required m
 			continue
 		}
 		si := colContaining(tbl.Header, "scorecard")
+		li := colContaining(tbl.Header, "license")
 		for _, r := range tbl.Rows {
 			if len(r) == 0 {
 				continue
@@ -77,20 +84,35 @@ func checkAdoptionClosure(g *Gate, text string, els map[string]dslEl, required m
 					}
 				}
 			}
-			if si < 0 {
-				continue
+			if si >= 0 {
+				score := ""
+				if si < len(r) {
+					score = strings.TrimSpace(r[si])
+				}
+				switch {
+				case score == "":
+					g.Errs = append(g.Errs, "adoption row "+ir.Repr(tech)+" leaves scorecard empty; record the dated OpenSSF Scorecard score ('7.5 (2026-08-01)') or 'n/a - <reason>'")
+				case scorecardCellRe.MatchString(score):
+					g.Count("scorecard entries")
+				default:
+					g.Errs = append(g.Errs, "adoption row "+ir.Repr(tech)+" scorecard "+ir.Repr(score)+" is neither '<score> (YYYY-MM-DD)' nor 'n/a - <reason>'")
+				}
 			}
-			score := ""
-			if si < len(r) {
-				score = strings.TrimSpace(r[si])
-			}
-			switch {
-			case score == "":
-				g.Errs = append(g.Errs, "adoption row "+ir.Repr(tech)+" leaves scorecard empty; record the dated OpenSSF Scorecard score ('7.5 (2026-08-01)') or 'n/a - <reason>'")
-			case scorecardCellRe.MatchString(score):
-				g.Count("scorecard entries")
-			default:
-				g.Errs = append(g.Errs, "adoption row "+ir.Repr(tech)+" scorecard "+ir.Repr(score)+" is neither '<score> (YYYY-MM-DD)' nor 'n/a - <reason>'")
+			// the license check the skill asks for per closure member, in a
+			// checkable shape; opt-in by column presence, like scorecard
+			if li >= 0 {
+				lic := ""
+				if li < len(r) {
+					lic = strings.TrimSpace(strings.ReplaceAll(r[li], "`", ""))
+				}
+				switch {
+				case lic == "":
+					g.Errs = append(g.Errs, "adoption row "+ir.Repr(tech)+" leaves license empty; record the SPDX id ('Apache-2.0') or 'n/a - <reason>'")
+				case licenseCellRe.MatchString(lic):
+					g.Count("license entries")
+				default:
+					g.Errs = append(g.Errs, "adoption row "+ir.Repr(tech)+" license "+ir.Repr(lic)+" is neither an SPDX id/expression nor 'n/a - <reason>'")
+				}
 			}
 		}
 	}

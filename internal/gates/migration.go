@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
@@ -749,19 +750,68 @@ func (v *migrationValidator) validateRisks() {
 	}
 }
 
+// transitionTopics are the five obligations of the Transition architecture
+// narrative (the skill: "naming the temporary exporter, replication/dual-write,
+// routing, observability, and failure posture"). Held exactly as the NFR
+// record holds its three topics: a mention satisfies the check, "out of scope"
+// spelled out included, because writing it mentions the topic. The needles
+// accept the corpus's real spellings (an importer IS the replication
+// mechanism of a store swap; a connection-string repoint IS its routing;
+// reconciliation IS how a transition is observed).
+var transitionTopics = []struct {
+	name    string
+	needles []string
+}{
+	{"the temporary exporter", []string{"exporter", "export"}},
+	{"replication or dual-write", []string{"replication", "dual-write", "dual write", "import"}},
+	{"routing (or the cutover switch)", []string{"routing", "reroute", "repoint", "switch"}},
+	{"transition observability", []string{"observability", "reconcil", "metrics", "monitor"}},
+	{"the failure posture", []string{"failure", "fail-closed", "fails closed", "rollback"}},
+}
+
 func (v *migrationValidator) validateNarrativeBridges() {
 	// both scans run fence-masked, matching Gb: a fenced example heading is
 	// documentation and must not satisfy a section-presence requirement
 	arch := maskFences(readFileOrErr(filepath.Join(v.design, "ARCHITECTURE.md"), v.g))
-	if !headingContains(arch, "transition architecture") {
-		v.errf("ARCHITECTURE.md needs a 'Transition architecture' heading describing the temporary coexistence topology and dependency failure posture")
-	} else {
+	if body, ok := sectionBody(arch, "transition architecture"); ok {
 		v.g.Count("transition architecture sections")
+		lower := strings.ToLower(body)
+		for _, topic := range transitionTopics {
+			found := false
+			for _, n := range topic.needles {
+				if strings.Contains(lower, n) {
+					found = true
+					break
+				}
+			}
+			if found {
+				v.g.Count("transition topics recorded")
+			} else {
+				v.errf("the Transition architecture section never names %s; record the posture, or record that it is out of scope for this migration shape", topic.name)
+			}
+		}
+	} else {
+		v.errf("ARCHITECTURE.md needs a 'Transition architecture' heading describing the temporary coexistence topology and dependency failure posture")
 	}
 	build := maskFences(readFileOrErr(filepath.Join(v.design, "BUILD.md"), v.g))
-	if !headingContains(build, "migration implementation plan") {
-		v.errf("BUILD.md needs a 'Migration implementation plan' heading that turns migration.yaml into build and test work")
-	} else {
+	if body, ok := sectionBody(build, "migration implementation plan"); ok {
 		v.g.Count("migration implementation plans")
+		// phase coverage: the plan "turns every mapping and phase into ordered
+		// build work"; mappings carry the opt-in tests: binding, and each
+		// declared phase id must at least be NAMED whole-token in the plan.
+		var ids []string
+		for id := range v.phases {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		for _, id := range ids {
+			if tokenIn(id, body) {
+				v.g.Count("phases named in the implementation plan")
+			} else {
+				v.errf("BUILD.md's Migration implementation plan never names phase %s; every declared phase becomes ordered build work, so name it where that work is planned", ir.Repr(id))
+			}
+		}
+	} else {
+		v.errf("BUILD.md needs a 'Migration implementation plan' heading that turns migration.yaml into build and test work")
 	}
 }

@@ -18,6 +18,7 @@ var RootKeys = map[string]bool{
 	"meta": true, "version": true, "_comment": true, "_delays": true,
 	"_lifecycle_of": true, "_role": true, "_component": true, "_max_retries": true,
 	"_oracle_tag": true, "_invariants": true, "_counters": true, "_io": true,
+	"_external_events": true,
 }
 
 // TransitionKeys whitelists transition-object members. A typo ("tagret") used
@@ -240,6 +241,42 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 	if tagV := ro.Get2("_oracle_tag"); tagV != nil {
 		if tagV.Kind != ir.KindString || !regexpOracleTag.MatchString(tagV.AsString()) {
 			errs = append(errs, fmt.Sprintf("%s: _oracle_tag %s must be 2-8 uppercase characters matching [A-Z0-9]", base, ir.Repr(tagV)))
+		}
+	}
+	// _external_events declares which of this machine's events arrive from
+	// OUTSIDE its component (a bus, another service). The declaration arms the
+	// reverse event-wiring sweep in Gx-trace (every externally-sourced event
+	// owes an event-contract row); here the marker itself is held: an entry no
+	// state handles or ignores is stale, and a stale marker arms a check over
+	// nothing.
+	if extV := ro.Get2("_external_events"); extV != nil {
+		if extV.Kind != ir.KindArray {
+			errs = append(errs, base+": _external_events must be an array of event-name strings this machine receives from outside its component")
+		} else {
+			handledHere := map[string]bool{}
+			for _, s := range states {
+				if so := s.Node.AsObject(); so != nil {
+					for _, k := range so.GetObject("on").Keys() {
+						handledHere[k] = true
+					}
+					for _, k := range so.GetObject("_ignores").Keys() {
+						handledHere[k] = true
+					}
+				}
+			}
+			for _, e := range extV.AsArray() {
+				name := ""
+				if e != nil && e.Kind == ir.KindString {
+					name = strings.TrimSpace(e.AsString())
+				}
+				if name == "" {
+					errs = append(errs, base+": _external_events entries must be non-empty event-name strings")
+					continue
+				}
+				if !handledHere[name] {
+					errs = append(errs, fmt.Sprintf("%s: _external_events names %s but no state handles or ignores it; the marker is stale (remove it, or wire the event)", base, ir.Repr(name)))
+				}
+			}
 		}
 	}
 	delaysVal := ro.Get2("_delays")

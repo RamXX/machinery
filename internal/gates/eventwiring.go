@@ -45,12 +45,14 @@
 //     the event, never which one; so does this. Requiring the machine NAMED by
 //     the consumer cell would be a stricter rule the pack does not have.
 //
-// NOT IMPLEMENTED, deliberately: the reverse sweep ("every machine event whose
-// source is external must have a row"). Nothing in a machine marks an event as
-// externally sourced, the pack check has no such sweep, and inferring it (an
-// event no local action fires) would demand an event-contract row for every
-// human-initiated event, a CLI command included. The rule stays attested, as
-// the skill's choreography section states it.
+// THE REVERSE SWEEP is opt-in by marker: a machine's `_external_events` array
+// declares which of its events arrive from outside its component, and every
+// declared event owes an event-contract row (an event crossing into the
+// design is coupling the table exists to govern). Without the marker the
+// reverse rule stays attested, exactly as before: inferring external sourcing
+// (an event no local action fires) would demand a contract row for every
+// human-initiated event, a CLI command included. Lint holds the marker itself
+// (a declared event no state handles is stale).
 //
 // A row whose obligation the design cannot meet says so in the row, with the
 // house waiver token and a reason: `(no machine: <reason>)` in the consumer
@@ -62,6 +64,7 @@ package gates
 
 import (
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
@@ -71,14 +74,24 @@ import (
 // of event names any machine handles or explicitly ignores, and the corpus of
 // action-position text plus matrix cells a produced event must appear in.
 // Machines that fail to load contribute nothing (G3 reports the parse error).
-func machineEventCorpus(design string, g *Gate) (handled map[string]bool, fired string) {
+func machineEventCorpus(design string, g *Gate) (handled map[string]bool, fired string, external map[string]bool) {
 	handled = map[string]bool{}
+	external = map[string]bool{}
 	var cells []string
 	mdir := filepath.Join(design, "machines")
 	for _, mf := range sortedGlobExt(mdir, ".machine.json") {
 		m, err := ir.LoadMachineJSON(mf)
 		if err != nil {
 			continue
+		}
+		if mo := m.AsObject(); mo != nil {
+			if extV := mo.Get2("_external_events"); extV != nil {
+				for _, e := range extV.AsArray() {
+					if name := strings.TrimSpace(e.AsString()); name != "" {
+						external[name] = true
+					}
+				}
+			}
 		}
 		for _, s := range ir.WalkStates(m.AsObject().Get2("states"), "") {
 			so := s.Node.AsObject()
@@ -112,7 +125,7 @@ func machineEventCorpus(design string, g *Gate) (handled map[string]bool, fired 
 			}
 		}
 	}
-	return handled, strings.Join(cells, "\n")
+	return handled, strings.Join(cells, "\n"), external
 }
 
 // eventNamesOf reads the event names a row's event cell states: the backticked
@@ -128,13 +141,39 @@ func eventNamesOf(cell string) []string {
 	return nil
 }
 
-// checkEventWiring holds every event-contract row to the committed machines.
+// checkEventWiring holds every event-contract row to the committed machines,
+// and every declared externally-sourced machine event to the table.
 func checkEventWiring(g *Gate, design, archText string) {
 	rows := eventContractRows(archText)
+	handled, fired, external := machineEventCorpus(design, g)
+	// the reverse sweep, armed per event by the machine-side declaration; it
+	// runs even with no table at all, because a declared external event with
+	// no contract row anywhere is exactly the finding
+	if len(external) > 0 {
+		rowEvents := map[string]bool{}
+		for _, r := range rows {
+			if r.Cols["event"] >= 0 {
+				for _, ev := range eventNamesOf(r.Cell("event")) {
+					rowEvents[ev] = true
+				}
+			}
+		}
+		var names []string
+		for ev := range external {
+			names = append(names, ev)
+		}
+		sort.Strings(names)
+		for _, ev := range names {
+			if rowEvents[ev] {
+				g.Count("externally-sourced events with contract rows")
+			} else {
+				g.Errs = append(g.Errs, "machine event "+ir.Repr(ev)+" is declared externally sourced (_external_events) but no event-contract row names it; an event crossing into this design is coupling the table exists to govern")
+			}
+		}
+	}
 	if len(rows) == 0 {
 		return
 	}
-	handled, fired := machineEventCorpus(design, g)
 	for _, r := range rows {
 		if r.Cols["event"] < 0 {
 			// no event column: the row names no event to reconcile. G2 does

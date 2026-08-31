@@ -105,6 +105,12 @@ retries, no deadlock):
 Each machine's `.matrix.md` carries the named-unit contracts (every guard, action, and actor with
 its test type and fixture) and the failure catalog mapping ARCHITECTURE.md section 3 to transitions.
 
+### Test specification
+
+N/A - the committed transition oracles under `machines/` are the test specification for this design;
+the named-unit matrices above carry the fixtures, and the Hard-TDD protocol (section 8) governs the
+conformance parse.
+
 ## 6. Traceability matrix
 
 Every invariant: its enforcement point, its owning component (per `workspace.dsl`), the interface
@@ -270,3 +276,16 @@ instances) in this section before the revision is implemented.
 `FailedDirty` is the explicit residual when compensation cannot complete within the retry bound; it
 requires manual reconciliation and must page an operator. Exactly-once effect depends on every consumer
 being idempotent; a non-idempotent consumer is a defect the outbox cannot mask.
+
+### What the gates do not verify
+
+Not covered by any deterministic check or proof, by construction: whether the interrogation
+extracted the RIGHT invariants (a shallow domain model gates clean); guard and action semantics in
+code (the named-unit contracts carry them into tests; a wrong implementation of a correctly-named
+guard is caught by tests, not proofs); races between concurrent machine instances, and message
+loss, duplication, or reordering between machines (the models are single-instance; the
+event-contract table and the idempotency contracts govern those seams, and the tests exercise
+them); whether migration transformations preserve real production data (Gm proves decision
+coverage, not the implementation or a database run); coupling through shared database tables or
+bus topics (invisible to import analysis; the event-contract table governs it); and security,
+capacity, and observability beyond what the Phase 2 NFR record captures.

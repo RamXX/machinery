@@ -65,7 +65,99 @@ func CheckLedger(design string) *Gate {
 	checkSelfReviewLines(g, design)
 	checkDecisionEntries(g, design)
 	checkHouseStyle(g, design)
+	checkDuplicateTables(g, design)
 	return g
+}
+
+// checkDuplicateTables warns when the same table (whitespace-collapsed) sits
+// in two hand-written documents with no machinery:embed marker sanctioning
+// the copy. The doctrine ("a copied table is a promise until it is marked")
+// left remembering the marker to the author; this makes the forgotten case
+// visible. Warn tier: the copy may be mid-edit, but the tracked corpus holds
+// warnings at zero. Ledgers are exempt (they narrate history), generated
+// artifacts are skipped as Gd skips them, and fenced examples are masked.
+func checkDuplicateTables(g *Gate, design string) {
+	type occ struct {
+		where  string
+		marked bool
+	}
+	seen := map[string][]occ{}
+	var order []string
+	for _, path := range markdownFiles(design) {
+		rel, rerr := filepath.Rel(design, path)
+		if rerr != nil {
+			rel = path
+		}
+		rel = filepath.ToSlash(rel)
+		base := filepath.Base(rel)
+		if idciteSkips(rel) || base == "STATE.md" || base == "DECISIONS.md" {
+			continue
+		}
+		lines := strings.Split(maskFences(readOrEmpty(path)), "\n")
+		start := -1
+		flush := func(end int) {
+			if start < 0 {
+				return
+			}
+			s := start
+			start = -1
+			if end-s < 3 { // header, separator, at least one data row
+				return
+			}
+			var norm []string
+			for _, l := range lines[s:end] {
+				norm = append(norm, collapseWS(l))
+			}
+			marked := false
+			for j := s - 1; j >= 0 && j >= s-3; j-- {
+				t := strings.TrimSpace(lines[j])
+				if embedMarker.MatchString(t) {
+					marked = true
+					break
+				}
+				if t != "" && !strings.HasPrefix(t, "<!--") {
+					break
+				}
+			}
+			key := strings.Join(norm, "\n")
+			if _, dup := seen[key]; !dup {
+				order = append(order, key)
+			}
+			seen[key] = append(seen[key], occ{where: rel + ":" + strconv.Itoa(s+1), marked: marked})
+		}
+		for i, l := range lines {
+			if strings.HasPrefix(strings.TrimLeft(l, " \t"), "|") {
+				if start < 0 {
+					start = i
+				}
+			} else {
+				flush(i)
+			}
+		}
+		flush(len(lines))
+	}
+	for _, key := range order {
+		occs := seen[key]
+		if len(occs) < 2 {
+			continue
+		}
+		marked := 0
+		var wheres []string
+		for _, o := range occs {
+			if o.marked {
+				marked++
+			}
+			wheres = append(wheres, o.where)
+		}
+		// one original plus marked copies is the sanctioned shape; anything
+		// less marked means at least one copy nobody declared
+		if marked >= len(occs)-1 {
+			g.Count("duplicate tables embed-marked")
+			continue
+		}
+		g.Warns = append(g.Warns, "the same table appears at "+strings.Join(wheres, " and ")+
+			" with no machinery:embed marker on the copy; a copied table is a promise until it is marked (mark it, or let one side own the rows)")
+	}
 }
 
 // checkSelfReviewLines holds every `self-review:` line in STATE.md to the

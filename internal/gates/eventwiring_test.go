@@ -3,6 +3,7 @@ package gates
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -223,5 +224,35 @@ func TestEventWiringSkippedWhenAPackGovernsTheDesign(t *testing.T) {
 	g := CheckTraceability(design)
 	if hasErr(g, "event-contract row") {
 		t.Fatalf("a packed design is G5's; Gx must not double-report: %v", g.Errs)
+	}
+}
+
+// The reverse sweep, armed by _external_events: a machine event declared
+// externally sourced owes an event-contract row, even when no table exists.
+func TestEventWiringExternalDeclarationReverseSweep(t *testing.T) {
+	design := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(design, "machines"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, filepath.Join(design, "machines", "Order.machine.json"),
+		`{"id":"order","_external_events":["markPaid"],"initial":"A","states":{
+			"A":{"on":{"markPaid":{"target":"B"}}},"B":{"type":"final"}}}`)
+	g := NewGate("test")
+	checkEventWiring(g, design, "# arch, no event table\n")
+	if !hasErr(g, "declared externally sourced (_external_events) but no event-contract row names it") {
+		t.Fatalf("a declared external event without a row must error: %v", g.Errs)
+	}
+	g = NewGate("test")
+	checkEventWiring(g, design,
+		"| event | producer | consumer | payload | delivery | ordering | dedupe |\n"+
+			"|---|---|---|---|---|---|---|\n"+
+			"| `markPaid` | payments (no machine: peer subsystem) | orders | Payment.id | at-least-once | none | Payment.id |\n")
+	for _, e := range g.Errs {
+		if strings.Contains(e, "externally sourced") {
+			t.Fatalf("a contract row must satisfy the sweep: %v", g.Errs)
+		}
+	}
+	if g.Counts["externally-sourced events with contract rows"] != 1 {
+		t.Fatalf("the satisfied sweep must be counted: %+v", g.Counts)
 	}
 }

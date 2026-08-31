@@ -161,6 +161,26 @@ func checkEventCells(g *Gate, text string, els map[string]dslEl, externalIDs map
 			}
 			g.Count("event-contract cells answered")
 		}
+		// delivery-vs-dedupe consistency: "at-least-once" is a promise that
+		// duplicates WILL arrive, so a bare no-answer dedupe cell contradicts
+		// it. A reasoned cell ("none (idempotent consumer: upsert by id)")
+		// passes: the parenthesized reason is the answer. This demotes the
+		// mechanical slice of the g3.event-redelivery attestation; the
+		// ADEQUACY of a stated dedupe story stays judgment.
+		if r.Cols["delivery"] >= 0 && r.Cols["dedupe"] >= 0 {
+			del := strings.ToLower(ir.CleanCell(r.Cell("delivery")))
+			ded := strings.TrimSpace(r.Cell("dedupe"))
+			if strings.Contains(del, "at-least-once") || strings.Contains(del, "at least once") {
+				switch strings.ToLower(ded) {
+				case "none", "n/a", "na", "-":
+					g.Errs = append(g.Errs, where+": delivery is at-least-once but dedupe is a bare "+ir.Repr(ded)+"; duplicates will arrive, so name the dedupe key or state why none is safe ('none (idempotent consumer: <reason>)')")
+				case "":
+					// the empty-cell finding above already names it
+				default:
+					g.Count("at-least-once rows with a dedupe answer")
+				}
+			}
+		}
 		for _, col := range []string{"producer", "consumer"} {
 			clean := r.Clean(col)
 			if clean == "" {

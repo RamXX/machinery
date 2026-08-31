@@ -175,6 +175,7 @@ redelivery, never errored.
 
 ### 4.5 Persistence and placement
 
+<!-- machinery:embed from="ARCHITECTURE.md" table="component,placement,persistence" claims="subset,complete" -->
 | component | placement | persistence | concurrency |
 |---|---|---|---|
 | `Order` | orders service | db row | single writer per order id |
@@ -240,6 +241,7 @@ and `cancel` on Paid (the refund flow belongs to payments).
 **Named-unit contract table** (the units the coding agent implements; source
 `design/machines/Order.matrix.md`, which remains what G3 checks):
 
+<!-- machinery:embed from="machines/Order.matrix.md" table="name,kind,signature" claims="subset,complete" -->
 | name | kind | signature | pre / post | maps to | test type | fixture |
 |---|---|---|---|---|---|---|
 | `request` | action | `(ctx) -> publish` | on entry to Placed, enqueue the payment request in the outbox, same transaction as the insert | bus relationship; dedupe `Payment.orderId` | integration | real outbox table + fake broker (contract-tested) |
@@ -248,6 +250,7 @@ and `cancel` on Paid (the refund flow belongs to payments).
 
 **Failure catalog** (source: the matrix, part b):
 
+<!-- machinery:embed from="machines/Order.matrix.md" table="failure,detection,recovery" claims="subset,complete" -->
 | failure | detection | transition | recovery | bounding mitigation |
 |---|---|---|---|---|
 | bus down while publishing `request` | outbox dispatcher error | none (outbox retries outside the machine) | dispatcher backoff | outbox + retry, ARCHITECTURE.md section 6 |
@@ -387,3 +390,16 @@ list.
 5. **Outbox delay under a bus outage.** Dispatcher retries are bounded only by the ack window
    (failure catalog); a long outage delays `request` publication, and duplicates on recovery are
    absorbed by the consumer dedupe. Accepted.
+
+### What the gates do not verify
+
+Not covered by any deterministic check or proof, by construction: whether the interrogation
+extracted the RIGHT invariants (a shallow domain model gates clean); guard and action semantics in
+code (the named-unit contracts carry them into tests; a wrong implementation of a correctly-named
+guard is caught by tests, not proofs); races between concurrent machine instances, and message
+loss, duplication, or reordering between machines (the models are single-instance; the
+event-contract table and the idempotency contracts govern those seams, and the tests exercise
+them); whether migration transformations preserve real production data (Gm proves decision
+coverage, not the implementation or a database run); coupling through shared database tables or
+bus topics (invisible to import analysis; the event-contract table governs it); and security,
+capacity, and observability beyond what the Phase 2 NFR record captures.

@@ -13,7 +13,7 @@ and array transition targets are rejected. Do not author outside the subset.
 
 - **root keys**: `id`, `initial`, `context`, `states`, `description`, `meta`, `version`, plus the
   underscore annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_component`,
-  `_max_retries`, `_oracle_tag`, `_invariants`.
+  `_max_retries`, `_oracle_tag`, `_invariants`, `_external_events`.
 - **state keys**: `on`, `after`, `always`, `invoke`, `entry`, `exit`, `states`, `initial`, `type`,
   `id`, `meta`, `description`, `tags`, `onDone`, `output`, plus `_comment`, `_exhaustive`,
   `_ignores`, `_refusal`.
@@ -198,6 +198,14 @@ whose derived tags collide (`Deal` vs `DealAggregate`) would mint identical stab
 different transitions; the oracle CLI hard-errors on that collision, and `_oracle_tag` is the
 disambiguation lever that avoids renaming the machines. Choose it once; changing it churns every
 stable id of that machine.
+
+**`_external_events: ["<event>", ...]`** (root, optional): the events this machine receives from
+OUTSIDE its component (a bus, a peer subsystem, a webhook), as opposed to commands its own
+component's surface issues. The declaration arms the reverse event-wiring sweep in Gx-trace: every
+declared event must appear in an event-contract row, so an event crossing into the design cannot
+stay ungoverned by the table. Lint holds the marker itself: a declared event no state handles or
+ignores is stale and an error. Undeclared external sourcing stays a review question (the open
+world cannot be inferred); the marker is how the author closes it per event.
 
 **`_delays: {name: "<ms> - <rationale>"}`** (root, **mandatory for every `after` key**): every
 delay name used in any `after` block must be declared here with its millisecond bound and

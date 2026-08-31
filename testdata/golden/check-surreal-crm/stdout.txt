@@ -1,5 +1,5 @@
 == Gm-transition  hybrid/rebuild migration contract ==
-  checked: 9 legacy entities, 9 target entities, 9 dispositions, 5 salvage decisions, 3 transition phases, 1 cutover contracts, 3 transition risks, 1 transition architecture sections, 1 migration implementation plans
+  checked: 9 legacy entities, 9 target entities, 9 dispositions, 5 salvage decisions, 3 transition phases, 1 cutover contracts, 3 transition risks, 1 transition architecture sections, 5 transition topics recorded, 1 migration implementation plans, 3 phases named in the implementation plan
   ok
 == Gs-surface  legacy surface ledger ==
   checked: 46 commands, 10 tables, 54 covered, 1 dropped, 1 deferred, 4 waived classes, 56 surface items
@@ -35,23 +35,23 @@
   note   User.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present
   checked: 5 machines, 194 transitions, 5 tla-generable, 5 oracles fresh, 194 matrix rows reconciled, 186 named units covered, 3 states relying on unproven _exhaustive liveness
 == Gd-idcite  design-side stable-id citations ==
-  warn   BUILD.md:719: T-SESS-05 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:719: T-SESS-08 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:726: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:720: T-SESS-05 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:720: T-SESS-08 is a positional row citation; rows renumber, so cite the stable id instead
   warn   BUILD.md:727: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:728: T-DEAL-30 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:729: T-DEAL-03 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:734: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:735: T-TASK-16 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:736: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:739: T-USER-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:742: T-DEAL-28 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:742: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:743: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:972: T-SESS-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:972: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:1157: T-SESS-35 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:1159: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:728: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:729: T-DEAL-30 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:730: T-DEAL-03 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:735: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:736: T-TASK-16 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:737: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:740: T-USER-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:743: T-DEAL-28 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:743: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:744: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:973: T-SESS-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:973: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:1158: T-SESS-35 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:1160: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
   checked: 2 citations resolved, 24 files scanned, 272 committed oracle ids
 == Gl-ledger  session ledgers + house style ==
   checked: 24 files style-scanned
@@ -64,7 +64,7 @@
   note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 2 placement rows waived, 9 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 2 invariants attested only (prose), 13 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
 == Gb-plan  build plan structure ==
-  checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 2 skeleton citations
+  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 2 skeleton citations
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

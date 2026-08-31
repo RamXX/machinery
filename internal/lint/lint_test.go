@@ -1092,3 +1092,19 @@ func TestRefusalMustBeAnObject(t *testing.T) {
 		t.Fatalf("a malformed _refusal must fail: %v", errs)
 	}
 }
+
+func TestLintExternalEventsMarker(t *testing.T) {
+	m, err := ir.LoadMachineJSONStr("M.machine.json", `{"id":"m","_external_events":["go","ghost"],"initial":"A","states":{
+		"A":{"on":{"go":{"target":"B"}}},"B":{"type":"final"}}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	errs, _, _, _ := LintMachine(m, "M.machine.json")
+	joined := strings.Join(errs, "\n")
+	if !strings.Contains(joined, "'ghost'") || !strings.Contains(joined, "stale") {
+		t.Fatalf("a declared event no state handles must error: %v", errs)
+	}
+	if strings.Contains(joined, "'go'") {
+		t.Fatalf("a handled declared event must pass: %v", errs)
+	}
+}

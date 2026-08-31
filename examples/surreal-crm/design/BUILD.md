@@ -51,7 +51,8 @@ lifecycle mappings, and the deliverables are the SurrealDB schema, the repositor
 movement pipeline. The embedded store remains the source of truth until the final cutover phase. The
 legacy surface ledger (`design/legacy/surface.yaml`, gate Gs-surface) pins the capability coverage:
 every legacy command and node label maps into this design, `crm backup` is dropped, `crm restore` is
-deferred.
+deferred. The declared phases map onto the steps below: steps 1-2 implement `baseline`, step 3
+implements `shadow`, and step 4 implements `cutover`.
 
 1. **Characterize and inventory.** The oracle and characterization suites are reused as-is (the machines
    did not change). Capture a volume snapshot and two byte-stable export manifests from the embedded
@@ -1188,3 +1189,16 @@ Named risks are cheaper than surprises. Each is either accepted-by-design or cov
     Mitigation: the restart policy covers container crashes, the rendered error names the daemon check
     first, and the mitigation table carries the posture. Residual: a machine that never starts Docker
     cannot run the CRM; accepted for a local developer-tool deployment.
+
+### What the gates do not verify
+
+Not covered by any deterministic check or proof, by construction: whether the interrogation
+extracted the RIGHT invariants (a shallow domain model gates clean); guard and action semantics in
+code (the named-unit contracts carry them into tests; a wrong implementation of a correctly-named
+guard is caught by tests, not proofs); races between concurrent machine instances, and message
+loss, duplication, or reordering between machines (the models are single-instance; the
+event-contract table and the idempotency contracts govern those seams, and the tests exercise
+them); whether migration transformations preserve real production data (Gm proves decision
+coverage, not the implementation or a database run); coupling through shared database tables or
+bus topics (invisible to import analysis; the event-contract table governs it); and security,
+capacity, and observability beyond what the Phase 2 NFR record captures.

@@ -106,8 +106,11 @@ func writeMigrationFixture(t *testing.T, contract string) string {
 		"domain.modelith.yaml":        migrationTargetModel,
 		"legacy/domain.modelith.yaml": migrationLegacyModel,
 		MigrationContractName:         contract,
-		"ARCHITECTURE.md":             "# Architecture\n\n## Transition architecture\n\nLegacy and target coexist behind a switch.\n",
-		"BUILD.md":                    "# Build\n\n## Migration implementation plan\n\nImplement the checked transition contract.\n",
+		"ARCHITECTURE.md": "# Architecture\n\n## Transition architecture\n\n" +
+			"Legacy and target coexist behind a switch. A read-only exporter feeds replication;\n" +
+			"reconciliation observes drift; on failure, reads switch back to legacy.\n",
+		"BUILD.md": "# Build\n\n## Migration implementation plan\n\n" +
+			"Implement the checked transition contract phase by phase: baseline, then shadow, then cutover.\n",
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(design, name), []byte(content), 0o644); err != nil {

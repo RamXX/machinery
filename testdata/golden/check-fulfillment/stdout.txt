@@ -8,7 +8,7 @@
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 5 boundaries, 4 allow rules, 4 transitive pairs, 3 deny rules, 1 boundaries with exposes, 19 dsl elements, 20 drawn relationships, 20 drawn edges outside the contract vocabulary, 5 boundaries bound to dsl, 5 mitigation rows, 7 dependencies with mitigation rows, 3 nfr topics recorded, 1 event tables with sources, 48 event-contract cells answered, 16 event-contract participants resolved, 4 edges contracted, 8 event contracts
+  checked: 5 boundaries, 4 allow rules, 4 transitive pairs, 3 deny rules, 1 boundaries with exposes, 19 dsl elements, 20 drawn relationships, 20 drawn edges outside the contract vocabulary, 5 boundaries bound to dsl, 5 mitigation rows, 7 dependencies with mitigation rows, 3 nfr topics recorded, 1 event tables with sources, 48 event-contract cells answered, 8 at-least-once rows with a dedupe answer, 16 event-contract participants resolved, 4 edges contracted, 8 event contracts
   ok
 == G3-machine  machines + oracle ==
   warn   FulfillmentSaga.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
@@ -33,19 +33,19 @@
   note   Shipment.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStatus is set on every path into the overlay from a domain state; only Pending, Dispatched, and InTransit reach the overlay (Delivered and Lost are final), and all three priorIs* guards are present
   checked: 6 machines, 138 transitions, 6 tla-generable, 6 oracles fresh, 168 named units covered, 6 states relying on unproven _exhaustive liveness, 1 dotted references checked
 == Gd-idcite  design-side stable-id citations ==
-  warn   BUILD.md:123: T-ORDE-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:124: T-ORDE-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:129: T-PAYM-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:134: T-FULF-02 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:136: T-OUTB-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:137: T-FULF-08 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:140: T-FULF-05 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:141: T-FULF-14 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:159: T-FULF-02 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:160: T-ORDE-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:160: T-ORDE-16 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:161: T-OUTB-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:161: T-OUTB-02 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:129: T-ORDE-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:130: T-ORDE-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:135: T-PAYM-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:140: T-FULF-02 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:142: T-OUTB-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:143: T-FULF-08 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:146: T-FULF-05 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:147: T-FULF-14 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:165: T-FULF-02 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:166: T-ORDE-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:166: T-ORDE-16 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:167: T-OUTB-01 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:167: T-OUTB-02 is a positional row citation; rows renumber, so cite the stable id instead
   checked: 3 citations resolved, 20 files scanned, 138 committed oracle ids
 == Gl-ledger  session ledgers + house style ==
   checked: 20 files style-scanned
@@ -67,7 +67,7 @@
   note   Shipment: 5 operational-overlay states (dispatching, carrierRetry, persisting, persistRetry, rolledBack)
   checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 3 placement rows with machines, 4 placement rows waived, 1 entities placement-waived, 11 entities placed, 4 event-contract reactions waived, 5 event-contract emissions traced, 4 event-contract reactions traced, 3 event-contract emissions waived, 13 event-contract consumer reads declared, 22 declared read fields carried, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 8 invariants attested only (prose), 17 invariants enforced, 16 invariants unit-backed (guard/action/actor), 1 invariants integrity-checked (relational model)
 == Gb-plan  build plan structure ==
-  checked: 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 8 skeleton citations
+  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 8 skeleton citations
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

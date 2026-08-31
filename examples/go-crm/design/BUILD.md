@@ -43,7 +43,9 @@ role and record ownership, with every write applied atomically inside one databa
 The rebuild is implemented from `design/migration.yaml`; this section turns that checked contract into
 deliverable work. The prototype remains the source of truth until the final cutover phase. Production code
 must not import prototype packages directly: the only legacy dependency is a read-only exporter behind a
-migration port, and every exported object receives a stable manifest id.
+migration port, and every exported object receives a stable manifest id. The declared phases map onto
+the steps below: steps 1-2 implement `baseline`, step 3 implements `shadow`, step 4 implements
+`dual-write`, and step 5 implements `cutover`.
 
 1. **Characterize and inventory.** Lock the reusable prototype behavior as adapter-level tests. Classify the
    exporter, embedded schema, test suite, and seed data exactly as the migration asset inventory specifies.
@@ -1146,3 +1148,16 @@ Named risks are cheaper than surprises. Each is either accepted-by-design or cov
     `update` of non-stage fields (title/amount) is a plain write guarded by `rbac-write-scope`; if amount is
     edited it must re-check `deal-amount-nonneg` (P-deal-amount-nonneg applies). Flagged so it is not assumed
     to be machine-driven.
+
+### What the gates do not verify
+
+Not covered by any deterministic check or proof, by construction: whether the interrogation
+extracted the RIGHT invariants (a shallow domain model gates clean); guard and action semantics in
+code (the named-unit contracts carry them into tests; a wrong implementation of a correctly-named
+guard is caught by tests, not proofs); races between concurrent machine instances, and message
+loss, duplication, or reordering between machines (the models are single-instance; the
+event-contract table and the idempotency contracts govern those seams, and the tests exercise
+them); whether migration transformations preserve real production data (Gm proves decision
+coverage, not the implementation or a database run); coupling through shared database tables or
+bus topics (invisible to import analysis; the event-contract table governs it); and security,
+capacity, and observability beyond what the Phase 2 NFR record captures.

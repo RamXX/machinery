@@ -141,7 +141,7 @@ build-plan format) are Gx-trace's and Gb-plan's to check: run `machinery check` 
 says rather than re-reading for them here.
 
 - `machinery check` ran; findings fixed or reported.
-- The mode is declared, and in manifest mode the root states the sharding explicitly.
+- In manifest mode the root states the sharding explicitly (the Mode line's presence is Gx's check).
 - A coding agent with zero context could build the system from BUILD.md alone (per shard when sharded).
 - The data dictionary appears exactly once and is the single source of truth.
 - Section 7 references the oracles by stable id and adds the guard-falsifying-clause tests, the

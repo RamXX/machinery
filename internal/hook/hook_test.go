@@ -1216,3 +1216,47 @@ func TestWaveSentinel(t *testing.T) {
 		t.Fatalf("expired sentinel: stale=%v active=%v", stale, active)
 	}
 }
+
+// The upgrade protocol forbids mixing a binary upgrade with a design change;
+// the warning fires exactly when a regenerated artifact's machinery-version
+// stamp changed AND a hand-written design file changed in the same tree.
+func TestUpgradeMixWarning(t *testing.T) {
+	root := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", root}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	writeFile(t, filepath.Join(root, "design", "domain.modelith.yaml"), "entities: {}\n")
+	writeFile(t, filepath.Join(root, "design", "machines", "Order.oracle.md"),
+		"<!-- machinery-version: v0.1.0 -->\n| test id | stable id |\n|---|---|\n| T-1 | ORDE-aaa |\n")
+	git("add", "-A")
+	git("commit", "-q", "-m", "base")
+
+	if w := upgradeMixWarning(root, "design"); w != "" {
+		t.Fatalf("clean tree must not warn: %q", w)
+	}
+	// stamp change alone: an upgrade in flight, no mixing
+	writeFile(t, filepath.Join(root, "design", "machines", "Order.oracle.md"),
+		"<!-- machinery-version: v0.2.0 -->\n| test id | stable id |\n|---|---|\n| T-1 | ORDE-aaa |\n")
+	if w := upgradeMixWarning(root, "design"); w != "" {
+		t.Fatalf("an upgrade alone must not warn: %q", w)
+	}
+	// plus a hand-written edit: the mix the protocol forbids
+	writeFile(t, filepath.Join(root, "design", "domain.modelith.yaml"), "entities: {A: {}}\n")
+	w := upgradeMixWarning(root, "design")
+	if !strings.Contains(w, "mixes a binary upgrade") || !strings.Contains(w, "machines/Order.oracle.md") {
+		t.Fatalf("mixed change set must warn naming the artifact: %q", w)
+	}
+	// hand edit alone (stamp reverted): no warning
+	writeFile(t, filepath.Join(root, "design", "machines", "Order.oracle.md"),
+		"<!-- machinery-version: v0.1.0 -->\n| test id | stable id |\n|---|---|\n| T-1 | ORDE-aaa |\n")
+	if w := upgradeMixWarning(root, "design"); w != "" {
+		t.Fatalf("a design edit alone must not warn: %q", w)
+	}
+}

@@ -178,6 +178,7 @@ deduped by their dedupe key before the machine fires.
 
 ### 4.5 Persistence and placement
 
+<!-- machinery:embed from="ARCHITECTURE.md" table="component,placement,persistence" claims="subset,complete" -->
 | component | placement | persistence | concurrency |
 |---|---|---|---|
 | `Payment` | payments service | db row | single writer per payment id |
@@ -243,6 +244,7 @@ Requested; duplicate `capture` (`payment-single-capture`) and stale `decline` on
 **Named-unit contract table** (the units the coding agent implements; source
 `design/machines/Payment.matrix.md`, which remains what G3 checks):
 
+<!-- machinery:embed from="machines/Payment.matrix.md" table="name,kind,signature" claims="subset,complete" -->
 | name | kind | signature | pre / post | maps to | test type | fixture |
 |---|---|---|---|---|---|---|
 | `markPaid` | action | `(ctx) -> publish` | on capture, enqueue markPaid in the outbox, same transaction as the status write | bus relationship; dedupe `Payment.id` | integration | real outbox table + fake broker (contract-tested) |
@@ -251,6 +253,7 @@ Requested; duplicate `capture` (`payment-single-capture`) and stale `decline` on
 
 **Failure catalog** (source: the matrix, part b):
 
+<!-- machinery:embed from="machines/Payment.matrix.md" table="failure,detection,recovery" claims="subset,complete" -->
 | failure | detection | transition | recovery | bounding mitigation |
 |---|---|---|---|---|
 | duplicate `request` redelivery | dedupe by `Payment.orderId` | none (creation dedupe; `_ignores` on Requested) | drop and log | idempotent consumer |
@@ -384,3 +387,16 @@ list.
 5. **The refinement proof covers the mapped machine only.** Properties outside the contract
    vocabulary (end-to-end latency, cross-subsystem liveness) are the parent's residuals, not
    proven here.
+
+### What the gates do not verify
+
+Not covered by any deterministic check or proof, by construction: whether the interrogation
+extracted the RIGHT invariants (a shallow domain model gates clean); guard and action semantics in
+code (the named-unit contracts carry them into tests; a wrong implementation of a correctly-named
+guard is caught by tests, not proofs); races between concurrent machine instances, and message
+loss, duplication, or reordering between machines (the models are single-instance; the
+event-contract table and the idempotency contracts govern those seams, and the tests exercise
+them); whether migration transformations preserve real production data (Gm proves decision
+coverage, not the implementation or a database run); coupling through shared database tables or
+bus topics (invisible to import analysis; the event-contract table governs it); and security,
+capacity, and observability beyond what the Phase 2 NFR record captures.

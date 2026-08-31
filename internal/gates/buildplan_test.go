@@ -56,11 +56,24 @@ Walking skeleton first, then vertical slices, each fully green before the next.
 - **M1 - Settlement slice.** DoD: all oracle rows green by stable id.
 `
 
+// templateSectionsStub carries every template section heading (except Build
+// plan, which each fixture states itself) plus the verbatim disclaimer, so a
+// fixture exercising one check is not red on the section-presence and
+// disclaimer obligations that are not under test.
+func templateSectionsStub() string {
+	return "\n## Purpose and scope\nstub\n## Glossary\nstub\n## Domain model\nstub\n" +
+		"## Architecture\nstub\n## Behavior\nstub\n## Traceability matrix\nstub\n" +
+		"## Test specification\nstub\n## State migration\nstub\n" +
+		"## Language realization notes\nstub\n## Hard-TDD protocol\nstub\n" +
+		"## Open questions and residual risks\nstub\n### What the gates do not verify\n" +
+		gatesDisclaimerText + "\n"
+}
+
 func writeBuildPlanFixture(t *testing.T, build string, extra map[string]string) string {
 	t.Helper()
 	design := t.TempDir()
 	files := map[string]string{
-		"BUILD.md":                 build,
+		"BUILD.md":                 build + templateSectionsStub(),
 		"machines/Thing.oracle.md": planOracleMD,
 	}
 	for name, content := range extra {
@@ -731,5 +744,19 @@ func TestCheckBuildPlanSkeletonNFRLine(t *testing.T) {
 	}
 	if g.Counts["skeleton NFR lines"] != 1 {
 		t.Fatalf("NFR line not counted: %+v", g.Counts)
+	}
+}
+
+// The gatesDisclaimerText constant must stay verbatim-equal (whitespace
+// collapsed) to the block in references/build-md-template.md: the template is
+// what authors copy, the constant is what the gate compares, and silent drift
+// between them would fail every conforming design.
+func TestGatesDisclaimerMatchesTemplate(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join("..", "..", "skills", "machinery", "references", "build-md-template.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(collapseWS(string(body)), collapseWS(gatesDisclaimerText)) {
+		t.Fatal("references/build-md-template.md no longer carries the exact disclaimer block gatesDisclaimerText compares against; update both together")
 	}
 }

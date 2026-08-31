@@ -20,14 +20,17 @@ package hook
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/gates"
@@ -390,6 +393,12 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 			design + "/ does not exist; gates skipped."})
 	}
 	sel, selWarn := selectGates(designDir, cfg)
+	if mix := upgradeMixWarning(root, design); mix != "" {
+		if selWarn != "" {
+			selWarn += "\n"
+		}
+		selWarn += mix
+	}
 	if len(sel.Run) == 0 {
 		clearState(root, in.SessionID)
 		if selWarn != "" {
@@ -491,6 +500,66 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 		}
 		return nil
 	}
+}
+
+// versionStampRe matches the machinery-version stamp line every generated
+// artifact carries in its header.
+var versionStampRe = regexp.MustCompile(`machinery-version:\s*(v?\d+\.\d+\.\d+)`)
+
+// upgradeMixWarning reports when the working tree mixes a binary upgrade with
+// a design change: at least one generated design artifact was regenerated
+// under a DIFFERENT machinery-version than its committed copy, while
+// hand-written design files also changed. The upgrade protocol requires the
+// two causes in separate change sets, so the diff attributes to exactly one;
+// the rule was stated in the skill and held by nobody. Never blocks: the
+// working tree is mid-change by definition, so this stays a message. Outside
+// a git repository (or with git absent) it stays silent.
+func upgradeMixWarning(root, design string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", "-C", root, "diff", "--name-only", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	var upgraded []string
+	handWritten := 0
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		rel := strings.TrimSpace(line)
+		if rel == "" || (rel != design && !strings.HasPrefix(rel, design+"/")) {
+			continue
+		}
+		cur := versionStampRe.FindString(readFileString(filepath.Join(root, filepath.FromSlash(rel))))
+		if generatedReason(design, rel) == "" && cur == "" {
+			// neither classified generated nor a stamp carrier: a hand edit
+			handWritten++
+			continue
+		}
+		if cur == "" {
+			continue // generated but unstamped (a pack doc): no upgrade signal
+		}
+		oldB, gerr := exec.CommandContext(ctx, "git", "-C", root, "show", "HEAD:"+rel).Output()
+		if gerr != nil {
+			continue // newly added: freshness, not an upgrade
+		}
+		if old := versionStampRe.FindString(string(oldB)); old != "" && old != cur {
+			upgraded = append(upgraded, rel)
+		}
+	}
+	if len(upgraded) == 0 || handWritten == 0 {
+		return ""
+	}
+	sort.Strings(upgraded)
+	return fmt.Sprintf("machinery: this change set mixes a binary upgrade (%s regenerated under a new machinery-version) with %d hand-written design edit(s); never mix an upgrade with a design change, the diff must attribute to exactly one cause (commit the upgrade alone first)",
+		strings.Join(upgraded, ", "), handWritten)
+}
+
+// readFileString reads a file, "" on any error.
+func readFileString(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // selectGates picks the suite for a stop-time check: the staged list from

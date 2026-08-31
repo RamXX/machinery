@@ -6,25 +6,25 @@
   note   exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 1 boundaries, 3 externals, 2 allow rules, 2 transitive pairs, 6 dsl elements, 3 drawn relationships, 1 drawn edges outside the contract vocabulary, 2 drawn edges verified, 1 boundaries bound to dsl, 3 mitigation rows, 6 dependencies with mitigation rows, 3 nfr topics recorded, 1 event tables with sources, 18 event-contract cells answered, 6 event-contract participants resolved, 2 edges contracted, 3 event contracts
+  checked: 1 boundaries, 3 externals, 2 allow rules, 2 transitive pairs, 6 dsl elements, 3 drawn relationships, 1 drawn edges outside the contract vocabulary, 2 drawn edges verified, 1 boundaries bound to dsl, 3 mitigation rows, 6 dependencies with mitigation rows, 3 nfr topics recorded, 1 event tables with sources, 18 event-contract cells answered, 3 at-least-once rows with a dedupe answer, 6 event-contract participants resolved, 2 edges contracted, 3 event contracts
   ok
 == G3-machine  machines + oracle ==
   checked: 1 machines, 4 transitions, 1 tla-generable, 1 oracles fresh, 3 named units covered
   ok
 == Gd-idcite  design-side stable-id citations ==
-  warn   BUILD.md:271: T-ORDE-04 is a positional row citation; rows renumber, so cite the stable id instead
+  warn   BUILD.md:274: T-ORDE-04 is a positional row citation; rows renumber, so cite the stable id instead
   checked: 4 citations resolved, 7 files scanned, 4 committed oracle ids
 == Gl-ledger  session ledgers + house style ==
-  checked: 7 files style-scanned
+  checked: 7 files style-scanned, 4 duplicate tables embed-marked
   ok
 == Gx-trace  cross-layer traceability ==
   warn   invariant 'order-total-positive' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
   checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor), 1 invariants attested only (prose)
 == Gb-plan  build plan structure ==
-  checked: 1 plans, 4 milestones, 4 DoD-bearing milestones, 1 skeleton NFR lines, 1 skeleton citations
+  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 4 milestones, 4 DoD-bearing milestones, 1 skeleton NFR lines, 1 skeleton citations
   ok
 == Ge-embed  declared-embed fidelity ==
-  checked: 1 embed markers, 1 embed tables verified, 1 subset claims, 3 rows compared, 1 complete claims
+  checked: 4 embed markers, 4 embed tables verified, 4 subset claims, 10 rows compared, 4 complete claims
   ok
 == G5-pack  contract packs ==
   checked: 6 pack files, 1 pack hash verified, 3 refinement artifacts fresh, 1 owned entities present, 3 owned attributes present, 1 owned enums shape-checked, 1 owned invariants intact, 1 delegated invariants traced, 1 produced events emitted, 2 consumed events handled, pack revision 1

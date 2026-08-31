@@ -102,9 +102,10 @@ For each component `<C>`:
   subset (guards and targets as single strings; no parallel or history states; no root-level `on`;
   named delays). `_comment` states the placement and how concurrent events are serialized (actor
   mailbox vs row lock), from the C4 table. Carry the classification (`_role` or `_lifecycle_of` where
-  needed) and the `_exhaustive` / `_refusal` / `_ignores` annotations. Every `_delays` entry must be
-  consumed by an `after` edge, and every `after` delay declared there: both directions are lint
-  errors.
+  needed) and the `_exhaustive` / `_refusal` / `_ignores` annotations (lint holds `_delays`/`after`
+  consumption in both directions). An event this machine receives from OUTSIDE its component (a bus,
+  a peer subsystem) is declared in the root `_external_events` array; the declaration arms the
+  deterministic reverse sweep that holds it to an event-contract row.
 - `design/machines/<C>.matrix.md` - the named-unit contract and failure-catalog document:
   - the **named-unit contract table**: one row per guard, action, and actor (invoke src) the machine
     fires (G3 reports DRIFT for any missing row). Unit names MUST be identifiers matching

@@ -25,7 +25,7 @@ func TestOracleRefusesLintFailingMachine(t *testing.T) {
 		"Idle":{"on":{"GO":{"target":["Done","Other"]}}},
 		"Done":{"type":"final"},
 		"Other":{"type":"final"}}}`)
-	_ = oracleRun(d)
+	_ = oracleRun(d, false)
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -48,7 +48,7 @@ func TestOracleTagCollisionIsError(t *testing.T) {
 	writeMachine(t, d, "DealAggregate.machine.json", `{"id":"dealAggregate","initial":"Lead","states":{
 		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}},"_refusal":{"advance":"fixture: the command boundary refuses when canAdvance is false"}},
 		"Closed":{"type":"final"}}}`)
-	_ = oracleRun(d)
+	_ = oracleRun(d, false)
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -66,7 +66,7 @@ func TestOracleTagOverrideDisambiguates(t *testing.T) {
 	writeMachine(t, d, "DealAggregate.machine.json", `{"id":"dealAggregate","_oracle_tag":"DEALAGG","initial":"Lead","states":{
 		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}},"_refusal":{"advance":"fixture: the command boundary refuses when canAdvance is false"}},
 		"Closed":{"type":"final"}}}`)
-	if err := oracleRun(d); err != nil {
+	if err := oracleRun(d, false); err != nil {
 		t.Fatalf("oracleRun: %v (stdout %q)", err, out.String())
 	}
 	if len(*codes) != 0 {
@@ -97,7 +97,7 @@ func TestOracleDirectoryRegeneratesValidPastBroken(t *testing.T) {
 	writeMachine(t, d, "Alpha.machine.json", validMachineA)
 	writeMachine(t, d, "Beta.machine.json", validMachineB)
 	writeMachine(t, d, "Broken.machine.json", `{"id":"broken","initial":`)
-	_ = oracleRun(d)
+	_ = oracleRun(d, false)
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -123,7 +123,7 @@ func TestOracleSingleFileMode(t *testing.T) {
 	d := t.TempDir()
 	fa := writeMachine(t, d, "Alpha.machine.json", validMachineA)
 	writeMachine(t, d, "Beta.machine.json", validMachineB)
-	if err := oracleRunFiles([]string{fa}); err != nil {
+	if err := oracleRunFiles([]string{fa}, false); err != nil {
 		t.Fatalf("oracleRunFiles: %v (stdout %q)", err, out.String())
 	}
 	if len(*codes) != 0 {
@@ -148,7 +148,7 @@ func TestOracleSingleFileReservesSiblingTags(t *testing.T) {
 	writeMachine(t, d, "DealAggregate.machine.json", `{"id":"dealAggregate","initial":"Lead","states":{
 		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}},"_refusal":{"advance":"fixture: the command boundary refuses when canAdvance is false"}},
 		"Closed":{"type":"final"}}}`)
-	_ = oracleRunFiles([]string{fa})
+	_ = oracleRunFiles([]string{fa}, false)
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -169,7 +169,7 @@ func TestOracleLintFailureSkipsOnlyThatMachine(t *testing.T) {
 		"Idle":{"on":{"GO":{"target":["Done","Other"]}}},
 		"Done":{"type":"final"},
 		"Other":{"type":"final"}}}`)
-	_ = oracleRun(d)
+	_ = oracleRun(d, false)
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -188,11 +188,104 @@ func TestOracleNonMachineFileArgIsError(t *testing.T) {
 	_, errB, codes := withCapturedIO(t)
 	d := t.TempDir()
 	p := writeMachine(t, d, "notes.txt", "hello")
-	_ = oracleRunFiles([]string{p})
+	_ = oracleRunFiles([]string{p}, false)
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
 	if !strings.Contains(errB.String(), "not a *.machine.json") {
 		t.Fatalf("stderr %q", errB.String())
+	}
+}
+
+func TestOracleDiffClassifiesChurn(t *testing.T) {
+	outB, _, codes := withCapturedIO(t)
+	d := t.TempDir()
+	writeMachine(t, d, "Thing.machine.json", `{"id":"thing","initial":"A","states":{
+		"A":{"on":{"go":{"target":"B"},"stop":{"target":"C"}}},
+		"B":{"type":"final"},
+		"C":{"type":"final"}}}`)
+	_ = oracleRun(d, false)
+	if len(*codes) != 0 {
+		t.Fatalf("generation failed: %v", *codes)
+	}
+	outB.Reset()
+	_ = oracleRun(d, true)
+	if !strings.Contains(outB.String(), "no churn") {
+		t.Fatalf("a fresh oracle must diff clean, got %q", outB.String())
+	}
+	committed, err := os.ReadFile(filepath.Join(d, "Thing.oracle.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// drop one transition, add another: the diff owes a deleted and a new id
+	writeMachine(t, d, "Thing.machine.json", `{"id":"thing","initial":"A","states":{
+		"A":{"on":{"go":{"target":"B"},"pause":{"target":"C"}}},
+		"B":{"type":"final"},
+		"C":{"type":"final"}}}`)
+	outB.Reset()
+	_ = oracleRun(d, true)
+	out := outB.String()
+	if !strings.Contains(out, "new") || !strings.Contains(out, "deleted") {
+		t.Fatalf("churn must classify as new+deleted, got %q", out)
+	}
+	after, err := os.ReadFile(filepath.Join(d, "Thing.oracle.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(committed) {
+		t.Fatal("--diff must not rewrite the committed oracle")
+	}
+}
+
+func TestOracleDiffRenameShapedChurn(t *testing.T) {
+	outB, _, codes := withCapturedIO(t)
+	d := t.TempDir()
+	base := `{"id":"thing",%s"initial":"A","states":{
+		"A":{"on":{"go":{"target":"B"}}},
+		"B":{"type":"final"}}}`
+	writeMachine(t, d, "Thing.machine.json", strings.Replace(base, "%s", "", 1))
+	_ = oracleRun(d, false)
+	if len(*codes) != 0 {
+		t.Fatalf("generation failed: %v", *codes)
+	}
+	// an _oracle_tag change churns every stable id with identical row content:
+	// exactly the rename-shaped class the revision protocol maps, never
+	// processes as delete-all-plus-new
+	writeMachine(t, d, "Thing.machine.json", strings.Replace(base, "%s", `"_oracle_tag":"WIDG",`, 1))
+	outB.Reset()
+	_ = oracleRun(d, true)
+	if !strings.Contains(outB.String(), "rename-shaped") {
+		t.Fatalf("identical-content id churn must classify as rename-shaped, got %q", outB.String())
+	}
+}
+
+func TestTokensEqual(t *testing.T) {
+	outB, _, codes := withCapturedIO(t)
+	d := t.TempDir()
+	a := filepath.Join(d, "a.md")
+	b := filepath.Join(d, "b.md")
+	c := filepath.Join(d, "c.md")
+	if err := os.WriteFile(a, []byte("one two\nthree   four\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(b, []byte("  one\ntwo three\nfour"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(c, []byte("one two\nthree five\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := tokensEqualRun(a, b); err != nil {
+		t.Fatalf("reflow is formatting-only: %v", err)
+	}
+	if !strings.Contains(outB.String(), "token-identical: 4 tokens") {
+		t.Fatalf("got %q", outB.String())
+	}
+	outB.Reset()
+	_ = tokensEqualRun(a, c)
+	if len(*codes) == 0 || (*codes)[0] != 1 {
+		t.Fatalf("a wording change must exit 1: %v", *codes)
+	}
+	if !strings.Contains(outB.String(), "NOT token-identical") {
+		t.Fatalf("got %q", outB.String())
 	}
 }

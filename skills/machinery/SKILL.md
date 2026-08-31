@@ -495,9 +495,8 @@ author can say which. Writing it down is the forcing function: it makes "can the
 ever pass?" a question the author cannot walk past. A handler with an unguarded fallback branch
 always admits and needs nothing. Handler names are the event name, `after:<delay>`,
 `<src>.onDone`/`<src>.onError`, or `onDone`; a `_refusal` entry naming no fully guarded handler is
-a stale claim and an error. Declarations must be consumed in both directions: an `after` naming a
-delay `_delays` does not declare is an error, and a `_delays` entry no `after` edge consumes is one
-too (a cadence nothing implements is not a bound). Resting states declare `_ignores: {event: reason}`
+a stale claim and an error. (`_delays`/`after` consumption is lint's in both directions; author to
+its messages rather than a restated rule here.) Resting states declare `_ignores: {event: reason}`
 for every reacted-to event they do not handle. After authoring, `machinery oracle design/machines`
 must be run and the generated `<M>.oracle.md` files committed; they are canonical, never hand-edited.
 
@@ -918,7 +917,7 @@ files are born clean under the project's own formatter and linters, with the RED
 green under every non-test gate the project enforces (a locked file has no legal remedy for a gate
 it fails later, because nobody may touch it; a gate that does demand a change to a locked file is
 a RED-phase defect, remedied by an owner-sanctioned formatting-only amendment carrying a
-token-identity proof, never a silent edit); GREEN is accepted only
+token-identity proof, produced by `machinery tokens-equal <old> <new>`, never a silent edit); GREEN is accepted only
 when the locked tests and that same check pass together. This is what makes the discipline hold on
 runtimes that cannot spawn a fresh-context test-writer (Codex and other single-context agents): the
 same agent runs RED then GREEN sequentially, and the deterministic gate runs separate the phases in
@@ -932,9 +931,9 @@ machinery designs change after code exists. The protocol:
 1. Edit the design artifacts, never the generated ones. `*.oracle.md` is generated; the machine
    JSON, matrix, contract, and domain model are the sources.
 2. Rerun `modelith lint`, `machinery check`, and `machinery oracle`.
-3. Diff the regenerated oracles against the previous commit. Rows whose stable id disappeared are
-   deleted tests; new stable ids are new tests; changed rows with the same stable id are modified
-   expectations. That diff IS the affected-test list for the implementer.
+3. Run `machinery oracle <design>/machines --diff`: it classifies the churn against the committed
+   oracles (new, deleted, and modified stable ids, with rename-shaped pairs called out) without
+   writing anything. That output IS the affected-test list for the implementer.
 4. Any machine whose states are persisted (see the placement table) MUST get a state-migration note
    in BUILD.md when a state is renamed, split, or removed: a mapping table from old persisted values
    to new states, or an explicit drain rule for in-flight instances.

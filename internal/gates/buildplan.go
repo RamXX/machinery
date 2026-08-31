@@ -234,6 +234,121 @@ func planShards(design string) (shards []string, indexFiles int) {
 	return shards, indexFiles
 }
 
+// buildTemplateSections is the template's closed section list. Each entry is
+// located by a heading phrase, at any level, in the root or (manifest mode)
+// any shard; the needles accept the corpus's real spellings (the v0.3.13/14
+// locator lesson). A section that does not apply keeps its heading and waives
+// its body with 'N/A - <reason>', which satisfies presence by construction.
+var buildTemplateSections = []struct {
+	name    string
+	needles []string
+}{
+	{"Purpose and scope", []string{"purpose"}},
+	{"Glossary", []string{"glossary"}},
+	{"Domain model", []string{"domain model"}},
+	{"Architecture", []string{"architecture"}},
+	{"Behavior (the state machines)", []string{"behavior"}},
+	{"Traceability matrix", []string{"traceability"}},
+	{"Test specification", []string{"test spec", "test suite"}},
+	{"State migration", []string{"state migration"}},
+	{"Build plan", []string{"build plan"}},
+	{"Language realization notes", []string{"language realization", "realization notes", "toolchain"}},
+	{"Hard-TDD protocol", []string{"hard-tdd", "hard tdd"}},
+	{"Open questions and residual risks", []string{"open questions", "residual risk"}},
+}
+
+// gatesDisclaimerText is the template's "What the gates do not verify" block,
+// owed verbatim by every root BUILD.md so a green check is never read as more
+// than it is. Compared whitespace-collapsed: reflowed line breaks are fine,
+// wording changes are not. TestGatesDisclaimerMatchesTemplate pins this
+// constant to references/build-md-template.md.
+const gatesDisclaimerText = `Not covered by any deterministic check or proof, by construction: whether the interrogation
+extracted the RIGHT invariants (a shallow domain model gates clean); guard and action semantics in
+code (the named-unit contracts carry them into tests; a wrong implementation of a correctly-named
+guard is caught by tests, not proofs); races between concurrent machine instances, and message
+loss, duplication, or reordering between machines (the models are single-instance; the
+event-contract table and the idempotency contracts govern those seams, and the tests exercise
+them); whether migration transformations preserve real production data (Gm proves decision
+coverage, not the implementation or a database run); coupling through shared database tables or
+bus topics (invisible to import analysis; the event-contract table governs it); and security,
+capacity, and observability beyond what the Phase 2 NFR record captures.`
+
+// collapseWS reduces every whitespace run to one space, the equivalence under
+// which "verbatim" is judged (reflow is formatting, wording is content).
+func collapseWS(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+// checkTemplateSections holds the union of the root's and shards' headings to
+// the template's closed section list.
+func checkTemplateSections(g *Gate, maskedDocs []string) {
+	for _, s := range buildTemplateSections {
+		found := false
+		for _, text := range maskedDocs {
+			for _, n := range s.needles {
+				if headingContains(text, n) {
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if found {
+			g.Count("template sections present")
+		} else {
+			g.Errs = append(g.Errs, "BUILD.md (root plus any shards) has no '"+s.name+"' section; fill every template section, or keep its heading and waive the body with 'N/A - <reason>'")
+		}
+	}
+}
+
+// checkGatesDisclaimer holds the root BUILD.md to the template's verbatim
+// "What the gates do not verify" block.
+func checkGatesDisclaimer(g *Gate, maskedRoot string) {
+	body, ok := sectionBody(maskedRoot, "what the gates do not verify")
+	if !ok {
+		g.Errs = append(g.Errs, "BUILD.md has no 'What the gates do not verify' section; include the template's block verbatim, so a green check is never read as more than it is")
+		return
+	}
+	if !strings.Contains(collapseWS(body), collapseWS(gatesDisclaimerText)) {
+		g.Errs = append(g.Errs, "the 'What the gates do not verify' block differs from the template's text; include it verbatim (reflowed line breaks are fine, wording changes are not)")
+		return
+	}
+	g.Count("gates-disclaimer verbatim")
+}
+
+// checkDataDictionaryIdentity errors when more than one data-dictionary
+// heading exists across the root and shards: the dictionary is the one
+// canonical schema, and two copies are two schemas the moment one is edited.
+// An embed-marked copy is the sanctioned exception (Ge holds its fidelity).
+func checkDataDictionaryIdentity(g *Gate, docs []planNamedDoc) {
+	var wheres []string
+	for _, d := range docs {
+		lines := strings.Split(d.text, "\n")
+		for i, line := range lines {
+			_, title := headingText(line)
+			if title == "" || !strings.Contains(strings.ToLower(title), "data dictionary") {
+				continue
+			}
+			if i > 0 && embedMarker.MatchString(lines[i-1]) {
+				continue // a marked embed is the sanctioned copy; Ge holds it
+			}
+			wheres = append(wheres, d.name+":"+strconv.Itoa(i+1))
+		}
+	}
+	switch {
+	case len(wheres) > 1:
+		g.Errs = append(g.Errs, "the data dictionary appears "+strconv.Itoa(len(wheres))+" times ("+strings.Join(wheres, ", ")+"); it appears exactly once so no two agents can implement two schemas (embed-mark a deliberate copy)")
+	case len(wheres) == 1:
+		g.Count("data dictionary unique")
+	}
+}
+
+// planNamedDoc is one build document with the name findings address it by.
+type planNamedDoc struct {
+	name string
+	text string // fence-masked
+}
+
 // CheckBuildPlan implements Gb-plan.
 func CheckBuildPlan(design string) *Gate {
 	g := NewGate("Gb-plan  build plan structure")
@@ -243,8 +358,29 @@ func CheckBuildPlan(design string) *Gate {
 		return g
 	}
 	text := readFileOrErr(filepath.Join(design, "BUILD.md"), g)
+	var shards []string
+	indexFiles := 0
 	if planMode(text) == "manifest" {
-		shards, indexFiles := planShards(design)
+		shards, indexFiles = planShards(design)
+	}
+	docs := []planNamedDoc{{name: "BUILD.md", text: maskFences(text)}}
+	for _, shard := range shards {
+		docs = append(docs, planNamedDoc{name: filepath.Base(shard), text: maskFences(readFileOrErr(shard, g))})
+	}
+	// A machine-less decomposed parent's manifest is a table of contents over
+	// the children, not a buildable plan: the template sections and the
+	// disclaimer live in the child BUILDs, exactly as the plans do.
+	parentManifest := planMode(text) == "manifest" && len(shards) == 0 && pack.HasDecomposition(design)
+	if !parentManifest {
+		var masked []string
+		for _, d := range docs {
+			masked = append(masked, d.text)
+		}
+		checkTemplateSections(g, masked)
+		checkGatesDisclaimer(g, docs[0].text)
+	}
+	checkDataDictionaryIdentity(g, docs)
+	if planMode(text) == "manifest" {
 		if indexFiles > 0 {
 			g.CheckedExtra(fmt.Sprintf("%d index files exempt", indexFiles))
 		}

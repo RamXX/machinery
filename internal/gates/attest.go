@@ -140,7 +140,7 @@ var attestVocabulary = []attestClaim{
 	},
 	{
 		id:     "g3.event-redelivery",
-		what:   "every consumed external event has its event-contract row and a redelivery story",
+		what:   "every consumed external event has its event-contract row and a redelivery story (deterministic slices exist: `_external_events` arms the row-existence sweep per declared event, and G2 refuses a bare dedupe cell under at-least-once; what stays judged is the story's ADEQUACY and the completeness of the declarations)",
 		owed:   HasMachines,
 		owedBy: "machines/*.machine.json",
 	},

@@ -34,6 +34,7 @@ func main() {
 
 	root.AddCommand(newLintCmd())
 	root.AddCommand(newOracleCmd())
+	root.AddCommand(newTokensEqualCmd())
 	root.AddCommand(newTLACmd())
 	root.AddCommand(newAlloyCmd())
 	root.AddCommand(newRefineCmd())
