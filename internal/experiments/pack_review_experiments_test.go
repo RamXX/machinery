@@ -705,7 +705,7 @@ func TestRefinementVersionOnlySkewIsNotDrift(t *testing.T) {
 	if len(g.Drift) != 0 || len(g.Errs) != 0 {
 		t.Fatalf("version-only skew reported as drift: errs=%v drift=%v", g.Errs, g.Drift)
 	}
-	if note := gates.VersionSkewNote([]*gates.Gate{g}); !strings.Contains(note, "v0.0.2") {
+	if note := gates.VersionSkewNote(orders, []*gates.Gate{g}); !strings.Contains(note, "v0.0.2") {
 		t.Errorf("skew note = %q, want v0.0.2 named", note)
 	}
 }

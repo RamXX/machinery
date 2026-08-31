@@ -301,25 +301,76 @@ func checkTemplateSections(g *Gate, maskedDocs []string) {
 	}
 }
 
+// disclaimerSource names where the canonical block lives, in every finding
+// about it: the skill's installed reference, whose text this binary pins.
+const disclaimerSource = "the block under 'What the gates do not verify' in references/build-md-template.md (the machinery skill's installed reference, pinned in this binary)"
+
+// divergenceWindow is how many words of each side a divergence report shows.
+const divergenceWindow = 8
+
+// wordWindow renders up to divergenceWindow words of words starting at from,
+// with an ellipsis when more follow; a from past the end says so in words,
+// because "" would read as a missing report rather than a missing tail.
+func wordWindow(words []string, from int) string {
+	if from >= len(words) {
+		return "(nothing; the text ends here)"
+	}
+	end := from + divergenceWindow
+	tail := ""
+	if end < len(words) {
+		tail = " ..."
+	} else {
+		end = len(words)
+	}
+	return strings.Join(words[from:end], " ") + tail
+}
+
+// firstWordDivergence reports the 1-based word position where want and got
+// first differ under whitespace collapse, plus a short window of each side
+// from that position. ok is false only when the two word sequences are
+// identical, which the containment check has already ruled out by the time
+// this runs. The compare starts at word 1 of each: when the found body is a
+// different text entirely, the first words diverge and the report says so.
+func firstWordDivergence(want, got string) (pos int, wantWin, gotWin string, ok bool) {
+	w, f := strings.Fields(want), strings.Fields(got)
+	i := 0
+	for i < len(w) && i < len(f) && w[i] == f[i] {
+		i++
+	}
+	if i >= len(w) && i >= len(f) {
+		return 0, "", "", false
+	}
+	return i + 1, wordWindow(w, i), wordWindow(f, i), true
+}
+
 // checkGatesDisclaimer holds the root BUILD.md to the template's verbatim
-// "What the gates do not verify" block.
+// "What the gates do not verify" block. Only the root is checked: a manifest
+// design's shards carry no disclaimer obligation.
 func checkGatesDisclaimer(g *Gate, maskedRoot string) {
 	body, ok := sectionBody(maskedRoot, "what the gates do not verify")
 	if !ok {
-		g.Errs = append(g.Errs, "BUILD.md has no 'What the gates do not verify' section; include the template's block verbatim, so a green check is never read as more than it is")
+		g.Errs = append(g.Errs, "BUILD.md has no 'What the gates do not verify' section; copy "+disclaimerSource+" verbatim, so a green check is never read as more than it is (only the root BUILD.md is checked; shards are not)")
 		return
 	}
 	if !strings.Contains(collapseWS(body), collapseWS(gatesDisclaimerText)) {
-		g.Errs = append(g.Errs, "the 'What the gates do not verify' block differs from the template's text; include it verbatim (reflowed line breaks are fine, wording changes are not)")
+		msg := "the 'What the gates do not verify' block in BUILD.md is not the template's text; the canonical wording is " + disclaimerSource
+		if pos, wantWin, gotWin, diverged := firstWordDivergence(gatesDisclaimerText, body); diverged {
+			msg += fmt.Sprintf("; first divergence at word %d: expected %q, found %q", pos, wantWin, gotWin)
+		}
+		msg += "; include the block verbatim (reflowed line breaks are fine, wording changes are not), and note that only the root BUILD.md is checked, shards are not"
+		g.Errs = append(g.Errs, msg)
 		return
 	}
 	g.Count("gates-disclaimer verbatim")
 }
 
-// checkDataDictionaryIdentity errors when more than one data-dictionary
-// heading exists across the root and shards: the dictionary is the one
-// canonical schema, and two copies are two schemas the moment one is edited.
-// An embed-marked copy is the sanctioned exception (Ge holds its fidelity).
+// checkDataDictionaryIdentity errors when more than one HEADING carrying the
+// phrase "data dictionary" exists across the root and shards: the dictionary
+// is the one canonical schema, and two copies are two schemas the moment one
+// is edited. The check keys on heading titles alone, never on the rows below
+// them, so a derived or per-shard slice clears it by being titled as one. An
+// embed-marked copy is the other sanctioned exception, and it fits only a
+// byte-identical copy (Ge holds its fidelity).
 func checkDataDictionaryIdentity(g *Gate, docs []planNamedDoc) {
 	var wheres []string
 	for _, d := range docs {
@@ -337,7 +388,7 @@ func checkDataDictionaryIdentity(g *Gate, docs []planNamedDoc) {
 	}
 	switch {
 	case len(wheres) > 1:
-		g.Errs = append(g.Errs, "the data dictionary appears "+strconv.Itoa(len(wheres))+" times ("+strings.Join(wheres, ", ")+"); it appears exactly once so no two agents can implement two schemas (embed-mark a deliberate copy)")
+		g.Errs = append(g.Errs, strconv.Itoa(len(wheres))+" headings contain the phrase 'data dictionary' ("+strings.Join(wheres, ", ")+"); the dictionary is the one canonical schema, so keep the phrase on exactly one heading: retitle derived or per-shard slices (e.g. 'schema slice'), or put a machinery:embed marker on the line before a byte-identical copy (Ge then holds its fidelity)")
 	case len(wheres) == 1:
 		g.Count("data dictionary unique")
 	}

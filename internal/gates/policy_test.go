@@ -160,7 +160,7 @@ func TestCheckPolicyVersionOnlySkewIsNotDrift(t *testing.T) {
 	if len(g.Drift) != 0 || len(g.Errs) != 0 {
 		t.Fatalf("version-only skew reported as drift: errs=%v drift=%v", g.Errs, g.Drift)
 	}
-	note := VersionSkewNote([]*Gate{g})
+	note := VersionSkewNote(design, []*Gate{g})
 	if !strings.Contains(note, "v0.0.9") {
 		t.Errorf("skew note = %q, want v0.0.9 named", note)
 	}

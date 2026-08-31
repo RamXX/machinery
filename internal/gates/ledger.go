@@ -80,6 +80,7 @@ func checkDuplicateTables(g *Gate, design string) {
 	type occ struct {
 		where  string
 		marked bool
+		gen    bool // the table sits in a generated *.modelith.md render
 	}
 	seen := map[string][]occ{}
 	var order []string
@@ -123,7 +124,11 @@ func checkDuplicateTables(g *Gate, design string) {
 			if _, dup := seen[key]; !dup {
 				order = append(order, key)
 			}
-			seen[key] = append(seen[key], occ{where: rel + ":" + strconv.Itoa(s+1), marked: marked})
+			seen[key] = append(seen[key], occ{
+				where:  rel + ":" + strconv.Itoa(s+1),
+				marked: marked,
+				gen:    strings.HasSuffix(strings.ToLower(base), ".modelith.md"),
+			})
 		}
 		for i, l := range lines {
 			if strings.HasPrefix(strings.TrimLeft(l, " \t"), "|") {
@@ -142,10 +147,14 @@ func checkDuplicateTables(g *Gate, design string) {
 			continue
 		}
 		marked := 0
+		allGen := true
 		var wheres []string
 		for _, o := range occs {
 			if o.marked {
 				marked++
+			}
+			if !o.gen {
+				allGen = false
 			}
 			wheres = append(wheres, o.where)
 		}
@@ -153,6 +162,14 @@ func checkDuplicateTables(g *Gate, design string) {
 		// less marked means at least one copy nobody declared
 		if marked >= len(occs)-1 {
 			g.Count("duplicate tables embed-marked")
+			continue
+		}
+		// a generated render is never hand-edited, so "mark it" is advice the
+		// author cannot legally take: two entities render byte-identical
+		// tables, and the fix lives in the modelith YAML source
+		if allGen {
+			g.Warns = append(g.Warns, "the same table appears at "+strings.Join(wheres, " and ")+
+				"; both sit in a generated *.modelith.md render, so this is two entities rendering byte-identical tables, not a copy anyone made: differentiate them in the modelith YAML source (for example, give distinguishing attribute descriptions), then re-render (never hand-edit the render, and no machinery:embed marker belongs there)")
 			continue
 		}
 		g.Warns = append(g.Warns, "the same table appears at "+strings.Join(wheres, " and ")+

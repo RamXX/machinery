@@ -335,3 +335,54 @@ func TestLedgerNoLedgersStillScansStyle(t *testing.T) {
 		t.Fatal("LedgerActive must be false with no ledgers")
 	}
 }
+
+// The same table in two hand-written documents keeps the marker advice: an
+// author can mark a copy they made.
+func TestLedgerDuplicateTableHandWrittenAdvice(t *testing.T) {
+	table := "| a | b |\n|---|---|\n| 1 | 2 |\n"
+	d := ledgerDesign(t, map[string]string{
+		"ARCHITECTURE.md": "# A\n\n" + table,
+		"BUILD.md":        "# B\n\n" + table,
+	})
+	g := CheckLedger(d)
+	if !hasFinding(g.Warns, "the same table appears at", "no machinery:embed marker on the copy") {
+		t.Fatalf("hand-written duplicate lost its warning: %v", g.Warns)
+	}
+	if hasFinding(g.Warns, "modelith YAML source") {
+		t.Fatalf("hand-written duplicate must not get the generated-render advice: %v", g.Warns)
+	}
+}
+
+// Both copies inside a generated *.modelith.md render: telling the author to
+// mark it would be telling them to hand-edit a generated file. The advice
+// points at the YAML source instead, and the tier stays warn.
+func TestLedgerDuplicateTableInGeneratedRenderPointsAtSource(t *testing.T) {
+	table := "| attribute | type |\n|---|---|\n| id | uuid |\n"
+	d := ledgerDesign(t, map[string]string{
+		"domain.modelith.md": "# Domain\n\n## Widget\n\n" + table + "\n## Gadget\n\n" + table,
+	})
+	g := CheckLedger(d)
+	if !hasFinding(g.Warns, "two entities rendering byte-identical tables", "modelith YAML source", "then re-render") {
+		t.Fatalf("generated-render duplicate did not get the source advice: %v", g.Warns)
+	}
+	if hasFinding(g.Warns, "no machinery:embed marker on the copy") {
+		t.Fatalf("generated-render duplicate must not be told to mark it: %v", g.Warns)
+	}
+	if len(g.Errs) != 0 || len(g.Drift) != 0 {
+		t.Fatalf("the finding must stay a warning: errs=%v drift=%v", g.Errs, g.Drift)
+	}
+}
+
+// One copy in a generated render and one hand-written is still a copy someone
+// made: the marker advice applies.
+func TestLedgerDuplicateTableMixedKeepsMarkerAdvice(t *testing.T) {
+	table := "| attribute | type |\n|---|---|\n| id | uuid |\n"
+	d := ledgerDesign(t, map[string]string{
+		"domain.modelith.md": "# Domain\n\n## Widget\n\n" + table,
+		"BUILD.md":           "# B\n\n" + table,
+	})
+	g := CheckLedger(d)
+	if !hasFinding(g.Warns, "no machinery:embed marker on the copy") {
+		t.Fatalf("mixed duplicate lost the marker advice: %v", g.Warns)
+	}
+}

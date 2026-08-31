@@ -60,7 +60,7 @@ func newCheckCmd() *cobra.Command {
 		}
 		// P-F10: committed artifacts stamped by another machinery version are
 		// worth one non-blocking INFO line; a missing stamp says nothing.
-		if note := gates.VersionSkewNote(run); note != "" {
+		if note := gates.VersionSkewNote(design, run); note != "" {
 			fmt.Fprintln(stdoutW, note)
 		}
 		fmt.Fprintf(stdoutW, "\n%d blocking (ERROR/DRIFT) finding(s)\n", fail)

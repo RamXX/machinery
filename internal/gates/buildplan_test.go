@@ -760,3 +760,153 @@ func TestGatesDisclaimerMatchesTemplate(t *testing.T) {
 		t.Fatal("references/build-md-template.md no longer carries the exact disclaimer block gatesDisclaimerText compares against; update both together")
 	}
 }
+
+// A reworded disclaimer names the canonical source, prints the first word
+// that diverges with a window of each side, and says the check is the root's
+// alone: the reader can find and fix the wording without reading Go source.
+func TestCheckBuildPlanDisclaimerDivergenceIsReported(t *testing.T) {
+	reworded := strings.Replace(gatesDisclaimerText, "the RIGHT invariants", "the CORRECT invariants", 1)
+	if reworded == gatesDisclaimerText {
+		t.Fatal("fixture no longer rewords the disclaimer")
+	}
+	build := strings.Replace(goCrmStylePlan+templateSectionsStub(), gatesDisclaimerText, reworded, 1)
+	design := writeBuildPlanFixture(t, "", map[string]string{"BUILD.md": build})
+	g := CheckBuildPlan(design)
+	msg := ""
+	for _, e := range g.Errs {
+		if strings.Contains(e, "What the gates do not verify") {
+			msg = e
+		}
+	}
+	if msg == "" {
+		t.Fatalf("a reworded disclaimer must be an ERROR: %v", g.Errs)
+	}
+	for _, want := range []string{
+		"references/build-md-template.md",
+		"pinned in this binary",
+		"first divergence at word 16:",
+		`expected "RIGHT invariants`,
+		`found "CORRECT invariants`,
+		"only the root BUILD.md is checked, shards are not",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("disclaimer finding omits %q: %s", want, msg)
+		}
+	}
+}
+
+// A body that is a different text entirely (the block simply absent under a
+// present heading) still gets a divergence report, from word 1.
+func TestCheckBuildPlanDisclaimerWhollyDifferentBodyReportsFromWordOne(t *testing.T) {
+	build := strings.Replace(goCrmStylePlan+templateSectionsStub(), gatesDisclaimerText, "Nothing to declare here.", 1)
+	design := writeBuildPlanFixture(t, "", map[string]string{"BUILD.md": build})
+	g := CheckBuildPlan(design)
+	if !hasErr(g, "first divergence at word 1:") {
+		t.Fatalf("a wholly different body must report from word 1: %v", g.Errs)
+	}
+	if !hasErr(g, `found "Nothing to declare here."`) {
+		t.Fatalf("the found window must quote the body: %v", g.Errs)
+	}
+}
+
+// The missing-section finding names the template file too: a reader who never
+// had the block cannot be told only that it is missing.
+func TestCheckBuildPlanDisclaimerMissingSectionNamesTemplate(t *testing.T) {
+	build := strings.Replace(goCrmStylePlan+templateSectionsStub(),
+		"### What the gates do not verify\n"+gatesDisclaimerText+"\n", "", 1)
+	design := writeBuildPlanFixture(t, "", map[string]string{"BUILD.md": build})
+	g := CheckBuildPlan(design)
+	if !hasErr(g, "no 'What the gates do not verify' section") {
+		t.Fatalf("a missing section must be an ERROR: %v", g.Errs)
+	}
+	if !hasErr(g, "references/build-md-template.md") {
+		t.Fatalf("the missing-section finding must name the template file: %v", g.Errs)
+	}
+}
+
+func TestFirstWordDivergence(t *testing.T) {
+	cases := []struct {
+		name             string
+		want, got        string
+		pos              int
+		wantWin, gotWin  string
+		expectDivergence bool
+	}{
+		{"identical", "a b c", "a  b\nc", 0, "", "", false},
+		{"mid-run", "a b c d", "a b x d", 3, "c d", "x d", true},
+		{"first word", "a b", "z b", 1, "a b", "z b", true},
+		{"got runs out", "a b c", "a b", 3, "c", "(nothing; the text ends here)", true},
+		{"want runs out", "a b", "a b c", 3, "(nothing; the text ends here)", "c", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			pos, wantWin, gotWin, ok := firstWordDivergence(c.want, c.got)
+			if ok != c.expectDivergence {
+				t.Fatalf("ok = %v, want %v", ok, c.expectDivergence)
+			}
+			if !ok {
+				return
+			}
+			if pos != c.pos || wantWin != c.wantWin || gotWin != c.gotWin {
+				t.Fatalf("got (%d, %q, %q), want (%d, %q, %q)", pos, wantWin, gotWin, c.pos, c.wantWin, c.gotWin)
+			}
+		})
+	}
+}
+
+// The window stops at divergenceWindow words and says more follow.
+func TestWordWindowTruncates(t *testing.T) {
+	words := strings.Fields("one two three four five six seven eight nine ten")
+	if got, want := wordWindow(words, 0), "one two three four five six seven eight ..."; got != want {
+		t.Fatalf("wordWindow = %q, want %q", got, want)
+	}
+	if got, want := wordWindow(words, 9), "ten"; got != want {
+		t.Fatalf("wordWindow tail = %q, want %q", got, want)
+	}
+}
+
+// The data-dictionary finding says what it actually keys on (heading titles)
+// and offers a remedy that fits a hand-derived slice, not only a byte copy.
+func TestCheckBuildPlanDataDictionaryFindingNamesHeadings(t *testing.T) {
+	build := goCrmStylePlan + "\n## Data dictionary\n\nrows\n\n## Data dictionary (orders slice)\n\nrows\n"
+	design := writeBuildPlanFixture(t, build, nil)
+	g := CheckBuildPlan(design)
+	msg := ""
+	for _, e := range g.Errs {
+		if strings.Contains(e, "data dictionary") {
+			msg = e
+		}
+	}
+	if msg == "" {
+		t.Fatalf("two data-dictionary headings must be an ERROR: %v", g.Errs)
+	}
+	for _, want := range []string{
+		"2 headings contain the phrase 'data dictionary'",
+		"BUILD.md:",
+		"retitle derived or per-shard slices",
+		"schema slice",
+		"machinery:embed marker on the line before a byte-identical copy",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("data-dictionary finding omits %q: %s", want, msg)
+		}
+	}
+}
+
+// One heading passes and counts; zero headings stay silent. The wording change
+// must not move either boundary.
+func TestCheckBuildPlanDataDictionaryCountsUnchanged(t *testing.T) {
+	one := writeBuildPlanFixture(t, goCrmStylePlan+"\n## Data dictionary\n\nrows\n", nil)
+	g := CheckBuildPlan(one)
+	if hasErr(g, "data dictionary") {
+		t.Fatalf("one dictionary must pass: %v", g.Errs)
+	}
+	if g.Counts["data dictionary unique"] != 1 {
+		t.Fatalf("one dictionary not counted: %+v", g.Counts)
+	}
+	none := writeBuildPlanFixture(t, goCrmStylePlan, nil)
+	g = CheckBuildPlan(none)
+	if hasErr(g, "data dictionary") || g.Counts["data dictionary unique"] != 0 {
+		t.Fatalf("no dictionary must be silent: errs=%v counts=%+v", g.Errs, g.Counts)
+	}
+}
