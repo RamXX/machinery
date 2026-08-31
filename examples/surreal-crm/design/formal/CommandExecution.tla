@@ -1,5 +1,5 @@
 ---- MODULE CommandExecution ----
-\* machinery-version: v0.6.0
+\* machinery-version: v0.6.1
 EXTENDS Naturals
 
 \* Generated from CommandExecution.machine.json by machinery tla. Control-flow model.
