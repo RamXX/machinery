@@ -20,7 +20,12 @@ no-op until the project root has a `.machinery.json` (or a conventional
      `code:` globs, otherwise it will fail loudly on every file),
    - strict mode: block the end of any turn on ANY red gate finding, not
      only DRIFT and import violations (default off; right for repos whose
-     design is complete and ratcheted).
+     design is complete and ratcheted),
+   - plain dialog: should design conversations hide machinery internals
+     from the user? (sets `"dialog": "plain"`; the end-of-turn notices
+     switch to plain language and the conductor is reminded to translate;
+     default off, the operator strings. Right for repos where the person
+     answering design questions is not the operator.)
 3. Write `.machinery.json` with only the fields that differ from the
    defaults, for example: {"gates": "g2,g4", "impl": "."}
 4. When `impl` is enabled, arm the import blocking: run

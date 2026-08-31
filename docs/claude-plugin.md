@@ -109,7 +109,8 @@ machinery-managed. All fields optional:
   "gates": "g2,g4",
   "impl": ".",
   "strict": false,
-  "hooks": true
+  "hooks": true,
+  "dialog": "plain"
 }
 ```
 
@@ -129,6 +130,12 @@ machinery-managed. All fields optional:
   repo whose design is complete; wrong mid-interrogation.
 - `hooks`: set `false` to keep the repo marked as machinery-managed while opting out of hook
   governance entirely.
+- `dialog`: set `"plain"` for a repo whose design conversations face users who should not see
+  machinery internals. The user-facing hook messages (the end-of-turn notices) switch to plain
+  language, and the session-start context reminds the conductor to hold the skill's dialog
+  register. Model-facing text (deny reasons, block reasons, the governance contract) keeps full
+  machinery vocabulary in both modes; the conductor translates it at relay time. Blocking
+  behavior never changes. Default: the operator strings.
 
 A config that fails to parse counts as managed with defaults plus a warning: a typo degrades
 loudly, it does not silently disable governance.

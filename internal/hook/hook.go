@@ -67,7 +67,19 @@ type Config struct {
 	Impl   string `json:"impl"`   // implementation dir for G4-import; empty disables it
 	Hooks  *bool  `json:"hooks"`  // explicit opt-out: {"hooks": false}
 	Strict bool   `json:"strict"` // block the stop on any blocking finding, not only DRIFT
+	// Dialog selects the register of the USER-FACING hook messages (the stop
+	// systemMessage lines): "" keeps the operator strings, "plain" swaps them
+	// for plain-language equivalents and adds a register reminder to the
+	// session-start context. Model-facing text (deny reasons, block reasons,
+	// the governance contract in session start) keeps full machinery
+	// vocabulary in both modes: the conductor needs it, and the skill makes
+	// translating it at relay time the conductor's job.
+	Dialog string `json:"dialog"`
 }
+
+// plainDialog reports whether the config selects the plain user-facing
+// register.
+func (c Config) plainDialog() bool { return c.Dialog == "plain" }
 
 // Load resolves the machinery hook configuration for root. ok is false when
 // the project is not machinery-managed (every hook no-ops). A present but
@@ -101,6 +113,10 @@ func Load(root string) (cfg Config, ok bool, warn string) {
 				break
 			}
 		}
+	}
+	if cfg.Dialog != "" && cfg.Dialog != "plain" {
+		warn = fmt.Sprintf("machinery: %s dialog value %q is not supported (use \"plain\" or omit it); using the default register", ConfigName, cfg.Dialog)
+		cfg.Dialog = ""
 	}
 	return cfg, true, warn
 }
@@ -450,6 +466,11 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 			} else {
 				msg := fmt.Sprintf("machinery: wave sentinel active (%s left); %d blocking finding(s), %d DRIFT are deferred to wave close. "+
 					"Delete %s/.machinery-wave to close the wave and gate.", left, blocking, drift, design)
+				if cfg.plainDialog() {
+					// plain register: the user sees the state, not the plumbing
+					plain := fmt.Sprintf("machinery: a review window is open (%s left); %d design-check item(s) are held until it closes.", left, blocking)
+					return emitJSON(w, stopOut{SystemMessage: plain})
+				}
 				return emitJSON(w, stopOut{SystemMessage: capString(msg+"\n"+buf.String(), reasonCap)})
 			}
 		}
@@ -473,6 +494,9 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 		clearState(root, in.SessionID)
 		msg := fmt.Sprintf("machinery: gates still red after a fix attempt (%d blocking finding(s), %d DRIFT). "+
 			"Stopping anyway; run 'machinery check %s' to review.", blocking, drift, design)
+		if cfg.plainDialog() {
+			msg = fmt.Sprintf("machinery: %d design-check item(s) are still failing after a fix attempt. Stopping anyway; the assistant can list and explain them.", blocking)
+		}
 		if selWarn != "" {
 			msg = selWarn + "\n" + msg
 		}
@@ -487,6 +511,9 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) error {
 				"Import blocking is disarmed: %s/ratchet.json does not exist. Complete Stage 1 with "+
 				"'machinery baseline %s --impl <dir>' (paste the printed rules, commit the ratchet) to arm enforcement.",
 				blocking, g4Blocking, design, design)
+		}
+		if cfg.plainDialog() {
+			msg = fmt.Sprintf("machinery: %d design-check item(s) are still open; normal while the design is in progress. The assistant can list and explain them.", blocking)
 		}
 		if selWarn != "" {
 			msg = selWarn + "\n" + msg
@@ -710,6 +737,11 @@ func sessionStart(w io.Writer, root string, cfg Config, warn string) error {
 	}
 	fmt.Fprintf(&b, "- When a turn edits the design or watched sources, 'machinery check' runs before the turn can end; %s.\n", mode)
 	b.WriteString("- Design work runs through the 'machinery' skill: four phases, each behind a gate.\n")
+	if cfg.plainDialog() {
+		b.WriteString("- Dialog register: PLAIN (set in " + ConfigName + "). Everything in this notice is conductor context, " +
+			"never language to repeat to the user: speak in plain step names, translate findings to their meaning, and keep " +
+			"gate ids, phase numbers, and CLI invocations out of the conversation unless the user uses them first.\n")
+	}
 	if raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(design), "STATE.md")); err == nil {
 		const maxLines = 30
 		lines := strings.Split(strings.TrimRight(string(raw), "\n"), "\n")

@@ -364,8 +364,8 @@ mitigation table is considered complete:
 2. **Treat every closure member as a first-class dependency.** Each one gets the same treatment as
    the technology that dragged it in: a license check, its own mitigation row, and a note on the
    operational and evidence surface it adds (backup, monitoring, compliance evidence).
-3. **Ask the amortization question.** Now that the closure member is paid for, what else should it
-   do, and does it let you consolidate something out? Guard: amortization must never corrupt
+3. **Ask the amortization question.** In dialog, plainly: "Now that you are running this anyway,
+   what else should it do for you, and does it replace anything you run today?" Guard: amortization must never corrupt
    boundaries. A dependency adopted as passive state does not thereby become a message bus or a
    shared cross-component store.
 4. **Record risk evidence, not vibes.** Score each OSS adoption candidate with OpenSSF Scorecard

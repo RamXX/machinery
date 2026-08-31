@@ -31,7 +31,10 @@ surface for each act. Persona by persona, not entity by entity: the entity walk 
 design already does, and it is exactly the walk that misses this, because it groups acts by the
 thing acted on rather than by the person acting. Name the concrete thing, so a reader can tell
 whether it exists: `Admin console > Tenants > Suspend tenant`, `admin CLI: tenant suspend <id>`,
-`POST /v1/tenants/{id}/suspend`, `tenant settings release, Billing tab`.
+`POST /v1/tenants/{id}/suspend`, `tenant settings release, Billing tab`. Ask the question in
+plain language, one act at a time: "Where does an admin actually go to suspend a tenant: a
+screen, a command, an API call?"; the answer shapes above are for the artifact, not for the
+question.
 
 Configuration knobs get rows too (`knob:<key>`): a knob a person is expected to change is an
 interface, and a design that assumes an operator can turn something on has assumed one.

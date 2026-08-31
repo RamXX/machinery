@@ -1,7 +1,7 @@
 ---
 name: machinery
 metadata:
-  version: "0.5.2"
+  version: "0.6.0"
 description: >
   Design software as a build-ready blueprint, greenfield, brownfield, hybrid, or rebuild. Use when the user
   wants to design a new system, service, or app from scratch, produce a BUILD.md for a
@@ -130,7 +130,8 @@ design/
 
 ## Phases and gates
 
-Never advance until the current gate passes. State the gate result to the user before moving on.
+Never advance until the current gate passes. State the result of the checks to the user, in the
+dialog register (see "Conversation register" under Operating discipline), before moving on.
 
 The deterministic gates live in `machinery check <design> [--impl <dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,gv,g4,gt,g5]`
 (g5 runs automatically on decomposed designs; gm runs once `migration.yaml` exists; gs once
@@ -1169,6 +1170,29 @@ means it was skipped); the ledgers' CONTENT stays unjudged, as everywhere.
 
 ## Operating discipline
 
+### Conversation register
+
+Two registers, one boundary, held everywhere:
+
+- **LEDGER register** (unchanged, forever): artifacts, STATE.md, DECISIONS.md, subagent returns,
+  CI output, and anything written or operator-invoked keep the full machinery vocabulary. The
+  system retains its complexity; nothing below changes an artifact, a gate, or a name.
+- **DIALOG register** (anything spoken to the user in a design conversation): plain language only.
+  Plain step names ("the domain model", "the architecture", "the behavior model", "the build
+  plan") instead of phase numbers; "I ran the consistency checks; two things need your decision"
+  instead of gate ids; artifact filenames only when the user must act on one; CLI invocations
+  never, unless asked. Translate findings to their meaning ("the design says an administrator
+  suspends tenants, but nothing yet names the screen or command they would use"), which is what
+  the checks exist to say anyway.
+- **Adaptive escape hatch**: if the user speaks machinery vocabulary, or invokes
+  `/machinery:check` or `/machinery:status`, mirror their register. Those two commands are
+  operator tools and stay exempt by name, not by accident.
+
+Subagent returns arrive in the ledger register by design; translating them at relay time is the
+conductor's job, never the agents'.
+
+### Interrogation discipline
+
 - Batch questions. When the choices are discrete, ask them as a single multiple-choice question.
   Converge, do not loop.
 - Mine the free text, not just the selected option. When a structured answer carries user-typed
@@ -1178,9 +1202,9 @@ means it was skipped); the ledgers' CONTENT stays unjudged, as everywhere.
 - Echo load-bearing interpretations before building on them. Before asking questions that depend
   on your reading of a term or an earlier answer, restate that reading in one line and let the
   user correct it. One misread term early poisons every question after it.
-- Signal progress. In a multi-round interrogation, state the shape each round: which phase this
-  is and roughly how many rounds remain. The estimate is a shape, not a commitment; surfaced
-  fuzziness legitimately extends it.
+- Signal progress. In a multi-round interrogation, state the shape each round: which step this
+  is, by its plain name, and roughly how many rounds remain. The estimate is a shape, not a
+  commitment; surfaced fuzziness legitimately extends it.
 - Record decisions at answer cadence. When an answer round lands, record its decisions in
   `design/DECISIONS.md` (verbatim where the user's wording is load-bearing) before asking the
   next round, one line per decision in the form `<date> <who>: <decision>`, where `<who>` is the

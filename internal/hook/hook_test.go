@@ -1260,3 +1260,47 @@ func TestUpgradeMixWarning(t *testing.T) {
 		t.Fatalf("a design edit alone must not warn: %q", w)
 	}
 }
+
+// The plain dialog register swaps only the USER-FACING stop messages and adds
+// a register reminder to session start; deny reasons, block reasons, and the
+// default strings stay byte-identical (every other test in this file runs
+// with the default register and pins that).
+func TestDialogPlainRegister(t *testing.T) {
+	t.Run("unknown value warns and clears", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, ConfigName), `{"dialog":"terse"}`)
+		cfg, ok, warn := Load(root)
+		if !ok || cfg.Dialog != "" || !strings.Contains(warn, "dialog value") {
+			t.Fatalf("cfg=%+v ok=%v warn=%q", cfg, ok, warn)
+		}
+	})
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, ConfigName), `{"dialog":"plain"}`)
+	writeFile(t, filepath.Join(root, "design", "domain.modelith.yaml"), "model: {}\n")
+	t.Run("mid-phase stop message is plain", func(t *testing.T) {
+		sid := "s-plain"
+		appendState(root, sid, "design")
+		out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+		var got stopOut
+		if err := json.Unmarshal([]byte(out), &got); err != nil {
+			t.Fatalf("stop output is not JSON: %v (%q)", err, out)
+		}
+		if got.Decision != "" {
+			t.Fatalf("plain register never changes blocking behavior: %+v", got)
+		}
+		if !strings.Contains(got.SystemMessage, "design-check item(s) are still open") {
+			t.Fatalf("plain message expected: %+v", got)
+		}
+		for _, jargon := range []string{"gate ERROR", "DRIFT", "machinery check"} {
+			if strings.Contains(got.SystemMessage, jargon) {
+				t.Fatalf("plain message leaks %q: %+v", jargon, got)
+			}
+		}
+	})
+	t.Run("session start carries the register reminder", func(t *testing.T) {
+		out := runEvent(t, root, Input{HookEventName: "SessionStart"})
+		if !strings.Contains(out, "Dialog register: PLAIN") {
+			t.Fatalf("session start must remind the conductor of the register, got %q", out)
+		}
+	})
+}
