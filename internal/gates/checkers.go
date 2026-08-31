@@ -112,9 +112,12 @@ func checkOneChecker(design, manifestPath string) *Gate {
 		g.Count("residuals (waived with reason)", len(residual))
 	}
 
-	// Freshness of the committed projection.
+	// Freshness of the committed projection. An existing-but-empty file must
+	// take the parse path, not fall between the branches: a zero-byte
+	// committed projection once produced no finding at all (neither branch
+	// matched), silently dropping the freshness obligation.
 	projPath := filepath.Join(design, man.Evidence.ProjectionOut)
-	if raw := readFileOrErr(projPath, g); raw != "" {
+	if raw, readOK := readTextOK(projPath); readOK {
 		committed, perr := checker.ParseProjection([]byte(raw))
 		switch {
 		case perr != nil:
@@ -138,6 +141,9 @@ func checkOneChecker(design, manifestPath string) *Gate {
 		}
 	} else if !fileExists(projPath) {
 		g.Drift = append(g.Drift, man.Evidence.ProjectionOut+" is not committed; the checker input was never generated. Run 'machinery project' and commit it.")
+	} else {
+		// exists but unreadable: readTextOK reports no error itself
+		_ = readFileOrErr(projPath, g)
 	}
 
 	// Evidence: absence is failure.

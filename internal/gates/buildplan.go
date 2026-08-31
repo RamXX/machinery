@@ -156,15 +156,28 @@ func headingText(line string) (int, string) {
 // heading whose text carries the phrase "Build plan", whatever the section
 // number and whatever trailing decoration the heading adds. The body runs to
 // the next heading of the same or higher level, so subheadings stay inside
-// the section.
+// the section. When a document declares more than one such section only the
+// first body is returned; checkPlanDoc ERRORs on the count, so a milestone
+// can never hide in a second section a first-match read would skip (the
+// PACK-1 every-match rule, discharged here by refusing the ambiguity).
 func buildPlanSection(text string) (string, bool) {
+	bodies := buildPlanSections(text)
+	if len(bodies) == 0 {
+		return "", false
+	}
+	return bodies[0], true
+}
+
+// buildPlanSections returns the body of EVERY Build plan section in document
+// order. A matching subheading inside an already-collected section is part of
+// that section's body, not a section of its own, so the scan resumes past
+// each collected body.
+func buildPlanSections(text string) []string {
 	lines := strings.Split(text, "\n")
-	for i, line := range lines {
-		level, title := headingText(line)
-		if level != 2 && level != 3 {
-			continue
-		}
-		if !planHeadingRe.MatchString(title) {
+	var bodies []string
+	for i := 0; i < len(lines); i++ {
+		level, title := headingText(lines[i])
+		if (level != 2 && level != 3) || !planHeadingRe.MatchString(title) {
 			continue
 		}
 		end := len(lines)
@@ -174,9 +187,10 @@ func buildPlanSection(text string) (string, bool) {
 				break
 			}
 		}
-		return strings.Join(lines[i+1:end], "\n"), true
+		bodies = append(bodies, strings.Join(lines[i+1:end], "\n"))
+		i = end - 1
 	}
-	return "", false
+	return bodies
 }
 
 // planOracleIDs collects BOTH id columns (sequential test ids and stable
@@ -392,11 +406,15 @@ func checkPlanDoc(g *Gate, name, text string, oracleIDs []string) {
 	// every scan below runs on the fence-masked text: fence content is
 	// neither headings nor milestones nor DoD lines nor citations
 	text = maskFences(text)
-	body, ok := buildPlanSection(text)
-	if !ok {
+	sections := buildPlanSections(text)
+	if len(sections) == 0 {
 		g.Errs = append(g.Errs, name+": no Build plan section (need a ## or ### heading carrying the phrase 'Build plan'; a section number and trailing decoration are fine)")
 		return
 	}
+	if len(sections) > 1 {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: %d 'Build plan' sections; the plan lives in exactly one section so every milestone is held (merge them)", name, len(sections)))
+	}
+	body := sections[0]
 	// section waiver: ONLY the documented literal form "N/A - <reason>" as
 	// the first non-blank line waives the structural checks (NG-6: any line
 	// merely starting with N/A once waived everything). A first line that

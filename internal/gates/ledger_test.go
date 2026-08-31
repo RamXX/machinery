@@ -301,6 +301,27 @@ func TestLedgerUnicodeSymbolsAreFine(t *testing.T) {
 	}
 }
 
+func TestLedgerNearMissMarkerWarns(t *testing.T) {
+	// a marker-shaped comment that matches no known marker grammar arms
+	// nothing, silently: the tier it meant to arm never runs
+	d := ledgerDesign(t, map[string]string{"ARCHITECTURE.md": "# A\n" +
+		"<!-- machinery: embed from=\"m.md\" -->\n" + // near miss: space after the colon
+		"<!-- machinery:read-complete -->\n" + // near miss: misspelled marker
+		"<!-- machinery:reads-complete -->\n" + // valid
+		"<!-- machinery:embed from=\"m.md\" table=\"a\" claims=\"subset\" -->\n" + // valid
+		"<!-- plain prose comment -->\n"})
+	g := CheckLedger(d)
+	var hits int
+	for _, w := range g.Warns {
+		if strings.Contains(w, "matches no known machinery marker grammar") {
+			hits++
+		}
+	}
+	if hits != 2 {
+		t.Fatalf("expected exactly the two near-miss markers to warn, got %d: %v", hits, g.Warns)
+	}
+}
+
 func TestLedgerNoLedgersStillScansStyle(t *testing.T) {
 	d := ledgerDesign(t, map[string]string{"ARCHITECTURE.md": "clean\n"})
 	g := CheckLedger(d)

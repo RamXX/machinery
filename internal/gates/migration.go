@@ -750,13 +750,15 @@ func (v *migrationValidator) validateRisks() {
 }
 
 func (v *migrationValidator) validateNarrativeBridges() {
-	arch := readFileOrErr(filepath.Join(v.design, "ARCHITECTURE.md"), v.g)
+	// both scans run fence-masked, matching Gb: a fenced example heading is
+	// documentation and must not satisfy a section-presence requirement
+	arch := maskFences(readFileOrErr(filepath.Join(v.design, "ARCHITECTURE.md"), v.g))
 	if !headingContains(arch, "transition architecture") {
 		v.errf("ARCHITECTURE.md needs a 'Transition architecture' heading describing the temporary coexistence topology and dependency failure posture")
 	} else {
 		v.g.Count("transition architecture sections")
 	}
-	build := readFileOrErr(filepath.Join(v.design, "BUILD.md"), v.g)
+	build := maskFences(readFileOrErr(filepath.Join(v.design, "BUILD.md"), v.g))
 	if !headingContains(build, "migration implementation plan") {
 		v.errf("BUILD.md needs a 'Migration implementation plan' heading that turns migration.yaml into build and test work")
 	} else {

@@ -71,8 +71,13 @@ func checkClauseCoverage(g *Gate, design string, corpus testCorpusData) {
 	}
 	for _, d := range decls {
 		n := len(d.active)
-		if n == 0 || n > 26 {
-			continue // an empty or absurd declaration is its own review finding
+		if n == 0 {
+			g.Errs = append(g.Errs, "guard "+d.guard+" declares CLAUSES{} with no clauses; the falsifying-test obligation it announces is armed by nothing (list the clauses, or drop the declaration)")
+			continue
+		}
+		if n > 26 {
+			g.Errs = append(g.Errs, fmt.Sprintf("guard %s declares %d clauses; the suffix scheme (a-z) holds at most 26, so this declaration cannot be checked (split the guard)", d.guard, n))
+			continue
 		}
 		g.Count("clause-declared guards checked")
 		for _, row := range rows {

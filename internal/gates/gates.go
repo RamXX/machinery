@@ -243,6 +243,11 @@ func isTokenChar(b byte) bool {
 var (
 	edgeRuleRe = regexp.MustCompile(`^"?\s*([^\s"]+)\s*->\s*([^\s"#]+)`)
 	dslDeclRe  = regexp.MustCompile(`^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(person|softwareSystem|container|component)\b(.*)$`)
+	// dslBlockTagsRe matches the block-statement spelling of tags inside an
+	// element body: `tags "Database"` / `tags "Database" "Queue"`.
+	dslBlockTagsRe = regexp.MustCompile(`^\s*tags\s+(".*)$`)
+	// dslQuotedRe blanks quoted strings for brace bookkeeping.
+	dslQuotedRe = regexp.MustCompile(`"[^"]*"`)
 	// mitigation tokens allow hyphens inside segments: external ids like
 	// external.rest-of-monolith must be able to satisfy their own row
 	mitTokRe = regexp.MustCompile("`([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*)`")
@@ -324,30 +329,56 @@ func dslElements(dslPath string, g *Gate) map[string]dslEl {
 // dslElements reads the file (and reports a read error) and delegates here, so
 // a caller that already holds the text (the drawn-edge check needs the same
 // text for its relationship lines) parses the model the one way.
+//
+// Tags come from BOTH legal Structurizr spellings: the inline argument on the
+// declaration line and a `tags "..."` statement inside the element's block.
+// Reading only the inline form once let a block-tagged Database/Queue element
+// dodge the infra-mitigation obligations G2 keys off these tags.
 func dslElementsOf(text string) map[string]dslEl {
 	els := map[string]dslEl{}
+	type openEl struct {
+		name  string
+		depth int
+	}
+	var stack []openEl
+	depth := 0
 	for _, line := range strings.Split(text, "\n") {
-		m := dslDeclRe.FindStringSubmatch(line)
-		if m == nil {
-			continue
-		}
-		name, kind, rest := m[1], m[2], m[3]
-		args := quoteStrings(rest)
-		tagIdx := 3
-		if kind == "person" || kind == "softwareSystem" {
-			tagIdx = 2
-		}
-		tags := map[string]bool{}
-		if len(args) > tagIdx {
-			for _, t := range strings.Split(args[tagIdx], ",") {
-				tags[strings.TrimSpace(t)] = true
+		if m := dslDeclRe.FindStringSubmatch(line); m != nil {
+			name, kind, rest := m[1], m[2], m[3]
+			args := quoteStrings(rest)
+			tagIdx := 3
+			if kind == "person" || kind == "softwareSystem" {
+				tagIdx = 2
+			}
+			tags := map[string]bool{}
+			if len(args) > tagIdx {
+				for _, t := range strings.Split(args[tagIdx], ",") {
+					tags[strings.TrimSpace(t)] = true
+				}
+			}
+			display := name
+			if len(args) > 0 {
+				display = args[0]
+			}
+			els[name] = dslEl{Kind: kind, Tags: tags, Display: display}
+			if strings.HasSuffix(strings.TrimSpace(line), "{") {
+				stack = append(stack, openEl{name: name, depth: depth})
+			}
+		} else if m := dslBlockTagsRe.FindStringSubmatch(line); m != nil && len(stack) > 0 {
+			el := els[stack[len(stack)-1].name]
+			for _, q := range quoteStrings(m[1]) {
+				for _, t := range strings.Split(q, ",") {
+					el.Tags[strings.TrimSpace(t)] = true
+				}
 			}
 		}
-		display := name
-		if len(args) > 0 {
-			display = args[0]
+		// brace bookkeeping with quoted content blanked, so a brace inside a
+		// description string does not unbalance the element stack
+		bare := dslQuotedRe.ReplaceAllString(line, `""`)
+		depth += strings.Count(bare, "{") - strings.Count(bare, "}")
+		for len(stack) > 0 && depth <= stack[len(stack)-1].depth {
+			stack = stack[:len(stack)-1]
 		}
-		els[name] = dslEl{Kind: kind, Tags: tags, Display: display}
 	}
 	return els
 }
@@ -1572,7 +1603,11 @@ func CheckTraceability(design string) *Gate {
 	}
 	build := filepath.Join(design, "BUILD.md")
 	if _, err := os.Stat(build); err == nil {
-		buildText := readFileOrErr(build, g)
+		// every BUILD scan below runs fence-masked, matching Gb: a fenced
+		// example "Mode:" line, heading, or table row is documentation, not a
+		// declaration, and must neither satisfy the template checks nor credit
+		// invariant enforcement in the traceability corpus
+		buildText := maskFences(readFileOrErr(build, g))
 		for _, tbl := range ir.ParseMdTables(buildText) {
 			for _, r := range tbl.Rows {
 				cells = append(cells, r...)
@@ -1580,7 +1615,7 @@ func CheckTraceability(design string) *Gate {
 		}
 		// manifest mode shards contribute to the traceability corpus too
 		for _, shard := range sortedGlobExt(filepath.Join(design, "BUILD"), ".md") {
-			for _, tbl := range ir.ParseMdTables(readFileOrErr(shard, g)) {
+			for _, tbl := range ir.ParseMdTables(maskFences(readFileOrErr(shard, g))) {
 				for _, r := range tbl.Rows {
 					cells = append(cells, r...)
 				}

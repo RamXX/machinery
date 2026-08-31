@@ -76,6 +76,19 @@ func writeBuildPlanFixture(t *testing.T, build string, extra map[string]string) 
 	return design
 }
 
+func TestCheckBuildPlanDuplicateSectionsError(t *testing.T) {
+	// two Build plan sections: the first-match locator once made the second
+	// section's milestones invisible to Gb and Ga (a closed milestone there
+	// never owed evidence). The ambiguity is refused loudly instead.
+	build := goCrmStylePlan +
+		"\n## Build plan (phase 2)\n\n**M7 - Later work.** DoD: T-CMD-02 green.\nStatus: closed\n"
+	design := writeBuildPlanFixture(t, build, nil)
+	g := CheckBuildPlan(design)
+	if !hasErr(g, "'Build plan' sections") {
+		t.Fatalf("a second Build plan section must be an ERROR: %v", g.Errs)
+	}
+}
+
 func TestCheckBuildPlanGoCrmShape(t *testing.T) {
 	design := writeBuildPlanFixture(t, goCrmStylePlan, nil)
 	g := CheckBuildPlan(design)

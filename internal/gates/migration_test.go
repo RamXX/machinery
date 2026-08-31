@@ -176,6 +176,16 @@ func TestCheckMigrationMutations(t *testing.T) {
 				t.Fatal(err)
 			}
 		}, "Migration implementation plan"},
+		{"fenced architecture bridge does not count", migrationContract, func(t *testing.T, design string) {
+			if err := os.WriteFile(filepath.Join(design, "ARCHITECTURE.md"), []byte("# Architecture\n```\n## Transition architecture\n```\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}, "Transition architecture"},
+		{"fenced build bridge does not count", migrationContract, func(t *testing.T, design string) {
+			if err := os.WriteFile(filepath.Join(design, "BUILD.md"), []byte("# Build\n```\n## Migration implementation plan\n```\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}, "Migration implementation plan"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

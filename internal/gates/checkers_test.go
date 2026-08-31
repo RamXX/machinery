@@ -112,6 +112,20 @@ func TestGkPass(t *testing.T) {
 	}
 }
 
+func TestGkEmptyProjectionIsError(t *testing.T) {
+	// a zero-byte committed projection once fell between the branches (not
+	// absent, not non-empty) and the freshness obligation was silently dropped
+	design, projPath, _, _ := setupChecker(t, ckOpts{verdict: "pass", coverage: passCoverage()})
+	must(t, os.WriteFile(projPath, nil, 0o644))
+	g := onlyGate(t, design)
+	if !hasErr(g, "not valid projection JSON") {
+		t.Fatalf("an empty committed projection must be an ERROR: errs=%v drift=%v", g.Errs, g.Drift)
+	}
+	if g.Counts["committed projection fresh"] != 0 {
+		t.Fatalf("an empty projection must not count as fresh: %v", g.Counts)
+	}
+}
+
 func TestGkMissingEvidenceIsError(t *testing.T) {
 	design, _, evPath, _ := setupChecker(t, ckOpts{verdict: "pass", coverage: passCoverage()})
 	must(t, os.Remove(evPath))

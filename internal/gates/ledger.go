@@ -37,6 +37,12 @@ var (
 	// decisionDateRe matches the dated-entry opener of a DECISIONS.md line:
 	// an optional bullet, then YYYY-MM-DD.
 	decisionDateRe = regexp.MustCompile(`^\s*[-*]?\s*(\d{4}-\d{2}-\d{2})\b`)
+	// htmlCommentRe and machineryMarkerishRe find marker-shaped comments: an
+	// HTML comment invoking the machinery marker namespace. A comment that is
+	// marker-shaped but matches no known marker grammar arms nothing, silently,
+	// which is the failure mode the warn below exists to surface.
+	htmlCommentRe        = regexp.MustCompile(`<!--.*?-->`)
+	machineryMarkerishRe = regexp.MustCompile(`machinery\s*:`)
 )
 
 // LedgerActive reports whether the design carries either session ledger. The
@@ -243,6 +249,18 @@ func checkHouseStyle(g *Gate, design string) {
 					findings = append(findings, finding{rel, lineNo + 1, fmt.Sprintf("emoji %q; house style forbids emojis in design artifacts (plain Unicode symbols are fine)", r), false})
 					break
 				}
+			}
+			// near-miss opt-in markers: a marker-shaped comment that parses as
+			// no known marker grammar arms nothing, and the tier it meant to
+			// arm silently never runs
+			for _, c := range htmlCommentRe.FindAllString(line, -1) {
+				if !machineryMarkerishRe.MatchString(c) {
+					continue
+				}
+				if embedMarker.MatchString(c) || readsCompleteMarker.MatchString(c) {
+					continue
+				}
+				findings = append(findings, finding{rel, lineNo + 1, "marker-shaped comment " + strconv.Quote(c) + " matches no known machinery marker grammar (machinery:embed, machinery:reads-complete); a near-miss marker arms nothing", false})
 			}
 		}
 		return nil

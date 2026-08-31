@@ -546,6 +546,48 @@ func writeGxCompletenessFixture(t *testing.T, rows string) *Gate {
 	return CheckTraceability(design)
 }
 
+// Gx's BUILD.md scans run fence-masked, matching Gb: a fenced example Mode
+// line or heading is documentation and must not satisfy a template check.
+func TestGxBuildScansAreFenceMasked(t *testing.T) {
+	design := t.TempDir()
+	mustWrite(t, filepath.Join(design, "domain.modelith.yaml"), gxCompletenessModel)
+	mustWrite(t, filepath.Join(design, "machines", "Ops.machine.json"),
+		`{"id":"ops","_role":"operational","initial":"A","states":{"A":{}}}`)
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), "# A\n")
+	mustWrite(t, filepath.Join(design, "BUILD.md"),
+		"# B\n```\nMode: full\n## Toolchain\n```\n")
+	g := CheckTraceability(design)
+	if !hasErr(g, "declares no mode") {
+		t.Fatalf("a fenced Mode line must not count as a declaration: %v", g.Errs)
+	}
+	if !hasErr(g, "no Toolchain heading") {
+		t.Fatalf("a fenced Toolchain heading must not count: %v", g.Errs)
+	}
+}
+
+// Block-form `tags "..."` statements inside an element body are a legal
+// Structurizr spelling; reading only the inline argument once let a
+// block-tagged Database element dodge the infra obligations G2 keys off tags.
+func TestDSLElementsBlockTags(t *testing.T) {
+	els := dslElementsOf(`api = container "API" "svc" "Go" {
+    tags "Database"
+    orders = component "Orders" "c" "Go" {
+        tags "Queue" "Internal"
+    }
+}
+web = container "Web (uses {braces} in prose)" "ui" "TS"
+`)
+	if !els["api"].Tags["Database"] {
+		t.Fatalf("block-form tag missing on api: %+v", els["api"])
+	}
+	if !els["orders"].Tags["Queue"] || !els["orders"].Tags["Internal"] {
+		t.Fatalf("nested block-form tags missing on orders: %+v", els["orders"])
+	}
+	if els["web"].Tags["Database"] || els["web"].Tags["Queue"] {
+		t.Fatalf("tags leaked past the declaring block: %+v", els["web"])
+	}
+}
+
 func TestGxPlacementCompleteness(t *testing.T) {
 	t.Run("every entity in a row passes", func(t *testing.T) {
 		g := writeGxCompletenessFixture(t,

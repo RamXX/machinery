@@ -30,6 +30,25 @@ func clauseCovFixture(t *testing.T, testBody string) (string, string) {
 	return design, impl
 }
 
+func TestClauseCoverageEmptyDeclarationErrors(t *testing.T) {
+	// CLAUSES{} announces the falsifying-test obligation and then arms
+	// nothing; silently skipping it once dropped the obligation without a
+	// trace. The declaration must either list clauses or go.
+	design := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(design, "machines"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, filepath.Join(design, "machines", "Deal.oracle.md"), clauseCovOracle)
+	mustWrite(t, filepath.Join(design, "machines", "Deal.matrix.md"),
+		"| `guardCanWin` | guard | CLAUSES{} |\n")
+	impl := t.TempDir()
+	mustWrite(t, filepath.Join(impl, "deal_test.go"), "package x\n// covers DEAL-abc123 DEAL-def456\n")
+	g := CheckOracleCoverage(design, impl)
+	if !hasErr(g, "declares CLAUSES{} with no clauses") {
+		t.Fatalf("an empty CLAUSES declaration must error: %v", g.Errs)
+	}
+}
+
 func TestClauseCoverageComplete(t *testing.T) {
 	design, impl := clauseCovFixture(t,
 		"package x\n// covers DEAL-abc123 DEAL-def456 DEAL-abc123a DEAL-abc123b\n")

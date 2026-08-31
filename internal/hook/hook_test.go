@@ -410,15 +410,26 @@ func TestStopStrictBlocksOnAnyFinding(t *testing.T) {
 }
 
 func TestStopBeforeAnyGateApplies(t *testing.T) {
-	root := managedRoot(t) // Phase 1 only: nothing for any gate to check yet
+	// Phase 1 skeleton: the conventional marker exists, so gc applies from
+	// turn one exactly as the CLI default suite arms it. An empty model is a
+	// finding ("an empty check is a failure, not a pass"), surfaced as the
+	// informational mid-phase message, never a block (no DRIFT, not strict).
+	root := managedRoot(t)
 	sid := "s-phase1"
 	appendState(root, sid, "design")
 	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
-	if out != "" {
-		t.Fatalf("with no applicable gate the stop must be silent, got %q", out)
+	var got stopOut
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("stop output is not JSON: %v (%q)", err, out)
+	}
+	if got.Decision != "" {
+		t.Fatalf("a mid-phase ERROR must not block: %+v", got)
+	}
+	if !strings.Contains(got.SystemMessage, "ERROR finding(s)") {
+		t.Fatalf("the empty-model carrier finding must surface in the message: %+v", got)
 	}
 	if d, _ := readState(root, sid); d {
-		t.Fatal("state must clear when no gate applies")
+		t.Fatal("state must clear after a non-blocking stop")
 	}
 }
 
@@ -449,6 +460,30 @@ func TestSelectGatesProgressiveOptional(t *testing.T) {
 	for _, g := range []string{"gm", "gs", "gp", "gi", "gn"} {
 		if !sel.Run[g] {
 			t.Errorf("%s must run once its opt-in artifact exists", g)
+		}
+	}
+}
+
+// The stop hook mirrors the CLI default suite for every checkable-from-design
+// gate: gc arms on the domain model, gd on machines, gk on the external-
+// checker layer. Omitting gk once let checker DRIFT (a stale committed
+// projection after a mid-session model edit) pass the turn end green while
+// the CLI reported it and exited 1.
+func TestSelectGatesArmsCarrierIdciteCheckers(t *testing.T) {
+	dir := t.TempDir()
+	sel, _ := selectGates(dir, Config{})
+	for _, g := range []string{"gc", "gd", "gk"} {
+		if sel.Run[g] {
+			t.Errorf("%s must not run before its artifact exists: %v", g, sel.Run)
+		}
+	}
+	writeFile(t, filepath.Join(dir, "domain.modelith.yaml"), "entities: {}\n")
+	writeFile(t, filepath.Join(dir, "machines", "Order.machine.json"), "{}\n")
+	writeFile(t, filepath.Join(dir, "checkers", "pii.checker.yaml"), "checker_version: 1\n")
+	sel, _ = selectGates(dir, Config{})
+	for _, g := range []string{"gc", "gd", "gk"} {
+		if !sel.Run[g] {
+			t.Errorf("%s must run once its artifact exists (CLI parity): %v", g, sel.Run)
 		}
 	}
 }
@@ -610,6 +645,36 @@ func TestPreDeniesWaveSentinelWrites(t *testing.T) {
 				if !strings.Contains(reason, want) {
 					t.Fatalf("reason %q missing %q", reason, want)
 				}
+			}
+		})
+	}
+}
+
+// The filesystems this hook guards on (APFS, NTFS) resolve names case-
+// insensitively, so the enforcement reads (os.Stat of the sentinel,
+// os.ReadFile of the config) find a case-variant spelling; the deny must
+// fold case too or the guard is bypassable by writing .MACHINERY-WAVE.
+func TestPreDeniesCaseVariants(t *testing.T) {
+	root := managedRoot(t)
+	cases := []struct{ name, rel, want string }{
+		{"wave sentinel upper", "design/.MACHINERY-WAVE", "wave sentinel"},
+		{"governance config mixed", ".Machinery.json", "governance configuration"},
+		{"ratchet mixed", "design/Ratchet.json", "machinery baseline"},
+		{"oracle mixed suffix", "design/machines/Thing.Oracle.MD", "machinery oracle"},
+		{"frozen pack mixed", "design/Pack/events.md", "frozen pack"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out := runEvent(t, root, editEvent("PreToolUse", "Write", "s-fold", filepath.Join(root, c.rel)))
+			var got preOut
+			if err := json.Unmarshal([]byte(out), &got); err != nil {
+				t.Fatalf("deny output is not JSON: %v (%q)", err, out)
+			}
+			if got.HookSpecificOutput.PermissionDecision != "deny" {
+				t.Fatalf("case variant %s must be denied: %+v", c.rel, got)
+			}
+			if !strings.Contains(got.HookSpecificOutput.PermissionDecisionReason, c.want) {
+				t.Fatalf("reason %q missing %q", got.HookSpecificOutput.PermissionDecisionReason, c.want)
 			}
 		})
 	}
