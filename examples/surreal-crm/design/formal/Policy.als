@@ -1,5 +1,5 @@
 // Code generated from domain.modelith.yaml + policy.relational.yaml by machinery alloy. DO NOT EDIT.
-// machinery-version: v0.5.2
+// machinery-version: v0.6.0
 //
 // Static relational model of the policy invariants: which configurations of
 // subjects, teams, and record ownership the invariant set admits. Alloy

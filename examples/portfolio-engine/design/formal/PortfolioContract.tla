@@ -1,5 +1,5 @@
 ---- MODULE PortfolioContract ----
-\* machinery-version: v0.5.2
+\* machinery-version: v0.6.0
 \* GENERATED. The abstract contract the big picture assumes of the Portfolio
 \* aggregate: resting or busy, atomic while busy, and every busy period terminates.
 VARIABLES phase, kind
