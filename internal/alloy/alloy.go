@@ -382,7 +382,21 @@ func Load(domainPath, annotationPath string) *Policy {
 	l.loadResiduals()
 	l.validateCoverage()
 	l.loadScope()
+	l.validateScopeFitsRoles()
 	return l.p
+}
+
+// validateScopeFitsRoles refuses a search bound smaller than the role count.
+// SomeWorld instantiates every role with its own subject atom, so a scope
+// below the role count makes satisfiability fail on the BOUND rather than on
+// the policy, which surfaces at the solver as an inscrutable no-instance
+// result long after generation. Failing here names the remedy at authoring
+// time instead.
+func (l *policyLoader) validateScopeFitsRoles() {
+	if len(l.p.Roles) > l.p.Scope {
+		die("the %s enum declares %d roles but the Alloy scope is %d; SomeWorld instantiates every role with its own %s atom, so the run would fail on the bound rather than the policy: raise the annotation's scope to at least %d (the cap is 12)",
+			l.p.RoleEnum, len(l.p.Roles), l.p.Scope, l.p.SubjectEntity, len(l.p.Roles))
+	}
 }
 
 type policyLoader struct {
