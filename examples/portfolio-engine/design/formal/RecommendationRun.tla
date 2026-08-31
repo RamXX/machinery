@@ -1,5 +1,5 @@
 ---- MODULE RecommendationRun ----
-\* machinery-version: v0.5.0
+\* machinery-version: v0.5.1
 EXTENDS Naturals
 
 \* Generated from RecommendationRun.machine.json by machinery tla. Control-flow model.
