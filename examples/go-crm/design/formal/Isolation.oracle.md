@@ -1,7 +1,7 @@
 # Generated tenant-scoping oracle: isolation
 
 Generated from `domain.modelith.yaml` + `isolation.relational.yaml` by `machinery alloy`. DO NOT EDIT BY HAND.
-<!-- machinery-version: v0.6.1 -->
+<!-- machinery-version: v0.6.2 -->
 Single source of truth for the link-authorization test: one row is one decision
 case for the pure tenant-scoping function that decides whether a reference may
 be established. Key tests on the STABLE id, not the row number; row numbers

@@ -1,5 +1,5 @@
 ---- MODULE User ----
-\* machinery-version: v0.6.1
+\* machinery-version: v0.6.2
 EXTENDS Naturals
 
 \* Generated from User.machine.json by machinery tla. Control-flow model.
