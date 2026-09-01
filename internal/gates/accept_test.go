@@ -478,8 +478,33 @@ func TestResolveReviewCommit(t *testing.T) {
 func writeAncestryFixture(t *testing.T, repo, evidenceCommit string) string {
 	t.Helper()
 	return writeAcceptFixtureIn(t, filepath.Join(repo, "design"), map[string]string{
-		"acceptance/M0.yaml": strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: "+evidenceCommit, 1),
+		// The sha is quoted: a live abbreviation can be purely numeric (about
+		// (10/16)^10 of repos), and unquoted YAML would read it as a number,
+		// which the schema check rejects by design. Quoting is exactly what
+		// the gate's own finding tells a user to do, and it makes this test
+		// deterministic instead of flaky at that probability.
+		"acceptance/M0.yaml": strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: \""+evidenceCommit+"\"", 1),
 	})
+}
+
+// The failure mode the ancestry fixture quotes its way around, pinned
+// deterministically: an UNQUOTED purely numeric revision is read by YAML as a
+// number, and the schema check must answer with the quoting guidance instead
+// of a bare type error.
+func TestCheckAcceptanceNumericRevisionGuidance(t *testing.T) {
+	repo := t.TempDir()
+	initGitHistory(t, repo)
+	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), map[string]string{
+		"acceptance/M0.yaml": strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: 1234567890", 1),
+	})
+	g := CheckAcceptance(design, "")
+	joined := strings.Join(g.Errs, "\n")
+	if !strings.Contains(joined, "quote a purely numeric revision") {
+		t.Fatalf("an unquoted numeric revision must earn the quoting guidance, got %v", g.Errs)
+	}
+	if g.Counts["commit bindings verified"] != 0 {
+		t.Errorf("a rejected revision may not be counted as verified: %+v", g.Counts)
+	}
 }
 
 func TestCheckAcceptanceDerivedModeAncestry(t *testing.T) {
