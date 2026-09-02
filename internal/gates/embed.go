@@ -404,6 +404,23 @@ func cellDenotes(cell, token string) bool {
 }
 
 func filterRows(t ir.MdTable, where string) ([][]string, string) {
+	picked, err := filterRowIdx(t, where)
+	if err != "" {
+		return nil, err
+	}
+	out := make([][]string, 0, len(picked))
+	for _, i := range picked {
+		out = append(out, t.Rows[i])
+	}
+	return out, ""
+}
+
+// filterRowIdx is the selector itself, returning the INDEXES of the selected
+// rows so a caller that needs a row's other representations (its raw source
+// line, for a rewrite) can reach them. filterRows is the cell-only view of
+// the same answer; both gates and `machinery embed refresh` therefore select
+// through exactly one implementation.
+func filterRowIdx(t ir.MdTable, where string) ([]int, string) {
 	parts := strings.SplitN(where, "=", 2)
 	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
 		return nil, "where=" + ir.Repr(where) + " is not of the form '<column>=<token>' (several columns: '<col>|<col>=<token>')"
@@ -417,11 +434,11 @@ func filterRows(t ir.MdTable, where string) ([][]string, string) {
 		}
 		idx = append(idx, i)
 	}
-	var out [][]string
-	for _, r := range t.Rows {
+	var out []int
+	for ri, r := range t.Rows {
 		for _, i := range idx {
 			if i < len(r) && cellDenotes(r[i], token) {
-				out = append(out, r)
+				out = append(out, ri)
 				break
 			}
 		}

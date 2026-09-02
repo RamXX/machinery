@@ -987,6 +987,14 @@ obligation, so adoption is per table; but a marker that cannot be resolved (miss
 selector matching no table or several) is an error, never a silent skip. The grammar is in
 `references/build-md-template.md`.
 
+When the source moves, do not re-copy by hand: `machinery embed refresh <design>` writes what Ge
+checks. It matches each copied row to its source by key rather than by position, leaves every
+`(shard-local: ...)` row exactly as it is, REPORTS (never deletes) a row with no source row, since a
+rename or a retirement is a judgment, and appends the selected source rows a `complete` claim with a
+`where=` filter is missing. `--dry-run` reports without writing. The run is deterministic and
+idempotent, so a second run changes nothing; re-run `machinery check <design> --gate ge` after it and
+resolve by hand whatever it reported rather than refreshed.
+
 ## Recursive decomposition (contract packs)
 
 Sharding splits the synthesis; recursion splits the DESIGN. Escalate to recursion only when the

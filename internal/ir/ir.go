@@ -309,6 +309,12 @@ func ActionsOf(node *Value, problems *[]string, state string) map[string]struct{
 type MdTable struct {
 	Header []string
 	Rows   [][]string
+	// RowLines holds the source line of each data row, index-aligned with
+	// Rows (leading and trailing whitespace trimmed, the cell text otherwise
+	// untouched). A tool that REWRITES a table copies a row from here, so the
+	// copy is byte-identical to its source rather than re-rendered from the
+	// parsed cells, which would normalize the author's spacing.
+	RowLines []string
 }
 
 var parenRe = regexp.MustCompile(`\([^)]*\)`)
@@ -389,12 +395,13 @@ func ParseMdTables(text string) []MdTable {
 			}
 		}
 		var data [][]string
+		var dataLines []string
 		if isSep {
-			data = rows[2:]
+			data, dataLines = rows[2:], b[2:]
 		} else {
-			data = rows[1:]
+			data, dataLines = rows[1:], b[1:]
 		}
-		tables = append(tables, MdTable{Header: rows[0], Rows: data})
+		tables = append(tables, MdTable{Header: rows[0], Rows: data, RowLines: dataLines})
 	}
 	return tables
 }
