@@ -273,3 +273,49 @@ func TestDumpNullVsEmpty(t *testing.T) {
 		t.Fatalf("absent guard must be null, got:\n%s", out)
 	}
 }
+
+func TestCleanCellBalancesNestedAnnotations(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"a flat annotation", "`core` (custody registration)", "core"},
+		{"an annotation containing parentheses", "`core` (custody registration (Oban-delivered))", "core"},
+		{"two annotations, one nested", "`core` (trust) (no machine: an insert (not a transition))", "core"},
+		{"deep nesting", "ops (a (b (c)) d)", "ops"},
+		{"an unclosed annotation swallows the rest", "ingest (a note that never closes", "ingest"},
+		{"a stray close paren is ordinary text", "ingest ) more", "ingest ) more"},
+		{"no annotation at all", "ingest", "ingest"},
+		{"annotation only", "(all annotation)", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := CleanCell(tc.in); got != tc.want {
+				t.Fatalf("CleanCell(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCellNamesWithNestedAnnotations(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{"single-identifier annotation still denotes", "`AuditEvent` (trust)", []string{"AuditEvent", "trust"}},
+		{"a nested annotation denotes nothing extra", "`AuditEvent` (trust (owning domain))", []string{"AuditEvent"}},
+		{"nested prose never leaks a name", "ingest (the batch_rows site MOVED to ops (2026))", []string{"ingest"}},
+		{"a fan-out head is still split on plus", "core + risk (both react)", []string{"core", "risk"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := CellNames(tc.in)
+			if len(got) != len(tc.want) {
+				t.Fatalf("CellNames(%q) = %v, want %v", tc.in, got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("CellNames(%q) = %v, want %v", tc.in, got, tc.want)
+				}
+			}
+		})
+	}
+}

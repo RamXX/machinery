@@ -156,3 +156,55 @@ func TestEventCellsNoTableCarriesNoObligation(t *testing.T) {
 		t.Fatalf("a non-event table carries no obligation: %v", g.Errs)
 	}
 }
+
+// An annotation may itself contain parentheses. Stripping only up to the first
+// ")" left a dangling ")" glued to the participant name, so a perfectly
+// well-formed cell resolved to nothing and the row failed with "annotations
+// only in parentheses" while the annotation WAS in parentheses.
+func TestEventCellsNestedAnnotationsResolve(t *testing.T) {
+	cases := []struct {
+		name string
+		row  string
+		errs bool
+	}{
+		{
+			name: "a nested annotation on the consumer",
+			row:  "| paid | app | gw (delivery lane (durable)) | Order.id | at-least-once | none | Order.id |\n",
+		},
+		{
+			name: "a nested annotation on the producer",
+			row:  "| paid | app (the write path (one tx)) | gw | Order.id | at-least-once | none | Order.id |\n",
+		},
+		{
+			name: "two annotations, the second nested",
+			row:  "| paid | app | gw (lane) (no machine: an insert (not a transition)) | Order.id | at-least-once | none | Order.id |\n",
+		},
+		{
+			name: "a cell that is annotation all the way down still errors",
+			row:  "| paid | app | (nothing but (an annotation)) | Order.id | at-least-once | none | Order.id |\n",
+			errs: true,
+		},
+		{
+			name: "an unresolvable name behind a nested annotation still errors",
+			row:  "| paid | billing (the biller (v2)) | gw | Order.id | at-least-once | none | Order.id |\n",
+			errs: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := eventCellFixture(t, fullEventHeader+tc.row)
+			if tc.errs {
+				if len(g.Errs) == 0 {
+					t.Fatal("expected an error, got none")
+				}
+				return
+			}
+			if len(g.Errs) != 0 {
+				t.Fatalf("a balanced annotation must resolve: %v", g.Errs)
+			}
+			if g.Counts["event-contract participants resolved"] != 2 {
+				t.Fatalf("both participants must resolve, counted %d", g.Counts["event-contract participants resolved"])
+			}
+		})
+	}
+}

@@ -317,7 +317,56 @@ type MdTable struct {
 	RowLines []string
 }
 
-var parenRe = regexp.MustCompile(`\([^)]*\)`)
+// stripAnnotations removes every parenthesized annotation from a cell,
+// BALANCING the parentheses: an annotation that itself contains parentheses
+// ("core (custody registration (Oban-delivered))") is one annotation, not a
+// prefix of one plus a stray ")" left behind to make the participant name
+// unresolvable. An annotation that is never closed swallows the rest of the
+// cell, which is the same reading: everything from the first top-level "(" is
+// annotation. A ")" with no "(" open is ordinary text and survives.
+func stripAnnotations(cell string) string {
+	var b strings.Builder
+	depth := 0
+	for _, r := range cell {
+		switch {
+		case r == '(':
+			depth++
+		case r == ')' && depth > 0:
+			depth--
+		case depth == 0:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// annotationGroups returns the CONTENT of each top-level parenthesized
+// annotation, balanced the same way. An unclosed group yields the rest of the
+// cell, so a caller sees the text it would otherwise silently ignore.
+func annotationGroups(cell string) []string {
+	var out []string
+	depth, start := 0, 0
+	for i, r := range cell {
+		switch r {
+		case '(':
+			if depth == 0 {
+				start = i + 1
+			}
+			depth++
+		case ')':
+			if depth == 1 {
+				out = append(out, cell[start:i])
+			}
+			if depth > 0 {
+				depth--
+			}
+		}
+	}
+	if depth > 0 {
+		out = append(out, cell[start:])
+	}
+	return out
+}
 
 // splitRowCells splits a markdown table row into cells, honoring the GFM
 // `\|` escape (a literal pipe inside a cell). Mirrors the previous
@@ -453,7 +502,7 @@ func FindCol(header []string, names ...string) int {
 // CleanCell mirrors machine_lint._clean_cell: strip backticks + parentheticals.
 func CleanCell(cell string) string {
 	cell = strings.ReplaceAll(cell, "`", "")
-	cell = parenRe.ReplaceAllString(cell, "")
+	cell = stripAnnotations(cell)
 	return strings.TrimSpace(cell)
 }
 
@@ -482,8 +531,7 @@ func CellNames(cell string) []string {
 			add(ids[0])
 		}
 	}
-	for _, p := range parenRe.FindAllString(cell, -1) {
-		inner := strings.Trim(p, "()")
+	for _, inner := range annotationGroups(cell) {
 		ids := identRe.FindAllString(inner, -1)
 		if len(ids) == 1 && strings.TrimSpace(inner) == ids[0] {
 			add(ids[0])
