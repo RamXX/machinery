@@ -364,6 +364,43 @@ func checkOneEmbed(g *Gate, d embedDirective) {
 			}
 		}
 	}
+	// A copy carries the SOURCE's rows, so carrying one of them twice is
+	// drift the subset and complete claims both miss: subset asks only that
+	// every row matches some source row, and complete only that every source
+	// row is present. A dogfooded shard held one mitigation row twice, under
+	// both claims, in silence, and the row counts the shard's prose quotes
+	// were wrong by one. Warn tier: the duplicate may be mid-edit, and which
+	// occurrence to drop is the author's call.
+	counted := map[string]int{}
+	var dupOrder []string
+	for _, er := range rows {
+		if er.rowLocal {
+			continue // a localized row is this shard's own, not a copy
+		}
+		key := strings.Join(er.cells, "\x00")
+		if counted[key] == 0 {
+			dupOrder = append(dupOrder, key)
+		}
+		counted[key]++
+	}
+	for _, key := range dupOrder {
+		n := counted[key]
+		if n < 2 {
+			continue
+		}
+		cells := strings.Split(key, "\x00")
+		inSource := 0
+		for _, src := range srcRows {
+			if rowMatches(cells, src, nil) {
+				inSource++
+			}
+		}
+		if n <= inSource {
+			continue // the source itself carries it that many times
+		}
+		g.Warns = append(g.Warns, fmt.Sprintf("%s: row %s appears %d times here but %d time(s) in the source; a copy carries the source's rows, so one occurrence is a duplicate (drop it, or mark it '(shard-local: <reason>)' if this shard means to repeat it)",
+			where, ir.Repr(clipText(firstCell(cells))), n, inSource))
+	}
 	if complete {
 		g.Count("complete claims")
 		for _, src := range srcRows {

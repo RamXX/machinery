@@ -149,14 +149,15 @@ func checkClauseCompleteness(g *Gate, design string) {
 				g.Count("single-clause waivers")
 				continue
 			}
-			g.Warns = append(g.Warns, loc+": guard `"+name+"` states a compound contract ("+ir.Repr(strings.ToLower(m[2]))+" in "+ir.Repr(clipStatement(stmt))+") and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'")
+			g.Warns = append(g.Warns, loc+": guard `"+name+"` states a compound contract ("+ir.Repr(strings.ToLower(m[2]))+" in "+ir.Repr(clipText(stmt))+") and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'")
 		}
 	}
 }
 
-// clipStatement shortens a contract statement for a finding: enough to read
-// the compound wording in context, never a whole paragraph in one warn line.
-func clipStatement(s string) string {
+// clipText shortens a quoted excerpt for a finding: enough to recognize what
+// is meant, never a whole paragraph on one warn line. Shared by every finding
+// that quotes an author's cell back to them.
+func clipText(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
 	const max = 90
 	if len([]rune(s)) <= max {

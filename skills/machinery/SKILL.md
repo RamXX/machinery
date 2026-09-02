@@ -997,7 +997,10 @@ line before the copied table:
 ```
 
 `subset` claims every row here is byte-identical to a source row; `complete` claims every source row
-the filter selects is here; each is independently declarable. A row the shard genuinely adapts marks
+the filter selects is here; each is independently declarable. A row copied TWICE warns on its own:
+subset only asks that each row match some source row and complete only that each source row be
+present, so neither notices a repeat, and the shard's own row counts then quietly disagree with the
+root's. A row the shard genuinely adapts marks
 what differs with `(shard-local: <reason>)`, in the first cell to exempt the whole row or in one cell
 to exempt that cell alone, and the rest of the row is still held. Unmarked tables carry no
 obligation, so adoption is per table; but a marker that cannot be resolved (missing source, a

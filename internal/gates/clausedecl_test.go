@@ -203,12 +203,12 @@ func TestNamedUnitCols(t *testing.T) {
 	}
 }
 
-func TestClipStatement(t *testing.T) {
+func TestClipText(t *testing.T) {
 	long := strings.Repeat("x", 200)
-	if got := clipStatement(long); len([]rune(got)) != 93 {
+	if got := clipText(long); len([]rune(got)) != 93 {
 		t.Fatalf("clip length = %d, want 93", len([]rune(got)))
 	}
-	if got := clipStatement("  a   b\nc  "); got != "a b c" {
+	if got := clipText("  a   b\nc  "); got != "a b c" {
 		t.Fatalf("clip whitespace = %q", got)
 	}
 }

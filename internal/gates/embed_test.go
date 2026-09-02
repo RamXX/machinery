@@ -339,3 +339,68 @@ func TestEmbedFromModelRendering(t *testing.T) {
 		t.Fatal("stale schema copy not flagged")
 	}
 }
+
+// A copy carries the SOURCE's rows, so carrying one of them twice is drift
+// both claims miss: subset only asks that every row match SOME source row,
+// and complete only that every source row be present. A dogfooded shard held
+// one row twice, under both claims, in silence.
+func TestEmbedDuplicateRow(t *testing.T) {
+	cases := []struct {
+		name  string
+		rows  string
+		warns bool
+	}{
+		{
+			name:  "a faithful copy warns about nothing",
+			rows:  allRows,
+			warns: false,
+		},
+		{
+			name:  "a row copied twice warns",
+			rows:  allRows + "\n| markPaid | payments | orders | at-least-once |",
+			warns: true,
+		},
+		{
+			name: "a row the shard localized is its own, not a duplicate",
+			rows: allRows + "\n| markPaid (shard-local: this lane re-keys it) | payments | orders | at-least-once |",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := embedFixture(t, goodMarker, tc.rows)
+			dup := false
+			for _, w := range g.Warns {
+				if strings.Contains(w, "appears 2 times here but 1 time(s) in the source") {
+					dup = true
+				}
+			}
+			if dup != tc.warns {
+				t.Fatalf("duplicate warning = %v, want %v (warns: %v)", dup, tc.warns, g.Warns)
+			}
+			if len(g.Errs) != 0 {
+				t.Fatalf("no case here is an error: %v", g.Errs)
+			}
+		})
+	}
+}
+
+// The source itself may legitimately carry the same row twice (two lanes with
+// identical cells); a copy carrying it twice is then faithful.
+func TestEmbedDuplicateAllowedWhenTheSourceRepeatsIt(t *testing.T) {
+	design := t.TempDir()
+	src := "# Source\n\n| event | producer | consumer | delivery |\n|---|---|---|---|\n" +
+		"| request | orders | payments | at-least-once |\n" +
+		"| request | orders | payments | at-least-once |\n"
+	mustWrite(t, filepath.Join(design, "SOURCE.md"), src)
+	body := "# Shard\n\n" + goodMarker + "\n\n" +
+		"| event | producer | consumer | delivery |\n|---|---|---|---|\n" +
+		"| request | orders | payments | at-least-once |\n" +
+		"| request | orders | payments | at-least-once |\n"
+	mustWrite(t, filepath.Join(design, "SHARD.md"), body)
+	g := CheckEmbeds(design)
+	for _, w := range g.Warns {
+		if strings.Contains(w, "appears") {
+			t.Fatalf("a copy matching a repeated source row is faithful: %v", g.Warns)
+		}
+	}
+}
