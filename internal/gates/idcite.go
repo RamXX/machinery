@@ -77,6 +77,16 @@ func loadCommittedIDs(design string) (ids map[string]bool, tags map[string]bool)
 		if err != nil {
 			return nil //nolint:nilerr // keep walking; an unreadable entry mints no ids
 		}
+		rel, rerr := filepath.Rel(design, path)
+		if rerr != nil {
+			rel = path
+		}
+		if ignoredHere(design, rel) {
+			if fi.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		if fi.IsDir() || !strings.HasSuffix(fi.Name(), ".oracle.md") {
 			return nil
 		}
@@ -129,12 +139,18 @@ func CheckIDCitations(design string) *Gate {
 		if err != nil {
 			return err
 		}
-		if fi.IsDir() {
-			return nil
-		}
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
 			rel = path
+		}
+		if ignoredHere(design, rel) {
+			if fi.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if fi.IsDir() {
+			return nil
 		}
 		if idciteSkips(rel) || !idciteScannable(fi.Name()) {
 			return nil

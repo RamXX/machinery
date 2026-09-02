@@ -126,7 +126,19 @@ design/
   attestations.yaml         # the attested halves themselves: claim id, attestor, covered artifacts + content hashes, held by Gv (see Attestation evidence)
   DECISIONS.md              # dated binding decisions; required once interrogation starts (see Operating discipline)
   STATE.md                  # session ledger for multi-session runs (see "Session ledger")
+  .machineryignore          # optional: paths under the design tree that are not design (see below)
 ```
+
+`machinery check` reads every markdown and yaml file under the design tree, which is what catches a
+design document nobody registered. When the tree also carries something that is NOT authored design
+(a spike project's fetched dependencies under `experiments/`, a vendored library), list it in
+`.machineryignore` at the design root rather than moving the evidence out of the tree: one
+gitignore-shaped pattern per line, `#` comments, patterns relative to the design root. A pattern
+with no `/` matches any path segment (`deps`); a pattern with a `/` matches the path from the root
+and, when it names a directory, everything under it (`experiments/spikes/*/deps`); `*` stays inside
+one segment, `**` crosses. There are no negations. Every design-tree walker honours it (house style,
+duplicate tables, citations, embeds, `machinery sweep`), and Gl's `checked:` line reports how many
+paths it ignored, so the ignoring is never invisible. Never list a real design artifact.
 
 ## Phases and gates
 

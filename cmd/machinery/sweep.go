@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/RamXX/machinery/internal/gates"
 )
 
 // machinery sweep: the propagation sweep, productized (S18 of the dogfood systemic
@@ -90,12 +92,20 @@ func sweepRun(name, design string, contextN int) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
-			return nil
-		}
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
 			rel = path
+		}
+		// the design's own .machineryignore: a sweep must cover exactly what
+		// the gates cover, or "every mention" means two different things
+		if gates.DesignIgnores(design, rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
 		}
 		if sweepSkipsPath(rel) || !sweepTextFile(d.Name()) {
 			return nil

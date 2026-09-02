@@ -63,6 +63,16 @@ func markdownFiles(design string) []string {
 			// siblings; the gates that own those files report the read error
 			return nil //nolint:nilerr // keep walking; readFileOrErr reports unreadable files
 		}
+		rel, rerr := filepath.Rel(design, path)
+		if rerr != nil {
+			rel = path
+		}
+		if ignoredHere(design, rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		if !d.IsDir() && strings.HasSuffix(d.Name(), ".md") {
 			out = append(out, path)
 		}

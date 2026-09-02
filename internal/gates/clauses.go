@@ -84,12 +84,18 @@ func checkClauseDrift(g *Gate, design string) {
 		if err != nil {
 			return nil //nolint:nilerr // keep walking; the audit covers what is readable
 		}
-		if fi.IsDir() {
-			return nil
-		}
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
 			rel = path
+		}
+		if ignoredHere(design, rel) {
+			if fi.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if fi.IsDir() {
+			return nil
 		}
 		if idciteSkips(rel) || !idciteScannable(fi.Name()) {
 			return nil
