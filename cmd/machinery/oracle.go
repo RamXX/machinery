@@ -27,7 +27,7 @@ func newOracleCmd() *cobra.Command {
 	diff := c.Flags().Bool("diff", false,
 		"classify the churn against the committed oracles instead of writing: new, deleted, and modified stable ids, with rename-shaped pairs called out; the output IS the affected-test list of the revision protocol")
 	against := c.Flags().String("against", "",
-		"with --diff: read the baseline oracles at this git ref (`git show <ref>:<path>`) instead of from the working tree, so the affected-test list survives a regeneration that has already been written")
+		"with --diff: read the baseline oracles at this git ref (git show <ref>:<path>) instead of from the working tree, so the affected-test list survives a regeneration that has already been written")
 	c.RunE = func(cmd *cobra.Command, args []string) error {
 		if *against != "" && !*diff {
 			err := fmt.Errorf("oracle_gen: --against names a baseline for --diff; pass --diff too (without it there is nothing to compare)")
