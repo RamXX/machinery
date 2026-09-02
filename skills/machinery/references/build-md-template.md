@@ -379,8 +379,20 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   impl exists, every committed oracle row the declared guard governs owes one
   suffixed falsifying-clause id per active clause in the test corpus, and the
   wholesale conformance parse does not discharge them (they are what the
-  table cannot derive). Declare clauses only where an artifact
-  enumerates them; a single-clause guard gains nothing from the ceremony.
+  table cannot derive). A single-clause guard gains nothing from the
+  ceremony, and nothing asks it to declare.
+- The reverse obligation is checked too, at the warnings tier: Gd reads every
+  named-unit row of kind `guard` and warns when the row's CONTRACT STATEMENT
+  (the sentence carrying `iff`, else the cell's first sentence) is a
+  conjunction or a disjunction (`and`, `or`, `any`, `either`, "all of",
+  "one of", whole words, case-insensitive) and the row declares no
+  `CLAUSES{...}` at all. A compound guard with no declaration is a clause
+  list nothing holds, which is how a recorded narrowing reaches four
+  artifacts and misses the fifth. Answer it by declaring the vocabulary or,
+  when the wording is idiomatic rather than compound ("at or after"), by
+  marking the row `(single-clause: <reason>)`; a waiver naming no reason
+  warns like any other unreasoned waiver in the suite. Rationale prose after
+  the contract statement is narration and is not read.
 - Event consumption rows may declare `READS{field, ...}` beside the
   backticked event name; every declared field must ride some event-table
   row for that event, which is the payload-sufficiency drift check. A design

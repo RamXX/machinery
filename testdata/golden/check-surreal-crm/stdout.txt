@@ -52,7 +52,13 @@
   warn   BUILD.md:973: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
   warn   BUILD.md:1158: T-SESS-35 is a positional row citation; rows renumber, so cite the stable id instead
   warn   BUILD.md:1160: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
-  checked: 2 citations resolved, 24 files scanned, 272 committed oracle ids
+  warn   machines/Deal.matrix.md:13: guard `guardCanAdvance` states a compound contract ('and' in 'true iff pendingStage is the next forward stage AND actor may write AND amountCents>=0') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  warn   machines/Deal.matrix.md:14: guard `guardCanWin` states a compound contract ('and' in 'true iff evt supplies a closeDate AND actor may write AND amountCents>=0') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  warn   machines/Deal.matrix.md:15: guard `guardCanLose` states a compound contract ('and' in 'true iff actor may write AND amountCents>=0') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  warn   machines/Task.matrix.md:14: guard `guardCanComplete` states a compound contract ('and' in 'true iff source is non-terminal AND actor may write') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  warn   machines/Task.matrix.md:15: guard `guardCanCancel` states a compound contract ('and' in 'true iff source is non-terminal AND actor may write') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  warn   machines/Task.matrix.md:16: guard `guardCanReassign` states a compound contract ('and' in "true iff new assignee is inside the assigner's VisibilityScope AND actor is Manager/Admin ...") and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  checked: 2 citations resolved, 24 files scanned, 272 committed oracle ids, 31 guard rows read for clause completeness
 == Gl-ledger  session ledgers + house style ==
   checked: 24 files style-scanned
   ok

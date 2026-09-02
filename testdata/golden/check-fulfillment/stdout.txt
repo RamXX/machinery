@@ -46,7 +46,10 @@
   warn   BUILD.md:166: T-ORDE-16 is a positional row citation; rows renumber, so cite the stable id instead
   warn   BUILD.md:167: T-OUTB-01 is a positional row citation; rows renumber, so cite the stable id instead
   warn   BUILD.md:167: T-OUTB-02 is a positional row citation; rows renumber, so cite the stable id instead
-  checked: 3 citations resolved, 20 files scanned, 138 committed oracle ids
+  warn   machines/Order.matrix.md:13: guard `guardCanConfirm` states a compound contract ('and' in 'true iff the order has line items and `totalCents` matches their sum') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  warn   machines/Payment.matrix.md:19: guard `isErrRetryable` states a compound contract ('or' in 'true iff the gateway error is a 5xx or a timeout (never a rejection)') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  warn   machines/Shipment.matrix.md:16: guard `isErrRetryable` states a compound contract ('or' in 'true iff the carrier error is a 5xx or a timeout') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  checked: 3 citations resolved, 20 files scanned, 138 committed oracle ids, 29 guard rows read for clause completeness
 == Gl-ledger  session ledgers + house style ==
   checked: 20 files style-scanned
   ok

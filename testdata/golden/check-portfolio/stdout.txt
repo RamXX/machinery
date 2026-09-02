@@ -14,8 +14,10 @@
   note   Portfolio.machine.json: state reverted always-list is fully guarded; liveness rests on the declared exhaustiveness: prior is set by every setPending action to the review stage the operation departed from; its codomain is exactly the four PortfolioStatus values, so one guarded branch per stage is total
   checked: 3 machines, 33 transitions, 3 tla-generable, 3 oracles fresh, 31 named units covered, 1 states relying on unproven _exhaustive liveness
 == Gd-idcite  design-side stable-id citations ==
-  checked: 65 citations resolved, 19 files scanned, 33 committed oracle ids, 3 row-count claims beside tables
-  ok
+  warn   machines/Portfolio.matrix.md:11: guard `canDecide` states a compound contract ('or' in 'true iff the acting role is Manager or Admin') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  warn   machines/Portfolio.matrix.md:12: guard `canReopen` states a compound contract ('or' in 'true iff the acting role is Manager or Admin') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  warn   machines/Portfolio.matrix.md:16: guard `isRetriable` states a compound contract ('or' in 'true iff the commit error is a transient conflict or busy store') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
+  checked: 65 citations resolved, 19 files scanned, 33 committed oracle ids, 3 row-count claims beside tables, 14 guard rows read for clause completeness
 == Gl-ledger  session ledgers + house style ==
   checked: 4 self-review lines, 2 dated decision entries, 19 files style-scanned
   ok

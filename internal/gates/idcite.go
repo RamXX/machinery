@@ -197,6 +197,9 @@ func CheckIDCitations(design string) *Gate {
 	// S17: clause-declared guards hold every line naming them to their
 	// clause vocabulary.
 	checkClauseDrift(g, design)
+	// S17 completeness: a compound guard that declares NO vocabulary is the
+	// declaration the drift check never gets to arm.
+	checkClauseCompleteness(g, design)
 	// S2 stage one: declared event reads must ride some payload row.
 	checkPayloadReads(g, design)
 	return g
