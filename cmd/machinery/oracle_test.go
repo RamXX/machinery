@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -411,4 +412,34 @@ func TestOracleAgainstWithoutDiffIsRefused(t *testing.T) {
 	if !strings.Contains(errB.String(), "pass --diff too") {
 		t.Fatalf("stderr %q", errB.String())
 	}
+}
+
+func TestGitHelpersDegradeCleanly(t *testing.T) {
+	t.Run("realPath falls back to the path it was given", func(t *testing.T) {
+		missing := filepath.Join(t.TempDir(), "no-such-dir")
+		if got := realPath(missing); got != missing {
+			t.Fatalf("realPath(%q) = %q, want the input back", missing, got)
+		}
+	})
+	t.Run("gitMessage renders a non-exec error", func(t *testing.T) {
+		if got := gitMessage(errors.New("  boom  ")); got != "boom" {
+			t.Fatalf("gitMessage = %q, want %q", got, "boom")
+		}
+	})
+	t.Run("gitShowOracle refuses a path outside the repository", func(t *testing.T) {
+		root := t.TempDir()
+		outside := filepath.Join(t.TempDir(), "Thing.oracle.md")
+		if _, err := gitShowOracle(root, "HEAD", outside); err == nil {
+			t.Fatal("a path outside the repository must fail loudly")
+		}
+	})
+	t.Run("gitRootOf refuses a directory outside a repository", func(t *testing.T) {
+		if _, err := exec.LookPath("git"); err != nil {
+			t.Skip("git not available")
+		}
+		// a temp dir is not inside the machinery checkout
+		if _, err := gitRootOf(t.TempDir()); err == nil {
+			t.Skip("the temp directory happens to sit inside a repository")
+		}
+	})
 }

@@ -89,3 +89,40 @@ func TestEmbedRefreshFailsLoudlyWithNoMarkers(t *testing.T) {
 		t.Fatalf("stdout %q", outB.String())
 	}
 }
+
+func TestEmbedRefreshReportsASkippedMarker(t *testing.T) {
+	outB, errB, codes := withCapturedIO(t)
+	d := t.TempDir()
+	shard := "<!-- machinery:embed from=\"GONE.md\" table=\"a,b\" claims=\"subset\" -->\n" +
+		"| a | b |\n|---|---|\n| 1 | 2 |\n"
+	if err := os.WriteFile(filepath.Join(d, "SHARD.md"), []byte(shard), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := embedRefreshRun(d, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(outB.String(), "skipped:") {
+		t.Fatalf("stdout %q does not report the skip", outB.String())
+	}
+	if len(*codes) == 0 || (*codes)[0] != 1 {
+		t.Fatalf("a skipped marker must exit 1: %v", *codes)
+	}
+	if !strings.Contains(errB.String(), "--gate ge") {
+		t.Fatalf("stderr %q does not point at the gate", errB.String())
+	}
+}
+
+func TestOrphanNames(t *testing.T) {
+	cases := []struct{ name, key, want string }{
+		{"a single-column key", "alpha", "alpha"},
+		{"an event key names its participants", "job.done\x00ops\x00core\x00core (sse)", "job.done (ops -> core)"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := orphanNames([]string{tc.key})
+			if len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("orphanNames = %v, want [%q]", got, tc.want)
+			}
+		})
+	}
+}

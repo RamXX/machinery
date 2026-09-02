@@ -341,3 +341,54 @@ func TestRefreshLeavesADuplicatedCopyAlone(t *testing.T) {
 		t.Fatalf("the duplicate did not survive untouched:\n%s", got)
 	}
 }
+
+func TestRefreshRefusesAnUnresolvableSelector(t *testing.T) {
+	cases := []struct {
+		name    string
+		source  string
+		wantSub string
+	}{
+		{
+			name:    "no source table has the columns",
+			source:  "# root\n\n| other | columns |\n|---|---|\n| a | b |\n",
+			wantSub: "resolves to 0 source tables",
+		},
+		{
+			name:    "two source tables have them",
+			source:  keyedSource + "\nand again\n\n| name | note |\n|---|---|\n| `alpha` | a second table |\n",
+			wantSub: "resolves to 2 source tables",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d := refreshDesign(t, tc.source,
+				"<!-- machinery:embed from=\"ARCHITECTURE.md\" table=\"name,note\" claims=\"subset\" -->\n"+
+					"| name | note |\n|---|---|\n| `alpha` | STALE |\n")
+			reports, changed, err := RefreshEmbeds(d, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(changed) != 0 {
+				t.Fatalf("an unresolvable selector rewrote the document: %v", changed)
+			}
+			if !strings.Contains(reports[0].Problem, tc.wantSub) {
+				t.Fatalf("problem = %q, want it to name %q", reports[0].Problem, tc.wantSub)
+			}
+		})
+	}
+}
+
+func TestSortReportsIsDeterministic(t *testing.T) {
+	rs := []RefreshReport{
+		{File: "b.md", From: "y.md"},
+		{File: "a.md", From: "z.md"},
+		{File: "a.md", From: "a.md"},
+	}
+	SortReports(rs)
+	want := []string{"a.md:a.md", "a.md:z.md", "b.md:y.md"}
+	for i, r := range rs {
+		if got := r.File + ":" + r.From; got != want[i] {
+			t.Fatalf("report %d = %q, want %q", i, got, want[i])
+		}
+	}
+}
