@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -25,7 +26,7 @@ func TestOracleRefusesLintFailingMachine(t *testing.T) {
 		"Idle":{"on":{"GO":{"target":["Done","Other"]}}},
 		"Done":{"type":"final"},
 		"Other":{"type":"final"}}}`)
-	_ = oracleRun(d, false)
+	_ = oracleRun(d, false, "")
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -48,7 +49,7 @@ func TestOracleTagCollisionIsError(t *testing.T) {
 	writeMachine(t, d, "DealAggregate.machine.json", `{"id":"dealAggregate","initial":"Lead","states":{
 		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}},"_refusal":{"advance":"fixture: the command boundary refuses when canAdvance is false"}},
 		"Closed":{"type":"final"}}}`)
-	_ = oracleRun(d, false)
+	_ = oracleRun(d, false, "")
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -66,7 +67,7 @@ func TestOracleTagOverrideDisambiguates(t *testing.T) {
 	writeMachine(t, d, "DealAggregate.machine.json", `{"id":"dealAggregate","_oracle_tag":"DEALAGG","initial":"Lead","states":{
 		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}},"_refusal":{"advance":"fixture: the command boundary refuses when canAdvance is false"}},
 		"Closed":{"type":"final"}}}`)
-	if err := oracleRun(d, false); err != nil {
+	if err := oracleRun(d, false, ""); err != nil {
 		t.Fatalf("oracleRun: %v (stdout %q)", err, out.String())
 	}
 	if len(*codes) != 0 {
@@ -97,7 +98,7 @@ func TestOracleDirectoryRegeneratesValidPastBroken(t *testing.T) {
 	writeMachine(t, d, "Alpha.machine.json", validMachineA)
 	writeMachine(t, d, "Beta.machine.json", validMachineB)
 	writeMachine(t, d, "Broken.machine.json", `{"id":"broken","initial":`)
-	_ = oracleRun(d, false)
+	_ = oracleRun(d, false, "")
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -123,7 +124,7 @@ func TestOracleSingleFileMode(t *testing.T) {
 	d := t.TempDir()
 	fa := writeMachine(t, d, "Alpha.machine.json", validMachineA)
 	writeMachine(t, d, "Beta.machine.json", validMachineB)
-	if err := oracleRunFiles([]string{fa}, false); err != nil {
+	if err := oracleRunFiles([]string{fa}, false, ""); err != nil {
 		t.Fatalf("oracleRunFiles: %v (stdout %q)", err, out.String())
 	}
 	if len(*codes) != 0 {
@@ -148,7 +149,7 @@ func TestOracleSingleFileReservesSiblingTags(t *testing.T) {
 	writeMachine(t, d, "DealAggregate.machine.json", `{"id":"dealAggregate","initial":"Lead","states":{
 		"Lead":{"on":{"advance":{"target":"Closed","guard":"canAdvance"}},"_refusal":{"advance":"fixture: the command boundary refuses when canAdvance is false"}},
 		"Closed":{"type":"final"}}}`)
-	_ = oracleRunFiles([]string{fa}, false)
+	_ = oracleRunFiles([]string{fa}, false, "")
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -169,7 +170,7 @@ func TestOracleLintFailureSkipsOnlyThatMachine(t *testing.T) {
 		"Idle":{"on":{"GO":{"target":["Done","Other"]}}},
 		"Done":{"type":"final"},
 		"Other":{"type":"final"}}}`)
-	_ = oracleRun(d, false)
+	_ = oracleRun(d, false, "")
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -188,7 +189,7 @@ func TestOracleNonMachineFileArgIsError(t *testing.T) {
 	_, errB, codes := withCapturedIO(t)
 	d := t.TempDir()
 	p := writeMachine(t, d, "notes.txt", "hello")
-	_ = oracleRunFiles([]string{p}, false)
+	_ = oracleRunFiles([]string{p}, false, "")
 	if len(*codes) == 0 || (*codes)[0] != 1 {
 		t.Fatalf("exit codes %v, want [1]", *codes)
 	}
@@ -204,12 +205,12 @@ func TestOracleDiffClassifiesChurn(t *testing.T) {
 		"A":{"on":{"go":{"target":"B"},"stop":{"target":"C"}}},
 		"B":{"type":"final"},
 		"C":{"type":"final"}}}`)
-	_ = oracleRun(d, false)
+	_ = oracleRun(d, false, "")
 	if len(*codes) != 0 {
 		t.Fatalf("generation failed: %v", *codes)
 	}
 	outB.Reset()
-	_ = oracleRun(d, true)
+	_ = oracleRun(d, true, "")
 	if !strings.Contains(outB.String(), "no churn") {
 		t.Fatalf("a fresh oracle must diff clean, got %q", outB.String())
 	}
@@ -223,7 +224,7 @@ func TestOracleDiffClassifiesChurn(t *testing.T) {
 		"B":{"type":"final"},
 		"C":{"type":"final"}}}`)
 	outB.Reset()
-	_ = oracleRun(d, true)
+	_ = oracleRun(d, true, "")
 	out := outB.String()
 	if !strings.Contains(out, "new") || !strings.Contains(out, "deleted") {
 		t.Fatalf("churn must classify as new+deleted, got %q", out)
@@ -244,7 +245,7 @@ func TestOracleDiffRenameShapedChurn(t *testing.T) {
 		"A":{"on":{"go":{"target":"B"}}},
 		"B":{"type":"final"}}}`
 	writeMachine(t, d, "Thing.machine.json", strings.Replace(base, "%s", "", 1))
-	_ = oracleRun(d, false)
+	_ = oracleRun(d, false, "")
 	if len(*codes) != 0 {
 		t.Fatalf("generation failed: %v", *codes)
 	}
@@ -253,7 +254,7 @@ func TestOracleDiffRenameShapedChurn(t *testing.T) {
 	// processes as delete-all-plus-new
 	writeMachine(t, d, "Thing.machine.json", strings.Replace(base, "%s", `"_oracle_tag":"WIDG",`, 1))
 	outB.Reset()
-	_ = oracleRun(d, true)
+	_ = oracleRun(d, true, "")
 	if !strings.Contains(outB.String(), "rename-shaped") {
 		t.Fatalf("identical-content id churn must classify as rename-shaped, got %q", outB.String())
 	}
@@ -287,5 +288,127 @@ func TestTokensEqual(t *testing.T) {
 	}
 	if !strings.Contains(outB.String(), "NOT token-identical") {
 		t.Fatalf("got %q", outB.String())
+	}
+}
+
+// gitInit makes dir a repository with one commit of everything in it. It
+// skips the test when git is unavailable, since --against is a git feature.
+func gitInit(t *testing.T, dir string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"config", "user.email", "t@example.invalid"},
+		{"config", "user.name", "t"},
+		{"add", "-A"},
+		{"-c", "commit.gpgsign=false", "commit", "-q", "-m", "baseline"},
+	} {
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", dir}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+}
+
+func TestOracleDiffAgainstRef(t *testing.T) {
+	outB, errB, codes := withCapturedIO(t)
+	d := t.TempDir()
+	writeMachine(t, d, "Thing.machine.json", `{"id":"thing","initial":"A","states":{
+		"A":{"on":{"go":{"target":"B"},"stop":{"target":"C"}}},
+		"B":{"type":"final"},
+		"C":{"type":"final"}}}`)
+	if err := oracleRun(d, false, ""); err != nil {
+		t.Fatal(err)
+	}
+	gitInit(t, d)
+
+	// the churn: one transition renamed, and the regeneration ALREADY written,
+	// which is exactly the state where plain --diff reports nothing.
+	writeMachine(t, d, "Thing.machine.json", `{"id":"thing","initial":"A","states":{
+		"A":{"on":{"go":{"target":"B"},"pause":{"target":"C"}}},
+		"B":{"type":"final"},
+		"C":{"type":"final"}}}`)
+	outB.Reset()
+	if err := oracleRun(d, false, ""); err != nil {
+		t.Fatal(err)
+	}
+	outB.Reset()
+	if err := oracleRun(d, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(outB.String(), "no churn") {
+		t.Fatalf("after a regeneration, plain --diff sees nothing; got %q", outB.String())
+	}
+	// --against HEAD recovers the affected-test list
+	outB.Reset()
+	if err := oracleRun(d, true, "HEAD"); err != nil {
+		t.Fatalf("oracleRun --against: %v (stderr %q)", err, errB.String())
+	}
+	out := outB.String()
+	if !strings.Contains(out, "new ") || !strings.Contains(out, "deleted ") {
+		t.Fatalf("--against HEAD must classify new+deleted, got %q", out)
+	}
+	if len(*codes) != 0 {
+		t.Fatalf("a clean --against run must not exit non-zero: %v", *codes)
+	}
+}
+
+func TestOracleDiffAgainstRefFailsLoudly(t *testing.T) {
+	cases := []struct {
+		name    string
+		ref     string
+		commit  bool
+		wantSub string
+	}{
+		{name: "unknown ref", ref: "no-such-ref", commit: true, wantSub: "does not resolve"},
+		{name: "path absent at the ref", ref: "HEAD", commit: false, wantSub: "at HEAD"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, errB, codes := withCapturedIO(t)
+			d := t.TempDir()
+			writeMachine(t, d, "Thing.machine.json", `{"id":"thing","initial":"A","states":{
+				"A":{"on":{"go":{"target":"B"}}},
+				"B":{"type":"final"}}}`)
+			if tc.commit {
+				if err := oracleRun(d, false, ""); err != nil {
+					t.Fatal(err)
+				}
+			}
+			gitInit(t, d)
+			if !tc.commit {
+				// the oracle exists in the working tree but not at the ref
+				if err := oracleRun(d, false, ""); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := oracleRun(d, true, tc.ref); err == nil {
+				t.Fatal("a baseline that cannot be read must fail loudly")
+			}
+			if len(*codes) == 0 || (*codes)[0] != 1 {
+				t.Fatalf("exit codes %v, want [1]", *codes)
+			}
+			if !strings.Contains(errB.String(), tc.wantSub) {
+				t.Fatalf("stderr %q does not name %q", errB.String(), tc.wantSub)
+			}
+		})
+	}
+}
+
+func TestOracleAgainstWithoutDiffIsRefused(t *testing.T) {
+	_, errB, codes := withCapturedIO(t)
+	c := newOracleCmd()
+	c.SilenceUsage, c.SilenceErrors = true, true
+	c.SetArgs([]string{t.TempDir(), "--against", "HEAD"})
+	if err := c.Execute(); err == nil {
+		t.Fatal("--against without --diff must be refused")
+	}
+	if len(*codes) == 0 || (*codes)[0] != 1 {
+		t.Fatalf("exit codes %v, want [1]", *codes)
+	}
+	if !strings.Contains(errB.String(), "pass --diff too") {
+		t.Fatalf("stderr %q", errB.String())
 	}
 }

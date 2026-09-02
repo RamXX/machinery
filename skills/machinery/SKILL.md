@@ -934,7 +934,12 @@ machinery designs change after code exists. The protocol:
 2. Rerun `modelith lint`, `machinery check`, and `machinery oracle`.
 3. Run `machinery oracle <design>/machines --diff`: it classifies the churn against the committed
    oracles (new, deleted, and modified stable ids, with rename-shaped pairs called out) without
-   writing anything. That output IS the affected-test list for the implementer.
+   writing anything. That output IS the affected-test list for the implementer. Step 2 destroys
+   that baseline: once the regeneration is written, the working-tree oracles ARE the fresh ones and
+   `--diff` reports "no churn". Add `--against <git-ref>` to read the baseline at a ref instead
+   (`machinery oracle <design>/machines --diff --against HEAD`, or the pre-edit commit), which
+   recovers the list after the fact and is the form to prefer; a ref or a path that does not exist
+   there fails loudly rather than reporting an empty list.
 4. Any machine whose states are persisted (see the placement table) MUST get a state-migration note
    in BUILD.md when a state is renamed, split, or removed: a mapping table from old persisted values
    to new states, or an explicit drain rule for in-flight instances.

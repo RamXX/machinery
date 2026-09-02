@@ -497,6 +497,9 @@ machinery baseline <design> --impl .  # brownfield Stage 1: propose baseline rul
 machinery verify-formal <your-design> # regenerate + TLC-check the proofs (needs Java)
 machinery oracle <dir|files...>       # regenerate transition oracles (a directory, or named machine files;
                                       #   valid machines regenerate past a broken sibling)
+machinery oracle <dir> --diff \        # classify the churn instead of writing; --against reads the
+  --against <git-ref>                 #   baseline at a git ref, so the affected-test list survives
+                                      #   a regeneration that is already written
 machinery sweep <name> <design>       # list every hand-written mention of a unit/guard/event/knob
 machinery embed refresh <design>      # re-copy every machinery:embed table from its source
                                       #   (--dry-run to report without writing)

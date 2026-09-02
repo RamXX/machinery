@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -22,9 +26,17 @@ func newOracleCmd() *cobra.Command {
 	}
 	diff := c.Flags().Bool("diff", false,
 		"classify the churn against the committed oracles instead of writing: new, deleted, and modified stable ids, with rename-shaped pairs called out; the output IS the affected-test list of the revision protocol")
+	against := c.Flags().String("against", "",
+		"with --diff: read the baseline oracles at this git ref (`git show <ref>:<path>`) instead of from the working tree, so the affected-test list survives a regeneration that has already been written")
 	c.RunE = func(cmd *cobra.Command, args []string) error {
+		if *against != "" && !*diff {
+			err := fmt.Errorf("oracle_gen: --against names a baseline for --diff; pass --diff too (without it there is nothing to compare)")
+			fmt.Fprintln(stderrW, err)
+			exitFunc(1)
+			return err
+		}
 		if len(args) == 0 {
-			return oracleRun(".", *diff)
+			return oracleRun(".", *diff, *against)
 		}
 		// One directory, or one-or-more machine files; never a mix, so a typo
 		// in a file name cannot silently widen into a directory sweep.
@@ -36,9 +48,9 @@ func newOracleCmd() *cobra.Command {
 		}
 		switch {
 		case dirs == 1 && len(args) == 1:
-			return oracleRun(args[0], *diff)
+			return oracleRun(args[0], *diff, *against)
 		case dirs == 0:
-			return oracleRunFiles(args, *diff)
+			return oracleRunFiles(args, *diff, *against)
 		default:
 			err := fmt.Errorf("oracle_gen: pass one machines directory or one-or-more *.machine.json files, not a mix")
 			fmt.Fprintln(stderrW, err)
@@ -49,7 +61,7 @@ func newOracleCmd() *cobra.Command {
 	return c
 }
 
-func oracleRun(mdir string, diff bool) error {
+func oracleRun(mdir string, diff bool, against string) error {
 	entries, err := os.ReadDir(mdir)
 	if err != nil {
 		fmt.Fprintf(stdoutW, "no *.machine.json under %s\n", mdir)
@@ -68,7 +80,7 @@ func oracleRun(mdir string, diff bool) error {
 		exitFunc(1)
 		return fmt.Errorf("no *.machine.json under %s", mdir)
 	}
-	return oracleRunFiles(files, diff)
+	return oracleRunFiles(files, diff, against)
 }
 
 // oracleRunFiles regenerates the oracles for the named machine files. A
@@ -78,7 +90,7 @@ func oracleRun(mdir string, diff bool) error {
 // that shape). The run exits 1 when anything was skipped, so CI still fails
 // loudly; the difference is that every machine's own oracle is as fresh as
 // its own source allows.
-func oracleRunFiles(files []string, diff bool) error {
+func oracleRunFiles(files []string, diff bool, against string) error {
 	type mach struct {
 		path string
 		m    *ir.Value
@@ -138,6 +150,25 @@ func oracleRunFiles(files []string, diff bool) error {
 			report(fmt.Sprintf("oracle_gen: stable-id tag %s is derived for %s; set _oracle_tag on all but one to disambiguate", tag, strings.Join(owners, " and ")))
 		}
 	}
+	// under --diff --against the baseline is the oracle set AT A GIT REF, not
+	// the working tree. Resolve the repository and the ref ONCE, before any
+	// classification: a bad ref must fail the whole run loudly, never produce
+	// a per-file "new oracle" line that reads like real churn.
+	var baseRoot string
+	if diff && against != "" {
+		root, rerr := gitRootOf(filepath.Dir(files[0]))
+		if rerr != nil {
+			fmt.Fprintln(stderrW, "oracle_gen: "+rerr.Error())
+			exitFunc(1)
+			return rerr
+		}
+		if _, verr := gitShowText(root, against, ""); verr != nil {
+			fmt.Fprintln(stderrW, "oracle_gen: "+verr.Error())
+			exitFunc(1)
+			return verr
+		}
+		baseRoot = root
+	}
 	// pass 3: generate for every machine that came through clean. Under
 	// --diff nothing is written: the fresh render is classified against the
 	// committed oracle instead, mechanizing step 3 of the revision protocol
@@ -150,6 +181,16 @@ func oracleRunFiles(files []string, diff bool) error {
 		out := replaceExt(mc.path, ".machine.json", ".oracle.md")
 		body := oracle.Render(mc.m, mc.path)
 		if diff {
+			if against != "" {
+				base, berr := gitShowOracle(baseRoot, against, out)
+				if berr != nil {
+					fmt.Fprintln(stderrW, "oracle_gen: "+berr.Error())
+					exitFunc(1)
+					return berr
+				}
+				churned += diffOneOracleBody(filepath.Base(out), base, true, body)
+				continue
+			}
 			churned += diffOneOracle(out, body)
 			continue
 		}
@@ -162,7 +203,11 @@ func oracleRunFiles(files []string, diff bool) error {
 		fmt.Fprintf(stdoutW, "generated %s  (%d transition rows)\n", filepath.Base(out), cnt)
 	}
 	if diff && churned == 0 && len(failures) == 0 {
-		fmt.Fprintf(stdoutW, "no churn: every committed oracle matches its machine\n")
+		if against != "" {
+			fmt.Fprintf(stdoutW, "no churn: every machine renders exactly what %s carries\n", against)
+		} else {
+			fmt.Fprintf(stdoutW, "no churn: every committed oracle matches its machine\n")
+		}
 	}
 	if len(failures) > 0 {
 		err := fmt.Errorf("oracle_gen: %d machine(s) failed; the valid ones were regenerated", len(failures))
@@ -223,13 +268,21 @@ func oracleDiffRows(body string) map[string]oracleDiffRow {
 // matches a new id's exactly, the id churn a rename produces with no
 // behavioral change). Returns the number of churn lines printed.
 func diffOneOracle(path, fresh string) int {
-	name := filepath.Base(path)
 	committedBody, err := os.ReadFile(path)
-	if err != nil {
+	return diffOneOracleBody(filepath.Base(path), string(committedBody), err == nil, fresh)
+}
+
+// diffOneOracleBody classifies the churn between a baseline oracle body and
+// the fresh render. The baseline is the working-tree file under plain --diff
+// and the file AT A GIT REF under --against; the classification is identical,
+// which is the point: the affected-test list must not depend on whether the
+// author has already written the regeneration.
+func diffOneOracleBody(name, committedBody string, haveBaseline bool, fresh string) int {
+	if !haveBaseline {
 		fmt.Fprintf(stdoutW, "== %s\n  new oracle: not committed yet; every row is a new test\n", name)
 		return 1
 	}
-	committed := oracleDiffRows(string(committedBody))
+	committed := oracleDiffRows(committedBody)
 	freshRows := oracleDiffRows(fresh)
 	var added, deleted, modified []string
 	for id := range freshRows {
@@ -347,4 +400,91 @@ func countSubstr(s, sub string) int {
 		}
 	}
 	return n
+}
+
+// --- the --against baseline: oracle bodies read at a git ref ---
+
+// gitBaselineTimeout bounds every git invocation the baseline reader makes.
+// A hung git must fail the run, not stall a CI job forever.
+const gitBaselineTimeout = 20 * time.Second
+
+// gitRootOf resolves the repository that owns dir, failing loudly when there
+// is none: --against reads history, and a design outside a repository has
+// none to read.
+func gitRootOf(dir string) (string, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve %s: %w", dir, err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), gitBaselineTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "-C", abs, "rev-parse", "--show-toplevel")
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "GIT_PAGER=cat", "GIT_TERMINAL_PROMPT=0")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("--against needs a git repository, and %s is not inside one (git: %s)", abs, gitMessage(err))
+	}
+	return realPath(strings.TrimSpace(string(out))), nil
+}
+
+// realPath resolves symlinks so a path and the repository root git reports are
+// comparable. On macOS a temporary directory is /var/... to the process and
+// /private/var/... to git, and a repository-relative path computed across that
+// difference is a "../../.." escape git refuses.
+func realPath(p string) string {
+	if resolved, err := filepath.EvalSymlinks(p); err == nil {
+		return resolved
+	}
+	return p
+}
+
+// gitShowText runs `git show <ref>:<rel>`, or verifies the ref alone when rel
+// is empty. Both failures are loud and name what could not be read.
+func gitShowText(root, ref, rel string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitBaselineTimeout)
+	defer cancel()
+	args := []string{"-C", root, "rev-parse", "--verify", "--quiet", ref + "^{commit}"}
+	what := "git ref " + ir.Repr(ref) + " does not resolve in " + root
+	if rel != "" {
+		args = []string{"-C", root, "show", ref + ":" + rel}
+		what = "no " + rel + " at " + ref + " (the path did not exist there)"
+	}
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "GIT_PAGER=cat", "GIT_TERMINAL_PROMPT=0")
+	out, err := cmd.Output()
+	if err != nil {
+		if msg := gitMessage(err); msg != "" {
+			return "", fmt.Errorf("%s; git says: %s", what, msg)
+		}
+		return "", errors.New(what)
+	}
+	return string(out), nil
+}
+
+// gitShowOracle reads one oracle file as it stood at ref.
+func gitShowOracle(root, ref, path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve %s: %w", path, err)
+	}
+	rel, err := filepath.Rel(root, realPath(filepath.Dir(abs)))
+	if err == nil {
+		rel = filepath.Join(rel, filepath.Base(abs))
+	}
+	if err != nil {
+		return "", fmt.Errorf("%s is not inside the repository at %s", path, root)
+	}
+	return gitShowText(root, ref, filepath.ToSlash(rel))
+}
+
+// gitMessage renders git's own stderr when it wrote any, so a finding says
+// what git said instead of only "exit status 128". An empty message means git
+// failed silently (`rev-parse --quiet` does), and the caller's own sentence is
+// then the whole finding.
+func gitMessage(err error) string {
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		return strings.TrimSpace(string(ee.Stderr))
+	}
+	return strings.TrimSpace(err.Error())
 }
