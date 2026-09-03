@@ -11,21 +11,29 @@ import (
 )
 
 const (
-	diagnosticProcessFloodToken      = "machinery-diagnostic-process-flood"
+	diagnosticProcessOverflowToken   = "machinery-diagnostic-process-overflow"
 	diagnosticProcessDescendantToken = "machinery-diagnostic-process-descendant"
 	diagnosticProcessHoldToken       = "machinery-diagnostic-process-hold"
 	diagnosticProcessWarningToken    = "machinery-diagnostic-process-warning"
 )
 
-func TestRunCommandBoundsInfiniteOutputAndTimeout(t *testing.T) {
-	setDiagnosticProcessTestBounds(t, 100*time.Millisecond, 100*time.Millisecond)
-	output, err := runCommand(os.Args[0], true, "-test.run=^TestDiagnosticProcessHelper$", "--", diagnosticProcessFloodToken)
-	if err == nil || !strings.Contains(err.Error(), "timed out after 100ms") || !strings.Contains(err.Error(), "process tree was terminated") {
-		t.Fatalf("unbounded diagnostic process diagnostic = %v", err)
+func TestRunCommandBoundsOutput(t *testing.T) {
+	setDiagnosticProcessTestBounds(t, 5*time.Second, 100*time.Millisecond)
+	output, err := runCommand(os.Args[0], true, "-test.run=^TestDiagnosticProcessHelper$", "--", diagnosticProcessOverflowToken)
+	if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("process output exceeded %d-byte capture limit", diagnosticCommandOutputLimit)) {
+		t.Fatalf("overflow diagnostic = %v", err)
 	}
 	wantSuffix := fmt.Sprintf("\n[output truncated at %d bytes]\n", diagnosticCommandOutputLimit)
 	if !strings.HasSuffix(output, wantSuffix) || len(output) != diagnosticCommandOutputLimit+len(wantSuffix) {
 		t.Fatalf("bounded diagnostic output length/suffix = %d/%q", len(output), output[len(output)-min(len(output), 80):])
+	}
+}
+
+func TestRunCommandBoundsTimeout(t *testing.T) {
+	setDiagnosticProcessTestBounds(t, 100*time.Millisecond, 100*time.Millisecond)
+	_, err := runCommand(os.Args[0], true, "-test.run=^TestDiagnosticProcessHelper$", "--", diagnosticProcessHoldToken)
+	if err == nil || !strings.Contains(err.Error(), "timed out after 100ms") || !strings.Contains(err.Error(), "process tree was terminated") {
+		t.Fatalf("timeout diagnostic = %v", err)
 	}
 }
 
@@ -67,16 +75,9 @@ func TestDiagnosticProcessHelper(t *testing.T) {
 		return
 	}
 	switch os.Args[len(os.Args)-1] {
-	case diagnosticProcessFloodToken:
-		block := []byte(strings.Repeat("x", 32*1024))
-		for {
-			if _, err := os.Stdout.Write(block); err != nil {
-				os.Exit(0)
-			}
-			if _, err := os.Stderr.Write(block); err != nil {
-				os.Exit(0)
-			}
-		}
+	case diagnosticProcessOverflowToken:
+		_, _ = os.Stdout.Write([]byte(strings.Repeat("x", diagnosticCommandOutputLimit+1)))
+		os.Exit(0)
 	case diagnosticProcessDescendantToken:
 		command := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestDiagnosticProcessHelper$", "--", diagnosticProcessHoldToken)
 		command.Stdout, command.Stderr = os.Stdout, os.Stderr
