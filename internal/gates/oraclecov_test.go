@@ -2,6 +2,7 @@ package gates
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -39,6 +40,19 @@ func writeCovFixture(t *testing.T, files map[string]string) (design, impl string
 		}
 		writeSuiteFile(t, filepath.Join(design, name), content)
 	}
+	// Coverage fixtures exercise oracle-to-test binding, not orphan-artifact
+	// behavior. Keep every oracle's source half present unless a test
+	// explicitly removes it (as the reverse-inventory regression does).
+	for name := range files {
+		if !strings.HasPrefix(name, "machines/") || !strings.HasSuffix(name, ".oracle.md") {
+			continue
+		}
+		stem := strings.TrimSuffix(strings.TrimPrefix(name, "machines/"), ".oracle.md")
+		machineName := "machines/" + stem + ".machine.json"
+		if _, hasMachine := files[machineName]; !hasMachine {
+			writeSuiteFile(t, filepath.Join(design, machineName), `{"id":"fixture","initial":"A","states":{"A":{},"B":{}}}`)
+		}
+	}
 	return design, impl
 }
 
@@ -46,8 +60,7 @@ func TestCheckOracleCoverageClean(t *testing.T) {
 	design, impl := writeCovFixture(t, map[string]string{
 		"machines/Thing.machine.json": `{"id": "thing", "initial": "A", "states": {"A": {}, "B": {}}}`,
 		"machines/Thing.oracle.md":    covOracleMD,
-		"impl/thing_test.go": "package thing\n\n// keyed on the oracle stable ids\n" +
-			"// T-THIN-01_THIN-aaa111 and THIN-bbb222 are exercised here\n",
+		"impl/thing_test.go":          "package thing\n\nfunc TestOracle(t *testing.T) { cases := []string{\"THIN-aaa111\", \"THIN-bbb222\"}; _ = cases }\n",
 	})
 	g := CheckOracleCoverage(design, impl)
 	if len(g.Errs) != 0 || len(g.Drift) != 0 {
@@ -61,12 +74,31 @@ func TestCheckOracleCoverageClean(t *testing.T) {
 	}
 }
 
+func TestCheckOracleCoverageRejectsAndIgnoresOrphanOracle(t *testing.T) {
+	design, impl := writeCovFixture(t, map[string]string{
+		"machines/Thing.machine.json": `{"id": "thing", "initial": "A", "states": {"A": {}, "B": {}}}`,
+		"machines/Thing.oracle.md":    covOracleMD,
+		"machines/Ghost.oracle.md":    covOracleMD,
+		"impl/thing_test.go":          "package thing\n\nfunc TestOracle(t *testing.T) { cases := []string{\"THIN-aaa111\", \"THIN-bbb222\"}; _ = cases }\n",
+	})
+	if err := os.Remove(filepath.Join(design, "machines", "Ghost.machine.json")); err != nil {
+		t.Fatal(err)
+	}
+	g := CheckOracleCoverage(design, impl)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "Ghost.oracle.md: orphan oracle has no corresponding Ghost.machine.json") {
+		t.Fatalf("Gt legitimized an orphan oracle: %v", g.Errs)
+	}
+	if g.Counts["machines"] != 1 || g.Counts["oracle rows"] != 2 {
+		t.Fatalf("orphan oracle contributed coverage counts: %+v", g.Counts)
+	}
+}
+
 func TestCheckOracleCoverageMissingIDs(t *testing.T) {
 	design, impl := writeCovFixture(t, map[string]string{
 		"machines/Thing.oracle.md": covOracleMD,
 		// THIN-bbb222 appears only hyphen-glued: X-THIN-bbb222 is a
 		// different id, not a citation
-		"impl/thing_test.go": "package thing\n\n// THIN-aaa111 and X-THIN-bbb222\n",
+		"impl/thing_test.go": "package thing\n\nfunc TestOracle(t *testing.T) { cases := []string{\"THIN-aaa111\", \"X-THIN-bbb222\"}; _ = cases }\n",
 	})
 	g := CheckOracleCoverage(design, impl)
 	joined := strings.Join(g.Errs, "\n")
@@ -84,7 +116,7 @@ func TestCheckOracleCoverageIgnoresProductionSources(t *testing.T) {
 	design, impl := writeCovFixture(t, map[string]string{
 		"machines/Thing.oracle.md": covOracleMD,
 		"impl/thing.go":            "package thing\n\n// THIN-bbb222\n",
-		"impl/thing_test.go":       "package thing\n\n// THIN-aaa111\n",
+		"impl/thing_test.go":       "package thing\n\nfunc TestOracle(t *testing.T) { const covered = \"THIN-aaa111\"; _ = covered }\n",
 	})
 	g := CheckOracleCoverage(design, impl)
 	if !strings.Contains(strings.Join(g.Errs, "\n"), "1 of 2 stable ids appear in no test file (THIN-bbb222)") {
@@ -208,7 +240,7 @@ func TestGtRustProductionTextIsNotTestCorpus(t *testing.T) {
 	design2, impl2 := writeCovFixture(t, map[string]string{
 		"machines/Thing.oracle.md": covOracleMD,
 		"impl/src/machine.rs": "pub fn transition() {}\n\n" +
-			"#[cfg(test)]\nmod tests {\n    // exercises THIN-aaa111 and THIN-bbb222\n}\n",
+			"#[cfg(test)]\nmod tests {\n    #[test]\n    fn oracle_rows() { let ids = [\"THIN-aaa111\", \"THIN-bbb222\"]; assert_eq!(ids.len(), 2); }\n}\n",
 	})
 	if g2 := CheckOracleCoverage(design2, impl2); len(g2.Errs) != 0 {
 		t.Fatalf("ids in the cfg(test) span must cover: %v", g2.Errs)
@@ -220,8 +252,8 @@ func TestGtRustProductionTextIsNotTestCorpus(t *testing.T) {
 func TestCheckOracleCoverageRustTestShapes(t *testing.T) {
 	design, impl := writeCovFixture(t, map[string]string{
 		"machines/Thing.oracle.md": covOracleMD,
-		"impl/tests/foo.rs":        "// exercises T-THIN-01_THIN-aaa111\n",
-		"impl/src/lib.rs":          "pub fn f() {}\n\n#[cfg(test)]\nmod tests {\n    // THIN-bbb222\n}\n",
+		"impl/tests/foo.rs":        "#[test]\nfn row_a() { assert_eq!(\"THIN-aaa111\", \"THIN-aaa111\"); }\n",
+		"impl/src/lib.rs":          "pub fn f() {}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn row_b() { assert_eq!(\"THIN-bbb222\", \"THIN-bbb222\"); }\n}\n",
 	})
 	g := CheckOracleCoverage(design, impl)
 	if len(g.Errs) != 0 {
@@ -395,7 +427,7 @@ func TestCheckOracleCoverageHonorsContractIgnore(t *testing.T) {
 func TestCheckOracleCoverageScansMjsTestFiles(t *testing.T) {
 	design, impl := writeCovFixture(t, map[string]string{
 		"machines/Thing.oracle.md": covOracleMD,
-		"impl/thing.test.mjs":      "// THIN-aaa111 and THIN-bbb222\n",
+		"impl/thing.test.mjs":      "test.each([\"THIN-aaa111\", \"THIN-bbb222\"])(\"%s\", id => expect(id).toBeTruthy())\n",
 	})
 	g := CheckOracleCoverage(design, impl)
 	if len(g.Errs) != 0 {

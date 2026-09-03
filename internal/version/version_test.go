@@ -55,6 +55,21 @@ func TestStripRemovesStampLinesOnly(t *testing.T) {
 	if got := Strip(plain); got != plain {
 		t.Errorf("Strip(plain) = %q", got)
 	}
+	// Executable content with a trailing marker is not a stamp. Removing this
+	// line would let a committed TLC config weaken a proof while still comparing
+	// fresh against the generated source.
+	injected := "CHECK_DEADLOCK FALSE \\* machinery-version: v0.0.1\n"
+	if got := Strip(injected); got != injected {
+		t.Errorf("Strip(executable marker) = %q, want unchanged", got)
+	}
+	if got := StampOf(injected); got != "" {
+		t.Errorf("StampOf(executable marker) = %q, want empty", got)
+	}
+	// Extra text makes even a comment-prefixed line non-canonical.
+	trailing := `\* machinery-version: v0.0.1 CHECK_DEADLOCK FALSE` + "\n"
+	if got := Strip(trailing); got != trailing {
+		t.Errorf("Strip(trailing content) = %q, want unchanged", got)
+	}
 }
 
 func TestStampOf(t *testing.T) {

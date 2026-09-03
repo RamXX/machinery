@@ -94,7 +94,7 @@ func readsCompleteArmed(archText string) bool {
 // and nil when the design is unarmed. Gd reads it to stand its opt-in warn
 // tier down for those events.
 func armedReadsEvents(design string) map[string]bool {
-	archText := readOrEmpty(filepath.Join(design, "ARCHITECTURE.md"))
+	archText := readDesignOrEmpty(design, filepath.Join(design, "ARCHITECTURE.md"))
 	if !readsCompleteArmed(archText) {
 		return nil
 	}
@@ -137,7 +137,7 @@ func checkReadsComplete(g *Gate, design, archText string) {
 			g.Errs = append(g.Errs, "an armed event-contract table has no event column; the completeness tier keys READS declarations by event name, so this table can never satisfy it (name the events, or drop the machinery:reads-complete marker)")
 		}
 	}
-	decls := collectReadsLines(design)
+	decls := collectReadsLines(g, design)
 	for _, r := range eventContractRows(archText) {
 		if m := noReadsWaiverRe.FindStringSubmatch(r.Cell("consumer")); m != nil {
 			if strings.TrimSpace(m[1]) == "" {

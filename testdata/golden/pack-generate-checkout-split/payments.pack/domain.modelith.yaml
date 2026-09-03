@@ -4,6 +4,9 @@
 kind: DomainModel
 version: v1
 title: Checkout Split / payments
+glossary:
+  Operator: The fulfillment or payments operator authorized to ship or refund.
+  System: An authenticated subsystem event handler acting without a human surface.
 enums:
   PaymentStatus:
     values:
@@ -40,8 +43,19 @@ entities:
         actor: Operator
     invariants:
       - id: payment-single-capture
-        definition: A payment is captured at most once.
+        statement: A payment is captured at most once.
 invariants:
   []
-scenarios: []
+scenarios:
+  - name: Payment captures at most once
+    description: "Exercises settlement, duplicate capture handling, and the refund path."
+    actors:
+      - System
+      - Operator
+    steps:
+      - "The order `System` requests a `Payment`."
+      - "The processor `System` captures it once; a duplicate capture has no effect."
+      - "An `Operator` refunds the captured `Payment`."
+    invariants_touched:
+      - payment-single-capture
 # foreign entities (owned elsewhere; reference only): Order

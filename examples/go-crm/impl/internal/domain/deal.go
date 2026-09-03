@@ -257,6 +257,10 @@ func (d *Deal) fireRolledBack(evt DealEvent) Effect {
 		d.State = DSWon
 	case d.priorIsLost():
 		d.State = DSLost
+	default:
+		d.recordRoutingError()
+		d.State = DSLost
+		return effect("recordRoutingError")
 	}
 	return Effect{}
 }

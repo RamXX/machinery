@@ -30,6 +30,13 @@ constraint the conductor passes in its prompt.
   and the event-contract table where one exists).
 - `design/machines/*.machine.json`, `design/machines/*.matrix.md`, and the generated
   `design/machines/*.oracle.md`.
+- `design/formal/*.semantics.yaml` and `design/formal/*.composition.yaml`, plus their committed
+  generated `.tla` and `.cfg` artifacts. Also read any strict manual TLA pair: the `.tla` first line
+  is exactly `\* machinery:manual` and a same-basename `.cfg` is mandatory. Unmarked or orphaned
+  manual halves are upstream errors, never files to infer or repair here. Confirm every lifecycle
+  machine has the appropriate semantics annotation and every cross-aggregate obligation has a
+  composition annotation or an explicit reason it needs none before treating the behavior model as
+  complete. `machinery verify-formal` TLC-checks manual pairs but does not regenerate them.
 - When the design carries any relational layer, its generated artifacts (each is opt-in; include
   only those present):
   - **policy** (`policy.relational.yaml` -> `Policy.als`, `Policy.oracle.md`): the authorization
@@ -44,7 +51,8 @@ constraint the conductor passes in its prompt.
     pure link-authorization function; `impl/internal/authz/tenant_oracle_test.go` is the reference
     shape.
 - The target language(s).
-- The `machinery` CLI on PATH (`make install`).
+- The `machinery` CLI on PATH (installed by the one-line installer, or built from this repository
+  with `make build` and invoked as `.bin/machinery`).
 
 Read all of them in full. Read the `machinery` skill's `references/build-md-template.md` and follow its
 section structure exactly.
@@ -126,11 +134,16 @@ template's sections. Fill every section; mark any as N/A only with a stated reas
 ## Run the checker before you return (non-negotiable)
 
 ```
+machinery check design --gate g3
+machinery verify-formal design
 machinery check design
 ```
 
-Gate 4's deterministic part is not optional: fix every finding you can (typically Gx-trace or Gb-plan
-findings against your own tables and plan), and report verbatim any finding you cannot fix because it belongs to an upstream
+First confirm the behavior-model gate and formal suite you received are still green. If Java is
+unavailable, run `machinery verify-formal --gen-only design` explicitly and carry the unchecked
+solver status from `design/STATE.md`; never silently skip the command. Gate 4's deterministic part
+is not optional: fix every finding you can (typically Gx-trace or Gb-plan findings against your own
+tables and plan), and report verbatim any finding you cannot fix because it belongs to an upstream
 artifact. Include the `checked:` counts in your report.
 
 ## Self-check before you return (Gate 4)
@@ -157,7 +170,7 @@ says rather than re-reading for them here.
   bar of tests plus gate together, and the sequential fallback for runtimes that cannot spawn a
   fresh-context test-writer.
 
-Three items on that list are judgments no gate can reach, so record them as rows in
+Four items on that list are judgments no gate can reach, so record the applicable ones as rows in
 `design/attestations.yaml` before you hand back rather than only asserting them in your summary
 (`Gv-attest` holds each row to the content hash of what it covers):
 
@@ -166,6 +179,8 @@ Three items on that list are judgments no gate can reach, so record them as rows
   and asserts, per row, the next state AND the expected actions.
 - `g4.standin-coverage`: for an isolated pack child only, the stand-in section and self-contained
   environment recipe above.
+- `g4.pack-event-discipline`: for a pack child only, every emitted or handled boundary event is in
+  the frozen pack; the implementation plan does not invent an event outside that contract.
 
 Each row carries `claim`, `attestor` (name yourself), `date`, and `covers` with one
 `{path, hash}` per build document you judged (the root plus each shard, in manifest mode). Get the

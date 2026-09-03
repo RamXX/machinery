@@ -1,6 +1,6 @@
 package cli_test
 
-// CommandExecution machine transition oracle. One case per BUILD.md 7.1 T-CMD
+// CommandExecution machine transition oracle. One case per committed oracle
 // row. Source: machines/CommandExecution.matrix.md.
 //
 // The CommandExecution machine has entry actions (Opening: setPhaseOpen,
@@ -11,7 +11,7 @@ package cli_test
 // action CONTAINMENT (firedInOrder): the row's listed actions must fire in order,
 // which tolerates the entry action the matrix omits (for example row 1 lists
 // captureArgs; entering Opening also fires setPhaseOpen). The five terminal-entry
-// rows T-CMD-29..33 are asserted on the Fire that ENTERS the terminal state (that
+// terminal-state contracts are asserted on the Fire that ENTERS the terminal state (that
 // is when record*Exit fires), and also check the exit classification.
 
 import (
@@ -71,8 +71,8 @@ type cmdCase struct {
 	actions []string
 }
 
-func cmdCases() []cmdCase {
-	return []cmdCase{
+func TestCommandExecutionTransitions(t *testing.T) {
+	cs := []cmdCase{
 		// --- Parsing ---
 		{"T-CMD-01_COMM-44671c", withArgs(cmd(cli.CParsing), validArgs), cmdAlways(), cli.COpening, []string{"captureArgs"}},
 		{"T-CMD-02_COMM-6f50f3", withArgs(cmd(cli.CParsing), invalidArgs), cmdAlways(), cli.CValidationFailed, []string{"recordParseError"}},
@@ -115,10 +115,7 @@ func cmdCases() []cmdCase {
 		// --- Rendering ---
 		{"T-CMD-28_COMM-121e81", cmd(cli.CRendering), cmdAlways(), cli.CDone, nil},
 	}
-}
-
-func TestCommandExecutionTransitions(t *testing.T) {
-	for _, tc := range cmdCases() {
+	for _, tc := range cs {
 		t.Run(tc.id, func(t *testing.T) {
 			got := tc.ce.Fire(tc.event)
 			if tc.ce.State != tc.want {
@@ -131,8 +128,8 @@ func TestCommandExecutionTransitions(t *testing.T) {
 	}
 }
 
-// T-CMD-29..33: the five terminal states set the process exit classification via
-// their entry action (record*Exit). Each is asserted on the Fire that ENTERS the
+// The five terminal states set the process exit classification via their entry
+// action (record*Exit). Each is asserted on the Fire that ENTERS the
 // terminal state, checking both the entry action and the exit class.
 func TestCommandExecutionTerminalExits(t *testing.T) {
 	type term struct {

@@ -8,7 +8,7 @@ win_stage: Accepted
 lose_stage: Rejected
 reopen_to: UnderReview
 close_date_on: Accepted
-overlay: { busy: committing, retry: commitRetry, rollback: reverted }
+overlay: { busy: committing, retry: commitRetry, rollback: reverted, fault: routingFault }
 max_retries: 3
 advance_event: advance
 win_event: accept

@@ -1,12 +1,68 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/RamXX/machinery/internal/gates"
 )
+
+func stableAttestationHashes(paths []string) ([]string, error) {
+	files := make([]*stableRegularFile, 0, len(paths))
+	closeFiles := func() error {
+		var errs []error
+		for _, file := range files {
+			errs = append(errs, file.close())
+		}
+		return errors.Join(errs...)
+	}
+	for i, path := range paths {
+		file, err := openStableRegular(path)
+		if err != nil {
+			return nil, errors.Join(err, closeFiles())
+		}
+		for prior := range files {
+			if os.SameFile(files[prior].info, file.info) || strings.EqualFold(files[prior].path, file.path) {
+				return nil, errors.Join(
+					fmt.Errorf("attestation paths %s and %s alias the same file identity", paths[prior], paths[i]),
+					file.close(),
+					closeFiles(),
+				)
+			}
+		}
+		files = append(files, file)
+	}
+	bodies := make([][]byte, len(files))
+	var readErrs []error
+	for i, file := range files {
+		body, err := file.read()
+		bodies[i] = body
+		if err != nil {
+			readErrs = append(readErrs, fmt.Errorf("read %s: %w", paths[i], err))
+		}
+		stableRegularAfterInitialRead(paths[i])
+	}
+	for i, file := range files {
+		if err := file.revalidate(bodies[i]); err != nil {
+			readErrs = append(readErrs, err)
+		}
+	}
+	if err := errors.Join(errors.Join(readErrs...), closeFiles()); err != nil {
+		return nil, err
+	}
+	hashes := make([]string, len(bodies))
+	for i, body := range bodies {
+		sum := sha256.Sum256(body)
+		hashes[i] = "sha256:" + hex.EncodeToString(sum[:])
+	}
+	return hashes, nil
+}
 
 // newAttestCmd is the attestor's side of Gv-attest: it prints the content
 // hash the gate will demand, so nobody hand-rolls a digest the gate then
@@ -26,31 +82,30 @@ func newAttestCmd() *cobra.Command {
 		Args: cobra.ArbitraryArgs,
 	}
 	c.Flags().BoolVar(&listClaims, "claims", false, "print the closed attested-claim vocabulary and exit")
-	c.RunE = func(cmd *cobra.Command, args []string) error {
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		stdout, stderr := output.stdout, output.stderr
 		if listClaims {
 			for _, id := range gates.AttestationClaimIDs() {
-				fmt.Fprintln(stdoutW, id)
+				fmt.Fprintln(stdout, id)
 			}
 			return nil
 		}
 		if len(args) == 0 {
-			fmt.Fprintln(stderrW, "machinery attest: name at least one path to hash, or pass --claims")
-			exitFunc(1)
-			return nil
+			fmt.Fprintln(stderr, "machinery attest: name at least one path to hash, or pass --claims")
+			return commandExit(1)
 		}
-		failed := false
-		for _, path := range args {
-			hash, err := gates.ContentHash(path)
-			if err != nil {
-				fmt.Fprintf(stderrW, "machinery attest: %s\n", err)
-				failed = true
-				continue
-			}
-			fmt.Fprintf(stdoutW, "%s  %s\n", hash, path)
+		hashes, err := stableAttestationHashes(args)
+		if err != nil {
+			fmt.Fprintf(stderr, "machinery attest: %s\n", err)
+			return commandExitBecause(1, err)
 		}
-		if failed {
-			exitFunc(1)
+		var rendered strings.Builder
+		for i, path := range args {
+			fmt.Fprintf(&rendered, "%s  %s\n", hashes[i], path)
 		}
+		fmt.Fprint(stdout, rendered.String())
 		return nil
 	}
 	return c

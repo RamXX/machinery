@@ -205,6 +205,9 @@ func writeFixtureDesign(t *testing.T, root string) string {
 	mustWrite(t, filepath.Join(d, "BUILD.md"), fixtureBuild)
 	mustWrite(t, filepath.Join(d, "machines", "Widget.machine.json"), fixtureMachineJSON)
 	mustWrite(t, filepath.Join(d, "machines", "Widget.matrix.md"), fixtureMatrix)
+	mustMkdir(t, filepath.Join(d, "formal"))
+	mustWrite(t, filepath.Join(d, "formal", "Widget.semantics.yaml"),
+		"machine: widget\npattern: control-flow-only\nreason: The synthetic fixture exercises only control-flow gate behavior.\n")
 	regenOracle(t, d, "Widget")
 	return d
 }
@@ -851,7 +854,7 @@ func TestG4OnlyRunWithUnparseableRuleDoesNotPanic(t *testing.T) {
 	}
 }
 
-func TestG4FollowsDirectorySymlinks(t *testing.T) {
+func TestG4RejectsDirectorySymlinks(t *testing.T) {
 	design, impl := fixture(t)
 	// move the store boundary code outside the impl tree, reachable only via symlink
 	outside := filepath.Join(t.TempDir(), "outside-store")
@@ -868,8 +871,8 @@ func TestG4FollowsDirectorySymlinks(t *testing.T) {
 		t.Skipf("symlink unavailable: %v", err)
 	}
 	g := gates.CheckImports(design, impl)
-	if !containsAny(g.Errs, "undeclared cross-boundary edge widget.store -> widget.app") {
-		t.Errorf("code behind a directory symlink is invisible to G4: errs=%v counts=%v", g.Errs, g.Counts)
+	if !containsAny(g.Errs, "symlink entries are rejected") {
+		t.Errorf("directory symlink did not make the governed source inventory fail closed: errs=%v counts=%v", g.Errs, g.Counts)
 	}
 }
 

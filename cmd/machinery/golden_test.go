@@ -66,13 +66,26 @@ func goldenDir(t *testing.T, caseName string) string {
 	return filepath.Join(repoRootDir(t), "testdata", "golden", caseName)
 }
 
+func privateTestConfigDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 // runBin executes the built binary, returning stdout, stderr, exit code.
 func runBin(t *testing.T, args ...string) (string, string, int) {
+	return runBinWithEnv(t, nil, args...)
+}
+
+func runBinWithEnv(t *testing.T, environment []string, args ...string) (string, string, int) {
 	t.Helper()
 	cmd := exec.CommandContext(t.Context(), goldenBin(t), args...)
-	cmd.Env = os.Environ()
-	if os.Getenv("MACHINERY_CONFIG_DIR") == "" {
-		cmd.Env = append(cmd.Env, "MACHINERY_CONFIG_DIR="+t.TempDir())
+	cmd.Env = environmentWithOverrides(os.Environ(), environment)
+	if environmentValue(cmd.Env, "MACHINERY_CONFIG_DIR") == "" {
+		cmd.Env = environmentWithOverrides(cmd.Env, []string{"MACHINERY_CONFIG_DIR=" + privateTestConfigDir(t)})
 	}
 	var out, errB bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errB
@@ -85,6 +98,32 @@ func runBin(t *testing.T, args ...string) (string, string, int) {
 		t.Fatal(err)
 	}
 	return out.String(), errB.String(), code
+}
+
+func environmentWithOverrides(base, overrides []string) []string {
+	replaced := make(map[string]bool, len(overrides))
+	for _, item := range overrides {
+		key, _, _ := strings.Cut(item, "=")
+		replaced[key] = true
+	}
+	result := make([]string, 0, len(base)+len(overrides))
+	for _, item := range base {
+		key, _, _ := strings.Cut(item, "=")
+		if !replaced[key] {
+			result = append(result, item)
+		}
+	}
+	return append(result, overrides...)
+}
+
+func environmentValue(environment []string, wanted string) string {
+	for i := len(environment) - 1; i >= 0; i-- {
+		key, value, found := strings.Cut(environment[i], "=")
+		if found && key == wanted {
+			return value
+		}
+	}
+	return ""
 }
 
 func compareOrUpdate(t *testing.T, path, got string) {
@@ -270,7 +309,9 @@ func TestGoldenGen(t *testing.T) {
 	root := repoRootDir(t)
 	for _, c := range goldenExamples {
 		t.Run(c.ex, func(t *testing.T) {
-			d := filepath.Join(root, "examples", c.ex, "design")
+			source := filepath.Join(root, "examples", c.ex, "design")
+			d := t.TempDir()
+			copyDirInto(t, source, d)
 			scratch := t.TempDir()
 			machines, _ := filepath.Glob(filepath.Join(d, "machines", "*.machine.json"))
 			for _, mj := range machines {

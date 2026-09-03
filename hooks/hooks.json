@@ -1,9 +1,9 @@
 {
-  "description": "machinery design governance for Claude Code and Codex. Every hook routes through one shim that exits 0 immediately unless the project root has .machinery.json or design/domain.modelith.yaml, so non-machinery repos are never disturbed. PreToolUse denies hand-edits to generated artifacts; PostToolUse records what the session touched; Stop/SubagentStop run the deterministic gates before the turn may end; SessionStart announces the governance contract.",
+  "description": "machinery design governance for Claude Code and Codex. Every hook routes through one shim; an available binary recovers durable project routing after mutable markers disappear, while a missing binary remains a silent no-op only outside managed ancestors. PreToolUse denies hand-edits to generated artifacts; PostToolUse and PostToolUseFailure close exact tracked operations while retaining touched obligations; Stop/SubagentStop run deterministic gates before the turn may end; SessionStart announces the governance contract.",
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch|Bash|bash|Shell|shell",
         "hooks": [
           {
             "type": "command",
@@ -15,7 +15,19 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch|Bash|bash|Shell|shell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/machinery-hook.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch|Bash|bash|Shell|shell",
         "hooks": [
           {
             "type": "command",

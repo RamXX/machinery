@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/RamXX/machinery/internal/checker"
@@ -26,6 +27,8 @@ entities:
     attributes:
       - {name: name, type: string}
 `
+
+const gateRuntimeClosure = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
 
 type ckOpts struct {
 	verdict   string
@@ -50,7 +53,7 @@ func setupChecker(t *testing.T, o ckOpts) (design, projPath, evPath, modelPath s
 	must(t, os.WriteFile(modelPath, []byte(gateModel), 0o644))
 
 	must(t, os.MkdirAll(filepath.Join(design, "checkers", "test"), 0o755))
-	man := "checker: {id: test}\n" +
+	man := "checker: {id: test, runtime_closure: " + gateRuntimeClosure + "}\n" +
 		"projection: {include: [model, invariants, relationships]}\n" +
 		"coverage:\n  claim: [\"priv-*\"]\n" + o.residuals +
 		"evidence:\n  projection_out: checkers/test/projection.json\n  evidence_in: checkers/test/evidence.json\n"
@@ -71,7 +74,7 @@ func setupChecker(t *testing.T, o ckOpts) (design, projPath, evPath, modelPath s
 	hash, err := proj.InputHash()
 	must(t, err)
 
-	ev := checker.Evidence{EvidenceSchema: checker.SchemaVersion, InputHash: hash, Verdict: o.verdict, Coverage: o.coverage, Findings: o.findings}
+	ev := checker.Evidence{EvidenceSchema: checker.SchemaVersion, InputHash: hash, RuntimeClosure: gateRuntimeClosure, Verdict: o.verdict, Coverage: o.coverage, Findings: o.findings}
 	ev.Checker.ID = "test"
 	ev.Checker.Version = "t"
 	evPath = filepath.Join(design, "checkers", "test", "evidence.json")
@@ -132,6 +135,46 @@ func TestGkMissingEvidenceIsError(t *testing.T) {
 	g := onlyGate(t, design)
 	if len(g.Errs) == 0 {
 		t.Fatal("absent evidence must be an ERROR")
+	}
+}
+
+func TestGkRejectsFailedCoverageRowUnderPassVerdict(t *testing.T) {
+	design, _, _, _ := setupChecker(t, ckOpts{
+		verdict: "pass",
+		coverage: []checker.CoverageRow{
+			{Element: "inv:priv-consent", Verdict: "fail"},
+			{Element: "inv:priv-retention", Verdict: "pass"},
+		},
+	})
+	g := onlyGate(t, design)
+	if !hasErr(g, "coverage verdict: fail [inv:priv-consent]") {
+		t.Fatalf("failed coverage row satisfied a passing claim: %v", g.Errs)
+	}
+}
+
+func TestGkRejectsEmptyClaimAndResidualOutsideClaim(t *testing.T) {
+	design, _, _, _ := setupChecker(t, ckOpts{verdict: "pass", coverage: passCoverage()})
+	manifestPath := filepath.Join(design, "checkers", "test.checker.yaml")
+	body := "checker: {id: test, runtime_closure: " + gateRuntimeClosure + "}\nprojection: {include: [model, invariants]}\ncoverage:\n  claim: [\"missing-*\"]\n  residuals:\n    - {id: priv-consent, reason: stale}\nevidence:\n  projection_out: checkers/test/projection.json\n  evidence_in: checkers/test/evidence.json\n"
+	if err := os.WriteFile(manifestPath, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g := onlyGate(t, design)
+	if !hasErr(g, "matched no invariants") || !hasErr(g, "outside the checker's obligation set") {
+		t.Fatalf("empty/stale coverage obligations were accepted: %v", g.Errs)
+	}
+}
+
+func TestLoadManifestRejectsMalformedClaimGlob(t *testing.T) {
+	design, _, _, _ := setupChecker(t, ckOpts{verdict: "pass", coverage: passCoverage()})
+	manifestPath := filepath.Join(design, "checkers", "test.checker.yaml")
+	body := "checker: {id: test, runtime_closure: " + gateRuntimeClosure + "}\nprojection: {include: [model, invariants]}\ncoverage: {claim: ['priv-[']}\nevidence: {projection_out: checkers/test/projection.json, evidence_in: checkers/test/evidence.json}\n"
+	if err := os.WriteFile(manifestPath, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g := onlyGate(t, design)
+	if !hasErr(g, "pattern") || !hasErr(g, "invalid") {
+		t.Fatalf("malformed coverage glob was accepted: %v", g.Errs)
 	}
 }
 
@@ -227,5 +270,49 @@ func TestHasCheckers(t *testing.T) {
 	}
 	if HasCheckers(t.TempDir()) {
 		t.Fatal("HasCheckers should be false with no checkers/ dir")
+	}
+}
+
+func TestExplicitGkWithZeroManifestsBlocks(t *testing.T) {
+	design := t.TempDir()
+	got := RunSelected(design, "", Selection{Run: map[string]bool{"gk": true}, Explicit: true}, RunOptions{})
+	if len(got) != 1 || len(got[0].Errs) != 1 || !strings.Contains(got[0].Errs[0], "no checkers/*.checker.yaml") {
+		t.Fatalf("explicit empty Gk did not block: %+v", got)
+	}
+}
+
+func TestDefaultGkBlocksAfterLastManifestDeleted(t *testing.T) {
+	design, _, _, _ := setupChecker(t, ckOpts{verdict: "pass", coverage: passCoverage()})
+	if err := os.Remove(filepath.Join(design, "checkers", "test.checker.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	sel, err := Select(design, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := RunSelected(design, "", sel, RunOptions{})
+	found := false
+	for _, gate := range got {
+		if strings.Contains(gate.Title, "Gk") && hasErr(gate, "no checkers/*.checker.yaml") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("default suite skipped deleted checker manifest and orphan outputs: %+v", got)
+	}
+}
+
+func TestGkBlocksOrphanCheckerDirectory(t *testing.T) {
+	design, _, _, _ := setupChecker(t, ckOpts{verdict: "pass", coverage: passCoverage()})
+	orphan := filepath.Join(design, "checkers", "old")
+	if err := os.Mkdir(orphan, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(orphan, "projection.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g := onlyGate(t, design)
+	if !hasErr(g, "orphan checker directory") {
+		t.Fatalf("orphan checker output was accepted: %v", g.Errs)
 	}
 }

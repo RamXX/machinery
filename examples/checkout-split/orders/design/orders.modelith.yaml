@@ -6,6 +6,11 @@ description: >
   public shape (its lifecycle enum) is frozen by the pack; everything internal
   is this design's own.
 
+glossary:
+  Customer: "The person who places or cancels an order before payment settlement."
+  Operator: "The fulfillment operator who records a carrier handoff after capture."
+  System: "An authenticated subsystem event handler acting without a human surface."
+
 enums:
   OrderStatus:
     values:
@@ -29,9 +34,17 @@ entities:
       - {name: ship, actor: Operator, preserves: [no-ship-without-capture]}
       - {name: cancel, actor: Customer}
     invariants:
-      - {id: order-total-positive, definition: "An order's total is strictly positive."}
+      - {id: order-total-positive, statement: "An order's total is strictly positive."}
 
 invariants:
-  - {id: no-ship-without-capture, definition: "An order ships only after its payment is captured. Delegated by the parent; enforced structurally: Shipped is reachable only from Paid, and Paid only on the payments subsystem's markPaid event."}
+  - {id: no-ship-without-capture, statement: "An order ships only after its payment is captured. Delegated by the parent; enforced structurally: Shipped is reachable only from Paid, and Paid only on the payments subsystem's markPaid event."}
 
-scenarios: []
+scenarios:
+  - name: Positive order settles before shipment
+    description: "Exercises creation validation and the capture-before-ship lifecycle rule."
+    actors: [Customer, System, Operator]
+    steps:
+      - "A `Customer` places an `Order` with a strictly positive total."
+      - "The payment `System` marks the `Order` paid after capture."
+      - "An `Operator` ships the paid `Order`; an unpaid order would be rejected."
+    invariants_touched: [order-total-positive, no-ship-without-capture]

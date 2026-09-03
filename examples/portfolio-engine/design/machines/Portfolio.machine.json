@@ -6,6 +6,9 @@
     "COMMIT_TIMEOUT": "5000 ms - DuckDB write timeout before a commit attempt is treated as failed",
     "RETRY_BACKOFF": "~200 ms exponential backoff between optimistic-lock retries"
   },
+  "_counters": {
+    "retries": "one budget per portfolio-command instance: each CLI invocation loads one Portfolio, runs one review action and its versioned commit overlay, then discards the machine instance; a later invocation creates a fresh instance with retries initialized to zero"
+  },
   "context": {
     "portfolioId": null,
     "pending": null,
@@ -98,13 +101,16 @@
       }
     },
     "reverted": {
-      "_exhaustive": "prior is set by every setPending action to the review stage the operation departed from; its codomain is exactly the four PortfolioStatus values, so one guarded branch per stage is total",
       "always": [
         { "target": "Proposed", "guard": "priorIsProposed" },
         { "target": "UnderReview", "guard": "priorIsUnderReview" },
         { "target": "Accepted", "guard": "priorIsAccepted" },
-        { "target": "Rejected", "guard": "priorIsRejected" }
+        { "target": "Rejected", "guard": "priorIsRejected" },
+        { "target": "routingFault", "actions": "recordRoutingError" }
       ]
+    },
+    "routingFault": {
+      "type": "final"
     }
   }
 }

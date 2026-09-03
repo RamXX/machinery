@@ -19,22 +19,17 @@ func newPackCmd() *cobra.Command {
 		Short: "Generate the frozen per-subsystem contract packs from decomposition.yaml",
 		Args:  cobra.ExactArgs(1),
 	}
-	gen.RunE = func(cmd *cobra.Command, args []string) error {
-		ids, err := pack.WritePacks(args[0])
+	gen.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		written, err := pack.WritePacksWithMetadata(args[0])
 		if err != nil {
-			fmt.Fprintln(stderrW, err)
-			exitFunc(1)
-			return nil
+			fmt.Fprintln(output.stderr, err)
+			return commandExitBecause(1, err)
 		}
-		packs, err := pack.GeneratePacks(args[0])
-		if err != nil {
-			fmt.Fprintln(stderrW, err)
-			exitFunc(1)
-			return nil
-		}
-		for _, id := range ids {
-			fmt.Fprintf(stdoutW, "generated packs/%s.pack (%d files, hash %.12s)\n",
-				id, len(packs[id]), pack.ContentHash(packs[id]))
+		for _, result := range written {
+			fmt.Fprintf(output.stdout, "generated packs/%s.pack (%d files, hash %.12s)\n",
+				result.ID, result.FileCount, result.Hash)
 		}
 		return nil
 	}
@@ -44,15 +39,16 @@ func newPackCmd() *cobra.Command {
 		Short: "Generate the contract-refinement proof artifacts from packmap.yaml (reconciled)",
 		Args:  cobra.ExactArgs(1),
 	}
-	ref.RunE = func(cmd *cobra.Command, args []string) error {
+	ref.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
 		names, err := pack.WriteRefinement(args[0])
 		if err != nil {
-			fmt.Fprintln(stderrW, err)
-			exitFunc(1)
-			return nil
+			fmt.Fprintln(output.stderr, err)
+			return commandExitBecause(1, err)
 		}
 		for _, n := range names {
-			fmt.Fprintf(stdoutW, "generated formal/%s\n", n)
+			fmt.Fprintf(output.stdout, "generated formal/%s\n", n)
 		}
 		return nil
 	}

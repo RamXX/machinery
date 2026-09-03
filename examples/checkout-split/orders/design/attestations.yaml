@@ -1,0 +1,72 @@
+attestation_version: 1
+attestations:
+  - claim: g2.action-ownership
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
+  - claim: g2.interface-contract-rightness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
+  - claim: g2.placement-rightness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
+  - claim: g2.adoption-closure-discovery
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
+  - claim: g2.event-contract-completeness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
+  - claim: g2.nfr-content
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
+  - claim: g3.guard-semantics
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: machines/Order.machine.json, hash: sha256:31bc66d23446cb85c7227d5e65d6dc22e531edcc4df4d62ddab9ed3f23343913}
+      - {path: machines/Order.matrix.md, hash: sha256:62eeca0a0e06e9ce09118d31474c4f36a8001235763e8333ccf83f71c0eab06c}
+  - claim: g3.invariant-enforcement
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: machines/Order.machine.json, hash: sha256:31bc66d23446cb85c7227d5e65d6dc22e531edcc4df4d62ddab9ed3f23343913}
+      - {path: machines/Order.matrix.md, hash: sha256:62eeca0a0e06e9ce09118d31474c4f36a8001235763e8333ccf83f71c0eab06c}
+  - claim: g3.residual-transitions
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: machines/Order.machine.json, hash: sha256:31bc66d23446cb85c7227d5e65d6dc22e531edcc4df4d62ddab9ed3f23343913}
+      - {path: machines/Order.matrix.md, hash: sha256:62eeca0a0e06e9ce09118d31474c4f36a8001235763e8333ccf83f71c0eab06c}
+  - claim: g3.event-redelivery
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: machines/Order.machine.json, hash: sha256:31bc66d23446cb85c7227d5e65d6dc22e531edcc4df4d62ddab9ed3f23343913}
+      - {path: machines/Order.matrix.md, hash: sha256:62eeca0a0e06e9ce09118d31474c4f36a8001235763e8333ccf83f71c0eab06c}
+  - claim: gt.conformance-test-shape
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: BUILD.md, hash: sha256:04822dd9ab8e3e3386a99082f3bd720cd43d5830fea27c614cfaddd70442fb5a}]
+  - claim: g4.zero-context
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: BUILD.md, hash: sha256:04822dd9ab8e3e3386a99082f3bd720cd43d5830fea27c614cfaddd70442fb5a}]
+  - claim: g4.standin-coverage
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: BUILD.md, hash: sha256:04822dd9ab8e3e3386a99082f3bd720cd43d5830fea27c614cfaddd70442fb5a}]
+  - claim: g4.pack-event-discipline
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: pack/OrdersContract.cfg, hash: sha256:8da015e211cc3be03f608521b0913280f54d65406b4a4f1907f1e4e703a5e2b9}
+      - {path: pack/OrdersContract.machine.json, hash: sha256:e7695de2ddc9d2648674a55213ecc75aea555fb2f4678692c5ba1a157747548f}
+      - {path: pack/OrdersContract.tla, hash: sha256:9ab0ceb250f4cb2408ee90f184c8778171a29c64d7ce00b299de5c7292f53acd}
+      - {path: pack/domain.modelith.yaml, hash: sha256:d8970dcd5be5a1542d882741c3cc18d74a98158992715eebd32edd114bf5af0e}
+      - {path: pack/events.md, hash: sha256:c2fa0dbe132c172473c5391acb7c612569581ecc5f76239dbdf333a1036ae134}
+      - {path: pack/pack.yaml, hash: sha256:88e755cac21cdfee215ab2b8e6e76fccc5d253817fd7c4b8d21a0f279f36dca6}

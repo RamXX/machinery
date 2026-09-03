@@ -18,6 +18,8 @@ CONSTANT MaxRetries
 Open == {"Lead", "Qualified", "Proposal", "Negotiation"}
 Terminal == {"Won", "Lost"}
 Domain == Open \cup Terminal
+Fault == {}
+Resting == Domain \cup Fault
 Overlay == {"persisting", "persistRetry", "rolledBack"}
 None == "none"
 Rank == [Lead |-> 0, Qualified |-> 1, Proposal |-> 2, Negotiation |-> 3, Won |-> 4, Lost |-> 4]
@@ -27,9 +29,9 @@ VARIABLES st, rc, stage, pending, prior, closeSet
 vars == << st, rc, stage, pending, prior, closeSet >>
 
 TypeOK ==
-  /\ st \in (Domain \cup Overlay)
+  /\ st \in (Resting \cup Overlay)
   /\ rc \in 0..MaxRetries
-  /\ stage \in Domain
+  /\ stage \in Resting
   /\ pending \in (Domain \cup {None})
   /\ prior \in (Domain \cup {None})
   /\ closeSet \in BOOLEAN
@@ -85,21 +87,29 @@ RolledBack ==
   /\ st' = prior /\ stage' = prior
   /\ pending' = None /\ prior' = None /\ rc' = 0 /\ closeSet' = closeSet
 
-Domain_Next == StartAdvance \/ StartWin \/ StartLose \/ StartReopen
-Overlay_Next == SaveDone \/ SaveLocked \/ SaveFail \/ RetryExhausted \/ RetryAgain \/ RolledBack
+RollbackFault ==
+  /\ st = "rolledBack" /\ st' \in Fault /\ stage' = st'
+  /\ pending' = None /\ prior' = None /\ rc' = 0 /\ closeSet' = closeSet
+
+FaultStutter == st \in Fault /\ UNCHANGED vars
+
+Domain_Next == StartAdvance \/ StartWin \/ StartLose \/ StartReopen \/ FaultStutter
+Overlay_Next == SaveDone \/ SaveLocked \/ SaveFail \/ RetryExhausted \/ RetryAgain \/ RolledBack \/ RollbackFault
 Next == Domain_Next \/ Overlay_Next
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(Overlay_Next)
 
-Inv_StageValid == stage \in Domain
+Inv_StageValid == stage \in Resting
 Inv_Atomic == (st \in Overlay) => (stage = prior)
-Inv_DomainConsistent == (st \in Domain) => (st = stage /\ pending = None /\ prior = None)
+Inv_DomainConsistent == (st \in Resting) => (st = stage /\ pending = None /\ prior = None)
 Inv_CloseDate == (stage = "Won") => closeSet
 
 StageForward ==
   [][ (stage' # stage) =>
-        \/ Rank[stage'] > Rank[stage]
-        \/ (stage \in Terminal /\ stage' = "Negotiation") ]_stage
+        \/ stage' \in Fault
+        \/ /\ stage \in Domain /\ stage' \in Domain
+           /\ \/ Rank[stage'] > Rank[stage]
+              \/ (stage \in Terminal /\ stage' = "Negotiation") ]_stage
 
-Live_OverlayResolves == (st \in Overlay) ~> (st \in Domain)
+Live_OverlayResolves == (st \in Overlay) ~> (st \in Resting)
 ====

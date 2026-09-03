@@ -1,0 +1,69 @@
+surface_version: 1
+sources:
+  - fulfillment.modelith.yaml action list, walked actor by actor across Customer, Operator, PaymentGateway, and Carrier
+  - ARCHITECTURE.md order API and external-adapter boundaries
+acts:
+  - act: Product.create
+    actor: Operator
+    surface: Admin API POST /v1/catalog/products
+    milestone: M1
+  - act: Product.reprice
+    actor: Operator
+    surface: Admin API PATCH /v1/catalog/products/{sku}/price
+    milestone: M1
+  - act: Inventory.restock
+    actor: Operator
+    surface: Admin API POST /v1/inventory/{sku}/restock
+    milestone: M2
+  - act: Order.place
+    actor: Customer
+    surface: Order API POST /v1/orders
+    milestone: M0
+  - act: Order.cancel
+    actor: Customer
+    surface: Order API POST /v1/orders/{orderId}/cancel
+    milestone: M1
+  - act: LineItem.add
+    actor: Customer
+    surface: Order API POST /v1/orders/{orderId}/items
+    milestone: M1
+  - act: Address.capture
+    actor: Customer
+    surface: Order API POST /v1/orders request body, shippingAddress field
+    milestone: M0
+  - act: Payment.authorize
+    actor: PaymentGateway
+    surface: Payment Service outbound port PaymentGateway.authorize
+    milestone: M3
+  - act: Payment.capture
+    actor: PaymentGateway
+    surface: Payment Service outbound port PaymentGateway.capture
+    milestone: M3
+  - act: Payment.fail
+    actor: PaymentGateway
+    surface: Payment Service gateway response adapter failure result
+    milestone: M3
+  - act: Payment.refund
+    actor: PaymentGateway
+    surface: Payment Service outbound port PaymentGateway.refund
+    milestone: M3
+  - act: Refund.issue
+    actor: PaymentGateway
+    surface: Payment Service compensation handler to PaymentGateway.refund
+    milestone: M3
+  - act: Shipment.dispatch
+    actor: Carrier
+    surface: Shipping Service outbound port Carrier.dispatch
+    milestone: M4
+  - act: Shipment.markInTransit
+    actor: Carrier
+    surface: Shipping Service carrier webhook POST /v1/carrier-events/in-transit
+    milestone: M4
+  - act: Shipment.deliver
+    actor: Carrier
+    surface: Shipping Service carrier webhook POST /v1/carrier-events/delivered
+    milestone: M4
+  - act: Shipment.markLost
+    actor: Carrier
+    surface: Shipping Service carrier webhook POST /v1/carrier-events/lost
+    milestone: M4

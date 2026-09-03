@@ -52,5 +52,6 @@ the design changes, stable ids do not.
 | T-TASK-28 | TASK-0dd646 | persistRetry | always | retriesExhausted | rolledBack | recordRetriesExhausted |
 | T-TASK-29 | TASK-3f585f | rolledBack | always | priorIsOpen | Open | - |
 | T-TASK-30 | TASK-98c3ba | rolledBack | always | priorIsInProgress | InProgress | - |
+| T-TASK-31 | TASK-754183 | rolledBack | always | - | Cancelled | recordRoutingError |
 
-Total transitions (test cases): 30
+Total transitions (test cases): 31

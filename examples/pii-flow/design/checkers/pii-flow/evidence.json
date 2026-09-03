@@ -2,9 +2,10 @@
   "evidence_schema": "1.0",
   "checker": {
     "id": "pii-flow",
-    "version": "souffle"
+    "version": "pii-flow-fixed-point-1"
   },
-  "input_hash": "sha256:6368783b81e5c7a0280190034298c8715d9e90cbc23bf87a1cfbb57ad77de95d",
+  "input_hash": "sha256:06da2492ce48807bc9f38eaae97a48f81cce47e7f92eb7fbc4367901462fc992",
+  "runtime_closure": "sha256:afd225b867fec907e1a80cd31984d54310eb5798d2363c0829d41538c3036129",
   "verdict": "pass",
   "coverage": [
     {

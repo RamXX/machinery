@@ -7,11 +7,17 @@ const toolNames = {
   edit: "Edit",
   patch: "apply_patch",
   apply_patch: "apply_patch",
+  bash: "Bash",
+  shell: "Bash",
 }
 
 function sessionID(value) {
   return value?.sessionID ?? value?.sessionId ?? value?.properties?.sessionID ??
     value?.properties?.sessionId ?? value?.properties?.info?.id ?? "opencode"
+}
+
+function toolUseID(value) {
+  return value?.callID ?? value?.callId ?? value?.toolCallID ?? value?.toolCallId ?? value?.id ?? ""
 }
 
 function toolInput(args = {}) {
@@ -22,20 +28,27 @@ function toolInput(args = {}) {
 }
 
 async function runMachinery($, root, payload) {
+  const failed = (detail) => ({
+    decision: "block",
+    reason: `Machinery governance failed closed: ${detail}. Repair or reinstall the machinery binary before continuing.`,
+  })
   try {
     const result = await $`printf %s ${JSON.stringify(payload)} | machinery hook --root ${root}`
       .quiet()
       .nothrow()
-    if (result.exitCode !== 0) return null
+    if (result.exitCode !== 0) {
+      const stderr = result.stderr?.toString().trim()
+      return failed(stderr || `machinery hook exited ${result.exitCode}`)
+    }
     const stdout = result.stdout.toString().trim()
     if (!stdout) return null
     try {
       return JSON.parse(stdout)
     } catch {
-      return stdout
+      return failed("machinery hook returned malformed JSON")
     }
-  } catch {
-    return null
+  } catch (error) {
+    return failed(error?.message || "machinery binary could not be executed")
   }
 }
 
@@ -85,26 +98,30 @@ export const MachineryPlugin = async ({ client, $, directory, worktree }) => {
       if (!tool) return
       const response = await runMachinery($, root, {
         session_id: sessionID(input),
+		tool_use_id: toolUseID(input),
         cwd: root,
         hook_event_name: "PreToolUse",
         tool_name: tool,
         tool_input: toolInput(output.args),
       })
-      const reason = denial(response)
-      if (reason) throw new Error(reason)
+      const failure = denial(response)
+      if (failure) throw new Error(failure)
     },
 
     "tool.execute.after": async (input, output) => {
       const tool = toolNames[input.tool]
       if (!tool) return
       const args = input.args || output.args || {}
-      await runMachinery($, root, {
+      const response = await runMachinery($, root, {
         session_id: sessionID(input),
+		tool_use_id: toolUseID(input),
         cwd: root,
         hook_event_name: "PostToolUse",
         tool_name: tool,
         tool_input: toolInput(args),
       })
+      const failure = denial(response)
+      if (failure) throw new Error(failure)
     },
 
     event: async ({ event }) => {
@@ -118,15 +135,11 @@ export const MachineryPlugin = async ({ client, $, directory, worktree }) => {
       })
       await recordWarning(client, denial(response) || response?.systemMessage)
       if (response?.decision === "block") {
-        // OpenCode cannot reactivate the agent from session.idle. Clear the
-        // shared touched-file ledger after surfacing this advisory result so
-        // every later idle event does not repeat the same stale warning.
-        await runMachinery($, root, {
-          session_id: id,
-          cwd: root,
-          hook_event_name: "Stop",
-          stop_hook_active: true,
-        })
+        // OpenCode cannot reactivate the agent from session.idle. Retain the
+        // shared touched-file ledger so every later idle event remains blocked
+        // until the underlying check is green, and fail this idle event rather
+        // than acknowledging a stop whose deterministic checks are red.
+        throw new Error(denial(response) || "Blocked by machinery governance.")
       }
     },
   }

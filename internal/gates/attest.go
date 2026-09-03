@@ -28,6 +28,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -36,7 +37,8 @@ import (
 )
 
 // AttestationsFileName is the committed attestation-evidence file under the
-// design; Gv auto-activates on it.
+// design. Gv auto-activates from either this file or phase artifacts that make
+// a vocabulary claim owed, so deleting the evidence cannot delete the gate.
 //
 // One file per DESIGN, not one per gate. The attested halves are halves of
 // the design's own gates, keyed by nothing else (unlike Ga's milestone number
@@ -202,11 +204,22 @@ func AttestationPath(design string) string {
 }
 
 // AttestationActive reports whether the design committed attestation
-// evidence. Like Ga and Gj, the gate activates on its artifact: a design that
-// has not adopted the record is not failed for not having adopted it.
+// evidence. Suite activation additionally uses AttestationOwed.
 func AttestationActive(design string) bool {
-	fi, err := os.Stat(AttestationPath(design))
-	return err == nil && !fi.IsDir()
+	has, err := probeRegularFile(design, AttestationsFileName)
+	return has || err != nil
+}
+
+// AttestationOwed reports whether phase artifacts have made at least one
+// closed-vocabulary judgment due. Gv activates from the obligation, not only
+// from the evidence file: otherwise omitting attestations.yaml omits the gate.
+func AttestationOwed(design string) bool {
+	for _, claim := range attestVocabulary {
+		if claim.owed != nil && claim.owed(design) {
+			return true
+		}
+	}
+	return false
 }
 
 // ContentHash returns the digest the attestation schema records for path, in
@@ -237,7 +250,7 @@ func declaresNeighborStandIns(design string) bool {
 	paths := []string{filepath.Join(design, "BUILD.md")}
 	paths = append(paths, sortedGlobExt(filepath.Join(design, "BUILD"), ".md")...)
 	for _, p := range paths {
-		if strings.Contains(strings.ToLower(readOrEmpty(p)), "neighbor stand-ins") {
+		if strings.Contains(strings.ToLower(readDesignOrEmpty(design, p)), "neighbor stand-ins") {
 			return true
 		}
 	}
@@ -264,11 +277,16 @@ func CheckAttestations(design string) *Gate {
 	g := NewGate("Gv-attest  attestation evidence")
 	g.startOrder()
 	path := AttestationPath(design)
-	if !AttestationActive(design) {
+	has, probeErr := probeRegularFile(design, AttestationsFileName)
+	if probeErr != nil {
+		g.Errs = append(g.Errs, probeErr.Error())
+		return g
+	}
+	if !has {
 		g.Errs = append(g.Errs, "no "+AttestationsFileName+" in the design; the attestation gate was requested but no attested judgment was committed (write "+AttestationsFileName+", or drop gv from the gate list)")
 		return g
 	}
-	rows := parseAttestations(g, path)
+	rows := parseAttestations(g, design, path)
 	if rows == nil {
 		return g
 	}
@@ -280,6 +298,7 @@ func CheckAttestations(design string) *Gate {
 		}
 		seen[row.claim] = true
 		checkAttestationFreshness(g, design, row)
+		checkAttestationSubjects(g, design, row)
 		g.Count("attested claims")
 	}
 	checkAttestationCoverage(g, design, seen)
@@ -287,10 +306,83 @@ func CheckAttestations(design string) *Gate {
 	return g
 }
 
+func buildArtifactPaths(g *Gate, design string) []string {
+	var out []string
+	if ok, err := probeRegularFile(design, "BUILD.md"); err != nil {
+		g.Errs = append(g.Errs, "BUILD.md inventory failed: "+err.Error())
+	} else if ok {
+		out = append(out, "BUILD.md")
+	}
+	paths, _ := strictSortedGlob(g, filepath.Join(design, "BUILD"), "*.md", "build shard")
+	for _, path := range paths {
+		rel, _ := filepath.Rel(design, path)
+		out = append(out, filepath.ToSlash(rel))
+	}
+	return out
+}
+
+func attestationRequiredPaths(g *Gate, design, claim string) []string {
+	var out []string
+	switch {
+	case strings.HasPrefix(claim, "g2."):
+		out = append(out, "ARCHITECTURE.md")
+	case strings.HasPrefix(claim, "g3."):
+		for _, ext := range []string{".machine.json", ".matrix.md"} {
+			paths, _ := strictSortedGlob(g, filepath.Join(design, "machines"), "*"+ext, "attestation subject")
+			for _, path := range paths {
+				rel, _ := filepath.Rel(design, path)
+				out = append(out, filepath.ToSlash(rel))
+			}
+		}
+	case claim == "gt.conformance-test-shape" || claim == "g4.zero-context" || claim == "g4.standin-coverage":
+		out = append(out, buildArtifactPaths(g, design)...)
+	case claim == "ga.review-quality":
+		paths, _ := strictSortedGlob(g, filepath.Join(design, AcceptanceDirName), "*.yaml", "acceptance evidence")
+		for _, path := range paths {
+			rel, _ := filepath.Rel(design, path)
+			out = append(out, filepath.ToSlash(rel))
+		}
+	case claim == "g4.pack-event-discipline":
+		err := filepath.Walk(filepath.Join(design, "pack"), func(path string, fi os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if fi == nil || fi.IsDir() {
+				return nil
+			}
+			if fi.Mode()&os.ModeSymlink != 0 || !fi.Mode().IsRegular() {
+				return fmt.Errorf("%s must be a regular attestation subject", path)
+			}
+			rel, _ := filepath.Rel(design, path)
+			out = append(out, filepath.ToSlash(rel))
+			return nil
+		})
+		if err != nil && !os.IsNotExist(err) {
+			g.Errs = append(g.Errs, "pack attestation subject inventory failed: "+err.Error())
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// checkAttestationSubjects binds each judgment to the artifacts that define
+// its subject. Freshness alone only proves that *some* file did not change.
+func checkAttestationSubjects(g *Gate, design string, row attestRow) {
+	covered := map[string]bool{}
+	for _, cover := range row.covers {
+		covered[filepath.ToSlash(filepath.Clean(filepath.FromSlash(cover.path)))] = true
+	}
+	for _, required := range attestationRequiredPaths(g, design, row.claim) {
+		if !covered[required] {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: %s does not cover required subject %s; this claim cannot be discharged by an unrelated current file", AttestationsFileName, row.claim, ir.Repr(required)))
+		}
+	}
+}
+
 // parseAttestations reads and validates the evidence file's shape. nil means
 // the file could not be trusted; every reason was recorded as an ERROR first.
-func parseAttestations(g *Gate, path string) []attestRow {
-	raw, err := os.ReadFile(path)
+func parseAttestations(g *Gate, design, path string) []attestRow {
+	raw, err := readDesignFile(design, path)
 	if err != nil {
 		g.Errs = append(g.Errs, AttestationsFileName+" is unreadable: "+err.Error())
 		return nil
@@ -433,20 +525,22 @@ func escapesDesign(rel string) bool {
 func checkAttestationFreshness(g *Gate, design string, row attestRow) {
 	for _, cover := range row.covers {
 		full := filepath.Join(design, filepath.FromSlash(cover.path))
-		fi, err := os.Stat(full)
-		switch {
-		case err != nil:
-			g.Errs = append(g.Errs, fmt.Sprintf("%s: %s covers %s, which the design does not carry; an attestation over an absent artifact covers nothing", AttestationsFileName, row.claim, ir.Repr(cover.path)))
-			continue
-		case fi.IsDir():
-			g.Errs = append(g.Errs, fmt.Sprintf("%s: %s covers %s, which is a directory; a content hash binds to one file's bytes (list the files)", AttestationsFileName, row.claim, ir.Repr(cover.path)))
-			continue
-		}
-		current, err := ContentHash(full)
+		data, err := readDesignFile(design, full)
 		if err != nil {
-			g.Errs = append(g.Errs, fmt.Sprintf("%s: %s is unreadable: %s", AttestationsFileName, ir.Repr(cover.path), err.Error()))
+			switch {
+			case os.IsNotExist(err):
+				g.Errs = append(g.Errs, fmt.Sprintf("%s: %s covers %s, which the design does not carry; an attestation over an absent artifact covers nothing", AttestationsFileName, row.claim, ir.Repr(cover.path)))
+			case strings.Contains(err.Error(), "is a directory"):
+				g.Errs = append(g.Errs, fmt.Sprintf("%s: %s covers %s, which is a directory; a content hash binds to one file's bytes (list the files)", AttestationsFileName, row.claim, ir.Repr(cover.path)))
+			case strings.Contains(err.Error(), "symlink"):
+				g.Errs = append(g.Errs, fmt.Sprintf("%s: %s is reached through a symlink; attestations bind files physically owned by the design tree", AttestationsFileName, ir.Repr(cover.path)))
+			default:
+				g.Errs = append(g.Errs, fmt.Sprintf("%s: %s is unreadable: %s", AttestationsFileName, ir.Repr(cover.path), err.Error()))
+			}
 			continue
 		}
+		sum := sha256.Sum256(data)
+		current := attestHashPrefix + hex.EncodeToString(sum[:])
 		if current != cover.hash {
 			g.Errs = append(g.Errs, fmt.Sprintf("%s: %s is STALE: %s changed since it was attested (recorded %s, current %s); re-read the artifact, judge it again, and update the row with 'machinery attest %s'",
 				AttestationsFileName, row.claim, cover.path, cover.hash, current, filepath.ToSlash(full)))
@@ -459,15 +553,16 @@ func checkAttestationFreshness(g *Gate, design string, row attestRow) {
 // checkAttestationCoverage reports every vocabulary claim this design has
 // reached the phase for and left unattested.
 //
-// A warning, not an error, and deliberately so. The evidence file is opt-in
-// and adopted mid-design; making the first commit of it fail the gate for
+// A warning, not an error, and deliberately so. The evidence file may be
+// adopted incrementally; making its first populated commit fail the gate for
 // every claim not yet re-judged would make adopting the record more expensive
 // than not adopting it, which is the one outcome that guarantees the attested
 // halves stay in conversation. What blocks is a record that is WRONG (an
 // unknown claim, an unattributed row, a dangling referent, a stale hash): a
-// misleading record is worse than a missing one. The absence rule still bites
-// where it must, at the file level: an evidence file with no rows is an
-// ERROR, because an empty check is a failure, not a pass.
+// misleading record is worse than an incomplete one. File-level absence still
+// blocks once any phase artifact makes a claim owed, and an empty file is an
+// ERROR because an empty check is a failure, not a pass. --complete promotes
+// the remaining coverage warnings to errors at final handoff.
 func checkAttestationCoverage(g *Gate, design string, attested map[string]bool) {
 	for _, claim := range attestVocabulary {
 		if claim.owed == nil || !claim.owed(design) {

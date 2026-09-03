@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/RamXX/machinery/internal/artifactset"
 	"github.com/RamXX/machinery/internal/version"
 )
 
@@ -17,6 +18,25 @@ func writeSrc(t *testing.T, src string) string {
 		t.Fatal(err)
 	}
 	return p
+}
+
+func TestGuardedCurrentTLAArtifactsRejectForeignTargetHalves(t *testing.T) {
+	files := map[string][]byte{"Deal.tla": []byte("generated tla\n"), "Deal.cfg": []byte("generated cfg\n")}
+	for _, target := range []string{"Deal.tla", "Deal.cfg"} {
+		t.Run(target, func(t *testing.T) {
+			dir := t.TempDir()
+			foreign := []byte("hand-authored sentinel\n")
+			if err := os.WriteFile(filepath.Join(dir, target), foreign, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := guardedCurrentTLAArtifacts(dir, "Deal.machine.json", files); err == nil {
+				t.Fatalf("foreign %s was accepted for replacement", target)
+			}
+			if got, err := os.ReadFile(filepath.Join(dir, target)); err != nil || string(got) != string(foreign) {
+				t.Fatalf("foreign target changed: %q, %v", got, err)
+			}
+		})
+	}
 }
 
 const minimalSrc = `{"id":"widget","initial":"Draft","states":{
@@ -88,6 +108,141 @@ func TestTLAModelsMultiTargetRetryResume(t *testing.T) {
 	}
 	if !strings.Contains(tla, `st' \in {"Draft", "persisting"}`) {
 		t.Fatalf("multi-target resume not modeled:\n%s", tla)
+	}
+}
+
+func TestTLAStringAlwaysFallbackIsNotRetryShaped(t *testing.T) {
+	src := `{"id":"widget","initial":"routing","states":{
+	  "routing":{"always":[{"target":"Done","guard":"isDone"},"working"],"after":{"tick":"working"}},
+	  "working":{"on":{"finish":"Done"}},
+	  "Done":{"type":"final"}}}`
+	_, tlaText, _, err := Generate(writeSrc(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(tlaText, "RetryAgain_routing") || strings.Contains(tlaText, "rc1") {
+		t.Fatalf("valid string fallback was erased and state misclassified as retry-shaped:\n%s", tlaText)
+	}
+	for _, want := range []string{"routing -always-> Done", "routing -always-> working", "routing -after:tick-> working"} {
+		if !strings.Contains(tlaText, want) {
+			t.Errorf("missing ordinary transition %q", want)
+		}
+	}
+}
+
+func TestTLARejectsEveryMalformedTransitionBeforeEmission(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{"unknown key", `{"target":"Done","typo":"silently-internal"}`, "unsupported key 'typo'"},
+		{"array target", `{"target":["Done"]}`, "array transition target"},
+		{"non-string target", `{"target":7}`, "non-string transition target 7"},
+		{"non-string guard", `{"target":"Done","guard":true}`, "non-string guard True"},
+		{"empty guard", `{"target":"Done","guard":""}`, "empty guard string"},
+		{"malformed action", `{"target":"Done","actions":42}`, "unsupported action value 42"},
+		{"null branch", `null`, "unsupported transition value None"},
+		{"empty branch list", `[]`, "empty transition branch list"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := `{"id":"widget","initial":"Draft","states":{"Draft":{"on":{"GO":` + tc.body + `}},"Done":{"type":"final"}}}`
+			mid, tlaText, cfg, err := Generate(writeSrc(t, src))
+			if err == nil || !strings.Contains(err.Error(), "malformed transition IR") || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("expected authoritative transition rejection containing %q, got mid=%q tla=%q cfg=%q err=%v", tc.want, mid, tlaText, cfg, err)
+			}
+		})
+	}
+}
+
+func TestTLARejectsMalformedTransitionContainers(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		states string
+		want   string
+	}{
+		{"on", `"Draft":{"on":null}`, "transition container 'on' must be an object"},
+		{"after", `"Draft":{"after":42}`, "transition container 'after' must be an object"},
+		{"invoke", `"Draft":{"invoke":["actor"]}`, "invoke entry 1 must be an object"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := `{"id":"widget","initial":"Draft","states":{` + tc.states + `,"Done":{"type":"final"}}}`
+			_, _, _, err := Generate(writeSrc(t, src))
+			if err == nil || !strings.Contains(err.Error(), "malformed transition IR") || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("expected malformed-container rejection containing %q, got %v", tc.want, err)
+			}
+		})
+	}
+}
+
+func TestTLARefusalDisablesUnsoundLivenessClaim(t *testing.T) {
+	src := `{"id":"widget","initial":"Draft","states":{
+	  "Draft":{"on":{"publish":[{"target":"persisting","guard":"canPublish"}]},"_refusal":{"publish":"return AuthzError and remain Draft"}},
+	  "persisting":{"after":{"done":"Published"}},
+	  "Published":{"type":"final"}}}`
+	_, tlaText, cfg, err := Generate(writeSrc(t, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Handler refusal is permitted", "state Draft, handler publish: return AuthzError and remain Draft", "Live_OverlayResolves intentionally omitted"} {
+		if !strings.Contains(tlaText, want) {
+			t.Errorf("missing refusal/liveness disclosure %q:\n%s", want, tlaText)
+		}
+	}
+	if strings.Contains(tlaText, "WF_vars(OverlayNext)") || strings.Contains(cfg, "PROPERTY Live_OverlayResolves") {
+		t.Fatalf("refusal-bearing machine still claims fairness/liveness:\n%s\n%s", tlaText, cfg)
+	}
+}
+
+func TestTLARejectsMalformedRefusalBeforeWeakeningLiveness(t *testing.T) {
+	for _, tc := range []struct {
+		name, refusal, want string
+	}{
+		{"null", `null`, "non-empty object"},
+		{"empty object", `{}`, "non-empty object"},
+		{"non-string reason", `{"publish":42}`, "non-empty string reason"},
+		{"empty reason", `{"publish":"  "}`, "non-empty string reason"},
+		{"unknown handler", `{"delete":"denied"}`, "no matching"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := `{"id":"widget","initial":"Draft","states":{
+  "Draft":{"on":{"publish":{"target":"Published"}},"_refusal":` + tc.refusal + `},
+  "Published":{"type":"final"}}}`
+			_, tlaText, cfg, err := Generate(writeSrc(t, src))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("malformed refusal accepted: err=%v tla=%q cfg=%q", err, tlaText, cfg)
+			}
+		})
+	}
+}
+
+func TestTLARefusalAcceptsDeclaredAfterAndInvokeBranches(t *testing.T) {
+	for _, src := range []string{
+		`{"id":"widget","initial":"Retry","states":{"Retry":{"after":{"backoff":{"target":"Done","guard":"ready"}},"_refusal":{"after:backoff":"guard is total"}},"Done":{"type":"final"}}}`,
+		`{"id":"widget","initial":"Saving","states":{"Saving":{"invoke":{"src":"persist","onDone":{"target":"Done","guard":"ready"}},"_refusal":{"persist.onDone":"guard is total"}},"Done":{"type":"final"}}}`,
+	} {
+		_, _, _, err := Generate(writeSrc(t, src))
+		if err != nil {
+			t.Fatalf("valid refusal handler rejected: %v", err)
+		}
+	}
+}
+
+func TestTLARejectsUnsafeIDBeforeWritingOutsideOutputDirectory(t *testing.T) {
+	src := strings.Replace(minimalSrc, `"id":"widget"`, `"id":"../escaped"`, 1)
+	machine := writeSrc(t, src)
+	outdir := filepath.Join(t.TempDir(), "formal")
+	outside := filepath.Join(filepath.Dir(outdir), "escaped.tla")
+	_, firstErr := RunWritten(machine, outdir)
+	_, secondErr := RunWritten(machine, outdir)
+	if firstErr == nil || !strings.Contains(firstErr.Error(), "safe TLA+ identifier") {
+		t.Fatalf("expected unsafe-id rejection, got %v", firstErr)
+	}
+	if secondErr == nil || secondErr.Error() != firstErr.Error() || strings.Contains(firstErr.Error(), "machinery-design-source-") {
+		t.Fatalf("invalid-input diagnostic is unstable or leaks private source root:\nfirst: %v\nsecond: %v", firstErr, secondErr)
+	}
+	if _, err := os.Stat(outside); !os.IsNotExist(err) {
+		t.Fatalf("unsafe id wrote outside output directory: %s", outside)
 	}
 }
 
@@ -244,6 +399,202 @@ func TestRunWrittenStampsGeneratorVersion(t *testing.T) {
 		if strings.HasSuffix(n, ".tla") && !strings.HasPrefix(body, "---- MODULE ") {
 			t.Errorf("%s no longer opens with the MODULE line:\n%s", n, body)
 		}
+	}
+}
+
+func TestRunWrittenReconcilesOrphanedOwnedPairAfterMachineRename(t *testing.T) {
+	design := t.TempDir()
+	machines := filepath.Join(design, "machines")
+	outdir := filepath.Join(design, "formal")
+	if err := os.MkdirAll(machines, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldPath := filepath.Join(machines, "Widget.machine.json")
+	if err := os.WriteFile(oldPath, []byte(minimalSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RunWritten(oldPath, outdir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(oldPath); err != nil {
+		t.Fatal(err)
+	}
+	newPath := filepath.Join(machines, "New.machine.json")
+	newSource := strings.Replace(minimalSrc, `"id":"widget"`, `"id":"new"`, 1)
+	if err := os.WriteFile(newPath, []byte(newSource), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RunWritten(newPath, outdir); err != nil {
+		t.Fatal(err)
+	}
+	for _, stale := range []string{"Widget.tla", "Widget.cfg"} {
+		if _, err := os.Lstat(filepath.Join(outdir, stale)); !os.IsNotExist(err) {
+			t.Fatalf("stale owned output %s survived rename: %v", stale, err)
+		}
+	}
+	for _, current := range []string{"New.tla", "New.cfg"} {
+		if _, err := os.Lstat(filepath.Join(outdir, current)); err != nil {
+			t.Fatalf("current output %s missing: %v", current, err)
+		}
+	}
+}
+
+func TestRunWrittenRejectsInPlaceMachineIDRenameBeforeMutatingOldPair(t *testing.T) {
+	design := t.TempDir()
+	machines := filepath.Join(design, "machines")
+	outdir := filepath.Join(design, "formal")
+	if err := os.MkdirAll(machines, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	machine := filepath.Join(machines, "Widget.machine.json")
+	if err := os.WriteFile(machine, []byte(minimalSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RunWritten(machine, outdir); err != nil {
+		t.Fatal(err)
+	}
+	priorTLA, err := os.ReadFile(filepath.Join(outdir, "Widget.tla"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	priorCFG, err := os.ReadFile(filepath.Join(outdir, "Widget.cfg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	renamed := strings.Replace(minimalSrc, `"id":"widget"`, `"id":"renamed"`, 1)
+	if err := os.WriteFile(machine, []byte(renamed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RunWritten(machine, outdir); err == nil || !strings.Contains(err.Error(), "canonical filename Renamed.machine.json") {
+		t.Fatalf("in-place machine id rename was accepted: %v", err)
+	}
+	for name, want := range map[string][]byte{"Widget.tla": priorTLA, "Widget.cfg": priorCFG} {
+		got, err := os.ReadFile(filepath.Join(outdir, name))
+		if err != nil || string(got) != string(want) {
+			t.Fatalf("old output %s changed after rejected rename: %v", name, err)
+		}
+	}
+	for _, name := range []string{"Renamed.tla", "Renamed.cfg"} {
+		if _, err := os.Lstat(filepath.Join(outdir, name)); !os.IsNotExist(err) {
+			t.Fatalf("rejected in-place rename created %s: %v", name, err)
+		}
+	}
+}
+
+func TestRunWrittenRejectsAtomicReplacementOfPlannedStalePair(t *testing.T) {
+	design := t.TempDir()
+	machines := filepath.Join(design, "machines")
+	outdir := filepath.Join(design, "formal")
+	if err := os.MkdirAll(machines, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldPath := filepath.Join(machines, "Widget.machine.json")
+	if err := os.WriteFile(oldPath, []byte(minimalSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RunWritten(oldPath, outdir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(oldPath); err != nil {
+		t.Fatal(err)
+	}
+	newPath := filepath.Join(machines, "New.machine.json")
+	if err := os.WriteFile(newPath, []byte(strings.Replace(minimalSrc, `"id":"widget"`, `"id":"new"`, 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prior := runWrittenAfterStalePlan
+	runWrittenAfterStalePlan = func() { atomicReplaceFile(t, filepath.Join(outdir, "Widget.tla")) }
+	defer func() { runWrittenAfterStalePlan = prior }()
+	if _, err := RunWritten(newPath, outdir); err == nil || !strings.Contains(err.Error(), "ownership plan") {
+		t.Fatalf("atomic stale replacement was accepted: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outdir, "Widget.tla")); err != nil {
+		t.Fatalf("replacement was not preserved: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(outdir, "New.tla")); !os.IsNotExist(err) {
+		t.Fatalf("new family was partially installed: %v", err)
+	}
+}
+
+func TestStaleOwnedTLAArtifactsIgnoresMarkerOutsideCanonicalHeader(t *testing.T) {
+	out := t.TempDir()
+	machines := t.TempDir()
+	body := "---- MODULE Manual ----\nEXTENDS Naturals\nManual == \\\"\\* Generated from Manual.machine.json by machinery tla. Control-flow model.\\\"\n====\n"
+	if err := os.WriteFile(filepath.Join(out, "Manual.tla"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stale, err := staleOwnedTLAArtifacts(out, machines, map[string][]byte{})
+	if err != nil || len(stale) != 0 {
+		t.Fatalf("handwritten quoted marker authorized deletion: stale=%v err=%v", stale, err)
+	}
+}
+
+func TestStaleOwnedTLAArtifactsConvergesMissingAnchorConfig(t *testing.T) {
+	out := t.TempDir()
+	machines := t.TempDir()
+	body := "\\* machinery-version: v1\nCONSTANT MaxRetries = 3\nSPECIFICATION Spec\nINVARIANT TypeOK\nPROPERTY Live_OverlayResolves\n"
+	if err := os.WriteFile(filepath.Join(out, "Gone.cfg"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stale, err := staleOwnedTLAArtifacts(out, machines, map[string][]byte{})
+	if err != nil || len(stale) != 1 || stale[0].Name != "Gone.cfg" {
+		t.Fatalf("missing-anchor generated cfg not reconciled: stale=%v err=%v", stale, err)
+	}
+	if err := artifactset.ReconcilePlanned(out, map[string][]byte{}, stale); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(out, "Gone.cfg")); !os.IsNotExist(err) {
+		t.Fatalf("orphan cfg retained: %v", err)
+	}
+}
+
+func atomicReplaceFile(t *testing.T, path string) {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	temp := path + ".replacement"
+	if err := os.WriteFile(temp, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(temp, path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRunWrittenDoesNotGenerateFromPostSnapshotABA(t *testing.T) {
+	design := t.TempDir()
+	machines := filepath.Join(design, "machines")
+	formal := filepath.Join(design, "formal")
+	if err := os.MkdirAll(machines, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	machine := filepath.Join(machines, "Widget.machine.json")
+	original := minimalSrc
+	transient := strings.ReplaceAll(minimalSrc, "Published", "Transient")
+	if err := os.WriteFile(machine, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prior := runWrittenAfterSourceSnapshot
+	runWrittenAfterSourceSnapshot = func() {
+		if err := os.WriteFile(machine, []byte(transient), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(machine, []byte(original), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer func() { runWrittenAfterSourceSnapshot = prior }()
+	if _, err := RunWritten(machine, formal); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(formal, "Widget.tla"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "Transient") || !strings.Contains(string(body), "Published") {
+		t.Fatalf("TLA output was derived from transient B input:\n%s", body)
 	}
 }
 

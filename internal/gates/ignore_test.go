@@ -133,6 +133,30 @@ func TestIgnoreIsRereadWhenTheFileChanges(t *testing.T) {
 	}
 }
 
+func TestIgnoreCacheUsesContentNotMtimeAndSize(t *testing.T) {
+	d := t.TempDir()
+	path := filepath.Join(d, IgnoreFileName)
+	if err := os.WriteFile(path, []byte("ignored-a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !DesignIgnores(d, "ignored-a/file.md") {
+		t.Fatal("first ignore body did not load")
+	}
+	if err := os.WriteFile(path, []byte("ignored-b\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	if DesignIgnores(d, "ignored-a/file.md") || !DesignIgnores(d, "ignored-b/file.md") {
+		t.Fatal("same-size rewrite with restored mtime served stale ignore patterns")
+	}
+}
+
 func TestIgnoreKeepsEmbedMarkersOutOfVendoredTrees(t *testing.T) {
 	d := ignoreDesign(t, "experiments/spikes/*/deps\n")
 	marker := "<!-- machinery:embed from=\"x.md\" table=\"a,b\" claims=\"subset\" -->\n| a | b |\n|---|---|\n| 1 | 2 |\n"

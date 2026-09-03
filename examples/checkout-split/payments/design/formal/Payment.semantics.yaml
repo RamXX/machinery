@@ -1,0 +1,3 @@
+machine: payment
+pattern: control-flow-only
+reason: The Payment lifecycle has no data-refinement state beyond the checked persisted status enum; processor and outbox effects are integration contracts outside the refinement algebras.

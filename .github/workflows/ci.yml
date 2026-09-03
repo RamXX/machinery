@@ -1,9 +1,8 @@
 # ci.yml - the required pipeline. Every push and PR must pass this.
 # Coverage: build, lint (golangci-lint + gofmt + vet), unit tests (including
 # the adversarial gate-experiment suite and the golden-corpus regression net),
-# the example gate suites (all eight design suites: go-crm, surreal-crm,
-# fulfillment, portfolio-engine, the three checkout-split roots, pii-flow),
-# and the go-crm impl tests. A single failure blocks merge.
+# the closed manifest of shipped example gate suites,
+# and every registered implementation module. A single failure blocks merge.
 name: ci
 
 on:
@@ -77,6 +76,30 @@ jobs:
           fi
       - name: go vet
         run: go vet ./...
+      - name: Install and run pinned actionlint
+        run: |
+          version=$(cat .actionlint-version)
+          go install github.com/rhysd/actionlint/cmd/actionlint@"$version"
+          actionlint .github/workflows/*.yml
+      - name: Install and run pinned ShellCheck on the closed shell corpus
+        run: |
+          set -euo pipefail
+          version=$(cat .shellcheck-version)
+          checksum=$(cat .shellcheck-linux-x86_64.sha256)
+          archive="$RUNNER_TEMP/shellcheck.tar.xz"
+          install_dir="$RUNNER_TEMP/shellcheck"
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${version}/shellcheck-v${version}.linux.x86_64.tar.xz" -o "$archive"
+          echo "$checksum  $archive" | sha256sum -c -
+          mkdir -p "$install_dir"
+          tar -xJf "$archive" --strip-components=1 -C "$install_dir"
+          test "$("$install_dir/shellcheck" --version | awk '$1 == "version:" {print $2}')" = "$version"
+          scripts/shellcheck-inventory.sh >"$RUNNER_TEMP/shellcheck-files"
+          shell_files=()
+          while IFS= read -r shell_file; do
+            shell_files+=("$shell_file")
+          done <"$RUNNER_TEMP/shellcheck-files"
+          test "${#shell_files[@]}" -gt 0
+          "$install_dir/shellcheck" "${shell_files[@]}"
       - name: Read pinned golangci-lint version
         id: gciv
         run: echo "version=$(cat .golangci-version)" >> "$GITHUB_OUTPUT"
@@ -118,35 +141,41 @@ jobs:
           cache: true
       - name: Build machinery
         run: make build
-      - name: Gate suite - go-crm (design + impl)
-        run: .bin/machinery check examples/go-crm/design --impl examples/go-crm/impl
-      - name: Gate suite - surreal-crm (store-swap rebuild, Gm + Gs)
-        run: .bin/machinery check examples/surreal-crm/design
-      - name: Gate suite - fulfillment (design only)
-        run: .bin/machinery check examples/fulfillment/design
-      - name: Gate suite - portfolio-engine (design only)
-        run: .bin/machinery check examples/portfolio-engine/design
-      - name: Gate suite - checkout-split (recursive decomposition, parent + children)
+      - name: Gate every registered example with its exact capabilities
         run: |
-          .bin/machinery check examples/checkout-split/parent/design
-          .bin/machinery check examples/checkout-split/orders/design
-          .bin/machinery check examples/checkout-split/payments/design
-      - name: Gate suite - pii-flow (external checker, hermetic Gk)
-        run: .bin/machinery check examples/pii-flow/design
+          set -euo pipefail
+          inventory=$(mktemp)
+          trap 'rm -f "$inventory"' EXIT
+          scripts/example-inventory.sh rows >"$inventory"
+          while IFS=$'\t' read -r -a row; do
+            design=${row[0]}
+            impl=${row[1]}
+            complete=${row[5]}
+            args=("$design" --warnings-as-errors)
+            [[ "$impl" == - ]] || args+=(--impl "$impl")
+            [[ "$complete" == no ]] || args+=(--complete)
+            .bin/machinery check "${args[@]}"
+          done <"$inventory"
 
-  # ----------------------------------------------------- go-crm impl tests ---
-  # The example Go application has its own hermetic test suite (separate go.mod).
-  go-crm-impl:
+  # ---------------------------------------------- example impl module tests ---
+  # Every registered example module has its own hermetic suite.
+  example-impls:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: examples/go-crm/impl/go.mod
+          go-version-file: go.mod
           cache: false
-      - name: go-crm hermetic suite
-        working-directory: examples/go-crm/impl
-        run: go test ./... -count=1
+      - name: Registered implementation module suites
+        run: |
+          set -euo pipefail
+          scripts/example-inventory.sh impl-modules | while IFS=$'\t' read -r design impl module; do
+            case "$module" in
+              go) (cd "$impl" && go test ./... -count=1) ;;
+              *) echo "::error::unsupported implementation module type $module: $design"; exit 1 ;;
+            esac
+          done
 
   # -------------------------------------------------------------- golden ---
   # The golden-corpus scoreboard, REQUIRED. The corpus under testdata/golden
@@ -168,6 +197,41 @@ jobs:
       - name: Adversarial gate-experiment suite
         run: go test -count=1 ./internal/experiments/
 
+  # Run the same byte-for-byte corpus on native non-Linux filesystems. This
+  # catches path separator, executable suffix, newline, and directory-order
+  # dependencies that a Linux-only golden job cannot see.
+  golden-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Golden corpus on native ${{ runner.os }}
+        run: go test -count=1 -run TestGolden ./cmd/machinery
+
+  # Exercise confinement, rename transactions, permissions, and portable-name
+  # rules on the native filesystems they protect.
+  native-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Full non-race suite on native ${{ runner.os }}
+        run: go test -count=1 ./...
+
   # ------------------------------------------------------------ docs gate ---
   # The toolchain command surface is documented in six places (README, SKILL,
   # agent prompts, template, tools README, and the team guide in docs/). This
@@ -181,27 +245,46 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
       - name: No whitespace errors in the aggregate change
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: git diff --check "$BASE_SHA..HEAD"
-      - name: No stale Python-toolchain references in the doc surface
+        run: go run ./scripts/git-safe -root . -- diff --check "$BASE_SHA..HEAD"
+      - name: No stale toolchain or checker-runtime references in the doc surface
         run: |
-          if grep -rnE "python3|PyYAML|pyyaml|uv run|oracle_gen\.py|machine_lint\.py|machinery_check\.py|tla_gen\.py|refine_gen\.py|compose_gen\.py|diff-all\.sh|capture-golden\.sh" \
-              README.md skills/ agents/ docs/ Makefile; then
-            echo "::error::stale Python-toolchain reference found (the toolchain is the Go binary)"
-            exit 1
-          fi
+          grep_status=0
+          grep -rnE "PyYAML|pyyaml|uv run|oracle_gen\.py|machine_lint\.py|machinery_check\.py|tla_gen\.py|refine_gen\.py|compose_gen\.py|diff-all\.sh|capture-golden\.sh" \
+            README.md skills/ agents/ docs/ Makefile || grep_status=$?
+          case "$grep_status" in
+            0) echo "::error::stale Python-toolchain reference found (the toolchain is the Go binary)"; exit 1 ;;
+            1) ;;
+            *) echo "::error::stale Python-toolchain scan failed with status $grep_status"; exit 1 ;;
+          esac
+          grep_status=0
+          grep -rnEi "Souffl(e|é).*(external.checker|checker engine|CI pin|required)|external.checker.*Souffl(e|é)" \
+            README.md docs/ examples/pii-flow/README.md || grep_status=$?
+          case "$grep_status" in
+            0) echo "::error::stale host checker-runtime contract found"; exit 1 ;;
+            1) ;;
+            *) echo "::error::host checker-runtime scan failed with status $grep_status"; exit 1 ;;
+          esac
           echo "doc surface clean"
-      # The pattern is spelled with an ANSI-C \u escape so this file itself
-      # stays free of the literal character and the grep can scan .github/
-      # without self-matching.
+      # The pattern uses literal UTF-8 octets: stock macOS Bash 3.2 does not
+      # decode \u escapes, and this keeps .github/ safe to scan without a
+      # self-match.
       - name: No em dashes in the doc surface (house style)
         run: |
-          if grep -rn $'\u2014' README.md skills/ agents/ docs/ Makefile .github/; then
-            echo "::error::em dash found; house style forbids it"
-            exit 1
-          fi
+          grep_status=0
+          em_dash=$(printf '\342\200\224')
+          grep -rn "$em_dash" README.md CONTRIBUTING.md install.sh skills/ agents/ docs/ examples/ commands/ adapters/ hooks/ Makefile .github/ || grep_status=$?
+          case "$grep_status" in
+            0) echo "::error::em dash found; house style forbids it"; exit 1 ;;
+            1) ;;
+            *) echo "::error::em-dash scan failed with status $grep_status"; exit 1 ;;
+          esac
           echo "no em dashes"
 
   # ----------------------------------------------------------- tidy gate ---
@@ -218,4 +301,94 @@ jobs:
       - name: go mod tidy (verify clean)
         run: |
           go mod tidy
-          git diff --exit-code -- go.mod go.sum
+          go run ./scripts/git-safe -root . -- diff --exit-code -- go.mod go.sum
+
+  # ---------------------------------------------------- Modelith render ---
+  # Modelith is the engine half of the domain-model phase. Regenerate every
+  # committed render with the pinned engine, apply the required mechanical
+  # house-style normalization, and reject any byte drift.
+  modelith-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install Modelith v0.4.0 (pinned)
+        run: go install github.com/stacklok/modelith/cmd/modelith@v0.4.0
+      - name: Assert committed Modelith renders are fresh
+        run: make modelith-render-check
+
+  # ----------------------------------------------- external engines gate ---
+  # Pure machinery gates remain dependency-free. This required job exercises
+  # the two explicit engine halves: C4 grammar compilation and the reference
+  # external checker. Every downloaded engine and action is version-pinned.
+  design-engines:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build machinery
+        run: make build
+      - name: Assert committed engine trust roots
+        run: |
+          set -euo pipefail
+          test -s .java-runtime-pin
+          test -s .structurizr-pin
+      - name: Compile every example workspace.dsl
+        run: |
+          set -euo pipefail
+          c4_inventory=$(mktemp)
+          trap 'rm -f "$c4_inventory"' EXIT
+          scripts/c4-inventory.sh examples >"$c4_inventory"
+          test -s "$c4_inventory"
+          while IFS= read -r dsl; do
+            .bin/machinery verify-c4 "$(dirname "$dsl")"
+          done <"$c4_inventory"
+      - name: Provision immutable external-checker OCI runtime
+        run: |
+          set -euo pipefail
+          command -v docker
+          runner=$RUNNER_TEMP/machinery-run-safe
+          runner_build_stderr=$RUNNER_TEMP/machinery-run-safe-build.stderr
+          if ! go build -o "$runner" ./scripts/run-safe 2>"$runner_build_stderr"; then
+            cat "$runner_build_stderr" >&2
+            exit 1
+          fi
+          if [ -s "$runner_build_stderr" ]; then
+            cat "$runner_build_stderr" >&2
+            echo "::error::building bounded external-command runner emitted stderr"
+            exit 1
+          fi
+          image=python@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc
+          platform=linux/amd64
+          pull_receipt=$("$runner" -timeout 10m -stdout-limit 4096 -stderr-limit 65536 -- \
+            docker pull --quiet --platform "$platform" "$image")
+          case "$pull_receipt" in
+            "$image"|"docker.io/library/$image") ;;
+            *) echo "::error::Docker pull returned a non-canonical image receipt: $pull_receipt"; exit 1 ;;
+          esac
+          inspect=$("$runner" -timeout 30s -stdout-limit 65536 -stderr-limit 4096 -- \
+            docker image inspect --platform "$platform" --format '{{json .RepoDigests}} {{.Os}}/{{.Architecture}}' "$image")
+          case "$inspect" in
+            *\"$image\"*" $platform") ;;
+            *) echo "::error::local OCI identity does not match $image on $platform: $inspect"; exit 1 ;;
+          esac
+          "$runner" -timeout 2m -stdout-limit 4096 -stderr-limit 4096 -- \
+            docker run --rm --pull=never --platform "$platform" --network=none --read-only "$image" python3 --version
+      - name: Required real OCI checker golden
+        env:
+          MACHINERY_REQUIRE_OCI_GOLDEN: "1"
+        run: go test -count=1 -run '^TestVerifyCheckersPiiFlowEngineGolden$' ./cmd/machinery
+      - name: Re-run every registered external checker
+        run: |
+          set -euo pipefail
+          scripts/example-inventory.sh checkers | while IFS=$'\t' read -r design registry; do
+            .bin/machinery verify-checkers "$design" --registry "$registry"
+          done

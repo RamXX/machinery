@@ -10,7 +10,7 @@ EXTENDS Naturals
 \*      machine_lint requires an unguarded fallback or an _exhaustive note; where
 \*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
 \*      below is only as sound as these hand-checked, UNVERIFIED claims:
-\*      - UNVERIFIED, state rolledBack: priorStage is set by every setPending* action to the current domain state, which is one of the six DealStage values; the six priorIs* guards cover DealStage totally
+\*      (none here: every guarded branch list has an unguarded fallback)
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or
@@ -91,6 +91,7 @@ Init == st = "Lead" /\ rc1 = 0
   \* T53: rolledBack -always-> Negotiation
   \* T54: rolledBack -always-> Won
   \* T55: rolledBack -always-> Lost
+  \* T56: rolledBack -always-> Lost
 
 T1 == st = "Lead" /\ st' = "persisting" /\ rc1' = 0
 T2 == st = "Lead" /\ st' = "Lead" /\ rc1' = 0
@@ -147,11 +148,12 @@ T52 == st = "rolledBack" /\ st' = "Proposal" /\ rc1' = 0
 T53 == st = "rolledBack" /\ st' = "Negotiation" /\ rc1' = 0
 T54 == st = "rolledBack" /\ st' = "Won" /\ rc1' = 0
 T55 == st = "rolledBack" /\ st' = "Lost" /\ rc1' = 0
+T56 == st = "rolledBack" /\ st' = "Lost" /\ rc1' = 0
 RetryExhausted_persistRetry == st = "persistRetry" /\ rc1 >= MaxRetries /\ st' = "rolledBack" /\ rc1' = rc1
 RetryAgain_persistRetry == st = "persistRetry" /\ rc1 < MaxRetries /\ st' = "persisting" /\ rc1' = rc1 + 1
 
 DomainNext == T1 \/ T2 \/ T3 \/ T4 \/ T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ T26 \/ T27 \/ T28 \/ T29 \/ T30 \/ T31 \/ T32 \/ T33 \/ T34 \/ T35 \/ T36 \/ T37
-OverlayNext == T38 \/ T39 \/ T40 \/ T41 \/ T42 \/ T43 \/ T44 \/ T45 \/ T46 \/ T47 \/ T48 \/ T49 \/ T50 \/ T51 \/ T52 \/ T53 \/ T54 \/ T55 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
+OverlayNext == T38 \/ T39 \/ T40 \/ T41 \/ T42 \/ T43 \/ T44 \/ T45 \/ T46 \/ T47 \/ T48 \/ T49 \/ T50 \/ T51 \/ T52 \/ T53 \/ T54 \/ T55 \/ T56 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
 Next == DomainNext \/ OverlayNext
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)

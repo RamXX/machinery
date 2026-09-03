@@ -1,0 +1,8 @@
+surface_version: 1
+sources:
+  - payments.modelith.yaml action list, walked for the Operator persona
+  - BUILD.md settlement surface and lifecycle specification
+acts:
+  - act: Payment.refund
+    actor: Operator
+    surface: "operator payment API: POST /payments/{id}/refund"

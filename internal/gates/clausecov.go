@@ -61,13 +61,13 @@ func oracleGuardRows(text string) []guardedOracleRow {
 // governs, one suffixed stable id per active clause (base+a, base+b, ...)
 // appears whole-token in some test file.
 func checkClauseCoverage(g *Gate, design string, corpus testCorpusData) {
-	decls := collectClauseDecls(design)
+	decls := collectClauseDecls(g, design)
 	if len(decls) == 0 {
 		return
 	}
 	var rows []guardedOracleRow
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.oracle.md") {
-		rows = append(rows, oracleGuardRows(readOrEmpty(path))...) // read errors reported by the coverage pass
+		rows = append(rows, oracleGuardRows(readDesignOrEmpty(design, path))...) // read errors reported by the coverage pass
 	}
 	for _, d := range decls {
 		n := len(d.active)
@@ -87,7 +87,7 @@ func checkClauseCoverage(g *Gate, design string, corpus testCorpusData) {
 			var missing []string
 			for i := range n {
 				suffixed := row.stableID + string(rune('a'+i))
-				if idTokenIn(suffixed, corpus.joined) {
+				if idTokenIn(suffixed, corpus.joinedCode) {
 					g.Count("falsifying-clause ids covered")
 				} else {
 					missing = append(missing, suffixed)

@@ -21,7 +21,7 @@ One process, seven code containers plus the embedded store and the external prov
 - **Domain** (`domain`): the RecommendationRun and Portfolio state machines as pure transition
   functions, the guards, and the invariant predicates. No I/O.
 - **Optimizer** (`optimizer`): a pure transform that selects the 16-of-N portfolio minimizing
-  historical maximum drawdown. No state machine (see "Not a state machine" below).
+  historical maximum drawdown. It has a contract spec rather than an entity lifecycle machine.
 - **Feed** (`feed`): the market-data adapter. Holds the circuit breaker that protects the tool from
   a failing provider. The only importer of the provider client.
 - **Repository** (`repo`): the only importer of the store client. All persistence, optimistic
@@ -149,7 +149,25 @@ dependency_rules:
     - "The CLI goes through the app; it never touches domain, feed, repo, or the externals directly."
 ```
 
-## 6. Interface contracts at each boundary
+## 6. Action ownership
+
+The domain action set is closed. Each action has exactly one component accountable for its
+validation and outcome; collaborators remain interface-contract dependencies of that owner.
+
+| action | owning component |
+|---|---|
+| `Index.refresh` | `pf.app` |
+| `Security.upsert` | `pf.repo` |
+| `CandidateSet.build` | `pf.app` |
+| `RecommendationRun.start` | `pf.app` |
+| `RecommendationRun.abort` | `pf.app` |
+| `Portfolio.advance` | `pf.domain` |
+| `Portfolio.accept` | `pf.domain` |
+| `Portfolio.reject` | `pf.domain` |
+| `Portfolio.reopen` | `pf.domain` |
+| `Holding.set` | `pf.optimizer` |
+
+## 7. Interface contracts at each boundary
 
 For each boundary crossing: request/response shape, enumerated errors (these become `onError`
 branches in Phase 3), and idempotency. One row per allowed edge; the sections below elaborate.
@@ -211,7 +229,7 @@ branches in Phase 3), and idempotency. One row per allowed edge; the sections be
 - **repo -> store**: SQL via the DuckDB client, wrapped so no store type escapes `repo`; maps store
   errors onto `ConflictError`, `CorruptError`, `IOError`.
 
-## 7. Dependency mitigation posture
+## 8. Dependency mitigation posture
 
 Two external dependencies. A mitigation reclassifies a failure; it does not delete it.
 
@@ -223,7 +241,7 @@ Two external dependencies. A mitigation reclassifies a failure; it does not dele
 The two externals plus their bound `mkt` and `store` elements are the only Database/External-tagged
 dependencies, so these two rows satisfy G2 mitigation coverage.
 
-## 8. Persistence and placement
+## 9. Persistence and placement
 
 For every stateful component: how the Phase 3 machine is realized and how concurrent events are
 serialized. Python has no cheap per-entity process, so persisted aggregates use the explicit
@@ -235,12 +253,12 @@ persisted-state-plus-optimistic-lock pattern where contention is possible.
 | `Portfolio` | none; load-act-save loop in `pf.app`, transition function in `pf.domain` | a row carrying its `status`, `acceptedAt`, and a `version` | optimistic lock: two managers may review at once, so `Save` asserts the stored `version`; on `ConflictError` the commit overlay retries with backoff up to `MaxRetries`, then rolls back and refuses |
 | `MarketDataFeed` | in-memory circuit breaker in `pf.feed`, one per process | none (transient breaker counters) | single process; breaker state (closed/open/halfOpen) guards outbound calls; a bounded failure count trips it |
 | `Optimizer` (no machine: pure deterministic transform, contract spec instead) | none | none | n/a |
-| `CandidateSet` (no machine: built once, then read-only) | none; built in `pf.app` | a set of rows with a `version` | optimistic lock on build |
-| `Index` (no machine: reference data, refreshed in place) | none | a row with a `version` | optimistic lock on refresh |
-| `Security` (no machine: reference data, upserted) | none | a row with a `version` | upsert by ticker |
+| `CandidateSet` | (no machine: immutable entity with no lifecycle; ReferenceDataCommand is its command-level operational envelope in `pf.app`) | a set of rows with a `version` | optimistic lock on build |
+| `Index` | (no machine: reference entity with no lifecycle; ReferenceDataCommand is its command-level operational envelope in `pf.app`) | a row with a `version` | optimistic lock on refresh |
+| `Security` | (no machine: reference entity with no lifecycle; ReferenceDataCommand is its command-level operational envelope in `pf.app`) | a row with a `version` | upsert by ticker |
 | `Holding` (no machine: owned rows written atomically with their `Portfolio`) | none | rows owned by a portfolio | written within the portfolio commit |
 
-## 9. Event-contract table
+## 10. Event-contract table
 
 N/A, with reason. One process per command; no message bus and no cross-component asynchronous
 events. A `recommend` command runs the whole pipeline synchronously in-process (feed then optimizer
@@ -248,7 +266,7 @@ then persist); review commands are separate synchronous invocations against the 
 machine consumes an external bus event, so there is no choreography or redelivery to govern. The two
 externals are reached only through `pf.feed` and `pf.repo`, which the Architecture Contract enforces.
 
-## 10. NFR record
+## 11. NFR record
 
 - **Security posture**: a local single-user tool. Authorization is by role passed on the command
   (`Analyst`, `Manager`, `Admin`): only a Manager or Admin may accept, reject, or reopen a portfolio

@@ -4,6 +4,7 @@ package lint
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -1356,7 +1357,7 @@ func Lint(path string) (nStates int, errs, warns, drift []string) {
 }
 
 // Run is the `machinery lint <dir>` entrypoint.
-func Run(mdir string, out, errw *os.File) int {
+func Run(mdir string, out, errw io.Writer) int {
 	entries, _ := os.ReadDir(mdir)
 	var files []string
 	for _, e := range entries {

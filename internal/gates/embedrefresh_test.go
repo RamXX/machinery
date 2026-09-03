@@ -1,11 +1,15 @@
 package gates
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/ir"
 )
 
@@ -21,6 +25,20 @@ func refreshDesign(t *testing.T, source, embedding string) string {
 		t.Fatal(err)
 	}
 	return d
+}
+
+func TestRefreshEmbedsDryRunRejectsInterruptedPublicationBeforeReads(t *testing.T) {
+	design := t.TempDir()
+	journal := filepath.Join(design, "formal", ".machinery-formal-transaction.jsonl")
+	if err := os.MkdirAll(filepath.Dir(journal), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(journal, []byte("seeded\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := RefreshEmbeds(design, true); err == nil || !strings.Contains(err.Error(), "interrupted Machinery publication") {
+		t.Fatalf("embed --dry-run read through interrupted publication: %v", err)
+	}
 }
 
 func shardText(t *testing.T, design string) string {
@@ -164,6 +182,69 @@ func TestRefreshEmbeds(t *testing.T) {
 	}
 }
 
+func TestRefreshEmbedSourceCannotEscapeRetainedWorkspace(t *testing.T) {
+	parent := t.TempDir()
+	workspace := filepath.Join(parent, "workspace")
+	design := filepath.Join(workspace, "child", "design")
+	outside := filepath.Join(parent, "outside.md")
+	if err := os.MkdirAll(design, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(outside, []byte(keyedSource), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	embedding := "<!-- machinery:embed from=\"../../../outside.md\" table=\"name,note\" claims=\"subset\" -->\n| name | note |\n|---|---|\n| `alpha` | STALE |\n"
+	if err := os.WriteFile(filepath.Join(design, "SHARD.md"), []byte(embedding), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	reports, changed, err := RefreshEmbeds(design, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) != 1 || !strings.Contains(reports[0].Problem, "escapes the retained design workspace") {
+		t.Fatalf("over-climbing refresh source was not rejected: %+v", reports)
+	}
+	if len(changed) != 0 || !strings.Contains(shardText(t, design), "STALE") {
+		t.Fatalf("rejected outside source changed the design: changed=%v", changed)
+	}
+}
+
+func TestRefreshEmbedsRejectsConcurrentSiblingSourceMutation(t *testing.T) {
+	workspace := t.TempDir()
+	source := filepath.Join(workspace, "parent", "ARCHITECTURE.md")
+	design := filepath.Join(workspace, "child", "design")
+	if err := os.MkdirAll(filepath.Dir(source), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(design, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(source, []byte(keyedSource), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustCopyChildPackCapability(t, design)
+	embedding := "<!-- machinery:embed from=\"../../parent/ARCHITECTURE.md\" table=\"name,note\" claims=\"subset\" -->\n| name | note |\n|---|---|\n| `alpha` | STALE |\n"
+	if err := os.WriteFile(filepath.Join(design, "SHARD.md"), []byte(embedding), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before := shardText(t, design)
+	prior := embedRefreshAfterWorkspaceSnapshot
+	embedRefreshAfterWorkspaceSnapshot = func() {
+		if err := os.WriteFile(source, []byte(strings.Replace(keyedSource, "current", "mutated", 1)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer func() { embedRefreshAfterWorkspaceSnapshot = prior }()
+
+	if _, _, err := RefreshEmbeds(design, false); err == nil || !strings.Contains(err.Error(), "external tree changed") {
+		t.Fatalf("concurrent sibling source mutation was not rejected: %v", err)
+	}
+	if got := shardText(t, design); got != before {
+		t.Fatalf("refresh published from an unstable sibling source:\n%s", got)
+	}
+}
+
 func TestRefreshIsIdempotent(t *testing.T) {
 	d := refreshDesign(t, eventSource,
 		"<!-- machinery:embed from=\"ARCHITECTURE.md\" table=\"event,producer,consumer,payload\" where=\"consumer=core\" claims=\"subset,complete\" -->\n"+
@@ -184,6 +265,815 @@ func TestRefreshIsIdempotent(t *testing.T) {
 	}
 	if got := shardText(t, d); got != first {
 		t.Fatalf("second run rewrote the document:\n%s\n---\n%s", first, got)
+	}
+}
+
+func TestRefreshCrashAfterFirstDirectoryExactRetryClearsSentinel(t *testing.T) {
+	design := multiDirectoryRefreshDesign(t)
+	prior := embedTransactionPoint
+	embedTransactionPoint = func(point string) error {
+		if point == "directory:a" {
+			panic("simulated process death after first directory")
+		}
+		return nil
+	}
+	func() {
+		defer func() {
+			if recovered := recover(); recovered == nil {
+				t.Fatal("simulated crash did not fire")
+			}
+		}()
+		_, _, _ = RefreshEmbeds(design, false)
+	}()
+	embedTransactionPoint = prior
+	defer func() { embedTransactionPoint = prior }()
+
+	aBody, err := os.ReadFile(filepath.Join(design, "a", "SHARD.md"))
+	if err != nil || strings.Contains(string(aBody), "STALE") {
+		t.Fatalf("first directory did not commit before crash: %q, %v", aBody, err)
+	}
+	bBody, err := os.ReadFile(filepath.Join(design, "b", "SHARD.md"))
+	if err != nil || !strings.Contains(string(bBody), "STALE") {
+		t.Fatalf("second directory changed across crash: %q, %v", bBody, err)
+	}
+	if reader, err := designlock.AcquireReader(design); err == nil {
+		_ = reader.Release()
+		t.Fatal("reader accepted crash-partial embed publication")
+	}
+	if _, changed, err := RefreshEmbeds(design, false); err != nil {
+		t.Fatalf("exact retry failed: %v", err)
+	} else if len(changed) != 2 || changed[0] != "a/SHARD.md" || changed[1] != "b/SHARD.md" {
+		t.Fatalf("retry changed = %v, want the immutable original two-file plan", changed)
+	}
+	reader, err := designlock.AcquireReader(design)
+	if err != nil {
+		t.Fatalf("reader remained stranded after exact retry: %v", err)
+	}
+	if err := reader.Release(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func multiDirectoryRefreshDesign(t *testing.T) string {
+	t.Helper()
+	design := t.TempDir()
+	stale := "<!-- machinery:embed from=\"ARCHITECTURE.md\" table=\"name,note\" claims=\"subset\" -->\n" +
+		"| name | note |\n|---|---|\n| `alpha` | STALE |\n"
+	for _, dir := range []string{"a", "b"} {
+		base := filepath.Join(design, dir)
+		if err := os.MkdirAll(base, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(base, "ARCHITECTURE.md"), []byte(keyedSource), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(base, "SHARD.md"), []byte(stale), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return design
+}
+
+func TestRefreshPowerLossAtEveryDurableBoundaryReplaysImmutablePlan(t *testing.T) {
+	points := []string{
+		"journal-stage-synced:prepared",
+		"journal-stage-dir-synced:prepared",
+		"journal-renamed:prepared",
+		"journal-dir-synced:prepared",
+		"prepared-journal",
+		"stage:a/.machinery-embed-new-000000",
+		"rename-linked:a/SHARD.md->a/.machinery-embed-old-000000",
+		"rename-linked:a/.machinery-embed-new-000000->a/SHARD.md",
+		"directory:a",
+		"stage:b/.machinery-embed-new-000001",
+		"directory:b",
+		"journal-stage-synced:committed",
+		"journal-stage-dir-synced:committed",
+		"journal-renamed:committed",
+		"journal-dir-synced:committed",
+		"committed-journal",
+		"finalized-before-publication-clear",
+	}
+	for _, crashPoint := range points {
+		t.Run(strings.ReplaceAll(crashPoint, "/", "_"), func(t *testing.T) {
+			design := multiDirectoryRefreshDesign(t)
+			prior := embedTransactionPoint
+			embedTransactionPoint = func(point string) error {
+				if point == crashPoint {
+					panic("power loss at " + point)
+				}
+				return nil
+			}
+			func() {
+				defer func() {
+					if recovered := recover(); recovered == nil {
+						t.Fatalf("power-loss point %s did not fire", crashPoint)
+					}
+				}()
+				_, _, _ = RefreshEmbeds(design, false)
+			}()
+			embedTransactionPoint = prior
+			t.Cleanup(func() { embedTransactionPoint = prior })
+
+			if reader, err := designlock.AcquireReader(design); err == nil {
+				_ = reader.Release()
+				t.Fatalf("reader crossed interrupted transaction at %s", crashPoint)
+			}
+			if _, changed, err := RefreshEmbeds(design, false); err != nil {
+				t.Fatalf("exact retry after %s: %v", crashPoint, err)
+			} else if crashPoint == "finalized-before-publication-clear" && len(changed) != 0 {
+				t.Fatalf("finalized retry after %s reported already-published files as newly changed: %v", crashPoint, changed)
+			} else if crashPoint != "finalized-before-publication-clear" && strings.Join(changed, ",") != "a/SHARD.md,b/SHARD.md" {
+				t.Fatalf("retry after %s did not replay original plan: %v", crashPoint, changed)
+			}
+			for _, dir := range []string{"a", "b"} {
+				body, err := os.ReadFile(filepath.Join(design, dir, "SHARD.md"))
+				if err != nil || strings.Contains(string(body), "STALE") {
+					t.Fatalf("%s not converged after %s: %q, %v", dir, crashPoint, body, err)
+				}
+			}
+			assertNoEmbedTransactionResidue(t, design)
+			if _, changed, err := RefreshEmbeds(design, false); err != nil || len(changed) != 0 {
+				t.Fatalf("post-recovery retry not idempotent after %s: changed=%v err=%v", crashPoint, changed, err)
+			}
+		})
+	}
+}
+
+func assertNoEmbedTransactionResidue(t *testing.T, design string) {
+	t.Helper()
+	err := filepath.WalkDir(design, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		name := entry.Name()
+		if name == embedTxJournalName || name == embedTxStageName || strings.HasPrefix(name, embedTxNewPrefix) || strings.HasPrefix(name, embedTxOldPrefix) || name == ".machinery-design-publish.json" {
+			return fmt.Errorf("transaction residue remains: %s", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEmbedRefreshJournalCarriesExactBytesHashesModesAndRejectsForeignOrMalformed(t *testing.T) {
+	t.Run("exact immutable payload", func(t *testing.T) {
+		design := multiDirectoryRefreshDesign(t)
+		prior := embedTransactionPoint
+		embedTransactionPoint = func(point string) error {
+			if point == "prepared-journal" {
+				panic("inspect journal")
+			}
+			return nil
+		}
+		func() {
+			defer func() { _ = recover() }()
+			_, _, _ = RefreshEmbeds(design, false)
+		}()
+		embedTransactionPoint = prior
+		t.Cleanup(func() { embedTransactionPoint = prior })
+		body, err := os.ReadFile(filepath.Join(design, embedTxJournalName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		journal, err := decodeEmbedTxJournal(body)
+		if err != nil || len(journal.Items) != 2 {
+			t.Fatalf("decode exact journal: %v, %#v", err, journal)
+		}
+		for _, item := range journal.Items {
+			if !bytes.Contains(item.Old, []byte("STALE")) || bytes.Contains(item.New, []byte("STALE")) || item.OldHash != embedTxHash(item.Old) || item.NewHash != embedTxHash(item.New) || item.OldMode != 0o644 || item.NewMode != 0o644 || item.Deletion {
+				t.Fatalf("journal omitted exact old/new identity: %#v", item)
+			}
+		}
+	})
+
+	t.Run("malformed", func(t *testing.T) {
+		design := refreshDesign(t, keyedSource, "clean\n")
+		if err := os.WriteFile(filepath.Join(design, embedTxJournalName), []byte(`{"version":1,"unknown":true}`+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := RefreshEmbeds(design, false); err == nil || !strings.Contains(err.Error(), "invalid embed refresh journal") {
+			t.Fatalf("malformed journal was accepted: %v", err)
+		}
+	})
+
+	t.Run("foreign scope", func(t *testing.T) {
+		design := refreshDesign(t, keyedSource, "clean\n")
+		item := embedTxItem{Path: "SHARD.md", Old: []byte("clean\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}
+		journal, err := newEmbedTxJournal("foreign-design-scope", []embedTxItem{item})
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := encodeEmbedTxJournal(journal)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(design, embedTxJournalName), body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := RefreshEmbeds(design, false); err == nil || !strings.Contains(err.Error(), "foreign design scope") {
+			t.Fatalf("foreign journal was accepted: %v", err)
+		}
+	})
+
+	t.Run("symlink journal", func(t *testing.T) {
+		design := refreshDesign(t, keyedSource, "clean\n")
+		outside := filepath.Join(t.TempDir(), "journal")
+		if err := os.WriteFile(outside, []byte("outside sentinel\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(outside, filepath.Join(design, embedTxJournalName)); err != nil {
+			t.Skipf("symlinks unavailable: %v", err)
+		}
+		if _, _, err := RefreshEmbeds(design, false); err == nil || !strings.Contains(err.Error(), "symlink") {
+			t.Fatalf("symlink journal was accepted: %v", err)
+		}
+		body, err := os.ReadFile(outside)
+		if err != nil || string(body) != "outside sentinel\n" {
+			t.Fatalf("outside journal referent changed: %q, %v", body, err)
+		}
+	})
+
+	t.Run("directory journal", func(t *testing.T) {
+		design := refreshDesign(t, keyedSource, "clean\n")
+		if err := os.Mkdir(filepath.Join(design, embedTxJournalName), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := RefreshEmbeds(design, false); err == nil || !strings.Contains(err.Error(), "must be a regular file") {
+			t.Fatalf("directory journal was accepted: %v", err)
+		}
+	})
+}
+
+func TestEmbedTransactionDiagnosticsAndRollbackAreDeterministicAndExact(t *testing.T) {
+	t.Run("alias diagnostic", func(t *testing.T) {
+		item := embedTxItem{Path: "A.md", Temp: "A.md", Backup: ".machinery-embed-old-000000", Old: []byte("old"), New: []byte("new"), OldMode: 0o644, NewMode: 0o644}
+		item.OldHash, item.NewHash = embedTxHash(item.Old), embedTxHash(item.New)
+		journal := embedTxJournal{Version: embedTxVersion, Operation: "embed-refresh", Phase: embedTxPrepared, Scope: "scope", Items: []embedTxItem{item}}
+		journal.Checksum = embedTxChecksum(journal)
+		const want = "journal item 0 temp A.md aliases target A.md"
+		for i := 0; i < 100; i++ {
+			if err := validateEmbedTxJournal(journal); err == nil || err.Error() != want {
+				t.Fatalf("run %d: err=%v, want %q", i, err, want)
+			}
+		}
+	})
+
+	t.Run("physical residue diagnostic", func(t *testing.T) {
+		design := t.TempDir()
+		for _, dir := range []string{"a", "b"} {
+			if err := os.Mkdir(filepath.Join(design, dir), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(design, dir, ".machinery-embed-new-999999"), []byte("foreign"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		tx, err := openEmbedRootTransaction(design)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Close()
+		journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "target.md", Old: []byte("old"), New: []byte("new"), OldMode: 0o644, NewMode: 0o644}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		const want = "unreferenced embed transaction residue a/.machinery-embed-new-999999"
+		for i := 0; i < 100; i++ {
+			if err := tx.validatePhysicalInventory(journal, false); err == nil || err.Error() != want {
+				t.Fatalf("run %d: err=%v, want %q", i, err, want)
+			}
+		}
+	})
+
+	t.Run("chmod prevents rollback overwrite", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("POSIX permission mutation contract")
+		}
+		design := multiDirectoryRefreshDesign(t)
+		target := filepath.Join(design, "a", "SHARD.md")
+		prior := embedTransactionPoint
+		embedTransactionPoint = func(point string) error {
+			if point == "directory:a" {
+				if err := os.Chmod(target, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				return fmt.Errorf("injected failure after concurrent chmod")
+			}
+			return nil
+		}
+		_, _, err := RefreshEmbeds(design, false)
+		embedTransactionPoint = prior
+		t.Cleanup(func() { embedTransactionPoint = prior })
+		if err == nil || !strings.Contains(err.Error(), "durable rollback failed") {
+			t.Fatalf("rollback silently overwrote mode mutation: %v", err)
+		}
+		info, statErr := os.Stat(target)
+		if statErr != nil {
+			t.Fatalf("stat concurrently modified target: %v", statErr)
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Fatalf("concurrent mode mutation was overwritten: mode=%v", info.Mode())
+		}
+	})
+}
+
+func replaceEmbedTestFile(t *testing.T, target string, body []byte, mode os.FileMode) {
+	t.Helper()
+	replacement := target + ".concurrent-replacement"
+	if err := os.WriteFile(replacement, body, mode); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(replacement, mode); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(replacement, target); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEmbedRollbackPreservesLateTargetReplacementAndABA(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		mutate  func([]byte) []byte
+		message string
+	}{
+		{name: "content", mutate: func([]byte) []byte { return []byte("concurrent user edit\n") }, message: "content"},
+		{name: "same-byte ABA", mutate: func(body []byte) []byte { return append([]byte(nil), body...) }, message: "identity"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			design := t.TempDir()
+			target := filepath.Join(design, "SHARD.md")
+			if err := os.WriteFile(target, []byte("old\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			tx, err := openEmbedRootTransaction(design)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Close()
+			journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "SHARD.md", Old: []byte("old\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			prior := embedTransactionPoint
+			embedTransactionPoint = func(point string) error {
+				switch point {
+				case "directory:.":
+					return fmt.Errorf("injected failure")
+				case "rollback-before-target-remove:SHARD.md":
+					body, readErr := os.ReadFile(target)
+					if readErr != nil {
+						t.Fatal(readErr)
+					}
+					replaceEmbedTestFile(t, target, tc.mutate(body), 0o644)
+				}
+				return nil
+			}
+			err = tx.commit(journal)
+			embedTransactionPoint = prior
+			t.Cleanup(func() { embedTransactionPoint = prior })
+			if err == nil || !strings.Contains(err.Error(), "durable rollback failed") || !strings.Contains(err.Error(), tc.message) {
+				t.Fatalf("late %s replacement was not rejected exactly: %v", tc.name, err)
+			}
+			got, readErr := os.ReadFile(target)
+			if readErr != nil || !bytes.Equal(got, tc.mutate([]byte("new\n"))) {
+				t.Fatalf("late replacement was not preserved: %q, %v", got, readErr)
+			}
+			for _, residue := range []string{embedTxJournalName, journal.Items[0].Backup} {
+				if _, statErr := os.Lstat(filepath.Join(design, filepath.FromSlash(residue))); statErr != nil {
+					t.Fatalf("recovery evidence %s was removed: %v", residue, statErr)
+				}
+			}
+		})
+	}
+}
+
+func TestEmbedRollbackPreservesLateBackupReplacementAtRestore(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func([]byte) []byte
+	}{
+		{name: "content", mutate: func([]byte) []byte { return []byte("concurrent original edit\n") }},
+		{name: "same-byte ABA", mutate: func(body []byte) []byte { return append([]byte(nil), body...) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			design := t.TempDir()
+			target := filepath.Join(design, "SHARD.md")
+			if err := os.WriteFile(target, []byte("old\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			tx, err := openEmbedRootTransaction(design)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Close()
+			journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "SHARD.md", Old: []byte("old\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			backup := filepath.Join(design, filepath.FromSlash(journal.Items[0].Backup))
+			prior := embedTransactionPoint
+			embedTransactionPoint = func(point string) error {
+				switch point {
+				case "directory:.":
+					return fmt.Errorf("injected failure")
+				case "rollback-before-backup-restore:SHARD.md":
+					body, readErr := os.ReadFile(backup)
+					if readErr != nil {
+						t.Fatal(readErr)
+					}
+					replaceEmbedTestFile(t, backup, tc.mutate(body), 0o644)
+				}
+				return nil
+			}
+			err = tx.commit(journal)
+			embedTransactionPoint = prior
+			t.Cleanup(func() { embedTransactionPoint = prior })
+			if err == nil || !strings.Contains(err.Error(), "durable rollback failed") || !strings.Contains(err.Error(), "changed content, identity") {
+				t.Fatalf("late %s backup replacement was not rejected: %v", tc.name, err)
+			}
+			got, readErr := os.ReadFile(backup)
+			if readErr != nil || !bytes.Equal(got, tc.mutate([]byte("old\n"))) {
+				t.Fatalf("late backup replacement was not preserved: %q, %v", got, readErr)
+			}
+			if _, statErr := os.Lstat(filepath.Join(design, embedTxJournalName)); statErr != nil {
+				t.Fatalf("journal was removed after ambiguous restore: %v", statErr)
+			}
+		})
+	}
+}
+
+func TestEmbedRollbackDoesNotOverwriteLateTargetAtRestore(t *testing.T) {
+	design := t.TempDir()
+	target := filepath.Join(design, "SHARD.md")
+	if err := os.WriteFile(target, []byte("old\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := openEmbedRootTransaction(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Close()
+	journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "SHARD.md", Old: []byte("old\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior := embedTransactionPoint
+	embedTransactionPoint = func(point string) error {
+		switch point {
+		case "directory:.":
+			return fmt.Errorf("injected failure")
+		case "rollback-before-backup-restore:SHARD.md":
+			if err := os.WriteFile(target, []byte("late target\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return nil
+	}
+	err = tx.commit(journal)
+	embedTransactionPoint = prior
+	t.Cleanup(func() { embedTransactionPoint = prior })
+	if err == nil || !strings.Contains(err.Error(), "refuse to overwrite concurrent embed transaction path SHARD.md") {
+		t.Fatalf("late restore target was overwritten: %v", err)
+	}
+	if got, readErr := os.ReadFile(target); readErr != nil || string(got) != "late target\n" {
+		t.Fatalf("late target was not preserved: %q, %v", got, readErr)
+	}
+	if got, readErr := os.ReadFile(filepath.Join(design, filepath.FromSlash(journal.Items[0].Backup))); readErr != nil || string(got) != "old\n" {
+		t.Fatalf("original backup was not preserved: %q, %v", got, readErr)
+	}
+}
+
+func TestEmbedFinalizePreservesLateBackupReplacementAndABA(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		mutate  func([]byte) []byte
+		message string
+	}{
+		{name: "content", mutate: func([]byte) []byte { return []byte("concurrent backup edit\n") }, message: "content"},
+		{name: "same-byte ABA", mutate: func(body []byte) []byte { return append([]byte(nil), body...) }, message: "identity"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			design := t.TempDir()
+			target := filepath.Join(design, "SHARD.md")
+			if err := os.WriteFile(target, []byte("old\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			tx, err := openEmbedRootTransaction(design)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Close()
+			journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "SHARD.md", Old: []byte("old\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			backup := filepath.Join(design, filepath.FromSlash(journal.Items[0].Backup))
+			prior := embedTransactionPoint
+			embedTransactionPoint = func(point string) error {
+				if point == "finalize-before-residue-remove:"+journal.Items[0].Backup {
+					body, readErr := os.ReadFile(backup)
+					if readErr != nil {
+						t.Fatal(readErr)
+					}
+					replaceEmbedTestFile(t, backup, tc.mutate(body), 0o644)
+				}
+				return nil
+			}
+			err = tx.commit(journal)
+			embedTransactionPoint = prior
+			t.Cleanup(func() { embedTransactionPoint = prior })
+			if err == nil || !strings.Contains(err.Error(), tc.message) {
+				t.Fatalf("late %s backup replacement was not rejected exactly: %v", tc.name, err)
+			}
+			got, readErr := os.ReadFile(backup)
+			if readErr != nil || !bytes.Equal(got, tc.mutate([]byte("old\n"))) {
+				t.Fatalf("late backup replacement was not preserved: %q, %v", got, readErr)
+			}
+			if _, statErr := os.Lstat(filepath.Join(design, embedTxJournalName)); statErr != nil {
+				t.Fatalf("journal was removed after ambiguous cleanup: %v", statErr)
+			}
+		})
+	}
+}
+
+func TestEmbedRollbackPreservesLateTempReplacementAndABA(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func([]byte) []byte
+	}{
+		{name: "content", mutate: func([]byte) []byte { return []byte("concurrent temp edit\n") }},
+		{name: "same-byte ABA", mutate: func(body []byte) []byte { return append([]byte(nil), body...) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			design := t.TempDir()
+			target := filepath.Join(design, "SHARD.md")
+			if err := os.WriteFile(target, []byte("old\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			tx, err := openEmbedRootTransaction(design)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Close()
+			journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "SHARD.md", Old: []byte("old\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			temp := filepath.Join(design, filepath.FromSlash(journal.Items[0].Temp))
+			prior := embedTransactionPoint
+			embedTransactionPoint = func(point string) error {
+				switch point {
+				case "stage:" + journal.Items[0].Temp:
+					return fmt.Errorf("injected failure")
+				case "rollback-before-temp-remove:" + journal.Items[0].Temp:
+					body, readErr := os.ReadFile(temp)
+					if readErr != nil {
+						t.Fatal(readErr)
+					}
+					replaceEmbedTestFile(t, temp, tc.mutate(body), 0o644)
+				}
+				return nil
+			}
+			err = tx.commit(journal)
+			embedTransactionPoint = prior
+			t.Cleanup(func() { embedTransactionPoint = prior })
+			if err == nil || !strings.Contains(err.Error(), "durable rollback failed") || !strings.Contains(err.Error(), "changed content, identity") {
+				t.Fatalf("late %s temp replacement was not rejected: %v", tc.name, err)
+			}
+			got, readErr := os.ReadFile(temp)
+			if readErr != nil || !bytes.Equal(got, tc.mutate([]byte("new\n"))) {
+				t.Fatalf("late temp replacement was not preserved: %q, %v", got, readErr)
+			}
+			if _, statErr := os.Lstat(filepath.Join(design, embedTxJournalName)); statErr != nil {
+				t.Fatalf("journal was removed after ambiguous temp cleanup: %v", statErr)
+			}
+		})
+	}
+}
+
+func TestEmbedFinalizePreservesLateTargetReplacementAndJournalABA(t *testing.T) {
+	t.Run("target before residue removal", func(t *testing.T) {
+		for _, sameBytes := range []bool{false, true} {
+			name := "content"
+			if sameBytes {
+				name = "same-byte ABA"
+			}
+			t.Run(name, func(t *testing.T) {
+				design := t.TempDir()
+				target := filepath.Join(design, "SHARD.md")
+				if err := os.WriteFile(target, []byte("old\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				tx, err := openEmbedRootTransaction(design)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer tx.Close()
+				journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "SHARD.md", Old: []byte("old\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				prior := embedTransactionPoint
+				embedTransactionPoint = func(point string) error {
+					if point == "finalize-before-residue-remove:"+journal.Items[0].Backup {
+						body := []byte("concurrent target edit\n")
+						if sameBytes {
+							body = []byte("new\n")
+						}
+						replaceEmbedTestFile(t, target, body, 0o644)
+					}
+					return nil
+				}
+				err = tx.commit(journal)
+				embedTransactionPoint = prior
+				t.Cleanup(func() { embedTransactionPoint = prior })
+				if err == nil || !strings.Contains(err.Error(), "target changed before residue removal") {
+					t.Fatalf("late target replacement was not rejected: %v", err)
+				}
+				for _, residue := range []string{embedTxJournalName, journal.Items[0].Backup} {
+					if _, statErr := os.Lstat(filepath.Join(design, filepath.FromSlash(residue))); statErr != nil {
+						t.Fatalf("recovery evidence %s was removed: %v", residue, statErr)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("journal", func(t *testing.T) {
+		design := t.TempDir()
+		target := filepath.Join(design, "SHARD.md")
+		if err := os.WriteFile(target, []byte("old\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		tx, err := openEmbedRootTransaction(design)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Close()
+		journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "SHARD.md", Old: []byte("old\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		journalPath := filepath.Join(design, embedTxJournalName)
+		prior := embedTransactionPoint
+		embedTransactionPoint = func(point string) error {
+			if point == "finalize-before-journal-remove" {
+				body, readErr := os.ReadFile(journalPath)
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				replaceEmbedTestFile(t, journalPath, body, 0o600)
+			}
+			return nil
+		}
+		err = tx.commit(journal)
+		embedTransactionPoint = prior
+		t.Cleanup(func() { embedTransactionPoint = prior })
+		if err == nil || !strings.Contains(err.Error(), "refuse to remove changed embed refresh journal") {
+			t.Fatalf("late journal ABA was not rejected: %v", err)
+		}
+		if _, statErr := os.Lstat(journalPath); statErr != nil {
+			t.Fatalf("replaced journal was not preserved: %v", statErr)
+		}
+	})
+}
+
+func TestEmbedRollbackPowerLossAfterRestoreLinkRecovers(t *testing.T) {
+	design := multiDirectoryRefreshDesign(t)
+	prior := embedTransactionPoint
+	embedTransactionPoint = func(point string) error {
+		if point == "directory:a" {
+			return fmt.Errorf("force ordinary rollback")
+		}
+		if point == "rename-linked:a/.machinery-embed-old-000000->a/SHARD.md" {
+			panic("power loss after no-clobber restore link")
+		}
+		return nil
+	}
+	func() {
+		defer func() {
+			if recovered := recover(); recovered == nil {
+				t.Fatal("restore-link power loss did not fire")
+			}
+		}()
+		_, _, _ = RefreshEmbeds(design, false)
+	}()
+	embedTransactionPoint = prior
+	t.Cleanup(func() { embedTransactionPoint = prior })
+
+	if _, changed, err := RefreshEmbeds(design, false); err != nil {
+		t.Fatalf("restart did not recover exact linked rollback state: %v", err)
+	} else if strings.Join(changed, ",") != "a/SHARD.md,b/SHARD.md" {
+		t.Fatalf("restart changed = %v", changed)
+	}
+	assertNoEmbedTransactionResidue(t, design)
+}
+
+func TestEmbedJournalPromotionRejectsLateStageAndJournalABA(t *testing.T) {
+	t.Run("stage", func(t *testing.T) {
+		design := t.TempDir()
+		tx, err := openEmbedRootTransaction(design)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Close()
+		journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "SHARD.md", Old: []byte("old\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		stage := filepath.Join(design, embedTxStageName)
+		prior := embedTransactionPoint
+		embedTransactionPoint = func(point string) error {
+			if point == "journal-before-promote:prepared" {
+				body, readErr := os.ReadFile(stage)
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				replaceEmbedTestFile(t, stage, body, 0o600)
+			}
+			return nil
+		}
+		err = tx.persistJournal(journal)
+		embedTransactionPoint = prior
+		t.Cleanup(func() { embedTransactionPoint = prior })
+		if err == nil || !strings.Contains(err.Error(), "stage changed before promotion") {
+			t.Fatalf("late staged-journal ABA was not rejected: %v", err)
+		}
+		if _, statErr := os.Lstat(stage); statErr != nil {
+			t.Fatalf("replaced stage was not preserved: %v", statErr)
+		}
+	})
+
+	t.Run("current journal", func(t *testing.T) {
+		design := t.TempDir()
+		tx, err := openEmbedRootTransaction(design)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Close()
+		journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "SHARD.md", Old: []byte("old\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.persistJournal(journal); err != nil {
+			t.Fatal(err)
+		}
+		current := filepath.Join(design, embedTxJournalName)
+		journal.Phase = embedTxCommitted
+		prior := embedTransactionPoint
+		embedTransactionPoint = func(point string) error {
+			if point == "journal-before-promote:committed" {
+				body, readErr := os.ReadFile(current)
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				replaceEmbedTestFile(t, current, body, 0o600)
+			}
+			return nil
+		}
+		err = tx.persistJournal(journal)
+		embedTransactionPoint = prior
+		t.Cleanup(func() { embedTransactionPoint = prior })
+		if err == nil || !strings.Contains(err.Error(), "journal changed before promotion") {
+			t.Fatalf("late current-journal ABA was not rejected: %v", err)
+		}
+		for _, name := range []string{embedTxJournalName, embedTxStageName} {
+			if _, statErr := os.Lstat(filepath.Join(design, name)); statErr != nil {
+				t.Fatalf("%s was not preserved: %v", name, statErr)
+			}
+		}
+	})
+}
+
+func TestEmbedRefreshRootedTransactionCannotEscapeSwappedParent(t *testing.T) {
+	design := multiDirectoryRefreshDesign(t)
+	outside := t.TempDir()
+	sentinel := filepath.Join(outside, "SHARD.md")
+	if err := os.WriteFile(sentinel, []byte("outside sentinel\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prior := embedTransactionPoint
+	embedTransactionPoint = func(point string) error {
+		if point != "stage:a/.machinery-embed-new-000000" {
+			return nil
+		}
+		if err := os.Rename(filepath.Join(design, "a"), filepath.Join(design, "a-parked")); err != nil {
+			return err
+		}
+		return os.Symlink(outside, filepath.Join(design, "a"))
+	}
+	_, _, err := RefreshEmbeds(design, false)
+	embedTransactionPoint = prior
+	t.Cleanup(func() { embedTransactionPoint = prior })
+	if err == nil {
+		t.Fatal("parent swap was not rejected")
+	}
+	body, readErr := os.ReadFile(sentinel)
+	if readErr != nil || string(body) != "outside sentinel\n" {
+		t.Fatalf("rooted transaction escaped to outside sentinel: %q, %v", body, readErr)
 	}
 }
 

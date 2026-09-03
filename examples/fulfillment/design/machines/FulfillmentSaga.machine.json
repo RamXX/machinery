@@ -9,6 +9,9 @@
   },
   "id": "fulfillmentSaga",
   "initial": "Reserving",
+  "_counters": {
+    "retries": "one compensation budget per order-saga instance: the instance enters compensation at most once, exhaustion ends in the explicit FailedDirty residual, and retrying fulfillment creates a new order and saga with retries initialized to zero"
+  },
   "context": { "orderId": null, "retries": 0 },
   "states": {
     "Reserving": {

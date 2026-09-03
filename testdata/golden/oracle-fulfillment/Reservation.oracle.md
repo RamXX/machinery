@@ -16,13 +16,14 @@ the design changes, stable ids do not.
 | persisting | atomic | - | - |
 | persistRetry | atomic | - | - |
 | rolledBack | atomic | - | - |
+| routingFault | final | - | - |
 
 ## Transitions
 
 | test id | stable id | source | trigger | guard | target | actions |
 |---|---|---|---|---|---|---|
-| T-RESE-01 | RESE-1581b4 | Held | on:commit | - | persisting | setPendingCommitted |
-| T-RESE-02 | RESE-05202b | Held | on:release | - | persisting | setPendingReleased |
+| T-RESE-01 | RESE-1581b4 | Held | on:commit | - | persisting | resetRetries, setPendingCommitted |
+| T-RESE-02 | RESE-05202b | Held | on:release | - | persisting | resetRetries, setPendingReleased |
 | T-RESE-03 | RESE-e34282 | persisting | after:persistTimeout | - | rolledBack | recordTimeout |
 | T-RESE-04 | RESE-883427 | persisting | onDone:persistReservation | pendingIsCommitted | Committed | commitStatus |
 | T-RESE-05 | RESE-618adb | persisting | onDone:persistReservation | pendingIsReleased | Released | commitStatus |
@@ -33,5 +34,6 @@ the design changes, stable ids do not.
 | T-RESE-10 | RESE-892929 | persistRetry | after:persistRetryBackoff | - | persisting | incrementRetries |
 | T-RESE-11 | RESE-25f172 | persistRetry | always | retriesExhausted | rolledBack | recordRetriesExhausted |
 | T-RESE-12 | RESE-d73c65 | rolledBack | always | priorIsHeld | Held | - |
+| T-RESE-13 | RESE-114864 | rolledBack | always | - | routingFault | recordRoutingError |
 
-Total transitions (test cases): 12
+Total transitions (test cases): 13

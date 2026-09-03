@@ -11,9 +11,9 @@ States trace to enum `TaskStatus`. Events trace to `Task` actions. `Done`/`Cance
 |---|---|---|---|---|
 | `saveTask` | actor | `(input{taskId,status,ownerId,newAssigneeId,actor}) -> TaskRow \| err{ErrConstraint,ErrConflict,ErrDiskFull,ErrTimeout,ErrLocked}` | pre: guard passed, tx open. post: node `status`(+`owner` on reassign) atomically, or unchanged on err | C4 `crm.domain -> crm.repo` then `crm.repo -> store` (Cypher SaveTask) |
 | `guardCanStart` | guard | `(ctx,evt) -> bool` | true iff actor may write the task (owner/manager/admin in scope) | inv `rbac-write-scope` |
-| `guardCanComplete` | guard | `(ctx,evt) -> bool` | true iff source is non-terminal AND actor may write | inv `task-terminal`, `rbac-write-scope` |
-| `guardCanCancel` | guard | `(ctx,evt) -> bool` | true iff source is non-terminal AND actor may write | inv `task-terminal`, `rbac-write-scope` |
-| `guardCanReassign` | guard | `(ctx,evt) -> bool` | true iff new assignee is inside the assigner's VisibilityScope AND actor is Manager/Admin in scope | inv `task-assignee-visible`, `rbac-reassign-authority`, `rbac-write-scope` |
+| `guardCanComplete` | guard | `(ctx,evt) -> bool` | true iff actor may write. The machine admits this guard only from non-terminal states; Done and Cancelled are structurally final. `CLAUSES{actor-may-write}` | inv `task-terminal`, `rbac-write-scope` |
+| `guardCanCancel` | guard | `(ctx,evt) -> bool` | true iff actor may write. The machine admits this guard only from non-terminal states; Done and Cancelled are structurally final. `CLAUSES{actor-may-write}` | inv `task-terminal`, `rbac-write-scope` |
+| `guardCanReassign` | guard | `(ctx,evt) -> bool` | true iff new assignee is in the actor's allowed target set AND the actor has Manager/Admin reassignment authority AND the source Task is within the actor's write scope. `CLAUSES{assignee-visible, reassignment-authority, source-in-write-scope}` | inv `task-assignee-visible`, `rbac-reassign-authority`, `rbac-write-scope` |
 | `pendingIsOpen` / `pendingIsInProgress` / `pendingIsDone` / `pendingIsCancelled` | guard | `(ctx) -> bool` | true iff `ctx.pendingStatus` equals that status | - (persist success routing) |
 | `priorIsOpen` / `priorIsInProgress` | guard | `(ctx) -> bool` | true iff `ctx.priorStatus` equals that status | - (rollback routing; only non-terminal states persist) |
 | `isErrLocked` / `isErrConstraint` / `isErrDiskFull` / `isErrTimeout` | guard | `(ctx,evt) -> bool` | true iff `evt.error` is that typed repo error | C4 section 6 failure classes |
@@ -75,5 +75,6 @@ States trace to enum `TaskStatus`. Events trace to `Task` actions. `Done`/`Cance
 | 30 | persistRetry | after persistRetryBackoff | - | persisting | incrementRetries | C4 6 backoff ~0.5s |
 | 31 | rolledBack | always | priorIsOpen | Open | - | atomic rollback |
 | 32 | rolledBack | always | priorIsInProgress | InProgress | - | atomic rollback |
+| 33 | rolledBack | always | (else) | Cancelled | recordRoutingError | fail closed on corrupt rollback metadata; the instance is discarded and the unchanged store remains authoritative |
 
 Ignored-by-design: `Done` and `Cancelled` are `final`; every event {start, complete, cancel, reassign} is structurally rejected there (this is `task-terminal`). All events are handled in `Open` and `InProgress`.

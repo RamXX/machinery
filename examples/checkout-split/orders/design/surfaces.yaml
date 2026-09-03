@@ -1,0 +1,14 @@
+surface_version: 1
+sources:
+  - orders.modelith.yaml action list, walked for Customer and Operator personas
+  - BUILD.md command API and lifecycle specification
+acts:
+  - act: Order.place
+    actor: Customer
+    surface: "customer order API: POST /orders with total"
+  - act: Order.ship
+    actor: Operator
+    surface: "operator order API: POST /orders/{id}/ship"
+  - act: Order.cancel
+    actor: Customer
+    surface: "customer order API: POST /orders/{id}/cancel"

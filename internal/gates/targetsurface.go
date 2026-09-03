@@ -36,6 +36,14 @@ func HasTargetSurfaces(design string) bool {
 	return err == nil && !fi.IsDir()
 }
 
+// HasHumanActions closes Gu's activation universe: the ledger is owed by a
+// human act in the model, so deleting surfaces.yaml must activate a failure
+// rather than delete the gate.
+func HasHumanActions(design string) bool {
+	model, err := readTargetActModel(design)
+	return err == nil && len(model.obligated()) > 0
+}
+
 // targetAct is one action of the Phase 1 target model, with the actor that
 // performs it ("" when the action declares none).
 type targetAct struct {
@@ -132,7 +140,7 @@ func CheckTargetSurfaces(design string) *Gate {
 		g.Errs = append(g.Errs, "no "+TargetSurfacesName+" in the design; the target surface gate was requested but no target surface ledger was authored")
 		return g
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := readDesignFile(design, path)
 	if err != nil {
 		g.Errs = append(g.Errs, err.Error())
 		return g
@@ -450,16 +458,16 @@ func readTargetActModel(design string) (targetActModel, error) {
 		actors:   map[string]bool{},
 	}
 	for _, path := range paths {
-		if err := model.readFile(path); err != nil {
+		if err := model.readFile(design, path); err != nil {
 			return targetActModel{}, err
 		}
 	}
 	return model, nil
 }
 
-func (m *targetActModel) readFile(path string) error {
+func (m *targetActModel) readFile(design, path string) error {
 	base := filepath.Base(path)
-	raw, err := os.ReadFile(path)
+	raw, err := readDesignFile(design, path)
 	if err != nil {
 		return err
 	}

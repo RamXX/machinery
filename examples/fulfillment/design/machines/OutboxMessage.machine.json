@@ -27,7 +27,7 @@
     },
     "Published": {
       "on": {
-        "markConsumed": { "target": "persisting", "actions": "setPendingConsumed" }
+        "markConsumed": { "target": "persisting", "actions": ["resetRetries", "setPendingConsumed"] }
       },
       "_ignores": {
         "publish": "the poller re-selected an already-published row (race with its own sweep); publishing again is safe (consumers dedupe) but skipped"
@@ -38,7 +38,7 @@
       "invoke": {
         "src": "publishToBus",
         "input": { "messageId": "context.messageId", "messageType": "context.messageType" },
-        "onDone": { "target": "persisting", "actions": "setPendingPublished" },
+        "onDone": { "target": "persisting", "actions": ["resetRetries", "setPendingPublished"] },
         "onError": { "target": "rolledBack", "actions": "recordPublishError" }
       },
       "after": {
@@ -73,11 +73,12 @@
       }
     },
     "rolledBack": {
-      "_exhaustive": "priorStatus is set on every path into the overlay from a domain state; only Pending and Published reach the overlay (Consumed is final), and both priorIs* guards are present; a rollback to Pending is precisely the at-least-once re-drive point for the next poller sweep",
       "always": [
         { "target": "Pending", "guard": "priorIsPending" },
-        { "target": "Published", "guard": "priorIsPublished" }
+        { "target": "Published", "guard": "priorIsPublished" },
+        { "target": "routingFault", "actions": "recordRoutingError" }
       ]
-    }
+    },
+    "routingFault": { "type": "final" }
   }
 }

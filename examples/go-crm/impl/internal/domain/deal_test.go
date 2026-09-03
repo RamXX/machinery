@@ -1,7 +1,7 @@
 package domain_test
 
-// Deal transition oracle. One table case per BUILD.md 7.1 T-DEAL row (and one
-// sub-case per falsifying clause of every conjunction guard, per the 7.1
+// Deal transition oracle. One table case per committed Deal oracle row (and one
+// sub-case per falsifying clause of every conjunction guard, per the BUILD.md
 // guard-branch completeness note). Source: machines/Deal.matrix.md.
 //
 // Each case sets up the "given state + context", fires the event, and asserts
@@ -50,7 +50,7 @@ type dealCase struct {
 	actions []string
 }
 
-func dealCases() []dealCase {
+func TestDealTransitions(t *testing.T) {
 	adv := domain.DealEvent{Kind: domain.DEvAdvanceStage}
 	lose := domain.DealEvent{Kind: domain.DEvLose}
 	reopen := domain.DealEvent{Kind: domain.DEvReopen}
@@ -64,52 +64,52 @@ func dealCases() []dealCase {
 	cs := []dealCase{
 		// --- Lead ---
 		{"T-DEAL-01_DEAL-eb0c40", newDeal(domain.DSLead), adv, domain.DSPersisting, []string{"setPendingAdvance"}},
-		{"T-DEAL-02a_notWritable_DEAL-38ba11", notWritable(newDeal(domain.DSLead)), adv, domain.DSLead, []string{"recordAdvanceDenied"}},
-		{"T-DEAL-02b_negAmount_DEAL-38ba11", negAmount(newDeal(domain.DSLead)), adv, domain.DSLead, []string{"recordAdvanceDenied"}},
+		{"DEAL-eb0c40a / notWritable / DEAL-38ba11", notWritable(newDeal(domain.DSLead)), adv, domain.DSLead, []string{"recordAdvanceDenied"}},
+		{"DEAL-eb0c40b / negAmount / DEAL-38ba11", negAmount(newDeal(domain.DSLead)), adv, domain.DSLead, []string{"recordAdvanceDenied"}},
 		{"T-DEAL-03_DEAL-1fe825", newDeal(domain.DSLead), winOK, domain.DSPersisting, []string{"setPendingWin"}},
-		{"T-DEAL-04a_noCloseDate_DEAL-e786d8", newDeal(domain.DSLead), winNoDate, domain.DSLead, []string{"recordWinDenied"}},
-		{"T-DEAL-04b_notWritable_DEAL-e786d8", notWritable(newDeal(domain.DSLead)), winOK, domain.DSLead, []string{"recordWinDenied"}},
-		{"T-DEAL-04c_negAmount_DEAL-e786d8", negAmount(newDeal(domain.DSLead)), winOK, domain.DSLead, []string{"recordWinDenied"}},
+		{"DEAL-1fe825a / noCloseDate / DEAL-e786d8", newDeal(domain.DSLead), winNoDate, domain.DSLead, []string{"recordWinDenied"}},
+		{"DEAL-1fe825b / notWritable / DEAL-e786d8", notWritable(newDeal(domain.DSLead)), winOK, domain.DSLead, []string{"recordWinDenied"}},
+		{"DEAL-1fe825c / negAmount / DEAL-e786d8", negAmount(newDeal(domain.DSLead)), winOK, domain.DSLead, []string{"recordWinDenied"}},
 		{"T-DEAL-05_DEAL-b76457", newDeal(domain.DSLead), lose, domain.DSPersisting, []string{"setPendingLose"}},
-		{"T-DEAL-06a_notWritable_DEAL-fdf795", notWritable(newDeal(domain.DSLead)), lose, domain.DSLead, []string{"recordLoseDenied"}},
-		{"T-DEAL-06b_negAmount_DEAL-fdf795", negAmount(newDeal(domain.DSLead)), lose, domain.DSLead, []string{"recordLoseDenied"}},
+		{"DEAL-b76457a / notWritable / DEAL-fdf795", notWritable(newDeal(domain.DSLead)), lose, domain.DSLead, []string{"recordLoseDenied"}},
+		{"DEAL-b76457b / negAmount / DEAL-fdf795", negAmount(newDeal(domain.DSLead)), lose, domain.DSLead, []string{"recordLoseDenied"}},
 		{"T-DEAL-07_DEAL-1d9aa0", newDeal(domain.DSLead), reopen, domain.DSLead, []string{"recordReopenNotTerminal"}},
 
 		// --- Qualified ---
 		{"T-DEAL-08_DEAL-a14020", newDeal(domain.DSQualified), adv, domain.DSPersisting, []string{"setPendingAdvance"}},
-		{"T-DEAL-09a_notWritable_DEAL-0c4c47", notWritable(newDeal(domain.DSQualified)), adv, domain.DSQualified, []string{"recordAdvanceDenied"}},
-		{"T-DEAL-09b_negAmount_DEAL-0c4c47", negAmount(newDeal(domain.DSQualified)), adv, domain.DSQualified, []string{"recordAdvanceDenied"}},
+		{"DEAL-a14020a / notWritable / DEAL-0c4c47", notWritable(newDeal(domain.DSQualified)), adv, domain.DSQualified, []string{"recordAdvanceDenied"}},
+		{"DEAL-a14020b / negAmount / DEAL-0c4c47", negAmount(newDeal(domain.DSQualified)), adv, domain.DSQualified, []string{"recordAdvanceDenied"}},
 		{"T-DEAL-10_DEAL-492234", newDeal(domain.DSQualified), winOK, domain.DSPersisting, []string{"setPendingWin"}},
-		{"T-DEAL-11a_noCloseDate_DEAL-81d0ab", newDeal(domain.DSQualified), winNoDate, domain.DSQualified, []string{"recordWinDenied"}},
-		{"T-DEAL-11b_notWritable_DEAL-81d0ab", notWritable(newDeal(domain.DSQualified)), winOK, domain.DSQualified, []string{"recordWinDenied"}},
-		{"T-DEAL-11c_negAmount_DEAL-81d0ab", negAmount(newDeal(domain.DSQualified)), winOK, domain.DSQualified, []string{"recordWinDenied"}},
+		{"DEAL-492234a / noCloseDate / DEAL-81d0ab", newDeal(domain.DSQualified), winNoDate, domain.DSQualified, []string{"recordWinDenied"}},
+		{"DEAL-492234b / notWritable / DEAL-81d0ab", notWritable(newDeal(domain.DSQualified)), winOK, domain.DSQualified, []string{"recordWinDenied"}},
+		{"DEAL-492234c / negAmount / DEAL-81d0ab", negAmount(newDeal(domain.DSQualified)), winOK, domain.DSQualified, []string{"recordWinDenied"}},
 		{"T-DEAL-12_DEAL-f7d8b2", newDeal(domain.DSQualified), lose, domain.DSPersisting, []string{"setPendingLose"}},
-		{"T-DEAL-13a_notWritable_DEAL-9f48af", notWritable(newDeal(domain.DSQualified)), lose, domain.DSQualified, []string{"recordLoseDenied"}},
-		{"T-DEAL-13b_negAmount_DEAL-9f48af", negAmount(newDeal(domain.DSQualified)), lose, domain.DSQualified, []string{"recordLoseDenied"}},
+		{"DEAL-f7d8b2a / notWritable / DEAL-9f48af", notWritable(newDeal(domain.DSQualified)), lose, domain.DSQualified, []string{"recordLoseDenied"}},
+		{"DEAL-f7d8b2b / negAmount / DEAL-9f48af", negAmount(newDeal(domain.DSQualified)), lose, domain.DSQualified, []string{"recordLoseDenied"}},
 		{"T-DEAL-14_DEAL-990c3b", newDeal(domain.DSQualified), reopen, domain.DSQualified, []string{"recordReopenNotTerminal"}},
 
 		// --- Proposal ---
 		{"T-DEAL-15_DEAL-388687", newDeal(domain.DSProposal), adv, domain.DSPersisting, []string{"setPendingAdvance"}},
-		{"T-DEAL-16a_notWritable_DEAL-5df488", notWritable(newDeal(domain.DSProposal)), adv, domain.DSProposal, []string{"recordAdvanceDenied"}},
-		{"T-DEAL-16b_negAmount_DEAL-5df488", negAmount(newDeal(domain.DSProposal)), adv, domain.DSProposal, []string{"recordAdvanceDenied"}},
+		{"DEAL-388687a / notWritable / DEAL-5df488", notWritable(newDeal(domain.DSProposal)), adv, domain.DSProposal, []string{"recordAdvanceDenied"}},
+		{"DEAL-388687b / negAmount / DEAL-5df488", negAmount(newDeal(domain.DSProposal)), adv, domain.DSProposal, []string{"recordAdvanceDenied"}},
 		{"T-DEAL-17_DEAL-7e1e9b", newDeal(domain.DSProposal), winOK, domain.DSPersisting, []string{"setPendingWin"}},
-		{"T-DEAL-18a_noCloseDate_DEAL-df4442", newDeal(domain.DSProposal), winNoDate, domain.DSProposal, []string{"recordWinDenied"}},
-		{"T-DEAL-18b_notWritable_DEAL-df4442", notWritable(newDeal(domain.DSProposal)), winOK, domain.DSProposal, []string{"recordWinDenied"}},
-		{"T-DEAL-18c_negAmount_DEAL-df4442", negAmount(newDeal(domain.DSProposal)), winOK, domain.DSProposal, []string{"recordWinDenied"}},
+		{"DEAL-7e1e9ba / noCloseDate / DEAL-df4442", newDeal(domain.DSProposal), winNoDate, domain.DSProposal, []string{"recordWinDenied"}},
+		{"DEAL-7e1e9bb / notWritable / DEAL-df4442", notWritable(newDeal(domain.DSProposal)), winOK, domain.DSProposal, []string{"recordWinDenied"}},
+		{"DEAL-7e1e9bc / negAmount / DEAL-df4442", negAmount(newDeal(domain.DSProposal)), winOK, domain.DSProposal, []string{"recordWinDenied"}},
 		{"T-DEAL-19_DEAL-fde084", newDeal(domain.DSProposal), lose, domain.DSPersisting, []string{"setPendingLose"}},
-		{"T-DEAL-20a_notWritable_DEAL-e16eea", notWritable(newDeal(domain.DSProposal)), lose, domain.DSProposal, []string{"recordLoseDenied"}},
-		{"T-DEAL-20b_negAmount_DEAL-e16eea", negAmount(newDeal(domain.DSProposal)), lose, domain.DSProposal, []string{"recordLoseDenied"}},
+		{"DEAL-fde084a / notWritable / DEAL-e16eea", notWritable(newDeal(domain.DSProposal)), lose, domain.DSProposal, []string{"recordLoseDenied"}},
+		{"DEAL-fde084b / negAmount / DEAL-e16eea", negAmount(newDeal(domain.DSProposal)), lose, domain.DSProposal, []string{"recordLoseDenied"}},
 		{"T-DEAL-21_DEAL-44482d", newDeal(domain.DSProposal), reopen, domain.DSProposal, []string{"recordReopenNotTerminal"}},
 
 		// --- Negotiation (no forward stage) ---
 		{"T-DEAL-22_DEAL-708606", newDeal(domain.DSNegotiation), adv, domain.DSNegotiation, []string{"recordAdvanceDenied"}},
 		{"T-DEAL-23_DEAL-38140e", newDeal(domain.DSNegotiation), winOK, domain.DSPersisting, []string{"setPendingWin"}},
-		{"T-DEAL-24a_noCloseDate_DEAL-3bbe10", newDeal(domain.DSNegotiation), winNoDate, domain.DSNegotiation, []string{"recordWinDenied"}},
-		{"T-DEAL-24b_notWritable_DEAL-3bbe10", notWritable(newDeal(domain.DSNegotiation)), winOK, domain.DSNegotiation, []string{"recordWinDenied"}},
-		{"T-DEAL-24c_negAmount_DEAL-3bbe10", negAmount(newDeal(domain.DSNegotiation)), winOK, domain.DSNegotiation, []string{"recordWinDenied"}},
+		{"DEAL-38140ea / noCloseDate / DEAL-3bbe10", newDeal(domain.DSNegotiation), winNoDate, domain.DSNegotiation, []string{"recordWinDenied"}},
+		{"DEAL-38140eb / notWritable / DEAL-3bbe10", notWritable(newDeal(domain.DSNegotiation)), winOK, domain.DSNegotiation, []string{"recordWinDenied"}},
+		{"DEAL-38140ec / negAmount / DEAL-3bbe10", negAmount(newDeal(domain.DSNegotiation)), winOK, domain.DSNegotiation, []string{"recordWinDenied"}},
 		{"T-DEAL-25_DEAL-8fde14", newDeal(domain.DSNegotiation), lose, domain.DSPersisting, []string{"setPendingLose"}},
-		{"T-DEAL-26a_notWritable_DEAL-b5154b", notWritable(newDeal(domain.DSNegotiation)), lose, domain.DSNegotiation, []string{"recordLoseDenied"}},
-		{"T-DEAL-26b_negAmount_DEAL-b5154b", negAmount(newDeal(domain.DSNegotiation)), lose, domain.DSNegotiation, []string{"recordLoseDenied"}},
+		{"DEAL-8fde14a / notWritable / DEAL-b5154b", notWritable(newDeal(domain.DSNegotiation)), lose, domain.DSNegotiation, []string{"recordLoseDenied"}},
+		{"DEAL-8fde14b / negAmount / DEAL-b5154b", negAmount(newDeal(domain.DSNegotiation)), lose, domain.DSNegotiation, []string{"recordLoseDenied"}},
 		{"T-DEAL-27_DEAL-69312c", newDeal(domain.DSNegotiation), reopen, domain.DSNegotiation, []string{"recordReopenNotTerminal"}},
 
 		// --- Won (terminal) ---
@@ -155,8 +155,19 @@ func dealCases() []dealCase {
 		{"T-DEAL-55_DEAL-8a4caf", dealPrior(domain.DSNegotiation), domain.DealEvent{Kind: domain.DEvAlways}, domain.DSNegotiation, nil},
 		{"T-DEAL-56_DEAL-9b6ee7", dealPrior(domain.DSWon), domain.DealEvent{Kind: domain.DEvAlways}, domain.DSWon, nil},
 		{"T-DEAL-57_DEAL-21905a", dealPrior(domain.DSLost), domain.DealEvent{Kind: domain.DEvAlways}, domain.DSLost, nil},
+		{"DEAL-b48a23 / fail-closed rollback routing", dealPrior(domain.DealState("bogus")), domain.DealEvent{Kind: domain.DEvAlways}, domain.DSLost, []string{"recordRoutingError"}},
 	}
-	return cs
+	for _, tc := range cs {
+		t.Run(tc.id, func(t *testing.T) {
+			got := tc.deal.Fire(tc.event)
+			if tc.deal.State != tc.want {
+				t.Errorf("%s: next state = %q, want %q", tc.id, tc.deal.State, tc.want)
+			}
+			if !firedInOrder(got.Actions, tc.actions) {
+				t.Errorf("%s: actions = %v, want (in order) %v", tc.id, got.Actions, tc.actions)
+			}
+		})
+	}
 }
 
 func dealWithActor(d *domain.Deal, a model.User) *domain.Deal { d.Actor = a; return d }
@@ -189,20 +200,6 @@ func dealPrior(prior domain.DealState) *domain.Deal {
 func saveDone() domain.DealEvent { return domain.DealEvent{Kind: domain.DEvSaveDone} }
 func saveErr(e error) domain.DealEvent {
 	return domain.DealEvent{Kind: domain.DEvSaveError, Err: e}
-}
-
-func TestDealTransitions(t *testing.T) {
-	for _, tc := range dealCases() {
-		t.Run(tc.id, func(t *testing.T) {
-			got := tc.deal.Fire(tc.event)
-			if tc.deal.State != tc.want {
-				t.Errorf("%s: next state = %q, want %q", tc.id, tc.deal.State, tc.want)
-			}
-			if !firedInOrder(got.Actions, tc.actions) {
-				t.Errorf("%s: actions = %v, want (in order) %v", tc.id, got.Actions, tc.actions)
-			}
-		})
-	}
 }
 
 // firedInOrder reports whether every action in want appears in got in the same

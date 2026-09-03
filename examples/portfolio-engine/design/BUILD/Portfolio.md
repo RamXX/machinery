@@ -12,16 +12,18 @@ its behavior, its test specification, and its build-plan milestone (M4 of the ro
 A review lifecycle: Proposed advances to UnderReview, then a Manager or Admin accepts or rejects
 it; a decided portfolio may be reopened to UnderReview. Every state change is written through the
 commit overlay (committing invokes the versioned write; a retriable conflict retries with backoff
-up to MaxRetries via commitRetry, then rolls back to the prior stage via reverted). Accepting
-records acceptedAt. Named-unit contracts and failure catalog: `design/machines/Portfolio.matrix.md`
-(11 guards, 7 actions, 1 actor). `canDecide` enforces `portfolio-accept-role`; `canReopen` enforces
+up to MaxRetries via commitRetry, then rolls back to the prior stage via reverted). A missing or
+corrupt prior stage takes the explicit unguarded fallback to terminal routingFault and records the
+diagnosis rather than guessing a persisted lifecycle value. Accepting records acceptedAt. Named-unit
+contracts and failure catalog: `design/machines/Portfolio.matrix.md`
+(11 guards, 8 actions, 1 actor). `canDecide` enforces `portfolio-accept-role`; `canReopen` enforces
 `portfolio-reopen-role`; `recordAccepted` enforces `portfolio-accepted-has-date`. The
 `persistDecision` actor is an integration/side-effect contract (writes once per
 `(portfolioId, version)`), not derivable from transition tests.
 
 ## 7. Test specification
 
-The transition test spec IS the generated `design/machines/Portfolio.oracle.md` (19 rows). Do not
+The transition test spec IS the generated `design/machines/Portfolio.oracle.md` (20 rows). Do not
 restate the table; tests key on the STABLE id, never the row number:
 
 | stable id | transition |
@@ -45,6 +47,7 @@ restate the table; tests key on the STABLE id, never the row number:
 | PORT-3cb0b6 | reverted, priorIsUnderReview, to UnderReview |
 | PORT-53d34b | reverted, priorIsAccepted, to Accepted |
 | PORT-3390a7 | reverted, priorIsRejected, to Rejected |
+| PORT-3bd579 | reverted, no prior guard admits, to routingFault (recordRoutingError) |
 
 ### Guard-branch completeness
 
@@ -62,7 +65,9 @@ falsifying triples; the falsifying tests are:
 ### Named-unit test plan
 
 Per the matrix: guards and pending/prior/commit actions are unit tests over context;
-`recordAccepted` uses a fake clock; `canDecide`/`canReopen` use fake roles. The `persistDecision`
+`recordAccepted` uses a fake clock; `canDecide`/`canReopen` use Manager, Admin, and Analyst role
+cases; `isRetriable` uses ConflictError, BusyError, and IOError; `recordRoutingError` uses null and
+invalid prior-stage cases. The `persistDecision`
 actor is an integration test: idempotency (writes once per `(portfolioId, version)`) against a
 contract-tested DuckDB fake plus one real-store test, and a forced version conflict exercising the
 overlay end to end.
@@ -70,7 +75,7 @@ overlay end to end.
 ## 8. State migration
 
 `Portfolio` persists `status`, `acceptedAt`, and `version`; no persisted instances yet. The
-protocol is the root's section 8; the committing/commitRetry/reverted overlay states are never
+protocol is the root's section 8; the committing/commitRetry/reverted/routingFault overlay states are never
 persisted, so renaming them needs no migration.
 
 ## 9. Build plan
@@ -82,7 +87,7 @@ M4 begins.
 
 **M4 - Portfolio review slice.** All Portfolio transitions, `portfolio-review-forward`,
 `portfolio-accept-role`, `portfolio-reopen-role`, `portfolio-accepted-has-date`, and the commit
-overlay under a forced version conflict. DoD: all 19 Portfolio oracle rows covered by stable id
-(PORT-27d66f through PORT-3390a7 above), the four listed invariants property-tested, the commit
+overlay under a forced version conflict. DoD: all 20 Portfolio oracle rows covered by stable id
+(PORT-27d66f through PORT-3bd579 above), the four listed invariants property-tested, the commit
 overlay verified under a forced version conflict, its contract tests green, G4-import clean, formal
 suite still green.

@@ -62,18 +62,12 @@ Architecture Contract). Reliable delivery is a transactional outbox plus idempot
 Order Service owns the saga as a `gen_statem` per order. The distributed mitigation posture (message
 bus, gateway, per-service DB, carrier, partition) is in ARCHITECTURE.md section 3. The event-contract
 table governing every bus-crossing message (producer, consumer, payload, delivery, ordering, dedupe)
-is ARCHITECTURE.md section 5.
+is ARCHITECTURE.md section 7.
 
 ### Migration implementation plan
 
 N/A - greenfield design: no `design/migration.yaml` exists and there is no legacy/target
 transition to plan.
-
-### Neighbor stand-ins and test environment
-
-N/A - not a pack child: no `design/pack/` exists. The four services are designed together in this
-one run, and the integration fixtures run the real bus and services via docker compose (see the
-Toolchain section), so no contract stand-in is needed.
 
 ## 5. Behavior and formal verification
 
@@ -114,37 +108,37 @@ conformance parse.
 ## 6. Traceability matrix
 
 Every invariant: its enforcement point, its owning component (per `workspace.dsl`), the interface
-contract that carries it (the ARCHITECTURE.md section 5 event rows for bus-crossing rules, the
+contract that carries it (the ARCHITECTURE.md section 7 event rows for bus-crossing rules, the
 service's own write path otherwise), and its test ids. Formal entries are TLC-checked. Transition
-tests are cited by the oracle's `T-<MACHINE>-NN` ids (the stable-id column is the key the tests
-use, section 8); `P-<invariant>` names the property test for that invariant.
+tests are cited only by the oracle's content-derived stable-id column; `P-<invariant>` names the
+property test for that invariant.
 
 | invariant | enforced by (guard / structural) | in component | interface contract | test id(s) |
 |---|---|---|---|---|
 | `customer-email-unique` | DB unique constraint on `Customer.email` | `orderSvc` (Order Repository, Order DB unique index) | order API customer write path | P-customer-email-unique |
-| `product-price-nonneg` | validation in the order service's product write path (catalog UX is out of scope; the catalog data lives in the Order DB per `workspace.dsl`) | `orderSvc` (API + Order Repository) | order API product write path | P-product-price-nonneg |
-| `reserved-within-stock` | guard in the Inventory reserve action; DB check constraint | `inventorySvc` | `reserve` command row (ARCHITECTURE.md section 5) | P-reserved-within-stock (incl. the `persistReservation` concurrent-hold property, matrix fixture) |
+| `product-price-nonneg` | validation in the inventory service's product write path (catalog UI is out of scope; the admin API is the target surface) | `inventorySvc` | inventory admin API product write path | P-product-price-nonneg |
+| `reserved-within-stock` | guard in the Inventory reserve action; DB check constraint | `inventorySvc` | `reserve` command row (ARCHITECTURE.md section 7) | P-reserved-within-stock (incl. the `persistReservation` concurrent-hold property, matrix fixture) |
 | `available-nonneg` | guard in the Inventory reserve/release actions | `inventorySvc` | `reserve` / `release` command rows | P-available-nonneg |
 | `order-owned-by-customer` | structural (an order is created with its customer; `guardCanCancel` checks the owner) | `orderSvc` (API + Order machine) | order API place | P-order-owned-by-customer |
-| `order-total-matches-items` | guard `guardCanConfirm` (has line items AND total equals their sum); computed on place | `orderSvc` (Order machine) | order API place/confirm | T-ORDE-01, P-order-total-matches-items |
-| `order-forward` | `Order.machine.json` (each state exposes only its forward saga event; `setPending*` named units) | `orderSvc` (Order machine) | consumed saga reply rows (`reserved`, `captured`, `dispatched`, `delivered`) | T-ORDE-01,05,09,11,13, P-order-forward |
+| `order-total-matches-items` | guard `guardCanConfirm` (has line items AND total equals their sum); computed on place | `orderSvc` (Order machine) | order API place/confirm | ORDE-eb2d3b, P-order-total-matches-items |
+| `order-forward` | `Order.machine.json` (each state exposes only its forward saga event; `setPending*` named units) | `orderSvc` (Order machine) | consumed saga reply rows (`reserved`, `captured`, `dispatched`, `delivered`) | ORDE-eb2d3b, ORDE-3c919f, ORDE-fb2298, ORDE-cce1ac, ORDE-45dbe0, P-order-forward |
 | `order-delivered-terminal` | structural (terminal states have no outgoing transition) | `orderSvc` (Order machine) | - (internal state graph) | P-order-delivered-terminal |
 | `line-item-quantity-positive` | validation on add | `orderSvc` (API) | order API add-item | P-line-item-quantity-positive |
 | `reservation-quantity-positive` | validation on hold | `inventorySvc` | `reserve` command row | P-reservation-quantity-positive |
 | `reservation-terminal` | structural (Committed/Released are final) | `inventorySvc` (Reservation machine) | `release` command row (no-op on Released) | P-reservation-terminal |
-| `payment-amount-nonneg` | guard `guardAmountNonneg` on authorize | `paymentSvc` (Payment machine) | `capture` command row | T-PAYM-01, P-payment-amount-nonneg |
+| `payment-amount-nonneg` | guard `guardAmountNonneg` on authorize | `paymentSvc` (Payment machine) | `capture` command row | PAYM-e44cea, P-payment-amount-nonneg |
 | `payment-idempotent` | idempotency key unique per capture; the gateway is called with the same key | `paymentSvc` | `capture` command row (dedupe `Payment.idempotencyKey`) | P-payment-idempotent |
 | `payment-terminal` | structural (Failed/Refunded are final) | `paymentSvc` (Payment machine) | - (internal state graph) | P-payment-terminal |
 | `refund-amount-positive` | validation on issue | `paymentSvc` | `refund` command row | P-refund-amount-positive |
 | `shipment-terminal` | structural (Delivered/Lost are final) | `shippingSvc` (Shipment machine) | - (internal state graph) | P-shipment-terminal |
-| `saga-terminal` | FulfillmentSaga control flow (final states); TLC termination proof | `orderSvc` (Saga Orchestrator) | - (internal state graph) | T-FULF-02,05,08, P-saga-terminal |
+| `saga-terminal` | FulfillmentSaga control flow (final states); TLC termination proof | `orderSvc` (Saga Orchestrator) | - (internal state graph) | FULF-ee2ed2, FULF-bba0be, FULF-6ec4e1, P-saga-terminal |
 | `address-country-present` | validation when the address is captured with the order | `orderSvc` (API); consumed by `shippingSvc` | order API place; `dispatch` command row payload | P-address-country-present |
-| `outbox-at-least-once` | outbox poller republishes until Consumed (`priorIsPending` re-drive) | every producing service's Outbox (reference component: `orderSvc` `outbox`) | every event row (all ride the outbox) | T-OUTB-01,04,07, P-outbox-at-least-once |
-| `no-ship-before-pay` | **formal**: `Checkout.tla` composition; runtime: the saga emits `dispatch` only after `captured` | `orderSvc` (Saga Orchestrator) | `dispatch` command row ordering | TLC `Checkout.tla`, T-FULF-08 |
+| `outbox-at-least-once` | outbox poller republishes until Consumed (`priorIsPending` re-drive) | every producing service's Outbox (reference component: `orderSvc` `outbox`) | every event row (all ride the outbox) | OUTB-265e80, OUTB-b71c55, OUTB-563ac6, P-outbox-at-least-once |
+| `no-ship-before-pay` | **formal**: `Checkout.tla` composition; runtime: the saga emits `dispatch` only after `captured` | `orderSvc` (Saga Orchestrator) | `dispatch` command row ordering | TLC `Checkout.tla`, FULF-6ec4e1 |
 | `capture-matches-total` | payment service asserts amount equals order total | `paymentSvc` | `capture` command row payload | P-capture-matches-total |
 | `refund-within-capture` | payment service caps refund at captured amount | `paymentSvc` | `refund` command row payload | P-refund-within-capture |
-| `reserve-before-pay` | **formal**: `Checkout.tla` composition; runtime: the saga emits `capture` only after `reserved` | `orderSvc` (Saga Orchestrator) | `capture` command row ordering | TLC `Checkout.tla`, T-FULF-05 |
-| `saga-compensation` | **formal**: `FulfillmentSagaData.tla` (no silent loss; FailedDirty is the explicit residual) | `orderSvc` (Saga Orchestrator) | `release` / `refund` compensation rows | TLC `FulfillmentSagaData.tla`, T-FULF-14 |
+| `reserve-before-pay` | **formal**: `Checkout.tla` composition; runtime: the saga emits `capture` only after `reserved` | `orderSvc` (Saga Orchestrator) | `capture` command row ordering | TLC `Checkout.tla`, FULF-bba0be |
+| `saga-compensation` | **formal**: `FulfillmentSagaData.tla` (no silent loss; FailedDirty is the explicit residual) | `orderSvc` (Saga Orchestrator) | `release` / `refund` compensation rows | TLC `FulfillmentSagaData.tla`, FULF-1720f5 |
 | `exactly-once-effect` | idempotent consumers keyed by message id | every consuming service (`orderSvc`, `inventorySvc`, `paymentSvc`, `shippingSvc`) | the dedupe column of every event row | P-exactly-once-effect |
 
 ## 7. Build plan
@@ -160,17 +154,19 @@ design-only example: the milestones bind the first implementer.
 **M0 - Walking skeleton (thinnest end-to-end thread).** `place order -> saga reserves (stub
 inventory) -> saga captures (stub gateway) -> saga dispatches (stub carrier) -> Delivered`,
 exercising one real message-bus round trip and the transactional outbox. NFR: transition logging
-keyed by order id and message id, the FailedDirty paging hook, and the outbox-lag gauge (section
-7's operator signals; every later milestone copies them). DoD: green for the saga
-forward path `FULF-ee2ed2`, `FULF-bba0be`, `FULF-6ec4e1` (T-FULF-02,05,08); the Order happy chain
-T-ORDE-01,05,09,11,13 with its persist commits T-ORDE-16..20; one outbox row driven
-Pending -> Published -> Consumed (T-OUTB-01,04,07 then T-OUTB-02,08); the delivered order durably
+keyed by order id and message id, the FailedDirty paging hook, and the outbox-lag gauge (ARCHITECTURE.md
+section 8's operator signals; every later milestone copies them). DoD: green for the saga
+forward path `FULF-ee2ed2`, `FULF-bba0be`, `FULF-6ec4e1`; the Order happy chain
+ORDE-eb2d3b, ORDE-3c919f, ORDE-fb2298, ORDE-cce1ac, ORDE-45dbe0 with its persist commits
+ORDE-6cd784, ORDE-9cace2, ORDE-264dbd, ORDE-7b4e42, ORDE-d7360c; one outbox row driven
+Pending -> Published -> Consumed (OUTB-265e80, OUTB-b71c55, OUTB-563ac6 then OUTB-8ee882,
+OUTB-a37134); the delivered order durably
 persisted (a re-read sees Delivered); the bus round trip and the outbox write are real (docker
 compose), the three step actors are stubs.
 
 **M1 - Order service slice (aggregate, saga, outbox).** Complete the Order lifecycle (cancel, fail,
 denial rows) and its persist overlay, every saga compensation path, and the outbox failure rows via
-the Oban poller. DoD: all 33 T-ORDE, 14 T-FULF, and 16 T-OUTB rows green; `order-forward`,
+the Oban poller. DoD: all 34 Order, 14 FulfillmentSaga, and 17 OutboxMessage oracle rows green; `order-forward`,
 `order-owned-by-customer`, `order-total-matches-items` (property over generated line-item lists),
 `order-delivered-terminal`, `saga-terminal`, `outbox-at-least-once`, `exactly-once-effect`
 (idempotent consumers keyed by message id), `customer-email-unique`, `product-price-nonneg`, and
@@ -178,17 +174,17 @@ the Oban poller. DoD: all 33 T-ORDE, 14 T-FULF, and 16 T-OUTB rows green; `order
 `machinery verify-formal design` still green (saga termination, `saga-compensation`).
 
 **M2 - Inventory service slice.** Reservation lifecycle end to end against the real Inventory
-Postgres. DoD: all 12 T-RESE rows green; `reserved-within-stock` guard tests green (DB check
+Postgres. DoD: all 13 Reservation oracle rows green; `reserved-within-stock` guard tests green (DB check
 included) and `available-nonneg` guard tests green; `reservation-quantity-positive` validation and
 `reservation-terminal` structural tests green; `reserve-before-pay` still proven (`Checkout.tla`).
 
 **M3 - Payment service slice.** Payment lifecycle against the gateway fake (contract-tested per the
-matrix fixture). DoD: all 37 T-PAYM rows green including the gatewayRetry bound and gatewayResume
+matrix fixture). DoD: all 39 Payment oracle rows green including the gatewayRetry bound and gatewayResume
 routing; `payment-amount-nonneg`, `payment-terminal`, `refund-amount-positive`,
 `payment-idempotent` (idempotency key unique per capture), `capture-matches-total`, and
 `refund-within-capture` enforced per section 6.
 
-**M4 - Shipping service slice.** Shipment lifecycle against the carrier fake. DoD: all 26 T-SHIP
+**M4 - Shipping service slice.** Shipment lifecycle against the carrier fake. DoD: all 27 Shipment oracle
 rows green including the carrierRetry bound; `shipment-terminal` structural and
 `address-country-present` validation tests green; `no-ship-before-pay` still proven
 (`Checkout.tla`).
@@ -231,6 +227,11 @@ money is never silently lost, no-ship-before-pay). A runtime that cannot spawn a
 test-writer runs RED then GREEN sequentially with the same single agent; the derivation rule is
 unchanged (tests come from the oracles, the matrices, and section 6, never from implementation
 intentions), and the gate runs before and after are what separate the phases.
+
+Each machine suite includes one wholesale conformance test that parses the committed oracle table.
+For every row, it constructs the declared source state and stimulus, applies the declared guard
+outcome, and asserts both the target state and the complete ordered expected-actions list. A parser
+that checks only row IDs or next states is incomplete; action assertions are part of conformance.
 
 RED exits only when all four deterministic checks hold: every oracle stable id appears whole-token
 in the suite (Gt-tests holds this once `machinery check design --impl <dir>` points at the code

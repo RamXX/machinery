@@ -3,13 +3,19 @@
 package compose
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/artifactset"
+	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/portablepath"
 	"github.com/RamXX/machinery/internal/version"
 )
 
@@ -110,13 +116,144 @@ func Generate(comp, machine *ir.Value, machineName string) (name, tla, cfg strin
 			}
 		}
 	}()
+	if schemaErr := validateCompositionSchema(comp); schemaErr != nil {
+		return "", "", "", schemaErr
+	}
 	name, tla, cfg = generateImpl(comp, machine, machineName)
 	return
+}
+
+func validateCompositionSchema(comp *ir.Value) error {
+	if comp == nil || comp.Kind != ir.KindObject {
+		return composeSchemaError("composition file must be a mapping")
+	}
+	o := comp.AsObject()
+	if err := composeRejectUnknown(o, map[string]bool{"composition": true, "coordinator": true, "aggregates": true, "sequence": true, "invariants": true}, "composition"); err != nil {
+		return err
+	}
+	for _, key := range []string{"composition", "coordinator"} {
+		if err := composeRequireString(o, key, "composition"); err != nil {
+			return err
+		}
+	}
+	aggregates := o.Get2("aggregates")
+	if aggregates == nil || aggregates.Kind != ir.KindObject {
+		return composeSchemaError("composition.aggregates must be a mapping")
+	}
+	for _, name := range aggregates.AsObject().Keys() {
+		entry := aggregates.AsObject().Get2(name)
+		where := "composition.aggregates." + name
+		if entry == nil || entry.Kind != ir.KindObject {
+			return composeSchemaError(where + " must be a mapping")
+		}
+		if err := composeRejectUnknown(entry.AsObject(), map[string]bool{"states": true, "initial": true}, where); err != nil {
+			return err
+		}
+		if err := composeRequireStringArray(entry.AsObject(), "states", true, where); err != nil {
+			return err
+		}
+		if err := composeRequireString(entry.AsObject(), "initial", where); err != nil {
+			return err
+		}
+	}
+	sequence := o.Get2("sequence")
+	if sequence == nil || sequence.Kind != ir.KindArray {
+		return composeSchemaError("composition.sequence must be a list")
+	}
+	for i, item := range sequence.AsArray() {
+		where := fmt.Sprintf("composition.sequence[%d]", i)
+		if item == nil || item.Kind != ir.KindObject {
+			return composeSchemaError(where + " must be a mapping")
+		}
+		if err := composeRejectUnknown(item.AsObject(), map[string]bool{"step": true, "aggregate": true, "to": true, "undo": true}, where); err != nil {
+			return err
+		}
+		for _, key := range []string{"step", "aggregate", "to"} {
+			if err := composeRequireString(item.AsObject(), key, where); err != nil {
+				return err
+			}
+		}
+		if undo := item.AsObject().Get2("undo"); undo != nil {
+			undoWhere := where + ".undo"
+			if undo.Kind != ir.KindObject {
+				return composeSchemaError(undoWhere + " must be a mapping")
+			}
+			if err := composeRejectUnknown(undo.AsObject(), map[string]bool{"to": true}, undoWhere); err != nil {
+				return err
+			}
+			if err := composeRequireString(undo.AsObject(), "to", undoWhere); err != nil {
+				return err
+			}
+		}
+	}
+	if invariants := o.Get2("invariants"); invariants != nil {
+		if invariants.Kind != ir.KindObject {
+			return composeSchemaError("composition.invariants must be a mapping of names to strings")
+		}
+		for _, name := range invariants.AsObject().Keys() {
+			if err := composeRequireString(invariants.AsObject(), name, "composition.invariants"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func composeSchemaError(message string) error { return &ExitError{Msg: "compose_gen: " + message} }
+
+func composeRejectUnknown(o *ir.Object, allowed map[string]bool, where string) error {
+	var unknown []string
+	for _, key := range o.Keys() {
+		if !allowed[key] {
+			unknown = append(unknown, key)
+		}
+	}
+	sort.Strings(unknown)
+	if len(unknown) > 0 {
+		return composeSchemaError(fmt.Sprintf("%s has unsupported key %s", where, ir.Repr(unknown[0])))
+	}
+	return nil
+}
+
+func composeRequireString(o *ir.Object, key, where string) error {
+	v := o.Get2(key)
+	if v == nil {
+		return composeSchemaError(fmt.Sprintf("%s.%s is required", where, key))
+	}
+	if v.Kind != ir.KindString {
+		return composeSchemaError(fmt.Sprintf("%s.%s has the wrong type", where, key))
+	}
+	return nil
+}
+
+func composeRequireStringArray(o *ir.Object, key string, required bool, where string) error {
+	v := o.Get2(key)
+	if v == nil {
+		if required {
+			return composeSchemaError(fmt.Sprintf("%s.%s is required", where, key))
+		}
+		return nil
+	}
+	if v.Kind != ir.KindArray {
+		return composeSchemaError(fmt.Sprintf("%s.%s must be a list of strings", where, key))
+	}
+	for i, item := range v.AsArray() {
+		if item == nil || item.Kind != ir.KindString {
+			return composeSchemaError(fmt.Sprintf("%s.%s[%d] must be a string", where, key, i))
+		}
+	}
+	return nil
 }
 
 func generateImpl(comp, machine *ir.Value, machineName string) (string, string, string) {
 	co := comp.AsObject()
 	name := ir.Title(co.GetString("composition"))
+	coordinator := co.GetString("coordinator")
+	machineStem := strings.TrimSuffix(filepath.Base(machineName), ".machine.json")
+	machineID := machine.AsObject().GetString("id")
+	if !strings.EqualFold(coordinator, machineStem) && !strings.EqualFold(coordinator, machineID) {
+		die("composition coordinator %s does not match machine %s (id %s)", ir.Repr(coordinator), ir.Repr(machineStem), ir.Repr(machineID))
+	}
 	var tla, cfg string
 	aggsVal := co.Get2("aggregates").AsObject()
 	seqVal := co.Get2("sequence").AsArray()
@@ -340,8 +477,6 @@ func generateImpl(comp, machine *ir.Value, machineName string) (string, string, 
 	cfgParts = append(cfgParts, "PROPERTY Live_Terminates")
 	cfg = strings.Join(cfgParts, "\n") + "\n"
 
-	fmt.Fprintf(os.Stdout, "compose_gen: validated %s against %s: %d forward steps, %d obligations, %d declared invariants\n",
-		name, machineName, len(chain), len(obligations), len(invs.Keys()))
 	return name, tla, cfg
 }
 
@@ -429,7 +564,12 @@ func bracketStr(xs []string) string {
 
 // Run is the `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` entrypoint.
 func Run(compPath, machinePath, outdir string) error {
-	_, err := RunWritten(compPath, machinePath, outdir)
+	return RunTo(compPath, machinePath, outdir, os.Stdout)
+}
+
+// RunTo is Run with an explicit status-output sink.
+func RunTo(compPath, machinePath, outdir string, out io.Writer) error {
+	_, err := RunWrittenTo(compPath, machinePath, outdir, out)
 	return err
 }
 
@@ -437,6 +577,70 @@ func Run(compPath, machinePath, outdir string) error {
 // (verify-formal) can distinguish freshly generated pairs from committed
 // orphans.
 func RunWritten(compPath, machinePath, outdir string) ([]string, error) {
+	return RunWrittenTo(compPath, machinePath, outdir, os.Stdout)
+}
+
+// RunWrittenTo is RunWritten with an explicit status-output sink.
+func RunWrittenTo(compPath, machinePath, outdir string, out io.Writer) ([]string, error) {
+	snapshot, err := designlock.Acquire(filepath.Dir(filepath.Dir(machinePath)))
+	if err != nil {
+		return nil, err
+	}
+	written, retErr := RunWrittenInSnapshotTo(snapshot, compPath, machinePath, outdir, out)
+	retErr = errors.Join(retErr, snapshot.Release())
+	retErr = snapshot.LogicalError(retErr)
+	if retErr != nil {
+		return nil, retErr
+	}
+	return written, nil
+}
+
+// RunWrittenInSnapshot is RunWritten for an orchestrator which already owns
+// the design snapshot lock.
+var runWrittenAfterInputSnapshot = func() {}
+var runWrittenAfterStalePlan = func() {}
+
+func RunWrittenInSnapshot(snapshot *designlock.Lock, compPath, machinePath, outdir string) (written []string, retErr error) {
+	return RunWrittenInSnapshotTo(snapshot, compPath, machinePath, outdir, os.Stdout)
+}
+
+// RunWrittenInSnapshotTo is RunWrittenInSnapshot with an explicit output sink.
+func RunWrittenInSnapshotTo(snapshot *designlock.Lock, compPath, machinePath, outdir string, out io.Writer) (written []string, retErr error) {
+	compositionSource := filepath.Base(compPath)
+	if err := validateComposeOwnerBase(compositionSource); err != nil {
+		return nil, &ExitError{Msg: "compose_gen: invalid composition input filename: " + err.Error()}
+	}
+	compositionSourceDir := ""
+	if stableDir, err := snapshot.SourcePath(filepath.Dir(compPath)); err != nil {
+		return nil, &ExitError{Msg: "compose_gen: resolve composition inventory: " + err.Error()}
+	} else if stableDir != filepath.Dir(compPath) || pathWithin(snapshot.SourceRoot(), stableDir) {
+		compositionSourceDir = stableDir
+	}
+	if outdir == "" {
+		outdir = filepath.Dir(compPath)
+	}
+	if err := snapshot.ValidateOutputDir(outdir); err != nil {
+		return nil, &ExitError{Msg: "compose_gen: unsafe output directory: " + err.Error()}
+	}
+	machines, err := snapshot.MaterializeExternalTree(filepath.Dir(machinePath))
+	if err != nil {
+		return nil, &ExitError{Msg: "compose_gen: snapshot machine inventory: " + err.Error()}
+	}
+	defer func() { retErr = errors.Join(retErr, machines.Close()) }()
+	machinePath = filepath.Join(machines.Path(), filepath.Base(machinePath))
+	composition, err := snapshot.MaterializeRegularFile(compPath)
+	if err != nil {
+		return nil, &ExitError{Msg: "compose_gen: snapshot composition: " + err.Error()}
+	}
+	defer func() { retErr = errors.Join(retErr, composition.Close()) }()
+	compPath = composition.Path()
+	if err := snapshot.ResumeExpected("compose", "rerun `machinery compose` with the same arguments"); err != nil {
+		return nil, err
+	}
+	runWrittenAfterInputSnapshot()
+	if err := ir.ValidateTLAModuleInventory(filepath.Dir(machinePath)); err != nil {
+		return nil, &ExitError{Msg: "compose_gen: " + err.Error()}
+	}
 	data, err := os.ReadFile(compPath)
 	if err != nil {
 		return nil, &ExitError{Msg: "compose_gen: " + err.Error()}
@@ -456,20 +660,251 @@ func RunWritten(compPath, machinePath, outdir string) ([]string, error) {
 	if genErr != nil {
 		return nil, genErr
 	}
-	if outdir == "" {
-		outdir = filepath.Dir(compPath)
-	}
-	if mkErr := os.MkdirAll(outdir, 0755); mkErr != nil {
-		return nil, mkErr
+	tla, err = bindCompositionSource(tla, comp.AsObject().GetString("composition")+".composition.yaml", compositionSource)
+	if err != nil {
+		return nil, err
 	}
 	// Stamp at write time (P-F10): the committed artifact records which
 	// machinery version produced it; freshness diffs strip the line.
-	if wErr := os.WriteFile(filepath.Join(outdir, name+".tla"), []byte(version.StampTLAModule(tla)), 0644); wErr != nil {
+	files := map[string][]byte{
+		name + ".tla": []byte(version.StampTLAModule(tla)),
+		name + ".cfg": []byte(version.StampCfg(cfg)),
+	}
+	replacements, err := guardedCurrentComposeArtifacts(outdir, compositionSource, files)
+	if err != nil {
+		return nil, err
+	}
+	stale, err := staleOwnedComposeArtifacts(outdir, compositionSourceDir, compositionSource, files)
+	if err != nil {
+		return nil, err
+	}
+	if len(stale) > 0 {
+		runWrittenAfterStalePlan()
+	}
+	expected := []designlock.OutputExpectation{
+		designlock.ExpectFile(filepath.Join(outdir, name+".tla"), files[name+".tla"], 0o644),
+		designlock.ExpectFile(filepath.Join(outdir, name+".cfg"), files[name+".cfg"], 0o644),
+	}
+	for _, artifact := range stale {
+		expected = append(expected, designlock.ExpectAbsent(filepath.Join(outdir, artifact.Name)))
+	}
+	if wErr := snapshot.PublishExpectedRooted("compose", "rerun `machinery compose` with the same arguments", expected, func(outputs *designlock.OutputScope) error {
+		return outputs.WithRoot(outdir, func(root *os.Root) error {
+			return artifactset.ReconcileGuardedRooted(outdir, root, files, stale, replacements)
+		})
+	}); wErr != nil {
 		return nil, wErr
 	}
-	if wErr := os.WriteFile(filepath.Join(outdir, name+".cfg"), []byte(version.StampCfg(cfg)), 0644); wErr != nil {
-		return nil, wErr
+	if _, err := fmt.Fprintf(out, "generated %s.tla + %s.cfg\n", name, name); err != nil {
+		return nil, fmt.Errorf("compose_gen: write status output: %w", err)
 	}
-	fmt.Fprintf(os.Stdout, "generated %s.tla + %s.cfg\n", name, name)
 	return []string{name + ".tla", name + ".cfg"}, nil
+}
+
+func guardedCurrentComposeArtifacts(outdir, compositionSource string, files map[string][]byte) ([]artifactset.RemovalPrecondition, error) {
+	info, err := os.Lstat(outdir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, fmt.Errorf("compose_gen: output directory must be a real directory")
+	}
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	inspected := map[string][]byte{}
+	conditions := map[string]artifactset.RemovalPrecondition{}
+	for _, name := range names {
+		body, condition, err := artifactset.InspectRemovalCandidate(outdir, name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		inspected[name], conditions[name] = body, condition
+	}
+	for _, name := range names {
+		body, exists := inspected[name]
+		if !exists || bytes.Equal(body, files[name]) {
+			continue
+		}
+		switch filepath.Ext(name) {
+		case ".tla":
+			owner, generated, err := canonicalComposeOwner(name, body)
+			if err != nil {
+				return nil, err
+			}
+			if !generated || owner != compositionSource {
+				return nil, fmt.Errorf("compose_gen: refusing to replace foreign or manual artifact %s", name)
+			}
+		case ".cfg":
+			anchor := strings.TrimSuffix(name, ".cfg") + ".tla"
+			anchorBody, ok := inspected[anchor]
+			if !ok || !canonicalComposeConfig(body) {
+				return nil, fmt.Errorf("compose_gen: refusing to replace unowned config %s", name)
+			}
+			owner, generated, err := canonicalComposeOwner(anchor, anchorBody)
+			if err != nil || !generated || owner != compositionSource {
+				return nil, fmt.Errorf("compose_gen: refusing to replace config %s without a same-owner generated module", name)
+			}
+		}
+	}
+	out := make([]artifactset.RemovalPrecondition, 0, len(conditions))
+	for _, name := range names {
+		if condition, ok := conditions[name]; ok {
+			out = append(out, condition)
+		}
+	}
+	return out, nil
+}
+
+func bindCompositionSource(tla, declared, actual string) (string, error) {
+	declaredHeader := `\* GENERATED by machinery compose from ` + declared + `,`
+	actualHeader := `\* GENERATED by machinery compose from ` + actual + `,`
+	if !strings.Contains(tla, declaredHeader) {
+		return "", &ExitError{Msg: "compose_gen: generated model has no canonical source-ownership header"}
+	}
+	return strings.Replace(tla, declaredHeader, actualHeader, 1), nil
+}
+
+func staleOwnedComposeArtifacts(outdir, sourceDir, source string, keep map[string][]byte) ([]artifactset.RemovalPrecondition, error) {
+	entries, err := os.ReadDir(outdir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var stale []artifactset.RemovalPrecondition
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".tla") {
+			continue
+		}
+		if _, current := keep[name]; current {
+			continue
+		}
+		body, condition, err := artifactset.InspectRemovalCandidate(outdir, name)
+		if err != nil {
+			return nil, err
+		}
+		owner, generated, headerErr := canonicalComposeOwner(name, body)
+		if headerErr != nil {
+			return nil, headerErr
+		}
+		if !generated {
+			continue
+		}
+		if sourceDir == "" {
+			return nil, fmt.Errorf("compose_gen: cannot safely reconcile non-current generated artifact %s for external composition input %s; remove the stale generated pair explicitly and rerun", name, source)
+		}
+		owned := owner == source
+		if !owned && sourceDir != "" && filepath.Base(owner) == owner && strings.HasSuffix(owner, ".composition.yaml") {
+			_, statErr := os.Lstat(filepath.Join(sourceDir, owner))
+			owned = errors.Is(statErr, os.ErrNotExist)
+			if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+				return nil, statErr
+			}
+		}
+		if !owned {
+			continue
+		}
+		stale = append(stale, condition)
+		cfg := strings.TrimSuffix(name, ".tla") + ".cfg"
+		if _, current := keep[cfg]; current {
+			continue
+		}
+		_, cfgCondition, inspectErr := artifactset.InspectRemovalCandidate(outdir, cfg)
+		if inspectErr == nil {
+			stale = append(stale, cfgCondition)
+		} else if !errors.Is(inspectErr, os.ErrNotExist) {
+			return nil, inspectErr
+		}
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".cfg") {
+			continue
+		}
+		if _, current := keep[name]; current {
+			continue
+		}
+		anchor := strings.TrimSuffix(name, ".cfg") + ".tla"
+		if _, err := os.Lstat(filepath.Join(outdir, anchor)); err == nil {
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		body, condition, err := artifactset.InspectRemovalCandidate(outdir, name)
+		if err != nil {
+			return nil, err
+		}
+		if canonicalComposeConfig(body) {
+			stale = append(stale, condition)
+		}
+	}
+	sort.Slice(stale, func(i, j int) bool { return stale[i].Name < stale[j].Name })
+	return stale, nil
+}
+
+func canonicalComposeConfig(body []byte) bool {
+	lines := strings.Split(strings.TrimSuffix(string(body), "\n"), "\n")
+	if len(lines) < 5 || !strings.HasPrefix(lines[0], `\* machinery-version: `) ||
+		lines[1] != "SPECIFICATION Spec" || lines[2] != "INVARIANT TypeOK" ||
+		lines[3] != "INVARIANT Inv_CleanCompensation" || lines[len(lines)-1] != "PROPERTY Live_Terminates" {
+		return false
+	}
+	for _, line := range lines[4 : len(lines)-1] {
+		if !strings.HasPrefix(line, "INVARIANT Inv_") || strings.TrimSpace(line) != line {
+			return false
+		}
+	}
+	return true
+}
+
+func canonicalComposeOwner(name string, body []byte) (string, bool, error) {
+	lines := bytes.SplitN(body, []byte("\n"), 4)
+	module := strings.TrimSuffix(name, ".tla")
+	if len(lines) < 3 || string(lines[0]) != "---- MODULE "+module+" ----" || !bytes.HasPrefix(lines[1], []byte(`\* machinery-version: `)) {
+		return "", false, nil
+	}
+	const prefix = `\* GENERATED by machinery compose from `
+	header := string(lines[2])
+	if !strings.HasPrefix(header, prefix) || !strings.HasSuffix(header, ",") {
+		return "", false, nil
+	}
+	owner := strings.TrimSuffix(strings.TrimPrefix(header, prefix), ",")
+	if filepath.Base(owner) != owner {
+		return "", true, fmt.Errorf("compose_gen: generated artifact %s has invalid source-ownership header", name)
+	}
+	if err := validateComposeOwnerBase(owner); err != nil {
+		return "", true, fmt.Errorf("compose_gen: generated artifact %s has non-portable source owner: %w", name, err)
+	}
+	return owner, true, nil
+}
+
+func validateComposeOwnerBase(name string) error {
+	if !strings.HasSuffix(name, ".composition.yaml") {
+		return fmt.Errorf("must end in .composition.yaml")
+	}
+	if strings.Contains(name, ",") || strings.Contains(name, " + ") {
+		return fmt.Errorf("contains a reserved ownership-header delimiter")
+	}
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("contains a control character")
+		}
+	}
+	return portablepath.ValidateBase(name)
+}
+
+func pathWithin(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }

@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+const checkerTestRuntime = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
 
 const sampleModel = `kind: DomainModel
 version: v1
@@ -54,6 +57,8 @@ entities:
       - {id: priv-retention, statement: "Retention bounded."}
       - {id: priv-consent, statement: "Consent required."}
 `
+
+var validTestDesignID = "sha256:" + strings.Repeat("a", 64)
 
 func writeTemp(t *testing.T, name, content string) string {
 	t.Helper()
@@ -109,17 +114,37 @@ func TestLoadModelErrors(t *testing.T) {
 	}
 }
 
+func TestLoadModelRejectsMalformedProjectionRows(t *testing.T) {
+	for name, model := range map[string]string{
+		"non-object entity":            "kind: DomainModel\nentities: {Thing: nope}\n",
+		"non-object attribute":         "kind: DomainModel\nentities:\n  Thing:\n    attributes: [nope]\n",
+		"empty attribute type":         "kind: DomainModel\nentities:\n  Thing:\n    attributes: [{name: value, type: ''}]\n",
+		"duplicate attribute":          "kind: DomainModel\nentities:\n  Thing:\n    attributes: [{name: value, type: string}, {name: value, type: string}]\n",
+		"non-object invariant":         "kind: DomainModel\nentities:\n  Thing:\n    invariants: [nope]\n",
+		"empty invariant statement":    "kind: DomainModel\nentities:\n  Thing:\n    invariants: [{id: inv-one, statement: ''}]\n",
+		"duplicate invariant identity": "kind: DomainModel\ninvariants: [{id: inv-one, statement: top}]\nentities:\n  Thing:\n    invariants: [{id: inv-one, statement: entity}]\n",
+		"unknown relationship target":  "kind: DomainModel\nentities:\n  Thing:\n    relationships: [{entity: Missing, cardinality: '1:n'}]\n",
+		"unknown cardinality":          "kind: DomainModel\nentities:\n  Thing:\n    relationships: [{entity: Other, cardinality: many}]\n  Other: {}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := LoadModel(writeTemp(t, "bad.modelith.yaml", model)); err == nil {
+				t.Fatal("malformed projection source was accepted")
+			}
+		})
+	}
+}
+
 func TestGenerateDeterministicAndOrderIndependent(t *testing.T) {
 	man := manifestWith([]string{"model", "invariants", "relationships"}, []string{"priv-*"})
 
 	mA, _ := LoadModel(writeTemp(t, "a.modelith.yaml", sampleModel))
 	mB, _ := LoadModel(writeTemp(t, "b.modelith.yaml", sampleModelReordered))
 
-	pA, err := Generate(mA, man, "sha256:x", "v0")
+	pA, err := Generate(mA, man, validTestDesignID, "v0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	pB, err := Generate(mB, man, "sha256:x", "v0")
+	pB, err := Generate(mB, man, validTestDesignID, "v0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +163,7 @@ func TestGenerateDeterministicAndOrderIndependent(t *testing.T) {
 	}
 
 	// machinery_version does not move the binding hash
-	pV, _ := Generate(mA, man, "sha256:x", "v99")
+	pV, _ := Generate(mA, man, validTestDesignID, "v99")
 	hV, _ := pV.InputHash()
 	if hV != hA {
 		t.Fatal("machinery_version leaked into the binding hash")
@@ -153,7 +178,7 @@ func TestGenerateDeterministicAndOrderIndependent(t *testing.T) {
 func TestGenerateStableIDsAndInclude(t *testing.T) {
 	man := manifestWith([]string{"relationships", "model", "invariants"}, nil)
 	m, _ := LoadModel(writeTemp(t, "d.modelith.yaml", sampleModel))
-	p, err := Generate(m, man, "sha256:x", "v0")
+	p, err := Generate(m, man, validTestDesignID, "v0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,15 +201,79 @@ func TestGenerateStableIDsAndInclude(t *testing.T) {
 func TestGenerateRejectsUnsupportedLayer(t *testing.T) {
 	man := manifestWith([]string{"model", "machines"}, nil)
 	m, _ := LoadModel(writeTemp(t, "d.modelith.yaml", sampleModel))
-	if _, err := Generate(m, man, "sha256:x", "v0"); err == nil {
+	if _, err := Generate(m, man, validTestDesignID, "v0"); err == nil {
 		t.Fatal("expected error requesting an unsupported layer")
+	}
+}
+
+func TestGenerateRejectsUnknownAndEmptyLayerVocabulary(t *testing.T) {
+	m, _ := LoadModel(writeTemp(t, "d.modelith.yaml", sampleModel))
+	for _, include := range [][]string{nil, {"model", "future-layer"}} {
+		if _, err := Generate(m, manifestWith(include, nil), validTestDesignID, "v0"); err == nil {
+			t.Fatalf("include %v: expected closed/non-empty vocabulary error", include)
+		}
+	}
+}
+
+func TestInputHashBindsCanonicalManifestSemanticsIncludingConfig(t *testing.T) {
+	m, _ := LoadModel(writeTemp(t, "d.modelith.yaml", sampleModel))
+	base := manifestWith([]string{"model", "invariants"}, []string{"priv-*"})
+	base.Config = map[string]any{"sinks": []any{"Export"}, "nested": map[string]any{"enabled": true}}
+	p1, err := Generate(m, base, validTestDesignID, "v0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h1, _ := p1.InputHash()
+
+	changed := *base
+	changed.Config = map[string]any{"sinks": []any{"Export", "Archive"}, "nested": map[string]any{"enabled": true}}
+	p2, err := Generate(m, &changed, validTestDesignID, "v0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h2, _ := p2.InputHash()
+	if h1 == h2 {
+		t.Fatal("config mutation did not invalidate projection input_hash")
+	}
+
+	reordered := *base
+	reordered.Projection.Include = []string{"invariants", "model"}
+	p3, err := Generate(m, &reordered, validTestDesignID, "v0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h3, _ := p3.InputHash()
+	if h1 != h3 {
+		t.Fatalf("set-like include reordering moved input_hash: %s != %s", h1, h3)
+	}
+}
+
+func TestParallelRelationshipsRequireDistinctStableIdentity(t *testing.T) {
+	model := strings.Replace(sampleModel,
+		"      - {entity: Export, cardinality: 1:n}",
+		"      - {entity: Export, cardinality: 1:n}\n      - {entity: Export, cardinality: 1:n}", 1)
+	m, _ := LoadModel(writeTemp(t, "collision.modelith.yaml", model))
+	if _, err := Generate(m, manifestWith([]string{"relationships"}, nil), validTestDesignID, "v0"); err == nil || !strings.Contains(err.Error(), "stable identity collision") {
+		t.Fatalf("expected hard relationship collision, got %v", err)
+	}
+
+	model = strings.Replace(model,
+		"      - {entity: Export, cardinality: 1:n}\n      - {entity: Export, cardinality: 1:n}",
+		"      - {entity: Export, cardinality: 1:n, role: primary}\n      - {entity: Export, cardinality: 1:n, role: archive}", 1)
+	m, _ = LoadModel(writeTemp(t, "distinct.modelith.yaml", model))
+	p, err := Generate(m, manifestWith([]string{"relationships"}, nil), validTestDesignID, "v0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Model.Relationships) != 2 || p.Model.Relationships[0].StableID == p.Model.Relationships[1].StableID {
+		t.Fatalf("parallel roles did not produce distinct identities: %+v", p.Model.Relationships)
 	}
 }
 
 func TestRenderRoundTripAndMirror(t *testing.T) {
 	man := manifestWith([]string{"model", "invariants", "relationships"}, nil)
 	m, _ := LoadModel(writeTemp(t, "d.modelith.yaml", sampleModel))
-	p, _ := Generate(m, man, "sha256:x", "v0")
+	p, _ := Generate(m, man, validTestDesignID, "v0")
 	rendered, _ := p.Render()
 
 	back, err := ParseProjection(rendered)
@@ -211,16 +300,13 @@ func TestRenderRoundTripAndMirror(t *testing.T) {
 }
 
 func TestLoadManifestValidation(t *testing.T) {
-	ok := `checker: {id: c}
-projection: {include: [model]}
-evidence: {projection_out: p, evidence_in: e}
-`
+	ok := "checker: {id: c, runtime_closure: " + checkerTestRuntime + "}\nprojection: {include: [model]}\nevidence: {projection_out: checkers/c/projection.json, evidence_in: checkers/c/evidence.json}\n"
 	if _, err := LoadManifest(writeTemp(t, "a.checker.yaml", ok)); err != nil {
 		t.Fatalf("valid manifest rejected: %v", err)
 	}
 	for name, body := range map[string]string{
-		"no-id":       "projection: {include: [model]}\nevidence: {projection_out: p, evidence_in: e}\n",
-		"no-include":  "checker: {id: c}\nevidence: {projection_out: p, evidence_in: e}\n",
+		"no-id":       "projection: {include: [model]}\nevidence: {projection_out: checkers/c/projection.json, evidence_in: checkers/c/evidence.json}\n",
+		"no-include":  "checker: {id: c}\nevidence: {projection_out: checkers/c/projection.json, evidence_in: checkers/c/evidence.json}\n",
 		"no-evidence": "checker: {id: c}\nprojection: {include: [model]}\n",
 	} {
 		if _, err := LoadManifest(writeTemp(t, "bad.checker.yaml", body)); err == nil {
@@ -229,9 +315,170 @@ evidence: {projection_out: p, evidence_in: e}
 	}
 }
 
+func TestLoadManifestUsesClosedUnambiguousYAML(t *testing.T) {
+	base := "checker: {id: c, runtime_closure: " + checkerTestRuntime + "}\nprojection: {include: [model]}\nevidence: {projection_out: checkers/c/projection.json, evidence_in: checkers/c/evidence.json}\n"
+	for name, body := range map[string]string{
+		"unknown top field":    base + "cheker: {id: typo}\n",
+		"unknown nested field": strings.Replace(base, "id: c", "id: c, descriptin: typo", 1),
+		"duplicate field":      strings.Replace(base, "checker: {id: c,", "checker: {id: c, id: other,", 1),
+		"non scalar key":       "? [checker]\n: {id: c}\nprojection: {include: [model]}\nevidence: {projection_out: checkers/c/projection.json, evidence_in: checkers/c/evidence.json}\n",
+		"multiple documents":   base + "---\nchecker: {id: other}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := LoadManifest(writeTemp(t, "bad.checker.yaml", body)); err == nil {
+				t.Fatal("ambiguous or open manifest was accepted")
+			}
+		})
+	}
+}
+
+func TestParseProjectionStrictContractAndSupportedCombinations(t *testing.T) {
+	m, err := LoadModel(writeTemp(t, "d.modelith.yaml", sampleModel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	validDesignID := "sha256:" + strings.Repeat("a", 64)
+	for _, include := range [][]string{{"model"}, {"invariants"}, {"relationships"}, {"model", "invariants", "relationships"}} {
+		p, err := Generate(m, manifestWith(include, nil), validDesignID, "v-test")
+		if err != nil {
+			t.Fatalf("include %v: %v", include, err)
+		}
+		rendered, err := p.Render()
+		if err != nil {
+			t.Fatal(err)
+		}
+		parsed, err := ParseProjection(rendered)
+		if err != nil {
+			t.Fatalf("include %v did not conform to parser/schema: %v\n%s", include, err, rendered)
+		}
+		if parsed.Model.Entities == nil {
+			t.Fatalf("include %v rendered model.entities as null", include)
+		}
+	}
+
+	p, _ := Generate(m, manifestWith([]string{"model"}, nil), validDesignID, "v-test")
+	rendered, _ := p.Render()
+	base := strings.TrimSpace(string(rendered))
+	for name, raw := range map[string]string{
+		"unknown field":     strings.Replace(base, `"projection_schema": "1.0",`, `"projection_schema": "1.0", "mystery": true,`, 1),
+		"duplicate field":   strings.Replace(base, `"checker_id":`, `"checker_id": "duplicate", "checker_id":`, 1),
+		"trailing document": base + "\n{}",
+		"null entities":     strings.Replace(base, `"entities": [`, `"entities": null, "discarded": [`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ParseProjection([]byte(raw)); err == nil {
+				t.Fatal("invalid projection was accepted")
+			}
+		})
+	}
+}
+
+func TestLoadEvidenceStrictContract(t *testing.T) {
+	valid := `{"evidence_schema":"1.0","checker":{"id":"c","version":"1"},"input_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","runtime_closure":"sha256:1111111111111111111111111111111111111111111111111111111111111111","verdict":"pass","coverage":[{"element":"inv:x","verdict":"pass"}]}`
+	for name, raw := range map[string]string{
+		"unknown field":         strings.Replace(valid, `"verdict":"pass"`, `"unknown":true,"verdict":"pass"`, 1),
+		"duplicate field":       strings.Replace(valid, `"checker":{"id":"c"`, `"checker":{"id":"c","id":"d"`, 1),
+		"trailing document":     valid + `{}`,
+		"wrong schema":          strings.Replace(valid, `"1.0"`, `"2.0"`, 1),
+		"empty checker id":      strings.Replace(valid, `"id":"c"`, `"id":""`, 1),
+		"empty version":         strings.Replace(valid, `"version":"1"`, `"version":""`, 1),
+		"bad hash":              strings.Replace(valid, `sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`, `sha256:ABC`, 1),
+		"null coverage":         strings.Replace(valid, `[{"element":"inv:x","verdict":"pass"}]`, `null`, 1),
+		"duplicate coverage":    strings.Replace(valid, `[{"element":"inv:x","verdict":"pass"}]`, `[{"element":"inv:x","verdict":"pass"},{"element":"inv:x","verdict":"fail"}]`, 1),
+		"bad finding severity":  strings.Replace(valid, `"coverage":[`, `"findings":[{"severity":"warning","message":"x"}],"coverage":[`, 1),
+		"empty finding message": strings.Replace(valid, `"coverage":[`, `"findings":[{"severity":"info","message":""}],"coverage":[`, 1),
+		"bad signature":         strings.Replace(valid, `"coverage":[`, `"input_signature":{"scheme":"rsa","value":"x"},"coverage":[`, 1),
+		"nonobject generated":   strings.Replace(valid, `"coverage":[`, `"generated":[],"coverage":[`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := LoadEvidence(writeTemp(t, "bad.json", raw)); err == nil {
+				t.Fatal("invalid evidence was accepted")
+			}
+		})
+	}
+}
+
+func TestLoadManifestRejectsEscapingAndSymlinkedEvidencePaths(t *testing.T) {
+	design := t.TempDir()
+	checkers := filepath.Join(design, "checkers")
+	if err := os.MkdirAll(checkers, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	base := func(proj string) string {
+		return "checker: {id: c, runtime_closure: " + checkerTestRuntime + "}\nprojection: {include: [model]}\nevidence: {projection_out: " + proj + ", evidence_in: checkers/c/evidence.json}\n"
+	}
+	for name, rel := range map[string]string{"absolute": filepath.Join(design, "out.json"), "escape": "../out.json"} {
+		p := filepath.Join(checkers, name+".checker.yaml")
+		if err := os.WriteFile(p, []byte(base(rel)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadManifest(p); err == nil {
+			t.Fatalf("%s path accepted", name)
+		}
+	}
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(checkers, "c")); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(checkers, "symlink.checker.yaml")
+	if err := os.WriteFile(p, []byte(base("checkers/c/projection.json")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadManifest(p); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("symlink component accepted: %v", err)
+	}
+}
+
+func TestConfinedPathRejectsHostIndependentNonportablePaths(t *testing.T) {
+	for _, rel := range []string{
+		`C:\temp\projection.json`,
+		`\\server\share\evidence.json`,
+		"checkers/NUL.json",
+		"checkers/con.txt",
+		"checkers/COM1.proof",
+		"checkers/name./projection.json",
+		"checkers/name /projection.json",
+		"checkers/café/projection.json",
+	} {
+		if _, err := ConfinedPath(t.TempDir(), rel); err == nil {
+			t.Errorf("nonportable path %q was accepted", rel)
+		}
+	}
+}
+
+func TestLoadManifestRequiresCheckerOwnedOutputDirectory(t *testing.T) {
+	body := "checker: {id: c, runtime_closure: " + checkerTestRuntime + "}\nprojection: {include: [model]}\nevidence: {projection_out: projection.json, evidence_in: evidence.json}\n"
+	if _, err := LoadManifest(writeTemp(t, "c.checker.yaml", body)); err == nil || !strings.Contains(err.Error(), "owned under checkers/c/") {
+		t.Fatalf("root-level checker outputs were accepted: %v", err)
+	}
+}
+
+func TestLoadManifestRejectsNonportableCheckerID(t *testing.T) {
+	for _, id := range []string{"café", "NUL", "name ", "a/b"} {
+		body := "checker: {id: '" + id + "'}\nprojection: {include: [model]}\nevidence: {projection_out: checkers/c/projection.json, evidence_in: checkers/c/evidence.json}\n"
+		if _, err := LoadManifest(writeTemp(t, "bad.checker.yaml", body)); err == nil {
+			t.Errorf("nonportable checker id %q was accepted", id)
+		}
+	}
+}
+
 func TestLoadEvidenceRejectsBadVerdict(t *testing.T) {
 	body := `{"evidence_schema":"1.0","checker":{"id":"c","version":"1"},"input_hash":"sha256:x","verdict":"maybe","coverage":[]}`
 	if _, err := LoadEvidence(writeTemp(t, "e.json", body)); err == nil {
 		t.Fatal("expected error on unknown verdict token")
+	}
+}
+
+func TestReadConfinedFileBoundedRejectsOversizedArtifact(t *testing.T) {
+	design := t.TempDir()
+	if err := os.WriteFile(filepath.Join(design, "trace.bin"), []byte("12345"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadConfinedFileBounded(design, "trace.bin", 4); err == nil || !strings.Contains(err.Error(), "exceeds 4-byte limit") {
+		t.Fatalf("oversized confined artifact diagnostic = %v", err)
+	}
+	got, err := ReadConfinedFileBounded(design, "trace.bin", 5)
+	if err != nil || string(got) != "12345" {
+		t.Fatalf("bounded confined artifact = %q, %v", got, err)
 	}
 }

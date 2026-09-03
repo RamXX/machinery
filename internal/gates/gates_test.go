@@ -719,6 +719,17 @@ func writeStampFixture(t *testing.T, mutate func(string) string) string {
 	if err := os.WriteFile(filepath.Join(mdir, "Widget.oracle.md"), []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	matrix := "| name | kind | contract |\n|---|---|---|\n" +
+		"| `guardCanPublish` | guard | decides publish |\n" +
+		"| `setPending` | action | records pending |\n" +
+		"| `recordDenied` | action | records refusal |\n" +
+		"| `commit` | action | commits |\n" +
+		"| `recordError` | action | records error |\n" +
+		"| `recordTimeout` | action | records timeout |\n" +
+		"| `saveWidget` | actor | persists widget |\n"
+	if err := os.WriteFile(filepath.Join(mdir, "Widget.matrix.md"), []byte(matrix), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	return design
 }
 

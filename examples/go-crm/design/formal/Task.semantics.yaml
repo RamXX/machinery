@@ -1,0 +1,7 @@
+machine: task
+pattern: control-flow-only
+reason: >-
+  Task is command-driven with two valid terminal outcomes and a shared
+  persistence retry and rollback overlay; the data-refinement algebras cannot
+  represent that shape without falsely treating cancellation as failure, so
+  the generated Task.tla control-flow model is the only claimed formal rung.

@@ -47,8 +47,8 @@ External checkers ride that same split:
                  verdict is pass
                                                               |
   verify-  --->  machinery verify-checkers:        --->  your engine's own
-  checkers       resolves the binary via the             run + verify
-                 registry, re-runs the adapter,
+  checkers       verifies the registry's immutable       run + verify
+                 OCI closure, re-runs the adapter,
                  compares to committed evidence
 ```
 
@@ -68,8 +68,9 @@ the three commands you actually run.
   projection, and checks that the committed evidence binds and covers the claim.
 - **`machinery verify-checkers <design> [--registry <path>] [--checker <id>]`** is the engine phase,
   the sibling of `machinery verify-formal`. It resolves each checker's binary through the registry,
-  re-runs the adapter, and confirms the freshly produced evidence is reproducible: verdict,
-  `input_hash`, and coverage all match the committed copy. It then runs the optional replay `verify`
+  re-runs the adapter, and confirms the freshly produced evidence is reproducible: schema, checker
+  id/version, verdict, `input_hash`, complete coverage rows, findings, attestation, and trace reference
+  all match the committed copy (only `generated` provenance is ignored). It then runs the optional replay `verify`
   command. It requires the committed projection to already be present, so run `machinery project`
   first. `--checker` scopes a run to one id; `--registry` overrides the default registry path,
   `.machinery/checkers.local.yaml` in the current working directory.
@@ -81,13 +82,13 @@ the three commands you actually run.
 | `projection.schema.json` | machinery | [`schemas/projection.schema.json`](../schemas/projection.schema.json) | the canonical, deterministic slice of the design machinery hands you |
 | `evidence.schema.json` | machinery | [`schemas/evidence.schema.json`](../schemas/evidence.schema.json) | the verdict + coverage + provenance you hand back |
 | the manifest | you | `design/checkers/<id>.checker.yaml` (committed, tool-neutral) | which slice you need, what you cover, where your evidence sits |
-| the registry | you | `.machinery/checkers.local.yaml` (repo root, git-ignored) | which binary fulfills `<id>`, and its verify command |
+| the registry | you | `.machinery/checkers.local.yaml` (repo root, git-ignored) | immutable OCI image plus exact platform, mounted-input closure, local engine, and run/replay argv for `<id>` |
 | the adapter | you | anywhere your registry command points | maps projection -> your input, and your output -> evidence.json |
 
-Machinery reads the two schemas, the manifest, and the evidence. It resolves the binary through the
-registry. It never reads your adapter, your engine, or your native output format. That separation is
-the whole point: your tool emits what it emits, and the adapter is the only thing that has to know
-both languages.
+Machinery reads the two schemas, manifest, evidence, and closed local registry. It hashes every
+declared adapter/rule input without interpreting it, verifies the immutable image identity, and never
+parses your native output format. That separation is the whole point: your tool emits what it emits,
+and the adapter is the only thing that has to know both languages.
 
 ## The two schemas
 
@@ -148,6 +149,7 @@ A single JSON object you write back. The required core is small:
   "evidence_schema": "1.0",
   "checker": { "id": "privacy-cl", "version": "2026.07.1" },
   "input_hash": "sha256:...",
+  "runtime_closure": "sha256:...",
   "verdict": "pass",
   "coverage": [
     { "element": "inv:priv-consent-required", "verdict": "pass" },
@@ -156,11 +158,13 @@ A single JSON object you write back. The required core is small:
 }
 ```
 
-`input_hash` is the binding. `coverage` is the list of elements you actually decided, which
+`input_hash` binds the design projection and `runtime_closure` binds the immutable checker
+userspace, command topology, and declared mounted inputs. `coverage` is the list of elements you actually decided, which
 machinery cross-checks against your claim; each `element` is the projection's full `stable_id`, not
-the bare invariant id the manifest's `claim` glob matched. Optional fields carry findings, a detached
-`input_signature` machinery can verify in the pure phase, an opaque `attestation` block for your
-engine's own provenance, and a `trace_ref` for replay. Full reference:
+the bare invariant id the manifest's `claim` glob matched. Optional fields carry findings, an opaque
+`attestation` block for your engine's own provenance, and a `trace_ref` for replay. Trace artifacts
+must live below `generated/` beside the evidence file so reverse inventory can reject obsolete proofs.
+Full reference:
 [`schemas/evidence.schema.json`](../schemas/evidence.schema.json).
 
 ## The manifest (tool-neutral, committed)
@@ -172,6 +176,7 @@ stays portable and nothing about your tool leaks into a committed artifact.
 checker:
   id: privacy-cl                       # opaque label; must match evidence.checker.id
   description: "Static data-protection check over data-handling invariants"
+  runtime_closure: sha256:...          # exact OCI image + platform + argv + mounted-input closure
 
 # The slice you need. Machinery projects exactly this, in canonical order, and owns its freshness.
 # v1 supports model, invariants, and relationships only. Naming actions, scenarios, machines, c4, or
@@ -196,12 +201,13 @@ config:
   sensitive: ["attr:DataSubject.email", "attr:DataSubject.nationalId"]
   sinks: ["entity:AnalyticsExport"]
 
-# Where your evidence sits and how it binds. Both paths are relative to the design directory.
+# Where your evidence sits and how it binds. Both outputs must be owned below
+# checkers/<checker-id>/ so reverse inventory can detect artifacts whose manifest was deleted.
 evidence:
   projection_out: checkers/privacy-cl/projection.json
   evidence_in: checkers/privacy-cl/evidence.json
 
-# Optional: this checker emits an oracle-shaped decision table the implementation must conform to.
+# Reserved in v1.0. `true` is rejected until an owned oracle path and freshness contract exist.
 emits_oracle: false
 ```
 
@@ -211,23 +217,45 @@ that does not cover it fails `gk`. You cannot silently skip a control on a new f
 
 v1 has no manifest-level `signature` field. A checker that signs its own artifacts carries that
 provenance through the opaque `attestation` block on evidence instead (see "Determinism across an
-opaque engine" and "Writing an adapter" below); `input_signature` remains reserved on the evidence
-schema for a directly-verified mode machinery does not yet implement.
+opaque engine" and "Writing an adapter" below). `input_signature` is reserved and rejected until a
+versioned evidence contract implements key resolution and actual signature verification.
 
-## The registry (local, git-ignored, resolves the binary)
+## The registry (local, git-ignored, declares one immutable OCI closure)
 
-`.machinery/checkers.local.yaml` at the repo root binds each `id` to a command. It is machine-local,
-git-ignored config, not a design artifact: the design never names your tool, and machinery core never
-does either. `machinery verify-checkers` reads it from the current working directory by default; pass
-`--registry <path>` to point at a different file (a shared CI config, a per-environment variant).
+`.machinery/checkers.local.yaml` at the repo root binds each `id` to an immutable OCI userspace and
+commands inside that userspace. It is machine-local, git-ignored config, not a design artifact.
+`machinery verify-checkers` reads it from the current working directory by default; pass `--registry
+<path>` to point at a different file.
 
 ```yaml
 checkers:
   <checker-id>:
-    run: ["<cmd>", "<args-with-tokens>"]   # required; the adapter, writes fresh evidence to {out}
-    verify: ["<cmd>", "<args>"]            # optional; replays / re-verifies the engine's own trace
-    timeout: "120s"                        # optional; default 120s
+    runtime:
+      kind: oci
+      engine: [docker]                     # local control plane, not checker userspace
+      image: registry.example/checker@sha256:<64-lowercase-hex>
+      platform: linux/amd64                # required; exactly selects one image implementation
+      inputs:                              # optional exact read-only files outside the image
+        - {source: tools/adapter.py, mount: adapter.py}
+        - {source: rules/control.dl, mount: control.dl}
+    run: ["python3", "/checker/adapter.py", "{projection}", "{config}", "{out}"]
+    verify: ["python3", "-c", "pass"]     # optional silent replay/identity command in the same image
+    timeout: "120s"
 ```
+
+Tags are rejected. The image must end in an immutable lowercase `@sha256:` digest and `platform`
+must be exactly `linux/amd64` or `linux/arm64`. The local engine must report that exact reference in
+`RepoDigests` and the inspected image OS/architecture must match the declared platform; verification
+always inspects and executes with that `--platform` and `--pull=never`. A registry closure digest
+binds the image digest, platform, every `run` and `verify` argument, and each declared input's
+portable mount name plus content digest. The manifest and evidence both carry that derived digest.
+A missing, extra, changed input, or platform change therefore fails before execution.
+
+Interpreters, standard libraries, language modules, native loaders, shared libraries, and child tools
+must all come from the immutable image. There is no ambient host PATH or module search inside the
+checker. Files outside the image are visible only when declared under `runtime.inputs`; machinery
+opens each through a rooted directory handle, rejects symlinks and special files, copies it into a
+private read-only `/checker` mount, and hashes the copied bytes into the closure.
 
 Tokens substituted into `run` and `verify` arguments:
 
@@ -237,15 +265,22 @@ Tokens substituted into `run` and `verify` arguments:
 | `{config}` | path to a temp JSON file holding the manifest's opaque `config` block |
 | `{manifest}` | path to the checker manifest itself |
 | `{out}` | path your adapter must write fresh evidence to |
-| `{design}` | the design directory |
+| `{design}` | rejected for OCI checkers; projection, config, and manifest are the complete design inputs |
 
 Concretely, for the manifest above:
 
 ```yaml
 checkers:
   privacy-cl:
-    run: ["./tools/privacy-cl-adapter.sh", "{projection}", "{config}", "{out}"]
-    verify: ["./tools/privacy-cl-verify.sh", "{out}"]
+    runtime:
+      kind: oci
+      engine: [docker]
+      image: registry.example/privacy-cl@sha256:<64-lowercase-hex>
+      platform: linux/amd64
+      inputs:
+        - {source: tools/privacy-cl-adapter.py, mount: adapter.py}
+    run: ["python3", "/checker/adapter.py", "{projection}", "{config}", "{out}"]
+    verify: ["python3", "/checker/adapter.py", "--verify", "{out}"]
     timeout: "120s"
 ```
 
@@ -254,10 +289,26 @@ entirely to your engine's own replay or verify subcommand. A missing or unresolv
 reported by `machinery verify-checkers` itself as an ERROR before it attempts to run anything; it is
 never silently skipped.
 
-`machinery doctor` reads this registry too: when it is present in the current directory, doctor lists
-each configured checker and probes that its `run` binary is on PATH, so a missing engine surfaces up
-front rather than as a confusing `verify-checkers` failure. With no registry present, doctor's output
-is unchanged.
+The checker contract is file-based: a successful `run` or `verify` must emit zero stdout/stderr
+bytes. Diagnostics belong in evidence/findings or native trace files. Any captured byte, including a
+warning or newline from an exit-zero command, is surfaced as an ERROR so warnings cannot disappear.
+
+The OCI engine is machinery's local control-plane trust boundary, not part of the checker userspace
+closure. Its executable is resolved once, required to be a regular non-symlink executable, copied and
+content-rechecked before all image inspection, run, and replay phases. The engine daemon must honor
+the requested isolation flags. Engine or daemon version is intentionally not represented as checker
+evidence; checker semantics are bound to the digest-addressed image, declared platform, and inputs.
+CI must provision and inspect the same image digest and platform before running with the same
+explicit `--platform` and `--pull=never`.
+
+Every run uses a network-disabled, read-only container with all capabilities dropped, no-new-
+privileges, deterministic locale/time/home/temp variables, a bounded tmpfs, and only private `/work`
+and read-only `/checker` mounts. Standard output and error have a fixed 256 KiB total bound; timeout
+terminates the process tree and reports truncation or cleanup failures explicitly.
+
+`machinery doctor` reads the registry and probes each distinct `runtime.engine` executable. It does
+not probe commands that exist only inside the image. A missing or unsafe engine is therefore reported
+before `verify-checkers`; no registry leaves doctor's output unchanged.
 
 ## The two phases in operation
 
@@ -272,13 +323,14 @@ For each manifest under `design/checkers/`, in id order, machinery:
    copy is DRIFT, pointing you at `machinery project`;
 3. reads the committed `evidence_in` and checks its `checker.id` matches the manifest; absence of the
    file is an ERROR, never a silent pass;
-4. checks `input_hash == sha256(fresh projection)`; a mismatch is DRIFT (the verdict was computed
-   over a different design);
+4. checks `input_hash == sha256(fresh projection)` and `runtime_closure ==
+   manifest.checker.runtime_closure`; either mismatch is DRIFT (the verdict was computed over a
+   different design or checker userspace);
 5. checks `verdict == pass` and that every claimed invariant is in `coverage` or a declared residual;
    a coverage gap is ERROR, and a `fail` verdict (or a `pass` that still carries a blocking finding)
    surfaces as ERROR with the blocking findings shown;
-6. prints `layers projected`, `invariants claimed`, `residuals`, `evidence bound to design`, and
-   `elements covered` counts.
+6. prints `layers projected`, `invariants claimed`, `residuals`, `evidence bound to design`,
+   `evidence bound to runtime closure`, and `elements covered` counts.
 
 Notice what step 5 does *not* do: it never re-derives the verdict. It proves the design projects to
 exactly this input and that fresh, bound evidence asserts pass over that input. That is fully
@@ -291,24 +343,29 @@ every other gate.
 ### `machinery verify-checkers <design>` (the engine phase, sibling of verify-formal)
 
 This is where the engine actually runs. It requires the committed projection to already be present
-(run `machinery project` first); it does not itself re-run the `gk` gate, keeping the phases separate
-exactly as `verify-formal` does, so running `machinery check --gate gk` first is the discipline that
-keeps an engine from burning time on a design that has not passed the pure gate. Pass `--checker <id>`
+(run `machinery project` first). It does not render the full `gk` report, but independently regenerates
+and validates the current projection and evidence binding before starting the engine, so direct use
+cannot bless two matching stale files. Pass `--checker <id>`
 to scope a run to one checker, or `--registry <path>` to point at a registry other than the default
 `.machinery/checkers.local.yaml`. For each checker it:
 
-1. resolves the binary through the registry;
-2. re-runs the adapter (the registry's `run` command) against the committed projection and the
-   manifest's `config`, in a sandbox with the declared timeout, writing fresh evidence to `{out}`;
-3. confirms the freshly produced evidence is reproducible against the committed copy: verdict,
-   `input_hash`, and coverage all match;
-4. runs the registry's `verify` command, when declared, delegating replay and signature checking to
+1. loads the closed registry, snapshots the OCI engine and every declared input, derives the complete
+   runtime closure, and rejects any mismatch with the manifest or committed evidence;
+2. asks the snapshotted engine to inspect the exact image reference and declared platform, rejecting
+   a missing or mismatched `RepoDigests` or OS/architecture identity before execution;
+3. re-runs the adapter in that image with explicit `--platform`, `--pull=never`, and the isolation contract above, writing
+   fresh evidence to `{out}`;
+4. confirms the freshly produced evidence is reproducible against the committed copy: schema,
+   checker id/version, verdict, `input_hash`, full coverage rows (including detail), findings,
+   runtime closure and attestation match, then requires the fresh generated-trace inventory and exact
+   trace bytes (bounded to 16 MiB) to match the committed artifact; non-binding evidence `generated`
+   provenance is ignored;
+5. runs the registry's `verify` command, when declared, in the same image and mounted closure, delegating replay and signature checking to
    your engine's own verifier. Machinery checks its exit code and that the re-derived verdict agrees;
    it does not parse your native trace.
 
-The split keeps `check` dependency-free (no Rust, Python, Java, or your engine on the CI box) while
-`verify-checkers` runs where your runtime is available, exactly as `verify-formal` needs Java only
-where the proofs run.
+The split keeps `check` dependency-free while `verify-checkers` requires only the declared OCI
+control plane and locally provisioned immutable image.
 
 ## Composing multiple checkers
 
@@ -318,10 +375,10 @@ manifest, in a single run. Two checkers on one design look like this:
 
 ```
 == Gk-minimality external checker ==
-  checked: 2 layers projected, 1 invariants claimed, 1 committed projection fresh, 1 evidence bound to design, 1 elements covered
+  checked: 2 layers projected, 1 invariants claimed, 1 committed projection fresh, 1 evidence bound to runtime closure, 1 evidence bound to design, 1 elements covered
   ok
 == Gk-pii-flow external checker ==
-  checked: 3 layers projected, 3 invariants claimed, 2 residuals (waived with reason), 1 committed projection fresh, 1 evidence bound to design, 1 elements covered
+  checked: 3 layers projected, 3 invariants claimed, 2 residuals (waived with reason), 1 committed projection fresh, 1 evidence bound to runtime closure, 1 evidence bound to design, 1 elements covered
   ok
 ```
 
@@ -387,6 +444,9 @@ cannot see through:
   byte-matched. Your engine cannot read the design any other way.
 - **Verdict binding.** `input_hash` ties the committed verdict to that exact input. A verdict over a
   changed design cannot pass.
+- **Runtime binding.** `runtime_closure` ties the verdict to the immutable image, exact OCI platform,
+  command topology, and exact declared mounted inputs. Host architecture selection, an undeclared
+  dependency, or input-set drift cannot silently reuse the committed evidence.
 - **Re-derivation elsewhere.** `machinery verify-checkers` re-runs or replays the engine and compares.
 
 For a **probabilistic** checker (converging intervals over a graph, for example), determinism is
@@ -444,22 +504,20 @@ reading end to end rather than taking on faith:
   collection-minimality are not decidable from a static flow graph), and carries a `config` block
   naming which attributes are sensitive and which entities are the sink and the redactor, so the
   Datalog program never has to guess at domain knowledge the projection does not carry.
-- **the rules**, `examples/pii-flow/design/checkers/pii-flow/rules.dl`: a Soufflé Datalog program.
-  Taint propagates along `flows` edges from any entity holding a `sensitive` attribute; a `redacted`
-  entity blocks propagation into it using closed-world negation (`tainted(F) :- tainted(E), flows(E,
-  F), !redacted(F).`), so anything downstream of the `Redactor` is clean; a `leak` fires when tainted
-  data reaches a `sink`.
-- **the adapter**, `examples/pii-flow/design/checkers/pii-flow/adapter.py`: reads `{projection}` and
-  `{config}`, lowers the projected entities and relationships into Soufflé EDB facts using the
-  `config` block's sensitive/sink/redactor lists, runs `souffle` against `rules.dl`, and maps an empty
-  `leak` relation to a `pass` (with `inv:priv-no-unredacted-export` in `coverage`) or a non-empty one
-  to a `fail` with a blocking finding per leaking element.
+- **the rules**, `examples/pii-flow/design/checkers/pii-flow/rules.dl`: the canonical Datalog
+  statement of the fixed-point semantics. Taint propagates along `flows` edges from any entity
+  holding a `sensitive` attribute; a `redacted` entity blocks propagation, and a `leak` fires when
+  tainted data reaches a `sink`.
+- **the adapter**, `examples/pii-flow/design/checkers/pii-flow/adapter.py`: a standard-library-only
+  fixed-point implementation of those semantics. It reads `{projection}` and `{config}`, validates
+  the mounted rule contract, and maps no leaks to `pass` or each leak to a blocking finding. It runs
+  under the digest-pinned Python OCI userspace and never searches for a host interpreter or child tool.
 - **the committed outputs**, `.../pii-flow/projection.json` and `.../pii-flow/evidence.json`: the
   real `machinery project` output and the adapter's real evidence for this design, so you can see an
   actual `input_hash` binding a real projection to a real verdict rather than an abstract one.
-- **a sample registry entry**, `checkers.local.example.yaml`: copy it to
-  `.machinery/checkers.local.yaml` and point it at your local `souffle` and Python to run
-  `machinery verify-checkers` against the example yourself.
+- **a sample registry entry**, `checkers.local.example.yaml`: pins the exact image digest and
+  `linux/amd64` platform, declares the adapter and rule file as read-only hashed inputs, and uses
+  Docker only as the local OCI control plane.
 
 This is the shape every checker in this guide follows; the rest of this section covers short
 variants where the mapping differs.
@@ -497,7 +555,9 @@ the external phase, having parsed none of the engine's formats.
 | `verdict: fail`, or a `pass` carrying a blocking finding | ERROR, with the blocking findings surfaced |
 | `projection.include` names a layer v1 does not project | ERROR, from `machinery project` and from the gate; never a silent omission |
 | registry entry or engine binary missing (`verify-checkers`) | ERROR, reported before anything is run |
-| schema or machinery version differs from what's running | non-blocking note (skew); regenerate when convenient |
+| projection/evidence schema differs from v1.0 | ERROR (unsupported contract) |
+| committed projection machinery version differs but binding content is current | non-blocking provenance note |
+| fresh checker id/version differs from committed evidence | ERROR (the run is not reproducible) |
 
 ## Order, and why gk sits after Gx
 
@@ -530,5 +590,5 @@ nothing:
    bound, covered.
 7. Run `machinery verify-checkers <design>` where your engine is available; wire it into CI next to
    `verify-formal`.
-8. If the checker emits an oracle-shaped decision table, set `emits_oracle: true` and add the
-   conformance test to `BUILD.md`, exactly as the policy oracle does, to close design to code.
+8. Keep `emits_oracle: false` in v1.0. A future contract may add an owned oracle path plus Gk/Gt
+   freshness checks; the current parser rejects `true` rather than accepting an unenforced claim.

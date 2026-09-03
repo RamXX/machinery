@@ -1,6 +1,6 @@
 package session_test
 
-// Session machine transition oracle. One table case per BUILD.md 7.1 T-SESS row.
+// Session machine transition oracle. One table case per committed oracle row.
 // Source: machines/Session.matrix.md. Each case sets up the given state (+context
 // for the guarded rows: verified/loaded user status, token expiry, retry count),
 // fires the trigger, and asserts the next state and that the row's actions fired
@@ -42,7 +42,7 @@ func firedInOrder(got, want []string) bool {
 	return i == len(want)
 }
 
-func sessCases() []sessCase {
+func TestSessionTransitions(t *testing.T) {
 	login := session.SessionEvent{Kind: session.SEvLogin, Username: "u", Password: "p"}
 	resume := session.SessionEvent{Kind: session.SEvResume}
 	logout := session.SessionEvent{Kind: session.SEvLogout}
@@ -61,7 +61,7 @@ func sessCases() []sessCase {
 	errUnreadable := session.SessionEvent{Kind: session.SEvInvokeError, Err: model.ErrUnreadable}
 	errNotFound := session.SessionEvent{Kind: session.SEvInvokeError, Err: model.ErrNotFound}
 
-	return []sessCase{
+	cs := []sessCase{
 		// --- Anonymous ---
 		{"T-SESS-01_SESS-ee5c17", sm(session.SAnonymous), login, session.SAuthenticating, []string{"setCredentials"}},
 		{"T-SESS-02_SESS-f3cc5e", sm(session.SAnonymous), resume, session.SResolving, nil},
@@ -150,10 +150,7 @@ func sessCases() []sessCase {
 		{"T-SESS-59_SESS-f6a536", sm(session.SSessionUnavailable), logout, session.SSessionUnavailable, []string{"recordNoSessionToLogout"}},
 		{"T-SESS-60_SESS-b830a0", sm(session.SSessionUnavailable), use, session.SSessionUnavailable, []string{"recordNoActiveSession"}},
 	}
-}
-
-func TestSessionTransitions(t *testing.T) {
-	for _, tc := range sessCases() {
+	for _, tc := range cs {
 		t.Run(tc.id, func(t *testing.T) {
 			got := tc.machine.Fire(tc.event)
 			if tc.machine.State != tc.want {

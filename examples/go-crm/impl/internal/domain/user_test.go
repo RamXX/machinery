@@ -1,6 +1,6 @@
 package domain_test
 
-// User status-lifecycle transition oracle. One case per BUILD.md 7.1 T-USER row.
+// User status-lifecycle transition oracle. One case per committed User oracle row.
 // Source: machines/User.matrix.md. guardAdminAuthority is a single clause
 // (actor.role == Admin), so each guard-false row has one falsifying case.
 
@@ -41,10 +41,10 @@ type userCase struct {
 	actions []string
 }
 
-func userCases() []userCase {
+func TestUserTransitions(t *testing.T) {
 	disable := domain.UserEvent{Kind: domain.UEvDisable}
 	enable := domain.UserEvent{Kind: domain.UEvEnable}
-	return []userCase{
+	cs := []userCase{
 		{"T-USER-01_USER-e20d04", newUserAgg(domain.USActive, uAdmin), disable, domain.USPersisting, []string{"setPendingDisable"}},
 		{"T-USER-02_notAdmin_USER-2b2218", newUserAgg(domain.USActive, uMgrT1), disable, domain.USActive, []string{"recordAuthorityDenied"}},
 		{"T-USER-03_USER-0ef83a", newUserAgg(domain.USActive, uAdmin), enable, domain.USActive, []string{"recordAlreadyActive"}},
@@ -68,6 +68,18 @@ func userCases() []userCase {
 
 		{"T-USER-18_USER-adccd9", userPrior(domain.USActive), domain.UserEvent{Kind: domain.UEvAlways}, domain.USActive, nil},
 		{"T-USER-19_USER-7cf0fc", userPrior(domain.USDisabled), domain.UserEvent{Kind: domain.UEvAlways}, domain.USDisabled, nil},
+		{"USER-453743 / fail-closed rollback routing", userPrior(domain.UserState("bogus")), domain.UserEvent{Kind: domain.UEvAlways}, domain.USDisabled, []string{"recordRoutingError"}},
+	}
+	for _, tc := range cs {
+		t.Run(tc.id, func(t *testing.T) {
+			got := tc.user.Fire(tc.event)
+			if tc.user.State != tc.want {
+				t.Errorf("%s: next state = %q, want %q", tc.id, tc.user.State, tc.want)
+			}
+			if !firedInOrder(got.Actions, tc.actions) {
+				t.Errorf("%s: actions = %v, want (in order) %v", tc.id, got.Actions, tc.actions)
+			}
+		})
 	}
 }
 
@@ -80,18 +92,4 @@ func userRetries(n int) *domain.User {
 func userSaveDone() domain.UserEvent { return domain.UserEvent{Kind: domain.UEvSaveDone} }
 func userSaveErr(e error) domain.UserEvent {
 	return domain.UserEvent{Kind: domain.UEvSaveError, Err: e}
-}
-
-func TestUserTransitions(t *testing.T) {
-	for _, tc := range userCases() {
-		t.Run(tc.id, func(t *testing.T) {
-			got := tc.user.Fire(tc.event)
-			if tc.user.State != tc.want {
-				t.Errorf("%s: next state = %q, want %q", tc.id, tc.user.State, tc.want)
-			}
-			if !firedInOrder(got.Actions, tc.actions) {
-				t.Errorf("%s: actions = %v, want (in order) %v", tc.id, got.Actions, tc.actions)
-			}
-		})
-	}
 }

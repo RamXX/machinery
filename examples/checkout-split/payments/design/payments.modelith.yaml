@@ -5,6 +5,10 @@ description: >
   The payments subsystem, designed against its contract pack. The Payment
   entity's public shape is frozen by the pack.
 
+glossary:
+  Operator: "The payments operator authorized to refund captured funds."
+  System: "An authenticated order or processor event handler acting without a human surface."
+
 enums:
   PaymentStatus:
     values:
@@ -27,7 +31,15 @@ entities:
       - {name: decline, actor: System}
       - {name: refund, actor: Operator}
     invariants:
-      - {id: payment-single-capture, definition: "A payment is captured at most once. Structural: capture is only handled in Requested."}
+      - {id: payment-single-capture, statement: "A payment is captured at most once. Structural: capture is only handled in Requested."}
 
 invariants: []
-scenarios: []
+scenarios:
+  - name: Payment captures at most once
+    description: "Exercises settlement, duplicate capture handling, and the refund path."
+    actors: [System, Operator]
+    steps:
+      - "The order `System` requests a `Payment`."
+      - "The processor `System` captures it once; a duplicate capture has no effect."
+      - "An `Operator` refunds the captured `Payment`."
+    invariants_touched: [payment-single-capture]

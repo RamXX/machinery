@@ -12,7 +12,6 @@ package gates
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -25,8 +24,8 @@ import (
 // HasBuildDoc reports whether the design has a BUILD.md (Phase 4 produced a
 // build document); Gb auto-activates on it.
 func HasBuildDoc(design string) bool {
-	fi, err := os.Stat(filepath.Join(design, "BUILD.md"))
-	return err == nil && !fi.IsDir()
+	has, err := probeRegularFile(design, "BUILD.md")
+	return has || err != nil
 }
 
 var (
@@ -200,7 +199,7 @@ func buildPlanSections(text string) []string {
 func planOracleIDs(design string, g *Gate) []string {
 	var ids []string
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.oracle.md") {
-		testIDs, stableIDs := oracleTableIDs(readFileOrErr(path, g))
+		testIDs, stableIDs := oracleTableIDs(readDesignFileOrErr(design, path, g))
 		ids = append(ids, testIDs...)
 		ids = append(ids, stableIDs...)
 	}
@@ -404,11 +403,16 @@ type planNamedDoc struct {
 func CheckBuildPlan(design string) *Gate {
 	g := NewGate("Gb-plan  build plan structure")
 	g.startOrder()
-	if !HasBuildDoc(design) {
+	has, probeErr := probeRegularFile(design, "BUILD.md")
+	if probeErr != nil {
+		g.Errs = append(g.Errs, probeErr.Error())
+		return g
+	}
+	if !has {
 		g.Errs = append(g.Errs, "no BUILD.md in the design; the build-plan gate was requested but Phase 4 never produced a build document (author BUILD.md, or drop gb from the gate list)")
 		return g
 	}
-	text := readFileOrErr(filepath.Join(design, "BUILD.md"), g)
+	text := readDesignFileOrErr(design, filepath.Join(design, "BUILD.md"), g)
 	var shards []string
 	indexFiles := 0
 	if planMode(text) == "manifest" {
@@ -416,7 +420,7 @@ func CheckBuildPlan(design string) *Gate {
 	}
 	docs := []planNamedDoc{{name: "BUILD.md", text: maskFences(text)}}
 	for _, shard := range shards {
-		docs = append(docs, planNamedDoc{name: filepath.Base(shard), text: maskFences(readFileOrErr(shard, g))})
+		docs = append(docs, planNamedDoc{name: filepath.Base(shard), text: maskFences(readDesignFileOrErr(design, shard, g))})
 	}
 	// A machine-less decomposed parent's manifest is a table of contents over
 	// the children, not a buildable plan: the template sections and the
@@ -466,7 +470,7 @@ func CheckBuildPlan(design string) *Gate {
 		// the design-wide committed oracle ids: a shard plans work on the same
 		// machines the root design committed.
 		for _, shard := range shards {
-			checkPlanDoc(g, filepath.Base(shard), readFileOrErr(shard, g), ids)
+			checkPlanDoc(g, filepath.Base(shard), readDesignFileOrErr(design, shard, g), ids)
 		}
 		return g
 	}
@@ -568,7 +572,7 @@ func planDocuments(design string, g *Gate) []planDoc {
 	if !HasBuildDoc(design) {
 		return nil
 	}
-	text := readFileOrErr(filepath.Join(design, "BUILD.md"), g)
+	text := readDesignFileOrErr(design, filepath.Join(design, "BUILD.md"), g)
 	var out []planDoc
 	if ms, ok := planMilestonesOf(text); ok {
 		out = append(out, planDoc{name: "BUILD.md", milestones: ms})
@@ -578,7 +582,7 @@ func planDocuments(design string, g *Gate) []planDoc {
 	}
 	shards, _ := planShards(design)
 	for _, shard := range shards {
-		if ms, ok := planMilestonesOf(readFileOrErr(shard, g)); ok {
+		if ms, ok := planMilestonesOf(readDesignFileOrErr(design, shard, g)); ok {
 			out = append(out, planDoc{name: filepath.Base(shard), milestones: ms})
 		}
 	}

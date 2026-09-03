@@ -1,8 +1,12 @@
 package pack
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -77,6 +81,252 @@ func TestLoadDecompositionValidates(t *testing.T) {
 	}
 }
 
+func TestLoadDecompositionRejectsUnknownAndWrongTypedSchemaDeterministically(t *testing.T) {
+	for _, tc := range []struct {
+		name, old, replacement, want string
+	}{
+		{"unknown root", "decomposition_version: 1\n", "decomposition_version: 1\nzzz: true\naaa: true\n", "unknown root key 'aaa'"},
+		{"wrong subsystems type", "subsystems:\n", "subsystems: null\n", "subsystems must be an array"},
+		{"unknown subsystem", "  - id: orders\n", "  - id: orders\n    zzz: true\n    aaa: true\n", "unknown key 'aaa'"},
+		{"wrong list member", "    owns: [Order]\n", "    owns: [Order, null]\n", "owns[1] must be a string"},
+		{"wrong boundary waiver", "    child_design: ../../orders/design\n", "    child_design: ../../orders/design\n    boundary_events:\n      none: reason\n      typo: value\n", "boundary_events must be a mapping"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			design := copyParentDesign(t)
+			if tc.name == "wrong subsystems type" {
+				if err := os.WriteFile(filepath.Join(design, "decomposition.yaml"), []byte("decomposition_version: 1\nsubsystems: null\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				editDesignFile(t, design, "decomposition.yaml", tc.old, tc.replacement)
+			}
+			var stable string
+			for i := 0; i < 100; i++ {
+				_, err := LoadDecomposition(design)
+				if err == nil || !strings.Contains(err.Error(), tc.want) {
+					t.Fatalf("invalid decomposition accepted or wrong diagnostic: %v", err)
+				}
+				if i == 0 {
+					stable = err.Error()
+				} else if err.Error() != stable {
+					t.Fatalf("diagnostic changed on run %d:\nwant %s\n got %s", i, stable, err)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadPackMapRejectsOpenOrWrongTypedSchema(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, want string
+	}{
+		{"unknown sorted", "subsystem: x\npack_hash: h\nmachine: M\nmapping: {}\nzzz: 1\naaa: 1\n", "unknown root key 'aaa'"},
+		{"missing mapping", "subsystem: x\npack_hash: h\nmachine: M\n", "mapping is required"},
+		{"null mapping", "subsystem: x\npack_hash: h\nmachine: M\nmapping: null\n", "mapping is required"},
+		{"wrong mapping value", "subsystem: x\npack_hash: h\nmachine: M\nmapping:\n  Ready: null\n", "mapping value for 'Ready'"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			design := t.TempDir()
+			if err := os.WriteFile(filepath.Join(design, "packmap.yaml"), []byte(tc.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, err := LoadPackMap(design)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("invalid packmap accepted or wrong diagnostic: %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadPackManifestRejectsOpenOrWrongTypedSchema(t *testing.T) {
+	valid := "pack_version: 1\npack_revision: 1\nsubsystem: x\ncontract_module: XContract\nowns: []\ncomponents: []\nboundaries: []\ndelegated_invariants: []\ncontent_hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n"
+	for _, tc := range []struct {
+		name, body, want string
+	}{
+		{"unknown sorted", valid + "zzz: 1\naaa: 1\n", "unknown root key 'aaa'"},
+		{"wrong revision", strings.Replace(valid, "pack_revision: 1", "pack_revision: null", 1), "pack_revision"},
+		{"missing list", strings.Replace(valid, "owns: []\n", "", 1), "owns is required"},
+		{"wrong list member", strings.Replace(valid, "owns: []", "owns: [null]", 1), "owns[0]"},
+		{"wrong hash", strings.Replace(valid, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "ABC", 1), "64 lowercase"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			design := t.TempDir()
+			if err := os.Mkdir(filepath.Join(design, "pack"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(design, "pack", "pack.yaml"), []byte(tc.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, err := LoadPackManifest(design)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("invalid manifest accepted or wrong diagnostic: %v", err)
+			}
+		})
+	}
+}
+
+func TestGenerateTLAFromMachineBytesUsesStableLogicalSource(t *testing.T) {
+	const logical = "design/contracts/Stable.machine.json"
+	var stable string
+	for i := 0; i < 100; i++ {
+		_, _, _, err := generateTLAFromMachineBytes(logical, []byte("{"))
+		if err == nil || !strings.Contains(err.Error(), logical) || strings.Contains(err.Error(), "machinery-pack-machine-") {
+			t.Fatalf("logical source missing or scratch leaked: %v", err)
+		}
+		if i == 0 {
+			stable = err.Error()
+		} else if err.Error() != stable {
+			t.Fatalf("diagnostic changed on run %d:\nwant %s\n got %s", i, stable, err)
+		}
+	}
+}
+
+func TestLoadDecompositionRequiresAuthoritativeArchitectureContract(t *testing.T) {
+	for _, tc := range []struct {
+		name, mutate, want string
+	}{
+		{"missing", "missing", "read ARCHITECTURE.md"},
+		{"bad fence", "fence", "no heading-anchored Architecture Contract YAML fence"},
+		{"bad yaml", "yaml", "parse Architecture Contract YAML"},
+		{"wrong boundaries type", "type", "boundaries is required and must be an array"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			design := copyParentDesign(t)
+			architecture := filepath.Join(design, "ARCHITECTURE.md")
+			switch tc.mutate {
+			case "missing":
+				if err := os.Remove(architecture); err != nil {
+					t.Fatal(err)
+				}
+			case "fence":
+				if err := os.WriteFile(architecture, []byte("# Architecture\n\nNo authoritative contract.\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			case "yaml":
+				if err := os.WriteFile(architecture, []byte("## Architecture Contract\n\n```yaml\nboundaries: [\n```\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			case "type":
+				if err := os.WriteFile(architecture, []byte("## Architecture Contract\n\n```yaml\ncontract_version: 1\nboundaries: null\n```\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var stable string
+			for i := 0; i < 20; i++ {
+				_, err := LoadDecomposition(design)
+				if err == nil || !strings.Contains(err.Error(), tc.want) {
+					t.Fatalf("invalid Architecture Contract accepted or wrong diagnostic: %v", err)
+				}
+				if i == 0 {
+					stable = err.Error()
+				} else if err.Error() != stable {
+					t.Fatalf("diagnostic changed: want %s, got %v", stable, err)
+				}
+			}
+		})
+	}
+}
+
+func TestContractBoundariesAcceptsLegitimateEmptyContract(t *testing.T) {
+	design := t.TempDir()
+	if err := os.WriteFile(filepath.Join(design, "ARCHITECTURE.md"), []byte("## Architecture Contract\n\n```yaml\ncontract_version: 1\nboundaries: []\n```\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	root, err := openDesignRoot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	boundaries, err := contractBoundariesRoot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(boundaries) != 0 {
+		t.Fatalf("empty contract has %d boundaries", len(boundaries))
+	}
+}
+
+func TestLoadDecompositionRejectsPortableSubsystemAlias(t *testing.T) {
+	design := copyParentDesign(t)
+	editDesignFile(t, design, "decomposition.yaml", "  - id: payments", "  - id: Orders")
+	_, err := LoadDecomposition(design)
+	if err == nil || !strings.Contains(err.Error(), "case-insensitive") {
+		t.Fatalf("portable subsystem alias accepted: %v", err)
+	}
+}
+
+func TestLoadDecompositionRejectsWindowsDeviceSubsystemName(t *testing.T) {
+	design := copyParentDesign(t)
+	editDesignFile(t, design, "decomposition.yaml", "  - id: payments", "  - id: CON")
+	_, err := LoadDecomposition(design)
+	if err == nil || !strings.Contains(err.Error(), "reserved Windows device") {
+		t.Fatalf("Windows device subsystem name accepted: %v", err)
+	}
+}
+
+func TestRetainedDiagnosticsAreDeterministic(t *testing.T) {
+	design := copyParentDesign(t)
+	editDesignFile(t, design, "decomposition.yaml", "decomposition_version: 1\n", "decomposition_version: 1\nretained:\n  zzz-unknown: z\n  no-ship-without-capture: conflict\n  aaa-unknown: a\n")
+	var want string
+	for i := 0; i < 100; i++ {
+		_, err := LoadDecomposition(design)
+		if err == nil {
+			t.Fatal("multi-invalid retained inventory passed")
+		}
+		if i == 0 {
+			want = err.Error()
+		} else if err.Error() != want {
+			t.Fatalf("retained diagnostics changed on run %d:\nwant %s\n got %s", i, want, err)
+		}
+	}
+	for _, fragment := range []string{"aaa-unknown", "zzz-unknown", "both retained and delegated"} {
+		if !strings.Contains(want, fragment) {
+			t.Fatalf("deterministic diagnostic omitted %q: %s", fragment, want)
+		}
+	}
+}
+
+func TestRootedDesignReadsCannotHybridizeAfterParentSwap(t *testing.T) {
+	base := t.TempDir()
+	design := filepath.Join(base, "design")
+	held := filepath.Join(base, "held-design")
+	outside := filepath.Join(base, "outside")
+	if err := os.Mkdir(design, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(design, "first"), []byte("inside-first"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(design, "second"), []byte("inside-second"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outside, "second"), []byte("outside-second"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	root, err := openDesignRoot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	first, err := readDesignFileRoot(root, "first")
+	if err != nil || string(first) != "inside-first" {
+		t.Fatalf("first snapshot read = %q, %v", first, err)
+	}
+	if err := os.Rename(design, held); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, design); err != nil {
+		t.Fatal(err)
+	}
+	second, err := readDesignFileRoot(root, "second")
+	if err != nil || string(second) != "inside-second" {
+		t.Fatalf("rooted snapshot hybridized after swap: %q, %v", second, err)
+	}
+}
+
 func TestGeneratePacksIsDeterministic(t *testing.T) {
 	a, err := GeneratePacks(parentDesign())
 	if err != nil {
@@ -96,6 +346,1441 @@ func TestGeneratePacksIsDeterministic(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestLoadDecompositionRejectsSymlinkedContractSource(t *testing.T) {
+	design := copyParentDesign(t)
+	contract := filepath.Join(design, "contracts", "OrdersContract.machine.json")
+	outside := filepath.Join(t.TempDir(), "outside.machine.json")
+	raw, err := os.ReadFile(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(outside, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(contract); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, contract); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadDecomposition(design); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("symlinked contract source accepted: %v", err)
+	}
+}
+
+func TestPackFilesOnDiskRejectsSymlinkMember(t *testing.T) {
+	design := t.TempDir()
+	packDir := filepath.Join(design, "pack")
+	if err := os.MkdirAll(packDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(outside, []byte("smuggled"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(packDir, "events.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PackFilesOnDisk(design); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("symlinked pack member accepted: %v", err)
+	}
+}
+
+func TestPackFilesOnDiskDiagnosticIsDeterministicWithMultipleBadEntries(t *testing.T) {
+	design := t.TempDir()
+	packDir := filepath.Join(design, "pack")
+	if err := os.Mkdir(packDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(packDir, "z-dir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(packDir, "a-dir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const want = `pack/ contains a directory 'a-dir'`
+	for i := 0; i < 100; i++ {
+		_, err := PackFilesOnDisk(design)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("run %d diagnostic = %v, want %q", i, err, want)
+		}
+	}
+}
+
+func TestLoadModelithDiagnosticIsDeterministicWithMultipleBadEntries(t *testing.T) {
+	design := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(outside, []byte("kind: modelith\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"z.modelith.yaml", "a.modelith.yaml"} {
+		if err := os.Symlink(outside, filepath.Join(design, name)); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+	}
+	for i := 0; i < 100; i++ {
+		root, err := openDesignRoot(design)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, loadErr := loadModelithRoot(design, root)
+		closeErr := root.Close()
+		if closeErr != nil {
+			t.Fatal(closeErr)
+		}
+		if loadErr == nil || !strings.Contains(loadErr.Error(), `'a.modelith.yaml' is a symlink`) {
+			t.Fatalf("run %d diagnostic = %v", i, loadErr)
+		}
+	}
+}
+
+func TestPackOutputAliasDiagnosticIsDeterministic(t *testing.T) {
+	design := t.TempDir()
+	packsDir := filepath.Join(design, "packs")
+	if err := os.Mkdir(packsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"PAYMENTS.pack", "ORDERS.pack"} {
+		if err := os.Mkdir(filepath.Join(packsDir, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	packs := map[string]map[string]string{
+		"orders":   {"pack.yaml": "new"},
+		"payments": {"pack.yaml": "new"},
+	}
+	for i := 0; i < 100; i++ {
+		_, err := writePacksWithRename(design, packs, renamePackRoot)
+		if err == nil || !strings.Contains(err.Error(), `'ORDERS.pack' aliases generated target 'orders.pack'`) {
+			t.Fatalf("run %d diagnostic = %v", i, err)
+		}
+	}
+}
+
+func TestWriteRefinementArtifactsRejectsSymlinkedFormalDir(t *testing.T) {
+	design := t.TempDir()
+	outside := t.TempDir()
+	sentinel := filepath.Join(outside, "Refinement.tla")
+	if err := os.WriteFile(sentinel, []byte("outside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(design, "formal")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := writeRefinementArtifacts(design, map[string]string{"Refinement.tla": "replacement"})
+	if err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("symlinked formal directory accepted: %v", err)
+	}
+	got, readErr := os.ReadFile(sentinel)
+	if readErr != nil || string(got) != "outside" {
+		t.Fatalf("outside target changed: %q, %v", got, readErr)
+	}
+}
+
+func TestWriteRefinementArtifactsRejectsSymlinkTargetBeforeWrites(t *testing.T) {
+	design := t.TempDir()
+	fdir := filepath.Join(design, "formal")
+	if err := os.Mkdir(fdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(outside, []byte("outside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(fdir, "B.cfg")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := writeRefinementArtifacts(design, map[string]string{"A.tla": "new-a", "B.cfg": "new-b"})
+	if err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("symlinked generated target accepted: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(fdir, "A.tla")); !os.IsNotExist(statErr) {
+		t.Fatalf("another target was written before symlink rejection: %v", statErr)
+	}
+}
+
+func TestWriteRefinementArtifactsPreservesForeignSuffixPairAndIsIdempotent(t *testing.T) {
+	design := t.TempDir()
+	fdir := filepath.Join(design, "formal")
+	if err := os.Mkdir(fdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"OldPackRefinement.tla", "OldPackRefinement.cfg"} {
+		if err := os.WriteFile(filepath.Join(fdir, name), []byte("stale"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	files := map[string]string{
+		"NewPackRefinement.tla": "new-tla",
+		"NewPackRefinement.cfg": "new-cfg",
+	}
+	for i := 0; i < 2; i++ {
+		names, err := writeRefinementArtifacts(design, files)
+		if err != nil {
+			t.Fatalf("write %d: %v", i, err)
+		}
+		if !reflect.DeepEqual(names, []string{"NewPackRefinement.cfg", "NewPackRefinement.tla"}) {
+			t.Fatalf("write %d names=%v", i, names)
+		}
+	}
+	for _, name := range []string{"OldPackRefinement.tla", "OldPackRefinement.cfg"} {
+		if got, err := os.ReadFile(filepath.Join(fdir, name)); err != nil || string(got) != "stale" {
+			t.Fatalf("foreign suffix artifact %s changed: %q, %v", name, got, err)
+		}
+	}
+}
+
+func TestStaleRefinementArtifactsConvergesMissingAnchorConfig(t *testing.T) {
+	design := t.TempDir()
+	fdir := filepath.Join(design, "formal")
+	if err := os.MkdirAll(fdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "\\* machinery-version: v1\nCONSTANT MaxRetries = 3\nSPECIFICATION Spec\nPROPERTY CSpecHolds\n"
+	if err := os.WriteFile(filepath.Join(fdir, "GonePackRefinement.cfg"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stale, err := staleRefinementArtifacts(design, design, map[string]string{})
+	if err != nil || len(stale) != 1 || stale[0].Name != "GonePackRefinement.cfg" {
+		t.Fatalf("missing-anchor pack cfg not reconciled: stale=%v err=%v", stale, err)
+	}
+}
+
+func TestWritePacksReplacesEachPackAsACompleteSet(t *testing.T) {
+	design := copyParentDesign(t)
+	stale := filepath.Join(design, "packs", "orders.pack", "stale.txt")
+	if err := os.WriteFile(stale, []byte("must disappear"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := WritePacks(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 2 {
+		t.Fatalf("ids=%v", ids)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatalf("stale member survived atomic directory replacement: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(design, "packs", "orders.pack", "pack.yaml")); err != nil {
+		t.Fatalf("replacement pack incomplete: %v", err)
+	}
+}
+
+func TestWritePacksRemovesRenamedPackAndIsIdempotent(t *testing.T) {
+	design := copyParentDesign(t)
+	editDesignFile(t, design, "decomposition.yaml", "  - id: orders", "  - id: fulfillment")
+	if _, err := WritePacks(design); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(design, "packs", "orders.pack")); !os.IsNotExist(err) {
+		t.Fatalf("renamed orders.pack survived convergence: %v", err)
+	}
+	if info, err := os.Stat(filepath.Join(design, "packs", "fulfillment.pack")); err != nil || !info.IsDir() {
+		t.Fatalf("renamed fulfillment.pack missing: %v", err)
+	}
+	want := snapshotPackDirs(t, filepath.Join(design, "packs"))
+	if _, err := WritePacks(design); err != nil {
+		t.Fatal(err)
+	}
+	got := snapshotPackDirs(t, filepath.Join(design, "packs"))
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("second convergence changed pack bytes:\nwant %#v\n got %#v", want, got)
+	}
+}
+
+func TestWritePacksMetadataDoesNotRereadUnlockedSources(t *testing.T) {
+	design := copyParentDesign(t)
+	results, err := writePacksWithMetadataHook(design, func() {
+		if err := os.WriteFile(filepath.Join(design, "ARCHITECTURE.md"), []byte("mutated after commit\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err != nil {
+		t.Fatalf("post-commit reporting reread mutated sources: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("reported %d packs, want 2", len(results))
+	}
+	for _, result := range results {
+		dir := filepath.Join(design, "packs", result.ID+".pack")
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files := map[string]string{}
+		for _, entry := range entries {
+			body, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			files[entry.Name()] = string(body)
+		}
+		if result.FileCount != len(files) || result.Hash != ContentHash(files) {
+			t.Fatalf("metadata for %s does not bind committed bytes: %#v", result.ID, result)
+		}
+	}
+}
+
+func TestStalePackDeletionRollsBackWithInstallFailure(t *testing.T) {
+	design := t.TempDir()
+	root := filepath.Join(design, "packs")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"orders.pack": "old-orders", "stale.pack": "old-stale"} {
+		writePackRecoveryDir(t, root, name, body)
+	}
+	injected := errors.New("install failed")
+	rename := func(opened *os.Root, old, new string) error {
+		if strings.HasPrefix(old, ".machinery-pack-stage-") && new == "orders.pack" {
+			return injected
+		}
+		return opened.Rename(old, new)
+	}
+	_, err := writePacksWithRename(design, map[string]map[string]string{
+		"orders": {"marker": "new-orders"},
+	}, rename)
+	if !errors.Is(err, injected) {
+		t.Fatalf("install failure hidden: %v", err)
+	}
+	for name, want := range map[string]string{"orders.pack": "old-orders", "stale.pack": "old-stale"} {
+		got, err := os.ReadFile(filepath.Join(root, name, "marker"))
+		if err != nil || string(got) != want {
+			t.Fatalf("rollback %s = %q, %v; want %q", name, got, err, want)
+		}
+	}
+}
+
+func TestWritePacksPreflightsLaterTargetBeforeStaging(t *testing.T) {
+	design := copyParentDesign(t)
+	root := filepath.Join(design, "packs")
+	orders := filepath.Join(root, "orders.pack")
+	want := snapshotPackDirs(t, orders)
+	paymentTarget := filepath.Join(root, "payments.pack")
+	if err := os.RemoveAll(paymentTarget); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(t.TempDir(), paymentTarget); err != nil {
+		t.Fatal(err)
+	}
+	_, firstErr := WritePacks(design)
+	_, secondErr := WritePacks(design)
+	if firstErr == nil || !strings.Contains(firstErr.Error(), "real directory") {
+		t.Fatalf("later symlink target was accepted: %v", firstErr)
+	}
+	if secondErr == nil || firstErr.Error() != secondErr.Error() || strings.Contains(firstErr.Error(), "machinery-design-source-") {
+		t.Fatalf("invalid pack diagnostic is unstable or leaks private source root:\nfirst: %v\nsecond: %v", firstErr, secondErr)
+	}
+	if got := snapshotPackDirs(t, orders); !reflect.DeepEqual(got, want) {
+		t.Fatalf("earlier target changed before later-target preflight failed:\nwant: %#v\n got: %#v", want, got)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), "pack-stage") || strings.Contains(entry.Name(), "pack-backup") {
+			t.Fatalf("preflight failure left transaction scratch %s", entry.Name())
+		}
+	}
+}
+
+func snapshotPackDirs(t *testing.T, root string) map[string]string {
+	t.Helper()
+	snapshot := map[string]string{}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			snapshot[filepath.ToSlash(rel)+"/"] = ""
+			return nil
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		snapshot[filepath.ToSlash(rel)] = string(body)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return snapshot
+}
+
+func TestWritePacksLaterInstallFailureRestoresWholeSet(t *testing.T) {
+	design := copyParentDesign(t)
+	root := filepath.Join(design, "packs")
+	if err := os.WriteFile(filepath.Join(root, "orders.pack", "old-only.txt"), []byte("orders sentinel"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "payments.pack", "old-only.txt"), []byte("payments sentinel"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want := snapshotPackDirs(t, root)
+	packs, err := GeneratePacks(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	failed := false
+	rename := func(root *os.Root, old, new string) error {
+		if !failed && new == "payments.pack" && strings.HasPrefix(old, ".machinery-pack-stage-") {
+			failed = true
+			return errors.New("injected later pack install failure")
+		}
+		return root.Rename(old, new)
+	}
+	if _, err := writePacksWithRename(design, packs, rename); err == nil || !strings.Contains(err.Error(), "injected later pack install failure") {
+		t.Fatalf("later install failure was ignored: %v", err)
+	}
+	if !failed {
+		t.Fatal("failure injection did not reach the later target")
+	}
+	got := snapshotPackDirs(t, root)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("pack set was not restored byte-for-byte:\nwant: %#v\n got: %#v", want, got)
+	}
+}
+
+func TestWritePacksJoinsCommitAndRollbackErrors(t *testing.T) {
+	design := copyParentDesign(t)
+	packs, err := GeneratePacks(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitErr := errors.New("injected later install failure")
+	rollbackErr := errors.New("injected later restore failure")
+	rename := func(root *os.Root, old, new string) error {
+		oldBase := old
+		newBase := new
+		if newBase == "payments.pack" && strings.HasPrefix(oldBase, ".machinery-pack-stage-") {
+			return commitErr
+		}
+		if newBase == "payments.pack" && strings.HasPrefix(oldBase, ".machinery-pack-backup-") {
+			return rollbackErr
+		}
+		return root.Rename(old, new)
+	}
+	_, err = writePacksWithRename(design, packs, rename)
+	if !errors.Is(err, commitErr) || !errors.Is(err, rollbackErr) {
+		t.Fatalf("combined failure does not expose both causes: %v", err)
+	}
+}
+
+func TestWritePacksRollbackPreservesLateMutatedInstalledTarget(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(string, string) error
+	}{
+		{
+			name: "content mutation",
+			mutate: func(path, _ string) error {
+				return os.WriteFile(path, []byte("user edit"), 0o644)
+			},
+		},
+		{
+			name: "ABA identity mutation",
+			mutate: func(path, original string) error {
+				if err := os.Remove(path); err != nil {
+					return err
+				}
+				return os.WriteFile(path, []byte(original), 0o644)
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			design := t.TempDir()
+			root := filepath.Join(design, "packs")
+			if err := os.Mkdir(root, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			writePackRecoveryDir(t, root, "orders.pack", "old-orders")
+			writePackRecoveryDir(t, root, "payments.pack", "old-payments")
+			newOrders := "new-orders"
+			injected := errors.New("injected later install failure")
+			rename := func(opened *os.Root, old, new string) error {
+				if new == "payments.pack" && strings.HasPrefix(old, ".machinery-pack-stage-") {
+					if err := test.mutate(filepath.Join(root, "orders.pack", "marker"), newOrders); err != nil {
+						return err
+					}
+					return injected
+				}
+				return opened.Rename(old, new)
+			}
+			_, err := writePacksWithRename(design, map[string]map[string]string{
+				"orders":   {"marker": newOrders},
+				"payments": {"marker": "new-payments"},
+			}, rename)
+			if !errors.Is(err, injected) || !strings.Contains(err.Error(), "preserving it") {
+				t.Fatalf("late mutation was not a preservation blocker: %v", err)
+			}
+			got, readErr := os.ReadFile(filepath.Join(root, "orders.pack", "marker"))
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			want := "user edit"
+			if test.name == "ABA identity mutation" {
+				want = newOrders
+			}
+			if string(got) != want {
+				t.Fatalf("late-mutated installed target was overwritten or removed: got %q, want %q", got, want)
+			}
+			for _, target := range []string{"orders.pack", "payments.pack"} {
+				backup := filepath.Join(root, packScratchName("backup", target), "marker")
+				if _, err := os.ReadFile(backup); err != nil {
+					t.Fatalf("usable backup %s was not preserved: %v", target, err)
+				}
+			}
+			if _, err := os.Lstat(filepath.Join(root, packJournalName)); err != nil {
+				t.Fatalf("authoritative recovery journal was removed after preservation blocker: %v", err)
+			}
+		})
+	}
+}
+
+func writePackRecoveryDir(t *testing.T, root, name, body string) {
+	t.Helper()
+	dir := filepath.Join(root, name)
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "marker"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func seedPackCrash(t *testing.T, root, phase string) []packJournalEntry {
+	t.Helper()
+	entries := []packJournalEntry{
+		{Target: "orders.pack", Stage: packScratchName("stage", "orders.pack"), Backup: packScratchName("backup", "orders.pack"), Retire: packScratchName("retire", "orders.pack"), Existed: true},
+		{Target: "payments.pack", Stage: packScratchName("stage", "payments.pack"), Backup: packScratchName("backup", "payments.pack"), Retire: packScratchName("retire", "payments.pack"), Existed: true},
+		{Target: "shipping.pack", Stage: packScratchName("stage", "shipping.pack"), Backup: packScratchName("backup", "shipping.pack"), Retire: packScratchName("retire", "shipping.pack"), Existed: false},
+	}
+	switch phase {
+	case "prepared":
+		writePackRecoveryDir(t, root, "orders.pack", "old-orders")
+		writePackRecoveryDir(t, root, "payments.pack", "old-payments")
+		for _, entry := range entries {
+			writePackRecoveryDir(t, root, entry.Stage, "new-"+entry.Target)
+		}
+	case "parking":
+		writePackRecoveryDir(t, root, entries[0].Backup, "old-orders")
+		writePackRecoveryDir(t, root, "payments.pack", "old-payments")
+		for _, entry := range entries {
+			writePackRecoveryDir(t, root, entry.Stage, "new-"+entry.Target)
+		}
+	case "installing":
+		writePackRecoveryDir(t, root, "orders.pack", "new-orders")
+		writePackRecoveryDir(t, root, "payments.pack", "new-payments")
+		writePackRecoveryDir(t, root, "shipping.pack", "new-shipping")
+		writePackRecoveryDir(t, root, entries[0].Backup, "old-orders")
+		writePackRecoveryDir(t, root, entries[1].Backup, "old-payments")
+	case "committed":
+		writePackRecoveryDir(t, root, "orders.pack", "new-orders")
+		writePackRecoveryDir(t, root, "payments.pack", "new-payments")
+		writePackRecoveryDir(t, root, "shipping.pack", "new-shipping")
+		writePackRecoveryDir(t, root, entries[0].Backup, "old-orders")
+		writePackRecoveryDir(t, root, entries[1].Backup, "old-payments")
+	default:
+		t.Fatalf("unknown crash phase %s", phase)
+	}
+	rootHandle, err := os.OpenRoot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := rootHandle.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	staged := make([]packStagedEntry, 0, len(entries))
+	for i := range entries {
+		entry := &entries[i]
+		entry.Before = packTreeWitness{Tree: packAbsentTree}
+		if entry.Existed {
+			beforeName := entry.Target
+			if _, err := rootHandle.Lstat(entry.Backup); err == nil {
+				beforeName = entry.Backup
+			}
+			state, err := capturePackTree(rootHandle, beforeName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entry.Before = state.witness
+		}
+		afterName := entry.Stage
+		if _, err := rootHandle.Lstat(afterName); os.IsNotExist(err) {
+			afterName = entry.Target
+		}
+		after, err := capturePackTree(rootHandle, afterName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry.AfterTree = after.witness.Tree
+		entry.after = after.witness
+		staged = append(staged, packStagedEntry{Target: entry.Target, After: after.witness})
+	}
+	if err := createPackJournal(rootHandle, entries); err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range staged {
+		if entry.After.Tree == packAbsentTree {
+			continue
+		}
+		if err := appendPackStage(rootHandle, entry); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, recorded := range []string{"staged", "parking", "installing", "committed"} {
+		if phase == "prepared" {
+			break
+		}
+		var err error
+		if recorded == "staged" {
+			err = appendPackStaged(rootHandle, staged)
+		} else {
+			err = appendPackPhase(rootHandle, recorded)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if phase == recorded {
+			break
+		}
+	}
+	return entries
+}
+
+func TestPackJournalRecoversEveryCrashPhaseOnLockAcquisition(t *testing.T) {
+	for _, phase := range []string{"prepared", "parking", "installing", "committed"} {
+		t.Run(phase, func(t *testing.T) {
+			root := t.TempDir()
+			entries := seedPackCrash(t, root, phase)
+			lock, err := acquirePackWriteLock(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := lock.releaseAll(); err != nil {
+				t.Fatal(err)
+			}
+			want := map[string]string{"orders.pack": "old-orders", "payments.pack": "old-payments"}
+			if phase == "committed" {
+				want = map[string]string{"orders.pack": "new-orders", "payments.pack": "new-payments", "shipping.pack": "new-shipping"}
+			}
+			for name, body := range want {
+				got, err := os.ReadFile(filepath.Join(root, name, "marker"))
+				if err != nil || string(got) != body {
+					t.Fatalf("%s after %s recovery = %q, %v; want %q", name, phase, got, err, body)
+				}
+			}
+			if phase != "committed" {
+				if _, err := os.Lstat(filepath.Join(root, "shipping.pack")); !os.IsNotExist(err) {
+					t.Fatalf("new pack survived uncommitted %s recovery: %v", phase, err)
+				}
+			}
+			for _, entry := range entries {
+				for _, scratch := range []string{entry.Stage, entry.Backup} {
+					if _, err := os.Lstat(filepath.Join(root, scratch)); !os.IsNotExist(err) {
+						t.Fatalf("%s survived recovery: %v", scratch, err)
+					}
+				}
+			}
+			if _, err := os.Lstat(filepath.Join(root, packJournalName)); !os.IsNotExist(err) {
+				t.Fatalf("journal survived recovery: %v", err)
+			}
+		})
+	}
+}
+
+func TestPackPreparedRecoveryPreservesForeignStageMutationReplacementAndABA(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*testing.T, string)
+		want   string
+	}{
+		{
+			name: "content mutation",
+			mutate: func(t *testing.T, stage string) {
+				t.Helper()
+				if err := os.WriteFile(filepath.Join(stage, "marker"), []byte("foreign content"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			want: "foreign content",
+		},
+		{
+			name: "foreign replacement",
+			mutate: func(t *testing.T, stage string) {
+				t.Helper()
+				if err := os.RemoveAll(stage); err != nil {
+					t.Fatal(err)
+				}
+				writePackRecoveryDir(t, filepath.Dir(stage), filepath.Base(stage), "foreign replacement")
+			},
+			want: "foreign replacement",
+		},
+		{
+			name: "same-byte ABA",
+			mutate: func(t *testing.T, stage string) {
+				t.Helper()
+				if err := os.RemoveAll(stage); err != nil {
+					t.Fatal(err)
+				}
+				writePackRecoveryDir(t, filepath.Dir(stage), filepath.Base(stage), "new-payments.pack")
+			},
+			want: "new-payments.pack",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			entries := seedPackCrash(t, root, "prepared")
+			stage := filepath.Join(root, entries[1].Stage)
+			test.mutate(t, stage)
+
+			if _, err := acquirePackWriteLock(root); err == nil || !strings.Contains(err.Error(), "preserving it") {
+				t.Fatalf("prepared recovery did not preserve foreign stage: %v", err)
+			}
+			if got, err := os.ReadFile(filepath.Join(stage, "marker")); err != nil || string(got) != test.want {
+				t.Fatalf("foreign stage was changed or deleted: got %q, err %v", got, err)
+			}
+			for _, entry := range entries {
+				if _, err := os.Lstat(filepath.Join(root, entry.Stage)); err != nil {
+					t.Fatalf("whole-set preflight removed stage %s: %v", entry.Stage, err)
+				}
+			}
+			for target, want := range map[string]string{"orders.pack": "old-orders", "payments.pack": "old-payments"} {
+				if got, err := os.ReadFile(filepath.Join(root, target, "marker")); err != nil || string(got) != want {
+					t.Fatalf("prepared recovery changed %s: got %q, err %v", target, got, err)
+				}
+			}
+			if _, err := os.Lstat(filepath.Join(root, packJournalName)); err != nil {
+				t.Fatalf("prepared recovery removed authoritative journal: %v", err)
+			}
+		})
+	}
+}
+
+func TestPackPreparedRecoveryPreservesUnwitnessedPartialStage(t *testing.T) {
+	root := t.TempDir()
+	writePackRecoveryDir(t, root, "orders.pack", "old-orders")
+	writePackRecoveryDir(t, root, packScratchName("stage", "orders.pack"), "partial-stage")
+	rootHandle, err := os.OpenRoot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := capturePackTree(rootHandle, "orders.pack")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := packJournalEntry{
+		Target: "orders.pack", Stage: packScratchName("stage", "orders.pack"), Backup: packScratchName("backup", "orders.pack"), Retire: packScratchName("retire", "orders.pack"),
+		Existed: true, Before: before.witness, AfterTree: generatedPackTreeDigest([]string{"marker"}, map[string]string{"marker": "intended-stage"}),
+	}
+	if err := createPackJournal(rootHandle, []packJournalEntry{entry}); err != nil {
+		t.Fatal(err)
+	}
+	if err := rootHandle.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := acquirePackWriteLock(root); err == nil || !strings.Contains(err.Error(), "no durable exact witness; preserving it") {
+		t.Fatalf("unwitnessed partial stage was not a recovery blocker: %v", err)
+	}
+	if got, err := os.ReadFile(filepath.Join(root, entry.Stage, "marker")); err != nil || string(got) != "partial-stage" {
+		t.Fatalf("unwitnessed partial stage was changed: got %q, err %v", got, err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, packJournalName)); err != nil {
+		t.Fatalf("journal was removed despite unwitnessed stage: %v", err)
+	}
+}
+
+func TestPackStageCleanupPreservesLateDeletionBoundaryMutationAndABA(t *testing.T) {
+	for _, phase := range []string{"prepared", "parking"} {
+		for _, test := range []struct {
+			name   string
+			mutate func(*testing.T, string)
+			want   string
+		}{
+			{
+				name: "content mutation",
+				mutate: func(t *testing.T, retirement string) {
+					t.Helper()
+					if err := os.WriteFile(filepath.Join(retirement, "marker"), []byte("late stage edit"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				},
+				want: "late stage edit",
+			},
+			{
+				name: "same-byte ABA",
+				mutate: func(t *testing.T, retirement string) {
+					t.Helper()
+					if err := os.RemoveAll(retirement); err != nil {
+						t.Fatal(err)
+					}
+					writePackRecoveryDir(t, filepath.Dir(retirement), filepath.Base(retirement), "new-payments.pack")
+				},
+				want: "new-payments.pack",
+			},
+		} {
+			t.Run(phase+" "+test.name, func(t *testing.T) {
+				root := t.TempDir()
+				entries := seedPackCrash(t, root, phase)
+				entry := entries[1]
+				prior := packTreeRemovalPoint
+				packTreeRemovalPoint = func(name, retirement string) error {
+					if name == entry.Stage {
+						test.mutate(t, filepath.Join(root, retirement))
+					}
+					return nil
+				}
+				_, err := acquirePackWriteLock(root)
+				packTreeRemovalPoint = prior
+				t.Cleanup(func() { packTreeRemovalPoint = prior })
+				if err == nil || !strings.Contains(err.Error(), "deletion boundary") || !strings.Contains(err.Error(), "preserving it") {
+					t.Fatalf("late stage mutation was not a preservation blocker: %v", err)
+				}
+				if got, readErr := os.ReadFile(filepath.Join(root, entry.Stage, "marker")); readErr != nil || string(got) != test.want {
+					t.Fatalf("late-mutated stage was not restored for inspection: got %q, err %v", got, readErr)
+				}
+				if _, statErr := os.Lstat(filepath.Join(root, packJournalName)); statErr != nil {
+					t.Fatalf("journal was removed after deletion-boundary ambiguity: %v", statErr)
+				}
+			})
+		}
+	}
+}
+
+func TestPackRestartRecoveryPreservesLateMutatedInstalledTarget(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(string) error
+		want   string
+	}{
+		{
+			name: "content mutation",
+			mutate: func(path string) error {
+				return os.WriteFile(path, []byte("user edit after crash"), 0o644)
+			},
+			want: "user edit after crash",
+		},
+		{
+			name: "ABA identity mutation",
+			mutate: func(path string) error {
+				if err := os.Remove(path); err != nil {
+					return err
+				}
+				return os.WriteFile(path, []byte("new-orders"), 0o644)
+			},
+			want: "new-orders",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			entries := seedPackCrash(t, root, "installing")
+			target := filepath.Join(root, "orders.pack", "marker")
+			if err := test.mutate(target); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := acquirePackWriteLock(root); err == nil || !strings.Contains(err.Error(), "preserving it") {
+				t.Fatalf("restart recovery did not fail closed on late mutation: %v", err)
+			}
+			got, err := os.ReadFile(target)
+			if err != nil || string(got) != test.want {
+				t.Fatalf("restart recovery changed late-mutated target: got %q, err %v; want %q", got, err, test.want)
+			}
+			backup := filepath.Join(root, entries[0].Backup, "marker")
+			if got, err := os.ReadFile(backup); err != nil || string(got) != "old-orders" {
+				t.Fatalf("restart recovery changed usable backup: got %q, err %v", got, err)
+			}
+			if _, err := os.Lstat(filepath.Join(root, packJournalName)); err != nil {
+				t.Fatalf("restart recovery removed journal after preservation blocker: %v", err)
+			}
+		})
+	}
+}
+
+func TestPackRestartRecoveryConvergesAfterBackupWasAlreadyRestored(t *testing.T) {
+	root := t.TempDir()
+	entries := seedPackCrash(t, root, "installing")
+	rootHandle, err := os.OpenRoot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rootHandle.RemoveAll(entries[0].Target); err != nil {
+		t.Fatal(err)
+	}
+	if err := rootHandle.Rename(entries[0].Backup, entries[0].Target); err != nil {
+		t.Fatal(err)
+	}
+	if err := rootHandle.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	lock, err := acquirePackWriteLock(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lock.releaseAll(); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{"orders.pack": "old-orders", "payments.pack": "old-payments"} {
+		got, err := os.ReadFile(filepath.Join(root, name, "marker"))
+		if err != nil || string(got) != want {
+			t.Fatalf("%s after resumed rollback = %q, %v; want %q", name, got, err, want)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(root, "shipping.pack")); !os.IsNotExist(err) {
+		t.Fatalf("new target survived resumed rollback: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, packJournalName)); !os.IsNotExist(err) {
+		t.Fatalf("journal survived completed resumed rollback: %v", err)
+	}
+}
+
+func TestPackRecoveryStaysOnOpenedRootDuringParentSwap(t *testing.T) {
+	base := t.TempDir()
+	rootPath := filepath.Join(base, "packs")
+	held := filepath.Join(base, "held-packs")
+	outside := filepath.Join(base, "outside")
+	if err := os.Mkdir(rootPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	seedPackCrash(t, rootPath, "parking")
+	if err := os.Mkdir(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sentinel := filepath.Join(outside, "sentinel")
+	if err := os.WriteFile(sentinel, []byte("outside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(rootPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	swapped := false
+	rename := func(opened *os.Root, old, new string) error {
+		if !swapped {
+			swapped = true
+			if err := os.Rename(rootPath, held); err != nil {
+				return err
+			}
+			if err := os.Symlink(outside, rootPath); err != nil {
+				return err
+			}
+		}
+		return opened.Rename(old, new)
+	}
+	if err := recoverPackTransaction(root, rename); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(held, "orders.pack", "marker"))
+	if err != nil || string(got) != "old-orders" {
+		t.Fatalf("rooted recovery restored %q, %v", got, err)
+	}
+	got, err = os.ReadFile(sentinel)
+	if err != nil || string(got) != "outside" {
+		t.Fatalf("outside sentinel changed: %q, %v", got, err)
+	}
+}
+
+func TestPackJournalBytesAreDeterministic(t *testing.T) {
+	witness := packTreeWitness{Tree: "sha256:" + strings.Repeat("0", 64), Identity: "sha256:" + strings.Repeat("1", 64)}
+	entries := []packJournalEntry{
+		{Target: "orders.pack", Stage: packScratchName("stage", "orders.pack"), Backup: packScratchName("backup", "orders.pack"), Retire: packScratchName("retire", "orders.pack"), Existed: true, Before: witness, AfterTree: witness.Tree},
+		{Target: "payments.pack", Stage: packScratchName("stage", "payments.pack"), Backup: packScratchName("backup", "payments.pack"), Retire: packScratchName("retire", "payments.pack"), Before: packTreeWitness{Tree: packAbsentTree}, AfterTree: witness.Tree},
+	}
+	var bodies [][]byte
+	for i := 0; i < 2; i++ {
+		root := t.TempDir()
+		rootHandle, err := os.OpenRoot(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := createPackJournal(rootHandle, entries); err != nil {
+			t.Fatal(err)
+		}
+		staged := []packStagedEntry{{Target: "orders.pack", After: witness}, {Target: "payments.pack", After: witness}}
+		if err := appendPackStaged(rootHandle, staged); err != nil {
+			t.Fatal(err)
+		}
+		if err := appendPackPhase(rootHandle, "parking"); err != nil {
+			t.Fatal(err)
+		}
+		if err := rootHandle.Close(); err != nil {
+			t.Fatal(err)
+		}
+		body, err := os.ReadFile(filepath.Join(root, packJournalName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		bodies = append(bodies, body)
+	}
+	if !bytes.Equal(bodies[0], bodies[1]) {
+		t.Fatalf("same pack transaction produced different journals:\n%s\n%s", bodies[0], bodies[1])
+	}
+}
+
+func replacePackJournalForTest(t *testing.T, root, body string) {
+	t.Helper()
+	replacePackJournalPathForTest(t, root, packJournalName, body)
+}
+
+func replacePackJournalPathForTest(t *testing.T, root, name, body string) {
+	t.Helper()
+	replacement := filepath.Join(root, ".pack-journal-replacement")
+	if err := os.WriteFile(replacement, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(replacement, filepath.Join(root, name)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func testPackJournalEntry() packJournalEntry {
+	target := "orders.pack"
+	return packJournalEntry{
+		Target: target, Stage: packScratchName("stage", target), Backup: packScratchName("backup", target), Retire: packScratchName("retire", target),
+		Existed: false, Before: packTreeWitness{Tree: packAbsentTree}, AfterTree: "sha256:" + strings.Repeat("1", sha256.Size*2),
+	}
+}
+
+func TestAppendPackJournalRejectsAfterOpenAndAfterSyncPathABA(t *testing.T) {
+	for _, point := range []string{"append-after-open", "append-after-sync"} {
+		t.Run(point, func(t *testing.T) {
+			root := t.TempDir()
+			rootHandle, err := os.OpenRoot(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rootHandle.Close()
+			if err := createPackJournal(rootHandle, []packJournalEntry{testPackJournalEntry()}); err != nil {
+				t.Fatal(err)
+			}
+			prior := packJournalPoint
+			packJournalPoint = func(got string) error {
+				if got == point {
+					body, readErr := os.ReadFile(filepath.Join(root, packJournalName))
+					if readErr != nil {
+						t.Fatal(readErr)
+					}
+					replacePackJournalForTest(t, root, string(body))
+				}
+				return nil
+			}
+			err = appendPackPhase(rootHandle, "parking")
+			packJournalPoint = prior
+			t.Cleanup(func() { packJournalPoint = prior })
+			if err == nil || !strings.Contains(err.Error(), "journal") || !strings.Contains(err.Error(), "authority") && !strings.Contains(err.Error(), "changed") {
+				t.Fatalf("journal ABA at %s was accepted: %v", point, err)
+			}
+			if _, statErr := os.Lstat(filepath.Join(root, packJournalName)); statErr != nil {
+				t.Fatalf("replacement journal was not preserved: %v", statErr)
+			}
+		})
+	}
+}
+
+func TestWritePacksRejectsJournalABABeforePublicRename(t *testing.T) {
+	design := t.TempDir()
+	root := filepath.Join(design, "packs")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writePackRecoveryDir(t, root, "orders.pack", "old-orders")
+	prior := packJournalPoint
+	packJournalPoint = func(point string) error {
+		if strings.HasPrefix(point, "before-public-rename:") {
+			body, err := os.ReadFile(filepath.Join(root, packJournalName))
+			if err != nil {
+				t.Fatal(err)
+			}
+			replacePackJournalForTest(t, root, string(body))
+		}
+		return nil
+	}
+	renameCalled := false
+	rename := func(opened *os.Root, oldName, newName string) error {
+		renameCalled = true
+		return opened.Rename(oldName, newName)
+	}
+	_, err := writePacksWithRename(design, map[string]map[string]string{"orders": {"marker": "new-orders"}}, rename)
+	packJournalPoint = prior
+	t.Cleanup(func() { packJournalPoint = prior })
+	if err == nil || !strings.Contains(err.Error(), "journal authority changed") || !strings.Contains(err.Error(), "preserving live state") {
+		t.Fatalf("pre-publication journal ABA was accepted: %v", err)
+	}
+	if renameCalled {
+		t.Fatal("public pack rename ran after journal authority was lost")
+	}
+	if got, readErr := os.ReadFile(filepath.Join(root, "orders.pack", "marker")); readErr != nil || string(got) != "old-orders" {
+		t.Fatalf("live target changed after journal ABA: got %q, err %v", got, readErr)
+	}
+	if _, statErr := os.Lstat(filepath.Join(root, packJournalName)); statErr != nil {
+		t.Fatalf("replacement journal was not preserved: %v", statErr)
+	}
+}
+
+func TestPackRecoveryRejectsJournalReplacementAfterParse(t *testing.T) {
+	root := t.TempDir()
+	seedPackCrash(t, root, "prepared")
+	before, err := os.Lstat(filepath.Join(root, packJournalName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior := packJournalPoint
+	packJournalPoint = func(point string) error {
+		if point == "recovery-after-journal-read" {
+			body, readErr := os.ReadFile(filepath.Join(root, packJournalName))
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			replacePackJournalForTest(t, root, string(body))
+		}
+		return nil
+	}
+	t.Cleanup(func() { packJournalPoint = prior })
+	_, err = acquirePackWriteLock(root)
+	packJournalPoint = prior
+	if err == nil || !strings.Contains(err.Error(), "journal changed") || !strings.Contains(err.Error(), "preserving") {
+		t.Fatalf("post-parse journal replacement was accepted: %v", err)
+	}
+	after, statErr := os.Lstat(filepath.Join(root, packJournalName))
+	if statErr != nil || os.SameFile(before, after) {
+		t.Fatalf("replacement journal was not preserved: before=%v after=%v err=%v", before, after, statErr)
+	}
+	if got, readErr := os.ReadFile(filepath.Join(root, "orders.pack", "marker")); readErr != nil || string(got) != "old-orders" {
+		t.Fatalf("stale parsed journal drove recovery: got %q, err %v", got, readErr)
+	}
+}
+
+func TestPackRecoveryRejectsChangedIsolatedJournalBeforeDestructiveAction(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*testing.T, string)
+	}{
+		{
+			name: "content mutation",
+			mutate: func(t *testing.T, path string) {
+				t.Helper()
+				file, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, writeErr := file.WriteString("foreign mutation")
+				if err := errors.Join(writeErr, file.Close()); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name: "path ABA",
+			mutate: func(t *testing.T, path string) {
+				t.Helper()
+				body, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				replacePackJournalPathForTest(t, filepath.Dir(path), filepath.Base(path), string(body))
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			seedPackCrash(t, root, "prepared")
+			prior := packJournalPoint
+			packJournalPoint = func(point string) error {
+				if point == "recovery-before-remove-stage-shipping.pack" {
+					test.mutate(t, filepath.Join(root, packJournalRetirement))
+				}
+				return nil
+			}
+			t.Cleanup(func() { packJournalPoint = prior })
+			_, err := acquirePackWriteLock(root)
+			packJournalPoint = prior
+			if err == nil || !strings.Contains(err.Error(), "isolated pack recovery journal changed") || !strings.Contains(err.Error(), "preserving") {
+				t.Fatalf("changed isolated journal was accepted: %v", err)
+			}
+			if _, statErr := os.Lstat(filepath.Join(root, packJournalRetirement)); statErr != nil {
+				t.Fatalf("changed isolated journal was not preserved: %v", statErr)
+			}
+			if got, readErr := os.ReadFile(filepath.Join(root, "orders.pack", "marker")); readErr != nil || string(got) != "old-orders" {
+				t.Fatalf("changed authority drove recovery: got %q, err %v", got, readErr)
+			}
+		})
+	}
+}
+
+func TestPackRecoveryRejectsReappearingJournalPath(t *testing.T) {
+	root := t.TempDir()
+	seedPackCrash(t, root, "prepared")
+	prior := packJournalPoint
+	packJournalPoint = func(point string) error {
+		if point == "recovery-before-remove-stage-shipping.pack" {
+			if err := os.WriteFile(filepath.Join(root, packJournalName), []byte("foreign replacement\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return nil
+	}
+	t.Cleanup(func() { packJournalPoint = prior })
+	_, err := acquirePackWriteLock(root)
+	packJournalPoint = prior
+	if err == nil || !strings.Contains(err.Error(), "journal path reappeared") || !strings.Contains(err.Error(), "preserving") {
+		t.Fatalf("reappearing journal path was accepted: %v", err)
+	}
+	for _, name := range []string{packJournalName, packJournalRetirement} {
+		if _, statErr := os.Lstat(filepath.Join(root, name)); statErr != nil {
+			t.Fatalf("journal authority %s was not preserved: %v", name, statErr)
+		}
+	}
+	if got, readErr := os.ReadFile(filepath.Join(root, "orders.pack", "marker")); readErr != nil || string(got) != "old-orders" {
+		t.Fatalf("replacement journal drove recovery: got %q, err %v", got, readErr)
+	}
+}
+
+func TestPackRecoveryConditionallyRemovesExactIsolatedJournal(t *testing.T) {
+	root := t.TempDir()
+	seedPackCrash(t, root, "committed")
+	prior := packJournalPoint
+	packJournalPoint = func(point string) error {
+		if point == "recovery-before-journal-remove" {
+			path := filepath.Join(root, packJournalRetirement)
+			body, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			replacePackJournalPathForTest(t, root, packJournalRetirement, string(body))
+		}
+		return nil
+	}
+	t.Cleanup(func() { packJournalPoint = prior })
+	_, err := acquirePackWriteLock(root)
+	packJournalPoint = prior
+	if err == nil || !strings.Contains(err.Error(), "isolated pack recovery journal changed") || !strings.Contains(err.Error(), "preserving") {
+		t.Fatalf("final journal replacement was removed or accepted: %v", err)
+	}
+	if _, statErr := os.Lstat(filepath.Join(root, packJournalRetirement)); statErr != nil {
+		t.Fatalf("final replacement journal was not preserved: %v", statErr)
+	}
+}
+
+func TestPackRecoveryResumesAnExactlyIsolatedJournalAfterCrash(t *testing.T) {
+	root := t.TempDir()
+	seedPackCrash(t, root, "prepared")
+	injected := errors.New("injected crash after journal isolation")
+	prior := packJournalPoint
+	packJournalPoint = func(point string) error {
+		if point == "recovery-after-journal-isolate" {
+			return injected
+		}
+		return nil
+	}
+	_, err := acquirePackWriteLock(root)
+	packJournalPoint = prior
+	t.Cleanup(func() { packJournalPoint = prior })
+	if !errors.Is(err, injected) {
+		t.Fatalf("journal isolation crash was not reported: %v", err)
+	}
+	if _, statErr := os.Lstat(filepath.Join(root, packJournalName)); !os.IsNotExist(statErr) {
+		t.Fatalf("live journal survived atomic isolation: %v", statErr)
+	}
+	if _, statErr := os.Lstat(filepath.Join(root, packJournalRetirement)); statErr != nil {
+		t.Fatalf("isolated authority was not durable after crash: %v", statErr)
+	}
+	lock, err := acquirePackWriteLock(root)
+	if err != nil {
+		t.Fatalf("resuming isolated recovery failed: %v", err)
+	}
+	if err := lock.releaseAll(); err != nil {
+		t.Fatal(err)
+	}
+	if got, readErr := os.ReadFile(filepath.Join(root, "orders.pack", "marker")); readErr != nil || string(got) != "old-orders" {
+		t.Fatalf("resumed recovery restored %q, %v", got, readErr)
+	}
+	for _, name := range []string{packJournalName, packJournalRetirement} {
+		if _, statErr := os.Lstat(filepath.Join(root, name)); !os.IsNotExist(statErr) {
+			t.Fatalf("journal path %s survived resumed recovery: %v", name, statErr)
+		}
+	}
+}
+
+func TestCreatePackJournalFailurePreservesReplacement(t *testing.T) {
+	injected := errors.New("injected journal persistence failure")
+	for _, operation := range []string{"write", "sync", "close"} {
+		t.Run(operation, func(t *testing.T) {
+			root := t.TempDir()
+			rootHandle, err := os.OpenRoot(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rootHandle.Close()
+			priorWrite, priorSync, priorClose := packJournalWrite, packJournalSync, packJournalClose
+			replace := func() { replacePackJournalForTest(t, root, "foreign replacement\n") }
+			switch operation {
+			case "write":
+				packJournalWrite = func(*os.File, []byte) (int, error) {
+					replace()
+					return 0, injected
+				}
+			case "sync":
+				packJournalSync = func(*os.File) error {
+					replace()
+					return injected
+				}
+			case "close":
+				packJournalClose = func(file *os.File) error {
+					closeErr := file.Close()
+					replace()
+					return errors.Join(closeErr, injected)
+				}
+			}
+			err = createPackJournal(rootHandle, []packJournalEntry{testPackJournalEntry()})
+			packJournalWrite, packJournalSync, packJournalClose = priorWrite, priorSync, priorClose
+			t.Cleanup(func() {
+				packJournalWrite, packJournalSync, packJournalClose = priorWrite, priorSync, priorClose
+			})
+			if !errors.Is(err, injected) || !strings.Contains(err.Error(), "preserving replacement") {
+				t.Fatalf("%s failure did not preserve and report replacement: %v", operation, err)
+			}
+			if body, readErr := os.ReadFile(filepath.Join(root, packJournalName)); readErr != nil || string(body) != "foreign replacement\n" {
+				t.Fatalf("%s failure removed replacement journal: got %q, err %v", operation, body, readErr)
+			}
+		})
+	}
+}
+
+func TestPackJournalRecoversPastTornPhaseRecord(t *testing.T) {
+	root := t.TempDir()
+	seedPackCrash(t, root, "prepared")
+	f, err := os.OpenFile(filepath.Join(root, packJournalName), os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(`{"phase":"stag`); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := acquirePackWriteLock(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lock.releaseAll(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(root, "orders.pack", "marker"))
+	if err != nil || string(got) != "old-orders" {
+		t.Fatalf("torn record recovery restored %q, %v", got, err)
+	}
+}
+
+func TestPackJournalRejectsUnsafeAuthority(t *testing.T) {
+	t.Run("symlink journal", func(t *testing.T) {
+		root := t.TempDir()
+		outside := filepath.Join(t.TempDir(), "sentinel")
+		if err := os.WriteFile(outside, []byte("outside"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(outside, filepath.Join(root, packJournalName)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := acquirePackWriteLock(root); err == nil || !strings.Contains(err.Error(), "non-symlink") {
+			t.Fatalf("symlink journal accepted: %v", err)
+		}
+		got, _ := os.ReadFile(outside)
+		if string(got) != "outside" {
+			t.Fatalf("outside sentinel changed: %q", got)
+		}
+	})
+	t.Run("special journal", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.Mkdir(filepath.Join(root, packJournalName), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := acquirePackWriteLock(root); err == nil || !strings.Contains(err.Error(), "regular") {
+			t.Fatalf("directory journal accepted: %v", err)
+		}
+	})
+	t.Run("malformed journal", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, packJournalName), []byte("not-json\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := acquirePackWriteLock(root); err == nil || !strings.Contains(err.Error(), "malformed") {
+			t.Fatalf("malformed journal accepted: %v", err)
+		}
+	})
+	t.Run("duplicate journal key", func(t *testing.T) {
+		root := t.TempDir()
+		body := `{"version":1,"version":1,"phase":"prepared","entries":[]}` + "\n"
+		if err := os.WriteFile(filepath.Join(root, packJournalName), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := acquirePackWriteLock(root); err == nil || !strings.Contains(err.Error(), "malformed") {
+			t.Fatalf("duplicate journal key accepted: %v", err)
+		}
+	})
+	t.Run("case-aliased journal key", func(t *testing.T) {
+		root := t.TempDir()
+		body := `{"Version":1,"phase":"prepared","entries":[]}` + "\n"
+		if err := os.WriteFile(filepath.Join(root, packJournalName), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := acquirePackWriteLock(root); err == nil || !strings.Contains(err.Error(), "malformed") {
+			t.Fatalf("case-aliased journal key accepted: %v", err)
+		}
+	})
+	t.Run("portable aliases", func(t *testing.T) {
+		root := t.TempDir()
+		witness := packTreeWitness{Tree: "sha256:" + strings.Repeat("0", 64), Identity: "sha256:" + strings.Repeat("1", 64)}
+		entries := []packJournalEntry{
+			{Target: "orders.pack", Stage: packScratchName("stage", "orders.pack"), Backup: packScratchName("backup", "orders.pack"), Retire: packScratchName("retire", "orders.pack"), Existed: true, Before: witness, AfterTree: witness.Tree},
+			{Target: "Orders.pack", Stage: packScratchName("stage", "Orders.pack"), Backup: packScratchName("backup", "Orders.pack"), Retire: packScratchName("retire", "Orders.pack"), Existed: true, Before: witness, AfterTree: witness.Tree},
+		}
+		body, _ := encodePackRecord(packJournalHeader{Version: 2, Phase: "prepared", Entries: entries})
+		if err := os.WriteFile(filepath.Join(root, packJournalName), body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := acquirePackWriteLock(root); err == nil || !strings.Contains(err.Error(), "alias") {
+			t.Fatalf("portable alias journal accepted: %v", err)
+		}
+	})
+	t.Run("outside path", func(t *testing.T) {
+		base := t.TempDir()
+		root := filepath.Join(base, "packs")
+		if err := os.Mkdir(root, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		outside := filepath.Join(base, "outside")
+		if err := os.WriteFile(outside, []byte("sentinel"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		target := "../outside"
+		witness := packTreeWitness{Tree: "sha256:" + strings.Repeat("0", 64), Identity: "sha256:" + strings.Repeat("1", 64)}
+		entry := packJournalEntry{Target: target, Stage: packScratchName("stage", target), Backup: packScratchName("backup", target), Retire: packScratchName("retire", target), Existed: true, Before: witness, AfterTree: witness.Tree}
+		body, _ := encodePackRecord(packJournalHeader{Version: 2, Phase: "prepared", Entries: []packJournalEntry{entry}})
+		if err := os.WriteFile(filepath.Join(root, packJournalName), body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := acquirePackWriteLock(root); err == nil || !strings.Contains(err.Error(), "unsafe") {
+			t.Fatalf("outside journal path accepted: %v", err)
+		}
+		got, _ := os.ReadFile(outside)
+		if string(got) != "sentinel" {
+			t.Fatalf("outside sentinel changed: %q", got)
+		}
+	})
 }
 
 func TestContentHashCoversManifestMinusHashLine(t *testing.T) {
@@ -484,6 +2169,66 @@ func TestGeneratedPackFilesAreUnstamped(t *testing.T) {
 				t.Errorf("pack %s file %s carries a version stamp; the content hash covers it", id, name)
 			}
 		}
+	}
+}
+
+func TestWritePacksStaysOnOpenedRootDuringParentSwap(t *testing.T) {
+	base := t.TempDir()
+	design := filepath.Join(base, "design")
+	root := filepath.Join(design, "packs")
+	held := filepath.Join(base, "held-packs")
+	outside := filepath.Join(base, "outside")
+	if err := os.MkdirAll(filepath.Join(root, "orders.pack"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "orders.pack", "pack.yaml"), []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sentinel := filepath.Join(outside, "sentinel")
+	if err := os.WriteFile(sentinel, []byte("outside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	rename := func(opened *os.Root, old, new string) error {
+		if !swapped {
+			swapped = true
+			if err := os.Rename(root, held); err != nil {
+				return err
+			}
+			if err := os.Symlink(outside, root); err != nil {
+				return err
+			}
+		}
+		return opened.Rename(old, new)
+	}
+	ids, err := writePacksWithRename(design, map[string]map[string]string{
+		"orders": {"pack.yaml": "new"},
+	}, rename)
+	if err != nil || !reflect.DeepEqual(ids, []string{"orders"}) {
+		t.Fatalf("rooted pack write failed: ids=%v err=%v", ids, err)
+	}
+	got, err := os.ReadFile(filepath.Join(held, "orders.pack", "pack.yaml"))
+	if err != nil || string(got) != "new" {
+		t.Fatalf("opened root received %q, %v", got, err)
+	}
+	got, err = os.ReadFile(sentinel)
+	if err != nil || string(got) != "outside" {
+		t.Fatalf("outside sentinel changed: %q, %v", got, err)
+	}
+	if _, err := os.Lstat(filepath.Join(outside, "orders.pack")); !os.IsNotExist(err) {
+		t.Fatalf("ambient replacement received transaction output: %v", err)
+	}
+}
+
+func TestApplyPackReleaseMakesSuccessFailAndJoinsCauses(t *testing.T) {
+	primary := errors.New("primary")
+	releaseErr := errors.New("injected pack lock close failure")
+	ids, err := applyPackRelease([]string{"orders"}, primary, func() error { return releaseErr })
+	if ids != nil || !errors.Is(err, primary) || !errors.Is(err, releaseErr) {
+		t.Fatalf("release failure was hidden or causes were lost: ids=%v err=%v", ids, err)
 	}
 }
 

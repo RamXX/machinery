@@ -20,11 +20,11 @@
     "Pending": {
       "on": {
         "confirm": [
-          { "target": "persisting", "guard": "guardCanConfirm", "actions": "setPendingConfirmed" },
+          { "target": "persisting", "guard": "guardCanConfirm", "actions": ["resetRetries", "setPendingConfirmed"] },
           { "actions": "recordConfirmDenied" }
         ],
         "cancel": [
-          { "target": "persisting", "guard": "guardCanCancel", "actions": "setPendingCancelled" },
+          { "target": "persisting", "guard": "guardCanCancel", "actions": ["resetRetries", "setPendingCancelled"] },
           { "actions": "recordCancelDenied" }
         ]
       },
@@ -38,12 +38,12 @@
     },
     "Confirmed": {
       "on": {
-        "markReserved": { "target": "persisting", "actions": "setPendingReserved" },
+        "markReserved": { "target": "persisting", "actions": ["resetRetries", "setPendingReserved"] },
         "cancel": [
-          { "target": "persisting", "guard": "guardCanCancel", "actions": "setPendingCancelled" },
+          { "target": "persisting", "guard": "guardCanCancel", "actions": ["resetRetries", "setPendingCancelled"] },
           { "actions": "recordCancelDenied" }
         ],
-        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+        "fail": { "target": "persisting", "actions": ["resetRetries", "setPendingFailed"] }
       },
       "_ignores": {
         "confirm": "idempotent redelivery: already confirmed",
@@ -54,8 +54,8 @@
     },
     "Reserved": {
       "on": {
-        "markPaid": { "target": "persisting", "actions": "setPendingPaid" },
-        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+        "markPaid": { "target": "persisting", "actions": ["resetRetries", "setPendingPaid"] },
+        "fail": { "target": "persisting", "actions": ["resetRetries", "setPendingFailed"] }
       },
       "_ignores": {
         "confirm": "idempotent redelivery: already confirmed",
@@ -67,8 +67,8 @@
     },
     "Paid": {
       "on": {
-        "markShipped": { "target": "persisting", "actions": "setPendingShipped" },
-        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+        "markShipped": { "target": "persisting", "actions": ["resetRetries", "setPendingShipped"] },
+        "fail": { "target": "persisting", "actions": ["resetRetries", "setPendingFailed"] }
       },
       "_ignores": {
         "confirm": "idempotent redelivery: already confirmed",
@@ -80,8 +80,8 @@
     },
     "Shipped": {
       "on": {
-        "markDelivered": { "target": "persisting", "actions": "setPendingDelivered" },
-        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+        "markDelivered": { "target": "persisting", "actions": ["resetRetries", "setPendingDelivered"] },
+        "fail": { "target": "persisting", "actions": ["resetRetries", "setPendingFailed"] }
       },
       "_ignores": {
         "confirm": "idempotent redelivery: already confirmed",
@@ -130,14 +130,15 @@
       }
     },
     "rolledBack": {
-      "_exhaustive": "priorStatus is set by every setPending* action to the current domain state; only Pending, Confirmed, Reserved, Paid, and Shipped have transitions into the persist overlay (final states persist nothing), and all five priorIs* guards are present",
       "always": [
         { "target": "Pending", "guard": "priorIsPending" },
         { "target": "Confirmed", "guard": "priorIsConfirmed" },
         { "target": "Reserved", "guard": "priorIsReserved" },
         { "target": "Paid", "guard": "priorIsPaid" },
-        { "target": "Shipped", "guard": "priorIsShipped" }
+        { "target": "Shipped", "guard": "priorIsShipped" },
+        { "target": "routingFault", "actions": "recordRoutingError" }
       ]
-    }
+    },
+    "routingFault": { "type": "final" }
   }
 }

@@ -144,6 +144,38 @@ func TestCheckMigrationClean(t *testing.T) {
 	}
 }
 
+func TestMigrationMultiErrorOrderIsStable(t *testing.T) {
+	broken := strings.Replace(migrationContract,
+		"  - {source: LegacyThing.id, target: Thing.id, transform: identity, validation: exact id equality, rollback: restore snapshot}\n", "", 1)
+	broken = strings.Replace(broken,
+		"  - {source: LegacyThing.status, target: Thing.status, transform: translate with state mapping, validation: every legacy value translated, rollback: restore snapshot}\n", "", 1)
+	design := writeMigrationFixture(t, broken)
+	want := strings.Join(CheckMigration(design, "").Errs, "\n")
+	if want == "" {
+		t.Fatal("broken fixture produced no errors")
+	}
+	for i := 0; i < 100; i++ {
+		if got := strings.Join(CheckMigration(design, "").Errs, "\n"); got != want {
+			t.Fatalf("finding order changed on run %d:\nwant:\n%s\ngot:\n%s", i, want, got)
+		}
+	}
+}
+
+func TestMigrationModelPathRejectsSymlinkEscape(t *testing.T) {
+	design := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "outside.modelith.yaml")
+	if err := os.WriteFile(outside, []byte(migrationLegacyModel), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(design, "legacy.modelith.yaml")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := migrationDesignPath(design, "legacy.modelith.yaml"); err == nil || !strings.Contains(err.Error(), "through a symlink") {
+		t.Fatalf("symlink escape error = %v", err)
+	}
+}
+
 func TestCheckMigrationMutations(t *testing.T) {
 	authorityRegression := strings.Replace(migrationContract, "  - id: cutover\n    source_of_truth: target", "  - id: cutover\n    source_of_truth: legacy", 1)
 	authorityRegression = strings.Replace(authorityRegression, "  - id: baseline\n    source_of_truth: legacy", "  - id: baseline\n    source_of_truth: target", 1)

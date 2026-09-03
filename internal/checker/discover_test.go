@@ -9,10 +9,10 @@ import (
 
 func TestManifestPathsAndHasCheckers(t *testing.T) {
 	design := t.TempDir()
-	if HasCheckers(design) {
+	if has, err := HasCheckers(design); err != nil || has {
 		t.Fatal("no checkers/ dir should mean no checkers")
 	}
-	if got := ManifestPaths(design); got != nil {
+	if got, err := ManifestPaths(design); err != nil || got != nil {
 		t.Fatalf("expected nil, got %v", got)
 	}
 
@@ -26,7 +26,10 @@ func TestManifestPathsAndHasCheckers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got := ManifestPaths(design)
+	got, err := ManifestPaths(design)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 2 {
 		t.Fatalf("expected 2 manifests, got %v", got)
 	}
@@ -34,8 +37,45 @@ func TestManifestPathsAndHasCheckers(t *testing.T) {
 	if !strings.HasSuffix(got[0], "a.checker.yaml") || !strings.HasSuffix(got[1], "b.checker.yaml") {
 		t.Fatalf("manifests not sorted: %v", got)
 	}
-	if !HasCheckers(design) {
+	if has, err := HasCheckers(design); err != nil || !has {
 		t.Fatal("HasCheckers should be true now")
+	}
+}
+
+func TestManifestPathsRejectsSymlinksAndNonRegularManifests(t *testing.T) {
+	for name, setup := range map[string]func(t *testing.T, design string){
+		"checker directory symlink": func(t *testing.T, design string) {
+			if err := os.Symlink(t.TempDir(), filepath.Join(design, "checkers")); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"manifest symlink": func(t *testing.T, design string) {
+			dir := filepath.Join(design, "checkers")
+			if err := os.Mkdir(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			target := filepath.Join(t.TempDir(), "target.yaml")
+			if err := os.WriteFile(target, []byte("checker: {id: x}"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(target, filepath.Join(dir, "x.checker.yaml")); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"manifest directory": func(t *testing.T, design string) {
+			dir := filepath.Join(design, "checkers")
+			if err := os.MkdirAll(filepath.Join(dir, "x.checker.yaml"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			design := t.TempDir()
+			setup(t, design)
+			if _, err := ManifestPaths(design); err == nil {
+				t.Fatal("unsafe checker discovery was accepted")
+			}
+		})
 	}
 }
 
@@ -59,7 +99,7 @@ func TestDesignID(t *testing.T) {
 }
 
 func TestLoadEvidenceOK(t *testing.T) {
-	body := `{"evidence_schema":"1.0","checker":{"id":"c","version":"1"},"input_hash":"sha256:abc","verdict":"pass","coverage":[{"element":"inv:x","verdict":"pass"}]}`
+	body := `{"evidence_schema":"1.0","checker":{"id":"c","version":"1"},"input_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","runtime_closure":"sha256:1111111111111111111111111111111111111111111111111111111111111111","verdict":"pass","coverage":[{"element":"inv:x","verdict":"pass"}]}`
 	ev, err := LoadEvidence(writeTemp(t, "e.json", body))
 	if err != nil {
 		t.Fatal(err)

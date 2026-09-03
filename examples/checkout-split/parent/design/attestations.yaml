@@ -1,0 +1,36 @@
+attestation_version: 1
+attestations:
+  - claim: g2.action-ownership
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:52f6094f6356fce93aed920af45b7fc06f65d0e2d78d15d734d8441fe432720f}]
+  - claim: g2.interface-contract-rightness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:52f6094f6356fce93aed920af45b7fc06f65d0e2d78d15d734d8441fe432720f}]
+  - claim: g2.placement-rightness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:52f6094f6356fce93aed920af45b7fc06f65d0e2d78d15d734d8441fe432720f}]
+  - claim: g2.adoption-closure-discovery
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:52f6094f6356fce93aed920af45b7fc06f65d0e2d78d15d734d8441fe432720f}]
+  - claim: g2.event-contract-completeness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:52f6094f6356fce93aed920af45b7fc06f65d0e2d78d15d734d8441fe432720f}]
+  - claim: g2.nfr-content
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:52f6094f6356fce93aed920af45b7fc06f65d0e2d78d15d734d8441fe432720f}]
+  - claim: gt.conformance-test-shape
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    note: child BUILD plans bind their committed pack and machine oracles; the parent manifest delegates implementation tests to those children
+    covers: [{path: BUILD.md, hash: sha256:753527c84c0a73b73db0dd248df933cd19b4316043e21c2e370f30faf639794c}]
+  - claim: g4.zero-context
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    note: the parent manifest plus frozen packs and linked child plans provide the complete decomposition handoff
+    covers: [{path: BUILD.md, hash: sha256:753527c84c0a73b73db0dd248df933cd19b4316043e21c2e370f30faf639794c}]

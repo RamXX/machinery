@@ -3,13 +3,20 @@
 package tla
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/artifactset"
+	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/portablepath"
 	"github.com/RamXX/machinery/internal/version"
 )
 
@@ -51,16 +58,21 @@ func retryShaped(o *ir.Object) bool {
 	if o == nil || o.Get2("always") == nil || o.Get2("after") == nil {
 		return false
 	}
-	branches := normAlways(o.Get2("always"))
-	if len(branches) == 0 {
-		return false
-	}
+	// Use the authoritative IR normalizer. A string transition is a valid
+	// unguarded fallback; the old local object-only parser erased it and
+	// misclassified the state as a fully guarded retry loop.
+	branches := ir.TransitionsOf(ir.ObjectValue(o), nil, "")
+	seenAlways := false
 	for _, b := range branches {
+		if b.Kind != "always" {
+			continue
+		}
+		seenAlways = true
 		if !b.HasGuard {
 			return false
 		}
 	}
-	return true
+	return seenAlways
 }
 
 // RetryState is a state with a guarded always plus an after: a bounded retry loop.
@@ -75,41 +87,6 @@ func RetryStates(states []ir.StateEntry) []RetryState {
 		if retryShaped(s.Node.AsObject()) {
 			out = append(out, RetryState{Name: s.Name, Node: s.Node})
 		}
-	}
-	return out
-}
-
-type alwaysBranch struct {
-	HasGuard bool
-	Target   string
-	HasTgt   bool
-}
-
-func normAlways(v *ir.Value) []alwaysBranch {
-	var items []*ir.Value
-	if v == nil {
-		return nil
-	}
-	if v.Kind == ir.KindArray {
-		items = v.AsArray()
-	} else {
-		items = []*ir.Value{v}
-	}
-	var out []alwaysBranch
-	for _, it := range items {
-		if it == nil || it.Kind != ir.KindObject {
-			continue
-		}
-		o := it.AsObject()
-		b := alwaysBranch{}
-		if gv := o.Get2("guard"); gv != nil && gv.Kind == ir.KindString && gv.AsString() != "" {
-			b.HasGuard = true
-		}
-		if tv := o.Get2("target"); tv != nil && tv.Kind == ir.KindString {
-			b.Target = tv.AsString()
-			b.HasTgt = true
-		}
-		out = append(out, b)
 	}
 	return out
 }
@@ -176,6 +153,31 @@ func setExpr(s map[string]bool) string {
 	return "{" + strings.Join(parts, ", ") + "}"
 }
 
+func declaresRefusalHandler(state *ir.Value, handler string) bool {
+	o := state.AsObject()
+	if o == nil {
+		return false
+	}
+	if o.GetObject("on").Get2(handler) != nil {
+		return true
+	}
+	if strings.HasPrefix(handler, "after:") {
+		return o.GetObject("after").Get2(strings.TrimPrefix(handler, "after:")) != nil
+	}
+	for _, inv := range ir.InvokesOf(state) {
+		io := inv.AsObject()
+		if io == nil {
+			continue
+		}
+		for _, branch := range []string{"onDone", "onError"} {
+			if handler == io.GetString("src")+"."+branch && io.Get2(branch) != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Check runs the generator's full admissibility pass over one machine and
 // reports the refusal without writing anything: the G3 gate calls it so the
 // structural lint and the formal generator admit the SAME machine subset
@@ -191,7 +193,17 @@ func Check(path string) error {
 
 // Generate mirrors tla_gen.generate(path) -> (mid, tla, cfg).
 func Generate(path string) (mid, tla, cfg string, err error) {
-	m, loadErr := ir.LoadMachineJSON(path)
+	raw, readErr := os.ReadFile(path)
+	if readErr != nil {
+		return "", "", "", &ExitError{Msg: "tla_gen: " + readErr.Error()}
+	}
+	return GenerateBytes(path, raw)
+}
+
+// GenerateBytes generates a TLA+ model from an authoritative byte snapshot.
+// source is used only as the stable logical identity in diagnostics.
+func GenerateBytes(source string, raw []byte) (mid, tla, cfg string, err error) {
+	m, loadErr := ir.LoadMachineJSONBytes(source, raw)
 	if loadErr != nil {
 		return "", "", "", &ExitError{Msg: "tla_gen: " + loadErr.Error()}
 	}
@@ -204,17 +216,16 @@ func Generate(path string) (mid, tla, cfg string, err error) {
 			}
 		}
 	}()
-	mid, tla, cfg = generateFromMachine(m, path)
+	mid, tla, cfg = generateFromMachine(m, source)
 	return mid, tla, cfg, nil
 }
 
 func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	ro := m.AsObject()
-	mid := ro.GetString("id")
-	if mid == "" {
-		mid = "machine"
+	mid, nameErr := ir.TLAModuleName(m)
+	if nameErr != nil {
+		die("tla_gen: %s: %v", filepath.Base(path), nameErr)
 	}
-	mid = ir.Title(mid)
 
 	allStates := ir.WalkStates(ro.Get2("states"), "")
 	if len(allStates) == 0 {
@@ -231,6 +242,9 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 		sort.Strings(sortedN)
 		die("tla_gen: %s: nested states are not supported at rung 3 (%s); flatten the machine or extend the generator",
 			mid, strings.Join(sortedN, ", "))
+	}
+	if problems := ir.TransitionProblems(m); len(problems) > 0 {
+		die("tla_gen: %s: malformed transition IR: %s", mid, strings.Join(problems, "; "))
 	}
 	for _, s := range allStates {
 		stype := s.Node.AsObject().GetString("type")
@@ -270,12 +284,29 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	}
 
 	var exhaustiveNotes [][2]string
+	var refusalNotes [][3]string
 	for _, s := range states {
 		note := strings.TrimSpace(s.Node.AsObject().GetString("_exhaustive"))
 		if note != "" {
 			exhaustiveNotes = append(exhaustiveNotes, [2]string{s.Name, note})
 		}
+		if refusal := s.Node.AsObject().Get2("_refusal"); refusal != nil {
+			if refusal.Kind != ir.KindObject || refusal.AsObject().Len() == 0 {
+				die("tla_gen: %s: state %s _refusal must be a non-empty object mapping declared handlers to non-empty reasons", mid, s.Name)
+			}
+			for _, handler := range refusal.AsObject().Keys() {
+				v := refusal.AsObject().Get2(handler)
+				if strings.TrimSpace(handler) == "" || v == nil || v.Kind != ir.KindString || strings.TrimSpace(v.AsString()) == "" {
+					die("tla_gen: %s: state %s _refusal entry %s must have a non-empty string reason", mid, s.Name, ir.Repr(handler))
+				}
+				if !declaresRefusalHandler(s.Node, handler) {
+					die("tla_gen: %s: state %s _refusal names handler %s, but the state declares no matching on:, after:, or invoke branch", mid, s.Name, ir.Repr(handler))
+				}
+				refusalNotes = append(refusalNotes, [3]string{s.Name, handler, v.AsString()})
+			}
+		}
 	}
+	claimLiveness := len(refusalNotes) == 0
 
 	counterUpdates := func(src, tgt string) map[string]string {
 		ups := map[string]string{}
@@ -416,8 +447,22 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 		for _, n := range exhaustiveNotes {
 			lines = append(lines, fmt.Sprintf("\\*      - UNVERIFIED, state %s: %s", n[0], n[1]))
 		}
-	} else {
+	} else if claimLiveness {
+		// Preserve the established generated bytes for machines whose proof
+		// posture did not change. Refusal-bearing machines use the precise
+		// always-list wording below because guarded handlers intentionally lack
+		// a fallback there.
 		lines = append(lines, "\\*      (none here: every guarded branch list has an unguarded fallback)")
+	} else {
+		lines = append(lines, "\\*      (none here: every guarded always-list has an unguarded fallback)")
+	}
+	if !claimLiveness {
+		lines = append(lines, "\\*      Handler refusal is permitted in this machine. A refused trigger leaves")
+		lines = append(lines, "\\*      the state unchanged, so this rung checks safety only and makes no")
+		lines = append(lines, "\\*      fairness or overlay-resolution liveness claim:")
+		for _, n := range refusalNotes {
+			lines = append(lines, fmt.Sprintf("\\*      - state %s, handler %s: %s", n[0], n[1], n[2]))
+		}
 	}
 	lines = append(lines, "\\*   2. Every invoke resolves exactly once (onDone or onError; no lost or")
 	lines = append(lines, "\\*      duplicated completion) and every after timer eventually fires.")
@@ -481,9 +526,15 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 	}
 	lines = append(lines, next)
 	lines = append(lines, "")
-	lines = append(lines, "Spec == Init /\\ [][Next]_vars /\\ WF_vars(OverlayNext)")
+	if claimLiveness {
+		lines = append(lines, "Spec == Init /\\ [][Next]_vars /\\ WF_vars(OverlayNext)")
+	} else {
+		lines = append(lines, "Spec == Init /\\ [][Next]_vars")
+	}
 	lines = append(lines, "")
-	if len(domain) == 0 {
+	if !claimLiveness {
+		lines = append(lines, "\\* Live_OverlayResolves intentionally omitted: _refusal permits persistent stuttering.")
+	} else if len(domain) == 0 {
 		// A perpetual envelope (timer-driven breaker, poller, health monitor)
 		// has no resting domain state and no final: Overlay ~> Domain would be
 		// unsatisfiable on a correct machine. Liveness reduces to deadlock
@@ -505,7 +556,10 @@ func generateFromMachine(m *ir.Value, path string) (string, string, string) {
 		}
 		maxRetries = int(n)
 	}
-	cfgOut := fmt.Sprintf("CONSTANT MaxRetries = %d\nSPECIFICATION Spec\nINVARIANT TypeOK\nPROPERTY Live_OverlayResolves\n", maxRetries)
+	cfgOut := fmt.Sprintf("CONSTANT MaxRetries = %d\nSPECIFICATION Spec\nINVARIANT TypeOK\n", maxRetries)
+	if claimLiveness {
+		cfgOut += "PROPERTY Live_OverlayResolves\n"
+	}
 	return mid, tlaOut, cfgOut
 }
 
@@ -519,7 +573,13 @@ func setOf(xs []string) map[string]bool {
 
 // Run is the `machinery tla <machine.json> [out-dir]` entrypoint.
 func Run(path, outdir string) error {
-	_, err := RunWritten(path, outdir)
+	return RunTo(path, outdir, os.Stdout)
+
+}
+
+// RunTo is Run with an explicit status-output sink.
+func RunTo(path, outdir string, out io.Writer) error {
+	_, err := RunWrittenTo(path, outdir, out)
 	return err
 }
 
@@ -527,25 +587,268 @@ func Run(path, outdir string) error {
 // (verify-formal) can distinguish freshly generated pairs from committed
 // orphans.
 func RunWritten(path, outdir string) ([]string, error) {
-	mid, tla, cfg, err := Generate(path)
+	return RunWrittenTo(path, outdir, os.Stdout)
+}
+
+// RunWrittenTo is RunWritten with an explicit status-output sink.
+func RunWrittenTo(path, outdir string, out io.Writer) ([]string, error) {
+	snapshot, err := designlock.Acquire(filepath.Dir(filepath.Dir(path)))
+	if err != nil {
+		return nil, err
+	}
+	written, retErr := RunWrittenInSnapshotTo(snapshot, path, outdir, out)
+	retErr = errors.Join(retErr, snapshot.Release())
+	retErr = snapshot.LogicalError(retErr)
+	if retErr != nil {
+		return nil, retErr
+	}
+	return written, nil
+}
+
+// RunWrittenInSnapshot is RunWritten for an orchestrator (verify-formal)
+// which already holds the design snapshot lock.
+var runWrittenAfterSourceSnapshot = func() {}
+var runWrittenAfterStalePlan = func() {}
+
+func RunWrittenInSnapshot(snapshot *designlock.Lock, path, outdir string) ([]string, error) {
+	return RunWrittenInSnapshotTo(snapshot, path, outdir, os.Stdout)
+}
+
+// RunWrittenInSnapshotTo is RunWrittenInSnapshot with an explicit output sink.
+func RunWrittenInSnapshotTo(snapshot *designlock.Lock, path, outdir string, out io.Writer) ([]string, error) {
+	if err := snapshot.ResumeExpected("tla", "rerun `machinery tla` with the same arguments"); err != nil {
+		return nil, err
+	}
+	sourcePath, err := snapshot.SourcePath(path)
+	if err != nil {
+		return nil, fmt.Errorf("tla_gen: resolve immutable machine source: %w", err)
+	}
+	runWrittenAfterSourceSnapshot()
+	if err := ir.ValidateTLAModuleInventory(filepath.Dir(sourcePath)); err != nil {
+		return nil, fmt.Errorf("tla_gen: %w", err)
+	}
+	mid, tla, cfg, err := Generate(sourcePath)
 	if err != nil {
 		return nil, err
 	}
 	if outdir == "" {
 		outdir = filepath.Dir(path)
 	}
-	if mkErr := os.MkdirAll(outdir, 0755); mkErr != nil {
-		return nil, mkErr
-	}
 	// Stamp at write time, not in Generate: the pack generator embeds
 	// Generate's output in hash-covered pack files, where a version stamp
 	// would churn the content hash on every release (P-F10).
-	if wErr := os.WriteFile(filepath.Join(outdir, mid+".tla"), []byte(version.StampTLAModule(tla)), 0644); wErr != nil {
+	files := map[string][]byte{
+		mid + ".tla": []byte(version.StampTLAModule(tla)),
+		mid + ".cfg": []byte(version.StampCfg(cfg)),
+	}
+	replacements, err := guardedCurrentTLAArtifacts(outdir, filepath.Base(sourcePath), files)
+	if err != nil {
+		return nil, err
+	}
+	stale, err := staleOwnedTLAArtifacts(outdir, filepath.Dir(sourcePath), files)
+	if err != nil {
+		return nil, err
+	}
+	if len(stale) > 0 {
+		runWrittenAfterStalePlan()
+	}
+	expected := []designlock.OutputExpectation{
+		designlock.ExpectFile(filepath.Join(outdir, mid+".tla"), files[mid+".tla"], 0o644),
+		designlock.ExpectFile(filepath.Join(outdir, mid+".cfg"), files[mid+".cfg"], 0o644),
+	}
+	for _, name := range stale {
+		expected = append(expected, designlock.ExpectAbsent(filepath.Join(outdir, name.Name)))
+	}
+	if wErr := snapshot.PublishExpectedRooted("tla", "rerun `machinery tla` with the same arguments", expected, func(outputs *designlock.OutputScope) error {
+		return outputs.WithRoot(outdir, func(root *os.Root) error {
+			return artifactset.ReconcileGuardedRooted(outdir, root, files, stale, replacements)
+		})
+	}); wErr != nil {
 		return nil, wErr
 	}
-	if wErr := os.WriteFile(filepath.Join(outdir, mid+".cfg"), []byte(version.StampCfg(cfg)), 0644); wErr != nil {
-		return nil, wErr
+	if _, err := fmt.Fprintf(out, "wrote %s.tla and %s.cfg to %s\n", mid, mid, outdir); err != nil {
+		return nil, fmt.Errorf("tla_gen: write status output: %w", err)
 	}
-	fmt.Fprintf(os.Stdout, "wrote %s.tla and %s.cfg to %s\n", mid, mid, outdir)
 	return []string{mid + ".tla", mid + ".cfg"}, nil
+}
+
+func guardedCurrentTLAArtifacts(outdir, machineSource string, files map[string][]byte) ([]artifactset.RemovalPrecondition, error) {
+	info, err := os.Lstat(outdir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, fmt.Errorf("tla_gen: output directory must be a real directory")
+	}
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	inspected := map[string][]byte{}
+	conditions := map[string]artifactset.RemovalPrecondition{}
+	for _, name := range names {
+		body, condition, err := artifactset.InspectRemovalCandidate(outdir, name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		inspected[name], conditions[name] = body, condition
+	}
+	for _, name := range names {
+		body, exists := inspected[name]
+		if !exists || bytes.Equal(body, files[name]) {
+			continue
+		}
+		switch filepath.Ext(name) {
+		case ".tla":
+			owner, generated, err := canonicalTLAOwner(name, body)
+			if err != nil {
+				return nil, err
+			}
+			if !generated || owner != machineSource {
+				return nil, fmt.Errorf("tla_gen: refusing to replace foreign or manual artifact %s", name)
+			}
+		case ".cfg":
+			anchor := strings.TrimSuffix(name, ".cfg") + ".tla"
+			anchorBody, ok := inspected[anchor]
+			if !ok || !canonicalTLAConfig(body) {
+				return nil, fmt.Errorf("tla_gen: refusing to replace unowned config %s", name)
+			}
+			owner, generated, err := canonicalTLAOwner(anchor, anchorBody)
+			if err != nil || !generated || owner != machineSource {
+				return nil, fmt.Errorf("tla_gen: refusing to replace config %s without a same-owner generated module", name)
+			}
+		}
+	}
+	out := make([]artifactset.RemovalPrecondition, 0, len(conditions))
+	for _, name := range names {
+		if condition, ok := conditions[name]; ok {
+			out = append(out, condition)
+		}
+	}
+	return out, nil
+}
+
+func staleOwnedTLAArtifacts(outdir, machineDir string, keep map[string][]byte) ([]artifactset.RemovalPrecondition, error) {
+	entries, err := os.ReadDir(outdir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var stale []artifactset.RemovalPrecondition
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".tla") {
+			continue
+		}
+		if _, current := keep[name]; current {
+			continue
+		}
+		body, condition, err := artifactset.InspectRemovalCandidate(outdir, name)
+		if err != nil {
+			return nil, err
+		}
+		source, generated, headerErr := canonicalTLAOwner(name, body)
+		if headerErr != nil {
+			return nil, headerErr
+		}
+		if !generated {
+			continue
+		}
+		if _, err := os.Lstat(filepath.Join(machineDir, source)); err == nil {
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		stale = append(stale, condition)
+		cfg := strings.TrimSuffix(name, ".tla") + ".cfg"
+		if _, kept := keep[cfg]; !kept {
+			_, cfgCondition, err := artifactset.InspectRemovalCandidate(outdir, cfg)
+			if err == nil {
+				stale = append(stale, cfgCondition)
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return nil, err
+			}
+		}
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".cfg") {
+			continue
+		}
+		if _, current := keep[name]; current {
+			continue
+		}
+		anchor := strings.TrimSuffix(name, ".cfg") + ".tla"
+		if _, err := os.Lstat(filepath.Join(outdir, anchor)); err == nil {
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		body, condition, err := artifactset.InspectRemovalCandidate(outdir, name)
+		if err != nil {
+			return nil, err
+		}
+		if !canonicalTLAConfig(body) {
+			continue
+		}
+		source := strings.TrimSuffix(name, ".cfg") + ".machine.json"
+		if _, err := os.Lstat(filepath.Join(machineDir, source)); err == nil {
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		stale = append(stale, condition)
+	}
+	sort.Slice(stale, func(i, j int) bool { return stale[i].Name < stale[j].Name })
+	return stale, nil
+}
+
+func canonicalTLAConfig(body []byte) bool {
+	lines := strings.Split(strings.TrimSuffix(string(body), "\n"), "\n")
+	if len(lines) != 4 && len(lines) != 5 {
+		return false
+	}
+	if !strings.HasPrefix(lines[0], `\* machinery-version: `) || lines[1] == "" || !strings.HasPrefix(lines[1], "CONSTANT MaxRetries = ") ||
+		lines[2] != "SPECIFICATION Spec" || lines[3] != "INVARIANT TypeOK" {
+		return false
+	}
+	if _, err := strconv.Atoi(strings.TrimPrefix(lines[1], "CONSTANT MaxRetries = ")); err != nil {
+		return false
+	}
+	return len(lines) == 4 || lines[4] == "PROPERTY Live_OverlayResolves"
+}
+
+func canonicalTLAOwner(name string, body []byte) (string, bool, error) {
+	lines := bytes.SplitN(body, []byte("\n"), 6)
+	module := strings.TrimSuffix(name, ".tla")
+	if len(lines) < 5 || string(lines[0]) != "---- MODULE "+module+" ----" ||
+		!bytes.HasPrefix(lines[1], []byte(`\* machinery-version: `)) || string(lines[2]) != "EXTENDS Naturals" || len(lines[3]) != 0 {
+		return "", false, nil
+	}
+	const prefix = `\* Generated from `
+	const suffix = ` by machinery tla. Control-flow model.`
+	header := string(lines[4])
+	if !strings.HasPrefix(header, prefix) || !strings.HasSuffix(header, suffix) {
+		return "", false, nil
+	}
+	source := strings.TrimSuffix(strings.TrimPrefix(header, prefix), suffix)
+	if filepath.Base(source) != source || !strings.HasSuffix(source, ".machine.json") {
+		return "", true, fmt.Errorf("tla_gen: generated artifact %s has invalid source-ownership header", name)
+	}
+	if err := portablepath.ValidateBase(source); err != nil {
+		return "", true, fmt.Errorf("tla_gen: generated artifact %s has non-portable source owner: %w", name, err)
+	}
+	if strings.TrimSuffix(source, ".machine.json") != module {
+		return "", true, fmt.Errorf("tla_gen: generated artifact %s module does not match source owner %s", name, source)
+	}
+	return source, true, nil
 }

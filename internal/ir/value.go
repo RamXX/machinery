@@ -262,6 +262,23 @@ func LoadMachineJSON(path string) (*Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %w", path, err)
 	}
+	return LoadMachineJSONBytes(path, data)
+}
+
+// LoadMachineJSONReader parses a machine from r while preserving JSON object
+// key order. source is used only in diagnostics, so callers that already hold
+// a confined file handle do not need to reopen its ambient filesystem path.
+func LoadMachineJSONReader(source string, r io.Reader) (*Value, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read %s: %w", source, err)
+	}
+	return LoadMachineJSONBytes(source, data)
+}
+
+// LoadMachineJSONBytes parses a machine from data while preserving JSON object
+// key order and the same source-labelled diagnostics as LoadMachineJSON.
+func LoadMachineJSONBytes(source string, data []byte) (*Value, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	v, derr := orderedDecode(dec)
@@ -270,15 +287,15 @@ func LoadMachineJSON(path string) (*Value, error) {
 		var se *json.SyntaxError
 		if errors.As(derr, &se) {
 			line := 1 + bytes.Count(data[:se.Offset], []byte("\n"))
-			return nil, fmt.Errorf("invalid JSON in %s: line %d: %s", path, line, se.Error())
+			return nil, fmt.Errorf("invalid JSON in %s: line %d: %s", source, line, se.Error())
 		}
-		return nil, fmt.Errorf("invalid JSON in %s: %w", path, derr)
+		return nil, fmt.Errorf("invalid JSON in %s: %w", source, derr)
 	}
 	// reject trailing content after the first value (json.load "Extra data")
 	if t, err := dec.Token(); err == nil {
-		return nil, fmt.Errorf("invalid JSON in %s: extra data after the machine object (%v)", path, t)
+		return nil, fmt.Errorf("invalid JSON in %s: extra data after the machine object (%v)", source, t)
 	} else if !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("invalid JSON in %s: extra data after the machine object", path)
+		return nil, fmt.Errorf("invalid JSON in %s: extra data after the machine object", source)
 	}
 	return v, nil
 }

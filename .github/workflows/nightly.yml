@@ -17,23 +17,27 @@ jobs:
   # artifact is stale or a generator drifted.
   regen-clean-tree:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
+      - name: Install Modelith v0.4.0 (pinned)
+        run: go install github.com/stacklok/modelith/cmd/modelith@v0.4.0
+      - name: Regenerate committed Modelith renders
+        run: make modelith-render
       - name: Regenerate oracles with Go
         run: |
+          set -euo pipefail
           make build
-          for md in examples/go-crm/design/machines examples/surreal-crm/design/machines \
-                    examples/fulfillment/design/machines \
-                    examples/portfolio-engine/design/machines \
-                    examples/checkout-split/orders/design/machines \
-                    examples/checkout-split/payments/design/machines; do
-            .bin/machinery oracle "$md"
+          scripts/example-inventory.sh formal | while IFS= read -r design; do
+            .bin/machinery oracle "$design/machines"
           done
-          .bin/machinery pack generate examples/checkout-split/parent/design
+          scripts/example-inventory.sh pack-parents | while IFS= read -r design; do
+            .bin/machinery pack generate "$design"
+          done
       # verify-formal --gen-only runs the exact generator orchestration the
       # checked run uses (tla + refine + compose, coordinator parsed as YAML),
       # with TLC skipped so this job stays Java-free. The previous shell
@@ -41,20 +45,20 @@ jobs:
       # single-sourcing it in the binary is the fix.
       - name: Regenerate formal specs with Go
         run: |
-          for d in examples/go-crm/design examples/surreal-crm/design \
-                   examples/fulfillment/design \
-                   examples/portfolio-engine/design \
-                   examples/checkout-split/orders/design \
-                   examples/checkout-split/payments/design; do
+          set -euo pipefail
+          scripts/example-inventory.sh formal | while IFS= read -r d; do
             .bin/machinery verify-formal --gen-only "$d" || exit 1
           done
       - name: Regenerate pack refinement proofs with Go
         run: |
-          .bin/machinery pack refine examples/checkout-split/orders/design
-          .bin/machinery pack refine examples/checkout-split/payments/design
+          set -euo pipefail
+          scripts/example-inventory.sh pack-children | while IFS=$'\t' read -r design parent; do
+            test -n "$parent"
+            .bin/machinery pack refine "$design"
+          done
       - name: Assert clean tree
         run: |
-          status=$(git status --porcelain)
+          status=$(go run ./scripts/git-safe -root . -- status --porcelain)
           if [ -n "$status" ]; then
             echo "$status"
             echo "::error::regeneration dirtied the tree (a stale tracked artifact or a newly emitted file)"
@@ -90,7 +94,12 @@ jobs:
       - run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
           govulncheck ./...
-      - working-directory: examples/go-crm/impl
+      - name: Registered example implementation vulnerability scans
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
-          govulncheck ./...
+          set -euo pipefail
+          scripts/example-inventory.sh security | while IFS=$'\t' read -r impl module; do
+            case "$module" in
+              go) (cd "$impl" && govulncheck ./...) ;;
+              *) echo "::error::unsupported security module type $module: $impl"; exit 1 ;;
+            esac
+          done

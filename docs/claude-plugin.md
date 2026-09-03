@@ -43,24 +43,31 @@ refresh; update reports that as a warning with the command an administrator can 
 
 ## When the hooks act, and when they are a no-op
 
-Every hook routes through one shim, `hooks/machinery-hook.sh`, whose first act is detection:
+Every hook routes through `hooks/machinery-hook.sh`. When the binary is available, the shim always
+dispatches and the Go hook determines whether the project is managed. This lets a Post or Stop event
+recover the immutable route and project-wide dirty obligation recorded before a shell command, even
+if that command deleted both mutable project markers. A genuinely unmanaged project still produces
+no output.
 
-- the project root has a `.machinery.json`, or
-- the conventional `design/domain.modelith.yaml` exists.
-
-If neither holds, the shim exits 0 before reading stdin or looking for the binary. A non-machinery
-repository never sees output, never pays more than two file stats, and never conflicts with other
-plugins. If the project is managed but the binary is missing, the shim warns on stderr and still
-exits 0: governance degrades loudly to absent, it never breaks a session.
+When the binary is unavailable, the shim searches the physical working directory and every real
+ancestor for `.machinery.json` or `design/domain.modelith.yaml`. It exits silently only when that
+entire path is unmanaged. A marker found at any ancestor blocks with exit 2; missing `HOME` does not
+change either result. A failing binary also blocks, because version skew or broken durable state
+must never silently remove governance.
 
 ## What the hooks enforce
 
 | Event | Behavior |
 |---|---|
 | SessionStart | Injects the governance contract into context: design dir, staged gates, the read-only artifact list, and `design/STATE.md` (the session ledger) when present. Every session in the repo knows the rules, whether or not the skill ever triggers. |
-| PreToolUse | Denies Edit/Write/MultiEdit/NotebookEdit on generated artifacts: `<design>/**/*.oracle.md`, `<design>/formal/*.tla`, `*.cfg` and `*.als`, `<design>/packs/**` (generated packs), `<design>/pack/**` (the frozen pack a child was built against), `<design>/ratchet.json` (the baseline snapshot), and `.machinery.json` itself (an agent edit there could switch governance off or reroute the gates; a human maintains it). Also denies creating or editing the wave sentinel `.machinery-wave` anywhere in the repository: it is operator-created, and an agent that could touch it would defer its own stop gates indefinitely (deleting it, which closes the wave, stays allowed, but the exemption is per operation: a patch that deletes and re-creates the sentinel in the same call is denied for the re-creation). The refusal names the regeneration command. |
-| PostToolUse | Silently records that the session touched the design (or watched sources, when `impl` is configured). No gates run mid-edit; authoring stays fluid. |
-| Stop / SubagentStop | If the session touched anything watched, runs `machinery check` (in-process; same suite semantics as the CLI). DRIFT findings block the stop with the gate output as the reason; the model fixes and the check re-runs. G4 import-boundary findings block only when they are ARMED: `<design>/ratchet.json` exists, written by `machinery baseline`. Before that snapshot exists, import findings warn with the arming instruction instead of blocking, because blocking a session on pre-existing boundary debt it did not create invites the model to "fix" the debt by adding allow rules, which is silent amnesty. Plain ERRORs only warn, because a half-built design is a normal interrogation state. After one blocked-and-continued attempt, the hook warns instead of blocking again, so it can never loop. While a fresh wave sentinel exists (`<design>/.machinery-wave`; TTL in minutes on its first line, default 45, capped at 240), red gates surface as a message instead of blocking, and the touched state is kept so deleting the sentinel closes the wave and the next stop gates normally; a stale sentinel is reported and ignored. The operator opens and extends the sentinel; PreToolUse denies agent file-tool writes to it. |
+| PreToolUse | Denies file or shell operations that name generated artifacts: `<design>/**/*.oracle.md`, `<design>/formal/*.tla`, `*.cfg` and `*.als`, `<design>/packs/**` (generated packs), `<design>/pack/**` (the frozen pack a child was built against), `<design>/ratchet.json` (the baseline snapshot), and `.machinery.json` itself (an agent edit there could switch governance off or reroute the gates; a human maintains it). Also denies creating or editing the wave sentinel `.machinery-wave` anywhere in the repository. Before an allowed operation starts, it durably records an exact `tool_use_id` token and the immutable session route. Shell commands conservatively arm both the design and configured implementation obligations because their dynamically computed targets cannot be reconstructed from command text. The refusal names the regeneration command. |
+| PostToolUse / PostToolUseFailure | Durably closes only the matching `tool_use_id` while retaining the project-wide design or implementation obligation. Success and failure are both terminal tool events; neither runs gates mid-edit. A missing terminal event leaves the token in flight and Stop cannot discharge it. |
+| Stop / SubagentStop | Refuses to discharge while an exact tool token or host-reported background task remains. Otherwise, if the project touched anything watched, runs `machinery check` (in-process; same suite semantics as the CLI). DRIFT findings block the stop with the gate output as the reason; the model fixes and the check re-runs. G4 import-boundary findings block only when they are ARMED: `<design>/ratchet.json` exists, written by `machinery baseline`. Before that snapshot exists, import findings warn with the arming instruction instead of blocking, because blocking a session on pre-existing boundary debt it did not create invites the model to "fix" the debt by adding allow rules, which is silent amnesty. Plain ERRORs only warn, because a half-built design is a normal interrogation state. The exact canonical wave sentinel content `open` defers red gates as a message while retaining the obligation; deleting it closes the wave, and malformed sentinel state gates normally with a diagnostic. No clock, mtime, or host identity participates in that decision. |
+
+The durable store records its own first initialization in a private home-rooted location outside the
+configuration and state parent. Its first creation is safe and silent. If the state parent later
+disappears, every managed event fails closed instead of recreating an empty store; a crash or cleanup
+therefore cannot erase outstanding work.
 
 Gate selection at stop time is progressive when no staged list is configured: Gm once
 `migration.yaml` exists (rebuild/hybrid transition contract; see the
@@ -88,14 +95,12 @@ Ga is the same shape: the hook runs it, but never binds a commit, because mid-tu
 review ran on does not exist yet. The gate says so on its own note line, and CI (which passes
 `--commit`) is where that binding is actually held.
 
-What the hooks deliberately do not do: they cannot make the interrogation good, they do not check
-guard semantics, and a `sed` through the Bash tool can still touch an oracle; that lands as DRIFT
-at the next stop. The PreToolUse wall guards the FILE tools only: Bash can still bypass it
-entirely, for example `rm .machinery.json` (governance off) or a `machinery baseline` rerun that
-accepts current debt. Oracle tampering through Bash surfaces as DRIFT at the next stop;
-config removal and baseline reruns do not, so those two stay review items (watch `.machinery.json`
-and `ratchet.json` in PR diffs). Users can disable hooks; the consuming repo's CI `machinery
-check` remains the
+What the hooks deliberately do not do: they cannot make the interrogation good and they do not check
+guard semantics. PreToolUse rejects shell commands that visibly name protected targets, but shell
+syntax can assemble paths dynamically. Every allowed shell operation is therefore armed before it
+runs; an unobserved mutation cannot become an untouched Stop, and generated-artifact changes still
+surface as DRIFT. Users can disable hooks only through a valid operator-owned configuration; the
+consuming repo's CI `machinery check` remains the
 non-negotiable backstop (see the [brownfield team guide](brownfield-team-guide.md)).
 
 ## `.machinery.json`
@@ -157,16 +162,19 @@ loudly, it does not silently disable governance.
   source, which is how the plugin reuses `skills/` and `agents/` without copies.
 - `.codex-plugin/plugin.json`: the Codex manifest; it points at the same `skills/`, while Codex
   discovers the same `hooks/hooks.json` by convention.
-- `hooks/hooks.json` + `hooks/machinery-hook.sh`: every event, one shared Claude/Codex shim,
-  detection first. The shim uses `CLAUDE_PROJECT_DIR` when present and Git-root discovery otherwise.
+- `hooks/hooks.json` + `hooks/machinery-hook.sh`: every event, one shared Claude/Codex shim. The shim
+  uses `CLAUDE_PROJECT_DIR` when present and otherwise passes its physical working directory to the
+  Go hook, which ascends real parents to the nearest marker or durable dirty project identity without
+  consulting ambient Git. If the binary is missing, the shim performs the ancestor marker search
+  itself and fails closed for a managed ancestor.
 - `commands/*.md`: the four commands.
 - `adapters/opencode/`: native OpenCode command wrappers and the event translator; the gate logic is
   not duplicated there.
 - The hook logic itself is `machinery hook` (hidden subcommand, `internal/hook`), so it is
   versioned, tested (`internal/hook/hook_test.go`, including a regression net over `hooks.json`
   and the manifests), and shares the exact gate-suite semantics with `machinery check` through
-  `internal/gates.Select` / `RunSelected`. The shim maps any binary failure to a warning plus
-  exit 0, so a plugin newer than the binary degrades to no governance instead of breaking tools.
+  `internal/gates.Select` / `RunSelected`. A missing or failing binary in a managed project blocks
+  with a nonzero exit so a broken guard cannot silently become no governance.
 
 Hooks load at session start: after installing or upgrading the plugin, restart the Claude Code
 session in the project.

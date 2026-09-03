@@ -99,7 +99,7 @@ func namedUnitCols(header []string) (name, kind, prepost int, ok bool) {
 // vocabulary nor a single-clause waiver.
 func checkClauseCompleteness(g *Gate, design string) {
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
-		body, ok := readTextOK(path)
+		body, ok := readTextOK(design, path)
 		if !ok {
 			continue
 		}

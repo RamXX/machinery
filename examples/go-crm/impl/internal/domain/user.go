@@ -164,6 +164,10 @@ func (u *User) fireRolledBack(evt UserEvent) Effect {
 		u.State = USActive
 	case u.priorIsDisabled():
 		u.State = USDisabled
+	default:
+		u.recordRoutingError()
+		u.State = USDisabled
+		return effect("recordRoutingError")
 	}
 	return Effect{}
 }

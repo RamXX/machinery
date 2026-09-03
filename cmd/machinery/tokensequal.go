@@ -8,8 +8,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -21,24 +22,40 @@ func newTokensEqualCmd() *cobra.Command {
 		Short: "Prove two files are formatting-only variants (equal whitespace-delimited token streams)",
 		Args:  cobra.ExactArgs(2),
 	}
-	c.RunE = func(cmd *cobra.Command, args []string) error {
-		return tokensEqualRun(args[0], args[1])
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		return tokensEqualRunTo(args[0], args[1], output.stdout, output.stderr)
 	}
 	return c
 }
 
 func tokensEqualRun(oldPath, newPath string) error {
-	oldBody, err := os.ReadFile(oldPath)
+	return tokensEqualRunTo(oldPath, newPath, stdoutW, stderrW)
+}
+
+func tokensEqualRunTo(oldPath, newPath string, stdoutW, stderrW io.Writer) error {
+	oldFile, err := openStableRegular(oldPath)
 	if err != nil {
 		fmt.Fprintln(stderrW, "tokens-equal:", err)
-		exitFunc(1)
-		return err
+		return commandExitBecause(1, err)
 	}
-	newBody, err := os.ReadFile(newPath)
+	newFile, err := openStableRegular(newPath)
 	if err != nil {
+		err = errors.Join(err, oldFile.close())
 		fmt.Fprintln(stderrW, "tokens-equal:", err)
-		exitFunc(1)
-		return err
+		return commandExitBecause(1, err)
+	}
+	oldBody, oldReadErr := oldFile.read()
+	newBody, newReadErr := newFile.read()
+	stableRegularAfterInitialRead(oldPath)
+	stableRegularAfterInitialRead(newPath)
+	oldValidateErr := oldFile.revalidate(oldBody)
+	newValidateErr := newFile.revalidate(newBody)
+	closeErr := errors.Join(oldFile.close(), newFile.close())
+	if err := errors.Join(oldReadErr, newReadErr, oldValidateErr, newValidateErr, closeErr); err != nil {
+		fmt.Fprintln(stderrW, "tokens-equal:", err)
+		return commandExitBecause(1, err)
 	}
 	oldToks := strings.Fields(string(oldBody))
 	newToks := strings.Fields(string(newBody))
@@ -47,8 +64,7 @@ func tokensEqualRun(oldPath, newPath string) error {
 		if oldToks[i] != newToks[i] {
 			fmt.Fprintf(stdoutW, "NOT token-identical: token %d differs: %q vs %q (context: %s | %s)\n",
 				i+1, oldToks[i], newToks[i], tokenContext(oldToks, i), tokenContext(newToks, i))
-			exitFunc(1)
-			return fmt.Errorf("token %d differs", i+1)
+			return commandExitBecause(1, fmt.Errorf("token %d differs", i+1))
 		}
 	}
 	if len(oldToks) != len(newToks) {
@@ -59,8 +75,7 @@ func tokensEqualRun(oldPath, newPath string) error {
 		}
 		fmt.Fprintf(stdoutW, "NOT token-identical: %s carries %d extra token(s) from token %d (%s)\n",
 			which, len(longer)-limit, at+1, tokenContext(longer, at))
-		exitFunc(1)
-		return fmt.Errorf("token counts differ: %d vs %d", len(oldToks), len(newToks))
+		return commandExitBecause(1, fmt.Errorf("token counts differ: %d vs %d", len(oldToks), len(newToks)))
 	}
 	fmt.Fprintf(stdoutW, "token-identical: %d tokens; the change is formatting-only\n", len(oldToks))
 	return nil

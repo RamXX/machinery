@@ -31,24 +31,23 @@ Design decisions for the Drawdown Portfolio Recommender, and how it exercises th
 ## Phase 3 and the formal layer (exercising the fixes)
 
 - Q: Which machines? A: RecommendationRun (lifecycle), Portfolio (lifecycle), MarketDataFeed
-  (operational). Index/Security/CandidateSet/Holding/Optimizer are pure data or pure transforms,
-  waived.
-- Q: Portfolio persist-overlay names? A: committing / commitRetry / reverted, NOT the
+  (operational), and ReferenceDataCommand (short-lived operational envelope). Index, Security,
+  CandidateSet, and Holding have no entity lifecycle; the optimizer remains a pure transform.
+- Q: Portfolio persist-overlay names? A: committing / commitRetry / reverted, with routingFault as
+  the explicit corrupt-rollback terminal, NOT the
   persisting/persistRetry/rolledBack defaults. Why: to prove the linear-lifecycle pattern reads its
   overlay names from the annotation (fix #1); the default names never appear in this design.
 - Q: How is the run pipeline proved formally? A: the new terminal-lifecycle pattern
   (RecommendationRun.semantics.yaml), proving completeness (a Ready run has its portfolio),
   terminal absorption, and termination. Why: the run is a forward pipeline, not a win/lose/reopen
   lifecycle; this is the pattern added to fix the lumpy-coverage finding.
-- Q: Where is _exhaustive used, and where avoided? A: RecommendationRun's collectRetry and the
-  MarketDataFeed breaker avoid it (after-escape and event-driven transitions, which TLC verifies);
-  only Portfolio's reverted rollback router uses it (its guard set is provably total). Why: to
-  demonstrate the preferred fallback pattern and confine _exhaustive to a genuinely-total case; G3
-  surfaces the one remaining use as a warn (fix #3).
-- Q: Which invariants are machine-enforced vs attested? A: 6 unit-backed (run-ready-has-portfolio,
-  portfolio-accept-role, portfolio-reopen-role, portfolio-accepted-has-date, portfolio-review-forward,
-  feed-circuit-breaks) and 12 attested/structural (the optimizer-output and reference-data rules).
-  Gx now reports the split (fix #2), so "enforced" does not overstate verification.
+- Q: Where is _exhaustive used, and where avoided? A: It is avoided throughout. Portfolio's
+  rollback router has an unguarded fallback to routingFault, so liveness remains sound after TLA+
+  guard erasure; RecommendationRun and MarketDataFeed resolve through ordinary event/timer paths.
+- Q: Which invariants are machine-enforced vs deliberately waived? A: 13 are unit-backed through
+  guards, actions, or actors; 5 optimizer-output structural properties remain explicitly waived in
+  `formal/waivers.yaml` and held to named property tests. Gx reports the split without counting
+  prose as enforcement.
 
 ## Retrofit (2026-07-22, documentation maintenance, no interrogation)
 
@@ -70,3 +69,17 @@ formal artifacts are untouched.
   oracle references by stable id, and DoD-bearing milestones. Rationale: gives Gb-plan's per-shard
   checks a worked corpus in the examples; the milestone content is the former sections 5, 7.1, 7.2,
   and 13, redistributed without behavioral change.
+
+## Production determinism hardening (2026-09-02)
+
+- 2026-09-02 Codex: `Holding.set` is system-owned because the optimizer commits holdings; it is not
+  a manual Analyst act. Every remaining human action has one concrete CLI surface in
+  `surfaces.yaml`, reconciled to the build milestones.
+- 2026-09-02 Codex: Reference-data effects use a per-command operational envelope with explicit
+  error, timeout, cancellation, and DuckDB rollback outcomes. The actors remain deterministic
+  invariant-carrying units, not synthetic entity lifecycles.
+- 2026-09-02 Codex: Portfolio rollback routing uses a real routingFault fallback. The linear
+  refinement carries that optional fault terminal and an explicit stutter action, so neither G3
+  liveness nor TLC depends on an unproved total-guard assertion.
+- 2026-09-02 Codex: All twelve judgment claims are committed in `attestations.yaml` and bound to
+  the exact architecture, behavior, matrix, and build bytes reviewed in this hardening pass.

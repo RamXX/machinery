@@ -74,7 +74,7 @@ func CheckSurface(design string) *Gate {
 		g.Errs = append(g.Errs, "no "+SurfaceLedgerName+" in the design; the surface gate was requested but no legacy surface ledger was authored")
 		return g
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := readDesignFile(design, path)
 	if err != nil {
 		g.Errs = append(g.Errs, err.Error())
 		return g
@@ -89,7 +89,7 @@ func CheckSurface(design string) *Gate {
 	if len(g.Errs) != 0 {
 		return g
 	}
-	v.model, err = readSurfaceTargetModel(filepath.Join(design, "domain.modelith.yaml"))
+	v.model, err = readSurfaceTargetModel(design, filepath.Join(design, "domain.modelith.yaml"))
 	if err != nil {
 		v.errf("domain.modelith.yaml: %v; covered bindings resolve against the Phase 1 target model", err)
 		return g
@@ -97,7 +97,7 @@ func CheckSurface(design string) *Gate {
 	dslPath := filepath.Join(design, "workspace.dsl")
 	if fi, statErr := os.Stat(dslPath); statErr == nil && !fi.IsDir() {
 		v.dslExists = true
-		v.dslEls = dslElements(dslPath, g)
+		v.dslEls = dslElements(design, dslPath, g)
 	}
 	v.validateClasses()
 	v.g.Count("covered", v.covered)
@@ -330,8 +330,8 @@ func (v *surfaceValidator) resolveBinding(where, name, via, target string) bool 
 	return true
 }
 
-func readSurfaceTargetModel(path string) (surfaceTargetModel, error) {
-	raw, err := os.ReadFile(path)
+func readSurfaceTargetModel(design, path string) (surfaceTargetModel, error) {
+	raw, err := readDesignFile(design, path)
 	if err != nil {
 		return surfaceTargetModel{}, err
 	}

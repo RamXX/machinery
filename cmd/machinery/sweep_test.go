@@ -84,3 +84,29 @@ func TestSweepContext(t *testing.T) {
 		}
 	}
 }
+
+func TestSweepRejectsMutationAndSymlinkInventory(t *testing.T) {
+	d := t.TempDir()
+	writeSweepFile(t, d, "BUILD.md", "guardFoo\n")
+	prior := designReaderAfterSnapshot
+	defer func() { designReaderAfterSnapshot = prior }()
+	designReaderAfterSnapshot = func() {
+		if err := os.WriteFile(filepath.Join(d, "BUILD.md"), []byte("changed\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := sweepRun("guardFoo", d, 0); err == nil || !strings.Contains(err.Error(), "design changed outside the snapshot lock") {
+		t.Fatalf("sweep hid paused mutation: %v", err)
+	}
+	designReaderAfterSnapshot = prior
+	outside := filepath.Join(t.TempDir(), "outside.md")
+	if err := os.WriteFile(outside, []byte("guardFoo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(d, "linked.md")); err != nil {
+		t.Fatal(err)
+	}
+	if err := sweepRun("guardFoo", d, 0); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("sweep accepted symlink inventory: %v", err)
+	}
+}

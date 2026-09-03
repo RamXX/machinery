@@ -4,6 +4,9 @@
 == Gs-surface  legacy surface ledger ==
   checked: 13 commands, 5 tables, 17 covered, 1 dropped, 4 waived classes, 18 surface items, as_of 2026-07-22
   ok
+== Gu-surfaces  target surface ledger ==
+  checked: 35 obligated actions, 35 covered, 0 deferred acts, 0 deferred personas, 0 knob rows, 0 actorless actions, 0 milestone references resolved
+  ok
 == Gp-policy static relational model ==
   checked: 4 roles, 5 resources, 4 policy rules, 1 residuals (waived with reason), 12 invariants carried, 14 solver commands generated, 70 authz oracle rows generated, 2 committed artifacts fresh (byte-identical)
   ok
@@ -19,64 +22,34 @@
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 6 boundaries, 1 externals, 12 allow rules, 16 transitive pairs, 2 deny rules, 5 boundaries with exposes, 14 dsl elements, 14 drawn relationships, 5 drawn edges outside the contract vocabulary, 9 drawn edges verified, 6 boundaries bound to dsl, 6 mitigation rows, 3 dependencies with mitigation rows, 3 nfr topics recorded, 2 adoption rows, 1 closure members with mitigation rows, 2 scorecard entries, 1 closures waived, 9 action-ownership rows, 35 actions owned, 12 edges contracted
+  checked: 6 boundaries, 2 externals, 13 allow rules, 18 transitive pairs, 2 deny rules, 5 boundaries with exposes, 14 dsl elements, 14 drawn relationships, 5 drawn edges outside the contract vocabulary, 9 drawn edges verified, 6 boundaries bound to dsl, 7 mitigation rows, 4 dependencies with mitigation rows, 3 nfr topics recorded, 2 adoption rows, 1 closure members with mitigation rows, 2 scorecard entries, 1 closures waived, 9 action-ownership rows, 35 actions owned, 13 edges contracted
   ok
 == G3-machine  machines + oracle ==
-  warn   CommandExecution.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
-  warn   Deal.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
-  warn   Deal.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
-  warn   Session.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
-  warn   Task.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
-  warn   Task.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
-  warn   User.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
-  warn   User.machine.json: liveness for rolledBack rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
-  note   Deal.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: priorStage is set by every setPending* action to the current domain state, which is one of the six DealStage values; the six priorIs* guards cover DealStage totally
-  note   Task.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: only Open and InProgress have transitions into the persist overlay, so priorStatus ranges over {Open, InProgress}; both priorIs* guards are present
-  note   User.machine.json: state rolledBack always-list is fully guarded; liveness rests on the declared exhaustiveness: both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present
-  checked: 5 machines, 194 transitions, 5 tla-generable, 5 oracles fresh, 194 matrix rows reconciled, 186 named units covered, 3 states relying on unproven _exhaustive liveness
+  checked: 5 machines, 197 transitions, 5 tla-generable, 5 oracles fresh, 197 matrix rows reconciled, 186 named units covered
+  ok
 == Gd-idcite  design-side stable-id citations ==
-  warn   BUILD.md:703: T-SESS-05 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:703: T-SESS-08 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:710: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:711: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:712: T-DEAL-30 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:713: T-DEAL-03 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:718: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:719: T-TASK-16 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:720: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:723: T-USER-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:726: T-DEAL-28 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:726: T-TASK-07 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:727: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:954: T-SESS-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:954: T-DEAL-01 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:1127: T-SESS-35 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   BUILD.md:1129: T-SESS-23 is a positional row citation; rows renumber, so cite the stable id instead
-  warn   machines/Deal.matrix.md:13: guard `guardCanAdvance` states a compound contract ('and' in 'true iff pendingStage is the next forward stage AND actor may write AND amountCents>=0') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
-  warn   machines/Deal.matrix.md:14: guard `guardCanWin` states a compound contract ('and' in 'true iff evt supplies a closeDate AND actor may write AND amountCents>=0') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
-  warn   machines/Deal.matrix.md:15: guard `guardCanLose` states a compound contract ('and' in 'true iff actor may write AND amountCents>=0') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
-  warn   machines/Task.matrix.md:14: guard `guardCanComplete` states a compound contract ('and' in 'true iff source is non-terminal AND actor may write') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
-  warn   machines/Task.matrix.md:15: guard `guardCanCancel` states a compound contract ('and' in 'true iff source is non-terminal AND actor may write') and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
-  warn   machines/Task.matrix.md:16: guard `guardCanReassign` states a compound contract ('and' in "true iff new assignee is inside the assigner's VisibilityScope AND actor is Manager/Admin ...") and declares no CLAUSES{...}; declare the clause vocabulary so every enumeration of it is held to one list, or waive with '(single-clause: <reason>)'
-  checked: 2 citations resolved, 24 files scanned, 272 committed oracle ids, 31 guard rows read for clause completeness
+  checked: 98 citations resolved, 29 files scanned, 275 committed oracle ids, 6 guards with clause declarations, 31 guard rows read for clause completeness, 6 guard rows with a clause declaration
+  ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 24 files style-scanned
+  checked: 29 files style-scanned
   ok
 == Gx-trace  cross-layer traceability ==
-  warn   invariant 'activity-immutable' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
-  warn   invariant 'deal-terminal' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
   note   Deal: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   Task: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
-  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 5 placement rows with machines, 2 placement rows waived, 9 entities placed, 6 mitigation rows with residual handlers, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 2 invariants attested only (prose), 13 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
+  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 3 lifecycle semantics annotations, 2 control-flow-only semantics, 5 placement rows with machines, 2 placement rows waived, 9 entities placed, 6 mitigation rows with residual handlers, 1 residual handlers waived, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 27 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 15 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
+  ok
 == Gb-plan  build plan structure ==
-  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 2 skeleton citations
+  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 14 skeleton citations
+  ok
+== Gv-attest  attestation evidence ==
+  checked: 48 covered artifacts current, 12 attested claims, 12 claims owed
   ok
 == G4-import  code respects the contract ==
-  checked: 2 dirs pruned by contract ignore, 16 go files checked, 21 imports resolved, 14 test files skipped, 12 edges verified
+  checked: 2 dirs pruned by contract ignore, 16 go files checked, 22 imports resolved, 14 test files skipped, 13 edges verified
   ok
 == Gt-tests  oracle ids in the test suite ==
-  checked: 14 test files scanned, 5 machines, 272 oracle rows, 194 ids covered by literal, 2 formal oracles, 2 formal oracles covered
+  checked: 14 test files scanned, 5 machines, 275 oracle rows, 197 ids covered by literal, 2 formal oracles, 2 formal oracles covered, 6 clause-declared guards checked, 36 falsifying-clause ids covered
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

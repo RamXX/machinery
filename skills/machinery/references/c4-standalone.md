@@ -140,6 +140,14 @@ After authoring, always validate the DSL compiles and exports before committing.
 `machinery verify-c4 <design>` runs exactly this as the C4 engine phase (exit 0 iff the export
 succeeds; `MACHINERY_STRUCTURIZR_CLI` overrides the binary lookup); the raw commands:
 
+The engine phase deliberately accepts a closed deterministic subset of Structurizr DSL. Local
+`!include` files are allowed only as regular files inside the retained design workspace and are
+followed recursively before the engine starts. Remote URLs, `workspace extends`, executable or
+dynamically discovered `!script`, `!plugin`, and `!components` directives, and custom
+`!impliedRelationships` strategies are rejected. Commit the complete local include closure. A
+successful exporter must also be silent: any warning or other process output is blocking, so a
+tool upgrade cannot quietly reinterpret an otherwise green design.
+
 ```bash
 # Validate + export to Mermaid (renders inline in GitHub README/PRs):
 structurizr-cli export -workspace design/workspace.dsl -format mermaid -output design/diagrams/
@@ -157,7 +165,7 @@ brew install structurizr-cli   # macOS
 # Or: download from https://github.com/structurizr/cli/releases, add to PATH
 ```
 
-Requires Java 17+.
+Requires the checksum-pinned Temurin Java 21.0.12.1+1 runtime.
 
 ## ARCHITECTURE.md must carry the Architecture Contract (v2)
 

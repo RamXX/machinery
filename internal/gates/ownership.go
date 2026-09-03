@@ -12,6 +12,7 @@
 package gates
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -129,6 +130,14 @@ func checkActionOwnership(g *Gate, design, text string, els map[string]dslEl, de
 			owners := mitTokRe.FindAllStringSubmatch(parenAnnotationRe.ReplaceAllString(ownerCell, " "), -1)
 			if len(owners) == 0 {
 				g.Errs = append(g.Errs, "action-ownership row for "+ir.Repr(acts[0])+" names no owning component in backticks and no '(unowned: <reason>)' waiver")
+				continue
+			}
+			if len(owners) != 1 {
+				var names []string
+				for _, m := range owners {
+					names = append(names, "`"+m[1]+"`")
+				}
+				g.Errs = append(g.Errs, "action-ownership row for "+ir.Repr(acts[0])+" names "+fmt.Sprintf("%d", len(owners))+" owning components ("+strings.Join(names, ", ")+"); ownership is singular, so name exactly one owner or one '(unowned: <reason>)' waiver")
 				continue
 			}
 			ok := true

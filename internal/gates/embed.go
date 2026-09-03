@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/ir"
 )
 
@@ -45,27 +46,42 @@ var shardLocalRe = regexp.MustCompile(`\(shard-local:\s*([^)]*)\)`)
 // EmbedActive reports whether any markdown file under design carries an embed
 // marker. Ge is artifact-activated on that, like Gk on a checker manifest.
 func EmbedActive(design string) bool {
-	for _, f := range markdownFiles(design) {
-		if embedMarker.MatchString(readOrEmpty(f)) {
-			return true
+	active, err := probeEmbedActive(design)
+	return active || err != nil // discovery failures activate Ge; the gate blocks
+}
+
+func probeEmbedActive(design string) (bool, error) {
+	files, err := markdownFiles(design)
+	if err != nil {
+		return false, err
+	}
+	active := false
+	for _, f := range files {
+		body, err := readDesignFile(design, f)
+		if err != nil {
+			return false, fmt.Errorf("read markdown %s: %w", relPathOf(f), err)
+		}
+		if embedMarker.Match(body) {
+			active = true
 		}
 	}
-	return false
+	return active, nil
 }
 
 // markdownFiles lists every *.md under design, sorted, so findings come out in
 // a deterministic order whatever the filesystem's walk order is.
-func markdownFiles(design string) []string {
+func markdownFiles(design string) ([]string, error) {
 	var out []string
-	_ = filepath.WalkDir(design, func(path string, d os.DirEntry, err error) error {
+	if err := validateDesignInventory(design); err != nil {
+		return nil, err
+	}
+	err := filepath.WalkDir(design, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			// one unreadable subtree must not hide the markers in its
-			// siblings; the gates that own those files report the read error
-			return nil //nolint:nilerr // keep walking; readFileOrErr reports unreadable files
+			return err
 		}
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
-			rel = path
+			return rerr
 		}
 		if ignoredHere(design, rel) {
 			if d.IsDir() {
@@ -73,13 +89,26 @@ func markdownFiles(design string) []string {
 			}
 			return nil
 		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%s must stay inside the design; symlinks are rejected", filepath.ToSlash(rel))
+		}
 		if !d.IsDir() && strings.HasSuffix(d.Name(), ".md") {
+			info, ierr := d.Info()
+			if ierr != nil {
+				return ierr
+			}
+			if !info.Mode().IsRegular() {
+				return fmt.Errorf("%s must be a regular markdown file", filepath.ToSlash(rel))
+			}
 			out = append(out, path)
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, fmt.Errorf("enumerate markdown under %s: %w", design, err)
+	}
 	sort.Strings(out)
-	return out
+	return out, nil
 }
 
 // embedDirective is one parsed marker plus the table it marks.
@@ -95,8 +124,8 @@ type embedDirective struct {
 // scanEmbeds reads one document and pairs each marker with the table that
 // follows it. The marked table is the next markdown table to START after the
 // marker line: a marker with no table after it is an error, never a no-op.
-func scanEmbeds(path string, g *Gate) []embedDirective {
-	text := readFileOrErr(path, g)
+func scanEmbeds(design, path string, g *Gate) []embedDirective {
+	text := readDesignFileOrErr(design, path, g)
 	if text == "" {
 		return nil
 	}
@@ -205,13 +234,17 @@ func rowMatches(embed, src []string, exempt map[int]bool) bool {
 func CheckEmbeds(design string) *Gate {
 	g := NewGate("Ge-embed  declared-embed fidelity")
 	g.startOrder()
-	files := markdownFiles(design)
+	files, err := markdownFiles(design)
+	if err != nil {
+		g.Errs = append(g.Errs, err.Error())
+		return g
+	}
 	found := false
 	for _, f := range files {
-		for _, d := range scanEmbeds(f, g) {
+		for _, d := range scanEmbeds(design, f, g) {
 			found = true
 			g.Count("embed markers")
-			checkOneEmbed(g, d)
+			checkOneEmbed(g, design, d)
 		}
 	}
 	if !found {
@@ -224,7 +257,7 @@ func CheckEmbeds(design string) *Gate {
 
 // checkOneEmbed verifies one marker: it resolves, its source table is unique,
 // and the two claims hold row by row.
-func checkOneEmbed(g *Gate, d embedDirective) {
+func checkOneEmbed(g *Gate, design string, d embedDirective) {
 	// findings name the marker compactly (file, source, selector): the raw
 	// marker text is precise but too long to read at the head of every line
 	where := relPathOf(d.file) + ": embed of " + d.from + " [" + d.table + "]"
@@ -267,12 +300,17 @@ func checkOneEmbed(g *Gate, d embedDirective) {
 		return
 	}
 	// 3. the source artifact
-	srcPath := filepath.Join(filepath.Dir(d.file), d.from)
-	srcText := readOrEmpty(srcPath)
-	if srcText == "" {
+	srcPath, resolveErr := resolveRetainedDesignReference(design, d.file, d.from)
+	if resolveErr != nil {
+		g.Errs = append(g.Errs, where+": "+resolveErr.Error())
+		return
+	}
+	srcBody, err := readRegularFile(srcPath)
+	if err != nil || len(srcBody) == 0 {
 		g.Errs = append(g.Errs, where+": source "+ir.Repr(d.from)+" does not exist or is empty (resolved to "+srcPath+")")
 		return
 	}
+	srcText := string(srcBody)
 	cols := strings.Split(d.table, ",")
 	var matched []ir.MdTable
 	for _, t := range ir.ParseMdTables(srcText) {
@@ -419,6 +457,33 @@ func checkOneEmbed(g *Gate, d embedDirective) {
 			}
 		}
 	}
+}
+
+// resolveRetainedDesignReference resolves one authored relative reference
+// against the immutable workspace capability MaterializeDesignWorkspace
+// retains. A conventional <workspace>/<component>/design tree may reference
+// sibling components inside <workspace>; no reference may climb above that
+// retained scope or become absolute. This check must happen before any read:
+// joining first and opening an ambient path would make gate results depend on
+// untracked host files outside the design snapshot.
+func resolveRetainedDesignReference(design, referringFile, reference string) (string, error) {
+	if strings.IndexByte(reference, 0) >= 0 {
+		return "", fmt.Errorf("source %s contains NUL", ir.Repr(reference))
+	}
+	native := filepath.FromSlash(reference)
+	if filepath.IsAbs(native) || filepath.VolumeName(native) != "" {
+		return "", fmt.Errorf("source %s must be relative to the retained design workspace", ir.Repr(reference))
+	}
+	scope, err := designlock.RetainedWorkspaceScope(design)
+	if err != nil {
+		return "", err
+	}
+	candidate := filepath.Clean(filepath.Join(filepath.Dir(referringFile), native))
+	rel, err := filepath.Rel(scope, candidate)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("source %s escapes the retained design workspace", ir.Repr(reference))
+	}
+	return candidate, nil
 }
 
 // firstCell names a row in a finding (its key column).

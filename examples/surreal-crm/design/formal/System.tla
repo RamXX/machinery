@@ -1,3 +1,4 @@
+\* machinery:manual
 ---- MODULE System ----
 \* Assume-guarantee composition, the rule that makes the recursion scale. A caller
 \* (the command envelope) drives a deal aggregate that is known ONLY through its

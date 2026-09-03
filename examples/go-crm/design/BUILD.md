@@ -700,31 +700,31 @@ guarantee (`one-default-pipeline`) is called out as a named residual (also secti
 |---|---|---|---|---|
 | `username-unique` | DB-constraint (unique index on `username`) | crm.repo | `Repo.SaveUser` -> ErrConstraint | P-username-unique, C-REPO-17 |
 | `password-hashed` | structural (only argon2id hashes ever written; no action stores plaintext) | crm.session | `Sessions.Login` / `verifyCredentials`, `setCredentials` | P-password-hashed, C-SESS-10 |
-| `disabled-cannot-auth` | machine guard (`guardUserDisabled`; `isErrDisabled`) | crm.session | `Sessions.Login` -> ErrDisabled | T-SESS-05, T-SESS-08, P-disabled-cannot-auth, C-SESS-03 |
+| `disabled-cannot-auth` | machine guard (`guardUserDisabled`; `isErrDisabled`) | crm.session | `Sessions.Login` -> ErrDisabled | SESS-abcf53, SESS-e12d58, P-disabled-cannot-auth, C-SESS-03 |
 | `single-team` | structural (data model: User has at most one Team relationship) | crm.repo / crm.domain | `Repo.SaveUser` (write discipline) | P-single-team |
 | `manager-has-team` | design-time: relational policy model (solver-checked, `formal/Policy.als`); runtime: write discipline in `Repo.SaveUser`/`assignRole` | crm.repo / crm.domain | `Repo.SaveUser`, `assignRole` refuse role Manager with no team | P-manager-has-team (revision: impl predates this invariant) |
 | `team-name-unique` | DB-constraint (unique index on `Team.name`) | crm.repo | `Repo.SaveTeam` -> ErrConstraint | P-team-name-unique, C-REPO-18 |
 | `account-owned` | structural (owner set at create; required n:1) | crm.domain / crm.repo | `Repo.SaveAccount` | P-account-owned |
 | `contact-owned` | structural (owner set at create; required n:1) | crm.domain / crm.repo | `Repo.SaveContact` | P-contact-owned |
 | `deal-owned` | structural (owner set at create; immutable under advance/win/lose/reopen) | crm.domain | `saveDeal` / `Repo.SaveDeal` | P-deal-owned |
-| `deal-amount-nonneg` | machine guard (`guardCanAdvance`/`guardCanWin`/`guardCanLose`) | crm.domain | `saveDeal` | T-DEAL-01..06,10..13,17..20,23..26, P-deal-amount-nonneg |
-| `deal-stage-forward` | machine guard + structural (`guardCanAdvance`; Negotiation no forward; reopen exception) | crm.domain | `saveDeal` | T-DEAL-01,02,08,09,15,16,22,28,33, P-deal-stage-forward |
-| `deal-terminal` | structural (Won/Lost expose only reopen; others rejected) | crm.domain | `saveDeal` | T-DEAL-30,31,32,35,36,37, P-deal-terminal |
-| `deal-won-has-closedate` | machine guard (`guardCanWin`; `commitCloseDate`) | crm.domain | `saveDeal` | T-DEAL-03,04,10,11,17,18,23,24,41, P-deal-won-has-closedate |
+| `deal-amount-nonneg` | machine guard (`guardCanAdvance`/`guardCanWin`/`guardCanLose`) | crm.domain | `saveDeal` | DEAL-eb0c40, DEAL-38ba11, DEAL-1fe825, DEAL-e786d8, DEAL-b76457, DEAL-fdf795, DEAL-492234, DEAL-81d0ab, DEAL-f7d8b2, DEAL-9f48af, DEAL-7e1e9b, DEAL-df4442, DEAL-fde084, DEAL-e16eea, DEAL-38140e, DEAL-3bbe10, DEAL-8fde14, DEAL-b5154b, P-deal-amount-nonneg |
+| `deal-stage-forward` | machine guard + structural (`guardCanAdvance`; Negotiation no forward; reopen exception) | crm.domain | `saveDeal` | DEAL-eb0c40, DEAL-38ba11, DEAL-a14020, DEAL-0c4c47, DEAL-388687, DEAL-5df488, DEAL-708606, DEAL-99392a, DEAL-0fef3d, P-deal-stage-forward |
+| `deal-terminal` | structural (Won/Lost expose only reopen; others rejected) | crm.domain | `saveDeal` | DEAL-e0bdaf, DEAL-d27905, DEAL-a45f13, DEAL-0a25a2, DEAL-0ec705, DEAL-e9e60a, P-deal-terminal |
+| `deal-won-has-closedate` | machine guard (`guardCanWin`; `commitCloseDate`) | crm.domain | `saveDeal` | DEAL-1fe825, DEAL-e786d8, DEAL-492234, DEAL-81d0ab, DEAL-7e1e9b, DEAL-df4442, DEAL-38140e, DEAL-3bbe10, DEAL-e5d58e, P-deal-won-has-closedate |
 | `one-default-pipeline` | **operation-level** (setDefault atomic read-modify-write; NOT a guard, NOT structural) | crm.domain setDefault op / crm.repo | `Repo.SetDefaultPipeline` | P-one-default-pipeline, C-REPO-20 |
 | `activity-immutable` | structural (no update action exists; append-only) | crm.domain / crm.repo | `Repo.SaveActivity` (no update path) | P-activity-immutable, C-REPO-23 |
 | `activity-owned` | structural (`log` records the acting User) | crm.domain | `Repo.SaveActivity` | P-activity-owned |
 | `activity-contact-same-tenant` | isolation layer: pure link-authorization function (`Authorizer.AuthorizeLink`) called by the `log` write path before the Activity->Contact reference is established; design-time: relational isolation model (solver-checked, `formal/Isolation.als`) + generated tenant-scoping oracle rows (`design/formal/Isolation.oracle.md`) | crm.authz + crm.domain | `Authorizer.AuthorizeLink` | P-tenant-oracle |
-| `task-owned` | structural + machine guard (owner set at create; `guardCanReassign` admits one in-scope owner) | crm.domain | `saveTask` | T-TASK-07,08,14,15, P-task-owned |
-| `task-terminal` | structural (Done/Cancelled are `final`; no reopen) | crm.domain | `saveTask` | T-TASK-16,17, P-task-terminal |
-| `task-assignee-visible` | machine guard (`guardCanReassign` via `authz.AuthorizeReassign`, the complete reassign decision) + generated authz oracle rows (design/formal/Policy.oracle.md) | crm.authz + crm.domain | `Authorizer.AuthorizeReassign` | T-TASK-07,08,14,15, P-task-assignee-visible, P-authz-oracle |
+| `task-owned` | structural + machine guard (owner set at create; `guardCanReassign` admits one in-scope owner) | crm.domain | `saveTask` | TASK-7ab0ac, TASK-b179c7, TASK-2f2bc8, TASK-91fb4d, P-task-owned |
+| `task-terminal` | structural (Done/Cancelled are `final`; no reopen) | crm.domain | `saveTask` | TASK-c56bd7, TASK-67b0ff, P-task-terminal |
+| `task-assignee-visible` | machine guard (`guardCanReassign` via `authz.AuthorizeReassign`, the complete reassign decision) + generated authz oracle rows (design/formal/Policy.oracle.md) | crm.authz + crm.domain | `Authorizer.AuthorizeReassign` | TASK-7ab0ac, TASK-b179c7, TASK-2f2bc8, TASK-91fb4d, P-task-assignee-visible, P-authz-oracle |
 | `task-deal-same-tenant` | isolation layer: pure link-authorization function (`Authorizer.AuthorizeLink`) called by the Task `create` write path before the Task->Deal reference is established; design-time: relational isolation model (solver-checked, `formal/Isolation.als`) + generated tenant-scoping oracle rows (`design/formal/Isolation.oracle.md`) | crm.authz + crm.domain | `Authorizer.AuthorizeLink` | P-tenant-oracle |
 | `tag-name-unique` | DB-constraint (unique index on `Tag.name`) | crm.repo | `Repo.SaveTag` -> ErrConstraint | P-tag-name-unique, C-REPO-19 |
-| `rbac-crud-verbs` | machine guard (`guardAuthorized`; User `guardAdminAuthority`) + generated authz oracle rows | crm.authz + crm.domain | `Authorizer.Authorize` | T-CMD-18,19, T-USER-01,02,04,05, C-AUTHZ-01..03, P-rbac-crud-verbs, P-authz-oracle |
-| `rbac-read-visibility` | machine guard (`guardAuthorized`, reads authorized too) + generated authz oracle rows | crm.authz | `Authorizer.Authorize` | T-CMD-18,19, C-AUTHZ-04..07, P-rbac-read-visibility, P-authz-oracle |
-| `rbac-write-scope` | machine guard (`guardAuthorized`; domain `guardCan*` re-checks) + generated authz oracle rows | crm.authz + crm.domain | `Authorizer.Authorize` | T-CMD-18,19, C-AUTHZ-08,09, P-rbac-write-scope, P-authz-oracle |
-| `rbac-reassign-authority` | machine guard (`guardAuthorized`; Deal `guardCanReopen`; Task `guardCanReassign`) + `Authorizer.AuthorizeReassign` (authority AND target rule) + generated authz oracle rows | crm.authz + crm.domain | `Authorizer.Authorize`, `Authorizer.AuthorizeReassign` | T-CMD-18,19, T-DEAL-28,29,33,34, T-TASK-07,08,14,15, C-AUTHZ-10..12, P-rbac-reassign-authority, P-authz-oracle |
-| `session-active-user` | machine guard (`guardSessionUserActive`) | crm.session | `Sessions.Current` | T-SESS-23,24, P-session-active-user, C-SESS-08 |
+| `rbac-crud-verbs` | machine guard (`guardAuthorized`; User `guardAdminAuthority`) + generated authz oracle rows | crm.authz + crm.domain | `Authorizer.Authorize` | COMM-8c204a, COMM-7f1685, USER-e20d04, USER-2b2218, USER-e59219, USER-ffd41a, C-AUTHZ-01..03, P-rbac-crud-verbs, P-authz-oracle |
+| `rbac-read-visibility` | machine guard (`guardAuthorized`, reads authorized too) + generated authz oracle rows | crm.authz | `Authorizer.Authorize` | COMM-8c204a, COMM-7f1685, C-AUTHZ-04..07, P-rbac-read-visibility, P-authz-oracle |
+| `rbac-write-scope` | machine guard (`guardAuthorized`; domain `guardCan*` re-checks) + generated authz oracle rows | crm.authz + crm.domain | `Authorizer.Authorize` | COMM-8c204a, COMM-7f1685, C-AUTHZ-08,09, P-rbac-write-scope, P-authz-oracle |
+| `rbac-reassign-authority` | machine guard (`guardAuthorized`; Deal `guardCanReopen`; Task `guardCanReassign`) + `Authorizer.AuthorizeReassign` (authority AND target rule) + generated authz oracle rows | crm.authz + crm.domain | `Authorizer.Authorize`, `Authorizer.AuthorizeReassign` | COMM-8c204a, COMM-7f1685, DEAL-99392a, DEAL-5746cc, DEAL-0fef3d, DEAL-7bb594, TASK-7ab0ac, TASK-b179c7, TASK-2f2bc8, TASK-91fb4d, C-AUTHZ-10..12, P-rbac-reassign-authority, P-authz-oracle |
+| `session-active-user` | machine guard (`guardSessionUserActive`) | crm.session | `Sessions.Current` | SESS-85613f, SESS-55a08c, P-session-active-user, C-SESS-08 |
 
 **Known / named risk.** `one-default-pipeline` is the only invariant with no enforcing machine guard and no
 structural guarantee: Pipeline has no lifecycle machine, and nothing in any state graph prevents zero or two
@@ -741,14 +741,13 @@ five `design/machines/*.matrix.md` named-unit tables, the section 4.6 interface 
 section 3.4 invariants.
 
 **Test id scheme.** Transition tests key on the oracle's STABLE id column (e.g. `DEAL-eb0c40`), never on
-a row number: row numbers renumber whenever the design changes, stable ids do not. The oracle also emits
-a sequential `T-<MACHINE>-NN` id per row (MACHINE in DEAL, TASK, USER, SESS, COMM); those names are how
-sections 6 and 9 of this document cite individual rows. `C-<BOUNDARY>-NN` = a contract test
+a row number: row numbers renumber whenever the design changes, stable ids do not. All transition
+citations in this document use those committed stable ids. `C-<BOUNDARY>-NN` = a contract test
 at a section-4.6 boundary (REPO, AUTHZ, SESS) plus `C-ARCH-01` for the dependency contract. `P-<invariant>`
 = a property test, one per invariant.
 
 **Guard-branch completeness note.** Each guard-false row whose guard is a conjunction (for example
-`guardCanAdvance` = next-stage AND may-write AND amount>=0) must be instantiated once per falsifying clause
+`guardCanWin` = close-date-present AND actor-may-write AND amount-nonnegative) must be instantiated once per falsifying clause
 (a/b/c). The property tests (7.3) pin the invariant-level clauses; the transition rows pin the routing. A
 row is not "covered" until every falsifying clause of its guard has a case.
 
@@ -768,14 +767,14 @@ keyed by the oracle's STABLE id column. Row numbers renumber when the design cha
 not. Regenerate with `machinery oracle design/machines` after any machine change; the stable-id
 diff is the affected-test list.
 
-**Deal (`crm.domain`).** `machines/Deal.oracle.md` (57 transition rows) is the canonical
+**Deal (`crm.domain`).** `machines/Deal.oracle.md` (58 transition rows) is the canonical
 per-transition test spec for the Deal aggregate, keyed by stable id (e.g. `DEAL-eb0c40`).
 
-**Task (`crm.domain`).** `machines/Task.oracle.md` (30 transition rows) is the canonical
+**Task (`crm.domain`).** `machines/Task.oracle.md` (31 transition rows) is the canonical
 per-transition test spec for the Task aggregate, keyed by stable id. Done and Cancelled are `final`,
 so their structural rejections appear as the absence of outgoing rows, not as extra rows.
 
-**User (`crm.domain`).** `machines/User.oracle.md` (19 transition rows) is the canonical
+**User (`crm.domain`).** `machines/User.oracle.md` (20 transition rows) is the canonical
 per-transition test spec for the User status lifecycle, keyed by stable id.
 
 **Session (`crm.session`).** `machines/Session.oracle.md` (60 transition rows) is the canonical
@@ -785,9 +784,9 @@ per-transition test spec for the Session machine, keyed by stable id.
 the canonical per-transition test spec for the invocation envelope, keyed by stable id; the exit-code
 actions of the five terminal states live in the oracle's state entry/exit table.
 
-**Historical note.** The existing impl test suite predates stable-id keying and keys on the
-sequential `T-<MACHINE>-NN` ids. Those remain valid because the oracle regenerates them, but they
-renumber on design changes, so new tests key on the stable id column.
+**Implementation keying.** The implementation test suite includes every committed stable transition id
+as a literal. Compound-guard tests append the stable clause suffix (`a`, `b`, and so on) to prove each
+declared clause has an independent falsifying case.
 
 ### 7.2 Contract tests (per boundary, from section 4.6)
 
@@ -938,7 +937,7 @@ affected-test list.
 
 Walking skeleton first (prove the topology through one real boundary), then one aggregate lifecycle per
 vertical slice, each slice fully green before the next. Definition of done (DoD) is stated per milestone;
-the global gates are section 11 (all transitions have a T-row test, all invariants a P-test, all boundaries
+the global gates are section 11 (all transitions have a stable-id oracle test, all invariants a P-test, all boundaries
 a C-test, no cross-boundary violation, >= 80% combined coverage).
 
 **M0 - Walking skeleton (thinnest end-to-end thread).** Implement exactly the path
@@ -950,27 +949,27 @@ ResolvingSession->Authorizing->Executing->Rendering->Done), `crm.session` (login
 BeginWrite, SaveDeal, Commit against a real temp DB dir). NFR: the classified stderr error envelope
 and per-terminal-state exit codes, 0600 permissions on the session and DB files, and the single
 authorization call site in crm.domain (section 8's mechanisms; every later milestone copies them).
-DoD: green for T-CMD-01,03,12,18,20,28,29;
-T-SESS-01,06,14,02,18,23; T-DEAL-01,38; contract C-REPO-01,05,06,12, C-SESS-01,05, C-AUTHZ-02, C-ARCH-01;
+DoD: green for COMM-44671c, COMM-5bc5e0, COMM-968d17, COMM-8c204a, COMM-5d7be9, COMM-121e81;
+SESS-ee5c17, SESS-c78e53, SESS-b95638, SESS-f3cc5e, SESS-e6484d, SESS-85613f; DEAL-eb0c40, DEAL-5abbd2; contract C-REPO-01,05,06,12, C-SESS-01,05, C-AUTHZ-02, C-ARCH-01;
 the login token is written and re-resolved on the next command; the advance is durably persisted (re-Open
 sees Qualified); one real write Tx is opened and committed.
 
 **M1 - Deal aggregate slice.** Complete the Deal lifecycle and its persist overlay end to end via
-`crm deal create/advance/win/lose/reopen/reassign`. DoD: all 57 T-DEAL rows green; P-deal-owned,
+`crm deal create/advance/win/lose/reopen/reassign`. DoD: all 58 committed Deal oracle stable IDs green; P-deal-owned,
 P-deal-amount-nonneg, P-deal-stage-forward, P-deal-terminal, P-deal-won-has-closedate green; C-REPO-10..16,22
 green; DBLocked bounded retry and rolledBack-to-priorStage verified; no cross-boundary violation.
 
-**M2 - Task aggregate slice.** `crm task create/start/complete/cancel/reassign`. DoD: all 32 T-TASK rows
+**M2 - Task aggregate slice.** `crm task create/start/complete/cancel/reassign`. DoD: all 31 committed Task oracle stable IDs
 green; P-task-owned, P-task-terminal, P-task-assignee-visible green; reassign scope enforced via authz +
 `guardCanReassign`.
 
 **M3 - User + Session slice (auth lifecycle).** `crm user disable/enable`, `crm login/logout/whoami`, plus
-`register/changePassword/assignRole` create/update paths. DoD: all 19 T-USER and 60 T-SESS rows green;
+`register/changePassword/assignRole` create/update paths. DoD: all 20 committed User oracle stable IDs and all 60 committed Session oracle stable IDs green;
 P-disabled-cannot-auth, P-session-active-user, P-password-hashed, P-username-unique, P-single-team green;
 C-SESS-01..10 green; argon2id verified (C-SESS-10).
 
 **M4 - CommandExecution failure envelope + backup/restore.** Harden every section 6 failure row and add
-`crm backup` / `crm restore`. DoD: all 33 T-CMD rows green including DBLocked open- and execute-phase retry,
+`crm backup` / `crm restore`. DoD: all 28 committed CommandExecution oracle stable IDs green including DBLocked open- and execute-phase retry,
 Corrupt fatal exit that instructs `crm restore`, disk-full/timeout rollback; `crm backup` then simulated
 corruption then `crm restore` recovers the DB; exit codes per terminal state asserted.
 
@@ -1036,7 +1035,7 @@ and the operational pair below. Output defaults to a table; `--json` renders JSO
 auto-recovery, so recovery depends on these commands. `crm backup <dest>` opens the DB read-consistently
 and copies the LadybugDB directory to a timestamped archive at `<dest>`; `crm restore <archive>` refuses to
 run against a healthy in-use DB, then replaces `~/.crm/db` from the archive. The Corrupt terminal state's
-message must direct the user to `crm restore` (T-CMD-33). Both are covered in M4.
+message must direct the user to `crm restore` (COMM-b9aee2). Both are covered in M4.
 
 ### Toolchain and versions
 
@@ -1122,11 +1121,11 @@ Named risks are cheaper than surprises. Each is either accepted-by-design or cov
    message directing the user to restore. Residual: backup cadence is a user responsibility, not enforced by
    the binary. Consider a future "backup reminder" or auto-snapshot-before-migration.
 4. **`ErrConflict` retried as if locked.** CommandExecution routes `isErrConflict` to DBLocked and retries
-   the whole Tx (T-CMD-23). In a single-writer store conflicts are rare; if go-ladybug ever surfaces a
+   the whole Tx (COMM-8be203). In a single-writer store conflicts are rare; if go-ladybug ever surfaces a
    non-retryable conflict, three retries then a DBError is the bound. Accepted.
-5. **Stale session token after a failed logout.** `clearSessionFile` is best-effort (T-SESS-35,36); a
+5. **Stale session token after a failed logout.** `clearSessionFile` is best-effort (SESS-706156, SESS-51ded9); a
    leftover token is mitigated by the HMAC signature, the signed expiry, and resume-time re-validation
-   (`session-active-user`, T-SESS-23,24). Residual: token file readable by another local user if perms are
+   (`session-active-user`, SESS-85613f, SESS-55a08c). Residual: token file readable by another local user if perms are
    wrong; realization mandates `0600`.
 6. **Session TTL vs clock skew.** `sessionTTL` (8h) is a declarative delay; the signed `expiresAt` is
    authoritative and compared to local time. Large clock changes could expire early or late. Minor,
@@ -1141,7 +1140,7 @@ Named risks are cheaper than surprises. Each is either accepted-by-design or cov
    show user-visible failures. This is the accepted embedded-store posture, not a bug (section 4.4).
 9. **Spec-to-code drift on the machines.** The machine JSON is the oracle; the Go transition switch is the
    implementation. Drift is prevented by hard TDD (locked T-tests) plus the `@xstate/graph` covering-path
-   check that every edge has a T-row. Residual: if the JSON changes, tests regenerate before code (section
+   check that every edge has an oracle row. Residual: if the JSON changes, tests regenerate before code (section
    11 rule 5).
 10. **Deferred / not modeled.** Deal `reassign` and the Account/Contact/Tag/Activity CRUD verbs are covered
     by authz + repo contract tests, not by a lifecycle machine (they are pure records, section 5.6). Deal

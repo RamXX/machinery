@@ -4,8 +4,9 @@ Shard of the manifest root `design/BUILD.md` (Mode: manifest). The root carries 
 domain model, the Architecture Contract, the traceability matrix, the shared toolchain, the
 state-migration protocol, and the hard-TDD protocol; this shard carries the RecommendationRun
 component: its behavior, its test specification, and its build-plan milestones (M0, M1, M3, M5 of
-the root milestone map). The optimizer and the reference-data builds have no machine of their own;
-their plan and tests live here because the run pipeline is what invokes them.
+the root milestone map). The optimizer remains pure logic; reference-data effects use the
+ReferenceDataCommand operational envelope. Their plan and tests live here because the run pipeline
+consumes their outputs.
 
 ## 5. Behavior
 
@@ -16,18 +17,27 @@ moves to Optimizing, which invokes the optimizer; success records the portfolio 
 A fetch failure or timeout retries a bounded number of times (collectRetry) then fails; an optimizer
 failure or timeout fails directly. Ready and Failed are terminal. Single writer, so no persist
 overlay on the run. Named-unit contracts and failure catalog:
-`design/machines/RecommendationRun.matrix.md` (1 guard, 4 actions, 2 actors). The `fetchPrices` and
+`design/machines/RecommendationRun.matrix.md` (1 guard, 5 actions, 2 actors). The `fetchPrices` and
 `optimize` actors are integration/side-effect contracts, not derivable from transition tests.
 
-### Pure logic driven by the run (no machine)
+### ReferenceDataCommand (`design/machines/ReferenceDataCommand.machine.json`)
+
+A short-lived operational envelope for one analyst `refresh`, `upsert`, or `build` command. Each
+command invokes exactly one invariant-carrying actor and terminates succeeded or failed; every
+invoke also has COMMAND_TIMEOUT. It does not invent a lifecycle for Index, Security, or CandidateSet.
+Named-unit contracts and failure catalog: `design/machines/ReferenceDataCommand.matrix.md` (3 actors,
+3 actions). The actors enforce `index-top-30`, `ticker-unique`, `candidate-deduped`, and
+`candidate-from-top-30` under property and real-store tests.
+
+### Logic driven by the run and reference commands
 
 - **pf.optimizer**: the pure 16-of-N min-drawdown transform, invoked from Optimizing. Its contract
   is the optimizer invariants in the root traceability matrix (`portfolio-size-16`,
   `portfolio-holdings-deduped`, `portfolio-from-candidates`, `portfolio-has-drawdown`,
   `holding-weight-nonneg`, `holding-weights-sum-full`).
-- **Reference data**: Index refresh (`index-top-30`), Security upsert (`ticker-unique`),
-  CandidateSet build (`candidate-deduped`, `candidate-from-top-30`); plus `backup`/`restore` and
-  the corruption abort path in `pf.repo`.
+- **Reference data actors**: Index refresh (`index-top-30`), Security upsert (`ticker-unique`),
+  CandidateSet build (`candidate-deduped`, `candidate-from-top-30`) run inside the operational
+  envelope above; `backup`/`restore` and the corruption abort path remain direct `pf.repo` commands.
 
 ## 7. Test specification
 
@@ -44,6 +54,24 @@ Do not restate the table; tests key on the STABLE id, never the row number:
 | RECO-ed98c7 | Optimizing, optimize error, to Failed |
 | RECO-0d730c | collectRetry, backoff elapsed, to Collecting (incRetries) |
 | RECO-61506b | collectRetry, retriesExhausted, to Failed |
+
+The ReferenceDataCommand transition spec IS the generated
+`design/machines/ReferenceDataCommand.oracle.md` (12 rows):
+
+| stable id | transition |
+|---|---|
+| REFE-33a2ae | idle, refresh, to refreshing |
+| REFE-6e63db | idle, upsert, to upserting |
+| REFE-62d231 | idle, build, to building |
+| REFE-cb1193 | refreshing, timeout, to failed (cancelReferenceOperation, recordReferenceTimeout) |
+| REFE-c51bb5 | refreshing, selectEligibleConstituents done, to succeeded |
+| REFE-6b30a5 | refreshing, selectEligibleConstituents error, to failed (recordReferenceError) |
+| REFE-8c9720 | upserting, timeout, to failed (cancelReferenceOperation, recordReferenceTimeout) |
+| REFE-cc283e | upserting, upsertSecurityByTicker done, to succeeded |
+| REFE-cc10bd | upserting, upsertSecurityByTicker error, to failed (recordReferenceError) |
+| REFE-f67aa3 | building, timeout, to failed (cancelReferenceOperation, recordReferenceTimeout) |
+| REFE-074a67 | building, buildCandidateSet done, to succeeded |
+| REFE-c60610 | building, buildCandidateSet error, to failed (recordReferenceError) |
 
 ### Guard-branch completeness
 
@@ -93,6 +121,7 @@ contract tests green, G4-import clean, formal suite still green.
 
 **M5 - Reference-data and operations slice.** Index refresh (`index-top-30`), Security upsert
 (`ticker-unique`), CandidateSet build (`candidate-deduped`, `candidate-from-top-30`), then `backup`/
-`restore` and the corruption abort path. DoD: the listed invariants property-tested, a backup then
+`restore` and the corruption abort path. DoD: all 12 ReferenceDataCommand oracle rows covered by
+stable id, the listed invariants property-tested, a backup then
 restore round trip green, the corruption abort loud, its contract tests green, G4-import clean,
 formal suite still green.

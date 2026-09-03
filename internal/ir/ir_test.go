@@ -1,6 +1,7 @@
 package ir
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -257,6 +258,104 @@ func TestDuplicateJSONKeysErrorViaFile(t *testing.T) {
 	_, err := LoadMachineJSON(p)
 	if err == nil || !strings.Contains(err.Error(), "invalid JSON") || !strings.Contains(err.Error(), "duplicate key 'id'") {
 		t.Fatalf("expected wrapped duplicate-key error, got %v", err)
+	}
+}
+
+func TestMachineJSONInMemoryLoadersPreserveSourceDiagnostics(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		load func(string, string) (*Value, error)
+	}{
+		{"bytes", func(source, src string) (*Value, error) {
+			return LoadMachineJSONBytes(source, []byte(src))
+		}},
+		{"reader", func(source, src string) (*Value, error) {
+			return LoadMachineJSONReader(source, strings.NewReader(src))
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v, err := tc.load("machines/Order.machine.json", `{"id":"order","states":{"A":{"type":"final"}}}`)
+			if err != nil || v.AsObject().GetString("id") != "order" {
+				t.Fatalf("valid in-memory machine did not parse: value=%v err=%v", v, err)
+			}
+			_, err = tc.load("machines/Order.machine.json", "{\n  \"id\": @}")
+			if err == nil || !strings.Contains(err.Error(), "invalid JSON in machines/Order.machine.json") || !strings.Contains(err.Error(), "line 2") {
+				t.Fatalf("source-labelled syntax diagnostic lost: %v", err)
+			}
+			_, err = tc.load("machines/Order.machine.json", `{"id":"order"} {"id":"other"}`)
+			if err == nil || !strings.Contains(err.Error(), "extra data after the machine object") {
+				t.Fatalf("trailing JSON was accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadYAMLRejectsDuplicateKeysAtEveryDepthWithLines(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		line string
+	}{
+		{"root", "name: first\nname: second\n", "line 2"},
+		{"nested mapping", "outer:\n  name: first\n  name: second\n", "line 3"},
+		{"mapping inside sequence", "items:\n  - name: first\n    name: second\n", "line 3"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := LoadYAML([]byte(tc.src))
+			if err == nil || !strings.Contains(err.Error(), "duplicate YAML key \"name\"") || !strings.Contains(err.Error(), tc.line) {
+				t.Fatalf("expected line-aware nested duplicate-key error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadYAMLRejectsNonScalarKeysAtEveryDepthWithLines(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		line string
+	}{
+		{"root", "? [a, b]\n: value\n", "line 1"},
+		{"nested", "outer:\n  ? {a: b}\n  : value\n", "line 2"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := LoadYAML([]byte(tc.src))
+			if err == nil || !strings.Contains(err.Error(), "non-scalar YAML mapping key") || !strings.Contains(err.Error(), tc.line) {
+				t.Fatalf("expected line-aware non-scalar-key error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadYAMLRejectsTrailingDocuments(t *testing.T) {
+	for _, src := range []string{
+		"kind: modelith\n---\nkind: hidden\n",
+		"kind: modelith\n---\n",
+	} {
+		_, err := LoadYAML([]byte(src))
+		if err == nil || !strings.Contains(err.Error(), "multiple YAML documents") {
+			t.Fatalf("trailing YAML document accepted for %q: %v", src, err)
+		}
+	}
+}
+
+func TestLoadYAMLRejectsCustomScalarTags(t *testing.T) {
+	_, err := LoadYAML([]byte("kind: !modleith modelith\n"))
+	if err == nil || !strings.Contains(err.Error(), "unsupported YAML scalar tag") {
+		t.Fatalf("custom YAML scalar tag accepted: %v", err)
+	}
+}
+
+func TestTLAModuleNameRejectsUnsafeMachineIDs(t *testing.T) {
+	for _, id := range []string{"../escape", "bad-name", "9startsWithDigit", "has.dot", "has/slash", "CON", "nul", ""} {
+		m := mustJSON(t, fmt.Sprintf(`{"id":%q}`, id))
+		if _, err := TLAModuleName(m); err == nil {
+			t.Errorf("TLAModuleName accepted unsafe id %q", id)
+		}
+	}
+	m := mustJSON(t, `{"id":"safe_name9"}`)
+	if got, err := TLAModuleName(m); err != nil || got != "Safe_name9" {
+		t.Fatalf("TLAModuleName(safe_name9) = %q, %v", got, err)
 	}
 }
 

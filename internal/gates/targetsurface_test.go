@@ -323,7 +323,7 @@ func TestCheckTargetSurfacesNoHumanActs(t *testing.T) {
 // default run, and an explicit --gate gu with no artifact fails loudly rather
 // than skipping.
 func TestTargetSurfacesActivation(t *testing.T) {
-	t.Run("absent file skips the gate in a default run", func(t *testing.T) {
+	t.Run("human acts activate a missing-ledger failure in a default run", func(t *testing.T) {
 		design := t.TempDir()
 		if err := os.WriteFile(filepath.Join(design, "domain.modelith.yaml"), []byte(targetSurfaceModelYAML), 0o644); err != nil {
 			t.Fatal(err)
@@ -335,10 +335,17 @@ func TestTargetSurfacesActivation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		found := false
 		for _, gate := range RunSelected(design, "", sel, RunOptions{}) {
 			if strings.Contains(gate.Title, "Gu-surfaces") {
-				t.Fatal("Gu ran without an authored ledger")
+				found = true
+				if !hasErr(gate, "no "+TargetSurfacesName) {
+					t.Fatalf("Gu ran but did not fail the missing ledger: %v", gate.Errs)
+				}
 			}
+		}
+		if !found {
+			t.Fatal("Gu did not activate from the model's human actions")
 		}
 	})
 	t.Run("explicit gu with no file errors", func(t *testing.T) {

@@ -4,6 +4,7 @@
 
 | name | kind | signature | pre / post | maps to | test type | fixture |
 |---|---|---|---|---|---|---|
+| `validatePositiveTotal` | action | `(total) -> error?` | before creation, reject `total <= 0`; every persisted Order has a strictly positive total | inv `order-total-positive` | property | generated numeric boundary values + real repository transaction |
 | `request` | action | `(ctx) -> publish` | on entry to Placed, enqueue the payment request in the outbox, same transaction as the insert | bus relationship; dedupe `Payment.orderId` | integration | real outbox table + fake broker (contract-tested) |
 | `recordShipment` | action | `(ctx) -> ctx` | stamps carrier handoff; only reachable from Paid, which is `no-ship-without-capture` | inv `no-ship-without-capture` (structural) | unit | none |
 | `recordCancel` | action | `(ctx) -> ctx` | stamps cancellation reason | - | unit | none |

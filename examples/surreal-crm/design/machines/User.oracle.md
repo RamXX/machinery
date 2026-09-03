@@ -39,5 +39,6 @@ the design changes, stable ids do not.
 | T-USER-17 | USER-1c13da | persistRetry | always | retriesExhausted | rolledBack | recordRetriesExhausted |
 | T-USER-18 | USER-adccd9 | rolledBack | always | priorIsActive | Active | - |
 | T-USER-19 | USER-7cf0fc | rolledBack | always | priorIsDisabled | Disabled | - |
+| T-USER-20 | USER-453743 | rolledBack | always | - | Disabled | recordRoutingError |
 
-Total transitions (test cases): 19
+Total transitions (test cases): 20

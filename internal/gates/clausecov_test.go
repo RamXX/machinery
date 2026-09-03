@@ -23,6 +23,7 @@ func clauseCovFixture(t *testing.T, testBody string) (string, string) {
 		t.Fatal(err)
 	}
 	mustWrite(t, filepath.Join(design, "machines", "Deal.oracle.md"), clauseCovOracle)
+	mustWrite(t, filepath.Join(design, "machines", "Deal.machine.json"), `{"id":"deal","initial":"Lead","states":{"Lead":{},"Won":{},"Lost":{}}}`)
 	mustWrite(t, filepath.Join(design, "machines", "Deal.matrix.md"),
 		"| `guardCanWin` | guard | CLAUSES{owned-record, open-stage} |\n")
 	impl := t.TempDir()
@@ -39,6 +40,7 @@ func TestClauseCoverageEmptyDeclarationErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustWrite(t, filepath.Join(design, "machines", "Deal.oracle.md"), clauseCovOracle)
+	mustWrite(t, filepath.Join(design, "machines", "Deal.machine.json"), `{"id":"deal","initial":"Lead","states":{"Lead":{},"Won":{},"Lost":{}}}`)
 	mustWrite(t, filepath.Join(design, "machines", "Deal.matrix.md"),
 		"| `guardCanWin` | guard | CLAUSES{} |\n")
 	impl := t.TempDir()
@@ -51,7 +53,7 @@ func TestClauseCoverageEmptyDeclarationErrors(t *testing.T) {
 
 func TestClauseCoverageComplete(t *testing.T) {
 	design, impl := clauseCovFixture(t,
-		"package x\n// covers DEAL-abc123 DEAL-def456 DEAL-abc123a DEAL-abc123b\n")
+		"package x\nfunc TestOracle(t *testing.T) { cases := []string{\"DEAL-abc123\", \"DEAL-def456\", \"DEAL-abc123a\", \"DEAL-abc123b\"}; _ = cases }\n")
 	g := CheckOracleCoverage(design, impl)
 	if len(g.Errs) != 0 {
 		t.Fatalf("complete clause coverage must pass: %v", g.Errs)
@@ -66,7 +68,7 @@ func TestClauseCoverageComplete(t *testing.T) {
 
 func TestClauseCoverageMissingSuffixErrors(t *testing.T) {
 	design, impl := clauseCovFixture(t,
-		"package x\n// covers DEAL-abc123 DEAL-def456 DEAL-abc123a\n")
+		"package x\nfunc TestOracle(t *testing.T) { cases := []string{\"DEAL-abc123\", \"DEAL-def456\", \"DEAL-abc123a\"}; _ = cases }\n")
 	g := CheckOracleCoverage(design, impl)
 	if !hasErr(g, "misses falsifying test(s) DEAL-abc123b") {
 		t.Fatalf("a missing suffixed id must error: %v", g.Errs)
@@ -86,7 +88,7 @@ func TestClauseCoverageWholesaleParseDoesNotDischarge(t *testing.T) {
 
 func TestClauseCoverageUndeclaredGuardCarriesNoObligation(t *testing.T) {
 	design, impl := clauseCovFixture(t,
-		"package x\n// covers DEAL-abc123 DEAL-def456\n")
+		"package x\nfunc TestOracle(t *testing.T) { cases := []string{\"DEAL-abc123\", \"DEAL-def456\"}; _ = cases }\n")
 	// drop the declaration: no CLAUSES, no obligation
 	mustWrite(t, filepath.Join(design, "machines", "Deal.matrix.md"),
 		"| `guardCanWin` | guard | owned and open |\n")
@@ -99,7 +101,7 @@ func TestClauseCoverageUndeclaredGuardCarriesNoObligation(t *testing.T) {
 func TestClauseCoverageUnguardedRowsExempt(t *testing.T) {
 	// DEAL-def456's row has no guard, so guardCanWin's clauses never bind it
 	design, impl := clauseCovFixture(t,
-		"package x\n// covers DEAL-abc123 DEAL-def456 DEAL-abc123a DEAL-abc123b\n")
+		"package x\nfunc TestOracle(t *testing.T) { cases := []string{\"DEAL-abc123\", \"DEAL-def456\", \"DEAL-abc123a\", \"DEAL-abc123b\"}; _ = cases }\n")
 	g := CheckOracleCoverage(design, impl)
 	for _, e := range g.Errs {
 		if idTokenIn("DEAL-def456", e) {

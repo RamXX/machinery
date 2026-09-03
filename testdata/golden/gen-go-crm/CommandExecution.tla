@@ -10,7 +10,11 @@ EXTENDS Naturals
 \*      machine_lint requires an unguarded fallback or an _exhaustive note; where
 \*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
 \*      below is only as sound as these hand-checked, UNVERIFIED claims:
-\*      (none here: every guarded branch list has an unguarded fallback)
+\*      (none here: every guarded always-list has an unguarded fallback)
+\*      Handler refusal is permitted in this machine. A refused trigger leaves
+\*      the state unchanged, so this rung checks safety only and makes no
+\*      fairness or overlay-resolution liveness claim:
+\*      - state DBLocked, handler after:dbRetryBackoff: Unreachable by construction: only Opening and Executing route into DBLocked, and each sets the phase it departed from, so exactly one of phaseIsOpen/phaseIsExecute holds on every backoff. If a third phase ever routes here without setting the phase, the timer would fire into nothing and the command would hang until retriesExhausted, which is why the two guards must stay total.
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or
@@ -96,7 +100,7 @@ DomainNext == FALSE
 OverlayNext == T1 \/ T2 \/ T3 \/ T4 \/ T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ RetryExhausted_DBLocked \/ RetryAgain_DBLocked
 Next == DomainNext \/ OverlayNext \/ Terminated
 
-Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)
+Spec == Init /\ [][Next]_vars
 
-Live_OverlayResolves == (st \in Overlay) ~> (st \in Domain)
+\* Live_OverlayResolves intentionally omitted: _refusal permits persistent stuttering.
 ====

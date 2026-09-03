@@ -17,15 +17,16 @@ the design changes, stable ids do not.
 | persisting | atomic | - | - |
 | persistRetry | atomic | - | - |
 | rolledBack | atomic | - | - |
+| routingFault | final | - | - |
 
 ## Transitions
 
 | test id | stable id | source | trigger | guard | target | actions |
 |---|---|---|---|---|---|---|
 | T-OUTB-01 | OUTB-265e80 | Pending | on:publish | - | publishing | loadPayload |
-| T-OUTB-02 | OUTB-8ee882 | Published | on:markConsumed | - | persisting | setPendingConsumed |
+| T-OUTB-02 | OUTB-8ee882 | Published | on:markConsumed | - | persisting | resetRetries, setPendingConsumed |
 | T-OUTB-03 | OUTB-7fe006 | publishing | after:busTimeout | - | rolledBack | recordPublishTimeout |
-| T-OUTB-04 | OUTB-b71c55 | publishing | onDone:publishToBus | - | persisting | setPendingPublished |
+| T-OUTB-04 | OUTB-b71c55 | publishing | onDone:publishToBus | - | persisting | resetRetries, setPendingPublished |
 | T-OUTB-05 | OUTB-61e189 | publishing | onError:publishToBus | - | rolledBack | recordPublishError |
 | T-OUTB-06 | OUTB-37e30a | persisting | after:persistTimeout | - | rolledBack | recordTimeout |
 | T-OUTB-07 | OUTB-563ac6 | persisting | onDone:persistOutboxRow | pendingIsPublished | Published | commitStatus |
@@ -38,5 +39,6 @@ the design changes, stable ids do not.
 | T-OUTB-14 | OUTB-073c83 | persistRetry | always | retriesExhausted | rolledBack | recordRetriesExhausted |
 | T-OUTB-15 | OUTB-e15197 | rolledBack | always | priorIsPending | Pending | - |
 | T-OUTB-16 | OUTB-34ea02 | rolledBack | always | priorIsPublished | Published | - |
+| T-OUTB-17 | OUTB-af12e2 | rolledBack | always | - | routingFault | recordRoutingError |
 
-Total transitions (test cases): 16
+Total transitions (test cases): 17

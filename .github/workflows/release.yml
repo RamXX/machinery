@@ -17,6 +17,12 @@ permissions:
   id-token: write      # SLSA build provenance (attest-build-provenance)
   attestations: write  # SLSA build provenance (attest-build-provenance)
 
+# A tag run and a manual run for the same version must never mutate one release
+# concurrently. Let the first run finish; never cancel a publication in flight.
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   # ---------------------------------------------------------------- build ---
   # Cross-compile in a single matrix job. CGO is disabled so the binaries are
@@ -45,44 +51,83 @@ jobs:
           cache: true
       - name: Resolve version
         id: ver
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            version="$INPUT_VERSION"
           else
-            echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            version="$REF_NAME"
           fi
+          if ! printf '%s\n' "$version" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::release version must be a numeric vMAJOR.MINOR.PATCH tag"
+            exit 1
+          fi
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+      - name: Bind release version to the checked-out commit
+        env:
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          go run ./scripts/git-safe -root . -timeout 2m -- fetch --quiet --force origin "refs/tags/${RELEASE_VERSION}:refs/tags/${RELEASE_VERSION}"
+          tag_sha=$(go run ./scripts/git-safe -root . -- rev-list -n 1 "refs/tags/${RELEASE_VERSION}")
+          head_sha=$(go run ./scripts/git-safe -root . -- rev-parse HEAD)
+          if [ "$tag_sha" != "$head_sha" ] || [ "$head_sha" != "$GITHUB_SHA" ]; then
+            echo "::error::release tag ${RELEASE_VERSION} resolves to ${tag_sha}, but this workflow checked out ${head_sha} (${GITHUB_SHA})"
+            exit 1
+          fi
+      - name: Fix reproducible build timestamp
+        run: echo "SOURCE_DATE_EPOCH=$(go run ./scripts/git-safe -root . -- show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
         run: |
+          set -euo pipefail
           mkdir -p dist
           ext=""
           [ "$GOOS" = "windows" ] && ext=".exe"
           binary="machinery-${GOOS}-${GOARCH}${ext}"
-          go build -trimpath -ldflags "-s -w -X main.version=${{ steps.ver.outputs.version }}" \
-            -o "dist/$binary" ./cmd/machinery
+          first=$(mktemp -d)
+          second=$(mktemp -d)
+          trap 'rm -rf "$first" "$second"' EXIT
+          go build -a -trimpath -ldflags "-s -w -X main.version=${RELEASE_VERSION}" \
+            -o "$first/$binary" ./cmd/machinery
+          go build -a -trimpath -ldflags "-s -w -X main.version=${RELEASE_VERSION}" \
+            -o "$second/$binary" ./cmd/machinery
+          cmp "$first/$binary" "$second/$binary"
+          install -m 0755 "$first/$binary" "dist/$binary"
           echo "Built dist/$binary"
       - name: Package tarball (pvg-compatible)
         if: matrix.goos != 'windows'
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
         # Convergence managers that follow the goreleaser convention (pvg's
         # channel installer) expect <tool>_<ver>_<os>_<arch>.tar.gz containing
         # the bare `machinery` binary, verified against checksums.txt. The
         # bare per-platform binaries above remain for install.sh.
         run: |
-          version="${{ steps.ver.outputs.version }}"
-          plain="${version#v}"
-          cp "dist/machinery-${GOOS}-${GOARCH}" machinery
-          tar czf "dist/machinery_${plain}_${GOOS}_${GOARCH}.tar.gz" machinery
-          rm machinery
+          set -euo pipefail
+          plain="${RELEASE_VERSION#v}"
+          archive="dist/machinery_${plain}_${GOOS}_${GOARCH}.tar.gz"
+          go run ./cmd/release-archive -input "dist/machinery-${GOOS}-${GOARCH}" \
+            -name machinery -epoch "$SOURCE_DATE_EPOCH" -output "$archive"
+          cp "$archive" /tmp/machinery-release-first.tar.gz
+          go run ./cmd/release-archive -input "dist/machinery-${GOOS}-${GOARCH}" \
+            -name machinery -epoch "$SOURCE_DATE_EPOCH" -output "$archive"
+          cmp /tmp/machinery-release-first.tar.gz "$archive"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: machinery-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
+          if-no-files-found: error
 
   # ------------------------------------------------------------ publish ---
   # Collect all artifacts, generate checksums, and create the GitHub Release.
@@ -91,24 +136,132 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
       - name: Resolve version
         id: ver
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            version="$INPUT_VERSION"
           else
-            echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            version="$REF_NAME"
           fi
+          if ! printf '%s\n' "$version" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::release version must be a numeric vMAJOR.MINOR.PATCH tag"
+            exit 1
+          fi
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+      - name: Bind release version to the checked-out commit
+        env:
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          go run ./scripts/git-safe -root . -timeout 2m -- fetch --quiet --force origin "refs/tags/${RELEASE_VERSION}:refs/tags/${RELEASE_VERSION}"
+          tag_sha=$(go run ./scripts/git-safe -root . -- rev-list -n 1 "refs/tags/${RELEASE_VERSION}")
+          head_sha=$(go run ./scripts/git-safe -root . -- rev-parse HEAD)
+          if [ "$tag_sha" != "$head_sha" ] || [ "$head_sha" != "$GITHUB_SHA" ]; then
+            echo "::error::release tag ${RELEASE_VERSION} resolves to ${tag_sha}, but this workflow checked out ${head_sha} (${GITHUB_SHA})"
+            exit 1
+          fi
+      - name: Fix reproducible archive timestamp
+        run: echo "SOURCE_DATE_EPOCH=$(go run ./scripts/git-safe -root . -- show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: dist
           merge-multiple: true
+      - name: Reject release/repository/plugin/binary version mismatch
+        env:
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s\n' "$RELEASE_VERSION" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::release version must be a numeric vMAJOR.MINOR.PATCH tag"
+            exit 1
+          fi
+          plain="${RELEASE_VERSION#v}"
+          skill=$(sed -n '/^metadata:/,/^description:/s/^[[:space:]]*version:[[:space:]]*"\([^"]*\)"/\1/p' skills/machinery/SKILL.md)
+          claude=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)",*/\1/p' .claude-plugin/plugin.json | head -1)
+          codex=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)",*/\1/p' .codex-plugin/plugin.json | head -1)
+          makefile=$(sed -n 's/^INTERNAL_VERSION := v\{0,1\}\(.*\)$/\1/p' Makefile)
+          cmd_default=$(sed -n 's/^var version = "v\{0,1\}\([^"]*\)"$/\1/p' cmd/machinery/main.go)
+          internal_default=$(sed -n 's/^var Version = "v\{0,1\}\([^"]*\)"$/\1/p' internal/version/version.go)
+          for pair in "skill:$skill" "claude-plugin:$claude" "codex-plugin:$codex" \
+                      "Makefile:$makefile" "cmd-default:$cmd_default" "internal-default:$internal_default"; do
+            name=${pair%%:*}
+            found=${pair#*:}
+            if [ "$found" != "$plain" ]; then
+              echo "::error::$name version $found does not match release $plain"
+              exit 1
+            fi
+          done
+          chmod +x dist/machinery-linux-amd64
+          binary=$(dist/machinery-linux-amd64 version)
+          if [ "$binary" != "machinery version $RELEASE_VERSION" ]; then
+            echo "::error::binary reports '$binary', expected 'machinery version $RELEASE_VERSION'"
+            exit 1
+          fi
+      - name: Package reproducible source archive
+        run: |
+          set -euo pipefail
+          archive=dist/machinery-source.tar.gz
+          go run ./cmd/release-archive -git-root . -epoch "$SOURCE_DATE_EPOCH" -output "$archive"
+          cp "$archive" /tmp/machinery-source-first.tar.gz
+          go run ./cmd/release-archive -git-root . -epoch "$SOURCE_DATE_EPOCH" -output "$archive"
+          cmp /tmp/machinery-source-first.tar.gz "$archive"
+      - name: Require the exact release artifact inventory
+        env:
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          plain="${RELEASE_VERSION#v}"
+          expected=$(mktemp)
+          discovered=$(mktemp)
+          trap 'rm -f "$expected" "$discovered"' EXIT
+          printf '%s\n' \
+            machinery-darwin-amd64 \
+            machinery-darwin-arm64 \
+            machinery-linux-amd64 \
+            machinery-linux-arm64 \
+            machinery-source.tar.gz \
+            machinery-windows-amd64.exe \
+            "machinery_${plain}_darwin_amd64.tar.gz" \
+            "machinery_${plain}_darwin_arm64.tar.gz" \
+            "machinery_${plain}_linux_amd64.tar.gz" \
+            "machinery_${plain}_linux_arm64.tar.gz" | LC_ALL=C sort >"$expected"
+          if ! find dist -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort >"$discovered"; then
+            echo "::error::release artifact discovery failed"
+            exit 1
+          fi
+          if ! cmp -s "$expected" "$discovered"; then
+            echo "::error::release artifact inventory is incomplete or contains extras"
+            diff -u "$expected" "$discovered" || true
+            exit 1
+          fi
+          while IFS= read -r artifact; do
+            if [ ! -f "dist/$artifact" ] || [ -L "dist/$artifact" ]; then
+              echo "::error::release artifact must be a regular non-symlink file: $artifact"
+              exit 1
+            fi
+          done <"$expected"
       - name: Generate checksums
         working-directory: dist
-        run: sha256sum machinery-* | tee checksums-sha256.txt
+        run: |
+          set -euo pipefail
+          find . -maxdepth 1 -type f -name 'machinery-*' -printf '%f\n' | \
+            LC_ALL=C sort | xargs sha256sum | tee checksums-sha256.txt
       - name: Generate goreleaser-style checksums (pvg-compatible)
         working-directory: dist
-        run: sha256sum machinery_*.tar.gz | tee checksums.txt
+        run: |
+          set -euo pipefail
+          find . -maxdepth 1 -type f -name 'machinery_*.tar.gz' -printf '%f\n' | \
+            LC_ALL=C sort | xargs sha256sum | tee checksums.txt
       - name: Attest build provenance (SLSA)
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

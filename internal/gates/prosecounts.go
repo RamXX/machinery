@@ -41,12 +41,12 @@ func historicalCountLine(line string) bool {
 // checkProseCounts warns where a count claim within five lines above a
 // markdown table disagrees with that table's data-row count.
 func checkProseCounts(g *Gate, design string) {
-	walk := func(path, rel string) {
-		body, ok := readTextOK(path)
-		if !ok {
-			return
+	walk := func(path, rel string) error {
+		body, err := readDesignFile(design, path)
+		if err != nil {
+			return err
 		}
-		lines := strings.Split(body, "\n")
+		lines := strings.Split(string(body), "\n")
 		isSep := func(i int) bool {
 			if i >= len(lines) {
 				return false
@@ -102,10 +102,11 @@ func checkProseCounts(g *Gate, design string) {
 			}
 			i = j - 1
 		}
+		return nil
 	}
-	_ = filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	err := filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
-			return nil //nolint:nilerr // keep walking; the audit covers what is readable
+			return err
 		}
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
@@ -126,7 +127,9 @@ func checkProseCounts(g *Gate, design string) {
 		if base := filepath.Base(rel); base == "DECISIONS.md" || base == "STATE.md" {
 			return nil // ledgers narrate history; their figures are of their time
 		}
-		walk(path, rel)
-		return nil
+		return walk(path, rel)
 	})
+	if err != nil {
+		g.Errs = append(g.Errs, "prose-count scan failed: "+err.Error())
+	}
 }

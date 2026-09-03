@@ -509,4 +509,3 @@ erDiagram
 
 - **reserve-before-pay** - An `Order` is not Paid until every `Reservation` for its `LineItem` records is Held.
 - **reserved-within-stock** - The reserved quantity of an `Inventory` never exceeds its onHand quantity.
-

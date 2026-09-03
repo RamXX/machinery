@@ -8,14 +8,19 @@ package pack
 // of proving a stale twin.
 
 import (
+	"bytes"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/artifactset"
+	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/ir"
-	"github.com/RamXX/machinery/internal/tla"
 	"github.com/RamXX/machinery/internal/version"
 )
 
@@ -30,7 +35,16 @@ type PackMap struct {
 
 // LoadPackMap reads and parses design/packmap.yaml.
 func LoadPackMap(design string) (*PackMap, error) {
-	data, err := os.ReadFile(filepath.Join(design, "packmap.yaml"))
+	root, err := openDesignRoot(design)
+	if err != nil {
+		return nil, err
+	}
+	pm, loadErr := loadPackMapRoot(root)
+	return pm, errors.Join(loadErr, root.Close())
+}
+
+func loadPackMapRoot(root *os.Root) (*PackMap, error) {
+	data, err := readDesignFileRoot(root, "packmap.yaml")
 	if err != nil {
 		return nil, fmt.Errorf("pack: cannot read packmap.yaml: %w", err)
 	}
@@ -39,15 +53,40 @@ func LoadPackMap(design string) (*PackMap, error) {
 		return nil, fmt.Errorf("pack: packmap.yaml is not a yaml mapping")
 	}
 	o := v.AsObject()
+	allowed := map[string]bool{"subsystem": true, "pack_hash": true, "machine": true, "mapping": true}
+	var unknown []string
+	for _, key := range o.Keys() {
+		if !allowed[key] {
+			unknown = append(unknown, key)
+		}
+	}
+	sort.Strings(unknown)
+	if len(unknown) > 0 {
+		return nil, fmt.Errorf("pack: packmap.yaml contains unknown root key %s", ir.Repr(unknown[0]))
+	}
+	for _, key := range []string{"subsystem", "pack_hash", "machine"} {
+		field := o.Get2(key)
+		if field == nil || field.Kind != ir.KindString || strings.TrimSpace(field.AsString()) == "" {
+			return nil, fmt.Errorf("pack: packmap.yaml %s is required and must be a non-empty string", key)
+		}
+	}
+	mappingValue := o.Get2("mapping")
+	if mappingValue == nil || mappingValue.Kind != ir.KindObject {
+		return nil, fmt.Errorf("pack: packmap.yaml mapping is required and must be a mapping of child state to contract state")
+	}
 	pm := &PackMap{
 		Subsystem: o.GetString("subsystem"),
 		PackHash:  o.GetString("pack_hash"),
 		Machine:   o.GetString("machine"),
 		Mapping:   map[string]string{},
 	}
-	mo := o.GetObject("mapping")
+	mo := mappingValue.AsObject()
 	for _, k := range mo.Keys() {
-		pm.Mapping[k] = mo.GetString(k)
+		value := mo.Get2(k)
+		if value == nil || value.Kind != ir.KindString || strings.TrimSpace(value.AsString()) == "" {
+			return nil, fmt.Errorf("pack: packmap.yaml mapping value for %s must be a non-empty string", ir.Repr(k))
+		}
+		pm.Mapping[k] = value.AsString()
 		pm.Order = append(pm.Order, k)
 	}
 	return pm, nil
@@ -55,7 +94,16 @@ func LoadPackMap(design string) (*PackMap, error) {
 
 // LoadPackManifest reads design/pack/pack.yaml of a child design.
 func LoadPackManifest(design string) (*ir.Object, error) {
-	data, err := os.ReadFile(filepath.Join(design, "pack", "pack.yaml"))
+	root, err := openDesignRoot(design)
+	if err != nil {
+		return nil, err
+	}
+	manifest, loadErr := loadPackManifestRoot(root)
+	return manifest, errors.Join(loadErr, root.Close())
+}
+
+func loadPackManifestRoot(root *os.Root) (*ir.Object, error) {
+	data, err := readDesignFileRoot(root, filepath.Join("pack", "pack.yaml"))
 	if err != nil {
 		return nil, fmt.Errorf("pack: cannot read pack/pack.yaml: %w", err)
 	}
@@ -63,7 +111,65 @@ func LoadPackManifest(design string) (*ir.Object, error) {
 	if err != nil || v.AsObject() == nil {
 		return nil, fmt.Errorf("pack: pack/pack.yaml is not a yaml mapping")
 	}
-	return v.AsObject(), nil
+	o := v.AsObject()
+	allowed := map[string]bool{"pack_version": true, "pack_revision": true, "subsystem": true, "contract_module": true, "owns": true, "components": true, "boundaries": true, "delegated_invariants": true, "content_hash": true}
+	var unknown []string
+	for _, key := range o.Keys() {
+		if !allowed[key] {
+			unknown = append(unknown, key)
+		}
+	}
+	sort.Strings(unknown)
+	if len(unknown) > 0 {
+		return nil, fmt.Errorf("pack: pack/pack.yaml contains unknown root key %s", ir.Repr(unknown[0]))
+	}
+	numberField := func(key string, exact int) error {
+		field := o.Get2(key)
+		if field == nil || field.Kind != ir.KindNumber {
+			return fmt.Errorf("pack: pack/pack.yaml %s is required and must be the integer %d", key, exact)
+		}
+		value, err := strconv.Atoi(string(field.AsNumber()))
+		if err != nil || value != exact {
+			return fmt.Errorf("pack: pack/pack.yaml %s must be the integer %d", key, exact)
+		}
+		return nil
+	}
+	if err := numberField("pack_version", 1); err != nil {
+		return nil, err
+	}
+	revision := o.Get2("pack_revision")
+	if revision == nil || revision.Kind != ir.KindNumber {
+		return nil, fmt.Errorf("pack: pack/pack.yaml pack_revision is required and must be an integer >= 1")
+	}
+	revisionNumber, revisionErr := strconv.Atoi(string(revision.AsNumber()))
+	if revisionErr != nil || revisionNumber < 1 {
+		return nil, fmt.Errorf("pack: pack/pack.yaml pack_revision must be an integer >= 1")
+	}
+	for _, key := range []string{"subsystem", "contract_module", "content_hash"} {
+		field := o.Get2(key)
+		if field == nil || field.Kind != ir.KindString || strings.TrimSpace(field.AsString()) == "" {
+			return nil, fmt.Errorf("pack: pack/pack.yaml %s is required and must be a non-empty string", key)
+		}
+	}
+	hashText := o.GetString("content_hash")
+	if decoded, err := hex.DecodeString(hashText); err != nil || len(decoded) != 32 {
+		return nil, fmt.Errorf("pack: pack/pack.yaml content_hash must be exactly 64 lowercase hexadecimal characters")
+	}
+	if hashText != strings.ToLower(hashText) {
+		return nil, fmt.Errorf("pack: pack/pack.yaml content_hash must be exactly 64 lowercase hexadecimal characters")
+	}
+	for _, key := range []string{"owns", "components", "boundaries", "delegated_invariants"} {
+		field := o.Get2(key)
+		if field == nil || field.Kind != ir.KindArray {
+			return nil, fmt.Errorf("pack: pack/pack.yaml %s is required and must be an array of strings", key)
+		}
+		for index, item := range field.AsArray() {
+			if item == nil || item.Kind != ir.KindString || strings.TrimSpace(item.AsString()) == "" {
+				return nil, fmt.Errorf("pack: pack/pack.yaml %s[%d] must be a non-empty string", key, index)
+			}
+		}
+	}
+	return o, nil
 }
 
 // PackFilesOnDisk reads the committed pack files of a child design (for hash
@@ -71,17 +177,45 @@ func LoadPackManifest(design string) (*ir.Object, error) {
 // error: the content hash covers files only, so a smuggled subdirectory would
 // carry unhashed content under the pack's authority.
 func PackFilesOnDisk(design string) (map[string]string, error) {
-	dir := filepath.Join(design, "pack")
-	entries, err := os.ReadDir(dir)
+	root, err := openDesignRoot(design)
+	if err != nil {
+		return nil, err
+	}
+	files, loadErr := packFilesOnDiskRoot(root)
+	return files, errors.Join(loadErr, root.Close())
+}
+
+func packFilesOnDiskRoot(root *os.Root) (map[string]string, error) {
+	info, lerr := root.Lstat("pack")
+	if lerr != nil {
+		return nil, fmt.Errorf("pack: %w", lerr)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, fmt.Errorf("pack: pack/ must be a real directory, not a symlink or non-directory")
+	}
+	packRoot, err := root.OpenRoot("pack")
 	if err != nil {
 		return nil, fmt.Errorf("pack: %w", err)
 	}
+	defer packRoot.Close()
+	dir, err := packRoot.Open(".")
+	if err != nil {
+		return nil, fmt.Errorf("pack: %w", err)
+	}
+	entries, readErr := dir.ReadDir(-1)
+	if err := errors.Join(readErr, dir.Close()); err != nil {
+		return nil, fmt.Errorf("pack: %w", err)
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	files := map[string]string{}
 	for _, e := range entries {
+		if e.Type()&os.ModeSymlink != 0 {
+			return nil, fmt.Errorf("pack: pack/ contains symlink %s; every hash-covered pack member must be a regular file", ir.Repr(e.Name()))
+		}
 		if e.IsDir() {
 			return nil, fmt.Errorf("pack: pack/ contains a directory %s; a pack is a flat generated file set and a subdirectory escapes the content hash entirely; remove it and re-copy the pack", ir.Repr(e.Name()))
 		}
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		data, err := readDesignFileRoot(packRoot, e.Name())
 		if err != nil {
 			return nil, err
 		}
@@ -212,12 +346,22 @@ func ReconcileMap(pm *PackMap, child, contract *ir.Value) error {
 // contract's TLA module (copied from the pack so the child proves against the
 // SAME bytes the parent composition instances) and the refinement module that
 // TLC checks via verify-formal.
-func GenerateRefinement(design string) (map[string]string, error) {
-	pm, err := LoadPackMap(design)
+func GenerateRefinement(design string) (result map[string]string, retErr error) {
+	root, err := openDesignRoot(design)
 	if err != nil {
 		return nil, err
 	}
-	manifest, err := LoadPackManifest(design)
+	defer func() {
+		retErr = errors.Join(retErr, root.Close())
+		if retErr != nil {
+			result = nil
+		}
+	}()
+	pm, err := loadPackMapRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	manifest, err := loadPackManifestRoot(root)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +369,7 @@ func GenerateRefinement(design string) (map[string]string, error) {
 		return nil, fmt.Errorf("pack: packmap subsystem %s does not match the pack's %s",
 			ir.Repr(pm.Subsystem), ir.Repr(manifest.GetString("subsystem")))
 	}
-	files, err := PackFilesOnDisk(design)
+	files, err := packFilesOnDiskRoot(root)
 	if err != nil {
 		return nil, err
 	}
@@ -237,13 +381,23 @@ func GenerateRefinement(design string) (map[string]string, error) {
 			shortHash(pm.PackHash), shortHash(manifest.GetString("content_hash")))
 	}
 	cmod := manifest.GetString("contract_module")
-	contractPath := filepath.Join(design, "pack", cmod+".machine.json")
-	contract, err := ir.LoadMachineJSON(contractPath)
+	contractRel := filepath.Join("pack", cmod+".machine.json")
+	contractRaw, err := readDesignFileRoot(root, contractRel)
 	if err != nil {
 		return nil, fmt.Errorf("pack: %w", err)
 	}
-	childPath := filepath.Join(design, "machines", pm.Machine+".machine.json")
-	child, err := ir.LoadMachineJSON(childPath)
+	contractPath := filepath.Join(design, contractRel)
+	contract, err := ir.LoadMachineJSONBytes(contractPath, contractRaw)
+	if err != nil {
+		return nil, fmt.Errorf("pack: %w", err)
+	}
+	childRel := filepath.Join("machines", pm.Machine+".machine.json")
+	childRaw, err := readDesignFileRoot(root, childRel)
+	if err != nil {
+		return nil, fmt.Errorf("pack: %w", err)
+	}
+	childPath := filepath.Join(design, childRel)
+	child, err := ir.LoadMachineJSONBytes(childPath, childRaw)
 	if err != nil {
 		return nil, fmt.Errorf("pack: %w", err)
 	}
@@ -254,7 +408,7 @@ func GenerateRefinement(design string) (map[string]string, error) {
 		return nil, err
 	}
 
-	childMid, _, childCfg, gerr := tla.Generate(childPath)
+	childMid, _, childCfg, gerr := generateTLAFromMachineBytes(childPath, childRaw)
 	if gerr != nil {
 		return nil, fmt.Errorf("pack: child machine: %w", gerr)
 	}
@@ -313,23 +467,234 @@ func shortHash(h string) string {
 
 // WriteRefinement generates and writes the refinement artifacts to design/formal/.
 func WriteRefinement(design string) ([]string, error) {
-	files, err := GenerateRefinement(design)
+	snapshot, err := designlock.Acquire(design)
 	if err != nil {
 		return nil, err
 	}
-	fdir := filepath.Join(design, "formal")
+	if err := snapshot.ResumeExpected("pack-refine", "rerun `machinery pack refine` with the same arguments"); err != nil {
+		return nil, errors.Join(err, snapshot.Release())
+	}
+	files, retErr := GenerateRefinement(snapshot.SourceRoot())
+	var names []string
+	if retErr == nil {
+		stale, staleErr := staleRefinementArtifacts(snapshot.SourceRoot(), design, files)
+		if staleErr != nil {
+			retErr = staleErr
+		}
+		expected := make([]designlock.OutputExpectation, 0, len(files)+len(stale))
+		for name, body := range files {
+			expected = append(expected, designlock.ExpectFile(filepath.Join(design, "formal", name), []byte(body), 0o644))
+		}
+		for _, name := range stale {
+			expected = append(expected, designlock.ExpectAbsent(filepath.Join(design, "formal", name.Name)))
+		}
+		if retErr == nil {
+			fdir := filepath.Join(design, "formal")
+			retErr = snapshot.PublishExpectedRooted("pack-refine", "rerun `machinery pack refine` with the same arguments", expected, func(outputs *designlock.OutputScope) error {
+				return outputs.WithRoot(fdir, func(root *os.Root) error {
+					var err error
+					names, err = writeRefinementArtifactsSetRooted(fdir, root, files, stale)
+					return err
+				})
+			})
+		}
+	}
+	retErr = errors.Join(retErr, snapshot.Release())
+	retErr = snapshot.LogicalError(retErr)
+	if retErr != nil {
+		return nil, retErr
+	}
+	return names, nil
+}
+
+func writeRefinementArtifacts(design string, files map[string]string) ([]string, error) {
+	stale, err := staleRefinementArtifacts(design, design, files)
+	if err != nil {
+		return nil, err
+	}
+	return writeRefinementArtifactsSet(design, files, stale)
+}
+
+func staleRefinementArtifacts(sourceDesign, liveDesign string, files map[string]string) (stale []artifactset.RemovalPrecondition, retErr error) {
+	fdir, err := designPathNoSymlinks(sourceDesign, "formal")
+	if err != nil {
+		return nil, fmt.Errorf("pack: formal output: %w", err)
+	}
+	info, err := os.Lstat(fdir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, fmt.Errorf("pack: formal output must be a real directory, not a symlink or non-directory")
+	}
+	root, err := os.OpenRoot(fdir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { retErr = errors.Join(retErr, root.Close()) }()
+	dir, err := root.Open(".")
+	if err != nil {
+		return nil, err
+	}
+	entries, readErr := dir.ReadDir(-1)
+	if err := errors.Join(readErr, dir.Close()); err != nil {
+		return nil, err
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	liveFormal := filepath.Join(liveDesign, "formal")
+	for _, entry := range entries {
+		name := entry.Name()
+		if _, keep := files[name]; keep || !strings.HasSuffix(name, "PackRefinement.tla") {
+			continue
+		}
+		body, err := root.ReadFile(name)
+		if err != nil {
+			return nil, err
+		}
+		if !canonicalPackRefinementTLA(name, body) {
+			continue
+		}
+		liveBody, condition, err := artifactset.InspectRemovalCandidate(liveFormal, name)
+		if err != nil || !bytes.Equal(liveBody, body) {
+			if err == nil {
+				err = fmt.Errorf("live stale refinement artifact changed after snapshot")
+			}
+			return nil, err
+		}
+		stale = append(stale, condition)
+		cfg := strings.TrimSuffix(name, ".tla") + ".cfg"
+		sourceCfg, cfgErr := root.ReadFile(cfg)
+		if os.IsNotExist(cfgErr) {
+			continue
+		}
+		if cfgErr != nil {
+			return nil, cfgErr
+		}
+		if !canonicalPackRefinementCFG(sourceCfg) {
+			continue
+		}
+		liveCfg, cfgCondition, err := artifactset.InspectRemovalCandidate(liveFormal, cfg)
+		if err != nil || !bytes.Equal(liveCfg, sourceCfg) {
+			if err == nil {
+				err = fmt.Errorf("live stale refinement config changed after snapshot")
+			}
+			return nil, err
+		}
+		stale = append(stale, cfgCondition)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if _, keep := files[name]; keep || !strings.HasSuffix(name, "PackRefinement.cfg") {
+			continue
+		}
+		anchor := strings.TrimSuffix(name, ".cfg") + ".tla"
+		if _, err := root.Lstat(anchor); err == nil {
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		sourceCfg, err := root.ReadFile(name)
+		if err != nil {
+			return nil, err
+		}
+		if !canonicalPackRefinementCFG(sourceCfg) {
+			continue
+		}
+		liveCfg, condition, err := artifactset.InspectRemovalCandidate(liveFormal, name)
+		if err != nil || !bytes.Equal(liveCfg, sourceCfg) {
+			if err == nil {
+				err = fmt.Errorf("live stale refinement config changed after snapshot")
+			}
+			return nil, err
+		}
+		stale = append(stale, condition)
+	}
+	sort.Slice(stale, func(i, j int) bool { return stale[i].Name < stale[j].Name })
+	return stale, nil
+}
+
+func canonicalPackRefinementTLA(name string, body []byte) bool {
+	module := strings.TrimSuffix(name, ".tla")
+	lines := bytes.SplitN(body, []byte("\n"), 4)
+	return strings.HasSuffix(module, "PackRefinement") && len(lines) >= 3 &&
+		string(lines[0]) == "---- MODULE "+module+" ----" && bytes.HasPrefix(lines[1], []byte(`\* machinery-version: `)) &&
+		string(lines[2]) == `\* GENERATED by machinery pack refine. RECONCILED against the child machine`
+}
+
+func canonicalPackRefinementCFG(body []byte) bool {
+	lines := strings.Split(strings.TrimSuffix(string(body), "\n"), "\n")
+	if len(lines) < 3 || !strings.HasPrefix(lines[0], `\* machinery-version: `) || lines[len(lines)-2] != "SPECIFICATION Spec" || lines[len(lines)-1] != "PROPERTY CSpecHolds" {
+		return false
+	}
+	for _, line := range lines[1 : len(lines)-2] {
+		if !strings.HasPrefix(line, "CONSTANT ") || strings.TrimSpace(line) != line {
+			return false
+		}
+	}
+	return true
+}
+
+func writeRefinementArtifactsSet(design string, files map[string]string, stale []artifactset.RemovalPrecondition) ([]string, error) {
+	fdir, err := designPathNoSymlinks(design, "formal")
+	if err != nil {
+		return nil, fmt.Errorf("pack: formal output: %w", err)
+	}
 	if err := os.MkdirAll(fdir, 0o755); err != nil {
 		return nil, err
 	}
+	info, err := os.Lstat(fdir)
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, fmt.Errorf("pack: formal output must be a real directory, not a symlink or non-directory")
+	}
 	var names []string
 	for n := range files {
+		if filepath.Base(n) != n || n == "." {
+			return nil, fmt.Errorf("pack: generated unsafe refinement artifact name %s", ir.Repr(n))
+		}
 		names = append(names, n)
 	}
 	sort.Strings(names)
 	for _, n := range names {
-		if err := os.WriteFile(filepath.Join(fdir, n), []byte(files[n]), 0o644); err != nil {
-			return nil, err
+		info, statErr := os.Lstat(filepath.Join(fdir, n))
+		if os.IsNotExist(statErr) {
+			continue
 		}
+		if statErr != nil {
+			return nil, statErr
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("pack: generated target %s must be a regular file, not a symlink or special file", ir.Repr(n))
+		}
+	}
+	committed := make(map[string][]byte, len(names))
+	for _, n := range names {
+		committed[n] = []byte(files[n])
+	}
+	if err := artifactset.ReconcilePlanned(fdir, committed, stale); err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+func writeRefinementArtifactsSetRooted(scope string, root *os.Root, files map[string]string, stale []artifactset.RemovalPrecondition) ([]string, error) {
+	names := make([]string, 0, len(files))
+	committed := make(map[string][]byte, len(files))
+	for name, body := range files {
+		if filepath.Base(name) != name || name == "." {
+			return nil, fmt.Errorf("pack: generated unsafe refinement artifact name %s", ir.Repr(name))
+		}
+		names = append(names, name)
+		committed[name] = []byte(body)
+	}
+	sort.Strings(names)
+	if err := artifactset.ReconcilePlannedRooted(scope, root, committed, stale); err != nil {
+		return nil, err
 	}
 	return names, nil
 }

@@ -7,6 +7,9 @@
     "OPTIMIZE_TIMEOUT": "60000 ms - the 16-of-N min-drawdown search",
     "RETRY_BACKOFF": "~1000 ms exponential backoff between price-fetch retries"
   },
+  "_counters": {
+    "retries": "one budget per recommendation-run instance: the recommend command creates one run, drives it once from Collecting to Ready or Failed, and never resumes a terminal instance; a re-issued command creates a new run with retries initialized to zero"
+  },
   "context": {
     "runId": null,
     "candidateSetId": null,
@@ -45,11 +48,11 @@
     },
     "Ready": {
       "type": "final",
-      "entry": "publishReady"
+      "entry": ["assertTerminalAbsorbing", "publishReady"]
     },
     "Failed": {
       "type": "final",
-      "entry": "publishFailure"
+      "entry": ["assertTerminalAbsorbing", "publishFailure"]
     }
   }
 }

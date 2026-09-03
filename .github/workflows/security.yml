@@ -29,12 +29,16 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
           govulncheck ./...
-      # Also scan the example application's dependencies (separate go.mod).
-      - name: Run govulncheck (go-crm example impl)
-        working-directory: examples/go-crm/impl
+      # Also scan every registered example implementation module.
+      - name: Run govulncheck (registered example impls)
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
-          govulncheck ./...
+          set -euo pipefail
+          scripts/example-inventory.sh security | while IFS=$'\t' read -r impl module; do
+            case "$module" in
+              go) (cd "$impl" && govulncheck ./...) ;;
+              *) echo "::error::unsupported security module type $module: $impl"; exit 1 ;;
+            esac
+          done
 
   # gitleaks scans the full history and the working tree for secrets (API keys,
   # tokens, private keys) on every trigger (full clone, fetch-depth 0).
@@ -59,5 +63,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          # Fail on any high/critical vulnerability introduced; warn on moderate.
-          fail-on-severity: high
+          # Production policy has no warning-only vulnerability tier. Any new
+          # known vulnerability must be fixed or explicitly reviewed upstream.
+          fail-on-severity: low

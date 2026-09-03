@@ -27,6 +27,8 @@
 package gates
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -34,8 +36,21 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/filelock"
 	"github.com/RamXX/machinery/internal/ir"
 )
+
+func embedRefreshLockScope(design string) string {
+	return filepath.Join(design, ".machinery-embed-refresh")
+}
+
+const (
+	embedRefreshWriter   = "embed-refresh"
+	embedRefreshRecovery = "rerun `machinery embed refresh` with the same arguments"
+)
+
+var embedRefreshAfterWorkspaceSnapshot = func() {}
 
 // leadTokenRe matches a cell's leading backticked token, the key most design
 // tables carry in their first column.
@@ -102,38 +117,164 @@ type RefreshReport struct {
 // nothing. Returns one report per marker, in file order, plus the set of
 // files it changed (empty under dryRun; the files it WOULD change are the
 // ones with a non-zero Recopied or Appended).
-func RefreshEmbeds(design string, dryRun bool) ([]RefreshReport, []string, error) {
-	var reports []RefreshReport
-	var changed []string
-	for _, path := range markdownFiles(design) {
-		body, err := os.ReadFile(path)
+func RefreshEmbeds(design string, dryRun bool) (reports []RefreshReport, changed []string, retErr error) {
+	acquire := designlock.Acquire
+	if dryRun {
+		acquire = designlock.AcquireReader
+	}
+	snapshot, err := acquire(design)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		if err := snapshot.Release(); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("release design snapshot lock: %w", err))
+		}
+		retErr = snapshot.LogicalError(retErr)
+	}()
+	if !dryRun {
+		// The inner journal is deliberately removed before PublishExpected
+		// performs its final validation and clears the outer sentinel. If the
+		// process dies in that last interval, resume the persisted exact output
+		// contract before discovery can mistake the completed outputs for a
+		// no-op and strand the sentinel forever. Live inner residue is left for
+		// the rooted transaction recovery below.
+		if err := snapshot.ResumeExpected(embedRefreshWriter, embedRefreshRecovery); err != nil {
+			return nil, nil, fmt.Errorf("resume finalized embed refresh publication: %w", err)
+		}
+	}
+	lock, err := filelock.Acquire(embedRefreshLockScope(design))
+	if err != nil {
+		return nil, nil, fmt.Errorf("acquire design-wide embed refresh lock: %w", err)
+	}
+	defer func() {
+		if err := lock.Release(); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("release design-wide embed refresh lock: %w", err))
+		}
+	}()
+	txRoot, err := snapshot.OpenRoot(design)
+	if err != nil {
+		return nil, nil, err
+	}
+	tx, err := openEmbedRootTransactionRetained(design, txRoot)
+	if err != nil {
+		_ = txRoot.Close()
+		return nil, nil, err
+	}
+	defer func() {
+		if err := tx.Close(); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("close rooted embed refresh transaction: %w", err))
+		}
+	}()
+	if journal, pending, err := tx.pending(); err != nil {
+		return nil, nil, err
+	} else if pending {
+		expected := make([]designlock.OutputExpectation, 0, len(journal.Items))
+		for _, item := range journal.Items {
+			target := filepath.Join(design, filepath.FromSlash(item.Path))
+			if item.Deletion {
+				expected = append(expected, designlock.ExpectAbsent(target))
+			} else {
+				expected = append(expected, designlock.ExpectFile(target, item.New, os.FileMode(item.NewMode)))
+			}
+			changed = append(changed, item.Path)
+		}
+		if dryRun {
+			return nil, nil, fmt.Errorf("interrupted embed refresh transaction requires an exact non-dry-run retry before reads")
+		}
+		if err := snapshot.PublishExpectedRooted(embedRefreshWriter, embedRefreshRecovery, expected, func(outputs *designlock.OutputScope) error {
+			return outputs.WithRoot(design, func(root *os.Root) error {
+				return tx.withRoot(root, func() error { return tx.recover(journal) })
+			})
+		}); err != nil {
+			return nil, nil, err
+		}
+		return nil, changed, nil
+	}
+	workspace, err := snapshot.MaterializeDesignWorkspace()
+	if err != nil {
+		return nil, nil, fmt.Errorf("materialize retained embed workspace: %w", err)
+	}
+	defer func() {
+		if err := workspace.Close(); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("remove retained embed workspace: %w", err))
+		}
+	}()
+	sourceDesign := workspace.Path()
+	embedRefreshAfterWorkspaceSnapshot()
+	files, err := markdownFiles(sourceDesign)
+	if err != nil {
+		return nil, nil, err
+	}
+	type plannedDoc struct {
+		path string
+		old  []byte
+		new  []byte
+		mode uint32
+	}
+	var planned []plannedDoc
+	for _, path := range files {
+		body, err := readDesignFile(sourceDesign, path)
 		if err != nil {
 			return nil, nil, err
 		}
-		rel, rerr := filepath.Rel(design, path)
+		rel, rerr := filepath.Rel(sourceDesign, path)
 		if rerr != nil {
 			rel = path
 		}
 		rel = filepath.ToSlash(rel)
-		out, rs := refreshOneDoc(rel, path, string(body))
+		out, rs := refreshOneDoc(sourceDesign, rel, path, string(body))
 		reports = append(reports, rs...)
+		targetPath := filepath.Join(design, filepath.FromSlash(rel))
 		if out == string(body) {
 			continue
 		}
-		changed = append(changed, rel)
-		if dryRun {
-			continue
+		info, statErr := os.Lstat(path)
+		if statErr != nil {
+			return nil, nil, statErr
 		}
-		if err := os.WriteFile(path, []byte(out), 0644); err != nil {
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return nil, nil, fmt.Errorf("embed target %s must be a regular file", rel)
+		}
+		changed = append(changed, rel)
+		planned = append(planned, plannedDoc{path: targetPath, old: body, new: []byte(out), mode: uint32(info.Mode().Perm())})
+	}
+	if dryRun || len(planned) == 0 {
+		if err := snapshot.CheckUnchanged(); err != nil {
 			return nil, nil, err
 		}
+		return reports, changed, nil
+	}
+
+	items := make([]embedTxItem, 0, len(planned))
+	expected := make([]designlock.OutputExpectation, 0, len(planned))
+	for _, p := range planned {
+		rel, err := filepath.Rel(design, p.path)
+		if err != nil {
+			return nil, nil, err
+		}
+		items = append(items, embedTxItem{Path: filepath.ToSlash(rel), Old: p.old, New: p.new, OldMode: p.mode, NewMode: p.mode})
+		expected = append(expected, designlock.ExpectFile(p.path, p.new, os.FileMode(p.mode)))
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].Path < items[j].Path })
+	journal, err := newEmbedTxJournal(tx.scope, items)
+	if err != nil {
+		return nil, nil, err
+	}
+	publishErr := snapshot.PublishExpectedRooted(embedRefreshWriter, embedRefreshRecovery, expected, func(outputs *designlock.OutputScope) error {
+		return outputs.WithRoot(design, func(root *os.Root) error {
+			return tx.withRoot(root, func() error { return tx.commit(journal) })
+		})
+	})
+	if publishErr != nil {
+		return nil, nil, publishErr
 	}
 	return reports, changed, nil
 }
 
 // refreshOneDoc rewrites every marked table in one document, returning the
 // new text and one report per marker.
-func refreshOneDoc(rel, path, text string) (string, []RefreshReport) {
+func refreshOneDoc(design, rel, path, text string) (string, []RefreshReport) {
 	lines := strings.Split(text, "\n")
 	var out []string
 	var reports []RefreshReport
@@ -166,7 +307,7 @@ func refreshOneDoc(rel, path, text string) (string, []RefreshReport) {
 			reports = append(reports, rep)
 			continue
 		}
-		refreshed := refreshOneTable(path, block, cols, &rep)
+		refreshed := refreshOneTable(design, path, block, cols, &rep)
 		out = append(out, refreshed...)
 		reports = append(reports, rep)
 	}
@@ -208,13 +349,18 @@ func isTableLine(line string) bool {
 
 // refreshOneTable rewrites one marked table block (header, separator, rows)
 // against its source, recording the outcome in rep.
-func refreshOneTable(docPath string, block, cols []string, rep *RefreshReport) []string {
-	srcPath := filepath.Join(filepath.Dir(docPath), rep.From)
-	srcText := readOrEmpty(srcPath)
-	if srcText == "" {
+func refreshOneTable(design, docPath string, block, cols []string, rep *RefreshReport) []string {
+	srcPath, resolveErr := resolveRetainedDesignReference(design, docPath, rep.From)
+	if resolveErr != nil {
+		rep.Problem = resolveErr.Error() + "; Ge reports it"
+		return block
+	}
+	srcBody, err := readRegularFile(srcPath)
+	if err != nil || len(srcBody) == 0 {
 		rep.Problem = "source " + ir.Repr(rep.From) + " does not exist or is empty; Ge reports it"
 		return block
 	}
+	srcText := string(srcBody)
 	var matched []ir.MdTable
 	for _, t := range ir.ParseMdTables(srcText) {
 		if headerHasAll(t.Header, cols) {

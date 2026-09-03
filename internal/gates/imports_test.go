@@ -3,9 +3,48 @@ package gates
 import (
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
-	"time"
 )
+
+func TestManifestDependenciesRejectMalformedEvidenceByEcosystem(t *testing.T) {
+	cases := []struct {
+		name, file, body, want string
+	}{
+		{"package JSON duplicate", "package.json", `{"dependencies":{"ok":"1"},"dependencies":{}}`, "duplicate JSON key"},
+		{"package JSON null root", "package.json", `null`, "root must be a non-null object"},
+		{"package JSON null dependencies", "package.json", `{"dependencies":null}`, "must be a non-null object"},
+		{"go.mod unterminated require", "go.mod", "module example.com/app\nrequire (\nexample.com/dep v1.2.3\n", "unterminated require block"},
+		{"Cargo malformed table", "Cargo.toml", "[dependencies\nserde = \"1\"\n", "malformed TOML table header"},
+		{"requirements recursive include", "requirements.txt", "good==1\n-r more.txt\n", "cannot be enumerated completely"},
+		{"Mix malformed deps", "mix.exs", "defp deps do\n  [{:plug, \"~> 1.0\"}\nend\n", "unbalanced Elixir"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			impl := t.TempDir()
+			mustWrite(t, filepath.Join(impl, tc.file), tc.body)
+			_, errs := manifestDependencies(impl, nil)
+			if len(errs) == 0 || !strings.Contains(strings.Join(errs, "\n"), tc.want) {
+				t.Fatalf("malformed %s did not invalidate dependency evidence: %v", tc.file, errs)
+			}
+		})
+	}
+}
+
+func TestPackageManifestMultiInvalidDiagnosticIsByteStable(t *testing.T) {
+	body := []byte(`{"dependencies":{"zeta":null,"alpha":false,"middle":""}}`)
+	const want = "dependencies.alpha must be a nonempty version string"
+	for i := 0; i < 100; i++ {
+		deps, err := parsePackageManifest(body)
+		if err == nil || err.Error() != want || deps != nil {
+			t.Fatalf("run %d: deps=%v err=%v, want nil and %q", i, deps, err, want)
+		}
+	}
+
+	if _, err := parsePackageManifest([]byte(`null`)); err == nil || !strings.Contains(err.Error(), "root must be a non-null object") {
+		t.Fatalf("null package root passed closed schema: %v", err)
+	}
+}
 
 func TestExModules(t *testing.T) {
 	cases := []struct {
@@ -136,8 +175,8 @@ func TestG4MultiModuleGoResolvesEveryModule(t *testing.T) {
 	if g.Counts["imports resolved"] != 2 {
 		t.Fatalf("intra-module and cross-module imports must both resolve: %+v", g.Counts)
 	}
-	if hasErr(g, "example.com/scratch/y") {
-		t.Fatalf("a go.mod under an ignored glob must not be discovered, got %v", g.Errs)
+	if !hasErr(g, "imports undeclared third-party module example.com/scratch/y") {
+		t.Fatalf("an import of ignored/unmodeled code must not disappear with the ignored module, got %v", g.Errs)
 	}
 	if len(scan.OrphanRefs["example.com/mcp/gone"]) != 1 {
 		t.Fatalf("a module-internal import with no boundary is an orphan: %+v", scan.OrphanRefs)
@@ -158,14 +197,12 @@ func TestGoModuleForPrefersLongestPath(t *testing.T) {
 	}
 }
 
-// Snapshots stamp a full date; older month-only snapshots stay readable and
-// age from the first of the month.
-func TestRatchetAgeNoteBothFormats(t *testing.T) {
-	now := time.Date(2026, 8, 23, 0, 0, 0, 0, time.UTC)
-	if got := ratchetAgeNote("2026-08-23", now); got != "ratchet snapshot 2026-08-23, 0 day(s) old" {
+// Snapshot telemetry is tree-derived and stays identical across midnight.
+func TestRatchetSnapshotNoteBothFormatsIsClockIndependent(t *testing.T) {
+	if got := ratchetSnapshotNote("2026-08-23"); got != "ratchet snapshot 2026-08-23" {
 		t.Fatalf("full date: %q", got)
 	}
-	if got := ratchetAgeNote("2026-08", now); got != "ratchet snapshot 2026-08, 22 day(s) old" {
+	if got := ratchetSnapshotNote("2026-08"); got != "ratchet snapshot 2026-08" {
 		t.Fatalf("month form: %q", got)
 	}
 }

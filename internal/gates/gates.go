@@ -17,6 +17,7 @@ import (
 	"github.com/RamXX/machinery/internal/lint"
 	"github.com/RamXX/machinery/internal/oracle"
 	"github.com/RamXX/machinery/internal/pack"
+	"github.com/RamXX/machinery/internal/portablepath"
 	"github.com/RamXX/machinery/internal/tla"
 	"github.com/RamXX/machinery/internal/version"
 )
@@ -106,7 +107,7 @@ func regenCommands(design string) []string {
 	}
 	if len(sortedGlob(formal, "*.semantics.yaml")) > 0 ||
 		len(sortedGlob(formal, "*.composition.yaml")) > 0 ||
-		hasGeneratedTLA(formal) {
+		hasGeneratedTLA(design, formal) {
 		cmds = append(cmds, "machinery verify-formal --gen-only "+design)
 	}
 	if pack.HasDecomposition(design) {
@@ -121,9 +122,9 @@ func regenCommands(design string) []string {
 // hasGeneratedTLA reports whether formal/ holds a machinery-generated .tla
 // module (one carrying a version stamp). A hand-written .tla is not a
 // regeneration obligation.
-func hasGeneratedTLA(formal string) bool {
+func hasGeneratedTLA(design, formal string) bool {
 	for _, path := range sortedGlob(formal, "*.tla") {
-		if version.StampOf(readOrEmpty(path)) != "" {
+		if version.StampOf(readDesignOrEmpty(design, path)) != "" {
 			return true
 		}
 	}
@@ -203,20 +204,39 @@ func (g *Gate) Emit(out io.Writer) int {
 
 // --- helpers ---
 
-func readOrEmpty(path string) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	return string(data)
-}
-
 // readFileOrErr reads path for a gate. An absent file is "" (the callers'
 // own existence logic owns that case), but a file that EXISTS and cannot be
 // read is a hard ERROR naming the file: silently treating an unreadable
 // artifact as empty produces wrong diagnoses (NG-9).
 func readFileOrErr(path string, g *Gate) string {
 	data, err := os.ReadFile(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			g.Errs = append(g.Errs, path+" is unreadable: "+err.Error())
+		}
+		return ""
+	}
+	return string(data)
+}
+
+func loadDesignMachine(design, path string) (*ir.Value, error) {
+	data, err := readDesignFile(design, path)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read %s: %w", path, err)
+	}
+	return ir.LoadMachineJSONBytes(path, data)
+}
+
+func readDesignOrEmpty(design, path string) string {
+	data, err := readDesignFile(design, path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func readDesignFileOrErr(design, path string, g *Gate) string {
+	data, err := readDesignFile(design, path)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			g.Errs = append(g.Errs, path+" is unreadable: "+err.Error())
@@ -306,12 +326,141 @@ var (
 	kebabRe  = regexp.MustCompile("`([a-z][a-z0-9]*(?:-[a-z0-9]+)+)`")
 )
 
-func loadContract(archPath string, g *Gate) *ir.Value {
+var (
+	contractRootKeys     = stringSet("contract_version", "boundaries", "externals", "ignore", "dependency_rules", "_comment")
+	contractBoundaryKeys = stringSet("id", "kind", "element", "code", "exposes", "modules", "provides", "consumes", "_comment")
+	contractExternalKeys = stringSet("id", "element", "imports", "modules", "_comment")
+	contractRuleKeys     = stringSet("allow", "deny", "baseline", "assert", "notes", "_comment")
+	contractAssertKeys   = stringSet("no_path", "_comment")
+)
+
+func contractUnknownKeys(g *Gate, o *ir.Object, allowed map[string]bool, where string) {
+	for _, key := range o.Keys() {
+		if !allowed[key] {
+			g.Errs = append(g.Errs, fmt.Sprintf("Architecture Contract: unsupported key %s in %s (contract v2 is closed; a typo must not remove an obligation)", ir.Repr(key), where))
+		}
+	}
+}
+
+func contractStringList(g *Gate, o *ir.Object, key, where string, required bool) {
+	v := o.Get2(key)
+	if v == nil {
+		if required {
+			g.Errs = append(g.Errs, fmt.Sprintf("Architecture Contract: %s.%s is required and must be a non-empty list of strings", where, key))
+		}
+		return
+	}
+	if v.Kind != ir.KindArray || (required && len(v.AsArray()) == 0) {
+		g.Errs = append(g.Errs, fmt.Sprintf("Architecture Contract: %s.%s must be %sa list of strings", where, key, map[bool]string{true: "a non-empty ", false: ""}[required]))
+		return
+	}
+	for i, item := range v.AsArray() {
+		if item == nil || item.Kind != ir.KindString || strings.TrimSpace(item.AsString()) == "" {
+			g.Errs = append(g.Errs, fmt.Sprintf("Architecture Contract: %s.%s[%d] must be a non-empty string", where, key, i))
+		}
+	}
+}
+
+func contractString(g *Gate, o *ir.Object, key, where string, required bool) {
+	v := o.Get2(key)
+	if v == nil {
+		if required {
+			g.Errs = append(g.Errs, fmt.Sprintf("Architecture Contract: %s.%s is required and must be a non-empty string", where, key))
+		}
+		return
+	}
+	if v.Kind != ir.KindString || strings.TrimSpace(v.AsString()) == "" {
+		g.Errs = append(g.Errs, fmt.Sprintf("Architecture Contract: %s.%s must be a non-empty string", where, key))
+	}
+}
+
+func validateContractSchema(g *Gate, co *ir.Object) {
+	contractUnknownKeys(g, co, contractRootKeys, "root")
+	contractString(g, co, "_comment", "root", false)
+	for _, spec := range []struct {
+		key      string
+		allowed  map[string]bool
+		required bool
+	}{
+		{"boundaries", contractBoundaryKeys, true},
+		{"externals", contractExternalKeys, false},
+	} {
+		v := co.Get2(spec.key)
+		if v == nil {
+			if spec.required {
+				g.Errs = append(g.Errs, "Architecture Contract: boundaries must be a non-empty list of mappings")
+			}
+			continue
+		}
+		if v.Kind != ir.KindArray || (spec.required && len(v.AsArray()) == 0) {
+			g.Errs = append(g.Errs, fmt.Sprintf("Architecture Contract: %s must be %sa list of mappings", spec.key, map[bool]string{true: "a non-empty ", false: ""}[spec.required]))
+			continue
+		}
+		for i, item := range v.AsArray() {
+			o := item.AsObject()
+			where := fmt.Sprintf("%s[%d]", spec.key, i)
+			if o == nil {
+				g.Errs = append(g.Errs, "Architecture Contract: "+where+" is not a mapping")
+				continue
+			}
+			contractUnknownKeys(g, o, spec.allowed, where)
+			if spec.key == "boundaries" {
+				contractString(g, o, "id", where, true)
+				contractString(g, o, "kind", where, false)
+				contractString(g, o, "element", where, false)
+				contractString(g, o, "_comment", where, false)
+				contractStringList(g, o, "code", where, true)
+				contractStringList(g, o, "exposes", where, false)
+				contractStringList(g, o, "modules", where, false)
+				contractStringList(g, o, "provides", where, false)
+				contractStringList(g, o, "consumes", where, false)
+			} else {
+				contractString(g, o, "id", where, true)
+				contractString(g, o, "element", where, false)
+				contractString(g, o, "_comment", where, false)
+				contractStringList(g, o, "imports", where, false)
+				contractStringList(g, o, "modules", where, false)
+			}
+		}
+	}
+	contractStringList(g, co, "ignore", "root", false)
+	if rv := co.Get2("dependency_rules"); rv != nil {
+		rules := rv.AsObject()
+		if rules == nil {
+			g.Errs = append(g.Errs, "Architecture Contract: dependency_rules must be a mapping")
+			return
+		}
+		contractUnknownKeys(g, rules, contractRuleKeys, "dependency_rules")
+		contractString(g, rules, "_comment", "dependency_rules", false)
+		for _, key := range []string{"allow", "deny", "baseline", "notes"} {
+			contractStringList(g, rules, key, "dependency_rules", false)
+		}
+		if av := rules.Get2("assert"); av != nil {
+			if av.Kind != ir.KindArray {
+				g.Errs = append(g.Errs, "Architecture Contract: dependency_rules.assert must be a list of mappings")
+			} else {
+				for i, item := range av.AsArray() {
+					o := item.AsObject()
+					if o == nil {
+						g.Errs = append(g.Errs, fmt.Sprintf("Architecture Contract: dependency_rules.assert[%d] is not a mapping", i))
+						continue
+					}
+					contractUnknownKeys(g, o, contractAssertKeys, fmt.Sprintf("dependency_rules.assert[%d]", i))
+					where := fmt.Sprintf("dependency_rules.assert[%d]", i)
+					contractString(g, o, "no_path", where, true)
+					contractString(g, o, "_comment", where, false)
+				}
+			}
+		}
+	}
+}
+
+func loadContract(design, archPath string, g *Gate) *ir.Value {
 	if _, err := os.Stat(archPath); err != nil {
 		g.Errs = append(g.Errs, filepath.Base(archPath)+" does not exist")
 		return nil
 	}
-	data, err := os.ReadFile(archPath)
+	data, err := readDesignFile(design, archPath)
 	if err != nil {
 		g.Errs = append(g.Errs, filepath.Base(archPath)+" is unreadable: "+err.Error())
 		return nil
@@ -349,6 +498,7 @@ func loadContract(archPath string, g *Gate) *ir.Value {
 		g.Errs = append(g.Errs, "Architecture Contract declares no boundaries")
 		return nil
 	}
+	validateContractSchema(g, co)
 	return c
 }
 
@@ -361,7 +511,19 @@ func contractEdges(rules *ir.Object, key string, g *Gate) [][2]string {
 	if v == nil {
 		return out
 	}
+	if v.Kind != ir.KindArray {
+		if g != nil {
+			g.Errs = append(g.Errs, fmt.Sprintf("dependency_rules.%s must be a list of 'src -> dst' strings", key))
+		}
+		return out
+	}
 	for _, e := range v.AsArray() {
+		if e == nil || e.Kind != ir.KindString {
+			if g != nil {
+				g.Errs = append(g.Errs, fmt.Sprintf("unparseable %s rule: %s (expected a string 'src -> dst')", key, goReprValue(e)))
+			}
+			continue
+		}
 		s := e.AsString()
 		m := edgeRuleRe.FindStringSubmatch(s)
 		if m != nil {
@@ -373,8 +535,8 @@ func contractEdges(rules *ir.Object, key string, g *Gate) [][2]string {
 	return out
 }
 
-func dslElements(dslPath string, g *Gate) map[string]dslEl {
-	return dslElementsOf(readFileOrErr(dslPath, g))
+func dslElements(design, dslPath string, g *Gate) map[string]dslEl {
+	return dslElementsOf(readDesignFileOrErr(design, dslPath, g))
 }
 
 // dslElementsOf parses element declarations out of a workspace.dsl text.
@@ -464,7 +626,7 @@ func CheckC4(design string) *Gate {
 	g := NewGate("G2-c4  Architecture Contract")
 	g.startOrder()
 	arch := filepath.Join(design, "ARCHITECTURE.md")
-	c := loadContract(arch, g)
+	c := loadContract(design, arch, g)
 	if c == nil {
 		return g
 	}
@@ -499,6 +661,29 @@ func CheckC4(design string) *Gate {
 		}
 		extIDs = append(extIDs, xo.GetString("id"))
 		g.Count("externals")
+	}
+	for _, xid := range uniqueDuplicates(extIDs) {
+		if countStr(extIDs, xid) > 1 {
+			g.Errs = append(g.Errs, fmt.Sprintf("duplicate external id %s", ir.Repr(xid)))
+		}
+	}
+	allIDs := append(append([]string{}, ids...), extIDs...)
+	for _, id := range uniqueDuplicates(allIDs) {
+		if countStr(allIDs, id) > 1 && countStr(ids, id) > 0 && countStr(extIDs, id) > 0 {
+			g.Errs = append(g.Errs, fmt.Sprintf("participant id %s is declared as both a boundary and an external", ir.Repr(id)))
+		}
+	}
+	bindings := map[string][]string{}
+	for _, item := range append(append([]*ir.Value{}, boundaries...), externals...) {
+		if o := item.AsObject(); o != nil && o.GetString("element") != "" {
+			bindings[o.GetString("element")] = append(bindings[o.GetString("element")], o.GetString("id"))
+		}
+	}
+	for _, element := range sortedKeys(bindings) {
+		if len(bindings[element]) > 1 {
+			sort.Strings(bindings[element])
+			g.Errs = append(g.Errs, fmt.Sprintf("workspace element %s is bound by multiple contract participants (%s); element bindings must be one-to-one", ir.Repr(element), strings.Join(bindings[element], ", ")))
+		}
 	}
 	declared := setOf(ids)
 	for _, x := range extIDs {
@@ -666,7 +851,7 @@ func CheckC4(design string) *Gate {
 		g.Errs = append(g.Errs, "workspace.dsl does not exist; the contract has no model to bind to")
 		return g
 	}
-	dslText := readFileOrErr(dslPath, g)
+	dslText := readDesignFileOrErr(design, dslPath, g)
 	els := dslElementsOf(dslText)
 	g.Count("dsl elements", len(els))
 	if len(els) == 0 {
@@ -721,7 +906,7 @@ func CheckC4(design string) *Gate {
 			}
 		}
 	}
-	text := readFileOrErr(arch, g)
+	text := readDesignFileOrErr(design, arch, g)
 	// EVERY header-matching table counts, as with the event and interface
 	// contracts: a design may split its mitigation posture across sections
 	// (transition-only dependencies in their own table, say), and the
@@ -1269,17 +1454,76 @@ func CheckMachines(design string) *Gate {
 	g := NewGate("G3-machine  machines + oracle")
 	g.startOrder()
 	mdir := filepath.Join(design, "machines")
-	files := sortedGlob(mdir, "*.machine.json")
+	files, invalidMachines := strictSortedGlob(g, mdir, "*.machine.json", "machine source")
+	oraclePaths, invalidOracles := strictSortedGlob(g, mdir, "*.oracle.md", "committed oracle")
+	matrixPaths, invalidMatrices := strictSortedGlob(g, mdir, "*.matrix.md", "committed matrix")
+	_ = invalidMachines // its findings are emitted even when no source remains
+	portableNames := map[string]string{}
+	for _, spec := range []struct {
+		paths  []string
+		kind   string
+		suffix string
+	}{{files, "machine source", ".machine.json"}, {oraclePaths, "committed oracle", ".oracle.md"}, {matrixPaths, "committed matrix", ".matrix.md"}} {
+		for _, path := range spec.paths {
+			base := filepath.Base(path)
+			if err := portablepath.ValidateBase(base); err != nil {
+				g.Errs = append(g.Errs, base+": "+spec.kind+" filename is not portable: "+err.Error())
+				continue
+			}
+			stem := strings.TrimSuffix(base, spec.suffix)
+			if err := portablepath.ValidateBase(stem); err != nil {
+				g.Errs = append(g.Errs, base+": "+spec.kind+" stem is not portable: "+err.Error())
+				continue
+			}
+			fold := strings.ToLower(base)
+			if prior, exists := portableNames[fold]; exists && prior != base {
+				g.Errs = append(g.Errs, fmt.Sprintf("portable machine-artifact collision: %q and %q alias on case-insensitive filesystems", prior, base))
+			} else {
+				portableNames[fold] = base
+			}
+		}
+	}
+	machineStems := map[string]bool{}
+	for _, path := range files {
+		machineStems[strings.TrimSuffix(filepath.Base(path), ".machine.json")] = true
+	}
+	// Reconcile in both directions. A generated-looking artifact with no
+	// source machine is stale inventory, not an additional verified machine;
+	// exact basename identity is the only deterministic association.
+	for _, spec := range []struct {
+		paths  []string
+		suffix string
+		kind   string
+	}{{oraclePaths, ".oracle.md", "oracle"}, {matrixPaths, ".matrix.md", "matrix"}} {
+		for _, path := range spec.paths {
+			stem := strings.TrimSuffix(filepath.Base(path), spec.suffix)
+			if !machineStems[stem] {
+				g.Errs = append(g.Errs, fmt.Sprintf("%s: orphan %s has no corresponding %s.machine.json; remove the stale artifact or restore its exact-basename machine", filepath.Base(path), spec.kind, stem))
+			}
+		}
+	}
 	if len(files) == 0 {
 		g.Errs = append(g.Errs, "no *.machine.json under "+mdir)
 		return g
 	}
+	oracleSet, matrixSet := map[string]bool{}, map[string]bool{}
+	for _, path := range oraclePaths {
+		oracleSet[path] = true
+	}
+	for _, path := range matrixPaths {
+		matrixSet[path] = true
+	}
 	for _, path := range files {
 		base := filepath.Base(path)
-		m, err := ir.LoadMachineJSON(path)
+		m, err := loadDesignMachine(design, path)
 		if err != nil {
 			g.Errs = append(g.Errs, err.Error())
 			continue
+		}
+		stem := strings.TrimSuffix(base, ".machine.json")
+		machineID := strings.TrimSpace(m.AsObject().GetString("id"))
+		if !strings.EqualFold(stem, machineID) {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: filename stem %s does not identify canonical machine id %s (case differences are portable; different names are not)", base, ir.Repr(stem), ir.Repr(machineID)))
 		}
 		g.Count("machines")
 		errs, warns, notes, counts := lint.LintMachine(m, base)
@@ -1318,9 +1562,12 @@ func CheckMachines(design string) *Gate {
 
 		opath := machineSibling(path, ".oracle.md")
 		fresh := oracle.Render(m, path)
-		if _, err := os.Stat(opath); err != nil {
+		if invalidOracles[opath] {
+			// strictSortedGlob already emitted the confinement finding; never
+			// follow the rejected entry through Stat or ReadFile.
+		} else if !oracleSet[opath] {
 			g.Errs = append(g.Errs, base+": no committed oracle ("+filepath.Base(opath)+"); run machinery oracle")
-		} else if committed, err := os.ReadFile(opath); err != nil {
+		} else if committed, err := readDesignFile(design, opath); err != nil {
 			g.Errs = append(g.Errs, base+": committed oracle is unreadable: "+err.Error())
 		} else if g.recordStamp(string(committed)); version.Strip(string(committed)) != version.Strip(fresh) {
 			// the stamp line is stripped from BOTH sides: a version-only skew
@@ -1331,11 +1578,14 @@ func CheckMachines(design string) *Gate {
 		}
 
 		mpath := machineSibling(path, ".matrix.md")
-		if _, err := os.Stat(mpath); err != nil {
-			g.Warns = append(g.Warns, base+": no matrix file; named-unit contracts are unchecked (transitions are covered by the generated oracle)")
+		if invalidMatrices[mpath] {
+			continue // confinement finding already emitted; do not read it
+		}
+		if !matrixSet[mpath] {
+			g.Errs = append(g.Errs, base+": no matrix file; every machine requires named-unit contracts for its guards, actions, and actors")
 			continue
 		}
-		mtext := readFileOrErr(mpath, g)
+		mtext := readDesignFileOrErr(design, mpath, g)
 		merrs, drift, nrows := lint.ReconcileMatrix(m, mtext, base)
 		g.Errs = append(g.Errs, merrs...)
 		g.Drift = append(g.Drift, drift...)
@@ -1373,18 +1623,56 @@ func CheckMachines(design string) *Gate {
 }
 
 func sortedGlob(dir, pattern string) []string {
-	entries, _ := os.ReadDir(dir)
+	paths, _, _ := regularGlob(dir, pattern)
+	return paths
+}
+
+// strictSortedGlob is the gate-facing inventory reader. Matching directory,
+// symlink, device, and pipe entries are findings and never returned to a
+// parser. Lstat makes the classification about the committed entry itself,
+// not whatever an attacker made it point at.
+func strictSortedGlob(g *Gate, dir, pattern, kind string) ([]string, map[string]bool) {
+	paths, invalid, err := regularGlob(dir, pattern)
+	rejected := map[string]bool{}
+	if err != nil && !os.IsNotExist(err) {
+		g.Errs = append(g.Errs, "cannot enumerate "+dir+": "+err.Error())
+	}
+	for _, path := range invalid {
+		rejected[path] = true
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: matching %s must be a regular file inside %s; symlinks and non-regular entries are rejected", filepath.Base(path), kind, filepath.Base(dir)))
+	}
+	return paths, rejected
+}
+
+func regularGlob(dir, pattern string) (paths, invalid []string, readErr error) {
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, nil, fmt.Errorf("%s must be a real directory; symlinks and non-directories are rejected", dir)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, nil, err
+	}
 	var out []string
 	for _, e := range entries {
-		if !e.IsDir() {
-			matched, _ := filepath.Match(pattern, e.Name())
-			if matched {
-				out = append(out, filepath.Join(dir, e.Name()))
-			}
+		matched, _ := filepath.Match(pattern, e.Name())
+		if !matched {
+			continue
 		}
+		path := filepath.Join(dir, e.Name())
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			invalid = append(invalid, path)
+			continue
+		}
+		out = append(out, path)
 	}
 	sort.Strings(out)
-	return out
+	sort.Strings(invalid)
+	return out, invalid, nil
 }
 
 // machineSibling swaps a *.machine.json path's suffix for a sibling
@@ -1396,12 +1684,16 @@ func machineSibling(path, newExt string) string {
 // --- traceability (Gx-trace) ---
 
 func loadModelith(design string, g *Gate) *ir.Value {
-	entries, _ := os.ReadDir(design)
-	var paths []string
-	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), ".modelith.yaml") {
-			paths = append(paths, filepath.Join(design, e.Name()))
-		}
+	paths, invalid, err := regularGlob(design, "*.modelith.yaml")
+	if err != nil {
+		g.Errs = append(g.Errs, "cannot enumerate modelith models: "+err.Error())
+		return nil
+	}
+	for _, path := range invalid {
+		g.Errs = append(g.Errs, filepath.Base(path)+": modelith source must be a regular file inside the design; symlinks and special entries are rejected")
+	}
+	if len(invalid) > 0 {
+		return nil
 	}
 	if len(paths) == 0 {
 		g.Errs = append(g.Errs, "no *.modelith.yaml in the design directory")
@@ -1416,9 +1708,13 @@ func loadModelith(design string, g *Gate) *ir.Value {
 		g.Errs = append(g.Errs, "multiple modelith models: "+strings.Join(names, ", "))
 		return nil
 	}
-	data, err := os.ReadFile(paths[0])
+	data, err := readDesignFile(design, paths[0])
 	if err != nil {
 		g.Errs = append(g.Errs, filepath.Base(paths[0])+": invalid YAML: "+err.Error())
+		return nil
+	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		g.Errs = append(g.Errs, filepath.Base(paths[0])+": not a yaml mapping (empty file?)")
 		return nil
 	}
 	v, err := ir.LoadYAML(data)
@@ -1506,12 +1802,13 @@ func CheckTraceability(design string) *Gate {
 	}
 
 	machineNames := map[string]bool{}
-	claimed := map[string]bool{}
+	claimed := map[string][]string{}
+	lifecycleSemantics := map[string]string{} // filename stem -> machine id
 	for _, path := range machineFiles {
 		base := filepath.Base(path)
 		name := strings.TrimSuffix(base, ".machine.json")
 		machineNames[name] = true
-		m, err := ir.LoadMachineJSON(path)
+		m, err := loadDesignMachine(design, path)
 		if err != nil {
 			g.Errs = append(g.Errs, err.Error())
 			continue
@@ -1539,7 +1836,8 @@ func CheckTraceability(design string) *Gate {
 			g.Errs = append(g.Errs, base+": _lifecycle_of "+ir.Repr(entity)+" is not a Modelith entity")
 			continue
 		}
-		claimed[entity] = true
+		claimed[entity] = append(claimed[entity], base)
+		lifecycleSemantics[name] = mo.GetString("id")
 		enumName := enumByEntity[entity]
 		if enumName == "" {
 			g.Errs = append(g.Errs, base+": entity "+ir.Repr(entity)+" has no enum-typed lifecycle attribute")
@@ -1612,10 +1910,66 @@ func CheckTraceability(design string) *Gate {
 	sort.Strings(enumEntities)
 	for _, ename := range enumEntities {
 		enumName := enumByEntity[ename]
-		if !claimed[ename] {
+		claimants := append([]string{}, claimed[ename]...)
+		sort.Strings(claimants)
+		if len(claimants) == 0 {
 			g.Errs = append(g.Errs, "entity "+ename+" has lifecycle enum "+enumName+" but no machine ("+ename+".machine.json); model the lifecycle or drop the enum")
+		} else if len(claimants) > 1 {
+			g.Errs = append(g.Errs, "entity "+ename+" has "+fmt.Sprintf("%d", len(claimants))+" lifecycle machines ("+strings.Join(claimants, ", ")+"); lifecycle ownership is singular, so exactly one machine may claim _lifecycle_of")
 		} else {
 			g.Count("lifecycle entities with machines")
+		}
+	}
+
+	// Every lifecycle machine owes exactly one source semantics annotation.
+	// Presence is a closed universe (the machine filenames enumerate it), so
+	// an absent or orphan annotation is never an optional formal refinement.
+	formalDir := filepath.Join(design, "formal")
+	seenSemantics := map[string]bool{}
+	for _, path := range sortedGlob(formalDir, "*.semantics.yaml") {
+		name := strings.TrimSuffix(filepath.Base(path), ".semantics.yaml")
+		seenSemantics[name] = true
+		machineID, owns := lifecycleSemantics[name]
+		if !owns {
+			g.Errs = append(g.Errs, filepath.Base(path)+": semantics annotation maps to no lifecycle machine named "+name+".machine.json")
+			continue
+		}
+		raw, err := readDesignFile(design, path)
+		if err != nil {
+			g.Errs = append(g.Errs, filepath.Base(path)+": unreadable: "+err.Error())
+			continue
+		}
+		sem, err := ir.LoadYAML(raw)
+		if err != nil || sem.AsObject() == nil {
+			g.Errs = append(g.Errs, filepath.Base(path)+": semantics annotation is not a yaml mapping")
+			continue
+		}
+		declaredMachine := strings.TrimSpace(sem.AsObject().GetString("machine"))
+		if declaredMachine == "" || (declaredMachine != name && declaredMachine != machineID) {
+			g.Errs = append(g.Errs, filepath.Base(path)+": machine must equal the lifecycle machine id or filename stem ("+ir.Repr(machineID)+" or "+ir.Repr(name)+")")
+		}
+		switch sem.AsObject().GetString("pattern") {
+		case "linear-lifecycle", "terminal-lifecycle", "saga":
+			g.Count("lifecycle semantics annotations")
+		case "control-flow-only":
+			if strings.TrimSpace(sem.AsObject().GetString("reason")) == "" {
+				g.Errs = append(g.Errs, filepath.Base(path)+": control-flow-only requires a non-empty specific reason why no data refinement applies")
+			} else {
+				g.Count("lifecycle semantics annotations")
+				g.Count("control-flow-only semantics")
+			}
+		default:
+			g.Errs = append(g.Errs, filepath.Base(path)+": unsupported or missing pattern (linear-lifecycle, terminal-lifecycle, saga, control-flow-only)")
+		}
+	}
+	semanticsNames := make([]string, 0, len(lifecycleSemantics))
+	for name := range lifecycleSemantics {
+		semanticsNames = append(semanticsNames, name)
+	}
+	sort.Strings(semanticsNames)
+	for _, name := range semanticsNames {
+		if !seenSemantics[name] {
+			g.Errs = append(g.Errs, name+".machine.json: no formal/"+name+".semantics.yaml; every lifecycle machine requires a refinement-pattern source annotation")
 		}
 	}
 
@@ -1629,7 +1983,7 @@ func CheckTraceability(design string) *Gate {
 	// event-contract rows against the machines: the pack side of this check
 	// runs only where a pack exists, so a design that carries one is left to
 	// G5 rather than reported twice for one defect (see eventwiring.go)
-	archText := readOrEmpty(filepath.Join(design, "ARCHITECTURE.md"))
+	archText := readDesignOrEmpty(design, filepath.Join(design, "ARCHITECTURE.md"))
 	if !pack.HasPack(design) {
 		checkEventWiring(g, design, archText)
 	}
@@ -1643,7 +1997,7 @@ func CheckTraceability(design string) *Gate {
 	var cells, unitCells []string
 	matrixFiles := globExt(mdir, ".matrix.md")
 	for _, f := range matrixFiles {
-		for _, tbl := range ir.ParseMdTables(readFileOrErr(f, g)) {
+		for _, tbl := range ir.ParseMdTables(readDesignFileOrErr(design, f, g)) {
 			mi := ir.FindCol(tbl.Header, "maps to")
 			for _, r := range tbl.Rows {
 				cells = append(cells, r...)
@@ -1659,7 +2013,7 @@ func CheckTraceability(design string) *Gate {
 		// example "Mode:" line, heading, or table row is documentation, not a
 		// declaration, and must neither satisfy the template checks nor credit
 		// invariant enforcement in the traceability corpus
-		buildText := maskFences(readFileOrErr(build, g))
+		buildText := maskFences(readDesignFileOrErr(design, build, g))
 		for _, tbl := range ir.ParseMdTables(buildText) {
 			for _, r := range tbl.Rows {
 				cells = append(cells, r...)
@@ -1667,7 +2021,7 @@ func CheckTraceability(design string) *Gate {
 		}
 		// manifest mode shards contribute to the traceability corpus too
 		for _, shard := range sortedGlobExt(filepath.Join(design, "BUILD"), ".md") {
-			for _, tbl := range ir.ParseMdTables(maskFences(readFileOrErr(shard, g))) {
+			for _, tbl := range ir.ParseMdTables(maskFences(readDesignFileOrErr(design, shard, g))) {
 				for _, r := range tbl.Rows {
 					cells = append(cells, r...)
 				}
@@ -1786,7 +2140,7 @@ func CheckTraceability(design string) *Gate {
 	}
 	for _, f := range matrixFiles {
 		base := filepath.Base(f)
-		for _, tbl := range ir.ParseMdTables(readOrEmpty(f)) { // read errors reported on the first pass above
+		for _, tbl := range ir.ParseMdTables(readDesignOrEmpty(design, f)) { // read errors reported on the first pass above
 			mi := ir.FindCol(tbl.Header, "maps to")
 			if mi < 0 {
 				continue
@@ -1827,7 +2181,7 @@ func checkPlacement(g *Gate, design string, machineNames map[string]bool, entiti
 	if _, err := os.Stat(arch); err != nil {
 		return persisted
 	}
-	text := readFileOrErr(arch, g)
+	text := readDesignFileOrErr(design, arch, g)
 	placedEntities := map[string]bool{}
 	waivedEntities := map[string]bool{}
 	tableFound := false

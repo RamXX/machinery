@@ -14,6 +14,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -59,32 +60,82 @@ func DesignID(modelPath string) (string, error) {
 // ManifestPaths returns the sorted *.checker.yaml files under design/checkers.
 // The directory is listed rather than globbed so a design path containing glob
 // metacharacters cannot defeat detection (the GATE-2 lesson).
-func ManifestPaths(design string) []string {
+func ManifestPaths(design string) ([]string, error) {
 	dir := filepath.Join(design, "checkers")
+	info, err := os.Lstat(dir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("inspect checker directory %s: %w", dir, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("checker directory %s must not be a symlink", dir)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("checker path %s is not a directory", dir)
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("read checker directory %s: %w", dir, err)
 	}
 	var out []string
+	portableNames := map[string]string{}
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".checker.yaml") {
-			out = append(out, filepath.Join(dir, e.Name()))
+		if !strings.HasSuffix(e.Name(), ".checker.yaml") {
+			continue
 		}
+		if err := validatePortableComponent(e.Name()); err != nil {
+			return nil, fmt.Errorf("checker manifest name %q is not portable: %w", e.Name(), err)
+		}
+		path := filepath.Join(dir, e.Name())
+		entryInfo, lerr := os.Lstat(path)
+		if lerr != nil {
+			return nil, fmt.Errorf("inspect checker manifest %s: %w", path, lerr)
+		}
+		if entryInfo.Mode()&os.ModeSymlink != 0 || !entryInfo.Mode().IsRegular() {
+			return nil, fmt.Errorf("checker manifest %s must be a regular, non-symlink file", path)
+		}
+		folded := strings.ToLower(e.Name())
+		if prior, exists := portableNames[folded]; exists {
+			return nil, fmt.Errorf("checker manifests %q and %q collide on a case-insensitive filesystem", prior, e.Name())
+		}
+		portableNames[folded] = e.Name()
+		out = append(out, path)
 	}
 	sort.Strings(out)
-	return out
+	return out, nil
 }
 
 // HasCheckers reports whether the design opted into the layer (any manifest).
-func HasCheckers(design string) bool { return len(ManifestPaths(design)) > 0 }
+func HasCheckers(design string) (bool, error) {
+	dir := filepath.Join(design, "checkers")
+	_, statErr := os.Lstat(dir)
+	if os.IsNotExist(statErr) {
+		return false, nil
+	}
+	paths, err := ManifestPaths(design)
+	return len(paths) > 0 || statErr == nil, err
+}
 
 // ModelPath returns the design's *.modelith.yaml source, or "" if there is none.
 // The directory is listed (not globbed) so a design path with glob metacharacters
 // cannot defeat detection.
 func ModelPath(design string) string {
+	paths := ModelPaths(design)
+	if len(paths) != 1 {
+		return ""
+	}
+	return paths[0]
+}
+
+// ModelPaths returns every root Modelith model in deterministic name order.
+// Callers that project a design require exactly one; silently choosing the
+// first lets an arbitrary filesystem name decide which domain is checked.
+func ModelPaths(design string) []string {
 	entries, err := os.ReadDir(design)
 	if err != nil {
-		return ""
+		return nil
 	}
 	var names []string
 	for _, e := range entries {
@@ -92,11 +143,12 @@ func ModelPath(design string) string {
 			names = append(names, e.Name())
 		}
 	}
-	if len(names) == 0 {
-		return ""
-	}
 	sort.Strings(names)
-	return filepath.Join(design, names[0])
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		out = append(out, filepath.Join(design, name))
+	}
+	return out
 }
 
 func setOf(xs []string) map[string]bool {

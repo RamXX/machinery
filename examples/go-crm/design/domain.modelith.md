@@ -460,4 +460,3 @@ erDiagram
 - **activity-owned** - Every `Activity` records the `User` who logged it.
 - **one-default-pipeline** - Exactly one `Pipeline` is marked default.
 - **tag-name-unique** - No two `Tag` records share a name.
-

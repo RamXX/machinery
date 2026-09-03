@@ -1,8 +1,9 @@
 {
   "projection_schema": "1.0",
   "machinery_version": "v0.6.2",
-  "design_id": "sha256:b0e124b78c45020f4258ad3a3d3de9bc76d5d75ee2cbcb008edd438e6341c082",
+  "design_id": "sha256:3e61bcd868505303d65a3a89a7cefdf11a7bcbb90c34b5ba4ac6c542ddf3fe90",
   "checker_id": "pii-flow",
+  "manifest_hash": "sha256:9675bf9b76b2d02fa375d96f0c7f206b0b3efeb5283b322beaffc56b31c65eeb",
   "include": [
     "model",
     "invariants",
@@ -80,6 +81,15 @@
         }
       },
       {
+        "stable_id": "inv:priv-export-idempotent",
+        "id": "priv-export-idempotent",
+        "text": "A stable export id has at most one effect at the analytics destination.",
+        "owner": {
+          "kind": "entity",
+          "entity": "entity:AnalyticsExport"
+        }
+      },
+      {
         "stable_id": "inv:priv-minimal-collection",
         "id": "priv-minimal-collection",
         "text": "Only attributes necessary for the stated purpose are collected.",
@@ -94,6 +104,24 @@
         "text": "No sensitive attribute reaches an export sink without passing through redaction.",
         "owner": {
           "kind": "top"
+        }
+      },
+      {
+        "stable_id": "inv:priv-purpose-present",
+        "id": "priv-purpose-present",
+        "text": "Every `ProcessingActivity` has a non-empty stated purpose before subject data is read.",
+        "owner": {
+          "kind": "entity",
+          "entity": "entity:ProcessingActivity"
+        }
+      },
+      {
+        "stable_id": "inv:priv-redaction-effective",
+        "id": "priv-redaction-effective",
+        "text": "A `Redactor` output contains neither email nor national identifier data.",
+        "owner": {
+          "kind": "entity",
+          "entity": "entity:Redactor"
         }
       },
       {
@@ -128,6 +156,6 @@
     ]
   },
   "generated": {
-    "input_hash": "sha256:6368783b81e5c7a0280190034298c8715d9e90cbc23bf87a1cfbb57ad77de95d"
+    "input_hash": "sha256:06da2492ce48807bc9f38eaae97a48f81cce47e7f92eb7fbc4367901462fc992"
   }
 }

@@ -1,0 +1,72 @@
+attestation_version: 1
+attestations:
+  - claim: g2.action-ownership
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}]
+  - claim: g2.interface-contract-rightness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}]
+  - claim: g2.placement-rightness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}]
+  - claim: g2.adoption-closure-discovery
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}]
+  - claim: g2.event-contract-completeness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}]
+  - claim: g2.nfr-content
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}]
+  - claim: g3.guard-semantics
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: machines/Payment.machine.json, hash: sha256:1f1ffcbd6a2f65c0bc5a840181d880f201f2acd9587b11ce8e344af9caa72b4e}
+      - {path: machines/Payment.matrix.md, hash: sha256:19155ed727a3df94d84dc31e3c38886e3c0d4fb315bfe27f696ef0a50f7953a2}
+  - claim: g3.invariant-enforcement
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: machines/Payment.machine.json, hash: sha256:1f1ffcbd6a2f65c0bc5a840181d880f201f2acd9587b11ce8e344af9caa72b4e}
+      - {path: machines/Payment.matrix.md, hash: sha256:19155ed727a3df94d84dc31e3c38886e3c0d4fb315bfe27f696ef0a50f7953a2}
+  - claim: g3.residual-transitions
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: machines/Payment.machine.json, hash: sha256:1f1ffcbd6a2f65c0bc5a840181d880f201f2acd9587b11ce8e344af9caa72b4e}
+      - {path: machines/Payment.matrix.md, hash: sha256:19155ed727a3df94d84dc31e3c38886e3c0d4fb315bfe27f696ef0a50f7953a2}
+  - claim: g3.event-redelivery
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: machines/Payment.machine.json, hash: sha256:1f1ffcbd6a2f65c0bc5a840181d880f201f2acd9587b11ce8e344af9caa72b4e}
+      - {path: machines/Payment.matrix.md, hash: sha256:19155ed727a3df94d84dc31e3c38886e3c0d4fb315bfe27f696ef0a50f7953a2}
+  - claim: gt.conformance-test-shape
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: BUILD.md, hash: sha256:5fc797d0edafbed7fe24d7429f55f6b257613737a557b13e2e420d4fbf861869}]
+  - claim: g4.zero-context
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: BUILD.md, hash: sha256:5fc797d0edafbed7fe24d7429f55f6b257613737a557b13e2e420d4fbf861869}]
+  - claim: g4.standin-coverage
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: BUILD.md, hash: sha256:5fc797d0edafbed7fe24d7429f55f6b257613737a557b13e2e420d4fbf861869}]
+  - claim: g4.pack-event-discipline
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: pack/PaymentsContract.cfg, hash: sha256:8da015e211cc3be03f608521b0913280f54d65406b4a4f1907f1e4e703a5e2b9}
+      - {path: pack/PaymentsContract.machine.json, hash: sha256:e0cf9cdb43eb83deacdccef1f7bae41ad51c3dd982e02f69cee5d204f120b2e1}
+      - {path: pack/PaymentsContract.tla, hash: sha256:91d9c644b83b753965d6a007790f4e27a83687525308590b4cf028d46139518a}
+      - {path: pack/domain.modelith.yaml, hash: sha256:393dc2d25b8c995fcb4a4399d1d1c624683055ce5729879f44f3641abfbbfe43}
+      - {path: pack/events.md, hash: sha256:c952e39f5e4d71b621fbb68fe59b9fad3e9c79a6925b94fd59e83b709a6235df}
+      - {path: pack/pack.yaml, hash: sha256:fac218dfb71301de2e0c75c35d79ea8a6200f921fd4aa2d8b8e98dde9d556d97}

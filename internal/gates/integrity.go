@@ -8,7 +8,6 @@ package gates
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/RamXX/machinery/internal/alloy"
@@ -18,8 +17,8 @@ import (
 // HasIntegrityAnnotation reports whether the design opted into the integrity
 // layer (the annotation file exists).
 func HasIntegrityAnnotation(design string) bool {
-	fi, err := os.Stat(filepath.Join(design, "formal", alloy.IntegrityAnnotationName))
-	return err == nil && !fi.IsDir()
+	has, err := probeRegularFile(design, filepath.Join("formal", alloy.IntegrityAnnotationName))
+	return has || err != nil
 }
 
 // CheckIntegrity implements Gi-integrity.
@@ -27,7 +26,12 @@ func CheckIntegrity(design string) *Gate {
 	g := NewGate("Gi-integrity structural relational model")
 	g.startOrder()
 	annPath := filepath.Join(design, "formal", alloy.IntegrityAnnotationName)
-	if !HasIntegrityAnnotation(design) {
+	has, probeErr := probeRegularFile(design, filepath.Join("formal", alloy.IntegrityAnnotationName))
+	if probeErr != nil {
+		g.Errs = append(g.Errs, probeErr.Error())
+		return g
+	}
+	if !has {
 		g.Errs = append(g.Errs, "no formal/"+alloy.IntegrityAnnotationName+" in the design; the integrity layer was requested but never authored (author the annotation, or drop gi from the gate list)")
 		return g
 	}
@@ -58,7 +62,7 @@ func CheckIntegrity(design string) *Gate {
 	g.Count("solver commands generated", len(stats.Commands))
 
 	committed := filepath.Join(design, "formal", alloy.IntegrityOutputName)
-	raw, rerr := os.ReadFile(committed)
+	raw, rerr := readDesignFile(design, committed)
 	if rerr == nil {
 		g.recordStamp(string(raw))
 	}

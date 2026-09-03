@@ -1,0 +1,58 @@
+{
+  "id": "referenceDataCommand",
+  "initial": "idle",
+  "_role": "operational",
+  "_comment": "One short-lived operational envelope per analyst reference-data command. The actor performs the deterministic invariant-carrying transform or versioned upsert; success and failure are terminal command outcomes, and no reference-data entity is given a synthetic lifecycle.",
+  "_delays": {
+    "COMMAND_TIMEOUT": "20000 ms - upper bound for one provider-backed refresh, versioned upsert, or candidate-set build"
+  },
+  "context": {
+    "commandId": null,
+    "lastError": null
+  },
+  "states": {
+    "idle": {
+      "on": {
+        "refresh": { "target": "refreshing" },
+        "upsert": { "target": "upserting" },
+        "build": { "target": "building" }
+      }
+    },
+    "refreshing": {
+      "invoke": {
+        "src": "selectEligibleConstituents",
+        "onDone": { "target": "succeeded" },
+        "onError": { "target": "failed", "actions": "recordReferenceError" }
+      },
+      "after": {
+        "COMMAND_TIMEOUT": { "target": "failed", "actions": ["cancelReferenceOperation", "recordReferenceTimeout"] }
+      }
+    },
+    "upserting": {
+      "invoke": {
+        "src": "upsertSecurityByTicker",
+        "onDone": { "target": "succeeded" },
+        "onError": { "target": "failed", "actions": "recordReferenceError" }
+      },
+      "after": {
+        "COMMAND_TIMEOUT": { "target": "failed", "actions": ["cancelReferenceOperation", "recordReferenceTimeout"] }
+      }
+    },
+    "building": {
+      "invoke": {
+        "src": "buildCandidateSet",
+        "onDone": { "target": "succeeded" },
+        "onError": { "target": "failed", "actions": "recordReferenceError" }
+      },
+      "after": {
+        "COMMAND_TIMEOUT": { "target": "failed", "actions": ["cancelReferenceOperation", "recordReferenceTimeout"] }
+      }
+    },
+    "succeeded": {
+      "type": "final"
+    },
+    "failed": {
+      "type": "final"
+    }
+  }
+}

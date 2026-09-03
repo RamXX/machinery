@@ -17,6 +17,7 @@ the design changes, stable ids do not.
 | committing | atomic | - | - |
 | commitRetry | atomic | - | - |
 | reverted | atomic | - | - |
+| routingFault | final | - | - |
 
 ## Transitions
 
@@ -41,5 +42,6 @@ the design changes, stable ids do not.
 | T-PORT-17 | PORT-3cb0b6 | reverted | always | priorIsUnderReview | UnderReview | - |
 | T-PORT-18 | PORT-53d34b | reverted | always | priorIsAccepted | Accepted | - |
 | T-PORT-19 | PORT-3390a7 | reverted | always | priorIsRejected | Rejected | - |
+| T-PORT-20 | PORT-3bd579 | reverted | always | - | routingFault | recordRoutingError |
 
-Total transitions (test cases): 19
+Total transitions (test cases): 20

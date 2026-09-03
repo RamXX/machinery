@@ -1,0 +1,3 @@
+machine: payment
+pattern: control-flow-only
+reason: Payment is an event-driven money aggregate with distinct authorize, capture, and refund gateway operations plus a shared persistence overlay; it is not a uniform linear lifecycle or an invoke-only terminal pipeline.

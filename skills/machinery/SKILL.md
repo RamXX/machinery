@@ -1294,7 +1294,8 @@ conductor's job, never the agents'.
   Single Go binary. Run it at each gate with `--gate` so correctness does not
   rely on the model getting every cross-reference right. See `tools/README.md`.
 - `machinery verify-c4 <design>` - the C4 engine phase: compiles `workspace.dsl` under
-  `structurizr-cli export` (needs Java 17+; `MACHINERY_STRUCTURIZR_CLI` overrides the binary
+  `structurizr-cli export` (needs the checksum-pinned Temurin Java 21.0.12.1+1 runtime;
+  `MACHINERY_STRUCTURIZR_CLI` overrides the binary
   lookup). The pure G2 gate stays dependency-free; this is the same split as verify-formal.
 - `machinery baseline <design> --impl <dir>` - the brownfield Stage-1 generator: proposes
   `baseline:` rules for today's violating edges, suggests `ignore:` globs, and writes

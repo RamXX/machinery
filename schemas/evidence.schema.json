@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/RamXX/machinery/schemas/evidence.schema.json",
   "title": "Machinery external-checker evidence (checker -> machinery)",
-  "description": "What an external checker, or an adapter the checker author ships, writes back for machinery to verify. Machinery's PURE check phase (`machinery check --gate gk`) reads ONLY this file: it never parses the checker's native output, so a checker may emit anything internally (a SARIF report, a signed decision, a converged interval graph) and map it here. The verdict is trusted in the pure phase only because `input_hash` binds it to an exact projection; the separate external phase (`machinery verify-checkers`) re-runs or replays the engine to confirm the verdict was earned. Fields under `generated` are non-binding.",
+  "description": "What an external checker, or an adapter the checker author ships, writes back for machinery to verify. Machinery's PURE check phase (`machinery check --gate gk`) reads ONLY this file: it never parses the checker's native output, so a checker may emit anything internally (a SARIF report, a signed decision, a converged interval graph) and map it here. The verdict is trusted in the pure phase only because `input_hash` binds it to an exact projection and `runtime_closure` binds it to an immutable checker userspace, exact OCI platform, command topology, and declared input set; the separate external phase (`machinery verify-checkers`) re-runs or replays the engine to confirm the verdict was earned. Fields under `generated` are non-binding.",
   "type": "object",
-  "required": ["evidence_schema", "checker", "input_hash", "verdict", "coverage"],
+  "required": ["evidence_schema", "checker", "input_hash", "runtime_closure", "verdict", "coverage"],
   "additionalProperties": false,
   "properties": {
     "evidence_schema": {
@@ -23,14 +23,20 @@
         },
         "version": {
           "type": "string",
-          "description": "The engine and/or ruleset version. Surfaced in a non-blocking skew note when it changes between runs; not part of the binding."
+          "minLength": 1,
+          "description": "The engine and/or ruleset version. It is not part of input_hash, but verify-checkers requires a fresh run to reproduce it exactly; a version change requires newly reviewed committed evidence."
         }
       }
     },
     "input_hash": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$",
-      "description": "THE BINDING. MUST equal machinery's sha256 over the canonical projection bytes (the projection's `generated` object excluded). A verdict whose input_hash does not match a fresh projection is DRIFT: it was computed over a different design. This single field is what makes a verdict from an opaque engine safe to trust in the pure phase."
+      "description": "THE DESIGN BINDING. MUST equal machinery's sha256 over the canonical projection bytes (the projection's `generated` object excluded). A verdict whose input_hash does not match a fresh projection is DRIFT: it was computed over a different design."
+    },
+    "runtime_closure": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "THE CHECKER BINDING. MUST equal checker.runtime_closure in the committed manifest and machinery's derived digest over the local registry's immutable OCI image digest, exact linux/amd64 or linux/arm64 platform, run/verify argv, and each declared read-only input mount name plus content digest. The image supplies interpreters, modules, native loaders/libraries, and child tools; host userspace runtimes are not accepted. The local OCI engine is a separately snapshotted control-plane trust boundary, not checker evidence."
     },
     "verdict": {
       "enum": ["pass", "fail"],
@@ -46,6 +52,7 @@
         "properties": {
           "element": {
             "type": "string",
+            "minLength": 1,
             "description": "A stable_id present in the projection this evidence binds to."
           },
           "verdict": { "enum": ["pass", "fail"] },
@@ -70,23 +77,12 @@
             "type": "string",
             "description": "Optional projection stable_id this finding is about."
           },
-          "message": { "type": "string" },
+          "message": { "type": "string", "minLength": 1 },
           "locator": {
             "type": "string",
             "description": "Optional pointer into the checker's own source (rule file:line, a norm id, an AST path). Machinery treats it as opaque text."
           }
         }
-      }
-    },
-    "input_signature": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "OPTIONAL. A detached signature OVER the ASCII bytes of `input_hash`, in a scheme the registry declares, that machinery's PURE phase verifies (crypto is deterministic, so this strengthens `check` without running the engine). Present only for checkers that sign their input binding directly. A checker that signs its own NATIVE artifact instead, in a format machinery does not parse, leaves this ABSENT and carries provenance under `attestation`, verified in the external phase by the checker's own verify command.",
-      "required": ["scheme", "value"],
-      "properties": {
-        "scheme": { "enum": ["ed25519"] },
-        "value": { "type": "string", "description": "Base64 detached signature over the exact ASCII bytes of input_hash." },
-        "key_id": { "type": "string", "description": "Which public key, from the registry entry's declared keys, verifies this." }
       }
     },
     "attestation": {
@@ -96,7 +92,8 @@
     },
     "trace_ref": {
       "type": "string",
-      "description": "OPTIONAL path (relative to this evidence file) to the checker's native trace or proof artifact, for the external verify phase to replay. Opaque to the pure phase."
+      "pattern": "^generated/[A-Za-z0-9._/-]+$",
+      "description": "OPTIONAL portable path below generated/ (relative to this evidence file) to the checker's native trace or proof artifact. The segregated directory lets reverse inventory reject obsolete generated proofs without confusing them with checker source files. verify-checkers requires the fresh generated inventory and exact trace bytes to reproduce the committed artifact; trace reads are bounded to 16 MiB."
     },
     "generated": {
       "type": "object",

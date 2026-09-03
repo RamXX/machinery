@@ -31,6 +31,30 @@ func embedFixture(t *testing.T, marker, table string) *Gate {
 	return CheckEmbeds(design)
 }
 
+func mustCopyChildPackCapability(t *testing.T, design string) {
+	t.Helper()
+	source := filepath.Join("..", "..", "examples", "checkout-split", "orders", "design")
+	if err := os.MkdirAll(filepath.Join(design, "pack"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(filepath.Join(source, "pack"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		body, err := os.ReadFile(filepath.Join(source, "pack", entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		mustWrite(t, filepath.Join(design, "pack", entry.Name()), string(body))
+	}
+	body, err := os.ReadFile(filepath.Join(source, "packmap.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, filepath.Join(design, "packmap.yaml"), string(body))
+}
+
 const goodMarker = `<!-- machinery:embed from="SOURCE.md" table="event,producer,consumer,delivery" claims="subset,complete" -->`
 
 const allRows = `| event | producer | consumer | delivery |
@@ -267,11 +291,71 @@ func TestEmbedSourceMayBeOutsideTheDesign(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "parent", "ARCHITECTURE.md"), srcDoc)
 	design := filepath.Join(root, "child", "design")
+	mustCopyChildPackCapability(t, design)
 	marker := strings.Replace(goodMarker, `from="SOURCE.md"`, `from="../../parent/ARCHITECTURE.md"`, 1)
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), "# Child\n\n"+marker+"\n\n"+allRows+"\n")
 	g := CheckEmbeds(design)
 	if len(g.Errs) != 0 {
 		t.Fatalf("a relative source outside the design must resolve: %v", g.Errs)
+	}
+}
+
+func TestStandaloneDesignCannotAuthorizeSiblingRepository(t *testing.T) {
+	workspace := t.TempDir()
+	design := filepath.Join(workspace, "project", "design")
+	mustWrite(t, filepath.Join(workspace, "sibling-repo", "SOURCE.md"), srcDoc)
+	marker := strings.Replace(goodMarker, `from="SOURCE.md"`, `from="../../sibling-repo/SOURCE.md"`, 1)
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), "# Project\n\n"+marker+"\n\n"+allRows+"\n")
+
+	g := CheckEmbeds(design)
+	if !hasErr(g, "escapes the retained design workspace") {
+		t.Fatalf("standalone project design authorized a sibling repository: %v", g.Errs)
+	}
+}
+
+func TestEmbedSourceCannotEscapeRetainedWorkspace(t *testing.T) {
+	parent := t.TempDir()
+	workspace := filepath.Join(parent, "workspace")
+	design := filepath.Join(workspace, "child", "design")
+	outside := filepath.Join(parent, "outside.md")
+	mustWrite(t, outside, srcDoc)
+	marker := strings.Replace(goodMarker, `from="SOURCE.md"`, `from="../../../outside.md"`, 1)
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), "# Child\n\n"+marker+"\n\n"+allRows+"\n")
+
+	g := CheckEmbeds(design)
+	if !hasErr(g, "escapes the retained design workspace") {
+		t.Fatalf("an over-climbing embed source was read from ambient state: %v", g.Errs)
+	}
+}
+
+func TestEmbedSnapshotBindsSiblingSourceAgainstConcurrentMutation(t *testing.T) {
+	workspace := t.TempDir()
+	source := filepath.Join(workspace, "parent", "ARCHITECTURE.md")
+	design := filepath.Join(workspace, "child", "design")
+	mustWrite(t, source, srcDoc)
+	mustCopyChildPackCapability(t, design)
+	marker := strings.Replace(goodMarker, `from="SOURCE.md"`, `from="../../parent/ARCHITECTURE.md"`, 1)
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), "# Child\n\n"+marker+"\n\n"+allRows+"\n")
+
+	snapshot, err := AcquireSnapshot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = snapshot.Release() }()
+	selection, err := snapshot.Select("ge", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, source, strings.Replace(srcDoc, "at-least-once", "exactly-once", 1))
+	results := snapshot.RunSelected("", selection, RunOptions{})
+	var found bool
+	for _, gate := range results {
+		if gate.Title == "G0-snapshot" && hasErr(gate, "external tree changed") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("concurrent sibling source mutation was not blocking: %+v", results)
 	}
 }
 

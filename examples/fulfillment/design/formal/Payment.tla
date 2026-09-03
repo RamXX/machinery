@@ -10,8 +10,7 @@ EXTENDS Naturals
 \*      machine_lint requires an unguarded fallback or an _exhaustive note; where
 \*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
 \*      below is only as sound as these hand-checked, UNVERIFIED claims:
-\*      - UNVERIFIED, state gatewayResume: gatewayOp is set by setGatewayAuthorize/setGatewayCapture/setGatewayRefund before entering the three gateway-call states, the only states that reach gatewayRetry; the three gatewayFor* guards cover {authorize, capture, refund} totally
-\*      - UNVERIFIED, state rolledBack: priorStatus is set on every path into the overlay from a domain state; only Pending, Authorized, and Captured reach the overlay (Failed and Refunded are final), and all three priorIs* guards are present
+\*      (none here: every guarded branch list has an unguarded fallback)
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or
@@ -30,10 +29,10 @@ CONSTANT MaxRetries
 VARIABLES st, rc1, rc2
 vars == << st, rc1, rc2 >>
 
-States == {"Authorized", "Captured", "Failed", "Pending", "Refunded", "authorizing", "capturing", "gatewayResume", "gatewayRetry", "persistRetry", "persisting", "refunding", "rolledBack"}
-Domain == {"Authorized", "Captured", "Failed", "Pending", "Refunded"}
+States == {"Authorized", "Captured", "Failed", "Pending", "Refunded", "authorizing", "capturing", "gatewayResume", "gatewayRetry", "persistRetry", "persisting", "refunding", "rolledBack", "routingFault"}
+Domain == {"Authorized", "Captured", "Failed", "Pending", "Refunded", "routingFault"}
 Overlay == {"authorizing", "capturing", "gatewayResume", "gatewayRetry", "persistRetry", "persisting", "refunding", "rolledBack"}
-Final == {"Failed", "Refunded"}
+Final == {"Failed", "Refunded", "routingFault"}
 
 TypeOK == st \in States /\ rc1 \in 0..MaxRetries /\ rc2 \in 0..MaxRetries
 Init == st = "Pending" /\ rc1 = 0 /\ rc2 = 0
@@ -59,18 +58,20 @@ Init == st = "Pending" /\ rc1 = 0 /\ rc2 = 0
   \* T19: gatewayResume -always-> authorizing
   \* T20: gatewayResume -always-> capturing
   \* T21: gatewayResume -always-> refunding
-  \* T22: persisting -after:persistTimeout-> rolledBack
-  \* T23: persisting -onDone:persistPayment-> Authorized
-  \* T24: persisting -onDone:persistPayment-> Captured
-  \* T25: persisting -onDone:persistPayment-> Refunded
-  \* T26: persisting -onDone:persistPayment-> Failed
-  \* T27: persisting -onDone:persistPayment-> rolledBack
-  \* T28: persisting -onError:persistPayment-> persistRetry
+  \* T22: gatewayResume -always-> routingFault
+  \* T23: persisting -after:persistTimeout-> rolledBack
+  \* T24: persisting -onDone:persistPayment-> Authorized
+  \* T25: persisting -onDone:persistPayment-> Captured
+  \* T26: persisting -onDone:persistPayment-> Refunded
+  \* T27: persisting -onDone:persistPayment-> Failed
+  \* T28: persisting -onDone:persistPayment-> rolledBack
   \* T29: persisting -onError:persistPayment-> persistRetry
-  \* T30: persisting -onError:persistPayment-> rolledBack
-  \* T31: rolledBack -always-> Pending
-  \* T32: rolledBack -always-> Authorized
-  \* T33: rolledBack -always-> Captured
+  \* T30: persisting -onError:persistPayment-> persistRetry
+  \* T31: persisting -onError:persistPayment-> rolledBack
+  \* T32: rolledBack -always-> Pending
+  \* T33: rolledBack -always-> Authorized
+  \* T34: rolledBack -always-> Captured
+  \* T35: rolledBack -always-> routingFault
 
 T1 == st = "Pending" /\ st' = "authorizing" /\ rc1' = 0 /\ rc2' = 0
 T2 == st = "Pending" /\ st' = "Pending" /\ rc1' = 0 /\ rc2' = 0
@@ -93,18 +94,20 @@ T18 == st = "refunding" /\ st' = "rolledBack" /\ rc1' = rc1 /\ rc2' = rc2
 T19 == st = "gatewayResume" /\ st' = "authorizing" /\ rc1' = rc1 /\ rc2' = rc2
 T20 == st = "gatewayResume" /\ st' = "capturing" /\ rc1' = rc1 /\ rc2' = rc2
 T21 == st = "gatewayResume" /\ st' = "refunding" /\ rc1' = rc1 /\ rc2' = rc2
-T22 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1 /\ rc2' = rc2
-T23 == st = "persisting" /\ st' = "Authorized" /\ rc1' = 0 /\ rc2' = 0
-T24 == st = "persisting" /\ st' = "Captured" /\ rc1' = 0 /\ rc2' = 0
-T25 == st = "persisting" /\ st' = "Refunded" /\ rc1' = 0 /\ rc2' = 0
-T26 == st = "persisting" /\ st' = "Failed" /\ rc1' = 0 /\ rc2' = 0
-T27 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1 /\ rc2' = rc2
-T28 == st = "persisting" /\ st' = "persistRetry" /\ rc1' = rc1 /\ rc2' = rc2
+T22 == st = "gatewayResume" /\ st' = "routingFault" /\ rc1' = 0 /\ rc2' = 0
+T23 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1 /\ rc2' = rc2
+T24 == st = "persisting" /\ st' = "Authorized" /\ rc1' = 0 /\ rc2' = 0
+T25 == st = "persisting" /\ st' = "Captured" /\ rc1' = 0 /\ rc2' = 0
+T26 == st = "persisting" /\ st' = "Refunded" /\ rc1' = 0 /\ rc2' = 0
+T27 == st = "persisting" /\ st' = "Failed" /\ rc1' = 0 /\ rc2' = 0
+T28 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1 /\ rc2' = rc2
 T29 == st = "persisting" /\ st' = "persistRetry" /\ rc1' = rc1 /\ rc2' = rc2
-T30 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1 /\ rc2' = rc2
-T31 == st = "rolledBack" /\ st' = "Pending" /\ rc1' = 0 /\ rc2' = 0
-T32 == st = "rolledBack" /\ st' = "Authorized" /\ rc1' = 0 /\ rc2' = 0
-T33 == st = "rolledBack" /\ st' = "Captured" /\ rc1' = 0 /\ rc2' = 0
+T30 == st = "persisting" /\ st' = "persistRetry" /\ rc1' = rc1 /\ rc2' = rc2
+T31 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1 /\ rc2' = rc2
+T32 == st = "rolledBack" /\ st' = "Pending" /\ rc1' = 0 /\ rc2' = 0
+T33 == st = "rolledBack" /\ st' = "Authorized" /\ rc1' = 0 /\ rc2' = 0
+T34 == st = "rolledBack" /\ st' = "Captured" /\ rc1' = 0 /\ rc2' = 0
+T35 == st = "rolledBack" /\ st' = "routingFault" /\ rc1' = 0 /\ rc2' = 0
 RetryExhausted_gatewayRetry == st = "gatewayRetry" /\ rc1 >= MaxRetries /\ st' = "rolledBack" /\ rc1' = rc1 /\ rc2' = rc2
 RetryAgain_gatewayRetry == st = "gatewayRetry" /\ rc1 < MaxRetries /\ st' = "gatewayResume" /\ rc1' = rc1 + 1 /\ rc2' = rc2
 RetryExhausted_persistRetry == st = "persistRetry" /\ rc2 >= MaxRetries /\ st' = "rolledBack" /\ rc2' = rc2 /\ rc1' = rc1
@@ -112,7 +115,7 @@ RetryAgain_persistRetry == st = "persistRetry" /\ rc2 < MaxRetries /\ st' = "per
 Terminated == st \in Final /\ UNCHANGED vars
 
 DomainNext == T1 \/ T2 \/ T3 \/ T4 \/ T5 \/ T6
-OverlayNext == T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ T26 \/ T27 \/ T28 \/ T29 \/ T30 \/ T31 \/ T32 \/ T33 \/ RetryExhausted_gatewayRetry \/ RetryAgain_gatewayRetry \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
+OverlayNext == T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ T26 \/ T27 \/ T28 \/ T29 \/ T30 \/ T31 \/ T32 \/ T33 \/ T34 \/ T35 \/ RetryExhausted_gatewayRetry \/ RetryAgain_gatewayRetry \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
 Next == DomainNext \/ OverlayNext \/ Terminated
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)

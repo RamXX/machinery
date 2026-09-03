@@ -214,13 +214,16 @@ func TestExplicitG5OnPlainDesignIsError(t *testing.T) {
 
 // ------------------- 2026-07-02 review: G5 hardening -----------------------
 
-// The content hash covers the manifest: deleting a delegated invariant from
-// the child's copied pack/pack.yaml alone must fail the child's G5.
+// The content hash covers the manifest: changing a delegated invariant in
+// the child's copied pack/pack.yaml alone must fail the child's G5. Keep the
+// edited manifest schema-valid so this proves hash coverage rather than the
+// closed-schema validator's earlier null/list rejection.
 func TestChildEditingManifestDelegatedInvariantFailsHash(t *testing.T) {
 	_, orders, _ := splitFixture(t)
-	editFile(t, filepath.Join(orders, "pack", "pack.yaml"), "  - no-ship-without-capture\n", "")
-	if !containsAny(gates.CheckPack(orders).Errs, "fails its own content hash") {
-		t.Error("editing the child's pack manifest passed G5")
+	editFile(t, filepath.Join(orders, "pack", "pack.yaml"), "  - no-ship-without-capture\n", "  - no-ship-without-settlement\n")
+	g := gates.CheckPack(orders)
+	if !containsAny(g.Errs, "fails its own content hash") {
+		t.Errorf("editing the child's pack manifest passed G5: errs=%v drift=%v", g.Errs, g.Drift)
 	}
 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -29,8 +30,10 @@ func newEmbedCmd() *cobra.Command {
 	}
 	dryRun := refresh.Flags().Bool("dry-run", false,
 		"report what would be re-copied and appended without writing any file")
-	refresh.RunE = func(cmd *cobra.Command, args []string) error {
-		return embedRefreshRun(args[0], *dryRun)
+	refresh.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		return embedRefreshRunTo(args[0], *dryRun, output.stdout, output.stderr)
 	}
 
 	c.AddCommand(refresh)
@@ -38,16 +41,18 @@ func newEmbedCmd() *cobra.Command {
 }
 
 func embedRefreshRun(design string, dryRun bool) error {
+	return embedRefreshRunTo(design, dryRun, stdoutW, stderrW)
+}
+
+func embedRefreshRunTo(design string, dryRun bool, stdoutW, stderrW io.Writer) error {
 	reports, changed, err := gates.RefreshEmbeds(design, dryRun)
 	if err != nil {
 		fmt.Fprintln(stderrW, "embed refresh: "+err.Error())
-		exitFunc(1)
-		return err
+		return commandExitBecause(1, err)
 	}
 	if len(reports) == 0 {
 		fmt.Fprintf(stdoutW, "no machinery:embed markers under %s\n", design)
-		exitFunc(1)
-		return fmt.Errorf("no machinery:embed markers under %s", design)
+		return commandExitBecause(1, fmt.Errorf("no machinery:embed markers under %s", design))
 	}
 	gates.SortReports(reports)
 	verb := "re-copied"
@@ -85,7 +90,7 @@ func embedRefreshRun(design string, dryRun bool) error {
 	fmt.Fprintln(stdoutW, head)
 	if problems > 0 {
 		fmt.Fprintf(stderrW, "embed refresh: %d marker(s) skipped; run `machinery check %s --gate ge` for the reasons\n", problems, design)
-		exitFunc(1)
+		return commandExit(1)
 	}
 	return nil
 }

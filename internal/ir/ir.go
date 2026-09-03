@@ -2,14 +2,86 @@ package ir
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/RamXX/machinery/internal/portablepath"
 )
 
 // IdentPattern is machine_lint.IDENT: [A-Za-z_][A-Za-z0-9_]*.
 const IdentPattern = `[A-Za-z_][A-Za-z0-9_]*`
 
 var identRe = regexp.MustCompile(IdentPattern)
+
+var tlaModuleIdentRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
+
+// TLAModuleName returns the canonical TLA+ module and artifact basename for a
+// machine. Machine ids cross two trust boundaries: they are emitted as TLA+
+// identifiers and joined to an output directory as filenames. Accepting only
+// the portable TLA+ identifier subset makes both uses safe; in particular, a
+// path separator or dot segment can never escape the requested output tree.
+func TLAModuleName(root *Value) (string, error) {
+	if root == nil || root.Kind != KindObject {
+		return "", fmt.Errorf("machine is not an object")
+	}
+	idv := root.AsObject().Get2("id")
+	if idv == nil || idv.Kind != KindString || idv.AsString() == "" {
+		return "", fmt.Errorf("machine id must be a non-empty string matching [A-Za-z][A-Za-z0-9_]*")
+	}
+	id := idv.AsString()
+	if !tlaModuleIdentRe.MatchString(id) {
+		return "", fmt.Errorf("machine id %s is not a safe TLA+ identifier (expected [A-Za-z][A-Za-z0-9_]*)", goRepr(idv))
+	}
+	module := Title(id)
+	if err := portablepath.ValidateBase(module + ".tla"); err != nil {
+		return "", fmt.Errorf("machine id %s does not produce a portable artifact name: %w", goRepr(idv), err)
+	}
+	return module, nil
+}
+
+// ValidateTLAModuleInventory requires every machine in dir to be a regular
+// source and to produce a basename unique under case-folding. Title-casing
+// makes foo and Foo an exact collision; FOO and Foo alias on APFS/NTFS.
+func ValidateTLAModuleInventory(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	owners := map[string]string{}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".machine.json") {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return fmt.Errorf("machine source %s must be a regular file, not a symlink or special file", entry.Name())
+		}
+		machine, err := LoadMachineJSON(path)
+		if err != nil {
+			return err
+		}
+		module, err := TLAModuleName(machine)
+		if err != nil {
+			return fmt.Errorf("%s: %w", entry.Name(), err)
+		}
+		stem := strings.TrimSuffix(entry.Name(), ".machine.json")
+		if !strings.EqualFold(stem, module) {
+			return fmt.Errorf("machine source %s must use a case-fold-equivalent canonical filename %s.machine.json for machine id", entry.Name(), module)
+		}
+		fold := strings.ToLower(module)
+		if prior, ok := owners[fold]; ok {
+			return fmt.Errorf("machine sources %s and %s produce TLA artifact names that alias on case-insensitive filesystems", prior, entry.Name())
+		}
+		owners[fold] = entry.Name()
+	}
+	return nil
+}
 
 // StateEntry is a walked state: (path, simpleName, node).
 type StateEntry struct {
@@ -137,6 +209,9 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 	}
 	if t.Kind == KindArray {
 		items = t.AsArray()
+		if len(items) == 0 && problems != nil {
+			*problems = append(*problems, fmt.Sprintf("empty transition branch list%s (the trigger would be silently swallowed)", whereSuffix(where)))
+		}
 	} else {
 		items = []*Value{t}
 	}
@@ -175,6 +250,10 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 				case KindString:
 					tgt = tv.AsString()
 					hasTgt = true
+				default:
+					if problems != nil {
+						*problems = append(*problems, fmt.Sprintf("non-string transition target %s%s", goRepr(tv), whereSuffix(where)))
+					}
 				}
 			}
 			var guard string
@@ -202,6 +281,21 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 	return out
 }
 
+// TransitionProblems runs the shared transition normalizer over every state
+// and returns every admissibility finding in source order. Generators use this
+// before emitting anything so malformed branches cannot be silently narrowed
+// into a different machine. Lint uses the same TransitionsOf path directly.
+func TransitionProblems(root *Value) []string {
+	if root == nil || root.Kind != KindObject {
+		return nil
+	}
+	var problems []string
+	for _, s := range WalkStates(root.AsObject().Get2("states"), "") {
+		TransitionsOf(s.Node, &problems, s.Path)
+	}
+	return problems
+}
+
 // TransitionsOf mirrors machine_lint.transitions_of: all transitions on a state
 // node, flattened. kind ∈ {on, after, always, stateDone, onDone, onError}.
 func TransitionsOf(node *Value, problems *[]string, state string) []Transition {
@@ -212,18 +306,30 @@ func TransitionsOf(node *Value, problems *[]string, state string) []Transition {
 	var res []Transition
 
 	if on := o.Get2("on"); on != nil {
-		for _, ev := range on.AsObject().Keys() {
-			for _, b := range normTransition(on.AsObject().Get2(ev), problems, state+" on:"+ev) {
-				res = append(res, Transition{Kind: "on", Event: ev,
-					Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+		if on.Kind != KindObject {
+			if problems != nil {
+				*problems = append(*problems, fmt.Sprintf("transition container 'on' must be an object%s", whereSuffix(state)))
+			}
+		} else {
+			for _, ev := range on.AsObject().Keys() {
+				for _, b := range normTransition(on.AsObject().Get2(ev), problems, state+" on:"+ev) {
+					res = append(res, Transition{Kind: "on", Event: ev,
+						Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+				}
 			}
 		}
 	}
 	if after := o.Get2("after"); after != nil {
-		for _, delay := range after.AsObject().Keys() {
-			for _, b := range normTransition(after.AsObject().Get2(delay), problems, state+" after:"+delay) {
-				res = append(res, Transition{Kind: "after", Event: delay,
-					Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+		if after.Kind != KindObject {
+			if problems != nil {
+				*problems = append(*problems, fmt.Sprintf("transition container 'after' must be an object%s", whereSuffix(state)))
+			}
+		} else {
+			for _, delay := range after.AsObject().Keys() {
+				for _, b := range normTransition(after.AsObject().Get2(delay), problems, state+" after:"+delay) {
+					res = append(res, Transition{Kind: "after", Event: delay,
+						Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+				}
 			}
 		}
 	}
@@ -240,7 +346,19 @@ func TransitionsOf(node *Value, problems *[]string, state string) []Transition {
 		}
 	}
 	if inv := o.Get2("invoke"); inv != nil {
-		for _, iv := range invokesRaw(inv) {
+		if inv.Kind != KindObject && inv.Kind != KindArray {
+			if problems != nil {
+				*problems = append(*problems, fmt.Sprintf("transition source 'invoke' must be an object or array%s", whereSuffix(state)))
+			}
+			return res
+		}
+		for i, iv := range invokesRaw(inv) {
+			if iv == nil || iv.Kind != KindObject {
+				if problems != nil {
+					*problems = append(*problems, fmt.Sprintf("invoke entry %d must be an object%s", i+1, whereSuffix(state)))
+				}
+				continue
+			}
 			ivObj := iv.AsObject()
 			for _, key := range []string{"onDone", "onError"} {
 				if ivObj.Get2(key) != nil {

@@ -11,6 +11,7 @@ glossary:
   Analyst: "A person who configures indices and starts recommendation runs."
   Manager: "A person who reviews a recommended `Portfolio` and accepts or rejects it."
   Admin: "A person who may perform any action, including manager decisions."
+  System: "The portfolio tool acting autonomously inside a recommendation run; not a human persona."
   Constituent: "A `Security` that is a member of an `Index`, carrying its rank within that index."
   Candidate: "A `Security` in the deduped universe a run optimizes over."
   Source: "An `Index` a `CandidateSet` was drawn from."
@@ -259,7 +260,7 @@ entities:
         description: "Allocation in basis points; the weights of a portfolio sum to 10000."
     actions:
       - name: set
-        actor: Analyst
+        actor: System
         preserves: [holding-weight-nonneg, holding-weights-sum-full]
         description: "Set a holding's security and weight when the optimizer commits a portfolio."
     invariants:

@@ -17,7 +17,27 @@ import (
 
 // eventSourceNoteRe matches an enumeration-source note line: a "Source:" or
 // "Sources:" label, or the phrase "enumerated from".
-var eventSourceNoteRe = regexp.MustCompile(`(?i)\bsources?\s*:|enumerated from`)
+var eventSourceNoteRe = regexp.MustCompile(`(?i)(?:\bsources?\s*:\s*\S|\benumerated from\s+\S)`)
+
+func validEventEmbed(line string) bool {
+	m := embedMarker.FindStringSubmatch(line)
+	if m == nil {
+		return false
+	}
+	attrs := map[string]string{}
+	for _, a := range embedAttr.FindAllStringSubmatch(m[1], -1) {
+		attrs[a[1]] = strings.TrimSpace(a[2])
+	}
+	if attrs["from"] == "" || attrs["table"] == "" || attrs["claims"] == "" {
+		return false
+	}
+	for key := range attrs {
+		if key != "from" && key != "table" && key != "where" && key != "claims" {
+			return false
+		}
+	}
+	return true
+}
 
 // eventSourceLookback is how many lines above the table header the note may
 // sit (the prose-count check uses the same neighborhood idiom).
@@ -57,7 +77,7 @@ func checkEventTableSources(g *Gate, text string) {
 		}
 		sourced := false
 		for k := max(0, i-eventSourceLookback); k < i; k++ {
-			if strings.Contains(lines[k], "machinery:embed") || eventSourceNoteRe.MatchString(lines[k]) {
+			if validEventEmbed(lines[k]) || eventSourceNoteRe.MatchString(lines[k]) {
 				sourced = true
 				break
 			}

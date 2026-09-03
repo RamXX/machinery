@@ -1,0 +1,9 @@
+# design<TAB>impl-or-<TAB>formal<TAB>checker-registry-or-<TAB>c4<TAB>complete<TAB>pack-role<TAB>impl-module<TAB>security
+examples/checkout-split/orders/design	-	yes	-	yes	no	child:examples/checkout-split/parent/design	-	no
+examples/checkout-split/parent/design	-	no	-	yes	no	parent	-	no
+examples/checkout-split/payments/design	-	yes	-	yes	no	child:examples/checkout-split/parent/design	-	no
+examples/fulfillment/design	-	yes	-	yes	no	-	-	no
+examples/go-crm/design	examples/go-crm/impl	yes	-	yes	yes	-	go	yes
+examples/pii-flow/design	-	yes	examples/pii-flow/checkers.local.example.yaml	yes	no	-	-	no
+examples/portfolio-engine/design	-	yes	-	yes	no	-	-	no
+examples/surreal-crm/design	-	yes	-	yes	no	-	-	no

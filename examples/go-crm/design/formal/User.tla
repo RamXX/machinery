@@ -10,7 +10,7 @@ EXTENDS Naturals
 \*      machine_lint requires an unguarded fallback or an _exhaustive note; where
 \*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
 \*      below is only as sound as these hand-checked, UNVERIFIED claims:
-\*      - UNVERIFIED, state rolledBack: both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present
+\*      (none here: every guarded branch list has an unguarded fallback)
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or
@@ -53,6 +53,7 @@ Init == st = "Active" /\ rc1 = 0
   \* T15: persisting -onError:saveUser-> rolledBack
   \* T16: rolledBack -always-> Active
   \* T17: rolledBack -always-> Disabled
+  \* T18: rolledBack -always-> Disabled
 
 T1 == st = "Active" /\ st' = "persisting" /\ rc1' = 0
 T2 == st = "Active" /\ st' = "Active" /\ rc1' = 0
@@ -71,11 +72,12 @@ T14 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1
 T15 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1
 T16 == st = "rolledBack" /\ st' = "Active" /\ rc1' = 0
 T17 == st = "rolledBack" /\ st' = "Disabled" /\ rc1' = 0
+T18 == st = "rolledBack" /\ st' = "Disabled" /\ rc1' = 0
 RetryExhausted_persistRetry == st = "persistRetry" /\ rc1 >= MaxRetries /\ st' = "rolledBack" /\ rc1' = rc1
 RetryAgain_persistRetry == st = "persistRetry" /\ rc1 < MaxRetries /\ st' = "persisting" /\ rc1' = rc1 + 1
 
 DomainNext == T1 \/ T2 \/ T3 \/ T4 \/ T5 \/ T6
-OverlayNext == T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
+OverlayNext == T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
 Next == DomainNext \/ OverlayNext
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)

@@ -6,6 +6,11 @@ description: >
   service coupled only through the bus. The worked example for recursive
   decomposition via contract packs.
 
+glossary:
+  Customer: "The person who places or cancels an order before payment settlement."
+  Operator: "The fulfillment or payments operator authorized to ship or refund."
+  System: "An authenticated subsystem event handler acting without a human surface."
+
 enums:
   OrderStatus:
     values:
@@ -35,7 +40,7 @@ entities:
       - {name: ship, actor: Operator, preserves: [no-ship-without-capture]}
       - {name: cancel, actor: Customer}
     invariants:
-      - {id: order-total-positive, definition: "An order's total is strictly positive."}
+      - {id: order-total-positive, statement: "An order's total is strictly positive."}
   Payment:
     definition: "A payment attempt in the payments subsystem."
     attributes:
@@ -49,9 +54,25 @@ entities:
       - {name: decline, actor: System}
       - {name: refund, actor: Operator}
     invariants:
-      - {id: payment-single-capture, definition: "A payment is captured at most once."}
+      - {id: payment-single-capture, statement: "A payment is captured at most once."}
 
 invariants:
-  - {id: no-ship-without-capture, definition: "An order ships only after its payment is captured. Cross-subsystem; enforcement is delegated to the orders subsystem, which may only reach Shipped from Paid, and Paid only on the payments subsystem's markPaid event."}
+  - {id: no-ship-without-capture, statement: "An order ships only after its payment is captured. Cross-subsystem; enforcement is delegated to the orders subsystem, which may only reach Shipped from Paid, and Paid only on the payments subsystem's markPaid event."}
 
-scenarios: []
+scenarios:
+  - name: Positive order settles before shipment
+    description: "Exercises creation validation and the capture-before-ship lifecycle rule."
+    actors: [Customer, System, Operator]
+    steps:
+      - "A `Customer` places an `Order` with a strictly positive total."
+      - "The payment `System` captures a `Payment` and marks the `Order` paid."
+      - "An `Operator` ships the paid `Order`; an unpaid order would be rejected."
+    invariants_touched: [order-total-positive, no-ship-without-capture]
+  - name: Payment captures at most once
+    description: "Exercises settlement, duplicate capture handling, and the refund path."
+    actors: [System, Operator]
+    steps:
+      - "The order `System` requests a `Payment`."
+      - "The processor `System` captures it once; a duplicate capture has no effect."
+      - "An `Operator` refunds the captured `Payment`."
+    invariants_touched: [payment-single-capture]

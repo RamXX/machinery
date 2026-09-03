@@ -1,7 +1,6 @@
 package oracle
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -143,37 +142,31 @@ func TestRenderIsDeterministic(t *testing.T) {
 }
 
 func TestStableIDPrefixCollisionIsExtended(t *testing.T) {
-	// Brute-force two event names whose stimulus hashes share a 6-hex prefix;
-	// distinct transitions must never render as duplicate-branch suffixes.
+	// Committed collision pair: these distinct stimuli both begin 322f7c.
+	// Keeping the pair in source makes the regression deterministic and keeps
+	// the test from probabilistically skipping after a bounded brute-force run.
 	tag := "WIDG"
-	base := stableHash(tag, "Draft", "on:evbase", "")
-	var collide string
-	for i := 0; ; i++ {
-		cand := fmt.Sprintf("ev%d", i)
-		if cand == "evbase" {
-			continue
-		}
-		if stableHash(tag, "Draft", "on:"+cand, "")[:6] == base[:6] {
-			collide = cand
-			break
-		}
-		if i > 3_000_000 {
-			t.Skip("no collision found in budget")
-		}
+	first, second := "ev563", "ev961"
+	firstHash := stableHash(tag, "Draft", "on:"+first, "")
+	secondHash := stableHash(tag, "Draft", "on:"+second, "")
+	if firstHash[:6] != secondHash[:6] || firstHash == secondHash {
+		t.Fatalf("committed collision fixture drifted: %s %s", firstHash, secondHash)
 	}
-	src := fmt.Sprintf(`{"id":"widget","initial":"Draft","states":{
-	  "Draft":{"on":{"evbase":{"target":"Done"},"%s":{"target":"Done"}}},
-	  "Done":{"type":"final"}}}`, collide)
+	src := `{"id":"widget","initial":"Draft","states":{
+	  "Draft":{"on":{"ev563":{"target":"Done"},"ev961":{"target":"Done"}}},
+	  "Done":{"type":"final"}}}`
 	m, err := ir.LoadMachineJSONStr("w", src)
 	if err != nil {
 		t.Fatal(err)
 	}
 	out := Render(m, "w")
-	if strings.Contains(out, base[:6]+".2") {
+	if strings.Contains(out, firstHash[:6]+".2") {
 		t.Fatalf("distinct transitions rendered as duplicate suffix:\n%s", out)
 	}
-	if !strings.Contains(out, "WIDG-"+base[:8]) {
-		t.Fatalf("expected extended 8-hex prefix for colliding rows:\n%s", out)
+	for _, want := range []string{"WIDG-" + firstHash[:8], "WIDG-" + secondHash[:8]} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected extended 8-hex prefix %s for colliding rows:\n%s", want, out)
+		}
 	}
 }
 

@@ -27,7 +27,7 @@ func embedDesign(t *testing.T) string {
 func TestEmbedRefreshRewritesAndReports(t *testing.T) {
 	outB, _, codes := withCapturedIO(t)
 	d := embedDesign(t)
-	if err := embedRefreshRun(d, false); err != nil {
+	if err := capturedEmbedRefreshRun(d, false); err != nil {
 		t.Fatal(err)
 	}
 	if len(*codes) != 0 {
@@ -58,7 +58,7 @@ func TestEmbedRefreshDryRunLeavesTheFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := embedRefreshRun(d, true); err != nil {
+	if err := capturedEmbedRefreshRun(d, true); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(outB.String(), "would be re-copied") {
@@ -79,7 +79,7 @@ func TestEmbedRefreshFailsLoudlyWithNoMarkers(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(d, "ARCHITECTURE.md"), []byte("# nothing\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := embedRefreshRun(d, false); err == nil {
+	if err := capturedEmbedRefreshRun(d, false); err == nil {
 		t.Fatal("a design with no markers must fail loudly")
 	}
 	if len(*codes) == 0 || (*codes)[0] != 1 {
@@ -98,7 +98,7 @@ func TestEmbedRefreshReportsASkippedMarker(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(d, "SHARD.md"), []byte(shard), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := embedRefreshRun(d, false); err != nil {
+	if err := capturedEmbedRefreshRun(d, false); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(outB.String(), "skipped:") {

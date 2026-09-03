@@ -15,18 +15,17 @@ import (
 
 // --- imports (G4-import) ---
 
-// walkSourceFiles collects source files under root, FOLLOWING directory
-// symlinks (the Python glob("**") did; monorepo/pnpm/bazel layouts satisfy
-// boundary code globs via symlinks, and skipping them makes the code
-// invisible to the gate). Cycles are broken by tracking resolved paths.
-// Dangling symlinks are skipped.
+// walkSourceFiles collects source files under one canonical source root.
+// Symlink entries below that root are rejected: following them makes G4/Gt
+// depend on mutable bytes outside the governed source inventory, while
+// skipping a broken link silently makes the scan incomplete.
 //
 // Directories whose root-relative path matches a contract ignore glob are
 // pruned BEFORE descent (symlinked or not): everything under them is
 // excluded post-walk anyway, and descending a huge ignored tree (a
-// node_modules symlink into a foreign pnpm store) wastes the walk at best
-// and used to abort it at worst. The prune keys on the walk path, so a
-// non-ignored symlink into an ignored directory stays followable.
+// node_modules tree wastes the walk at best and used to abort it at worst.
+// A symlink is skipped only when its own walk path is ignored; a non-ignored
+// alias is rejected even when its target would have been ignored.
 //
 // A directory that cannot be resolved or read is recorded in warns and its
 // SIBLINGS are still walked: a partial walk must be loud (the caller reports
@@ -36,6 +35,14 @@ import (
 // pruned lists the root-relative directories the ignore globs pruned, so the
 // caller can keep the skipped volume visible in its counts.
 func walkSourceFiles(root string, ignore []string) (files, pruned, warns []string, err error) {
+	// Resolve once to prove the explicitly supplied source root exists. Keep
+	// the caller's exact spelling for returned paths: callers may configure a
+	// relative root, and macOS commonly maps /var to /private/var. Rewriting
+	// that trusted root would make every file appear to escape the configured
+	// implementation directory.
+	if _, err := filepath.EvalSymlinks(root); err != nil {
+		return nil, nil, nil, err
+	}
 	visited := map[string]bool{}
 	var walk func(dir string, isRoot bool) error
 	walk = func(dir string, isRoot bool) error {
@@ -62,11 +69,12 @@ func walkSourceFiles(root string, ignore []string) (files, pruned, warns []strin
 			p := filepath.Join(dir, e.Name())
 			isDir := e.IsDir()
 			if e.Type()&os.ModeSymlink != 0 {
-				fi, statErr := os.Stat(p) // follow the link
-				if statErr != nil {
-					continue // dangling symlink
+				rel, relErr := filepath.Rel(root, p)
+				if relErr == nil && sourcePathIgnored(rel, ignore) {
+					continue
 				}
-				isDir = fi.IsDir()
+				warns = append(warns, p+": symlink entries are rejected from the governed source inventory")
+				continue
 			}
 			if isDir {
 				if rel, relErr := filepath.Rel(root, p); relErr == nil && dirIgnored(rel, ignore) {
@@ -90,6 +98,15 @@ func walkSourceFiles(root string, ignore []string) (files, pruned, warns []strin
 		return files, pruned, warns, walkErr
 	}
 	return files, pruned, warns, nil
+}
+
+func sourcePathIgnored(rel string, ignore []string) bool {
+	for _, pattern := range ignore {
+		if matchGlob(rel, pattern) || dirIgnored(rel, []string{pattern}) {
+			return true
+		}
+	}
+	return false
 }
 
 // dirIgnored reports whether a directory (root-relative rel) is excluded by
@@ -180,6 +197,10 @@ func rustSplitTests(text string) (string, []string) {
 // lint-grade (a brace inside a string literal would miscount), matching the
 // regex-grade parsing of every other language here.
 func rustItemEnd(text string, from int) int {
+	// rustStripStrings is length preserving: braces in strings/comments become
+	// spaces while structural braces stay in place. Counting on that lexical
+	// view prevents one test literal from swallowing production code to EOF.
+	text = rustStripStrings(text)
 	depth := 0
 	for i := from; i < len(text); i++ {
 		switch text[i] {
@@ -210,9 +231,11 @@ func matchGlob(rel, pattern string) bool {
 	return rel == static || strings.HasPrefix(rel, static+"/")
 }
 
-func boundaryOf(rel string, pkgmap [][2]string) string {
+// boundaryMatch returns the unique most-specific owner and, on an equal
+// specificity tie across different boundaries, the sorted ambiguous owners.
+func boundaryMatch(rel string, pkgmap [][2]string) (string, []string) {
 	best := -1
-	var bestBid string
+	owners := map[string]bool{}
 	for _, pm := range pkgmap {
 		pattern, bid := pm[0], pm[1]
 		if matchGlob(rel, pattern) {
@@ -220,11 +243,24 @@ func boundaryOf(rel string, pkgmap [][2]string) string {
 			static = strings.ReplaceAll(static, "/*", "")
 			if len(static) > best {
 				best = len(static)
-				bestBid = bid
+				owners = map[string]bool{bid: true}
+			} else if len(static) == best {
+				owners[bid] = true
 			}
 		}
 	}
-	return bestBid
+	var bids []string
+	for bid := range owners {
+		bids = append(bids, bid)
+	}
+	sort.Strings(bids)
+	if len(bids) == 1 {
+		return bids[0], nil
+	}
+	if len(bids) > 1 {
+		return "", bids
+	}
+	return "", nil
 }
 
 // goModule is one go.mod under impl: its module path and the directory
@@ -241,18 +277,19 @@ var goModuleLineRe = regexp.MustCompile(`(?m)^module\s+(\S+)`)
 // an enclosing one whose path is its prefix. A subtree that cannot be read
 // is recorded in warns and the walk continues with its siblings; only a
 // failure on impl itself is fatal.
-func goModules(impl string, ignore []string) ([]goModule, []string, error) {
+func goModules(impl string, ignore []string) ([]goModule, error) {
 	var mods []goModule
-	var warns []string
 	err := filepath.WalkDir(impl, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			if path == impl {
-				return err
-			}
-			warns = append(warns, path+": "+err.Error())
-			return nil //nolint:nilerr // recorded in warns; keep walking siblings
+			return err
 		}
 		rel, _ := filepath.Rel(impl, path)
+		if d.Type()&os.ModeSymlink != 0 {
+			if sourcePathIgnored(rel, ignore) {
+				return nil
+			}
+			return fmt.Errorf("%s: symlink entries are rejected from Go module discovery", path)
+		}
 		if d.IsDir() {
 			if rel == "." {
 				return nil
@@ -271,8 +308,7 @@ func goModules(impl string, ignore []string) ([]goModule, []string, error) {
 		}
 		data, readErr := os.ReadFile(path)
 		if readErr != nil {
-			warns = append(warns, path+": "+readErr.Error())
-			return nil //nolint:nilerr // recorded in warns; keep walking siblings
+			return readErr
 		}
 		if m := goModuleLineRe.FindSubmatch(data); m != nil {
 			mods = append(mods, goModule{path: string(m[1]), dir: filepath.Dir(rel)})
@@ -280,7 +316,7 @@ func goModules(impl string, ignore []string) ([]goModule, []string, error) {
 		return nil
 	})
 	sort.SliceStable(mods, func(i, j int) bool { return len(mods[i].path) > len(mods[j].path) })
-	return mods, warns, err
+	return mods, err
 }
 
 // goModuleFor returns the module owning an import path and the impl-relative
@@ -308,18 +344,19 @@ type tsPackage struct {
 // with its siblings; only a failure on impl itself is fatal. A package.json
 // without a name (or unparseable) is skipped silently: it names nothing an
 // import specifier could reference.
-func tsPackages(impl string, ignore []string) ([]tsPackage, []string, error) {
+func tsPackages(impl string, ignore []string) ([]tsPackage, error) {
 	var pkgs []tsPackage
-	var warns []string
 	err := filepath.WalkDir(impl, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			if path == impl {
-				return err
-			}
-			warns = append(warns, path+": "+err.Error())
-			return nil //nolint:nilerr // recorded in warns; keep walking siblings
+			return err
 		}
 		rel, _ := filepath.Rel(impl, path)
+		if d.Type()&os.ModeSymlink != 0 {
+			if sourcePathIgnored(rel, ignore) {
+				return nil
+			}
+			return fmt.Errorf("%s: symlink entries are rejected from package discovery", path)
+		}
 		if d.IsDir() {
 			if rel == "." {
 				return nil
@@ -338,8 +375,7 @@ func tsPackages(impl string, ignore []string) ([]tsPackage, []string, error) {
 		}
 		data, readErr := os.ReadFile(path)
 		if readErr != nil {
-			warns = append(warns, path+": "+readErr.Error())
-			return nil //nolint:nilerr // recorded in warns; keep walking siblings
+			return readErr
 		}
 		var pj struct {
 			Name string `json:"name"`
@@ -350,7 +386,7 @@ func tsPackages(impl string, ignore []string) ([]tsPackage, []string, error) {
 		return nil
 	})
 	sort.SliceStable(pkgs, func(i, j int) bool { return len(pkgs[i].name) > len(pkgs[j].name) })
-	return pkgs, warns, err
+	return pkgs, err
 }
 
 // tsPackageFor returns the impl-relative path an import specifier resolves
@@ -371,11 +407,12 @@ func tsPackageFor(pkgs []tsPackage, ref string) (rel string, ok bool) {
 }
 
 var (
-	goBlockImportRe = regexp.MustCompile(`(?ms)^import\s*\((.*?)\)`)
-	goLineImportRe  = regexp.MustCompile(`(?m)^import\s+(?:[\w.]+\s+)?"([^"]+)"`)
-	goBlockLineRe   = regexp.MustCompile(`(?:^|\s)(?:[\w.]+\s+)?"([^"]+)"`)
-	pyImportRe      = regexp.MustCompile(`(?m)^\s*import\s+([\w.]+(?:\s+as\s+\w+)?(?:\s*,\s*[\w.]+(?:\s+as\s+\w+)?)*)`)
-	pyFromRe        = regexp.MustCompile(`(?m)^\s*from\s+([\w.]+)\s+import\b`)
+	goBlockImportRe   = regexp.MustCompile(`(?ms)^import\s*\((.*?)\)`)
+	goLineImportRe    = regexp.MustCompile(`(?m)^import\s+(?:[\w.]+\s+)?"([^"]+)"`)
+	goBlockLineRe     = regexp.MustCompile(`(?:^|\s)(?:[\w.]+\s+)?"([^"]+)"`)
+	pyImportRe        = regexp.MustCompile(`(?m)^\s*import\s+([\w.]+(?:\s+as\s+\w+)?(?:\s*,\s*[\w.]+(?:\s+as\s+\w+)?)*)`)
+	pyFromRe          = regexp.MustCompile(`(?m)^\s*from\s+([\w.]+)\s+import\b`)
+	pyDynamicImportRe = regexp.MustCompile(`(?:importlib\.import_module|__import__)\s*\(\s*['"]([^'"]+)['"]`)
 	// from/import/dynamic import()/require() forms
 	tsImportRe = regexp.MustCompile(`(?:from|import\s*\(|import|require\()\s*['"]([^'"]+)['"]`)
 	exModRe    = regexp.MustCompile(`(?m)^\s*(?:alias|import|use|require)\s+([A-Z][\w.]*)`)
@@ -389,7 +426,7 @@ var (
 	exQualCallRe = regexp.MustCompile(`([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.[a-z_][A-Za-z0-9_]*[!?]?\(`)
 	exStructRe   = regexp.MustCompile(`%([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\{`)
 	exCaptureRe  = regexp.MustCompile(`&([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\.`)
-	rustUseRe    = regexp.MustCompile(`(?m)^\s*use\s+([\w:]+)`)
+	rustUseRe    = regexp.MustCompile(`(?m)^\s*(?:pub(?:\([^)]*\))?\s+)?use\s+([^;]+);`)
 	// Use-free fully-qualified Rust references in expression position: a
 	// call path::to::item(, a macro call path::to::name!(, a struct literal
 	// path::To::Type {, and a turbofish path::to::item::<T>. The head
@@ -422,8 +459,8 @@ func goImports(text string) []string {
 // never host a line-anchored import (their opening quote precedes the
 // keyword on the same line), and a # comment can never precede a
 // line-anchored match either; both are stripped anyway for scan stability.
-// Dynamic imports (importlib.import_module, __import__) are invisible,
-// matching the Elixir apply/3 limitation.
+// Literal dynamic imports (importlib.import_module, __import__) are retained;
+// computed arguments remain intentionally unresolved.
 func pyImports(text, rel string) []string {
 	text = pyStripStrings(text)
 	var out []string
@@ -447,6 +484,9 @@ func pyImports(text, rel string) []string {
 		} else {
 			out = append(out, strings.ReplaceAll(mod, ".", "/"))
 		}
+	}
+	for _, m := range pyDynamicImportRe.FindAllStringSubmatch(text, -1) {
+		out = append(out, strings.ReplaceAll(m[1], ".", "/"))
 	}
 	return out
 }
@@ -636,10 +676,41 @@ func rustImports(text string) []string {
 		}
 	}
 	for _, m := range rustUseRe.FindAllStringSubmatch(code, -1) {
-		add(m[1])
+		for _, path := range rustUsePaths(m[1]) {
+			add(path)
+		}
 	}
 	for _, m := range rustQualRe.FindAllStringSubmatch(code, -1) {
 		add(m[1])
+	}
+	return out
+}
+
+// rustUsePaths expands the dependency-bearing heads of a Rust use tree. It
+// intentionally does not model imported item aliases: boundary ownership is
+// decided by the path before `as`.
+func rustUsePaths(expr string) []string {
+	expr = strings.TrimSpace(strings.SplitN(expr, " as ", 2)[0])
+	open := strings.Index(expr, "{")
+	close := strings.LastIndex(expr, "}")
+	if open < 0 || close < open {
+		return []string{strings.TrimSuffix(strings.TrimSpace(expr), "::")}
+	}
+	prefix := strings.TrimSuffix(strings.TrimSpace(expr[:open]), "::")
+	var out []string
+	for _, branch := range strings.Split(expr[open+1:close], ",") {
+		branch = strings.TrimSpace(strings.SplitN(branch, " as ", 2)[0])
+		if branch == "" || branch == "self" {
+			if prefix != "" {
+				out = append(out, prefix)
+			}
+			continue
+		}
+		if prefix != "" {
+			out = append(out, prefix+"::"+branch)
+		} else {
+			out = append(out, branch)
+		}
 	}
 	return out
 }
@@ -811,6 +882,7 @@ func pyStripStrings(text string) string {
 				i++
 			}
 		case '"', '\'':
+			keep := keepPyImportArg(out)
 			width := 1
 			if i+2 < n && src[i+1] == c && src[i+2] == c {
 				width = 3
@@ -820,10 +892,18 @@ func pyStripStrings(text string) string {
 			i += width
 			for i < n {
 				if src[i] == '\\' {
-					out = append(out, ' ')
+					if keep {
+						out = append(out, src[i])
+					} else {
+						out = append(out, ' ')
+					}
 					i++
 					if i < n {
-						out = append(out, blank(src[i]))
+						if keep {
+							out = append(out, src[i])
+						} else {
+							out = append(out, blank(src[i]))
+						}
 						i++
 					}
 					continue
@@ -836,7 +916,11 @@ func pyStripStrings(text string) string {
 					i += width
 					break
 				}
-				out = append(out, blank(src[i]))
+				if keep {
+					out = append(out, src[i])
+				} else {
+					out = append(out, blank(src[i]))
+				}
 				i++
 			}
 		default:
@@ -847,6 +931,11 @@ func pyStripStrings(text string) string {
 	return string(out)
 }
 
+func keepPyImportArg(out []byte) bool {
+	s := strings.TrimSpace(string(out))
+	return strings.HasSuffix(s, "importlib.import_module(") || strings.HasSuffix(s, "__import__(")
+}
+
 // tsStripStrings blanks TS/JS comments, string literals, and template
 // literals in a single pass so tsImportRe (which is not line-anchored)
 // never matches inside them. Delimiters are kept and inner bytes become
@@ -855,9 +944,8 @@ func pyStripStrings(text string) string {
 // from or import keyword, or with an import( / require( call opener, the
 // string IS the reference (keepImportArg). Template literals are always
 // blanked, ${...} included: a require inside one, or a require(`...`) call,
-// produces no edge (documented choice). Regex literals are not modeled; a
-// quote inside one can desync the scan until the line ends (lint-grade,
-// like every other language here).
+// produces no edge (documented choice). Regex literals are lexed separately
+// so quotes and comment-like bytes inside them cannot desynchronize the scan.
 func tsStripStrings(text string) string {
 	src := []byte(text)
 	out := make([]byte, 0, len(src))
@@ -883,6 +971,40 @@ func tsStripStrings(text string) string {
 				if src[i] == '*' && i+1 < n && src[i+1] == '/' {
 					out = append(out, ' ', ' ')
 					i += 2
+					break
+				}
+				out = append(out, blank(src[i]))
+				i++
+			}
+		case c == '/' && tsRegexStart(out):
+			// Regex literals are lexical code, not comments. Blank their body so
+			// quote bytes inside /.../ cannot open phantom JS strings.
+			out = append(out, '/')
+			i++
+			inClass := false
+			for i < n {
+				if src[i] == '\\' {
+					out = append(out, ' ')
+					i++
+					if i < n {
+						out = append(out, blank(src[i]))
+						i++
+					}
+					continue
+				}
+				if src[i] == '[' {
+					inClass = true
+				}
+				if src[i] == ']' {
+					inClass = false
+				}
+				if src[i] == '/' && !inClass {
+					out = append(out, '/')
+					i++
+					for i < n && ((src[i] >= 'a' && src[i] <= 'z') || (src[i] >= 'A' && src[i] <= 'Z')) {
+						out = append(out, src[i])
+						i++
+					}
 					break
 				}
 				out = append(out, blank(src[i]))
@@ -928,6 +1050,17 @@ func tsStripStrings(text string) string {
 	return string(out)
 }
 
+func tsRegexStart(out []byte) bool {
+	i := len(out) - 1
+	for i >= 0 && (out[i] == ' ' || out[i] == '\t' || out[i] == '\r' || out[i] == '\n') {
+		i--
+	}
+	if i < 0 {
+		return true
+	}
+	return strings.ContainsRune("=([{,:;!?&|+-*%^~<>", rune(out[i]))
+}
+
 // keepImportArg reports whether the code emitted so far ends where an
 // import specifier string begins: after the from or import keyword, or
 // after the opening paren of an import(...) or require(...) call.
@@ -962,8 +1095,8 @@ func keepImportArg(out []byte) bool {
 //	go      goImports: import declarations only. Go has no import-free
 //	        qualified reference form (every cross-package reference
 //	        requires an import), so Go deliberately has no inline scan.
-//	python  pyImports: line-anchored import/from lines on pyStripStrings
-//	        output. Dynamic imports are invisible.
+//	python  pyImports: line-anchored import/from lines plus literal dynamic
+//	        imports on pyStripStrings output.
 //	ts      tsImports: from/import/import()/require() specifiers on
 //	        tsStripStrings output.
 //	elixir  exModules: alias/import/use/require lines plus inline
@@ -996,6 +1129,97 @@ type importScan struct {
 	Complete      bool                // the walk and judgment actually ran
 }
 
+// manifestDependencies closes the deterministically enumerable part of the
+// external universe. It reads direct dependency declarations from supported
+// language manifests; a literal import matching one of these names must bind
+// to Architecture Contract externals rather than disappear as "not local".
+func manifestDependencies(impl string, ignore []string) (map[string]bool, []string) {
+	deps := map[string]bool{}
+	var errs []string
+	walkErr := filepath.WalkDir(impl, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d == nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(impl, path)
+		if d.Type()&os.ModeSymlink != 0 {
+			if sourcePathIgnored(rel, ignore) {
+				return nil
+			}
+			return fmt.Errorf("%s: symlink entries are rejected from dependency manifest discovery", path)
+		}
+		if d.IsDir() {
+			if rel != "." && (strings.HasPrefix(d.Name(), ".") || d.Name() == "vendor" || d.Name() == "node_modules" || dirIgnored(rel, ignore)) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		body, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		switch d.Name() {
+		case "package.json":
+			found, parseErr := parsePackageManifest(body)
+			if parseErr != nil {
+				return fmt.Errorf("%s: invalid package.json: %w", path, parseErr)
+			}
+			for _, name := range found {
+				deps[name] = true
+			}
+		case "go.mod":
+			found, parseErr := parseGoModManifest(body)
+			if parseErr != nil {
+				return fmt.Errorf("%s: invalid go.mod: %w", path, parseErr)
+			}
+			for _, name := range found {
+				deps[name] = true
+			}
+		case "Cargo.toml":
+			found, parseErr := parseCargoManifest(body)
+			if parseErr != nil {
+				return fmt.Errorf("%s: invalid Cargo.toml: %w", path, parseErr)
+			}
+			for _, name := range found {
+				deps[name] = true
+			}
+		case "requirements.txt", "requirements.in":
+			found, parseErr := parseRequirementsManifest(body)
+			if parseErr != nil {
+				return fmt.Errorf("%s: invalid %s: %w", path, d.Name(), parseErr)
+			}
+			for _, name := range found {
+				deps[name] = true
+			}
+		case "mix.exs":
+			found, parseErr := parseMixManifest(body)
+			if parseErr != nil {
+				return fmt.Errorf("%s: invalid mix.exs: %w", path, parseErr)
+			}
+			for _, name := range found {
+				deps[name] = true
+			}
+		}
+		return nil
+	})
+	if walkErr != nil {
+		errs = append(errs, walkErr.Error())
+	}
+	sort.Strings(errs)
+	return deps, errs
+}
+
+func importMatchesManifest(ref string, deps map[string]bool) bool {
+	for dep := range deps {
+		if ref == dep || strings.HasPrefix(ref, dep+"/") || strings.HasPrefix(ref, dep+".") || strings.SplitN(ref, "::", 2)[0] == dep {
+			return true
+		}
+	}
+	return false
+}
+
 // CheckImports implements G4-import.
 func CheckImports(design, impl string) *Gate {
 	return checkImports(design, impl, nil)
@@ -1011,7 +1235,7 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 		return g
 	}
 	cg := NewGate("_")
-	c := loadContract(filepath.Join(design, "ARCHITECTURE.md"), cg)
+	c := loadContract(design, filepath.Join(design, "ARCHITECTURE.md"), cg)
 	if c == nil {
 		g.Errs = append(g.Errs, cg.Errs...)
 		if len(cg.Errs) == 0 {
@@ -1083,64 +1307,86 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 		g.Errs = append(g.Errs, ratchetErr.Error())
 	}
 	if ratchet != nil && ratchet.Date != "" {
-		g.Notes = append(g.Notes, ratchetAgeNote(ratchet.Date, time.Now()))
+		g.Notes = append(g.Notes, ratchetSnapshotNote(ratchet.Date))
 	}
 
 	// matchEdgeRule (dsledges.go) is the shared rule matcher: the drawn-edge
 	// check in G2 judges a diagram edge with the same wildcard semantics
 	matchRule := matchEdgeRule
 
-	goMods, goModWarns, goModErr := goModules(impl, ignore)
+	goMods, goModErr := goModules(impl, ignore)
 	if goModErr != nil {
 		g.Errs = append(g.Errs, "discovering go modules under "+impl+": "+goModErr.Error())
 	}
-	for _, w := range goModWarns {
-		g.Errs = append(g.Errs, "go module discovery incomplete, subtree skipped: "+w)
-	}
-	tsPkgs, tsPkgWarns, tsPkgErr := tsPackages(impl, ignore)
+	tsPkgs, tsPkgErr := tsPackages(impl, ignore)
 	if tsPkgErr != nil {
 		g.Errs = append(g.Errs, "discovering workspace packages under "+impl+": "+tsPkgErr.Error())
 	}
-	for _, w := range tsPkgWarns {
-		g.Errs = append(g.Errs, "workspace package discovery incomplete, subtree skipped: "+w)
+	manifestDeps, manifestErrs := manifestDependencies(impl, ignore)
+	for _, err := range manifestErrs {
+		g.Errs = append(g.Errs, "dependency manifest discovery incomplete: "+err)
 	}
 
-	internalTarget := func(ref string) (string, string) {
+	resolveBoundary := func(rel string) (string, []string) { return boundaryMatch(rel, pkgmap) }
+	bestNamedTarget := func(ref, sep string, pairs [][2]string) (string, []string) {
+		best := -1
+		owners := map[string]bool{}
+		for _, pair := range pairs {
+			prefix := strings.TrimSuffix(pair[0], sep)
+			if ref != pair[0] && !strings.HasPrefix(ref, prefix+sep) {
+				continue
+			}
+			if len(prefix) > best {
+				best, owners = len(prefix), map[string]bool{pair[1]: true}
+			} else if len(prefix) == best {
+				owners[pair[1]] = true
+			}
+		}
+		var ids []string
+		for id := range owners {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		if len(ids) == 1 {
+			return ids[0], nil
+		}
+		if len(ids) > 1 {
+			return "", ids
+		}
+		return "", nil
+	}
+
+	internalTarget := func(ref string) (string, string, []string) {
 		if _, rel, ok := goModuleFor(goMods, ref); ok {
-			return boundaryOf(rel, pkgmap), rel
+			bid, amb := resolveBoundary(rel)
+			return bid, rel, amb
 		}
 		if rel, ok := tsPackageFor(tsPkgs, ref); ok {
-			return boundaryOf(rel, pkgmap), rel
+			bid, amb := resolveBoundary(rel)
+			return bid, rel, amb
 		}
-		for _, bm := range boundModules {
-			if ref == bm[0] || strings.HasPrefix(ref, bm[0]+".") {
-				return bm[1], ref
-			}
+		if bid, amb := bestNamedTarget(ref, ".", boundModules); bid != "" || len(amb) > 0 {
+			return bid, ref, amb
 		}
-		if b := boundaryOf(ref, pkgmap); b != "" {
-			return b, ref
+		if b, amb := resolveBoundary(ref); b != "" || len(amb) > 0 {
+			return b, ref, amb
 		}
 		for _, ext := range []string{"", ".py", ".ts", ".tsx", ".js", ".rs"} {
-			if b := boundaryOf(ref+ext, pkgmap); b != "" {
-				return b, ref + ext
+			if b, amb := resolveBoundary(ref + ext); b != "" || len(amb) > 0 {
+				return b, ref + ext, amb
 			}
 		}
-		return "", ""
+		return "", "", nil
 	}
 
-	externalTarget := func(ref string) string {
-		for _, ep := range extByPrefix {
-			prefix := strings.TrimSuffix(ep[0], "/")
-			if ref == ep[0] || strings.HasPrefix(ref, prefix+"/") {
-				return ep[1]
-			}
+	externalTarget := func(ref string) (string, []string) {
+		if bid, amb := bestNamedTarget(ref, "/", extByPrefix); bid != "" || len(amb) > 0 {
+			return bid, amb
 		}
-		for _, em := range extModules {
-			if ref == em[0] || strings.HasPrefix(ref, em[0]+".") {
-				return em[1]
-			}
+		if bid, amb := bestNamedTarget(ref, ".", extModules); bid != "" || len(amb) > 0 {
+			return bid, amb
 		}
-		return ""
+		return "", nil
 	}
 
 	// Each distinct cross-boundary edge is judged once, but every witness file
@@ -1162,7 +1408,7 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 		g.Errs = append(g.Errs, "walk incomplete, subtree skipped: "+w)
 	}
 	if scan != nil {
-		scan.WalkWarns = append(append(append([]string{}, goModWarns...), tsPkgWarns...), walkWarns...)
+		scan.WalkWarns = append([]string{}, walkWarns...)
 	}
 	sort.Strings(files)
 
@@ -1184,7 +1430,11 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 			continue
 		}
 		lang := langExts[filepath.Ext(path)]
-		srcB := boundaryOf(rel, pkgmap)
+		srcB, srcAmb := resolveBoundary(rel)
+		if len(srcAmb) > 0 {
+			g.Errs = append(g.Errs, "source file "+rel+" matches equally specific code globs in multiple boundaries ("+strings.Join(srcAmb, ", ")+"); boundary ownership must be unique")
+			continue
+		}
 		text := readFileOrErr(path, g)
 		if lang == "rust" {
 			// judge only the production portion: imports living inside a
@@ -1194,11 +1444,17 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 		}
 		if srcB == "" && lang == "elixir" {
 			for _, mod := range exDefmoduleRe.FindAllStringSubmatch(text, -1) {
-				for _, bm := range boundModules {
-					if mod[1] == bm[0] || strings.HasPrefix(mod[1], bm[0]+".") {
-						srcB = bm[1]
-						break
-					}
+				bid, amb := bestNamedTarget(mod[1], ".", boundModules)
+				if len(amb) > 0 {
+					g.Errs = append(g.Errs, "source file "+rel+" module "+mod[1]+" resolves equally specifically to multiple boundaries ("+strings.Join(amb, ", ")+")")
+					continue
+				}
+				if srcB != "" && bid != "" && bid != srcB {
+					g.Errs = append(g.Errs, "source file "+rel+" declares modules owned by both "+srcB+" and "+bid+"; one file must have one boundary owner")
+					continue
+				}
+				if bid != "" {
+					srcB = bid
 				}
 			}
 		}
@@ -1225,9 +1481,17 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 			refs = rustImports(text)
 		}
 		for _, ref := range refs {
-			dstB, norm := internalTarget(ref)
+			dstB, norm, amb := internalTarget(ref)
+			if len(amb) > 0 {
+				g.Errs = append(g.Errs, rel+": import "+ref+" resolves equally specifically to multiple boundaries ("+strings.Join(amb, ", ")+"); import ownership must be unique")
+				continue
+			}
 			if dstB == "" {
-				dstB = externalTarget(ref)
+				dstB, amb = externalTarget(ref)
+				if len(amb) > 0 {
+					g.Errs = append(g.Errs, rel+": import "+ref+" resolves equally specifically to multiple externals ("+strings.Join(amb, ", ")+"); external ownership must be unique")
+					continue
+				}
 				norm = ref
 				if dstB == "" {
 					orphaned := false
@@ -1246,6 +1510,14 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 								scan.OrphanRefs = map[string][]string{}
 							}
 							scan.OrphanRefs[ref] = append(scan.OrphanRefs[ref], rel)
+						}
+					}
+					if importMatchesManifest(ref, manifestDeps) {
+						g.Errs = append(g.Errs, rel+": imports manifest-declared dependency "+ref+" without a matching Architecture Contract external; dependency declarations and import literals must reconcile")
+					} else if lang == "go" && !orphaned {
+						head := strings.SplitN(ref, "/", 2)[0]
+						if strings.Contains(head, ".") {
+							g.Errs = append(g.Errs, rel+": imports undeclared third-party module "+ref+"; every external dependency must be declared under Architecture Contract externals.imports")
 						}
 					}
 					continue
@@ -1418,17 +1690,13 @@ func dropWildcardEdges(edges [][2]string) [][2]string {
 	return out
 }
 
-// ratchetAgeNote makes tolerated debt visible: the snapshot date and its age
-// in days (GATE-8). Non-blocking by design: the ratchet has no expiry, but a
-// silent date hid year-old amnesties.
-func ratchetAgeNote(date string, now time.Time) string {
+// ratchetSnapshotNote makes tolerated debt visible without consulting the
+// wall clock. The same tree and arguments therefore produce byte-identical
+// check output across midnight and on hosts with different clock settings.
+func ratchetSnapshotNote(date string) string {
 	for _, layout := range []string{"2006-01-02", "2006-01"} {
-		if t, err := time.Parse(layout, date); err == nil {
-			days := int(now.Sub(t).Hours() / 24)
-			if days < 0 {
-				days = 0
-			}
-			return fmt.Sprintf("ratchet snapshot %s, %d day(s) old", date, days)
+		if _, err := time.Parse(layout, date); err == nil {
+			return "ratchet snapshot " + date
 		}
 	}
 	return fmt.Sprintf("ratchet snapshot dated %s (not a YYYY-MM or YYYY-MM-DD date)", ir.Repr(date))

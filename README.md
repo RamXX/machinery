@@ -117,7 +117,8 @@ Rebuild  Transition   legacy model + target model + migration.yaml + surface led
                Gs-surface (every legacy route/command/table/job disposed against the target)
          attested: what is worth saving; transformation and rollback semantics; sweep completeness
 Phase 1  Modelith     domain model
-         tool: modelith lint clean
+         tool: modelith lint clean; pinned render engine reproduces every committed *.modelith.md
+               after the mechanical em-dash normalization
          attested: lifecycle enums, action pre/post, invariant owners, scenario coverage
 Phase 1.5 Relational  static relational models (opt-in, per invariant shape):
            policy    access control      -> Gp-policy    (Policy.als + Policy.oracle.md)
@@ -223,9 +224,15 @@ formal correctness into every layer, strongest first:
    transition oracle (with content-derived stable ids that survive design revisions), the TLA+
    specs, and, on designs with a policy annotation, the Alloy model plus the authorization oracle
    (the policy enumerated as a decision table the implementation tests consume).
-   G3 then byte-diffs every committed oracle against a fresh generation on every check, and the
-   formal specs are regenerated from source by `verify-formal` (with the nightly regen-clean-tree
-   job asserting the committed copies match), so staleness is caught as drift, never assumed away.
+   G3 then byte-diffs every committed oracle against a fresh generation on every check. The pinned
+   Modelith engine regenerates every committed domain render in required CI (including any legacy
+   render), followed by the mechanical em-dash normalization and a byte-diff. The
+   formal specs are regenerated from source by `verify-formal` (with the required formal workflow
+   and the nightly regen-clean-tree job both asserting the committed copies match), so staleness is
+   caught as drift, never assumed away. The sole non-generated exception is a strict manual TLA
+   pair: the module's first line is exactly `\* machinery:manual`, a same-basename `.cfg` is
+   mandatory, and any unmarked orphan pair or half is an error. Manual pairs are TLC-checked and
+   counted as declared and checked, but are never regenerated.
 2. **Deterministic symbolic gates that cannot pass on absence.** `machinery check` verifies, with no
    LLM in the loop: machines are well-formed (reachability, unambiguous targets, no dead ends, every
    side effect has an error path and a timeout, every resting state handles or explicitly ignores
@@ -431,7 +438,7 @@ anything missing; it installs nothing.
   your `PATH`); or download a prebuilt
   binary (macOS, Linux, Windows) from the
   [releases](https://github.com/stacklok/modelith/releases). machinery pins modelith at `v0.4.0`,
-  and `machinery preflight` warns when the installed version does not match the pin. Full options:
+  and `machinery preflight` fails when the installed version does not match the pin. Full options:
   [modelith.sh/cli](https://modelith.sh/cli/).
 - **machinery** -- the deterministic gate tools and formal generators, plus the agent skill and role
   docs. A single static binary (no Python, no Go runtime). Three ways to install:
@@ -444,8 +451,9 @@ anything missing; it installs nothing.
   This puts the `machinery` binary on `~/.local/bin` and runs `machinery install` to place the skill
   + role docs into your agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see
   [Agent homes](#agent-homes)). Override with environment variables, for example
-  `MACHINERY_VERSION=v0.1.7`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/.claude"`, or
-  `MACHINERY_TARGETS="codex opencode"`.
+  `MACHINERY_VERSION=v0.1.7`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
+  `MACHINERY_TARGETS="codex opencode"`. `MACHINERY_HOMES` accepts one full path per line, preserving
+  spaces; use a literal newline between multiple homes.
 
   **Binary by hand** (macOS arm64/x86, Linux amd64/arm64, Windows amd64): download
   `machinery-<os>-<arch>` from the [releases page](https://github.com/RamXX/machinery/releases), put
@@ -461,7 +469,10 @@ anything missing; it installs nothing.
 
 **Optional**
 
-- **[Java](https://adoptium.net/) 11+** -- only for `machinery verify-formal`, which runs
+- **[Java](https://adoptium.net/) 21.0.12.1+1** -- only for `machinery verify-formal` and
+  `machinery verify-c4`; machinery accepts distributor-independent OpenJDK/HotSpot builds of this
+  exact checksum-pinned Temurin build, fingerprints the complete runtime closure, and runs it in a minimal fixed
+  environment. `machinery verify-formal` runs
   [TLC](https://github.com/tlaplus/tlaplus) to model-check the proofs and, on designs with a policy
   annotation, [Alloy](https://alloytools.org/) to check the relational policy model (the binary
   fetches the pinned, checksum-verified
@@ -469,17 +480,24 @@ anything missing; it installs nothing.
   [org.alloytools.alloy.dist.jar](https://github.com/AlloyTools/org.alloytools.alloy/releases) into
   your cache on first use). macOS:
   `brew install --cask temurin`; Linux: `sudo apt install default-jdk` or
-  `sudo dnf install java-21-openjdk`, or [download Temurin](https://adoptium.net/temurin/releases/);
+  machinery provisions the archive pinned in `.java-runtime-pin` into its private cache, or [download Temurin](https://adoptium.net/temurin/releases/);
   Windows: `winget install EclipseAdoptium.Temurin.21.JDK` or
   [download](https://adoptium.net/temurin/releases/). Without Java you still get the full design and
   every deterministic gate; with it you add the machine-checked proofs (the top of the correctness
-  ladder above).
+  ladder above). The default engine path ignores ambient `java` and provisions the committed archive
+  pin. An explicit `MACHINERY_JAVA` override is accepted only with the exact source-controlled
+  closure digest in `MACHINERY_JAVA_CLOSURE_SHA256`; the version string alone is never trusted.
 - **[Structurizr CLI](https://github.com/structurizr/cli)** -- only to export C4 diagrams from
   `workspace.dsl` (the [Structurizr DSL](https://github.com/structurizr/dsl) text and every gate need
-  no export); needs Java. Any OS: download a
+  no export); needs the same Java 21.0.12.1+1 runtime. Any OS: download a
    [release zip](https://github.com/structurizr/cli/releases), unzip, and add it to `PATH`
    (`structurizr.sh` on macOS/Linux, `structurizr.bat` on Windows); or run the
-   [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`.
+   [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`. The pure
+   G2 gate stays dependency-free; this repository's required CI downloads a checksum-pinned CLI and
+   compiles every committed `workspace.dsl` as the engine half. Machinery provisions the ZIP named
+   by its embedded `.structurizr-pin` trust root. An explicit `MACHINERY_STRUCTURIZR_CLI` override
+   additionally requires its source-controlled full-tree digest in
+   `MACHINERY_STRUCTURIZR_CLI_CLOSURE_SHA256`.
 
 Everything after install is a `machinery` subcommand run on your own design path, no clone and no
 Make:
@@ -516,6 +534,9 @@ contract, and one deterministic CLI. `machinery install` preserves the original 
 placing the skill under `<home>/skills/machinery` and the two role docs under `<home>/agents`. The
 default homes are `~/.agents` (the cross-agent convention) and `~/.claude` (Claude Code); the first
 holds real files and the rest are symlinked to it, so there is one canonical copy to update.
+Each release also publishes `machinery-source.tar.gz`, a reproducible, commit-timestamped snapshot
+with normalized ownership. Its digest is in `checksums-sha256.txt`; install and update fetch that
+exact asset for matching skill and role sources instead of an unversioned branch archive.
 
 - **`machinery install` (recommended).** Fetches the skill from the release that matches the binary
   and lays it down as above. `--home` (repeatable) overrides the set, `--copy` copies into every home
@@ -566,7 +587,9 @@ recovery behavior is in the [agent portability guide](docs/agent-portability.md#
 
 The gate tools are a single Go binary (no Python runtime). `verify-formal` downloads a version-pinned,
 checksum-verified `tla2tools.jar` on first use. CI runs the test suite, all gate runs, the full formal
-suite, cross-compile builds, security scanning, and the go-crm build on every push.
+suite with a generated-diff assertion, pinned Modelith render reproduction, native macOS and Windows
+golden corpora, Structurizr compilation for every example, the pinned OCI external-checker closure,
+cross-compile builds, security scanning, and the go-crm build on every push.
 
 ### Claude Code plugin (optional, recommended for Claude Code)
 
@@ -625,7 +648,7 @@ verdict: `ok`, or findings at three severities defined in the table below. The f
 summarizes blocking findings; a zero there is a clean design. Then, if Java is present:
 
 ```bash
-make verify-formal   # regenerates and checks all 34 TLC proofs + the relational (Alloy) suites
+make verify-formal   # regenerates and checks all 35 TLC proofs + the relational (Alloy) suites
 ```
 
 | Gate | One line |
@@ -731,8 +754,8 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 - `examples/pii-flow/` the external-checker reference: a small but complete design (model with a
   `DataSubject` lifecycle machine, an Architecture Contract whose export-never-reaches-back claim
   is a checked `no_path` assertion) whose central invariant, no sensitive attribute reaches the
-  export sink unredacted, is decided by a bring-your-own Soufflé Datalog checker under the Gk
-  contract. The full default gate suite passes on it; the checker's coverage claim is the carrier
+  export sink unredacted, is decided by a standard-library fixed-point checker in a digest-pinned
+  OCI Python userspace under the Gk contract. The full default gate suite passes on it; the checker's coverage claim is the carrier
   Gc credits for the flow invariant, and its declared residuals carry the two process controls no
   static flow graph can decide.
 - `testdata/golden/` the byte-for-byte golden corpus: expected stdout, stderr, exit code, and every
@@ -773,7 +796,7 @@ full gate suite run against a synthesized design/impl fixture) runs as Go tests 
 | **internal/ overall** | **79%** | own-package tests only; the cross-package adversarial suites in `internal/experiments` exercise gates and pack further (cmd/ is thin CLI plumbing) |
 
 Run `go test -coverprofile=cover.out ./internal/... && go tool cover -func=cover.out` locally.
-CI runs `go test -race ./...`. Beyond unit tests, two stronger nets are always green in CI:
+CI runs `go test -race ./...`. Beyond unit tests, three stronger nets are always green in CI:
 
 - **Golden corpus**: `testdata/golden` byte-compares stdout, stderr, exit code, and every generated
   artifact for the deterministic subcommands: lint, oracle, and tla on the four standalone
@@ -783,11 +806,22 @@ CI runs `go test -race ./...`. Beyond unit tests, two stronger nets are always g
   pack generate and scale on checkout-split (`make golden`;
   re-captured with `make golden-update` after intended output changes). Environment-dependent
   commands (verify-formal, doctor, preflight) are exercised by the formal-verification and CI jobs
-  instead.
-- **Formal verification**: `machinery verify-formal` regenerates and TLC-model-checks all 34 TLA+
-  proofs across the six example designs that carry formal suites (8 in go-crm, 8 in surreal-crm,
-  8 in fulfillment, 6 in portfolio-engine, and 4 in checkout-split, two per child including the
-  contract-refinement proofs; pii-flow carries none by design, its formal half is the checker).
+  instead. The same byte corpus runs natively on Linux, macOS, and Windows.
+- **Formal verification**: `machinery verify-formal` regenerates and TLC-model-checks all 35 TLA+
+  proofs across the seven example designs that carry formal suites (8 in go-crm, 8 in surreal-crm,
+  8 in fulfillment, 6 in portfolio-engine, 4 in checkout-split, two per child including the
+  contract-refinement proofs, and 1 in pii-flow). Pii-flow's central sensitive-data invariant is
+  still held separately by its external checker; its lifecycle machine supplies the control-flow
+  proof. The required workflow also rejects any generated diff after the solver run. Strict manual
+  pairs, when present, start with `\* machinery:manual`, require a sibling cfg, and are reported as
+  declared/not-regenerated while TLC still checks them; an unmarked orphan pair or half fails.
+- **Engine reproduction**: required CI installs Modelith v0.4.0 and reproduces every committed
+  domain render after the renderer's mechanical house-style normalization; compiles every example
+  `workspace.dsl` with checksum-pinned Structurizr CLI v2025.11.09; provisions the exact Python image
+  digest for the registry-bound `linux/amd64` platform; verifies its local `RepoDigests` and
+  OS/architecture; and runs the pii-flow adapter offline with the same `--platform` and
+  `--pull=never` through the committed checker registry. These jobs are
+  the engine halves; `machinery check` remains hermetic and dependency-free.
 
 ## Built on
 

@@ -1,0 +1,42 @@
+surface_version: 1
+sources:
+  - domain.modelith.yaml action list, walked persona by persona
+  - BUILD.md and BUILD shards, reconciled against the CLI slices and milestone map
+acts:
+  - act: Index.refresh
+    actor: Analyst
+    surface: "analyst CLI: pf index refresh <index-id>"
+    milestone: M5
+  - act: Security.upsert
+    actor: Analyst
+    surface: "analyst CLI: pf security upsert --ticker <ticker> --name <name> --sector <sector>"
+    milestone: M5
+  - act: CandidateSet.build
+    actor: Analyst
+    surface: "analyst CLI: pf candidates build --index <index-id> [--index <index-id> ...]"
+    milestone: M5
+  - act: RecommendationRun.start
+    actor: Analyst
+    surface: "analyst CLI: pf recommend --candidate-set <candidate-set-id> --lookback-days <days>"
+    milestone: M0
+  - act: RecommendationRun.abort
+    actor: Analyst
+    surface: "analyst CLI: pf run abort <run-id>"
+    milestone: M1
+  - act: Portfolio.advance
+    actor: Manager
+    surface: "manager CLI: pf portfolio advance <portfolio-id>"
+    milestone: M4
+  - act: Portfolio.accept
+    actor: Manager
+    surface: "manager CLI: pf portfolio accept <portfolio-id>"
+    milestone: M4
+  - act: Portfolio.reject
+    actor: Manager
+    surface: "manager CLI: pf portfolio reject <portfolio-id>"
+    milestone: M4
+  - act: Portfolio.reopen
+    actor: Manager
+    surface: "manager CLI: pf portfolio reopen <portfolio-id>"
+    milestone: M4
+deferrals: []

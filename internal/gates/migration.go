@@ -130,7 +130,7 @@ func (v *migrationValidator) checkDeclaredTests(impl string) {
 	}
 	corpus := testCorpus(v.design, impl, v.g)
 	for _, claim := range v.declaredTests {
-		if idTokenIn(claim.token, corpus.joined) {
+		if idTokenIn(claim.token, corpus.joinedCode) {
 			v.g.Count("mapping regression tests resolved")
 		} else {
 			v.errf("%s cites regression test %q, which appears in no test file under the impl; write the test or fix the citation", claim.where, claim.token)
@@ -156,7 +156,7 @@ func CheckMigration(design, impl string) *Gate {
 		g.Errs = append(g.Errs, "no "+MigrationContractName+" in the design; the transition gate was requested but no hybrid/rebuild contract was authored")
 		return g
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := readDesignFile(design, path)
 	if err != nil {
 		g.Errs = append(g.Errs, err.Error())
 		return g
@@ -294,12 +294,12 @@ func (v *migrationValidator) loadModels() {
 		v.errf("legacy.model and target.model must be different files; rebuild/hybrid mode keeps current and intended truth separate")
 		return
 	}
-	v.legacy, err = readMigrationModel(legacyPath)
+	v.legacy, err = readMigrationModel(v.design, legacyPath)
 	if err != nil {
 		v.errf("legacy.model: %v", err)
 		return
 	}
-	v.target, err = readMigrationModel(targetPath)
+	v.target, err = readMigrationModel(v.design, targetPath)
 	if err != nil {
 		v.errf("target.model: %v", err)
 		return
@@ -320,11 +320,23 @@ func migrationDesignPath(design, name string) (string, error) {
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("path escapes the design directory")
 	}
+	realDesign, err := filepath.EvalSymlinks(design)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve design directory: %w", err)
+	}
+	realJoined, err := filepath.EvalSymlinks(joined)
+	if err != nil {
+		return "", err
+	}
+	realRel, err := filepath.Rel(realDesign, realJoined)
+	if err != nil || realRel == ".." || strings.HasPrefix(realRel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes the design directory through a symlink")
+	}
 	return joined, nil
 }
 
-func readMigrationModel(path string) (migrationModel, error) {
-	raw, err := os.ReadFile(path)
+func readMigrationModel(design, path string) (migrationModel, error) {
+	raw, err := readDesignFile(design, path)
 	if err != nil {
 		return migrationModel{}, err
 	}
@@ -519,16 +531,20 @@ func (v *migrationValidator) validateDataMappings() {
 		}
 		v.g.Count("data mappings")
 	}
-	for _, d := range v.dispositions {
+	for _, legacyName := range v.legacy.order {
+		d, ok := v.dispositions[legacyName]
+		if !ok {
+			continue
+		}
 		if d.strategy != "replace" {
 			continue
 		}
-		for attr := range v.legacy.entities[d.legacy].attributes {
+		for _, attr := range sortedKeys(v.legacy.entities[d.legacy].attributes) {
 			if !sourceCovered[d.legacy+"."+attr] {
 				v.errf("replace disposition %s -> %s does not map or drop legacy attribute %s.%s", d.legacy, d.target, d.legacy, attr)
 			}
 		}
-		for attr := range v.target.entities[d.target].attributes {
+		for _, attr := range sortedKeys(v.target.entities[d.target].attributes) {
 			if !targetCovered[d.target+"."+attr] {
 				v.errf("replace disposition %s -> %s does not map or derive target attribute %s.%s", d.legacy, d.target, d.target, attr)
 			}
@@ -591,7 +607,11 @@ func (v *migrationValidator) validateStateMappings() {
 		covered[legacyEntity+"."+legacyValue] = true
 		v.g.Count("state mappings")
 	}
-	for _, d := range v.dispositions {
+	for _, legacyName := range v.legacy.order {
+		d, ok := v.dispositions[legacyName]
+		if !ok {
+			continue
+		}
 		if d.strategy != "replace" {
 			continue
 		}
@@ -772,7 +792,7 @@ var transitionTopics = []struct {
 func (v *migrationValidator) validateNarrativeBridges() {
 	// both scans run fence-masked, matching Gb: a fenced example heading is
 	// documentation and must not satisfy a section-presence requirement
-	arch := maskFences(readFileOrErr(filepath.Join(v.design, "ARCHITECTURE.md"), v.g))
+	arch := maskFences(readDesignFileOrErr(v.design, filepath.Join(v.design, "ARCHITECTURE.md"), v.g))
 	if body, ok := sectionBody(arch, "transition architecture"); ok {
 		v.g.Count("transition architecture sections")
 		lower := strings.ToLower(body)
@@ -793,7 +813,7 @@ func (v *migrationValidator) validateNarrativeBridges() {
 	} else {
 		v.errf("ARCHITECTURE.md needs a 'Transition architecture' heading describing the temporary coexistence topology and dependency failure posture")
 	}
-	build := maskFences(readFileOrErr(filepath.Join(v.design, "BUILD.md"), v.g))
+	build := maskFences(readDesignFileOrErr(v.design, filepath.Join(v.design, "BUILD.md"), v.g))
 	if body, ok := sectionBody(build, "migration implementation plan"); ok {
 		v.g.Count("migration implementation plans")
 		// phase coverage: the plan "turns every mapping and phase into ordered

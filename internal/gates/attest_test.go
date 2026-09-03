@@ -329,8 +329,8 @@ func TestContentHashShapeAndStability(t *testing.T) {
 	}
 }
 
-// Gv joins the vocabulary, the default list, and the artifact-activated set,
-// so `machinery check` runs it exactly when the evidence exists.
+// Gv joins the vocabulary, the default list, and the obligation-activated
+// set: phase artifacts activate it even when evidence is missing.
 func TestAttestationSuiteWiring(t *testing.T) {
 	design, _ := attestFixture(t, attestEvidence(attestAllG2()...))
 	if !KnownGate("gv") {
@@ -361,6 +361,10 @@ func TestAttestationSuiteWiring(t *testing.T) {
 	got := titles(design)
 	if !strings.Contains(got, "Gv-attest") {
 		t.Errorf("committed attestation evidence must activate Gv:\n%s", got)
+	}
+	owed, _ := attestFixture(t, "")
+	if got := titles(owed); !strings.Contains(got, "Gv-attest") {
+		t.Errorf("ARCHITECTURE.md must activate Gv even when evidence is missing:\n%s", got)
 	}
 }
 

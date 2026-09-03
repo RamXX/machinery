@@ -33,8 +33,8 @@ var (
 // AdjudicationActive reports whether the design carries adjudication
 // evidence.
 func AdjudicationActive(design string) bool {
-	fi, err := os.Stat(filepath.Join(design, AdjudicationDirName))
-	return err == nil && fi.IsDir()
+	has, err := probeRealDir(design, AdjudicationDirName)
+	return has || err != nil
 }
 
 // CheckAdjudications implements Gj-adjudication.
@@ -42,11 +42,16 @@ func CheckAdjudications(design string) *Gate {
 	g := NewGate("Gj-adjudication  characterization verdicts")
 	g.startOrder()
 	dir := filepath.Join(design, AdjudicationDirName)
-	if !AdjudicationActive(design) {
+	has, probeErr := probeRealDir(design, AdjudicationDirName)
+	if probeErr != nil {
+		g.Errs = append(g.Errs, probeErr.Error())
+		return g
+	}
+	if !has {
 		g.Errs = append(g.Errs, "no "+AdjudicationDirName+"/ in the design; the adjudication gate was requested but no verdict evidence was committed")
 		return g
 	}
-	files := sortedGlobExt(dir, ".yaml")
+	files, _ := strictSortedGlob(g, dir, "*.yaml", "adjudication evidence")
 	if len(files) == 0 {
 		g.Errs = append(g.Errs, AdjudicationDirName+"/ exists but holds no *.yaml; an empty evidence directory is a failure, not a pass")
 		return g
@@ -65,7 +70,7 @@ func CheckAdjudications(design string) *Gate {
 // twice.
 func checkAdjudicationFile(g *Gate, design, path string, removed map[string]bool) {
 	label := AdjudicationDirName + "/" + filepath.Base(path)
-	raw, err := os.ReadFile(path)
+	raw, err := readDesignFile(design, path)
 	if err != nil {
 		g.Errs = append(g.Errs, label+" is unreadable: "+err.Error())
 		return
@@ -96,7 +101,7 @@ func checkAdjudicationFile(g *Gate, design, path string, removed map[string]bool
 		g.Errs = append(g.Errs, fmt.Sprintf("%s: no committed oracle machines/%s.oracle.md; adjudication evidence binds to oracle rows, so the machine and its oracle must exist", label, machine))
 		return
 	}
-	_, stableIDs := oracleTableIDs(readFileOrErr(oraclePath, g))
+	_, stableIDs := oracleTableIDs(readDesignFileOrErr(design, oraclePath, g))
 	minted := setOf(stableIDs)
 	rows := root.Get2("rows")
 	if rows == nil || rows.Kind != ir.KindArray || len(rows.AsArray()) == 0 {

@@ -19,8 +19,8 @@
   "states": {
     "Held": {
       "on": {
-        "commit": { "target": "persisting", "actions": "setPendingCommitted" },
-        "release": { "target": "persisting", "actions": "setPendingReleased" }
+        "commit": { "target": "persisting", "actions": ["resetRetries", "setPendingCommitted"] },
+        "release": { "target": "persisting", "actions": ["resetRetries", "setPendingReleased"] }
       }
     },
     "Committed": { "type": "final" },
@@ -56,10 +56,11 @@
       }
     },
     "rolledBack": {
-      "_exhaustive": "only Held has transitions into the persist overlay (Committed and Released are final), so priorStatus is always Held and the single priorIsHeld guard is total",
       "always": [
-        { "target": "Held", "guard": "priorIsHeld" }
+        { "target": "Held", "guard": "priorIsHeld" },
+        { "target": "routingFault", "actions": "recordRoutingError" }
       ]
-    }
+    },
+    "routingFault": { "type": "final" }
   }
 }

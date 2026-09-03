@@ -1,3 +1,6 @@
+== Gu-surfaces  target surface ledger ==
+  checked: 1 obligated actions, 1 covered, 0 deferred acts, 0 deferred personas, 0 knob rows, 0 actorless actions, 0 milestone references resolved
+  ok
 == Gc-carrier  invariant carrier reconciliation ==
   note   relational layers not opted in: policy, integrity, isolation
   checked: 1 invariants declared, 1 preserves references, 1 carried by preserves
@@ -12,19 +15,22 @@
   checked: 1 machines, 3 transitions, 1 tla-generable, 1 oracles fresh, 3 named units covered, 4 dotted references checked
   ok
 == Gd-idcite  design-side stable-id citations ==
-  warn   BUILD.md:276: T-PAYM-01 is a positional row citation; rows renumber, so cite the stable id instead
-  checked: 6 citations resolved, 7 files scanned, 3 committed oracle ids
+  checked: 6 citations resolved, 11 files scanned, 3 committed oracle ids
+  ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 7 files style-scanned, 4 duplicate tables embed-marked
+  checked: 11 files style-scanned, 4 duplicate tables embed-marked
   ok
 == Gx-trace  cross-layer traceability ==
-  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor)
+  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 lifecycle semantics annotations, 1 control-flow-only semantics, 1 placement rows with machines, 1 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor)
   ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 3 milestones, 3 DoD-bearing milestones, 1 skeleton NFR lines, 1 skeleton citations
   ok
 == Ge-embed  declared-embed fidelity ==
   checked: 4 embed markers, 4 embed tables verified, 4 subset claims, 10 rows compared, 4 complete claims
+  ok
+== Gv-attest  attestation evidence ==
+  checked: 23 covered artifacts current, 14 attested claims, 14 claims owed
   ok
 == G5-pack  contract packs ==
   checked: 6 pack files, 1 pack hash verified, 3 refinement artifacts fresh, 1 owned entities present, 4 owned attributes present, 1 owned enums shape-checked, 1 owned invariants intact, 1 consumed events handled, 2 produced events emitted, pack revision 1

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -31,8 +32,10 @@ func newSweepCmd() *cobra.Command {
 	}
 	var contextN int
 	c.Flags().IntVar(&contextN, "context", 0, "print N trimmed lines around each mention")
-	c.RunE = func(cmd *cobra.Command, args []string) error {
-		return sweepRun(args[0], args[1], contextN)
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		return sweepRunTo(args[0], args[1], contextN, output.stdout, output.stderr)
 	}
 	return c
 }
@@ -67,10 +70,19 @@ func sweepTextFile(base string) bool {
 }
 
 func sweepRun(name, design string, contextN int) error {
+	return sweepRunTo(name, design, contextN, stdoutW, stderrW)
+}
+
+func sweepRunTo(name, design string, contextN int, stdoutW, stderrW io.Writer) error {
+	return withDesignSnapshot(design, func(snapshot string) error {
+		return sweepSnapshotRunTo(name, snapshot, design, contextN, stdoutW, stderrW)
+	})
+}
+
+func sweepSnapshotRunTo(name, design, displayDesign string, contextN int, stdoutW, stderrW io.Writer) error {
 	if err := checkIsDir(design); err != nil {
-		fmt.Fprintln(stderrW, err)
-		exitFunc(1)
-		return err
+		fmt.Fprintln(stderrW, remapSnapshotText(err.Error(), design, displayDesign))
+		return commandExitBecause(1, err)
 	}
 	// Whole-token match, backtick-tolerant: `guardFoo` and guardFoo both hit;
 	// guardFooBar does not. Word characters plus the name characters
@@ -79,8 +91,7 @@ func sweepRun(name, design string, contextN int) error {
 	re, err := regexp.Compile(`(^|[^A-Za-z0-9_.])` + regexp.QuoteMeta(name) + `($|[^A-Za-z0-9_.])`)
 	if err != nil {
 		fmt.Fprintln(stderrW, "machinery_sweep: "+err.Error())
-		exitFunc(1)
-		return err
+		return commandExitBecause(1, err)
 	}
 	type hit struct {
 		line int
@@ -127,11 +138,10 @@ func sweepRun(name, design string, contextN int) error {
 	})
 	if walkErr != nil {
 		fmt.Fprintln(stderrW, "machinery_sweep: "+walkErr.Error())
-		exitFunc(1)
-		return walkErr
+		return commandExitBecause(1, walkErr)
 	}
 	if len(byFile) == 0 {
-		fmt.Fprintf(stdoutW, "no mentions of %s under %s (hand-written files)\n", quote(name), design)
+		fmt.Fprintf(stdoutW, "no mentions of %s under %s (hand-written files)\n", quote(name), displayDesign)
 		return nil
 	}
 	files := make([]string, 0, len(byFile))

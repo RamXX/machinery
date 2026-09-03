@@ -110,6 +110,8 @@ externals:
   - id: external.ladybug
     element: store
     imports: [ "github.com/LadybugDB/go-ladybug" ]
+  - id: external.argon2
+    imports: [ "golang.org/x/crypto/argon2" ]
 ignore:
   - "internal/testsupport/**"   # hard-TDD fakes shared by the test suites
   - "internal/arch/**"          # the architecture-boundary test package itself
@@ -121,6 +123,7 @@ dependency_rules:
     - crm.commands -> crm.model
     - crm.session  -> crm.repo
     - crm.session  -> crm.model
+    - crm.session  -> external.argon2
     - crm.authz    -> crm.model
     - crm.domain   -> crm.authz
     - crm.domain   -> crm.repo
@@ -147,6 +150,7 @@ One row per allowed boundary crossing; the signatures below the table are the el
 | `crm.commands -> crm.repo`, `crm.session -> crm.repo`, `crm.domain -> crm.repo` | `Repo` interface: `Open`, `BeginWrite`, `Commit`, `Rollback`, `Get*`/`Save*` per aggregate, all inside the caller's open write Tx | `ErrLocked`, `ErrCorrupt`, `ErrUnavailable`, `ErrNotFound`, `ErrConstraint`, `ErrConflict`, `ErrDiskFull`, `ErrTimeout` | reads are safe to retry; a write runs in one transaction and is retried only on `ErrLocked` (nothing partially committed) |
 | `crm.domain -> crm.authz` | `Authorizer.Authorize(actor, verb, entity, ownerID, teamID) -> Decision` (pure, no I/O) | none; a refusal is `Decision{Allowed: false, Reason: ...}`, never an error | pure: safe to repeat, no state touched |
 | `crm.repo -> external.ladybug` | go-ladybug `Connection`/`Tx`: open the directory, Cypher statements, one write Tx at a time | driver errors mapped at this boundary to the typed `Err*` set above; no driver type escapes `crm.repo` | writes are idempotent per Tx: a rolled-back Tx leaves no trace, so a retried Tx repeats the whole unit |
+| `crm.session -> external.argon2` | pure `argon2.IDKey(password, salt, time, memory, threads, keyLen) -> hash` call with fixed, versioned cost parameters | none at runtime; invalid or missing module versions fail the checksum-verified build | deterministic for the same password, salt, and parameters; callers generate a new salt only when creating a new hash |
 | `crm.commands -> crm.model`, `crm.session -> crm.model`, `crm.authz -> crm.model`, `crm.domain -> crm.model`, `crm.repo -> crm.model` | type-only: the shared vocabulary (aggregate structs, enums, the typed `Err*` values); no functions with side effects | none; the package performs no operation that can fail | n/a: no calls cross this edge, only type references |
 
 Signatures are Go-flavored pseudocode; the types reference `domain.modelith.yaml`.
@@ -199,6 +203,7 @@ transitions; Gx-trace resolves every name against the committed machines.
 | `store` (LadybugDB write) | disk full | none | `ErrDiskFull`: roll back, fail loudly; DB stays consistent | atomic | `saveDeal`, `saveTask`, `saveUser` |
 | `store` (LadybugDB query) | runaway query | `Connection.SetTimeout` + `Interrupt` | `ErrTimeout`: abort, surface, roll back | timeout 10s | `executeInTx` |
 | `sessionfile` | missing / expired / unreadable | none | `ErrNoSession` / `ErrExpired`: require `crm login` | user re-authenticates | `readSessionFile` |
+| `external.argon2` | unavailable, tampered, or API-incompatible Go module | exact version in `go.mod`; checksum locked in `go.sum`; CI builds and runs password-hash vectors before release | no runtime residual: the binary cannot be produced if the dependency does not verify or compile | build-time failure | (no residual: pure in-process function with no runtime availability state) |
 
 ## 7. Persistence and placement (the C4 to FSM bridge)
 

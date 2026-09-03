@@ -4,13 +4,20 @@
 package refine
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/artifactset"
+	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/portablepath"
 	"github.com/RamXX/machinery/internal/version"
 )
 
@@ -80,6 +87,58 @@ func alwaysTargets(node *ir.Value) map[string]bool {
 		}
 	}
 	return out
+}
+
+// validateLifecycleRollbackRoutes proves more than target-set equality.  A
+// rollback decision is ordered control flow: every remembered domain state
+// needs its own guarded branch and the list needs one final unguarded fallback
+// for a corrupt or otherwise unrecognized prior value.  Collapsing the routes
+// to target names loses that fact when the fallback intentionally shares a
+// target with a guarded branch.
+func validateLifecycleRollbackRoutes(node *ir.Value, rollback, fault string, enters map[string]bool) map[string]bool {
+	targetsSeen := map[string]bool{}
+	guardsSeen := map[string]bool{}
+	fallbacks := 0
+	fallbackSeen := false
+	for _, tr := range ir.TransitionsOf(node, nil, rollback) {
+		if tr.Kind != "always" || tr.Target == "" {
+			continue
+		}
+		target := ir.Simple(tr.Target)
+		targetsSeen[target] = true
+		if !tr.HasGuard {
+			fallbacks++
+			fallbackSeen = true
+			if fault != "" && target != fault {
+				die("%s rollback fallback routes to %s; overlay.fault requires %s", rollback, ir.Repr(target), ir.Repr(fault))
+			}
+			continue
+		}
+		if fallbackSeen {
+			die("%s rollback routing is incomplete or stale: the unguarded fallback must be the final route", rollback)
+		}
+		const prefix = "priorIs"
+		if !strings.HasPrefix(tr.Guard, prefix) {
+			die("%s rollback guard %s is not a prior-state guard", rollback, ir.Repr(tr.Guard))
+		}
+		state := strings.TrimPrefix(tr.Guard, prefix)
+		if state == "" || !enters[state] || target != state {
+			die("%s rollback guard %s routes to %s; expected priorIs<State> -> <State> for a state that enters the overlay", rollback, ir.Repr(tr.Guard), ir.Repr(target))
+		}
+		if guardsSeen[state] {
+			die("%s declares duplicate rollback guard %s", rollback, ir.Repr(tr.Guard))
+		}
+		guardsSeen[state] = true
+	}
+	for _, state := range sortedSet(enters) {
+		if !guardsSeen[state] {
+			die("%s rollback routing is incomplete or stale: missing guarded route priorIs%s -> %s", rollback, state, state)
+		}
+	}
+	if fallbacks != 1 {
+		die("%s rollback routing is incomplete or stale: expected exactly one final unguarded fallback, found %d", rollback, fallbacks)
+	}
+	return targetsSeen
 }
 
 // requireModeled enumerates the FULL transition set of a pattern-relevant
@@ -178,6 +237,19 @@ func lifecycleOverlay(sem *ir.Value) (busy, retry, rollback string) {
 	return
 }
 
+// lifecycleFault returns the optional final state used when rollback routing
+// cannot recover the remembered domain state. Keeping it explicit in the
+// semantics prevents a catch-all machine branch from disappearing from the
+// refinement proof.
+func lifecycleFault(sem *ir.Value) string {
+	if ov := sem.AsObject().Get2("overlay"); ov != nil && ov.Kind == ir.KindObject {
+		if v := ov.AsObject().Get2("fault"); v != nil && v.Kind == ir.KindString {
+			return v.AsString()
+		}
+	}
+	return ""
+}
+
 func strSlice(v *ir.Value) []string {
 	var out []string
 	if v == nil || v.Kind != ir.KindArray {
@@ -208,6 +280,15 @@ func sortedSet(m map[string]bool) []string {
 	return xs
 }
 
+func sortedTopStateNames(m map[string]*ir.Value) []string {
+	xs := make([]string, 0, len(m))
+	for name := range m {
+		xs = append(xs, name)
+	}
+	sort.Strings(xs)
+	return xs
+}
+
 func contains(xs []string, x string) bool {
 	for _, e := range xs {
 		if e == x {
@@ -220,6 +301,7 @@ func contains(xs []string, x string) bool {
 func ReconcileLifecycle(machine, sem *ir.Value) map[string]bool {
 	so := sem.AsObject()
 	busy, retry, rollback := lifecycleOverlay(sem)
+	fault := lifecycleFault(sem)
 	stages := strSlice(so.Get2("stages"))
 	win := so.GetString("win_stage")
 	lose := so.GetString("lose_stage")
@@ -244,11 +326,10 @@ func ReconcileLifecycle(machine, sem *ir.Value) map[string]bool {
 	domainExpected[win] = true
 	domainExpected[lose] = true
 	domainActual := map[string]bool{}
-	for n, node := range top {
+	for _, n := range sortedTopStateNames(top) {
 		if ir.IsUpperFirst(n) {
 			domainActual[n] = true
 		}
-		_ = node
 	}
 	if !setEq(domainActual, domainExpected) {
 		die("domain states disagree: machine has %s, semantics declare %s",
@@ -263,13 +344,25 @@ func ReconcileLifecycle(machine, sem *ir.Value) map[string]bool {
 			die("overlay state %s missing from the machine (declared under overlay:)", ir.Repr(ov))
 		}
 	}
+	if fault != "" {
+		node, ok := top[fault]
+		if !ok {
+			die("overlay fault state %s missing from the machine (declared under overlay:)", ir.Repr(fault))
+		}
+		if node.AsObject().GetString("type") != "final" {
+			die("overlay fault state %s must be final; rollback failure is a terminal outcome", ir.Repr(fault))
+		}
+	}
 	// every top-level state must be part of the pattern: a state outside the
 	// vocabulary would be entirely unmodeled
 	expectedTop := map[string]bool{busy: true, retry: true, rollback: true}
+	if fault != "" {
+		expectedTop[fault] = true
+	}
 	for s := range domainExpected {
 		expectedTop[s] = true
 	}
-	for n := range top {
+	for _, n := range sortedTopStateNames(top) {
 		if !expectedTop[n] {
 			die("machine state %s is outside the linear-lifecycle vocabulary (stages, terminals, and the busy/retry/rollback overlay); the emitted model would not carry it", ir.Repr(n))
 		}
@@ -334,18 +427,25 @@ func ReconcileLifecycle(machine, sem *ir.Value) map[string]bool {
 	if !setEq(retryAlways, expRB) {
 		die("%s always must go to %s (found %s)", retry, rollback, brSorted(retryAlways))
 	}
-	rbTargets := alwaysTargets(top[rollback])
 	enters := map[string]bool{}
-	for s := range domainActual {
+	for _, s := range sortedSet(domainActual) {
 		for _, tr := range ir.TransitionsOf(top[s], nil, "") {
 			if tr.Target != "" && ir.Simple(tr.Target) == busy {
 				enters[s] = true
 			}
 		}
 	}
-	if !setEq(rbTargets, enters) {
+	expectedRollbackTargets := map[string]bool{}
+	for _, state := range sortedSet(enters) {
+		expectedRollbackTargets[state] = true
+	}
+	if fault != "" {
+		expectedRollbackTargets[fault] = true
+	}
+	rbTargets := validateLifecycleRollbackRoutes(top[rollback], rollback, fault, enters)
+	if !setEq(rbTargets, expectedRollbackTargets) {
 		die("%s routes to %s but the overlay is entered from %s; the rollback routing is incomplete or stale",
-			rollback, brSorted(rbTargets), brSorted(enters))
+			rollback, brSorted(rbTargets), brSorted(expectedRollbackTargets))
 	}
 	closeOn := so.GetString("close_date_on")
 	if !domainExpected[closeOn] {
@@ -395,7 +495,7 @@ func ReconcileLifecycle(machine, sem *ir.Value) map[string]bool {
 		"after":  targets(busy),
 	})
 	requireModeled(top[rollback], rollback, "linear-lifecycle", map[string]map[string]bool{
-		"always": enters,
+		"always": expectedRollbackTargets,
 	})
 	return enters
 }
@@ -435,7 +535,8 @@ func emitLifecycleImpl(machine, sem *ir.Value, sourceNames [2]string) (string, m
 	so := sem.AsObject()
 	mid := ir.Title(so.GetString("machine"))
 	busy, retry, rollback := lifecycleOverlay(sem)
-	reconciledFrom := ReconcileLifecycle(machine, sem)
+	fault := lifecycleFault(sem)
+	ReconcileLifecycle(machine, sem)
 	stages := strSlice(so.Get2("stages"))
 	win := so.GetString("win_stage")
 	lose := so.GetString("lose_stage")
@@ -446,6 +547,10 @@ func emitLifecycleImpl(machine, sem *ir.Value, sourceNames [2]string) (string, m
 
 	terminal := []string{win, lose}
 	domain := append(append([]string{}, stages...), terminal...)
+	faults := []string{}
+	if fault != "" {
+		faults = append(faults, fault)
+	}
 	advanceable := stages[:len(stages)-1]
 	rank := map[string]int{}
 	for i, s := range stages {
@@ -497,6 +602,8 @@ CONSTANT MaxRetries
 Open == %s
 Terminal == %s
 Domain == Open \cup Terminal
+Fault == %s
+Resting == Domain \cup Fault
 Overlay == {"%s", "%s", "%s"}
 None == "none"
 Rank == %s
@@ -506,9 +613,9 @@ VARIABLES st, rc, stage, pending, prior, closeSet
 vars == << st, rc, stage, pending, prior, closeSet >>
 
 TypeOK ==
-  /\ st \in (Domain \cup Overlay)
+  /\ st \in (Resting \cup Overlay)
   /\ rc \in 0..MaxRetries
-  /\ stage \in Domain
+  /\ stage \in Resting
   /\ pending \in (Domain \cup {None})
   /\ prior \in (Domain \cup {None})
   /\ closeSet \in BOOLEAN
@@ -564,28 +671,36 @@ RolledBack ==
   /\ st' = prior /\ stage' = prior
   /\ pending' = None /\ prior' = None /\ rc' = 0 /\ closeSet' = closeSet
 
-Domain_Next == StartAdvance \/ StartWin \/ StartLose \/ StartReopen
-Overlay_Next == SaveDone \/ SaveLocked \/ SaveFail \/ RetryExhausted \/ RetryAgain \/ RolledBack
+RollbackFault ==
+  /\ st = "%s" /\ st' \in Fault /\ stage' = st'
+  /\ pending' = None /\ prior' = None /\ rc' = 0 /\ closeSet' = closeSet
+
+FaultStutter == st \in Fault /\ UNCHANGED vars
+
+Domain_Next == StartAdvance \/ StartWin \/ StartLose \/ StartReopen \/ FaultStutter
+Overlay_Next == SaveDone \/ SaveLocked \/ SaveFail \/ RetryExhausted \/ RetryAgain \/ RolledBack \/ RollbackFault
 Next == Domain_Next \/ Overlay_Next
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(Overlay_Next)
 
-Inv_StageValid == stage \in Domain
+Inv_StageValid == stage \in Resting
 Inv_Atomic == (st \in Overlay) => (stage = prior)
-Inv_DomainConsistent == (st \in Domain) => (st = stage /\ pending = None /\ prior = None)
+Inv_DomainConsistent == (st \in Resting) => (st = stage /\ pending = None /\ prior = None)
 Inv_CloseDate == (stage = "%s") => closeSet
 
 StageForward ==
   [][ (stage' # stage) =>
-        \/ Rank[stage'] > Rank[stage]
-        \/ (stage \in Terminal /\ stage' = "%s") ]_stage
+        \/ stage' \in Fault
+        \/ /\ stage \in Domain /\ stage' \in Domain
+           /\ \/ Rank[stage'] > Rank[stage]
+              \/ (stage \in Terminal /\ stage' = "%s") ]_stage
 
-Live_OverlayResolves == (st \in Overlay) ~> (st \in Domain)
+Live_OverlayResolves == (st \in Overlay) ~> (st \in Resting)
 ====
 `,
-		mid, header, q(stages), q(terminal), busy, retry, rollback, rankf, nextf,
+		mid, header, q(stages), q(terminal), q(faults), busy, retry, rollback, rankf, nextf,
 		initial, initial, q(advanceable), busy, busy, win, busy, lose, busy, reopenTo,
-		busy, closeOn, busy, retry, busy, rollback, retry, rollback, retry, busy, rollback, closeOn, reopenTo)
+		busy, closeOn, busy, retry, busy, rollback, retry, rollback, retry, busy, rollback, rollback, closeOn, reopenTo)
 
 	dataCfg := fmt.Sprintf("CONSTANT MaxRetries = %d\nSPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT Inv_StageValid\nINVARIANT Inv_Atomic\nINVARIANT Inv_DomainConsistent\nINVARIANT Inv_CloseDate\nPROPERTY StageForward\nPROPERTY Live_OverlayResolves\n", maxr)
 
@@ -616,8 +731,8 @@ CTermination == (phase = "busy") ~> (phase = "resting")
 \* GENERATED. Proof that %sData refines %sContract under a refinement mapping.
 EXTENDS %sData
 
-phaseBar == IF st \in Domain THEN "resting" ELSE "busy"
-kindBar == IF stage \in Terminal THEN "terminal" ELSE "open"
+phaseBar == IF st \in Resting THEN "resting" ELSE "busy"
+kindBar == IF st \in Fault \/ stage \in Terminal THEN "terminal" ELSE "open"
 
 DC == INSTANCE %sContract WITH phase <- phaseBar, kind <- kindBar
 
@@ -629,8 +744,6 @@ RefTermination == DC!CTermination
 
 	refCfg := fmt.Sprintf("CONSTANT MaxRetries = %d\nSPECIFICATION Spec\nINVARIANT RefTypeOK\nPROPERTY RefSpec\nPROPERTY RefTermination\n", maxr)
 
-	fmt.Fprintf(os.Stdout, "refine_gen: reconciled %s against the machine: %d domain states, overlay entered from %d states\n",
-		mid, len(stages)+2, len(reconciledFrom))
 	return mid, map[string]string{
 		mid + "Data.tla":       data,
 		mid + "Data.cfg":       dataCfg,
@@ -694,7 +807,7 @@ func ReconcileTerminal(machine, sem *ir.Value) (phases []string, success string,
 		domainExpected[f] = true
 	}
 	domainActual := map[string]bool{}
-	for n := range top {
+	for _, n := range sortedTopStateNames(top) {
 		if ir.IsUpperFirst(n) {
 			domainActual[n] = true
 		}
@@ -729,7 +842,7 @@ func ReconcileTerminal(machine, sem *ir.Value) (phases []string, success string,
 	for _, r := range retries {
 		expectedTop[r.State] = true
 	}
-	for n := range top {
+	for _, n := range sortedTopStateNames(top) {
 		if !expectedTop[n] {
 			die("machine state %s is outside the terminal-lifecycle vocabulary (phases, terminals, and the declared retry overlays); the emitted model would not carry it", ir.Repr(n))
 		}
@@ -1008,8 +1121,6 @@ func EmitTerminal(machine, sem *ir.Value, sourceNames [2]string) (mid string, fi
 	L = append(L, "====")
 	tla := strings.Join(L, "\n") + "\n"
 	cfg := fmt.Sprintf("CONSTANT MaxRetries = %d\nSPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT Inv_Complete\nPROPERTY Inv_TerminalAbsorbing\nPROPERTY Live_Terminates\n", maxr)
-	fmt.Fprintf(os.Stdout, "refine_gen: reconciled %s against the machine: %d phases, %d retry overlay(s), %d failure terminal(s)\n",
-		mid, len(phases), len(retries), len(failures))
 	return mid, map[string]string{
 		mid + "Data.tla": tla,
 		mid + "Data.cfg": cfg,
@@ -1040,7 +1151,7 @@ func ReconcileSaga(machine, sem *ir.Value) (err error) {
 		expected[s] = true
 	}
 	actual := map[string]bool{}
-	for n := range top {
+	for _, n := range sortedTopStateNames(top) {
 		actual[n] = true
 	}
 	if !setEq(actual, expected) {
@@ -1339,8 +1450,6 @@ func EmitSaga(machine, sem *ir.Value, sourceNames [2]string) (mid string, files 
 	L = append(L, "====")
 	tla := strings.Join(L, "\n") + "\n"
 	cfg := fmt.Sprintf("CONSTANT MaxRetries = %d\nSPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT Inv_NoSilentLoss\nINVARIANT Inv_CleanCompensation\nPROPERTY Live_Terminates\n", maxr)
-	fmt.Fprintf(os.Stdout, "refine_gen: reconciled %s against the machine: %d forward steps, %d compensating obligations\n",
-		mid, len(states), len(obligations))
 	return mid, map[string]string{
 		mid + "Data.tla": tla,
 		mid + "Data.cfg": cfg,
@@ -1430,14 +1539,315 @@ func filterOut(xs []string, x string) []string {
 
 // Run is the `machinery refine <machine.json> <semantics.yaml> [out-dir]` entrypoint.
 func Run(machinePath, semPath, outdir string) error {
-	_, err := RunWritten(machinePath, semPath, outdir)
+	return RunTo(machinePath, semPath, outdir, os.Stdout)
+}
+
+// RunTo is Run with an explicit status-output sink.
+func RunTo(machinePath, semPath, outdir string, out io.Writer) error {
+	_, err := RunWrittenTo(machinePath, semPath, outdir, out)
 	return err
+}
+
+// ValidateControlFlowOnly validates the deliberately shallow semantics
+// declaration for a lifecycle whose control flow is already represented by
+// the rung-3 TLA generator but does not truthfully fit a data-refinement
+// algebra. Its closed three-key shape prevents the annotation from implying a
+// deeper proof through ignored fields.
+func ValidateControlFlowOnly(machinePath, semPath string) error {
+	machine, err := ir.LoadMachineJSON(machinePath)
+	if err != nil {
+		return &ExitError{Msg: "refine_gen: " + err.Error()}
+	}
+	data, err := os.ReadFile(semPath)
+	if err != nil {
+		return &ExitError{Msg: "refine_gen: " + err.Error()}
+	}
+	sem, err := ir.LoadYAML(data)
+	if err != nil || sem.Kind != ir.KindObject {
+		return &ExitError{Msg: "refine_gen: control-flow-only semantics must be a yaml mapping"}
+	}
+	o := sem.AsObject()
+	allowed := map[string]bool{"machine": true, "pattern": true, "reason": true}
+	for _, key := range o.Keys() {
+		if !allowed[key] {
+			return &ExitError{Msg: fmt.Sprintf("refine_gen: control-flow-only semantics has unsupported key %s (only machine, pattern, reason are allowed)", ir.Repr(key))}
+		}
+	}
+	if o.Len() != 3 {
+		return &ExitError{Msg: "refine_gen: control-flow-only semantics requires exactly machine, pattern, and reason"}
+	}
+	want := machine.AsObject().GetString("id")
+	if got := o.GetString("machine"); got == "" || got != want {
+		return &ExitError{Msg: fmt.Sprintf("refine_gen: control-flow-only machine must exactly equal the machine id %s, got %s", ir.Repr(want), ir.Repr(got))}
+	}
+	if o.GetString("pattern") != "control-flow-only" {
+		return &ExitError{Msg: "refine_gen: pattern must be control-flow-only"}
+	}
+	reason := o.Get2("reason")
+	if reason == nil || reason.Kind != ir.KindString || strings.TrimSpace(reason.AsString()) == "" {
+		return &ExitError{Msg: "refine_gen: control-flow-only semantics requires a non-empty reason"}
+	}
+	return nil
+}
+
+func validateSemanticsSchema(sem *ir.Value) error {
+	if sem == nil || sem.Kind != ir.KindObject {
+		return &ExitError{Msg: "refine_gen: semantics file is not a mapping"}
+	}
+	o := sem.AsObject()
+	pattern := o.GetString("pattern")
+	common := map[string]bool{"machine": true, "pattern": true, "max_retries": true}
+	allowed := map[string]bool{}
+	for key := range common {
+		allowed[key] = true
+	}
+	switch pattern {
+	case "linear-lifecycle":
+		for _, key := range []string{"stages", "win_stage", "lose_stage", "reopen_to", "close_date_on", "advance_event", "win_event", "lose_event", "reopen_event", "overlay"} {
+			allowed[key] = true
+		}
+	case "terminal-lifecycle":
+		for _, key := range []string{"phases", "success_terminal", "failure_terminals", "retry", "retries", "success_flag"} {
+			allowed[key] = true
+		}
+	case "saga":
+		allowed["states"], allowed["obligations"] = true, true
+	case "control-flow-only":
+		allowed = map[string]bool{"machine": true, "pattern": true, "reason": true}
+	default:
+		// The caller emits the canonical unsupported-pattern diagnostic.
+		return nil
+	}
+	if err := rejectUnknownKeys(o, allowed, "semantics"); err != nil {
+		return err
+	}
+	if err := requireSchemaKind(o, "machine", ir.KindString, true, "semantics"); err != nil {
+		return err
+	}
+	if err := requireSchemaKind(o, "pattern", ir.KindString, true, "semantics"); err != nil {
+		return err
+	}
+	if err := requireSchemaKind(o, "max_retries", ir.KindNumber, false, "semantics"); err != nil {
+		return err
+	}
+	switch pattern {
+	case "linear-lifecycle":
+		if err := requireStringArray(o, "stages"); err != nil {
+			return err
+		}
+		for _, key := range []string{"win_stage", "lose_stage", "reopen_to", "close_date_on", "advance_event", "win_event", "lose_event", "reopen_event"} {
+			if err := requireSchemaKind(o, key, ir.KindString, true, "semantics"); err != nil {
+				return err
+			}
+		}
+		if overlay := o.Get2("overlay"); overlay != nil {
+			if overlay.Kind != ir.KindObject {
+				return schemaError("semantics.overlay must be a mapping")
+			}
+			if err := rejectUnknownKeys(overlay.AsObject(), map[string]bool{"busy": true, "retry": true, "rollback": true, "fault": true}, "semantics.overlay"); err != nil {
+				return err
+			}
+			for _, key := range overlay.AsObject().Keys() {
+				if err := requireSchemaKind(overlay.AsObject(), key, ir.KindString, true, "semantics.overlay"); err != nil {
+					return err
+				}
+			}
+		}
+	case "terminal-lifecycle":
+		if err := requireStringArray(o, "phases"); err != nil {
+			return err
+		}
+		if err := requireStringArray(o, "failure_terminals"); err != nil {
+			return err
+		}
+		for _, key := range []string{"success_terminal", "success_flag"} {
+			if err := requireSchemaKind(o, key, ir.KindString, true, "semantics"); err != nil {
+				return err
+			}
+		}
+		if o.Get2("retry") != nil && o.Get2("retries") != nil {
+			return schemaError("semantics may declare retry or retries, not both")
+		}
+		if retry := o.Get2("retry"); retry != nil {
+			if err := validateRetrySchema(retry, "semantics.retry"); err != nil {
+				return err
+			}
+		}
+		if retries := o.Get2("retries"); retries != nil {
+			if retries.Kind != ir.KindArray {
+				return schemaError("semantics.retries must be a list")
+			}
+			for i, retry := range retries.AsArray() {
+				if err := validateRetrySchema(retry, fmt.Sprintf("semantics.retries[%d]", i)); err != nil {
+					return err
+				}
+			}
+		}
+	case "saga":
+		if err := requireStringArray(o, "states"); err != nil {
+			return err
+		}
+		obligations := o.Get2("obligations")
+		if obligations == nil || obligations.Kind != ir.KindObject {
+			return schemaError("semantics.obligations must be a mapping")
+		}
+		for _, state := range obligations.AsObject().Keys() {
+			entry := obligations.AsObject().Get2(state)
+			where := "semantics.obligations." + state
+			if entry == nil || entry.Kind != ir.KindObject {
+				return schemaError(where + " must be a mapping")
+			}
+			if err := rejectUnknownKeys(entry.AsObject(), map[string]bool{"sets": true, "undo": true}, where); err != nil {
+				return err
+			}
+			if err := requireSchemaKind(entry.AsObject(), "sets", ir.KindString, true, where); err != nil {
+				return err
+			}
+			if err := requireSchemaKind(entry.AsObject(), "undo", ir.KindString, false, where); err != nil {
+				return err
+			}
+		}
+	case "control-flow-only":
+		if err := requireSchemaKind(o, "reason", ir.KindString, true, "semantics"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func schemaError(message string) error { return &ExitError{Msg: "refine_gen: " + message} }
+
+func rejectUnknownKeys(o *ir.Object, allowed map[string]bool, where string) error {
+	var unknown []string
+	for _, key := range o.Keys() {
+		if !allowed[key] {
+			unknown = append(unknown, key)
+		}
+	}
+	sort.Strings(unknown)
+	if len(unknown) > 0 {
+		return schemaError(fmt.Sprintf("%s has unsupported key %s", where, ir.Repr(unknown[0])))
+	}
+	return nil
+}
+
+func requireSchemaKind(o *ir.Object, key string, kind ir.Kind, required bool, where string) error {
+	v := o.Get2(key)
+	if v == nil {
+		if required {
+			return schemaError(fmt.Sprintf("%s.%s is required", where, key))
+		}
+		return nil
+	}
+	if v.Kind != kind {
+		return schemaError(fmt.Sprintf("%s.%s has the wrong type", where, key))
+	}
+	return nil
+}
+
+func requireStringArray(o *ir.Object, key string) error {
+	v := o.Get2(key)
+	if v == nil {
+		return schemaError(fmt.Sprintf("semantics.%s is required", key))
+	}
+	if v.Kind != ir.KindArray {
+		return schemaError(fmt.Sprintf("semantics.%s must be a list of strings", key))
+	}
+	for i, item := range v.AsArray() {
+		if item == nil || item.Kind != ir.KindString {
+			return schemaError(fmt.Sprintf("semantics.%s[%d] must be a string", key, i))
+		}
+	}
+	return nil
+}
+
+func validateRetrySchema(v *ir.Value, where string) error {
+	if v == nil || v.Kind != ir.KindObject {
+		return schemaError(where + " must be a mapping")
+	}
+	if err := rejectUnknownKeys(v.AsObject(), map[string]bool{"state": true, "serves": true}, where); err != nil {
+		return err
+	}
+	for _, key := range []string{"state", "serves"} {
+		if err := requireSchemaKind(v.AsObject(), key, ir.KindString, true, where); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // RunWritten is Run, reporting the basenames of the files it wrote so callers
 // (verify-formal) can distinguish freshly generated pairs from committed
 // orphans.
 func RunWritten(machinePath, semPath, outdir string) ([]string, error) {
+	return RunWrittenTo(machinePath, semPath, outdir, os.Stdout)
+}
+
+// RunWrittenTo is RunWritten with an explicit status-output sink.
+func RunWrittenTo(machinePath, semPath, outdir string, out io.Writer) ([]string, error) {
+	snapshot, err := designlock.Acquire(filepath.Dir(filepath.Dir(machinePath)))
+	if err != nil {
+		return nil, err
+	}
+	written, retErr := RunWrittenInSnapshotTo(snapshot, machinePath, semPath, outdir, out)
+	retErr = errors.Join(retErr, snapshot.Release())
+	retErr = snapshot.LogicalError(retErr)
+	if retErr != nil {
+		return nil, retErr
+	}
+	return written, nil
+}
+
+// RunWrittenInSnapshot is RunWritten for an orchestrator which already owns
+// the design snapshot lock.
+var runWrittenAfterInputSnapshot = func() {}
+var runWrittenAfterStalePlan = func() {}
+
+func RunWrittenInSnapshot(snapshot *designlock.Lock, machinePath, semPath, outdir string) (written []string, retErr error) {
+	return RunWrittenInSnapshotTo(snapshot, machinePath, semPath, outdir, os.Stdout)
+}
+
+// RunWrittenInSnapshotTo is RunWrittenInSnapshot with an explicit output sink.
+func RunWrittenInSnapshotTo(snapshot *designlock.Lock, machinePath, semPath, outdir string, out io.Writer) (written []string, retErr error) {
+	machineSource := filepath.Base(machinePath)
+	semanticsSource := filepath.Base(semPath)
+	if err := validateRefinementOwnerBase(machineSource, ".machine.json"); err != nil {
+		return nil, &ExitError{Msg: "refine_gen: invalid machine input filename: " + err.Error()}
+	}
+	if err := validateRefinementOwnerBase(semanticsSource, ".semantics.yaml"); err != nil {
+		return nil, &ExitError{Msg: "refine_gen: invalid semantics input filename: " + err.Error()}
+	}
+	semanticsSourceDir := ""
+	if stableDir, err := snapshot.SourcePath(filepath.Dir(semPath)); err != nil {
+		return nil, &ExitError{Msg: "refine_gen: resolve semantics inventory: " + err.Error()}
+	} else if stableDir != filepath.Dir(semPath) || refinementPathWithin(snapshot.SourceRoot(), stableDir) {
+		semanticsSourceDir = stableDir
+	}
+	if outdir == "" {
+		outdir = filepath.Dir(semPath)
+	}
+	if err := snapshot.ValidateOutputDir(outdir); err != nil {
+		return nil, &ExitError{Msg: "refine_gen: unsafe output directory: " + err.Error()}
+	}
+	machines, err := snapshot.MaterializeExternalTree(filepath.Dir(machinePath))
+	if err != nil {
+		return nil, &ExitError{Msg: "refine_gen: snapshot machine inventory: " + err.Error()}
+	}
+	defer func() { retErr = errors.Join(retErr, machines.Close()) }()
+	machinePath = filepath.Join(machines.Path(), filepath.Base(machinePath))
+	semantics, err := snapshot.MaterializeRegularFile(semPath)
+	if err != nil {
+		return nil, &ExitError{Msg: "refine_gen: snapshot semantics: " + err.Error()}
+	}
+	defer func() { retErr = errors.Join(retErr, semantics.Close()) }()
+	semPath = semantics.Path()
+	if err := snapshot.ResumeExpected("refine", "rerun `machinery refine` with the same arguments"); err != nil {
+		return nil, err
+	}
+	runWrittenAfterInputSnapshot()
+	if err := ir.ValidateTLAModuleInventory(filepath.Dir(machinePath)); err != nil {
+		return nil, &ExitError{Msg: "refine_gen: " + err.Error()}
+	}
 	machine, err := ir.LoadMachineJSON(machinePath)
 	if err != nil {
 		return nil, &ExitError{Msg: "refine_gen: " + err.Error()}
@@ -1453,6 +1863,9 @@ func RunWritten(machinePath, semPath, outdir string) ([]string, error) {
 	if sem.Kind != ir.KindObject {
 		return nil, &ExitError{Msg: "refine_gen: semantics file is not a mapping"}
 	}
+	if err := validateSemanticsSchema(sem); err != nil {
+		return nil, err
+	}
 	names := [2]string{filepath.Base(machinePath), filepath.Base(semPath)}
 	pat := sem.AsObject().GetString("pattern")
 	var mid string
@@ -1465,8 +1878,37 @@ func RunWritten(machinePath, semPath, outdir string) ([]string, error) {
 		mid, files, genErr = EmitTerminal(machine, sem, names)
 	case "saga":
 		mid, files, genErr = EmitSaga(machine, sem, names)
+	case "control-flow-only":
+		if err := ValidateControlFlowOnly(machinePath, semPath); err != nil {
+			return nil, err
+		}
+		stale, err := staleOwnedRefinementArtifacts(outdir, filepath.Dir(machinePath), semanticsSourceDir, machineSource, semanticsSource, nil)
+		if err != nil {
+			return nil, err
+		}
+		if len(stale) > 0 {
+			runWrittenAfterStalePlan()
+			expected := make([]designlock.OutputExpectation, 0, len(stale))
+			for _, name := range stale {
+				expected = append(expected, designlock.ExpectAbsent(filepath.Join(outdir, name.Name)))
+			}
+			if err := snapshot.PublishExpectedRooted("refine", "rerun `machinery refine` with the same arguments", expected, func(outputs *designlock.OutputScope) error {
+				return outputs.WithRoot(outdir, func(root *os.Root) error {
+					return artifactset.ReconcilePlannedRooted(outdir, root, map[string][]byte{}, stale)
+				})
+			}); err != nil {
+				return nil, err
+			}
+		}
+		if _, err := fmt.Fprintf(out, "validated control-flow-only semantics for %s; no data-refinement artifacts claimed\n", machine.AsObject().GetString("id")); err != nil {
+			return nil, fmt.Errorf("refine_gen: write status output: %w", err)
+		}
+		if err := snapshot.CheckUnchanged(); err != nil {
+			return nil, err
+		}
+		return []string{}, nil
 	default:
-		return nil, &ExitError{Msg: fmt.Sprintf("refine_gen: unsupported pattern %s (linear-lifecycle, terminal-lifecycle, saga)", ir.Repr(pat))}
+		return nil, &ExitError{Msg: fmt.Sprintf("refine_gen: unsupported pattern %s (linear-lifecycle, terminal-lifecycle, saga, control-flow-only)", ir.Repr(pat))}
 	}
 	if genErr != nil {
 		return nil, genErr
@@ -1474,14 +1916,14 @@ func RunWritten(machinePath, semPath, outdir string) ([]string, error) {
 	if len(files) == 0 {
 		return nil, &ExitError{Msg: "refine_gen: " + mid + ": generation produced no files"}
 	}
-	if outdir == "" {
-		outdir = filepath.Dir(semPath)
+	var fileNames []string
+	for name := range files {
+		fileNames = append(fileNames, name)
 	}
-	if mkErr := os.MkdirAll(outdir, 0755); mkErr != nil {
-		return nil, mkErr
-	}
-	var written []string
-	for name, body := range files {
+	sort.Strings(fileNames)
+	committed := make(map[string][]byte, len(fileNames))
+	for _, name := range fileNames {
+		body := files[name]
 		// Stamp at write time (P-F10): the committed artifact records which
 		// machinery version produced it; freshness diffs strip the line.
 		switch {
@@ -1490,11 +1932,334 @@ func RunWritten(machinePath, semPath, outdir string) ([]string, error) {
 		case strings.HasSuffix(name, ".cfg"):
 			body = version.StampCfg(body)
 		}
-		if wErr := os.WriteFile(filepath.Join(outdir, name), []byte(body), 0644); wErr != nil {
-			return nil, wErr
-		}
+		committed[name] = []byte(body)
 		written = append(written, name)
 	}
-	fmt.Fprintf(os.Stdout, "generated %d files for %s (%s)\n", len(files), mid, pat)
+	replacements, err := guardedCurrentRefinementArtifacts(outdir, machineSource, semanticsSource, committed)
+	if err != nil {
+		return nil, err
+	}
+	stale, err := staleOwnedRefinementArtifacts(outdir, filepath.Dir(machinePath), semanticsSourceDir, machineSource, semanticsSource, committed)
+	if err != nil {
+		return nil, err
+	}
+	if len(stale) > 0 {
+		runWrittenAfterStalePlan()
+	}
+	expected := make([]designlock.OutputExpectation, 0, len(fileNames)+len(stale))
+	for _, name := range fileNames {
+		expected = append(expected, designlock.ExpectFile(filepath.Join(outdir, name), committed[name], 0o644))
+	}
+	for _, name := range stale {
+		expected = append(expected, designlock.ExpectAbsent(filepath.Join(outdir, name.Name)))
+	}
+	if wErr := snapshot.PublishExpectedRooted("refine", "rerun `machinery refine` with the same arguments", expected, func(outputs *designlock.OutputScope) error {
+		return outputs.WithRoot(outdir, func(root *os.Root) error {
+			return artifactset.ReconcileGuardedRooted(outdir, root, committed, stale, replacements)
+		})
+	}); wErr != nil {
+		return nil, wErr
+	}
+	if _, err := fmt.Fprintf(out, "generated %d files for %s (%s)\n", len(files), mid, pat); err != nil {
+		return nil, fmt.Errorf("refine_gen: write status output: %w", err)
+	}
 	return written, nil
+}
+
+func guardedCurrentRefinementArtifacts(outdir, machineSource, semanticsSource string, files map[string][]byte) ([]artifactset.RemovalPrecondition, error) {
+	info, err := os.Lstat(outdir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, fmt.Errorf("refine_gen: output directory must be a real directory")
+	}
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	inspected := map[string][]byte{}
+	conditions := map[string]artifactset.RemovalPrecondition{}
+	for _, name := range names {
+		body, condition, err := artifactset.InspectRemovalCandidate(outdir, name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		inspected[name], conditions[name] = body, condition
+	}
+	prefix := strings.TrimSuffix(machineSource, ".machine.json")
+	anchor := prefix + "Data.tla"
+	anchorOwned := false
+	if body, ok := inspected[anchor]; ok {
+		machineOwner, semanticsOwner, generated, err := refinementSourceOwner(anchor, body)
+		if err != nil {
+			return nil, err
+		}
+		anchorOwned = generated && machineOwner == machineSource && semanticsOwner == semanticsSource
+	}
+	for _, name := range names {
+		body, exists := inspected[name]
+		if !exists || bytes.Equal(body, files[name]) {
+			continue
+		}
+		if name == anchor {
+			if !anchorOwned {
+				return nil, fmt.Errorf("refine_gen: refusing to replace foreign or manual artifact %s", name)
+			}
+			continue
+		}
+		if !anchorOwned || !canonicalRefinementFamilyMember(name, prefix, body) {
+			return nil, fmt.Errorf("refine_gen: refusing to replace artifact %s without a canonical same-owner refinement family", name)
+		}
+	}
+	out := make([]artifactset.RemovalPrecondition, 0, len(conditions))
+	for _, name := range names {
+		if condition, ok := conditions[name]; ok {
+			out = append(out, condition)
+		}
+	}
+	return out, nil
+}
+
+var refinementFamilySuffixes = []string{"Data.tla", "Data.cfg", "Contract.tla", "Refinement.tla", "Refinement.cfg"}
+
+func staleOwnedRefinementArtifacts(outdir, machineDir, semanticsDir, machineSource, semanticsSource string, keep map[string][]byte) ([]artifactset.RemovalPrecondition, error) {
+	entries, err := os.ReadDir(outdir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	staleSet := map[string]artifactset.RemovalPrecondition{}
+entryLoop:
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, "Data.tla") {
+			continue
+		}
+		body, _, err := artifactset.InspectRemovalCandidate(outdir, name)
+		if err != nil {
+			return nil, err
+		}
+		machineOwner, semanticsOwner, generated, ownerErr := refinementSourceOwner(name, body)
+		if ownerErr != nil {
+			return nil, fmt.Errorf("refine_gen: invalid source-ownership header in %s: %w", name, ownerErr)
+		}
+		if !generated {
+			continue
+		}
+		prefix := strings.TrimSuffix(name, "Data.tla")
+		if semanticsDir == "" {
+			for _, suffix := range refinementFamilySuffixes {
+				candidate := prefix + suffix
+				if _, current := keep[candidate]; current {
+					continue
+				}
+				_, _, inspectErr := artifactset.InspectRemovalCandidate(outdir, candidate)
+				switch {
+				case errors.Is(inspectErr, os.ErrNotExist):
+				case inspectErr != nil:
+					return nil, inspectErr
+				default:
+					return nil, fmt.Errorf("refine_gen: cannot safely reconcile non-current generated artifact %s for external semantics input %s; remove the stale generated family explicitly and rerun", candidate, semanticsSource)
+				}
+			}
+			continue entryLoop
+		}
+		owned := machineOwner == machineSource && semanticsOwner == semanticsSource
+		if !owned {
+			_, statErr := os.Lstat(filepath.Join(machineDir, machineOwner))
+			owned = errors.Is(statErr, os.ErrNotExist)
+			if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+				return nil, statErr
+			}
+		}
+		if !owned && semanticsDir != "" {
+			_, statErr := os.Lstat(filepath.Join(semanticsDir, semanticsOwner))
+			owned = errors.Is(statErr, os.ErrNotExist)
+			if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+				return nil, statErr
+			}
+		}
+		if !owned {
+			continue
+		}
+		for _, suffix := range refinementFamilySuffixes {
+			candidate := prefix + suffix
+			if _, current := keep[candidate]; current {
+				continue
+			}
+			_, condition, inspectErr := artifactset.InspectRemovalCandidate(outdir, candidate)
+			if inspectErr == nil {
+				staleSet[candidate] = condition
+			} else if !errors.Is(inspectErr, os.ErrNotExist) {
+				return nil, inspectErr
+			}
+		}
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if _, current := keep[name]; current || strings.HasSuffix(name, "Data.tla") {
+			continue
+		}
+		prefix, recognized := refinementFamilyPrefix(name)
+		if !recognized {
+			continue
+		}
+		anchor := prefix + "Data.tla"
+		if _, err := os.Lstat(filepath.Join(outdir, anchor)); err == nil {
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		body, condition, err := artifactset.InspectRemovalCandidate(outdir, name)
+		if err != nil {
+			return nil, err
+		}
+		if !canonicalRefinementFamilyMember(name, prefix, body) {
+			continue
+		}
+		if prefix != strings.TrimSuffix(machineSource, ".machine.json") {
+			if _, err := os.Lstat(filepath.Join(machineDir, prefix+".machine.json")); err == nil {
+				continue
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return nil, err
+			}
+		}
+		staleSet[name] = condition
+	}
+	stale := make([]artifactset.RemovalPrecondition, 0, len(staleSet))
+	for _, condition := range staleSet {
+		stale = append(stale, condition)
+	}
+	sort.Slice(stale, func(i, j int) bool { return stale[i].Name < stale[j].Name })
+	return stale, nil
+}
+
+func refinementFamilyPrefix(name string) (string, bool) {
+	for _, suffix := range refinementFamilySuffixes {
+		if strings.HasSuffix(name, suffix) && len(name) > len(suffix) {
+			return strings.TrimSuffix(name, suffix), true
+		}
+	}
+	return "", false
+}
+
+func canonicalRefinementFamilyMember(name, prefix string, body []byte) bool {
+	switch name {
+	case prefix + "Contract.tla":
+		lines := bytes.SplitN(body, []byte("\n"), 4)
+		return len(lines) >= 3 && string(lines[0]) == "---- MODULE "+prefix+"Contract ----" &&
+			bytes.HasPrefix(lines[1], []byte(`\* machinery-version: `)) && bytes.HasPrefix(lines[2], []byte(`\* GENERATED. `))
+	case prefix + "Refinement.tla":
+		lines := bytes.SplitN(body, []byte("\n"), 4)
+		want := `\* GENERATED. Proof that ` + prefix + `Data refines ` + prefix + `Contract under a refinement mapping.`
+		return len(lines) >= 3 && string(lines[0]) == "---- MODULE "+prefix+"Refinement ----" &&
+			bytes.HasPrefix(lines[1], []byte(`\* machinery-version: `)) && string(lines[2]) == want
+	case prefix + "Data.cfg":
+		return canonicalRefinementDataConfig(body)
+	case prefix + "Refinement.cfg":
+		return canonicalRefinementProofConfig(body)
+	default:
+		return false
+	}
+}
+
+func canonicalRefinementDataConfig(body []byte) bool {
+	lines := strings.Split(strings.TrimSuffix(string(body), "\n"), "\n")
+	if len(lines) < 4 || !strings.HasPrefix(lines[0], `\* machinery-version: `) || !strings.HasPrefix(lines[1], "CONSTANT MaxRetries = ") {
+		return false
+	}
+	if _, err := strconv.Atoi(strings.TrimPrefix(lines[1], "CONSTANT MaxRetries = ")); err != nil {
+		return false
+	}
+	rest := strings.Join(lines[2:], "\n")
+	for _, known := range []string{
+		"SPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT Inv_StageValid\nINVARIANT Inv_Atomic\nINVARIANT Inv_DomainConsistent\nINVARIANT Inv_CloseDate\nPROPERTY StageForward\nPROPERTY Live_OverlayResolves",
+		"SPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT Inv_Complete\nPROPERTY Inv_TerminalAbsorbing\nPROPERTY Live_Terminates",
+		"SPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT Inv_NoSilentLoss\nINVARIANT Inv_CleanCompensation\nPROPERTY Live_Terminates",
+	} {
+		if rest == known {
+			return true
+		}
+	}
+	return false
+}
+
+func canonicalRefinementProofConfig(body []byte) bool {
+	lines := strings.Split(strings.TrimSuffix(string(body), "\n"), "\n")
+	if len(lines) != 6 || !strings.HasPrefix(lines[0], `\* machinery-version: `) || !strings.HasPrefix(lines[1], "CONSTANT MaxRetries = ") {
+		return false
+	}
+	if _, err := strconv.Atoi(strings.TrimPrefix(lines[1], "CONSTANT MaxRetries = ")); err != nil {
+		return false
+	}
+	return strings.Join(lines[2:], "\n") == "SPECIFICATION Spec\nINVARIANT RefTypeOK\nPROPERTY RefSpec\nPROPERTY RefTermination"
+}
+
+func refinementSourceOwner(name string, body []byte) (machine, semantics string, generated bool, err error) {
+	lines := bytes.SplitN(body, []byte("\n"), 4)
+	module := strings.TrimSuffix(name, ".tla")
+	if len(lines) < 3 || string(lines[0]) != "---- MODULE "+module+" ----" || !bytes.HasPrefix(lines[1], []byte(`\* machinery-version: `)) {
+		return "", "", false, nil
+	}
+	header := string(lines[2])
+	var owner string
+	for _, prefix := range []string{
+		`\* GENERATED by machinery refine from `,
+		`\* GENERATED by machinery refine (terminal-lifecycle) from `,
+		`\* GENERATED by machinery refine (saga pattern) from `,
+	} {
+		if strings.HasPrefix(header, prefix) && strings.HasSuffix(header, ".") {
+			owner = strings.TrimSuffix(strings.TrimPrefix(header, prefix), ".")
+			break
+		}
+	}
+	if owner == "" {
+		return "", "", false, nil
+	}
+	machine, semantics, ok := strings.Cut(owner, " + ")
+	if !ok || filepath.Base(machine) != machine || filepath.Base(semantics) != semantics ||
+		!strings.HasSuffix(machine, ".machine.json") || !strings.HasSuffix(semantics, ".semantics.yaml") {
+		return "", "", true, fmt.Errorf("expected portable machine and semantics basenames")
+	}
+	if err := validateRefinementOwnerBase(machine, ".machine.json"); err != nil {
+		return "", "", true, fmt.Errorf("invalid machine owner: %w", err)
+	}
+	if err := validateRefinementOwnerBase(semantics, ".semantics.yaml"); err != nil {
+		return "", "", true, fmt.Errorf("invalid semantics owner: %w", err)
+	}
+	machineStem := strings.TrimSuffix(machine, ".machine.json")
+	if !strings.HasPrefix(module, machineStem) || module != machineStem+"Data" {
+		return "", "", true, fmt.Errorf("data module %s does not match machine owner %s", module, machine)
+	}
+	return machine, semantics, true, nil
+}
+
+func validateRefinementOwnerBase(name, suffix string) error {
+	if !strings.HasSuffix(name, suffix) {
+		return fmt.Errorf("must end in %s", suffix)
+	}
+	if strings.Contains(name, " + ") || strings.Contains(name, ",") {
+		return fmt.Errorf("contains a reserved ownership-header delimiter")
+	}
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("contains a control character")
+		}
+	}
+	return portablepath.ValidateBase(name)
+}
+
+func refinementPathWithin(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }

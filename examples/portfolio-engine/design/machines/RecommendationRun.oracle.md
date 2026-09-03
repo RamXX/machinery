@@ -13,8 +13,8 @@ the design changes, stable ids do not.
 | Collecting | atomic | - | - |
 | Optimizing | atomic | - | - |
 | collectRetry | atomic | - | - |
-| Ready | final | publishReady | - |
-| Failed | final | publishFailure | - |
+| Ready | final | assertTerminalAbsorbing, publishReady | - |
+| Failed | final | assertTerminalAbsorbing, publishFailure | - |
 
 ## Transitions
 

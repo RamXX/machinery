@@ -50,6 +50,12 @@ func writeReviewFile(t *testing.T, path, content string) {
 	}
 }
 
+func writeReviewMachine(t *testing.T, design, name string) {
+	t.Helper()
+	writeReviewFile(t, filepath.Join(design, "machines", name+".machine.json"),
+		`{"id":"`+name+`","initial":"Done","states":{"Done":{"type":"final"}}}`+"\n")
+}
+
 func gateErrs(gs []*gates.Gate, title string) []string {
 	for _, g := range gs {
 		if strings.Contains(g.Title, title) {
@@ -148,6 +154,8 @@ func TestReviewCommentMentionCoversNoOracle(t *testing.T) {
 	oracle2 := "# oracle\n\n| test id | stable id | source |\n|---|---|---|\n| T-B-01 | BBB-222222 | X |\n"
 	writeReviewFile(t, filepath.Join(design, "machines", "Deal.oracle.md"), oracle)
 	writeReviewFile(t, filepath.Join(design, "machines", "Task.oracle.md"), oracle2)
+	writeReviewMachine(t, design, "Deal")
+	writeReviewMachine(t, design, "Task")
 	writeReviewFile(t, filepath.Join(impl, "x", "x_test.go"),
 		"package x\n\n// TODO: see Deal.oracle.md Task.oracle.md for the tables we should eventually cover\nfunc nothing() {}\n")
 	g := gates.CheckOracleCoverage(design, impl)
@@ -196,6 +204,7 @@ func TestReviewRustCfgTestSplit(t *testing.T) {
 		"```yaml\ncontract_version: 2\nboundaries:\n  - id: app\n    code: [\"app/**\"]\n```\n")
 	writeReviewFile(t, filepath.Join(design, "machines", "Thing.oracle.md"),
 		"# o\n\n| test id | stable id | source |\n|---|---|---|\n| T-THIN-01 | THIN-aaa111 | A |\n")
+	writeReviewMachine(t, design, "Thing")
 	// production ids + inline test module, outside every boundary (f1+f4)
 	writeReviewFile(t, filepath.Join(impl, "rogue.rs"),
 		"pub const T1: &str = \"THIN-aaa111\";\n\npub fn production_logic() {}\n\n"+
@@ -276,6 +285,7 @@ func TestReviewUnreadableOracleIsHardError(t *testing.T) {
 	design, impl := filepath.Join(root, "design"), filepath.Join(root, "impl")
 	writeReviewFile(t, filepath.Join(design, "machines", "Thing.oracle.md"),
 		"# o\n\n| test id | stable id | source |\n|---|---|---|\n| T-THIN-01 | THIN-aaa111 | A |\n")
+	writeReviewMachine(t, design, "Thing")
 	writeReviewFile(t, filepath.Join(impl, "thing_test.go"), "package thing\n\n// THIN-aaa111\n")
 	path := filepath.Join(design, "machines", "Thing.oracle.md")
 	if err := os.Chmod(path, 0o000); err != nil {

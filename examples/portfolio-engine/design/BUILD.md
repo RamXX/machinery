@@ -165,6 +165,23 @@ One process on one machine, one local DuckDB file, one HTTP provider. A `recomme
 whole run to completion; review commands are separate invocations. `backup` copies the file; `restore`
 replaces it. Offline once prices are cached; the provider is only needed while Collecting.
 
+### Target CLI surfaces
+
+These commands are the complete human-action surface declared in `surfaces.yaml`; command handlers
+map one-to-one to the named domain action before calling the owning component.
+
+| actor | domain action | command |
+|---|---|---|
+| Analyst | `Index.refresh` | `pf index refresh <index-id>` |
+| Analyst | `Security.upsert` | `pf security upsert --ticker <ticker> --name <name> --sector <sector>` |
+| Analyst | `CandidateSet.build` | `pf candidates build --index <index-id> [--index <index-id> ...]` |
+| Analyst | `RecommendationRun.start` | `pf recommend --candidate-set <candidate-set-id> --lookback-days <days>` |
+| Analyst | `RecommendationRun.abort` | `pf run abort <run-id>` |
+| Manager or Admin | `Portfolio.advance` | `pf portfolio advance <portfolio-id>` |
+| Manager or Admin | `Portfolio.accept` | `pf portfolio accept <portfolio-id>` |
+| Manager or Admin | `Portfolio.reject` | `pf portfolio reject <portfolio-id>` |
+| Manager or Admin | `Portfolio.reopen` | `pf portfolio reopen <portfolio-id>` |
+
 ### Architecture Contract (boundaries + dependency rules)
 
 The coding agent must not introduce a cross-boundary dependency outside `allow`. `pf.feed` is the sole
@@ -176,7 +193,8 @@ denies are overridden only by the feed and repo allows.
 
 ### Interface contracts, event-contract, persistence and placement, NFR record
 
-See `design/ARCHITECTURE.md` sections 6-10. Summary: interface contracts pin request/response shape,
+See `design/ARCHITECTURE.md` sections 6-11. Summary: action ownership is closed over the model;
+interface contracts pin request/response shape,
 enumerated errors, and idempotency for each boundary (these are the `onError` branches in the shard
 behavior sections). The event-contract table is N/A (one synchronous process per command; no bus).
 Persistence: Portfolio is a versioned row under an optimistic lock (two managers may review at once),
@@ -188,20 +206,22 @@ loud, distinct message with a distinct exit code.
 
 ## 5. Behavior: the component shards
 
-Three machines, one shard each. The JSON files are the source; neither this root nor any shard
-pastes them. Each shard carries its component's lifecycle narration, named-unit contract references,
+Four machines are grouped into three component shards. The JSON files are the source; neither this
+root nor any shard pastes them. Each shard carries its component's behavior narration, named-unit contract references,
 test specification (oracle rows by stable id, guard-branch completeness, named-unit plan), and
 build-plan milestones.
 
 | component | machine (source) | oracle (generated) | matrix | shard |
 |---|---|---|---|---|
 | RecommendationRun | `machines/RecommendationRun.machine.json` | `machines/RecommendationRun.oracle.md` (8 rows) | `machines/RecommendationRun.matrix.md` | `BUILD/RecommendationRun.md` |
-| Portfolio | `machines/Portfolio.machine.json` | `machines/Portfolio.oracle.md` (19 rows) | `machines/Portfolio.matrix.md` | `BUILD/Portfolio.md` |
+| ReferenceDataCommand | `machines/ReferenceDataCommand.machine.json` | `machines/ReferenceDataCommand.oracle.md` (12 rows) | `machines/ReferenceDataCommand.matrix.md` | `BUILD/RecommendationRun.md` |
+| Portfolio | `machines/Portfolio.machine.json` | `machines/Portfolio.oracle.md` (20 rows) | `machines/Portfolio.matrix.md` | `BUILD/Portfolio.md` |
 | MarketDataFeed | `machines/MarketDataFeed.machine.json` | `machines/MarketDataFeed.oracle.md` (6 rows) | `machines/MarketDataFeed.matrix.md` | `BUILD/MarketDataFeed.md` |
 
-Pure logic with no machine: the optimizer (a pure transform under a contract spec) and the
-reference-data builds (Index refresh, Security upsert, CandidateSet dedup). Their plan and tests
-live in the RecommendationRun shard, because the run pipeline is what invokes them.
+The optimizer remains a pure transform under a contract spec. ReferenceDataCommand is only the
+short-lived operational envelope around provider and repository effects; its three invariant-carrying
+actors remain deterministic transforms/versioned writes rather than synthetic entity lifecycles.
+Their plan and tests live in the RecommendationRun shard, because the run pipeline consumes their output.
 
 ## 6. Traceability matrix
 
@@ -211,13 +231,13 @@ tests. Gx-trace reports the split (unit-backed vs attested).
 
 | invariant id | enforced by (guard / structural) | in component | interface contract | test id(s) |
 |---|---|---|---|---|
-| `index-top-30` | structural: only rank <= 30 rows feed a build | pf.app, pf.repo | app->repo build | PROP-index-top-30 |
-| `ticker-unique` | structural: upsert keys on ticker | pf.app, pf.repo | app->repo upsert | PROP-ticker-unique |
-| `candidate-deduped` | structural: build dedupes by ticker | pf.app | app->repo build | PROP-candidate-deduped |
-| `candidate-from-top-30` | structural: build draws only from index top 30 | pf.app | app->repo build | PROP-candidate-from-top-30 |
+| `index-top-30` | invariant unit `selectEligibleConstituents`: stable rank/ticker order, exact ranks 1..30 | pf.app, pf.repo | app->repo build | PROP-index-top-30 |
+| `ticker-unique` | invariant unit `upsertSecurityByTicker` + unique store constraint | pf.app, pf.repo | app->repo upsert | PROP-ticker-unique |
+| `candidate-deduped` | invariant unit `buildCandidateSet`: normalized-ticker set union | pf.app | app->repo build | PROP-candidate-deduped |
+| `candidate-from-top-30` | invariant unit `buildCandidateSet`: input restricted to eligible constituents | pf.app | app->repo build | PROP-candidate-from-top-30 |
 | `run-ready-has-portfolio` | action `recordPortfolio`; formal `Inv_Complete` | pf.domain | app->optimizer | RECO-d6fcf9 |
 | `run-forward-only` | structural: the run graph; formal `Inv_TerminalAbsorbing` and forward chain | pf.domain | app->domain transition | RECO-f89da8, RECO-d6fcf9 |
-| `run-terminal-absorbing` | structural: Ready and Failed are `final`; formal `Inv_TerminalAbsorbing` | pf.domain | app->domain transition | RECO-61506b, RECO-ed98c7 |
+| `run-terminal-absorbing` | invariant unit `assertTerminalAbsorbing`: Ready and Failed are `final`; formal `Inv_TerminalAbsorbing` | pf.domain | app->domain transition | RECO-61506b, RECO-ed98c7 |
 | `portfolio-size-16` | structural: the optimizer returns exactly 16 holdings | pf.optimizer | app->optimizer | PROP-portfolio-size-16 |
 | `portfolio-holdings-deduped` | structural: distinct securities in the selection | pf.optimizer | app->optimizer | PROP-portfolio-holdings-deduped |
 | `portfolio-from-candidates` | structural: the optimizer selects only from candidates | pf.optimizer | app->optimizer | PROP-portfolio-from-candidates |
@@ -226,8 +246,8 @@ tests. Gx-trace reports the split (unit-backed vs attested).
 | `portfolio-accept-role` | guard `canDecide` | pf.domain | app->domain accept/reject | PORT-2bf44c, PORT-a41039, PORT-ddb44c, PORT-351dec |
 | `portfolio-reopen-role` | guard `canReopen` | pf.domain | app->domain reopen | PORT-db3bb9, PORT-9facf7 |
 | `portfolio-accepted-has-date` | action `recordAccepted`; formal `Inv_CloseDate` | pf.domain | app->domain accept | PORT-d1647b |
-| `holding-weight-nonneg` | structural: optimizer weights are non-negative | pf.optimizer | app->optimizer | PROP-holding-weight-nonneg |
-| `holding-weights-sum-full` | structural: optimizer weights sum to 10000 bps | pf.optimizer | app->optimizer | PROP-holding-weights-sum-full |
+| `holding-weight-nonneg` | actor `optimize`: rejects any negative output weight | pf.optimizer | app->optimizer | PROP-holding-weight-nonneg |
+| `holding-weights-sum-full` | actor `optimize`: requires the exact integer sum to be 10000 bps | pf.optimizer | app->optimizer | PROP-holding-weights-sum-full |
 | `feed-circuit-breaks` | guard `atThreshold` + action `recordTrip` | pf.feed | app->feed | MARK-acc7d7 |
 
 No invariant is left unenforced. The structural rows are made true by the optimizer contract or the
@@ -273,8 +293,9 @@ starts from an empty store, no migration required.
 Protocol for future lifecycle changes: when a `PortfolioStatus` or `RunStatus` value is renamed,
 split, or removed, ship a mapping table from each old persisted value to its new state, applied once
 on `Open()` over every row, or an explicit drain rule. The overlay states (committing/commitRetry/
-reverted for Portfolio; collectRetry for the run) are never persisted (they exist only within a
-command's execution), so renaming them needs no migration. Regenerate the oracles after any machine
+reverted/routingFault for Portfolio; collectRetry for the run; idle/refreshing/upserting/building/
+succeeded/failed for ReferenceDataCommand) are never persisted (they exist only within a command's
+execution), so renaming them needs no migration. Regenerate the oracles after any machine
 change; the stable-id diff is the affected-test list.
 
 ## 9. Milestone map

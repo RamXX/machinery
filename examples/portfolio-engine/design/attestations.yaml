@@ -1,0 +1,154 @@
+attestation_version: 1
+attestations:
+  - claim: g2.action-ownership
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: The closed action-ownership table maps all ten Modelith actions exactly once; assignments were reviewed against the synchronous orchestration, domain, repository, and optimizer responsibilities.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:ba60ce203687b99c8a682cb3733fcdf6b2f8d5e72ffb83cc376e225141b52714
+  - claim: g2.interface-contract-rightness
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: Every allowed synchronous edge was re-read for exchanged shape, typed failures, and retry behavior; no provider or DuckDB type escapes its adapter.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:ba60ce203687b99c8a682cb3733fcdf6b2f8d5e72ffb83cc376e225141b52714
+  - claim: g2.placement-rightness
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: Persisted lifecycles, command-level operational envelopes, optimistic locking, and the in-memory breaker match the one-process Python/DuckDB topology.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:ba60ce203687b99c8a682cb3733fcdf6b2f8d5e72ffb83cc376e225141b52714
+  - claim: g2.adoption-closure-discovery
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: The in-process Python packages add no sidecar, operator, service, or stateful backend; the only runtime closure members are the declared market-data credential/provider and DuckDB file.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:ba60ce203687b99c8a682cb3733fcdf6b2f8d5e72ffb83cc376e225141b52714
+  - claim: g2.event-contract-completeness
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: The design has no asynchronous channel or external event consumer; every crossing is a synchronous in-process call or the two declared external calls, so the reasoned N/A is complete.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:ba60ce203687b99c8a682cb3733fcdf6b2f8d5e72ffb83cc376e225141b52714
+  - claim: g2.nfr-content
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: Security, bounded local-scale capacity, timeouts, exit-code/error observability, secret handling, and owner-only store permissions are internally consistent with the deployment.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:ba60ce203687b99c8a682cb3733fcdf6b2f8d5e72ffb83cc376e225141b52714
+  - claim: g3.guard-semantics
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: Guard predicates, closed role/error classes, routing predicates, retry thresholds, and breaker branches were checked against their matrices and falsifying fixtures.
+    covers:
+      - path: machines/MarketDataFeed.machine.json
+        hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
+      - path: machines/MarketDataFeed.matrix.md
+        hash: sha256:d9f63ba2452af287a1e7a0ce2f9f5a8137a67715a0255529e04b233af4d233a4
+      - path: machines/Portfolio.machine.json
+        hash: sha256:2490f9d4069c373ea27e3fdad05fc20844cb654a6b58e2b29360072e5d28d4cc
+      - path: machines/Portfolio.matrix.md
+        hash: sha256:231e76abe65d2ea4cd91b073dea90f7ead9623f57b1572d2feca5a9df1e456c2
+      - path: machines/RecommendationRun.machine.json
+        hash: sha256:c14c026315a2ff7080d6807df1f27e04a8f1734083a3076e031531dd4dc22e58
+      - path: machines/RecommendationRun.matrix.md
+        hash: sha256:423db91a3e78fdcb76940bb4b4e6be23727e47b62a82c2568dd58e130d8264a1
+      - path: machines/ReferenceDataCommand.machine.json
+        hash: sha256:135989645a8d5b9984ebf0f4cfc54b2e52cc62df81e93ca88a781ac2e38374da
+      - path: machines/ReferenceDataCommand.matrix.md
+        hash: sha256:222539d82c470914676c12b304d143176ca4db97e4368ccc3fb23dd90aae10f8
+  - claim: g3.invariant-enforcement
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: Lifecycle invariants are structural or guard/action-backed; reference-data and optimizer invariants have named actor contracts and property/real-store fixtures; every residual is explicitly carried.
+    covers:
+      - path: machines/MarketDataFeed.machine.json
+        hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
+      - path: machines/MarketDataFeed.matrix.md
+        hash: sha256:d9f63ba2452af287a1e7a0ce2f9f5a8137a67715a0255529e04b233af4d233a4
+      - path: machines/Portfolio.machine.json
+        hash: sha256:2490f9d4069c373ea27e3fdad05fc20844cb654a6b58e2b29360072e5d28d4cc
+      - path: machines/Portfolio.matrix.md
+        hash: sha256:231e76abe65d2ea4cd91b073dea90f7ead9623f57b1572d2feca5a9df1e456c2
+      - path: machines/RecommendationRun.machine.json
+        hash: sha256:c14c026315a2ff7080d6807df1f27e04a8f1734083a3076e031531dd4dc22e58
+      - path: machines/RecommendationRun.matrix.md
+        hash: sha256:423db91a3e78fdcb76940bb4b4e6be23727e47b62a82c2568dd58e130d8264a1
+      - path: machines/ReferenceDataCommand.machine.json
+        hash: sha256:135989645a8d5b9984ebf0f4cfc54b2e52cc62df81e93ca88a781ac2e38374da
+      - path: machines/ReferenceDataCommand.matrix.md
+        hash: sha256:222539d82c470914676c12b304d143176ca4db97e4368ccc3fb23dd90aae10f8
+  - claim: g3.residual-transitions
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: Provider, optimizer, store, timeout, conflict, cancellation, retry exhaustion, and corrupt rollback-route failures all have bounded explicit outcomes; no mitigation deletes a failure.
+    covers:
+      - path: machines/MarketDataFeed.machine.json
+        hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
+      - path: machines/MarketDataFeed.matrix.md
+        hash: sha256:d9f63ba2452af287a1e7a0ce2f9f5a8137a67715a0255529e04b233af4d233a4
+      - path: machines/Portfolio.machine.json
+        hash: sha256:2490f9d4069c373ea27e3fdad05fc20844cb654a6b58e2b29360072e5d28d4cc
+      - path: machines/Portfolio.matrix.md
+        hash: sha256:231e76abe65d2ea4cd91b073dea90f7ead9623f57b1572d2feca5a9df1e456c2
+      - path: machines/RecommendationRun.machine.json
+        hash: sha256:c14c026315a2ff7080d6807df1f27e04a8f1734083a3076e031531dd4dc22e58
+      - path: machines/RecommendationRun.matrix.md
+        hash: sha256:423db91a3e78fdcb76940bb4b4e6be23727e47b62a82c2568dd58e130d8264a1
+      - path: machines/ReferenceDataCommand.machine.json
+        hash: sha256:135989645a8d5b9984ebf0f4cfc54b2e52cc62df81e93ca88a781ac2e38374da
+      - path: machines/ReferenceDataCommand.matrix.md
+        hash: sha256:222539d82c470914676c12b304d143176ca4db97e4368ccc3fb23dd90aae10f8
+  - claim: g3.event-redelivery
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: No machine consumes an external asynchronous event; synchronous provider/store retries are governed by the idempotent read, versioned write, cancellation, and rollback contracts.
+    covers:
+      - path: machines/MarketDataFeed.machine.json
+        hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
+      - path: machines/MarketDataFeed.matrix.md
+        hash: sha256:d9f63ba2452af287a1e7a0ce2f9f5a8137a67715a0255529e04b233af4d233a4
+      - path: machines/Portfolio.machine.json
+        hash: sha256:2490f9d4069c373ea27e3fdad05fc20844cb654a6b58e2b29360072e5d28d4cc
+      - path: machines/Portfolio.matrix.md
+        hash: sha256:231e76abe65d2ea4cd91b073dea90f7ead9623f57b1572d2feca5a9df1e456c2
+      - path: machines/RecommendationRun.machine.json
+        hash: sha256:c14c026315a2ff7080d6807df1f27e04a8f1734083a3076e031531dd4dc22e58
+      - path: machines/RecommendationRun.matrix.md
+        hash: sha256:423db91a3e78fdcb76940bb4b4e6be23727e47b62a82c2568dd58e130d8264a1
+      - path: machines/ReferenceDataCommand.machine.json
+        hash: sha256:135989645a8d5b9984ebf0f4cfc54b2e52cc62df81e93ca88a781ac2e38374da
+      - path: machines/ReferenceDataCommand.matrix.md
+        hash: sha256:222539d82c470914676c12b304d143176ca4db97e4368ccc3fb23dd90aae10f8
+  - claim: gt.conformance-test-shape
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: The root and every shard require table-driven tests keyed to every committed oracle row, asserting next state and ordered actions, with separate named-unit/property/real-boundary tests.
+    covers:
+      - path: BUILD.md
+        hash: sha256:f7274d1c1523c5fdb056016cfd009db281cb1a0f5ed9b5dff38cce8718ddfd99
+      - path: BUILD/MarketDataFeed.md
+        hash: sha256:b9d84fe574d08354b97c60bc7a73837cbb46f7fdbda317f024e8006af0c912ca
+      - path: BUILD/Portfolio.md
+        hash: sha256:186f2f86d415a61381b3ed9e9f16f5faa37926ed3a03c95075544d124d6a93a4
+      - path: BUILD/RecommendationRun.md
+        hash: sha256:000b9b48f6e958921aa8a43ffe7a402db25e281d439725265d93531a73238e6d
+  - claim: g4.zero-context
+    attestor: Codex deterministic design review
+    date: 2026-09-02
+    note: The manifest plus each shard names the schema, boundaries, command surfaces, exact behavior/oracle obligations, failure handling, test protocol, toolchain, milestones, and residuals needed by a fresh implementation agent.
+    covers:
+      - path: BUILD.md
+        hash: sha256:f7274d1c1523c5fdb056016cfd009db281cb1a0f5ed9b5dff38cce8718ddfd99
+      - path: BUILD/MarketDataFeed.md
+        hash: sha256:b9d84fe574d08354b97c60bc7a73837cbb46f7fdbda317f024e8006af0c912ca
+      - path: BUILD/Portfolio.md
+        hash: sha256:186f2f86d415a61381b3ed9e9f16f5faa37926ed3a03c95075544d124d6a93a4
+      - path: BUILD/RecommendationRun.md
+        hash: sha256:000b9b48f6e958921aa8a43ffe7a402db25e281d439725265d93531a73238e6d

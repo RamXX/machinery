@@ -30,10 +30,10 @@
 package gates
 
 import (
-	"os"
+	"crypto/sha256"
+	"fmt"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -69,8 +69,9 @@ type cachedIgnore struct {
 func designIgnoreFor(design string) *designIgnore {
 	path := filepath.Join(design, IgnoreFileName)
 	stamp := "absent"
-	if fi, err := os.Stat(path); err == nil {
-		stamp = strconv.FormatInt(fi.ModTime().UnixNano(), 10) + ":" + strconv.FormatInt(fi.Size(), 10)
+	body, readErr := readDesignFile(design, path)
+	if readErr == nil {
+		stamp = fmt.Sprintf("sha256:%x", sha256.Sum256(body))
 	}
 	key, err := filepath.Abs(design)
 	if err != nil {
@@ -81,8 +82,7 @@ func designIgnoreFor(design string) *designIgnore {
 	if c, ok := ignoreCache[key]; ok && c.stamp == stamp {
 		return c.set
 	}
-	body, err := os.ReadFile(path)
-	set := parseIgnore(string(body), err == nil)
+	set := parseIgnore(string(body), readErr == nil)
 	ignoreCache[key] = cachedIgnore{stamp: stamp, set: set}
 	return set
 }

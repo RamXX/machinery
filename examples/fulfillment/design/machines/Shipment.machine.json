@@ -22,7 +22,7 @@
   "states": {
     "Pending": {
       "on": {
-        "dispatch": { "target": "dispatching", "actions": "setCarrierDispatch" }
+        "dispatch": { "target": "dispatching", "actions": ["resetCarrierRetries", "setCarrierDispatch"] }
       },
       "_ignores": {
         "markInTransit": "no dispatch has succeeded; a tracking event for an undispatched shipment is stale, nack for redelivery",
@@ -32,9 +32,9 @@
     },
     "Dispatched": {
       "on": {
-        "markInTransit": { "target": "persisting", "actions": "setPendingInTransit" },
-        "deliver": { "target": "persisting", "actions": "setPendingDelivered" },
-        "markLost": { "target": "persisting", "actions": "setPendingLost" }
+        "markInTransit": { "target": "persisting", "actions": ["resetRetries", "setPendingInTransit"] },
+        "deliver": { "target": "persisting", "actions": ["resetRetries", "setPendingDelivered"] },
+        "markLost": { "target": "persisting", "actions": ["resetRetries", "setPendingLost"] }
       },
       "_ignores": {
         "dispatch": "idempotent redelivery: already dispatched (carrier keyed by shipmentId)"
@@ -42,8 +42,8 @@
     },
     "InTransit": {
       "on": {
-        "deliver": { "target": "persisting", "actions": "setPendingDelivered" },
-        "markLost": { "target": "persisting", "actions": "setPendingLost" }
+        "deliver": { "target": "persisting", "actions": ["resetRetries", "setPendingDelivered"] },
+        "markLost": { "target": "persisting", "actions": ["resetRetries", "setPendingLost"] }
       },
       "_ignores": {
         "dispatch": "idempotent redelivery: already dispatched",
@@ -56,7 +56,7 @@
       "invoke": {
         "src": "carrierDispatch",
         "input": { "shipmentId": "context.shipmentId", "orderId": "context.orderId" },
-        "onDone": { "target": "persisting", "actions": ["captureTrackingId", "setPendingDispatched"] },
+        "onDone": { "target": "persisting", "actions": ["resetRetries", "captureTrackingId", "setPendingDispatched"] },
         "onError": [
           { "target": "carrierRetry", "guard": "isErrRetryable", "actions": "recordCarrierError" },
           { "target": "rolledBack", "actions": "recordDispatchFailed" }
@@ -104,12 +104,13 @@
       }
     },
     "rolledBack": {
-      "_exhaustive": "priorStatus is set on every path into the overlay from a domain state; only Pending, Dispatched, and InTransit reach the overlay (Delivered and Lost are final), and all three priorIs* guards are present",
       "always": [
         { "target": "Pending", "guard": "priorIsPending" },
         { "target": "Dispatched", "guard": "priorIsDispatched" },
-        { "target": "InTransit", "guard": "priorIsInTransit" }
+        { "target": "InTransit", "guard": "priorIsInTransit" },
+        { "target": "routingFault", "actions": "recordRoutingError" }
       ]
-    }
+    },
+    "routingFault": { "type": "final" }
   }
 }

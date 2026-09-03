@@ -8,7 +8,6 @@ package gates
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/RamXX/machinery/internal/alloy"
@@ -18,8 +17,8 @@ import (
 // HasIsolationAnnotation reports whether the design opted into the isolation
 // layer (the annotation file exists).
 func HasIsolationAnnotation(design string) bool {
-	fi, err := os.Stat(filepath.Join(design, "formal", alloy.IsolationAnnotationName))
-	return err == nil && !fi.IsDir()
+	has, err := probeRegularFile(design, filepath.Join("formal", alloy.IsolationAnnotationName))
+	return has || err != nil
 }
 
 // CheckIsolation implements Gn-isolation.
@@ -27,7 +26,12 @@ func CheckIsolation(design string) *Gate {
 	g := NewGate("Gn-isolation multi-tenant relational model")
 	g.startOrder()
 	annPath := filepath.Join(design, "formal", alloy.IsolationAnnotationName)
-	if !HasIsolationAnnotation(design) {
+	has, probeErr := probeRegularFile(design, filepath.Join("formal", alloy.IsolationAnnotationName))
+	if probeErr != nil {
+		g.Errs = append(g.Errs, probeErr.Error())
+		return g
+	}
+	if !has {
 		g.Errs = append(g.Errs, "no formal/"+alloy.IsolationAnnotationName+" in the design; the isolation layer was requested but never authored (author the annotation, or drop gn from the gate list)")
 		return g
 	}
@@ -52,7 +56,7 @@ func CheckIsolation(design string) *Gate {
 
 	fresh := func(name, want, label string) {
 		committed := filepath.Join(design, "formal", name)
-		raw, rerr := os.ReadFile(committed)
+		raw, rerr := readDesignFile(design, committed)
 		if rerr == nil {
 			g.recordStamp(string(raw))
 		}

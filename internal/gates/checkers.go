@@ -8,6 +8,8 @@
 package gates
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -19,15 +21,39 @@ import (
 )
 
 // HasCheckers reports whether the design opted into the external-checker layer.
-func HasCheckers(design string) bool { return checker.HasCheckers(design) }
+// A discovery error returns true so the suite runs Gk and surfaces the error;
+// filesystem faults must never be interpreted as an absent optional layer.
+func HasCheckers(design string) bool {
+	has, err := checker.HasCheckers(design)
+	return has || err != nil
+}
 
 // CheckExternalCheckers runs Gk for every committed manifest, one gate each, in
 // manifest-path order so the output is stable.
 func CheckExternalCheckers(design string) []*Gate {
-	var out []*Gate
-	for _, mp := range checker.ManifestPaths(design) {
-		out = append(out, checkOneChecker(design, mp))
+	paths, err := checker.ManifestPaths(design)
+	if err != nil || len(paths) == 0 {
+		g := NewGate("Gk external checker discovery")
+		g.startOrder()
+		if err != nil {
+			g.Errs = append(g.Errs, err.Error())
+		} else {
+			g.Errs = append(g.Errs, "no checkers/*.checker.yaml in "+design+"; explicitly requested Gk has no checker contract to verify")
+		}
+		return []*Gate{g}
 	}
+	var out []*Gate
+	var manifests []*checker.Manifest
+	for _, mp := range paths {
+		out = append(out, checkOneChecker(design, mp))
+		if manifest, loadErr := checker.LoadManifest(mp); loadErr == nil {
+			manifests = append(manifests, manifest)
+		}
+	}
+	if err := checker.ValidateManifestSet(manifests); err != nil {
+		out[0].Errs = append(out[0].Errs, err.Error())
+	}
+	out[0].Errs = append(out[0].Errs, checker.InventoryProblems(design, manifests)...)
 	return out
 }
 
@@ -47,11 +73,12 @@ func checkOneChecker(design, manifestPath string) *Gate {
 
 	// The model is the projection source. Its absence is a hard failure: a
 	// checker over no domain is meaningless.
-	modelPath := checker.ModelPath(design)
-	if modelPath == "" {
-		g.Errs = append(g.Errs, "no *.modelith.yaml in "+design+"; the checker has no domain to project")
+	modelPaths := checker.ModelPaths(design)
+	if len(modelPaths) != 1 {
+		g.Errs = append(g.Errs, "expected exactly one *.modelith.yaml in "+design+"; found "+fmt.Sprint(len(modelPaths)))
 		return g
 	}
+	modelPath := modelPaths[0]
 	model, err := checker.LoadModel(modelPath)
 	if err != nil {
 		g.Errs = append(g.Errs, err.Error())
@@ -100,10 +127,13 @@ func checkOneChecker(design, manifestPath string) *Gate {
 		if strings.TrimSpace(r.Reason) == "" {
 			g.Errs = append(g.Errs, "residual "+quoteID(r.ID)+" has no reason; a waiver without a reason is not a waiver")
 		}
+		if !claimed[r.ID] {
+			g.Errs = append(g.Errs, "residual "+quoteID(r.ID)+" is not matched by coverage.claim; a waiver cannot exist outside the checker's obligation set")
+		}
 		residual[r.ID] = true
 	}
 	if len(man.Coverage.Claim) > 0 && len(claimed) == 0 {
-		g.Warns = append(g.Warns, "coverage.claim matched no invariants in the model")
+		g.Errs = append(g.Errs, "coverage.claim matched no invariants in the model; an empty obligation set is not coverage")
 	}
 	if len(claimed) > 0 {
 		g.Count("invariants claimed", len(claimed))
@@ -116,9 +146,9 @@ func checkOneChecker(design, manifestPath string) *Gate {
 	// take the parse path, not fall between the branches: a zero-byte
 	// committed projection once produced no finding at all (neither branch
 	// matched), silently dropping the freshness obligation.
-	projPath := filepath.Join(design, man.Evidence.ProjectionOut)
-	if raw, readOK := readTextOK(projPath); readOK {
-		committed, perr := checker.ParseProjection([]byte(raw))
+	projectionBytes, projectionErr := checker.ReadConfinedFile(design, man.Evidence.ProjectionOut)
+	if projectionErr == nil {
+		committed, perr := checker.ParseProjection(projectionBytes)
 		switch {
 		case perr != nil:
 			g.Errs = append(g.Errs, man.Evidence.ProjectionOut+" is not valid projection JSON: "+perr.Error())
@@ -139,31 +169,30 @@ func checkOneChecker(design, manifestPath string) *Gate {
 				g.Count("committed projection fresh")
 			}
 		}
-	} else if !fileExists(projPath) {
+	} else if errors.Is(projectionErr, os.ErrNotExist) {
 		g.Drift = append(g.Drift, man.Evidence.ProjectionOut+" is not committed; the checker input was never generated. Run 'machinery project' and commit it.")
 	} else {
-		// exists but unreadable: readTextOK reports no error itself
-		_ = readFileOrErr(projPath, g)
+		g.Errs = append(g.Errs, man.Evidence.ProjectionOut+" is unreadable: "+projectionErr.Error())
 	}
 
 	// Evidence: absence is failure.
-	evPath := filepath.Join(design, man.Evidence.EvidenceIn)
-	if !fileExists(evPath) {
-		g.Errs = append(g.Errs, man.Evidence.EvidenceIn+" is not committed; the checker was requested but never ran. An empty check is a failure, not a pass.")
-		return g
-	}
-	ev, err := checker.LoadEvidence(evPath)
+	ev, err := checker.LoadEvidenceConfined(design, man.Evidence.EvidenceIn)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			g.Errs = append(g.Errs, man.Evidence.EvidenceIn+" is not committed; the checker was requested but never ran. An empty check is a failure, not a pass.")
+			return g
+		}
 		g.Errs = append(g.Errs, err.Error())
 		return g
 	}
 	if ev.Checker.ID != man.Checker.ID {
 		g.Errs = append(g.Errs, "evidence checker id "+quoteID(ev.Checker.ID)+" does not match manifest "+quoteID(man.Checker.ID)+"; this evidence was produced for a different checker")
 	}
-	if ev.EvidenceSchema != "" && ev.EvidenceSchema != checker.SchemaVersion {
-		g.Warns = append(g.Warns, "evidence_schema "+ev.EvidenceSchema+" differs from "+checker.SchemaVersion+"; regenerate on upgrade")
+	if ev.RuntimeClosure != man.Checker.RuntimeClosure {
+		g.Errs = append(g.Errs, "evidence runtime_closure does not match checker.runtime_closure in the manifest; the verdict was produced by a different runtime closure")
+	} else {
+		g.Count("evidence bound to runtime closure")
 	}
-
 	// Binding: does the verdict cover the current design?
 	if ev.InputHash != freshHash {
 		g.Drift = append(g.Drift, "evidence input_hash does not match the current design projection; the verdict was computed over a different design. Re-run the checker and commit fresh evidence.")
@@ -213,6 +242,11 @@ func surfaceFindings(g *Gate, ev *checker.Evidence) {
 			g.Notes = append(g.Notes, line)
 		}
 	}
+	for _, row := range ev.Coverage {
+		if row.Verdict == "fail" {
+			g.Errs = append(g.Errs, "checker coverage verdict: fail ["+row.Element+"]")
+		}
+	}
 	switch ev.Verdict {
 	case "fail":
 		g.Errs = append(g.Errs, "checker verdict: fail")
@@ -224,7 +258,7 @@ func surfaceFindings(g *Gate, ev *checker.Evidence) {
 }
 
 // reconcileCoverage enforces the hard rule: every claimed invariant is covered by
-// evidence or a declared residual. It also warns on evidence that decides an
+// evidence or a declared residual. It also rejects evidence that decides an
 // element the projection does not carry.
 func reconcileCoverage(g *Gate, p *checker.Projection, claimed, residual map[string]bool, ev *checker.Evidence) {
 	covered := map[string]bool{}
@@ -251,7 +285,7 @@ func reconcileCoverage(g *Gate, p *checker.Projection, claimed, residual map[str
 		}
 	}
 	for _, e := range uniqueSorted(unknown) {
-		g.Warns = append(g.Warns, "evidence covers "+quoteID(e)+", which is not an element in the projection")
+		g.Errs = append(g.Errs, "evidence covers "+quoteID(e)+", which is not an element in the projection")
 	}
 }
 
@@ -274,11 +308,6 @@ func projectionElementIDs(p *checker.Projection) map[string]bool {
 		}
 	}
 	return ids
-}
-
-func fileExists(p string) bool {
-	fi, err := os.Stat(p)
-	return err == nil && !fi.IsDir()
 }
 
 func quoteID(s string) string { return "'" + s + "'" }
