@@ -97,11 +97,12 @@ func TestCargoWorkspacePointerMutationCannotChangeSnapshotAuthority(t *testing.T
 func TestCargoWorkspaceAuthorityDiscoveryHonorsContractIgnore(t *testing.T) {
 	design := t.TempDir()
 	impl := t.TempDir()
-	writeSuiteFile(t, filepath.Join(design, "ARCHITECTURE.md"), "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n  - id: app\n    code: [\"app/**\"]\n  - id: lib\n    code: [\"lib/**\"]\nignore: [\"ignored/**\"]\ndependency_rules:\n  allow: [\"app -> lib\"]\n  deny: []\n```\n")
+	writeSuiteFile(t, filepath.Join(design, "ARCHITECTURE.md"), "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n  - id: app\n    code: [\"app/**\"]\n  - id: lib\n    code: [\"lib/**\"]\nignore: [\"ignored/**\", \"fixtures/Cargo.toml\"]\ndependency_rules:\n  allow: [\"app -> lib\"]\n  deny: []\n```\n")
 	writeSuiteFile(t, filepath.Join(impl, "go.mod"), "module example.com/m\n")
 	writeSuiteFile(t, filepath.Join(impl, "app", "main.go"), "package app\n\nimport _ \"example.com/m/lib\"\n")
 	writeSuiteFile(t, filepath.Join(impl, "lib", "lib.go"), "package lib\n")
 	writeSuiteFile(t, filepath.Join(impl, "ignored", "Cargo.toml"), "not valid TOML\n")
+	writeSuiteFile(t, filepath.Join(impl, "fixtures", "Cargo.toml"), "also not valid TOML\n")
 	got := RunSelected(design, impl, Selection{Run: map[string]bool{"g4": true}, Explicit: true}, RunOptions{})
 	if len(got) != 1 || got[0].Title != "G4-import  code respects the contract" || len(got[0].Errs) != 0 {
 		t.Fatalf("contract-ignored Cargo fixture affected G4: %#v", got)

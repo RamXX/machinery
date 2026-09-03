@@ -1298,6 +1298,9 @@ func manifestDependenciesWithWorkspace(impl string, ignore []string, aggregateMa
 			}
 			return nil
 		}
+		if sourcePathIgnored(rel, ignore) {
+			return nil
+		}
 		switch d.Name() {
 		case "package.json", "go.mod", "Cargo.toml", "requirements.txt", "requirements.in", "mix.exs":
 		default:
