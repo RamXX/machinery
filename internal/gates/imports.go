@@ -226,6 +226,17 @@ func sourcePathIgnored(rel string, ignore []string) bool {
 	return false
 }
 
+func contractIgnorePatterns(contract *ir.Value) []string {
+	if contract == nil || contract.AsObject() == nil {
+		return nil
+	}
+	var ignore []string
+	for _, pattern := range objSlice(contract.AsObject().Get2("ignore")) {
+		ignore = append(ignore, pattern.AsString())
+	}
+	return ignore
+}
+
 // dirIgnored reports whether a directory (root-relative rel) is excluded by
 // the contract's ignore globs, so the walk can prune it before descending.
 // Semantics match the post-walk file filters (matchGlob): the glob
@@ -1502,7 +1513,15 @@ func governingCargoWorkspace(manifestPath string, record *cargoManifestRecord, r
 
 const cargoExternalWorkspaceKey = "<external-cargo-workspace>"
 
-func findCargoWorkspaceAuthority(stableImpl, logicalImpl string) (string, error) {
+func findCargoWorkspaceAuthority(stableImpl, logicalImpl string, ignore []string) (string, error) {
+	stableAbs, err := filepath.Abs(stableImpl)
+	if err != nil {
+		return "", err
+	}
+	logicalAbs, err := filepath.Abs(logicalImpl)
+	if err != nil {
+		return "", err
+	}
 	records := map[string]*cargoManifestRecord{}
 	var manifestBytes int64
 	walkErr := walkTreeDirBounded(stableImpl, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth, func(path string, d os.DirEntry, err error) error {
@@ -1512,13 +1531,20 @@ func findCargoWorkspaceAuthority(stableImpl, logicalImpl string) (string, error)
 		if d == nil {
 			return nil
 		}
+		rel, relErr := filepath.Rel(stableAbs, path)
+		if relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("cargo manifest discovery path %s escaped the stable implementation snapshot", path)
+		}
+		if d.Type()&os.ModeSymlink != 0 && sourcePathIgnored(rel, ignore) {
+			return nil
+		}
 		if d.IsDir() {
-			if path != stableImpl && (strings.HasPrefix(d.Name(), ".") || d.Name() == "vendor" || d.Name() == "node_modules") {
+			if rel != "." && (strings.HasPrefix(d.Name(), ".") || d.Name() == "vendor" || d.Name() == "node_modules" || dirIgnored(rel, ignore)) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if d.Name() != "Cargo.toml" {
+		if d.Name() != "Cargo.toml" || sourcePathIgnored(rel, ignore) {
 			return nil
 		}
 		remaining := dependencyManifestAggregateMaxBytes - manifestBytes
@@ -1536,14 +1562,6 @@ func findCargoWorkspaceAuthority(stableImpl, logicalImpl string) (string, error)
 	})
 	if walkErr != nil {
 		return "", walkErr
-	}
-	stableAbs, err := filepath.Abs(stableImpl)
-	if err != nil {
-		return "", err
-	}
-	logicalAbs, err := filepath.Abs(logicalImpl)
-	if err != nil {
-		return "", err
 	}
 	authorities := map[string]bool{}
 	paths := make([]string, 0, len(records))
@@ -1689,10 +1707,7 @@ func checkImportsWithWorkspace(design, impl string, scan *importScan, cargoWorks
 			externals = append(externals, x)
 		}
 	}
-	var ignore []string
-	for _, ig := range objSlice(co.Get2("ignore")) {
-		ignore = append(ignore, ig.AsString())
-	}
+	ignore := contractIgnorePatterns(c)
 	var pkgmap [][2]string
 	exposes := map[string][]string{}
 	for _, b := range boundaries {

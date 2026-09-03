@@ -104,7 +104,13 @@ func (s *Snapshot) RunSelected(impl string, sel Selection, opt RunOptions) []*Ga
 		}
 		if sel.Run["g4"] {
 			cargoAfterImplementationSnapshot()
-			workspacePath, locateErr := findCargoWorkspaceAuthority(stable.Path(), logicalImpl)
+			contractGate := NewGate("_")
+			contract := loadContract(s.design, filepath.Join(s.design, "ARCHITECTURE.md"), contractGate)
+			var workspacePath string
+			var locateErr error
+			if contract != nil && len(contractGate.Errs) == 0 {
+				workspacePath, locateErr = findCargoWorkspaceAuthority(stable.Path(), logicalImpl, contractIgnorePatterns(contract))
+			}
 			if locateErr != nil {
 				return []*Gate{{Title: "G0-snapshot", Errs: []string{"locate Cargo workspace authority: " + errors.Join(locateErr, stable.Close()).Error()}}}
 			}

@@ -204,7 +204,7 @@ func TestManifestDependenciesBoundsReadsAndResolvesCargoWorkspace(t *testing.T) 
 		if len(errs) != 0 {
 			t.Fatalf("governing workspace definition was not resolved: %v", errs)
 		}
-		if got, err := findCargoWorkspaceAuthority(impl, impl); err != nil || got != filepath.Join(root, "Cargo.toml") {
+		if got, err := findCargoWorkspaceAuthority(impl, impl, nil); err != nil || got != filepath.Join(root, "Cargo.toml") {
 			t.Fatalf("workspace ancestor = %q, %v", got, err)
 		}
 		mustWrite(t, filepath.Join(impl, "member", "Cargo.toml"), "[package]\nname = \"member\"\nversion = \"0.1.0\"\n[dependencies]\nmissing.workspace = true\n")
@@ -220,7 +220,7 @@ func TestManifestDependenciesBoundsReadsAndResolvesCargoWorkspace(t *testing.T) 
 		workspace := filepath.Join(root, "workspace", "Cargo.toml")
 		mustWrite(t, workspace, "[workspace]\n[workspace.dependencies]\nserde = \"1\"\n")
 		mustWrite(t, filepath.Join(impl, "Cargo.toml"), "[package]\nname = \"member\"\nversion = \"0.1.0\"\nworkspace = \"../workspace\"\n[dependencies]\nserde.workspace = true\n")
-		got, err := findCargoWorkspaceAuthority(impl, impl)
+		got, err := findCargoWorkspaceAuthority(impl, impl, nil)
 		if err != nil || got != workspace {
 			t.Fatalf("explicit workspace authority = %q, %v", got, err)
 		}
@@ -237,7 +237,7 @@ func TestManifestDependenciesBoundsReadsAndResolvesCargoWorkspace(t *testing.T) 
 			mustWrite(t, filepath.Join(root, "workspace-"+name, "Cargo.toml"), "[workspace]\n[workspace.dependencies]\nserde = \"1\"\n")
 			mustWrite(t, filepath.Join(impl, name, "Cargo.toml"), "[package]\nname = \""+name+"\"\nversion = \"0.1.0\"\nworkspace = \"../../workspace-"+name+"\"\n[dependencies]\nserde.workspace = true\n")
 		}
-		_, err := findCargoWorkspaceAuthority(impl, impl)
+		_, err := findCargoWorkspaceAuthority(impl, impl, nil)
 		if err == nil || !strings.Contains(err.Error(), "multiple external Cargo workspace authorities") {
 			t.Fatalf("multiple workspace roots were conflated: %v", err)
 		}
