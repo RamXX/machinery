@@ -1696,15 +1696,15 @@ type httpStatusError struct {
 
 func (e *httpStatusError) Error() string { return fmt.Sprintf("GET %s: %s", e.URL, e.Status) }
 
-func validateDownloadContentLength(length int64, chunked bool, policy downloadPolicy) error {
+func validateDownloadContentLength(length int64, policy downloadPolicy) error {
 	if policy.maxBytes <= 0 {
 		return fmt.Errorf("%s has invalid configured byte bound %d", policy.label, policy.maxBytes)
 	}
 	if length == -1 {
-		if chunked {
-			return nil
-		}
-		return fmt.Errorf("%s response is missing Content-Length and is not chunked", policy.label)
+		// HTTP/2 and HTTP/3 frame response bodies without Transfer-Encoding and
+		// legitimately omit Content-Length. The read below remains bounded by
+		// maxBytes+1 and by the request context deadline.
+		return nil
 	}
 	if length < -1 {
 		return fmt.Errorf("%s reports invalid negative Content-Length %d", policy.label, length)
@@ -1730,8 +1730,7 @@ func download(url, dst string, policy downloadPolicy) (retErr error) {
 	if resp.StatusCode != http.StatusOK {
 		return &httpStatusError{URL: url, Code: resp.StatusCode, Status: resp.Status}
 	}
-	chunked := len(resp.TransferEncoding) == 1 && strings.EqualFold(resp.TransferEncoding[0], "chunked")
-	if err := validateDownloadContentLength(resp.ContentLength, chunked, policy); err != nil {
+	if err := validateDownloadContentLength(resp.ContentLength, policy); err != nil {
 		return err
 	}
 	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)

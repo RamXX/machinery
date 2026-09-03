@@ -16,27 +16,22 @@ import (
 func TestValidateDownloadContentLengthRejectsInvalidAndOversize(t *testing.T) {
 	policy := downloadPolicy{label: "test artifact", maxBytes: 4}
 	for _, tc := range []struct {
-		name    string
-		length  int64
-		chunked bool
-		want    string
+		name   string
+		length int64
+		want   string
 	}{
-		{name: "missing", length: -1, want: "missing Content-Length"},
 		{name: "negative", length: -2, want: "negative Content-Length"},
 		{name: "oversize", length: 5, want: "exceeds 4-byte bound"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := validateDownloadContentLength(tc.length, tc.chunked, policy); err == nil || !strings.Contains(err.Error(), tc.want) {
+			if err := validateDownloadContentLength(tc.length, policy); err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("Content-Length %d error = %v", tc.length, err)
 			}
 		})
 	}
-	for _, tc := range []struct {
-		length  int64
-		chunked bool
-	}{{length: -1, chunked: true}, {length: 0}, {length: 4}} {
-		if err := validateDownloadContentLength(tc.length, tc.chunked, policy); err != nil {
-			t.Fatalf("safe Content-Length %d (chunked=%v) rejected: %v", tc.length, tc.chunked, err)
+	for _, length := range []int64{-1, 0, 4} {
+		if err := validateDownloadContentLength(length, policy); err != nil {
+			t.Fatalf("safe Content-Length %d rejected: %v", length, err)
 		}
 	}
 }
