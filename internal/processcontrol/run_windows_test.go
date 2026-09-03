@@ -64,6 +64,7 @@ func assertAttachFailureTerminatesSuspendedChild(t *testing.T, attachReached <-c
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestWindowsAttachFailureChild$")
+	cmd.Env = append(os.Environ(), "MACHINERY_WINDOWS_ATTACH_FAILURE_CHILD=1")
 	done := make(chan error, 1)
 	go func() { done <- Run(ctx, cmd) }()
 
@@ -97,6 +98,9 @@ func assertAttachFailureTerminatesSuspendedChild(t *testing.T, attachReached <-c
 }
 
 func TestWindowsAttachFailureChild(t *testing.T) {
+	if os.Getenv("MACHINERY_WINDOWS_ATTACH_FAILURE_CHILD") != "1" {
+		t.Skip("helper subprocess only")
+	}
 	// Run starts this test binary suspended. Reaching the body would mean the
 	// attach-failure path accidentally resumed a child it does not control.
 	t.Fatal("attach-failure child unexpectedly resumed")

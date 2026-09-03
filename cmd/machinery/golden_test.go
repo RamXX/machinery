@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -41,8 +42,19 @@ func goldenBin(t *testing.T) string {
 			buildErr = err
 			return
 		}
-		builtBin = filepath.Join(dir, "machinery")
-		out, err := exec.CommandContext(t.Context(), "go", "build", "-o", builtBin, ".").CombinedOutput()
+		name := "machinery"
+		if runtime.GOOS == "windows" {
+			name += ".exe"
+		}
+		builtBin = filepath.Join(dir, name)
+		_, sourceFile, _, ok := runtime.Caller(0)
+		if !ok {
+			buildErr = errors.New("resolve golden harness source directory")
+			return
+		}
+		cmd := exec.CommandContext(t.Context(), "go", "build", "-o", builtBin, ".")
+		cmd.Dir = filepath.Dir(sourceFile)
+		out, err := cmd.CombinedOutput()
 		if err != nil {
 			buildErr = fmt.Errorf("go build: %w\n%s", err, out)
 		}

@@ -226,7 +226,7 @@ case "$pull_receipt" in
   *) fail "Docker pull returned a non-canonical image receipt: $pull_receipt" ;;
 esac
 repo_digests=$("$run_safe" -timeout 30s -stdout-limit 65536 -stderr-limit 4096 -- \
-  "$docker_bin" image inspect --platform "$checker_platform" --format '{{json .RepoDigests}} {{.Os}}/{{.Architecture}}' "$checker_image") ||
+  "$docker_bin" image inspect --format '{{json .RepoDigests}} {{.Os}}/{{.Architecture}}' "$checker_image") ||
   fail "could not inspect pinned external-checker image"
 case "$repo_digests" in
   *\"$checker_image\"*" $checker_platform") ;;

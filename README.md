@@ -602,10 +602,11 @@ a new Codex task or run Claude Code's `/reload-plugins` after a plugin refresh. 
 recovery behavior is in the [agent portability guide](docs/agent-portability.md#updating-a-release).
 
 The gate tools are a single Go binary (no Python runtime). `verify-formal` downloads a version-pinned,
-checksum-verified `tla2tools.jar` on first use. CI runs the test suite, all gate runs, the full formal
-suite with a generated-diff assertion, pinned Modelith render reproduction, native macOS and Windows
-golden corpora, Structurizr compilation for every example, the pinned OCI external-checker closure,
-cross-compile builds, security scanning, and the go-crm build on every push.
+checksum-verified `tla2tools.jar` on first use. CI runs the full suite on Linux and macOS, all gate
+runs, the full formal suite with a generated-diff assertion, pinned Modelith render reproduction,
+native macOS and Windows golden corpora, targeted Windows transaction and process-control tests,
+Structurizr compilation for every example, the pinned OCI external-checker closure, cross-compile
+builds, security scanning, and the go-crm build on every push.
 
 ### Claude Code plugin (optional, recommended for Claude Code)
 

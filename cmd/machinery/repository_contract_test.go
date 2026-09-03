@@ -595,7 +595,7 @@ func TestExternalEnginesUseBoundedClosedRunnerAndImmutableModelith(t *testing.T)
 	preflight := mustRepositoryFile(t, filepath.Join(repo, "scripts", "preflight.sh"))
 	ci := mustRepositoryFile(t, filepath.Join(repo, ".github", "workflows", "ci.yml"))
 	for name, body := range map[string]string{"preflight": preflight, "CI": ci} {
-		for _, required := range []string{"./scripts/run-safe", "pull --quiet --platform", "image inspect --platform", "run --rm --pull=never"} {
+		for _, required := range []string{"./scripts/run-safe", "pull --quiet --platform", "image inspect --format", "run --rm --pull=never"} {
 			if !strings.Contains(body, required) {
 				t.Errorf("%s external-engine gate lacks bounded runner contract %q", name, required)
 			}
@@ -733,6 +733,7 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 	requireAll("CI workflow", ci,
 		"os: [macos-latest, windows-latest]",
 		"go test -count=1 -run TestGolden ./cmd/machinery",
+		"go test -count=1 -run '^TestWindows' ./...",
 		"go install github.com/stacklok/modelith/cmd/modelith@v0.4.0",
 		"make modelith-render-check",
 		"Assert committed engine trust roots",
@@ -741,7 +742,7 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		"verify-c4 \"$(dirname \"$dsl\")\"",
 		"python@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc",
 		"docker pull --quiet --platform \"$platform\" \"$image\"",
-		"docker image inspect --platform \"$platform\" --format '{{json .RepoDigests}} {{.Os}}/{{.Architecture}}'",
+		"docker image inspect --format '{{json .RepoDigests}} {{.Os}}/{{.Architecture}}'",
 		"docker run --rm --pull=never --platform \"$platform\"",
 		"go build -o \"$runner\" ./scripts/run-safe",
 		"timeout-minutes: 30",
@@ -758,6 +759,12 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		".shellcheck-linux-x86_64.sha256",
 		`"$install_dir/shellcheck" "${shell_files[@]}"`,
 	)
+	if strings.Contains(ci, "docker image inspect --platform") {
+		t.Fatal("CI uses docker image inspect --platform, which is not supported by standard Docker Engine")
+	}
+	if checkouts, fullHistory := strings.Count(ci, "actions/checkout@"), strings.Count(ci, "fetch-depth: 0"); checkouts == 0 || fullHistory != checkouts {
+		t.Fatalf("CI full-history checkouts = %d for %d checkout steps", fullHistory, checkouts)
+	}
 	actionlintPin := strings.TrimSpace(mustRepositoryFile(t, filepath.Join(root, ".actionlint-version")))
 	if actionlintPin != "v1.7.11" {
 		t.Fatalf("actionlint pin = %q, want v1.7.11", actionlintPin)

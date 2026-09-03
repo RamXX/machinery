@@ -516,7 +516,7 @@ func createPackJournal(root *os.Root, entries []packJournalEntry) error {
 	if err != nil {
 		return err
 	}
-	if !os.SameFile(created, state.info) || !bytes.Equal(state.body, body) || state.info.Mode().Perm() != 0o600 {
+	if !os.SameFile(created, state.info) || !bytes.Equal(state.body, body) || !packJournalPermissionsSafe(state.info.Mode()) {
 		return fmt.Errorf("created pack transaction journal changed before authority rebind; preserving it")
 	}
 	return syncPackDir(root)

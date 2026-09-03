@@ -579,7 +579,7 @@ func TestCheckAcceptanceCompleteCommitResolutionFailsClosed(t *testing.T) {
 
 	t.Run("timeout", func(t *testing.T) {
 		design := writeAcceptFixture(t, nil)
-		installFakeGit(t, "exec sleep 10")
+		installFakeGit(t, "while :; do :; done")
 		old := gitCommandTimeout
 		gitCommandTimeout = 25 * time.Millisecond
 		t.Cleanup(func() { gitCommandTimeout = old })

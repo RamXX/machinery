@@ -2099,17 +2099,18 @@ func TestReportCheckerBinaries(t *testing.T) {
 	// are deliberately not resolved on the host.
 	dir := t.TempDir()
 	t.Chdir(dir)
+	t.Setenv("PATH", filepath.Dir(goldenBin(t))+string(os.PathListSeparator)+os.Getenv("PATH"))
 	if err := os.MkdirAll(filepath.Join(dir, ".machinery"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	reg := "checkers:\n  present:\n    runtime: {kind: oci, engine: [sh], image: example.invalid/present@" + testRuntimeClosure + ", platform: " + testRuntimePlatform + "}\n    run: [checker, \"{out}\"]\n  absent:\n    runtime: {kind: oci, engine: [machinery-no-such-engine-xyz], image: example.invalid/absent@" + testRuntimeClosure + ", platform: " + testRuntimePlatform + "}\n    run: [checker, \"{out}\"]\n    verify: [checker, verify]\n"
+	reg := "checkers:\n  present:\n    runtime: {kind: oci, engine: [machinery], image: example.invalid/present@" + testRuntimeClosure + ", platform: " + testRuntimePlatform + "}\n    run: [checker, \"{out}\"]\n  absent:\n    runtime: {kind: oci, engine: [machinery-no-such-engine-xyz], image: example.invalid/absent@" + testRuntimeClosure + ", platform: " + testRuntimePlatform + "}\n    run: [checker, \"{out}\"]\n    verify: [checker, verify]\n"
 	if err := os.WriteFile(checker.DefaultRegistryPath, []byte(reg), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	buf.Reset()
 	reportCheckerBinaries(&buf)
 	got := buf.String()
-	if !strings.Contains(got, "present  checker present OCI engine sh is snapshot-safe") || !strings.Contains(got, "not executed by doctor") {
+	if !strings.Contains(got, "present  checker present OCI engine machinery is snapshot-safe") || !strings.Contains(got, "not executed by doctor") {
 		t.Errorf("present OCI engine not reported ok:\n%s", got)
 	}
 	if !strings.Contains(got, "MISSING  checker absent OCI engine machinery-no-such-engine-xyz") {

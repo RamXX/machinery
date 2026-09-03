@@ -52,6 +52,18 @@ source "$script_dir/git-safe.sh"
 git_safe_prepare "$repo_root" "$work/git-safe"
 
 go_build_stderr=$work/go-build.stderr
+go_mod_stdout=$work/go-mod.stdout
+if ! go mod download >"$go_mod_stdout" 2>"$go_build_stderr"; then
+  echo "download pinned Go module closure failed" >&2
+  cat "$go_build_stderr" >&2
+  exit 1
+fi
+if [[ -s "$go_mod_stdout" || -s "$go_build_stderr" ]]; then
+  echo "downloading pinned Go module closure emitted output; warnings are forbidden" >&2
+  cat "$go_mod_stdout" >&2
+  cat "$go_build_stderr" >&2
+  exit 1
+fi
 if ! go build -o "$transaction" ./scripts/modelith-tx.go 2>"$go_build_stderr"; then
   echo "build Modelith transaction helper failed" >&2
   cat "$go_build_stderr" >&2

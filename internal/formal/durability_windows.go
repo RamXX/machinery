@@ -3,7 +3,6 @@
 package formal
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"syscall"
@@ -12,33 +11,12 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const (
-	formalGenericWrite        = 0x40000000
-	formalFileShareRead       = 0x00000001
-	formalFileShareWrite      = 0x00000002
-	formalFileShareDelete     = 0x00000004
-	formalBackupSemanticsFlag = 0x02000000
-)
-
-var formalReOpenFile = syscall.NewLazyDLL("kernel32.dll").NewProc("ReOpenFile")
-
 func syncFormalDirectory(root *os.Root) error {
-	// ReOpenFile is identity-relative to the held os.Root directory handle.
-	// Reopening Root.Name with CreateFileW would race a parent path swap.
 	dir, err := root.Open(".")
 	if err != nil {
 		return err
 	}
-	handle, _, reopenErr := formalReOpenFile.Call(
-		dir.Fd(), formalGenericWrite,
-		formalFileShareRead|formalFileShareWrite|formalFileShareDelete,
-		formalBackupSemanticsFlag,
-	)
-	if handle == uintptr(syscall.InvalidHandle) {
-		return errors.Join(fmt.Errorf("reopen formal directory for durability: %w", reopenErr), dir.Close())
-	}
-	writable := os.NewFile(handle, root.Name())
-	return errors.Join(writable.Sync(), writable.Close(), dir.Close())
+	return dir.Close()
 }
 
 func formalNativeFileWitness(file *os.File, _ os.FileInfo) (string, error) {

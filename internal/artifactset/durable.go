@@ -1648,6 +1648,9 @@ func txStableFileID(info os.FileInfo) string {
 	if value := txInfoFields(info, "VolumeSerialNumber", "FileIndexHigh", "FileIndexLow"); value != "" {
 		return "windows:" + value
 	}
+	if value := txNestedInfoFields(info, "CreationTime", "HighDateTime", "LowDateTime"); value != "" {
+		return "windows-creation:" + value
+	}
 	return ""
 }
 
@@ -1693,6 +1696,42 @@ func txInfoFields(info os.FileInfo, names ...string) string {
 		value = value.Elem()
 	}
 	if value.Kind() != reflect.Struct {
+		return ""
+	}
+	parts := make([]string, 0, len(names))
+	for _, name := range names {
+		field := value.FieldByName(name)
+		if !field.IsValid() {
+			return ""
+		}
+		switch field.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			parts = append(parts, fmt.Sprintf("%d", field.Int()))
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			parts = append(parts, fmt.Sprintf("%d", field.Uint()))
+		default:
+			return ""
+		}
+	}
+	return strings.Join(parts, ":")
+}
+
+func txNestedInfoFields(info os.FileInfo, outer string, names ...string) string {
+	if info == nil || info.Sys() == nil {
+		return ""
+	}
+	value := reflect.ValueOf(info.Sys())
+	if value.Kind() == reflect.Pointer {
+		if value.IsNil() {
+			return ""
+		}
+		value = value.Elem()
+	}
+	if value.Kind() != reflect.Struct {
+		return ""
+	}
+	value = value.FieldByName(outer)
+	if !value.IsValid() || value.Kind() != reflect.Struct {
 		return ""
 	}
 	parts := make([]string, 0, len(names))

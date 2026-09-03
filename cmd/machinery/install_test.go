@@ -93,7 +93,7 @@ func TestInstallAndDoctorTargetAll(t *testing.T) {
 	home := t.TempDir()
 	// Install, doctor, and uninstall are one topology lifecycle and therefore
 	// must share the authoritative schema-2 receipt location.
-	environment := []string{"HOME=" + home, "MACHINERY_CONFIG_DIR=" + privateTestConfigDir(t)}
+	environment := []string{"HOME=" + home, "MACHINERY_CONFIG_DIR=" + privateTestConfigDir(t), fakeModelithPath(t)}
 
 	if out, errS, code := runBinWithEnv(t, environment, "install", "--from", root, "--target", "all"); code != 0 {
 		t.Fatalf("machinery install --target all exited %d: %s\n%s", code, errS, out)
@@ -166,6 +166,7 @@ func TestInstallScript(t *testing.T) {
 		"MACHINERY_BIN=" + goldenBin(t),
 		"MACHINERY_SKILL_SRC=" + root,
 		"MACHINERY_HOMES=" + agents + "\n" + claude,
+		fakeModelithPath(t),
 	})
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("install.sh failed: %v\n%s", err, out)
@@ -192,6 +193,7 @@ func TestInstallScriptHostTargets(t *testing.T) {
 		"MACHINERY_BIN=" + goldenBin(t),
 		"MACHINERY_SKILL_SRC=" + root,
 		"MACHINERY_TARGETS=codex opencode",
+		fakeModelithPath(t),
 	})
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("targeted install.sh failed: %v\n%s", err, out)
@@ -207,6 +209,16 @@ func TestInstallScriptHostTargets(t *testing.T) {
 		}
 	}
 	assertReceiptTargets(t, filepath.Join(config, "install.json"), "codex", "opencode")
+}
+
+func fakeModelithPath(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "modelith")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n[ \"${1:-}\" = --version ] || exit 2\nprintf 'modelith version 0.4.0\\n'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return "PATH=" + dir + string(os.PathListSeparator) + os.Getenv("PATH")
 }
 
 func assertReceiptTargets(t *testing.T, path string, expected ...string) {

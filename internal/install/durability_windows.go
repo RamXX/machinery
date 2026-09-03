@@ -3,7 +3,6 @@
 package install
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"syscall"
@@ -11,7 +10,6 @@ import (
 )
 
 const (
-	installGenericWrite    = 0x40000000
 	installReadAttributes  = 0x00000080
 	installFileShareRead   = 0x00000001
 	installFileShareWrite  = 0x00000002
@@ -22,12 +20,10 @@ const (
 )
 
 var (
-	installKernel32         = syscall.NewLazyDLL("kernel32.dll")
-	installCreateFileW      = installKernel32.NewProc("CreateFileW")
-	installFlushFileBuffers = installKernel32.NewProc("FlushFileBuffers")
-	installCloseHandle      = installKernel32.NewProc("CloseHandle")
-	installGetFileInfo      = installKernel32.NewProc("GetFileInformationByHandle")
-	installReOpenFile       = installKernel32.NewProc("ReOpenFile")
+	installKernel32    = syscall.NewLazyDLL("kernel32.dll")
+	installCreateFileW = installKernel32.NewProc("CreateFileW")
+	installCloseHandle = installKernel32.NewProc("CloseHandle")
+	installGetFileInfo = installKernel32.NewProc("GetFileInformationByHandle")
 )
 
 // Windows synthesizes POSIX permission bits. Confinement is structural and
@@ -36,50 +32,14 @@ func privateFilePermissionsOK(os.FileInfo) bool           { return true }
 func installDirectoryOwnedByCurrentUser(os.FileInfo) bool { return true }
 
 func syncDirectoryPath(path string) error {
-	wide, err := syscall.UTF16PtrFromString(path)
+	dir, err := os.Open(path)
 	if err != nil {
 		return err
 	}
-	handle, _, createErr := installCreateFileW.Call(
-		uintptr(unsafe.Pointer(wide)), installGenericWrite,
-		installFileShareRead|installFileShareWrite|installFileShareDelete,
-		0, installOpenExisting, installBackupSemantics, 0,
-	)
-	if handle == uintptr(syscall.InvalidHandle) {
-		return fmt.Errorf("open install directory %s for durability: %w", path, createErr)
-	}
-	flushed, _, flushErr := installFlushFileBuffers.Call(handle)
-	closed, _, closeErr := installCloseHandle.Call(handle)
-	var errs []error
-	if flushed == 0 {
-		errs = append(errs, fmt.Errorf("flush install directory %s: %w", path, flushErr))
-	}
-	if closed == 0 {
-		errs = append(errs, fmt.Errorf("close install directory %s: %w", path, closeErr))
-	}
-	return errors.Join(errs...)
+	return dir.Close()
 }
 
-func syncRootDirectoryFile(f *os.File, path string) error {
-	handle, _, reopenErr := installReOpenFile.Call(
-		f.Fd(), installGenericWrite,
-		installFileShareRead|installFileShareWrite|installFileShareDelete,
-		installBackupSemantics,
-	)
-	if handle == uintptr(syscall.InvalidHandle) {
-		return fmt.Errorf("reopen rooted install directory %s for durability: %w", path, reopenErr)
-	}
-	flushed, _, flushErr := installFlushFileBuffers.Call(handle)
-	closed, _, closeErr := installCloseHandle.Call(handle)
-	var errs []error
-	if flushed == 0 {
-		errs = append(errs, fmt.Errorf("flush rooted install directory %s: %w", path, flushErr))
-	}
-	if closed == 0 {
-		errs = append(errs, fmt.Errorf("close rooted install directory %s: %w", path, closeErr))
-	}
-	return errors.Join(errs...)
-}
+func syncRootDirectoryFile(*os.File, string) error { return nil }
 
 func stableInstallDirIdentity(path string, _ os.FileInfo) (string, error) {
 	wide, err := syscall.UTF16PtrFromString(path)

@@ -14,3 +14,5 @@ func syncPackDirectory(root *os.Root) error {
 	}
 	return errors.Join(f.Sync(), f.Close())
 }
+
+func packJournalPermissionsSafe(mode os.FileMode) bool { return mode.Perm() == 0o600 }
