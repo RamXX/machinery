@@ -16,6 +16,7 @@ var (
 	manifestModuleRe     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._~/-]*\.[A-Za-z0-9._~/-]+$`)
 	manifestVersionRe    = regexp.MustCompile(`^v[^\s]+$`)
 	cargoKeyRe           = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	cargoArtifactRe      = regexp.MustCompile(`^(?:bin(?::[A-Za-z0-9][A-Za-z0-9_.-]*)?|cdylib|staticlib)$`)
 	requirementRe        = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9_.-]*)(?:\[[A-Za-z0-9_,.-]+\])?(?:\s*@\s*\S+|\s*(?:===|==|!=|~=|<=|>=|<|>)\s*[^\s,;]+(?:\s*,\s*(?:===|==|!=|~=|<=|>=|<|>)\s*[^\s,;]+)*)?(?:\s*;\s*.+)?$`)
 	mixDepsRe            = regexp.MustCompile(`(?s)defp?\s+deps\s+do\s*\[(.*?)\]\s*end`)
 	mixDependencyEntryRe = regexp.MustCompile(`^\{\s*:([a-z][a-z0-9_]*)\s*,`)
@@ -238,7 +239,12 @@ func parseCargoManifest(body []byte) ([]string, error) {
 		if !tableOK {
 			return nil, fmt.Errorf("workspace must be a table")
 		}
-		if err := addGroups("workspace", workspaceTable, groups...); err != nil {
+		for _, unsupported := range []string{"build-dependencies", "dev-dependencies"} {
+			if _, present := workspaceTable[unsupported]; present {
+				return nil, fmt.Errorf("workspace.%s is not a Cargo dependency group; only workspace.dependencies is supported by Cargo", unsupported)
+			}
+		}
+		if err := addGroups("workspace", workspaceTable, "dependencies"); err != nil {
 			return nil, err
 		}
 	}
@@ -305,24 +311,33 @@ func validateCargoDependencySpec(path string, value any, workspaceDefinition boo
 					return fmt.Errorf("%s.%s must be a non-empty string", path, key)
 				}
 			case boolFields[key]:
-				if _, ok := field.(bool); !ok {
+				flag, ok := field.(bool)
+				if !ok {
 					return fmt.Errorf("%s.%s must be a boolean", path, key)
+				}
+				if key == "lib" && !flag {
+					return fmt.Errorf("%s.lib must be true when present", path)
 				}
 			case key == "artifact":
 				switch artifact := field.(type) {
 				case string:
-					if strings.TrimSpace(artifact) == "" {
-						return fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
+					if !cargoArtifactRe.MatchString(artifact) {
+						return fmt.Errorf("%s.artifact has unsupported kind %q", path, artifact)
 					}
 				case []any:
 					if len(artifact) == 0 {
 						return fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
 					}
+					seenKinds := map[string]bool{}
 					for i, kind := range artifact {
 						text, ok := kind.(string)
-						if !ok || strings.TrimSpace(text) == "" {
-							return fmt.Errorf("%s.artifact[%d] must be a non-empty string", path, i)
+						if !ok || !cargoArtifactRe.MatchString(text) {
+							return fmt.Errorf("%s.artifact[%d] has unsupported kind", path, i)
 						}
+						if seenKinds[text] {
+							return fmt.Errorf("%s.artifact repeats kind %q", path, text)
+						}
+						seenKinds[text] = true
 					}
 				default:
 					return fmt.Errorf("%s.artifact must be a non-empty string or string array", path)

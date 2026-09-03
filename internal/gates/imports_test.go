@@ -91,6 +91,9 @@ func TestCargoManifestRejectsMalformedDependencySpecifications(t *testing.T) {
 		{"multiple git selectors", `{ git = "https://example.invalid/repo", branch = "main", rev = "abc" }`, "only one of branch, rev, or tag"},
 		{"source-free table", `{ optional = true }`, "must declare version, path, git, or workspace = true"},
 		{"empty artifact array", `{ version = "1", artifact = [] }`, "artifact must be a non-empty string or string array"},
+		{"unknown artifact kind", `{ version = "1", artifact = "nonsense" }`, "artifact has unsupported kind"},
+		{"duplicate artifact kind", `{ version = "1", artifact = ["bin", "bin"] }`, "artifact repeats kind"},
+		{"false artifact lib", `{ version = "1", artifact = "staticlib", lib = false }`, "lib must be true"},
 		{"artifact target without artifact", `{ version = "1", target = "wasm32-unknown-unknown" }`, "target requires artifact"},
 		{"artifact lib without artifact", `{ version = "1", lib = true }`, "lib requires artifact"},
 		{"git and path", `{ git = "https://example.invalid/repo", path = "../repo" }`, "cannot combine git and path"},
@@ -118,6 +121,17 @@ func TestCargoWorkspaceDependencyDefinitionsRejectPackageOnlyFields(t *testing.T
 			_, err := parseCargoManifest([]byte("[workspace.dependencies]\nserde = " + tc.spec + "\n"))
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("invalid workspace dependency was accepted: err=%v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCargoManifestRejectsUnsupportedWorkspaceDependencyGroups(t *testing.T) {
+	for _, group := range []string{"dev-dependencies", "build-dependencies"} {
+		t.Run(group, func(t *testing.T) {
+			_, err := parseCargoManifest([]byte("[workspace." + group + "]\nserde = \"1\"\n"))
+			if err == nil || !strings.Contains(err.Error(), "only workspace.dependencies is supported") {
+				t.Fatalf("workspace.%s was trusted as dependency evidence: %v", group, err)
 			}
 		})
 	}
