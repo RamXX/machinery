@@ -101,21 +101,21 @@ attestations:
     date: 2026-09-03
     note: The Go tests key executable table cases on every stable oracle id and assert next state plus ordered actions.
     covers:
-      - {path: BUILD.md, hash: sha256:b1948679c75df48c8908db9db0127c5062282ce050808105c73b3e6e344106ac}
+      - {path: BUILD.md, hash: sha256:c58124cf07f7f8cdf8f4e99b2cb484aec5d4ca110543e25b2ed0711863d44c1d}
   - claim: g4.zero-context
     attestor: Codex CRM design review
     date: 2026-09-03
     note: BUILD.md identifies sources, contracts, machines, tests, migration, toolchain, failure handling, and milestone order without relying on conversation context.
     covers:
-      - {path: BUILD.md, hash: sha256:b1948679c75df48c8908db9db0127c5062282ce050808105c73b3e6e344106ac}
+      - {path: BUILD.md, hash: sha256:c58124cf07f7f8cdf8f4e99b2cb484aec5d4ca110543e25b2ed0711863d44c1d}
   - claim: ga.review-quality
     attestor: Codex release acceptance review
     date: 2026-09-03
     note: Each milestone review was rerun against the named implementation commit; the DoD evidence, acceptance judgments, and empty findings lists are complete and accurate.
     covers:
       - {path: acceptance/M0.yaml, hash: sha256:1cce160669cd04f77bff60f1ae74e6760bdf358c08adeeddd6f03260ecc01339}
-      - {path: acceptance/M1.yaml, hash: sha256:bdba898561357b49527aabb62aa16a29684d40626dbaa40a66b53ab4226820f8}
-      - {path: acceptance/M2.yaml, hash: sha256:c9f150658fe0bfdf45bf4e1ac3b02f27212fccb3257bec7b8a8b03ec52de647f}
-      - {path: acceptance/M3.yaml, hash: sha256:1a79aa4c43ab39bff255b02f8e5e990d3be3543b92bc29f418f070d539995fe2}
-      - {path: acceptance/M4.yaml, hash: sha256:f0e6ffc3e2d16e55d6a7ec3cb900fdb54ca00c47968d152adc4eedd9fd9f2811}
-      - {path: acceptance/M5.yaml, hash: sha256:215960c60ea600393e5853592ee09ecaa2df96f2e37a2d0e68dba9c3fec767a2}
+      - {path: acceptance/M1.yaml, hash: sha256:b0d518e198e5197de8e4ed132b3e58431a353a591670af867bc9590af6b11f63}
+      - {path: acceptance/M2.yaml, hash: sha256:f4490e4d8d34a565985f98138a81b165e861bb75e02e2f4852cc868f030bdd2a}
+      - {path: acceptance/M3.yaml, hash: sha256:11f6d1ee99d95e51f09d14457604f0b1c56ec91484d05ae6c72e5e7d649147df}
+      - {path: acceptance/M4.yaml, hash: sha256:66593a6aca928f948dd22b9f46b249adadf8155dfa457984d31c07f03039704d}
+      - {path: acceptance/M5.yaml, hash: sha256:64c90b5ccbe557ae0c04ed1cb619f5bc2c44e7258bb4a4c358107fbd1bf481c9}

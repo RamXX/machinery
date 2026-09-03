@@ -1,7 +1,87 @@
 milestone: 3
 commit: 4bdd519009d31584595ca908e17fd5c09077b336
 verdict: ACCEPTED
-dod_ids: []
+dod_ids:
+  - USER-e20d04
+  - USER-2b2218
+  - USER-0ef83a
+  - USER-e59219
+  - USER-ffd41a
+  - USER-799d7d
+  - USER-a986a8
+  - USER-930b15
+  - USER-dd6c98
+  - USER-7b324b
+  - USER-dde0a6
+  - USER-d2cfe6
+  - USER-8e0d4c
+  - USER-388821
+  - USER-838e85
+  - USER-081a5d
+  - USER-1c13da
+  - USER-adccd9
+  - USER-7cf0fc
+  - USER-453743
+  - SESS-ee5c17
+  - SESS-f3cc5e
+  - SESS-27e1b6
+  - SESS-fd60bd
+  - SESS-63844a
+  - SESS-abcf53
+  - SESS-c78e53
+  - SESS-fbf094
+  - SESS-e12d58
+  - SESS-2dee87
+  - SESS-9c998d
+  - SESS-316622
+  - SESS-aaa861
+  - SESS-402e07
+  - SESS-b95638
+  - SESS-7b8023
+  - SESS-c552bf
+  - SESS-e01d44
+  - SESS-e6484d
+  - SESS-4f7245
+  - SESS-dddfd5
+  - SESS-12a601
+  - SESS-aafc2f
+  - SESS-85613f
+  - SESS-55a08c
+  - SESS-10b95d
+  - SESS-54c2ea
+  - SESS-a337ab
+  - SESS-69da3c
+  - SESS-448752
+  - SESS-fd231f
+  - SESS-7fed3c
+  - SESS-87f3f3
+  - SESS-927687
+  - SESS-706156
+  - SESS-51ded9
+  - SESS-90aa72
+  - SESS-5e1b28
+  - SESS-2587f3
+  - SESS-25fc00
+  - SESS-bb2221
+  - SESS-3cee4a
+  - SESS-656e49
+  - SESS-f09ff1
+  - SESS-61d379
+  - SESS-f821b7
+  - SESS-65b326
+  - SESS-aca1a6
+  - SESS-5a47c2
+  - SESS-22bc20
+  - SESS-3e386e
+  - SESS-75e8c1
+  - SESS-f59ab7
+  - SESS-134dea
+  - SESS-de6aa7
+  - SESS-19fd5c
+  - SESS-e7bef7
+  - SESS-0488b7
+  - SESS-f6a536
+  - SESS-b830a0
 attestations:
   - User and session lifecycles, disabled-user rejection, password hashing, uniqueness, team membership, and session invalidation passed on the reviewed commit.
   - Default and race test suites passed on the reviewed commit.

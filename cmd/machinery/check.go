@@ -22,7 +22,7 @@ func newCheckCmd() *cobra.Command {
 	var complete bool
 	c.Flags().StringVar(&implDir, "impl", "", "implementation directory for G4-import and Gt-tests")
 	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,gv,g4,gt,g5")
-	c.Flags().StringVar(&commit, "commit", "", "commit under review, bound by Ga-accept's evidence (env MACHINERY_COMMIT; the flag wins)")
+	c.Flags().StringVar(&commit, "commit", "", "repository-history anchor for Ga-accept evidence (env MACHINERY_COMMIT; the flag wins)")
 	c.Flags().BoolVar(&warningsAsErrors, "warnings-as-errors", false, "treat every gate warning as a blocking finding")
 	c.Flags().BoolVar(&complete, "complete", false, "final-handoff mode: require all phase artifacts, --impl, closed milestones, and zero warnings")
 	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {

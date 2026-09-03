@@ -28,7 +28,7 @@
   checked: 5 machines, 197 transitions, 5 tla-generable, 5 oracles fresh, 197 matrix rows reconciled, 186 named units covered
   ok
 == Gd-idcite  design-side stable-id citations ==
-  checked: 112 citations resolved, 35 files scanned, 275 committed oracle ids, 6 guards with clause declarations, 31 guard rows read for clause completeness, 6 guard rows with a clause declaration
+  checked: 387 citations resolved, 35 files scanned, 275 committed oracle ids, 6 guards with clause declarations, 31 guard rows read for clause completeness, 6 guard rows with a clause declaration
   ok
 == Gl-ledger  session ledgers + house style ==
   checked: 35 files style-scanned
@@ -43,7 +43,7 @@
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 6 closed milestones, 1 skeleton NFR lines, 14 skeleton citations
   ok
 == Ga-accept  milestone acceptance evidence ==
-  checked: 1 plan documents, 6 declared milestones, 6 closed milestones, 6 acceptance files, 14 DoD ids bound, 6 closed milestones with accepted evidence, 6 commit bindings verified, commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry
+  checked: 1 plan documents, 6 declared milestones, 6 closed milestones, 6 acceptance files, 289 DoD ids bound, 7 DoD oracle sets bound, 6 closed milestones with accepted evidence, 6 commit bindings verified, commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry
   ok
 == Gv-attest  attestation evidence ==
   checked: 54 covered artifacts current, 13 attested claims, 13 claims owed

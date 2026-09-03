@@ -8,10 +8,10 @@
 //
 // The split is machinery's standing one. Deterministic here: the evidence
 // exists, parses, binds to a declared milestone, carries every required
-// field, covers the DoD's ids, and names the commit under review (the same
+// field, covers the DoD's ids, and names the reviewed commit (the same
 // binding discipline as Gk's input_hash and Gt's stable ids). Attested, like
 // every other LLM-attested half: whether the reviewer judged well. What Ga
-// proves is that an acceptance review happened, on this commit, against
+// proves is that an acceptance review happened, on a commit in this history, against
 // these obligations.
 //
 // One file per milestone: git history is the record of prior attempts, so a
@@ -43,9 +43,8 @@ import (
 // design; Ga auto-activates on it.
 const AcceptanceDirName = "acceptance"
 
-// minCommitPrefix is the shortest commit prefix that binds. Git's own default
-// abbreviation is 7 characters; anything shorter names too many commits to be
-// evidence of anything.
+// minCommitPrefix is the shortest identity prefix accepted by the exported-
+// design fallback, where no repository exists to prove ancestry.
 const minCommitPrefix = 7
 
 // gitHeadTimeout bounds the one subprocess the gate suite runs. A gate that
@@ -84,6 +83,11 @@ var (
 	acceptanceFileRe = regexp.MustCompile(`^M(\d+)\.yaml$`)
 	// acceptanceDateRe pins the date shape before the calendar check.
 	acceptanceDateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	// acceptanceOracleSetRe is the compact, checked BUILD.md declaration that
+	// expands to every stable id in one committed oracle table. The path
+	// vocabulary is closed so a marker cannot escape the design or name an
+	// arbitrary evidence file.
+	acceptanceOracleSetRe = regexp.MustCompile(`ORACLESET\{(machines/[A-Za-z0-9][A-Za-z0-9_.-]*\.oracle\.md|formal/(?:Policy|Isolation)\.oracle\.md)\}`)
 	// gitObjectNameRe pins what a derived HEAD may look like before it is
 	// treated as a commit; git prints nothing else, and a gate must not bind
 	// evidence to whatever a subprocess happened to write.
@@ -146,11 +150,10 @@ type acceptRecord struct {
 	date         string
 }
 
-// CheckAcceptance implements Ga-accept. commit is the VCS commit under review
-// (--commit or MACHINERY_COMMIT), and a supplied one binds by identity. When
-// it is empty the gate defaults to the HEAD of the git repository the design
-// sits in and binds by ancestry instead (see checkCommitBinding); only outside
-// a repository does the binding degrade to a non-blocking note.
+// CheckAcceptance implements Ga-accept. commit is an optional repository-
+// history anchor (--commit or MACHINERY_COMMIT). When empty, the gate derives
+// HEAD from the repository holding the design. Repository-backed evidence
+// binds by ancestry; exported designs can use the explicit identity fallback.
 func CheckAcceptance(design, commit string) *Gate {
 	return checkAcceptance(design, commit, false)
 }
@@ -209,7 +212,7 @@ func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool
 			g.Errs = append(g.Errs, fmt.Sprintf("%s: names milestone M%d, which no build-plan document declares; acceptance evidence binds to a planned milestone", rec.label, num))
 			continue
 		}
-		checkDoDCoverage(g, rec, ref, ids)
+		checkDoDCoverage(g, design, rec, ref, ids)
 	}
 
 	if len(closed) > 0 && !requireCommit {
@@ -243,12 +246,12 @@ func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool
 	// the findings above it.
 	switch provenance {
 	case commitFromCaller:
-		g.CheckedExtra("commit under review supplied by --commit or MACHINERY_COMMIT; evidence commit bound by identity")
+		g.CheckedExtra("history anchor supplied by --commit or MACHINERY_COMMIT; repository evidence bound by ancestry (identity fallback only outside git)")
 	case commitFromGit:
 		g.CheckedExtra("commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry")
 	case commitAbsent:
 		if len(closed) > 0 && !requireCommit && !commitResolveFailed {
-			g.Notes = append(g.Notes, "commit binding not checked: no --commit and no MACHINERY_COMMIT, and the design is not inside a git repository this binary can read; CI is expected to pass the reviewed commit")
+			g.Notes = append(g.Notes, "commit binding not checked: no --commit and no MACHINERY_COMMIT, and the design is not inside a git repository this binary can read; CI must run from a repository checkout or supply a history anchor")
 		}
 	}
 	return g
@@ -257,8 +260,8 @@ func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool
 // resolveReviewCommit resolves the commit accepted evidence binds to. It
 // converts only semantic absence (outside a repository or an unborn HEAD) to
 // commitAbsent; every operational/tool/output error remains blocking. An
-// explicit --commit or MACHINERY_COMMIT always wins, because the caller knows
-// which commit the review ran on and a local checkout may have moved since.
+// explicit --commit or MACHINERY_COMMIT always wins because the caller may
+// intentionally validate against a history endpoint other than local HEAD.
 // Otherwise the commit defaults to the HEAD of the git repository the design
 // sits in: a local run then binds as tightly as CI does, instead of printing a
 // note and proving nothing on every developer machine.
@@ -695,7 +698,7 @@ func acceptanceOracleIDs(design string, g *Gate) []string {
 // same way Gk's input_hash proves a verdict covered the right design. The
 // reverse direction is the half that was missing: a list that resolves to
 // nothing reads as coverage and proves nothing.
-func checkDoDCoverage(g *Gate, rec *acceptRecord, ref milestoneRef, ids []string) {
+func checkDoDCoverage(g *Gate, design string, rec *acceptRecord, ref milestoneRef, ids []string) {
 	listed := map[string]bool{}
 	for _, id := range rec.dodIDs {
 		listed[id] = true
@@ -720,6 +723,27 @@ func checkDoDCoverage(g *Gate, rec *acceptRecord, ref milestoneRef, ids []string
 		seen[id] = true
 		cited = append(cited, id)
 	}
+	markers := acceptanceOracleSetRe.FindAllStringSubmatch(dod, -1)
+	if strings.Count(dod, "ORACLESET{") != len(markers) {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%d has a malformed ORACLESET marker; use ORACLESET{machines/<Machine>.oracle.md}, ORACLESET{formal/Policy.oracle.md}, or ORACLESET{formal/Isolation.oracle.md}", ref.doc, rec.milestone))
+	}
+	for _, marker := range markers {
+		path := filepath.Join(design, filepath.FromSlash(marker[1]))
+		_, stableIDs := oracleTableIDs(readDesignFileOrErr(design, path, g))
+		if len(stableIDs) == 0 {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%d ORACLESET{%s} resolved no stable ids", ref.doc, rec.milestone, marker[1]))
+			continue
+		}
+		for _, id := range stableIDs {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			cited = append(cited, id)
+		}
+		g.Count("DoD oracle sets bound")
+	}
+	sort.Strings(cited)
 	bound := 0
 	for _, id := range cited {
 		if listed[id] {
@@ -733,44 +757,37 @@ func checkDoDCoverage(g *Gate, rec *acceptRecord, ref milestoneRef, ids []string
 	}
 }
 
-// checkCommitBinding holds accepted evidence to the commit under review. The
-// rule depends on where that commit came from, and the two modes answer two
-// different questions.
-//
-// EXPLICIT (--commit or MACHINERY_COMMIT): identity. The caller named the one
-// commit the review is being judged against, so the evidence must name it too.
-// This is CI's contract and it does not move: on a pull request the commit
-// under review is the head commit, and a merge commit that did not exist when
-// the review ran does not bind, deliberately.
-//
-// DERIVED (git HEAD of the design's repository): ancestry. Nobody named a
-// commit; the gate went looking for one, and the honest question it can ask of
-// an arbitrary local checkout is not "was the review run on exactly this
-// commit" (it never is: the commit that ADDS the evidence file already has a
-// different sha than the commit the evidence names, so identity here would go
-// red one commit later and stay red) but "is the reviewed commit part of this
-// history at all". A sha that resolves to nothing, or to a commit on a branch
-// this history never took, is caught on every local run and at stop time,
-// which is the hole the note tier left open.
+// Acceptance evidence necessarily lands after the commit it reviews. Whether
+// the history anchor is supplied or derived from HEAD, the evidence commit
+// must therefore be an ancestor of that anchor. This also lets independently
+// reviewed milestones retain their own commit identities. Only an exported
+// design outside git falls back to string identity against a supplied target.
 func checkCommitBinding(g *Gate, design string, rec *acceptRecord, commit string, prov commitProvenance) {
 	if commit == "" {
 		return
 	}
-	if prov == commitFromGit {
-		checkCommitAncestry(g, design, rec, commit)
-		return
+	if prov == commitFromCaller {
+		_, err := gitHeadAtExact(design)
+		if errors.Is(err, errReviewCommitAbsent) {
+			if !commitBinds(rec.commit, commit) {
+				g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s does not name the supplied review target %s; outside git, only an exact match or an unambiguous prefix of at least %d characters can bind", rec.label, ir.Repr(rec.commit), ir.Repr(commit), minCommitPrefix))
+				return
+			}
+			g.Count("commit bindings verified")
+			return
+		}
+		if err != nil {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: could not retain the repository history used for commit binding: %v", rec.label, err))
+			return
+		}
 	}
-	if !commitBinds(rec.commit, commit) {
-		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s does not name the commit under review (%s); the review was performed on a different commit (an exact match, or either value an unambiguous prefix of the other of at least %d characters, binds)", rec.label, ir.Repr(rec.commit), ir.Repr(commit), minCommitPrefix))
-		return
-	}
-	g.Count("commit bindings verified")
+	checkCommitAncestry(g, design, rec, commit)
 }
 
-// checkCommitAncestry is the derived mode's rule: the evidence commit must
-// resolve to a commit this repository holds, and that commit must be reachable
-// from HEAD (equal counts). Both failures are ERRORs, because both mean the
-// evidence names something this tree cannot account for.
+// checkCommitAncestry requires the evidence commit to resolve in this
+// repository and be reachable from the selected history anchor (equality
+// counts). Both failures mean the evidence names work this tree cannot account
+// for and are therefore errors.
 func checkCommitAncestry(g *Gate, design string, rec *acceptRecord, head string) {
 	full, err := gitCommitOf(design, rec.commit)
 	if err != nil {
@@ -778,25 +795,21 @@ func checkCommitAncestry(g *Gate, design string, rec *acceptRecord, head string)
 		return
 	}
 	if full == "" {
-		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s names no commit in the repository holding the design (HEAD is %s); a reviewed commit that the history does not contain is a typo, a fabrication, or evidence from another repository", rec.label, ir.Repr(rec.commit), ir.Repr(head)))
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s names no commit in the repository holding the design (history anchor is %s); a reviewed commit that the history does not contain is a typo, a fabrication, or evidence from another repository", rec.label, ir.Repr(rec.commit), ir.Repr(head)))
 		return
 	}
 	isAncestor, err := gitIsAncestor(design, full, head)
 	if err != nil {
-		g.Errs = append(g.Errs, fmt.Sprintf("%s: could not prove whether commit %s is an ancestor of HEAD %s: %v", rec.label, ir.Repr(rec.commit), ir.Repr(head), err))
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: could not prove whether commit %s is an ancestor of history anchor %s: %v", rec.label, ir.Repr(rec.commit), ir.Repr(head), err))
 		return
 	}
 	if !isAncestor {
-		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s is not an ancestor of the commit under review (HEAD is %s); the review ran on a commit this history never took (an unmerged branch, or a rewritten one), so it says nothing about this tree (pass --commit to bind a specific commit by identity instead)", rec.label, ir.Repr(rec.commit), ir.Repr(head)))
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s is not an ancestor of history anchor %s; the review ran on a commit this history never took (an unmerged branch, or a rewritten one), so it says nothing about this tree", rec.label, ir.Repr(rec.commit), ir.Repr(head)))
 		return
 	}
 	g.Count("commit bindings verified")
 }
 
-// commitBinds reports whether an evidence commit names the commit under
-// review: an exact match, or either value an unambiguous prefix of the other.
-// Prefixes shorter than minCommitPrefix never bind; they name too many
-// commits to be evidence.
 func commitBinds(evidence, given string) bool {
 	e := strings.ToLower(strings.TrimSpace(evidence))
 	got := strings.ToLower(strings.TrimSpace(given))

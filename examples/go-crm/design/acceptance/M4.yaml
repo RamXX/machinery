@@ -1,7 +1,35 @@
 milestone: 4
 commit: 4bdd519009d31584595ca908e17fd5c09077b336
 verdict: ACCEPTED
-dod_ids: []
+dod_ids:
+  - COMM-44671c
+  - COMM-6f50f3
+  - COMM-5e3106
+  - COMM-5bc5e0
+  - COMM-ea53cf
+  - COMM-b9aee2
+  - COMM-8a2a55
+  - COMM-343b9c
+  - COMM-215300
+  - COMM-71162c
+  - COMM-00c530
+  - COMM-35a500
+  - COMM-968d17
+  - COMM-ed4f93
+  - COMM-cc7919
+  - COMM-22d79f
+  - COMM-2151b8
+  - COMM-8c204a
+  - COMM-7f1685
+  - COMM-84ddf1
+  - COMM-5d7be9
+  - COMM-ec7aeb
+  - COMM-d6cfde
+  - COMM-8be203
+  - COMM-40743b
+  - COMM-cb11e8
+  - COMM-0b53b2
+  - COMM-121e81
 attestations:
   - Command failure classification, bounded retry, rollback, corrupt-store recovery guidance, backup, restore, and exit behavior passed on the reviewed commit.
   - Default, LadybugDB-tagged, and race test suites passed on the reviewed commit.

@@ -149,7 +149,7 @@ func TestCheckAcceptanceCommitBinding(t *testing.T) {
 			g := CheckAcceptance(design, tc.given)
 			joined := strings.Join(g.Errs, "\n")
 			switch {
-			case tc.wantErr && !strings.Contains(joined, "does not name the commit under review"):
+			case tc.wantErr && !strings.Contains(joined, "does not name the supplied review target"):
 				t.Fatalf("want a commit-binding error, got %v", g.Errs)
 			case !tc.wantErr && len(g.Errs) != 0:
 				t.Fatalf("commit must bind: %v", g.Errs)
@@ -241,6 +241,37 @@ func TestCheckAcceptanceDoDIDCoverage(t *testing.T) {
 	}
 	if g.Counts["DoD ids bound"] != 1 {
 		t.Errorf("the id that WAS bound must still count: %+v", g.Counts)
+	}
+}
+
+func TestCheckAcceptanceOracleSetExpandsToExactStableIDInventory(t *testing.T) {
+	plan := strings.Replace(acceptPlan,
+		"DoD: T-CMD-01 and CMD-abc123 green.",
+		"DoD: ORACLESET{machines/Thing.oracle.md} green.", 1)
+	design := writeAcceptFixture(t, map[string]string{"BUILD.md": plan})
+	g := CheckAcceptance(design, acceptedCommit)
+	if !hasErr(g, "dod_ids omits 'CMD-def456'") {
+		t.Fatalf("an oracle-set review must enumerate every current stable id: %v", g.Errs)
+	}
+
+	complete := strings.Replace(acceptEvidenceM0, "  - CMD-abc123\n", "  - CMD-abc123\n  - CMD-def456\n", 1)
+	design = writeAcceptFixture(t, map[string]string{"BUILD.md": plan, "acceptance/M0.yaml": complete})
+	g = CheckAcceptance(design, acceptedCommit)
+	if len(g.Errs) != 0 {
+		t.Fatalf("the exact oracle-set inventory must pass: %v", g.Errs)
+	}
+	if g.Counts["DoD oracle sets bound"] != 1 || g.Counts["DoD ids bound"] != 2 {
+		t.Fatalf("oracle-set expansion was not visible in counts: %+v", g.Counts)
+	}
+}
+
+func TestCheckAcceptanceRejectsMalformedOracleSet(t *testing.T) {
+	plan := strings.Replace(acceptPlan,
+		"DoD: T-CMD-01 and CMD-abc123 green.",
+		"DoD: ORACLESET{../Thing.oracle.md} green.", 1)
+	g := CheckAcceptance(writeAcceptFixture(t, map[string]string{"BUILD.md": plan}), acceptedCommit)
+	if !hasErr(g, "malformed ORACLESET marker") {
+		t.Fatalf("an escaping oracle-set marker must fail closed: %v", g.Errs)
 	}
 }
 
@@ -766,15 +797,12 @@ func TestRunSelectedCompleteUsesFailClosedCommitResolution(t *testing.T) {
 	}
 }
 
-// --- derived mode: ancestry ----------------------------------------------
+// --- commit binding: ancestry --------------------------------------------
 //
-// Dispatcher QC adjudication, 2026-08-30. The derived lane binds by ANCESTRY,
-// not identity. Identity is right when a caller names the commit under review;
-// it is wrong when the gate went looking for one, because the commit that adds
-// the evidence file already differs from the commit the evidence names, so an
-// identity rule would go red one commit later and stay red. Ancestry still
-// catches what the note tier let through: a sha that resolves to nothing, and
-// a sha from a history this tree never took.
+// Acceptance evidence necessarily lands after the commit it reviews. Both an
+// explicit history anchor and a derived HEAD therefore bind by ancestry. This
+// permits independently reviewed milestones to name different commits while
+// rejecting fabricated, rewritten, and unmerged histories.
 
 // writeAncestryFixture lays the standard design inside repo's design/ with its
 // evidence naming evidenceCommit.
@@ -838,7 +866,7 @@ func TestCheckAcceptanceDerivedModeAncestry(t *testing.T) {
 		{
 			name:     "a commit on an unmerged branch",
 			evidence: func(f gitFixture) string { return f.side },
-			wantErr:  "is not an ancestor of the commit under review",
+			wantErr:  "is not an ancestor of history anchor",
 		},
 	}
 	for _, tc := range cases {
@@ -872,10 +900,7 @@ func TestCheckAcceptanceDerivedModeAncestry(t *testing.T) {
 	}
 }
 
-// The two modes are genuinely different rules on the same tree: the commit
-// that merely FOLLOWS the evidence passes derived (it is a descendant) and
-// fails explicit (it is not that commit). This is the adjudication, pinned.
-func TestCheckAcceptanceModesDifferOnADescendantHead(t *testing.T) {
+func TestCheckAcceptanceExplicitDescendantAnchorAcceptsReviewedCommit(t *testing.T) {
 	repo := t.TempDir()
 	f := initGitHistory(t, repo)
 	design := writeAncestryFixture(t, repo, f.root)
@@ -886,29 +911,29 @@ func TestCheckAcceptanceModesDifferOnADescendantHead(t *testing.T) {
 	}
 
 	explicit := CheckAcceptance(design, f.head)
-	if !strings.Contains(strings.Join(explicit.Errs, "\n"), "does not name the commit under review") {
-		t.Fatalf("explicit mode must still demand identity: %v", explicit.Errs)
+	if len(explicit.Errs) != 0 {
+		t.Fatalf("explicit history anchor must accept the reviewed ancestor: %v", explicit.Errs)
 	}
-	if want := "supplied by --commit or MACHINERY_COMMIT; evidence commit bound by identity"; !strings.Contains(checkedLine(explicit), want) {
+	if want := "history anchor supplied by --commit or MACHINERY_COMMIT; repository evidence bound by ancestry"; !strings.Contains(checkedLine(explicit), want) {
 		t.Errorf("the explicit rule must be named on the checked line: %q", checkedLine(explicit))
 	}
 }
 
-// An explicit commit still wins inside a repository, whatever HEAD says, and
-// is held to identity against the value supplied rather than to the history.
+// An explicit history anchor still wins inside a repository, whatever HEAD
+// says, and is used as the ancestry endpoint.
 func TestCheckAcceptanceExplicitCommitWinsInsideRepo(t *testing.T) {
 	repo := t.TempDir()
-	initGitRepo(t, repo)
-	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), nil)
-	g := CheckAcceptance(design, acceptedCommit)
+	f := initGitHistory(t, repo)
+	design := writeAncestryFixture(t, repo, f.root)
+	g := CheckAcceptance(design, f.head)
 	if len(g.Errs) != 0 {
 		t.Fatalf("the supplied commit must win over the repository HEAD: %v", g.Errs)
 	}
-	if want := "commit under review supplied by --commit or MACHINERY_COMMIT"; !strings.Contains(checkedLine(g), want) {
+	if want := "history anchor supplied by --commit or MACHINERY_COMMIT"; !strings.Contains(checkedLine(g), want) {
 		t.Errorf("the provenance must be visible: %q", checkedLine(g))
 	}
 	if g.Counts["commit bindings verified"] != 1 {
-		t.Errorf("identity against the supplied commit must bind: %+v", g.Counts)
+		t.Errorf("ancestry against the supplied anchor must bind: %+v", g.Counts)
 	}
 }
 

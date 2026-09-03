@@ -683,6 +683,27 @@ func TestAgentPortabilityDocumentationContracts(t *testing.T) {
 	}
 }
 
+func TestAcceptanceDocumentationUsesSatisfiableHistoryBinding(t *testing.T) {
+	root := repoRootDir(t)
+	for _, rel := range []string{
+		"docs/acceptance-gate.md",
+		"skills/machinery/references/build-md-template.md",
+		"skills/machinery/references/verification-evidence.md",
+	} {
+		body := mustRepositoryFile(t, filepath.Join(root, filepath.FromSlash(rel)))
+		for _, impossible := range []string{"--commit $(git rev-parse HEAD)", `--commit "${{ github.sha }}"`} {
+			if strings.Contains(body, impossible) {
+				t.Errorf("%s prescribes self-referential acceptance binding %q", rel, impossible)
+			}
+		}
+		for _, required := range []string{"ancestr", "ORACLESET{"} {
+			if !strings.Contains(body, required) {
+				t.Errorf("%s is missing acceptance contract %q", rel, required)
+			}
+		}
+	}
+}
+
 // TestRepositoryDeterminismSurfaceContracts holds the release, CI, and role
 // prompts to the deterministic obligations they advertise. These files are
 // executable interfaces even though they are not Go production code.

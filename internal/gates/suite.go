@@ -29,8 +29,8 @@ type Selection struct {
 // so a gate that reads one degrades to a stated non-check when it is absent
 // instead of passing silently.
 type RunOptions struct {
-	// Commit is the VCS commit under review (--commit, or MACHINERY_COMMIT).
-	// "" leaves Ga's commit binding unchecked, with a non-blocking note.
+	// Commit is an optional repository-history anchor (--commit, or
+	// MACHINERY_COMMIT). "" makes Ga derive HEAD from the design repository.
 	Commit string
 	// Complete is final-handoff mode: phase artifacts are no longer optional
 	// adoption points and the closing completeness gate is appended.

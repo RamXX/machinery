@@ -273,10 +273,14 @@ Every milestone in this plan is discharged the same way, held by Ga-accept:
   `REJECTED`), `dod_ids` (every committed oracle id this milestone's DoD line cites), `attestations`
   (what the review checked by judgment; required for an ACCEPTED verdict), `findings` (may be
   empty), `reviewer`, and `date` (YYYY-MM-DD).
+- When the DoD requires a complete oracle table, cite it compactly as
+  `ORACLESET{machines/<Machine>.oracle.md}`, `ORACLESET{formal/Policy.oracle.md}`, or
+  `ORACLESET{formal/Isolation.oracle.md}`. The evidence still enumerates every expanded stable id.
 - Only then does the milestone block get its `Status: closed` line. A closed milestone with no
   evidence, or with a REJECTED verdict, is a blocking finding.
-- CI runs `machinery check design --commit $(git rev-parse HEAD)`, which binds the evidence to the
-  commit under review; without a commit the gate says so instead of checking it.
+- CI runs `machinery check design --impl impl --complete`; the gate derives the checkout's HEAD
+  and proves every evidence commit is its ancestor. `--commit <sha>` supplies an alternative
+  history anchor and applies the same ancestry proof.
 - Prior attempts are not kept in the tree: one file per milestone, and git history is the record.
 
 The skeleton's `NFR:` line (the format contract above) is what carries the NFR-record mechanisms

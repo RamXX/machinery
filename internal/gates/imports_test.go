@@ -72,6 +72,32 @@ windows-sys = "0.61"
 	}
 }
 
+func TestCargoManifestRejectsMalformedDependencySpecifications(t *testing.T) {
+	cases := []struct {
+		name, spec, want string
+	}{
+		{"boolean", "false", "version string or dependency table"},
+		{"array", "[]", "version string or dependency table"},
+		{"empty string", `""`, "empty version requirement"},
+		{"empty table", "{}", "empty dependency table"},
+		{"false workspace inheritance", "{ workspace = false }", "workspace must be true"},
+		{"unknown field", `{ version = "1", mystery = true }`, "unsupported dependency field"},
+		{"wrong version type", "{ version = 1 }", "version must be a non-empty string"},
+		{"non-string feature", `{ version = "1", features = [1] }`, "features[0] must be a non-empty string"},
+		{"selector without git", `{ version = "1", branch = "main" }`, "branch requires git"},
+		{"multiple git selectors", `{ git = "https://example.invalid/repo", branch = "main", rev = "abc" }`, "only one of branch, rev, or tag"},
+		{"source-free table", `{ optional = true }`, "must declare version, path, git, or workspace = true"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseCargoManifest([]byte("[dependencies]\nserde = " + tc.spec + "\n"))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("malformed Cargo dependency was accepted: err=%v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestPackageManifestMultiInvalidDiagnosticIsByteStable(t *testing.T) {
 	body := []byte(`{"dependencies":{"zeta":null,"alpha":false,"middle":""}}`)
 	const want = "dependencies.alpha must be a nonempty version string"

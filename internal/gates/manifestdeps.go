@@ -206,6 +206,9 @@ func parseCargoManifest(body []byte) ([]string, error) {
 			if !cargoKeyRe.MatchString(name) {
 				return fmt.Errorf("%s has invalid dependency name %q", path, name)
 			}
+			if err := validateCargoDependencySpec(path+"."+name, group[name]); err != nil {
+				return err
+			}
 			seen[name] = true
 			seen[strings.ReplaceAll(name, "-", "_")] = true
 		}
@@ -266,6 +269,112 @@ func parseCargoManifest(body []byte) ([]string, error) {
 	}
 	sort.Strings(deps)
 	return deps, nil
+}
+
+func validateCargoDependencySpec(path string, value any) error {
+	switch spec := value.(type) {
+	case string:
+		if strings.TrimSpace(spec) == "" {
+			return fmt.Errorf("%s must not have an empty version requirement", path)
+		}
+		return nil
+	case map[string]any:
+		if len(spec) == 0 {
+			return fmt.Errorf("%s must not be an empty dependency table", path)
+		}
+		keys := make([]string, 0, len(spec))
+		for key := range spec {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		stringFields := map[string]bool{
+			"artifact": true, "branch": true, "git": true, "package": true,
+			"path": true, "registry": true, "registry-index": true, "rev": true,
+			"tag": true, "target": true, "version": true,
+		}
+		boolFields := map[string]bool{
+			"default-features": true, "lib": true, "optional": true, "public": true,
+			"workspace": true,
+		}
+		for _, key := range keys {
+			field := spec[key]
+			switch {
+			case stringFields[key]:
+				text, ok := field.(string)
+				if !ok || strings.TrimSpace(text) == "" {
+					return fmt.Errorf("%s.%s must be a non-empty string", path, key)
+				}
+			case boolFields[key]:
+				if _, ok := field.(bool); !ok {
+					return fmt.Errorf("%s.%s must be a boolean", path, key)
+				}
+			case key == "features":
+				features, ok := field.([]any)
+				if !ok {
+					return fmt.Errorf("%s.features must be a string array", path)
+				}
+				for i, feature := range features {
+					text, ok := feature.(string)
+					if !ok || strings.TrimSpace(text) == "" {
+						return fmt.Errorf("%s.features[%d] must be a non-empty string", path, i)
+					}
+				}
+			default:
+				return fmt.Errorf("%s has unsupported dependency field %q", path, key)
+			}
+		}
+
+		workspace, inherited := spec["workspace"]
+		if inherited {
+			if workspace != true {
+				return fmt.Errorf("%s.workspace must be true", path)
+			}
+			for _, conflicting := range []string{
+				"artifact", "branch", "git", "lib", "package", "path", "public",
+				"registry", "registry-index", "rev", "tag", "target", "version",
+			} {
+				if _, ok := spec[conflicting]; ok {
+					return fmt.Errorf("%s.workspace cannot be combined with %s", path, conflicting)
+				}
+			}
+			return nil
+		}
+
+		hasSource := false
+		for _, source := range []string{"git", "path", "version"} {
+			if _, ok := spec[source]; ok {
+				hasSource = true
+			}
+		}
+		if !hasSource {
+			return fmt.Errorf("%s must declare version, path, git, or workspace = true", path)
+		}
+		selectors := 0
+		for _, selector := range []string{"branch", "rev", "tag"} {
+			if _, ok := spec[selector]; ok {
+				selectors++
+				if _, hasGit := spec["git"]; !hasGit {
+					return fmt.Errorf("%s.%s requires git", path, selector)
+				}
+			}
+		}
+		if selectors > 1 {
+			return fmt.Errorf("%s may declare only one of branch, rev, or tag", path)
+		}
+		if _, hasRegistry := spec["registry"]; hasRegistry {
+			if _, hasVersion := spec["version"]; !hasVersion {
+				return fmt.Errorf("%s.registry requires version", path)
+			}
+		}
+		if _, hasRegistryIndex := spec["registry-index"]; hasRegistryIndex {
+			if _, hasVersion := spec["version"]; !hasVersion {
+				return fmt.Errorf("%s.registry-index requires version", path)
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("%s must be a non-empty version string or dependency table", path)
+	}
 }
 
 func balancedManifestValue(value string) bool {

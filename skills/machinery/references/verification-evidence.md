@@ -156,8 +156,16 @@ date: 2026-09-03
 ```
 
 Only then set `Status: closed` in the root milestone manifest. Run
-`machinery check <design> --commit <reviewed-commit>`. `dod_ids` must equal the
-real oracle identifiers cited by that milestone's DoD, in both directions.
+`machinery check <design>` from the evidence-bearing checkout; Machinery proves
+that each reviewed commit is in that checkout's ancestry. Use `--commit <sha>`
+only to select a different history endpoint. `dod_ids` must equal the real
+oracle identifiers cited by that milestone's DoD, in both directions.
+
+When a DoD requires an entire oracle table, keep the plan compact with
+`ORACLESET{machines/<Machine>.oracle.md}`, `ORACLESET{formal/Policy.oracle.md}`,
+or `ORACLESET{formal/Isolation.oracle.md}`. The acceptance file must still list
+every expanded stable id individually, so later oracle drift invalidates the
+old review instead of changing its meaning.
 
 ## Implementation dependency inventory
 

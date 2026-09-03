@@ -20,8 +20,9 @@ plan claims it says.
 2. **The evidence is committed**, as `design/acceptance/M<n>.yaml`, one file per milestone.
 3. **Only then is the milestone marked closed** in the build plan, with a `Status: closed` line
    in its block.
-4. **CI runs the gate with the commit**: `machinery check design --commit $(git rev-parse HEAD)`.
-   A local run needs no flag: inside a git repository the gate defaults to that repository's HEAD.
+4. **CI runs the gate against the checked-out history**: `machinery check design --impl impl`.
+   With no override, the gate derives the repository's HEAD and proves that every reviewed commit
+   is its ancestor. `--commit <sha>` may supply a different history anchor explicitly.
 
 Steps 2 and 3 are deliberately in that order. A closed milestone with no evidence behind it is
 an ERROR, so the marker cannot land first and be reconciled later.
@@ -88,6 +89,11 @@ things, the way forcing `gp`, `gi`, or `gn` is.
   checked at first, so a list could be padded with ids that existed nowhere and still read as
   coverage. This is the same discipline as Gk binding evidence to a projection by `input_hash`: it
   does not prove the review was good, it proves the review was about this work.
+- **Whole oracle inventories stay compact in the plan, exact in evidence.** A DoD can write
+  `ORACLESET{machines/Deal.oracle.md}`, `ORACLESET{formal/Policy.oracle.md}`, or
+  `ORACLESET{formal/Isolation.oracle.md}`. The marker expands to every stable id currently
+  committed in that table, and `dod_ids` must enumerate all of them. Regeneration that changes
+  the table therefore invalidates the old evidence instead of silently changing its meaning.
 - **The evidence binds to the commit**, under one of two rules. Which one applies depends on where
   the commit under review came from, and the `checked:` line always names it, so the rule in force
   is never inferred from the absence of a note. See "The two binding modes" below.
@@ -101,14 +107,15 @@ The evidence names the commit its review ran on. What the gate can fairly demand
 depends on whether a caller told the gate which commit is under review, or the gate had to go
 find one, so there are two rules and the `checked:` line always says which is in force.
 
-**Explicit (identity).** `--commit <sha>`, or `MACHINERY_COMMIT` when the flag is absent. The
-caller has named the one commit this closure is being judged against, so the evidence must name
-it too: an exact match, or either value an unambiguous prefix of the other of at least 7
-characters (git's own abbreviation floor). This is CI's contract. On a pull request the commit
-under review is the head commit, which is what an acceptance review runs against; a merge commit
-that did not exist when the review ran will not bind, and that is the intended behavior, not a
-bug to work around. The `checked:` line reads `commit under review supplied by --commit or
-MACHINERY_COMMIT; evidence commit bound by identity`.
+**Explicit history anchor (ancestry).** `--commit <sha>`, or `MACHINERY_COMMIT` when the flag is
+absent. The caller supplies the history endpoint to validate. Every evidence commit must resolve
+in the design's repository and be an ancestor of that endpoint, equality included. This is
+necessary because the commit that adds an evidence file cannot be the commit the file reviewed,
+and milestones accepted at different times legitimately name different reviewed commits. The
+`checked:` line names the supplied anchor and the ancestry rule.
+
+For an exported design outside Git, a supplied anchor has no history to query;
+that constrained fallback can prove only exact or unambiguous-prefix identity.
 
 **Derived (ancestry).** No flag and no environment variable, and the design directory sits inside
 a git repository. The gate defaults the commit to `git rev-parse HEAD` of THAT repository,
@@ -122,19 +129,14 @@ not its own. The evidence commit must then
 Either failure is an ERROR. The `checked:` line reads `commit under review derived from git HEAD
 of the repository holding the design; evidence commit bound by ancestry`.
 
-Ancestry, not identity, is the honest question here, and the difference is not a softening. When
-a caller names a commit, identity asks "was the review run on exactly this commit"; when nobody
-names one, the same question has a guaranteed wrong answer, because the commit that ADDS the
-evidence file already has a different sha than the commit the evidence names. An identity rule on
-a derived commit would go red on the very next commit and stay red for the life of the milestone,
-which teaches people to turn the gate off. What ancestry still catches is exactly what the old
-note tier let through: a sha with a typo in it, a fabricated one, and one from a branch this
-history never took. Those are caught now on every local run and at stop time, without a flag
-anyone has to remember.
+Ancestry is the honest question in both modes, not a softening. Identity has a guaranteed wrong
+answer once the evidence itself is committed. Ancestry still catches a typo, a fabricated sha,
+and a commit from a branch this history never took, while allowing evidence-bearing commits and
+later milestone closures to follow the implementation commits they reviewed.
 
 **Neither.** Outside a git repository, or with no usable git, the binding degrades to a
-non-blocking note naming what was not checked, never to a silent pass. CI is expected to pass the
-reviewed commit; the note says so.
+non-blocking note naming what was not checked, never to a silent pass. Complete mode remains
+fail-closed because it requires a resolvable history anchor.
 
 Everything else is attested: whether the DoD was really met, whether the attestations are true,
 whether the findings list is complete. Ga is the record that someone with a name looked, on a
@@ -153,13 +155,12 @@ second copy of a standing judgment.
 
 ```yaml
 - name: machinery gates
-  run: machinery check design --impl impl --commit "${{ github.sha }}"
+  run: machinery check design --impl impl --complete
 ```
 
-or, equivalently, `MACHINERY_COMMIT=$GITHUB_SHA machinery check design --impl impl`. Passing the
-commit is what puts CI in the explicit mode, and the identity rule there is deliberate: see "The
-two binding modes" above. A CI job that passes no commit falls into the derived mode against
-whatever the runner checked out, which is a weaker claim than CI should be making, so pass it.
+The checkout's HEAD is the authoritative history anchor. If CI intentionally validates another
+endpoint, pass it as `--commit <sha>` or `MACHINERY_COMMIT=<sha>`; repository-backed runs apply
+the same resolution and ancestry proof.
 
 ## Where this sits in the suite
 
