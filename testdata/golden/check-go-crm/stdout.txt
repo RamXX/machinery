@@ -28,10 +28,10 @@
   checked: 5 machines, 197 transitions, 5 tla-generable, 5 oracles fresh, 197 matrix rows reconciled, 186 named units covered
   ok
 == Gd-idcite  design-side stable-id citations ==
-  checked: 98 citations resolved, 29 files scanned, 275 committed oracle ids, 6 guards with clause declarations, 31 guard rows read for clause completeness, 6 guard rows with a clause declaration
+  checked: 112 citations resolved, 35 files scanned, 275 committed oracle ids, 6 guards with clause declarations, 31 guard rows read for clause completeness, 6 guard rows with a clause declaration
   ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 29 files style-scanned
+  checked: 35 files style-scanned
   ok
 == Gx-trace  cross-layer traceability ==
   note   Deal: 3 operational-overlay states (persisting, persistRetry, rolledBack)
@@ -40,10 +40,13 @@
   checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 3 lifecycle semantics annotations, 2 control-flow-only semantics, 5 placement rows with machines, 2 placement rows waived, 9 entities placed, 6 mitigation rows with residual handlers, 1 residual handlers waived, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 27 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 15 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
   ok
 == Gb-plan  build plan structure ==
-  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 14 skeleton citations
+  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 6 closed milestones, 1 skeleton NFR lines, 14 skeleton citations
+  ok
+== Ga-accept  milestone acceptance evidence ==
+  checked: 1 plan documents, 6 declared milestones, 6 closed milestones, 6 acceptance files, 14 DoD ids bound, 6 closed milestones with accepted evidence, 6 commit bindings verified, commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry
   ok
 == Gv-attest  attestation evidence ==
-  checked: 48 covered artifacts current, 12 attested claims, 12 claims owed
+  checked: 54 covered artifacts current, 13 attested claims, 13 claims owed
   ok
 == G4-import  code respects the contract ==
   checked: 2 dirs pruned by contract ignore, 16 go files checked, 22 imports resolved, 14 test files skipped, 13 edges verified

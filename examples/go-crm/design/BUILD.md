@@ -941,6 +941,8 @@ the global gates are section 11 (all transitions have a stable-id oracle test, a
 a C-test, no cross-boundary violation, >= 80% combined coverage).
 
 **M0 - Walking skeleton (thinnest end-to-end thread).** Implement exactly the path
+Status: closed
+
 `crm login -> crm deal create -> crm deal advance`, exercising one real LadybugDB write transaction end to
 end through every boundary once. This crosses `crm.commands` (CommandExecution Parsing->Opening->
 ResolvingSession->Authorizing->Executing->Rendering->Done), `crm.session` (login: Anonymous->Authenticating
@@ -955,25 +957,35 @@ the login token is written and re-resolved on the next command; the advance is d
 sees Qualified); one real write Tx is opened and committed.
 
 **M1 - Deal aggregate slice.** Complete the Deal lifecycle and its persist overlay end to end via
+Status: closed
+
 `crm deal create/advance/win/lose/reopen/reassign`. DoD: all 58 committed Deal oracle stable IDs green; P-deal-owned,
 P-deal-amount-nonneg, P-deal-stage-forward, P-deal-terminal, P-deal-won-has-closedate green; C-REPO-10..16,22
 green; DBLocked bounded retry and rolledBack-to-priorStage verified; no cross-boundary violation.
 
 **M2 - Task aggregate slice.** `crm task create/start/complete/cancel/reassign`. DoD: all 31 committed Task oracle stable IDs
+Status: closed
+
 green; P-task-owned, P-task-terminal, P-task-assignee-visible green; reassign scope enforced via authz +
 `guardCanReassign`.
 
 **M3 - User + Session slice (auth lifecycle).** `crm user disable/enable`, `crm login/logout/whoami`, plus
+Status: closed
+
 `register/changePassword/assignRole` create/update paths. DoD: all 20 committed User oracle stable IDs and all 60 committed Session oracle stable IDs green;
 P-disabled-cannot-auth, P-session-active-user, P-password-hashed, P-username-unique, P-single-team green;
 C-SESS-01..10 green; argon2id verified (C-SESS-10).
 
 **M4 - CommandExecution failure envelope + backup/restore.** Harden every section 6 failure row and add
+Status: closed
+
 `crm backup` / `crm restore`. DoD: all 28 committed CommandExecution oracle stable IDs green including DBLocked open- and execute-phase retry,
 Corrupt fatal exit that instructs `crm restore`, disk-full/timeout rollback; `crm backup` then simulated
 corruption then `crm restore` recovers the DB; exit codes per terminal state asserted.
 
 **M5 - Authz/RBAC breadth + pure records + one-default-pipeline.** Complete `crm.authz` for all
+Status: closed
+
 (role, verb, entity, scope) combinations and the six pure-record CRUD paths (Account, Contact, Pipeline,
 Activity, Tag, Team). DoD: C-AUTHZ-01..14 green; all four P-rbac-* green; DB-uniqueness constraints
 (C-REPO-17,18,19) green; P-account-owned, P-contact-owned, P-activity-owned, P-activity-immutable,

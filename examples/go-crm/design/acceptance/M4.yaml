@@ -1,0 +1,10 @@
+milestone: 4
+commit: 4bdd519009d31584595ca908e17fd5c09077b336
+verdict: ACCEPTED
+dod_ids: []
+attestations:
+  - Command failure classification, bounded retry, rollback, corrupt-store recovery guidance, backup, restore, and exit behavior passed on the reviewed commit.
+  - Default, LadybugDB-tagged, and race test suites passed on the reviewed commit.
+findings: []
+reviewer: Codex release acceptance review
+date: 2026-09-03
