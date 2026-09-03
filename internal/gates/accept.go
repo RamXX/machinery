@@ -79,13 +79,15 @@ type commitProvenance int
 
 const (
 	commitAbsent commitProvenance = iota
-	commitFromCaller
+	commitFromCallerExported
+	commitFromCallerRepository
 	commitFromGit
 )
 
 var (
 	// acceptanceFileRe matches the one legal evidence file name.
-	acceptanceFileRe = regexp.MustCompile(`^M(\d+)\.yaml$`)
+	acceptanceFileRe        = regexp.MustCompile(`^M(\d+)\.yaml$`)
+	acceptanceOracleTokenRe = regexp.MustCompile(`\bORACLESET\b`)
 	// acceptanceDateRe pins the date shape before the calendar check.
 	acceptanceDateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 	// acceptanceOracleSetRe is the compact, checked BUILD.md declaration that
@@ -250,8 +252,10 @@ func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool
 	// names the RULE, not the outcome; the outcome is the count beside it and
 	// the findings above it.
 	switch provenance {
-	case commitFromCaller:
-		g.CheckedExtra("history anchor supplied by --commit or MACHINERY_COMMIT; repository evidence bound by ancestry (identity fallback only outside git)")
+	case commitFromCallerRepository:
+		g.CheckedExtra("history anchor supplied by --commit or MACHINERY_COMMIT; repository evidence bound by ancestry")
+	case commitFromCallerExported:
+		g.CheckedExtra("review target supplied by --commit or MACHINERY_COMMIT outside git; exported evidence bound by identity")
 	case commitFromGit:
 		g.CheckedExtra("commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry")
 	case commitAbsent:
@@ -290,7 +294,7 @@ func resolveReviewCommitExact(design, given string) (string, commitProvenance, e
 			return "", commitAbsent, fmt.Errorf("supplied history anchor must be a lowercase hexadecimal VCS object id or unambiguous prefix (7 to 64 characters)")
 		}
 		if _, err := gitHeadAtExact(design); errors.Is(err, errReviewCommitOutsideRepository) {
-			return g, commitFromCaller, nil
+			return g, commitFromCallerExported, nil
 		} else if err != nil {
 			return "", commitAbsent, err
 		}
@@ -301,7 +305,7 @@ func resolveReviewCommitExact(design, given string) (string, commitProvenance, e
 		if full == "" {
 			return "", commitAbsent, fmt.Errorf("supplied history anchor %s names no commit in the repository holding the design", ir.Repr(g))
 		}
-		return full, commitFromCaller, nil
+		return full, commitFromCallerRepository, nil
 	}
 	head, err := gitHeadAtExact(design)
 	if err != nil {
@@ -546,7 +550,11 @@ func scanAcceptanceDir(design string, g *Gate) (map[int]bool, map[int]*acceptRec
 		case strings.EqualFold(name, "README.md"), strings.EqualFold(name, "index.md"):
 			indexFiles++
 		case acceptanceFileRe.MatchString(name):
-			num, _ := strconv.Atoi(acceptanceFileRe.FindStringSubmatch(name)[1])
+			num, parseErr := strconv.Atoi(acceptanceFileRe.FindStringSubmatch(name)[1])
+			if parseErr != nil || name != fmt.Sprintf("M%d.yaml", num) {
+				g.Errs = append(g.Errs, label+" is not a canonical acceptance filename; use exactly M<n>.yaml with an unpadded, machine-sized non-negative milestone number")
+				continue
+			}
 			if present[num] {
 				g.Errs = append(g.Errs, fmt.Sprintf("%s duplicates milestone M%d acceptance evidence under another numeric spelling; use exactly one canonical M<n>.yaml file", label, num))
 				continue
@@ -724,6 +732,10 @@ func acceptanceOracleIDs(design string, g *Gate) []string {
 func checkDoDCoverage(g *Gate, design string, rec *acceptRecord, ref milestoneRef, ids []string) {
 	listed := map[string]bool{}
 	for _, id := range rec.dodIDs {
+		if listed[id] {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: dod_ids repeats %s; acceptance coverage must be an exact set with each obligation named once", rec.label, ir.Repr(id)))
+			continue
+		}
 		listed[id] = true
 	}
 	committed := map[string]bool{}
@@ -747,7 +759,8 @@ func checkDoDCoverage(g *Gate, design string, rec *acceptRecord, ref milestoneRe
 		cited = append(cited, id)
 	}
 	markers := acceptanceOracleSetRe.FindAllStringSubmatch(dod, -1)
-	if strings.Count(dod, "ORACLESET{") != len(markers) {
+	withoutValidMarkers := acceptanceOracleSetRe.ReplaceAllString(dod, "")
+	if acceptanceOracleTokenRe.MatchString(withoutValidMarkers) {
 		g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%d has a malformed ORACLESET marker; use ORACLESET{machines/<Machine>.oracle.md}, ORACLESET{formal/Policy.oracle.md}, or ORACLESET{formal/Isolation.oracle.md}", ref.doc, rec.milestone))
 	}
 	for _, marker := range markers {
@@ -775,6 +788,11 @@ func checkDoDCoverage(g *Gate, design string, rec *acceptRecord, ref milestoneRe
 		}
 		g.Errs = append(g.Errs, fmt.Sprintf("%s: dod_ids omits %s, which milestone M%d's DoD in %s cites; the evidence must list every committed oracle id its DoD names", rec.label, ir.Repr(id), rec.milestone, ref.doc))
 	}
+	for _, id := range rec.dodIDs {
+		if committed[id] && !seen[id] {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: dod_ids names %s, which exists in the committed oracle corpus but is not cited by milestone M%d's DoD in %s; acceptance coverage must equal this milestone's obligations exactly", rec.label, ir.Repr(id), rec.milestone, ref.doc))
+		}
+	}
 	if bound > 0 {
 		g.Count("DoD ids bound", bound)
 	}
@@ -789,20 +807,13 @@ func checkCommitBinding(g *Gate, design string, rec *acceptRecord, commit string
 	if commit == "" {
 		return
 	}
-	if prov == commitFromCaller {
-		_, err := gitHeadAtExact(design)
-		if errors.Is(err, errReviewCommitOutsideRepository) {
-			if !commitBinds(rec.commit, commit) {
-				g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s does not name the supplied review target %s; outside git, only an exact match or an unambiguous prefix of at least %d characters can bind", rec.label, ir.Repr(rec.commit), ir.Repr(commit), minCommitPrefix))
-				return
-			}
-			g.Count("commit bindings verified")
+	if prov == commitFromCallerExported {
+		if !commitBinds(rec.commit, commit) {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s does not name the supplied review target %s; outside git, only an exact match or an unambiguous prefix of at least %d characters can bind", rec.label, ir.Repr(rec.commit), ir.Repr(commit), minCommitPrefix))
 			return
 		}
-		if err != nil {
-			g.Errs = append(g.Errs, fmt.Sprintf("%s: could not retain the repository history used for commit binding: %v", rec.label, err))
-			return
-		}
+		g.Count("commit bindings verified")
+		return
 	}
 	checkCommitAncestry(g, design, rec, commit)
 }

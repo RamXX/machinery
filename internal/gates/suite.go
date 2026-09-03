@@ -38,6 +38,10 @@ type RunOptions struct {
 	// GitDesign is the logical checkout path used only for VCS object queries
 	// when design itself is an immutable private materialization.
 	GitDesign string
+	// cargoWorkspaceManifest is an immutable exact-file snapshot of a Cargo
+	// workspace root above --impl. It is populated only by Snapshot.RunSelected.
+	cargoWorkspaceManifest string
+	cargoWorkspaceLogical  string
 }
 
 // Snapshot holds one exclusive design snapshot across selection, gate
@@ -89,11 +93,30 @@ func (s *Snapshot) RunSelected(impl string, sel Selection, opt RunOptions) []*Ga
 	}
 	logicalImpl := impl
 	var stable *designlock.ExternalTreeSnapshot
+	var cargoWorkspace *designlock.RegularFileSnapshot
 	if impl != "" {
 		var err error
+		if sel.Run["g4"] {
+			workspacePath, locateErr := findCargoWorkspaceAncestor(impl)
+			if locateErr != nil {
+				return []*Gate{{Title: "G0-snapshot", Errs: []string{"locate Cargo workspace authority: " + locateErr.Error()}}}
+			}
+			if workspacePath != "" {
+				cargoWorkspace, err = s.lock.MaterializeRegularFile(workspacePath)
+				if err != nil {
+					return []*Gate{{Title: "G0-snapshot", Errs: []string{"snapshot Cargo workspace authority: " + err.Error()}}}
+				}
+				opt.cargoWorkspaceManifest = cargoWorkspace.Path()
+				opt.cargoWorkspaceLogical = workspacePath
+			}
+		}
 		stable, err = s.lock.MaterializeExternalTree(impl)
 		if err != nil {
-			return []*Gate{{Title: "G0-snapshot", Errs: []string{"snapshot implementation tree: " + err.Error()}}}
+			cleanupErr := error(nil)
+			if cargoWorkspace != nil {
+				cleanupErr = cargoWorkspace.Close()
+			}
+			return []*Gate{{Title: "G0-snapshot", Errs: []string{"snapshot implementation tree: " + errors.Join(err, cleanupErr).Error()}}}
 		}
 		impl = stable.Path()
 	}
@@ -102,12 +125,20 @@ func (s *Snapshot) RunSelected(impl string, sel Selection, opt RunOptions) []*Ga
 	if stable != nil {
 		remapGatePaths(out, stable.Path(), logicalImpl)
 	}
+	if cargoWorkspace != nil {
+		remapGatePaths(out, cargoWorkspace.Path(), opt.cargoWorkspaceLogical)
+	}
 	if err := s.lock.CheckUnchanged(); err != nil {
 		out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{err.Error()}})
 	}
 	if stable != nil {
 		if err := stable.Close(); err != nil {
 			out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{"remove private implementation snapshot: " + err.Error()}})
+		}
+	}
+	if cargoWorkspace != nil {
+		if err := cargoWorkspace.Close(); err != nil {
+			out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{"remove private Cargo workspace snapshot: " + err.Error()}})
 		}
 	}
 	return out
@@ -422,7 +453,7 @@ func runSelectedInSnapshot(design, impl string, sel Selection, opt RunOptions) [
 		out = append(out, CheckAttestations(design))
 	}
 	if sel.Run["g4"] && impl != "" {
-		out = append(out, CheckImports(design, impl))
+		out = append(out, checkImportsWithWorkspace(design, impl, nil, opt.cargoWorkspaceManifest))
 	}
 	if sel.Run["gt"] && impl != "" {
 		out = append(out, CheckOracleCoverage(design, impl))

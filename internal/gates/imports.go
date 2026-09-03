@@ -17,6 +17,8 @@ import (
 
 const implementationDirectoryMaxEntries = 100_000
 const implementationDirectoryMaxDepth = 64
+const dependencyManifestAggregateMaxBytes int64 = 64 << 20
+const cargoWorkspaceAncestorMaxDepth = 16
 
 // --- imports (G4-import) ---
 
@@ -1248,10 +1250,24 @@ type importScan struct {
 // external universe. It reads direct dependency declarations from supported
 // language manifests; a literal import matching one of these names must bind
 // to Architecture Contract externals rather than disappear as "not local".
-func manifestDependencies(impl string, ignore []string) (map[string]bool, []string) {
+func manifestDependencies(impl string) (map[string]bool, []string) {
+	return manifestDependenciesWithWorkspace(impl, nil, dependencyManifestAggregateMaxBytes, "")
+}
+
+func manifestDependenciesBounded(impl string, ignore []string, aggregateMaxBytes int64) (map[string]bool, []string) {
+	return manifestDependenciesWithWorkspace(impl, ignore, aggregateMaxBytes, "")
+}
+
+func manifestDependenciesWithWorkspace(impl string, ignore []string, aggregateMaxBytes int64, externalWorkspaceManifest string) (map[string]bool, []string) {
 	deps := map[string]bool{}
 	var errs []string
-	walkErr := walkTreeDirBounded(impl, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth, func(path string, d os.DirEntry, err error) error {
+	var manifestBytes int64
+	cargoRecords := map[string]*cargoManifestRecord{}
+	implRoot, absErr := filepath.Abs(impl)
+	if absErr != nil {
+		return deps, []string{absErr.Error()}
+	}
+	walkErr := walkTreeDirBounded(implRoot, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -1271,10 +1287,24 @@ func manifestDependencies(impl string, ignore []string) (map[string]bool, []stri
 			}
 			return nil
 		}
-		body, readErr := readRegularFile(path)
+		switch d.Name() {
+		case "package.json", "go.mod", "Cargo.toml", "requirements.txt", "requirements.in", "mix.exs":
+		default:
+			return nil
+		}
+		remaining := aggregateMaxBytes - manifestBytes
+		readLimit := min(remaining, designArtifactMaxBytes)
+		body, readErr := readRegularFileBounded(path, readLimit)
 		if readErr != nil {
+			if remaining < designArtifactMaxBytes && strings.Contains(readErr.Error(), "exceeds ") {
+				return fmt.Errorf("dependency manifest inventory exceeds aggregate byte limit %d", aggregateMaxBytes)
+			}
 			return readErr
 		}
+		if int64(len(body)) > remaining {
+			return fmt.Errorf("dependency manifest inventory exceeds aggregate byte limit %d", aggregateMaxBytes)
+		}
+		manifestBytes += int64(len(body))
 		switch d.Name() {
 		case "package.json":
 			found, parseErr := parsePackageManifest(body)
@@ -1293,11 +1323,12 @@ func manifestDependencies(impl string, ignore []string) (map[string]bool, []stri
 				deps[name] = true
 			}
 		case "Cargo.toml":
-			found, parseErr := parseCargoManifest(body)
+			record, parseErr := parseCargoManifestRecord(body)
 			if parseErr != nil {
 				return fmt.Errorf("%s: invalid Cargo.toml: %w", path, parseErr)
 			}
-			for _, name := range found {
+			cargoRecords[filepath.Clean(path)] = record
+			for _, name := range record.dependencies {
 				deps[name] = true
 			}
 		case "requirements.txt", "requirements.in":
@@ -1322,8 +1353,206 @@ func manifestDependencies(impl string, ignore []string) (map[string]bool, []stri
 	if walkErr != nil {
 		errs = append(errs, walkErr.Error())
 	}
+	if walkErr == nil && externalWorkspaceManifest != "" {
+		remaining := aggregateMaxBytes - manifestBytes
+		body, readErr := readRegularFileBounded(externalWorkspaceManifest, min(remaining, designArtifactMaxBytes))
+		if readErr != nil {
+			errs = append(errs, "read Cargo workspace authority: "+readErr.Error())
+		} else {
+			manifestBytes += int64(len(body))
+			record, parseErr := parseCargoManifestRecord(body)
+			if parseErr != nil {
+				errs = append(errs, "invalid Cargo workspace authority: "+parseErr.Error())
+			} else if !record.workspaceRoot {
+				errs = append(errs, "Cargo workspace authority does not declare [workspace]")
+			} else {
+				cargoRecords[cargoExternalWorkspaceKey] = record
+				for _, name := range record.dependencies {
+					deps[name] = true
+				}
+			}
+		}
+	}
+	if walkErr == nil && externalWorkspaceManifest == "" && cargoRecordsNeedWorkspace(cargoRecords) {
+		ancestorBytes, ancestorErr := loadCargoWorkspaceAncestor(implRoot, cargoRecords, deps, aggregateMaxBytes-manifestBytes)
+		manifestBytes += ancestorBytes
+		if ancestorErr != nil {
+			errs = append(errs, ancestorErr.Error())
+		}
+	}
+	errs = append(errs, cargoWorkspaceInheritanceErrors(cargoRecords)...)
 	sort.Strings(errs)
 	return deps, errs
+}
+
+func cargoRecordsNeedWorkspace(records map[string]*cargoManifestRecord) bool {
+	for path, record := range records {
+		if len(record.inherited) == 0 {
+			continue
+		}
+		if _, err := governingCargoWorkspace(path, record, records); err != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// loadCargoWorkspaceAncestor extends manifest authority only along the exact
+// ancestor chain needed by Cargo's workspace inheritance. The search is
+// depth- and byte-bounded, reads Cargo.toml only, and stops at the first
+// workspace root; unrelated sibling files never enter the inventory.
+func loadCargoWorkspaceAncestor(implRoot string, records map[string]*cargoManifestRecord, deps map[string]bool, remaining int64) (int64, error) {
+	var readBytes int64
+	dir := filepath.Dir(implRoot)
+	for depth := 0; depth < cargoWorkspaceAncestorMaxDepth; depth++ {
+		candidate := filepath.Join(dir, "Cargo.toml")
+		info, statErr := os.Lstat(candidate)
+		switch {
+		case os.IsNotExist(statErr):
+		case statErr != nil:
+			return readBytes, fmt.Errorf("inspect Cargo workspace ancestor %s: %w", candidate, statErr)
+		case info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular():
+			return readBytes, fmt.Errorf("cargo workspace ancestor %s must be a regular file, not a symlink or special entry", candidate)
+		default:
+			available := remaining - readBytes
+			body, readErr := readRegularFileBounded(candidate, min(available, designArtifactMaxBytes))
+			if readErr != nil {
+				if available < designArtifactMaxBytes && strings.Contains(readErr.Error(), "exceeds ") {
+					return readBytes, fmt.Errorf("dependency manifest inventory exceeds aggregate byte limit %d", remaining)
+				}
+				return readBytes, readErr
+			}
+			readBytes += int64(len(body))
+			record, parseErr := parseCargoManifestRecord(body)
+			if parseErr != nil {
+				return readBytes, fmt.Errorf("%s: invalid Cargo.toml: %w", candidate, parseErr)
+			}
+			records[candidate] = record
+			for _, name := range record.dependencies {
+				deps[name] = true
+			}
+			if record.workspaceRoot {
+				return readBytes, nil
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return readBytes, nil
+}
+
+func cargoWorkspaceInheritanceErrors(records map[string]*cargoManifestRecord) []string {
+	paths := make([]string, 0, len(records))
+	for path := range records {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	var errs []string
+	for _, path := range paths {
+		record := records[path]
+		if len(record.inherited) == 0 {
+			continue
+		}
+		workspacePath, err := governingCargoWorkspace(path, record, records)
+		if err != nil {
+			errs = append(errs, path+": "+err.Error())
+			continue
+		}
+		workspace := records[workspacePath]
+		for _, name := range record.inherited {
+			if !workspace.workspaceDeps[name] {
+				errs = append(errs, fmt.Sprintf("%s: dependency %q inherits with workspace = true but governing %s does not declare it in workspace.dependencies", path, name, workspacePath))
+			}
+		}
+	}
+	return errs
+}
+
+func governingCargoWorkspace(manifestPath string, record *cargoManifestRecord, records map[string]*cargoManifestRecord) (string, error) {
+	manifestDir := filepath.Dir(manifestPath)
+	if record.packageWorkspace != "" {
+		candidate := filepath.Clean(filepath.Join(manifestDir, filepath.FromSlash(record.packageWorkspace), "Cargo.toml"))
+		workspace, ok := records[candidate]
+		if ok && workspace.workspaceRoot {
+			return candidate, nil
+		}
+		if workspace, external := records[cargoExternalWorkspaceKey]; external && workspace.workspaceRoot {
+			return cargoExternalWorkspaceKey, nil
+		}
+		return "", fmt.Errorf("package.workspace does not name an inventoried Cargo workspace root")
+	}
+	for dir, depth := manifestDir, 0; depth <= cargoWorkspaceAncestorMaxDepth; dir, depth = filepath.Dir(dir), depth+1 {
+		candidate := filepath.Join(dir, "Cargo.toml")
+		if workspace, ok := records[candidate]; ok && workspace.workspaceRoot {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+	}
+	if workspace, ok := records[cargoExternalWorkspaceKey]; ok && workspace.workspaceRoot {
+		return cargoExternalWorkspaceKey, nil
+	}
+	return "", fmt.Errorf("workspace = true has no governing Cargo workspace inside the implementation root")
+}
+
+const cargoExternalWorkspaceKey = "<external-cargo-workspace>"
+
+func findCargoWorkspaceAncestor(impl string) (string, error) {
+	abs, err := filepath.Abs(impl)
+	if err != nil {
+		return "", err
+	}
+	for dir, depth := abs, 0; depth <= cargoWorkspaceAncestorMaxDepth; dir, depth = filepath.Dir(dir), depth+1 {
+		candidate := filepath.Join(dir, "Cargo.toml")
+		info, statErr := os.Lstat(candidate)
+		switch {
+		case os.IsNotExist(statErr):
+		case statErr != nil:
+			return "", statErr
+		case info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular():
+			return "", fmt.Errorf("%s must be a regular Cargo workspace manifest", candidate)
+		default:
+			body, readErr := readRegularFile(candidate)
+			if readErr != nil {
+				return "", readErr
+			}
+			record, parseErr := parseCargoManifestRecord(body)
+			if parseErr != nil {
+				return "", fmt.Errorf("%s: invalid Cargo.toml: %w", candidate, parseErr)
+			}
+			if record.workspaceRoot {
+				if depth == 0 {
+					return "", nil
+				}
+				return candidate, nil
+			}
+			if record.packageWorkspace != "" {
+				explicit := filepath.Clean(filepath.Join(dir, filepath.FromSlash(record.packageWorkspace), "Cargo.toml"))
+				explicitBody, explicitReadErr := readRegularFile(explicit)
+				if explicitReadErr != nil {
+					return "", fmt.Errorf("read package.workspace authority %s: %w", explicit, explicitReadErr)
+				}
+				explicitRecord, explicitParseErr := parseCargoManifestRecord(explicitBody)
+				if explicitParseErr != nil {
+					return "", fmt.Errorf("package.workspace authority %s is invalid: %w", explicit, explicitParseErr)
+				}
+				if !explicitRecord.workspaceRoot {
+					return "", fmt.Errorf("package.workspace authority %s does not declare [workspace]", explicit)
+				}
+				return explicit, nil
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+	}
+	return "", nil
 }
 
 func importMatchesManifest(ref string, deps map[string]bool) bool {
@@ -1343,6 +1572,10 @@ func CheckImports(design, impl string) *Gate {
 // checkImports is CheckImports with an optional scan collector; scan may be
 // nil (the plain gate) and collecting must never change the gate's findings.
 func checkImports(design, impl string, scan *importScan) *Gate {
+	return checkImportsWithWorkspace(design, impl, scan, "")
+}
+
+func checkImportsWithWorkspace(design, impl string, scan *importScan, cargoWorkspaceManifest string) *Gate {
 	g := NewGate("G4-import  code respects the contract")
 	g.startOrder()
 	if fi, err := os.Stat(impl); err != nil || !fi.IsDir() {
@@ -1437,7 +1670,7 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 	if tsPkgErr != nil {
 		g.Errs = append(g.Errs, "discovering workspace packages under "+impl+": "+tsPkgErr.Error())
 	}
-	manifestDeps, manifestErrs := manifestDependencies(impl, ignore)
+	manifestDeps, manifestErrs := manifestDependenciesWithWorkspace(impl, ignore, dependencyManifestAggregateMaxBytes, cargoWorkspaceManifest)
 	for _, err := range manifestErrs {
 		g.Errs = append(g.Errs, "dependency manifest discovery incomplete: "+err)
 	}

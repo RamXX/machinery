@@ -105,10 +105,25 @@ func TestCheckAcceptanceGreenPath(t *testing.T) {
 }
 
 func TestAcceptanceRejectsNumericFilenameAlias(t *testing.T) {
-	design := writeAcceptFixture(t, map[string]string{"acceptance/M00.yaml": acceptEvidenceM0})
-	g := CheckAcceptance(design, acceptedCommit)
-	if !hasErr(g, "duplicates milestone M0 acceptance evidence") {
-		t.Fatalf("M0.yaml and M00.yaml must not be first-wins: %v", g.Errs)
+	for _, tc := range []struct {
+		name string
+		file string
+	}{
+		{"leading zero alongside canonical", "M00.yaml"},
+		{"leading zero alone", "M00.yaml"},
+		{"numeric overflow", "M" + strings.Repeat("9", 249) + ".yaml"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			files := map[string]string{"acceptance/" + tc.file: acceptEvidenceM0}
+			if tc.name != "leading zero alongside canonical" {
+				files["acceptance/M0.yaml"] = ""
+			}
+			design := writeAcceptFixture(t, files)
+			g := CheckAcceptance(design, acceptedCommit)
+			if !hasErr(g, "not a canonical acceptance filename") {
+				t.Fatalf("%s must not discharge M0: %v", tc.file, g.Errs)
+			}
+		})
 	}
 }
 
@@ -258,7 +273,7 @@ func TestCheckAcceptanceOracleSetExpandsToExactStableIDInventory(t *testing.T) {
 		t.Fatalf("an oracle-set review must enumerate every current stable id: %v", g.Errs)
 	}
 
-	complete := strings.Replace(acceptEvidenceM0, "  - CMD-abc123\n", "  - CMD-abc123\n  - CMD-def456\n", 1)
+	complete := strings.Replace(acceptEvidenceM0, "  - T-CMD-01\n  - CMD-abc123\n", "  - CMD-abc123\n  - CMD-def456\n", 1)
 	design = writeAcceptFixture(t, map[string]string{"BUILD.md": plan, "acceptance/M0.yaml": complete})
 	g = CheckAcceptance(design, acceptedCommit)
 	if len(g.Errs) != 0 {
@@ -270,12 +285,14 @@ func TestCheckAcceptanceOracleSetExpandsToExactStableIDInventory(t *testing.T) {
 }
 
 func TestCheckAcceptanceRejectsMalformedOracleSet(t *testing.T) {
-	plan := strings.Replace(acceptPlan,
-		"DoD: T-CMD-01 and CMD-abc123 green.",
-		"DoD: ORACLESET{../Thing.oracle.md} green.", 1)
-	g := CheckAcceptance(writeAcceptFixture(t, map[string]string{"BUILD.md": plan}), acceptedCommit)
-	if !hasErr(g, "malformed ORACLESET marker") {
-		t.Fatalf("an escaping oracle-set marker must fail closed: %v", g.Errs)
+	for _, marker := range []string{"ORACLESET{../Thing.oracle.md}", "ORACLESET {machines/Thing.oracle.md}"} {
+		plan := strings.Replace(acceptPlan,
+			"DoD: T-CMD-01 and CMD-abc123 green.",
+			"DoD: "+marker+" green.", 1)
+		g := CheckAcceptance(writeAcceptFixture(t, map[string]string{"BUILD.md": plan}), acceptedCommit)
+		if !hasErr(g, "malformed ORACLESET marker") {
+			t.Fatalf("marker %q must fail closed: %v", marker, g.Errs)
+		}
 	}
 }
 
@@ -400,6 +417,23 @@ func TestCheckAcceptanceDoDIDsMustResolve(t *testing.T) {
 	}
 }
 
+func TestCheckAcceptanceDoDIDsMustBeExactAndUnique(t *testing.T) {
+	t.Run("globally valid but uncited", func(t *testing.T) {
+		extra := strings.Replace(acceptEvidenceM0, "  - CMD-abc123\n", "  - CMD-abc123\n  - CMD-def456\n", 1)
+		g := CheckAcceptance(writeAcceptFixture(t, map[string]string{"acceptance/M0.yaml": extra}), acceptedCommit)
+		if !hasErr(g, "exists in the committed oracle corpus but is not cited") {
+			t.Fatalf("a different milestone's valid id must not inflate coverage: %v", g.Errs)
+		}
+	})
+	t.Run("duplicate", func(t *testing.T) {
+		duplicate := strings.Replace(acceptEvidenceM0, "  - CMD-abc123\n", "  - CMD-abc123\n  - CMD-abc123\n", 1)
+		g := CheckAcceptance(writeAcceptFixture(t, map[string]string{"acceptance/M0.yaml": duplicate}), acceptedCommit)
+		if !hasErr(g, "dod_ids repeats 'CMD-abc123'") {
+			t.Fatalf("duplicate coverage ids must fail: %v", g.Errs)
+		}
+	})
+}
+
 // A typo in an otherwise complete list is the exact failure the reverse rule
 // exists for: forward coverage reports the omission, reverse resolution names
 // the id that replaced it, and the reviewer sees both halves of the story.
@@ -488,9 +522,9 @@ func TestResolveReviewCommit(t *testing.T) {
 	outside := t.TempDir()
 
 	t.Run("flag or env wins over git", func(t *testing.T) {
-		got, prov, err := resolveReviewCommit(design, "  "+acceptedCommit+"  ")
-		if err != nil || got != acceptedCommit || prov != commitFromCaller {
-			t.Fatalf("the caller's commit must win: got %q prov=%d err=%v", got, prov, err)
+		got, prov, err := resolveReviewCommit(design, "  "+head+"  ")
+		if err != nil || got != head || prov != commitFromCallerRepository {
+			t.Fatalf("the caller's repository anchor must win: got %q prov=%d err=%v", got, prov, err)
 		}
 	})
 	t.Run("derived from the design's repository", func(t *testing.T) {
@@ -949,7 +983,7 @@ func TestResolveExplicitHistoryAnchorOnceToImmutableCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if provenance != commitFromCaller || resolved != f.head {
+	if provenance != commitFromCallerRepository || resolved != f.head {
 		t.Fatalf("resolved anchor = %q provenance=%v, want immutable %q", resolved, provenance, f.head)
 	}
 	if err := os.WriteFile(filepath.Join(repo, "after-anchor"), []byte("new\n"), 0o644); err != nil {
@@ -965,6 +999,15 @@ func TestResolveExplicitHistoryAnchorOnceToImmutableCommit(t *testing.T) {
 	}
 	if resolved != f.head {
 		t.Fatalf("resolved anchor moved with HEAD: got %q want %q", resolved, f.head)
+	}
+}
+
+func TestRepositoryCommitProvenanceCannotDowngradeToExportedIdentity(t *testing.T) {
+	g := NewGate("test")
+	rec := &acceptRecord{label: "acceptance/M0.yaml", commit: acceptedCommit}
+	checkCommitBinding(g, t.TempDir(), rec, acceptedCommit, commitFromCallerRepository)
+	if len(g.Errs) == 0 || g.Counts["commit bindings verified"] != 0 {
+		t.Fatalf("repository authority must stay ancestry-bound when the repository becomes unavailable: errs=%v counts=%v", g.Errs, g.Counts)
 	}
 }
 

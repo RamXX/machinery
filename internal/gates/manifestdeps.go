@@ -7,10 +7,19 @@ import (
 	"io"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 )
+
+type cargoManifestRecord struct {
+	dependencies     []string
+	inherited        []string
+	workspaceDeps    map[string]bool
+	workspaceRoot    bool
+	packageWorkspace string
+}
 
 var (
 	manifestModuleRe     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._~/-]*\.[A-Za-z0-9._~/-]+$`)
@@ -184,6 +193,14 @@ func parseGoRequire(line string, lineNo int) (string, error) {
 }
 
 func parseCargoManifest(body []byte) ([]string, error) {
+	record, err := parseCargoManifestRecord(body)
+	if err != nil {
+		return nil, err
+	}
+	return record.dependencies, nil
+}
+
+func parseCargoManifestRecord(body []byte) (*cargoManifestRecord, error) {
 	var root map[string]any
 	if err := toml.Unmarshal(body, &root); err != nil {
 		return nil, err
@@ -192,8 +209,9 @@ func parseCargoManifest(body []byte) ([]string, error) {
 		return nil, fmt.Errorf("cargo manifest root must be a table")
 	}
 
+	record := &cargoManifestRecord{workspaceDeps: map[string]bool{}}
 	seen := map[string]bool{}
-	addGroup := func(path string, value any, workspaceDefinition bool) error {
+	addGroup := func(path, groupName string, value any, workspaceDefinition bool) error {
 		group, ok := value.(map[string]any)
 		if !ok {
 			return fmt.Errorf("%s must be a dependency table", path)
@@ -207,22 +225,29 @@ func parseCargoManifest(body []byte) ([]string, error) {
 			if !cargoKeyRe.MatchString(name) {
 				return fmt.Errorf("%s has invalid dependency name %q", path, name)
 			}
-			if err := validateCargoDependencySpec(path+"."+name, group[name], workspaceDefinition); err != nil {
+			inherited, err := validateCargoDependencySpec(path+"."+name, group[name], workspaceDefinition, groupName)
+			if err != nil {
 				return err
+			}
+			if inherited {
+				record.inherited = append(record.inherited, name)
+			}
+			if workspaceDefinition {
+				record.workspaceDeps[name] = true
 			}
 			seen[name] = true
 			seen[strings.ReplaceAll(name, "-", "_")] = true
 		}
 		return nil
 	}
-	addGroups := func(prefix string, table map[string]any, groups ...string) error {
+	addGroups := func(prefix string, table map[string]any, workspaceDefinition bool, groups ...string) error {
 		for _, group := range groups {
 			if value, ok := table[group]; ok {
 				path := group
 				if prefix != "" {
 					path = prefix + "." + group
 				}
-				if err := addGroup(path, value, prefix == "workspace"); err != nil {
+				if err := addGroup(path, group, value, workspaceDefinition); err != nil {
 					return err
 				}
 			}
@@ -231,10 +256,8 @@ func parseCargoManifest(body []byte) ([]string, error) {
 	}
 
 	groups := []string{"dependencies", "dev-dependencies", "build-dependencies"}
-	if err := addGroups("", root, groups...); err != nil {
-		return nil, err
-	}
 	if workspace, ok := root["workspace"]; ok {
+		record.workspaceRoot = true
 		workspaceTable, tableOK := workspace.(map[string]any)
 		if !tableOK {
 			return nil, fmt.Errorf("workspace must be a table")
@@ -244,9 +267,21 @@ func parseCargoManifest(body []byte) ([]string, error) {
 				return nil, fmt.Errorf("workspace.%s is not a Cargo dependency group; only workspace.dependencies is supported by Cargo", unsupported)
 			}
 		}
-		if err := addGroups("workspace", workspaceTable, "dependencies"); err != nil {
+		if err := addGroups("workspace", workspaceTable, true, "dependencies"); err != nil {
 			return nil, err
 		}
+	}
+	if pkg, ok := root["package"].(map[string]any); ok {
+		if value, present := pkg["workspace"]; present {
+			workspacePath, stringOK := value.(string)
+			if !stringOK || strings.TrimSpace(workspacePath) == "" {
+				return nil, fmt.Errorf("package.workspace must be a non-empty string")
+			}
+			record.packageWorkspace = workspacePath
+		}
+	}
+	if err := addGroups("", root, false, groups...); err != nil {
+		return nil, err
 	}
 	if targets, ok := root["target"]; ok {
 		targetTable, tableOK := targets.(map[string]any)
@@ -263,7 +298,7 @@ func parseCargoManifest(body []byte) ([]string, error) {
 			if !entryOK {
 				return nil, fmt.Errorf("target.%s must be a table", name)
 			}
-			if err := addGroups("target."+name, entry, groups...); err != nil {
+			if err := addGroups("target."+name, entry, false, groups...); err != nil {
 				return nil, err
 			}
 		}
@@ -274,19 +309,21 @@ func parseCargoManifest(body []byte) ([]string, error) {
 		deps = append(deps, name)
 	}
 	sort.Strings(deps)
-	return deps, nil
+	record.dependencies = deps
+	sort.Strings(record.inherited)
+	return record, nil
 }
 
-func validateCargoDependencySpec(path string, value any, workspaceDefinition bool) error {
+func validateCargoDependencySpec(path string, value any, workspaceDefinition bool, groupName string) (bool, error) {
 	switch spec := value.(type) {
 	case string:
-		if strings.TrimSpace(spec) == "" {
-			return fmt.Errorf("%s must not have an empty version requirement", path)
+		if err := validateCargoVersionRequirement(spec); err != nil {
+			return false, fmt.Errorf("%s has invalid version requirement: %w", path, err)
 		}
-		return nil
+		return false, nil
 	case map[string]any:
 		if len(spec) == 0 {
-			return fmt.Errorf("%s must not be an empty dependency table", path)
+			return false, fmt.Errorf("%s must not be an empty dependency table", path)
 		}
 		keys := make([]string, 0, len(spec))
 		for key := range spec {
@@ -295,7 +332,7 @@ func validateCargoDependencySpec(path string, value any, workspaceDefinition boo
 		sort.Strings(keys)
 		stringFields := map[string]bool{
 			"branch": true, "git": true, "package": true,
-			"path": true, "registry": true, "registry-index": true, "rev": true,
+			"path": true, "registry": true, "rev": true,
 			"tag": true, "target": true, "version": true,
 		}
 		boolFields := map[string]bool{
@@ -308,78 +345,90 @@ func validateCargoDependencySpec(path string, value any, workspaceDefinition boo
 			case stringFields[key]:
 				text, ok := field.(string)
 				if !ok || strings.TrimSpace(text) == "" {
-					return fmt.Errorf("%s.%s must be a non-empty string", path, key)
+					return false, fmt.Errorf("%s.%s must be a non-empty string", path, key)
+				}
+				if key == "version" {
+					if err := validateCargoVersionRequirement(text); err != nil {
+						return false, fmt.Errorf("%s.version has invalid version requirement: %w", path, err)
+					}
+				}
+				if key == "package" && !cargoKeyRe.MatchString(text) {
+					return false, fmt.Errorf("%s.package has invalid Cargo package name %q", path, text)
+				}
+				if key == "git" && strings.Contains(text, "#") {
+					return false, fmt.Errorf("%s.git must not contain a URL fragment; Cargo ignores it with a warning", path)
 				}
 			case boolFields[key]:
 				flag, ok := field.(bool)
 				if !ok {
-					return fmt.Errorf("%s.%s must be a boolean", path, key)
+					return false, fmt.Errorf("%s.%s must be a boolean", path, key)
 				}
-				if key == "lib" && !flag {
-					return fmt.Errorf("%s.lib must be true when present", path)
-				}
+				_ = flag
 			case key == "artifact":
 				switch artifact := field.(type) {
 				case string:
 					if !cargoArtifactRe.MatchString(artifact) {
-						return fmt.Errorf("%s.artifact has unsupported kind %q", path, artifact)
+						return false, fmt.Errorf("%s.artifact has unsupported kind %q", path, artifact)
 					}
 				case []any:
 					if len(artifact) == 0 {
-						return fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
+						return false, fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
 					}
 					seenKinds := map[string]bool{}
 					for i, kind := range artifact {
 						text, ok := kind.(string)
 						if !ok || !cargoArtifactRe.MatchString(text) {
-							return fmt.Errorf("%s.artifact[%d] has unsupported kind", path, i)
+							return false, fmt.Errorf("%s.artifact[%d] has unsupported kind", path, i)
 						}
 						if seenKinds[text] {
-							return fmt.Errorf("%s.artifact repeats kind %q", path, text)
+							return false, fmt.Errorf("%s.artifact repeats kind %q", path, text)
 						}
 						seenKinds[text] = true
 					}
 				default:
-					return fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
+					return false, fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
 				}
 			case key == "features":
 				features, ok := field.([]any)
 				if !ok {
-					return fmt.Errorf("%s.features must be a string array", path)
+					return false, fmt.Errorf("%s.features must be a string array", path)
 				}
 				for i, feature := range features {
 					text, ok := feature.(string)
 					if !ok || strings.TrimSpace(text) == "" {
-						return fmt.Errorf("%s.features[%d] must be a non-empty string", path, i)
+						return false, fmt.Errorf("%s.features[%d] must be a non-empty string", path, i)
 					}
 				}
 			default:
-				return fmt.Errorf("%s has unsupported dependency field %q", path, key)
+				return false, fmt.Errorf("%s has unsupported dependency field %q", path, key)
 			}
 		}
 		if workspaceDefinition {
 			if _, ok := spec["workspace"]; ok {
-				return fmt.Errorf("%s cannot inherit from workspace inside workspace.dependencies", path)
+				return false, fmt.Errorf("%s cannot inherit from workspace inside workspace.dependencies", path)
 			}
 			if _, ok := spec["optional"]; ok {
-				return fmt.Errorf("%s cannot be optional inside workspace.dependencies", path)
+				return false, fmt.Errorf("%s cannot be optional inside workspace.dependencies", path)
+			}
+			if _, ok := spec["public"]; ok {
+				return false, fmt.Errorf("%s cannot be public inside workspace.dependencies", path)
 			}
 		}
 
 		workspace, inherited := spec["workspace"]
 		if inherited {
 			if workspace != true {
-				return fmt.Errorf("%s.workspace must be true", path)
+				return false, fmt.Errorf("%s.workspace must be true", path)
 			}
 			for _, conflicting := range []string{
-				"artifact", "branch", "git", "lib", "package", "path", "public",
-				"registry", "registry-index", "rev", "tag", "target", "version",
+				"artifact", "branch", "default-features", "git", "lib", "package", "path", "public",
+				"registry", "rev", "tag", "target", "version",
 			} {
 				if _, ok := spec[conflicting]; ok {
-					return fmt.Errorf("%s.workspace cannot be combined with %s", path, conflicting)
+					return false, fmt.Errorf("%s.workspace cannot be combined with %s", path, conflicting)
 				}
 			}
-			return nil
+			return true, nil
 		}
 
 		hasSource := false
@@ -389,54 +438,135 @@ func validateCargoDependencySpec(path string, value any, workspaceDefinition boo
 			}
 		}
 		if !hasSource {
-			return fmt.Errorf("%s must declare version, path, git, or workspace = true", path)
+			return false, fmt.Errorf("%s must declare version, path, git, or workspace = true", path)
 		}
 		selectors := 0
 		for _, selector := range []string{"branch", "rev", "tag"} {
 			if _, ok := spec[selector]; ok {
 				selectors++
 				if _, hasGit := spec["git"]; !hasGit {
-					return fmt.Errorf("%s.%s requires git", path, selector)
+					return false, fmt.Errorf("%s.%s requires git", path, selector)
 				}
 			}
 		}
 		if selectors > 1 {
-			return fmt.Errorf("%s may declare only one of branch, rev, or tag", path)
+			return false, fmt.Errorf("%s may declare only one of branch, rev, or tag", path)
 		}
 		_, hasGit := spec["git"]
 		_, hasPath := spec["path"]
 		if hasGit && hasPath {
-			return fmt.Errorf("%s cannot combine git and path sources", path)
+			return false, fmt.Errorf("%s cannot combine git and path sources", path)
 		}
 		_, hasArtifact := spec["artifact"]
 		for _, artifactOnly := range []string{"lib", "target"} {
 			if _, ok := spec[artifactOnly]; ok && !hasArtifact {
-				return fmt.Errorf("%s.%s requires artifact", path, artifactOnly)
+				return false, fmt.Errorf("%s.%s requires artifact", path, artifactOnly)
 			}
+		}
+		if hasArtifact && !workspaceDefinition && groupName != "build-dependencies" {
+			return false, fmt.Errorf("%s.artifact is supported only in build-dependencies", path)
 		}
 		if _, hasRegistry := spec["registry"]; hasRegistry {
 			if _, hasVersion := spec["version"]; !hasVersion {
-				return fmt.Errorf("%s.registry requires version", path)
+				return false, fmt.Errorf("%s.registry requires version", path)
 			}
 			if hasGit || hasPath {
-				return fmt.Errorf("%s.registry cannot be combined with git or path", path)
+				return false, fmt.Errorf("%s.registry cannot be combined with git or path", path)
 			}
 		}
-		if _, hasRegistryIndex := spec["registry-index"]; hasRegistryIndex {
-			if _, hasVersion := spec["version"]; !hasVersion {
-				return fmt.Errorf("%s.registry-index requires version", path)
-			}
-			if hasGit || hasPath {
-				return fmt.Errorf("%s.registry-index cannot be combined with git or path", path)
-			}
-			if _, hasRegistry := spec["registry"]; hasRegistry {
-				return fmt.Errorf("%s cannot combine registry and registry-index", path)
-			}
-		}
-		return nil
+		return false, nil
 	default:
-		return fmt.Errorf("%s must be a non-empty version string or dependency table", path)
+		return false, fmt.Errorf("%s must be a non-empty version string or dependency table", path)
 	}
+}
+
+// validateCargoVersionRequirement implements Cargo's VersionReq grammar:
+// star or comma-separated comparators, each holding an optional Cargo
+// operator and a one-to-three-component partial SemVer.
+func validateCargoVersionRequirement(requirement string) error {
+	requirement = strings.TrimSpace(requirement)
+	if requirement == "" {
+		return fmt.Errorf("empty version requirement")
+	}
+	for _, raw := range strings.Split(requirement, ",") {
+		part := strings.TrimSpace(raw)
+		if part == "" {
+			return fmt.Errorf("empty comparator")
+		}
+		op := ""
+		for _, candidate := range []string{">=", "<=", "^", "~", ">", "<", "="} {
+			if strings.HasPrefix(part, candidate) {
+				op = candidate
+				part = strings.TrimSpace(strings.TrimPrefix(part, candidate))
+				break
+			}
+		}
+		if part == "" || strings.ContainsAny(part, " \t\r\n") {
+			return fmt.Errorf("malformed comparator %q", raw)
+		}
+		core := part
+		if plus := strings.IndexByte(core, '+'); plus >= 0 {
+			if !validCargoSemverIdentifiers(core[plus+1:], false) {
+				return fmt.Errorf("malformed build metadata in %q", raw)
+			}
+			core = core[:plus]
+		}
+		if dash := strings.IndexByte(core, '-'); dash >= 0 {
+			if !validCargoSemverIdentifiers(core[dash+1:], true) {
+				return fmt.Errorf("malformed prerelease in %q", raw)
+			}
+			core = core[:dash]
+		}
+		components := strings.Split(core, ".")
+		if len(components) == 0 || len(components) > 3 {
+			return fmt.Errorf("version in %q must have one to three components", raw)
+		}
+		wildcard := false
+		for i, component := range components {
+			if component == "*" || component == "x" || component == "X" {
+				if op != "" || i != len(components)-1 || strings.ContainsAny(part, "-+") {
+					return fmt.Errorf("wildcard is not valid in %q", raw)
+				}
+				wildcard = true
+				continue
+			}
+			if wildcard || component == "" || (len(component) > 1 && component[0] == '0') {
+				return fmt.Errorf("malformed numeric component in %q", raw)
+			}
+			if _, err := strconv.ParseUint(component, 10, 64); err != nil {
+				return fmt.Errorf("malformed numeric component in %q", raw)
+			}
+		}
+		if strings.ContainsAny(part, "-+") && len(components) != 3 {
+			return fmt.Errorf("prerelease and build metadata require a full version in %q", raw)
+		}
+	}
+	return nil
+}
+
+func validCargoSemverIdentifiers(value string, rejectNumericLeadingZeros bool) bool {
+	if value == "" {
+		return false
+	}
+	for _, identifier := range strings.Split(value, ".") {
+		if identifier == "" {
+			return false
+		}
+		allNumeric := true
+		for _, r := range identifier {
+			valid := (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '-'
+			if !valid {
+				return false
+			}
+			if r < '0' || r > '9' {
+				allNumeric = false
+			}
+		}
+		if rejectNumericLeadingZeros && allNumeric && len(identifier) > 1 && identifier[0] == '0' {
+			return false
+		}
+	}
+	return true
 }
 
 func balancedManifestValue(value string) bool {

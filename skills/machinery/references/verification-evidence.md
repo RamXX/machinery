@@ -174,6 +174,12 @@ to an Architecture Contract `external.imports` entry. This applies to Go,
 Rust/Cargo, Node, Python, and Elixir manifests. Cargo dotted keys such as
 `serde.workspace = true`, dependency tables, workspace dependencies, target
 dependencies, build dependencies, and dev dependencies are supported.
+For a Cargo member subtree, pass the member or `crates/` directory as
+`--impl`; Machinery snapshots the governing ancestor `Cargo.toml` separately
+and verifies every `workspace = true` dependency against its exact
+`[workspace.dependencies]` definition. Malformed version requirements,
+warning-bearing Git URL fragments, unsupported dependency keys, and invalid
+field/group combinations fail closed.
 
 Declare each adopted library once as an external with its import roots, then
 give it the same adoption-closure and mitigation treatment as other declared

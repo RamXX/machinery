@@ -120,6 +120,10 @@ func readDesignFile(design, path string) ([]byte, error) {
 }
 
 func readRegularFile(path string) ([]byte, error) {
+	return readRegularFileBounded(path, designArtifactMaxBytes)
+}
+
+func readRegularFileBounded(path string, maxBytes int64) ([]byte, error) {
 	root, _, err := openRealRoot(filepath.Dir(path))
 	if err != nil {
 		return nil, err
@@ -133,7 +137,7 @@ func readRegularFile(path string) ([]byte, error) {
 	if !ok {
 		return nil, os.ErrNotExist
 	}
-	return readRootRegularFile(root, base)
+	return readRootRegularFileBounded(root, base, maxBytes)
 }
 
 func openRealRoot(dir string) (*os.Root, string, error) {
@@ -165,6 +169,13 @@ func openRealRoot(dir string) (*os.Root, string, error) {
 }
 
 func readRootRegularFile(root *os.Root, rel string) (_ []byte, retErr error) {
+	return readRootRegularFileBounded(root, rel, designArtifactMaxBytes)
+}
+
+func readRootRegularFileBounded(root *os.Root, rel string, maxBytes int64) (_ []byte, retErr error) {
+	if maxBytes < 0 || maxBytes > designArtifactMaxBytes {
+		return nil, fmt.Errorf("invalid regular-file byte limit %d", maxBytes)
+	}
 	f, err := root.Open(rel)
 	if err != nil {
 		return nil, err
@@ -177,8 +188,8 @@ func readRootRegularFile(root *os.Root, rel string) (_ []byte, retErr error) {
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("%s must be a regular file, not a special file", rel)
 	}
-	if info.Size() < 0 || info.Size() > designArtifactMaxBytes {
-		return nil, fmt.Errorf("%s size %d exceeds %d-byte limit", rel, info.Size(), designArtifactMaxBytes)
+	if info.Size() < 0 || info.Size() > maxBytes {
+		return nil, fmt.Errorf("%s size %d exceeds %d-byte limit", rel, info.Size(), maxBytes)
 	}
 	body, err := io.ReadAll(io.LimitReader(f, info.Size()+1))
 	if err != nil {

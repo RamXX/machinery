@@ -3,6 +3,7 @@
 
 # Agent scratch
 scratchpad/
+.codebase-memory/
 *.tmp
 
 # Editors

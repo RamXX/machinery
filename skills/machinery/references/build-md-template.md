@@ -270,7 +270,8 @@ Format contract, held deterministically by Gb-plan:
 Every milestone in this plan is discharged the same way, held by Ga-accept:
 - The review runs on one commit and produces `design/acceptance/M<n>.yaml`, one file per milestone:
   `milestone` (the number here), `commit` (the reviewed commit), `verdict` (`ACCEPTED` or
-  `REJECTED`), `dod_ids` (every committed oracle id this milestone's DoD line cites), `attestations`
+  `REJECTED`), `dod_ids` (the exact, duplicate-free set of committed oracle ids this milestone's
+  DoD line cites; no omissions and no unrelated ids), `attestations`
   (what the review checked by judgment; required for an ACCEPTED verdict), `findings` (may be
   empty), `reviewer`, and `date` (YYYY-MM-DD).
 - When the DoD requires a complete oracle table, cite it compactly as
