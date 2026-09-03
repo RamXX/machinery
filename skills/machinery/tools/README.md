@@ -36,7 +36,8 @@ One line per subcommand:
   Gp/Gi/Gn gates byte-diff committed artifacts against fresh generation.
 - `machinery refine <machine.json> <semantics.yaml> [out-dir]` reconciles a `<M>.semantics.yaml`
   annotation against the machine, then generates the data-refined model, the abstract contract, and
-  the refinement proof. Patterns: `linear-lifecycle`, `terminal-lifecycle`, `saga` (state names come
+  the refinement proof. Patterns: `linear-lifecycle`, `terminal-lifecycle`, `saga`, or an explicit
+  `control-flow-only` declaration with a specific reason (state names come
   from the annotation, nothing is hardcoded to a domain). Reconciliation failure is a hard error.
 - `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
   `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate

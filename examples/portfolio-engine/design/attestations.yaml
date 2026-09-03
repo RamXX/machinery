@@ -128,27 +128,27 @@ attestations:
         hash: sha256:222539d82c470914676c12b304d143176ca4db97e4368ccc3fb23dd90aae10f8
   - claim: gt.conformance-test-shape
     attestor: Codex deterministic design review
-    date: 2026-09-02
-    note: The root and every shard require table-driven tests keyed to every committed oracle row, asserting next state and ordered actions, with separate named-unit/property/real-boundary tests.
+    date: 2026-09-03
+    note: The root and every milestone packet require table-driven tests keyed to committed oracle rows, asserting next state and ordered actions, with separate named-unit, property, and real-boundary tests.
     covers:
       - path: BUILD.md
-        hash: sha256:f7274d1c1523c5fdb056016cfd009db281cb1a0f5ed9b5dff38cce8718ddfd99
-      - path: BUILD/MarketDataFeed.md
-        hash: sha256:b9d84fe574d08354b97c60bc7a73837cbb46f7fdbda317f024e8006af0c912ca
-      - path: BUILD/Portfolio.md
-        hash: sha256:186f2f86d415a61381b3ed9e9f16f5faa37926ed3a03c95075544d124d6a93a4
-      - path: BUILD/RecommendationRun.md
-        hash: sha256:000b9b48f6e958921aa8a43ffe7a402db25e281d439725265d93531a73238e6d
+        hash: sha256:2c1240dfd86c84c253cf4da5b08cd0f6c04d62c8cf29ea6267ea2f2e636aa38a
+      - {path: BUILD/M0-walking-skeleton.md, hash: sha256:5a06ed03f8f8c693e679b480c77ba041b979d5c9d10c961677dd65eb370d9db2}
+      - {path: BUILD/M1-run-pipeline.md, hash: sha256:e7365aedd9c3b60f4cbc80fac8c13877b7756be8c5ae9082045cec51190e850a}
+      - {path: BUILD/M2-feed-breaker.md, hash: sha256:3bf41a0d3bf415d52ddb69bdfff13644ebf69ca9c68c0a40f233a42056ff621d}
+      - {path: BUILD/M3-optimizer.md, hash: sha256:621255b4ece8863c50c70cc0f9bc7ac3e831a6ad702a23408f5b41f80a3e3c67}
+      - {path: BUILD/M4-portfolio-review.md, hash: sha256:2109b5ff7f8887d14f729fed209bdcfa4dbd4d20057a757c831ba53a64bf986c}
+      - {path: BUILD/M5-reference-operations.md, hash: sha256:a4bd13c0b9f001d624cf129f984138c1dde204577c16074adc37eed5677915b5}
   - claim: g4.zero-context
     attestor: Codex deterministic design review
-    date: 2026-09-02
-    note: The manifest plus each shard names the schema, boundaries, command surfaces, exact behavior/oracle obligations, failure handling, test protocol, toolchain, milestones, and residuals needed by a fresh implementation agent.
+    date: 2026-09-03
+    note: Each bounded milestone packet contains the domain slice, boundaries, exact behavior and oracle obligations, TDD ownership, failure recovery, and acceptance needed by a fresh small implementation model.
     covers:
       - path: BUILD.md
-        hash: sha256:f7274d1c1523c5fdb056016cfd009db281cb1a0f5ed9b5dff38cce8718ddfd99
-      - path: BUILD/MarketDataFeed.md
-        hash: sha256:b9d84fe574d08354b97c60bc7a73837cbb46f7fdbda317f024e8006af0c912ca
-      - path: BUILD/Portfolio.md
-        hash: sha256:186f2f86d415a61381b3ed9e9f16f5faa37926ed3a03c95075544d124d6a93a4
-      - path: BUILD/RecommendationRun.md
-        hash: sha256:000b9b48f6e958921aa8a43ffe7a402db25e281d439725265d93531a73238e6d
+        hash: sha256:2c1240dfd86c84c253cf4da5b08cd0f6c04d62c8cf29ea6267ea2f2e636aa38a
+      - {path: BUILD/M0-walking-skeleton.md, hash: sha256:5a06ed03f8f8c693e679b480c77ba041b979d5c9d10c961677dd65eb370d9db2}
+      - {path: BUILD/M1-run-pipeline.md, hash: sha256:e7365aedd9c3b60f4cbc80fac8c13877b7756be8c5ae9082045cec51190e850a}
+      - {path: BUILD/M2-feed-breaker.md, hash: sha256:3bf41a0d3bf415d52ddb69bdfff13644ebf69ca9c68c0a40f233a42056ff621d}
+      - {path: BUILD/M3-optimizer.md, hash: sha256:621255b4ece8863c50c70cc0f9bc7ac3e831a6ad702a23408f5b41f80a3e3c67}
+      - {path: BUILD/M4-portfolio-review.md, hash: sha256:2109b5ff7f8887d14f729fed209bdcfa4dbd4d20057a757c831ba53a64bf986c}
+      - {path: BUILD/M5-reference-operations.md, hash: sha256:a4bd13c0b9f001d624cf129f984138c1dde204577c16074adc37eed5677915b5}

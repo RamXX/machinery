@@ -6,17 +6,14 @@
   context builds the system from this file alone, under hard TDD. Assume the reader has never seen
   the domain model, the architecture, or the state machines. Inline what matters; reference the
   `design/` files for the full source.
-- **Manifest mode** (sharded designs, see the skill's "Sharding large designs"): the root BUILD.md
-  is an entry-point manifest over `design/` and the shards `design/BUILD/<context>.md`. The root
-  carries the glossary, the Architecture Contract, the traceability matrix, and the cross-context
-  test spec; each shard carries sections 5 to 9 for its context. The zero-context claim then applies
-  to the design tree as a whole, and self-containment applies per shard. A `README.md` or `index.md`
-  under `design/BUILD/` is a shard index for humans, not a plan shard; Gb exempts it from the plan
-  obligations. The build plan may live in the shards (each with its own section 9) or in the root's
-  own section 9 with each shard waiving toward it (`N/A - the build plan is the root BUILD.md
-  section 9`); Gb checks whichever documents actually declare a plan, root included. Milestone
-  numbers are global across the whole design either way: acceptance evidence is keyed by number
-  alone, so a number declared in two documents is ambiguous and fails Ga-accept.
+- **Manifest mode** (large designs or smaller execution models): the root BUILD.md is the single
+  milestone, demo, ordering, and acceptance manifest. Every root milestone links to exactly one
+  direct `design/BUILD/M<n>-<name>.md` execution packet, and every non-index packet is linked once.
+  A packet contains all domain, architecture, behavior, oracle, TDD, implementation, risk,
+  recovery, and acceptance context for that milestone. It never declares another Build plan or
+  milestone. A `README.md` or `index.md` under `design/BUILD/` is navigation for humans and is
+  exempt from packet obligations. Read [execution-packets.md](execution-packets.md) for the exact
+  packet shape and size bound.
 
 Two artifacts are never pasted by hand: the machine JSON (section 5 references the machine files)
 and the transition tables (section 7 references the generated oracles). Pasted copies drift; the
@@ -24,7 +21,7 @@ files are what the deterministic gates check.
 
 ## Declared embeds (the one sanctioned copy, and how it is held)
 
-Self-containment per shard means the OTHER copies are deliberate: a shard restates the root's
+Self-containment per packet means the OTHER copies are deliberate: a packet restates the root's
 matrix rows, a child restates its parent's event rows, so each document can be read alone. That
 duplication has no generator, so it used to be held by a prose promise. Mark it instead, and
 Ge-embed checks it. The marker goes on the line before the table it describes (HTML comment, so it
@@ -76,7 +73,7 @@ first non-blank line, and a bare or misshapen N/A fails loudly instead of waivin
 ```markdown
 # BUILD: <System Name>
 
-Mode: full (self-contained) | manifest (root of a sharded design; shards in design/BUILD/<context>.md)
+Mode: full (self-contained) | manifest (root milestone/demo manifest; packets in design/BUILD/M<n>-<name>.md)
 
 ## 1. Purpose and scope
 One paragraph: what this system does, who uses it, and the one-sentence reason it exists.
@@ -241,6 +238,11 @@ Format contract, held deterministically by Gb-plan:
   so "Build planning notes" and "Milestone map" name no plan section.
 - Each milestone is a bold marker `**M<n> - <title>**` with a unique number. Numbers compare
   numerically: M1 and M01 are the same milestone, and declaring both is a duplicate.
+- In manifest mode, every milestone block carries exactly one `Packet:` Markdown link to a direct
+  `BUILD/*.md` packet and exactly one non-empty `Demo:` line. Every non-index packet is linked by
+  exactly one milestone. The packet title is `# M<n> - <title>`, it is at most 64 KiB, it declares
+  no Build plan or milestone, and it contains exactly one H2 section for each heading specified in
+  [execution-packets.md](execution-packets.md).
 - The first milestone (M0) is the walking skeleton: its title contains "walking skeleton". A
   brownfield gap plan whose skeleton already exists in production waives it with the literal line
   `Walking skeleton: N/A - <reason>`.

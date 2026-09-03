@@ -14,21 +14,21 @@
   checked: 4 machines, 46 transitions, 4 tla-generable, 4 oracles fresh, 39 named units covered
   ok
 == Gd-idcite  design-side stable-id citations ==
-  checked: 78 citations resolved, 23 files scanned, 46 committed oracle ids, 4 row-count claims beside tables, 3 guards with clause declarations, 14 guard rows read for clause completeness, 3 guard rows with a clause declaration
+  checked: 76 citations resolved, 26 files scanned, 46 committed oracle ids, 3 guards with clause declarations, 14 guard rows read for clause completeness, 3 guard rows with a clause declaration
   ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 4 self-review lines, 6 dated decision entries, 23 files style-scanned
+  checked: 4 self-review lines, 6 dated decision entries, 26 files style-scanned
   ok
 == Gx-trace  cross-layer traceability ==
   note   Portfolio: 4 operational-overlay states (committing, commitRetry, reverted, routingFault)
   note   RecommendationRun: 1 operational-overlay states (collectRetry)
-  checked: 6 entities, 2 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 2 lifecycle semantics annotations, 3 placement rows with machines, 5 placement rows waived, 6 entities placed, 3 build shards scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 13 invariants enforced, 13 invariants unit-backed (guard/action/actor), 5 invariants waived with reason
+  checked: 6 entities, 2 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 2 lifecycle semantics annotations, 3 placement rows with machines, 5 placement rows waived, 6 entities placed, 6 build packets scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 13 invariants enforced, 13 invariants unit-backed (guard/action/actor), 5 invariants waived with reason
   ok
 == Gb-plan  build plan structure ==
-  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 3 plans, 6 milestones, 6 DoD-bearing milestones, 2 skeleton waivers, 1 skeleton NFR lines, 3 skeleton citations, skeleton citation skipped (skeleton waived), skeleton citation skipped (skeleton waived)
+  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 3 skeleton citations, 6 milestone demos, 42 packet sections, 6 execution packets
   ok
 == Gv-attest  attestation evidence ==
-  checked: 46 covered artifacts current, 12 attested claims, 12 claims owed
+  checked: 52 covered artifacts current, 12 attested claims, 12 claims owed
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

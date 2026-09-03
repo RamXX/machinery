@@ -155,7 +155,7 @@ var attestVocabulary = []attestClaim{
 	},
 	{
 		id:     "g4.zero-context",
-		what:   "a coding agent with no prior context could build the system from BUILD.md alone (per shard, when sharded)",
+		what:   "a coding agent with no prior context could execute each milestone from its BUILD packet alone (or the single BUILD.md in full mode)",
 		owed:   HasBuildDoc,
 		owedBy: "BUILD.md",
 	},
@@ -256,11 +256,11 @@ func hasArchitectureDoc(design string) bool {
 // section is keying it on the posture itself.
 func declaresNeighborStandIns(design string) (bool, error) {
 	paths := []string{filepath.Join(design, "BUILD.md")}
-	shards, err := sortedGlobExt(filepath.Join(design, "BUILD"), ".md")
+	packets, err := sortedGlobExt(filepath.Join(design, "BUILD"), ".md")
 	if err != nil {
 		return false, err
 	}
-	paths = append(paths, shards...)
+	paths = append(paths, packets...)
 	for _, p := range paths {
 		if strings.Contains(strings.ToLower(readDesignOrEmpty(design, p)), "neighbor stand-ins") {
 			return true, nil
@@ -330,7 +330,7 @@ func buildArtifactPaths(g *Gate, design string) []string {
 	} else if ok {
 		out = append(out, "BUILD.md")
 	}
-	paths, _ := strictSortedGlob(g, filepath.Join(design, "BUILD"), "*.md", "build shard")
+	paths, _ := strictSortedGlob(g, filepath.Join(design, "BUILD"), "*.md", "build packet")
 	for _, path := range paths {
 		rel, _ := filepath.Rel(design, path)
 		out = append(out, filepath.ToSlash(rel))

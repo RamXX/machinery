@@ -1,7 +1,7 @@
 # Generated transition oracle: `shipment`
 
 Generated from `Shipment.machine.json` by `machinery oracle`. DO NOT EDIT BY HAND.
-<!-- machinery-version: v0.6.2 -->
+<!-- machinery-version: v0.6.3 -->
 Single source of truth for the hard-TDD transition tests: one transition row is one
 test case. Key tests on the STABLE id, not the row number; row numbers renumber when
 the design changes, stable ids do not.

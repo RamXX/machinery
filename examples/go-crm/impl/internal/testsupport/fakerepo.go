@@ -147,6 +147,9 @@ func (f *FakeRepo) SaveUser(tx repo.Tx, u model.User) error {
 	if f.SaveUserErr != nil {
 		return f.SaveUserErr
 	}
+	if u.Role == model.RoleManager && u.TeamID == "" {
+		return model.ErrConstraint
+	}
 	for id, ex := range f.Users {
 		if ex.Username == u.Username && id != u.ID {
 			return model.ErrConstraint // username-unique

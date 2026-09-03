@@ -21,4 +21,4 @@ sessions.
 - Phase 1 Domain model: `self-review: reality=clean depth=clean scope=clean coverage=clean consistency=clean`
 - Phase 2 Architecture: `self-review: reality=fixed(stale Python gate-runner reference replaced with the machinery binary) depth=clean scope=clean coverage=clean consistency=clean`
 - Phase 3 State machines: `self-review: reality=clean depth=clean scope=clean coverage=clean consistency=clean`
-- Phase 4 BUILD.md: `self-review: reality=fixed(Python-toolchain gate commands replaced with the machinery binary; BUILD.md converted to manifest+shards, see DECISIONS.md 2026-07-22) depth=clean scope=clean coverage=clean consistency=clean`
+- Phase 4 BUILD.md: `self-review: reality=fixed(Python-toolchain gate commands replaced with the machinery binary; BUILD.md converted to a milestone manifest with one execution packet per milestone, see DECISIONS.md) depth=clean scope=clean coverage=clean consistency=clean`

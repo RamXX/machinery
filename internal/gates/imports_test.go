@@ -15,7 +15,7 @@ func TestManifestDependenciesRejectMalformedEvidenceByEcosystem(t *testing.T) {
 		{"package JSON null root", "package.json", `null`, "root must be a non-null object"},
 		{"package JSON null dependencies", "package.json", `{"dependencies":null}`, "must be a non-null object"},
 		{"go.mod unterminated require", "go.mod", "module example.com/app\nrequire (\nexample.com/dep v1.2.3\n", "unterminated require block"},
-		{"Cargo malformed table", "Cargo.toml", "[dependencies\nserde = \"1\"\n", "malformed TOML table header"},
+		{"Cargo malformed table", "Cargo.toml", "[dependencies\nserde = \"1\"\n", "expected ']' to close table name"},
 		{"requirements recursive include", "requirements.txt", "good==1\n-r more.txt\n", "cannot be enumerated completely"},
 		{"Mix malformed deps", "mix.exs", "defp deps do\n  [{:plug, \"~> 1.0\"}\nend\n", "unbalanced Elixir"},
 	}
@@ -28,6 +28,47 @@ func TestManifestDependenciesRejectMalformedEvidenceByEcosystem(t *testing.T) {
 				t.Fatalf("malformed %s did not invalidate dependency evidence: %v", tc.file, errs)
 			}
 		})
+	}
+}
+
+func TestCargoManifestAcceptsCargoAndTOMLSyntax(t *testing.T) {
+	body := []byte(`
+[package]
+name = "app"
+version.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nil-core.workspace = true
+serde = { version = "1", features = [
+  "derive",
+] }
+
+[dev-dependencies]
+pretty_assertions = "1"
+
+[build-dependencies.bindgen]
+version = "0.72"
+
+[workspace.dependencies]
+workspace-crate = { path = "crates/workspace-crate" }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.build-dependencies]
+windows-sys = "0.61"
+`)
+	want := []string{
+		"bindgen", "libc", "nil-core", "nil_core", "pretty_assertions", "serde",
+		"windows-sys", "windows_sys", "workspace-crate", "workspace_crate",
+	}
+	got, err := parseCargoManifest(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("dependencies = %v, want %v", got, want)
 	}
 }
 

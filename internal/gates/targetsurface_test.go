@@ -539,19 +539,16 @@ func TestCheckTargetSurfacesEmptyMilestoneWithPlan(t *testing.T) {
 	}
 }
 
-// Milestones declared in a manifest's shards resolve too: the index is built
-// from planDocuments, the same document selection Gb and Ga use.
-func TestCheckTargetSurfacesMilestoneFromManifestShard(t *testing.T) {
-	root := "# BUILD: target\n\nMode: manifest\n\n## 1. Purpose\n\nProse.\n"
+// Execution packets cannot declare target-surface milestones. The root is
+// the single milestone authority shared by Gb, Gu, and Ga.
+func TestCheckTargetSurfacesMilestoneFromManifestPacketIsIgnored(t *testing.T) {
+	root := "# BUILD: target\n\nMode: manifest\n\n## 9. Build plan\n\n**M2 - Root slice.**\nDoD: green.\n"
 	ledger := strings.Replace(targetSurfacesLedger, "milestone: M2", "milestone: M4", 1)
 	design := writeTargetSurfacePlanFixture(t, ledger, root)
 	shard := "# BUILD: orders\n\n## 9. Build plan\n\nWalking skeleton: N/A - it lives in the root.\n\n**M4 - Orders slice.**\nDoD: green.\n"
 	writeSuiteFile(t, filepath.Join(design, "BUILD", "orders.md"), shard)
 	g := CheckTargetSurfaces(design)
-	if len(g.Errs) != 0 {
-		t.Fatalf("a shard milestone must resolve: %v", g.Errs)
-	}
-	if !strings.Contains(checkedLine(g), "1 milestone references resolved") {
-		t.Errorf("the shard resolution must be counted: %q", checkedLine(g))
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "which the build plan does not declare") {
+		t.Fatalf("a packet-local milestone must not satisfy the root inventory: %v", g.Errs)
 	}
 }

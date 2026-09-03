@@ -69,6 +69,25 @@ func templateSectionsStub() string {
 		gatesDisclaimerText + "\n"
 }
 
+func executionPacket(num, title string) string {
+	return "# M" + num + " - " + title + "\n\n" +
+		"## Outcome\nObservable result.\n\n" +
+		"## Domain context\nExact milestone domain slice.\n\n" +
+		"## Architecture context\nOwned boundary and dependencies.\n\n" +
+		"## Behavior and oracles\nCommitted transition rows.\n\n" +
+		"## TDD and implementation\nRED then GREEN.\n\n" +
+		"## Risks and recovery\nBounded failure and rollback.\n\n" +
+		"## Acceptance\nExecutable evidence.\n"
+}
+
+func manifestPlan() string {
+	return "# B\n\nMode: manifest\n\n## 9. Build plan\n\n" +
+		"**M0 - Walking skeleton.**\nStatus: open\nPacket: [M0 execution packet](BUILD/M0-walking-skeleton.md)\n" +
+		"Demo: Exercise one real transition through one real boundary.\nNFR: error envelope, logging.\nDoD: T-CMD-01 green.\n\n" +
+		"**M1 - Breadth slice.**\nStatus: open\nPacket: [M1 execution packet](BUILD/M1-breadth.md)\n" +
+		"Demo: Exercise the complete public workflow.\nDoD: all rows green.\n"
+}
+
 func writeBuildPlanFixture(t *testing.T, build string, extra map[string]string) string {
 	t.Helper()
 	design := t.TempDir()
@@ -159,7 +178,7 @@ func TestCheckBuildPlanMutations(t *testing.T) {
 			"cites no committed oracle id"},
 		{"manifest with nothing behind it",
 			"# B\n\nMode: manifest\n",
-			"a manifest with nothing behind it"},
+			"manifest mode requires the root to carry the single Build plan"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -236,45 +255,67 @@ func TestCheckBuildPlanNoModeLineIsFullMode(t *testing.T) {
 	}
 }
 
-func TestCheckBuildPlanManifestShards(t *testing.T) {
-	shardOK := "# Shard\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n"
-	shardBad := "# Shard\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope. No definition here.\n"
-	design := writeBuildPlanFixture(t, "# B\n\nMode: manifest\n", map[string]string{
-		"BUILD/core.md": shardOK,
-		"BUILD/edge.md": shardBad,
+func TestCheckBuildPlanManifestPackets(t *testing.T) {
+	design := writeBuildPlanFixture(t, manifestPlan(), map[string]string{
+		"BUILD/M0-walking-skeleton.md": executionPacket("0", "Walking skeleton"),
+		"BUILD/M1-breadth.md":          executionPacket("1", "Breadth slice"),
 	})
 	g := CheckBuildPlan(design)
-	if g.Counts["plans"] != 2 {
-		t.Errorf("plans = %d, want 2 (one per shard): %+v", g.Counts["plans"], g.Counts)
+	if len(g.Errs) != 0 {
+		t.Fatalf("Gb not clean on milestone packets: %v", g.Errs)
 	}
-	joined := strings.Join(g.Errs, "\n")
-	if !strings.Contains(joined, "edge.md: milestone M0") {
-		t.Errorf("shard findings must carry the shard name: %v", g.Errs)
-	}
-	if strings.Contains(joined, "core.md") {
-		t.Errorf("the clean shard must not be flagged: %v", g.Errs)
+	if g.Counts["plans"] != 1 || g.Counts["milestones"] != 2 || g.Counts["execution packets"] != 2 || g.Counts["packet sections"] != 14 {
+		t.Errorf("one root plan and two complete packets: %+v", g.Counts)
 	}
 }
 
-// Manifest shards get the full check including the skeleton citation, held
-// against the design-wide committed oracle ids (the same corpus as full mode).
-func TestCheckBuildPlanManifestShardsRequireSkeletonCitation(t *testing.T) {
-	shardCiting := "# Core\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n"
-	shardBare := "# Edge\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: skeleton green.\n"
-	design := writeBuildPlanFixture(t, "# B\n\nMode: manifest\n", map[string]string{
-		"BUILD/core.md": shardCiting,
-		"BUILD/edge.md": shardBare,
+func TestCheckBuildPlanManifestPacketInventoryIsExact(t *testing.T) {
+	root := strings.Replace(manifestPlan(), "BUILD/M1-breadth.md", "BUILD/M0-walking-skeleton.md", 1)
+	design := writeBuildPlanFixture(t, root, map[string]string{
+		"BUILD/M0-walking-skeleton.md": executionPacket("0", "Walking skeleton"),
+		"BUILD/orphan.md":              executionPacket("1", "Orphan"),
 	})
 	g := CheckBuildPlan(design)
 	joined := strings.Join(g.Errs, "\n")
-	if !strings.Contains(joined, "edge.md") || !strings.Contains(joined, "cites no committed oracle id") {
-		t.Fatalf("a shard whose skeleton DoD cites no oracle id must fail: %v", g.Errs)
+	if !strings.Contains(joined, "linked by 2 milestones") || !strings.Contains(joined, "BUILD/orphan.md: packet is not linked") {
+		t.Fatalf("duplicate ownership and orphan inventory must both fail: %v", g.Errs)
 	}
-	if strings.Contains(joined, "core.md") {
-		t.Errorf("the citing shard must pass: %v", g.Errs)
+}
+
+func TestCheckBuildPlanManifestPacketContract(t *testing.T) {
+	cases := []struct {
+		name, root, packet, want string
+	}{
+		{"missing packet line", strings.Replace(manifestPlan(), "Packet: [M0 execution packet](BUILD/M0-walking-skeleton.md)\n", "", 1), executionPacket("0", "Walking skeleton"), "has no Packet line"},
+		{"invalid packet path", strings.Replace(manifestPlan(), "BUILD/M0-walking-skeleton.md", "BUILD/../escape.md", 1), executionPacket("0", "Walking skeleton"), "invalid packet path"},
+		{"missing demo", strings.Replace(manifestPlan(), "Demo: Exercise one real transition through one real boundary.\n", "", 1), executionPacket("0", "Walking skeleton"), "has no Demo line"},
+		{"wrong packet owner", manifestPlan(), executionPacket("7", "Wrong owner"), "exactly one first-level title identifying its owner"},
+		{"missing packet section", manifestPlan(), strings.Replace(executionPacket("0", "Walking skeleton"), "## Risks and recovery\nBounded failure and rollback.\n\n", "", 1), "missing required '## Risks and recovery' section"},
+		{"packet contains plan", manifestPlan(), executionPacket("0", "Walking skeleton") + "\n## Build plan\nNot allowed.\n", "keep milestone declarations and the Build plan only in BUILD.md"},
 	}
-	if g.Counts["skeleton citations"] != 1 {
-		t.Errorf("skeleton citations = %d, want 1 (core.md): %+v", g.Counts["skeleton citations"], g.Counts)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			design := writeBuildPlanFixture(t, tc.root, map[string]string{
+				"BUILD/M0-walking-skeleton.md": tc.packet,
+				"BUILD/M1-breadth.md":          executionPacket("1", "Breadth slice"),
+			})
+			g := CheckBuildPlan(design)
+			if !strings.Contains(strings.Join(g.Errs, "\n"), tc.want) {
+				t.Fatalf("want error containing %q, got %v", tc.want, g.Errs)
+			}
+		})
+	}
+}
+
+func TestCheckBuildPlanManifestPacketBound(t *testing.T) {
+	packet := executionPacket("0", "Walking skeleton") + strings.Repeat("x", maxExecutionPacketBytes)
+	design := writeBuildPlanFixture(t, manifestPlan(), map[string]string{
+		"BUILD/M0-walking-skeleton.md": packet,
+		"BUILD/M1-breadth.md":          executionPacket("1", "Breadth slice"),
+	})
+	g := CheckBuildPlan(design)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "maximum is 65536 bytes") {
+		t.Fatalf("an oversized packet must fail: %v", g.Errs)
 	}
 }
 
@@ -282,17 +323,17 @@ func TestCheckBuildPlanManifestShardsRequireSkeletonCitation(t *testing.T) {
 // shards: they carry no plan obligation, the exemption is visible in the
 // checked line, and the real shard is still fully checked.
 func TestCheckBuildPlanManifestExemptsIndexFiles(t *testing.T) {
-	shard := "# Core\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n"
-	design := writeBuildPlanFixture(t, "# B\n\nMode: manifest\n", map[string]string{
-		"BUILD/README.md": "# Shard index\n\nWho builds what.\n",
-		"BUILD/core.md":   shard,
+	design := writeBuildPlanFixture(t, manifestPlan(), map[string]string{
+		"BUILD/README.md":              "# Shard index\n\nWho builds what.\n",
+		"BUILD/M0-walking-skeleton.md": executionPacket("0", "Walking skeleton"),
+		"BUILD/M1-breadth.md":          executionPacket("1", "Breadth slice"),
 	})
 	g := CheckBuildPlan(design)
 	if len(g.Errs) != 0 {
 		t.Fatalf("an index file must carry no plan obligation: %v", g.Errs)
 	}
-	if g.Counts["plans"] != 1 || g.Counts["milestones"] != 1 {
-		t.Errorf("the real shard must still be fully checked: %+v", g.Counts)
+	if g.Counts["plans"] != 1 || g.Counts["execution packets"] != 2 {
+		t.Errorf("the real packets must still be fully checked: %+v", g.Counts)
 	}
 	if !strings.Contains(strings.Join(g.checkedExtra, ", "), "1 index files exempt") {
 		t.Errorf("checked line must show the exemption: %v", g.checkedExtra)
@@ -437,7 +478,7 @@ func TestCheckBuildPlanModeSniffIsFenceMasked(t *testing.T) {
 		build := "# B\n\n```text\nMode: full (single BUILD.md)\n```\n\nMode: manifest\n"
 		design := writeBuildPlanFixture(t, build, nil)
 		g := CheckBuildPlan(design)
-		if !strings.Contains(strings.Join(g.Errs, "\n"), "a manifest with nothing behind it") {
+		if !strings.Contains(strings.Join(g.Errs, "\n"), "manifest mode requires the root to carry the single Build plan") {
 			t.Fatalf("the real Mode: manifest must govern: %v", g.Errs)
 		}
 	})
@@ -560,72 +601,51 @@ func TestIDTokenIn(t *testing.T) {
 	}
 }
 
-// The manifest ROOT carries a plan obligation once it declares a Build plan
-// section of its own. The production shape that went unchecked: every shard
-// waived its section toward the root ("N/A - the plan is the root's section
-// 9"), so the run reported "N plans, N waived plans" and no milestone, DoD,
-// or skeleton rule ran anywhere.
+// The manifest root is the sole plan authority. Packets are context, not
+// competing plans, so acceptance remains unambiguous for small executors.
 func TestCheckBuildPlanManifestRootPlanIsChecked(t *testing.T) {
-	waived := "# Shard\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n"
-	root := "# B\n\nMode: manifest\n\n## 9. Build plan\n\n" +
-		"**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n\n" +
-		"**M1 - Breadth slice.** DoD: all rows green.\n"
-	design := writeBuildPlanFixture(t, root, map[string]string{
-		"BUILD/core.md": waived,
-		"BUILD/edge.md": strings.Replace(waived, "# Shard", "# Edge", 1),
+	design := writeBuildPlanFixture(t, manifestPlan(), map[string]string{
+		"BUILD/M0-walking-skeleton.md": executionPacket("0", "Walking skeleton"),
+		"BUILD/M1-breadth.md":          executionPacket("1", "Breadth slice"),
 	})
 	g := CheckBuildPlan(design)
 	if len(g.Errs) != 0 {
 		t.Fatalf("Gb not clean on a root-plan manifest: %v", g.Errs)
 	}
-	if g.Counts["plans"] != 3 || g.Counts["waived plans"] != 2 {
-		t.Errorf("the root plan plus two waived shards: %+v", g.Counts)
-	}
-	if g.Counts["milestones"] != 2 || g.Counts["DoD-bearing milestones"] != 2 || g.Counts["skeleton citations"] != 1 {
+	if g.Counts["plans"] != 1 || g.Counts["milestones"] != 2 || g.Counts["DoD-bearing milestones"] != 2 || g.Counts["skeleton citations"] != 1 {
 		t.Errorf("the root plan must get the full structural check: %+v", g.Counts)
 	}
 }
 
 // The same shape, with a defective root plan: the finding names BUILD.md.
 func TestCheckBuildPlanManifestRootPlanFindingsNameTheRoot(t *testing.T) {
-	waived := "# Shard\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n"
 	root := "# B\n\nMode: manifest\n\n## 9. Build plan\n\n" +
-		"**M0 - Walking skeleton.** NFR: error envelope. No definition here.\n"
-	design := writeBuildPlanFixture(t, root, map[string]string{"BUILD/core.md": waived})
+		"**M0 - Walking skeleton.**\nPacket: [packet](BUILD/M0-walking-skeleton.md)\nDemo: run it.\nNFR: error envelope. No definition here.\n"
+	design := writeBuildPlanFixture(t, root, map[string]string{"BUILD/M0-walking-skeleton.md": executionPacket("0", "Walking skeleton")})
 	g := CheckBuildPlan(design)
 	if !strings.Contains(strings.Join(g.Errs, "\n"), "BUILD.md: milestone M0") {
 		t.Fatalf("the root plan's findings must name BUILD.md: %v", g.Errs)
 	}
 }
 
-// A manifest root that declares the plan itself needs no shards behind it:
-// the plan is checked, so the "manifest with nothing behind it" error would
-// be wrong.
+// Manifest milestones cannot exist without their execution packets.
 func TestCheckBuildPlanManifestRootPlanWithoutShards(t *testing.T) {
-	root := "# B\n\nMode: manifest\n\n## 9. Build plan\n\n" +
-		"**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n"
-	design := writeBuildPlanFixture(t, root, nil)
+	design := writeBuildPlanFixture(t, manifestPlan(), nil)
 	g := CheckBuildPlan(design)
-	if len(g.Errs) != 0 {
-		t.Fatalf("a manifest root that carries the plan is not empty: %v", g.Errs)
-	}
-	if g.Counts["plans"] != 1 || g.Counts["milestones"] != 1 {
-		t.Errorf("the root plan must be the checked plan: %+v", g.Counts)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "is not a regular non-index file in BUILD/") {
+		t.Fatalf("a linked packet missing from disk must fail: %v", g.Errs)
 	}
 }
 
-// A manifest root with no Build plan section keeps its old freedom: the
-// shards carry the plans and the root has no obligation of its own.
-func TestCheckBuildPlanManifestRootWithoutPlanSectionUnchanged(t *testing.T) {
-	shard := "# Core\n\n## Build plan\n\n**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n"
+// A packet cannot become a second scheduling authority when the root omits
+// its plan; the missing root plan fails directly.
+func TestCheckBuildPlanManifestRootRequiresPlanSection(t *testing.T) {
+	packet := executionPacket("0", "Walking skeleton")
 	design := writeBuildPlanFixture(t, "# B\n\nMode: manifest\n\n## 9. Milestone map\n\nSee the shards.\n",
-		map[string]string{"BUILD/core.md": shard})
+		map[string]string{"BUILD/M0-walking-skeleton.md": packet})
 	g := CheckBuildPlan(design)
-	if len(g.Errs) != 0 {
-		t.Fatalf("a root with no plan section carries no plan obligation: %v", g.Errs)
-	}
-	if g.Counts["plans"] != 1 {
-		t.Errorf("plans = %d, want 1 (the shard only): %+v", g.Counts["plans"], g.Counts)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "manifest mode requires the root to carry the single Build plan") {
+		t.Fatalf("manifest mode without a root plan must fail: %v", g.Errs)
 	}
 }
 
@@ -677,19 +697,16 @@ func TestCheckBuildPlanDecoratedHeadingStandalone(t *testing.T) {
 }
 
 func TestCheckBuildPlanDecoratedHeadingManifestRoot(t *testing.T) {
-	waived := "# Shard\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n"
-	root := "# B\n\nMode: manifest\n\n## 9. Build plan (sealed trust layers; user directive 2026-08-04)\n\n" +
-		"**M0 - Walking skeleton.** NFR: error envelope, logging. DoD: T-CMD-01 green.\n\n" +
-		"**M1 - Breadth slice.** DoD: all rows green.\n"
+	root := strings.Replace(manifestPlan(), "## 9. Build plan", "## 9. Build plan (sealed trust layers; user directive 2026-08-04)", 1)
 	design := writeBuildPlanFixture(t, root, map[string]string{
-		"BUILD/core.md": waived,
-		"BUILD/edge.md": strings.Replace(waived, "# Shard", "# Edge", 1),
+		"BUILD/M0-walking-skeleton.md": executionPacket("0", "Walking skeleton"),
+		"BUILD/M1-breadth.md":          executionPacket("1", "Breadth slice"),
 	})
 	g := CheckBuildPlan(design)
 	if len(g.Errs) != 0 {
 		t.Fatalf("Gb not clean on a decorated root plan heading: %v", g.Errs)
 	}
-	if g.Counts["plans"] != 3 || g.Counts["waived plans"] != 2 || g.Counts["milestones"] != 2 {
+	if g.Counts["plans"] != 1 || g.Counts["execution packets"] != 2 || g.Counts["milestones"] != 2 {
 		t.Errorf("the decorated root plan must be counted and checked: %+v", g.Counts)
 	}
 }
@@ -787,7 +804,7 @@ func TestCheckBuildPlanDisclaimerDivergenceIsReported(t *testing.T) {
 		"first divergence at word 16:",
 		`expected "RIGHT invariants`,
 		`found "CORRECT invariants`,
-		"only the root BUILD.md is checked, shards are not",
+		"only the root BUILD.md is checked, packets are not",
 	} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("disclaimer finding omits %q: %s", want, msg)
@@ -883,7 +900,7 @@ func TestCheckBuildPlanDataDictionaryFindingNamesHeadings(t *testing.T) {
 	for _, want := range []string{
 		"2 headings contain the phrase 'data dictionary'",
 		"BUILD.md:",
-		"retitle derived or per-shard slices",
+		"retitle derived or per-packet slices",
 		"schema slice",
 		"machinery:embed marker on the line before a byte-identical copy",
 	} {

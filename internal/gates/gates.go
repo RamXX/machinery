@@ -2020,18 +2020,18 @@ func CheckTraceability(design string) *Gate {
 				cells = append(cells, r...)
 			}
 		}
-		// manifest mode shards contribute to the traceability corpus too
-		shards, inventoryErr := sortedGlobExt(filepath.Join(design, "BUILD"), ".md")
+		// manifest mode packets contribute to the traceability corpus too
+		packets, inventoryErr := sortedGlobExt(filepath.Join(design, "BUILD"), ".md")
 		if inventoryErr != nil {
 			g.Errs = append(g.Errs, inventoryErr.Error())
 		}
-		for _, shard := range shards {
-			for _, tbl := range ir.ParseMdTables(maskFences(readDesignFileOrErr(design, shard, g))) {
+		for _, packet := range packets {
+			for _, tbl := range ir.ParseMdTables(maskFences(readDesignFileOrErr(design, packet, g))) {
 				for _, r := range tbl.Rows {
 					cells = append(cells, r...)
 				}
 			}
-			g.Count("build shards scanned")
+			g.Count("build packets scanned")
 		}
 		// template conformance: deterministic structural requirements
 		if modeRe.FindString(buildText) == "" {

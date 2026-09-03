@@ -49,8 +49,16 @@ drops the migration machinery (a clean-break rebuild reclassified to greenfield-
 keeps its completeness anchor.
 
 ```yaml
-surface_version: 1
+surface_version: 2
 system: go-crm v1, a single-binary CLI CRM over an embedded LadybugDB graph store
+corpus:
+  - area: legacy CRM application
+    classification: rearchitect-adapt
+    source: impl/ plus the embedded schema
+    rationale: preserve the product capabilities while replacing its storage boundary
+    target: target CRM application
+    decided_by: product owner
+    decided: 2026-09-03
 classes:
   routes:
     none: The legacy system is a local CLI binary; it exposes no network API.
@@ -83,9 +91,10 @@ classes:
 
 | key | required | meaning |
 |---|---|---|
-| `surface_version` | yes | the integer `1` |
+| `surface_version` | yes | the integer `2` |
 | `system` | yes | one line naming the legacy system and its shape |
 | `as_of` | no | the legacy commit or date the surface was enumerated against; non-empty string, printed on the Gs `checked:` line. Keep it an anchor: an ISO date (`2026-07-22`), a VCS revision (7 to 40 hex characters), or a tag-like token (`v1.4.2`, `release/2026-06`, `legacy@a1b2c3`). Anything else warns |
+| `corpus` | yes | non-empty intent classification for every coherent legacy area; unresolved rows block architecture |
 | `classes` | yes | the six surface classes, all of them (see below) |
 | `_comment` | no | free text |
 

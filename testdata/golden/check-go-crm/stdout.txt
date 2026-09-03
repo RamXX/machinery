@@ -2,7 +2,7 @@
   checked: 4 legacy entities, 9 target entities, 4 dispositions, 5 new target entities, 4 salvage decisions, 16 data mappings, 9 state mappings, 4 transition phases, 1 cutover contracts, 3 transition risks, 1 transition architecture sections, 5 transition topics recorded, 1 migration implementation plans, 4 phases named in the implementation plan
   ok
 == Gs-surface  legacy surface ledger ==
-  checked: 13 commands, 5 tables, 17 covered, 1 dropped, 4 waived classes, 18 surface items, as_of 2026-07-22
+  checked: 13 commands, 5 tables, 17 covered, 1 dropped, 4 waived classes, 18 surface items, 1 classified corpus areas, as_of 2026-07-22
   ok
 == Gu-surfaces  target surface ledger ==
   checked: 35 obligated actions, 35 covered, 0 deferred acts, 0 deferred personas, 0 knob rows, 0 actorless actions, 0 milestone references resolved

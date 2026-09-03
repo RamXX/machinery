@@ -1,7 +1,7 @@
 surface_version: 1
 sources:
   - domain.modelith.yaml action list, walked persona by persona
-  - BUILD.md and BUILD shards, reconciled against the CLI slices and milestone map
+  - BUILD.md and milestone execution packets, reconciled against the CLI slices and manifest
 acts:
   - act: Index.refresh
     actor: Analyst

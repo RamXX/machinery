@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 var (
@@ -181,63 +183,89 @@ func parseGoRequire(line string, lineNo int) (string, error) {
 }
 
 func parseCargoManifest(body []byte) ([]string, error) {
-	section := ""
+	var root map[string]any
+	if err := toml.Unmarshal(body, &root); err != nil {
+		return nil, err
+	}
+	if root == nil {
+		return nil, fmt.Errorf("Cargo.toml root must be a table")
+	}
+
 	seen := map[string]bool{}
-	var deps []string
-	for lineNo, raw := range strings.Split(string(body), "\n") {
-		line, err := stripManifestComment(raw)
-		if err != nil {
-			return nil, fmt.Errorf("line %d: %w", lineNo+1, err)
+	addGroup := func(path string, value any) error {
+		group, ok := value.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%s must be a dependency table", path)
 		}
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
+		names := make([]string, 0, len(group))
+		for name := range group {
+			names = append(names, name)
 		}
-		if strings.HasPrefix(line, "[") {
-			if !strings.HasSuffix(line, "]") || strings.HasPrefix(line, "[[") != strings.HasSuffix(line, "]]") {
-				return nil, fmt.Errorf("line %d: malformed TOML table header", lineNo+1)
+		sort.Strings(names)
+		for _, name := range names {
+			if !cargoKeyRe.MatchString(name) {
+				return fmt.Errorf("%s has invalid dependency name %q", path, name)
 			}
-			section = strings.Trim(line, "[] ")
-			if section == "" {
-				return nil, fmt.Errorf("line %d: empty TOML table header", lineNo+1)
+			seen[name] = true
+			seen[strings.ReplaceAll(name, "-", "_")] = true
+		}
+		return nil
+	}
+	addGroups := func(prefix string, table map[string]any, groups ...string) error {
+		for _, group := range groups {
+			if value, ok := table[group]; ok {
+				path := group
+				if prefix != "" {
+					path = prefix + "." + group
+				}
+				if err := addGroup(path, value); err != nil {
+					return err
+				}
 			}
-			if dep, ok := cargoDependencyTable(section); ok {
-				deps = append(deps, dep...)
-			}
-			continue
 		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("line %d: malformed TOML assignment", lineNo+1)
+		return nil
+	}
+
+	groups := []string{"dependencies", "dev-dependencies", "build-dependencies"}
+	if err := addGroups("", root, groups...); err != nil {
+		return nil, err
+	}
+	if workspace, ok := root["workspace"]; ok {
+		workspaceTable, tableOK := workspace.(map[string]any)
+		if !tableOK {
+			return nil, fmt.Errorf("workspace must be a table")
 		}
-		key, value := strings.Trim(strings.TrimSpace(parts[0]), `"'`), strings.TrimSpace(parts[1])
-		if !cargoKeyRe.MatchString(key) || value == "" || !balancedManifestValue(value) {
-			return nil, fmt.Errorf("line %d: malformed TOML key/value", lineNo+1)
-		}
-		identity := section + "\x00" + key
-		if seen[identity] {
-			return nil, fmt.Errorf("line %d: duplicate TOML key %q in [%s]", lineNo+1, key, section)
-		}
-		seen[identity] = true
-		if cargoDependencySection(section) {
-			deps = append(deps, key, strings.ReplaceAll(key, "-", "_"))
+		if err := addGroups("workspace", workspaceTable, groups...); err != nil {
+			return nil, err
 		}
 	}
+	if targets, ok := root["target"]; ok {
+		targetTable, tableOK := targets.(map[string]any)
+		if !tableOK {
+			return nil, fmt.Errorf("target must be a table")
+		}
+		targetNames := make([]string, 0, len(targetTable))
+		for name := range targetTable {
+			targetNames = append(targetNames, name)
+		}
+		sort.Strings(targetNames)
+		for _, name := range targetNames {
+			entry, entryOK := targetTable[name].(map[string]any)
+			if !entryOK {
+				return nil, fmt.Errorf("target.%s must be a table", name)
+			}
+			if err := addGroups("target."+name, entry, groups...); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	deps := make([]string, 0, len(seen))
+	for name := range seen {
+		deps = append(deps, name)
+	}
+	sort.Strings(deps)
 	return deps, nil
-}
-
-func cargoDependencySection(section string) bool {
-	return section == "dependencies" || section == "workspace.dependencies" || (strings.HasPrefix(section, "target.") && strings.HasSuffix(section, ".dependencies"))
-}
-
-func cargoDependencyTable(section string) ([]string, bool) {
-	for _, prefix := range []string{"dependencies.", "workspace.dependencies."} {
-		if strings.HasPrefix(section, prefix) {
-			name := strings.TrimPrefix(section, prefix)
-			return []string{name, strings.ReplaceAll(name, "-", "_")}, true
-		}
-	}
-	return nil, false
 }
 
 func stripManifestComment(line string) (string, error) {

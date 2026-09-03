@@ -103,3 +103,24 @@ func TestPropSessionActiveUser(t *testing.T) {
 		t.Errorf("P-session-active-user: Current must invalidate a now-Disabled user")
 	}
 }
+
+// P-manager-has-team: assigning Manager to a teamless user is refused, while
+// the same assignment succeeds after the user belongs to exactly one team.
+func TestPropManagerHasTeam(t *testing.T) {
+	s, f, _ := newSess(t)
+	tx, _ := f.Open("mem")
+	u, err := session.Impl(s).Register(tx, "manager", "pw", model.RoleRep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Impl(s).AssignRole(tx, u.ID, model.RoleManager); !errors.Is(err, model.ErrConstraint) {
+		t.Fatalf("P-manager-has-team: teamless Manager assignment = %v, want ErrConstraint", err)
+	}
+	u.TeamID = "team-1"
+	if err := f.SaveUser(tx, u); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Impl(s).AssignRole(tx, u.ID, model.RoleManager); err != nil {
+		t.Fatalf("P-manager-has-team: teamed Manager assignment: %v", err)
+	}
+}

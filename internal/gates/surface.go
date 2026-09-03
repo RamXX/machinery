@@ -17,9 +17,11 @@ import (
 const SurfaceLedgerName = "legacy/surface.yaml"
 
 var (
-	surfaceRootKeys  = stringSet("surface_version", "system", "classes", "as_of", "_comment")
+	surfaceRootKeys  = stringSet("surface_version", "system", "corpus", "classes", "as_of", "_comment")
 	surfaceClassKeys = stringSet("none", "source", "items")
 	surfaceItemKeys  = stringSet("name", "disposition", "via", "target", "rationale")
+	corpusItemKeys   = stringSet("area", "classification", "source", "rationale", "target", "decided_by", "decided", "question", "owner")
+	corpusClasses    = stringSet("preserve-port", "rearchitect-adapt", "learning-only", "historical-only", "unresolved")
 	// surfaceClasses is the fixed enumeration vocabulary: every class must be
 	// inventoried or explicitly waived, so a forgotten class is an error, not
 	// a silent pass.
@@ -58,6 +60,7 @@ type surfaceValidator struct {
 	dropped   int
 	deferred  int
 	waived    int
+	corpus    int
 }
 
 // CheckSurface implements Gs-surface. The ledger anchors design coverage to
@@ -89,6 +92,10 @@ func CheckSurface(design string) *Gate {
 	if len(g.Errs) != 0 {
 		return g
 	}
+	v.validateCorpus()
+	if len(g.Errs) != 0 {
+		return g
+	}
 	v.model, err = readSurfaceTargetModel(design, filepath.Join(design, "domain.modelith.yaml"))
 	if err != nil {
 		v.errf("domain.modelith.yaml: %v; covered bindings resolve against the Phase 1 target model", err)
@@ -105,6 +112,7 @@ func CheckSurface(design string) *Gate {
 	v.g.Count("deferred", v.deferred)
 	v.g.Count("waived classes", v.waived)
 	v.g.Count("surface items", v.covered+v.dropped+v.deferred)
+	v.g.Count("classified corpus areas", v.corpus)
 	if asOf := strings.TrimSpace(v.root.GetString("as_of")); asOf != "" {
 		// the ledger's anchor: which legacy revision or date the enumeration
 		// held for; surfacing it keeps a stale ledger reviewable (P-F3)
@@ -159,8 +167,8 @@ func (v *surfaceValidator) validateRoot() {
 	v.checkKeys(v.root, surfaceRootKeys, SurfaceLedgerName)
 	version := v.root.Get2("surface_version")
 	n, err := version.AsNumber().Int64()
-	if version == nil || version.Kind != ir.KindNumber || err != nil || n != 1 {
-		v.errf("surface_version must be the integer 1")
+	if version == nil || version.Kind != ir.KindNumber || err != nil || n != 2 {
+		v.errf("surface_version must be the integer 2 (v2 adds the required legacy corpus intent inventory)")
 	}
 	if v.root.GetString("system") == "" {
 		v.errf("system is required: one line naming the legacy system and its shape")
@@ -182,6 +190,63 @@ func (v *surfaceValidator) validateRoot() {
 		if !allowed[key] {
 			v.errf("classes.%s is not a surface class (the vocabulary is %s)", key, strings.Join(surfaceClasses, ", "))
 		}
+	}
+}
+
+func (v *surfaceValidator) validateCorpus() {
+	items := migrationList(v.root.Get2("corpus"))
+	if len(items) == 0 {
+		v.errf("corpus is required and must classify every coherent legacy area; missing classification never implies preserve-port")
+		return
+	}
+	seen := map[string]bool{}
+	for i, item := range items {
+		where := fmt.Sprintf("corpus[%d]", i)
+		obj := item.AsObject()
+		if obj == nil {
+			v.errf("%s is not a mapping", where)
+			continue
+		}
+		v.checkKeys(obj, corpusItemKeys, where)
+		area := strings.TrimSpace(obj.GetString("area"))
+		if area == "" {
+			v.errf("%s.area is required: name one coherent legacy subsystem, schema family, API, workflow, test corpus, migration, or operational tool", where)
+		} else if seen[area] {
+			v.errf("%s.area %s is duplicated; each corpus area has exactly one intent classification", where, ir.Repr(area))
+		} else {
+			seen[area] = true
+		}
+		classification := strings.TrimSpace(obj.GetString("classification"))
+		if !corpusClasses[classification] {
+			v.errf("%s.classification is %s; use preserve-port, rearchitect-adapt, learning-only, historical-only, or unresolved", where, ir.Repr(classification))
+		}
+		for _, key := range []string{"source", "rationale"} {
+			if strings.TrimSpace(obj.GetString(key)) == "" {
+				v.errf("%s.%s is required", where, key)
+			}
+		}
+		switch classification {
+		case "unresolved":
+			if strings.TrimSpace(obj.GetString("question")) == "" || strings.TrimSpace(obj.GetString("owner")) == "" {
+				v.errf("%s: unresolved intent blocks architecture; record both question and owner", where)
+			} else {
+				v.errf("%s: unresolved intent blocks architecture until %s decides %s", where, obj.GetString("owner"), ir.Repr(obj.GetString("question")))
+			}
+		case "preserve-port", "rearchitect-adapt", "learning-only", "historical-only":
+			if strings.TrimSpace(obj.GetString("decided_by")) == "" {
+				v.errf("%s.decided_by is required for a resolved classification", where)
+			}
+			date := strings.TrimSpace(obj.GetString("decided"))
+			if !surfaceAsOfDateRe.MatchString(date) {
+				v.errf("%s.decided must be YYYY-MM-DD", where)
+			} else if _, err := time.Parse("2006-01-02", date); err != nil {
+				v.errf("%s.decided %s is not a real calendar date", where, ir.Repr(date))
+			}
+			if (classification == "preserve-port" || classification == "rearchitect-adapt") && strings.TrimSpace(obj.GetString("target")) == "" {
+				v.errf("%s.target is required for %s: name the target owner or component", where, classification)
+			}
+		}
+		v.corpus++
 	}
 }
 

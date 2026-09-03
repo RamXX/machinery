@@ -28,10 +28,18 @@ the broker or infra configuration (topic definitions, subscriptions, queue bindi
 Strict root shape (unknown keys fail):
 
 ```yaml
-surface_version: 1
+surface_version: 2
 system: <one line naming the legacy system and its shape>
 as_of: <legacy commit or date the surface was enumerated against>   # optional; printed on the Gs checked line
                                      # an ISO date, a 7-40 character revision, or a tag-like token; prose warns
+corpus:
+  - area: <coherent subsystem, schema family, API, workflow, test corpus, migration, or tool>
+    classification: rearchitect-adapt # preserve-port | rearchitect-adapt | learning-only | historical-only | unresolved
+    source: <where this evidence came from>
+    rationale: <why this is the intended treatment>
+    target: <target owner or component> # required for preserve-port and rearchitect-adapt
+    decided_by: <person>                # required for resolved classifications
+    decided: 2026-09-03                 # required for resolved classifications
 classes:
   routes:                            # network API surface
     source: <where the enumeration came from>
@@ -52,6 +60,10 @@ classes:
 
 ## Coverage rules
 
+- `corpus` is non-empty and classifies every coherent legacy area exactly once. Missing never means
+  preserve-port. Resolved rows record source, rationale, decision maker/date, and the target for
+  preserve/adapt work. `unresolved` records a question and owner and always blocks the architecture
+  handoff. See [archaeology-classification.md](archaeology-classification.md).
 - All six classes must appear, each as an inventory (`source` + non-empty `items`) or a waiver
   (`none: <reason>`), never both. A forgotten class is a missing key, which is an error.
 - Every item has a `name` (unique within its class) and exactly one disposition.

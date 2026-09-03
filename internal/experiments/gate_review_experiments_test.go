@@ -298,30 +298,29 @@ func TestReviewUnreadableOracleIsHardError(t *testing.T) {
 	}
 }
 
-// GA-1 (the 7-shard dogfood finding): a manifest design whose every shard
-// waives its Build plan toward the root's section 9. Before the fix Gb
-// checked only the shards, reported "7 plans, 7 waived plans", and the real
-// plan (milestones, DoD lines, oracle citations) was checked by nothing. The
-// root plan must now be checked, and Ga must bind acceptance evidence to the
-// milestones it declares.
+// GA-1: manifest scheduling has one authority. The root declares milestones,
+// demos, and packet ownership; Ga binds only those root milestones.
 func TestReviewManifestRootPlanIsHeldAndAccepted(t *testing.T) {
 	design := t.TempDir()
 	writeReviewFile(t, filepath.Join(design, "machines", "Thing.oracle.md"),
 		"# o\n\n| test id | stable id | source |\n|---|---|---|\n| T-THIN-01 | THIN-aaa111 | A |\n")
 	writeReviewFile(t, filepath.Join(design, "BUILD.md"), "# B\n\nMode: manifest\n\n## 9. Build plan\n\n"+
-		"**M0 - Walking skeleton.** NFR: error envelope. DoD: THIN-aaa111 green end to end.\nStatus: closed\n\n"+
-		"**M1 - Breadth slice.** DoD: every remaining row green.\n"+reviewTemplateStub(t))
-	for _, shard := range []string{"orders", "payments"} {
-		writeReviewFile(t, filepath.Join(design, "BUILD", shard+".md"),
-			"# "+shard+"\n\n## 9. Build plan\n\nN/A - the build plan is the root BUILD.md section 9.\n")
+		"**M0 - Walking skeleton.**\nPacket: [M0 packet](BUILD/M0-skeleton.md)\nDemo: exercise one boundary.\nNFR: error envelope.\nDoD: THIN-aaa111 green end to end.\nStatus: closed\n\n"+
+		"**M1 - Breadth slice.**\nPacket: [M1 packet](BUILD/M1-breadth.md)\nDemo: exercise the remaining workflow.\nDoD: every remaining row green.\n"+reviewTemplateStub(t))
+	packet := func(num, title string) string {
+		return "# M" + num + " - " + title + "\n\n## Outcome\nresult\n\n## Domain context\ndomain\n\n" +
+			"## Architecture context\nboundary\n\n## Behavior and oracles\nrows\n\n" +
+			"## TDD and implementation\nred green\n\n## Risks and recovery\nbounds\n\n## Acceptance\nevidence\n"
 	}
+	writeReviewFile(t, filepath.Join(design, "BUILD", "M0-skeleton.md"), packet("0", "Walking skeleton"))
+	writeReviewFile(t, filepath.Join(design, "BUILD", "M1-breadth.md"), packet("1", "Breadth slice"))
 
 	gb := gates.CheckBuildPlan(design)
 	if len(gb.Errs) != 0 {
 		t.Fatalf("Gb must accept a root-plan manifest: %v", gb.Errs)
 	}
 	if gb.Counts["milestones"] != 2 || gb.Counts["skeleton citations"] != 1 || gb.Counts["closed milestones"] != 1 {
-		t.Fatalf("the root plan must be structurally checked, not waived away: %+v", gb.Counts)
+		t.Fatalf("the root plan must be structurally checked with its packets: %+v", gb.Counts)
 	}
 
 	// closed with no evidence at all: Ga activates on the marker alone

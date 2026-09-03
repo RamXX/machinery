@@ -8,21 +8,21 @@ waivers:
       structural property of the RecommendationRun machine: its transition
       graph has no backward edge (Collecting -> Optimizing -> Ready/Failed),
       so no unit can violate it; the machine matrix and the M2 run-spine
-      slice tests in BUILD/RecommendationRun.md are the enforcement artifacts
+      slice tests in BUILD/M1-run-pipeline.md are the enforcement artifacts
   - invariant: portfolio-size-16
     reason: >-
       optimizer-commit property; no modeled action owns the commit (the run
       machine commits internally); enforced by the locked property test
-      PROP-portfolio-size-16 in the BUILD/RecommendationRun.md M3 slice
+      PROP-portfolio-size-16 in BUILD/M3-optimizer.md
   - invariant: portfolio-holdings-deduped
     reason: >-
       optimizer-commit property; enforced by the locked property test
-      PROP-portfolio-holdings-deduped in the BUILD/RecommendationRun.md M3 slice
+      PROP-portfolio-holdings-deduped in BUILD/M3-optimizer.md
   - invariant: portfolio-from-candidates
     reason: >-
       optimizer-commit property; enforced by the locked property test
-      PROP-portfolio-from-candidates in the BUILD/RecommendationRun.md M3 slice
+      PROP-portfolio-from-candidates in BUILD/M3-optimizer.md
   - invariant: portfolio-has-drawdown
     reason: >-
       optimizer-commit property; enforced by the locked property test
-      PROP-portfolio-has-drawdown in the BUILD/RecommendationRun.md M3 slice
+      PROP-portfolio-has-drawdown in BUILD/M3-optimizer.md

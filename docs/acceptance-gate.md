@@ -91,9 +91,9 @@ things, the way forcing `gp`, `gi`, or `gn` is.
 - **The evidence binds to the commit**, under one of two rules. Which one applies depends on where
   the commit under review came from, and the `checked:` line always names it, so the rule in force
   is never inferred from the absence of a note. See "The two binding modes" below.
-- **Milestone numbers are unambiguous.** Evidence is keyed by number alone, so a number declared
-  in two plan-bearing documents (the manifest root and a shard, or two shards) is an ERROR
-  naming both. Milestone numbers are global across a sharded design.
+- **Milestone numbers are unambiguous.** Evidence is keyed by number alone. Root `BUILD.md` is the
+  sole plan and acceptance authority; bounded `BUILD/*.md` execution packets cannot declare
+  milestones, so a packet cannot silently introduce a second acceptance target.
 
 ## The two binding modes
 

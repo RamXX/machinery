@@ -1004,7 +1004,7 @@ func TestCheckAcceptanceManifestRootPlan(t *testing.T) {
 	}
 }
 
-const acceptShardPlanned = `# BUILD: orders
+const acceptPacketWithPlan = `# M2 - Orders slice
 
 ## 9. Build plan
 
@@ -1014,40 +1014,36 @@ Walking skeleton: N/A - the design-wide skeleton lives in the payments shard.
 Status: closed
 `
 
-// Shards may carry the plans instead; milestone numbers must then be unique
-// across every plan-bearing document, because evidence is keyed by number.
-func TestCheckAcceptanceManifestShardPlans(t *testing.T) {
+// Execution packets are never milestone authorities. Even a malformed packet
+// carrying a Build plan cannot make acceptance evidence valid for an id the
+// root did not declare; Gb separately rejects the packet's plan section.
+func TestCheckAcceptanceManifestPacketPlanIsIgnored(t *testing.T) {
 	root := "# BUILD: thing\n\nMode: manifest\n\n## 1. Purpose\n\nProse.\n"
 	evidence := strings.Replace(
 		strings.Replace(acceptEvidenceM0, "milestone: 0", "milestone: 2", 1),
 		"dod_ids:\n  - T-CMD-01\n  - CMD-abc123\n", "dod_ids:\n  - T-CMD-02\n", 1)
 	design := writeAcceptFixture(t, map[string]string{
 		"BUILD.md":           root,
-		"BUILD/orders.md":    acceptShardPlanned,
+		"BUILD/orders.md":    acceptPacketWithPlan,
 		"acceptance/M0.yaml": "",
 		"acceptance/M2.yaml": evidence,
 	})
 	g := CheckAcceptance(design, acceptedCommit)
-	if len(g.Errs) != 0 {
-		t.Fatalf("Ga not clean on a shard-plan manifest: %v", g.Errs)
-	}
-	if g.Counts["closed milestones with accepted evidence"] != 1 {
-		t.Errorf("the shard's closed milestone must be discharged: %+v", g.Counts)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "which no build-plan document declares") {
+		t.Fatalf("packet-local milestones must not authorize acceptance: %v", g.Errs)
 	}
 }
 
-func TestCheckAcceptanceManifestDuplicateMilestoneNumbers(t *testing.T) {
-	root := "# BUILD: thing\n\nMode: manifest\n\n## 1. Purpose\n\nProse.\n"
+func TestCheckAcceptanceManifestPacketCannotDuplicateRootMilestone(t *testing.T) {
 	design := writeAcceptFixture(t, map[string]string{
-		"BUILD.md":           root,
-		"BUILD/orders.md":    acceptShardPlanned,
-		"BUILD/payments.md":  strings.Replace(acceptShardPlanned, "Orders slice", "Payments slice", 1),
-		"acceptance/M0.yaml": "",
-		"acceptance/M2.yaml": strings.Replace(acceptEvidenceM0, "milestone: 0", "milestone: 2", 1),
+		"BUILD.md":             acceptManifestRoot,
+		"BUILD/orders.md":      strings.Replace(acceptPacketWithPlan, "M2", "M0", 1),
+		"acceptance/M0.yaml":   acceptEvidenceM0,
+		"machines/T.oracle.md": acceptOracleMD,
 	})
 	g := CheckAcceptance(design, acceptedCommit)
-	if !strings.Contains(strings.Join(g.Errs, "\n"), "declared in both orders.md and payments.md") {
-		t.Fatalf("a repeated milestone number must be ambiguous, got %v", g.Errs)
+	if len(g.Errs) != 0 || g.Counts["declared milestones"] != 2 {
+		t.Fatalf("only root milestones enter acceptance inventory: errs=%v counts=%+v", g.Errs, g.Counts)
 	}
 }
 

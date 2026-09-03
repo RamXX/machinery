@@ -61,14 +61,13 @@ formal artifacts are untouched.
   (`machinery oracle design/machines`, `machinery check design [--impl .]`,
   `machinery verify-formal design`). Rationale: that toolchain no longer exists in this repo; a
   builder following the old commands would stall at the first gate run.
-- 2026-07-22: Shard conversion. BUILD.md converted from full mode to manifest mode: the root keeps
-  the shared obligations (glossary, domain model, Architecture Contract, traceability matrix,
-  cross-context test spec, toolchain pins, state-migration protocol, milestone map, hard-TDD
-  protocol) and one shard per stateful component now lives under `design/BUILD/`
-  (RecommendationRun.md, Portfolio.md, MarketDataFeed.md), each carrying its component's behavior,
-  oracle references by stable id, and DoD-bearing milestones. Rationale: gives Gb-plan's per-shard
-  checks a worked corpus in the examples; the milestone content is the former sections 5, 7.1, 7.2,
-  and 13, redistributed without behavioral change.
+- 2026-09-03: Milestone packet conversion. Root BUILD.md is the only milestone and acceptance
+  authority. Each milestone links to exactly one narrow `design/BUILD/M<n>-*.md` execution packet
+  containing the domain, architecture, behavior/oracle, TDD, implementation, risk/recovery, and
+  acceptance context needed to execute that milestone without reading the whole design corpus.
+  The packet inventory is exact: missing, duplicate, and orphan packets fail the build-plan gate.
+  Rationale: small/local execution models receive bounded, self-contained work while the root
+  manifest preserves global ordering and acceptance authority.
 
 ## Production determinism hardening (2026-09-02)
 

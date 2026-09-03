@@ -132,10 +132,12 @@ For each component `<C>`:
 - `design/machines/<C>.oracle.md` - GENERATED: run `machinery oracle design/machines`
   and commit the output. Never hand-edit it; G3 regenerates it in memory and diffs, so a stale or
   edited oracle is DRIFT.
-- `design/formal/<C>.semantics.yaml` - one source annotation for every lifecycle machine, declaring
-  and reconciling its `linear-lifecycle`, `terminal-lifecycle`, or `saga` pattern. Do not omit the
-  annotation merely because control-flow TLA+ can be generated without it: the annotation is what
-  arms data refinement.
+- `design/formal/<C>.semantics.yaml` - one source annotation for every lifecycle machine. Use
+  `linear-lifecycle`, `terminal-lifecycle`, or `saga` when the lifecycle honestly fits that data
+  refinement. Otherwise use `control-flow-only` with a specific non-empty reason. Do not omit the
+  annotation: the explicit declaration prevents a missing proof from looking like an intentional
+  control-flow scope. The complete source shapes are in the Machinery skill's
+  `references/verification-evidence.md`.
 - `design/formal/<name>.composition.yaml` - one source annotation for every cross-aggregate
   invariant or saga whose correctness depends on an ordered coordinator/step/undo composition.
   Do not invent a composition when no cross-aggregate obligation exists; state that the sweep found

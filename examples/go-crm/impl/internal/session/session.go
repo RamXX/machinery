@@ -165,6 +165,21 @@ func (s *sessions) ChangePassword(tx repo.Tx, userID, newPassword string) error 
 	return s.repo.SaveUser(tx, u)
 }
 
+// AssignRole changes a user's role while enforcing manager-has-team. A
+// Manager's team is the complete boundary of that role's write authority, so a
+// teamless manager is never persisted.
+func (s *sessions) AssignRole(tx repo.Tx, userID string, role model.UserRole) error {
+	u, err := s.repo.GetUser(tx, userID)
+	if err != nil {
+		return err
+	}
+	if role == model.RoleManager && u.TeamID == "" {
+		return model.ErrConstraint
+	}
+	u.Role = role
+	return s.repo.SaveUser(tx, u)
+}
+
 // Impl exposes the concrete type for the create/update paths that are not part
 // of the Sessions boundary interface, so contract/property tests can reach
 // Register/ChangePassword. The implementer keeps this seam or inlines it.
@@ -183,6 +198,7 @@ func (s *sessions) verifyCredentials(username, password string) (model.User, err
 	if err != nil {
 		return model.User{}, err
 	}
+	defer s.repo.Rollback(tx) //nolint:errcheck // read-handle close; no write transaction exists
 	u, err := s.repo.GetUserByName(tx, username)
 	if err != nil {
 		if errors.Is(err, model.ErrNotFound) {
@@ -241,6 +257,7 @@ func (s *sessions) loadUser(userID string) (model.User, error) {
 	if err != nil {
 		return model.User{}, err
 	}
+	defer s.repo.Rollback(tx) //nolint:errcheck // read-handle close; no write transaction exists
 	return s.repo.GetUser(tx, userID)
 }
 

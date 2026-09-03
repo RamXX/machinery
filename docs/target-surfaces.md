@@ -152,9 +152,9 @@ It verifies, deterministically:
    name one of them: its number in any of the spellings the plan admits (`M2`, `m2`, `2`, and the
    padded form as written) or its title. An unresolvable name is an ERROR that lists the declared
    milestones, because "M2" surviving a replan that renumbered the plan reads like a commitment
-   and points at nothing. The milestones come from the same plan parse Gb and Ga use, root
-   document and manifest shards alike, so the ledger can never bind to a milestone Gb does not
-   hold. Before a plan exists the key is only held non-empty: the ledger is authored in Phase 2
+   and points at nothing. The milestones come from the same root BUILD.md plan parse Gb and Ga
+   use; execution packets cannot declare milestones, so the ledger can never bind to a milestone
+   Gb does not hold. Before a plan exists the key is only held non-empty: the ledger is authored in Phase 2
    and the plan in Phase 4, so a ledger legitimately runs ahead of it.
 
 The `checked:` line prints six numbers, zeros included, plus a seventh once a plan declares
