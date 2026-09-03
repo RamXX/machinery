@@ -138,7 +138,6 @@ func TestCheckAcceptanceCommitBinding(t *testing.T) {
 		{"exact", acceptedCommit, acceptedCommit, false},
 		{"evidence is a prefix of the commit", "9f3c1a2b", acceptedCommit, false},
 		{"commit is a prefix of the evidence", acceptedCommit, "9f3c1a2b", false},
-		{"case-insensitive", strings.ToUpper(acceptedCommit), acceptedCommit, false},
 		{"mismatch", "dead0000beef1111222233334444555566667777", acceptedCommit, true},
 		{"prefix too short to bind", "9f3c1a", acceptedCommit, true},
 	}
@@ -147,9 +146,8 @@ func TestCheckAcceptanceCommitBinding(t *testing.T) {
 			evidence := strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: "+tc.evidence, 1)
 			design := writeAcceptFixture(t, map[string]string{"acceptance/M0.yaml": evidence})
 			g := CheckAcceptance(design, tc.given)
-			joined := strings.Join(g.Errs, "\n")
 			switch {
-			case tc.wantErr && !strings.Contains(joined, "does not name the supplied review target"):
+			case tc.wantErr && len(g.Errs) == 0:
 				t.Fatalf("want a commit-binding error, got %v", g.Errs)
 			case !tc.wantErr && len(g.Errs) != 0:
 				t.Fatalf("commit must bind: %v", g.Errs)
@@ -198,7 +196,13 @@ func TestCheckAcceptanceEvidenceMutations(t *testing.T) {
 			"milestone must be an integer"},
 		{"empty commit",
 			strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, `commit: ""`, 1),
-			"commit must name the single VCS commit"},
+			"commit must be a lowercase hexadecimal VCS object id"},
+		{"symbolic commit",
+			strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: HEAD~1", 1),
+			"not a symbolic or moving revision"},
+		{"uppercase commit",
+			strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: "+strings.ToUpper(acceptedCommit), 1),
+			"lowercase hexadecimal VCS object id"},
 		{"empty reviewer",
 			strings.Replace(acceptEvidenceM0, "reviewer: acceptance review, conductor", `reviewer: ""`, 1),
 			"reviewer must name who or what produced the review"},
@@ -937,13 +941,59 @@ func TestCheckAcceptanceExplicitCommitWinsInsideRepo(t *testing.T) {
 	}
 }
 
+func TestResolveExplicitHistoryAnchorOnceToImmutableCommit(t *testing.T) {
+	repo := t.TempDir()
+	f := initGitHistory(t, repo)
+	design := writeAncestryFixture(t, repo, f.root)
+	resolved, provenance, err := resolveReviewCommitExact(design, f.head[:10])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provenance != commitFromCaller || resolved != f.head {
+		t.Fatalf("resolved anchor = %q provenance=%v, want immutable %q", resolved, provenance, f.head)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "after-anchor"), []byte("new\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"add", "after-anchor"},
+		{"-c", "user.name=machinery test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", "move HEAD after anchor resolution"},
+	} {
+		if out, err := testgit.Run(t.Context(), repo, args...); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	if resolved != f.head {
+		t.Fatalf("resolved anchor moved with HEAD: got %q want %q", resolved, f.head)
+	}
+}
+
+func TestCheckAcceptanceRejectsSymbolicExplicitHistoryAnchor(t *testing.T) {
+	g := CheckAcceptance(writeAcceptFixture(t, nil), "HEAD")
+	if !hasErr(g, "supplied history anchor must be a lowercase hexadecimal") {
+		t.Fatalf("a moving explicit ref must fail closed: %v", g.Errs)
+	}
+}
+
+func TestCheckAcceptanceExplicitAnchorRejectsUnbornRepository(t *testing.T) {
+	repo := t.TempDir()
+	if out, err := testgit.Run(t.Context(), repo, "init", "-q"); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), nil)
+	g := CheckAcceptance(design, acceptedCommit)
+	if !hasErr(g, "git repository has no commit") && !hasErr(g, "unknown revision") {
+		t.Fatalf("an unborn repository must not use exported-design identity fallback: %v", g.Errs)
+	}
+}
+
 // An evidence value that could be read as a git option is data, and must
 // never reach git as a flag.
 func TestCheckAcceptanceDerivedModeRefusesOptionShapedCommits(t *testing.T) {
 	repo := t.TempDir()
 	initGitHistory(t, repo)
 	g := CheckAcceptance(writeAncestryFixture(t, repo, "--output=/tmp/machinery-gate-escape"), "")
-	if !strings.Contains(strings.Join(g.Errs, "\n"), "names no commit in the repository holding the design") {
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "not a symbolic or moving revision") {
 		t.Fatalf("an option-shaped commit must be refused as data: %v", g.Errs)
 	}
 	if _, err := os.Stat("/tmp/machinery-gate-escape"); err == nil {

@@ -67,6 +67,11 @@ var gitCommandTimeout = gitHeadTimeout
 // Operational failures must never be folded into this sentinel.
 var errReviewCommitAbsent = errors.New("repository commit is semantically absent")
 
+var (
+	errReviewCommitOutsideRepository = errors.New("design is outside a git repository")
+	errReviewCommitUnbornRepository  = errors.New("git repository has no commit")
+)
+
 // commitProvenance records where the commit under review came from. It is
 // printed on the checked: line, because a binding whose source the reader
 // cannot trace is half an audit trail.
@@ -267,7 +272,8 @@ func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool
 // note and proving nothing on every developer machine.
 func resolveReviewCommit(design, given string) (string, commitProvenance, error) {
 	commit, provenance, err := resolveReviewCommitExact(design, given)
-	if errors.Is(err, errReviewCommitAbsent) {
+	if errors.Is(err, errReviewCommitOutsideRepository) ||
+		(strings.TrimSpace(given) == "" && errors.Is(err, errReviewCommitUnbornRepository)) {
 		return "", commitAbsent, nil
 	}
 	return commit, provenance, err
@@ -280,7 +286,22 @@ func resolveReviewCommit(design, given string) (string, commitProvenance, error)
 // successfully resolved commit and therefore cannot collapse to absence.
 func resolveReviewCommitExact(design, given string) (string, commitProvenance, error) {
 	if g := strings.TrimSpace(given); g != "" {
-		return g, commitFromCaller, nil
+		if !gitObjectNameRe.MatchString(g) {
+			return "", commitAbsent, fmt.Errorf("supplied history anchor must be a lowercase hexadecimal VCS object id or unambiguous prefix (7 to 64 characters)")
+		}
+		if _, err := gitHeadAtExact(design); errors.Is(err, errReviewCommitOutsideRepository) {
+			return g, commitFromCaller, nil
+		} else if err != nil {
+			return "", commitAbsent, err
+		}
+		full, err := gitCommitOf(design, g)
+		if err != nil {
+			return "", commitAbsent, fmt.Errorf("resolve supplied history anchor: %w", err)
+		}
+		if full == "" {
+			return "", commitAbsent, fmt.Errorf("supplied history anchor %s names no commit in the repository holding the design", ir.Repr(g))
+		}
+		return full, commitFromCaller, nil
 	}
 	head, err := gitHeadAtExact(design)
 	if err != nil {
@@ -409,9 +430,11 @@ func gitHeadAtExact(dir string) (string, error) {
 	head, err := runGitExact(dir, "rev-parse", "HEAD")
 	if err != nil {
 		lower := strings.ToLower(err.Error())
-		if strings.Contains(lower, "not a git repository") ||
-			(strings.Contains(lower, "ambiguous argument 'head'") && strings.Contains(lower, "unknown revision or path")) {
-			return "", errors.Join(errReviewCommitAbsent, err)
+		if strings.Contains(lower, "not a git repository") {
+			return "", errors.Join(errReviewCommitAbsent, errReviewCommitOutsideRepository, err)
+		}
+		if strings.Contains(lower, "ambiguous argument 'head'") && strings.Contains(lower, "unknown revision or path") {
+			return "", errors.Join(errReviewCommitAbsent, errReviewCommitUnbornRepository, err)
 		}
 		return "", err
 	}
@@ -603,8 +626,8 @@ func parseAcceptance(g *Gate, design, path, label string, fileNum int) *acceptRe
 		g.Errs = append(g.Errs, fmt.Sprintf("%s: verdict is %s; it is exactly ACCEPTED or REJECTED (upper case)", label, ir.Repr(root.GetString("verdict"))))
 		ok = false
 	}
-	if rec.commit == "" || strings.ContainsAny(rec.commit, " \t") {
-		g.Errs = append(g.Errs, label+": commit must name the single VCS commit the review ran on (quote a purely numeric revision so it reads as a string)")
+	if !gitObjectNameRe.MatchString(rec.commit) {
+		g.Errs = append(g.Errs, label+": commit must be a lowercase hexadecimal VCS object id or unambiguous prefix (7 to 64 characters), not a symbolic or moving revision; quote a purely numeric revision so YAML reads it as a string")
 		ok = false
 	}
 	if rec.reviewer == "" {
@@ -768,7 +791,7 @@ func checkCommitBinding(g *Gate, design string, rec *acceptRecord, commit string
 	}
 	if prov == commitFromCaller {
 		_, err := gitHeadAtExact(design)
-		if errors.Is(err, errReviewCommitAbsent) {
+		if errors.Is(err, errReviewCommitOutsideRepository) {
 			if !commitBinds(rec.commit, commit) {
 				g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s does not name the supplied review target %s; outside git, only an exact match or an unambiguous prefix of at least %d characters can bind", rec.label, ir.Repr(rec.commit), ir.Repr(commit), minCommitPrefix))
 				return

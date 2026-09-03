@@ -58,9 +58,12 @@ libc = "0.2"
 
 [target.'cfg(windows)'.build-dependencies]
 windows-sys = "0.61"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+artifact-client = { version = "1", artifact = ["bin", "cdylib"] }
 `)
 	want := []string{
-		"bindgen", "libc", "nil-core", "nil_core", "pretty_assertions", "serde",
+		"artifact-client", "artifact_client", "bindgen", "libc", "nil-core", "nil_core", "pretty_assertions", "serde",
 		"windows-sys", "windows_sys", "workspace-crate", "workspace_crate",
 	}
 	got, err := parseCargoManifest(body)
@@ -87,12 +90,34 @@ func TestCargoManifestRejectsMalformedDependencySpecifications(t *testing.T) {
 		{"selector without git", `{ version = "1", branch = "main" }`, "branch requires git"},
 		{"multiple git selectors", `{ git = "https://example.invalid/repo", branch = "main", rev = "abc" }`, "only one of branch, rev, or tag"},
 		{"source-free table", `{ optional = true }`, "must declare version, path, git, or workspace = true"},
+		{"empty artifact array", `{ version = "1", artifact = [] }`, "artifact must be a non-empty string or string array"},
+		{"artifact target without artifact", `{ version = "1", target = "wasm32-unknown-unknown" }`, "target requires artifact"},
+		{"artifact lib without artifact", `{ version = "1", lib = true }`, "lib requires artifact"},
+		{"git and path", `{ git = "https://example.invalid/repo", path = "../repo" }`, "cannot combine git and path"},
+		{"registry with path", `{ version = "1", registry = "private", path = "../repo" }`, "registry cannot be combined with git or path"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := parseCargoManifest([]byte("[dependencies]\nserde = " + tc.spec + "\n"))
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("malformed Cargo dependency was accepted: err=%v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCargoWorkspaceDependencyDefinitionsRejectPackageOnlyFields(t *testing.T) {
+	cases := []struct {
+		name, spec, want string
+	}{
+		{"self inheritance", "{ workspace = true }", "cannot inherit from workspace"},
+		{"optional workspace dependency", `{ version = "1", optional = true }`, "cannot be optional"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseCargoManifest([]byte("[workspace.dependencies]\nserde = " + tc.spec + "\n"))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("invalid workspace dependency was accepted: err=%v, want %q", err, tc.want)
 			}
 		})
 	}

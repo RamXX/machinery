@@ -192,7 +192,7 @@ func parseCargoManifest(body []byte) ([]string, error) {
 	}
 
 	seen := map[string]bool{}
-	addGroup := func(path string, value any) error {
+	addGroup := func(path string, value any, workspaceDefinition bool) error {
 		group, ok := value.(map[string]any)
 		if !ok {
 			return fmt.Errorf("%s must be a dependency table", path)
@@ -206,7 +206,7 @@ func parseCargoManifest(body []byte) ([]string, error) {
 			if !cargoKeyRe.MatchString(name) {
 				return fmt.Errorf("%s has invalid dependency name %q", path, name)
 			}
-			if err := validateCargoDependencySpec(path+"."+name, group[name]); err != nil {
+			if err := validateCargoDependencySpec(path+"."+name, group[name], workspaceDefinition); err != nil {
 				return err
 			}
 			seen[name] = true
@@ -221,7 +221,7 @@ func parseCargoManifest(body []byte) ([]string, error) {
 				if prefix != "" {
 					path = prefix + "." + group
 				}
-				if err := addGroup(path, value); err != nil {
+				if err := addGroup(path, value, prefix == "workspace"); err != nil {
 					return err
 				}
 			}
@@ -271,7 +271,7 @@ func parseCargoManifest(body []byte) ([]string, error) {
 	return deps, nil
 }
 
-func validateCargoDependencySpec(path string, value any) error {
+func validateCargoDependencySpec(path string, value any, workspaceDefinition bool) error {
 	switch spec := value.(type) {
 	case string:
 		if strings.TrimSpace(spec) == "" {
@@ -288,7 +288,7 @@ func validateCargoDependencySpec(path string, value any) error {
 		}
 		sort.Strings(keys)
 		stringFields := map[string]bool{
-			"artifact": true, "branch": true, "git": true, "package": true,
+			"branch": true, "git": true, "package": true,
 			"path": true, "registry": true, "registry-index": true, "rev": true,
 			"tag": true, "target": true, "version": true,
 		}
@@ -308,6 +308,25 @@ func validateCargoDependencySpec(path string, value any) error {
 				if _, ok := field.(bool); !ok {
 					return fmt.Errorf("%s.%s must be a boolean", path, key)
 				}
+			case key == "artifact":
+				switch artifact := field.(type) {
+				case string:
+					if strings.TrimSpace(artifact) == "" {
+						return fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
+					}
+				case []any:
+					if len(artifact) == 0 {
+						return fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
+					}
+					for i, kind := range artifact {
+						text, ok := kind.(string)
+						if !ok || strings.TrimSpace(text) == "" {
+							return fmt.Errorf("%s.artifact[%d] must be a non-empty string", path, i)
+						}
+					}
+				default:
+					return fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
+				}
 			case key == "features":
 				features, ok := field.([]any)
 				if !ok {
@@ -321,6 +340,14 @@ func validateCargoDependencySpec(path string, value any) error {
 				}
 			default:
 				return fmt.Errorf("%s has unsupported dependency field %q", path, key)
+			}
+		}
+		if workspaceDefinition {
+			if _, ok := spec["workspace"]; ok {
+				return fmt.Errorf("%s cannot inherit from workspace inside workspace.dependencies", path)
+			}
+			if _, ok := spec["optional"]; ok {
+				return fmt.Errorf("%s cannot be optional inside workspace.dependencies", path)
 			}
 		}
 
@@ -361,14 +388,34 @@ func validateCargoDependencySpec(path string, value any) error {
 		if selectors > 1 {
 			return fmt.Errorf("%s may declare only one of branch, rev, or tag", path)
 		}
+		_, hasGit := spec["git"]
+		_, hasPath := spec["path"]
+		if hasGit && hasPath {
+			return fmt.Errorf("%s cannot combine git and path sources", path)
+		}
+		_, hasArtifact := spec["artifact"]
+		for _, artifactOnly := range []string{"lib", "target"} {
+			if _, ok := spec[artifactOnly]; ok && !hasArtifact {
+				return fmt.Errorf("%s.%s requires artifact", path, artifactOnly)
+			}
+		}
 		if _, hasRegistry := spec["registry"]; hasRegistry {
 			if _, hasVersion := spec["version"]; !hasVersion {
 				return fmt.Errorf("%s.registry requires version", path)
+			}
+			if hasGit || hasPath {
+				return fmt.Errorf("%s.registry cannot be combined with git or path", path)
 			}
 		}
 		if _, hasRegistryIndex := spec["registry-index"]; hasRegistryIndex {
 			if _, hasVersion := spec["version"]; !hasVersion {
 				return fmt.Errorf("%s.registry-index requires version", path)
+			}
+			if hasGit || hasPath {
+				return fmt.Errorf("%s.registry-index cannot be combined with git or path", path)
+			}
+			if _, hasRegistry := spec["registry"]; hasRegistry {
+				return fmt.Errorf("%s cannot combine registry and registry-index", path)
 			}
 		}
 		return nil
