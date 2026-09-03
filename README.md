@@ -41,8 +41,11 @@ design into three layers that compose rather than merely coexist:
   conditioned on the architecture the previous layer fixed. Model-checked.
 
 The state machines come last because they need the other two as inputs, and half of each machine is
-*derived* from the domain model rather than invented. The final artifact is a `BUILD.md` a zero-context
-coder can build from, plus the machines that are simultaneously the test oracle and the formal spec.
+*derived* from the domain model rather than invented. A narrow design ends in one self-contained
+`BUILD.md`. A large design ends in a root milestone/demo manifest with exactly one bounded,
+self-contained execution packet per milestone, so a smaller coding model can implement one slice
+without reconstructing the rest of the design. The machines remain both the test oracle and the
+formal spec.
 
 For a rebuild or hybrid migration, machinery keeps a second, legacy domain model instead of blending
 current and intended behavior into one document. A checked `migration.yaml` disposes every legacy
@@ -328,8 +331,12 @@ run (and only this step needs Java).
 ## Brownfield systems
 
 The pipeline reads as greenfield, but the toolchain does not care. On an existing system you run
-the phases as archaeology instead of invention: write the Modelith model, the contract, and the
-machines to describe the system AS IT IS, then let the gates arbitrate what they can see. Be
+the phases as archaeology instead of invention. Before architecture, classify every coherent legacy
+corpus area as behavior to preserve/port, capability to rearchitect/adapt, learning-only evidence,
+historical-only material, or unresolved intent. Missing classification never means "must port," and
+an unresolved product decision blocks the architecture handoff. Then write the Modelith model, the
+contract, and the machines for the target the evidence supports, and let the gates arbitrate what
+they can see. Be
 precise about what that is: the only code-facing gate is G4-import, and it reads import statements
 only, so what you get from day one is the import-boundary drift map, not a behavioral comparison.
 No gate executes or reads code behavior. Behavioral code-vs-model drift surfaces through
@@ -398,6 +405,13 @@ a weaker model would fumble, so a mid-tier model is much safer for the synthesis
 layer narrows the failure mode rather than removing it: with a weak interrogator you get a
 structurally consistent, formally verified model of the wrong system.
 
+Execution is deliberately a different workload from design. For a large project, the root
+`BUILD.md` is only the ordered milestone and demo authority; every milestone links to one packet
+under `BUILD/` containing its domain, architecture, behavior, oracle, TDD, implementation, risk,
+recovery, and acceptance context. Each packet is capped at 64 KiB and may not depend on another
+packet for missing context. This keeps implementation tractable for smaller or local models without
+weakening the tests, proofs, or acceptance boundary.
+
 ### When not to use machinery
 
 CRUD screens, UI-heavy surfaces, and pure transforms get a contract spec and ordinary tests, not
@@ -426,8 +440,8 @@ they are covered.
 
 ### Prerequisites
 
-`machinery preflight` (or `machinery doctor`) checks all of these at any time and warns about
-anything missing; it installs nothing.
+`machinery doctor` reports prerequisite and installation status. `machinery preflight` enforces the
+required versions and release checks. Neither command installs anything.
 
 **Required**
 
@@ -451,7 +465,7 @@ anything missing; it installs nothing.
   This puts the `machinery` binary on `~/.local/bin` and runs `machinery install` to place the skill
   + role docs into your agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see
   [Agent homes](#agent-homes)). Override with environment variables, for example
-  `MACHINERY_VERSION=v0.1.7`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
+  `MACHINERY_VERSION=v0.6.3`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
   `MACHINERY_TARGETS="codex opencode"`. `MACHINERY_HOMES` accepts one full path per line, preserving
   spaces; use a literal newline between multiple homes.
 
@@ -509,8 +523,10 @@ machinery uninstall                   # remove them
 machinery install --target all        # add native Claude, Codex, and OpenCode integration
 machinery doctor --target all         # inspect every host-specific artifact
 machinery uninstall --target all      # remove every host adapter and the shared skill
-machinery preflight                   # check prerequisites (warns; installs nothing)
+machinery preflight                   # enforce the pinned release prerequisites
 machinery check <your-design>         # run the deterministic gate suite
+machinery check <design> --impl <dir> \
+  --complete --warnings-as-errors     # require a final, closed, zero-warning handoff
 machinery baseline <design> --impl .  # brownfield Stage 1: propose baseline rules, write the ratchet
 machinery verify-formal <your-design> # regenerate + TLC-check the proofs (needs Java)
 machinery oracle <dir|files...>       # regenerate transition oracles (a directory, or named machine files;
@@ -574,7 +590,7 @@ version matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.5.0         # force an exact release
+machinery update --version v0.6.3         # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
@@ -666,11 +682,11 @@ make verify-formal   # regenerates and checks all 35 TLC proofs + the relational
 | G3-machine | machines pass structural lint, the TLA generator's own admissibility pass (a machine G3 passes is a machine `verify-formal` can generate), retry-counter accounting (leg-entry resets, or a proof-carrying `_counters` waiver), derived-deadline span checks (the stamped-absolute-deadline idiom), the dotted-reference name-rot audit, and the `_branch_order` requirement for overlapping guarded branches; committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
 | Gd-idcite | designs with machines only: every stable-id citation in hand-written files resolves to a committed oracle row (letter-suffixed forms are falsifying-clause derivatives; `design/removed-ids.txt` is the dated allowance; DECISIONS.md and STATE.md are historical ledgers, counted not judged), positional `T-<TAG>-NN` citations warn, rule-15 form-b row counts are verified against their tables, and opt-in `CLAUSES{...}`/`READS{...}` declarations catch clause drift and payload-sufficiency drift (the `READS{...}` tier stands down for the events an armed event contract names: Gx-trace judges those at ERROR strength instead, so one defect earns one finding); a guard row whose contract statement is a conjunction or disjunction and declares NO clause vocabulary warns, waivable per row with `(single-clause: <reason>)`. |
 | Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows, and entities to persistence-placement rows (every declared entity has a row or a `(not placed: <reason>)` waiver; the entity list is closed, so the table's completeness is checked, not attested). When the mitigation table carries a `handled by` column, every name resolves to a committed machine or one of its invoke actors, or waives with `(no residual: <reason>)`. The event-contract rows are reconciled against the machines with the pack gate's own semantics: a consumed event is handled or `_ignores`-ed by some machine, a produced event appears whole-token in some machine action or matrix cell, or the cell that owes the obligation carries a `(no machine: <reason>)` waiver. A design that carries a pack is left to G5, which reconciles the same rows from the generated `events.md`, so one defect never earns two findings. Opt-in by a `<!-- machinery:reads-complete -->` marker in ARCHITECTURE.md, the consumer-READS completeness tier: every event-contract row then owes a `READS{field, ...}` declaration on a matrix row naming its event, or a `(no reads: <reason>)` waiver in the consumer cell for a consumer that genuinely reads nothing off the payload (a pure signal), and every declared field must appear whole-token in that row's payload cell. A `(no machine: <reason>)` waiver answers a different question and never discharges it. An unarmed design carries no obligation and keeps Gd's opt-in warn tier exactly as it was. |
-| Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, the skeleton DoD cites a committed oracle id, and the skeleton block carries an `NFR:` line naming the NFR-record mechanisms it instantiates. |
+| Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, the skeleton DoD cites a committed oracle id, and the skeleton block carries an `NFR:` line naming the NFR-record mechanisms it instantiates. In `Mode: manifest`, each milestone also has one observable `Demo:` and links exactly one direct `BUILD/M<n>-*.md` packet; the packet inventory is exact, every packet has the seven required self-contained context sections, and each is at most 64 KiB. |
 | Ga-accept | once the build starts, milestone by milestone: committed acceptance evidence per closed milestone binds to a reviewed commit in the selected repository history (the derived HEAD or an explicit `--commit`/`MACHINERY_COMMIT` anchor, by ancestry), and to the literal or `ORACLESET{...}`-expanded oracle ids its DoD cites. |
 | Gl-ledger | always: every STATE.md `self-review:` line parses (five keys, `clean`/`fixed`/`fixed(<reason>)`/`accepted(<reason>)`), DECISIONS.md dated entries are real dates, author-proposed unconfirmed items are counted as a note, and the house-style scan warns on em dashes and emojis across the hand-written design tree. An em dash in a generated `*.modelith.md` render is an ERROR instead: the renderer emits them and the post-render strip is mechanical, so a survivor is a skipped step, not a style opinion. A `.machineryignore` at the design root (gitignore-shaped, patterns relative to the root, no negations) keeps paths that are not authored design (a spike's vendored dependencies) out of every design-tree walker; Gl's `checked:` line reports how many paths it ignored. |
 | Gj-adjudication | designs with `adjudications/` only: every characterization verdict file parses, binds to a committed oracle stable id (one verdict per id), carries verdict/date/note, and every model-is-truth verdict names its filed defect. |
-| Gv-attest | designs with `attestations.yaml` only: every attested-claim row resolves to the closed claim vocabulary (no id twice), names an attestor and a real date, and covers artifacts the design carries whose content hashes still match, so an artifact edited after the judgment makes the row STALE and blocks. A claim whose artifact exists but carries no row warns. Whether a judgment is true is never checked, by design. `machinery attest <path>` prints the hash the gate expects. |
+| Gv-attest | designs with `attestations.yaml` only: every attested-claim row resolves to the closed claim vocabulary (no id twice), names an attestor and a real date, and covers artifacts whose hashes still match, so an edited artifact makes the row STALE and blocks. Inventory-wide claims must cover their full subject: all machines and matrices for `g3.*`, all BUILD artifacts for the G4/GT build claims, all acceptance files for review quality, and all pack files for pack-event discipline. A claim whose artifact exists but carries no row warns. Whether a judgment is true is never checked, by design. `machinery attest <path>` prints the hash the gate expects. |
 | Ge-embed | designs carrying a `machinery:embed` marker only: every marked table is held to the source it declares (`subset`: each row is byte-identical to a source row; `complete`: every selected source row is present), with `(shard-local: <reason>)` exempting exactly the row or cell it names. A row copied twice into one embed warns (a copy carries the source's rows; neither claim catches a repeat on its own). The sanctioned shard-copy duplication, checked instead of promised. `machinery embed refresh <design>` writes what this gate checks: a keyed, idempotent re-copy that leaves localized rows alone and reports (never deletes) a row with no source row. |
 | G4-import | code imports respect the contract boundaries (Go, Python, TypeScript/JavaScript, Elixir, Rust). |
 | Gt-tests | with `--impl` only: every stable id in the committed oracles appears whole-token in a test file, or a test parses the committed oracle table (the conformance idiom); for every `CLAUSES{...}`-declared guard, each governed oracle row also owes one suffixed falsifying-clause id per active clause (the conformance parse never discharges those); the hard-TDD RED-exit check made deterministic. |
@@ -692,11 +708,13 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 
 ## How it is put together
 
-- `skills/machinery/SKILL.md` the conductor, plus `references/` (XState format, C4 technique, BUILD.md
-  template) and `tools/` (the TLC shell wrappers, `tlc.sh` and `verify_formal.sh`).
+- `skills/machinery/SKILL.md` the conductor, plus phase-selected `references/` (XState format, C4
+  technique, verification evidence, archaeology classification, BUILD.md template, and bounded
+  execution packets) and `tools/` (the TLC shell wrappers, `tlc.sh` and `verify_formal.sh`).
 - `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `alloy`, `refine`,
   `compose`, `check`, `attest`, `project`, `verify-checkers`, `baseline`, `verify-formal`, `verify-c4`,
-  `pack`, `scale`, `sweep`, `doctor`, `preflight`, `install`, `update`, `uninstall`.
+  `pack`, `scale`, `sweep`, `embed`, `tokens-equal`, `doctor`, `preflight`, `install`, `update`,
+  `uninstall`, `completion`, and `version`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
   `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the full gate suite,
   see the table below), `pack/` (recursive decomposition via contract packs), `formal/` (TLC + Alloy
@@ -742,7 +760,8 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 - `examples/portfolio-engine/` a second design-only example in a different domain and language (a
   Python drawdown portfolio recommender): exercises the terminal-lifecycle pattern and a
   persistence overlay renamed from the defaults, proving the formal layer is not hardcoded to one
-  vocabulary.
+  vocabulary. Its root BUILD manifest and six milestone packets are the worked large-project,
+  small-model execution handoff.
 - `examples/checkout-split/` the recursive-decomposition example: a parent design that stops at
   contracts (`decomposition.yaml`, two abstract contract machines, generated `packs/`) plus two
   child designs, each a full machinery run against its frozen pack, with a TLC-checked proof that
