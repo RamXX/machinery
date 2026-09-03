@@ -471,9 +471,9 @@ func (state *packTreeState) revalidateAt(root *os.Root, actual string) error {
 
 func generatedPackTreeDigest(names []string, files map[string]string) string {
 	hash := sha256.New()
-	fmt.Fprintf(hash, "D\x00\x00%04o\x00", os.FileMode(0o755))
+	fmt.Fprintf(hash, "D\x00\x00%04o\x00", packGeneratedDirectoryMode())
 	for _, name := range names {
-		fmt.Fprintf(hash, "F\x00%s\x00%04o\x00", filepath.ToSlash(name), os.FileMode(0o644))
+		fmt.Fprintf(hash, "F\x00%s\x00%04o\x00", filepath.ToSlash(name), packGeneratedFileMode())
 		sum := sha256.Sum256([]byte(files[name]))
 		fmt.Fprintf(hash, "%x\x00", sum)
 	}

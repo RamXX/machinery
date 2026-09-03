@@ -155,9 +155,11 @@ expected_digest=$("$transaction" fingerprint "$repo_root/$corpus")
 version_stdout=$work/version.stdout
 version_stderr=$work/version.stderr
 version_expected=$work/version.expected
+version_expected_prefixed=$work/version.expected-prefixed
 printf 'modelith version %s\n' "${pin#v}" >"$version_expected"
+printf 'modelith version %s\n' "$pin" >"$version_expected_prefixed"
 if ! "$run_safe" -timeout 10s -stdout-limit 4096 -stderr-limit 4096 \
-  -expect-stdout-file "$version_expected" -executable-receipt "$modelith_receipt" \
+  -executable-receipt "$modelith_receipt" \
   -- "$modelith_bin" --version >"$version_stdout" 2>"$version_stderr"; then
   echo "modelith --version failed" >&2
   cat "$version_stdout" >&2
@@ -169,7 +171,8 @@ if [[ -s "$version_stderr" ]]; then
   cat "$version_stderr" >&2
   exit 1
 fi
-if ! cmp -s "$version_expected" "$version_stdout"; then
+if ! cmp -s "$version_expected" "$version_stdout" && \
+  ! cmp -s "$version_expected_prefixed" "$version_stdout"; then
   echo "modelith version output does not exactly match pin $pin" >&2
   diff -u "$version_expected" "$version_stdout" >&2 || true
   exit 1

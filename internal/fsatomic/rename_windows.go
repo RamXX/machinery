@@ -12,10 +12,10 @@ import (
 )
 
 type fileRenameInformation struct {
-	ReplaceIfExists uint32
+	ReplaceIfExists byte
 	RootDirectory   windows.Handle
 	FileNameLength  uint32
-	FileName        [1]uint16
+	FileName        [windows.MAX_LONG_PATH]uint16
 }
 
 var (
@@ -63,16 +63,16 @@ func renameNoReplaceBase(oldRoot *os.Root, oldname string, newRoot *os.Root, new
 	if err != nil {
 		return errors.Join(err, windows.CloseHandle(source), newDir.Close(), oldDir.Close())
 	}
+	if len(newUTF16) > len(fileRenameInformation{}.FileName) {
+		return errors.Join(windows.ERROR_FILENAME_EXCED_RANGE, windows.CloseHandle(source), newDir.Close(), oldDir.Close())
+	}
 	nameBytes := (len(newUTF16) - 1) * 2
-	var dummy fileRenameInformation
-	bufferSize := int(unsafe.Offsetof(dummy.FileName)) + nameBytes
-	buffer := make([]byte, bufferSize)
-	info := (*fileRenameInformation)(unsafe.Pointer(&buffer[0]))
+	info := &fileRenameInformation{}
 	info.ReplaceIfExists = 0
 	info.RootDirectory = newRootHandle
 	info.FileNameLength = uint32(nameBytes)
-	copy((*[windows.MAX_LONG_PATH]uint16)(unsafe.Pointer(&info.FileName[0]))[:nameBytes/2:nameBytes/2], newUTF16)
-	err = fsatomicNtSetInformationFile(source, &iosb, &buffer[0], uint32(bufferSize), windows.FileRenameInformation)
+	copy(info.FileName[:], newUTF16)
+	err = fsatomicNtSetInformationFile(source, &iosb, (*byte)(unsafe.Pointer(info)), uint32(unsafe.Sizeof(*info)), windows.FileRenameInformation)
 	return errors.Join(err, windows.CloseHandle(source), newDir.Close(), oldDir.Close())
 }
 
@@ -117,7 +117,7 @@ func removePrivateDirectory(root *os.Root, private *os.Root, name string) error 
 	}
 	type dispositionInformationEx struct{ Flags uint32 }
 	disposition := dispositionInformationEx{Flags: windows.FILE_DISPOSITION_DELETE | windows.FILE_DISPOSITION_POSIX_SEMANTICS | windows.FILE_DISPOSITION_IGNORE_READONLY_ATTRIBUTE}
-	dispositionErr := windows.NtSetInformationFile(
+	dispositionErr := fsatomicNtSetInformationFile(
 		windows.Handle(dir.Fd()),
 		&iosb,
 		(*byte)(unsafe.Pointer(&disposition)),

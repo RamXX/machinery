@@ -75,6 +75,15 @@ func TestRenderScriptPublishesExactSetAndIsByteIdempotent(t *testing.T) {
 	assertNoTransactionResidue(t, repo)
 }
 
+func TestRenderScriptAcceptsCanonicalPrefixedVersion(t *testing.T) {
+	t.Parallel()
+	repo := scriptFixture(t)
+	if output, err := runRenderFixture(t, repo, "version-prefixed"); err != nil {
+		t.Fatalf("render with v-prefixed Modelith version: %v\n%s", err, output)
+	}
+	assertNoTransactionResidue(t, repo)
+}
+
 func scriptFixture(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, _ := runtime.Caller(0)
@@ -118,7 +127,11 @@ func scriptFixture(t *testing.T) string {
 set -euo pipefail
 case "${1:-}" in
   --version)
-    printf 'modelith version 0.4.0\n'
+    if [[ "${MODELITH_FAKE_MODE:-}" == version-prefixed ]]; then
+      printf 'modelith version v0.4.0\n'
+    else
+      printf 'modelith version 0.4.0\n'
+    fi
     if [[ "${MODELITH_FAKE_MODE:-}" == version-warning ]]; then printf 'WARNING: hostile environment\n' >&2; fi
     ;;
   render)

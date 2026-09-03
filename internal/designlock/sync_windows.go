@@ -13,3 +13,7 @@ func syncDirectory(path string) error {
 	}
 	return dir.Close()
 }
+
+// Windows reports synthesized POSIX permission bits; ACL confinement is
+// enforced by the private directory and retained-root transaction protocol.
+func publishSentinelPermissionsSafe(os.FileMode) bool { return true }

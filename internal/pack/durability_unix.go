@@ -16,3 +16,6 @@ func syncPackDirectory(root *os.Root) error {
 }
 
 func packJournalPermissionsSafe(mode os.FileMode) bool { return mode.Perm() == 0o600 }
+
+func packGeneratedDirectoryMode() os.FileMode { return 0o755 }
+func packGeneratedFileMode() os.FileMode      { return 0o644 }

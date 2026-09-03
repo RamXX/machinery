@@ -1549,6 +1549,9 @@ func runCheckerOCIEngineFixture(wrongDigest, wrongPlatform bool) {
 		encoded, _ := json.Marshal([]string{repoDigest})
 		_, _ = os.Stdout.Write(append(encoded, '\n'))
 		imagePlatform := platform
+		if imagePlatform == "" {
+			imagePlatform = testRuntimePlatform
+		}
 		if wrongPlatform {
 			imagePlatform = "linux/arm64"
 		}

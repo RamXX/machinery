@@ -35,6 +35,13 @@ func TestWindowsRootedTransactionMutationAndRecovery(t *testing.T) {
 	if got, err := os.ReadFile(target); err != nil || string(got) != "new" {
 		t.Fatalf("mutated target = %q, %v", got, err)
 	}
+	gotDigest, err := stableArtifactPostImageDigest(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wantDigest := tx.journal.Items[0].PostDigest; gotDigest != wantDigest {
+		t.Fatalf("transaction-written Windows post-image digest = %s, want durable declaration %s", gotDigest, wantDigest)
+	}
 	if err := tx.closeAnchors(); err != nil {
 		t.Fatal(err)
 	}

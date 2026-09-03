@@ -601,6 +601,10 @@ func TestExternalEnginesUseBoundedClosedRunnerAndImmutableModelith(t *testing.T)
 			}
 		}
 	}
+	checkerRuntime := mustRepositoryFile(t, filepath.Join(repo, "cmd", "machinery", "verify_checkers.go"))
+	if strings.Contains(checkerRuntime, `"image", "inspect", "--platform"`) {
+		t.Fatal("checker runtime uses docker image inspect --platform, which is not supported by standard Docker Engine")
+	}
 	for _, workflow := range []string{"ci.yml", "nightly.yml"} {
 		body := mustRepositoryFile(t, filepath.Join(repo, ".github", "workflows", workflow))
 		if !strings.Contains(body, "timeout-minutes:") {

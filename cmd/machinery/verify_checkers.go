@@ -1288,7 +1288,7 @@ func verifyLocalOCIImage(engineArgs []string, image, digest, platform string, ti
 		timeout = checkerOCIControlPlaneTimeout
 	}
 	args := append([]string(nil), engineArgs...)
-	args = append(args, "image", "inspect", "--platform", platform, "--format", "{{json .RepoDigests}}\n{{json .Os}}\n{{json .Architecture}}", image)
+	args = append(args, "image", "inspect", "--format", "{{json .RepoDigests}}\n{{json .Os}}\n{{json .Architecture}}", image)
 	out, err := runChecker(args, timeout, workDir)
 	if err != nil {
 		return fmt.Errorf("inspect %s with the snapshotted engine: %w: %s", image, err, strings.TrimSpace(out))

@@ -11,3 +11,5 @@ func syncDirectory(path string) error {
 	}
 	return errorsJoin(f.Sync(), f.Close())
 }
+
+func publishSentinelPermissionsSafe(mode os.FileMode) bool { return mode.Perm() == 0o600 }

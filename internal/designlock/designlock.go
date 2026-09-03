@@ -1493,7 +1493,7 @@ func (l *Lock) beginPublish(record publishRecord) (_ *publishAuthority, retErr e
 		return nil, fmt.Errorf("persist design publication sentinel: %w", err)
 	}
 	stageState, err := capturePublishFile(root, publishSentinelStage, publishRecordMaxBytes+1)
-	if err != nil || !bytes.Equal(stageState.body, body) || stageState.mode.Perm() != 0o600 {
+	if err != nil || !bytes.Equal(stageState.body, body) || !publishSentinelPermissionsSafe(stageState.mode) {
 		return nil, errors.Join(fmt.Errorf("staged design publication sentinel does not match its exact record"), err)
 	}
 	if testAfterPublishStageSync != nil {
