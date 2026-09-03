@@ -49,6 +49,12 @@ func TestCheckCompleteRejectsIncompleteFinalHandoffWithImpl(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	buildPath := filepath.Join(design, "BUILD.md")
+	build, err := os.ReadFile(buildPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeText(t, buildPath, strings.ReplaceAll(string(build), "Status: closed\n", ""))
 	// This is a full, implementation-backed design, not the empty-input or
 	// gate-subset validation exercised above. Supplying --impl still cannot
 	// earn final handoff while closing artifacts are absent and its declared

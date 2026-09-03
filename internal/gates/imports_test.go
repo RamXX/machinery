@@ -44,9 +44,11 @@ nil-core.workspace = true
 serde = { version = "1", features = [
   "derive",
 ] }
+artifact-client = { version = "1", artifact = ["bin:client", "cdylib"], lib = false }
 
 [dev-dependencies]
 pretty_assertions = "1"
+artifact-dev = { version = "1", artifact = "bin" }
 
 [build-dependencies.bindgen]
 version = "0.72"
@@ -61,11 +63,9 @@ libc = "0.2"
 [target.'cfg(windows)'.build-dependencies]
 windows-sys = "0.61"
 
-[target.'cfg(target_os = "linux")'.build-dependencies]
-artifact-client = { version = "1", artifact = ["bin", "cdylib"], lib = false }
 `)
 	want := []string{
-		"artifact-client", "artifact_client", "bindgen", "libc", "nil-core", "nil_core", "pretty_assertions", "serde",
+		"artifact-client", "artifact-dev", "artifact_client", "artifact_dev", "bindgen", "libc", "nil-core", "nil_core", "pretty_assertions", "serde",
 		"windows-sys", "windows_sys", "workspace-crate", "workspace_crate",
 	}
 	got, err := parseCargoManifest(body)
@@ -95,7 +95,7 @@ func TestCargoManifestRejectsMalformedDependencySpecifications(t *testing.T) {
 		{"empty artifact array", `{ version = "1", artifact = [] }`, "artifact must be a non-empty string or string array"},
 		{"unknown artifact kind", `{ version = "1", artifact = "nonsense" }`, "artifact has unsupported kind"},
 		{"duplicate artifact kind", `{ version = "1", artifact = ["bin", "bin"] }`, "artifact repeats kind"},
-		{"artifact outside build dependency", `{ version = "1", artifact = "staticlib", lib = false }`, "only in build-dependencies"},
+		{"all and selected binaries", `{ version = "1", artifact = ["bin", "bin:tool"] }`, "cannot combine bin with selected"},
 		{"artifact target without artifact", `{ version = "1", target = "wasm32-unknown-unknown" }`, "target requires artifact"},
 		{"artifact lib without artifact", `{ version = "1", lib = true }`, "lib requires artifact"},
 		{"git and path", `{ git = "https://example.invalid/repo", path = "../repo" }`, "cannot combine git and path"},
@@ -145,14 +145,26 @@ func TestCargoWorkspaceInheritanceAllowsOnlyAdditiveFields(t *testing.T) {
 }
 
 func TestCargoVersionRequirementGrammar(t *testing.T) {
-	for _, requirement := range []string{"1", "^1.2.3", "~1.2", "*", "1.*", "1.2.x", ">= 1.2, < 2", "=1.2.3-alpha.1+build.7"} {
+	for _, requirement := range []string{"1", "^1.2.3", "~1.2", "*", "1.*", "1.2.x", ">= 1.2, < 2", "=1.2.3-alpha.1"} {
 		if err := validateCargoVersionRequirement(requirement); err != nil {
 			t.Errorf("valid requirement %q rejected: %v", requirement, err)
 		}
 	}
-	for _, requirement := range []string{"latest", "1.02", "1.2.3-alpha.01", "1.2.3+", ">=1 <2", "1.*.3", "^*", "18446744073709551616"} {
+	for _, requirement := range []string{"latest", "1.02", "1.2.3-alpha.01", "1.2.3+build.7", ">=1 <2", "1.*.3", "^*", "18446744073709551616"} {
 		if err := validateCargoVersionRequirement(requirement); err == nil {
 			t.Errorf("invalid requirement %q passed", requirement)
+		}
+	}
+}
+
+func TestCargoManifestRejectsWarningBearingDependencyTableAliases(t *testing.T) {
+	for _, body := range []string{
+		"[dev_dependencies]\nserde = \"1\"\n",
+		"[build_dependencies]\nserde = \"1\"\n",
+		"[target.'cfg(unix)'.dev_dependencies]\nserde = \"1\"\n",
+	} {
+		if _, err := parseCargoManifest([]byte(body)); err == nil || !strings.Contains(err.Error(), "underscore dependency-table alias") {
+			t.Fatalf("warning-bearing dependency table passed: %q, %v", body, err)
 		}
 	}
 }
@@ -192,7 +204,7 @@ func TestManifestDependenciesBoundsReadsAndResolvesCargoWorkspace(t *testing.T) 
 		if len(errs) != 0 {
 			t.Fatalf("governing workspace definition was not resolved: %v", errs)
 		}
-		if got, err := findCargoWorkspaceAncestor(impl); err != nil || got != filepath.Join(root, "Cargo.toml") {
+		if got, err := findCargoWorkspaceAuthority(impl, impl); err != nil || got != filepath.Join(root, "Cargo.toml") {
 			t.Fatalf("workspace ancestor = %q, %v", got, err)
 		}
 		mustWrite(t, filepath.Join(impl, "member", "Cargo.toml"), "[package]\nname = \"member\"\nversion = \"0.1.0\"\n[dependencies]\nmissing.workspace = true\n")
@@ -208,7 +220,7 @@ func TestManifestDependenciesBoundsReadsAndResolvesCargoWorkspace(t *testing.T) 
 		workspace := filepath.Join(root, "workspace", "Cargo.toml")
 		mustWrite(t, workspace, "[workspace]\n[workspace.dependencies]\nserde = \"1\"\n")
 		mustWrite(t, filepath.Join(impl, "Cargo.toml"), "[package]\nname = \"member\"\nversion = \"0.1.0\"\nworkspace = \"../workspace\"\n[dependencies]\nserde.workspace = true\n")
-		got, err := findCargoWorkspaceAncestor(impl)
+		got, err := findCargoWorkspaceAuthority(impl, impl)
 		if err != nil || got != workspace {
 			t.Fatalf("explicit workspace authority = %q, %v", got, err)
 		}
@@ -217,13 +229,26 @@ func TestManifestDependenciesBoundsReadsAndResolvesCargoWorkspace(t *testing.T) 
 			t.Fatalf("explicit workspace definition was not resolved: %v", errs)
 		}
 	})
+
+	t.Run("multiple explicit workspace authorities fail closed", func(t *testing.T) {
+		root := t.TempDir()
+		impl := filepath.Join(root, "members")
+		for _, name := range []string{"a", "b"} {
+			mustWrite(t, filepath.Join(root, "workspace-"+name, "Cargo.toml"), "[workspace]\n[workspace.dependencies]\nserde = \"1\"\n")
+			mustWrite(t, filepath.Join(impl, name, "Cargo.toml"), "[package]\nname = \""+name+"\"\nversion = \"0.1.0\"\nworkspace = \"../../workspace-"+name+"\"\n[dependencies]\nserde.workspace = true\n")
+		}
+		_, err := findCargoWorkspaceAuthority(impl, impl)
+		if err == nil || !strings.Contains(err.Error(), "multiple external Cargo workspace authorities") {
+			t.Fatalf("multiple workspace roots were conflated: %v", err)
+		}
+	})
 }
 
 func TestCargoManifestRejectsUnsupportedWorkspaceDependencyGroups(t *testing.T) {
-	for _, group := range []string{"dev-dependencies", "build-dependencies"} {
+	for _, group := range []string{"dev-dependencies", "build-dependencies", "dev_dependencies", "build_dependencies"} {
 		t.Run(group, func(t *testing.T) {
 			_, err := parseCargoManifest([]byte("[workspace." + group + "]\nserde = \"1\"\n"))
-			if err == nil || !strings.Contains(err.Error(), "only workspace.dependencies is supported") {
+			if err == nil || (!strings.Contains(err.Error(), "only workspace.dependencies is supported") && !strings.Contains(err.Error(), "underscore dependency-table alias")) {
 				t.Fatalf("workspace.%s was trusted as dependency evidence: %v", group, err)
 			}
 		})

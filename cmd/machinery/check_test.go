@@ -445,7 +445,7 @@ func TestCheckCommitFlagAndEnvironmentReachGa(t *testing.T) {
 
 	t.Setenv("MACHINERY_COMMIT", "")
 	out, code = runCheckGa(t, design, "--commit", other)
-	if code != 1 || !strings.Contains(out, "does not name the commit under review") {
+	if code != 1 || !strings.Contains(out, "does not name the supplied review target") {
 		t.Fatalf("a wrong commit must block: code=%d out=%s", code, out)
 	}
 
@@ -492,7 +492,7 @@ func TestCheckDefaultsCommitToGitHistoryOfTheDesignRepo(t *testing.T) {
 	}
 
 	evidence(side)
-	if out, code := runCheckGa(t, design); code != 1 || !strings.Contains(out, "is not an ancestor of the commit under review") {
+	if out, code := runCheckGa(t, design); code != 1 || !strings.Contains(out, "is not an ancestor of history anchor") {
 		t.Fatalf("a commit from an unmerged branch must block: code=%d out=%s", code, out)
 	}
 	evidence("9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345")

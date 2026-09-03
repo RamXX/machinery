@@ -211,7 +211,7 @@ func parseCargoManifestRecord(body []byte) (*cargoManifestRecord, error) {
 
 	record := &cargoManifestRecord{workspaceDeps: map[string]bool{}}
 	seen := map[string]bool{}
-	addGroup := func(path, groupName string, value any, workspaceDefinition bool) error {
+	addGroup := func(path string, value any, workspaceDefinition bool) error {
 		group, ok := value.(map[string]any)
 		if !ok {
 			return fmt.Errorf("%s must be a dependency table", path)
@@ -225,7 +225,7 @@ func parseCargoManifestRecord(body []byte) (*cargoManifestRecord, error) {
 			if !cargoKeyRe.MatchString(name) {
 				return fmt.Errorf("%s has invalid dependency name %q", path, name)
 			}
-			inherited, err := validateCargoDependencySpec(path+"."+name, group[name], workspaceDefinition, groupName)
+			inherited, err := validateCargoDependencySpec(path+"."+name, group[name], workspaceDefinition)
 			if err != nil {
 				return err
 			}
@@ -241,13 +241,22 @@ func parseCargoManifestRecord(body []byte) (*cargoManifestRecord, error) {
 		return nil
 	}
 	addGroups := func(prefix string, table map[string]any, workspaceDefinition bool, groups ...string) error {
+		for _, alias := range []string{"dev_dependencies", "build_dependencies"} {
+			if _, present := table[alias]; present {
+				path := alias
+				if prefix != "" {
+					path = prefix + "." + alias
+				}
+				return fmt.Errorf("%s uses an underscore dependency-table alias that Cargo warns about; use the canonical hyphenated table name", path)
+			}
+		}
 		for _, group := range groups {
 			if value, ok := table[group]; ok {
 				path := group
 				if prefix != "" {
 					path = prefix + "." + group
 				}
-				if err := addGroup(path, group, value, workspaceDefinition); err != nil {
+				if err := addGroup(path, value, workspaceDefinition); err != nil {
 					return err
 				}
 			}
@@ -314,7 +323,7 @@ func parseCargoManifestRecord(body []byte) (*cargoManifestRecord, error) {
 	return record, nil
 }
 
-func validateCargoDependencySpec(path string, value any, workspaceDefinition bool, groupName string) (bool, error) {
+func validateCargoDependencySpec(path string, value any, workspaceDefinition bool) (bool, error) {
 	switch spec := value.(type) {
 	case string:
 		if err := validateCargoVersionRequirement(spec); err != nil {
@@ -375,6 +384,7 @@ func validateCargoDependencySpec(path string, value any, workspaceDefinition boo
 						return false, fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
 					}
 					seenKinds := map[string]bool{}
+					hasAllBins, hasSelectedBin := false, false
 					for i, kind := range artifact {
 						text, ok := kind.(string)
 						if !ok || !cargoArtifactRe.MatchString(text) {
@@ -384,6 +394,11 @@ func validateCargoDependencySpec(path string, value any, workspaceDefinition boo
 							return false, fmt.Errorf("%s.artifact repeats kind %q", path, text)
 						}
 						seenKinds[text] = true
+						hasAllBins = hasAllBins || text == "bin"
+						hasSelectedBin = hasSelectedBin || strings.HasPrefix(text, "bin:")
+					}
+					if hasAllBins && hasSelectedBin {
+						return false, fmt.Errorf("%s.artifact cannot combine bin with selected bin:<name> kinds", path)
 					}
 				default:
 					return false, fmt.Errorf("%s.artifact must be a non-empty string or string array", path)
@@ -463,9 +478,6 @@ func validateCargoDependencySpec(path string, value any, workspaceDefinition boo
 				return false, fmt.Errorf("%s.%s requires artifact", path, artifactOnly)
 			}
 		}
-		if hasArtifact && !workspaceDefinition && groupName != "build-dependencies" {
-			return false, fmt.Errorf("%s.artifact is supported only in build-dependencies", path)
-		}
 		if _, hasRegistry := spec["registry"]; hasRegistry {
 			if _, hasVersion := spec["version"]; !hasVersion {
 				return false, fmt.Errorf("%s.registry requires version", path)
@@ -505,14 +517,11 @@ func validateCargoVersionRequirement(requirement string) error {
 			return fmt.Errorf("malformed comparator %q", raw)
 		}
 		core := part
-		if plus := strings.IndexByte(core, '+'); plus >= 0 {
-			if !validCargoSemverIdentifiers(core[plus+1:], false) {
-				return fmt.Errorf("malformed build metadata in %q", raw)
-			}
-			core = core[:plus]
+		if strings.Contains(core, "+") {
+			return fmt.Errorf("build metadata in %q is ignored by Cargo and is forbidden by the zero-warning contract", raw)
 		}
 		if dash := strings.IndexByte(core, '-'); dash >= 0 {
-			if !validCargoSemverIdentifiers(core[dash+1:], true) {
+			if !validCargoSemverIdentifiers(core[dash+1:]) {
 				return fmt.Errorf("malformed prerelease in %q", raw)
 			}
 			core = core[:dash]
@@ -544,7 +553,7 @@ func validateCargoVersionRequirement(requirement string) error {
 	return nil
 }
 
-func validCargoSemverIdentifiers(value string, rejectNumericLeadingZeros bool) bool {
+func validCargoSemverIdentifiers(value string) bool {
 	if value == "" {
 		return false
 	}
@@ -562,7 +571,7 @@ func validCargoSemverIdentifiers(value string, rejectNumericLeadingZeros bool) b
 				allNumeric = false
 			}
 		}
-		if rejectNumericLeadingZeros && allNumeric && len(identifier) > 1 && identifier[0] == '0' {
+		if allNumeric && len(identifier) > 1 && identifier[0] == '0' {
 			return false
 		}
 	}

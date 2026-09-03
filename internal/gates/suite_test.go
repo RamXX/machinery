@@ -70,6 +70,30 @@ func TestRunSelectedRejectsInterruptedPublishBeforeGateReads(t *testing.T) {
 	}
 }
 
+func TestCargoWorkspacePointerMutationCannotChangeSnapshotAuthority(t *testing.T) {
+	design := t.TempDir()
+	root := t.TempDir()
+	impl := filepath.Join(root, "member")
+	for _, name := range []string{"a", "b"} {
+		writeSuiteFile(t, filepath.Join(root, "workspace-"+name, "Cargo.toml"), "[workspace]\n[workspace.dependencies]\nserde = \"1\"\n")
+	}
+	manifest := filepath.Join(impl, "Cargo.toml")
+	member := func(workspace string) string {
+		return "[package]\nname = \"member\"\nversion = \"0.1.0\"\nworkspace = \"../workspace-" + workspace + "\"\n[dependencies]\nserde.workspace = true\n"
+	}
+	writeSuiteFile(t, manifest, member("a"))
+	prior := cargoAfterImplementationSnapshot
+	cargoAfterImplementationSnapshot = func() { writeSuiteFile(t, manifest, member("b")) }
+	t.Cleanup(func() { cargoAfterImplementationSnapshot = prior })
+	got := RunSelected(design, impl, Selection{Run: map[string]bool{"g4": true}, Explicit: true}, RunOptions{})
+	for _, gate := range got {
+		if gate.Title == "G0-snapshot" && strings.Contains(strings.Join(gate.Errs, "\n"), "tracked external tree changed outside the snapshot lock") {
+			return
+		}
+	}
+	t.Fatalf("A-to-B workspace-pointer mutation escaped snapshot validation: %#v", got)
+}
+
 func TestGateSnapshotNeverExposesPostAcquireABA(t *testing.T) {
 	design := t.TempDir()
 	path := filepath.Join(design, "ARCHITECTURE.md")

@@ -1502,12 +1502,100 @@ func governingCargoWorkspace(manifestPath string, record *cargoManifestRecord, r
 
 const cargoExternalWorkspaceKey = "<external-cargo-workspace>"
 
-func findCargoWorkspaceAncestor(impl string) (string, error) {
-	abs, err := filepath.Abs(impl)
+func findCargoWorkspaceAuthority(stableImpl, logicalImpl string) (string, error) {
+	records := map[string]*cargoManifestRecord{}
+	var manifestBytes int64
+	walkErr := walkTreeDirBounded(stableImpl, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d == nil {
+			return nil
+		}
+		if d.IsDir() {
+			if path != stableImpl && (strings.HasPrefix(d.Name(), ".") || d.Name() == "vendor" || d.Name() == "node_modules") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Name() != "Cargo.toml" {
+			return nil
+		}
+		remaining := dependencyManifestAggregateMaxBytes - manifestBytes
+		body, readErr := readRegularFileBounded(path, min(remaining, designArtifactMaxBytes))
+		if readErr != nil {
+			return readErr
+		}
+		manifestBytes += int64(len(body))
+		record, parseErr := parseCargoManifestRecord(body)
+		if parseErr != nil {
+			return fmt.Errorf("%s: invalid Cargo.toml: %w", path, parseErr)
+		}
+		records[filepath.Clean(path)] = record
+		return nil
+	})
+	if walkErr != nil {
+		return "", walkErr
+	}
+	stableAbs, err := filepath.Abs(stableImpl)
 	if err != nil {
 		return "", err
 	}
-	for dir, depth := abs, 0; depth <= cargoWorkspaceAncestorMaxDepth; dir, depth = filepath.Dir(dir), depth+1 {
+	logicalAbs, err := filepath.Abs(logicalImpl)
+	if err != nil {
+		return "", err
+	}
+	authorities := map[string]bool{}
+	paths := make([]string, 0, len(records))
+	for path := range records {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		record := records[path]
+		if len(record.inherited) == 0 {
+			continue
+		}
+		if _, resolveErr := governingCargoWorkspace(path, record, records); resolveErr == nil {
+			continue
+		}
+		rel, relErr := filepath.Rel(stableAbs, path)
+		if relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return "", fmt.Errorf("cargo manifest %s escaped the stable implementation snapshot", path)
+		}
+		logicalManifestDir := filepath.Dir(filepath.Join(logicalAbs, rel))
+		if record.packageWorkspace != "" {
+			authorities[filepath.Clean(filepath.Join(logicalManifestDir, filepath.FromSlash(record.packageWorkspace), "Cargo.toml"))] = true
+			continue
+		}
+		implicit, findErr := findCargoWorkspaceAbove(filepath.Dir(logicalAbs))
+		if findErr != nil {
+			return "", findErr
+		}
+		if implicit == "" {
+			return "", fmt.Errorf("%s uses workspace = true but no governing Cargo workspace was found", filepath.Join(logicalAbs, rel))
+		}
+		authorities[implicit] = true
+	}
+	paths = paths[:0]
+	for path := range authorities {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	if len(paths) > 1 {
+		return "", fmt.Errorf("implementation subtree requires multiple external Cargo workspace authorities (%s); use an --impl root that contains their workspace manifests", strings.Join(paths, ", "))
+	}
+	if len(paths) == 0 {
+		return "", nil
+	}
+	if err := validateCargoWorkspaceAuthority(paths[0]); err != nil {
+		return "", err
+	}
+	return paths[0], nil
+}
+
+func findCargoWorkspaceAbove(start string) (string, error) {
+	for dir, depth := start, 0; depth < cargoWorkspaceAncestorMaxDepth; dir, depth = filepath.Dir(dir), depth+1 {
 		candidate := filepath.Join(dir, "Cargo.toml")
 		info, statErr := os.Lstat(candidate)
 		switch {
@@ -1526,25 +1614,7 @@ func findCargoWorkspaceAncestor(impl string) (string, error) {
 				return "", fmt.Errorf("%s: invalid Cargo.toml: %w", candidate, parseErr)
 			}
 			if record.workspaceRoot {
-				if depth == 0 {
-					return "", nil
-				}
 				return candidate, nil
-			}
-			if record.packageWorkspace != "" {
-				explicit := filepath.Clean(filepath.Join(dir, filepath.FromSlash(record.packageWorkspace), "Cargo.toml"))
-				explicitBody, explicitReadErr := readRegularFile(explicit)
-				if explicitReadErr != nil {
-					return "", fmt.Errorf("read package.workspace authority %s: %w", explicit, explicitReadErr)
-				}
-				explicitRecord, explicitParseErr := parseCargoManifestRecord(explicitBody)
-				if explicitParseErr != nil {
-					return "", fmt.Errorf("package.workspace authority %s is invalid: %w", explicit, explicitParseErr)
-				}
-				if !explicitRecord.workspaceRoot {
-					return "", fmt.Errorf("package.workspace authority %s does not declare [workspace]", explicit)
-				}
-				return explicit, nil
 			}
 		}
 		parent := filepath.Dir(dir)
@@ -1553,6 +1623,21 @@ func findCargoWorkspaceAncestor(impl string) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+func validateCargoWorkspaceAuthority(path string) error {
+	body, err := readRegularFile(path)
+	if err != nil {
+		return err
+	}
+	record, err := parseCargoManifestRecord(body)
+	if err != nil {
+		return fmt.Errorf("%s: invalid Cargo.toml: %w", path, err)
+	}
+	if !record.workspaceRoot {
+		return fmt.Errorf("%s does not declare [workspace]", path)
+	}
+	return nil
 }
 
 func importMatchesManifest(ref string, deps map[string]bool) bool {

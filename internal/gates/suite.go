@@ -53,6 +53,8 @@ type Snapshot struct {
 	workspace     *designlock.ExternalTreeSnapshot
 }
 
+var cargoAfterImplementationSnapshot = func() {}
+
 func AcquireSnapshot(design string) (*Snapshot, error) {
 	lock, err := designlock.AcquireReader(design)
 	if err != nil {
@@ -96,27 +98,24 @@ func (s *Snapshot) RunSelected(impl string, sel Selection, opt RunOptions) []*Ga
 	var cargoWorkspace *designlock.RegularFileSnapshot
 	if impl != "" {
 		var err error
+		stable, err = s.lock.MaterializeExternalTree(impl)
+		if err != nil {
+			return []*Gate{{Title: "G0-snapshot", Errs: []string{"snapshot implementation tree: " + err.Error()}}}
+		}
 		if sel.Run["g4"] {
-			workspacePath, locateErr := findCargoWorkspaceAncestor(impl)
+			cargoAfterImplementationSnapshot()
+			workspacePath, locateErr := findCargoWorkspaceAuthority(stable.Path(), logicalImpl)
 			if locateErr != nil {
-				return []*Gate{{Title: "G0-snapshot", Errs: []string{"locate Cargo workspace authority: " + locateErr.Error()}}}
+				return []*Gate{{Title: "G0-snapshot", Errs: []string{"locate Cargo workspace authority: " + errors.Join(locateErr, stable.Close()).Error()}}}
 			}
 			if workspacePath != "" {
 				cargoWorkspace, err = s.lock.MaterializeRegularFile(workspacePath)
 				if err != nil {
-					return []*Gate{{Title: "G0-snapshot", Errs: []string{"snapshot Cargo workspace authority: " + err.Error()}}}
+					return []*Gate{{Title: "G0-snapshot", Errs: []string{"snapshot Cargo workspace authority: " + errors.Join(err, stable.Close()).Error()}}}
 				}
 				opt.cargoWorkspaceManifest = cargoWorkspace.Path()
 				opt.cargoWorkspaceLogical = workspacePath
 			}
-		}
-		stable, err = s.lock.MaterializeExternalTree(impl)
-		if err != nil {
-			cleanupErr := error(nil)
-			if cargoWorkspace != nil {
-				cleanupErr = cargoWorkspace.Close()
-			}
-			return []*Gate{{Title: "G0-snapshot", Errs: []string{"snapshot implementation tree: " + errors.Join(err, cleanupErr).Error()}}}
 		}
 		impl = stable.Path()
 	}
