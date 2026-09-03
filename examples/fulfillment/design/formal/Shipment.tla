@@ -1,5 +1,5 @@
 ---- MODULE Shipment ----
-\* machinery-version: v0.6.2
+\* machinery-version: v0.6.3
 EXTENDS Naturals
 
 \* Generated from Shipment.machine.json by machinery tla. Control-flow model.
@@ -10,7 +10,7 @@ EXTENDS Naturals
 \*      machine_lint requires an unguarded fallback or an _exhaustive note; where
 \*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
 \*      below is only as sound as these hand-checked, UNVERIFIED claims:
-\*      - UNVERIFIED, state rolledBack: priorStatus is set on every path into the overlay from a domain state; only Pending, Dispatched, and InTransit reach the overlay (Delivered and Lost are final), and all three priorIs* guards are present
+\*      (none here: every guarded branch list has an unguarded fallback)
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or
@@ -29,10 +29,10 @@ CONSTANT MaxRetries
 VARIABLES st, rc1, rc2
 vars == << st, rc1, rc2 >>
 
-States == {"Delivered", "Dispatched", "InTransit", "Lost", "Pending", "carrierRetry", "dispatching", "persistRetry", "persisting", "rolledBack"}
-Domain == {"Delivered", "Dispatched", "InTransit", "Lost", "Pending"}
+States == {"Delivered", "Dispatched", "InTransit", "Lost", "Pending", "carrierRetry", "dispatching", "persistRetry", "persisting", "rolledBack", "routingFault"}
+Domain == {"Delivered", "Dispatched", "InTransit", "Lost", "Pending", "routingFault"}
 Overlay == {"carrierRetry", "dispatching", "persistRetry", "persisting", "rolledBack"}
-Final == {"Delivered", "Lost"}
+Final == {"Delivered", "Lost", "routingFault"}
 
 TypeOK == st \in States /\ rc1 \in 0..MaxRetries /\ rc2 \in 0..MaxRetries
 Init == st = "Pending" /\ rc1 = 0 /\ rc2 = 0
@@ -59,6 +59,7 @@ Init == st = "Pending" /\ rc1 = 0 /\ rc2 = 0
   \* T20: rolledBack -always-> Pending
   \* T21: rolledBack -always-> Dispatched
   \* T22: rolledBack -always-> InTransit
+  \* T23: rolledBack -always-> routingFault
 
 T1 == st = "Pending" /\ st' = "dispatching" /\ rc1' = 0 /\ rc2' = 0
 T2 == st = "Dispatched" /\ st' = "persisting" /\ rc1' = 0 /\ rc2' = 0
@@ -82,6 +83,7 @@ T19 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1 /\ rc2' = rc2
 T20 == st = "rolledBack" /\ st' = "Pending" /\ rc1' = 0 /\ rc2' = 0
 T21 == st = "rolledBack" /\ st' = "Dispatched" /\ rc1' = 0 /\ rc2' = 0
 T22 == st = "rolledBack" /\ st' = "InTransit" /\ rc1' = 0 /\ rc2' = 0
+T23 == st = "rolledBack" /\ st' = "routingFault" /\ rc1' = 0 /\ rc2' = 0
 RetryExhausted_carrierRetry == st = "carrierRetry" /\ rc1 >= MaxRetries /\ st' = "rolledBack" /\ rc1' = rc1 /\ rc2' = rc2
 RetryAgain_carrierRetry == st = "carrierRetry" /\ rc1 < MaxRetries /\ st' = "dispatching" /\ rc1' = rc1 + 1 /\ rc2' = rc2
 RetryExhausted_persistRetry == st = "persistRetry" /\ rc2 >= MaxRetries /\ st' = "rolledBack" /\ rc2' = rc2 /\ rc1' = rc1
@@ -89,7 +91,7 @@ RetryAgain_persistRetry == st = "persistRetry" /\ rc2 < MaxRetries /\ st' = "per
 Terminated == st \in Final /\ UNCHANGED vars
 
 DomainNext == T1 \/ T2 \/ T3 \/ T4 \/ T5 \/ T6
-OverlayNext == T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ RetryExhausted_carrierRetry \/ RetryAgain_carrierRetry \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
+OverlayNext == T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ RetryExhausted_carrierRetry \/ RetryAgain_carrierRetry \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
 Next == DomainNext \/ OverlayNext \/ Terminated
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)

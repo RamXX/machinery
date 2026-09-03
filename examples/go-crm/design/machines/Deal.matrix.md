@@ -10,9 +10,9 @@ States trace to enum `DealStage`. Events trace to `Deal` actions. Operational st
 | name | kind | signature | pre / post | maps to |
 |---|---|---|---|---|
 | `saveDeal` | actor | `(input{dealId,stage,amountCents,closeDate,ownerId,actor}) -> DealRow \| err{ErrConstraint,ErrConflict,ErrDiskFull,ErrTimeout,ErrLocked}` | pre: guard passed, tx open. post: node `stage` = pendingStage atomically, or store unchanged on err | C4 `crm.domain -> crm.repo` then `crm.repo -> store` (Cypher SaveDeal) |
-| `guardCanAdvance` | guard | `(ctx,evt) -> bool` | true iff pendingStage is the next forward stage AND actor may write AND amountCents>=0 | inv `deal-stage-forward`, `rbac-write-scope`, `deal-amount-nonneg` |
-| `guardCanWin` | guard | `(ctx,evt) -> bool` | true iff evt supplies a closeDate AND actor may write AND amountCents>=0 | inv `deal-won-has-closedate`, `rbac-write-scope`, `deal-amount-nonneg` |
-| `guardCanLose` | guard | `(ctx,evt) -> bool` | true iff actor may write AND amountCents>=0 | inv `rbac-write-scope`, `deal-amount-nonneg` |
+| `guardCanAdvance` | guard | `(ctx,evt) -> bool` | true iff actor may write AND amountCents>=0. The machine offers this guard only from Lead, Qualified, and Proposal, whose next forward stage is structurally defined; Negotiation rejects advance without evaluating the guard. `CLAUSES{actor-may-write, amount-nonnegative}` | inv `deal-stage-forward`, `rbac-write-scope`, `deal-amount-nonneg` |
+| `guardCanWin` | guard | `(ctx,evt) -> bool` | true iff evt supplies a closeDate AND actor may write AND amountCents>=0. `CLAUSES{close-date-present, actor-may-write, amount-nonnegative}` | inv `deal-won-has-closedate`, `rbac-write-scope`, `deal-amount-nonneg` |
+| `guardCanLose` | guard | `(ctx,evt) -> bool` | true iff actor may write AND amountCents>=0. `CLAUSES{actor-may-write, amount-nonnegative}` | inv `rbac-write-scope`, `deal-amount-nonneg` |
 | `guardCanReopen` | guard | `(ctx,evt) -> bool` | true iff actor is Manager/Admin acting in scope (the sanctioned backward move) | inv `rbac-reassign-authority`, `rbac-write-scope`; sanctioned exception to `deal-stage-forward` |
 | `pendingIsQualified` / `pendingIsProposal` / `pendingIsNegotiation` / `pendingIsWon` / `pendingIsLost` | guard | `(ctx) -> bool` | true iff `ctx.pendingStage` equals that stage | - (persist success routing) |
 | `priorIsLead` / `priorIsQualified` / `priorIsProposal` / `priorIsNegotiation` / `priorIsWon` / `priorIsLost` | guard | `(ctx) -> bool` | true iff `ctx.priorStage` equals that stage | - (rollback routing) |
@@ -26,7 +26,7 @@ States trace to enum `DealStage`. Events trace to `Deal` actions. Operational st
 | `commitCloseDate` | action | `(ctx) -> ctx` | `closeDate:=pendingCloseDate` | supports `deal-won-has-closedate` |
 | `incrementRetries` | action | `(ctx) -> ctx` | `retries:=retries+1` | - |
 | `recordError` / `recordConstraint` / `recordDiskFull` / `recordTimeout` / `recordUnknownError` / `recordRetriesExhausted` / `recordRoutingError` | action | `(ctx,evt) -> ctx` | `lastError:=classified error` for surfacing to the CLI | maps repo errors to a domain validation/error message |
-| `recordAdvanceDenied` / `recordWinDenied` / `recordLoseDenied` / `recordReopenDenied` / `recordReopenNotTerminal` / `recordTerminalRejected` | action | `(ctx,evt) -> ctx` | set a rejection reason; no state change | surfaces the violated invariant to the caller |
+| `recordAdvanceDenied` / `recordWinDenied` / `recordLoseDenied` / `recordReopenDenied` / `recordReopenNotTerminal` / `recordTerminalRejected` | action | `(ctx,evt) -> ctx` | set a rejection reason; no state change; `recordTerminalRejected` is the command-boundary enforcement that refuses every non-reopen mutation while the Deal rests in Won or Lost | surfaces `deal-terminal` and the violated invariant to the caller |
 
 ## (b) Failure catalog
 
@@ -100,5 +100,6 @@ States trace to enum `DealStage`. Events trace to `Deal` actions. Operational st
 | 55 | rolledBack | always | priorIsNegotiation | Negotiation | - | atomic rollback |
 | 56 | rolledBack | always | priorIsWon | Won | - | atomic rollback |
 | 57 | rolledBack | always | priorIsLost | Lost | - | atomic rollback |
+| 58 | rolledBack | always | (else) | Lost | recordRoutingError | fail closed on corrupt rollback metadata; the instance is discarded and the unchanged store remains authoritative |
 
 Ignored-by-design: none. Every event in {advanceStage, win, lose, reopen} is handled in every resting stage (either a guarded persist or an explicit `record*` reject). `persisting`/`persistRetry`/`rolledBack` are transient (invoke/after/always), so domain events cannot arrive there within one command.

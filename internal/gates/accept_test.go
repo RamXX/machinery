@@ -4,8 +4,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/RamXX/machinery/internal/testgit"
 )
 
 // acceptOracleMD is the committed oracle Ga's DoD-coverage rule reads its id
@@ -100,6 +104,29 @@ func TestCheckAcceptanceGreenPath(t *testing.T) {
 	}
 }
 
+func TestAcceptanceRejectsNumericFilenameAlias(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		file string
+	}{
+		{"leading zero alongside canonical", "M00.yaml"},
+		{"leading zero alone", "M00.yaml"},
+		{"numeric overflow", "M" + strings.Repeat("9", 249) + ".yaml"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			files := map[string]string{"acceptance/" + tc.file: acceptEvidenceM0}
+			if tc.name != "leading zero alongside canonical" {
+				files["acceptance/M0.yaml"] = ""
+			}
+			design := writeAcceptFixture(t, files)
+			g := CheckAcceptance(design, acceptedCommit)
+			if !hasErr(g, "not a canonical acceptance filename") {
+				t.Fatalf("%s must not discharge M0: %v", tc.file, g.Errs)
+			}
+		})
+	}
+}
+
 // Without a commit the gate still runs; the unchecked binding is a
 // non-blocking note, never a silent pass.
 func TestCheckAcceptanceNoCommitNotes(t *testing.T) {
@@ -126,7 +153,6 @@ func TestCheckAcceptanceCommitBinding(t *testing.T) {
 		{"exact", acceptedCommit, acceptedCommit, false},
 		{"evidence is a prefix of the commit", "9f3c1a2b", acceptedCommit, false},
 		{"commit is a prefix of the evidence", acceptedCommit, "9f3c1a2b", false},
-		{"case-insensitive", strings.ToUpper(acceptedCommit), acceptedCommit, false},
 		{"mismatch", "dead0000beef1111222233334444555566667777", acceptedCommit, true},
 		{"prefix too short to bind", "9f3c1a", acceptedCommit, true},
 	}
@@ -135,9 +161,8 @@ func TestCheckAcceptanceCommitBinding(t *testing.T) {
 			evidence := strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: "+tc.evidence, 1)
 			design := writeAcceptFixture(t, map[string]string{"acceptance/M0.yaml": evidence})
 			g := CheckAcceptance(design, tc.given)
-			joined := strings.Join(g.Errs, "\n")
 			switch {
-			case tc.wantErr && !strings.Contains(joined, "does not name the commit under review"):
+			case tc.wantErr && len(g.Errs) == 0:
 				t.Fatalf("want a commit-binding error, got %v", g.Errs)
 			case !tc.wantErr && len(g.Errs) != 0:
 				t.Fatalf("commit must bind: %v", g.Errs)
@@ -186,7 +211,13 @@ func TestCheckAcceptanceEvidenceMutations(t *testing.T) {
 			"milestone must be an integer"},
 		{"empty commit",
 			strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, `commit: ""`, 1),
-			"commit must name the single VCS commit"},
+			"commit must be a lowercase hexadecimal VCS object id"},
+		{"symbolic commit",
+			strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: HEAD~1", 1),
+			"not a symbolic or moving revision"},
+		{"uppercase commit",
+			strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: "+strings.ToUpper(acceptedCommit), 1),
+			"lowercase hexadecimal VCS object id"},
 		{"empty reviewer",
 			strings.Replace(acceptEvidenceM0, "reviewer: acceptance review, conductor", `reviewer: ""`, 1),
 			"reviewer must name who or what produced the review"},
@@ -229,6 +260,39 @@ func TestCheckAcceptanceDoDIDCoverage(t *testing.T) {
 	}
 	if g.Counts["DoD ids bound"] != 1 {
 		t.Errorf("the id that WAS bound must still count: %+v", g.Counts)
+	}
+}
+
+func TestCheckAcceptanceOracleSetExpandsToExactStableIDInventory(t *testing.T) {
+	plan := strings.Replace(acceptPlan,
+		"DoD: T-CMD-01 and CMD-abc123 green.",
+		"DoD: ORACLESET{machines/Thing.oracle.md} green.", 1)
+	design := writeAcceptFixture(t, map[string]string{"BUILD.md": plan})
+	g := CheckAcceptance(design, acceptedCommit)
+	if !hasErr(g, "dod_ids omits 'CMD-def456'") {
+		t.Fatalf("an oracle-set review must enumerate every current stable id: %v", g.Errs)
+	}
+
+	complete := strings.Replace(acceptEvidenceM0, "  - T-CMD-01\n  - CMD-abc123\n", "  - CMD-abc123\n  - CMD-def456\n", 1)
+	design = writeAcceptFixture(t, map[string]string{"BUILD.md": plan, "acceptance/M0.yaml": complete})
+	g = CheckAcceptance(design, acceptedCommit)
+	if len(g.Errs) != 0 {
+		t.Fatalf("the exact oracle-set inventory must pass: %v", g.Errs)
+	}
+	if g.Counts["DoD oracle sets bound"] != 1 || g.Counts["DoD ids bound"] != 2 {
+		t.Fatalf("oracle-set expansion was not visible in counts: %+v", g.Counts)
+	}
+}
+
+func TestCheckAcceptanceRejectsMalformedOracleSet(t *testing.T) {
+	for _, marker := range []string{"ORACLESET{../Thing.oracle.md}", "ORACLESET {machines/Thing.oracle.md}"} {
+		plan := strings.Replace(acceptPlan,
+			"DoD: T-CMD-01 and CMD-abc123 green.",
+			"DoD: "+marker+" green.", 1)
+		g := CheckAcceptance(writeAcceptFixture(t, map[string]string{"BUILD.md": plan}), acceptedCommit)
+		if !hasErr(g, "malformed ORACLESET marker") {
+			t.Fatalf("marker %q must fail closed: %v", marker, g.Errs)
+		}
 	}
 }
 
@@ -353,6 +417,23 @@ func TestCheckAcceptanceDoDIDsMustResolve(t *testing.T) {
 	}
 }
 
+func TestCheckAcceptanceDoDIDsMustBeExactAndUnique(t *testing.T) {
+	t.Run("globally valid but uncited", func(t *testing.T) {
+		extra := strings.Replace(acceptEvidenceM0, "  - CMD-abc123\n", "  - CMD-abc123\n  - CMD-def456\n", 1)
+		g := CheckAcceptance(writeAcceptFixture(t, map[string]string{"acceptance/M0.yaml": extra}), acceptedCommit)
+		if !hasErr(g, "exists in the committed oracle corpus but is not cited") {
+			t.Fatalf("a different milestone's valid id must not inflate coverage: %v", g.Errs)
+		}
+	})
+	t.Run("duplicate", func(t *testing.T) {
+		duplicate := strings.Replace(acceptEvidenceM0, "  - CMD-abc123\n", "  - CMD-abc123\n  - CMD-abc123\n", 1)
+		g := CheckAcceptance(writeAcceptFixture(t, map[string]string{"acceptance/M0.yaml": duplicate}), acceptedCommit)
+		if !hasErr(g, "dod_ids repeats 'CMD-abc123'") {
+			t.Fatalf("duplicate coverage ids must fail: %v", g.Errs)
+		}
+	})
+}
+
 // A typo in an otherwise complete list is the exact failure the reverse rule
 // exists for: forward coverage reports the omission, reverse resolution names
 // the id that replaced it, and the reviewer sees both halves of the story.
@@ -392,10 +473,10 @@ func initGitHistory(t *testing.T, dir string) gitFixture {
 	t.Helper()
 	git := func(args ...string) string {
 		t.Helper()
-		base := []string{"-C", dir,
+		base := []string{
 			"-c", "user.name=machinery test", "-c", "user.email=test@example.invalid",
-			"-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"}
-		out, err := exec.CommandContext(t.Context(), "git", append(base, args...)...).CombinedOutput()
+		}
+		out, err := testgit.Run(t.Context(), dir, append(base, args...)...)
 		if err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
@@ -441,37 +522,325 @@ func TestResolveReviewCommit(t *testing.T) {
 	outside := t.TempDir()
 
 	t.Run("flag or env wins over git", func(t *testing.T) {
-		got, prov := resolveReviewCommit(design, "  "+acceptedCommit+"  ")
-		if got != acceptedCommit || prov != commitFromCaller {
-			t.Fatalf("the caller's commit must win: got %q prov=%d", got, prov)
+		got, prov, err := resolveReviewCommit(design, "  "+head+"  ")
+		if err != nil || got != head || prov != commitFromCallerRepository {
+			t.Fatalf("the caller's repository anchor must win: got %q prov=%d err=%v", got, prov, err)
 		}
 	})
 	t.Run("derived from the design's repository", func(t *testing.T) {
-		got, prov := resolveReviewCommit(design, "")
-		if got != head || prov != commitFromGit {
-			t.Fatalf("want the fixture repo HEAD %s, got %q prov=%d", head, got, prov)
+		got, prov, err := resolveReviewCommit(design, "")
+		if err != nil || got != head || prov != commitFromGit {
+			t.Fatalf("want the fixture repo HEAD %s, got %q prov=%d err=%v", head, got, prov, err)
 		}
 		if cwdHead := gitHeadAt("."); cwdHead != "" && cwdHead == got {
 			t.Fatal("the commit was resolved from the process working directory, not the design path")
 		}
 	})
 	t.Run("no repository leaves it unresolved", func(t *testing.T) {
-		got, prov := resolveReviewCommit(outside, "")
-		if got != "" || prov != commitAbsent {
-			t.Fatalf("outside a repository nothing may be derived: got %q prov=%d", got, prov)
+		got, prov, err := resolveReviewCommit(outside, "")
+		if err != nil || got != "" || prov != commitAbsent {
+			t.Fatalf("outside a repository nothing may be derived: got %q prov=%d err=%v", got, prov, err)
 		}
 	})
 }
 
-// --- derived mode: ancestry ----------------------------------------------
+func installFakeGit(t *testing.T, script string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake git executable is a POSIX shell fixture")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "git"), []byte("#!/bin/sh\n"+script+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+}
+
+func TestCheckAcceptanceCompleteCommitResolutionFailsClosed(t *testing.T) {
+	t.Run("missing git", func(t *testing.T) {
+		design := writeAcceptFixture(t, nil)
+		t.Setenv("PATH", t.TempDir())
+		g := checkAcceptance(design, "", true)
+		if !hasErr(g, "final handoff requires a commit under review") || !hasErr(g, "executable file not found") {
+			t.Fatalf("missing git must block final handoff with its cause: %v", g.Errs)
+		}
+		if len(g.Notes) != 0 {
+			t.Fatalf("complete mode may not downgrade commit failure to a note: %v", g.Notes)
+		}
+	})
+
+	t.Run("not a repository", func(t *testing.T) {
+		design := writeAcceptFixture(t, nil)
+		g := checkAcceptance(design, "", true)
+		if !hasErr(g, "final handoff requires a commit under review") || !hasErr(g, "not a git repository") {
+			t.Fatalf("a non-repository design must block final handoff: %v", g.Errs)
+		}
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		design := writeAcceptFixture(t, nil)
+		installFakeGit(t, "exec sleep 10")
+		old := gitCommandTimeout
+		gitCommandTimeout = 25 * time.Millisecond
+		t.Cleanup(func() { gitCommandTimeout = old })
+		g := checkAcceptance(design, "", true)
+		if !hasErr(g, "timed out") || !hasErr(g, "context deadline exceeded") {
+			t.Fatalf("a hung git must block final handoff precisely: %v", g.Errs)
+		}
+	})
+
+	t.Run("malformed HEAD", func(t *testing.T) {
+		design := writeAcceptFixture(t, nil)
+		installFakeGit(t, "printf '%s\\n' not-a-commit")
+		g := checkAcceptance(design, "", true)
+		if !hasErr(g, "returned malformed commit") {
+			t.Fatalf("malformed git output must block final handoff: %v", g.Errs)
+		}
+	})
+}
+
+func TestCheckAcceptanceStagedCommitResolutionFailsClosedOperationally(t *testing.T) {
+	t.Run("missing git", func(t *testing.T) {
+		design := writeAcceptFixture(t, nil)
+		t.Setenv("PATH", t.TempDir())
+		g := checkAcceptance(design, "", false)
+		if !hasErr(g, "commit binding could not resolve") || !hasErr(g, "executable file not found") {
+			t.Fatalf("missing git was downgraded in staged mode: %v", g.Errs)
+		}
+		if len(g.Notes) != 0 {
+			t.Fatalf("operational failure must not claim semantic non-repository absence: %v", g.Notes)
+		}
+	})
+
+	t.Run("permission failure", func(t *testing.T) {
+		design := writeAcceptFixture(t, nil)
+		installFakeGit(t, "echo 'fatal: permission denied reading repository' >&2; exit 126")
+		g := checkAcceptance(design, "", false)
+		if !hasErr(g, "permission denied") {
+			t.Fatalf("Git permission failure was downgraded in staged mode: %v", g.Errs)
+		}
+	})
+
+	t.Run("corrupt repository", func(t *testing.T) {
+		design := writeAcceptFixture(t, nil)
+		installFakeGit(t, "echo 'fatal: bad object HEAD' >&2; exit 128")
+		g := checkAcceptance(design, "", false)
+		if !hasErr(g, "bad object HEAD") {
+			t.Fatalf("corrupt repository was downgraded in staged mode: %v", g.Errs)
+		}
+	})
+
+	t.Run("malformed HEAD", func(t *testing.T) {
+		design := writeAcceptFixture(t, nil)
+		installFakeGit(t, "printf '%s\\n' not-a-commit")
+		g := checkAcceptance(design, "", false)
+		if !hasErr(g, "returned malformed commit") {
+			t.Fatalf("malformed Git output was downgraded in staged mode: %v", g.Errs)
+		}
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		if _, err := os.Stat("/bin/sleep"); err != nil {
+			t.Skip("POSIX sleep fixture unavailable")
+		}
+		design := writeAcceptFixture(t, nil)
+		installFakeGit(t, "exec /bin/sleep 10")
+		old := gitCommandTimeout
+		gitCommandTimeout = 25 * time.Millisecond
+		t.Cleanup(func() { gitCommandTimeout = old })
+		g := checkAcceptance(design, "", false)
+		if !hasErr(g, "timed out") {
+			t.Fatalf("Git timeout was downgraded in staged mode: %v", g.Errs)
+		}
+	})
+}
+
+func TestRunGitExactBoundsOutputAndProcessTree(t *testing.T) {
+	t.Run("output", func(t *testing.T) {
+		installFakeGit(t, `i=0
+while [ "$i" -lt 10000 ]; do
+  printf '1234567890'
+  i=$((i + 1))
+done
+exit 2`)
+		_, err := runGitExact(t.TempDir(), "rev-parse", "HEAD")
+		if err == nil || !strings.Contains(err.Error(), "output truncated at 65536 bytes") {
+			t.Fatalf("noisy git must fail with bounded, explicit truncation: %v", err)
+		}
+		if len(err.Error()) > gitOutputLimit+1000 {
+			t.Fatalf("git diagnostic exceeded its capture bound: %d bytes", len(err.Error()))
+		}
+	})
+
+	t.Run("successful output overflow", func(t *testing.T) {
+		installFakeGit(t, `i=0
+while [ "$i" -lt 10000 ]; do
+  printf '1234567890'
+  i=$((i + 1))
+done
+exit 0`)
+		_, err := runGitExact(t.TempDir(), "rev-parse", "HEAD")
+		if err == nil || !strings.Contains(err.Error(), "exceeded the 65536-byte success-output limit on stdout") {
+			t.Fatalf("successful output overflow must fail closed: %v", err)
+		}
+		if len(err.Error()) > 1000 {
+			t.Fatalf("success-overflow diagnostic was not constant-size: %d bytes", len(err.Error()))
+		}
+	})
+
+	t.Run("descendant holding pipes", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("the fake git executable is a POSIX shell fixture")
+		}
+		sentinel := filepath.Join(t.TempDir(), "survived")
+		t.Setenv("MACHINERY_GIT_DESCENDANT_SENTINEL", sentinel)
+		installFakeGit(t, `(
+  /bin/sleep 1
+  printf survived > "$MACHINERY_GIT_DESCENDANT_SENTINEL"
+) &
+		/bin/sleep 10`)
+		old := gitCommandTimeout
+		gitCommandTimeout = 50 * time.Millisecond
+		t.Cleanup(func() { gitCommandTimeout = old })
+		started := time.Now()
+		if _, err := runGitExact(t.TempDir(), "rev-parse", "HEAD"); err == nil || !strings.Contains(err.Error(), "timed out") {
+			t.Fatalf("timed-out git process tree was not reported: %v", err)
+		}
+		if elapsed := time.Since(started); elapsed > 500*time.Millisecond {
+			t.Fatalf("descendant held the git query open for %s", elapsed)
+		}
+		time.Sleep(1100 * time.Millisecond)
+		if _, err := os.Lstat(sentinel); !os.IsNotExist(err) {
+			t.Fatalf("git descendant survived process-tree cleanup: %v", err)
+		}
+	})
+}
+
+func TestAcceptanceAncestryQueriesDistinguishSemanticAndOperationalFailure(t *testing.T) {
+	t.Run("missing commit is semantic", func(t *testing.T) {
+		installFakeGit(t, "exit 1")
+		full, err := gitCommitOf(t.TempDir(), "deadbeef")
+		if err != nil || full != "" {
+			t.Fatalf("exit 1 from quiet rev-parse means no such commit: full=%q err=%v", full, err)
+		}
+	})
+
+	t.Run("commit query failure is operational", func(t *testing.T) {
+		installFakeGit(t, "echo 'fatal: corrupt object database' >&2; exit 128")
+		_, err := gitCommitOf(t.TempDir(), "deadbeef")
+		if err == nil || !strings.Contains(err.Error(), "corrupt object database") {
+			t.Fatalf("corrupt rev-parse must retain its operational error: %v", err)
+		}
+	})
+
+	t.Run("malformed commit output is operational", func(t *testing.T) {
+		installFakeGit(t, "printf '%s\\n' malformed")
+		_, err := gitCommitOf(t.TempDir(), "deadbeef")
+		if err == nil || !strings.Contains(err.Error(), "malformed commit") {
+			t.Fatalf("malformed rev-parse output must not mean absent: %v", err)
+		}
+	})
+
+	t.Run("not ancestor is semantic", func(t *testing.T) {
+		installFakeGit(t, "exit 1")
+		ok, err := gitIsAncestor(t.TempDir(), "deadbeef", "cafebabe")
+		if err != nil || ok {
+			t.Fatalf("merge-base exit 1 means not ancestor: ok=%v err=%v", ok, err)
+		}
+	})
+
+	t.Run("ancestry query failure is operational", func(t *testing.T) {
+		installFakeGit(t, "echo 'fatal: cannot read commit graph' >&2; exit 128")
+		_, err := gitIsAncestor(t.TempDir(), "deadbeef", "cafebabe")
+		if err == nil || !strings.Contains(err.Error(), "cannot read commit graph") {
+			t.Fatalf("merge-base operational failure was collapsed to not-ancestor: %v", err)
+		}
+	})
+
+	t.Run("ancestry success stdout is operational", func(t *testing.T) {
+		installFakeGit(t, "printf 'unexpected success output\\n'; exit 0")
+		_, err := gitIsAncestor(t.TempDir(), "deadbeef", "cafebabe")
+		if err == nil || !strings.Contains(err.Error(), "emitted stdout on success") || !strings.Contains(err.Error(), "unexpected success output") {
+			t.Fatalf("merge-base success stdout must fail closed: %v", err)
+		}
+	})
+}
+
+func TestAcceptanceGitIgnoresAmbientRepositoryRedirectionAndSuccessWarnings(t *testing.T) {
+	repoA := t.TempDir()
+	headA := initGitRepo(t, repoA)
+	repoB := t.TempDir()
+	_ = initGitRepo(t, repoB)
+	t.Setenv("GIT_DIR", filepath.Join(repoB, ".git"))
+	t.Setenv("GIT_WORK_TREE", repoB)
+	t.Setenv("GIT_TRACE", "1")
+	designA := filepath.Join(repoA, "design")
+	if err := os.MkdirAll(designA, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := gitHeadAtExact(designA)
+	if err != nil || got != headA {
+		t.Fatalf("ambient Git redirection changed acceptance repository: got=%q want=%q err=%v", got, headA, err)
+	}
+
+	installFakeGit(t, "printf '%s\\n' "+acceptedCommit+"; echo 'warning: injected config' >&2; exit 0")
+	if _, err := gitHeadAtExact(t.TempDir()); err == nil || !strings.Contains(err.Error(), "emitted stderr on success") || !strings.Contains(err.Error(), "injected config") {
+		t.Fatalf("successful Git warning was discarded: %v", err)
+	}
+}
+
+func TestCheckAcceptanceStagedUnbornRepositoryIsSemanticAbsence(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git unavailable")
+	}
+	repo := t.TempDir()
+	if out, err := testgit.Run(t.Context(), repo, "init", "-q"); err != nil {
+		t.Fatalf("git init: %v: %s", err, out)
+	}
+	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), nil)
+	g := checkAcceptance(design, "", false)
+	if len(g.Errs) != 0 || !strings.Contains(strings.Join(g.Notes, "\n"), "commit binding not checked") {
+		t.Fatalf("an unborn but readable repository should remain an explicit staged note: errs=%v notes=%v", g.Errs, g.Notes)
+	}
+}
+
+func TestCheckAcceptanceCompleteResolvesValidImplicitCommit(t *testing.T) {
+	repo := t.TempDir()
+	head := initGitRepo(t, repo)
+	design := writeAncestryFixture(t, repo, head)
+	g := checkAcceptance(design, "", true)
+	if len(g.Errs) != 0 {
+		t.Fatalf("a readable repository HEAD must bind final handoff: %v", g.Errs)
+	}
+	if g.Counts["commit bindings verified"] != 1 {
+		t.Fatalf("implicit final-handoff commit was not verified: %+v", g.Counts)
+	}
+	if len(g.Notes) != 0 {
+		t.Fatalf("a verified final-handoff binding needs no note: %v", g.Notes)
+	}
+}
+
+func TestRunSelectedCompleteUsesFailClosedCommitResolution(t *testing.T) {
+	design := writeAcceptFixture(t, nil)
+	selection := Selection{Run: map[string]bool{"ga": true}, Explicit: true}
+	var acceptance *Gate
+	for _, gate := range RunSelected(design, "", selection, RunOptions{Complete: true}) {
+		if strings.HasPrefix(gate.Title, "Ga-accept") {
+			acceptance = gate
+			break
+		}
+	}
+	if acceptance == nil || !hasErr(acceptance, "final handoff requires a commit under review") {
+		t.Fatalf("complete suite did not route Ga through strict commit resolution: %+v", acceptance)
+	}
+}
+
+// --- commit binding: ancestry --------------------------------------------
 //
-// Dispatcher QC adjudication, 2026-08-30. The derived lane binds by ANCESTRY,
-// not identity. Identity is right when a caller names the commit under review;
-// it is wrong when the gate went looking for one, because the commit that adds
-// the evidence file already differs from the commit the evidence names, so an
-// identity rule would go red one commit later and stay red. Ancestry still
-// catches what the note tier let through: a sha that resolves to nothing, and
-// a sha from a history this tree never took.
+// Acceptance evidence necessarily lands after the commit it reviews. Both an
+// explicit history anchor and a derived HEAD therefore bind by ancestry. This
+// permits independently reviewed milestones to name different commits while
+// rejecting fabricated, rewritten, and unmerged histories.
 
 // writeAncestryFixture lays the standard design inside repo's design/ with its
 // evidence naming evidenceCommit.
@@ -535,7 +904,7 @@ func TestCheckAcceptanceDerivedModeAncestry(t *testing.T) {
 		{
 			name:     "a commit on an unmerged branch",
 			evidence: func(f gitFixture) string { return f.side },
-			wantErr:  "is not an ancestor of the commit under review",
+			wantErr:  "is not an ancestor of history anchor",
 		},
 	}
 	for _, tc := range cases {
@@ -569,10 +938,7 @@ func TestCheckAcceptanceDerivedModeAncestry(t *testing.T) {
 	}
 }
 
-// The two modes are genuinely different rules on the same tree: the commit
-// that merely FOLLOWS the evidence passes derived (it is a descendant) and
-// fails explicit (it is not that commit). This is the adjudication, pinned.
-func TestCheckAcceptanceModesDifferOnADescendantHead(t *testing.T) {
+func TestCheckAcceptanceExplicitDescendantAnchorAcceptsReviewedCommit(t *testing.T) {
 	repo := t.TempDir()
 	f := initGitHistory(t, repo)
 	design := writeAncestryFixture(t, repo, f.root)
@@ -583,29 +949,84 @@ func TestCheckAcceptanceModesDifferOnADescendantHead(t *testing.T) {
 	}
 
 	explicit := CheckAcceptance(design, f.head)
-	if !strings.Contains(strings.Join(explicit.Errs, "\n"), "does not name the commit under review") {
-		t.Fatalf("explicit mode must still demand identity: %v", explicit.Errs)
+	if len(explicit.Errs) != 0 {
+		t.Fatalf("explicit history anchor must accept the reviewed ancestor: %v", explicit.Errs)
 	}
-	if want := "supplied by --commit or MACHINERY_COMMIT; evidence commit bound by identity"; !strings.Contains(checkedLine(explicit), want) {
+	if want := "history anchor supplied by --commit or MACHINERY_COMMIT; repository evidence bound by ancestry"; !strings.Contains(checkedLine(explicit), want) {
 		t.Errorf("the explicit rule must be named on the checked line: %q", checkedLine(explicit))
 	}
 }
 
-// An explicit commit still wins inside a repository, whatever HEAD says, and
-// is held to identity against the value supplied rather than to the history.
+// An explicit history anchor still wins inside a repository, whatever HEAD
+// says, and is used as the ancestry endpoint.
 func TestCheckAcceptanceExplicitCommitWinsInsideRepo(t *testing.T) {
 	repo := t.TempDir()
-	initGitRepo(t, repo)
-	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), nil)
-	g := CheckAcceptance(design, acceptedCommit)
+	f := initGitHistory(t, repo)
+	design := writeAncestryFixture(t, repo, f.root)
+	g := CheckAcceptance(design, f.head)
 	if len(g.Errs) != 0 {
 		t.Fatalf("the supplied commit must win over the repository HEAD: %v", g.Errs)
 	}
-	if want := "commit under review supplied by --commit or MACHINERY_COMMIT"; !strings.Contains(checkedLine(g), want) {
+	if want := "history anchor supplied by --commit or MACHINERY_COMMIT"; !strings.Contains(checkedLine(g), want) {
 		t.Errorf("the provenance must be visible: %q", checkedLine(g))
 	}
 	if g.Counts["commit bindings verified"] != 1 {
-		t.Errorf("identity against the supplied commit must bind: %+v", g.Counts)
+		t.Errorf("ancestry against the supplied anchor must bind: %+v", g.Counts)
+	}
+}
+
+func TestResolveExplicitHistoryAnchorOnceToImmutableCommit(t *testing.T) {
+	repo := t.TempDir()
+	f := initGitHistory(t, repo)
+	design := writeAncestryFixture(t, repo, f.root)
+	resolved, provenance, err := resolveReviewCommitExact(design, f.head[:10])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provenance != commitFromCallerRepository || resolved != f.head {
+		t.Fatalf("resolved anchor = %q provenance=%v, want immutable %q", resolved, provenance, f.head)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "after-anchor"), []byte("new\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"add", "after-anchor"},
+		{"-c", "user.name=machinery test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", "move HEAD after anchor resolution"},
+	} {
+		if out, err := testgit.Run(t.Context(), repo, args...); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	if resolved != f.head {
+		t.Fatalf("resolved anchor moved with HEAD: got %q want %q", resolved, f.head)
+	}
+}
+
+func TestRepositoryCommitProvenanceCannotDowngradeToExportedIdentity(t *testing.T) {
+	g := NewGate("test")
+	rec := &acceptRecord{label: "acceptance/M0.yaml", commit: acceptedCommit}
+	checkCommitBinding(g, t.TempDir(), rec, acceptedCommit, commitFromCallerRepository)
+	if len(g.Errs) == 0 || g.Counts["commit bindings verified"] != 0 {
+		t.Fatalf("repository authority must stay ancestry-bound when the repository becomes unavailable: errs=%v counts=%v", g.Errs, g.Counts)
+	}
+}
+
+func TestCheckAcceptanceRejectsSymbolicExplicitHistoryAnchor(t *testing.T) {
+	g := CheckAcceptance(writeAcceptFixture(t, nil), "HEAD")
+	if !hasErr(g, "supplied history anchor must be a lowercase hexadecimal") {
+		t.Fatalf("a moving explicit ref must fail closed: %v", g.Errs)
+	}
+}
+
+func TestCheckAcceptanceExplicitAnchorRejectsUnbornRepository(t *testing.T) {
+	repo := t.TempDir()
+	if out, err := testgit.Run(t.Context(), repo, "init", "-q"); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), nil)
+	g := CheckAcceptance(design, acceptedCommit)
+	if !hasErr(g, "git repository has no commit") && !hasErr(g, "unknown revision") {
+		t.Fatalf("an unborn repository must not use exported-design identity fallback: %v", g.Errs)
 	}
 }
 
@@ -615,7 +1036,7 @@ func TestCheckAcceptanceDerivedModeRefusesOptionShapedCommits(t *testing.T) {
 	repo := t.TempDir()
 	initGitHistory(t, repo)
 	g := CheckAcceptance(writeAncestryFixture(t, repo, "--output=/tmp/machinery-gate-escape"), "")
-	if !strings.Contains(strings.Join(g.Errs, "\n"), "names no commit in the repository holding the design") {
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "not a symbolic or moving revision") {
 		t.Fatalf("an option-shaped commit must be refused as data: %v", g.Errs)
 	}
 	if _, err := os.Stat("/tmp/machinery-gate-escape"); err == nil {
@@ -701,7 +1122,7 @@ func TestCheckAcceptanceManifestRootPlan(t *testing.T) {
 	}
 }
 
-const acceptShardPlanned = `# BUILD: orders
+const acceptPacketWithPlan = `# M2 - Orders slice
 
 ## 9. Build plan
 
@@ -711,40 +1132,36 @@ Walking skeleton: N/A - the design-wide skeleton lives in the payments shard.
 Status: closed
 `
 
-// Shards may carry the plans instead; milestone numbers must then be unique
-// across every plan-bearing document, because evidence is keyed by number.
-func TestCheckAcceptanceManifestShardPlans(t *testing.T) {
+// Execution packets are never milestone authorities. Even a malformed packet
+// carrying a Build plan cannot make acceptance evidence valid for an id the
+// root did not declare; Gb separately rejects the packet's plan section.
+func TestCheckAcceptanceManifestPacketPlanIsIgnored(t *testing.T) {
 	root := "# BUILD: thing\n\nMode: manifest\n\n## 1. Purpose\n\nProse.\n"
 	evidence := strings.Replace(
 		strings.Replace(acceptEvidenceM0, "milestone: 0", "milestone: 2", 1),
 		"dod_ids:\n  - T-CMD-01\n  - CMD-abc123\n", "dod_ids:\n  - T-CMD-02\n", 1)
 	design := writeAcceptFixture(t, map[string]string{
 		"BUILD.md":           root,
-		"BUILD/orders.md":    acceptShardPlanned,
+		"BUILD/orders.md":    acceptPacketWithPlan,
 		"acceptance/M0.yaml": "",
 		"acceptance/M2.yaml": evidence,
 	})
 	g := CheckAcceptance(design, acceptedCommit)
-	if len(g.Errs) != 0 {
-		t.Fatalf("Ga not clean on a shard-plan manifest: %v", g.Errs)
-	}
-	if g.Counts["closed milestones with accepted evidence"] != 1 {
-		t.Errorf("the shard's closed milestone must be discharged: %+v", g.Counts)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "which no build-plan document declares") {
+		t.Fatalf("packet-local milestones must not authorize acceptance: %v", g.Errs)
 	}
 }
 
-func TestCheckAcceptanceManifestDuplicateMilestoneNumbers(t *testing.T) {
-	root := "# BUILD: thing\n\nMode: manifest\n\n## 1. Purpose\n\nProse.\n"
+func TestCheckAcceptanceManifestPacketCannotDuplicateRootMilestone(t *testing.T) {
 	design := writeAcceptFixture(t, map[string]string{
-		"BUILD.md":           root,
-		"BUILD/orders.md":    acceptShardPlanned,
-		"BUILD/payments.md":  strings.Replace(acceptShardPlanned, "Orders slice", "Payments slice", 1),
-		"acceptance/M0.yaml": "",
-		"acceptance/M2.yaml": strings.Replace(acceptEvidenceM0, "milestone: 0", "milestone: 2", 1),
+		"BUILD.md":             acceptManifestRoot,
+		"BUILD/orders.md":      strings.Replace(acceptPacketWithPlan, "M2", "M0", 1),
+		"acceptance/M0.yaml":   acceptEvidenceM0,
+		"machines/T.oracle.md": acceptOracleMD,
 	})
 	g := CheckAcceptance(design, acceptedCommit)
-	if !strings.Contains(strings.Join(g.Errs, "\n"), "declared in both orders.md and payments.md") {
-		t.Fatalf("a repeated milestone number must be ambiguous, got %v", g.Errs)
+	if len(g.Errs) != 0 || g.Counts["declared milestones"] != 2 {
+		t.Fatalf("only root milestones enter acceptance inventory: errs=%v counts=%+v", g.Errs, g.Counts)
 	}
 }
 
@@ -820,8 +1237,8 @@ func TestSelectNarrowingKeepsGaWhenAcceptanceExists(t *testing.T) {
 	if !sel.Run["ga"] {
 		t.Errorf("narrowing dropped ga although acceptance evidence exists: %v", sel.Run)
 	}
-	if !strings.Contains(sel.Note, "gb,ga,g5") {
-		t.Errorf("the note must list ga after gb: %q", sel.Note)
+	if !strings.Contains(sel.Note, "gb,ga,gv,g5") {
+		t.Errorf("the note must list ga after gb and owed Gv after ga: %q", sel.Note)
 	}
 }
 

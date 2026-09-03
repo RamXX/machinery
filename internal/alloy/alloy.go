@@ -11,15 +11,25 @@
 package alloy
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/artifactset"
+	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/safefile"
 	"github.com/RamXX/machinery/internal/version"
 )
+
+const alloyInputMaxBytes int64 = 16 << 20
+const alloyInventoryMaxEntries = 100_000
 
 // AnnotationName is the policy annotation file name under design/formal/.
 // Deliberately NOT *.semantics.yaml: verify-formal feeds every
@@ -151,7 +161,7 @@ func listOf(v *ir.Value) []*ir.Value {
 }
 
 func loadDomain(path string) *domain {
-	data, err := os.ReadFile(path)
+	data, err := safefile.Read(path, "modelith domain model", alloyInputMaxBytes)
 	if err != nil {
 		die("%s: %v", filepath.Base(path), err)
 	}
@@ -351,7 +361,7 @@ func parseScopeMap(o *ir.Object, roles []string, where string, hasTeam bool) []S
 // of proving a stale twin (the refine_gen rule, applied here).
 func Load(domainPath, annotationPath string) *Policy {
 	d := loadDomain(domainPath)
-	data, err := os.ReadFile(annotationPath)
+	data, err := safefile.Read(annotationPath, "policy relational annotation", alloyInputMaxBytes)
 	if err != nil {
 		die("%s: %v", filepath.Base(annotationPath), err)
 	}
@@ -659,9 +669,15 @@ func (l *policyLoader) loadReassignRule(ro *ir.Object, rule Rule, where string) 
 			die("%s: reassign.target.%s must be 'any' or 'team', got %s", where, role, ir.Repr(value.AsString()))
 		}
 	}
-	for role := range inScope {
-		if _, ok := target.Get(role); !ok {
-			die("%s: reassign.target must decide every role with reassign scope; %s is undecided", where, ir.Repr(role))
+	// Diagnose the first undecided role in the domain's canonical declaration
+	// order. Ranging over inScope made identical malformed annotations report
+	// a different role across processes because Go deliberately randomizes map
+	// iteration.
+	for _, role := range l.p.Roles {
+		if inScope[role] {
+			if _, ok := target.Get(role); !ok {
+				die("%s: reassign.target must decide every role with reassign scope; %s is undecided", where, ir.Repr(role))
+			}
 		}
 	}
 	for _, role := range l.p.Roles {
@@ -1135,7 +1151,7 @@ func (p *Policy) emit() (string, Stats) {
 // owns validation. Gx-trace uses this to credit the relational model as an
 // enforcement artifact. A missing or malformed annotation yields nil.
 func CarriedIDs(annotationPath string) map[string]bool {
-	data, err := os.ReadFile(annotationPath)
+	data, err := safefile.Read(annotationPath, "policy relational annotation", alloyInputMaxBytes)
 	if err != nil {
 		return nil
 	}
@@ -1181,7 +1197,7 @@ func CarriedIDs(annotationPath string) map[string]bool {
 // to credit an explicit waiver-with-reason; a missing or malformed
 // annotation yields nil.
 func ResidualIDs(annotationPath string) map[string]bool {
-	data, err := os.ReadFile(annotationPath)
+	data, err := safefile.Read(annotationPath, "policy relational annotation", alloyInputMaxBytes)
 	if err != nil {
 		return nil
 	}
@@ -1217,7 +1233,10 @@ func ResidualIDs(annotationPath string) map[string]bool {
 // Paths resolves the domain model and annotation for a design dir.
 // The annotation path is returned even when absent (callers stat it).
 func Paths(design string) (domainPath, annotationPath string, err error) {
-	entries, _ := os.ReadDir(design)
+	entries, readErr := dirscan.Read(design, alloyInventoryMaxEntries)
+	if readErr != nil {
+		return "", "", fmt.Errorf("alloy_gen: enumerate %s: %w", design, readErr)
+	}
 	var models []string
 	for _, e := range entries {
 		if strings.HasSuffix(e.Name(), ".modelith.yaml") {
@@ -1238,9 +1257,18 @@ func Paths(design string) (domainPath, annotationPath string, err error) {
 	return models[0], filepath.Join(design, "formal", AnnotationName), nil
 }
 
-func statFile(path string) bool {
-	fi, err := os.Stat(path)
-	return err == nil && !fi.IsDir()
+func strictAnnotationFile(path string) (bool, error) {
+	fi, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if fi.Mode()&os.ModeSymlink != 0 || !fi.Mode().IsRegular() {
+		return false, fmt.Errorf("relational annotation %s must be a regular non-symlink file", filepath.Base(path))
+	}
+	return true, nil
 }
 
 // Run is the `machinery alloy <design> [out-dir]` entrypoint. One command
@@ -1248,43 +1276,82 @@ func statFile(path string) bool {
 // artifact set per present annotation, in a fixed order. At least one
 // annotation must be present; each layer is independently skippable.
 func Run(design, outdir string) error {
-	domainPath, policyAnn, err := Paths(design)
+	return RunTo(design, outdir, os.Stdout)
+}
+
+// RunTo plans and validates every opted-in relational layer before committing
+// the complete generated set as one artifact transaction. Progress is emitted
+// only after the set commits, so a failed late layer cannot claim earlier
+// output was written.
+func RunTo(design, outdir string, out io.Writer) error {
+	snapshot, err := designlock.Acquire(design)
+	if err != nil {
+		return err
+	}
+	retErr := runToInSnapshot(snapshot, design, outdir, out)
+	return snapshot.LogicalError(errors.Join(retErr, snapshot.Release()))
+}
+
+func runToInSnapshot(snapshot *designlock.Lock, design, outdir string, out io.Writer) error {
+	if err := snapshot.ResumeExpected("alloy", "rerun `machinery alloy` with the same arguments"); err != nil {
+		return err
+	}
+	if out == nil {
+		out = io.Discard
+	}
+	sourceDesign := snapshot.SourceRoot()
+	domainPath, policyAnn, err := Paths(sourceDesign)
 	if err != nil {
 		return err
 	}
 	if outdir == "" {
 		outdir = filepath.Join(design, "formal")
 	}
-	formalDir := filepath.Join(design, "formal")
+	if err := snapshot.ValidateOutputDir(outdir); err != nil {
+		return fmt.Errorf("alloy_gen: unsafe output directory: %w", err)
+	}
+	formalDir := filepath.Join(sourceDesign, "formal")
 	integrityAnn := filepath.Join(formalDir, IntegrityAnnotationName)
 	isolationAnn := filepath.Join(formalDir, IsolationAnnotationName)
 
-	havePolicy := statFile(policyAnn)
-	haveIntegrity := statFile(integrityAnn)
-	haveIsolation := statFile(isolationAnn)
-	if !havePolicy && !haveIntegrity && !haveIsolation {
-		return fmt.Errorf("alloy_gen: no relational annotation under %s (looked for %s, %s, %s); the relational layer is opt-in, author an annotation first (see the machinery skill, Phase 1)",
-			formalDir, AnnotationName, IntegrityAnnotationName, IsolationAnnotationName)
-	}
-	if err := os.MkdirAll(outdir, 0755); err != nil {
+	havePolicy, err := strictAnnotationFile(policyAnn)
+	if err != nil {
 		return err
 	}
+	haveIntegrity, err := strictAnnotationFile(integrityAnn)
+	if err != nil {
+		return err
+	}
+	haveIsolation, err := strictAnnotationFile(isolationAnn)
+	if err != nil {
+		return err
+	}
+	ownedNames := []string{OutputName, OracleName, IntegrityOutputName, IsolationOutputName, IsolationOracleName}
+	var ownedBodies map[string][]byte
+	var ownedConditions map[string]artifactset.RemovalPrecondition
+	if !havePolicy && !haveIntegrity && !haveIsolation {
+		ownedBodies, ownedConditions, err = inspectOwnedAlloyOutputs(outdir, ownedNames)
+		if err != nil {
+			return err
+		}
+		if len(ownedBodies) == 0 {
+			return fmt.Errorf("alloy_gen: no relational annotation under %s (looked for %s, %s, %s); the relational layer is opt-in, author an annotation first (see the machinery skill, Phase 1)",
+				formalDir, AnnotationName, IntegrityAnnotationName, IsolationAnnotationName)
+		}
+	}
+	files := map[string][]byte{}
+	var messages []string
 
 	if havePolicy {
 		als, oracle, stats, err := GenerateAll(domainPath, policyAnn)
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(outdir, OutputName), []byte(als), 0644); err != nil {
-			return err
-		}
-		if err := os.WriteFile(filepath.Join(outdir, OracleName), []byte(oracle), 0644); err != nil {
-			return err
-		}
-		fmt.Fprintf(os.Stdout, "alloy_gen: reconciled %s against %s: %d roles, %d resources, %d rule(s), %d residual(s), %d invariant(s) carried\n",
-			AnnotationName, filepath.Base(domainPath), stats.Roles, stats.Resources, stats.Rules, stats.Residuals, stats.Carried)
-		fmt.Fprintf(os.Stdout, "wrote %s (%d commands) and %s (%d decision rows) to %s\n",
-			OutputName, len(stats.Commands), OracleName, stats.OracleRows, outdir)
+		files[OutputName] = []byte(als)
+		files[OracleName] = []byte(oracle)
+		messages = append(messages,
+			fmt.Sprintf("alloy_gen: reconciled %s against %s: %d roles, %d resources, %d rule(s), %d residual(s), %d invariant(s) carried", AnnotationName, filepath.Base(domainPath), stats.Roles, stats.Resources, stats.Rules, stats.Residuals, stats.Carried),
+			fmt.Sprintf("wrote %s (%d commands) and %s (%d decision rows) to %s", OutputName, len(stats.Commands), OracleName, stats.OracleRows, outdir))
 	}
 
 	if haveIntegrity {
@@ -1292,12 +1359,10 @@ func Run(design, outdir string) error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(outdir, IntegrityOutputName), []byte(als), 0644); err != nil {
-			return err
-		}
-		fmt.Fprintf(os.Stdout, "alloy_gen: reconciled %s against %s: %d entities, %d relationship(s), %d unique, %d singleton, %d residual(s), %d invariant(s) carried\n",
-			IntegrityAnnotationName, filepath.Base(domainPath), stats.Entities, stats.Relationships, stats.Uniques, stats.Singletons, stats.Residuals, stats.Carried)
-		fmt.Fprintf(os.Stdout, "wrote %s (%d commands) to %s\n", IntegrityOutputName, len(stats.Commands), outdir)
+		files[IntegrityOutputName] = []byte(als)
+		messages = append(messages,
+			fmt.Sprintf("alloy_gen: reconciled %s against %s: %d entities, %d relationship(s), %d unique, %d singleton, %d residual(s), %d invariant(s) carried", IntegrityAnnotationName, filepath.Base(domainPath), stats.Entities, stats.Relationships, stats.Uniques, stats.Singletons, stats.Residuals, stats.Carried),
+			fmt.Sprintf("wrote %s (%d commands) to %s", IntegrityOutputName, len(stats.Commands), outdir))
 	}
 
 	if haveIsolation {
@@ -1305,16 +1370,95 @@ func Run(design, outdir string) error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(outdir, IsolationOutputName), []byte(als), 0644); err != nil {
+		files[IsolationOutputName] = []byte(als)
+		files[IsolationOracleName] = []byte(oracle)
+		messages = append(messages,
+			fmt.Sprintf("alloy_gen: reconciled %s against %s: %d record(s), %d reference(s), %d residual(s), %d invariant(s) carried", IsolationAnnotationName, filepath.Base(domainPath), stats.Records, stats.References, stats.Residuals, stats.Carried),
+			fmt.Sprintf("wrote %s (%d commands) and %s (%d decision rows) to %s", IsolationOutputName, len(stats.Commands), IsolationOracleName, stats.OracleRows, outdir))
+	}
+	if ownedBodies == nil {
+		ownedBodies, ownedConditions, err = inspectOwnedAlloyOutputs(outdir, ownedNames)
+		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(outdir, IsolationOracleName), []byte(oracle), 0644); err != nil {
-			return err
+	}
+	var stale []artifactset.RemovalPrecondition
+	var replacements []artifactset.RemovalPrecondition
+	expected := make([]designlock.OutputExpectation, 0, len(ownedNames))
+	for _, name := range ownedNames {
+		if body, keep := files[name]; keep {
+			if prior, exists := ownedBodies[name]; exists && !bytes.Equal(prior, body) && !canonicalAlloyOwned(name, prior) {
+				return fmt.Errorf("alloy_gen: refusing to replace foreign or manual artifact %s", name)
+			}
+			if condition, exists := ownedConditions[name]; exists {
+				replacements = append(replacements, condition)
+			}
+			expected = append(expected, designlock.ExpectFile(filepath.Join(outdir, name), body, 0o644))
+		} else {
+			expected = append(expected, designlock.ExpectAbsent(filepath.Join(outdir, name)))
+			if condition, exists := ownedConditions[name]; exists {
+				stale = append(stale, condition)
+			}
 		}
-		fmt.Fprintf(os.Stdout, "alloy_gen: reconciled %s against %s: %d record(s), %d reference(s), %d residual(s), %d invariant(s) carried\n",
-			IsolationAnnotationName, filepath.Base(domainPath), stats.Records, stats.References, stats.Residuals, stats.Carried)
-		fmt.Fprintf(os.Stdout, "wrote %s (%d commands) and %s (%d decision rows) to %s\n",
-			IsolationOutputName, len(stats.Commands), IsolationOracleName, stats.OracleRows, outdir)
+	}
+	if err := snapshot.PublishExpectedRooted("alloy", "rerun `machinery alloy` with the same arguments", expected, func(outputs *designlock.OutputScope) error {
+		return outputs.WithRoot(outdir, func(root *os.Root) error {
+			return artifactset.ReconcileGuardedRooted(outdir, root, files, stale, replacements)
+		})
+	}); err != nil {
+		return fmt.Errorf("alloy_gen: commit generated artifact set: %w", err)
+	}
+	for _, message := range messages {
+		fmt.Fprintln(out, message)
 	}
 	return nil
+}
+
+func inspectOwnedAlloyOutputs(dir string, names []string) (map[string][]byte, map[string]artifactset.RemovalPrecondition, error) {
+	bodies := map[string][]byte{}
+	conditions := map[string]artifactset.RemovalPrecondition{}
+	info, err := os.Lstat(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return bodies, conditions, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, nil, fmt.Errorf("alloy_gen: output directory must be a real directory")
+	}
+	for _, name := range names {
+		body, condition, err := artifactset.InspectRemovalCandidate(dir, name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("alloy_gen: inspect reserved output %s: %w", name, err)
+		}
+		if !canonicalAlloyOwned(name, body) {
+			return nil, nil, fmt.Errorf("alloy_gen: reserved output %s contains foreign or manual bytes; refusing to overwrite or delete it", name)
+		}
+		bodies[name], conditions[name] = body, condition
+	}
+	return bodies, conditions, nil
+}
+
+func canonicalAlloyOwned(name string, body []byte) bool {
+	lines := bytes.SplitN(body, []byte("\n"), 5)
+	switch name {
+	case OutputName, IntegrityOutputName, IsolationOutputName:
+		return len(lines) >= 2 && bytes.HasPrefix(lines[0], []byte("// Code generated from ")) &&
+			bytes.HasSuffix(lines[0], []byte(" by machinery alloy. DO NOT EDIT.")) &&
+			bytes.HasPrefix(lines[1], []byte("// machinery-version: "))
+	case OracleName:
+		return len(lines) >= 4 && string(lines[0]) == "# Generated authorization oracle: policy" && len(lines[1]) == 0 &&
+			bytes.HasPrefix(lines[2], []byte("Generated from `")) && bytes.HasSuffix(lines[2], []byte(" by `machinery alloy`. DO NOT EDIT BY HAND.")) &&
+			bytes.HasPrefix(lines[3], []byte("<!-- machinery-version: "))
+	case IsolationOracleName:
+		return len(lines) >= 4 && string(lines[0]) == "# Generated tenant-scoping oracle: isolation" && len(lines[1]) == 0 &&
+			bytes.HasPrefix(lines[2], []byte("Generated from `")) && bytes.HasSuffix(lines[2], []byte(" by `machinery alloy`. DO NOT EDIT BY HAND.")) &&
+			bytes.HasPrefix(lines[3], []byte("<!-- machinery-version: "))
+	default:
+		return false
+	}
 }

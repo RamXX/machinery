@@ -1,13 +1,52 @@
 package ir
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 )
 
+type endlessMachineReader struct{}
+
+func (endlessMachineReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = ' '
+	}
+	return len(p), nil
+}
+
 func writeFile(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+func TestMachineJSONReadersEnforceFixedPolicyLimit(t *testing.T) {
+	path := t.TempDir() + "/oversized.machine.json"
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(MaxMachineJSONBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadMachineJSON(path); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("file loader accepted oversized sparse input: %v", err)
+	}
+	if _, err := LoadMachineJSONReader("endless", endlessMachineReader{}); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("reader loader did not terminate at fixed limit: %v", err)
+	}
+	if _, err := LoadMachineJSONBytes("bytes", make([]byte, MaxMachineJSONBytes+1)); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("byte loader accepted oversized input: %v", err)
+	}
+}
+
+func TestYAMLParserRejectsOversizedInputBeforeDecode(t *testing.T) {
+	if _, err := LoadYAML(make([]byte, MaxYAMLBytes+1)); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("YAML parser accepted oversized input: %v", err)
+	}
 }
 
 func mustJSON(t *testing.T, src string) *Value {
@@ -260,6 +299,104 @@ func TestDuplicateJSONKeysErrorViaFile(t *testing.T) {
 	}
 }
 
+func TestMachineJSONInMemoryLoadersPreserveSourceDiagnostics(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		load func(string, string) (*Value, error)
+	}{
+		{"bytes", func(source, src string) (*Value, error) {
+			return LoadMachineJSONBytes(source, []byte(src))
+		}},
+		{"reader", func(source, src string) (*Value, error) {
+			return LoadMachineJSONReader(source, strings.NewReader(src))
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v, err := tc.load("machines/Order.machine.json", `{"id":"order","states":{"A":{"type":"final"}}}`)
+			if err != nil || v.AsObject().GetString("id") != "order" {
+				t.Fatalf("valid in-memory machine did not parse: value=%v err=%v", v, err)
+			}
+			_, err = tc.load("machines/Order.machine.json", "{\n  \"id\": @}")
+			if err == nil || !strings.Contains(err.Error(), "invalid JSON in machines/Order.machine.json") || !strings.Contains(err.Error(), "line 2") {
+				t.Fatalf("source-labelled syntax diagnostic lost: %v", err)
+			}
+			_, err = tc.load("machines/Order.machine.json", `{"id":"order"} {"id":"other"}`)
+			if err == nil || !strings.Contains(err.Error(), "extra data after the machine object") {
+				t.Fatalf("trailing JSON was accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadYAMLRejectsDuplicateKeysAtEveryDepthWithLines(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		line string
+	}{
+		{"root", "name: first\nname: second\n", "line 2"},
+		{"nested mapping", "outer:\n  name: first\n  name: second\n", "line 3"},
+		{"mapping inside sequence", "items:\n  - name: first\n    name: second\n", "line 3"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := LoadYAML([]byte(tc.src))
+			if err == nil || !strings.Contains(err.Error(), "duplicate YAML key \"name\"") || !strings.Contains(err.Error(), tc.line) {
+				t.Fatalf("expected line-aware nested duplicate-key error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadYAMLRejectsNonScalarKeysAtEveryDepthWithLines(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		line string
+	}{
+		{"root", "? [a, b]\n: value\n", "line 1"},
+		{"nested", "outer:\n  ? {a: b}\n  : value\n", "line 2"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := LoadYAML([]byte(tc.src))
+			if err == nil || !strings.Contains(err.Error(), "non-scalar YAML mapping key") || !strings.Contains(err.Error(), tc.line) {
+				t.Fatalf("expected line-aware non-scalar-key error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadYAMLRejectsTrailingDocuments(t *testing.T) {
+	for _, src := range []string{
+		"kind: modelith\n---\nkind: hidden\n",
+		"kind: modelith\n---\n",
+	} {
+		_, err := LoadYAML([]byte(src))
+		if err == nil || !strings.Contains(err.Error(), "multiple YAML documents") {
+			t.Fatalf("trailing YAML document accepted for %q: %v", src, err)
+		}
+	}
+}
+
+func TestLoadYAMLRejectsCustomScalarTags(t *testing.T) {
+	_, err := LoadYAML([]byte("kind: !modleith modelith\n"))
+	if err == nil || !strings.Contains(err.Error(), "unsupported YAML scalar tag") {
+		t.Fatalf("custom YAML scalar tag accepted: %v", err)
+	}
+}
+
+func TestTLAModuleNameRejectsUnsafeMachineIDs(t *testing.T) {
+	for _, id := range []string{"../escape", "bad-name", "9startsWithDigit", "has.dot", "has/slash", "CON", "nul", ""} {
+		m := mustJSON(t, fmt.Sprintf(`{"id":%q}`, id))
+		if _, err := TLAModuleName(m); err == nil {
+			t.Errorf("TLAModuleName accepted unsafe id %q", id)
+		}
+	}
+	m := mustJSON(t, `{"id":"safe_name9"}`)
+	if got, err := TLAModuleName(m); err != nil || got != "Safe_name9" {
+		t.Fatalf("TLAModuleName(safe_name9) = %q, %v", got, err)
+	}
+}
+
 func TestDumpNullVsEmpty(t *testing.T) {
 	m := mustJSON(t, `{"id":"m","initial":"A","states":{
 		"A":{"on":{"x":[{"target":"B","guard":"g"},{"actions":"y"}]}},
@@ -271,5 +408,51 @@ func TestDumpNullVsEmpty(t *testing.T) {
 	}
 	if !strings.Contains(out, `"guard": null`) {
 		t.Fatalf("absent guard must be null, got:\n%s", out)
+	}
+}
+
+func TestCleanCellBalancesNestedAnnotations(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"a flat annotation", "`core` (custody registration)", "core"},
+		{"an annotation containing parentheses", "`core` (custody registration (Oban-delivered))", "core"},
+		{"two annotations, one nested", "`core` (trust) (no machine: an insert (not a transition))", "core"},
+		{"deep nesting", "ops (a (b (c)) d)", "ops"},
+		{"an unclosed annotation swallows the rest", "ingest (a note that never closes", "ingest"},
+		{"a stray close paren is ordinary text", "ingest ) more", "ingest ) more"},
+		{"no annotation at all", "ingest", "ingest"},
+		{"annotation only", "(all annotation)", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := CleanCell(tc.in); got != tc.want {
+				t.Fatalf("CleanCell(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCellNamesWithNestedAnnotations(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{"single-identifier annotation still denotes", "`AuditEvent` (trust)", []string{"AuditEvent", "trust"}},
+		{"a nested annotation denotes nothing extra", "`AuditEvent` (trust (owning domain))", []string{"AuditEvent"}},
+		{"nested prose never leaks a name", "ingest (the batch_rows site MOVED to ops (2026))", []string{"ingest"}},
+		{"a fan-out head is still split on plus", "core + risk (both react)", []string{"core", "risk"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := CellNames(tc.in)
+			if len(got) != len(tc.want) {
+				t.Fatalf("CellNames(%q) = %v, want %v", tc.in, got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("CellNames(%q) = %v, want %v", tc.in, got, tc.want)
+				}
+			}
+		})
 	}
 }

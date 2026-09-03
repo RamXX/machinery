@@ -1,0 +1,3 @@
+machine: shipment
+pattern: control-flow-only
+reason: Shipment combines carrier callbacks, dispatch invocation retries, and status persistence in one event-driven lifecycle; neither existing data-refinement pattern can represent those distinct overlays without losing or inventing routes.

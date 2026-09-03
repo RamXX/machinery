@@ -15,21 +15,26 @@ func newProjectCmd() *cobra.Command {
 		Short: "Generate the committed projection for every external-checker manifest",
 		Args:  cobra.ExactArgs(1),
 	}
-	c.RunE = func(cmd *cobra.Command, args []string) error {
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
 		design := args[0]
-		if !checker.HasCheckers(design) {
-			fmt.Fprintf(stderrW, "machinery_project: no checkers/*.checker.yaml in %s\n", design)
-			exitFunc(1)
-			return nil
+		has, err := checker.HasCheckers(design)
+		if err != nil {
+			fmt.Fprintf(output.stderr, "machinery_project: %s\n", err)
+			return commandExitBecause(1, err)
+		}
+		if !has {
+			fmt.Fprintf(output.stderr, "machinery_project: no checkers/*.checker.yaml in %s\n", design)
+			return commandExit(1)
 		}
 		results, err := checker.ProjectAll(design, machversion.Version)
 		if err != nil {
-			fmt.Fprintf(stderrW, "machinery_project: %s\n", err)
-			exitFunc(1)
-			return nil
+			fmt.Fprintf(output.stderr, "machinery_project: %s\n", err)
+			return commandExitBecause(1, err)
 		}
 		for _, r := range results {
-			fmt.Fprintf(stdoutW, "wrote %s (checker %s)\n", r.Path, r.CheckerID)
+			fmt.Fprintf(output.stdout, "wrote %s (checker %s)\n", r.Path, r.CheckerID)
 		}
 		return nil
 	}

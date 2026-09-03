@@ -1,0 +1,7 @@
+machine: user
+pattern: control-flow-only
+reason: >-
+  User is a reversible Active-to-Disabled command lifecycle with a shared
+  persistence retry and rollback overlay and no terminal success/failure
+  split; the data-refinement algebras do not fit that shape, so the generated
+  User.tla control-flow model is the only claimed formal rung.

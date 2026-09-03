@@ -11,13 +11,14 @@ import (
 
 func newUpdateCmd() *cobra.Command {
 	var (
-		versionFlag string
-		repo        string
-		installDir  string
-		homes       []string
-		targets     []string
-		copyAll     bool
-		skipPlugins bool
+		versionFlag       string
+		repo              string
+		installDir        string
+		homes             []string
+		targets           []string
+		copyAll           bool
+		skipPlugins       bool
+		bootstrapDefaults bool
 	)
 	c := &cobra.Command{
 		Use:   "update",
@@ -39,7 +40,9 @@ never overwritten directly.
   machinery update --target all
   machinery update --home ~/.agents --target codex`,
 		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) (retErr error) {
+			output := trackOutput(cmd.OutOrStdout(), cmd.ErrOrStderr())
+			defer func() { retErr = output.join(retErr) }()
 			if copyAll && len(homes) == 0 && len(targets) == 0 {
 				return fmt.Errorf("--copy requires an explicit --home or --target selection; recorded installs keep their recorded topology")
 			}
@@ -52,14 +55,15 @@ never overwritten directly.
 				destination = filepath.Join(installDir, name)
 			}
 			_, err := install.Update(install.UpdateOptions{
-				Version:     versionFlag,
-				Repo:        repo,
-				Executable:  destination,
-				Homes:       homes,
-				Targets:     targets,
-				Copy:        copyAll,
-				SkipPlugins: skipPlugins,
-				Out:         cmd.OutOrStdout(),
+				Version:           versionFlag,
+				Repo:              repo,
+				Executable:        destination,
+				Homes:             homes,
+				Targets:           targets,
+				Copy:              copyAll,
+				SkipPlugins:       skipPlugins,
+				BootstrapDefaults: bootstrapDefaults,
+				Out:               output.stdout,
 			})
 			return err
 		},
@@ -71,5 +75,7 @@ never overwritten directly.
 	c.Flags().StringArrayVar(&targets, "target", nil, "native host target to refresh: claude, codex, opencode, or all (repeatable)")
 	c.Flags().BoolVar(&copyAll, "copy", false, "with explicit selectors, copy rather than symlink secondary homes")
 	c.Flags().BoolVar(&skipPlugins, "skip-plugins", false, "do not ask detected Claude Code or Codex plugin managers to refresh machinery")
+	c.Flags().BoolVar(&bootstrapDefaults, "bootstrap-defaults", false, "use plugin-aware default homes for a fresh bootstrap")
+	_ = c.Flags().MarkHidden("bootstrap-defaults")
 	return c
 }

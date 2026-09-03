@@ -16,7 +16,7 @@ func runAttest(t *testing.T, args ...string) (string, string, int) {
 	cmd.SetOut(out)
 	cmd.SetErr(errB)
 	cmd.SetArgs(args)
-	if err := cmd.Execute(); err != nil {
+	if err := executeCapturedCommand(cmd); err != nil {
 		t.Fatal(err)
 	}
 	code := 0
@@ -100,6 +100,76 @@ func TestAttestFailsOnAnAbsentPath(t *testing.T) {
 	}
 }
 
+func TestAttestRejectsSymlinkAndInPlaceMutation(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.md")
+	if err := os.WriteFile(target, []byte("first"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link.md")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	_, errB, code := runAttest(t, link)
+	if code != 1 || !strings.Contains(errB, "regular non-symlink") {
+		t.Fatalf("attest accepted symlink: code=%d stderr=%q", code, errB)
+	}
+	prior := stableRegularAfterInitialRead
+	stableRegularAfterInitialRead = func(path string) {
+		if path == target {
+			if err := os.WriteFile(target, []byte("later"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	defer func() { stableRegularAfterInitialRead = prior }()
+	_, errB, code = runAttest(t, target)
+	if code != 1 || !strings.Contains(errB, "changed") {
+		t.Fatalf("attest hid in-place mutation: code=%d stderr=%q", code, errB)
+	}
+}
+
+func TestAttestRejectsMutationBetweenFilesWithoutPartialOutput(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "first.md")
+	second := filepath.Join(dir, "second.md")
+	if err := os.WriteFile(first, []byte("first"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(second, []byte("second"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prior := stableRegularAfterInitialRead
+	stableRegularAfterInitialRead = func(path string) {
+		if path == first {
+			if err := os.WriteFile(second, []byte("second-mutated"), 0o644); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	t.Cleanup(func() { stableRegularAfterInitialRead = prior })
+	out, errOut, code := runAttest(t, first, second)
+	if code != 1 || out != "" || !strings.Contains(errOut, "changed identity while reading") {
+		t.Fatalf("hybrid attestation set accepted or partially emitted: code=%d out=%q stderr=%q", code, out, errOut)
+	}
+}
+
+func TestAttestRejectsIdentityAliases(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "first.md")
+	alias := filepath.Join(dir, "alias.md")
+	if err := os.WriteFile(first, []byte("first"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(first, alias); err != nil {
+		t.Skipf("hard links unavailable: %v", err)
+	}
+	out, errOut, code := runAttest(t, first, alias)
+	if code != 1 || out != "" || !strings.Contains(errOut, "alias the same file identity") {
+		t.Fatalf("identity alias accepted: code=%d out=%q stderr=%q", code, out, errOut)
+	}
+}
+
 // No paths and no --claims is a usage error, not a silent success.
 func TestAttestWithoutArgumentsFails(t *testing.T) {
 	_, errB, code := runAttest(t)
@@ -138,7 +208,7 @@ func TestCheckGateGvRunsAndCatchesStaleness(t *testing.T) {
 		out, _, codes := withCapturedIO(t)
 		cmd := newCheckCmd()
 		cmd.SetArgs([]string{design, "--gate", "gv"})
-		if err := cmd.Execute(); err != nil {
+		if err := executeCapturedCommand(cmd); err != nil {
 			t.Fatal(err)
 		}
 		code := 0

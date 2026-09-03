@@ -1,9 +1,17 @@
-surface_version: 1
+surface_version: 2
 system: >
   Go CRM prototype: a single-process working prototype over an embedded schema
   (legacy/domain.modelith.yaml) that proved the CRM workflow but is not suitable as the
   production foundation.
 as_of: 2026-07-22
+corpus:
+  - area: prototype CRM application and embedded schema
+    classification: rearchitect-adapt
+    source: legacy/domain.modelith.yaml, migration.yaml, and the prototype implementation
+    rationale: preserve the proven CRM capabilities while replacing the embedded storage and operational boundary
+    target: target CRM application and SurrealDB repository
+    decided_by: example design owner
+    decided: 2026-07-22
 _comment: >
   Retrofit ledger, authored 2026-07-22: the rebuild's design run predates the surface-ledger
   discipline, so this enumeration is derived from the two committed legacy sources rather

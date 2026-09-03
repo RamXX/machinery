@@ -1,0 +1,17 @@
+surface_version: 1
+sources:
+  - checkout.modelith.yaml action list, walked for Customer and Operator personas
+  - ARCHITECTURE.md subsystem interface and event contracts
+acts:
+  - act: Order.place
+    actor: Customer
+    surface: "orders child API: POST /orders with total"
+  - act: Order.ship
+    actor: Operator
+    surface: "orders child operator API: POST /orders/{id}/ship"
+  - act: Order.cancel
+    actor: Customer
+    surface: "orders child customer API: POST /orders/{id}/cancel"
+  - act: Payment.refund
+    actor: Operator
+    surface: "payments child operator API: POST /payments/{id}/refund"

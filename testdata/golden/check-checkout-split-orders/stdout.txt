@@ -1,3 +1,6 @@
+== Gu-surfaces  target surface ledger ==
+  checked: 3 obligated actions, 3 covered, 0 deferred acts, 0 deferred personas, 0 knob rows, 0 actorless actions, 0 milestone references resolved
+  ok
 == Gc-carrier  invariant carrier reconciliation ==
   note   relational layers not opted in: policy, integrity, isolation
   checked: 2 invariants declared, 2 preserves references, 2 carried by preserves
@@ -12,19 +15,22 @@
   checked: 1 machines, 4 transitions, 1 tla-generable, 1 oracles fresh, 3 named units covered
   ok
 == Gd-idcite  design-side stable-id citations ==
-  warn   BUILD.md:274: T-ORDE-04 is a positional row citation; rows renumber, so cite the stable id instead
-  checked: 4 citations resolved, 7 files scanned, 4 committed oracle ids
+  checked: 4 citations resolved, 11 files scanned, 4 committed oracle ids
+  ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 7 files style-scanned, 4 duplicate tables embed-marked
+  checked: 11 files style-scanned, 4 duplicate tables embed-marked
   ok
 == Gx-trace  cross-layer traceability ==
-  warn   invariant 'order-total-positive' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
-  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 1 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor), 1 invariants attested only (prose)
+  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 lifecycle semantics annotations, 1 control-flow-only semantics, 1 placement rows with machines, 1 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 2 invariants enforced, 2 invariants unit-backed (guard/action/actor)
+  ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 4 milestones, 4 DoD-bearing milestones, 1 skeleton NFR lines, 1 skeleton citations
   ok
 == Ge-embed  declared-embed fidelity ==
-  checked: 4 embed markers, 4 embed tables verified, 4 subset claims, 10 rows compared, 4 complete claims
+  checked: 4 embed markers, 4 embed tables verified, 4 subset claims, 11 rows compared, 4 complete claims
+  ok
+== Gv-attest  attestation evidence ==
+  checked: 23 covered artifacts current, 14 attested claims, 14 claims owed
   ok
 == G5-pack  contract packs ==
   checked: 6 pack files, 1 pack hash verified, 3 refinement artifacts fresh, 1 owned entities present, 3 owned attributes present, 1 owned enums shape-checked, 1 owned invariants intact, 1 delegated invariants traced, 1 produced events emitted, 2 consumed events handled, pack revision 1

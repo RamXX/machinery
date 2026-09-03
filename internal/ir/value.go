@@ -17,6 +17,11 @@ import (
 	"strings"
 )
 
+// MaxMachineJSONBytes is the largest machine document Machinery will parse.
+// A fixed policy bound prevents sparse or concurrently growing inputs from
+// turning parsing into an unbounded allocation or EOF wait.
+const MaxMachineJSONBytes int64 = 16 << 20
+
 // Value is a JSON value whose object members preserve source order.
 //
 //	KindObject  -> *Object
@@ -258,9 +263,73 @@ func decodeToken(dec *json.Decoder, t json.Token) (*Value, error) {
 // Returns (root, nil) on success or (nil, err) mirroring machine_lint.load_machine
 // error strings ("invalid JSON in <path>: line N: <msg>" / "cannot read ...").
 func LoadMachineJSON(path string) (*Value, error) {
-	data, err := os.ReadFile(path)
+	data, err := ReadMachineJSONFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %w", path, err)
+	}
+	return LoadMachineJSONBytes(path, data)
+}
+
+// ReadMachineJSONFile returns a stable, exact-size snapshot of one regular
+// machine document. It never reads past the size observed before the read.
+func ReadMachineJSONFile(path string) (_ []byte, retErr error) {
+	before, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() {
+		return nil, fmt.Errorf("machine JSON must be a regular non-symlink file")
+	}
+	if before.Size() < 0 || before.Size() > MaxMachineJSONBytes {
+		return nil, fmt.Errorf("machine JSON size %d exceeds %d-byte limit", before.Size(), MaxMachineJSONBytes)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { retErr = errors.Join(retErr, file.Close()) }()
+	opened, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !os.SameFile(before, opened) {
+		return nil, fmt.Errorf("machine JSON changed identity while opening")
+	}
+	data, err := io.ReadAll(io.LimitReader(file, before.Size()+1))
+	if err != nil {
+		return nil, err
+	}
+	after, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	pathAfter, pathErr := os.Lstat(path)
+	if pathErr != nil || !os.SameFile(before, after) || !os.SameFile(before, pathAfter) ||
+		after.Size() != before.Size() || after.Mode() != before.Mode() || !after.ModTime().Equal(before.ModTime()) || int64(len(data)) != before.Size() {
+		return nil, errors.Join(pathErr, fmt.Errorf("machine JSON changed while reading"))
+	}
+	return data, nil
+}
+
+// LoadMachineJSONReader parses a machine from r while preserving JSON object
+// key order. source is used only in diagnostics, so callers that already hold
+// a confined file handle do not need to reopen its ambient filesystem path.
+func LoadMachineJSONReader(source string, r io.Reader) (*Value, error) {
+	data, err := io.ReadAll(io.LimitReader(r, MaxMachineJSONBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("cannot read %s: %w", source, err)
+	}
+	if int64(len(data)) > MaxMachineJSONBytes {
+		return nil, fmt.Errorf("cannot read %s: machine JSON exceeds %d-byte limit", source, MaxMachineJSONBytes)
+	}
+	return LoadMachineJSONBytes(source, data)
+}
+
+// LoadMachineJSONBytes parses a machine from data while preserving JSON object
+// key order and the same source-labelled diagnostics as LoadMachineJSON.
+func LoadMachineJSONBytes(source string, data []byte) (*Value, error) {
+	if int64(len(data)) > MaxMachineJSONBytes {
+		return nil, fmt.Errorf("invalid JSON in %s: machine JSON exceeds %d-byte limit", source, MaxMachineJSONBytes)
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
@@ -270,15 +339,15 @@ func LoadMachineJSON(path string) (*Value, error) {
 		var se *json.SyntaxError
 		if errors.As(derr, &se) {
 			line := 1 + bytes.Count(data[:se.Offset], []byte("\n"))
-			return nil, fmt.Errorf("invalid JSON in %s: line %d: %s", path, line, se.Error())
+			return nil, fmt.Errorf("invalid JSON in %s: line %d: %s", source, line, se.Error())
 		}
-		return nil, fmt.Errorf("invalid JSON in %s: %w", path, derr)
+		return nil, fmt.Errorf("invalid JSON in %s: %w", source, derr)
 	}
 	// reject trailing content after the first value (json.load "Extra data")
 	if t, err := dec.Token(); err == nil {
-		return nil, fmt.Errorf("invalid JSON in %s: extra data after the machine object (%v)", path, t)
+		return nil, fmt.Errorf("invalid JSON in %s: extra data after the machine object (%v)", source, t)
 	} else if !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("invalid JSON in %s: extra data after the machine object", path)
+		return nil, fmt.Errorf("invalid JSON in %s: extra data after the machine object", source)
 	}
 	return v, nil
 }

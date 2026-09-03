@@ -273,7 +273,7 @@ them structurally).
 
 | invariant id | enforced by (guard / structural) | in component | interface contract | test id(s) |
 |---|---|---|---|---|
-| `payment-single-capture` | structural: `capture` is handled only in `Requested`; redelivery lands in `_ignores` on `Captured` | Payment machine (payments.svc) | `capture` outcome + produced `markPaid` event (section 4.3) | T-PAYM-01 (stable PAYM-975859), P-payment-single-capture |
+| `payment-single-capture` | structural: `capture` is handled only in `Requested`; redelivery lands in `_ignores` on `Captured` | Payment machine (payments.svc) | `capture` outcome + produced `markPaid` event (section 4.3) | PAYM-975859, P-payment-single-capture |
 
 No invariant is dropped; none needs a known-risk callout (the one invariant is structural).
 

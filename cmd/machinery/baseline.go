@@ -1,11 +1,18 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/RamXX/machinery/internal/artifactset"
+	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/gates"
 )
 
@@ -25,25 +32,41 @@ the ratchet.`,
 	}
 	var implDir, date string
 	c.Flags().StringVar(&implDir, "impl", "", "implementation directory to scan (required)")
-	c.Flags().StringVar(&date, "date", "", "stamp for the snapshot and rule comments (default: today, YYYY-MM-DD; older YYYY-MM snapshots stay readable)")
-	c.RunE = func(cmd *cobra.Command, args []string) error {
+	c.Flags().StringVar(&date, "date", "", "stamp for the snapshot and rule comments (YYYY-MM-DD; otherwise SOURCE_DATE_EPOCH or an existing ratchet date is required)")
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		stdoutW, stderrW := output.stdout, output.stderr
 		design := args[0]
 		if err := checkIsDir(design); err != nil {
 			fmt.Fprintln(stderrW, err)
-			exitFunc(1)
-			return nil
+			return commandExitBecause(1, err)
 		}
 		if implDir == "" {
 			fmt.Fprintln(stderrW, "machinery_baseline: --impl is required")
-			exitFunc(1)
-			return nil
+			return commandExit(1)
 		}
-		if date == "" {
-			date = time.Now().Format("2006-01-02")
+		snapshot, err := designlock.Acquire(design)
+		if err != nil {
+			return err
 		}
-		rep, err := gates.BuildBaseline(design, implDir, date)
+		defer func() { retErr = snapshot.LogicalError(errors.Join(retErr, snapshot.Release())) }()
+		sourceDesign := snapshot.SourceRoot()
+		date, err = resolveBaselineDate(sourceDesign, date, os.Getenv("SOURCE_DATE_EPOCH"))
 		if err != nil {
 			return fmt.Errorf("machinery_baseline: %w", err)
+		}
+		stableImpl, err := snapshot.MaterializeExternalTree(implDir)
+		if err != nil {
+			return fmt.Errorf("machinery_baseline: snapshot implementation: %w", err)
+		}
+		defer func() { retErr = errors.Join(retErr, stableImpl.Close()) }()
+		if err := snapshot.ResumeExpected("baseline", "rerun `machinery baseline` with the same arguments"); err != nil {
+			return err
+		}
+		rep, err := gates.BuildBaseline(sourceDesign, stableImpl.Path(), date)
+		if err != nil {
+			return fmt.Errorf("machinery_baseline: %w", snapshot.LogicalError(err))
 		}
 
 		fmt.Fprintln(stdoutW, "== baseline  boundary debt snapshot ==")
@@ -80,7 +103,16 @@ the ratchet.`,
 			}
 		}
 
-		if err := gates.WriteRatchet(design, rep.Ratchet); err != nil {
+		ratchetBody, err := gates.RenderRatchet(rep.Ratchet)
+		if err != nil {
+			return fmt.Errorf("machinery_baseline: render %s: %w", gates.RatchetFile, err)
+		}
+		expected := []designlock.OutputExpectation{designlock.ExpectFile(filepath.Join(design, gates.RatchetFile), ratchetBody, 0o644)}
+		if err := snapshot.PublishExpectedRooted("baseline", "rerun `machinery baseline` with the same arguments", expected, func(outputs *designlock.OutputScope) error {
+			return outputs.WithRoot(design, func(root *os.Root) error {
+				return artifactset.CommitRooted(design, root, map[string][]byte{gates.RatchetFile: ratchetBody})
+			})
+		}); err != nil {
 			return fmt.Errorf("machinery_baseline: writing %s: %w", gates.RatchetFile, err)
 		}
 		total := 0
@@ -92,4 +124,34 @@ the ratchet.`,
 		return nil
 	}
 	return c
+}
+
+func resolveBaselineDate(design, explicit, sourceDateEpoch string) (string, error) {
+	if explicit = strings.TrimSpace(explicit); explicit != "" {
+		parsed, err := time.Parse("2006-01-02", explicit)
+		if err != nil || parsed.Format("2006-01-02") != explicit {
+			return "", fmt.Errorf("--date must be a real canonical YYYY-MM-DD date")
+		}
+		return explicit, nil
+	}
+	if sourceDateEpoch = strings.TrimSpace(sourceDateEpoch); sourceDateEpoch != "" {
+		seconds, err := strconv.ParseInt(sourceDateEpoch, 10, 64)
+		if err != nil {
+			return "", fmt.Errorf("SOURCE_DATE_EPOCH must be integer Unix seconds: %w", err)
+		}
+		return time.Unix(seconds, 0).UTC().Format("2006-01-02"), nil
+	}
+	existing, err := gates.LoadRatchet(design)
+	if err != nil {
+		return "", fmt.Errorf("cannot reuse existing ratchet date: %w", err)
+	}
+	if existing != nil && strings.TrimSpace(existing.Date) != "" {
+		for _, layout := range []string{"2006-01-02", "2006-01"} {
+			if parsed, parseErr := time.Parse(layout, existing.Date); parseErr == nil && parsed.Format(layout) == existing.Date {
+				return existing.Date, nil
+			}
+		}
+		return "", fmt.Errorf("existing ratchet date %q is not canonical YYYY-MM or YYYY-MM-DD", existing.Date)
+	}
+	return "", fmt.Errorf("a deterministic snapshot date is required: pass --date or SOURCE_DATE_EPOCH (an existing ratchet date is reused automatically)")
 }

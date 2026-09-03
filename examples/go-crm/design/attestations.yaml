@@ -1,0 +1,121 @@
+attestation_version: 1
+attestations:
+  - claim: g2.action-ownership
+    attestor: Codex CRM design review
+    date: 2026-09-02
+    note: Every domain action is assigned to the component that owns its state change and boundary effects.
+    covers:
+      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+  - claim: g2.interface-contract-rightness
+    attestor: Codex CRM design review
+    date: 2026-09-02
+    note: Interface shapes, classified errors, retry behavior, and idempotency match the Go realization.
+    covers:
+      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+  - claim: g2.placement-rightness
+    attestor: Codex CRM design review
+    date: 2026-09-02
+    note: Placement keeps domain decisions pure and confines LadybugDB access to the repository boundary.
+    covers:
+      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+  - claim: g2.adoption-closure-discovery
+    attestor: Codex CRM design review
+    date: 2026-09-02
+    note: The local CLI, session, authorization, domain, repository, and declared externals form the complete adoption closure.
+    covers:
+      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+  - claim: g2.event-contract-completeness
+    attestor: Codex CRM design review
+    date: 2026-09-02
+    note: The design is synchronous and declares no cross-component asynchronous event that needs a missing contract.
+    covers:
+      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+  - claim: g2.nfr-content
+    attestor: Codex CRM design review
+    date: 2026-09-02
+    note: Security, reliability, operability, performance, and data-integrity claims are concrete and testable for the local CLI.
+    covers:
+      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+  - claim: g3.guard-semantics
+    attestor: Codex CRM design review
+    date: 2026-09-02
+    note: Every named guard was reviewed against its independent clauses, source-state structure, and invariant mapping.
+    covers:
+      - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
+      - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
+      - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
+      - {path: machines/Deal.matrix.md, hash: sha256:40f1339eb0c142c1741386f8f79c6ca9043eee325a50a7b93a93e2f7b97d32a0}
+      - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
+      - {path: machines/Session.matrix.md, hash: sha256:2bafb36ce3a4f4800fc1bf36fa1eb0c3e08fb39616dae864d4c81291cda7d1c6}
+      - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
+      - {path: machines/Task.matrix.md, hash: sha256:e1fc8c68e7e7ded94d90d034ab796f69d3d43a554a341d87e95bd9a64a92cf80}
+      - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
+      - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
+  - claim: g3.invariant-enforcement
+    attestor: Codex CRM design review
+    date: 2026-09-02
+    note: Every machine-carried invariant is bound to the guard, action, or actor unit that enforces it; non-machine carriers are explicit.
+    covers:
+      - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
+      - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
+      - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
+      - {path: machines/Deal.matrix.md, hash: sha256:40f1339eb0c142c1741386f8f79c6ca9043eee325a50a7b93a93e2f7b97d32a0}
+      - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
+      - {path: machines/Session.matrix.md, hash: sha256:2bafb36ce3a4f4800fc1bf36fa1eb0c3e08fb39616dae864d4c81291cda7d1c6}
+      - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
+      - {path: machines/Task.matrix.md, hash: sha256:e1fc8c68e7e7ded94d90d034ab796f69d3d43a554a341d87e95bd9a64a92cf80}
+      - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
+      - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
+  - claim: g3.residual-transitions
+    attestor: Codex CRM design review
+    date: 2026-09-02
+    note: Classified store and session failures retain bounded retry, rollback, and fail-closed residual transitions.
+    covers:
+      - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
+      - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
+      - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
+      - {path: machines/Deal.matrix.md, hash: sha256:40f1339eb0c142c1741386f8f79c6ca9043eee325a50a7b93a93e2f7b97d32a0}
+      - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
+      - {path: machines/Session.matrix.md, hash: sha256:2bafb36ce3a4f4800fc1bf36fa1eb0c3e08fb39616dae864d4c81291cda7d1c6}
+      - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
+      - {path: machines/Task.matrix.md, hash: sha256:e1fc8c68e7e7ded94d90d034ab796f69d3d43a554a341d87e95bd9a64a92cf80}
+      - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
+      - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
+  - claim: g3.event-redelivery
+    attestor: Codex CRM design review
+    date: 2026-09-02
+    note: These invocation-local synchronous machines consume no external at-least-once event stream; retry replays are bounded per instance.
+    covers:
+      - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
+      - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
+      - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
+      - {path: machines/Deal.matrix.md, hash: sha256:40f1339eb0c142c1741386f8f79c6ca9043eee325a50a7b93a93e2f7b97d32a0}
+      - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
+      - {path: machines/Session.matrix.md, hash: sha256:2bafb36ce3a4f4800fc1bf36fa1eb0c3e08fb39616dae864d4c81291cda7d1c6}
+      - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
+      - {path: machines/Task.matrix.md, hash: sha256:e1fc8c68e7e7ded94d90d034ab796f69d3d43a554a341d87e95bd9a64a92cf80}
+      - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
+      - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
+  - claim: gt.conformance-test-shape
+    attestor: Codex CRM design review
+    date: 2026-09-03
+    note: The Go tests key executable table cases on every stable oracle id and assert next state plus ordered actions.
+    covers:
+      - {path: BUILD.md, hash: sha256:c58124cf07f7f8cdf8f4e99b2cb484aec5d4ca110543e25b2ed0711863d44c1d}
+  - claim: g4.zero-context
+    attestor: Codex CRM design review
+    date: 2026-09-03
+    note: BUILD.md identifies sources, contracts, machines, tests, migration, toolchain, failure handling, and milestone order without relying on conversation context.
+    covers:
+      - {path: BUILD.md, hash: sha256:c58124cf07f7f8cdf8f4e99b2cb484aec5d4ca110543e25b2ed0711863d44c1d}
+  - claim: ga.review-quality
+    attestor: Codex release acceptance review
+    date: 2026-09-03
+    note: Each milestone review was rerun against the named implementation commit; the DoD evidence, acceptance judgments, and empty findings lists are complete and accurate.
+    covers:
+      - {path: acceptance/M0.yaml, hash: sha256:1cce160669cd04f77bff60f1ae74e6760bdf358c08adeeddd6f03260ecc01339}
+      - {path: acceptance/M1.yaml, hash: sha256:b0d518e198e5197de8e4ed132b3e58431a353a591670af867bc9590af6b11f63}
+      - {path: acceptance/M2.yaml, hash: sha256:f4490e4d8d34a565985f98138a81b165e861bb75e02e2f4852cc868f030bdd2a}
+      - {path: acceptance/M3.yaml, hash: sha256:11f6d1ee99d95e51f09d14457604f0b1c56ec91484d05ae6c72e5e7d649147df}
+      - {path: acceptance/M4.yaml, hash: sha256:66593a6aca928f948dd22b9f46b249adadf8155dfa457984d31c07f03039704d}
+      - {path: acceptance/M5.yaml, hash: sha256:64c90b5ccbe557ae0c04ed1cb619f5bc2c44e7258bb4a4c358107fbd1bf481c9}

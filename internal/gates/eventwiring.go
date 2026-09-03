@@ -79,8 +79,12 @@ func machineEventCorpus(design string, g *Gate) (handled map[string]bool, fired 
 	external = map[string]bool{}
 	var cells []string
 	mdir := filepath.Join(design, "machines")
-	for _, mf := range sortedGlobExt(mdir, ".machine.json") {
-		m, err := ir.LoadMachineJSON(mf)
+	machineFiles, err := sortedGlobExt(mdir, ".machine.json")
+	if err != nil {
+		g.Errs = append(g.Errs, err.Error())
+	}
+	for _, mf := range machineFiles {
+		m, err := loadDesignMachine(design, mf)
 		if err != nil {
 			continue
 		}
@@ -118,8 +122,12 @@ func machineEventCorpus(design string, g *Gate) (handled map[string]bool, fired 
 			}
 		}
 	}
-	for _, f := range sortedGlobExt(mdir, ".matrix.md") {
-		for _, tbl := range ir.ParseMdTables(readFileOrErr(f, g)) {
+	matrixFiles, err := sortedGlobExt(mdir, ".matrix.md")
+	if err != nil {
+		g.Errs = append(g.Errs, err.Error())
+	}
+	for _, f := range matrixFiles {
+		for _, tbl := range ir.ParseMdTables(readDesignFileOrErr(design, f, g)) {
 			for _, r := range tbl.Rows {
 				cells = append(cells, r...)
 			}

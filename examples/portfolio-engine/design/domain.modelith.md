@@ -12,6 +12,7 @@ A local tool that recommends a stock portfolio. It draws the top 30 constituents
 - **`Constituent`** - A `Security` that is a member of an `Index`, carrying its rank within that index.
 - **`Manager`** - A person who reviews a recommended `Portfolio` and accepts or rejects it.
 - **`Source`** - An `Index` a `CandidateSet` was drawn from.
+- **`System`** - The portfolio tool acting autonomously inside a recommendation run; not a human persona.
 
 ## Enums
 
@@ -82,7 +83,7 @@ One position in a `Portfolio`: a candidate `Security` and the fraction of the po
 
 **Actions**
 
-- `set` - actor `Analyst`; preserves holding-weight-nonneg, holding-weights-sum-full - Set a holding's security and weight when the optimizer commits a portfolio.
+- `set` - actor `System`; preserves holding-weight-nonneg, holding-weights-sum-full - Set a holding's security and weight when the optimizer commits a portfolio.
 
 **Invariants**
 
@@ -351,4 +352,3 @@ Reference data cannot duplicate a ticker.
 **Invariants touched**
 
 - **ticker-unique** - Every `Security` has a ticker that is unique across all securities.
-

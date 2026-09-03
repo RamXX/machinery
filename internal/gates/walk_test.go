@@ -72,8 +72,8 @@ func TestDirIgnoredGlobVsDirPrefix(t *testing.T) {
 }
 
 // An ignored directory is pruned DURING the walk (its unreadable subtree is
-// never touched, so no warning), while a non-ignored symlink into it stays
-// followable: the prune keys on the walk path, not the resolved target.
+// never touched). A non-ignored symlink cannot re-import that subtree from a
+// second path: governed source inventory never follows symlinks.
 func TestWalkPrunesIgnoredDirsDuringWalk(t *testing.T) {
 	skipIfPermsUnenforceable(t)
 	root := t.TempDir()
@@ -87,11 +87,11 @@ func TestWalkPrunesIgnoredDirsDuringWalk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(warns) != 0 {
-		t.Fatalf("pruning must happen during the walk (the ignored unreadable subtree is never read), got warns %v", warns)
+	if len(warns) != 1 || !strings.Contains(warns[0], "mirror") || !strings.Contains(warns[0], "symlink") {
+		t.Fatalf("the ignored subtree must stay pruned and its non-ignored symlink alias must be rejected, got warns %v", warns)
 	}
-	if got := relFiles(t, root, files); len(got) != 1 || got[0] != filepath.Join("mirror", "pkg.ex") {
-		t.Fatalf("the symlink into the ignored dir must stay followable and the dir itself pruned, got %v", got)
+	if got := relFiles(t, root, files); len(got) != 0 {
+		t.Fatalf("the symlink alias must not import source bytes, got %v", got)
 	}
 	if len(pruned) != 1 || pruned[0] != "real" {
 		t.Fatalf("the pruned dir must be reported, got %v", pruned)
@@ -102,7 +102,7 @@ func TestWalkPrunesIgnoredDirsDuringWalk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(warns) != 1 || !strings.Contains(warns[0], "unreadable") {
+	if len(warns) != 2 || !strings.Contains(strings.Join(warns, "\n"), "unreadable") || !strings.Contains(strings.Join(warns, "\n"), "mirror") {
 		t.Fatalf("the unpruned walk must warn about the unreadable subtree, got %v", warns)
 	}
 }
@@ -129,7 +129,7 @@ func TestWalkContinuesPastUnreadableDir(t *testing.T) {
 	}
 }
 
-func TestWalkSymlinkCycleTerminates(t *testing.T) {
+func TestWalkSymlinkCycleIsRejected(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation needs privileges on Windows")
 	}
@@ -139,7 +139,7 @@ func TestWalkSymlinkCycleTerminates(t *testing.T) {
 		t.Fatal(err)
 	}
 	files, _, warns, err := walkSourceFiles(root, nil)
-	if err != nil || len(warns) != 0 {
+	if err != nil || len(warns) != 1 || !strings.Contains(warns[0], "symlink") {
 		t.Fatalf("err %v warns %v", err, warns)
 	}
 	if got := relFiles(t, root, files); len(got) != 1 || got[0] != filepath.Join("d", "f.go") {
@@ -147,7 +147,7 @@ func TestWalkSymlinkCycleTerminates(t *testing.T) {
 	}
 }
 
-func TestWalkDanglingSymlinkSkipped(t *testing.T) {
+func TestWalkDanglingSymlinkIsLoud(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation needs privileges on Windows")
 	}
@@ -157,8 +157,8 @@ func TestWalkDanglingSymlinkSkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 	files, _, warns, err := walkSourceFiles(root, nil)
-	if err != nil || len(warns) != 0 {
-		t.Fatalf("a dangling symlink is skipped silently, got err %v warns %v", err, warns)
+	if err != nil || len(warns) != 1 || !strings.Contains(warns[0], "gone") || !strings.Contains(warns[0], "symlink") {
+		t.Fatalf("a dangling symlink must make the governed scan incomplete, got err %v warns %v", err, warns)
 	}
 	if got := relFiles(t, root, files); len(got) != 1 || got[0] != "a.go" {
 		t.Fatalf("got %v", got)

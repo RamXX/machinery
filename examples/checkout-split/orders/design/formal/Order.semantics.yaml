@@ -1,0 +1,3 @@
+machine: order
+pattern: control-flow-only
+reason: The Order lifecycle has no data-refinement state beyond the checked persisted status enum; total validation is a creation-boundary unit contract, not a transition algebra.

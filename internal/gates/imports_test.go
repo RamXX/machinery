@@ -1,11 +1,274 @@
 package gates
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
-	"time"
 )
+
+func TestManifestDependenciesRejectMalformedEvidenceByEcosystem(t *testing.T) {
+	cases := []struct {
+		name, file, body, want string
+	}{
+		{"package JSON duplicate", "package.json", `{"dependencies":{"ok":"1"},"dependencies":{}}`, "duplicate JSON key"},
+		{"package JSON null root", "package.json", `null`, "root must be a non-null object"},
+		{"package JSON null dependencies", "package.json", `{"dependencies":null}`, "must be a non-null object"},
+		{"go.mod unterminated require", "go.mod", "module example.com/app\nrequire (\nexample.com/dep v1.2.3\n", "unterminated require block"},
+		{"Cargo malformed table", "Cargo.toml", "[dependencies\nserde = \"1\"\n", "expected ']' to close table name"},
+		{"requirements recursive include", "requirements.txt", "good==1\n-r more.txt\n", "cannot be enumerated completely"},
+		{"Mix malformed deps", "mix.exs", "defp deps do\n  [{:plug, \"~> 1.0\"}\nend\n", "unbalanced Elixir"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			impl := t.TempDir()
+			mustWrite(t, filepath.Join(impl, tc.file), tc.body)
+			_, errs := manifestDependencies(impl)
+			if len(errs) == 0 || !strings.Contains(strings.Join(errs, "\n"), tc.want) {
+				t.Fatalf("malformed %s did not invalidate dependency evidence: %v", tc.file, errs)
+			}
+		})
+	}
+}
+
+func TestCargoManifestAcceptsCargoAndTOMLSyntax(t *testing.T) {
+	body := []byte(`
+[package]
+name = "app"
+version.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nil-core.workspace = true
+serde = { version = "1", features = [
+  "derive",
+] }
+artifact-client = { version = "1", artifact = ["bin:client", "cdylib"], lib = false }
+
+[dev-dependencies]
+pretty_assertions = "1"
+artifact-dev = { version = "1", artifact = "bin" }
+
+[build-dependencies.bindgen]
+version = "0.72"
+
+[workspace.dependencies]
+nil-core = "0.1"
+workspace-crate = { path = "crates/workspace-crate" }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.build-dependencies]
+windows-sys = "0.61"
+
+`)
+	want := []string{
+		"artifact-client", "artifact-dev", "artifact_client", "artifact_dev", "bindgen", "libc", "nil-core", "nil_core", "pretty_assertions", "serde",
+		"windows-sys", "windows_sys", "workspace-crate", "workspace_crate",
+	}
+	got, err := parseCargoManifest(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("dependencies = %v, want %v", got, want)
+	}
+}
+
+func TestCargoManifestRejectsMalformedDependencySpecifications(t *testing.T) {
+	cases := []struct {
+		name, spec, want string
+	}{
+		{"boolean", "false", "version string or dependency table"},
+		{"array", "[]", "version string or dependency table"},
+		{"empty string", `""`, "empty version requirement"},
+		{"empty table", "{}", "empty dependency table"},
+		{"false workspace inheritance", "{ workspace = false }", "workspace must be true"},
+		{"unknown field", `{ version = "1", mystery = true }`, "unsupported dependency field"},
+		{"wrong version type", "{ version = 1 }", "version must be a non-empty string"},
+		{"non-string feature", `{ version = "1", features = [1] }`, "features[0] must be a non-empty string"},
+		{"selector without git", `{ version = "1", branch = "main" }`, "branch requires git"},
+		{"multiple git selectors", `{ git = "https://example.invalid/repo", branch = "main", rev = "abc" }`, "only one of branch, rev, or tag"},
+		{"source-free table", `{ optional = true }`, "must declare version, path, git, or workspace = true"},
+		{"empty artifact array", `{ version = "1", artifact = [] }`, "artifact must be a non-empty string or string array"},
+		{"unknown artifact kind", `{ version = "1", artifact = "nonsense" }`, "artifact has unsupported kind"},
+		{"duplicate artifact kind", `{ version = "1", artifact = ["bin", "bin"] }`, "artifact repeats kind"},
+		{"all and selected binaries", `{ version = "1", artifact = ["bin", "bin:tool"] }`, "cannot combine bin with selected"},
+		{"artifact target without artifact", `{ version = "1", target = "wasm32-unknown-unknown" }`, "target requires artifact"},
+		{"artifact lib without artifact", `{ version = "1", lib = true }`, "lib requires artifact"},
+		{"git and path", `{ git = "https://example.invalid/repo", path = "../repo" }`, "cannot combine git and path"},
+		{"registry with path", `{ version = "1", registry = "private", path = "../repo" }`, "registry cannot be combined with git or path"},
+		{"unsupported registry index", `{ version = "1", registry-index = "https://example.invalid/index" }`, "unsupported dependency field"},
+		{"warning git fragment", `{ git = "https://example.invalid/repo#main" }`, "must not contain a URL fragment"},
+		{"invalid package name", `{ version = "1", package = "not a package" }`, "invalid Cargo package name"},
+		{"invalid version word", `"latest"`, "invalid version requirement"},
+		{"invalid version trailing comma", `">=1.2, "`, "empty comparator"},
+		{"invalid leading zero", `"1.02"`, "malformed numeric component"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseCargoManifest([]byte("[dependencies]\nserde = " + tc.spec + "\n"))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("malformed Cargo dependency was accepted: err=%v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCargoWorkspaceDependencyDefinitionsRejectPackageOnlyFields(t *testing.T) {
+	cases := []struct {
+		name, spec, want string
+	}{
+		{"self inheritance", "{ workspace = true }", "cannot inherit from workspace"},
+		{"optional workspace dependency", `{ version = "1", optional = true }`, "cannot be optional"},
+		{"public workspace dependency", `{ version = "1", public = true }`, "cannot be public"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseCargoManifest([]byte("[workspace.dependencies]\nserde = " + tc.spec + "\n"))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("invalid workspace dependency was accepted: err=%v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCargoWorkspaceInheritanceAllowsOnlyAdditiveFields(t *testing.T) {
+	for _, field := range []string{"default-features = false", `version = "1"`, `package = "serde_core"`} {
+		_, err := parseCargoManifest([]byte("[dependencies]\nserde = { workspace = true, " + field + " }\n"))
+		if err == nil || !strings.Contains(err.Error(), "workspace cannot be combined") {
+			t.Fatalf("workspace inheritance with %q passed: %v", field, err)
+		}
+	}
+}
+
+func TestCargoVersionRequirementGrammar(t *testing.T) {
+	for _, requirement := range []string{"1", "^1.2.3", "~1.2", "*", "1.*", "1.2.x", ">= 1.2, < 2", "=1.2.3-alpha.1"} {
+		if err := validateCargoVersionRequirement(requirement); err != nil {
+			t.Errorf("valid requirement %q rejected: %v", requirement, err)
+		}
+	}
+	for _, requirement := range []string{"latest", "1.02", "1.2.3-alpha.01", "1.2.3+build.7", ">=1 <2", "1.*.3", "^*", "18446744073709551616"} {
+		if err := validateCargoVersionRequirement(requirement); err == nil {
+			t.Errorf("invalid requirement %q passed", requirement)
+		}
+	}
+}
+
+func TestCargoManifestRejectsWarningBearingDependencyTableAliases(t *testing.T) {
+	for _, body := range []string{
+		"[dev_dependencies]\nserde = \"1\"\n",
+		"[build_dependencies]\nserde = \"1\"\n",
+		"[target.'cfg(unix)'.dev_dependencies]\nserde = \"1\"\n",
+	} {
+		if _, err := parseCargoManifest([]byte(body)); err == nil || !strings.Contains(err.Error(), "underscore dependency-table alias") {
+			t.Fatalf("warning-bearing dependency table passed: %q, %v", body, err)
+		}
+	}
+}
+
+func TestManifestDependenciesBoundsReadsAndResolvesCargoWorkspace(t *testing.T) {
+	t.Run("irrelevant large regular file is not read", func(t *testing.T) {
+		impl := t.TempDir()
+		path := filepath.Join(impl, "irrelevant.bin")
+		if err := os.WriteFile(path, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Truncate(path, designArtifactMaxBytes+1); err != nil {
+			t.Fatal(err)
+		}
+		_, errs := manifestDependencies(impl)
+		if len(errs) != 0 {
+			t.Fatalf("irrelevant file consumed manifest read authority: %v", errs)
+		}
+	})
+
+	t.Run("aggregate manifest bytes are bounded", func(t *testing.T) {
+		impl := t.TempDir()
+		mustWrite(t, filepath.Join(impl, "package.json"), `{"dependencies":{}}`)
+		mustWrite(t, filepath.Join(impl, "requirements.txt"), "serde==1\n")
+		_, errs := manifestDependenciesBounded(impl, nil, 20)
+		if len(errs) == 0 || !strings.Contains(strings.Join(errs, "\n"), "aggregate byte limit 20") {
+			t.Fatalf("aggregate overflow passed: %v", errs)
+		}
+	})
+
+	t.Run("workspace inheritance resolves against governing root", func(t *testing.T) {
+		root := t.TempDir()
+		impl := filepath.Join(root, "crates")
+		mustWrite(t, filepath.Join(root, "Cargo.toml"), "[workspace]\nmembers = [\"crates/member\"]\n[workspace.dependencies]\nserde = \"1\"\n")
+		mustWrite(t, filepath.Join(impl, "member", "Cargo.toml"), "[package]\nname = \"member\"\nversion = \"0.1.0\"\n[dependencies]\nserde.workspace = true\n")
+		_, errs := manifestDependencies(impl)
+		if len(errs) != 0 {
+			t.Fatalf("governing workspace definition was not resolved: %v", errs)
+		}
+		if got, err := findCargoWorkspaceAuthority(impl, impl, nil); err != nil || got != filepath.Join(root, "Cargo.toml") {
+			t.Fatalf("workspace ancestor = %q, %v", got, err)
+		}
+		mustWrite(t, filepath.Join(impl, "member", "Cargo.toml"), "[package]\nname = \"member\"\nversion = \"0.1.0\"\n[dependencies]\nmissing.workspace = true\n")
+		_, errs = manifestDependencies(impl)
+		if len(errs) == 0 || !strings.Contains(strings.Join(errs, "\n"), "does not declare it in workspace.dependencies") {
+			t.Fatalf("undefined workspace inheritance passed: %v", errs)
+		}
+	})
+
+	t.Run("explicit package workspace is exact authority", func(t *testing.T) {
+		root := t.TempDir()
+		impl := filepath.Join(root, "member")
+		workspace := filepath.Join(root, "workspace", "Cargo.toml")
+		mustWrite(t, workspace, "[workspace]\n[workspace.dependencies]\nserde = \"1\"\n")
+		mustWrite(t, filepath.Join(impl, "Cargo.toml"), "[package]\nname = \"member\"\nversion = \"0.1.0\"\nworkspace = \"../workspace\"\n[dependencies]\nserde.workspace = true\n")
+		got, err := findCargoWorkspaceAuthority(impl, impl, nil)
+		if err != nil || got != workspace {
+			t.Fatalf("explicit workspace authority = %q, %v", got, err)
+		}
+		_, errs := manifestDependenciesWithWorkspace(impl, nil, dependencyManifestAggregateMaxBytes, workspace)
+		if len(errs) != 0 {
+			t.Fatalf("explicit workspace definition was not resolved: %v", errs)
+		}
+	})
+
+	t.Run("multiple explicit workspace authorities fail closed", func(t *testing.T) {
+		root := t.TempDir()
+		impl := filepath.Join(root, "members")
+		for _, name := range []string{"a", "b"} {
+			mustWrite(t, filepath.Join(root, "workspace-"+name, "Cargo.toml"), "[workspace]\n[workspace.dependencies]\nserde = \"1\"\n")
+			mustWrite(t, filepath.Join(impl, name, "Cargo.toml"), "[package]\nname = \""+name+"\"\nversion = \"0.1.0\"\nworkspace = \"../../workspace-"+name+"\"\n[dependencies]\nserde.workspace = true\n")
+		}
+		_, err := findCargoWorkspaceAuthority(impl, impl, nil)
+		if err == nil || !strings.Contains(err.Error(), "multiple external Cargo workspace authorities") {
+			t.Fatalf("multiple workspace roots were conflated: %v", err)
+		}
+	})
+}
+
+func TestCargoManifestRejectsUnsupportedWorkspaceDependencyGroups(t *testing.T) {
+	for _, group := range []string{"dev-dependencies", "build-dependencies", "dev_dependencies", "build_dependencies"} {
+		t.Run(group, func(t *testing.T) {
+			_, err := parseCargoManifest([]byte("[workspace." + group + "]\nserde = \"1\"\n"))
+			if err == nil || (!strings.Contains(err.Error(), "only workspace.dependencies is supported") && !strings.Contains(err.Error(), "underscore dependency-table alias")) {
+				t.Fatalf("workspace.%s was trusted as dependency evidence: %v", group, err)
+			}
+		})
+	}
+}
+
+func TestPackageManifestMultiInvalidDiagnosticIsByteStable(t *testing.T) {
+	body := []byte(`{"dependencies":{"zeta":null,"alpha":false,"middle":""}}`)
+	const want = "dependencies.alpha must be a nonempty version string"
+	for i := 0; i < 100; i++ {
+		deps, err := parsePackageManifest(body)
+		if err == nil || err.Error() != want || deps != nil {
+			t.Fatalf("run %d: deps=%v err=%v, want nil and %q", i, deps, err, want)
+		}
+	}
+
+	if _, err := parsePackageManifest([]byte(`null`)); err == nil || !strings.Contains(err.Error(), "root must be a non-null object") {
+		t.Fatalf("null package root passed closed schema: %v", err)
+	}
+}
 
 func TestExModules(t *testing.T) {
 	cases := []struct {
@@ -136,8 +399,8 @@ func TestG4MultiModuleGoResolvesEveryModule(t *testing.T) {
 	if g.Counts["imports resolved"] != 2 {
 		t.Fatalf("intra-module and cross-module imports must both resolve: %+v", g.Counts)
 	}
-	if hasErr(g, "example.com/scratch/y") {
-		t.Fatalf("a go.mod under an ignored glob must not be discovered, got %v", g.Errs)
+	if !hasErr(g, "imports undeclared third-party module example.com/scratch/y") {
+		t.Fatalf("an import of ignored/unmodeled code must not disappear with the ignored module, got %v", g.Errs)
 	}
 	if len(scan.OrphanRefs["example.com/mcp/gone"]) != 1 {
 		t.Fatalf("a module-internal import with no boundary is an orphan: %+v", scan.OrphanRefs)
@@ -158,14 +421,12 @@ func TestGoModuleForPrefersLongestPath(t *testing.T) {
 	}
 }
 
-// Snapshots stamp a full date; older month-only snapshots stay readable and
-// age from the first of the month.
-func TestRatchetAgeNoteBothFormats(t *testing.T) {
-	now := time.Date(2026, 8, 23, 0, 0, 0, 0, time.UTC)
-	if got := ratchetAgeNote("2026-08-23", now); got != "ratchet snapshot 2026-08-23, 0 day(s) old" {
+// Snapshot telemetry is tree-derived and stays identical across midnight.
+func TestRatchetSnapshotNoteBothFormatsIsClockIndependent(t *testing.T) {
+	if got := ratchetSnapshotNote("2026-08-23"); got != "ratchet snapshot 2026-08-23" {
 		t.Fatalf("full date: %q", got)
 	}
-	if got := ratchetAgeNote("2026-08", now); got != "ratchet snapshot 2026-08, 22 day(s) old" {
+	if got := ratchetSnapshotNote("2026-08"); got != "ratchet snapshot 2026-08" {
 		t.Fatalf("month form: %q", got)
 	}
 }

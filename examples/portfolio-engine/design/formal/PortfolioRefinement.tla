@@ -1,10 +1,10 @@
 ---- MODULE PortfolioRefinement ----
-\* machinery-version: v0.6.2
+\* machinery-version: v0.6.3
 \* GENERATED. Proof that PortfolioData refines PortfolioContract under a refinement mapping.
 EXTENDS PortfolioData
 
-phaseBar == IF st \in Domain THEN "resting" ELSE "busy"
-kindBar == IF stage \in Terminal THEN "terminal" ELSE "open"
+phaseBar == IF st \in Resting THEN "resting" ELSE "busy"
+kindBar == IF st \in Fault \/ stage \in Terminal THEN "terminal" ELSE "open"
 
 DC == INSTANCE PortfolioContract WITH phase <- phaseBar, kind <- kindBar
 

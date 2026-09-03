@@ -1,7 +1,7 @@
 # Generated transition oracle: `shipment`
 
 Generated from `Shipment.machine.json` by `machinery oracle`. DO NOT EDIT BY HAND.
-<!-- machinery-version: v0.6.2 -->
+<!-- machinery-version: v0.6.3 -->
 Single source of truth for the hard-TDD transition tests: one transition row is one
 test case. Key tests on the STABLE id, not the row number; row numbers renumber when
 the design changes, stable ids do not.
@@ -20,19 +20,20 @@ the design changes, stable ids do not.
 | persisting | atomic | - | - |
 | persistRetry | atomic | - | - |
 | rolledBack | atomic | - | - |
+| routingFault | final | - | - |
 
 ## Transitions
 
 | test id | stable id | source | trigger | guard | target | actions |
 |---|---|---|---|---|---|---|
-| T-SHIP-01 | SHIP-26175d | Pending | on:dispatch | - | dispatching | setCarrierDispatch |
-| T-SHIP-02 | SHIP-e816f2 | Dispatched | on:markInTransit | - | persisting | setPendingInTransit |
-| T-SHIP-03 | SHIP-285f38 | Dispatched | on:deliver | - | persisting | setPendingDelivered |
-| T-SHIP-04 | SHIP-0407ce | Dispatched | on:markLost | - | persisting | setPendingLost |
-| T-SHIP-05 | SHIP-7cf986 | InTransit | on:deliver | - | persisting | setPendingDelivered |
-| T-SHIP-06 | SHIP-883bf9 | InTransit | on:markLost | - | persisting | setPendingLost |
+| T-SHIP-01 | SHIP-26175d | Pending | on:dispatch | - | dispatching | resetCarrierRetries, setCarrierDispatch |
+| T-SHIP-02 | SHIP-e816f2 | Dispatched | on:markInTransit | - | persisting | resetRetries, setPendingInTransit |
+| T-SHIP-03 | SHIP-285f38 | Dispatched | on:deliver | - | persisting | resetRetries, setPendingDelivered |
+| T-SHIP-04 | SHIP-0407ce | Dispatched | on:markLost | - | persisting | resetRetries, setPendingLost |
+| T-SHIP-05 | SHIP-7cf986 | InTransit | on:deliver | - | persisting | resetRetries, setPendingDelivered |
+| T-SHIP-06 | SHIP-883bf9 | InTransit | on:markLost | - | persisting | resetRetries, setPendingLost |
 | T-SHIP-07 | SHIP-6a449a | dispatching | after:carrierTimeout | - | carrierRetry | recordCarrierTimeout |
-| T-SHIP-08 | SHIP-50ce91 | dispatching | onDone:carrierDispatch | - | persisting | captureTrackingId, setPendingDispatched |
+| T-SHIP-08 | SHIP-50ce91 | dispatching | onDone:carrierDispatch | - | persisting | resetRetries, captureTrackingId, setPendingDispatched |
 | T-SHIP-09 | SHIP-8c1a12 | dispatching | onError:carrierDispatch | isErrRetryable | carrierRetry | recordCarrierError |
 | T-SHIP-10 | SHIP-de1d57 | dispatching | onError:carrierDispatch | - | rolledBack | recordDispatchFailed |
 | T-SHIP-11 | SHIP-e77b68 | carrierRetry | after:carrierRetryBackoff | - | dispatching | incrementCarrierRetries |
@@ -51,5 +52,6 @@ the design changes, stable ids do not.
 | T-SHIP-24 | SHIP-125d9c | rolledBack | always | priorIsPending | Pending | - |
 | T-SHIP-25 | SHIP-e7b4be | rolledBack | always | priorIsDispatched | Dispatched | - |
 | T-SHIP-26 | SHIP-8146f7 | rolledBack | always | priorIsInTransit | InTransit | - |
+| T-SHIP-27 | SHIP-1890ca | rolledBack | always | - | routingFault | recordRoutingError |
 
-Total transitions (test cases): 26
+Total transitions (test cases): 27

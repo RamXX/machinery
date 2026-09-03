@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,5 +83,49 @@ func TestSweepContext(t *testing.T) {
 		if !strings.Contains(s, want) {
 			t.Fatalf("context output missing %q:\n%s", want, s)
 		}
+	}
+}
+
+func TestSweepRejectsMutationAndSymlinkInventory(t *testing.T) {
+	d := t.TempDir()
+	writeSweepFile(t, d, "BUILD.md", "guardFoo\n")
+	prior := designReaderAfterSnapshot
+	defer func() { designReaderAfterSnapshot = prior }()
+	designReaderAfterSnapshot = func() {
+		if err := os.WriteFile(filepath.Join(d, "BUILD.md"), []byte("changed\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := sweepRun("guardFoo", d, 0); err == nil || !strings.Contains(err.Error(), "design changed outside the snapshot lock") {
+		t.Fatalf("sweep hid paused mutation: %v", err)
+	}
+	designReaderAfterSnapshot = prior
+	outside := filepath.Join(t.TempDir(), "outside.md")
+	if err := os.WriteFile(outside, []byte("guardFoo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(d, "linked.md")); err != nil {
+		t.Fatal(err)
+	}
+	if err := sweepRun("guardFoo", d, 0); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("sweep accepted symlink inventory: %v", err)
+	}
+}
+
+func TestSweepRejectsOversizedSparseTextBeforeAllocation(t *testing.T) {
+	design := t.TempDir()
+	path := filepath.Join(design, "BUILD.md")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(sweepFileMaxBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := sweepSnapshotRunTo("guardFoo", design, design, 0, io.Discard, io.Discard); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatalf("sweep accepted oversized sparse input: %v", err)
 	}
 }

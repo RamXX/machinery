@@ -11,17 +11,24 @@
 # The targets below build and test machinery itself and need the Go source tree.
 
 AGENT_HOMES ?= $(HOME)/.agents $(HOME)/.claude
+SHELL := /bin/bash
+.SHELLFLAGS := -eu -o pipefail -c
 SRC := $(CURDIR)
-INTERNAL_VERSION := v0.6.2
+INTERNAL_VERSION := v0.6.3
+MODELITH_VERSION := v0.4.0
 MACH ?= $(CURDIR)/.bin/machinery
+EXAMPLE_INVENTORY := scripts/example-inventory.sh
+MODELITH_INVENTORY := scripts/modelith-inventory.sh
+MODELITH_RENDER := scripts/modelith-render.sh
 # Single source of truth for the linter version, shared with CI (ci.yml reads
 # the same file) and the local preflight gate.
 GOLANGCI_VERSION := $(shell cat .golangci-version 2>/dev/null)
+ACTIONLINT_VERSION := $(shell cat .actionlint-version 2>/dev/null)
 # Where dev-link copies the built binary. Override: INSTALL_DIR=/usr/local/bin
 INSTALL_DIR ?= $(HOME)/.local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: build dev-link uninstall test test-install golden golden-update check verify-formal preflight hooks lint-install help
+.PHONY: build dev-link uninstall test test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight hooks lint-install help
 
 build: ## Build the machinery binary from source into .bin/machinery (needs Go)
 	@mkdir -p .bin && go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery
@@ -58,24 +65,30 @@ golden-update: ## Re-capture the golden corpus from the current binary (review t
 	@go test -count=1 -run TestGolden ./cmd/machinery -update
 
 check: build ## Run the deterministic gate suite across the bundled examples
-	@$(MACH) check examples/go-crm/design --impl examples/go-crm/impl
-	@$(MACH) check examples/surreal-crm/design
-	@$(MACH) check examples/fulfillment/design
-	@$(MACH) check examples/portfolio-engine/design
-	@$(MACH) check examples/checkout-split/parent/design
-	@$(MACH) check examples/checkout-split/orders/design
-	@$(MACH) check examples/checkout-split/payments/design
-	@$(MACH) check examples/pii-flow/design
+	@$(EXAMPLE_INVENTORY) rows | while IFS=$$'\t' read -r -a row; do \
+		design="$${row[0]}"; impl="$${row[1]}"; complete="$${row[5]}"; \
+		args=("$$design" --warnings-as-errors); \
+		if [[ "$$impl" != - ]]; then args+=(--impl "$$impl"); fi; \
+		if [[ "$$complete" == yes ]]; then args+=(--complete); fi; \
+		$(MACH) check "$${args[@]}"; \
+	done
 
 verify-formal: build ## Regenerate + TLC-check the whole formal suite across the examples (needs Java)
-	@echo "== go-crm =="; $(MACH) verify-formal examples/go-crm/design
-	@echo "== surreal-crm =="; $(MACH) verify-formal examples/surreal-crm/design
-	@echo "== fulfillment =="; $(MACH) verify-formal examples/fulfillment/design
-	@echo "== portfolio-engine =="; $(MACH) verify-formal examples/portfolio-engine/design
-	@echo "== checkout-split/orders =="; $(MACH) verify-formal examples/checkout-split/orders/design
-	@echo "== checkout-split/payments =="; $(MACH) verify-formal examples/checkout-split/payments/design
+	@$(EXAMPLE_INVENTORY) formal | while IFS= read -r design; do \
+		echo "== $$design =="; \
+		$(MACH) verify-formal "$$design"; \
+	done
 
-preflight: ## Run the local CI mirror (ci.yml, cheapest gate first); green here means green in CI
+modelith-render: ## Regenerate Modelith renders and mechanically normalize house style
+	@$(MODELITH_RENDER) render examples "$(MODELITH_VERSION)"
+
+modelith-inventory: ## Require an exact source/render pair for every authoritative Modelith model
+	@$(MODELITH_INVENTORY) check
+
+modelith-render-check: modelith-inventory modelith-render ## Regenerate committed Modelith renders and reject byte drift
+	@$(MODELITH_INVENTORY) git-diff
+
+preflight: ## Run every required local CI/formal gate, cheapest first
 	@scripts/preflight.sh
 
 hooks: ## Install the git pre-push hook (points core.hooksPath at .githooks)
@@ -83,10 +96,11 @@ hooks: ## Install the git pre-push hook (points core.hooksPath at .githooks)
 	@chmod +x .githooks/pre-push scripts/preflight.sh
 	@echo "pre-push hook installed. Bypass once with: SKIP_PREFLIGHT=1 git push"
 
-lint-install: ## Install the pinned golangci-lint (.golangci-version) so local matches CI exactly
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
-	  | sh -s -- -b "$(shell go env GOPATH)/bin" "$(GOLANGCI_VERSION)"
+lint-install: ## Install the pinned static-analysis tools so local matches CI exactly
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
+	@go install github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 	@echo "installed golangci-lint $(GOLANGCI_VERSION) to $(shell go env GOPATH)/bin"
+	@echo "installed actionlint $(ACTIONLINT_VERSION) to $(shell go env GOPATH)/bin"
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'

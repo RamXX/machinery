@@ -1,6 +1,9 @@
+== Gu-surfaces  target surface ledger ==
+  checked: 2 obligated actions, 2 covered, 0 deferred acts, 0 deferred personas, 0 knob rows, 0 actorless actions, 0 milestone references resolved
+  ok
 == Gc-carrier  invariant carrier reconciliation ==
   note   relational layers not opted in: policy, integrity, isolation
-  checked: 4 invariants declared, 1 preserves references, 2 waived with reason, 1 carried by an external checker, 1 carried by preserves
+  checked: 7 invariants declared, 1 preserves references, 5 waived with reason, 1 carried by an external checker, 1 carried by preserves
   ok
 == G2-c4  Architecture Contract ==
   note   exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)
@@ -11,16 +14,25 @@
   checked: 1 machines, 1 transitions, 1 tla-generable, 1 oracles fresh, 1 named units covered
   ok
 == Gd-idcite  design-side stable-id citations ==
-  checked: 8 files scanned, 1 committed oracle ids
+  checked: 4 citations resolved, 13 files scanned, 1 committed oracle ids
   ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 8 files style-scanned
+  checked: 13 files style-scanned, 4 duplicate tables embed-marked
   ok
 == Gx-trace  cross-layer traceability ==
-  warn   BUILD.md not present; invariant enforcement is checked against the matrices only (fine before Phase 4)
-  checked: 4 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 placement rows with machines, 2 placement rows waived, 3 entities placed, 1 entities placement-waived, 2 invariants waived with reason, 2 invariants enforced, 1 invariants checker-claimed (external checker), 1 invariants unit-backed (guard/action/actor)
+  checked: 4 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 lifecycle semantics annotations, 1 control-flow-only semantics, 1 placement rows with machines, 2 placement rows waived, 3 entities placed, 1 entities placement-waived, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 5 invariants waived with reason, 2 invariants enforced, 1 invariants checker-claimed (external checker), 1 invariants unit-backed (guard/action/actor)
+  ok
 == Gk-pii-flow external checker ==
-  checked: 3 layers projected, 3 invariants claimed, 2 residuals (waived with reason), 1 committed projection fresh, 1 evidence bound to design, 1 elements covered
+  checked: 3 layers projected, 6 invariants claimed, 5 residuals (waived with reason), 1 committed projection fresh, 1 evidence bound to runtime closure, 1 evidence bound to design, 1 elements covered
+  ok
+== Gb-plan  build plan structure ==
+  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 4 milestones, 4 DoD-bearing milestones, 1 skeleton NFR lines, 1 skeleton citations
+  ok
+== Ge-embed  declared-embed fidelity ==
+  checked: 4 embed markers, 4 embed tables verified, 4 subset claims, 9 rows compared, 4 complete claims
+  ok
+== Gv-attest  attestation evidence ==
+  checked: 16 covered artifacts current, 12 attested claims, 12 claims owed
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

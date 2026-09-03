@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,17 +56,23 @@ func assertTopology(t *testing.T, canon, secondary string) {
 // TestInstallCommand drives `machinery install` directly against the working
 // tree (--from) and asserts the topology, then checks uninstall removes it.
 func TestInstallCommand(t *testing.T) {
+	t.Parallel()
 	root := repoRootDir(t)
-	home := t.TempDir()
+	config := privateTestConfigDir(t)
+	environment := []string{"MACHINERY_CONFIG_DIR=" + config}
+	home := filepath.Join(t.TempDir(), "home with spaces")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	agents := filepath.Join(home, ".agents")
 	claude := filepath.Join(home, ".claude")
 
-	if _, errS, code := runBin(t, "install", "--from", root, "--home", agents, "--home", claude); code != 0 {
+	if _, errS, code := runBinWithEnv(t, environment, "install", "--from", root, "--home", agents, "--home", claude); code != 0 {
 		t.Fatalf("machinery install exited %d: %s", code, errS)
 	}
 	assertTopology(t, agents, claude)
 
-	if _, errS, code := runBin(t, "uninstall", "--home", agents, "--home", claude); code != 0 {
+	if _, errS, code := runBinWithEnv(t, environment, "uninstall", "--home", agents, "--home", claude); code != 0 {
 		t.Fatalf("machinery uninstall exited %d: %s", code, errS)
 	}
 	if _, err := os.Lstat(filepath.Join(agents, "skills", "machinery")); !os.IsNotExist(err) {
@@ -77,11 +84,18 @@ func TestInstallAndDoctorTargetAll(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("HOME override does not steer agent config paths on Windows")
 	}
+	t.Parallel()
 	root := repoRootDir(t)
+	// Build before HOME is redirected; otherwise Go's default module cache is
+	// created beneath the fixture home with read-only module files that the
+	// testing package cannot remove on cleanup.
+	_ = goldenBin(t)
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	// Install, doctor, and uninstall are one topology lifecycle and therefore
+	// must share the authoritative schema-2 receipt location.
+	environment := []string{"HOME=" + home, "MACHINERY_CONFIG_DIR=" + privateTestConfigDir(t)}
 
-	if out, errS, code := runBin(t, "install", "--from", root, "--target", "all"); code != 0 {
+	if out, errS, code := runBinWithEnv(t, environment, "install", "--from", root, "--target", "all"); code != 0 {
 		t.Fatalf("machinery install --target all exited %d: %s\n%s", code, errS, out)
 	}
 	for _, path := range []string{
@@ -97,7 +111,7 @@ func TestInstallAndDoctorTargetAll(t *testing.T) {
 		}
 	}
 
-	out, errS, code := runBin(t, "doctor", "--target", "all")
+	out, errS, code := runBinWithEnv(t, environment, "doctor", "--target", "all")
 	if code != 0 {
 		t.Fatalf("machinery doctor --target all exited %d: %s", code, errS)
 	}
@@ -107,7 +121,7 @@ func TestInstallAndDoctorTargetAll(t *testing.T) {
 		}
 	}
 
-	if out, errS, code := runBin(t, "uninstall", "--target", "all"); code != 0 {
+	if out, errS, code := runBinWithEnv(t, environment, "uninstall", "--target", "all"); code != 0 {
 		t.Fatalf("machinery uninstall --target all exited %d: %s\n%s", code, errS, out)
 	}
 	for _, path := range []string{
@@ -130,6 +144,7 @@ func TestInstallScript(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("install.sh is a POSIX shell installer")
 	}
+	t.Parallel()
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("no POSIX sh available")
@@ -145,12 +160,13 @@ func TestInstallScript(t *testing.T) {
 	claude := filepath.Join(home, ".claude")
 
 	cmd := exec.CommandContext(t.Context(), sh, script)
-	cmd.Env = append(os.Environ(),
-		"HOME="+home,
-		"MACHINERY_BIN="+goldenBin(t),
-		"MACHINERY_SKILL_SRC="+root,
-		"MACHINERY_HOMES="+agents+" "+claude,
-	)
+	cmd.Env = environmentWithOverrides(os.Environ(), []string{
+		"HOME=" + home,
+		"MACHINERY_CONFIG_DIR=" + privateTestConfigDir(t),
+		"MACHINERY_BIN=" + goldenBin(t),
+		"MACHINERY_SKILL_SRC=" + root,
+		"MACHINERY_HOMES=" + agents + "\n" + claude,
+	})
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("install.sh failed: %v\n%s", err, out)
 	}
@@ -161,19 +177,22 @@ func TestInstallScriptHostTargets(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("install.sh is a POSIX shell installer")
 	}
+	t.Parallel()
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("no POSIX sh available")
 	}
 	root := repoRootDir(t)
 	home := t.TempDir()
+	config := privateTestConfigDir(t)
 	cmd := exec.CommandContext(t.Context(), sh, filepath.Join(root, "install.sh"))
-	cmd.Env = append(os.Environ(),
-		"HOME="+home,
-		"MACHINERY_BIN="+goldenBin(t),
-		"MACHINERY_SKILL_SRC="+root,
+	cmd.Env = environmentWithOverrides(os.Environ(), []string{
+		"HOME=" + home,
+		"MACHINERY_CONFIG_DIR=" + config,
+		"MACHINERY_BIN=" + goldenBin(t),
+		"MACHINERY_SKILL_SRC=" + root,
 		"MACHINERY_TARGETS=codex opencode",
-	)
+	})
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("targeted install.sh failed: %v\n%s", err, out)
 	}
@@ -186,5 +205,66 @@ func TestInstallScriptHostTargets(t *testing.T) {
 		if _, err := os.Stat(path); err != nil {
 			t.Errorf("targeted bootstrap missing %s: %v", path, err)
 		}
+	}
+	assertReceiptTargets(t, filepath.Join(config, "install.json"), "codex", "opencode")
+}
+
+func assertReceiptTargets(t *testing.T, path string, expected ...string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read isolated install receipt: %v", err)
+	}
+	var receipt struct {
+		SchemaVersion int `json:"schema_version"`
+		Targets       []struct {
+			Target string `json:"target"`
+		} `json:"targets"`
+		HomeInstalls []json.RawMessage `json:"home_installs"`
+	}
+	if err := json.Unmarshal(data, &receipt); err != nil {
+		t.Fatalf("decode isolated install receipt: %v", err)
+	}
+	if receipt.SchemaVersion != 2 {
+		t.Fatalf("install receipt schema = %d, want 2", receipt.SchemaVersion)
+	}
+	if len(receipt.HomeInstalls) != 0 {
+		t.Fatalf("target-only receipt was contaminated by %d home installs", len(receipt.HomeInstalls))
+	}
+	if len(receipt.Targets) != len(expected) {
+		t.Fatalf("install receipt targets = %#v, want %v", receipt.Targets, expected)
+	}
+	for index, want := range expected {
+		if got := receipt.Targets[index].Target; got != want {
+			t.Fatalf("install receipt target[%d] = %q, want %q", index, got, want)
+		}
+	}
+}
+
+func TestInstallScriptPropagatesPreflightFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("install.sh is a POSIX shell installer")
+	}
+	t.Parallel()
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no POSIX sh available")
+	}
+	root := repoRootDir(t)
+	home := t.TempDir()
+	fake := filepath.Join(t.TempDir(), "machinery")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\ncase \"$1\" in install) exit 0;; preflight) exit 23;; *) exit 2;; esac\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(t.Context(), sh, filepath.Join(root, "install.sh"))
+	cmd.Env = environmentWithOverrides(os.Environ(), []string{
+		"HOME=" + home,
+		"MACHINERY_CONFIG_DIR=" + privateTestConfigDir(t),
+		"MACHINERY_BIN=" + fake,
+		"MACHINERY_SKILL_SRC=" + root,
+		"MACHINERY_HOMES=" + filepath.Join(home, ".agents"),
+	})
+	if output, err := cmd.CombinedOutput(); err == nil {
+		t.Fatalf("install.sh masked preflight failure:\n%s", output)
 	}
 }

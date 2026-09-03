@@ -45,14 +45,16 @@ func splitClauses(s string) []string {
 }
 
 // collectClauseDecls finds CLAUSES declarations on matrix guard rows.
-func collectClauseDecls(design string) []clauseSet {
+func collectClauseDecls(g *Gate, design string) []clauseSet {
 	var out []clauseSet
-	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
-		body, ok := readTextOK(path)
-		if !ok {
+	paths, _ := strictSortedGlob(g, filepath.Join(design, "machines"), "*.matrix.md", "clause matrix")
+	for _, path := range paths {
+		body, err := readDesignFile(design, path)
+		if err != nil {
+			g.Errs = append(g.Errs, filepath.Base(path)+": unreadable clause matrix: "+err.Error())
 			continue
 		}
-		for _, line := range strings.Split(body, "\n") {
+		for _, line := range strings.Split(string(body), "\n") {
 			m := clauseDecl.FindStringSubmatch(line)
 			if m == nil {
 				continue
@@ -75,21 +77,27 @@ func collectClauseDecls(design string) []clauseSet {
 // checkClauseDrift scans every hand-written design file for lines naming a
 // declared guard and holds them to its clause vocabulary.
 func checkClauseDrift(g *Gate, design string) {
-	decls := collectClauseDecls(design)
+	decls := collectClauseDecls(g, design)
 	if len(decls) == 0 {
 		return
 	}
 	g.Count("guards with clause declarations", len(decls))
-	_ = filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	err := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
-			return nil //nolint:nilerr // keep walking; the audit covers what is readable
-		}
-		if fi.IsDir() {
-			return nil
+			return err
 		}
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
 			rel = path
+		}
+		if ignoredHere(design, rel) {
+			if fi.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if fi.IsDir() {
+			return nil
 		}
 		if idciteSkips(rel) || !idciteScannable(fi.Name()) {
 			return nil
@@ -100,11 +108,11 @@ func checkClauseDrift(g *Gate, design string) {
 		if base := filepath.Base(rel); base == "DECISIONS.md" || base == "STATE.md" {
 			return nil
 		}
-		body, ok := readTextOK(path)
-		if !ok {
-			return nil
+		body, readErr := readDesignFile(design, path)
+		if readErr != nil {
+			return readErr
 		}
-		for lineNo, line := range strings.Split(body, "\n") {
+		for lineNo, line := range strings.Split(string(body), "\n") {
 			for _, d := range decls {
 				if !tokenIn(d.guard, line) || clauseDecl.MatchString(line) {
 					continue
@@ -133,4 +141,7 @@ func checkClauseDrift(g *Gate, design string) {
 		}
 		return nil
 	})
+	if err != nil {
+		g.Errs = append(g.Errs, "clause drift scan failed: "+err.Error())
+	}
 }

@@ -1,7 +1,7 @@
 # Generated transition oracle: `task`
 
 Generated from `Task.machine.json` by `machinery oracle`. DO NOT EDIT BY HAND.
-<!-- machinery-version: v0.6.2 -->
+<!-- machinery-version: v0.6.3 -->
 Single source of truth for the hard-TDD transition tests: one transition row is one
 test case. Key tests on the STABLE id, not the row number; row numbers renumber when
 the design changes, stable ids do not.
@@ -52,5 +52,6 @@ the design changes, stable ids do not.
 | T-TASK-28 | TASK-0dd646 | persistRetry | always | retriesExhausted | rolledBack | recordRetriesExhausted |
 | T-TASK-29 | TASK-3f585f | rolledBack | always | priorIsOpen | Open | - |
 | T-TASK-30 | TASK-98c3ba | rolledBack | always | priorIsInProgress | InProgress | - |
+| T-TASK-31 | TASK-754183 | rolledBack | always | - | Cancelled | recordRoutingError |
 
-Total transitions (test cases): 30
+Total transitions (test cases): 31

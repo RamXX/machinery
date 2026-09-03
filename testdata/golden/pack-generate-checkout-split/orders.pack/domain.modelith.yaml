@@ -4,6 +4,11 @@
 kind: DomainModel
 version: v1
 title: Checkout Split / orders
+glossary:
+  Customer: The person who places or cancels an order before payment settlement.
+  Operator: The fulfillment or payments operator authorized to ship or refund.
+  System: An authenticated subsystem event handler acting without a human surface.
+  Payment: Foreign reference to the parent Payment entity; owned by another subsystem.
 enums:
   OrderStatus:
     values:
@@ -44,9 +49,22 @@ entities:
         actor: Customer
     invariants:
       - id: order-total-positive
-        definition: "An order's total is strictly positive."
+        statement: "An order's total is strictly positive."
 invariants:
   - id: no-ship-without-capture
-    definition: "An order ships only after its payment is captured. Cross-subsystem; enforcement is delegated to the orders subsystem, which may only reach Shipped from Paid, and Paid only on the payments subsystem's markPaid event."
-scenarios: []
+    statement: "An order ships only after its payment is captured. Cross-subsystem; enforcement is delegated to the orders subsystem, which may only reach Shipped from Paid, and Paid only on the payments subsystem's markPaid event."
+scenarios:
+  - name: Positive order settles before shipment
+    description: Exercises creation validation and the capture-before-ship lifecycle rule.
+    actors:
+      - Customer
+      - System
+      - Operator
+    steps:
+      - "A `Customer` places an `Order` with a strictly positive total."
+      - "The payment `System` captures a `Payment` and marks the `Order` paid."
+      - "An `Operator` ships the paid `Order`; an unpaid order would be rejected."
+    invariants_touched:
+      - order-total-positive
+      - no-ship-without-capture
 # foreign entities (owned elsewhere; reference only): Payment

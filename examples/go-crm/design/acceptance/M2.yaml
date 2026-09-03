@@ -1,0 +1,41 @@
+milestone: 2
+commit: 4bdd519009d31584595ca908e17fd5c09077b336
+verdict: ACCEPTED
+dod_ids:
+  - TASK-db41f8
+  - TASK-2a7cdb
+  - TASK-2019ec
+  - TASK-84d702
+  - TASK-b819d1
+  - TASK-36d38a
+  - TASK-7ab0ac
+  - TASK-b179c7
+  - TASK-173f61
+  - TASK-72ad76
+  - TASK-7d91c2
+  - TASK-cdda50
+  - TASK-d159c9
+  - TASK-2f2bc8
+  - TASK-91fb4d
+  - TASK-b4999d
+  - TASK-6d5eb1
+  - TASK-ae4260
+  - TASK-c56bd7
+  - TASK-67b0ff
+  - TASK-d5bcc8
+  - TASK-8d6955
+  - TASK-376b22
+  - TASK-dc5fe1
+  - TASK-21e793
+  - TASK-be8721
+  - TASK-168d9b
+  - TASK-0dd646
+  - TASK-3f585f
+  - TASK-98c3ba
+  - TASK-754183
+attestations:
+  - Task lifecycle, terminal-state, ownership, reassignment-scope, and authorization behavior passed on the reviewed commit.
+  - Default and race test suites passed on the reviewed commit.
+findings: []
+reviewer: Codex release acceptance review
+date: 2026-09-03

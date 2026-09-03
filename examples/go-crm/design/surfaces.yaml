@@ -1,0 +1,40 @@
+surface_version: 1
+sources:
+  - domain.modelith.yaml action list, walked persona by persona
+  - BUILD.md command grammar and build-plan CLI slices
+acts:
+  - {act: User.register, actor: Admin, surface: "admin CLI: crm user register --username <name> --role <role> [--team <team>]"}
+  - {act: User.login, actor: User, surface: "CLI: crm login --username <name>"}
+  - {act: User.logout, actor: User, surface: "CLI: crm logout"}
+  - {act: User.changePassword, actor: User, surface: "CLI: crm user password change"}
+  - {act: User.disable, actor: Admin, surface: "admin CLI: crm user disable <user-id>"}
+  - {act: User.enable, actor: Admin, surface: "admin CLI: crm user enable <user-id>"}
+  - {act: User.assignRole, actor: Admin, surface: "admin CLI: crm user assign-role <user-id> <role>"}
+  - {act: Team.create, actor: Admin, surface: "admin CLI: crm team create --name <name>"}
+  - {act: Team.rename, actor: Admin, surface: "admin CLI: crm team rename <team-id> --name <name>"}
+  - {act: Account.create, actor: User, surface: "CLI: crm account create --name <name> --owner <user-id>"}
+  - {act: Account.update, actor: Owner, surface: "CLI: crm account update <account-id> [fields]"}
+  - {act: Account.reassign, actor: Manager, surface: "manager CLI: crm account reassign <account-id> --owner <user-id>"}
+  - {act: Account.delete, actor: Owner, surface: "CLI: crm account delete <account-id>"}
+  - {act: Contact.create, actor: User, surface: "CLI: crm contact create --account <account-id> --name <name> --owner <user-id>"}
+  - {act: Contact.update, actor: Owner, surface: "CLI: crm contact update <contact-id> [fields]"}
+  - {act: Contact.reassign, actor: Manager, surface: "manager CLI: crm contact reassign <contact-id> --owner <user-id>"}
+  - {act: Contact.delete, actor: Owner, surface: "CLI: crm contact delete <contact-id>"}
+  - {act: Deal.create, actor: User, surface: "CLI: crm deal create --account <account-id> --title <title> --owner <user-id>"}
+  - {act: Deal.advanceStage, actor: Owner, surface: "CLI: crm deal advance <deal-id>"}
+  - {act: Deal.win, actor: Owner, surface: "CLI: crm deal win <deal-id> --close-date <date>"}
+  - {act: Deal.lose, actor: Owner, surface: "CLI: crm deal lose <deal-id>"}
+  - {act: Deal.reopen, actor: Manager, surface: "manager CLI: crm deal reopen <deal-id>"}
+  - {act: Deal.reassign, actor: Manager, surface: "manager CLI: crm deal reassign <deal-id> --owner <user-id>"}
+  - {act: Pipeline.create, actor: Admin, surface: "admin CLI: crm pipeline create --name <name>"}
+  - {act: Pipeline.setDefault, actor: Admin, surface: "admin CLI: crm pipeline set-default <pipeline-id>"}
+  - {act: Activity.log, actor: User, surface: "CLI: crm activity log --contact <contact-id> --type <type> --body <text>"}
+  - {act: Activity.delete, actor: Manager, surface: "manager CLI: crm activity delete <activity-id>"}
+  - {act: Task.create, actor: User, surface: "CLI: crm task create --title <title> --owner <user-id> [--deal <deal-id>]"}
+  - {act: Task.start, actor: Owner, surface: "CLI: crm task start <task-id>"}
+  - {act: Task.complete, actor: Owner, surface: "CLI: crm task complete <task-id>"}
+  - {act: Task.cancel, actor: Owner, surface: "CLI: crm task cancel <task-id>"}
+  - {act: Task.reassign, actor: Manager, surface: "manager CLI: crm task reassign <task-id> --owner <user-id>"}
+  - {act: Tag.create, actor: User, surface: "CLI: crm tag create --name <name> [--color <color>]"}
+  - {act: Tag.apply, actor: User, surface: "CLI: crm tag apply <tag-id> --to <entity-id>"}
+  - {act: Tag.remove, actor: User, surface: "CLI: crm tag remove <tag-id> --from <entity-id>"}

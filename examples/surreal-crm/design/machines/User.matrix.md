@@ -55,5 +55,6 @@ States trace to enum `UserStatus`. Events trace to `User` actions `disable`/`ena
 | 17 | persistRetry | after persistRetryBackoff | - | persisting | incrementRetries | C4 6 backoff ~0.5s |
 | 18 | rolledBack | always | priorIsActive | Active | - | atomic rollback |
 | 19 | rolledBack | always | priorIsDisabled | Disabled | - | atomic rollback |
+| 20 | rolledBack | always | (else) | Disabled | recordRoutingError | fail closed on corrupt rollback metadata; Disabled is the least-privilege in-memory posture, the instance is discarded, and the unchanged store remains authoritative |
 
 Ignored-by-design: none. `disable` and `enable` are both handled in each resting state (a guarded persist or an explicit idempotent no-op / authority reject).

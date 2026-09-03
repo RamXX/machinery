@@ -1,7 +1,7 @@
 # Generated transition oracle: `deal`
 
 Generated from `Deal.machine.json` by `machinery oracle`. DO NOT EDIT BY HAND.
-<!-- machinery-version: v0.6.2 -->
+<!-- machinery-version: v0.6.3 -->
 Single source of truth for the hard-TDD transition tests: one transition row is one
 test case. Key tests on the STABLE id, not the row number; row numbers renumber when
 the design changes, stable ids do not.
@@ -81,5 +81,6 @@ the design changes, stable ids do not.
 | T-DEAL-55 | DEAL-8a4caf | rolledBack | always | priorIsNegotiation | Negotiation | - |
 | T-DEAL-56 | DEAL-9b6ee7 | rolledBack | always | priorIsWon | Won | - |
 | T-DEAL-57 | DEAL-21905a | rolledBack | always | priorIsLost | Lost | - |
+| T-DEAL-58 | DEAL-b48a23 | rolledBack | always | - | Lost | recordRoutingError |
 
-Total transitions (test cases): 57
+Total transitions (test cases): 58

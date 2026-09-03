@@ -8,7 +8,6 @@ package gates
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/RamXX/machinery/internal/alloy"
@@ -18,8 +17,8 @@ import (
 // HasPolicyAnnotation reports whether the design opted into the relational
 // layer (the annotation file exists).
 func HasPolicyAnnotation(design string) bool {
-	fi, err := os.Stat(filepath.Join(design, "formal", alloy.AnnotationName))
-	return err == nil && !fi.IsDir()
+	has, err := probeRegularFile(design, filepath.Join("formal", alloy.AnnotationName))
+	return has || err != nil
 }
 
 // CheckPolicy implements Gp-policy.
@@ -27,7 +26,12 @@ func CheckPolicy(design string) *Gate {
 	g := NewGate("Gp-policy static relational model")
 	g.startOrder()
 	annPath := filepath.Join(design, "formal", alloy.AnnotationName)
-	if !HasPolicyAnnotation(design) {
+	has, probeErr := probeRegularFile(design, filepath.Join("formal", alloy.AnnotationName))
+	if probeErr != nil {
+		g.Errs = append(g.Errs, probeErr.Error())
+		return g
+	}
+	if !has {
 		g.Errs = append(g.Errs, "no formal/"+alloy.AnnotationName+" in the design; the relational layer was requested but never authored (author the annotation, or drop gp from the gate list)")
 		return g
 	}
@@ -53,7 +57,7 @@ func CheckPolicy(design string) *Gate {
 
 	fresh := func(name, want, label string) {
 		committed := filepath.Join(design, "formal", name)
-		raw, rerr := os.ReadFile(committed)
+		raw, rerr := readDesignFile(design, committed)
 		if rerr == nil {
 			g.recordStamp(string(raw))
 		}

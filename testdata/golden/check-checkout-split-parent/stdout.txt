@@ -1,4 +1,7 @@
-note: decomposed parent with no machines/; running gc,g2,gl,gb,g5 (G3/Gx run on the child designs; gt skipped: no machines)
+note: decomposed parent with no machines/; running gu,gc,g2,gl,gb,gv,g5 (G3/Gx run on the child designs; gt skipped: no machines)
+== Gu-surfaces  target surface ledger ==
+  checked: 4 obligated actions, 4 covered, 0 deferred acts, 0 deferred personas, 0 knob rows, 0 actorless actions
+  ok
 == Gc-carrier  invariant carrier reconciliation ==
   note   relational layers not opted in: policy, integrity, isolation
   checked: 3 invariants declared, 3 preserves references, 3 carried by preserves
@@ -10,10 +13,13 @@ note: decomposed parent with no machines/; running gc,g2,gl,gb,g5 (G3/Gx run on 
   checked: 2 boundaries, 3 externals, 4 allow rules, 4 transitive pairs, 4 deny rules, 7 dsl elements, 5 drawn relationships, 1 drawn edges outside the contract vocabulary, 4 drawn edges verified, 2 boundaries bound to dsl, 3 mitigation rows, 6 dependencies with mitigation rows, 3 nfr topics recorded, 1 event tables with sources, 18 event-contract cells answered, 3 at-least-once rows with a dedupe answer, 6 event-contract participants resolved, 4 edges waived, 3 event contracts
   ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 3 dated decision entries, 8 files style-scanned
+  checked: 3 dated decision entries, 11 files style-scanned
   ok
 == Gb-plan  build plan structure ==
   checked: 0 local plans (decomposed parent; the children carry the plans)
+  ok
+== Gv-attest  attestation evidence ==
+  checked: 8 covered artifacts current, 8 attested claims, 8 claims owed
   ok
 == G5-pack  contract packs ==
   checked: 2 subsystems, 2 packs fresh, 2 children pinned, boundary events: orders 3, payments 3, pack revision 1

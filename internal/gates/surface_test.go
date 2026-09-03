@@ -43,8 +43,16 @@ workspace {
 `
 
 const surfaceLedger = `
-surface_version: 1
+surface_version: 2
 system: legacy thing service, a REST API over Postgres
+corpus:
+  - area: legacy service
+    classification: rearchitect-adapt
+    source: router, schema, and worker inventory
+    rationale: preserve capabilities while replacing the monolithic boundary
+    target: API Service
+    decided_by: Test owner
+    decided: 2026-09-03
 classes:
   routes:
     source: legacy router.go route table
@@ -98,7 +106,7 @@ func TestCheckSurfaceClean(t *testing.T) {
 	}
 	want := map[string]int{
 		"routes": 3, "tables": 3, "covered": 4, "dropped": 1, "deferred": 1,
-		"waived classes": 4, "surface items": 6,
+		"waived classes": 4, "surface items": 6, "classified corpus areas": 1,
 	}
 	for count, n := range want {
 		if g.Counts[count] != n {
@@ -215,8 +223,10 @@ func TestCheckSurfaceAsOfShape(t *testing.T) {
 
 func TestCheckSurfaceMutations(t *testing.T) {
 	allWaived := `
-surface_version: 1
+surface_version: 2
 system: legacy thing service
+corpus:
+  - {area: legacy service, classification: learning-only, source: legacy tree, rationale: evidence only, decided_by: Test owner, decided: 2026-09-03}
 classes:
   routes: {none: nothing}
   commands: {none: nothing}
@@ -232,7 +242,10 @@ classes:
 		want   string
 	}{
 		{"unknown root key", surfaceLedger + "bogus: true\n", nil, "unsupported key"},
-		{"bad version", strings.Replace(surfaceLedger, "surface_version: 1", "surface_version: 2", 1), nil, "surface_version must be the integer 1"},
+		{"bad version", strings.Replace(surfaceLedger, "surface_version: 2", "surface_version: 1", 1), nil, "surface_version must be the integer 2"},
+		{"missing corpus", strings.Replace(surfaceLedger, "corpus:\n  - area: legacy service\n    classification: rearchitect-adapt\n    source: router, schema, and worker inventory\n    rationale: preserve capabilities while replacing the monolithic boundary\n    target: API Service\n    decided_by: Test owner\n    decided: 2026-09-03\n", "", 1), nil, "corpus is required"},
+		{"unresolved corpus blocks", strings.Replace(surfaceLedger, "classification: rearchitect-adapt", "classification: unresolved", 1), nil, "unresolved intent blocks architecture"},
+		{"resolved corpus needs target", strings.Replace(surfaceLedger, "    target: API Service\n", "", 1), nil, "target is required"},
 		{"missing system", strings.Replace(surfaceLedger, "system: legacy thing service, a REST API over Postgres", "system: \"\"", 1), nil, "system is required"},
 		{"missing class", strings.Replace(surfaceLedger, "  commands:\n    none: the legacy system is a service; it has no CLI surface\n", "", 1), nil, "classes.commands is missing"},
 		{"unknown class", surfaceLedger + "  webhooks:\n    none: not a real class\n", nil, "not a surface class"},

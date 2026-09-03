@@ -14,6 +14,105 @@ func repoRoot() string {
 	return p
 }
 
+func TestReservedAlloyOutputsRequireCanonicalOwnership(t *testing.T) {
+	names := []string{OutputName, OracleName, IntegrityOutputName, IsolationOutputName, IsolationOracleName}
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			foreign := []byte("hand-authored sentinel\n")
+			if err := os.WriteFile(filepath.Join(dir, name), foreign, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := inspectOwnedAlloyOutputs(dir, names); err == nil || !strings.Contains(err.Error(), "foreign or manual") {
+				t.Fatalf("foreign reserved output was accepted: %v", err)
+			}
+			if got, err := os.ReadFile(filepath.Join(dir, name)); err != nil || string(got) != string(foreign) {
+				t.Fatalf("foreign output changed: %q, %v", got, err)
+			}
+		})
+	}
+	t.Run("cross-writer header", func(t *testing.T) {
+		dir := t.TempDir()
+		body := []byte("// Code generated from model + annotation by machinery tla. DO NOT EDIT.\n// machinery-version: test\n")
+		if err := os.WriteFile(filepath.Join(dir, OutputName), body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := inspectOwnedAlloyOutputs(dir, names); err == nil {
+			t.Fatal("cross-writer output was treated as Alloy-owned")
+		}
+	})
+}
+
+func TestRunRejectsWrongTypeAnnotationsWithoutMutatingOwnedOutputs(t *testing.T) {
+	for _, annotation := range []string{AnnotationName, IntegrityAnnotationName, IsolationAnnotationName} {
+		t.Run(annotation+" directory", func(t *testing.T) {
+			design := t.TempDir()
+			write(t, design, "domain.modelith.yaml", miniDomain)
+			formal := filepath.Join(design, "formal")
+			if err := os.MkdirAll(formal, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			write(t, formal, AnnotationName, miniAnnotation)
+			if err := RunTo(design, "", nil); err != nil {
+				t.Fatal(err)
+			}
+			policyPath := filepath.Join(formal, OutputName)
+			before, err := os.ReadFile(policyPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			target := filepath.Join(formal, annotation)
+			if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(target, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := RunTo(design, "", nil); err == nil || (!strings.Contains(err.Error(), "regular non-symlink") && !strings.Contains(err.Error(), "symlink")) {
+				t.Fatalf("annotation directory was accepted: %v", err)
+			}
+			if after, err := os.ReadFile(policyPath); err != nil || string(after) != string(before) {
+				t.Fatalf("owned output changed: %q, %v", after, err)
+			}
+		})
+
+		t.Run(annotation+" symlink", func(t *testing.T) {
+			design := t.TempDir()
+			write(t, design, "domain.modelith.yaml", miniDomain)
+			formal := filepath.Join(design, "formal")
+			if err := os.MkdirAll(formal, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			write(t, formal, AnnotationName, miniAnnotation)
+			if err := RunTo(design, "", nil); err != nil {
+				t.Fatal(err)
+			}
+			policyPath := filepath.Join(formal, OutputName)
+			before, err := os.ReadFile(policyPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			target := filepath.Join(formal, annotation)
+			if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+				t.Fatal(err)
+			}
+			outside := filepath.Join(t.TempDir(), "annotation.yaml")
+			if err := os.WriteFile(outside, []byte(miniAnnotation), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(outside, target); err != nil {
+				t.Skipf("symlinks unavailable: %v", err)
+			}
+			if err := RunTo(design, "", nil); err == nil || (!strings.Contains(err.Error(), "regular non-symlink") && !strings.Contains(err.Error(), "symlink")) {
+				t.Fatalf("symlinked annotation was accepted: %v", err)
+			}
+			if after, err := os.ReadFile(policyPath); err != nil || string(after) != string(before) {
+				t.Fatalf("owned output changed: %q, %v", after, err)
+			}
+		})
+	}
+}
+
 // --- the real fixture: the go-crm example ---
 
 func TestGenerateGoCRM(t *testing.T) {
@@ -428,6 +527,33 @@ func TestReassignErrors(t *testing.T) {
 	}
 }
 
+func TestReassignMultipleUndecidedRolesReportsCanonicalFirstRole(t *testing.T) {
+	ann := strings.Replace(miniAnnotation, ", invariant: u-team", "", 1) + `  - invariant: u-team
+    reassign:
+      scope: {C: all, B: team, A: own}
+      target: {A: any}
+`
+	dir := t.TempDir()
+	domainPath := write(t, dir, "domain.modelith.yaml", miniDomain)
+	annotationPath := write(t, dir, "policy.relational.yaml", ann)
+	var first string
+	for i := 0; i < 250; i++ {
+		_, _, err := Generate(domainPath, annotationPath)
+		if err == nil {
+			t.Fatal("want undecided-target error")
+		}
+		if i == 0 {
+			first = err.Error()
+		}
+		if err.Error() != first {
+			t.Fatalf("diagnostic changed at iteration %d:\nfirst: %s\n now: %s", i, first, err)
+		}
+	}
+	if !strings.Contains(first, `'B' is undecided`) {
+		t.Fatalf("first undecided role must follow canonical domain order: %s", first)
+	}
+}
+
 func TestPaths(t *testing.T) {
 	dir := t.TempDir()
 	if _, _, err := Paths(dir); err == nil {
@@ -454,8 +580,13 @@ func TestRunEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	// annotation absent: opt-in error
-	if err := Run(dir, ""); err == nil || !strings.Contains(err.Error(), "opt-in") {
-		t.Errorf("want opt-in error, got %v", err)
+	firstErr := Run(dir, "")
+	secondErr := Run(dir, "")
+	if firstErr == nil || !strings.Contains(firstErr.Error(), "opt-in") {
+		t.Errorf("want opt-in error, got %v", firstErr)
+	}
+	if secondErr == nil || secondErr.Error() != firstErr.Error() || strings.Contains(firstErr.Error(), "machinery-design-source-") {
+		t.Fatalf("invalid-input diagnostic is unstable or leaks private source root:\nfirst: %v\nsecond: %v", firstErr, secondErr)
 	}
 	write(t, filepath.Join(dir, "formal"), AnnotationName, miniAnnotation)
 	if err := Run(dir, ""); err != nil {
@@ -464,6 +595,178 @@ func TestRunEndToEnd(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "formal", OutputName)); err != nil {
 		t.Errorf("Policy.als not written: %v", err)
 	}
+}
+
+func TestRunLateInvalidLayerLeavesEveryEarlierArtifactUnchanged(t *testing.T) {
+	design := t.TempDir()
+	write(t, design, "domain.modelith.yaml", miniDomain)
+	formal := filepath.Join(design, "formal")
+	if err := os.MkdirAll(formal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, formal, AnnotationName, miniAnnotation)
+	// Isolation is planned last. Its invalidity must be discovered before the
+	// already-valid policy layer mutates either of its outputs.
+	write(t, formal, IsolationAnnotationName, "tenant: {}\n")
+	before := map[string]string{
+		OutputName:          "old policy model\n",
+		OracleName:          "old policy oracle\n",
+		IsolationOutputName: "old isolation model\n",
+		IsolationOracleName: "old isolation oracle\n",
+	}
+	for name, body := range before {
+		write(t, formal, name, body)
+	}
+	if err := RunTo(design, "", nil); err == nil || !strings.Contains(err.Error(), "annotation declares no tenant") {
+		t.Fatalf("late-layer error = %v", err)
+	}
+	for name, want := range before {
+		got, err := os.ReadFile(filepath.Join(formal, name))
+		if err != nil || string(got) != want {
+			t.Errorf("%s changed after late validation failure: got %q, err %v, want %q", name, got, err, want)
+		}
+	}
+}
+
+func TestRunLateInvalidLayerDoesNotCreateOutputDirectory(t *testing.T) {
+	design := t.TempDir()
+	write(t, design, "domain.modelith.yaml", miniDomain)
+	formal := filepath.Join(design, "formal")
+	if err := os.MkdirAll(formal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, formal, AnnotationName, miniAnnotation)
+	write(t, formal, IsolationAnnotationName, "tenant: {}\n")
+	outdir := filepath.Join(t.TempDir(), "not-created")
+	if err := RunTo(design, outdir, nil); err == nil {
+		t.Fatal("invalid late layer passed")
+	}
+	if _, err := os.Lstat(outdir); !os.IsNotExist(err) {
+		t.Fatalf("planning failure mutated output directory: %v", err)
+	}
+}
+
+func TestRunReconcilesRemovedAnnotationOutputsAndPreservesManualFiles(t *testing.T) {
+	design := t.TempDir()
+	write(t, design, "domain.modelith.yaml", miniDomain)
+	formal := filepath.Join(design, "formal")
+	if err := os.MkdirAll(formal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, formal, AnnotationName, miniAnnotation)
+	write(t, formal, IntegrityAnnotationName, `entities: [U]
+unique:
+  - {entity: U, attribute: nick, invariant: top-read}
+`)
+	manual := write(t, formal, "Manual.als", "manual sentinel\n")
+	if err := RunTo(design, "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(formal, AnnotationName)); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunTo(design, "", nil); err != nil {
+		t.Fatalf("reconcile removed policy annotation: %v", err)
+	}
+	for _, name := range []string{OutputName, OracleName} {
+		if _, err := os.Lstat(filepath.Join(formal, name)); !os.IsNotExist(err) {
+			t.Fatalf("stale %s survived annotation removal: %v", name, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(formal, IntegrityOutputName)); err != nil {
+		t.Fatalf("remaining integrity output disappeared: %v", err)
+	}
+	if body, err := os.ReadFile(manual); err != nil || string(body) != "manual sentinel\n" {
+		t.Fatalf("manual Alloy file changed: %q, %v", body, err)
+	}
+	before, err := os.ReadFile(filepath.Join(formal, IntegrityOutputName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RunTo(design, "", nil); err != nil {
+		t.Fatalf("idempotent reconciliation: %v", err)
+	}
+	after, err := os.ReadFile(filepath.Join(formal, IntegrityOutputName))
+	if err != nil || string(after) != string(before) {
+		t.Fatalf("idempotent rerun changed retained output: %v", err)
+	}
+}
+
+func TestRunReconcilesLastRemovedAnnotationBeforeOptInDeactivates(t *testing.T) {
+	design := t.TempDir()
+	write(t, design, "domain.modelith.yaml", miniDomain)
+	formal := filepath.Join(design, "formal")
+	if err := os.MkdirAll(formal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	annotation := write(t, formal, AnnotationName, miniAnnotation)
+	if err := RunTo(design, "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(annotation, filepath.Join(formal, "policy.relational.disabled")); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunTo(design, "", nil); err != nil {
+		t.Fatalf("last-annotation cleanup failed: %v", err)
+	}
+	for _, name := range []string{OutputName, OracleName} {
+		if _, err := os.Lstat(filepath.Join(formal, name)); !os.IsNotExist(err) {
+			t.Fatalf("stale %s survived last annotation rename: %v", name, err)
+		}
+	}
+	if err := RunTo(design, "", nil); err == nil || !strings.Contains(err.Error(), "opt-in") {
+		t.Fatalf("fully converged annotation-free design did not return opt-in guidance: %v", err)
+	}
+}
+
+func TestRunUsesConfinedPortableArtifactSetWriter(t *testing.T) {
+	if testing.Short() {
+		t.Skip("filesystem confinement cases")
+	}
+	newDesign := func(t *testing.T) string {
+		t.Helper()
+		design := t.TempDir()
+		write(t, design, "domain.modelith.yaml", miniDomain)
+		formal := filepath.Join(design, "formal")
+		if err := os.MkdirAll(formal, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		write(t, formal, AnnotationName, miniAnnotation)
+		return design
+	}
+	t.Run("symlink target", func(t *testing.T) {
+		design := newDesign(t)
+		formal := filepath.Join(design, "formal")
+		outside := filepath.Join(t.TempDir(), "outside.als")
+		if err := os.WriteFile(outside, []byte("sentinel\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(outside, filepath.Join(formal, OutputName)); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+		if err := RunTo(design, "", nil); err == nil || !strings.Contains(err.Error(), "symlink") {
+			t.Fatalf("symlink output error = %v", err)
+		}
+		got, err := os.ReadFile(outside)
+		if err != nil || string(got) != "sentinel\n" {
+			t.Fatalf("writer followed output symlink: got %q, err %v", got, err)
+		}
+	})
+	t.Run("portable alias", func(t *testing.T) {
+		design := newDesign(t)
+		formal := filepath.Join(design, "formal")
+		alias := filepath.Join(formal, strings.ToLower(OutputName))
+		if err := os.WriteFile(alias, []byte("portable sentinel\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := RunTo(design, "", nil); err == nil || (!strings.Contains(err.Error(), "portable artifact-name collision") && !strings.Contains(err.Error(), "foreign or manual")) {
+			t.Fatalf("portable alias error = %v", err)
+		}
+		got, err := os.ReadFile(alias)
+		if err != nil || string(got) != "portable sentinel\n" {
+			t.Fatalf("portable alias changed: got %q, err %v", got, err)
+		}
+	})
 }
 
 // P-F10: every generated relational artifact carries exactly one version

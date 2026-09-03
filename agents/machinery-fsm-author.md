@@ -28,8 +28,9 @@ constraint the conductor passes in its prompt.
 - `design/workspace.dsl` and `design/ARCHITECTURE.md`, including the dependency mitigation postures,
   the persistence-and-placement decisions, and (for multi-component designs) the event-contract table.
 - The target language(s).
-- The `machinery` CLI on PATH (`make install`); `machinery lint` and `machinery oracle` are the
-  tools you must run.
+- The `machinery` CLI on PATH (installed by the one-line installer, or built from this repository
+  with `make build` and invoked as `.bin/machinery`); `machinery lint`, `machinery oracle`,
+  `machinery check`, and `machinery verify-formal` are the tools you must run.
 
 Read all of them in full before writing anything. Run `modelith render design/domain.modelith.yaml`
 if the rendered form is missing. Read the `machinery` skill's `references/xstate-format.md` for the
@@ -131,22 +132,43 @@ For each component `<C>`:
 - `design/machines/<C>.oracle.md` - GENERATED: run `machinery oracle design/machines`
   and commit the output. Never hand-edit it; G3 regenerates it in memory and diffs, so a stale or
   edited oracle is DRIFT.
+- `design/formal/<C>.semantics.yaml` - one source annotation for every lifecycle machine. Use
+  `linear-lifecycle`, `terminal-lifecycle`, or `saga` when the lifecycle honestly fits that data
+  refinement. Otherwise use `control-flow-only` with a specific non-empty reason. Do not omit the
+  annotation: the explicit declaration prevents a missing proof from looking like an intentional
+  control-flow scope. The complete source shapes are in the Machinery skill's
+  `references/verification-evidence.md`.
+- `design/formal/<name>.composition.yaml` - one source annotation for every cross-aggregate
+  invariant or saga whose correctness depends on an ordered coordinator/step/undo composition.
+  Do not invent a composition when no cross-aggregate obligation exists; state that the sweep found
+  none in your return instead.
+- `design/formal/<Name>.tla` plus `design/formal/<Name>.cfg` - only when a property cannot be
+  expressed by the generated control-flow, refinement, or composition models. A manually authored
+  TLA module's first line is exactly `\* machinery:manual`, and its same-basename `.cfg` sibling is
+  mandatory. Never put the marker on generated output. An unmarked orphan pair, a marked module
+  without its cfg, or a cfg without its module is an ERROR. `machinery verify-formal` TLC-checks
+  manual pairs and reports them as declared and checked, but deliberately does not regenerate them.
 
 ## Run the tools before you return (non-negotiable)
 
 ```
 machinery lint design/machines
 machinery oracle design/machines
+machinery check design --gate g3
+machinery verify-formal design
 ```
 
-Fix every lint ERROR and rerun until clean, then generate the oracles. Returning machines that fail
-lint is a protocol violation.
+Fix every lint or G3 ERROR and rerun until clean, then generate the oracles and regenerate plus check
+the formal suite. If Java is unavailable, run `machinery verify-formal --gen-only design` explicitly
+and record in `design/STATE.md` that generation passed but solver checking remains outstanding.
+Returning machines that fail lint or G3, carry a stale oracle/formal artifact, or silently skip the
+formal command is a protocol violation.
 
 ## Self-check before you return (Gate 3)
 
-Deterministic: `machinery lint` and `machinery oracle` above are the whole list. Run them, do not
-eyeball, and do not deliver with a lint ERROR outstanding or an oracle ungenerated. Enumerating
-their checks here would only drift from them.
+Deterministic: the four commands above are the whole list. Run them, do not eyeball, and do not
+deliver with a lint or G3 ERROR outstanding, an oracle ungenerated, or a formal source/generated
+pair unreconciled. Enumerating their checks here would only drift from them.
 
 Your own judgment (the tools cannot check these; attest them explicitly). Write each one as a
 row in `design/attestations.yaml` before you hand back, covering the machines it ranges over;
@@ -168,9 +190,10 @@ after an edit means updating that row's hash and date, never adding a second row
 Before handing back, run the conductor's five-question phase-exit self-review (reality, depth,
 scope, coverage, consistency) over your artifacts and include the verdicts in your summary.
 
-Return a concise summary: the machines you wrote, the `machinery lint` and `machinery oracle` results, the Gate 3 result
-(pass or the exact gaps), and any invariant with no enforcement point. Do not restate the full files;
-the conductor has them on disk.
+Return a concise summary: the machines and formal annotations you wrote, the `machinery lint`,
+`machinery oracle`, G3, and `machinery verify-formal` results (or the explicit `--gen-only` status),
+and any invariant with no enforcement point. Do not restate the full files; the conductor has them
+on disk.
 
 Order-sensitive branch lists (added 2026-08-28): for every multi-guard branch
 list whose guards are not mutually exclusive by construction, state why the

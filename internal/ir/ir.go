@@ -2,14 +2,89 @@ package ir
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/RamXX/machinery/internal/dirscan"
+	"github.com/RamXX/machinery/internal/portablepath"
 )
+
+const machineInventoryMaxEntries = 100_000
 
 // IdentPattern is machine_lint.IDENT: [A-Za-z_][A-Za-z0-9_]*.
 const IdentPattern = `[A-Za-z_][A-Za-z0-9_]*`
 
 var identRe = regexp.MustCompile(IdentPattern)
+
+var tlaModuleIdentRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
+
+// TLAModuleName returns the canonical TLA+ module and artifact basename for a
+// machine. Machine ids cross two trust boundaries: they are emitted as TLA+
+// identifiers and joined to an output directory as filenames. Accepting only
+// the portable TLA+ identifier subset makes both uses safe; in particular, a
+// path separator or dot segment can never escape the requested output tree.
+func TLAModuleName(root *Value) (string, error) {
+	if root == nil || root.Kind != KindObject {
+		return "", fmt.Errorf("machine is not an object")
+	}
+	idv := root.AsObject().Get2("id")
+	if idv == nil || idv.Kind != KindString || idv.AsString() == "" {
+		return "", fmt.Errorf("machine id must be a non-empty string matching [A-Za-z][A-Za-z0-9_]*")
+	}
+	id := idv.AsString()
+	if !tlaModuleIdentRe.MatchString(id) {
+		return "", fmt.Errorf("machine id %s is not a safe TLA+ identifier (expected [A-Za-z][A-Za-z0-9_]*)", goRepr(idv))
+	}
+	module := Title(id)
+	if err := portablepath.ValidateBase(module + ".tla"); err != nil {
+		return "", fmt.Errorf("machine id %s does not produce a portable artifact name: %w", goRepr(idv), err)
+	}
+	return module, nil
+}
+
+// ValidateTLAModuleInventory requires every machine in dir to be a regular
+// source and to produce a basename unique under case-folding. Title-casing
+// makes foo and Foo an exact collision; FOO and Foo alias on APFS/NTFS.
+func ValidateTLAModuleInventory(dir string) error {
+	entries, err := dirscan.Read(dir, machineInventoryMaxEntries)
+	if err != nil {
+		return err
+	}
+	owners := map[string]string{}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".machine.json") {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return fmt.Errorf("machine source %s must be a regular file, not a symlink or special file", entry.Name())
+		}
+		machine, err := LoadMachineJSON(path)
+		if err != nil {
+			return err
+		}
+		module, err := TLAModuleName(machine)
+		if err != nil {
+			return fmt.Errorf("%s: %w", entry.Name(), err)
+		}
+		stem := strings.TrimSuffix(entry.Name(), ".machine.json")
+		if !strings.EqualFold(stem, module) {
+			return fmt.Errorf("machine source %s must use a case-fold-equivalent canonical filename %s.machine.json for machine id", entry.Name(), module)
+		}
+		fold := strings.ToLower(module)
+		if prior, ok := owners[fold]; ok {
+			return fmt.Errorf("machine sources %s and %s produce TLA artifact names that alias on case-insensitive filesystems", prior, entry.Name())
+		}
+		owners[fold] = entry.Name()
+	}
+	return nil
+}
 
 // StateEntry is a walked state: (path, simpleName, node).
 type StateEntry struct {
@@ -137,6 +212,9 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 	}
 	if t.Kind == KindArray {
 		items = t.AsArray()
+		if len(items) == 0 && problems != nil {
+			*problems = append(*problems, fmt.Sprintf("empty transition branch list%s (the trigger would be silently swallowed)", whereSuffix(where)))
+		}
 	} else {
 		items = []*Value{t}
 	}
@@ -175,6 +253,10 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 				case KindString:
 					tgt = tv.AsString()
 					hasTgt = true
+				default:
+					if problems != nil {
+						*problems = append(*problems, fmt.Sprintf("non-string transition target %s%s", goRepr(tv), whereSuffix(where)))
+					}
 				}
 			}
 			var guard string
@@ -202,6 +284,21 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 	return out
 }
 
+// TransitionProblems runs the shared transition normalizer over every state
+// and returns every admissibility finding in source order. Generators use this
+// before emitting anything so malformed branches cannot be silently narrowed
+// into a different machine. Lint uses the same TransitionsOf path directly.
+func TransitionProblems(root *Value) []string {
+	if root == nil || root.Kind != KindObject {
+		return nil
+	}
+	var problems []string
+	for _, s := range WalkStates(root.AsObject().Get2("states"), "") {
+		TransitionsOf(s.Node, &problems, s.Path)
+	}
+	return problems
+}
+
 // TransitionsOf mirrors machine_lint.transitions_of: all transitions on a state
 // node, flattened. kind ∈ {on, after, always, stateDone, onDone, onError}.
 func TransitionsOf(node *Value, problems *[]string, state string) []Transition {
@@ -212,18 +309,30 @@ func TransitionsOf(node *Value, problems *[]string, state string) []Transition {
 	var res []Transition
 
 	if on := o.Get2("on"); on != nil {
-		for _, ev := range on.AsObject().Keys() {
-			for _, b := range normTransition(on.AsObject().Get2(ev), problems, state+" on:"+ev) {
-				res = append(res, Transition{Kind: "on", Event: ev,
-					Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+		if on.Kind != KindObject {
+			if problems != nil {
+				*problems = append(*problems, fmt.Sprintf("transition container 'on' must be an object%s", whereSuffix(state)))
+			}
+		} else {
+			for _, ev := range on.AsObject().Keys() {
+				for _, b := range normTransition(on.AsObject().Get2(ev), problems, state+" on:"+ev) {
+					res = append(res, Transition{Kind: "on", Event: ev,
+						Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+				}
 			}
 		}
 	}
 	if after := o.Get2("after"); after != nil {
-		for _, delay := range after.AsObject().Keys() {
-			for _, b := range normTransition(after.AsObject().Get2(delay), problems, state+" after:"+delay) {
-				res = append(res, Transition{Kind: "after", Event: delay,
-					Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+		if after.Kind != KindObject {
+			if problems != nil {
+				*problems = append(*problems, fmt.Sprintf("transition container 'after' must be an object%s", whereSuffix(state)))
+			}
+		} else {
+			for _, delay := range after.AsObject().Keys() {
+				for _, b := range normTransition(after.AsObject().Get2(delay), problems, state+" after:"+delay) {
+					res = append(res, Transition{Kind: "after", Event: delay,
+						Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+				}
 			}
 		}
 	}
@@ -240,7 +349,19 @@ func TransitionsOf(node *Value, problems *[]string, state string) []Transition {
 		}
 	}
 	if inv := o.Get2("invoke"); inv != nil {
-		for _, iv := range invokesRaw(inv) {
+		if inv.Kind != KindObject && inv.Kind != KindArray {
+			if problems != nil {
+				*problems = append(*problems, fmt.Sprintf("transition source 'invoke' must be an object or array%s", whereSuffix(state)))
+			}
+			return res
+		}
+		for i, iv := range invokesRaw(inv) {
+			if iv == nil || iv.Kind != KindObject {
+				if problems != nil {
+					*problems = append(*problems, fmt.Sprintf("invoke entry %d must be an object%s", i+1, whereSuffix(state)))
+				}
+				continue
+			}
 			ivObj := iv.AsObject()
 			for _, key := range []string{"onDone", "onError"} {
 				if ivObj.Get2(key) != nil {
@@ -309,9 +430,64 @@ func ActionsOf(node *Value, problems *[]string, state string) map[string]struct{
 type MdTable struct {
 	Header []string
 	Rows   [][]string
+	// RowLines holds the source line of each data row, index-aligned with
+	// Rows (leading and trailing whitespace trimmed, the cell text otherwise
+	// untouched). A tool that REWRITES a table copies a row from here, so the
+	// copy is byte-identical to its source rather than re-rendered from the
+	// parsed cells, which would normalize the author's spacing.
+	RowLines []string
 }
 
-var parenRe = regexp.MustCompile(`\([^)]*\)`)
+// stripAnnotations removes every parenthesized annotation from a cell,
+// BALANCING the parentheses: an annotation that itself contains parentheses
+// ("core (custody registration (Oban-delivered))") is one annotation, not a
+// prefix of one plus a stray ")" left behind to make the participant name
+// unresolvable. An annotation that is never closed swallows the rest of the
+// cell, which is the same reading: everything from the first top-level "(" is
+// annotation. A ")" with no "(" open is ordinary text and survives.
+func stripAnnotations(cell string) string {
+	var b strings.Builder
+	depth := 0
+	for _, r := range cell {
+		switch {
+		case r == '(':
+			depth++
+		case r == ')' && depth > 0:
+			depth--
+		case depth == 0:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// annotationGroups returns the CONTENT of each top-level parenthesized
+// annotation, balanced the same way. An unclosed group yields the rest of the
+// cell, so a caller sees the text it would otherwise silently ignore.
+func annotationGroups(cell string) []string {
+	var out []string
+	depth, start := 0, 0
+	for i, r := range cell {
+		switch r {
+		case '(':
+			if depth == 0 {
+				start = i + 1
+			}
+			depth++
+		case ')':
+			if depth == 1 {
+				out = append(out, cell[start:i])
+			}
+			if depth > 0 {
+				depth--
+			}
+		}
+	}
+	if depth > 0 {
+		out = append(out, cell[start:])
+	}
+	return out
+}
 
 // splitRowCells splits a markdown table row into cells, honoring the GFM
 // `\|` escape (a literal pipe inside a cell). Mirrors the previous
@@ -389,12 +565,13 @@ func ParseMdTables(text string) []MdTable {
 			}
 		}
 		var data [][]string
+		var dataLines []string
 		if isSep {
-			data = rows[2:]
+			data, dataLines = rows[2:], b[2:]
 		} else {
-			data = rows[1:]
+			data, dataLines = rows[1:], b[1:]
 		}
-		tables = append(tables, MdTable{Header: rows[0], Rows: data})
+		tables = append(tables, MdTable{Header: rows[0], Rows: data, RowLines: dataLines})
 	}
 	return tables
 }
@@ -446,7 +623,7 @@ func FindCol(header []string, names ...string) int {
 // CleanCell mirrors machine_lint._clean_cell: strip backticks + parentheticals.
 func CleanCell(cell string) string {
 	cell = strings.ReplaceAll(cell, "`", "")
-	cell = parenRe.ReplaceAllString(cell, "")
+	cell = stripAnnotations(cell)
 	return strings.TrimSpace(cell)
 }
 
@@ -475,8 +652,7 @@ func CellNames(cell string) []string {
 			add(ids[0])
 		}
 	}
-	for _, p := range parenRe.FindAllString(cell, -1) {
-		inner := strings.Trim(p, "()")
+	for _, inner := range annotationGroups(cell) {
 		ids := identRe.FindAllString(inner, -1)
 		if len(ids) == 1 && strings.TrimSpace(inner) == ids[0] {
 			add(ids[0])

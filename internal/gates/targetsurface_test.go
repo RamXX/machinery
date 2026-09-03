@@ -323,7 +323,7 @@ func TestCheckTargetSurfacesNoHumanActs(t *testing.T) {
 // default run, and an explicit --gate gu with no artifact fails loudly rather
 // than skipping.
 func TestTargetSurfacesActivation(t *testing.T) {
-	t.Run("absent file skips the gate in a default run", func(t *testing.T) {
+	t.Run("human acts activate a missing-ledger failure in a default run", func(t *testing.T) {
 		design := t.TempDir()
 		if err := os.WriteFile(filepath.Join(design, "domain.modelith.yaml"), []byte(targetSurfaceModelYAML), 0o644); err != nil {
 			t.Fatal(err)
@@ -335,10 +335,17 @@ func TestTargetSurfacesActivation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		found := false
 		for _, gate := range RunSelected(design, "", sel, RunOptions{}) {
 			if strings.Contains(gate.Title, "Gu-surfaces") {
-				t.Fatal("Gu ran without an authored ledger")
+				found = true
+				if !hasErr(gate, "no "+TargetSurfacesName) {
+					t.Fatalf("Gu ran but did not fail the missing ledger: %v", gate.Errs)
+				}
 			}
+		}
+		if !found {
+			t.Fatal("Gu did not activate from the model's human actions")
 		}
 	})
 	t.Run("explicit gu with no file errors", func(t *testing.T) {
@@ -532,19 +539,16 @@ func TestCheckTargetSurfacesEmptyMilestoneWithPlan(t *testing.T) {
 	}
 }
 
-// Milestones declared in a manifest's shards resolve too: the index is built
-// from planDocuments, the same document selection Gb and Ga use.
-func TestCheckTargetSurfacesMilestoneFromManifestShard(t *testing.T) {
-	root := "# BUILD: target\n\nMode: manifest\n\n## 1. Purpose\n\nProse.\n"
+// Execution packets cannot declare target-surface milestones. The root is
+// the single milestone authority shared by Gb, Gu, and Ga.
+func TestCheckTargetSurfacesMilestoneFromManifestPacketIsIgnored(t *testing.T) {
+	root := "# BUILD: target\n\nMode: manifest\n\n## 9. Build plan\n\n**M2 - Root slice.**\nDoD: green.\n"
 	ledger := strings.Replace(targetSurfacesLedger, "milestone: M2", "milestone: M4", 1)
 	design := writeTargetSurfacePlanFixture(t, ledger, root)
 	shard := "# BUILD: orders\n\n## 9. Build plan\n\nWalking skeleton: N/A - it lives in the root.\n\n**M4 - Orders slice.**\nDoD: green.\n"
 	writeSuiteFile(t, filepath.Join(design, "BUILD", "orders.md"), shard)
 	g := CheckTargetSurfaces(design)
-	if len(g.Errs) != 0 {
-		t.Fatalf("a shard milestone must resolve: %v", g.Errs)
-	}
-	if !strings.Contains(checkedLine(g), "1 milestone references resolved") {
-		t.Errorf("the shard resolution must be counted: %q", checkedLine(g))
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "which the build plan does not declare") {
+		t.Fatalf("a packet-local milestone must not satisfy the root inventory: %v", g.Errs)
 	}
 }

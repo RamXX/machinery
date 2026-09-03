@@ -1,7 +1,7 @@
 # FulfillmentSaga machine - named-unit contracts and failure catalog
 
 Component: `order.service` Saga Orchestrator. Machine: `FulfillmentSaga.machine.json`.
-Placement (ARCHITECTURE.md 4): a persistent `gen_statem` per order under a `Registry`, state journaled
+Placement (ARCHITECTURE.md 5): a persistent `gen_statem` per order under a `Registry`, state journaled
 to the Order DB. Transitions are the generated oracle (`FulfillmentSaga.oracle.md`); this document is
 the named-unit contract table and the failure catalog.
 
@@ -15,9 +15,11 @@ the named-unit contract table and the failure catalog.
 | `compensate` | actor | `(orderId) -> ok \| err` | single idempotent step: refund if captured, release if reserved; ok only when every held obligation is undone | inv `saga-compensation`, `refund-within-capture` | integration + property | real bus + both services; property: compensate twice = compensate once |
 | `retriesExhausted` | guard | `(ctx) -> bool` | true iff `ctx.retries >= 3` | C4 3 compensation bound | unit | pure |
 | `incrementRetries` | action | `(ctx) -> ctx` | `retries := retries + 1` | - | unit | pure |
+| `reserveBeforePay` | invariant | `(state) -> bool` | `reserve-before-pay`: the only path into Paying is successful completion of `reserveInventory`, so capture cannot begin before every reservation is Held | inv `reserve-before-pay` | model + unit | machine graph and command-emission assertion |
+| `sagaTerminal` | invariant | `(state) -> bool` | `saga-terminal`: Completed, Failed, and FailedDirty are final; no event or timer can leave them | inv `saga-terminal` | model + unit | machine graph final-state assertion |
 | `markReserved` / `markPaid` / `markShipped` | action | `(ctx,evt) -> ctx` | record the completed forward step (drives the Order aggregate's saga events) | Order actions of the same name | unit | pure |
 | `recordReserveFailed` / `recordReserveTimeout` / `recordPayFailed` / `recordPayTimeout` / `recordShipFailed` / `recordShipTimeout` | action | `(ctx,evt) -> ctx` | `lastError := classified step failure` | C4 3 step timeouts | unit | pure |
-| `recordCompensated` / `recordCompensateError` / `recordCompensateTimeout` / `recordCompensationIncomplete` | action | `(ctx,evt) -> ctx` | record the compensation outcome; `recordCompensationIncomplete` marks the FailedDirty residual and MUST page an operator (ARCHITECTURE.md 6) | inv `saga-compensation` | unit | pure |
+| `recordCompensated` / `recordCompensateError` / `recordCompensateTimeout` / `recordCompensationIncomplete` | action | `(ctx,evt) -> ctx` | record the compensation outcome; `recordCompensationIncomplete` marks the FailedDirty residual and MUST page an operator (ARCHITECTURE.md 8) | inv `saga-compensation` | unit | pure |
 
 ## (b) Failure catalog
 
@@ -29,13 +31,13 @@ the named-unit contract table and the failure catalog.
 | Compensation fails or times out | `compensate` onError, or `after compensateTimeout` (8s) | `Compensating -> compensateRetry -> Compensating` (backoff 0.5s) | bounded retry | retry <= 3 |
 | Compensation exhausted | `retriesExhausted` at 3 | `compensateRetry -> FailedDirty` | none automatic; explicit residual | FailedDirty MUST page an operator; money or stock may be held pending manual action |
 
-Formal note: `formal/FulfillmentSagaData.tla` (generated from `FulfillmentSaga.semantics.yaml`)
-proves that a terminal saga never silently holds an obligation: refunds what it captured and
-releases what it reserved, or ends FailedDirty explicitly.
+Formal note: the generated data-refined saga proof establishes that a terminal saga never silently
+holds an obligation: it refunds what it captured and releases what it reserved, or ends
+FailedDirty explicitly.
 
 ## (c) Consumed events
 
-The event-contract table (ARCHITECTURE.md 6) arms the consumer-READS completeness tier. The saga
+The event-contract table (ARCHITECTURE.md 7) arms the consumer-READS completeness tier. The saga
 consumes each reply through the invoke actor that emitted the command rather than as a machine
 event (which is what its `(no machine: ...)` consumer waivers state), and the reads obligation
 binds all the same: what the handler reads off the payload is stated here.

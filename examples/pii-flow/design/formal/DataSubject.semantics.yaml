@@ -1,0 +1,3 @@
+machine: datasubject
+pattern: control-flow-only
+reason: The DataSubject lifecycle is only the persisted Active or Erased control-flow enum; privacy dataflow is decided independently by the committed hermetic checker evidence.

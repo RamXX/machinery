@@ -25,10 +25,10 @@
     "Pending": {
       "on": {
         "authorize": [
-          { "target": "authorizing", "guard": "guardAmountNonneg", "actions": "setGatewayAuthorize" },
+          { "target": "authorizing", "guard": "guardAmountNonneg", "actions": ["resetGatewayRetries", "setGatewayAuthorize"] },
           { "actions": "recordAuthorizeDenied" }
         ],
-        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+        "fail": { "target": "persisting", "actions": ["resetRetries", "setPendingFailed"] }
       },
       "_ignores": {
         "capture": "out-of-order saga event: nothing authorized yet; nack for redelivery",
@@ -37,8 +37,8 @@
     },
     "Authorized": {
       "on": {
-        "capture": { "target": "capturing", "actions": "setGatewayCapture" },
-        "fail": { "target": "persisting", "actions": "setPendingFailed" }
+        "capture": { "target": "capturing", "actions": ["resetGatewayRetries", "setGatewayCapture"] },
+        "fail": { "target": "persisting", "actions": ["resetRetries", "setPendingFailed"] }
       },
       "_ignores": {
         "authorize": "idempotent redelivery: already authorized (same idempotency key)",
@@ -47,7 +47,7 @@
     },
     "Captured": {
       "on": {
-        "refund": { "target": "refunding", "actions": "setGatewayRefund" }
+        "refund": { "target": "refunding", "actions": ["resetGatewayRetries", "setGatewayRefund"] }
       },
       "_ignores": {
         "authorize": "idempotent redelivery: already past authorization",
@@ -61,10 +61,10 @@
       "invoke": {
         "src": "gatewayAuthorize",
         "input": { "amountCents": "context.amountCents", "idempotencyKey": "context.idempotencyKey" },
-        "onDone": { "target": "persisting", "actions": "setPendingAuthorized" },
+        "onDone": { "target": "persisting", "actions": ["resetRetries", "setPendingAuthorized"] },
         "onError": [
           { "target": "gatewayRetry", "guard": "isErrRetryable", "actions": "recordGatewayError" },
-          { "target": "persisting", "actions": ["recordGatewayRejected", "setPendingFailed"] }
+          { "target": "persisting", "actions": ["resetRetries", "recordGatewayRejected", "setPendingFailed"] }
         ]
       },
       "after": {
@@ -75,10 +75,10 @@
       "invoke": {
         "src": "gatewayCapture",
         "input": { "amountCents": "context.amountCents", "idempotencyKey": "context.idempotencyKey" },
-        "onDone": { "target": "persisting", "actions": "setPendingCaptured" },
+        "onDone": { "target": "persisting", "actions": ["resetRetries", "setPendingCaptured"] },
         "onError": [
           { "target": "gatewayRetry", "guard": "isErrRetryable", "actions": "recordGatewayError" },
-          { "target": "persisting", "actions": ["recordGatewayRejected", "setPendingFailed"] }
+          { "target": "persisting", "actions": ["resetRetries", "recordGatewayRejected", "setPendingFailed"] }
         ]
       },
       "after": {
@@ -89,7 +89,7 @@
       "invoke": {
         "src": "gatewayRefund",
         "input": { "amountCents": "context.amountCents", "idempotencyKey": "context.idempotencyKey" },
-        "onDone": { "target": "persisting", "actions": "setPendingRefunded" },
+        "onDone": { "target": "persisting", "actions": ["resetRetries", "setPendingRefunded"] },
         "onError": [
           { "target": "gatewayRetry", "guard": "isErrRetryable", "actions": "recordGatewayError" },
           { "target": "rolledBack", "actions": "recordRefundFailed" }
@@ -108,11 +108,11 @@
       }
     },
     "gatewayResume": {
-      "_exhaustive": "gatewayOp is set by setGatewayAuthorize/setGatewayCapture/setGatewayRefund before entering the three gateway-call states, the only states that reach gatewayRetry; the three gatewayFor* guards cover {authorize, capture, refund} totally",
       "always": [
         { "target": "authorizing", "guard": "gatewayForAuthorize" },
         { "target": "capturing", "guard": "gatewayForCapture" },
-        { "target": "refunding", "guard": "gatewayForRefund" }
+        { "target": "refunding", "guard": "gatewayForRefund" },
+        { "target": "routingFault", "actions": "recordRoutingError" }
       ]
     },
     "persisting": {
@@ -145,12 +145,13 @@
       }
     },
     "rolledBack": {
-      "_exhaustive": "priorStatus is set on every path into the overlay from a domain state; only Pending, Authorized, and Captured reach the overlay (Failed and Refunded are final), and all three priorIs* guards are present",
       "always": [
         { "target": "Pending", "guard": "priorIsPending" },
         { "target": "Authorized", "guard": "priorIsAuthorized" },
-        { "target": "Captured", "guard": "priorIsCaptured" }
+        { "target": "Captured", "guard": "priorIsCaptured" },
+        { "target": "routingFault", "actions": "recordRoutingError" }
       ]
-    }
+    },
+    "routingFault": { "type": "final" }
   }
 }

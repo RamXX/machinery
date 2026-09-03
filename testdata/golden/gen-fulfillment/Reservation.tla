@@ -1,5 +1,5 @@
 ---- MODULE Reservation ----
-\* machinery-version: v0.6.2
+\* machinery-version: v0.6.3
 EXTENDS Naturals
 
 \* Generated from Reservation.machine.json by machinery tla. Control-flow model.
@@ -10,7 +10,7 @@ EXTENDS Naturals
 \*      machine_lint requires an unguarded fallback or an _exhaustive note; where
 \*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
 \*      below is only as sound as these hand-checked, UNVERIFIED claims:
-\*      - UNVERIFIED, state rolledBack: only Held has transitions into the persist overlay (Committed and Released are final), so priorStatus is always Held and the single priorIsHeld guard is total
+\*      (none here: every guarded branch list has an unguarded fallback)
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or
@@ -29,10 +29,10 @@ CONSTANT MaxRetries
 VARIABLES st, rc1
 vars == << st, rc1 >>
 
-States == {"Committed", "Held", "Released", "persistRetry", "persisting", "rolledBack"}
-Domain == {"Committed", "Held", "Released"}
+States == {"Committed", "Held", "Released", "persistRetry", "persisting", "rolledBack", "routingFault"}
+Domain == {"Committed", "Held", "Released", "routingFault"}
 Overlay == {"persistRetry", "persisting", "rolledBack"}
-Final == {"Committed", "Released"}
+Final == {"Committed", "Released", "routingFault"}
 
 TypeOK == st \in States /\ rc1 \in 0..MaxRetries
 Init == st = "Held" /\ rc1 = 0
@@ -47,6 +47,7 @@ Init == st = "Held" /\ rc1 = 0
   \* T8: persisting -onError:persistReservation-> persistRetry
   \* T9: persisting -onError:persistReservation-> rolledBack
   \* T10: rolledBack -always-> Held
+  \* T11: rolledBack -always-> routingFault
 
 T1 == st = "Held" /\ st' = "persisting" /\ rc1' = 0
 T2 == st = "Held" /\ st' = "persisting" /\ rc1' = 0
@@ -58,12 +59,13 @@ T7 == st = "persisting" /\ st' = "persistRetry" /\ rc1' = rc1
 T8 == st = "persisting" /\ st' = "persistRetry" /\ rc1' = rc1
 T9 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1
 T10 == st = "rolledBack" /\ st' = "Held" /\ rc1' = 0
+T11 == st = "rolledBack" /\ st' = "routingFault" /\ rc1' = 0
 RetryExhausted_persistRetry == st = "persistRetry" /\ rc1 >= MaxRetries /\ st' = "rolledBack" /\ rc1' = rc1
 RetryAgain_persistRetry == st = "persistRetry" /\ rc1 < MaxRetries /\ st' = "persisting" /\ rc1' = rc1 + 1
 Terminated == st \in Final /\ UNCHANGED vars
 
 DomainNext == T1 \/ T2
-OverlayNext == T3 \/ T4 \/ T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
+OverlayNext == T3 \/ T4 \/ T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
 Next == DomainNext \/ OverlayNext \/ Terminated
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)

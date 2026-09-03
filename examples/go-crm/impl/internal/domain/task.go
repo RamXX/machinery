@@ -223,6 +223,10 @@ func (t *Task) fireRolledBack(evt TaskEvent) Effect {
 		t.State = TSOpen
 	case t.priorIsInProgress():
 		t.State = TSInProgress
+	default:
+		t.recordRoutingError()
+		t.State = TSCancelled
+		return effect("recordRoutingError")
 	}
 	return Effect{}
 }

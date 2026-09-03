@@ -55,6 +55,10 @@ dependency_rules:
     - "order.service -> inventory.service"
     - "order.service -> payment.service"
     - "order.service -> shipping.service"
+  assert:
+    - no_path: order.service -> inventory.service
+    - no_path: order.service -> payment.service
+    - no_path: order.service -> shipping.service
   notes:
     - "Cross-service communication is asynchronous over the message bus, never a direct call."
     - "Reliable delivery is the transactional outbox plus idempotent consumers (exactly-once effect)."
@@ -65,22 +69,37 @@ dependency_rules:
 Distributed, so the failure model is partial failure and message loss, not a single local store. This is
 where this design differs most from go-crm, and where the FulfillmentSaga's compensation earns its keep.
 
-| dependency | failure modes | mitigation | residual behavior the machines handle | bound |
-|---|---|---|---|---|
-| `bus` (message bus) | unavailable, partition, duplicate | transactional outbox (at-least-once), clustered bus | duplicate delivery handled by idempotent consumers; delayed delivery becomes a saga step timeout then compensation | dedupe by message id; step timeout 5-8s |
-| `stripe` (payment gateway) | 5xx, timeout, duplicate charge | idempotency key, bounded retry | a timeout compensates (refund is idempotent and retried); a partial capture is reconciled by the refund | idempotency key; capture retried |
-| `orderDb` `inventoryDb` `paymentDb` `shippingDb` (per-service DB) | unavailable, conflict | HA Postgres, the outbox | transient unavailability retries; the outbox guarantees no event is lost on a crash | retry <= 3 |
-| `carrier` | 5xx, timeout, lost parcel | retry, tracking | a dispatch timeout compensates; a lost parcel is the terminal Shipment Lost | timeout 8s |
-| `bus` (network partition, service to bus) | messages delayed | outbox retry, saga step timeout | a step that does not confirm in time drives the saga into compensation | saga step timeout |
+| dependency | failure modes | mitigation | residual behavior the machines handle | bound | handled by |
+|---|---|---|---|---|---|
+| `bus` (message bus) | unavailable, partition, duplicate | transactional outbox (at-least-once), clustered bus | duplicate delivery handled by idempotent consumers; delayed delivery becomes a saga step timeout then compensation | dedupe by message id; step timeout 5-8s | `OutboxMessage`, `FulfillmentSaga` |
+| `stripe` (payment gateway) | 5xx, timeout, duplicate charge | idempotency key, bounded retry | a timeout compensates (refund is idempotent and retried); a partial capture is reconciled by the refund | idempotency key; capture retried | `Payment` |
+| `orderDb` `inventoryDb` `paymentDb` `shippingDb` (per-service DB) | unavailable, conflict | HA Postgres, the outbox | transient unavailability retries; the outbox guarantees no event is lost on a crash | retry <= 3 | `Order`, `Reservation`, `Payment`, `Shipment`, `OutboxMessage` |
+| `carrier` | 5xx, timeout, lost parcel | retry, tracking | a dispatch timeout compensates; a lost parcel is the terminal Shipment Lost | timeout 8s | `Shipment`, `FulfillmentSaga` |
+| `bus` (network partition, service to bus) | messages delayed | outbox retry, saga step timeout | a step that does not confirm in time drives the saga into compensation | saga step timeout | `OutboxMessage`, `FulfillmentSaga` |
 
 The saga's compensation is a single idempotent step (refund if captured, release if reserved), retried;
 if it cannot complete within the bound the saga ends in the explicit residual FailedDirty. The data-refined
 model `formal/FulfillmentSagaData.tla` proves that money and stock are never silently lost.
 
+## 3a. Adoption closure
+
+Every adopted runtime or library is accounted for together with the infrastructure it brings. A
+closure member is either a declared dependency with the mitigation above or an explicit no-closure
+decision.
+
+| technology | closure |
+|---|---|
+| Elixir/OTP | (no closure: the BEAM runtime ships inside each service image and introduces no separately operated sidecar, state store, or control plane) |
+| Ecto and PostgreSQL | `orderDb`, `inventoryDb`, `paymentDb`, `shippingDb` |
+| Oban outbox poller | `orderDb` for the canonical poller job and outbox rows; each service uses its own declared database under the same contract |
+| RabbitMQ client | `bus` |
+| Payment gateway adapter | `stripe` |
+| Carrier adapter | `carrier` |
+
 ## 4. Interface contracts
 
 The contract allows exactly four crossings, all into the shared contracts library. Everything else
-between services is asynchronous and governed by the event-contract table in section 6: a bus message
+between services is asynchronous and governed by the event-contract table in section 7: a bus message
 is not an edge in the dependency graph, which is precisely why that table exists.
 
 | edge | shape | errors | idempotency |
@@ -100,7 +119,28 @@ is not an edge in the dependency graph, which is precisely why that table exists
 | `Refund` (no machine: the outcome record of a compensating capture) | none; rows in the Payment Service DB | one row per issued refund | written inside the payment's compensation step |
 | `Address` (not placed: a value object stored inline in the `Shipment` row it belongs to) | n/a | n/a | n/a |
 
-## 6. Event-contract table
+## 6. Action ownership
+
+The domain action set is closed here in both directions. `orderSvc` owns the canonical
+OutboxMessage lifecycle contract; every producing service instantiates that same contract without
+creating a second semantic owner.
+
+| action | owning component |
+|---|---|
+| `Customer.register` | `orderSvc` |
+| `Product.create`, `Product.reprice` | `inventorySvc` |
+| `Inventory.restock`, `Inventory.reserve`, `Inventory.release`, `Inventory.commit` | `inventorySvc` |
+| `Order.place`, `Order.confirm`, `Order.markReserved`, `Order.markPaid`, `Order.markShipped`, `Order.markDelivered`, `Order.cancel`, `Order.fail` | `orderSvc` |
+| `LineItem.add` | `orderSvc` |
+| `Reservation.hold`, `Reservation.commit`, `Reservation.release` | `inventorySvc` |
+| `Payment.authorize`, `Payment.capture`, `Payment.fail`, `Payment.refund` | `paymentSvc` |
+| `Refund.issue` | `paymentSvc` |
+| `Shipment.dispatch`, `Shipment.markInTransit`, `Shipment.deliver`, `Shipment.markLost` | `shippingSvc` |
+| `Address.capture` | `orderSvc` |
+| `FulfillmentSaga.start`, `FulfillmentSaga.advance`, `FulfillmentSaga.compensate`, `FulfillmentSaga.complete`, `FulfillmentSaga.abort` | `orderSvc` |
+| `OutboxMessage.enqueue`, `OutboxMessage.publish`, `OutboxMessage.markConsumed` | `orderSvc` |
+
+## 7. Event-contract table
 
 Bus coupling is invisible to import-level checking, so this table is the governing artifact for
 every message that crosses a service boundary. Every row rides the transactional outbox of the
@@ -131,7 +171,7 @@ subscriptions exist to sweep.
 | `captured` / `refunded` / `failed` events | `paymentSvc` (via its outbox) (no machine: the reply is an outbox row the service writes after the Payment transition, not a machine action) | `orderSvc` (saga) (no machine: the saga consumes the reply through its `capturePayment` invoke, not as an event; the Order aggregate then reacts as `markPaid` or `fail`) | order id, `Payment.status`, `Payment.amountCents` | at-least-once via outbox | per order; as above | message id |
 | `dispatched` / `delivered` / `lost` events | `shippingSvc` (via its outbox) (no machine: the reply is an outbox row the service writes after the Shipment transition, not a machine action) | `orderSvc` (saga) (no machine: the saga consumes the reply through its `dispatchShipment` invoke, not as an event; the Order aggregate then reacts as `markShipped`, `markDelivered`, or `fail`) | order id, `Shipment.status`, `Shipment.trackingId` | at-least-once via outbox | per order; as above; `delivered` / `lost` drive the Order's `markDelivered` / `fail` | message id |
 
-## 7. NFR record
+## 8. NFR record
 
 - **Security posture**: the customer-facing API and the operator's stock management are HTTPS. The
   payment gateway credential lives only in the Payment Service and is never logged; the platform
@@ -151,7 +191,7 @@ subscriptions exist to sweep.
   is broken. Metrics and log tooling choices are deferred to implementation; the signals above are
   not.
 
-## 8. Gate 2 result
+## 9. Gate 2 result
 
 Every Modelith action maps to an owning service; every external dependency has a mitigation-posture row;
 the contract is consistent and the services are forbidden from calling each other directly; persistence

@@ -30,7 +30,7 @@ var noResidualWaiverRe = regexp.MustCompile(`\(no residual:\s*([^)]*)\)`)
 func machineInvokeSrcs(design string) map[string]bool {
 	srcs := map[string]bool{}
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.machine.json") {
-		m, err := ir.LoadMachineJSON(path)
+		m, err := loadDesignMachine(design, path)
 		if err != nil {
 			continue
 		}
@@ -53,8 +53,8 @@ func machineInvokeSrcs(design string) map[string]bool {
 // actors.
 func checkResidualHandling(g *Gate, design string, machineNames map[string]bool) {
 	arch := filepath.Join(design, "ARCHITECTURE.md")
-	text := readOrEmpty(arch) // read errors reported by the placement pass
-	var srcs map[string]bool  // computed lazily: only an adopted column needs it
+	text := readDesignOrEmpty(design, arch) // read errors reported by the placement pass
+	var srcs map[string]bool                // computed lazily: only an adopted column needs it
 	for _, tbl := range ir.ParseMdTables(text) {
 		hl := strings.ToLower(strings.Join(tbl.Header, " "))
 		if !strings.Contains(hl, "failure") || !strings.Contains(hl, "mitigation") {

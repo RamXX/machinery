@@ -1,0 +1,3 @@
+machine: outboxMessage
+pattern: control-flow-only
+reason: OutboxMessage combines poller-driven publish and acknowledgement events with a persistence overlay, while unbounded delivery retry belongs to the external poller; no existing data-refinement pattern models that split without inventing behavior.

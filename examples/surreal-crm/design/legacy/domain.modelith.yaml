@@ -20,17 +20,17 @@ glossary:
 enums:
   UserRole:
     values:
-      - {name: Admin, definition: "Unrestricted access."}
+      - {name: Admin, definition: "Unrestricted access in the legacy LadybugDB-backed release."}
       - {name: Manager, definition: "Team-wide read and write and reassignment."}
       - {name: Rep, definition: "Own and team records."}
       - {name: ReadOnly, definition: "Read within scope only."}
   UserStatus:
     values:
-      - {name: Active, definition: "May authenticate and act."}
+      - {name: Active, definition: "May authenticate and act in the legacy LadybugDB-backed release."}
       - {name: Disabled, definition: "May not authenticate; retained for audit."}
   DealStage:
     values:
-      - {name: Lead, definition: "Unqualified opportunity."}
+      - {name: Lead, definition: "Unqualified opportunity in the legacy LadybugDB-backed release."}
       - {name: Qualified, definition: "Confirmed fit and budget."}
       - {name: Proposal, definition: "A proposal has been sent."}
       - {name: Negotiation, definition: "Terms under negotiation."}
@@ -38,13 +38,13 @@ enums:
       - {name: Lost, definition: "Closed unsuccessfully; terminal."}
   TaskStatus:
     values:
-      - {name: Open, definition: "Created, not started."}
+      - {name: Open, definition: "Created, not started, in the legacy LadybugDB-backed release."}
       - {name: InProgress, definition: "Being worked."}
       - {name: Done, definition: "Completed; terminal."}
       - {name: Cancelled, definition: "Abandoned; terminal."}
   ActivityType:
     values:
-      - {name: Call, definition: "A phone call."}
+      - {name: Call, definition: "A phone call recorded by the legacy LadybugDB-backed release."}
       - {name: Meeting, definition: "An in-person or virtual meeting."}
       - {name: Email, definition: "An email exchange."}
       - {name: Note, definition: "A freeform note."}
@@ -56,7 +56,7 @@ entities:
       single role and belongs to at most one `Team`. Every record in the system is
       owned by exactly one `User`.
     attributes:
-      - {name: username, type: string}
+      - {name: username, type: string, description: "Legacy LadybugDB user login name."}
       - {name: passwordHash, type: string}
       - {name: role, type: UserRole}
       - {name: status, type: UserStatus}
@@ -81,7 +81,7 @@ entities:
       A named group of `User` records used to scope row-level visibility. A
       `Manager` reads and writes the records of every `User` in the manager's team.
     attributes:
-      - {name: name, type: string}
+      - {name: name, type: string, description: "Legacy LadybugDB team display name."}
     relationships:
       - {entity: User, cardinality: 1:n, ownership: referenced}
     invariants:
@@ -95,7 +95,7 @@ entities:
       An organization that is a customer or prospect. An `Account` groups the
       `Contact` people who work there and the `Deal` opportunities pursued with it.
     attributes:
-      - {name: name, type: string}
+      - {name: name, type: string, description: "Legacy LadybugDB account display name."}
       - {name: domain, type: string}
       - {name: industry, type: string}
     relationships:
@@ -115,10 +115,10 @@ entities:
       A person associated with an `Account`. A `Contact` is the human counterpart
       the CRM `User` communicates with, and is the subject of `Activity` records.
     attributes:
-      - {name: fullName, type: string}
+      - {name: fullName, type: string, description: "Legacy LadybugDB contact display name."}
       - {name: email, type: string}
       - {name: phone, type: string}
-      - {name: title, type: string}
+      - {name: title, type: string, description: "Legacy LadybugDB contact job title."}
     relationships:
       - {entity: User, cardinality: n:1, ownership: referenced}
     invariants:
@@ -134,7 +134,7 @@ entities:
       A sales opportunity with an `Account`, progressing through the stages of a
       `Pipeline`. A `Deal` moves forward through its stages and ends as Won or Lost.
     attributes:
-      - {name: title, type: string}
+      - {name: title, type: string, description: "Legacy LadybugDB deal title."}
       - {name: amountCents, type: integer}
       - {name: stage, type: DealStage}
       - {name: closeDate, type: timestamp}
@@ -161,7 +161,7 @@ entities:
       example Enterprise or SMB. Every pipeline uses the same canonical stage set;
       a `Pipeline` is a namespace, not a redefinition of the stages.
     attributes:
-      - {name: name, type: string}
+      - {name: name, type: string, description: "Legacy LadybugDB pipeline display name."}
       - {name: isDefault, type: boolean}
     relationships:
       - {entity: Deal, cardinality: 1:n, ownership: referenced}
@@ -177,7 +177,7 @@ entities:
       a `Contact` or `Deal`. An `Activity` is an append-only log entry, not a
       stateful object.
     attributes:
-      - {name: type, type: ActivityType}
+      - {name: type, type: ActivityType, description: "Legacy LadybugDB activity classification."}
       - {name: subject, type: string}
       - {name: body, type: string}
       - {name: occurredAt, type: timestamp}
@@ -198,7 +198,7 @@ entities:
       linked to a `Deal`. A `Task` moves from Open through to a terminal Done or
       Cancelled.
     attributes:
-      - {name: title, type: string}
+      - {name: title, type: string, description: "Legacy LadybugDB task title."}
       - {name: dueDate, type: timestamp}
       - {name: status, type: TaskStatus}
     relationships:
@@ -221,7 +221,7 @@ entities:
       A freeform label applied to `Contact`, `Account`, or `Deal` records for
       grouping and filtering. A `Tag` has no lifecycle of its own.
     attributes:
-      - {name: name, type: string}
+      - {name: name, type: string, description: "Legacy LadybugDB tag display name."}
       - {name: color, type: string}
     relationships:
       - {entity: Deal, cardinality: n:n, ownership: referenced}

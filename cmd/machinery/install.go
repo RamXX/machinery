@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/RamXX/machinery/internal/install"
 	"github.com/spf13/cobra"
@@ -36,7 +35,9 @@ published release yet; an explicit --version is fetched exactly or fails.
   machinery install --home ~/.claude
   machinery install --from . --copy        # from a local checkout, real copies everywhere`,
 		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) (retErr error) {
+			output := trackOutput(cmd.OutOrStdout(), cmd.ErrOrStderr())
+			defer func() { retErr = output.join(retErr) }()
 			v := verFlag
 			if v == "" {
 				v = version // this binary's version (main.version)
@@ -49,7 +50,7 @@ published release yet; an explicit --version is fetched exactly or fails.
 				Version:         v,
 				VersionExplicit: verFlag != "",
 				Repo:            repo,
-				Out:             cmd.OutOrStdout(),
+				Out:             output.stdout,
 				Record:          true,
 			})
 		},
@@ -72,41 +73,16 @@ func newUninstallCmd() *cobra.Command {
 		Use:   "uninstall",
 		Short: "Remove the machinery skill + role docs from your agent home(s)",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) (retErr error) {
+			output := trackOutput(cmd.OutOrStdout(), cmd.ErrOrStderr())
+			defer func() { retErr = output.join(retErr) }()
 			if len(targets) > 0 {
 				if len(homes) > 0 {
 					return fmt.Errorf("--home and --target cannot be combined")
 				}
-				if err := install.UninstallTargets(targets, cmd.OutOrStdout()); err != nil {
-					return err
-				}
-				if err := install.ForgetTargetInstalls(targets); err != nil {
-					return err
-				}
-				// Target removal also owns these direct paths: Claude always
-				// removes ~/.claude, while a complete selection removes the
-				// shared ~/.agents copy too.
-				selected := map[string]bool{}
-				for _, target := range targets {
-					selected[strings.ToLower(strings.TrimSpace(target))] = true
-				}
-				all := selected["all"] || (selected["claude"] && selected["codex"] && selected["opencode"])
-				removeHomes := []string{}
-				defaults := install.DefaultHomes()
-				if all {
-					removeHomes = append(removeHomes, defaults...)
-				} else if selected["claude"] && len(defaults) > 1 {
-					removeHomes = append(removeHomes, defaults[1])
-				}
-				if len(removeHomes) > 0 {
-					return install.ForgetHomeInstalls(removeHomes)
-				}
-				return nil
+				return install.UninstallTargets(targets, output.stdout)
 			}
-			if err := install.Uninstall(homes, cmd.OutOrStdout()); err != nil {
-				return err
-			}
-			return install.ForgetHomeInstalls(homes)
+			return install.Uninstall(homes, output.stdout)
 		},
 	}
 	c.Flags().StringArrayVar(&homes, "home", nil, "agent home to remove from (repeatable). Default: ~/.agents ~/.claude")

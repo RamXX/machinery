@@ -3,8 +3,12 @@ package gates
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/RamXX/machinery/internal/designlock"
 )
 
 func writeSuiteFile(t *testing.T, path, content string) {
@@ -14,6 +18,118 @@ func writeSuiteFile(t *testing.T, path, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRunSelectedWaitsForWholeWriterSnapshot(t *testing.T) {
+	design := t.TempDir()
+	writeSuiteFile(t, filepath.Join(design, "ARCHITECTURE.md"), "# pre\n")
+	writeSuiteFile(t, filepath.Join(design, "workspace.dsl"), "workspace \"pre\" \"pre\" {}\n")
+
+	writer, err := designlock.Acquire(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(design, "ARCHITECTURE.md"), []byte("# post\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	checked := make(chan []*Gate, 1)
+	go func() {
+		checked <- RunSelected(design, "", Selection{Run: map[string]bool{"g2": true}, Explicit: true}, RunOptions{})
+	}()
+	select {
+	case <-checked:
+		t.Fatal("check observed the writer's paused, hybrid design state")
+	case <-time.After(50 * time.Millisecond):
+	}
+	if err := os.WriteFile(filepath.Join(design, "workspace.dsl"), []byte("workspace \"post\" \"post\" {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Release(); err != nil {
+		t.Fatal(err)
+	}
+	var got []*Gate
+	select {
+	case got = <-checked:
+	case <-time.After(2 * time.Second):
+		t.Fatal("check did not resume after the writer published its snapshot")
+	}
+	want := RunSelected(design, "", Selection{Run: map[string]bool{"g2": true}, Explicit: true}, RunOptions{})
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("paused check did not observe the complete post-write snapshot:\ngot  %#v\nwant %#v", got, want)
+	}
+}
+
+func TestRunSelectedRejectsInterruptedPublishBeforeGateReads(t *testing.T) {
+	design := t.TempDir()
+	writeSuiteFile(t, filepath.Join(design, "ARCHITECTURE.md"), "this would be read by g2\n")
+	writeSuiteFile(t, filepath.Join(design, "formal", ".machinery-formal-transaction.jsonl"), "seeded parked transaction\n")
+	got := RunSelected(design, "", Selection{Run: map[string]bool{"g2": true}, Explicit: true}, RunOptions{})
+	if len(got) != 1 || got[0].Title != "G0-snapshot" || len(got[0].Errs) != 1 || !strings.Contains(got[0].Errs[0], "formal/.machinery-formal-transaction.jsonl") {
+		t.Fatalf("interrupted journal did not fail before g2: %#v", got)
+	}
+}
+
+func TestCargoWorkspacePointerMutationCannotChangeSnapshotAuthority(t *testing.T) {
+	design := t.TempDir()
+	root := t.TempDir()
+	impl := filepath.Join(root, "member")
+	for _, name := range []string{"a", "b"} {
+		writeSuiteFile(t, filepath.Join(root, "workspace-"+name, "Cargo.toml"), "[workspace]\n[workspace.dependencies]\nserde = \"1\"\n")
+	}
+	manifest := filepath.Join(impl, "Cargo.toml")
+	member := func(workspace string) string {
+		return "[package]\nname = \"member\"\nversion = \"0.1.0\"\nworkspace = \"../workspace-" + workspace + "\"\n[dependencies]\nserde.workspace = true\n"
+	}
+	writeSuiteFile(t, manifest, member("a"))
+	prior := cargoAfterImplementationSnapshot
+	cargoAfterImplementationSnapshot = func() { writeSuiteFile(t, manifest, member("b")) }
+	t.Cleanup(func() { cargoAfterImplementationSnapshot = prior })
+	got := RunSelected(design, impl, Selection{Run: map[string]bool{"g4": true}, Explicit: true}, RunOptions{})
+	for _, gate := range got {
+		if gate.Title == "G0-snapshot" && strings.Contains(strings.Join(gate.Errs, "\n"), "tracked external tree changed outside the snapshot lock") {
+			return
+		}
+	}
+	t.Fatalf("A-to-B workspace-pointer mutation escaped snapshot validation: %#v", got)
+}
+
+func TestCargoWorkspaceAuthorityDiscoveryHonorsContractIgnore(t *testing.T) {
+	design := t.TempDir()
+	impl := t.TempDir()
+	writeSuiteFile(t, filepath.Join(design, "ARCHITECTURE.md"), "# A\n\n## Architecture Contract\n\n```yaml\ncontract_version: 2\nboundaries:\n  - id: app\n    code: [\"app/**\"]\n  - id: lib\n    code: [\"lib/**\"]\nignore: [\"ignored/**\", \"fixtures/Cargo.toml\"]\ndependency_rules:\n  allow: [\"app -> lib\"]\n  deny: []\n```\n")
+	writeSuiteFile(t, filepath.Join(impl, "go.mod"), "module example.com/m\n")
+	writeSuiteFile(t, filepath.Join(impl, "app", "main.go"), "package app\n\nimport _ \"example.com/m/lib\"\n")
+	writeSuiteFile(t, filepath.Join(impl, "lib", "lib.go"), "package lib\n")
+	writeSuiteFile(t, filepath.Join(impl, "ignored", "Cargo.toml"), "not valid TOML\n")
+	writeSuiteFile(t, filepath.Join(impl, "fixtures", "Cargo.toml"), "also not valid TOML\n")
+	got := RunSelected(design, impl, Selection{Run: map[string]bool{"g4": true}, Explicit: true}, RunOptions{})
+	if len(got) != 1 || got[0].Title != "G4-import  code respects the contract" || len(got[0].Errs) != 0 {
+		t.Fatalf("contract-ignored Cargo fixture affected G4: %#v", got)
+	}
+}
+
+func TestGateSnapshotNeverExposesPostAcquireABA(t *testing.T) {
+	design := t.TempDir()
+	path := filepath.Join(design, "ARCHITECTURE.md")
+	writeSuiteFile(t, path, "A\n")
+	snapshot, err := AcquireSnapshot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer snapshot.Release()
+	if err := os.WriteFile(path, []byte("B\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(snapshot.design, "ARCHITECTURE.md"))
+	if err != nil || string(body) != "A\n" {
+		t.Fatalf("gate snapshot exposed transient B: %q, %v", body, err)
+	}
+	if err := os.WriteFile(path, []byte("A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshot.CheckUnchanged(); err != nil {
+		t.Fatalf("restored live design should match acquisition: %v", err)
 	}
 }
 
@@ -62,7 +178,7 @@ func TestSelectNarrowingKeepsGbWhenBuildDocExists(t *testing.T) {
 	if sel.Run["gt"] {
 		t.Errorf("gt is never part of the narrowed parent list: %v", sel.Run)
 	}
-	want := "note: decomposed parent with no machines/; running g2,gl,gb,g5 (G3/Gx run on the child designs; gt skipped: no machines)"
+	want := "note: decomposed parent with no machines/; running g2,gl,gb,gv,g5 (G3/Gx run on the child designs; gt skipped: no machines)"
 	if sel.Note != want {
 		t.Errorf("note = %q\nwant %q", sel.Note, want)
 	}

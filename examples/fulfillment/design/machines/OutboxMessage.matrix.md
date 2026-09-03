@@ -1,7 +1,7 @@
 # OutboxMessage machine - named-unit contracts and failure catalog
 
 Component: the Outbox in every service (the canonical instance lives in `order.service`).
-Machine: `OutboxMessage.machine.json`. Placement (ARCHITECTURE.md 4): a table in each service DB,
+Machine: `OutboxMessage.machine.json`. Placement (ARCHITECTURE.md 5): a table in each service DB,
 drained by a poller; the machine models ONE publish attempt, and the poller loop supplies the
 unbounded at-least-once re-drive. Transitions are the generated oracle (`OutboxMessage.oracle.md`);
 this document is the named-unit contract table and the failure catalog.
@@ -18,6 +18,7 @@ this document is the named-unit contract table and the failure catalog.
 | `retriesExhausted` | guard | `(ctx) -> bool` | true iff `ctx.retries >= 3` | C4 3 bound | unit | pure |
 | `loadPayload` | action | `(ctx,evt) -> ctx` | load the event payload for the publish attempt | - | unit | pure |
 | `setPendingPublished` / `setPendingConsumed` | action | `(ctx,evt) -> ctx` | `priorStatus := status; pendingStatus := <that status>` | - | unit | pure |
+| `resetRetries` | action | `(ctx) -> ctx` | `retries := 0` before each independent status persistence operation; a prior poller attempt cannot consume the next attempt's DB retry budget | C4 3 per-operation DB retry bound | unit | pure |
 | `commitStatus` | action | `(ctx) -> ctx` | `status := pendingStatus` | - | unit | pure |
 | `incrementRetries` | action | `(ctx) -> ctx` | `retries := retries + 1` | - | unit | pure |
 | `recordPublishError` / `recordPublishTimeout` | action | `(ctx,evt) -> ctx` | `lastError := classified bus outcome`; the row stays Pending for the next sweep | C4 3 bus posture | unit | pure |
@@ -31,3 +32,4 @@ this document is the named-unit contract table and the failure catalog.
 | Duplicate publish | poller races its own sweep, or redelivery | `_ignores` on Published | consumers dedupe by message id (exactly-once effect) | inv `exactly-once-effect` |
 | Service DB unavailable / conflict on mark | `persistOutboxRow` onError | `persisting -> persistRetry -> persisting` then `rolledBack` at 3 | bounded retry per attempt; the sweep retries the marking too | C4 3. Residual: a Published row may be re-published (safe, deduped) |
 | Write timeout | `after persistTimeout` (5s) | `persisting -> rolledBack -> priorStatus` | abort the attempt | C4 3. Residual: none |
+| Corrupt or absent rollback route | no `priorIs*` guard admits after a persistence failure | `rolledBack -> routingFault` | stop and alert; never mark an unknown row Consumed or silently discard it | explicit terminal residual; row remains durably inspectable |

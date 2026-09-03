@@ -98,12 +98,13 @@ machinery update --install-dir ~/.local/bin
 contain both custom portable homes and native host adapters. Native target placement runs last and
 is authoritative when an explicit custom home overlaps a standard host path.
 
-All downloads and the direct-install plan are staged before binary replacement. If checksum,
-candidate-version, receipt, or source download validation fails, the existing binary is untouched.
-If a direct harness refresh fails after replacement, the new binary remains installed and update
-returns a non-zero, retryable error naming the failed install command. Host plugin refresh failures
-are warnings because managed scopes and host policy may forbid them; rerun the printed host command
-or use `--skip-plugins` deliberately.
+All downloads and the direct-install plan are staged before binary replacement. The binary, direct
+harness artifacts, install targets, and receipt form one serialized transaction. If validation or a
+direct harness refresh fails, update restores the complete previous local generation and returns a
+non-zero error naming the failed operation. A detected host plugin that cannot be inspected or
+refreshed also makes the command fail; external host commands may have their own side effects, so
+the error names the exact retry. Use `--skip-plugins` only as an explicit opt-out from host plugin
+management.
 
 Successful `machinery install` calls maintain the receipt, and successful `machinery uninstall`
 calls remove the corresponding entries. Single-target removal keeps the shared Agent Skills copy;
@@ -133,8 +134,9 @@ provide enforcement.
 ## Codex
 
 The repository carries `.codex-plugin/plugin.json` and reuses the same `skills/` and `hooks/`
-directories as Claude Code. The hook shim discovers the Git root when `CLAUDE_PROJECT_DIR` is absent,
-and `machinery hook` understands both direct file paths and Codex's `apply_patch` payload. A patch is
+directories as Claude Code. When `CLAUDE_PROJECT_DIR` is absent, the Go hook ascends physical parent
+directories to the nearest machinery marker without consulting ambient Git; the missing-binary shim
+uses the same ancestor-marker boundary. `machinery hook` understands both direct file paths and Codex's `apply_patch` payload. A patch is
 denied if any file in the patch is generated, and every touched design or implementation path is
 recorded for the stop gate.
 

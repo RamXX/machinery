@@ -84,7 +84,12 @@ func checkDuplicateTables(g *Gate, design string) {
 	}
 	seen := map[string][]occ{}
 	var order []string
-	for _, path := range markdownFiles(design) {
+	files, err := markdownFiles(design)
+	if err != nil {
+		g.Errs = append(g.Errs, err.Error())
+		return
+	}
+	for _, path := range files {
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
 			rel = path
@@ -94,7 +99,12 @@ func checkDuplicateTables(g *Gate, design string) {
 		if idciteSkips(rel) || base == "STATE.md" || base == "DECISIONS.md" {
 			continue
 		}
-		lines := strings.Split(maskFences(readOrEmpty(path)), "\n")
+		body, err := readDesignFile(design, path)
+		if err != nil {
+			g.Errs = append(g.Errs, rel+": unreadable: "+err.Error())
+			continue
+		}
+		lines := strings.Split(maskFences(string(body)), "\n")
 		start := -1
 		flush := func(end int) {
 			if start < 0 {
@@ -183,7 +193,7 @@ func checkDuplicateTables(g *Gate, design string) {
 // which phases OWE a line would need a phase parser no free-form ledger can
 // satisfy without false positives.
 func checkSelfReviewLines(g *Gate, design string) {
-	body, ok := readTextOK(filepath.Join(design, "STATE.md"))
+	body, ok := readTextOK(design, filepath.Join(design, "STATE.md"))
 	if !ok {
 		return
 	}
@@ -260,7 +270,7 @@ func checkSelfReviewLines(g *Gate, design string) {
 // a coverage fact (a note), never a finding, because the items may legally
 // belong to a phase still in flight.
 func checkDecisionEntries(g *Gate, design string) {
-	body, ok := readTextOK(filepath.Join(design, "DECISIONS.md"))
+	body, ok := readTextOK(design, filepath.Join(design, "DECISIONS.md"))
 	if !ok {
 		return
 	}
@@ -325,22 +335,32 @@ func checkHouseStyle(g *Gate, design string) {
 		isErr bool
 	}
 	var findings []finding
-	_ = filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	ignored := 0
+	walkErr := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
-			return nil //nolint:nilerr // keep walking; the audit covers what is readable
-		}
-		if fi.IsDir() {
-			return nil
+			return err
 		}
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
 			rel = path
 		}
+		if fi.IsDir() {
+			return nil
+		}
 		if idciteSkips(rel) || !idciteScannable(fi.Name()) {
 			return nil
 		}
-		body, ok := readTextOK(path)
+		// Gl walks INTO an ignored subtree instead of pruning it, so the
+		// count it reports is files, not directories: "3 paths ignored" for a
+		// vendored tree of 300 documents would understate what was skipped,
+		// and the number exists to make the ignoring visible.
+		if ignoredHere(design, rel) {
+			ignored++
+			return nil
+		}
+		body, ok := readTextOK(design, path)
 		if !ok {
+			g.Errs = append(g.Errs, "house-style scan incomplete: "+rel+" is unreadable")
 			return nil
 		}
 		g.Count("files style-scanned")
@@ -374,12 +394,21 @@ func checkHouseStyle(g *Gate, design string) {
 		}
 		return nil
 	})
+	if walkErr != nil {
+		g.Errs = append(g.Errs, "house-style scan incomplete: "+walkErr.Error())
+	}
 	sort.Slice(findings, func(i, j int) bool {
 		if findings[i].rel != findings[j].rel {
 			return findings[i].rel < findings[j].rel
 		}
 		return findings[i].line < findings[j].line
 	})
+	// the ignore count is emitted verbatim, zero included, whenever the design
+	// carries the file: a reader must be able to see that paths are being
+	// ignored, and that a list has stopped matching anything.
+	if designIgnoreFor(design).present {
+		g.CheckedExtra(strconv.Itoa(ignored) + " paths ignored (" + IgnoreFileName + ")")
+	}
 	for _, f := range findings {
 		text := f.rel + ":" + strconv.Itoa(f.line) + ": " + f.msg
 		if f.isErr {

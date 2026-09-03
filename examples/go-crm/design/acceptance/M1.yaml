@@ -1,0 +1,68 @@
+milestone: 1
+commit: 4bdd519009d31584595ca908e17fd5c09077b336
+verdict: ACCEPTED
+dod_ids:
+  - DEAL-eb0c40
+  - DEAL-38ba11
+  - DEAL-1fe825
+  - DEAL-e786d8
+  - DEAL-b76457
+  - DEAL-fdf795
+  - DEAL-1d9aa0
+  - DEAL-a14020
+  - DEAL-0c4c47
+  - DEAL-492234
+  - DEAL-81d0ab
+  - DEAL-f7d8b2
+  - DEAL-9f48af
+  - DEAL-990c3b
+  - DEAL-388687
+  - DEAL-5df488
+  - DEAL-7e1e9b
+  - DEAL-df4442
+  - DEAL-fde084
+  - DEAL-e16eea
+  - DEAL-44482d
+  - DEAL-708606
+  - DEAL-38140e
+  - DEAL-3bbe10
+  - DEAL-8fde14
+  - DEAL-b5154b
+  - DEAL-69312c
+  - DEAL-99392a
+  - DEAL-5746cc
+  - DEAL-e0bdaf
+  - DEAL-d27905
+  - DEAL-a45f13
+  - DEAL-0fef3d
+  - DEAL-7bb594
+  - DEAL-0a25a2
+  - DEAL-0ec705
+  - DEAL-e9e60a
+  - DEAL-24f320
+  - DEAL-5abbd2
+  - DEAL-da0ce2
+  - DEAL-47ce0d
+  - DEAL-e5d58e
+  - DEAL-03d4fb
+  - DEAL-92b688
+  - DEAL-809c09
+  - DEAL-cf2596
+  - DEAL-daae59
+  - DEAL-41c002
+  - DEAL-7d1911
+  - DEAL-450b55
+  - DEAL-8c9948
+  - DEAL-210c14
+  - DEAL-793e1f
+  - DEAL-97c3ea
+  - DEAL-8a4caf
+  - DEAL-9b6ee7
+  - DEAL-21905a
+  - DEAL-b48a23
+attestations:
+  - Deal lifecycle, persistence rollback, bounded locking behavior, properties, and repository contracts passed on the reviewed commit.
+  - Default, LadybugDB-tagged, and race test suites passed on the reviewed commit.
+findings: []
+reviewer: Codex release acceptance review
+date: 2026-09-03

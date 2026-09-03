@@ -1,0 +1,3 @@
+machine: reservation
+pattern: control-flow-only
+reason: Reservation branches from Held to one of two terminal outcomes through a persistence overlay, so the existing linear and terminal refinement algebras would add transitions or invocation phases the machine does not have.

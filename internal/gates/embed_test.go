@@ -31,6 +31,30 @@ func embedFixture(t *testing.T, marker, table string) *Gate {
 	return CheckEmbeds(design)
 }
 
+func mustCopyChildPackCapability(t *testing.T, design string) {
+	t.Helper()
+	source := filepath.Join("..", "..", "examples", "checkout-split", "orders", "design")
+	if err := os.MkdirAll(filepath.Join(design, "pack"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(filepath.Join(source, "pack"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		body, err := os.ReadFile(filepath.Join(source, "pack", entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		mustWrite(t, filepath.Join(design, "pack", entry.Name()), string(body))
+	}
+	body, err := os.ReadFile(filepath.Join(source, "packmap.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, filepath.Join(design, "packmap.yaml"), string(body))
+}
+
 const goodMarker = `<!-- machinery:embed from="SOURCE.md" table="event,producer,consumer,delivery" claims="subset,complete" -->`
 
 const allRows = `| event | producer | consumer | delivery |
@@ -267,11 +291,71 @@ func TestEmbedSourceMayBeOutsideTheDesign(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "parent", "ARCHITECTURE.md"), srcDoc)
 	design := filepath.Join(root, "child", "design")
+	mustCopyChildPackCapability(t, design)
 	marker := strings.Replace(goodMarker, `from="SOURCE.md"`, `from="../../parent/ARCHITECTURE.md"`, 1)
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), "# Child\n\n"+marker+"\n\n"+allRows+"\n")
 	g := CheckEmbeds(design)
 	if len(g.Errs) != 0 {
 		t.Fatalf("a relative source outside the design must resolve: %v", g.Errs)
+	}
+}
+
+func TestStandaloneDesignCannotAuthorizeSiblingRepository(t *testing.T) {
+	workspace := t.TempDir()
+	design := filepath.Join(workspace, "project", "design")
+	mustWrite(t, filepath.Join(workspace, "sibling-repo", "SOURCE.md"), srcDoc)
+	marker := strings.Replace(goodMarker, `from="SOURCE.md"`, `from="../../sibling-repo/SOURCE.md"`, 1)
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), "# Project\n\n"+marker+"\n\n"+allRows+"\n")
+
+	g := CheckEmbeds(design)
+	if !hasErr(g, "escapes the retained design workspace") {
+		t.Fatalf("standalone project design authorized a sibling repository: %v", g.Errs)
+	}
+}
+
+func TestEmbedSourceCannotEscapeRetainedWorkspace(t *testing.T) {
+	parent := t.TempDir()
+	workspace := filepath.Join(parent, "workspace")
+	design := filepath.Join(workspace, "child", "design")
+	outside := filepath.Join(parent, "outside.md")
+	mustWrite(t, outside, srcDoc)
+	marker := strings.Replace(goodMarker, `from="SOURCE.md"`, `from="../../../outside.md"`, 1)
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), "# Child\n\n"+marker+"\n\n"+allRows+"\n")
+
+	g := CheckEmbeds(design)
+	if !hasErr(g, "escapes the retained design workspace") {
+		t.Fatalf("an over-climbing embed source was read from ambient state: %v", g.Errs)
+	}
+}
+
+func TestEmbedSnapshotBindsSiblingSourceAgainstConcurrentMutation(t *testing.T) {
+	workspace := t.TempDir()
+	source := filepath.Join(workspace, "parent", "ARCHITECTURE.md")
+	design := filepath.Join(workspace, "child", "design")
+	mustWrite(t, source, srcDoc)
+	mustCopyChildPackCapability(t, design)
+	marker := strings.Replace(goodMarker, `from="SOURCE.md"`, `from="../../parent/ARCHITECTURE.md"`, 1)
+	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), "# Child\n\n"+marker+"\n\n"+allRows+"\n")
+
+	snapshot, err := AcquireSnapshot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = snapshot.Release() }()
+	selection, err := snapshot.Select("ge", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, source, strings.Replace(srcDoc, "at-least-once", "exactly-once", 1))
+	results := snapshot.RunSelected("", selection, RunOptions{})
+	var found bool
+	for _, gate := range results {
+		if gate.Title == "G0-snapshot" && hasErr(gate, "external tree changed") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("concurrent sibling source mutation was not blocking: %+v", results)
 	}
 }
 
@@ -337,5 +421,70 @@ func TestEmbedFromModelRendering(t *testing.T) {
 	g = CheckEmbeds(d)
 	if len(g.Errs)+len(g.Drift) == 0 {
 		t.Fatal("stale schema copy not flagged")
+	}
+}
+
+// A copy carries the SOURCE's rows, so carrying one of them twice is drift
+// both claims miss: subset only asks that every row match SOME source row,
+// and complete only that every source row be present. A dogfooded shard held
+// one row twice, under both claims, in silence.
+func TestEmbedDuplicateRow(t *testing.T) {
+	cases := []struct {
+		name  string
+		rows  string
+		warns bool
+	}{
+		{
+			name:  "a faithful copy warns about nothing",
+			rows:  allRows,
+			warns: false,
+		},
+		{
+			name:  "a row copied twice warns",
+			rows:  allRows + "\n| markPaid | payments | orders | at-least-once |",
+			warns: true,
+		},
+		{
+			name: "a row the shard localized is its own, not a duplicate",
+			rows: allRows + "\n| markPaid (shard-local: this lane re-keys it) | payments | orders | at-least-once |",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := embedFixture(t, goodMarker, tc.rows)
+			dup := false
+			for _, w := range g.Warns {
+				if strings.Contains(w, "appears 2 times here but 1 time(s) in the source") {
+					dup = true
+				}
+			}
+			if dup != tc.warns {
+				t.Fatalf("duplicate warning = %v, want %v (warns: %v)", dup, tc.warns, g.Warns)
+			}
+			if len(g.Errs) != 0 {
+				t.Fatalf("no case here is an error: %v", g.Errs)
+			}
+		})
+	}
+}
+
+// The source itself may legitimately carry the same row twice (two lanes with
+// identical cells); a copy carrying it twice is then faithful.
+func TestEmbedDuplicateAllowedWhenTheSourceRepeatsIt(t *testing.T) {
+	design := t.TempDir()
+	src := "# Source\n\n| event | producer | consumer | delivery |\n|---|---|---|---|\n" +
+		"| request | orders | payments | at-least-once |\n" +
+		"| request | orders | payments | at-least-once |\n"
+	mustWrite(t, filepath.Join(design, "SOURCE.md"), src)
+	body := "# Shard\n\n" + goodMarker + "\n\n" +
+		"| event | producer | consumer | delivery |\n|---|---|---|---|\n" +
+		"| request | orders | payments | at-least-once |\n" +
+		"| request | orders | payments | at-least-once |\n"
+	mustWrite(t, filepath.Join(design, "SHARD.md"), body)
+	g := CheckEmbeds(design)
+	for _, w := range g.Warns {
+		if strings.Contains(w, "appears") {
+			t.Fatalf("a copy matching a repeated source row is faithful: %v", g.Warns)
+		}
 	}
 }

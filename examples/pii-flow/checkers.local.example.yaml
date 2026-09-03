@@ -1,8 +1,18 @@
 # Copy to <repo-root>/.machinery/checkers.local.yaml (git-ignored) to enable
-# `machinery verify-checkers`. The design stays tool-neutral; the engine binary
-# is resolved here, outside the design.
+# `machinery verify-checkers`. Docker is the local control plane; all checker
+# userspace, including Python and its native libraries, comes from the exact OCI
+# digest. The adapter and rules are copied into read-only /checker mounts and
+# their bytes are included in checker.runtime_closure.
 checkers:
   pii-flow:
-    run: ["python3", "examples/pii-flow/design/checkers/pii-flow/adapter.py", "{projection}", "{config}", "{out}"]
-    verify: ["souffle", "--version"]
-    timeout: "120s"
+    runtime:
+      kind: oci
+      engine: [docker]
+      image: python@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc
+      platform: linux/amd64
+      inputs:
+        - {source: design/checkers/pii-flow/adapter.py, mount: adapter.py}
+        - {source: design/checkers/pii-flow/rules.dl, mount: rules.dl}
+    run: ["python3", "/checker/adapter.py", "{projection}", "{config}", "{out}", "/checker/rules.dl"]
+    verify: ["python3", "-c", "pass"]
+    timeout: "30s"

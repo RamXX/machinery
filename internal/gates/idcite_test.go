@@ -60,12 +60,12 @@ func TestIDCiteSuffixConvention(t *testing.T) {
 	}
 }
 
-func TestIDCiteUnknownTagIgnored(t *testing.T) {
+func TestIDCiteRemovedOracleTagStillErrors(t *testing.T) {
 	d := idciteDesign(t)
 	writeDesignFile(t, d, "BUILD.md", "sha OTHER-abc123 is not a citation\n")
 	g := CheckIDCitations(d)
-	if len(g.Errs) != 0 {
-		t.Fatalf("unknown tag flagged: %v", g.Errs)
+	if !hasErr(g, "OTHER-abc123 resolves to no committed oracle row") {
+		t.Fatalf("a stable-id-shaped citation from a removed oracle family must remain dangling: %v", g.Errs)
 	}
 }
 

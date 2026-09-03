@@ -128,9 +128,9 @@ func TestG4WildcardBaselineDoesNotAmnesty(t *testing.T) {
 	}
 }
 
-// The ratchet snapshot date is read back, not just recorded: G4 notes the
-// snapshot age so tolerated debt stays visible (GATE-8; non-blocking).
-func TestG4RatchetAgeNote(t *testing.T) {
+// The ratchet snapshot date is read back, not just recorded: G4 names it
+// without wall-clock age telemetry, keeping unchanged check output stable.
+func TestG4RatchetSnapshotNote(t *testing.T) {
 	design, impl := writeFixture(t, fixtureOpts{rules: "  baseline: [\"alpha -> beta\"]"})
 	if err := WriteRatchet(design, &Ratchet{Date: "2026-01-15", Edges: map[string][]string{"alpha -> beta": {"alpha/a.go"}}}); err != nil {
 		t.Fatal(err)
@@ -139,8 +139,8 @@ func TestG4RatchetAgeNote(t *testing.T) {
 	if len(g.Errs) != 0 {
 		t.Fatalf("G4 must stay green at snapshot: %v", g.Errs)
 	}
-	if !hasNote(g, "ratchet snapshot 2026-01-15") || !hasNote(g, "old") {
-		t.Fatalf("want a ratchet-age note naming the snapshot date, got %v", g.Notes)
+	if !hasNote(g, "ratchet snapshot 2026-01-15") || hasNote(g, "old") {
+		t.Fatalf("want a stable snapshot note without wall-clock age, got %v", g.Notes)
 	}
 }
 
@@ -344,5 +344,34 @@ func TestRatchetRoundTrip(t *testing.T) {
 	mustWrite(t, filepath.Join(design, RatchetFile), "{not json")
 	if _, err := LoadRatchet(design); err == nil {
 		t.Fatal("a corrupt ratchet must fail loudly")
+	}
+}
+
+func TestRatchetRejectsUnknownDuplicateAndMistypedJSON(t *testing.T) {
+	tests := []struct {
+		name, body, want string
+	}{
+		{"unknown root", `{"date":"2026-09","edges":{},"egde":{}}`, "unknown root key"},
+		{"missing date", `{"edges":{}}`, "missing required root key"},
+		{"missing edges", `{"date":"2026-09"}`, "missing required root key"},
+		{"duplicate date", `{"date":"2026-09","date":"2026-10","edges":{}}`, "duplicate root key"},
+		{"duplicate edges", `{"date":"2026-09","edges":{},"edges":{}}`, "duplicate root key"},
+		{"duplicate edge name", `{"date":"2026-09","edges":{"a -> b":[],"a -> b":["x.go"]}}`, "duplicate edge key"},
+		{"date number", `{"date":202609,"edges":{}}`, "date must be a string"},
+		{"date null", `{"date":null,"edges":{}}`, "date must be a string"},
+		{"edges array", `{"date":"2026-09","edges":[]}`, "edges must be an object"},
+		{"edge value string", `{"date":"2026-09","edges":{"a -> b":"x.go"}}`, "must be an array"},
+		{"edge entry null", `{"date":"2026-09","edges":{"a -> b":[null]}}`, "entries must be strings"},
+		{"trailing value", `{"date":"2026-09","edges":{}} {}`, "trailing JSON value"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			design := t.TempDir()
+			mustWrite(t, filepath.Join(design, RatchetFile), tc.body)
+			_, err := LoadRatchet(design)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("LoadRatchet error = %v, want %q", err, tc.want)
+			}
+		})
 	}
 }

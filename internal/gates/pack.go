@@ -23,10 +23,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/pack"
 	"github.com/RamXX/machinery/internal/version"
 )
+
+var readPackDir = func(path string) ([]os.DirEntry, error) {
+	return dirscan.Read(path, designInventoryMaxEntries)
+}
 
 // CheckPack implements G5-pack. Applicable when the design is a decomposed
 // parent, a decomposed child, or both (a mid-level design in a deeper tree).
@@ -60,10 +65,29 @@ func checkParentPacks(design string, g *Gate) {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
+	packsRoot := filepath.Join(design, "packs")
+	rootInfo, rootErr := os.Lstat(packsRoot)
+	if rootErr != nil {
+		g.Errs = append(g.Errs, "packs/: committed pack root is unreadable: "+rootErr.Error())
+		return
+	}
+	if rootInfo.Mode()&os.ModeSymlink != 0 || !rootInfo.IsDir() {
+		g.Errs = append(g.Errs, "packs/: committed pack root must be a real directory inside the design")
+		return
+	}
 	for _, id := range ids {
 		g.Count("subsystems")
-		dir := filepath.Join(design, "packs", id+".pack")
+		dir := filepath.Join(packsRoot, id+".pack")
 		stale := false
+		dirInfo, dirErr := os.Lstat(dir)
+		if dirErr != nil {
+			g.Errs = append(g.Errs, "pack "+id+": committed directory "+id+".pack is unreadable: "+dirErr.Error())
+			continue
+		}
+		if dirInfo.Mode()&os.ModeSymlink != 0 || !dirInfo.IsDir() {
+			g.Errs = append(g.Errs, "pack "+id+": committed "+id+".pack must be a real directory inside packs/ (symlinks and non-directories are rejected)")
+			continue
+		}
 		var names []string
 		for name := range fresh[id] {
 			names = append(names, name)
@@ -71,7 +95,14 @@ func checkParentPacks(design string, g *Gate) {
 		sort.Strings(names) // deterministic finding order across runs
 		for _, name := range names {
 			want := fresh[id][name]
-			got, rerr := os.ReadFile(filepath.Join(dir, name))
+			path := filepath.Join(dir, name)
+			info, lerr := os.Lstat(path)
+			if lerr == nil && (info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular()) {
+				g.Errs = append(g.Errs, "pack "+id+": committed file "+name+" must be a regular file inside its pack directory")
+				stale = true
+				continue
+			}
+			got, rerr := readDesignFile(design, path)
 			if rerr != nil {
 				g.Errs = append(g.Errs, "pack "+id+": missing committed file "+name+"; run machinery pack generate")
 				stale = true
@@ -84,16 +115,16 @@ func checkParentPacks(design string, g *Gate) {
 		}
 		// extra committed files are stale artifacts a fresh generation never
 		// produces; the child would copy and trust them
-		if entries, rerr := os.ReadDir(dir); rerr == nil {
+		if entries, rerr := readPackDir(dir); rerr == nil {
 			for _, e := range entries {
-				if e.IsDir() {
-					continue
-				}
 				if _, ok := fresh[id][e.Name()]; !ok {
-					g.Errs = append(g.Errs, "pack "+id+": committed file "+e.Name()+" is not part of a fresh generation; remove it and rerun machinery pack generate")
+					g.Errs = append(g.Errs, "pack "+id+": committed entry "+e.Name()+" is not part of a fresh generation; remove it and rerun machinery pack generate")
 					stale = true
 				}
 			}
+		} else {
+			g.Errs = append(g.Errs, "pack "+id+": cannot enumerate committed directory: "+rerr.Error())
+			stale = true
 		}
 		if !stale {
 			g.Count("packs fresh")
@@ -103,16 +134,27 @@ func checkParentPacks(design string, g *Gate) {
 	// (after a rename or removal) is a dead contract a child keeps trusting;
 	// the freshness loop above only walks CURRENT subsystems, so the orphan
 	// must be sought explicitly
-	if entries, rerr := os.ReadDir(filepath.Join(design, "packs")); rerr == nil {
+	if entries, rerr := readPackDir(packsRoot); rerr == nil {
 		current := map[string]bool{}
 		for _, id := range ids {
 			current[id+".pack"] = true
 		}
 		for _, e := range entries {
-			if e.IsDir() && !current[e.Name()] {
-				g.Errs = append(g.Errs, "packs/"+e.Name()+" corresponds to no current subsystem (stale after a rename or removal); its child keeps validating against a dead contract, remove the directory and re-issue the current pack")
+			if current[e.Name()] {
+				continue // its type and content were checked in the current-pack loop
 			}
+			if strings.HasSuffix(e.Name(), ".pack") {
+				if e.Type()&os.ModeSymlink != 0 || !e.IsDir() {
+					g.Errs = append(g.Errs, "packs/"+e.Name()+" must be a real directory inside packs/ (symlinks and non-directories are rejected)")
+					continue
+				}
+				g.Errs = append(g.Errs, "packs/"+e.Name()+" corresponds to no current subsystem (stale after a rename or removal); its child keeps validating against a dead contract, remove the directory and re-issue the current pack")
+				continue
+			}
+			g.Errs = append(g.Errs, "packs/ contains unexpected entry "+e.Name()+"; committed pack inventory contains only current <subsystem>.pack directories")
 		}
+	} else {
+		g.Errs = append(g.Errs, "packs/: cannot enumerate committed pack directories: "+rerr.Error())
 	}
 	// per-pack boundary-event visibility: a zero must be seen in every gate
 	// run, not discovered after empty packs ship (the dogfood finding).
@@ -189,7 +231,7 @@ func checkChildPack(design string, g *Gate) {
 		}
 		sort.Strings(names)
 		for _, n := range names {
-			got, rerr := os.ReadFile(filepath.Join(design, "formal", n))
+			got, rerr := readDesignFile(design, filepath.Join(design, "formal", n))
 			if rerr != nil {
 				g.Errs = append(g.Errs, "no committed refinement artifact formal/"+n+"; run machinery pack refine and commit it (verify-formal TLC-checks it)")
 			} else if g.recordStamp(string(got)); version.Strip(string(got)) != version.Strip(freshRef[n]) {
@@ -204,16 +246,18 @@ func checkChildPack(design string, g *Gate) {
 		// not produce is a stale binding from a previous packmap; the one-way
 		// diff above never looked, so a rebind left the old "proof" committed
 		// and green while nothing checked it anymore
-		if entries, rerr := os.ReadDir(filepath.Join(design, "formal")); rerr == nil {
+		if entries, rerr := dirscan.Read(filepath.Join(design, "formal"), designInventoryMaxEntries); rerr == nil {
 			for _, e := range entries {
 				n := e.Name()
 				if e.IsDir() || (!strings.HasSuffix(n, "PackRefinement.tla") && !strings.HasSuffix(n, "PackRefinement.cfg")) {
 					continue
 				}
 				if _, ok := freshRef[n]; !ok {
-					g.Errs = append(g.Errs, "committed formal/"+n+" is a refinement artifact a fresh generation does not produce (a stale binding from a previous packmap); remove it")
+					g.Errs = append(g.Errs, "committed formal/"+n+" is a refinement artifact a fresh generation does not produce (a stale binding from a previous packmap); run machinery pack refine to reconcile the owned artifact set")
 				}
 			}
+		} else if !os.IsNotExist(rerr) {
+			g.Errs = append(g.Errs, "cannot enumerate formal refinement artifacts: "+rerr.Error())
 		}
 	}
 
@@ -286,7 +330,7 @@ func checkOwnedShape(design string, slice *ir.Value, g *Gate) {
 		childInvs := map[string]string{}
 		for _, iv := range childEnt.Get2("invariants").AsArray() {
 			if io := iv.AsObject(); io != nil {
-				childInvs[io.GetString("id")] = io.GetString("definition")
+				childInvs[io.GetString("id")] = invariantStatement(io)
 			}
 		}
 		for _, iv := range entities.Get2(en).AsObject().Get2("invariants").AsArray() {
@@ -302,8 +346,8 @@ func checkOwnedShape(design string, slice *ir.Value, g *Gate) {
 			switch {
 			case !ok:
 				g.Errs = append(g.Errs, "owned entity "+en+" invariant "+iid+" is missing from the child domain model; the pack's entity invariants are frozen")
-			case !statementKept(io.GetString("definition"), got):
-				g.Errs = append(g.Errs, "owned entity "+en+" invariant "+iid+" drifted from the pack: pack says "+ir.Repr(io.GetString("definition"))+" but the child says "+ir.Repr(got)+"; the frozen statement may gain appended enforcement detail, never be rewritten")
+			case !statementKept(invariantStatement(io), got):
+				g.Errs = append(g.Errs, "owned entity "+en+" invariant "+iid+" drifted from the pack: pack says "+ir.Repr(invariantStatement(io))+" but the child says "+ir.Repr(got)+"; the frozen statement may gain appended enforcement detail, never be rewritten")
 			default:
 				g.Count("owned invariants intact")
 			}
@@ -311,7 +355,21 @@ func checkOwnedShape(design string, slice *ir.Value, g *Gate) {
 	}
 }
 
-// statementKept reports whether the child's invariant definition preserves
+// invariantStatement reads the canonical Modelith invariant field. Packs
+// created by older machinery releases used `definition`; that spelling is
+// accepted only when `statement` is absent, so a present canonical field can
+// never be silently overridden by contradictory legacy data.
+func invariantStatement(o *ir.Object) string {
+	if o == nil {
+		return ""
+	}
+	if _, ok := o.Get("statement"); ok {
+		return o.GetString("statement")
+	}
+	return o.GetString("definition")
+}
+
+// statementKept reports whether the child's invariant statement preserves
 // the pack's, comparing whitespace-normalized text. Equality passes; so does
 // the child APPENDING detail after the pack's full statement (the shipped
 // examples add "Structural: ..." enforcement notes); anything else is drift.
@@ -363,15 +421,19 @@ func checkDelegatedInvariants(design string, manifest *ir.Object, g *Gate) {
 		return
 	}
 	var cells []string
-	for _, f := range sortedGlobExt(filepath.Join(design, "machines"), ".matrix.md") {
-		for _, tbl := range ir.ParseMdTables(readFileOrErr(f, g)) {
+	matrixFiles, inventoryErr := sortedGlobExt(filepath.Join(design, "machines"), ".matrix.md")
+	if inventoryErr != nil {
+		g.Errs = append(g.Errs, inventoryErr.Error())
+	}
+	for _, f := range matrixFiles {
+		for _, tbl := range ir.ParseMdTables(readDesignFileOrErr(design, f, g)) {
 			for _, r := range tbl.Rows {
 				cells = append(cells, r...)
 			}
 		}
 	}
 	if _, err := os.Stat(filepath.Join(design, "BUILD.md")); err == nil {
-		for _, tbl := range ir.ParseMdTables(readFileOrErr(filepath.Join(design, "BUILD.md"), g)) {
+		for _, tbl := range ir.ParseMdTables(readDesignFileOrErr(design, filepath.Join(design, "BUILD.md"), g)) {
 			for _, r := range tbl.Rows {
 				cells = append(cells, r...)
 			}
@@ -410,8 +472,12 @@ func checkBoundaryEvents(design, eventsMD string, g *Gate) {
 	// gather what the child's machines handle and fire
 	handled := map[string]bool{}
 	var actionCells []string
-	for _, mf := range sortedGlobExt(filepath.Join(design, "machines"), ".machine.json") {
-		m, err := ir.LoadMachineJSON(mf)
+	machineFiles, inventoryErr := sortedGlobExt(filepath.Join(design, "machines"), ".machine.json")
+	if inventoryErr != nil {
+		g.Errs = append(g.Errs, inventoryErr.Error())
+	}
+	for _, mf := range machineFiles {
+		m, err := loadDesignMachine(design, mf)
 		if err != nil {
 			continue // G3 reports the parse error
 		}
@@ -440,8 +506,12 @@ func checkBoundaryEvents(design, eventsMD string, g *Gate) {
 			}
 		}
 	}
-	for _, f := range sortedGlobExt(filepath.Join(design, "machines"), ".matrix.md") {
-		for _, tbl := range ir.ParseMdTables(readFileOrErr(f, g)) {
+	matrixFiles, inventoryErr := sortedGlobExt(filepath.Join(design, "machines"), ".matrix.md")
+	if inventoryErr != nil {
+		g.Errs = append(g.Errs, inventoryErr.Error())
+	}
+	for _, f := range matrixFiles {
+		for _, tbl := range ir.ParseMdTables(readDesignFileOrErr(design, f, g)) {
 			for _, r := range tbl.Rows {
 				actionCells = append(actionCells, r...)
 			}

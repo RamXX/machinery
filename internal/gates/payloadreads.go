@@ -51,15 +51,17 @@ type readsLine struct {
 }
 
 // collectReadsLines finds every READS declaration under design/machines.
-func collectReadsLines(design string) []readsLine {
+func collectReadsLines(g *Gate, design string) []readsLine {
 	var out []readsLine
-	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
-		body, ok := readTextOK(path)
-		if !ok {
+	paths, _ := strictSortedGlob(g, filepath.Join(design, "machines"), "*.matrix.md", "payload matrix")
+	for _, path := range paths {
+		body, err := readDesignFile(design, path)
+		if err != nil {
+			g.Errs = append(g.Errs, filepath.Base(path)+": unreadable payload matrix: "+err.Error())
 			continue
 		}
 		base := filepath.Base(path)
-		for lineNo, line := range strings.Split(body, "\n") {
+		for lineNo, line := range strings.Split(string(body), "\n") {
 			m := readsDecl.FindStringSubmatch(line)
 			if m == nil {
 				continue
@@ -77,9 +79,9 @@ func collectReadsLines(design string) []readsLine {
 
 // collectReadsDecls keeps the READS declarations on matrix lines that name an
 // event in backticks, which is what this tier can resolve payloads for.
-func collectReadsDecls(design string) []readsClaim {
+func collectReadsDecls(g *Gate, design string) []readsClaim {
 	var out []readsClaim
-	for _, l := range collectReadsLines(design) {
+	for _, l := range collectReadsLines(g, design) {
 		ev := backtickedEventName.FindStringSubmatch(l.line)
 		if ev == nil {
 			continue
@@ -93,27 +95,33 @@ func collectReadsDecls(design string) []readsClaim {
 // event across the hand-written design: rows whose FIRST cell is the
 // backticked event name and that have at least six cells (the event-table
 // shape, so a mention in narrow tables does not count as a payload).
-func payloadTextFor(design string) map[string][]string {
+func payloadTextFor(design string) (map[string][]string, error) {
 	out := map[string][]string{}
-	_ = filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	err := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
-			return nil //nolint:nilerr // keep walking; the audit covers what is readable
-		}
-		if fi.IsDir() {
-			return nil
+			return err
 		}
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
 			rel = path
 		}
+		if ignoredHere(design, rel) {
+			if fi.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if fi.IsDir() {
+			return nil
+		}
 		if idciteSkips(rel) || strings.ToLower(filepath.Ext(fi.Name())) != ".md" {
 			return nil
 		}
-		body, ok := readTextOK(path)
-		if !ok {
-			return nil
+		body, readErr := readDesignFile(design, path)
+		if readErr != nil {
+			return readErr
 		}
-		for _, line := range strings.Split(body, "\n") {
+		for _, line := range strings.Split(string(body), "\n") {
 			m := leadingEventName.FindStringSubmatch(line)
 			if m == nil || strings.Count(line, "|") < 7 {
 				continue
@@ -122,12 +130,15 @@ func payloadTextFor(design string) map[string][]string {
 		}
 		return nil
 	})
-	return out
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // checkPayloadReads warns for every declared read no payload row carries.
 func checkPayloadReads(g *Gate, design string) {
-	decls := collectReadsDecls(design)
+	decls := collectReadsDecls(g, design)
 	if len(decls) == 0 {
 		return
 	}
@@ -149,7 +160,11 @@ func checkPayloadReads(g *Gate, design string) {
 		}
 	}
 	g.Count("payload READS declarations", len(decls))
-	payloads := payloadTextFor(design)
+	payloads, err := payloadTextFor(design)
+	if err != nil {
+		g.Errs = append(g.Errs, "payload scan failed: "+err.Error())
+		return
+	}
 	for _, d := range decls {
 		rows := payloads[d.event]
 		if len(rows) == 0 {

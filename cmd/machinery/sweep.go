@@ -2,15 +2,23 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/RamXX/machinery/internal/dirscan"
+	"github.com/RamXX/machinery/internal/gates"
+	"github.com/RamXX/machinery/internal/safefile"
 )
+
+const sweepMaxEntries = 100_000
+const sweepFileMaxBytes int64 = 16 << 20
+const sweepTotalMaxBytes int64 = 256 << 20
 
 // machinery sweep: the propagation sweep, productized (S18 of the dogfood systemic
 // findings). Decision propagation across the attested layer was the top
@@ -29,8 +37,10 @@ func newSweepCmd() *cobra.Command {
 	}
 	var contextN int
 	c.Flags().IntVar(&contextN, "context", 0, "print N trimmed lines around each mention")
-	c.RunE = func(cmd *cobra.Command, args []string) error {
-		return sweepRun(args[0], args[1], contextN)
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		return sweepRunTo(args[0], args[1], contextN, output.stdout, output.stderr)
 	}
 	return c
 }
@@ -65,10 +75,19 @@ func sweepTextFile(base string) bool {
 }
 
 func sweepRun(name, design string, contextN int) error {
+	return sweepRunTo(name, design, contextN, stdoutW, stderrW)
+}
+
+func sweepRunTo(name, design string, contextN int, stdoutW, stderrW io.Writer) error {
+	return withDesignSnapshot(design, func(snapshot string) error {
+		return sweepSnapshotRunTo(name, snapshot, design, contextN, stdoutW, stderrW)
+	})
+}
+
+func sweepSnapshotRunTo(name, design, displayDesign string, contextN int, stdoutW, stderrW io.Writer) error {
 	if err := checkIsDir(design); err != nil {
-		fmt.Fprintln(stderrW, err)
-		exitFunc(1)
-		return err
+		fmt.Fprintln(stderrW, remapSnapshotText(err.Error(), design, displayDesign))
+		return commandExitBecause(1, err)
 	}
 	// Whole-token match, backtick-tolerant: `guardFoo` and guardFoo both hit;
 	// guardFooBar does not. Word characters plus the name characters
@@ -77,8 +96,7 @@ func sweepRun(name, design string, contextN int) error {
 	re, err := regexp.Compile(`(^|[^A-Za-z0-9_.])` + regexp.QuoteMeta(name) + `($|[^A-Za-z0-9_.])`)
 	if err != nil {
 		fmt.Fprintln(stderrW, "machinery_sweep: "+err.Error())
-		exitFunc(1)
-		return err
+		return commandExitBecause(1, err)
 	}
 	type hit struct {
 		line int
@@ -86,24 +104,37 @@ func sweepRun(name, design string, contextN int) error {
 	}
 	byFile := map[string][]hit{}
 	linesByFile := map[string][]string{}
-	walkErr := filepath.WalkDir(design, func(path string, d fs.DirEntry, err error) error {
+	var totalBytes int64
+	walkErr := dirscan.Walk(design, sweepMaxEntries, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
-		}
-		if d.IsDir() {
-			return nil
 		}
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
 			rel = path
 		}
+		// the design's own .machineryignore: a sweep must cover exactly what
+		// the gates cover, or "every mention" means two different things
+		if gates.DesignIgnores(design, rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
 		if sweepSkipsPath(rel) || !sweepTextFile(d.Name()) {
 			return nil
 		}
-		body, rerr := os.ReadFile(path)
+		body, rerr := safefile.Read(path, "sweep input", sweepFileMaxBytes)
 		if rerr != nil {
 			return rerr
 		}
+		if int64(len(body)) > sweepTotalMaxBytes-totalBytes {
+			return fmt.Errorf("sweep input exceeds %d-byte aggregate limit", sweepTotalMaxBytes)
+		}
+		totalBytes += int64(len(body))
 		lines := strings.Split(string(body), "\n")
 		for i, l := range lines {
 			if re.MatchString(l) {
@@ -117,11 +148,10 @@ func sweepRun(name, design string, contextN int) error {
 	})
 	if walkErr != nil {
 		fmt.Fprintln(stderrW, "machinery_sweep: "+walkErr.Error())
-		exitFunc(1)
-		return walkErr
+		return commandExitBecause(1, walkErr)
 	}
 	if len(byFile) == 0 {
-		fmt.Fprintf(stdoutW, "no mentions of %s under %s (hand-written files)\n", quote(name), design)
+		fmt.Fprintf(stdoutW, "no mentions of %s under %s (hand-written files)\n", quote(name), displayDesign)
 		return nil
 	}
 	files := make([]string, 0, len(byFile))

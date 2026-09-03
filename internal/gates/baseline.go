@@ -10,12 +10,16 @@
 package gates
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/RamXX/machinery/internal/artifactset"
 )
 
 // RatchetFile is the snapshot's filename inside the design directory. It is
@@ -33,34 +37,164 @@ type Ratchet struct {
 // LoadRatchet reads design/ratchet.json. A missing file is (nil, nil): the
 // ratchet is optional until the contract carries baseline: rules.
 func LoadRatchet(design string) (*Ratchet, error) {
-	raw, err := os.ReadFile(filepath.Join(design, RatchetFile))
+	raw, err := readDesignFile(design, filepath.Join(design, RatchetFile))
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("%s is unreadable: %w", RatchetFile, err)
 	}
-	var r Ratchet
-	if err := json.Unmarshal(raw, &r); err != nil {
+	r, err := decodeRatchet(raw)
+	if err != nil {
 		return nil, fmt.Errorf("%s does not parse (rerun 'machinery baseline' rather than editing it): %w", RatchetFile, err)
 	}
-	if r.Edges == nil {
-		r.Edges = map[string][]string{}
+	return r, nil
+}
+
+func decodeRatchet(raw []byte) (*Ratchet, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	start, err := dec.Token()
+	if err != nil {
+		return nil, err
 	}
-	return &r, nil
+	if delim, ok := start.(json.Delim); !ok || delim != '{' {
+		return nil, fmt.Errorf("root must be a JSON object")
+	}
+	r := &Ratchet{Edges: map[string][]string{}}
+	seen := map[string]bool{}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		key, ok := tok.(string)
+		if !ok {
+			return nil, fmt.Errorf("object key must be a string")
+		}
+		if seen[key] {
+			return nil, fmt.Errorf("duplicate root key %q", key)
+		}
+		seen[key] = true
+		switch key {
+		case "date":
+			value, err := dec.Token()
+			if err != nil {
+				return nil, err
+			}
+			date, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("date must be a string")
+			}
+			r.Date = date
+		case "edges":
+			edges, err := decodeRatchetEdges(dec)
+			if err != nil {
+				return nil, err
+			}
+			r.Edges = edges
+		default:
+			return nil, fmt.Errorf("unknown root key %q (supported: date, edges)", key)
+		}
+	}
+	if _, err := dec.Token(); err != nil {
+		return nil, err
+	}
+	for _, required := range []string{"date", "edges"} {
+		if !seen[required] {
+			return nil, fmt.Errorf("missing required root key %q", required)
+		}
+	}
+	var trailing any
+	if err := dec.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return nil, fmt.Errorf("trailing JSON value after root object")
+		}
+		return nil, err
+	}
+	return r, nil
+}
+
+func decodeRatchetEdges(dec *json.Decoder) (map[string][]string, error) {
+	start, err := dec.Token()
+	if err != nil {
+		return nil, fmt.Errorf("edges must be an object: %w", err)
+	}
+	if delim, ok := start.(json.Delim); !ok || delim != '{' {
+		return nil, fmt.Errorf("edges must be an object of string arrays")
+	}
+	edges := map[string][]string{}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		edge, ok := tok.(string)
+		if !ok {
+			return nil, fmt.Errorf("edge key must be a string")
+		}
+		if _, duplicate := edges[edge]; duplicate {
+			return nil, fmt.Errorf("duplicate edge key %q", edge)
+		}
+		start, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		if delim, ok := start.(json.Delim); !ok || delim != '[' {
+			return nil, fmt.Errorf("edge %q must be an array of strings", edge)
+		}
+		files := []string{}
+		for dec.More() {
+			value, err := dec.Token()
+			if err != nil {
+				return nil, err
+			}
+			file, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("edge %q entries must be strings", edge)
+			}
+			files = append(files, file)
+		}
+		if _, err := dec.Token(); err != nil {
+			return nil, err
+		}
+		edges[edge] = files
+	}
+	if _, err := dec.Token(); err != nil {
+		return nil, err
+	}
+	return edges, nil
 }
 
 // WriteRatchet writes the snapshot deterministically (sorted keys via
 // encoding/json, sorted file lists, trailing newline) so it diffs cleanly.
 func WriteRatchet(design string, r *Ratchet) error {
+	data, err := RenderRatchet(r)
+	if err != nil {
+		return err
+	}
+	return artifactset.CommitScoped(design, design, map[string][]byte{RatchetFile: data})
+}
+
+// WriteRatchetInSnapshot publishes a ratchet while the caller holds the
+// design snapshot across BuildBaseline and this write.
+func WriteRatchetInSnapshot(design string, r *Ratchet) error {
+	data, err := RenderRatchet(r)
+	if err != nil {
+		return err
+	}
+	return artifactset.Commit(design, map[string][]byte{RatchetFile: data})
+}
+
+// RenderRatchet returns the exact deterministic bytes written by WriteRatchet.
+func RenderRatchet(r *Ratchet) ([]byte, error) {
 	for _, files := range r.Edges {
 		sort.Strings(files)
 	}
 	data, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return os.WriteFile(filepath.Join(design, RatchetFile), append(data, '\n'), 0o644)
+	return append(data, '\n'), nil
 }
 
 // ProposedRule is one baseline: entry the generator suggests, with enough

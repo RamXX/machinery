@@ -12,7 +12,6 @@ package gates
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -25,8 +24,8 @@ import (
 // HasBuildDoc reports whether the design has a BUILD.md (Phase 4 produced a
 // build document); Gb auto-activates on it.
 func HasBuildDoc(design string) bool {
-	fi, err := os.Stat(filepath.Join(design, "BUILD.md"))
-	return err == nil && !fi.IsDir()
+	has, err := probeRegularFile(design, "BUILD.md")
+	return has || err != nil
 }
 
 var (
@@ -55,6 +54,16 @@ var (
 	// The value is captured so an unrecognized token fails loudly in Gb
 	// instead of silently reading as "not closed" and disarming Ga.
 	milestoneStatusRe = regexp.MustCompile(`(?mi)^[ \t]*(?:[-*][ \t]+|\d+\.[ \t]+)?\*{0,2}Status:\*{0,2}[ \t]*([A-Za-z][A-Za-z-]*)`)
+	// packetLineRe binds one manifest milestone to one Markdown packet. The
+	// destination is intentionally a plain relative path: fragments, URLs,
+	// angle destinations, and title suffixes would make inventory comparison
+	// ambiguous across Markdown implementations.
+	packetLineRe = regexp.MustCompile(`(?mi)^[ \t]*(?:[-*][ \t]+|\d+\.[ \t]+)?\*{0,2}Packet:\*{0,2}[ \t]*\[[^\]\n]+\]\(([^)\n]+)\)[ \t]*$`)
+	// demoLineRe makes every manifest milestone promise one independently
+	// observable result. The content is a judgment, but presence and
+	// non-emptiness are deterministic.
+	demoLineRe    = regexp.MustCompile(`(?mi)^[ \t]*(?:[-*][ \t]+|\d+\.[ \t]+)?\*{0,2}Demo:\*{0,2}[ \t]*([^\n]*)$`)
+	packetTitleRe = regexp.MustCompile(`^M(\d+)[ \t]*[-:][ \t]*\S`)
 	// skeletonNFRRe matches the skeleton milestone's NFR line: the literal
 	// token "NFR:" (bold decoration tolerated, like the status line) with the
 	// rest of the line captured, so an empty declaration fails loudly. Not
@@ -72,6 +81,18 @@ var (
 	// plan".
 	planHeadingRe = regexp.MustCompile(`(?i)(^|[^a-z])build[ \t]+plan([^a-z]|$)`)
 )
+
+const maxExecutionPacketBytes = 64 << 10
+
+var executionPacketSections = []string{
+	"Outcome",
+	"Domain context",
+	"Architecture context",
+	"Behavior and oracles",
+	"TDD and implementation",
+	"Risks and recovery",
+	"Acceptance",
+}
 
 // idTokenIn reports whether an oracle or test id occurs in text as a whole
 // token. The boundaries differ from tokenIn (the invariant matcher): a
@@ -200,7 +221,7 @@ func buildPlanSections(text string) []string {
 func planOracleIDs(design string, g *Gate) []string {
 	var ids []string
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.oracle.md") {
-		testIDs, stableIDs := oracleTableIDs(readFileOrErr(path, g))
+		testIDs, stableIDs := oracleTableIDs(readDesignFileOrErr(design, path, g))
 		ids = append(ids, testIDs...)
 		ids = append(ids, stableIDs...)
 	}
@@ -219,24 +240,173 @@ func planMode(text string) string {
 	return "full"
 }
 
-// planShards lists a manifest design's plan shards under BUILD/ plus the
-// number of shard-index files exempted. README.md and index.md there are
-// navigation for humans, not plan shards; they carry no plan obligation.
-func planShards(design string) (shards []string, indexFiles int) {
-	for _, shard := range sortedGlobExt(filepath.Join(design, "BUILD"), ".md") {
-		switch strings.ToLower(filepath.Base(shard)) {
+// planPackets lists a manifest design's execution packets under BUILD/ plus
+// the number of navigation index files exempted. README.md and index.md carry
+// no packet obligation.
+func planPackets(design string) (packets []string, indexFiles int, err error) {
+	paths, err := sortedGlobExt(filepath.Join(design, "BUILD"), ".md")
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, packet := range paths {
+		switch strings.ToLower(filepath.Base(packet)) {
 		case "readme.md", "index.md":
 			indexFiles++
 		default:
-			shards = append(shards, shard)
+			packets = append(packets, packet)
 		}
 	}
-	return shards, indexFiles
+	return packets, indexFiles, nil
+}
+
+// portablePacketPath accepts only a direct BUILD/*.md destination. Keeping
+// the grammar smaller than general Markdown makes the root manifest and the
+// on-disk inventory exactly comparable on every supported OS.
+func portablePacketPath(raw string) (string, bool) {
+	if raw == "" || strings.ContainsAny(raw, `\\?#`) || filepath.IsAbs(raw) {
+		return "", false
+	}
+	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(raw)))
+	if clean != raw || filepath.ToSlash(filepath.Dir(filepath.FromSlash(raw))) != "BUILD" {
+		return "", false
+	}
+	base := filepath.Base(filepath.FromSlash(raw))
+	if strings.EqualFold(base, "README.md") || strings.EqualFold(base, "index.md") || !strings.EqualFold(filepath.Ext(base), ".md") {
+		return "", false
+	}
+	return clean, true
+}
+
+func packetHeadingCounts(text string) map[string]int {
+	counts := make(map[string]int, len(executionPacketSections))
+	for _, line := range strings.Split(maskFences(text), "\n") {
+		level, title := headingText(line)
+		if level != 2 {
+			continue
+		}
+		for _, required := range executionPacketSections {
+			if strings.EqualFold(strings.TrimSpace(title), required) {
+				counts[required]++
+			}
+		}
+	}
+	return counts
+}
+
+// checkManifestPackets holds the small-model execution boundary: the root is
+// the sole milestone/demo manifest, and every non-index BUILD/*.md file is a
+// bounded packet owned by exactly one milestone.
+func checkManifestPackets(g *Gate, design, root string, packets []string) {
+	body, ok := buildPlanSection(maskFences(root))
+	if !ok {
+		g.Errs = append(g.Errs, "BUILD.md: manifest mode requires the root to carry the single Build plan; each root milestone links to one execution packet")
+		return
+	}
+	if first := firstNonBlankLine(body); strings.HasPrefix(strings.ToUpper(first), "N/A") {
+		g.Errs = append(g.Errs, "BUILD.md: a manifest root cannot waive its Build plan; it is the single milestone, demo, packet, and acceptance authority")
+		return
+	}
+	milestones := parsePlanMilestones(body)
+	if len(milestones) == 0 {
+		return // checkPlanDoc reports the missing milestone structure
+	}
+	refs := make(map[string]int, len(milestones))
+	owners := make(map[string]string, len(milestones))
+	for _, m := range milestones {
+		matches := packetLineRe.FindAllStringSubmatch(m.block, -1)
+		switch len(matches) {
+		case 0:
+			g.Errs = append(g.Errs, fmt.Sprintf("BUILD.md: milestone M%s (%s) has no Packet line; link exactly one direct BUILD/*.md execution packet", m.numRaw, m.title))
+		case 1:
+			path, valid := portablePacketPath(strings.TrimSpace(matches[0][1]))
+			if !valid {
+				g.Errs = append(g.Errs, fmt.Sprintf("BUILD.md: milestone M%s (%s) has invalid packet path %s; use one portable direct path such as BUILD/M%s-name.md", m.numRaw, m.title, ir.Repr(strings.TrimSpace(matches[0][1])), m.numRaw))
+				break
+			}
+			if !strings.HasPrefix(filepath.Base(filepath.FromSlash(path)), "M"+m.numRaw+"-") {
+				g.Errs = append(g.Errs, fmt.Sprintf("BUILD.md: milestone M%s (%s) links %s; its packet basename must start M%s-", m.numRaw, m.title, ir.Repr(path), m.numRaw))
+			}
+			refs[path]++
+			owners[path] = m.numRaw
+		default:
+			g.Errs = append(g.Errs, fmt.Sprintf("BUILD.md: milestone M%s (%s) has %d Packet lines; each milestone owns exactly one packet", m.numRaw, m.title, len(matches)))
+		}
+
+		demos := demoLineRe.FindAllStringSubmatch(m.block, -1)
+		switch len(demos) {
+		case 0:
+			g.Errs = append(g.Errs, fmt.Sprintf("BUILD.md: milestone M%s (%s) has no Demo line; state one observable milestone result", m.numRaw, m.title))
+		case 1:
+			if strings.TrimSpace(demos[0][1]) == "" {
+				g.Errs = append(g.Errs, fmt.Sprintf("BUILD.md: milestone M%s (%s) has an empty Demo line; state one observable milestone result", m.numRaw, m.title))
+			} else {
+				g.Count("milestone demos")
+			}
+		default:
+			g.Errs = append(g.Errs, fmt.Sprintf("BUILD.md: milestone M%s (%s) has %d Demo lines; state exactly one observable result", m.numRaw, m.title, len(demos)))
+		}
+	}
+
+	inventory := make(map[string]string, len(packets))
+	for _, packet := range packets {
+		rel := "BUILD/" + filepath.Base(packet)
+		inventory[rel] = packet
+	}
+	for _, ref := range sortedKeys(refs) {
+		count := refs[ref]
+		if count != 1 {
+			g.Errs = append(g.Errs, fmt.Sprintf("BUILD.md: packet %s is linked by %d milestones; every packet must be owned by exactly one milestone", ref, count))
+		}
+		if _, exists := inventory[ref]; !exists {
+			g.Errs = append(g.Errs, fmt.Sprintf("BUILD.md: packet %s linked by M%s is not a regular non-index file in BUILD/", ref, owners[ref]))
+		}
+	}
+	for _, rel := range sortedKeys(inventory) {
+		path := inventory[rel]
+		count := refs[rel]
+		if count == 0 {
+			g.Errs = append(g.Errs, rel+": packet is not linked by any root milestone; every packet must be inventoried exactly once")
+			continue
+		}
+		text := readDesignFileOrErr(design, path, g)
+		if len([]byte(text)) > maxExecutionPacketBytes {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: execution packet is %d bytes; the maximum is %d bytes (split the milestone at a user-demonstrable boundary)", rel, len([]byte(text)), maxExecutionPacketBytes))
+		}
+		masked := maskFences(text)
+		if len(buildPlanSections(masked)) > 0 || len(milestoneRe.FindAllStringIndex(masked, -1)) > 0 {
+			g.Errs = append(g.Errs, rel+": execution packets contain context for one root milestone; keep milestone declarations and the Build plan only in BUILD.md")
+		}
+		var h1s []string
+		for _, line := range strings.Split(masked, "\n") {
+			if level, title := headingText(line); level == 1 {
+				h1s = append(h1s, title)
+			}
+		}
+		var title []string
+		if len(h1s) == 1 {
+			title = packetTitleRe.FindStringSubmatch(h1s[0])
+		}
+		if len(h1s) != 1 || title == nil || title[1] != owners[rel] {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: packet must have exactly one first-level title identifying its owner as '# M%s - <title>'", rel, owners[rel]))
+		}
+		counts := packetHeadingCounts(masked)
+		for _, section := range executionPacketSections {
+			switch counts[section] {
+			case 1:
+				g.Count("packet sections")
+			case 0:
+				g.Errs = append(g.Errs, fmt.Sprintf("%s: missing required '## %s' section", rel, section))
+			default:
+				g.Errs = append(g.Errs, fmt.Sprintf("%s: required '## %s' section appears %d times; each packet section is unique", rel, section, counts[section]))
+			}
+		}
+		g.Count("execution packets")
+	}
 }
 
 // buildTemplateSections is the template's closed section list. Each entry is
 // located by a heading phrase, at any level, in the root or (manifest mode)
-// any shard; the needles accept the corpus's real spellings (the v0.3.13/14
+// any packet; the needles accept the corpus's real spellings (the v0.3.13/14
 // locator lesson). A section that does not apply keeps its heading and waives
 // its body with 'N/A - <reason>', which satisfies presence by construction.
 var buildTemplateSections = []struct {
@@ -277,7 +447,7 @@ capacity, and observability beyond what the Phase 2 NFR record captures.`
 // which "verbatim" is judged (reflow is formatting, wording is content).
 func collapseWS(s string) string { return strings.Join(strings.Fields(s), " ") }
 
-// checkTemplateSections holds the union of the root's and shards' headings to
+// checkTemplateSections holds the union of the root's and packets' headings to
 // the template's closed section list.
 func checkTemplateSections(g *Gate, maskedDocs []string) {
 	for _, s := range buildTemplateSections {
@@ -296,7 +466,7 @@ func checkTemplateSections(g *Gate, maskedDocs []string) {
 		if found {
 			g.Count("template sections present")
 		} else {
-			g.Errs = append(g.Errs, "BUILD.md (root plus any shards) has no '"+s.name+"' section; fill every template section, or keep its heading and waive the body with 'N/A - <reason>'")
+			g.Errs = append(g.Errs, "BUILD.md (root plus any packets) has no '"+s.name+"' section; fill every template section, or keep its heading and waive the body with 'N/A - <reason>'")
 		}
 	}
 }
@@ -345,11 +515,11 @@ func firstWordDivergence(want, got string) (pos int, wantWin, gotWin string, ok 
 
 // checkGatesDisclaimer holds the root BUILD.md to the template's verbatim
 // "What the gates do not verify" block. Only the root is checked: a manifest
-// design's shards carry no disclaimer obligation.
+// design's packets carry no disclaimer obligation.
 func checkGatesDisclaimer(g *Gate, maskedRoot string) {
 	body, ok := sectionBody(maskedRoot, "what the gates do not verify")
 	if !ok {
-		g.Errs = append(g.Errs, "BUILD.md has no 'What the gates do not verify' section; copy "+disclaimerSource+" verbatim, so a green check is never read as more than it is (only the root BUILD.md is checked; shards are not)")
+		g.Errs = append(g.Errs, "BUILD.md has no 'What the gates do not verify' section; copy "+disclaimerSource+" verbatim, so a green check is never read as more than it is (only the root BUILD.md is checked; packets are not)")
 		return
 	}
 	if !strings.Contains(collapseWS(body), collapseWS(gatesDisclaimerText)) {
@@ -357,7 +527,7 @@ func checkGatesDisclaimer(g *Gate, maskedRoot string) {
 		if pos, wantWin, gotWin, diverged := firstWordDivergence(gatesDisclaimerText, body); diverged {
 			msg += fmt.Sprintf("; first divergence at word %d: expected %q, found %q", pos, wantWin, gotWin)
 		}
-		msg += "; include the block verbatim (reflowed line breaks are fine, wording changes are not), and note that only the root BUILD.md is checked, shards are not"
+		msg += "; include the block verbatim (reflowed line breaks are fine, wording changes are not), and note that only the root BUILD.md is checked, packets are not"
 		g.Errs = append(g.Errs, msg)
 		return
 	}
@@ -365,10 +535,10 @@ func checkGatesDisclaimer(g *Gate, maskedRoot string) {
 }
 
 // checkDataDictionaryIdentity errors when more than one HEADING carrying the
-// phrase "data dictionary" exists across the root and shards: the dictionary
+// phrase "data dictionary" exists across the root and packets: the dictionary
 // is the one canonical schema, and two copies are two schemas the moment one
 // is edited. The check keys on heading titles alone, never on the rows below
-// them, so a derived or per-shard slice clears it by being titled as one. An
+// them, so a derived or per-packet slice clears it by being titled as one. An
 // embed-marked copy is the other sanctioned exception, and it fits only a
 // byte-identical copy (Ge holds its fidelity).
 func checkDataDictionaryIdentity(g *Gate, docs []planNamedDoc) {
@@ -388,7 +558,7 @@ func checkDataDictionaryIdentity(g *Gate, docs []planNamedDoc) {
 	}
 	switch {
 	case len(wheres) > 1:
-		g.Errs = append(g.Errs, strconv.Itoa(len(wheres))+" headings contain the phrase 'data dictionary' ("+strings.Join(wheres, ", ")+"); the dictionary is the one canonical schema, so keep the phrase on exactly one heading: retitle derived or per-shard slices (e.g. 'schema slice'), or put a machinery:embed marker on the line before a byte-identical copy (Ge then holds its fidelity)")
+		g.Errs = append(g.Errs, strconv.Itoa(len(wheres))+" headings contain the phrase 'data dictionary' ("+strings.Join(wheres, ", ")+"); the dictionary is the one canonical schema, so keep the phrase on exactly one heading: retitle derived or per-packet slices (e.g. 'schema slice'), or put a machinery:embed marker on the line before a byte-identical copy (Ge then holds its fidelity)")
 	case len(wheres) == 1:
 		g.Count("data dictionary unique")
 	}
@@ -404,24 +574,33 @@ type planNamedDoc struct {
 func CheckBuildPlan(design string) *Gate {
 	g := NewGate("Gb-plan  build plan structure")
 	g.startOrder()
-	if !HasBuildDoc(design) {
+	has, probeErr := probeRegularFile(design, "BUILD.md")
+	if probeErr != nil {
+		g.Errs = append(g.Errs, probeErr.Error())
+		return g
+	}
+	if !has {
 		g.Errs = append(g.Errs, "no BUILD.md in the design; the build-plan gate was requested but Phase 4 never produced a build document (author BUILD.md, or drop gb from the gate list)")
 		return g
 	}
-	text := readFileOrErr(filepath.Join(design, "BUILD.md"), g)
-	var shards []string
+	text := readDesignFileOrErr(design, filepath.Join(design, "BUILD.md"), g)
+	var packets []string
 	indexFiles := 0
 	if planMode(text) == "manifest" {
-		shards, indexFiles = planShards(design)
+		var inventoryErr error
+		packets, indexFiles, inventoryErr = planPackets(design)
+		if inventoryErr != nil {
+			g.Errs = append(g.Errs, inventoryErr.Error())
+		}
 	}
 	docs := []planNamedDoc{{name: "BUILD.md", text: maskFences(text)}}
-	for _, shard := range shards {
-		docs = append(docs, planNamedDoc{name: filepath.Base(shard), text: maskFences(readFileOrErr(shard, g))})
+	for _, packet := range packets {
+		docs = append(docs, planNamedDoc{name: filepath.Base(packet), text: maskFences(readDesignFileOrErr(design, packet, g))})
 	}
 	// A machine-less decomposed parent's manifest is a table of contents over
 	// the children, not a buildable plan: the template sections and the
 	// disclaimer live in the child BUILDs, exactly as the plans do.
-	parentManifest := planMode(text) == "manifest" && len(shards) == 0 && pack.HasDecomposition(design)
+	parentManifest := planMode(text) == "manifest" && len(packets) == 0 && pack.HasDecomposition(design)
 	if !parentManifest {
 		var masked []string
 		for _, d := range docs {
@@ -435,39 +614,17 @@ func CheckBuildPlan(design string) *Gate {
 		if indexFiles > 0 {
 			g.CheckedExtra(fmt.Sprintf("%d index files exempt", indexFiles))
 		}
-		ids := planOracleIDs(design, g)
-		// The manifest ROOT carries a plan obligation exactly when it declares
-		// a Build plan section of its own. Checking only the shards left the
-		// real plan unchecked whenever every shard waived its section toward
-		// the root ("N/A - the plan is the root's section 9"): the run reported
-		// "N plans, N waived plans" and no milestone, DoD, or skeleton rule ran
-		// anywhere (the 7-shard dogfood finding). A root with no plan section
-		// keeps its old freedom: the shards carry the plans.
-		rootPlanned := false
-		if _, ok := buildPlanSection(maskFences(text)); ok {
-			rootPlanned = true
-			checkPlanDoc(g, "BUILD.md", text, ids)
-		}
-		if len(shards) == 0 {
-			switch {
-			case rootPlanned:
-				// the root itself carried the plan; it was just checked
-			case pack.HasDecomposition(design):
+		if len(packets) == 0 {
+			if pack.HasDecomposition(design) {
 				// the checkout-split parent shape: the manifest fixes the
 				// shared artifacts and the children carry the buildable
 				// plans; the zero must stay visible in every run
 				g.CheckedExtra("0 local plans (decomposed parent; the children carry the plans)")
-			default:
-				g.Errs = append(g.Errs, "BUILD.md declares manifest mode but BUILD/ holds no shards and the design has no decomposition; a manifest with nothing behind it plans nothing")
+				return g
 			}
-			return g
 		}
-		// each shard gets the full check, skeleton citation included, against
-		// the design-wide committed oracle ids: a shard plans work on the same
-		// machines the root design committed.
-		for _, shard := range shards {
-			checkPlanDoc(g, filepath.Base(shard), readFileOrErr(shard, g), ids)
-		}
+		checkPlanDoc(g, "BUILD.md", text, planOracleIDs(design, g))
+		checkManifestPackets(g, design, text, packets)
 		return g
 	}
 	checkPlanDoc(g, "BUILD.md", text, planOracleIDs(design, g))
@@ -541,8 +698,7 @@ func parsePlanMilestones(body string) []planMilestone {
 // planMilestonesOf parses one plan-bearing document: its milestones and
 // whether the document declares a checkable plan at all. ok is false when the
 // document has no Build plan section or waives it (a waived section declares
-// no milestones by definition, and a shard that waives toward the root plan
-// is a legal waiver).
+// no milestones by definition).
 func planMilestonesOf(text string) (ms []planMilestone, ok bool) {
 	body, found := buildPlanSection(maskFences(text))
 	if !found {
@@ -560,27 +716,17 @@ type planDoc struct {
 	milestones []planMilestone
 }
 
-// planDocuments returns every plan-bearing document of the design: the root
-// BUILD.md whenever it declares a non-waived Build plan section, plus every
-// non-waived shard of a manifest design. It mirrors Gb's document selection
-// exactly, so Ga can never bind evidence to a milestone Gb does not hold.
+// planDocuments returns the one plan-bearing document of the design. In
+// manifest mode BUILD/*.md files are execution packets, never competing
+// milestone authorities; acceptance remains keyed to the root manifest.
 func planDocuments(design string, g *Gate) []planDoc {
 	if !HasBuildDoc(design) {
 		return nil
 	}
-	text := readFileOrErr(filepath.Join(design, "BUILD.md"), g)
+	text := readDesignFileOrErr(design, filepath.Join(design, "BUILD.md"), g)
 	var out []planDoc
 	if ms, ok := planMilestonesOf(text); ok {
 		out = append(out, planDoc{name: "BUILD.md", milestones: ms})
-	}
-	if planMode(text) != "manifest" {
-		return out
-	}
-	shards, _ := planShards(design)
-	for _, shard := range shards {
-		if ms, ok := planMilestonesOf(readFileOrErr(shard, g)); ok {
-			out = append(out, planDoc{name: filepath.Base(shard), milestones: ms})
-		}
 	}
 	return out
 }

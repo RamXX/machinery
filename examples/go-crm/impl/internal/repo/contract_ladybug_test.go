@@ -31,6 +31,7 @@ func openTemp(t *testing.T) (repo.Repo, repo.Tx) {
 	if err != nil {
 		t.Fatalf("Open on a healthy dir must succeed: %v", err)
 	}
+	t.Cleanup(func() { _ = r.Rollback(tx) })
 	return r, tx
 }
 
@@ -54,6 +55,7 @@ func TestCRepo02OpenLocked(t *testing.T) {
 	if err := r1.BeginWrite(tx1); err != nil {
 		t.Fatalf("BeginWrite must succeed: %v", err)
 	}
+	defer r1.Rollback(tx1) //nolint:errcheck // cleanup after the asserted lock result
 	r2 := repo.NewLadybug()
 	if _, err := r2.Open(dir); !errors.Is(err, model.ErrLocked) {
 		t.Errorf("C-REPO-02: want ErrLocked, got %v", err)
@@ -98,7 +100,10 @@ func TestCRepo05NoCommitNotVisible(t *testing.T) {
 	if err := r.SaveDeal(tx, model.Deal{ID: "d1", Title: "T", Stage: model.StageLead, OwnerID: "u1"}); err != nil {
 		t.Fatal(err)
 	}
-	// Do not Commit. A fresh handle must not see the write.
+	// End without Commit. A fresh handle must not see the write.
+	if err := r.Rollback(tx); err != nil {
+		t.Fatal(err)
+	}
 	r2 := repo.NewLadybug()
 	tx2, err := r2.Open(dir)
 	if err != nil {
@@ -151,15 +156,23 @@ func TestCRepo07RollbackNoPartial(t *testing.T) {
 
 // C-REPO-08: GetUserByName existing -> returns User row.
 func TestCRepo08GetUserByName(t *testing.T) {
-	r, tx := openTemp(t)
+	dir := filepath.Join(t.TempDir(), "db")
+	r := repo.NewLadybug()
+	tx, err := r.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_ = r.BeginWrite(tx)
 	if err := r.SaveUser(tx, model.User{ID: "u1", Username: "alice", PasswordHash: "$argon2id$x", Role: model.RoleRep, Status: model.StatusActive}); err != nil {
 		t.Fatal(err)
 	}
 	_ = r.Commit(tx)
-	tx2, _ := r.Open(filepath.Join(t.TempDir(), "db")) // same repo, re-open would differ; use fresh get in-tx
-	_ = tx2
-	got, err := r.GetUserByName(tx, "alice")
+	tx2, err := r.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Rollback(tx2) //nolint:errcheck // close the read handle
+	got, err := r.GetUserByName(tx2, "alice")
 	if err != nil || got.Username != "alice" {
 		t.Errorf("C-REPO-08: want alice, got (%+v, %v)", got, err)
 	}
@@ -216,17 +229,56 @@ func TestCRepo13SaveDealConstraint(t *testing.T) {
 
 // C-REPO-14: SaveDeal under a write conflict -> ErrConflict.
 func TestCRepo14SaveDealConflict(t *testing.T) {
-	t.Skip("C-REPO-14: requires a deterministic write-conflict simulation on the single-writer store; implemented in the integration environment")
+	r := repo.NewLadybugWithFault(func(operation string) error {
+		if operation == "SaveDeal" {
+			return errors.New("transaction conflict")
+		}
+		return nil
+	})
+	tx, err := r.Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Rollback(tx) //nolint:errcheck // cleanup after the assertion
+	if err := r.SaveDeal(tx, model.Deal{ID: "d1", Stage: model.StageLead, OwnerID: "u1"}); !errors.Is(err, model.ErrConflict) {
+		t.Fatalf("C-REPO-14: want ErrConflict, got %v", err)
+	}
 }
 
 // C-REPO-15: SaveDeal with the disk full -> ErrDiskFull.
 func TestCRepo15SaveDealDiskFull(t *testing.T) {
-	t.Skip("C-REPO-15: requires a disk-full condition (e.g., a size-capped tmpfs); implemented in the integration environment")
+	r := repo.NewLadybugWithFault(func(operation string) error {
+		if operation == "SaveDeal" {
+			return errors.New("no space left on device")
+		}
+		return nil
+	})
+	tx, err := r.Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Rollback(tx) //nolint:errcheck // cleanup after the assertion
+	if err := r.SaveDeal(tx, model.Deal{ID: "d1", Stage: model.StageLead, OwnerID: "u1"}); !errors.Is(err, model.ErrDiskFull) {
+		t.Fatalf("C-REPO-15: want ErrDiskFull, got %v", err)
+	}
 }
 
 // C-REPO-16: SaveDeal exceeding query timeout -> ErrTimeout.
 func TestCRepo16SaveDealTimeout(t *testing.T) {
-	t.Skip("C-REPO-16: requires forcing Connection.SetTimeout to elapse (slow query); implemented in the integration environment")
+	r := repo.NewLadybugWithFault(func(operation string) error {
+		if operation == "SaveDeal" {
+			return errors.New("interrupted")
+		}
+		return nil
+	})
+	tx, err := r.Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Rollback(tx) //nolint:errcheck // cleanup after the assertion
+	if err := r.SaveDeal(tx, model.Deal{ID: "d1", Stage: model.StageLead, OwnerID: "u1"}); !errors.Is(err, model.ErrTimeout) {
+		t.Fatalf("C-REPO-16: want ErrTimeout, got %v", err)
+	}
 }
 
 // C-REPO-17: SaveUser with a duplicate username -> ErrConstraint (username-unique).
@@ -292,7 +344,12 @@ func TestCRepo21ActivityAppendOnly(t *testing.T) {
 
 // C-REPO-22: Idempotency: SaveDeal retried after ErrLocked -> applied exactly once.
 func TestCRepo22IdempotentRetry(t *testing.T) {
-	r, tx := openTemp(t)
+	dir := filepath.Join(t.TempDir(), "db")
+	r := repo.NewLadybug()
+	tx, err := r.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_ = r.BeginWrite(tx)
 	d := model.Deal{ID: "d1", Stage: model.StageLead, OwnerID: "u1"}
 	// The whole write Tx is retried on ErrLocked; re-applying must not create a
@@ -300,7 +357,12 @@ func TestCRepo22IdempotentRetry(t *testing.T) {
 	_ = r.SaveDeal(tx, d)
 	_ = r.SaveDeal(tx, d) // retry of the same unit
 	_ = r.Commit(tx)
-	got, err := r.GetDeal(tx, "d1")
+	tx2, err := r.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Rollback(tx2) //nolint:errcheck // close the read handle
+	got, err := r.GetDeal(tx2, "d1")
 	if err != nil || got.ID != "d1" {
 		t.Errorf("C-REPO-22: retried write must resolve to exactly one deal, got (%+v, %v)", got, err)
 	}

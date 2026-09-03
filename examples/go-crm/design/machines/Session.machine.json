@@ -9,6 +9,9 @@
     "sessionTTL": "28800000 ms (8h) - token lifetime; the signed expiry is authoritative, this delay is its declarative representation"
   },
   "id": "session",
+  "_counters": {
+    "retries": "one budget per session-command instance: each CLI invocation creates a Session machine for one login, resume, logout, or current-session resolution and then discards it; a later invocation creates a new instance with retries initialized to zero"
+  },
   "initial": "Anonymous",
   "context": {
     "userId": null,

@@ -1,0 +1,60 @@
+attestation_version: 1
+attestations:
+  - claim: g2.action-ownership
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f700d878f4491f5b267819f1b277338723014954e2da53dc58f716f6547e47f0}]
+  - claim: g2.interface-contract-rightness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f700d878f4491f5b267819f1b277338723014954e2da53dc58f716f6547e47f0}]
+  - claim: g2.placement-rightness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f700d878f4491f5b267819f1b277338723014954e2da53dc58f716f6547e47f0}]
+  - claim: g2.adoption-closure-discovery
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f700d878f4491f5b267819f1b277338723014954e2da53dc58f716f6547e47f0}]
+  - claim: g2.event-contract-completeness
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f700d878f4491f5b267819f1b277338723014954e2da53dc58f716f6547e47f0}]
+  - claim: g2.nfr-content
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: ARCHITECTURE.md, hash: sha256:f700d878f4491f5b267819f1b277338723014954e2da53dc58f716f6547e47f0}]
+  - claim: g3.guard-semantics
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: machines/DataSubject.machine.json, hash: sha256:cab0dcb83a01a7fc329441a9dbbe2f8541d12d9c59f1fe791ef432663a39d4ac}
+      - {path: machines/DataSubject.matrix.md, hash: sha256:547101d69f230fb70b36185c0235b078b620325613d6d7dec1f3024cf94be266}
+  - claim: g3.invariant-enforcement
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers:
+      - {path: machines/DataSubject.machine.json, hash: sha256:cab0dcb83a01a7fc329441a9dbbe2f8541d12d9c59f1fe791ef432663a39d4ac}
+      - {path: machines/DataSubject.matrix.md, hash: sha256:547101d69f230fb70b36185c0235b078b620325613d6d7dec1f3024cf94be266}
+  - claim: g3.residual-transitions
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    note: The subject lifecycle has no cross-boundary dependency transition; export retries are a bounded spool activation outside this lifecycle.
+    covers:
+      - {path: machines/DataSubject.machine.json, hash: sha256:cab0dcb83a01a7fc329441a9dbbe2f8541d12d9c59f1fe791ef432663a39d4ac}
+      - {path: machines/DataSubject.matrix.md, hash: sha256:547101d69f230fb70b36185c0235b078b620325613d6d7dec1f3024cf94be266}
+  - claim: g3.event-redelivery
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    note: DataSubject consumes no external event; registration and erasure replay are idempotent API operations.
+    covers:
+      - {path: machines/DataSubject.machine.json, hash: sha256:cab0dcb83a01a7fc329441a9dbbe2f8541d12d9c59f1fe791ef432663a39d4ac}
+      - {path: machines/DataSubject.matrix.md, hash: sha256:547101d69f230fb70b36185c0235b078b620325613d6d7dec1f3024cf94be266}
+  - claim: gt.conformance-test-shape
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: BUILD.md, hash: sha256:a02918fbbe10e5e134abae2cd701932ca9e617b492caaab1e916e4e93b7ccb4b}]
+  - claim: g4.zero-context
+    attestor: Machinery production-readiness review
+    date: 2026-09-02
+    covers: [{path: BUILD.md, hash: sha256:a02918fbbe10e5e134abae2cd701932ca9e617b492caaab1e916e4e93b7ccb4b}]

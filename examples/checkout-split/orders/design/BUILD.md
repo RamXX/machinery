@@ -244,6 +244,7 @@ and `cancel` on Paid (the refund flow belongs to payments).
 <!-- machinery:embed from="machines/Order.matrix.md" table="name,kind,signature" claims="subset,complete" -->
 | name | kind | signature | pre / post | maps to | test type | fixture |
 |---|---|---|---|---|---|---|
+| `validatePositiveTotal` | action | `(total) -> error?` | before creation, reject `total <= 0`; every persisted Order has a strictly positive total | inv `order-total-positive` | property | generated numeric boundary values + real repository transaction |
 | `request` | action | `(ctx) -> publish` | on entry to Placed, enqueue the payment request in the outbox, same transaction as the insert | bus relationship; dedupe `Payment.orderId` | integration | real outbox table + fake broker (contract-tested) |
 | `recordShipment` | action | `(ctx) -> ctx` | stamps carrier handoff; only reachable from Paid, which is `no-ship-without-capture` | inv `no-ship-without-capture` (structural) | unit | none |
 | `recordCancel` | action | `(ctx) -> ctx` | stamps cancellation reason | - | unit | none |
@@ -271,11 +272,11 @@ traced in this child.
 
 | invariant id | enforced by (guard / structural) | in component | interface contract | test id(s) |
 |---|---|---|---|---|
-| `no-ship-without-capture` | structural: `Shipped` is reachable only from `Paid`, and `Paid` only on `markPaid`; see `_ignores` on Placed | Order machine (orders.svc) | consumed `markPaid` event (section 4.3) | T-ORDE-04 (stable ORDE-e6d28f), P-no-ship-without-capture |
-| `order-total-positive` | creation-time validation at the API boundary (attested; creation is not a machine transition) | orders.svc command API | `place` command (section 4.3) | P-order-total-positive |
+| `no-ship-without-capture` | structural: `Shipped` is reachable only from `Paid`, and `Paid` only on `markPaid`; see `_ignores` on Placed | Order machine (orders.svc) | consumed `markPaid` event (section 4.3) | ORDE-e6d28f, P-no-ship-without-capture |
+| `order-total-positive` | creation-boundary unit `validatePositiveTotal`; creation is not a machine transition | orders.svc command API | `place` command (section 4.3) | P-order-total-positive |
 
-No invariant is dropped. `order-total-positive` is enforced by neither a guard nor the machine's
-structure; it is carried as a named risk in section 12.
+No invariant is dropped. The creation-only invariant is carried by the named validation unit and
+its property test; the lifecycle invariant is carried structurally by the machine.
 
 ## 7. Test specification (the hard-TDD oracle)
 
@@ -291,10 +292,11 @@ outgoing rows, covered by the redelivery property below.
 **Guard-branch completeness analysis.** N/A: the Order machine declares no guards, so there is no
 conjunction clause to falsify.
 
-**Named-unit test plan** (from the section 5 table): the outbox `request` action is an integration
-test against the real outbox table with a contract-tested fake broker; `recordShipment` and
-`recordCancel` are unit tests with no fixture. Idempotency contracts are never derived from
-transition tests.
+**Named-unit test plan** (from the section 5 table): `validatePositiveTotal` is a property test over
+numeric boundary values and the real repository transaction; the outbox `request` action is an
+integration test against the real outbox table with a contract-tested fake broker;
+`recordShipment` and `recordCancel` are unit tests with no fixture. Idempotency contracts are never
+derived from transition tests.
 
 **Contract tests per boundary** (section 4.3):
 

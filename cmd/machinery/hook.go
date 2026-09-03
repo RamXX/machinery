@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/RamXX/machinery/internal/hook"
+	"github.com/RamXX/machinery/internal/install"
 )
 
 // newHookCmd is the shared host-adapter plumbing: a hook shim or plugin pipes
@@ -19,8 +20,15 @@ func newHookCmd() *cobra.Command {
 	}
 	var root string
 	c.Flags().StringVar(&root, "root", "", "project root (default: $CLAUDE_PROJECT_DIR, then the event's cwd)")
-	c.RunE = func(cmd *cobra.Command, args []string) error {
-		return hook.Run(stdinR, stdoutW, root)
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		// Host governance must never inspect a half-installed adapter or design
+		// substrate. The same lock used by install/update first recovers a
+		// PREPARED transaction and remains held until the decision is emitted.
+		return install.WithInstallInspectionLock(func() error {
+			return hook.Run(stdinR, output.stdout, root)
+		})
 	}
 	return c
 }

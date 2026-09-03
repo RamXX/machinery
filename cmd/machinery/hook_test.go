@@ -18,13 +18,14 @@ func runHookCmd(t *testing.T, root, event string) string {
 	stdoutW = &out
 	cmd := newHookCmd()
 	cmd.SetArgs([]string{"--root", root})
-	if err := cmd.Execute(); err != nil {
+	if err := executeCapturedCommand(cmd); err != nil {
 		t.Fatalf("hook command: %v", err)
 	}
 	return out.String()
 }
 
 func TestHookCmdNoopOutsideMachineryRepos(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", privateTestConfigDir(t))
 	out := runHookCmd(t, t.TempDir(), `{"hook_event_name":"Stop","session_id":"s"}`)
 	if out != "" {
 		t.Fatalf("hook must be silent in a non-machinery repo, got %q", out)
@@ -32,6 +33,7 @@ func TestHookCmdNoopOutsideMachineryRepos(t *testing.T) {
 }
 
 func TestHookCmdDeniesGeneratedEdit(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", privateTestConfigDir(t))
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "design"), 0o755); err != nil {
 		t.Fatal(err)
@@ -44,6 +46,33 @@ func TestHookCmdDeniesGeneratedEdit(t *testing.T) {
 	out := runHookCmd(t, root, event)
 	if !strings.Contains(out, `"permissionDecision":"deny"`) {
 		t.Fatalf("expected a deny for a generated-oracle edit, got %q", out)
+	}
+}
+
+func TestHookCmdFailsClosedWhenInterruptedInstallCannotRecover(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("MACHINERY_CONFIG_DIR", config)
+	journal := filepath.Join(config, ".machinery-install-journal")
+	if err := os.MkdirAll(journal, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(journal, "journal.json"), []byte("{corrupt\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	oldIn, oldOut := stdinR, stdoutW
+	defer func() { stdinR, stdoutW = oldIn, oldOut }()
+	stdinR = strings.NewReader(`{"hook_event_name":"Stop","session_id":"s"}`)
+	var out bytes.Buffer
+	stdoutW = &out
+	cmd := newHookCmd()
+	cmd.SetArgs([]string{"--root", t.TempDir()})
+	err := executeCapturedCommand(cmd)
+	if err == nil || !strings.Contains(err.Error(), "recover interrupted install transaction") {
+		t.Fatalf("hook recovery error = %v", err)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("governance ran before recovery failed: %q", out.String())
 	}
 }
 

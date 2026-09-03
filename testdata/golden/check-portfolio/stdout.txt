@@ -1,3 +1,6 @@
+== Gu-surfaces  target surface ledger ==
+  checked: 9 obligated actions, 9 covered, 0 deferred acts, 0 deferred personas, 0 knob rows, 0 actorless actions, 9 milestone references resolved
+  ok
 == Gc-carrier  invariant carrier reconciliation ==
   note   relational layers not opted in: policy, integrity, isolation
   checked: 18 invariants declared, 16 preserves references, 12 carried by preserves, 1 carried by a machine unit, 5 waived with reason
@@ -5,33 +8,27 @@
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)
-  checked: 7 boundaries, 2 externals, 13 allow rules, 21 transitive pairs, 2 deny rules, 6 boundaries with exposes, 12 dsl elements, 15 drawn relationships, 2 drawn edges outside the contract vocabulary, 13 drawn edges verified, 7 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 nfr topics recorded, 13 edges contracted
+  checked: 7 boundaries, 2 externals, 13 allow rules, 21 transitive pairs, 2 deny rules, 6 boundaries with exposes, 12 dsl elements, 15 drawn relationships, 2 drawn edges outside the contract vocabulary, 13 drawn edges verified, 7 boundaries bound to dsl, 2 mitigation rows, 4 dependencies with mitigation rows, 3 nfr topics recorded, 10 action-ownership rows, 10 actions owned, 13 edges contracted
   ok
 == G3-machine  machines + oracle ==
-  warn   Portfolio.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
-  warn   Portfolio.machine.json: liveness for reverted rests on an UNPROVEN _exhaustive claim (guards are erased in the TLA+ model, so TLC cannot check it); verify the guard set is provably total, or add an unguarded fallback branch so the liveness proof becomes sound
-  warn   RecommendationRun.machine.json: counter 'retries' has an increment and an exhaustion guard but no reset action on any edge; if a re-issued entry is promised a fresh budget, wire the reset on the leg-entry edges, and if one budget per instance is the design, say so with its proof in _counters
-  note   Portfolio.machine.json: state reverted always-list is fully guarded; liveness rests on the declared exhaustiveness: prior is set by every setPending action to the review stage the operation departed from; its codomain is exactly the four PortfolioStatus values, so one guarded branch per stage is total
-  checked: 3 machines, 33 transitions, 3 tla-generable, 3 oracles fresh, 31 named units covered, 1 states relying on unproven _exhaustive liveness
+  checked: 4 machines, 46 transitions, 4 tla-generable, 4 oracles fresh, 39 named units covered
+  ok
 == Gd-idcite  design-side stable-id citations ==
-  checked: 65 citations resolved, 19 files scanned, 33 committed oracle ids, 3 row-count claims beside tables
+  checked: 76 citations resolved, 26 files scanned, 46 committed oracle ids, 3 guards with clause declarations, 14 guard rows read for clause completeness, 3 guard rows with a clause declaration
   ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 4 self-review lines, 2 dated decision entries, 19 files style-scanned
+  checked: 4 self-review lines, 6 dated decision entries, 26 files style-scanned
   ok
 == Gx-trace  cross-layer traceability ==
-  warn   invariant 'candidate-deduped' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
-  warn   invariant 'candidate-from-top-30' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
-  warn   invariant 'holding-weight-nonneg' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
-  warn   invariant 'holding-weights-sum-full' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
-  warn   invariant 'index-top-30' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
-  warn   invariant 'run-terminal-absorbing' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
-  warn   invariant 'ticker-unique' is carried by preserves but realized by no machine unit or relational layer; its enforcement rests on the prose tables and the tests they name (map it in a machine matrix or a relational layer)
-  note   Portfolio: 3 operational-overlay states (committing, commitRetry, reverted)
+  note   Portfolio: 4 operational-overlay states (committing, commitRetry, reverted, routingFault)
   note   RecommendationRun: 1 operational-overlay states (collectRetry)
-  checked: 6 entities, 1 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 3 placement rows with machines, 5 placement rows waived, 6 entities placed, 3 build shards scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 7 invariants attested only (prose), 6 invariants enforced, 6 invariants unit-backed (guard/action/actor), 5 invariants waived with reason
+  checked: 6 entities, 2 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 2 lifecycle semantics annotations, 3 placement rows with machines, 5 placement rows waived, 6 entities placed, 6 build packets scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 13 invariants enforced, 13 invariants unit-backed (guard/action/actor), 5 invariants waived with reason
+  ok
 == Gb-plan  build plan structure ==
-  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 3 plans, 6 milestones, 6 DoD-bearing milestones, 2 skeleton waivers, 1 skeleton NFR lines, 3 skeleton citations, skeleton citation skipped (skeleton waived), skeleton citation skipped (skeleton waived)
+  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 3 skeleton citations, 6 milestone demos, 42 packet sections, 6 execution packets
+  ok
+== Gv-attest  attestation evidence ==
+  checked: 52 covered artifacts current, 12 attested claims, 12 claims owed
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

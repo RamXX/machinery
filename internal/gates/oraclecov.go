@@ -11,6 +11,9 @@ package gates
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -66,8 +69,22 @@ func CheckOracleCoverage(design, impl string) *Gate {
 	}
 
 	mdir := filepath.Join(design, "machines")
-	oraclePaths := sortedGlob(mdir, "*.oracle.md")
-	machineFiles := sortedGlob(mdir, "*.machine.json")
+	oraclePaths, _ := strictSortedGlob(g, mdir, "*.oracle.md", "committed oracle")
+	machineFiles, _ := strictSortedGlob(g, mdir, "*.machine.json", "machine source")
+	machineStems := map[string]bool{}
+	for _, path := range machineFiles {
+		machineStems[strings.TrimSuffix(filepath.Base(path), ".machine.json")] = true
+	}
+	validOracles := oraclePaths[:0]
+	for _, path := range oraclePaths {
+		stem := strings.TrimSuffix(filepath.Base(path), ".oracle.md")
+		if !machineStems[stem] {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: orphan oracle has no corresponding %s.machine.json; it cannot establish test coverage", filepath.Base(path), stem))
+			continue
+		}
+		validOracles = append(validOracles, path)
+	}
+	oraclePaths = validOracles
 	var formalPaths []string
 	for _, name := range formalOracleNames {
 		path := filepath.Join(design, "formal", name)
@@ -106,7 +123,7 @@ func CheckOracleCoverage(design, impl string) *Gate {
 			continue // the single no-test-files error above already blocks
 		}
 		base := filepath.Base(path)
-		wholesale, _ := coverOracle(g, base, base, readFileOrErr(path, g), corpus)
+		wholesale, _ := coverOracle(g, base, base, readDesignFileOrErr(design, path, g), corpus)
 		if wholesale {
 			g.Count("machines covered by conformance parse")
 		}
@@ -117,7 +134,7 @@ func CheckOracleCoverage(design, impl string) *Gate {
 			continue // covered by the single no-test-files error
 		}
 		name := filepath.Base(path)
-		if _, covered := coverOracle(g, "formal/"+name, name, readFileOrErr(path, g), corpus); covered {
+		if _, covered := coverOracle(g, "formal/"+name, name, readDesignFileOrErr(design, path, g), corpus); covered {
 			g.Count("formal oracles covered")
 		}
 	}
@@ -147,7 +164,7 @@ func coverOracle(g *Gate, label, base, text string, corpus testCorpusData) (whol
 	}
 	var missing []string
 	for _, id := range stableIDs {
-		if idTokenIn(id, corpus.joined) {
+		if idTokenIn(id, corpus.joinedCode) {
 			g.Count("ids covered by literal")
 		} else {
 			missing = append(missing, id)
@@ -168,8 +185,9 @@ func coverOracle(g *Gate, label, base, text string, corpus testCorpusData) (whol
 // citation is judged per file) plus the joined text for whole-token id
 // lookups.
 type testCorpusData struct {
-	files  []corpusFile
-	joined string
+	files      []corpusFile
+	joined     string
+	joinedCode string // comments removed; row ids must occur in test code/data
 }
 
 type corpusFile struct {
@@ -186,23 +204,33 @@ type corpusFile struct {
 // tables, constants) proves nothing about the tests (NG-7).
 func testCorpus(design, impl string, g *Gate) testCorpusData {
 	var ignore []string
-	if c := loadContract(filepath.Join(design, "ARCHITECTURE.md"), NewGate("_")); c != nil {
+	if c := loadContract(design, filepath.Join(design, "ARCHITECTURE.md"), NewGate("_")); c != nil {
 		for _, ig := range objSlice(c.AsObject().Get2("ignore")) {
 			ignore = append(ignore, ig.AsString())
 		}
 	}
-	files, _, walkWarns, walkErr := walkSourceFiles(impl, ignore)
+	inventory, _, walkWarns, walkErr := walkSourceFilesBounded(impl, ignore, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth)
 	if walkErr != nil {
 		g.Errs = append(g.Errs, "walking "+impl+": "+walkErr.Error())
+	}
+	if inventory != nil {
+		defer func() {
+			if closeErr := inventory.Close(); closeErr != nil {
+				g.Errs = append(g.Errs, "walking "+impl+": source inventory changed before traversal completed: "+closeErr.Error())
+			}
+		}()
 	}
 	for _, w := range walkWarns {
 		g.Errs = append(g.Errs, "walk incomplete, subtree skipped: "+w)
 	}
+	var files []string
+	if inventory != nil {
+		files = inventory.Files()
+	}
 	sort.Strings(files)
 	var corpus testCorpusData
-	var texts []string
-	for _, path := range files {
-		rel, _ := filepath.Rel(impl, path)
+	var texts, codeTexts []string
+	for _, rel := range files {
 		ignored := false
 		for _, ig := range ignore {
 			if matchGlob(rel, ig) {
@@ -213,7 +241,12 @@ func testCorpus(design, impl string, g *Gate) testCorpusData {
 		if ignored {
 			continue
 		}
-		text := readFileOrErr(path, g)
+		body, readErr := inventory.ReadFile(rel)
+		if readErr != nil {
+			g.Errs = append(g.Errs, filepath.Join(impl, rel)+" is unreadable: "+readErr.Error())
+			continue
+		}
+		text := string(body)
 		switch {
 		case isTestFile(rel):
 			// the whole file is test text
@@ -229,9 +262,128 @@ func testCorpus(design, impl string, g *Gate) testCorpusData {
 		g.Count("test files scanned")
 		corpus.files = append(corpus.files, corpusFile{rel: rel, text: text})
 		texts = append(texts, text)
+		codeTexts = append(codeTexts, executableTestText(text, rel))
 	}
 	corpus.joined = strings.Join(texts, "\n")
+	corpus.joinedCode = strings.Join(codeTexts, "\n")
 	return corpus
+}
+
+func executableTestText(text, rel string) string {
+	clean := stripTestComments(text, filepath.Ext(rel))
+	switch filepath.Ext(rel) {
+	case ".go":
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, rel, clean, 0)
+		if err != nil {
+			return ""
+		}
+		var parts []string
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil || (!strings.HasPrefix(fn.Name.Name, "Test") && !strings.HasPrefix(fn.Name.Name, "Benchmark") && !strings.HasPrefix(fn.Name.Name, "Fuzz") && !strings.HasPrefix(fn.Name.Name, "Example")) {
+				continue
+			}
+			// The test declaration itself is executable test identity. This is
+			// especially important for migration contracts, whose `tests:` rows
+			// cite test function names rather than literals in their bodies.
+			parts = append(parts, fn.Name.Name)
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				switch x := n.(type) {
+				case *ast.BasicLit:
+					parts = append(parts, x.Value)
+				case *ast.Ident:
+					parts = append(parts, x.Name)
+				}
+				return true
+			})
+		}
+		return strings.Join(parts, "\n")
+	case ".rs":
+		var parts []string
+		for start := 0; start < len(clean); {
+			i := strings.Index(clean[start:], "#[test]")
+			if i < 0 {
+				break
+			}
+			i += start
+			end := rustItemEnd(clean, i+len("#[test]"))
+			parts = append(parts, clean[i:end])
+			start = end
+		}
+		return strings.Join(parts, "\n")
+	default:
+		return clean
+	}
+}
+
+// stripTestComments is a length-preserving lexical pass for the comment
+// forms used by supported test languages. Strings are retained because table
+// driven tests legitimately store stable ids as data; comments are removed so
+// listing ids in prose cannot manufacture coverage.
+func stripTestComments(text, ext string) string {
+	src := []byte(text)
+	out := append([]byte(nil), src...)
+	hashComments := ext == ".py" || ext == ".rb"
+	lineComments := !hashComments
+	quote := byte(0)
+	escaped := false
+	for i := 0; i < len(src); {
+		if quote != 0 {
+			if escaped {
+				escaped = false
+				i++
+				continue
+			}
+			if src[i] == '\\' {
+				escaped = true
+				i++
+				continue
+			}
+			if src[i] == quote {
+				quote = 0
+			}
+			i++
+			continue
+		}
+		if src[i] == '\'' || src[i] == '"' || src[i] == '`' {
+			quote = src[i]
+			i++
+			continue
+		}
+		if hashComments && src[i] == '#' {
+			for i < len(src) && src[i] != '\n' {
+				out[i] = ' '
+				i++
+			}
+			continue
+		}
+		if lineComments && src[i] == '/' && i+1 < len(src) && src[i+1] == '/' {
+			for i < len(src) && src[i] != '\n' {
+				out[i] = ' '
+				i++
+			}
+			continue
+		}
+		if lineComments && src[i] == '/' && i+1 < len(src) && src[i+1] == '*' {
+			out[i], out[i+1] = ' ', ' '
+			i += 2
+			for i < len(src) {
+				if src[i] == '*' && i+1 < len(src) && src[i+1] == '/' {
+					out[i], out[i+1] = ' ', ' '
+					i += 2
+					break
+				}
+				if src[i] != '\n' {
+					out[i] = ' '
+				}
+				i++
+			}
+			continue
+		}
+		i++
+	}
+	return string(out)
 }
 
 // fileNameCited reports whether some SINGLE test file cites base

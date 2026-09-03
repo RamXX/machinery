@@ -1,7 +1,7 @@
 # Generated transition oracle: `portfolio`
 
 Generated from `Portfolio.machine.json` by `machinery oracle`. DO NOT EDIT BY HAND.
-<!-- machinery-version: v0.6.2 -->
+<!-- machinery-version: v0.6.3 -->
 Single source of truth for the hard-TDD transition tests: one transition row is one
 test case. Key tests on the STABLE id, not the row number; row numbers renumber when
 the design changes, stable ids do not.
@@ -17,6 +17,7 @@ the design changes, stable ids do not.
 | committing | atomic | - | - |
 | commitRetry | atomic | - | - |
 | reverted | atomic | - | - |
+| routingFault | final | - | - |
 
 ## Transitions
 
@@ -41,5 +42,6 @@ the design changes, stable ids do not.
 | T-PORT-17 | PORT-3cb0b6 | reverted | always | priorIsUnderReview | UnderReview | - |
 | T-PORT-18 | PORT-53d34b | reverted | always | priorIsAccepted | Accepted | - |
 | T-PORT-19 | PORT-3390a7 | reverted | always | priorIsRejected | Rejected | - |
+| T-PORT-20 | PORT-3bd579 | reverted | always | - | routingFault | recordRoutingError |
 
-Total transitions (test cases): 19
+Total transitions (test cases): 20

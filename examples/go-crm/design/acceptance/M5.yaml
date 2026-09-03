@@ -1,0 +1,88 @@
+milestone: 5
+commit: 4bdd519009d31584595ca908e17fd5c09077b336
+verdict: ACCEPTED
+dod_ids:
+  - AUTHZ-21866c
+  - AUTHZ-63b862
+  - AUTHZ-06b8a0
+  - AUTHZ-d6443f
+  - AUTHZ-b7c2db
+  - AUTHZ-24780c
+  - AUTHZ-76c225
+  - AUTHZ-4ea0cc
+  - AUTHZ-3748b1
+  - AUTHZ-0048e5
+  - AUTHZ-950c3c
+  - AUTHZ-374aae
+  - AUTHZ-fc14f2
+  - AUTHZ-3ba6fd
+  - AUTHZ-582aba
+  - AUTHZ-f5d436
+  - AUTHZ-54760d
+  - AUTHZ-610903
+  - AUTHZ-36c864
+  - AUTHZ-6d9aec
+  - AUTHZ-afac0d
+  - AUTHZ-f83379
+  - AUTHZ-8884ab
+  - AUTHZ-ce036c
+  - AUTHZ-b13aef
+  - AUTHZ-20b826
+  - AUTHZ-99df64
+  - AUTHZ-a5226e
+  - AUTHZ-8193df
+  - AUTHZ-f03de6
+  - AUTHZ-8acd04
+  - AUTHZ-f71187
+  - AUTHZ-02ae72
+  - AUTHZ-f7e5e1
+  - AUTHZ-df5dcf
+  - AUTHZ-545bba
+  - AUTHZ-8bb7e6
+  - AUTHZ-92d11c
+  - AUTHZ-acd4a6
+  - AUTHZ-fe22fc
+  - AUTHZ-9f8279
+  - AUTHZ-d33642
+  - AUTHZ-9b3466
+  - AUTHZ-017d70
+  - AUTHZ-b9cbb0
+  - AUTHZ-a65f6e
+  - AUTHZ-e394f9
+  - AUTHZ-1da44b
+  - AUTHZ-e1caaf
+  - AUTHZ-55a039
+  - AUTHZ-0d7332
+  - AUTHZ-0a62af
+  - AUTHZ-e2bc72
+  - AUTHZ-5c6425
+  - AUTHZ-c1e494
+  - AUTHZ-8775f2
+  - AUTHZ-fbc244
+  - AUTHZ-3cb8e2
+  - AUTHZ-f50d28
+  - AUTHZ-13a179
+  - AUTHZ-20d68e
+  - AUTHZ-d87990
+  - AUTHZ-b4b911
+  - AUTHZ-d08d5d
+  - AUTHZ-6f6cbf
+  - AUTHZ-e5bf1a
+  - AUTHZ-977c09
+  - AUTHZ-b82fd0
+  - AUTHZ-21b434
+  - AUTHZ-9d609b
+  - TENANT-97e9c6
+  - TENANT-ab139b
+  - TENANT-3ff52e
+  - TENANT-fd4ae5
+  - TENANT-f6e72d
+  - TENANT-49174b
+  - TENANT-0b87ae
+  - TENANT-54ea9e
+attestations:
+  - RBAC breadth, tenant isolation, pure-record behavior, uniqueness, ownership, immutability, and one-default-pipeline properties passed on the reviewed commit.
+  - Default, LadybugDB-tagged, and race test suites passed on the reviewed commit.
+findings: []
+reviewer: Codex release acceptance review
+date: 2026-09-03

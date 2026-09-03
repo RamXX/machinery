@@ -12,7 +12,6 @@
 package gates
 
 import (
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -42,7 +41,7 @@ type machineNames struct {
 func collectMachineNames(design string) map[string]machineNames {
 	out := map[string]machineNames{}
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.machine.json") {
-		m, err := ir.LoadMachineJSON(path)
+		m, err := loadDesignMachine(design, path)
 		if err != nil {
 			continue
 		}
@@ -186,7 +185,7 @@ func CheckNameRot(g *Gate, design string) {
 	}
 	files := sortedGlob(filepath.Join(design, "machines"), "*.machine.json")
 	for _, path := range files {
-		m, err := ir.LoadMachineJSON(path)
+		m, err := loadDesignMachine(design, path)
 		if err != nil {
 			continue
 		}
@@ -202,7 +201,7 @@ func CheckNameRot(g *Gate, design string) {
 		}
 	}
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
-		body, err := os.ReadFile(path)
+		body, err := readDesignFile(design, path)
 		if err != nil {
 			continue
 		}

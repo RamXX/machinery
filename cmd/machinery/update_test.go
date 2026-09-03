@@ -36,7 +36,7 @@ func TestInstallAndUninstallMaintainUpdateReceipt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("installation receipt missing: %v", err)
 	}
-	if !strings.Contains(string(raw), home) || !strings.Contains(string(raw), `"schema_version": 1`) {
+	if !strings.Contains(string(raw), home) || !strings.Contains(string(raw), `"schema_version": 2`) || !strings.Contains(string(raw), `"artifacts"`) || !strings.Contains(string(raw), `"sha256:`) {
 		t.Fatalf("receipt does not describe the custom home:\n%s", raw)
 	}
 	if _, errOut, code := runBin(t, "uninstall", "--home", home); code != 0 {

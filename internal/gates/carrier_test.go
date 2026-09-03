@@ -143,7 +143,7 @@ func TestGcMachineUnitCarries(t *testing.T) {
 
 func TestGcCheckerClaimCarriesAndResidualWaives(t *testing.T) {
 	design := writeCarrierDesign(t, map[string]string{
-		"checkers/aud.checker.yaml": "checker:\n  id: aud\n  description: audit flow\nprojection:\n  include: [model, invariants]\ncoverage:\n  claim: [\"audit-*\"]\n  residuals:\n    - id: widget-immutable\n      reason: not decidable from the flow graph\nevidence:\n  projection_out: checkers/aud/projection.json\n  evidence_in: checkers/aud/evidence.json\n",
+		"checkers/aud.checker.yaml": "checker:\n  id: aud\n  description: audit flow\n  runtime_closure: sha256:1111111111111111111111111111111111111111111111111111111111111111\nprojection:\n  include: [model, invariants]\ncoverage:\n  claim: [\"audit-*\"]\n  residuals:\n    - id: widget-immutable\n      reason: not decidable from the flow graph\nevidence:\n  projection_out: checkers/aud/projection.json\n  evidence_in: checkers/aud/evidence.json\n",
 	})
 	g := CheckCarriers(design)
 	if hasErr(g, "'audit-verifiable'") || hasErr(g, "'widget-immutable'") {
@@ -299,7 +299,7 @@ func TestGxWaivedInvariantIsCreditedNotWarned(t *testing.T) {
 
 func TestGxCheckerClaimCountsAsEnforced(t *testing.T) {
 	design := writeGxCarrierFixture(t, map[string]string{
-		"checkers/aud.checker.yaml": "checker:\n  id: aud\n  description: audit flow\nprojection:\n  include: [model, invariants]\ncoverage:\n  claim: [\"audit-*\"]\nevidence:\n  projection_out: checkers/aud/projection.json\n  evidence_in: checkers/aud/evidence.json\n",
+		"checkers/aud.checker.yaml": "checker:\n  id: aud\n  description: audit flow\n  runtime_closure: sha256:1111111111111111111111111111111111111111111111111111111111111111\nprojection:\n  include: [model, invariants]\ncoverage:\n  claim: [\"audit-*\"]\nevidence:\n  projection_out: checkers/aud/projection.json\n  evidence_in: checkers/aud/evidence.json\n",
 	})
 	g := CheckTraceability(design)
 	if hasWarn(g, "'audit-verifiable'") {

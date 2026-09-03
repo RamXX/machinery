@@ -5,6 +5,9 @@
     "persistRetryBackoff": "500 ms - ErrLocked backoff; retriesExhausted at 3 attempts (~1.5s total)"
   },
   "id": "user",
+  "_counters": {
+    "retries": "one budget per aggregate-command instance: CommandExecution loads one User and fires one status action inside one write transaction; success or rollback returns the result and discards the instance, so a re-issued action creates a new instance with retries initialized to zero"
+  },
   "initial": "Active",
   "context": {
     "userId": null,
@@ -71,10 +74,10 @@
       }
     },
     "rolledBack": {
-      "_exhaustive": "both domain states (Active, Disabled) can enter the persist overlay, so priorStatus ranges over {Active, Disabled}; both priorIs* guards are present",
       "always": [
         { "target": "Active", "guard": "priorIsActive" },
-        { "target": "Disabled", "guard": "priorIsDisabled" }
+        { "target": "Disabled", "guard": "priorIsDisabled" },
+        { "target": "Disabled", "actions": "recordRoutingError" }
       ]
     }
   }

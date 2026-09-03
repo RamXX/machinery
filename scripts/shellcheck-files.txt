@@ -1,0 +1,12 @@
+.githooks/pre-push
+hooks/machinery-hook.sh
+install.sh
+scripts/c4-inventory.sh
+scripts/example-inventory.sh
+scripts/git-safe.sh
+scripts/modelith-inventory.sh
+scripts/modelith-render.sh
+scripts/preflight.sh
+scripts/shellcheck-inventory.sh
+skills/machinery/tools/tlc.sh
+skills/machinery/tools/verify_formal.sh

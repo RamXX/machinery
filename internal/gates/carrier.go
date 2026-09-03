@@ -20,6 +20,7 @@ package gates
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -44,7 +45,7 @@ var (
 // one is an ERROR because a waiver that does not parse waives nothing.
 func loadWaiverAnnex(design string, g *Gate) []string {
 	path := filepath.Join(design, "formal", WaiverAnnexName)
-	data, err := os.ReadFile(path)
+	data, err := readDesignFile(design, path)
 	if err != nil {
 		return nil
 	}
@@ -97,7 +98,11 @@ func loadWaiverAnnex(design string, g *Gate) []string {
 // evidence behind the claims; a malformed manifest contributes nothing here.
 func checkerClaims(design string, declared map[string]bool) (claimed, waived map[string]bool) {
 	claimed, waived = map[string]bool{}, map[string]bool{}
-	for _, mp := range checker.ManifestPaths(design) {
+	paths, err := checker.ManifestPaths(design)
+	if err != nil {
+		return claimed, waived
+	}
+	for _, mp := range paths {
 		man, err := checker.LoadManifest(mp)
 		if err != nil {
 			continue
@@ -114,7 +119,7 @@ func checkerClaims(design string, declared map[string]bool) (claimed, waived map
 				continue
 			}
 			for _, pat := range man.Coverage.Claim {
-				if ok, _ := filepath.Match(pat, id); ok {
+				if ok, _ := path.Match(pat, id); ok {
 					claimed[id] = true
 					break
 				}
@@ -128,7 +133,7 @@ func checkerClaims(design string, declared map[string]bool) (claimed, waived map
 // (Gx-trace consumes it the way it consumes alloy.ResidualIDs); Gc-carrier
 // owns validation and error reporting. Absent or malformed yields nil.
 func annexWaiverIDs(design string) map[string]bool {
-	data, err := os.ReadFile(filepath.Join(design, "formal", WaiverAnnexName))
+	data, err := readDesignFile(design, filepath.Join(design, "formal", WaiverAnnexName))
 	if err != nil {
 		return nil
 	}
@@ -281,8 +286,12 @@ func CheckCarriers(design string) *Gate {
 	// no matrices and this corpus is empty, which costs nothing; that is
 	// the point of running from Phase 1.
 	var unitCells []string
-	for _, f := range globExt(filepath.Join(design, "machines"), ".matrix.md") {
-		for _, tbl := range ir.ParseMdTables(readOrEmpty(f)) {
+	matrixFiles, inventoryErr := globExt(filepath.Join(design, "machines"), ".matrix.md")
+	if inventoryErr != nil {
+		g.Errs = append(g.Errs, inventoryErr.Error())
+	}
+	for _, f := range matrixFiles {
+		for _, tbl := range ir.ParseMdTables(readDesignOrEmpty(design, f)) {
 			mi := ir.FindCol(tbl.Header, "maps to")
 			if mi < 0 {
 				continue

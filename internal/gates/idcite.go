@@ -4,8 +4,10 @@
 // and DoD lines against the committed oracles, and every review round found
 // dangling or wrong citations that only ad-hoc conductor sweeps caught. This
 // gate makes a dangling citation a deterministic ERROR: every token in a
-// hand-written design file that looks like a stable id under a KNOWN tag must
-// resolve to a committed oracle row.
+// hand-written design file that has the stable-id shape must resolve to a
+// committed oracle row. The shape itself is the citation signal: limiting the
+// check to currently minted tags lets deleting an oracle family hide all of
+// that family's stale citations.
 
 package gates
 
@@ -13,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -57,8 +60,8 @@ func idciteScannable(base string) bool {
 
 // readTextOK reads a file, reporting failure as a skip: the walking checks
 // audit what is readable and never fail a design on one unreadable file.
-func readTextOK(path string) (string, bool) {
-	body, err := os.ReadFile(path)
+func readTextOK(design, path string) (string, bool) {
+	body, err := readDesignFile(design, path)
 	if err != nil {
 		return "", false
 	}
@@ -67,21 +70,31 @@ func readTextOK(path string) (string, bool) {
 
 // loadCommittedIDs walks the design for every *.oracle.md (machine oracles
 // under machines/, alloy oracles under formal/) and returns the committed
-// stable-id set plus the tag vocabulary. The tag set is the false-positive
-// wall: an id-shaped token under a tag no committed oracle mints is NOT a
-// citation and is never flagged.
-func loadCommittedIDs(design string) (ids map[string]bool, tags map[string]bool) {
+// stable-id set plus the tag vocabulary (the latter remains useful to callers
+// that need current-family counts; Gd resolves every stable-id-shaped token).
+func loadCommittedIDs(design string) (ids map[string]bool, tags map[string]bool, walkErrors []string) {
 	ids = map[string]bool{}
 	tags = map[string]bool{}
-	_ = filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	walkErr := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
-			return nil //nolint:nilerr // keep walking; an unreadable entry mints no ids
+			return err
+		}
+		rel, rerr := filepath.Rel(design, path)
+		if rerr != nil {
+			rel = path
+		}
+		if ignoredHere(design, rel) {
+			if fi.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		if fi.IsDir() || !strings.HasSuffix(fi.Name(), ".oracle.md") {
 			return nil
 		}
-		body, ok := readTextOK(path)
+		body, ok := readTextOK(design, path)
 		if !ok {
+			walkErrors = append(walkErrors, path+": unreadable oracle")
 			return nil
 		}
 		for _, m := range stableIDToken.FindAllStringSubmatch(body, -1) {
@@ -93,7 +106,11 @@ func loadCommittedIDs(design string) (ids map[string]bool, tags map[string]bool)
 		}
 		return nil
 	})
-	return ids, tags
+	if walkErr != nil {
+		walkErrors = append(walkErrors, walkErr.Error())
+	}
+	sort.Strings(walkErrors)
+	return ids, tags, walkErrors
 }
 
 // loadRemovedIDs reads the dated removed-ids allowance: design/removed-ids.txt,
@@ -101,7 +118,7 @@ func loadCommittedIDs(design string) (ids map[string]bool, tags map[string]bool)
 // may be cited historically without erroring; the gate counts the uses.
 func loadRemovedIDs(design string) map[string]bool {
 	out := map[string]bool{}
-	body, err := os.ReadFile(filepath.Join(design, "removed-ids.txt"))
+	body, err := readDesignFile(design, filepath.Join(design, "removed-ids.txt"))
 	if err != nil {
 		return out
 	}
@@ -118,23 +135,32 @@ func loadRemovedIDs(design string) map[string]bool {
 // CheckIDCitations implements Gd-idcite.
 func CheckIDCitations(design string) *Gate {
 	g := NewGate("Gd-idcite  design-side stable-id citations")
-	committed, tags := loadCommittedIDs(design)
+	committed, _, discoveryErrors := loadCommittedIDs(design)
+	for _, err := range discoveryErrors {
+		g.Errs = append(g.Errs, "oracle discovery incomplete: "+err)
+	}
 	if len(committed) == 0 {
 		g.Warns = append(g.Warns, "no committed oracle rows found; nothing to resolve citations against")
 		return g
 	}
 	removed := loadRemovedIDs(design)
 	filesScanned := 0
-	walkErr := filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	walkErr := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
-		}
-		if fi.IsDir() {
-			return nil
 		}
 		rel, rerr := filepath.Rel(design, path)
 		if rerr != nil {
 			rel = path
+		}
+		if ignoredHere(design, rel) {
+			if fi.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if fi.IsDir() {
+			return nil
 		}
 		if idciteSkips(rel) || !idciteScannable(fi.Name()) {
 			return nil
@@ -144,7 +170,7 @@ func CheckIDCitations(design string) *Gate {
 		// not drift. Judging them would grow the removed-ids allowance
 		// without bound; their citations are counted, never resolved.
 		ledger := rel == "DECISIONS.md" || rel == "STATE.md"
-		body, rerr := os.ReadFile(path)
+		body, rerr := readDesignFile(design, path)
 		if rerr != nil {
 			return rerr
 		}
@@ -152,9 +178,10 @@ func CheckIDCitations(design string) *Gate {
 		for lineNo, line := range strings.Split(string(body), "\n") {
 			for _, m := range stableIDToken.FindAllStringSubmatch(line, -1) {
 				tag, hexPart, suffix := m[2], m[3], m[4]
-				if !tags[tag] {
-					continue // unknown tag: id-shaped noise, not a citation
-				}
+				// Stable-id syntax inside the authored design is itself a
+				// citation. Restricting resolution to tags minted by CURRENT
+				// oracles let removal of an entire oracle family erase its own
+				// dangling citations from the check.
 				base := tag + "-" + hexPart
 				if ledger {
 					g.Count("ledger citations (historical, unjudged)")
@@ -179,7 +206,7 @@ func CheckIDCitations(design string) *Gate {
 				}
 			}
 			for _, m := range positionalIDToken.FindAllStringSubmatch(line, -1) {
-				if !tags[m[2]] || ledger {
+				if ledger {
 					continue
 				}
 				g.Warns = append(g.Warns, rel+":"+strconv.Itoa(lineNo+1)+": T-"+m[2]+"-"+m[3]+" is a positional row citation; rows renumber, so cite the stable id instead")
@@ -197,6 +224,9 @@ func CheckIDCitations(design string) *Gate {
 	// S17: clause-declared guards hold every line naming them to their
 	// clause vocabulary.
 	checkClauseDrift(g, design)
+	// S17 completeness: a compound guard that declares NO vocabulary is the
+	// declaration the drift check never gets to arm.
+	checkClauseCompleteness(g, design)
 	// S2 stage one: declared event reads must ride some payload row.
 	checkPayloadReads(g, design)
 	return g

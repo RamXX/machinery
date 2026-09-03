@@ -1,5 +1,5 @@
 ---- MODULE OutboxMessage ----
-\* machinery-version: v0.6.2
+\* machinery-version: v0.6.3
 EXTENDS Naturals
 
 \* Generated from OutboxMessage.machine.json by machinery tla. Control-flow model.
@@ -10,7 +10,7 @@ EXTENDS Naturals
 \*      machine_lint requires an unguarded fallback or an _exhaustive note; where
 \*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
 \*      below is only as sound as these hand-checked, UNVERIFIED claims:
-\*      - UNVERIFIED, state rolledBack: priorStatus is set on every path into the overlay from a domain state; only Pending and Published reach the overlay (Consumed is final), and both priorIs* guards are present; a rollback to Pending is precisely the at-least-once re-drive point for the next poller sweep
+\*      (none here: every guarded branch list has an unguarded fallback)
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or
@@ -29,10 +29,10 @@ CONSTANT MaxRetries
 VARIABLES st, rc1
 vars == << st, rc1 >>
 
-States == {"Consumed", "Pending", "Published", "persistRetry", "persisting", "publishing", "rolledBack"}
-Domain == {"Consumed", "Pending", "Published"}
+States == {"Consumed", "Pending", "Published", "persistRetry", "persisting", "publishing", "rolledBack", "routingFault"}
+Domain == {"Consumed", "Pending", "Published", "routingFault"}
 Overlay == {"persistRetry", "persisting", "publishing", "rolledBack"}
-Final == {"Consumed"}
+Final == {"Consumed", "routingFault"}
 
 TypeOK == st \in States /\ rc1 \in 0..MaxRetries
 Init == st = "Pending" /\ rc1 = 0
@@ -51,6 +51,7 @@ Init == st = "Pending" /\ rc1 = 0
   \* T12: persisting -onError:persistOutboxRow-> rolledBack
   \* T13: rolledBack -always-> Pending
   \* T14: rolledBack -always-> Published
+  \* T15: rolledBack -always-> routingFault
 
 T1 == st = "Pending" /\ st' = "publishing" /\ rc1' = 0
 T2 == st = "Published" /\ st' = "persisting" /\ rc1' = 0
@@ -66,12 +67,13 @@ T11 == st = "persisting" /\ st' = "persistRetry" /\ rc1' = rc1
 T12 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1
 T13 == st = "rolledBack" /\ st' = "Pending" /\ rc1' = 0
 T14 == st = "rolledBack" /\ st' = "Published" /\ rc1' = 0
+T15 == st = "rolledBack" /\ st' = "routingFault" /\ rc1' = 0
 RetryExhausted_persistRetry == st = "persistRetry" /\ rc1 >= MaxRetries /\ st' = "rolledBack" /\ rc1' = rc1
 RetryAgain_persistRetry == st = "persistRetry" /\ rc1 < MaxRetries /\ st' = "persisting" /\ rc1' = rc1 + 1
 Terminated == st \in Final /\ UNCHANGED vars
 
 DomainNext == T1 \/ T2
-OverlayNext == T3 \/ T4 \/ T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
+OverlayNext == T3 \/ T4 \/ T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
 Next == DomainNext \/ OverlayNext \/ Terminated
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)

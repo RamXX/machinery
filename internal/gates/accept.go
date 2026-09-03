@@ -8,10 +8,10 @@
 //
 // The split is machinery's standing one. Deterministic here: the evidence
 // exists, parses, binds to a declared milestone, carries every required
-// field, covers the DoD's ids, and names the commit under review (the same
+// field, covers the DoD's ids, and names the reviewed commit (the same
 // binding discipline as Gk's input_hash and Gt's stable ids). Attested, like
 // every other LLM-attested half: whether the reviewer judged well. What Ga
-// proves is that an acceptance review happened, on this commit, against
+// proves is that an acceptance review happened, on a commit in this history, against
 // these obligations.
 //
 // One file per milestone: git history is the record of prior attempts, so a
@@ -22,6 +22,7 @@ package gates
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,21 +33,44 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RamXX/machinery/internal/dirscan"
+	"github.com/RamXX/machinery/internal/gitcontrol"
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/processcontrol"
 )
 
 // AcceptanceDirName is the committed acceptance-evidence directory under the
 // design; Ga auto-activates on it.
 const AcceptanceDirName = "acceptance"
 
-// minCommitPrefix is the shortest commit prefix that binds. Git's own default
-// abbreviation is 7 characters; anything shorter names too many commits to be
-// evidence of anything.
+// minCommitPrefix is the shortest identity prefix accepted by the exported-
+// design fallback, where no repository exists to prove ancestry.
 const minCommitPrefix = 7
 
 // gitHeadTimeout bounds the one subprocess the gate suite runs. A gate that
 // can hang is a gate people disable.
 const gitHeadTimeout = 5 * time.Second
+
+// gitOutputLimit is enough for every read-only query below while bounding a
+// corrupt or hostile git wrapper. processcontrol continues draining after the
+// limit so truncation cannot deadlock the child.
+const gitOutputLimit = 64 << 10
+
+// gitCommandTimeout is a variable only so the timeout failure path can be
+// exercised without making the test suite sleep for the full production
+// bound. Production never changes it.
+var gitCommandTimeout = gitHeadTimeout
+
+// errReviewCommitAbsent identifies the two semantic absence cases where a
+// staged acceptance run may explicitly report an unchecked binding: the
+// design is outside Git, or it is inside a repository that has no commit yet.
+// Operational failures must never be folded into this sentinel.
+var errReviewCommitAbsent = errors.New("repository commit is semantically absent")
+
+var (
+	errReviewCommitOutsideRepository = errors.New("design is outside a git repository")
+	errReviewCommitUnbornRepository  = errors.New("git repository has no commit")
+)
 
 // commitProvenance records where the commit under review came from. It is
 // printed on the checked: line, because a binding whose source the reader
@@ -55,15 +79,22 @@ type commitProvenance int
 
 const (
 	commitAbsent commitProvenance = iota
-	commitFromCaller
+	commitFromCallerExported
+	commitFromCallerRepository
 	commitFromGit
 )
 
 var (
 	// acceptanceFileRe matches the one legal evidence file name.
-	acceptanceFileRe = regexp.MustCompile(`^M(\d+)\.yaml$`)
+	acceptanceFileRe        = regexp.MustCompile(`^M(\d+)\.yaml$`)
+	acceptanceOracleTokenRe = regexp.MustCompile(`\bORACLESET\b`)
 	// acceptanceDateRe pins the date shape before the calendar check.
 	acceptanceDateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	// acceptanceOracleSetRe is the compact, checked BUILD.md declaration that
+	// expands to every stable id in one committed oracle table. The path
+	// vocabulary is closed so a marker cannot escape the design or name an
+	// arbitrary evidence file.
+	acceptanceOracleSetRe = regexp.MustCompile(`ORACLESET\{(machines/[A-Za-z0-9][A-Za-z0-9_.-]*\.oracle\.md|formal/(?:Policy|Isolation)\.oracle\.md)\}`)
 	// gitObjectNameRe pins what a derived HEAD may look like before it is
 	// treated as a commit; git prints nothing else, and a gate must not bind
 	// evidence to whatever a subprocess happened to write.
@@ -84,8 +115,8 @@ var (
 // HasAcceptanceDir reports whether the design carries the acceptance
 // directory at all.
 func HasAcceptanceDir(design string) bool {
-	fi, err := os.Stat(filepath.Join(design, AcceptanceDirName))
-	return err == nil && fi.IsDir()
+	has, err := probeRealDir(design, AcceptanceDirName)
+	return has || err != nil
 }
 
 // AcceptanceActive reports whether Ga auto-activates on this design: the
@@ -126,14 +157,38 @@ type acceptRecord struct {
 	date         string
 }
 
-// CheckAcceptance implements Ga-accept. commit is the VCS commit under review
-// (--commit or MACHINERY_COMMIT), and a supplied one binds by identity. When
-// it is empty the gate defaults to the HEAD of the git repository the design
-// sits in and binds by ancestry instead (see checkCommitBinding); only outside
-// a repository does the binding degrade to a non-blocking note.
+// CheckAcceptance implements Ga-accept. commit is an optional repository-
+// history anchor (--commit or MACHINERY_COMMIT). When empty, the gate derives
+// HEAD from the repository holding the design. Repository-backed evidence
+// binds by ancestry; exported designs can use the explicit identity fallback.
 func CheckAcceptance(design, commit string) *Gate {
+	return checkAcceptance(design, commit, false)
+}
+
+// checkAcceptance implements both the staged and final-handoff forms of Ga.
+// Staged runs retain the historical, explicit non-check note when no commit
+// can be derived. Final handoff is closed: it must receive a commit from the
+// caller or derive a well-formed HEAD from the repository holding the design.
+func checkAcceptance(design, commit string, requireCommit bool) *Gate {
+	return checkAcceptanceWithGit(design, design, commit, requireCommit)
+}
+
+func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool) *Gate {
 	g := NewGate("Ga-accept  milestone acceptance evidence")
 	g.startOrder()
+	reviewed, provenance := "", commitAbsent
+	commitResolveFailed := false
+	if requireCommit {
+		var resolveErr error
+		reviewed, provenance, resolveErr = resolveReviewCommitExact(gitDesign, commit)
+		if resolveErr != nil {
+			g.Errs = append(g.Errs, "final handoff requires a commit under review from --commit/MACHINERY_COMMIT or a readable repository HEAD: "+resolveErr.Error())
+		}
+	}
+	if _, err := probeRealDir(design, AcceptanceDirName); err != nil {
+		g.Errs = append(g.Errs, err.Error())
+		return g
+	}
 	if !HasBuildDoc(design) {
 		g.Errs = append(g.Errs, "no BUILD.md in the design; acceptance evidence is keyed to the build plan's milestones and this design declares none (author BUILD.md, or drop ga from the gate list)")
 		return g
@@ -164,12 +219,16 @@ func CheckAcceptance(design, commit string) *Gate {
 			g.Errs = append(g.Errs, fmt.Sprintf("%s: names milestone M%d, which no build-plan document declares; acceptance evidence binds to a planned milestone", rec.label, num))
 			continue
 		}
-		checkDoDCoverage(g, rec, ref, ids)
+		checkDoDCoverage(g, design, rec, ref, ids)
 	}
 
-	reviewed, provenance := "", commitAbsent
-	if len(closed) > 0 {
-		reviewed, provenance = resolveReviewCommit(design, commit)
+	if len(closed) > 0 && !requireCommit {
+		var resolveErr error
+		reviewed, provenance, resolveErr = resolveReviewCommit(gitDesign, commit)
+		if resolveErr != nil {
+			commitResolveFailed = true
+			g.Errs = append(g.Errs, "commit binding could not resolve the repository HEAD: "+resolveErr.Error())
+		}
 	}
 	for _, num := range closed {
 		ref := byNum[num]
@@ -184,7 +243,7 @@ func CheckAcceptance(design, commit string) *Gate {
 			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%s (%s) is marked closed but %s records verdict REJECTED; a rejected review does not close a milestone (reopen the milestone, or land the fixes and re-review)", ref.doc, ref.m.numRaw, ref.m.title, rec.label))
 		case rec.verdict == "ACCEPTED":
 			g.Count("closed milestones with accepted evidence")
-			checkCommitBinding(g, design, rec, reviewed, provenance)
+			checkCommitBinding(g, gitDesign, rec, reviewed, provenance)
 		}
 	}
 	// the provenance is stated, never the sha: the source is what a reader
@@ -193,104 +252,242 @@ func CheckAcceptance(design, commit string) *Gate {
 	// names the RULE, not the outcome; the outcome is the count beside it and
 	// the findings above it.
 	switch provenance {
-	case commitFromCaller:
-		g.CheckedExtra("commit under review supplied by --commit or MACHINERY_COMMIT; evidence commit bound by identity")
+	case commitFromCallerRepository:
+		g.CheckedExtra("history anchor supplied by --commit or MACHINERY_COMMIT; repository evidence bound by ancestry")
+	case commitFromCallerExported:
+		g.CheckedExtra("review target supplied by --commit or MACHINERY_COMMIT outside git; exported evidence bound by identity")
 	case commitFromGit:
 		g.CheckedExtra("commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry")
 	case commitAbsent:
-		if len(closed) > 0 {
-			g.Notes = append(g.Notes, "commit binding not checked: no --commit and no MACHINERY_COMMIT, and the design is not inside a git repository this binary can read; CI is expected to pass the reviewed commit")
+		if len(closed) > 0 && !requireCommit && !commitResolveFailed {
+			g.Notes = append(g.Notes, "commit binding not checked: no --commit and no MACHINERY_COMMIT, and the design is not inside a git repository this binary can read; CI must run from a repository checkout or supply a history anchor")
 		}
 	}
 	return g
 }
 
-// resolveReviewCommit resolves the commit accepted evidence binds to. An
-// explicit --commit or MACHINERY_COMMIT always wins, because the caller knows
-// which commit the review ran on and a local checkout may have moved since.
+// resolveReviewCommit resolves the commit accepted evidence binds to. It
+// converts only semantic absence (outside a repository or an unborn HEAD) to
+// commitAbsent; every operational/tool/output error remains blocking. An
+// explicit --commit or MACHINERY_COMMIT always wins because the caller may
+// intentionally validate against a history endpoint other than local HEAD.
 // Otherwise the commit defaults to the HEAD of the git repository the design
 // sits in: a local run then binds as tightly as CI does, instead of printing a
 // note and proving nothing on every developer machine.
-func resolveReviewCommit(design, given string) (string, commitProvenance) {
-	if g := strings.TrimSpace(given); g != "" {
-		return g, commitFromCaller
+func resolveReviewCommit(design, given string) (string, commitProvenance, error) {
+	commit, provenance, err := resolveReviewCommitExact(design, given)
+	if errors.Is(err, errReviewCommitOutsideRepository) ||
+		(strings.TrimSpace(given) == "" && errors.Is(err, errReviewCommitUnbornRepository)) {
+		return "", commitAbsent, nil
 	}
-	if head := gitHeadAt(design); head != "" {
-		return head, commitFromGit
-	}
-	return "", commitAbsent
+	return commit, provenance, err
 }
 
-// runGit runs one read-only git command in the repository containing dir and
-// returns its trimmed stdout. ok is false when dir is not a directory, git is
-// unavailable, or the command exits non-zero (which, for the queries below, is
-// itself the answer: no such object, or not an ancestor).
-//
+// resolveReviewCommitExact is the fail-closed resolver used by final handoff.
+// Unlike the staged wrapper, it preserves every reason an implicit binding
+// could not be established: missing tool, inaccessible directory, timeout,
+// command failure, and malformed output are materially different from a
+// successfully resolved commit and therefore cannot collapse to absence.
+func resolveReviewCommitExact(design, given string) (string, commitProvenance, error) {
+	if g := strings.TrimSpace(given); g != "" {
+		if !gitObjectNameRe.MatchString(g) {
+			return "", commitAbsent, fmt.Errorf("supplied history anchor must be a lowercase hexadecimal VCS object id or unambiguous prefix (7 to 64 characters)")
+		}
+		if _, err := gitHeadAtExact(design); errors.Is(err, errReviewCommitOutsideRepository) {
+			return g, commitFromCallerExported, nil
+		} else if err != nil {
+			return "", commitAbsent, err
+		}
+		full, err := gitCommitOf(design, g)
+		if err != nil {
+			return "", commitAbsent, fmt.Errorf("resolve supplied history anchor: %w", err)
+		}
+		if full == "" {
+			return "", commitAbsent, fmt.Errorf("supplied history anchor %s names no commit in the repository holding the design", ir.Repr(g))
+		}
+		return full, commitFromCallerRepository, nil
+	}
+	head, err := gitHeadAtExact(design)
+	if err != nil {
+		return "", commitAbsent, err
+	}
+	return head, commitFromGit, nil
+}
+
 // The repository is resolved FROM DIR with `git -C`, never from the process
 // working directory: `machinery check some/other/design` is routinely run from
 // an unrelated repository, and binding a design's evidence to whatever
 // repository the shell happened to sit in would be worse than not binding at
 // all.
-func runGit(dir string, args ...string) (string, bool) {
+// runGitExact runs a read-only git query without erasing operational errors.
+// Semantic callers inspect gitQueryError.exitCode explicitly; inability to
+// run the proof never collapses to a negative repository answer.
+func runGitExact(dir string, args ...string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
-		return "", false
+		return "", fmt.Errorf("resolve design directory: %w", err)
 	}
-	if fi, statErr := os.Stat(abs); statErr != nil || !fi.IsDir() {
-		return "", false
+	fi, err := os.Stat(abs)
+	if err != nil {
+		return "", fmt.Errorf("inspect design directory %s: %w", abs, err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), gitHeadTimeout)
+	if !fi.IsDir() {
+		return "", fmt.Errorf("design path %s is not a directory", abs)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", abs}, args...)...)
 	// a gate reads; it never takes a lock, opens a pager, or runs a hook
-	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "GIT_PAGER=cat", "GIT_TERMINAL_PROMPT=0")
-	out, err := cmd.Output()
+	cmd.Env = gitcontrol.Environment(os.Environ())
+	stdout, stderr := &acceptGitCapture{}, &acceptGitCapture{}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	err = processcontrol.Run(ctx, cmd)
 	if err != nil {
-		return "", false
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("git %s timed out after %s: %w", strings.Join(args, " "), gitCommandTimeout, ctx.Err())
+		}
+		detail := strings.TrimSpace(stderr.String())
+		if detail == "" {
+			detail = strings.TrimSpace(stdout.String())
+		}
+		return "", &gitQueryError{args: append([]string(nil), args...), exitCode: processExitCode(err), detail: detail, err: err}
 	}
-	return strings.TrimSpace(string(out)), true
+	if stdout.truncated || stderr.truncated {
+		streams := make([]string, 0, 2)
+		if stdout.truncated {
+			streams = append(streams, "stdout")
+		}
+		if stderr.truncated {
+			streams = append(streams, "stderr")
+		}
+		return "", fmt.Errorf("git %s exceeded the %d-byte success-output limit on %s", strings.Join(args, " "), gitOutputLimit, strings.Join(streams, " and "))
+	}
+	if detail := strings.TrimSpace(stderr.String()); detail != "" {
+		return "", fmt.Errorf("git %s emitted stderr on success: %s", strings.Join(args, " "), detail)
+	}
+	return strings.TrimSpace(stdout.String()), nil
+}
+
+type gitQueryError struct {
+	args     []string
+	exitCode int
+	detail   string
+	err      error
+}
+
+type acceptGitCapture struct {
+	data      []byte
+	truncated bool
+}
+
+func (capture *acceptGitCapture) Write(p []byte) (int, error) {
+	overflow := len(p) > gitOutputLimit-len(capture.data)
+	if room := gitOutputLimit - len(capture.data); room > 0 {
+		take := len(p)
+		if take > room {
+			take = room
+		}
+		capture.data = append(capture.data, p[:take]...)
+	}
+	capture.truncated = capture.truncated || overflow
+	return len(p), nil
+}
+
+func (capture *acceptGitCapture) String() string {
+	out := string(capture.data)
+	if capture.truncated {
+		out += fmt.Sprintf("\n[output truncated at %d bytes]\n", gitOutputLimit)
+	}
+	return out
+}
+
+func (err *gitQueryError) Error() string {
+	prefix := "git " + strings.Join(err.args, " ") + " failed"
+	if err.detail == "" {
+		return prefix + ": " + err.err.Error()
+	}
+	return prefix + ": " + err.err.Error() + ": " + err.detail
+}
+
+func (err *gitQueryError) Unwrap() error { return err.err }
+
+func processExitCode(err error) int {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
+	}
+	return -1
 }
 
 // gitHeadAt returns the HEAD commit of the git repository containing dir, or
 // "" when dir is outside a repository, git is unavailable, or the repository
 // carries no commit yet.
 func gitHeadAt(dir string) string {
-	head, ok := runGit(dir, "rev-parse", "HEAD")
-	if !ok {
-		return ""
-	}
-	head = strings.ToLower(head)
-	if !gitObjectNameRe.MatchString(head) {
+	head, err := gitHeadAtExact(dir)
+	if err != nil {
 		return ""
 	}
 	return head
+}
+
+func gitHeadAtExact(dir string) (string, error) {
+	head, err := runGitExact(dir, "rev-parse", "HEAD")
+	if err != nil {
+		lower := strings.ToLower(err.Error())
+		if strings.Contains(lower, "not a git repository") {
+			return "", errors.Join(errReviewCommitAbsent, errReviewCommitOutsideRepository, err)
+		}
+		if strings.Contains(lower, "ambiguous argument 'head'") && strings.Contains(lower, "unknown revision or path") {
+			return "", errors.Join(errReviewCommitAbsent, errReviewCommitUnbornRepository, err)
+		}
+		return "", err
+	}
+	head = strings.ToLower(head)
+	if !gitObjectNameRe.MatchString(head) {
+		return "", fmt.Errorf("git rev-parse HEAD returned malformed commit %q", head)
+	}
+	return head, nil
 }
 
 // gitCommitOf resolves rev to a full commit object name in the repository
 // containing dir, or "" when that repository holds no such commit. A leading
 // dash is refused before the value reaches git: an evidence field is data, and
 // data must never arrive as an option.
-func gitCommitOf(dir, rev string) string {
+func gitCommitOf(dir, rev string) (string, error) {
 	rev = strings.TrimSpace(rev)
 	if rev == "" || strings.HasPrefix(rev, "-") {
-		return ""
+		return "", nil
 	}
-	full, ok := runGit(dir, "rev-parse", "--verify", "--quiet", rev+"^{commit}")
-	if !ok {
-		return ""
+	full, err := runGitExact(dir, "rev-parse", "--verify", "--quiet", rev+"^{commit}")
+	if err != nil {
+		var queryErr *gitQueryError
+		if errors.As(err, &queryErr) && queryErr.exitCode == 1 {
+			return "", nil
+		}
+		return "", err
 	}
 	full = strings.ToLower(full)
 	if !gitObjectNameRe.MatchString(full) {
-		return ""
+		return "", fmt.Errorf("git rev-parse returned malformed commit %q", full)
 	}
-	return full
+	return full, nil
 }
 
 // gitIsAncestor reports whether ancestor is reachable from descendant, which
 // includes the two being the same commit.
-func gitIsAncestor(dir, ancestor, descendant string) bool {
-	_, ok := runGit(dir, "merge-base", "--is-ancestor", ancestor, descendant)
-	return ok
+func gitIsAncestor(dir, ancestor, descendant string) (bool, error) {
+	stdout, err := runGitExact(dir, "merge-base", "--is-ancestor", ancestor, descendant)
+	if err == nil {
+		if stdout != "" {
+			return false, fmt.Errorf("git merge-base --is-ancestor emitted stdout on success: %s", stdout)
+		}
+		return true, nil
+	}
+	var queryErr *gitQueryError
+	if errors.As(err, &queryErr) && queryErr.exitCode == 1 {
+		return false, nil
+	}
+	return false, err
 }
 
 // acceptanceMilestones indexes every declared milestone by number and returns
@@ -331,23 +528,39 @@ func scanAcceptanceDir(design string, g *Gate) (map[int]bool, map[int]*acceptRec
 	present := map[int]bool{}
 	records := map[int]*acceptRecord{}
 	dir := filepath.Join(design, AcceptanceDirName)
-	entries, err := os.ReadDir(dir)
+	entries, err := dirscan.Read(dir, designInventoryMaxEntries)
 	if err != nil {
+		g.Errs = append(g.Errs, "cannot enumerate "+AcceptanceDirName+"/: "+err.Error())
 		return present, records
 	}
 	indexFiles := 0
 	for _, e := range entries {
 		name := e.Name()
 		label := AcceptanceDirName + "/" + name
+		info, lerr := os.Lstat(filepath.Join(dir, name))
+		if lerr != nil {
+			g.Errs = append(g.Errs, label+" cannot be inspected: "+lerr.Error())
+			continue
+		}
 		switch {
+		case info.Mode()&os.ModeSymlink != 0 || (!info.IsDir() && !info.Mode().IsRegular()):
+			g.Errs = append(g.Errs, label+" must be a regular evidence file; symlinks and special entries are rejected")
 		case e.IsDir():
 			g.Errs = append(g.Errs, label+" is a directory; acceptance evidence is one flat "+AcceptanceDirName+"/M<n>.yaml per milestone")
 		case strings.EqualFold(name, "README.md"), strings.EqualFold(name, "index.md"):
 			indexFiles++
 		case acceptanceFileRe.MatchString(name):
-			num, _ := strconv.Atoi(acceptanceFileRe.FindStringSubmatch(name)[1])
+			num, parseErr := strconv.Atoi(acceptanceFileRe.FindStringSubmatch(name)[1])
+			if parseErr != nil || name != fmt.Sprintf("M%d.yaml", num) {
+				g.Errs = append(g.Errs, label+" is not a canonical acceptance filename; use exactly M<n>.yaml with an unpadded, machine-sized non-negative milestone number")
+				continue
+			}
+			if present[num] {
+				g.Errs = append(g.Errs, fmt.Sprintf("%s duplicates milestone M%d acceptance evidence under another numeric spelling; use exactly one canonical M<n>.yaml file", label, num))
+				continue
+			}
 			present[num] = true
-			if rec := parseAcceptance(g, filepath.Join(dir, name), label, num); rec != nil {
+			if rec := parseAcceptance(g, design, filepath.Join(dir, name), label, num); rec != nil {
 				records[num] = rec
 			}
 		default:
@@ -362,8 +575,8 @@ func scanAcceptanceDir(design string, g *Gate) (map[int]bool, map[int]*acceptRec
 
 // parseAcceptance reads and validates one evidence file. nil means the file
 // could not be trusted; every reason was recorded as an ERROR first.
-func parseAcceptance(g *Gate, path, label string, fileNum int) *acceptRecord {
-	data, err := os.ReadFile(path)
+func parseAcceptance(g *Gate, design, path, label string, fileNum int) *acceptRecord {
+	data, err := readDesignFile(design, path)
 	if err != nil {
 		g.Errs = append(g.Errs, label+" is unreadable: "+err.Error())
 		return nil
@@ -421,8 +634,8 @@ func parseAcceptance(g *Gate, path, label string, fileNum int) *acceptRecord {
 		g.Errs = append(g.Errs, fmt.Sprintf("%s: verdict is %s; it is exactly ACCEPTED or REJECTED (upper case)", label, ir.Repr(root.GetString("verdict"))))
 		ok = false
 	}
-	if rec.commit == "" || strings.ContainsAny(rec.commit, " \t") {
-		g.Errs = append(g.Errs, label+": commit must name the single VCS commit the review ran on (quote a purely numeric revision so it reads as a string)")
+	if !gitObjectNameRe.MatchString(rec.commit) {
+		g.Errs = append(g.Errs, label+": commit must be a lowercase hexadecimal VCS object id or unambiguous prefix (7 to 64 characters), not a symbolic or moving revision; quote a purely numeric revision so YAML reads it as a string")
 		ok = false
 	}
 	if rec.reviewer == "" {
@@ -502,7 +715,7 @@ func acceptanceOracleIDs(design string, g *Gate) []string {
 		if fi, err := os.Stat(path); err != nil || fi.IsDir() {
 			continue // the relational layers are opt-in; Gp/Gn own their health
 		}
-		testIDs, stableIDs := oracleTableIDs(readFileOrErr(path, g))
+		testIDs, stableIDs := oracleTableIDs(readDesignFileOrErr(design, path, g))
 		ids = append(ids, testIDs...)
 		ids = append(ids, stableIDs...)
 	}
@@ -516,9 +729,13 @@ func acceptanceOracleIDs(design string, g *Gate) []string {
 // same way Gk's input_hash proves a verdict covered the right design. The
 // reverse direction is the half that was missing: a list that resolves to
 // nothing reads as coverage and proves nothing.
-func checkDoDCoverage(g *Gate, rec *acceptRecord, ref milestoneRef, ids []string) {
+func checkDoDCoverage(g *Gate, design string, rec *acceptRecord, ref milestoneRef, ids []string) {
 	listed := map[string]bool{}
 	for _, id := range rec.dodIDs {
+		if listed[id] {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: dod_ids repeats %s; acceptance coverage must be an exact set with each obligation named once", rec.label, ir.Repr(id)))
+			continue
+		}
 		listed[id] = true
 	}
 	committed := map[string]bool{}
@@ -541,6 +758,28 @@ func checkDoDCoverage(g *Gate, rec *acceptRecord, ref milestoneRef, ids []string
 		seen[id] = true
 		cited = append(cited, id)
 	}
+	markers := acceptanceOracleSetRe.FindAllStringSubmatch(dod, -1)
+	withoutValidMarkers := acceptanceOracleSetRe.ReplaceAllString(dod, "")
+	if acceptanceOracleTokenRe.MatchString(withoutValidMarkers) {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%d has a malformed ORACLESET marker; use ORACLESET{machines/<Machine>.oracle.md}, ORACLESET{formal/Policy.oracle.md}, or ORACLESET{formal/Isolation.oracle.md}", ref.doc, rec.milestone))
+	}
+	for _, marker := range markers {
+		path := filepath.Join(design, filepath.FromSlash(marker[1]))
+		_, stableIDs := oracleTableIDs(readDesignFileOrErr(design, path, g))
+		if len(stableIDs) == 0 {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: milestone M%d ORACLESET{%s} resolved no stable ids", ref.doc, rec.milestone, marker[1]))
+			continue
+		}
+		for _, id := range stableIDs {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			cited = append(cited, id)
+		}
+		g.Count("DoD oracle sets bound")
+	}
+	sort.Strings(cited)
 	bound := 0
 	for _, id := range cited {
 		if listed[id] {
@@ -549,66 +788,62 @@ func checkDoDCoverage(g *Gate, rec *acceptRecord, ref milestoneRef, ids []string
 		}
 		g.Errs = append(g.Errs, fmt.Sprintf("%s: dod_ids omits %s, which milestone M%d's DoD in %s cites; the evidence must list every committed oracle id its DoD names", rec.label, ir.Repr(id), rec.milestone, ref.doc))
 	}
+	for _, id := range rec.dodIDs {
+		if committed[id] && !seen[id] {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: dod_ids names %s, which exists in the committed oracle corpus but is not cited by milestone M%d's DoD in %s; acceptance coverage must equal this milestone's obligations exactly", rec.label, ir.Repr(id), rec.milestone, ref.doc))
+		}
+	}
 	if bound > 0 {
 		g.Count("DoD ids bound", bound)
 	}
 }
 
-// checkCommitBinding holds accepted evidence to the commit under review. The
-// rule depends on where that commit came from, and the two modes answer two
-// different questions.
-//
-// EXPLICIT (--commit or MACHINERY_COMMIT): identity. The caller named the one
-// commit the review is being judged against, so the evidence must name it too.
-// This is CI's contract and it does not move: on a pull request the commit
-// under review is the head commit, and a merge commit that did not exist when
-// the review ran does not bind, deliberately.
-//
-// DERIVED (git HEAD of the design's repository): ancestry. Nobody named a
-// commit; the gate went looking for one, and the honest question it can ask of
-// an arbitrary local checkout is not "was the review run on exactly this
-// commit" (it never is: the commit that ADDS the evidence file already has a
-// different sha than the commit the evidence names, so identity here would go
-// red one commit later and stay red) but "is the reviewed commit part of this
-// history at all". A sha that resolves to nothing, or to a commit on a branch
-// this history never took, is caught on every local run and at stop time,
-// which is the hole the note tier left open.
+// Acceptance evidence necessarily lands after the commit it reviews. Whether
+// the history anchor is supplied or derived from HEAD, the evidence commit
+// must therefore be an ancestor of that anchor. This also lets independently
+// reviewed milestones retain their own commit identities. Only an exported
+// design outside git falls back to string identity against a supplied target.
 func checkCommitBinding(g *Gate, design string, rec *acceptRecord, commit string, prov commitProvenance) {
 	if commit == "" {
 		return
 	}
-	if prov == commitFromGit {
-		checkCommitAncestry(g, design, rec, commit)
+	if prov == commitFromCallerExported {
+		if !commitBinds(rec.commit, commit) {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s does not name the supplied review target %s; outside git, only an exact match or an unambiguous prefix of at least %d characters can bind", rec.label, ir.Repr(rec.commit), ir.Repr(commit), minCommitPrefix))
+			return
+		}
+		g.Count("commit bindings verified")
 		return
 	}
-	if !commitBinds(rec.commit, commit) {
-		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s does not name the commit under review (%s); the review was performed on a different commit (an exact match, or either value an unambiguous prefix of the other of at least %d characters, binds)", rec.label, ir.Repr(rec.commit), ir.Repr(commit), minCommitPrefix))
-		return
-	}
-	g.Count("commit bindings verified")
+	checkCommitAncestry(g, design, rec, commit)
 }
 
-// checkCommitAncestry is the derived mode's rule: the evidence commit must
-// resolve to a commit this repository holds, and that commit must be reachable
-// from HEAD (equal counts). Both failures are ERRORs, because both mean the
-// evidence names something this tree cannot account for.
+// checkCommitAncestry requires the evidence commit to resolve in this
+// repository and be reachable from the selected history anchor (equality
+// counts). Both failures mean the evidence names work this tree cannot account
+// for and are therefore errors.
 func checkCommitAncestry(g *Gate, design string, rec *acceptRecord, head string) {
-	full := gitCommitOf(design, rec.commit)
-	if full == "" {
-		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s names no commit in the repository holding the design (HEAD is %s); a reviewed commit that the history does not contain is a typo, a fabrication, or evidence from another repository", rec.label, ir.Repr(rec.commit), ir.Repr(head)))
+	full, err := gitCommitOf(design, rec.commit)
+	if err != nil {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: could not resolve evidence commit %s in the repository holding the design: %v", rec.label, ir.Repr(rec.commit), err))
 		return
 	}
-	if !gitIsAncestor(design, full, head) {
-		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s is not an ancestor of the commit under review (HEAD is %s); the review ran on a commit this history never took (an unmerged branch, or a rewritten one), so it says nothing about this tree (pass --commit to bind a specific commit by identity instead)", rec.label, ir.Repr(rec.commit), ir.Repr(head)))
+	if full == "" {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s names no commit in the repository holding the design (history anchor is %s); a reviewed commit that the history does not contain is a typo, a fabrication, or evidence from another repository", rec.label, ir.Repr(rec.commit), ir.Repr(head)))
+		return
+	}
+	isAncestor, err := gitIsAncestor(design, full, head)
+	if err != nil {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: could not prove whether commit %s is an ancestor of history anchor %s: %v", rec.label, ir.Repr(rec.commit), ir.Repr(head), err))
+		return
+	}
+	if !isAncestor {
+		g.Errs = append(g.Errs, fmt.Sprintf("%s: commit %s is not an ancestor of history anchor %s; the review ran on a commit this history never took (an unmerged branch, or a rewritten one), so it says nothing about this tree", rec.label, ir.Repr(rec.commit), ir.Repr(head)))
 		return
 	}
 	g.Count("commit bindings verified")
 }
 
-// commitBinds reports whether an evidence commit names the commit under
-// review: an exact match, or either value an unambiguous prefix of the other.
-// Prefixes shorter than minCommitPrefix never bind; they name too many
-// commits to be evidence.
 func commitBinds(evidence, given string) bool {
 	e := strings.ToLower(strings.TrimSpace(evidence))
 	got := strings.ToLower(strings.TrimSpace(given))

@@ -1,5 +1,5 @@
 ---- MODULE Task ----
-\* machinery-version: v0.6.2
+\* machinery-version: v0.6.3
 EXTENDS Naturals
 
 \* Generated from Task.machine.json by machinery tla. Control-flow model.
@@ -10,7 +10,7 @@ EXTENDS Naturals
 \*      machine_lint requires an unguarded fallback or an _exhaustive note; where
 \*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
 \*      below is only as sound as these hand-checked, UNVERIFIED claims:
-\*      - UNVERIFIED, state rolledBack: only Open and InProgress have transitions into the persist overlay, so priorStatus ranges over {Open, InProgress}; both priorIs* guards are present
+\*      (none here: every guarded branch list has an unguarded fallback)
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or
@@ -65,6 +65,7 @@ Init == st = "Open" /\ rc1 = 0
   \* T26: persisting -onError:saveTask-> rolledBack
   \* T27: rolledBack -always-> Open
   \* T28: rolledBack -always-> InProgress
+  \* T29: rolledBack -always-> Cancelled
 
 T1 == st = "Open" /\ st' = "persisting" /\ rc1' = 0
 T2 == st = "Open" /\ st' = "Open" /\ rc1' = 0
@@ -94,12 +95,13 @@ T25 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1
 T26 == st = "persisting" /\ st' = "rolledBack" /\ rc1' = rc1
 T27 == st = "rolledBack" /\ st' = "Open" /\ rc1' = 0
 T28 == st = "rolledBack" /\ st' = "InProgress" /\ rc1' = 0
+T29 == st = "rolledBack" /\ st' = "Cancelled" /\ rc1' = 0
 RetryExhausted_persistRetry == st = "persistRetry" /\ rc1 >= MaxRetries /\ st' = "rolledBack" /\ rc1' = rc1
 RetryAgain_persistRetry == st = "persistRetry" /\ rc1 < MaxRetries /\ st' = "persisting" /\ rc1' = rc1 + 1
 Terminated == st \in Final /\ UNCHANGED vars
 
 DomainNext == T1 \/ T2 \/ T3 \/ T4 \/ T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14 \/ T15
-OverlayNext == T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ T26 \/ T27 \/ T28 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
+OverlayNext == T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ T26 \/ T27 \/ T28 \/ T29 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
 Next == DomainNext \/ OverlayNext \/ Terminated
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)

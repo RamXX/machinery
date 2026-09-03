@@ -19,9 +19,13 @@ func newVerifyFormalCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&genOnly, "gen-only", false,
 		"regenerate the formal suite from source without running TLC (no Java needed)")
-	c.RunE = func(cmd *cobra.Command, args []string) error {
-		rc := formal.VerifyFormal(args[0], genOnly)
-		exitFunc(rc)
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		rc := formal.VerifyFormalTo(args[0], genOnly, output.stdout, output.stderr)
+		if rc != 0 {
+			return commandExit(rc)
+		}
 		return nil
 	}
 	return c
@@ -30,18 +34,21 @@ func newVerifyFormalCmd() *cobra.Command {
 func newDoctorCmd() *cobra.Command {
 	var targets []string
 	c := &cobra.Command{Use: "doctor", Short: "Check prerequisites and install status", Args: cobra.NoArgs}
-	c.RunE = func(cmd *cobra.Command, args []string) error {
-		return doctorRun(targets)
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		return doctorRunTo(targets, output.stdout)
 	}
 	c.Flags().StringArrayVar(&targets, "target", nil, "host adapter to inspect: claude, codex, opencode, or all (repeatable)")
 	return c
 }
 
 func newPreflightCmd() *cobra.Command {
-	c := &cobra.Command{Use: "preflight", Short: "Check runtime prerequisites (warns; installs nothing)"}
-	c.RunE = func(cmd *cobra.Command, args []string) error {
-		preflightRun()
-		return nil
+	c := &cobra.Command{Use: "preflight", Short: "Check runtime prerequisites (installs nothing)", Args: cobra.NoArgs}
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		return preflightRunTo(output.stdout)
 	}
 	return c
 }
@@ -52,8 +59,10 @@ func newIRDumpCmd() *cobra.Command {
 		Hidden: true,
 		Args:   cobra.ExactArgs(1),
 	}
-	c.RunE = func(cmd *cobra.Command, args []string) error {
-		return irDumpRun(args[0])
+	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
+		output := trackCommandOutput()
+		defer func() { retErr = output.join(retErr) }()
+		return irDumpRunTo(args[0], output.stdout, output.stderr)
 	}
 	return c
 }

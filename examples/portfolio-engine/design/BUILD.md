@@ -1,19 +1,15 @@
 # BUILD: Drawdown Portfolio Recommender
 
-Mode: manifest (root of a sharded design; shards in design/BUILD/<Component>.md).
+Mode: manifest (root milestone/demo manifest; one bounded packet per milestone in design/BUILD/).
 
-This root is the entry-point manifest over `design/` and the shards under `design/BUILD/`. It
-carries what every shard shares: the glossary, the domain model, the Architecture Contract, the
-traceability matrix, the cross-context test spec, the shared toolchain and pins, the
-state-migration protocol, and the milestone map. Each shard carries the behavior, the test
-specification, and the build plan for one stateful component:
+This root is the single scheduling and acceptance authority. It carries the glossary, domain model,
+Architecture Contract, traceability matrix, shared test contract, toolchain, state-migration
+protocol, and milestone/demo manifest. Each milestone links to one self-contained execution packet:
 
-- `BUILD/RecommendationRun.md` (the run pipeline, plus the optimizer and reference-data logic it
-  drives)
-- `BUILD/Portfolio.md` (the review lifecycle and its commit overlay)
-- `BUILD/MarketDataFeed.md` (the circuit breaker)
+- M0 walking skeleton, M1 run pipeline, M2 feed breaker, M3 optimizer,
+  M4 portfolio review, and M5 reference-data operations.
 
-The zero-context claim applies to the design tree as a whole; self-containment applies per shard.
+The zero-context claim applies independently to each packet.
 The machine JSON and the transition tables are referenced, never pasted; those files are what the
 deterministic gates check.
 
@@ -165,6 +161,23 @@ One process on one machine, one local DuckDB file, one HTTP provider. A `recomme
 whole run to completion; review commands are separate invocations. `backup` copies the file; `restore`
 replaces it. Offline once prices are cached; the provider is only needed while Collecting.
 
+### Target CLI surfaces
+
+These commands are the complete human-action surface declared in `surfaces.yaml`; command handlers
+map one-to-one to the named domain action before calling the owning component.
+
+| actor | domain action | command |
+|---|---|---|
+| Analyst | `Index.refresh` | `pf index refresh <index-id>` |
+| Analyst | `Security.upsert` | `pf security upsert --ticker <ticker> --name <name> --sector <sector>` |
+| Analyst | `CandidateSet.build` | `pf candidates build --index <index-id> [--index <index-id> ...]` |
+| Analyst | `RecommendationRun.start` | `pf recommend --candidate-set <candidate-set-id> --lookback-days <days>` |
+| Analyst | `RecommendationRun.abort` | `pf run abort <run-id>` |
+| Manager or Admin | `Portfolio.advance` | `pf portfolio advance <portfolio-id>` |
+| Manager or Admin | `Portfolio.accept` | `pf portfolio accept <portfolio-id>` |
+| Manager or Admin | `Portfolio.reject` | `pf portfolio reject <portfolio-id>` |
+| Manager or Admin | `Portfolio.reopen` | `pf portfolio reopen <portfolio-id>` |
+
 ### Architecture Contract (boundaries + dependency rules)
 
 The coding agent must not introduce a cross-boundary dependency outside `allow`. `pf.feed` is the sole
@@ -176,7 +189,8 @@ denies are overridden only by the feed and repo allows.
 
 ### Interface contracts, event-contract, persistence and placement, NFR record
 
-See `design/ARCHITECTURE.md` sections 6-10. Summary: interface contracts pin request/response shape,
+See `design/ARCHITECTURE.md` sections 6-11. Summary: action ownership is closed over the model;
+interface contracts pin request/response shape,
 enumerated errors, and idempotency for each boundary (these are the `onError` branches in the shard
 behavior sections). The event-contract table is N/A (one synchronous process per command; no bus).
 Persistence: Portfolio is a versioned row under an optimistic lock (two managers may review at once),
@@ -186,22 +200,22 @@ machine. NFR: role-based authz for portfolio decisions; market-data key from env
 file 0600; thousands of securities not millions; correctness over speed; residual failures print a
 loud, distinct message with a distinct exit code.
 
-## 5. Behavior: the component shards
+## 5. Behavior: machine sources and milestone packets
 
-Three machines, one shard each. The JSON files are the source; neither this root nor any shard
-pastes them. Each shard carries its component's lifecycle narration, named-unit contract references,
-test specification (oracle rows by stable id, guard-branch completeness, named-unit plan), and
-build-plan milestones.
+The JSON files are the source; neither this root nor any packet pastes them. Packets carry only the
+machine and invariant context needed for their owning milestone.
 
-| component | machine (source) | oracle (generated) | matrix | shard |
+| component | machine (source) | oracle (generated) | matrix | packet(s) |
 |---|---|---|---|---|
-| RecommendationRun | `machines/RecommendationRun.machine.json` | `machines/RecommendationRun.oracle.md` (8 rows) | `machines/RecommendationRun.matrix.md` | `BUILD/RecommendationRun.md` |
-| Portfolio | `machines/Portfolio.machine.json` | `machines/Portfolio.oracle.md` (19 rows) | `machines/Portfolio.matrix.md` | `BUILD/Portfolio.md` |
-| MarketDataFeed | `machines/MarketDataFeed.machine.json` | `machines/MarketDataFeed.oracle.md` (6 rows) | `machines/MarketDataFeed.matrix.md` | `BUILD/MarketDataFeed.md` |
+| RecommendationRun | `machines/RecommendationRun.machine.json` | `machines/RecommendationRun.oracle.md` (8 rows) | `machines/RecommendationRun.matrix.md` | `BUILD/M0-walking-skeleton.md`, `BUILD/M1-run-pipeline.md` |
+| ReferenceDataCommand | `machines/ReferenceDataCommand.machine.json` | `machines/ReferenceDataCommand.oracle.md` (12 rows) | `machines/ReferenceDataCommand.matrix.md` | `BUILD/M5-reference-operations.md` |
+| Portfolio | `machines/Portfolio.machine.json` | `machines/Portfolio.oracle.md` (20 rows) | `machines/Portfolio.matrix.md` | `BUILD/M4-portfolio-review.md` |
+| MarketDataFeed | `machines/MarketDataFeed.machine.json` | `machines/MarketDataFeed.oracle.md` (6 rows) | `machines/MarketDataFeed.matrix.md` | `BUILD/M2-feed-breaker.md` |
 
-Pure logic with no machine: the optimizer (a pure transform under a contract spec) and the
-reference-data builds (Index refresh, Security upsert, CandidateSet dedup). Their plan and tests
-live in the RecommendationRun shard, because the run pipeline is what invokes them.
+The optimizer remains a pure transform under a contract spec. ReferenceDataCommand is only the
+short-lived operational envelope around provider and repository effects; its three invariant-carrying
+actors remain deterministic transforms/versioned writes rather than synthetic entity lifecycles.
+Their plan and tests live in the owning milestone packets.
 
 ## 6. Traceability matrix
 
@@ -211,13 +225,13 @@ tests. Gx-trace reports the split (unit-backed vs attested).
 
 | invariant id | enforced by (guard / structural) | in component | interface contract | test id(s) |
 |---|---|---|---|---|
-| `index-top-30` | structural: only rank <= 30 rows feed a build | pf.app, pf.repo | app->repo build | PROP-index-top-30 |
-| `ticker-unique` | structural: upsert keys on ticker | pf.app, pf.repo | app->repo upsert | PROP-ticker-unique |
-| `candidate-deduped` | structural: build dedupes by ticker | pf.app | app->repo build | PROP-candidate-deduped |
-| `candidate-from-top-30` | structural: build draws only from index top 30 | pf.app | app->repo build | PROP-candidate-from-top-30 |
+| `index-top-30` | invariant unit `selectEligibleConstituents`: stable rank/ticker order, exact ranks 1..30 | pf.app, pf.repo | app->repo build | PROP-index-top-30 |
+| `ticker-unique` | invariant unit `upsertSecurityByTicker` + unique store constraint | pf.app, pf.repo | app->repo upsert | PROP-ticker-unique |
+| `candidate-deduped` | invariant unit `buildCandidateSet`: normalized-ticker set union | pf.app | app->repo build | PROP-candidate-deduped |
+| `candidate-from-top-30` | invariant unit `buildCandidateSet`: input restricted to eligible constituents | pf.app | app->repo build | PROP-candidate-from-top-30 |
 | `run-ready-has-portfolio` | action `recordPortfolio`; formal `Inv_Complete` | pf.domain | app->optimizer | RECO-d6fcf9 |
 | `run-forward-only` | structural: the run graph; formal `Inv_TerminalAbsorbing` and forward chain | pf.domain | app->domain transition | RECO-f89da8, RECO-d6fcf9 |
-| `run-terminal-absorbing` | structural: Ready and Failed are `final`; formal `Inv_TerminalAbsorbing` | pf.domain | app->domain transition | RECO-61506b, RECO-ed98c7 |
+| `run-terminal-absorbing` | invariant unit `assertTerminalAbsorbing`: Ready and Failed are `final`; formal `Inv_TerminalAbsorbing` | pf.domain | app->domain transition | RECO-61506b, RECO-ed98c7 |
 | `portfolio-size-16` | structural: the optimizer returns exactly 16 holdings | pf.optimizer | app->optimizer | PROP-portfolio-size-16 |
 | `portfolio-holdings-deduped` | structural: distinct securities in the selection | pf.optimizer | app->optimizer | PROP-portfolio-holdings-deduped |
 | `portfolio-from-candidates` | structural: the optimizer selects only from candidates | pf.optimizer | app->optimizer | PROP-portfolio-from-candidates |
@@ -226,8 +240,8 @@ tests. Gx-trace reports the split (unit-backed vs attested).
 | `portfolio-accept-role` | guard `canDecide` | pf.domain | app->domain accept/reject | PORT-2bf44c, PORT-a41039, PORT-ddb44c, PORT-351dec |
 | `portfolio-reopen-role` | guard `canReopen` | pf.domain | app->domain reopen | PORT-db3bb9, PORT-9facf7 |
 | `portfolio-accepted-has-date` | action `recordAccepted`; formal `Inv_CloseDate` | pf.domain | app->domain accept | PORT-d1647b |
-| `holding-weight-nonneg` | structural: optimizer weights are non-negative | pf.optimizer | app->optimizer | PROP-holding-weight-nonneg |
-| `holding-weights-sum-full` | structural: optimizer weights sum to 10000 bps | pf.optimizer | app->optimizer | PROP-holding-weights-sum-full |
+| `holding-weight-nonneg` | actor `optimize`: rejects any negative output weight | pf.optimizer | app->optimizer | PROP-holding-weight-nonneg |
+| `holding-weights-sum-full` | actor `optimize`: requires the exact integer sum to be 10000 bps | pf.optimizer | app->optimizer | PROP-holding-weights-sum-full |
 | `feed-circuit-breaks` | guard `atThreshold` + action `recordTrip` | pf.feed | app->feed | MARK-acc7d7 |
 
 No invariant is left unenforced. The structural rows are made true by the optimizer contract or the
@@ -235,7 +249,7 @@ build/upsert logic rather than a runtime guard; each is property-tested (section
 
 ## 7. Cross-context test spec
 
-Per-component transition tests, guard-branch completeness, and named-unit plans live in the shards.
+Per-milestone transition tests, guard-branch completeness, and named-unit plans live in the packets.
 This section fixes what crosses components: the shared test-id conventions, the contract tests at
 every boundary, and the property tests.
 
@@ -250,7 +264,7 @@ hand-written ones.
 
 - cli->app: result and exit-code mapping.
 - app->repo: Save/Load under version guards (ConflictError on a stale version).
-- feed->mkt: error mapping and breaker behavior (breaker specifics in `BUILD/MarketDataFeed.md`).
+- feed->mkt: error mapping and breaker behavior (breaker specifics in `BUILD/M2-feed-breaker.md`).
 - app->optimizer: shape and InfeasibleError.
 
 ### 7.3 Property tests
@@ -273,24 +287,52 @@ starts from an empty store, no migration required.
 Protocol for future lifecycle changes: when a `PortfolioStatus` or `RunStatus` value is renamed,
 split, or removed, ship a mapping table from each old persisted value to its new state, applied once
 on `Open()` over every row, or an explicit drain rule. The overlay states (committing/commitRetry/
-reverted for Portfolio; collectRetry for the run) are never persisted (they exist only within a
-command's execution), so renaming them needs no migration. Regenerate the oracles after any machine
+reverted/routingFault for Portfolio; collectRetry for the run; idle/refreshing/upserting/building/
+succeeded/failed for ReferenceDataCommand) are never persisted (they exist only within a command's
+execution), so renaming them needs no migration. Regenerate the oracles after any machine
 change; the stable-id diff is the affected-test list.
 
-## 9. Milestone map
+## 9. Build plan
 
-The milestones are numbered globally (M0 to M5) and live in the shards; each shard's build plan
-carries the full milestone blocks with their DoD lines. Build them in numeric order; every milestone
-is green before the next starts.
+Build in numeric order. The root is the sole milestone, demo, and acceptance authority; each
+packet is the complete context a small execution model needs for that one milestone.
 
-| milestone | title | shard |
-|---|---|---|
-| M0 | Walking skeleton | `BUILD/RecommendationRun.md` |
-| M1 | Run pipeline slice | `BUILD/RecommendationRun.md` |
-| M2 | Feed breaker slice | `BUILD/MarketDataFeed.md` |
-| M3 | Optimizer slice | `BUILD/RecommendationRun.md` |
-| M4 | Portfolio review slice | `BUILD/Portfolio.md` |
-| M5 | Reference-data and operations slice | `BUILD/RecommendationRun.md` |
+**M0 - Walking skeleton**
+Status: open
+Packet: [M0 execution packet](BUILD/M0-walking-skeleton.md)
+Demo: Run `pf recommend` through one real DuckDB write and one deterministic optimizer result.
+NFR: distinct failure exit codes and messages, secret-safe configuration, and a 0600 store file.
+DoD: `RECO-f89da8`, `RECO-d6fcf9`, and forced-failure `RECO-040944` pass at the real boundary; crossed contract tests and the formal suite are green.
+
+**M1 - Run pipeline slice**
+Status: open
+Packet: [M1 run packet](BUILD/M1-run-pipeline.md)
+Demo: Complete, retry, exhaust, and fail a recommendation run with deterministic terminal results.
+DoD: all eight RecommendationRun oracle stable ids, including `RECO-61506b`, pass with run invariants and contract tests green.
+
+**M2 - Feed breaker slice**
+Status: open
+Packet: [M2 feed packet](BUILD/M2-feed-breaker.md)
+Demo: Trip the market-data breaker, fast-fail while open, then close it after one successful probe.
+DoD: all six MarketDataFeed rows from `MARK-acc7d7` through `MARK-775b8f` pass and `feed-circuit-breaks` is property-tested.
+
+**M3 - Optimizer slice**
+Status: open
+Packet: [M3 optimizer packet](BUILD/M3-optimizer.md)
+Demo: Produce a deterministic 16-holding minimum-drawdown portfolio from a fixed candidate set.
+DoD: optimizer invariants `portfolio-size-16`, `portfolio-holdings-deduped`, `portfolio-from-candidates`, `portfolio-has-drawdown`, `holding-weight-nonneg`, and `holding-weights-sum-full` are property-tested.
+
+**M4 - Portfolio review slice**
+Status: open
+Packet: [M4 review packet](BUILD/M4-portfolio-review.md)
+Demo: Review, accept, persist, conflict-retry, and reopen a portfolio through the CLI.
+DoD: all 20 Portfolio rows from `PORT-27d66f` through `PORT-3bd579` pass, including forced conflict and routing-fault recovery.
+
+**M5 - Reference-data and operations slice**
+Status: open
+Packet: [M5 operations packet](BUILD/M5-reference-operations.md)
+Demo: Refresh reference data, build candidates, then complete a verified backup/restore round trip.
+DoD: all 12 ReferenceDataCommand rows from `REFE-33a2ae` through `REFE-c60610` pass; reference invariants, corruption abort, and backup/restore tests are green.
 
 ## 10. Language realization notes
 

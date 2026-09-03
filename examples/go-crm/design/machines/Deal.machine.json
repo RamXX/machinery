@@ -5,6 +5,9 @@
     "persistRetryBackoff": "500 ms - ErrLocked backoff; retriesExhausted at 3 attempts gives ~1.5s total (ARCHITECTURE.md section 6 open-lock bound)"
   },
   "id": "deal",
+  "_counters": {
+    "retries": "one budget per aggregate-command instance: CommandExecution loads one Deal and fires one domain action inside one write transaction; success or rollback returns the result and discards the instance, so a re-issued action creates a new instance with retries initialized to zero"
+  },
   "initial": "Lead",
   "context": {
     "dealId": null,
@@ -148,14 +151,14 @@
       }
     },
     "rolledBack": {
-      "_exhaustive": "priorStage is set by every setPending* action to the current domain state, which is one of the six DealStage values; the six priorIs* guards cover DealStage totally",
       "always": [
         { "target": "Lead", "guard": "priorIsLead" },
         { "target": "Qualified", "guard": "priorIsQualified" },
         { "target": "Proposal", "guard": "priorIsProposal" },
         { "target": "Negotiation", "guard": "priorIsNegotiation" },
         { "target": "Won", "guard": "priorIsWon" },
-        { "target": "Lost", "guard": "priorIsLost" }
+        { "target": "Lost", "guard": "priorIsLost" },
+        { "target": "Lost", "actions": "recordRoutingError" }
       ]
     }
   }

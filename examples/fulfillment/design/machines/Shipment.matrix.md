@@ -1,7 +1,7 @@
 # Shipment machine - named-unit contracts and failure catalog
 
 Component: `shipping.service` Shipment aggregate. Machine: `Shipment.machine.json`.
-Placement (ARCHITECTURE.md 4): a row in the Shipping DB, optimistic lock; the carrier is called with
+Placement (ARCHITECTURE.md 5): a row in the Shipping DB, optimistic lock; the carrier is called with
 bounded retry. Transitions are the generated oracle (`Shipment.oracle.md`); this document is the
 named-unit contract table and the failure catalog.
 
@@ -13,17 +13,20 @@ named-unit contract table and the failure catalog.
 | `persistShipment` | actor | `(shipmentId, status) -> row \| err{ErrUnavailable,ErrConflict}` | writes the status row and the outbox event in one transaction, or neither | C4 `shippingSvc -> shippingDb`; inv `exactly-once-effect` | integration | real Postgres |
 | `pendingIsDispatched` / `pendingIsInTransit` / `pendingIsDelivered` / `pendingIsLost` | guard | `(ctx) -> bool` | true iff `ctx.pendingStatus` equals that status | - (persist success routing) | unit | pure |
 | `priorIsPending` / `priorIsDispatched` / `priorIsInTransit` | guard | `(ctx) -> bool` | true iff `ctx.priorStatus` equals that status | - (rollback routing) | unit | pure |
-| `isErrRetryable` | guard | `(ctx,evt) -> bool` | true iff the carrier error is a 5xx or a timeout | C4 3 carrier failure classes | unit | pure |
+| `isErrRetryable` | guard | `(ctx,evt) -> bool` | true iff the carrier error is a 5xx or a timeout. `CLAUSES{carrier-5xx, carrier-timeout}` | C4 3 carrier failure classes | unit | pure |
 | `carrierRetriesExhausted` | guard | `(ctx) -> bool` | true iff `ctx.carrierRetries >= 3` | C4 3 carrier bound | unit | pure |
 | `isErrUnavailable` / `isErrConflict` | guard | `(ctx,evt) -> bool` | true iff `evt.error` is that typed repo error | C4 3 DB failure classes | unit | pure |
 | `retriesExhausted` | guard | `(ctx) -> bool` | true iff `ctx.retries >= 3` | C4 3 bound | unit | pure |
 | `setCarrierDispatch` | action | `(ctx,evt) -> ctx` | `priorStatus := status; carrierRetries := 0` | - | unit | pure |
+| `resetCarrierRetries` | action | `(ctx) -> ctx` | `carrierRetries := 0` before a new dispatch operation; retries within the operation keep the same shipmentId | C4 3 per-operation carrier retry bound | unit | pure |
 | `captureTrackingId` | action | `(ctx,evt) -> ctx` | `trackingId := evt.trackingId` | - | unit | pure |
 | `setPendingDispatched` / `setPendingInTransit` / `setPendingDelivered` / `setPendingLost` | action | `(ctx,evt) -> ctx` | `pendingStatus := <that status>` | inv `shipment-terminal` (only legal successors) | unit | pure |
 | `commitStatus` | action | `(ctx) -> ctx` | `status := pendingStatus` | - | unit | pure |
+| `resetRetries` | action | `(ctx) -> ctx` | `retries := 0` before each independent shipment-status persistence operation | C4 3 per-operation DB retry bound | unit | pure |
 | `incrementRetries` / `incrementCarrierRetries` | action | `(ctx) -> ctx` | increment the respective counter | - | unit | pure |
 | `recordCarrierError` / `recordCarrierTimeout` / `recordCarrierExhausted` / `recordDispatchFailed` | action | `(ctx,evt) -> ctx` | `lastError := classified carrier outcome`; a failed dispatch leaves the shipment truthfully Pending for the saga to compensate | C4 3 carrier posture | unit | pure |
 | `recordError` / `recordConflict` / `recordTimeout` / `recordUnknownError` / `recordRetriesExhausted` / `recordRoutingError` | action | `(ctx,evt) -> ctx` | `lastError := classified repo error` | maps repo errors | unit | pure |
+| `validateAddressCountry` | invariant | `(address) -> bool` | reject dispatch input when `Address.country` is empty before invoking the carrier | inv `address-country-present`; Shipment dispatch boundary | property | generated addresses with empty and non-empty country |
 
 Structural: `shipment-terminal` is enforced by Delivered and Lost being final states.
 
@@ -36,10 +39,11 @@ Structural: `shipment-terminal` is enforced by Delivered and Lost being final st
 | Lost parcel | tracking event `markLost` | `Dispatched/InTransit -> persisting -> Lost` | terminal Lost; the order receives fail | C4 3: explicit terminal. Residual: manual claim with the carrier |
 | Shipping DB unavailable / conflict | `persistShipment` onError | `persisting -> persistRetry -> persisting` then `rolledBack` at 3 | bounded retry; tracking events are redelivered by the bus | C4 3. Residual: row lags until redelivery lands |
 | Write timeout | `after persistTimeout` (5s) | `persisting -> rolledBack -> priorStatus` | abort; outbox guarantees no half-published event | C4 3. Residual: none |
+| Corrupt or absent rollback route | no `priorIs*` guard admits after a carrier or persistence failure | `rolledBack -> routingFault` | stop and alert; never guess a shipment status after a possibly external side effect | explicit terminal residual; tracking and DB records remain available for reconciliation |
 
 ## (c) Consumed events
 
-The event-contract table (ARCHITECTURE.md 6) arms the consumer-READS completeness tier, so each
+The event-contract table (ARCHITECTURE.md 7) arms the consumer-READS completeness tier, so each
 command this aggregate consumes states which payload fields it reads; Gx-trace holds every declared
 field to the payload cell of the row that carries the event.
 

@@ -1,5 +1,13 @@
-surface_version: 1
+surface_version: 2
 system: go-crm v1, a single-binary CLI CRM over an embedded LadybugDB graph store
+corpus:
+  - area: legacy CRM CLI and LadybugDB persistence
+    classification: rearchitect-adapt
+    source: impl/internal/cli, impl/internal/repo, and the LadybugDB schema
+    rationale: preserve the CRM command capabilities while replacing the embedded persistence and restore model
+    target: target CRM CLI and SurrealDB repository
+    decided_by: example design owner
+    decided: 2026-09-03
 _comment: >
   Opening sweep enumerated the cobra command tree and the store shape from the running
   system (examples/go-crm: BUILD.md sections 4-5, impl/internal/cli, impl/internal/repo,

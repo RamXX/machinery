@@ -184,7 +184,13 @@ func checkEventCells(g *Gate, text string, els map[string]dslEl, externalIDs map
 		for _, col := range []string{"producer", "consumer"} {
 			clean := r.Clean(col)
 			if clean == "" {
-				continue // the empty-cell finding above already names it
+				if strings.TrimSpace(r.Cell(col)) == "" {
+					continue // the empty-cell finding above already names it
+				}
+				// non-empty, but nothing survives the annotation strip: the
+				// cell is annotation with no participant in front of it.
+				g.Errs = append(g.Errs, where+": "+col+" "+ir.Repr(r.Cell(col))+" names no component before its annotation; write the component, then the annotation in parentheses")
+				continue
 			}
 			if declared[clean] {
 				g.Count("event-contract participants resolved")

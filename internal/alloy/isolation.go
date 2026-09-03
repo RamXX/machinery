@@ -23,11 +23,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/safefile"
 	"github.com/RamXX/machinery/internal/version"
 )
 
@@ -92,7 +92,7 @@ var isolationRefKeys = map[string]bool{"from": true, "to": true, "field": true, 
 // domain model. Every disagreement dies (the refine_gen rule).
 func LoadIsolation(domainPath, annotationPath string) *Isolation {
 	d := loadDomain(domainPath)
-	data, err := os.ReadFile(annotationPath)
+	data, err := safefile.Read(annotationPath, "isolation relational annotation", alloyInputMaxBytes)
 	if err != nil {
 		die("%s: %v", filepath.Base(annotationPath), err)
 	}
@@ -560,7 +560,7 @@ func (p *Isolation) generateOracle() (string, int) {
 // claims to carry, WITHOUT validating them; the Gn gate owns validation.
 // Gx-trace uses this to credit the isolation model as an enforcement artifact.
 func CarriedIsolationIDs(annotationPath string) map[string]bool {
-	data, err := os.ReadFile(annotationPath)
+	data, err := safefile.Read(annotationPath, "isolation relational annotation", alloyInputMaxBytes)
 	if err != nil {
 		return nil
 	}

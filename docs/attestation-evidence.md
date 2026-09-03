@@ -137,7 +137,7 @@ Adding an attested half to SKILL.md means adding its id here; that coupling is t
 | `g3.residual-transitions` | every C4 dependency failure has its residual transition, reclassified by its mitigation rather than deleted | `machines/*.machine.json` |
 | `g3.event-redelivery` | every consumed external event has its event-contract row and a redelivery story (the row-to-machine direction is checked by Gx; the machine-to-row direction has no deterministic marker and stays here) | `machines/*.machine.json` |
 | `gt.conformance-test-shape` | a wholesale-conformance test parses the committed oracle table and asserts, per row, the next state AND the expected actions | `BUILD.md` |
-| `g4.zero-context` | a coding agent with no prior context could build the system from `BUILD.md` alone (per shard, when sharded) | `BUILD.md` |
+| `g4.zero-context` | a coding agent with no prior context could execute each milestone from its packet alone (or the single `BUILD.md` in full mode) | `BUILD.md` and every non-index `BUILD/*.md` packet |
 | `g4.standin-coverage` | isolated child only: the neighbor stand-in section exists, every neighboring boundary has a stand-in held to its oracle, and the environment recipe is self-contained | a `Neighbor stand-ins` section in the build document |
 | `g4.pack-event-discipline` | pack child only: the implementation carries no emitter or handler for an event absent from its pack | `pack/` |
 | `ga.review-quality` | the milestone reviewer judged WELL: the DoD was really met, the acceptance file's attestations are true, and its findings list is complete | `acceptance/` |

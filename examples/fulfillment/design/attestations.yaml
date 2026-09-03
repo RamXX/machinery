@@ -1,0 +1,174 @@
+attestation_version: 1
+attestations:
+  - claim: g2.action-ownership
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: The closed action-ownership table was reconciled actor by actor and assigns each of the 37 domain actions to exactly one deployed component.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+  - claim: g2.interface-contract-rightness
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: The only compile-time crossings are pure shared event schemas; all runtime service interaction is governed by the event contract, with explicit decode errors and retry-safe idempotency.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+  - claim: g2.placement-rightness
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: Stateful aggregates, saga, and outbox are placed with persistence and serialization matching their service ownership; value and CRUD records carry explicit no-machine or inline-placement reasons.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+  - claim: g2.adoption-closure-discovery
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: Elixir/OTP, Ecto, PostgreSQL, Oban, RabbitMQ, and the two external adapters were swept for separately operated closure members and bound to declared, mitigated dependencies.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+  - claim: g2.event-contract-completeness
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: The reserve, release, capture, refund, dispatch, and reply flows were swept in both producer and consumer directions; order placement remains an explicitly local API-to-saga call.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+  - claim: g2.nfr-content
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: Security, capacity, and observability claims were checked against the four-service topology, explicit retry bounds, outbox signals, and FailedDirty paging requirement.
+    covers:
+      - path: ARCHITECTURE.md
+        hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+  - claim: g3.guard-semantics
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: Guard contracts were reconciled to their transition sites and invariant IDs; compound guards now expose closed CLAUSES vocabularies and routing guards have explicit fallbacks.
+    covers:
+      - path: machines/FulfillmentSaga.machine.json
+        hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
+      - path: machines/FulfillmentSaga.matrix.md
+        hash: sha256:ad12c5e03919c491c4a527d36beccde7832bb13552282cdd54845d58ed3928f1
+      - path: machines/Order.machine.json
+        hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
+      - path: machines/Order.matrix.md
+        hash: sha256:2b3f2d142356e919eac6423484d19fdeb74a17fcd28f07fe5cce0e4005687ad9
+      - path: machines/OutboxMessage.machine.json
+        hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
+      - path: machines/OutboxMessage.matrix.md
+        hash: sha256:d4db76c9536e4cfd3de351924f41a3dedec0d131922e291c7f7c0ff7e482fc77
+      - path: machines/Payment.machine.json
+        hash: sha256:2321294295c4638418423637a1ba7bacc703c682bdc8aa9c14744fa8e4613758
+      - path: machines/Payment.matrix.md
+        hash: sha256:307c8e56c4f0d9925aceb09323e86f8b33965ad4dae0411f8afbc73f4b6b630d
+      - path: machines/Reservation.machine.json
+        hash: sha256:b6a2e1b943da3bd59ee6e9d84ba264a3b55ab3af7cd0d1ab1b1ba614328d4da7
+      - path: machines/Reservation.matrix.md
+        hash: sha256:3a7f97e54e3663fba3367abbd276a5476b68ab073a7b2a5c9bcbef96559bb9cf
+      - path: machines/Shipment.machine.json
+        hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
+      - path: machines/Shipment.matrix.md
+        hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
+  - claim: g3.invariant-enforcement
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: All 25 invariants have a machine unit or generated integrity carrier; creation-time validations and terminal-state properties are named units rather than prose-only assertions.
+    covers:
+      - path: machines/FulfillmentSaga.machine.json
+        hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
+      - path: machines/FulfillmentSaga.matrix.md
+        hash: sha256:ad12c5e03919c491c4a527d36beccde7832bb13552282cdd54845d58ed3928f1
+      - path: machines/Order.machine.json
+        hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
+      - path: machines/Order.matrix.md
+        hash: sha256:2b3f2d142356e919eac6423484d19fdeb74a17fcd28f07fe5cce0e4005687ad9
+      - path: machines/OutboxMessage.machine.json
+        hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
+      - path: machines/OutboxMessage.matrix.md
+        hash: sha256:d4db76c9536e4cfd3de351924f41a3dedec0d131922e291c7f7c0ff7e482fc77
+      - path: machines/Payment.machine.json
+        hash: sha256:2321294295c4638418423637a1ba7bacc703c682bdc8aa9c14744fa8e4613758
+      - path: machines/Payment.matrix.md
+        hash: sha256:307c8e56c4f0d9925aceb09323e86f8b33965ad4dae0411f8afbc73f4b6b630d
+      - path: machines/Reservation.machine.json
+        hash: sha256:b6a2e1b943da3bd59ee6e9d84ba264a3b55ab3af7cd0d1ab1b1ba614328d4da7
+      - path: machines/Reservation.matrix.md
+        hash: sha256:3a7f97e54e3663fba3367abbd276a5476b68ab073a7b2a5c9bcbef96559bb9cf
+      - path: machines/Shipment.machine.json
+        hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
+      - path: machines/Shipment.matrix.md
+        hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
+  - claim: g3.residual-transitions
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: Bus, gateway, database, carrier, timeout, retry exhaustion, and corrupt-router outcomes retain explicit transitions; unknown routing stops in a diagnosable routingFault residual rather than guessing domain state.
+    covers:
+      - path: machines/FulfillmentSaga.machine.json
+        hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
+      - path: machines/FulfillmentSaga.matrix.md
+        hash: sha256:ad12c5e03919c491c4a527d36beccde7832bb13552282cdd54845d58ed3928f1
+      - path: machines/Order.machine.json
+        hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
+      - path: machines/Order.matrix.md
+        hash: sha256:2b3f2d142356e919eac6423484d19fdeb74a17fcd28f07fe5cce0e4005687ad9
+      - path: machines/OutboxMessage.machine.json
+        hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
+      - path: machines/OutboxMessage.matrix.md
+        hash: sha256:d4db76c9536e4cfd3de351924f41a3dedec0d131922e291c7f7c0ff7e482fc77
+      - path: machines/Payment.machine.json
+        hash: sha256:2321294295c4638418423637a1ba7bacc703c682bdc8aa9c14744fa8e4613758
+      - path: machines/Payment.matrix.md
+        hash: sha256:307c8e56c4f0d9925aceb09323e86f8b33965ad4dae0411f8afbc73f4b6b630d
+      - path: machines/Reservation.machine.json
+        hash: sha256:b6a2e1b943da3bd59ee6e9d84ba264a3b55ab3af7cd0d1ab1b1ba614328d4da7
+      - path: machines/Reservation.matrix.md
+        hash: sha256:3a7f97e54e3663fba3367abbd276a5476b68ab073a7b2a5c9bcbef96559bb9cf
+      - path: machines/Shipment.machine.json
+        hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
+      - path: machines/Shipment.matrix.md
+        hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
+  - claim: g3.event-redelivery
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: At-least-once commands and replies have event-contract rows, payload READS declarations, dedupe keys, and explicit stale or out-of-order dispositions in resting states.
+    covers:
+      - path: machines/FulfillmentSaga.machine.json
+        hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
+      - path: machines/FulfillmentSaga.matrix.md
+        hash: sha256:ad12c5e03919c491c4a527d36beccde7832bb13552282cdd54845d58ed3928f1
+      - path: machines/Order.machine.json
+        hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
+      - path: machines/Order.matrix.md
+        hash: sha256:2b3f2d142356e919eac6423484d19fdeb74a17fcd28f07fe5cce0e4005687ad9
+      - path: machines/OutboxMessage.machine.json
+        hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
+      - path: machines/OutboxMessage.matrix.md
+        hash: sha256:d4db76c9536e4cfd3de351924f41a3dedec0d131922e291c7f7c0ff7e482fc77
+      - path: machines/Payment.machine.json
+        hash: sha256:2321294295c4638418423637a1ba7bacc703c682bdc8aa9c14744fa8e4613758
+      - path: machines/Payment.matrix.md
+        hash: sha256:307c8e56c4f0d9925aceb09323e86f8b33965ad4dae0411f8afbc73f4b6b630d
+      - path: machines/Reservation.machine.json
+        hash: sha256:b6a2e1b943da3bd59ee6e9d84ba264a3b55ab3af7cd0d1ab1b1ba614328d4da7
+      - path: machines/Reservation.matrix.md
+        hash: sha256:3a7f97e54e3663fba3367abbd276a5476b68ab073a7b2a5c9bcbef96559bb9cf
+      - path: machines/Shipment.machine.json
+        hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
+      - path: machines/Shipment.matrix.md
+        hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
+  - claim: gt.conformance-test-shape
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: The handoff requires one parser-backed conformance suite per machine that asserts target state and the complete ordered action list for every committed oracle row.
+    covers:
+      - path: BUILD.md
+        hash: sha256:24a8fd8a71a7504a6bd614520ee6ca5c6b72a0bd4386d2439c59042d91853baf
+  - claim: g4.zero-context
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: The build plan fixes topology, versions, milestones, oracle-derived test obligations, formal checks, residuals, and state-migration discipline for an implementation agent with no conversation history.
+    covers:
+      - path: BUILD.md
+        hash: sha256:24a8fd8a71a7504a6bd614520ee6ca5c6b72a0bd4386d2439c59042d91853baf

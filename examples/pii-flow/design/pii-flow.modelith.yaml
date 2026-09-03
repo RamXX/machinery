@@ -56,6 +56,8 @@ entities:
       - {name: purpose, type: string}
     relationships:
       - {entity: Redactor, cardinality: 1:1}
+    invariants:
+      - {id: priv-purpose-present, statement: "Every `ProcessingActivity` has a non-empty stated purpose before subject data is read."}
 
   Redactor:
     definition: >
@@ -67,6 +69,8 @@ entities:
       - {name: method, type: string}
     relationships:
       - {entity: AnalyticsExport, cardinality: 1:1}
+    invariants:
+      - {id: priv-redaction-effective, statement: "A `Redactor` output contains neither email nor national identifier data."}
 
   AnalyticsExport:
     definition: >
@@ -74,6 +78,8 @@ entities:
       reporting or analytics destination outside the processing boundary.
     attributes:
       - {name: destination, type: string}
+    invariants:
+      - {id: priv-export-idempotent, statement: "A stable export id has at most one effect at the analytics destination."}
 
 invariants:
   - {id: priv-no-unredacted-export, statement: "No sensitive attribute reaches an export sink without passing through redaction."}

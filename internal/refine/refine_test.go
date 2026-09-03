@@ -3,6 +3,7 @@ package refine
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -12,6 +13,15 @@ import (
 
 func repoRoot() string { return "../.." }
 
+func isolatedExampleDesign(t *testing.T, rel string) string {
+	t.Helper()
+	design := filepath.Join(t.TempDir(), "design")
+	if err := os.CopyFS(design, os.DirFS(filepath.Join(repoRoot(), rel))); err != nil {
+		t.Fatalf("copy isolated example design: %v", err)
+	}
+	return design
+}
+
 func loadJSON(t *testing.T, path string) *ir.Value {
 	t.Helper()
 	v, err := ir.LoadMachineJSON(path)
@@ -19,6 +29,29 @@ func loadJSON(t *testing.T, path string) *ir.Value {
 		t.Fatal(err)
 	}
 	return v
+}
+
+func TestGuardedCurrentRefinementArtifactsRejectForeignFamilyMembers(t *testing.T) {
+	files := map[string][]byte{}
+	for _, suffix := range refinementFamilySuffixes {
+		files["Deal"+suffix] = []byte("generated " + suffix + "\n")
+	}
+	for _, suffix := range refinementFamilySuffixes {
+		t.Run(suffix, func(t *testing.T) {
+			dir := t.TempDir()
+			target := "Deal" + suffix
+			foreign := []byte("hand-authored sentinel\n")
+			if err := os.WriteFile(filepath.Join(dir, target), foreign, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := guardedCurrentRefinementArtifacts(dir, "Deal.machine.json", "Deal.semantics.yaml", files); err == nil {
+				t.Fatalf("foreign %s was accepted for replacement", target)
+			}
+			if got, err := os.ReadFile(filepath.Join(dir, target)); err != nil || string(got) != string(foreign) {
+				t.Fatalf("foreign target changed: %q, %v", got, err)
+			}
+		})
+	}
 }
 
 func loadYAML(t *testing.T, path string) *ir.Value {
@@ -46,6 +79,34 @@ func TestLifecycleReconcilesAndEmits(t *testing.T) {
 	}
 	if body, ok := files["DealData.tla"]; !ok || !containsStr(body, "RECONCILED against the machine") {
 		t.Error("DealData.tla missing or unreconciled")
+	}
+}
+
+func TestLifecycleModelsExplicitRollbackFault(t *testing.T) {
+	machine := loadJSON(t, filepath.Join(repoRoot(), "examples/portfolio-engine/design/machines/Portfolio.machine.json"))
+	sem := loadYAML(t, filepath.Join(repoRoot(), "examples/portfolio-engine/design/formal/Portfolio.semantics.yaml"))
+	_, files, err := EmitLifecycle(machine, sem, [2]string{"m", "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := files["PortfolioData.tla"]
+	for _, want := range []string{`Fault == {"routingFault"}`, "RollbackFault ==", `st' \in Fault`, `stage' \in Fault`, `FaultStutter == st \in Fault`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("generated refinement does not model rollback fault %q", want)
+		}
+	}
+	if mapping := files["PortfolioRefinement.tla"]; !strings.Contains(mapping, `st \in Fault`) {
+		t.Error("refinement mapping does not classify the rollback fault as terminal")
+	}
+}
+
+func TestLifecycleRejectsNonFinalRollbackFault(t *testing.T) {
+	machine := loadJSON(t, filepath.Join(repoRoot(), "examples/portfolio-engine/design/machines/Portfolio.machine.json"))
+	sem := loadYAML(t, filepath.Join(repoRoot(), "examples/portfolio-engine/design/formal/Portfolio.semantics.yaml"))
+	machine.AsObject().Get2("states").AsObject().Get2("routingFault").AsObject().Delete("type")
+	_, _, err := EmitLifecycle(machine, sem, [2]string{"m", "s"})
+	if err == nil || !strings.Contains(err.Error(), "must be final") {
+		t.Fatalf("non-final rollback fault accepted: %v", err)
 	}
 }
 
@@ -150,6 +211,103 @@ func toValueSlice(xs []string) []*ir.Value {
 		out[i] = ir.StringValue(x)
 	}
 	return out
+}
+
+func repeatedError(t *testing.T, runs int, run func() error) string {
+	t.Helper()
+	var first string
+	for i := 0; i < runs; i++ {
+		err := run()
+		if err == nil {
+			t.Fatalf("run %d returned no error", i)
+		}
+		got := err.Error()
+		if i == 0 {
+			first = got
+		} else if got != first {
+			t.Fatalf("run %d diagnostic changed:\nfirst: %q\n got: %q", i, first, got)
+		}
+	}
+	return first
+}
+
+func captureExitError(run func()) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			if exitErr, ok := recovered.(*ExitError); ok {
+				err = exitErr
+				return
+			}
+			panic(recovered)
+		}
+	}()
+	run()
+	return nil
+}
+
+func addEmptyTopState(machine *ir.Value, name string) {
+	machine.AsObject().Get2("states").AsObject().Set(name, ir.ObjectValue(ir.NewObject()))
+}
+
+func TestLifecycleRollbackMissingRouteDiagnosticIsDeterministic(t *testing.T) {
+	fallback := ir.NewObject()
+	fallback.Set("target", ir.StringValue("Fault"))
+	node := ir.NewObject()
+	node.Set("always", ir.ObjectValue(fallback))
+	enters := map[string]bool{"Zulu": true, "Alpha": true}
+
+	got := repeatedError(t, 100, func() error {
+		return captureExitError(func() {
+			validateLifecycleRollbackRoutes(ir.ObjectValue(node), "rolledBack", "Fault", enters)
+		})
+	})
+	if !strings.Contains(got, "priorIsAlpha -> Alpha") {
+		t.Fatalf("first missing route is not the sorted state: %q", got)
+	}
+}
+
+func TestLifecycleMultipleUnexpectedStatesDiagnosticIsDeterministic(t *testing.T) {
+	got := repeatedError(t, 100, func() error {
+		machine := loadJSON(t, filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json"))
+		sem := loadYAML(t, filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"))
+		addEmptyTopState(machine, "zDetour")
+		addEmptyTopState(machine, "aDetour")
+		_, _, err := EmitLifecycle(machine, sem, [2]string{"m", "s"})
+		return err
+	})
+	if !strings.Contains(got, "aDetour") {
+		t.Fatalf("first unexpected state is not the sorted state: %q", got)
+	}
+}
+
+func TestTerminalMultipleUnexpectedStatesDiagnosticIsDeterministic(t *testing.T) {
+	got := repeatedError(t, 100, func() error {
+		machine := loadJSON(t, filepath.Join(repoRoot(), "examples/portfolio-engine/design/machines/RecommendationRun.machine.json"))
+		sem := loadYAML(t, filepath.Join(repoRoot(), "examples/portfolio-engine/design/formal/RecommendationRun.semantics.yaml"))
+		addEmptyTopState(machine, "zDetour")
+		addEmptyTopState(machine, "aDetour")
+		_, _, err := EmitTerminal(machine, sem, [2]string{"m", "s"})
+		return err
+	})
+	if !strings.Contains(got, "aDetour") {
+		t.Fatalf("first unexpected state is not the sorted state: %q", got)
+	}
+}
+
+func TestSagaMultipleUnexpectedStatesDiagnosticIsDeterministic(t *testing.T) {
+	got := repeatedError(t, 100, func() error {
+		machine := loadJSON(t, filepath.Join(repoRoot(), "examples/fulfillment/design/machines/FulfillmentSaga.machine.json"))
+		sem := loadYAML(t, filepath.Join(repoRoot(), "examples/fulfillment/design/formal/FulfillmentSaga.semantics.yaml"))
+		addEmptyTopState(machine, "zDetour")
+		addEmptyTopState(machine, "aDetour")
+		_, _, err := EmitSaga(machine, sem, [2]string{"m", "s"})
+		return err
+	})
+	aDetour := strings.Index(got, "aDetour")
+	zDetour := strings.Index(got, "zDetour")
+	if aDetour < 0 || zDetour < 0 || aDetour > zDetour {
+		t.Fatalf("unexpected saga states are not reported in sorted order: %q", got)
+	}
 }
 
 func TestLifecycleMissingStagesIsErrorNotSilentSuccess(t *testing.T) {
@@ -492,16 +650,20 @@ failure_terminals: [Aborted, Expired]
 // P-F10: every file RunWritten commits to design/formal carries exactly one
 // version stamp line; the in-memory Emit* output stays unstamped.
 func TestRunWrittenStampsGeneratorVersion(t *testing.T) {
+	design := isolatedExampleDesign(t, "examples/go-crm/design")
 	outdir := t.TempDir()
 	names, err := RunWritten(
-		filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json"),
-		filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"),
+		filepath.Join(design, "machines/Deal.machine.json"),
+		filepath.Join(design, "formal/Deal.semantics.yaml"),
 		outdir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(names) == 0 {
 		t.Fatal("RunWritten wrote nothing")
+	}
+	if !sort.StringsAreSorted(names) {
+		t.Fatalf("RunWritten returned nondeterministic artifact order: %v", names)
 	}
 	for _, n := range names {
 		data, rerr := os.ReadFile(filepath.Join(outdir, n))
@@ -517,6 +679,413 @@ func TestRunWrittenStampsGeneratorVersion(t *testing.T) {
 		}
 		if strings.HasSuffix(n, ".tla") && !strings.HasPrefix(body, "---- MODULE ") {
 			t.Errorf("%s no longer opens with the MODULE line", n)
+		}
+	}
+}
+
+func TestRunWrittenControlFlowOnlyValidatesWithoutArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	machine := filepath.Join(dir, "Order.machine.json")
+	sem := filepath.Join(dir, "Order.semantics.yaml")
+	body := `{"id":"order","initial":"A","states":{"A":{"on":{"go":{"target":"B"}}},"B":{"type":"final"}}}`
+	if err := os.WriteFile(machine, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	valid := "machine: order\npattern: control-flow-only\nreason: event-driven lifecycle does not fit a data-refinement algebra\n"
+	if err := os.WriteFile(sem, []byte(valid), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(dir, "out")
+	names, err := RunWritten(machine, sem, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 0 {
+		t.Fatalf("control-flow-only claimed artifacts: %v", names)
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Fatalf("control-flow-only created an output directory/artifact: %v", err)
+	}
+
+	bad := strings.Replace(valid, "reason: event-driven lifecycle does not fit a data-refinement algebra", "reason: ''", 1)
+	if err := os.WriteFile(sem, []byte(bad), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, firstErr := RunWritten(machine, sem, out)
+	_, secondErr := RunWritten(machine, sem, out)
+	if firstErr == nil || !strings.Contains(firstErr.Error(), "non-empty reason") {
+		t.Fatalf("invalid control-flow-only declaration accepted: %v", firstErr)
+	}
+	if secondErr == nil || firstErr.Error() != secondErr.Error() || strings.Contains(firstErr.Error(), "machinery-design-source-") || strings.Contains(firstErr.Error(), "machinery-input-snapshot-") {
+		t.Fatalf("invalid semantics diagnostic is unstable or leaks private snapshot:\nfirst: %v\nsecond: %v", firstErr, secondErr)
+	}
+}
+
+func TestRunWrittenControlFlowOnlyReconcilesRenamedSemanticsFiveFileFamily(t *testing.T) {
+	design := filepath.Join(t.TempDir(), "design")
+	machines := filepath.Join(design, "machines")
+	formal := filepath.Join(design, "formal")
+	if err := os.MkdirAll(machines, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(formal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	machineBody, err := os.ReadFile(filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	semanticsBody, err := os.ReadFile(filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	machine := filepath.Join(machines, "Deal.machine.json")
+	semantics := filepath.Join(formal, "Deal.semantics.yaml")
+	if err := os.WriteFile(machine, machineBody, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(semantics, semanticsBody, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if _, err := RunWritten(machine, semantics, out); err != nil {
+		t.Fatal(err)
+	}
+	renamedSemantics := filepath.Join(formal, "Renamed.semantics.yaml")
+	controlFlowOnly := "machine: deal\npattern: control-flow-only\nreason: this lifecycle is intentionally verified only as control flow\n"
+	if err := os.WriteFile(renamedSemantics, []byte(controlFlowOnly), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(semantics); err != nil {
+		t.Fatal(err)
+	}
+	names, err := RunWritten(machine, renamedSemantics, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 0 {
+		t.Fatalf("control-flow-only claimed artifacts: %v", names)
+	}
+	for _, suffix := range refinementFamilySuffixes {
+		if _, err := os.Lstat(filepath.Join(out, "Deal"+suffix)); !os.IsNotExist(err) {
+			t.Fatalf("control-flow-only left stale Deal%s: %v", suffix, err)
+		}
+	}
+}
+
+func TestRunWrittenFailsClosedOnAmbiguousExternalSemanticsOwnership(t *testing.T) {
+	design := isolatedExampleDesign(t, "examples/go-crm/design")
+	machine := filepath.Join(design, "machines/Deal.machine.json")
+	linear, err := os.ReadFile(filepath.Join(design, "formal/Deal.semantics.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	controlFlowOnly := []byte("machine: deal\npattern: control-flow-only\nreason: this lifecycle is intentionally verified only as control flow\n")
+	for _, tc := range []struct {
+		name       string
+		secondBase string
+	}{
+		{name: "same basename in another external directory", secondBase: "Deal.semantics.yaml"},
+		{name: "external source move and rename", secondBase: "Moved.semantics.yaml"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			first := filepath.Join(t.TempDir(), "Deal.semantics.yaml")
+			second := filepath.Join(t.TempDir(), tc.secondBase)
+			if err := os.WriteFile(first, linear, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(second, controlFlowOnly, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			out := t.TempDir()
+			if _, err := RunWritten(machine, first, out); err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.ReadFile(filepath.Join(out, "DealData.tla"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := RunWritten(machine, second, out); err == nil || !strings.Contains(err.Error(), "cannot safely reconcile") {
+				t.Fatalf("ambiguous external semantics ownership was not rejected: %v", err)
+			}
+			after, err := os.ReadFile(filepath.Join(out, "DealData.tla"))
+			if err != nil || string(after) != string(before) {
+				t.Fatalf("existing external-owner refinement output changed: %v", err)
+			}
+			for _, suffix := range refinementFamilySuffixes {
+				if _, err := os.Stat(filepath.Join(out, "Deal"+suffix)); err != nil {
+					t.Fatalf("fail-closed external cleanup removed Deal%s: %v", suffix, err)
+				}
+			}
+		})
+	}
+}
+
+func TestRunWrittenRejectsAtomicReplacementOfPlannedStaleRefinement(t *testing.T) {
+	design := filepath.Join(t.TempDir(), "design")
+	machines, formal := filepath.Join(design, "machines"), filepath.Join(design, "formal")
+	if err := os.MkdirAll(machines, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(formal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	machineBody, _ := os.ReadFile(filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json"))
+	semanticsBody, _ := os.ReadFile(filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"))
+	machine := filepath.Join(machines, "Deal.machine.json")
+	semantics := filepath.Join(formal, "Deal.semantics.yaml")
+	if err := os.WriteFile(machine, machineBody, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(semantics, semanticsBody, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if _, err := RunWritten(machine, semantics, out); err != nil {
+		t.Fatal(err)
+	}
+	controlFlowOnly := "machine: deal\npattern: control-flow-only\nreason: this lifecycle is intentionally verified only as control flow\n"
+	if err := os.WriteFile(semantics, []byte(controlFlowOnly), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prior := runWrittenAfterStalePlan
+	runWrittenAfterStalePlan = func() { atomicReplaceFile(t, filepath.Join(out, "DealData.tla")) }
+	defer func() { runWrittenAfterStalePlan = prior }()
+	if _, err := RunWritten(machine, semantics, out); err == nil || !strings.Contains(err.Error(), "ownership plan") {
+		t.Fatalf("atomic stale replacement was accepted: %v", err)
+	}
+	for _, suffix := range refinementFamilySuffixes {
+		if _, err := os.Stat(filepath.Join(out, "Deal"+suffix)); err != nil {
+			t.Fatalf("old family mutated at Deal%s: %v", suffix, err)
+		}
+	}
+}
+
+func TestRefinementOwnershipGrammarAndCanonicalHeader(t *testing.T) {
+	for _, name := range []string{"bad,name.semantics.yaml", "bad + owner.semantics.yaml", "bad\nname.semantics.yaml", "bad\x01name.semantics.yaml"} {
+		if err := validateRefinementOwnerBase(name, ".semantics.yaml"); err == nil {
+			t.Errorf("hostile ownership filename accepted: %q", name)
+		}
+	}
+	out := t.TempDir()
+	manual := "---- MODULE DealData ----\n\\* machinery-version: v1\nEXTENDS Naturals\nManual == \\\"\\* GENERATED by machinery refine from Deal.machine.json + Deal.semantics.yaml.\\\"\n====\n"
+	if err := os.WriteFile(filepath.Join(out, "DealData.tla"), []byte(manual), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stale, err := staleOwnedRefinementArtifacts(out, t.TempDir(), t.TempDir(), "Deal.machine.json", "Deal.semantics.yaml", map[string][]byte{})
+	if err != nil || len(stale) != 0 {
+		t.Fatalf("handwritten quoted marker authorized deletion: stale=%v err=%v", stale, err)
+	}
+}
+
+func TestStaleOwnedRefinementArtifactsConvergesEveryMissingAnchorMember(t *testing.T) {
+	design := filepath.Join(t.TempDir(), "design")
+	machines, formal := filepath.Join(design, "machines"), filepath.Join(design, "formal")
+	if err := os.MkdirAll(machines, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(formal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	machineBody, err := os.ReadFile(filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	semanticsBody, err := os.ReadFile(filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	machine := filepath.Join(machines, "Deal.machine.json")
+	semantics := filepath.Join(formal, "Deal.semantics.yaml")
+	if err := os.WriteFile(machine, machineBody, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(semantics, semanticsBody, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if _, err := RunWritten(machine, semantics, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(out, "DealData.tla")); err != nil {
+		t.Fatal(err)
+	}
+	stale, err := staleOwnedRefinementArtifacts(out, machines, formal, "Deal.machine.json", "Deal.semantics.yaml", map[string][]byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]string, 0, len(stale))
+	for _, condition := range stale {
+		got = append(got, condition.Name)
+	}
+	want := []string{"DealContract.tla", "DealData.cfg", "DealRefinement.cfg", "DealRefinement.tla"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("missing-anchor family plan = %v, want %v", got, want)
+	}
+}
+
+func atomicReplaceFile(t *testing.T, path string) {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	temp := path + ".replacement"
+	if err := os.WriteFile(temp, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(temp, path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSemanticsSchemaRejectsUnknownAndWrongTypedClaims(t *testing.T) {
+	cases := []struct {
+		name, body, want string
+	}{
+		{"root typo", "machine: x\npattern: linear-lifecycle\nmax_retry: 3\n", "max_retry"},
+		{"overlay typo", "machine: x\npattern: linear-lifecycle\nstages: [A]\nwin_stage: W\nlose_stage: L\nreopen_to: A\nclose_date_on: W\nadvance_event: a\nwin_event: w\nlose_event: l\nreopen_event: r\noverlay: {retri: R}\n", "retri"},
+		{"wrong list type", "machine: x\npattern: terminal-lifecycle\nphases: A\nsuccess_terminal: W\nfailure_terminals: [L]\nsuccess_flag: done\n", "phases must be a list"},
+		{"retry typo", "machine: x\npattern: terminal-lifecycle\nphases: [A]\nsuccess_terminal: W\nfailure_terminals: [L]\nsuccess_flag: done\nretry: {state: R, serve: A}\n", "serve"},
+		{"obligation typo", "machine: x\npattern: saga\nstates: [A]\nobligations: {A: {set: done}}\n", "set"},
+		{"null retry bound", "machine: x\npattern: saga\nstates: [A]\nobligations: {A: {sets: done}}\nmax_retries: null\n", "max_retries has the wrong type"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sem, err := ir.LoadYAML([]byte(tc.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := validateSemanticsSchema(sem); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("invalid semantics accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestSemanticsSchemaFirstUnknownKeyIsDeterministic(t *testing.T) {
+	sem, err := ir.LoadYAML([]byte("machine: x\npattern: control-flow-only\nreason: x\nz_bad: 1\na_bad: 1\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 1_000; i++ {
+		err := validateSemanticsSchema(sem)
+		if err == nil || !strings.Contains(err.Error(), "'a_bad'") {
+			t.Fatalf("validation %d = %v", i, err)
+		}
+	}
+}
+
+func TestRunWrittenRejectsSymlinkedAndMutatingSemanticsInput(t *testing.T) {
+	design := isolatedExampleDesign(t, "examples/go-crm/design")
+	machine := filepath.Join(design, "machines/Deal.machine.json")
+	source := filepath.Join(design, "formal/Deal.semantics.yaml")
+	body, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("symlink", func(t *testing.T) {
+		dir := t.TempDir()
+		link := filepath.Join(dir, "Deal.semantics.yaml")
+		if err := os.Symlink(source, link); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := RunWritten(machine, link, t.TempDir()); err == nil || !strings.Contains(err.Error(), "symlink") {
+			t.Fatalf("symlinked semantics accepted: %v", err)
+		}
+	})
+	t.Run("mutation", func(t *testing.T) {
+		dir := t.TempDir()
+		input := filepath.Join(dir, "Deal.semantics.yaml")
+		if err := os.WriteFile(input, body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		prior := runWrittenAfterInputSnapshot
+		runWrittenAfterInputSnapshot = func() {
+			if err := os.WriteFile(input, append(body, []byte("\n# concurrent edit\n")...), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		defer func() { runWrittenAfterInputSnapshot = prior }()
+		out := filepath.Join(dir, "out")
+		if _, err := RunWritten(machine, input, out); err == nil || !strings.Contains(err.Error(), "external input") {
+			t.Fatalf("mutating semantics accepted: %v", err)
+		}
+		if _, err := os.Stat(out); !os.IsNotExist(err) {
+			t.Fatalf("mutation wrote output: %v", err)
+		}
+	})
+	t.Run("symlinked output directory", func(t *testing.T) {
+		dir := t.TempDir()
+		outside := t.TempDir()
+		out := filepath.Join(dir, "out")
+		if err := os.Symlink(outside, out); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+		if _, err := RunWritten(machine, source, out); err == nil || !strings.Contains(err.Error(), "unsafe output directory") {
+			t.Fatalf("symlinked output directory accepted: %v", err)
+		}
+	})
+}
+
+func TestRunWrittenReconcilesPriorFiveFileFamilyAfterMachineRename(t *testing.T) {
+	design := filepath.Join(t.TempDir(), "design")
+	machines := filepath.Join(design, "machines")
+	formal := filepath.Join(design, "formal")
+	if err := os.MkdirAll(machines, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(formal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	machineBody, err := os.ReadFile(filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	semanticsBody, err := os.ReadFile(filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	machine := filepath.Join(machines, "Deal.machine.json")
+	semantics := filepath.Join(formal, "Deal.semantics.yaml")
+	if err := os.WriteFile(machine, machineBody, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(semantics, semanticsBody, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if _, err := RunWritten(machine, semantics, out); err != nil {
+		t.Fatal(err)
+	}
+	renamedMachineBody := strings.Replace(string(machineBody), `"id": "deal"`, `"id": "renamed"`, 1)
+	renamedSemanticsBody := strings.Replace(string(semanticsBody), "machine: deal", "machine: renamed", 1)
+	if renamedMachineBody == string(machineBody) || renamedSemanticsBody == string(semanticsBody) {
+		t.Fatal("fixture source identities were not replaced")
+	}
+	renamedMachine := filepath.Join(machines, "Renamed.machine.json")
+	renamedSemantics := filepath.Join(formal, "Renamed.semantics.yaml")
+	if err := os.WriteFile(renamedMachine, []byte(renamedMachineBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(renamedSemantics, []byte(renamedSemanticsBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(machine); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(semantics); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RunWritten(renamedMachine, renamedSemantics, out); err != nil {
+		t.Fatal(err)
+	}
+	for _, suffix := range refinementFamilySuffixes {
+		if _, err := os.Lstat(filepath.Join(out, "Deal"+suffix)); !os.IsNotExist(err) {
+			t.Fatalf("stale refinement artifact Deal%s remains: %v", suffix, err)
+		}
+		if _, err := os.Stat(filepath.Join(out, "Renamed"+suffix)); err != nil {
+			t.Fatalf("current refinement artifact Renamed%s missing: %v", suffix, err)
 		}
 	}
 }

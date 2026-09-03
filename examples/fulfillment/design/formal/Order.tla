@@ -1,5 +1,5 @@
 ---- MODULE Order ----
-\* machinery-version: v0.6.2
+\* machinery-version: v0.6.3
 EXTENDS Naturals
 
 \* Generated from Order.machine.json by machinery tla. Control-flow model.
@@ -10,7 +10,7 @@ EXTENDS Naturals
 \*      machine_lint requires an unguarded fallback or an _exhaustive note; where
 \*      an _exhaustive note is used TLC CANNOT verify it, so the liveness result
 \*      below is only as sound as these hand-checked, UNVERIFIED claims:
-\*      - UNVERIFIED, state rolledBack: priorStatus is set by every setPending* action to the current domain state; only Pending, Confirmed, Reserved, Paid, and Shipped have transitions into the persist overlay (final states persist nothing), and all five priorIs* guards are present
+\*      (none here: every guarded branch list has an unguarded fallback)
 \*   2. Every invoke resolves exactly once (onDone or onError; no lost or
 \*      duplicated completion) and every after timer eventually fires.
 \*   3. Single machine instance; no interleaving with other instances or
@@ -29,10 +29,10 @@ CONSTANT MaxRetries
 VARIABLES st, rc1
 vars == << st, rc1 >>
 
-States == {"Cancelled", "Confirmed", "Delivered", "Failed", "Paid", "Pending", "Reserved", "Shipped", "persistRetry", "persisting", "rolledBack"}
-Domain == {"Cancelled", "Confirmed", "Delivered", "Failed", "Paid", "Pending", "Reserved", "Shipped"}
+States == {"Cancelled", "Confirmed", "Delivered", "Failed", "Paid", "Pending", "Reserved", "Shipped", "persistRetry", "persisting", "rolledBack", "routingFault"}
+Domain == {"Cancelled", "Confirmed", "Delivered", "Failed", "Paid", "Pending", "Reserved", "Shipped", "routingFault"}
 Overlay == {"persistRetry", "persisting", "rolledBack"}
-Final == {"Cancelled", "Delivered", "Failed"}
+Final == {"Cancelled", "Delivered", "Failed", "routingFault"}
 
 TypeOK == st \in States /\ rc1 \in 0..MaxRetries
 Init == st = "Pending" /\ rc1 = 0
@@ -68,6 +68,7 @@ Init == st = "Pending" /\ rc1 = 0
   \* T29: rolledBack -always-> Reserved
   \* T30: rolledBack -always-> Paid
   \* T31: rolledBack -always-> Shipped
+  \* T32: rolledBack -always-> routingFault
 
 T1 == st = "Pending" /\ st' = "persisting" /\ rc1' = 0
 T2 == st = "Pending" /\ st' = "Pending" /\ rc1' = 0
@@ -100,12 +101,13 @@ T28 == st = "rolledBack" /\ st' = "Confirmed" /\ rc1' = 0
 T29 == st = "rolledBack" /\ st' = "Reserved" /\ rc1' = 0
 T30 == st = "rolledBack" /\ st' = "Paid" /\ rc1' = 0
 T31 == st = "rolledBack" /\ st' = "Shipped" /\ rc1' = 0
+T32 == st = "rolledBack" /\ st' = "routingFault" /\ rc1' = 0
 RetryExhausted_persistRetry == st = "persistRetry" /\ rc1 >= MaxRetries /\ st' = "rolledBack" /\ rc1' = rc1
 RetryAgain_persistRetry == st = "persistRetry" /\ rc1 < MaxRetries /\ st' = "persisting" /\ rc1' = rc1 + 1
 Terminated == st \in Final /\ UNCHANGED vars
 
 DomainNext == T1 \/ T2 \/ T3 \/ T4 \/ T5 \/ T6 \/ T7 \/ T8 \/ T9 \/ T10 \/ T11 \/ T12 \/ T13 \/ T14
-OverlayNext == T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ T26 \/ T27 \/ T28 \/ T29 \/ T30 \/ T31 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
+OverlayNext == T15 \/ T16 \/ T17 \/ T18 \/ T19 \/ T20 \/ T21 \/ T22 \/ T23 \/ T24 \/ T25 \/ T26 \/ T27 \/ T28 \/ T29 \/ T30 \/ T31 \/ T32 \/ RetryExhausted_persistRetry \/ RetryAgain_persistRetry
 Next == DomainNext \/ OverlayNext \/ Terminated
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(OverlayNext)

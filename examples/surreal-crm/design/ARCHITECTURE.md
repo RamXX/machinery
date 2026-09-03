@@ -111,6 +111,8 @@ externals:
   - id: external.surrealdb
     element: store
     imports: [ "github.com/surrealdb/surrealdb.go" ]
+  - id: external.argon2
+    imports: [ "golang.org/x/crypto/argon2" ]
 ignore:
   - "internal/testsupport/**"   # hard-TDD fakes shared by the test suites
   - "internal/arch/**"          # the architecture-boundary test package itself
@@ -123,6 +125,7 @@ dependency_rules:
     - crm.commands -> crm.model
     - crm.session  -> crm.repo
     - crm.session  -> crm.model
+    - crm.session  -> external.argon2
     - crm.authz    -> crm.model
     - crm.domain   -> crm.authz
     - crm.domain   -> crm.repo
@@ -149,6 +152,7 @@ One row per allowed boundary crossing; the signatures below the table are the el
 | `crm.commands -> crm.repo`, `crm.session -> crm.repo`, `crm.domain -> crm.repo` | `Repo` interface: `Connect`, `BeginWrite`, `Commit`, `Rollback`, `Get*`/`Save*` per aggregate, all inside the caller's open transaction | `ErrLocked`, `ErrCorrupt`, `ErrUnavailable`, `ErrNotFound`, `ErrConstraint`, `ErrConflict`, `ErrDiskFull`, `ErrTimeout` (the eight legacy classes, remapped to store conditions) | reads are safe to retry; a write runs in one transaction and is retried once on `ErrLocked` or `ErrConflict`, neither of which leaves a partial commit |
 | `crm.domain -> crm.authz` | `Authorizer.Authorize(actor, verb, entity, ownerID, teamID) -> Decision` (pure, no I/O) | none; a refusal is `Decision{Allowed: false, Reason: ...}`, never an error | pure: safe to repeat, no state touched |
 | `crm.repo -> external.surrealdb` | surrealdb.go client against `127.0.0.1:8000`: connect with namespace and database, SurrealQL statements, one transaction per invocation | driver and store conditions mapped at this boundary to the typed `Err*` set above; no driver type escapes `crm.repo` | writes are idempotent per transaction: a rolled-back transaction leaves no trace, so a retried transaction repeats the whole unit |
+| `crm.session -> external.argon2` | pure `argon2.IDKey(password, salt, time, memory, threads, keyLen) -> hash` call with fixed, versioned cost parameters | none at runtime; invalid or missing module versions fail the checksum-verified build | deterministic for the same password, salt, and parameters; callers generate a new salt only when creating a new hash |
 | `crm.commands -> crm.model`, `crm.session -> crm.model`, `crm.authz -> crm.model`, `crm.domain -> crm.model`, `crm.repo -> crm.model` | type-only: the shared vocabulary (aggregate structs, enums, the typed `Err*` values); no functions with side effects | none; the package performs no operation that can fail | n/a: no calls cross this edge, only type references |
 
 Signatures are Go-flavored pseudocode; the types reference `domain.modelith.yaml`. The Repo
@@ -217,6 +221,7 @@ retry overlay in CommandExecution absorbs it with new detection and new bounds.
 | `store` (data integrity) | corrupt or image-incompatible volume | pinned image tag; volume snapshot before upgrades; SurrealDB export as backup | `ErrCorrupt`: fail loudly, direct the user to the restore runbook | fatal, no auto-recovery |
 | `dockerd` | daemon stopped or container removed | restart policy covers container crashes, not a stopped daemon; the runbook covers the rest | connect fails as `ErrUnavailable` with the daemon check named first | user starts the daemon |
 | `sessionfile` | missing / expired / unreadable | none | `ErrNoSession` / `ErrExpired`: require `crm login` | user re-authenticates |
+| `external.argon2` | unavailable, tampered, or API-incompatible Go module | exact version in `go.mod`; checksum locked in `go.sum`; CI builds and runs password-hash vectors before release | no runtime residual: the binary cannot be produced if the dependency does not verify or compile | build-time failure |
 
 ## 7. Persistence and placement (the C4 to FSM bridge)
 

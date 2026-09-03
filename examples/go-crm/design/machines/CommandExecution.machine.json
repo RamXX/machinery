@@ -8,6 +8,9 @@
     "queryTimeout": "10000 ms - LadybugDB query/write timeout (ARCHITECTURE.md section 6, Connection.SetTimeout 10s)"
   },
   "id": "commandExecution",
+  "_counters": {
+    "retries": "one budget per command-execution instance: an instance begins at Parsing for one CLI invocation and reaches a final exit; re-issuing the command creates a new instance with retries initialized to zero"
+  },
   "initial": "Parsing",
   "context": {
     "argv": null,

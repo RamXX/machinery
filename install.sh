@@ -10,7 +10,9 @@
 #
 # Environment overrides (all optional):
 #   MACHINERY_VERSION      release tag to install, or "latest" (default: latest)
-#   MACHINERY_HOMES        space-separated agent homes; the FIRST is canonical.
+#   MACHINERY_HOMES        one agent home per line; the FIRST is canonical.
+#                          A single path may contain spaces. For multiple paths,
+#                          include literal newlines (for example with printf).
 #                          Unset, the binary uses its defaults ("$HOME/.agents"
 #                          then "$HOME/.claude") and skips any home the Claude
 #                          Code plugin already serves; setting this passes the
@@ -34,6 +36,18 @@ die() { printf 'install: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "required tool not found: $1"; }
 
 [ -z "$HOMES" ] || [ -z "$TARGETS" ] || die "MACHINERY_HOMES and MACHINERY_TARGETS cannot be combined"
+case "$REPO" in
+  */*) ;;
+  *) die "MACHINERY_REPO must be owner/name" ;;
+esac
+case "$VERSION" in
+  latest) ;;
+  v[0-9]*.[0-9]*.[0-9]*)
+	printf '%s\n' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?(\+[0-9A-Za-z][0-9A-Za-z.-]*)?$' ||
+	  die "invalid MACHINERY_VERSION: $VERSION (want latest or an exact vMAJOR.MINOR.PATCH tag)"
+	;;
+  *) die "invalid MACHINERY_VERSION: $VERSION (want latest or an exact vMAJOR.MINOR.PATCH tag)" ;;
+esac
 
 # --- detect os/arch (must match the release asset names) -------------------
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -49,6 +63,7 @@ case "$os" in
   msys*|mingw*|cygwin*|windows*) os=windows; ext=".exe" ;;
   *) die "unsupported OS: $os" ;;
 esac
+[ "$os" != windows ] || [ "$arch" = amd64 ] || die "unsupported release tuple: windows/$arch (releases publish Windows amd64 only)"
 binname="machinery"
 if [ "$os" = windows ]; then binname="machinery.exe"; fi
 
@@ -63,8 +78,9 @@ else
     elif command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
     else die "no sha256 tool (shasum or sha256sum) found"; fi
   }
-  tmp=$(mktemp -d "${TMPDIR:-/tmp}/machinery.XXXXXX")
-  trap 'rm -rf "$tmp"' EXIT INT TERM
+	tmp=$(mktemp -d "${TMPDIR:-/tmp}/machinery.XXXXXX")
+	candidate=""
+	trap 'rm -rf "$tmp"' EXIT INT TERM
   if [ "$VERSION" = "latest" ]; then
     curl -fsSL -o "$tmp/rel.json" "https://api.github.com/repos/$REPO/releases/latest" \
       || die "cannot reach the GitHub API to resolve the latest release"
@@ -74,6 +90,8 @@ else
   else
     TAG="$VERSION"
   fi
+	printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?(\+[0-9A-Za-z][0-9A-Za-z.-]*)?$' ||
+	  die "release API returned an invalid tag: $TAG"
   say "machinery $TAG ($os/$arch)"
   asset="machinery-${os}-${arch}${ext}"
   base="https://github.com/$REPO/releases/download/$TAG"
@@ -84,36 +102,65 @@ else
   want=$(awk -v f="$asset" '$2 == f {print $1}' "$tmp/checksums-sha256.txt")
   got=$(sha256 "$tmp/$asset")
   [ -n "$want" ] || die "no checksum listed for $asset"
+	case "$want" in
+	  *' '*|*'
+'*) die "duplicate or malformed checksum entries for $asset" ;;
+	esac
+	printf '%s\n' "$want" | grep -Eq '^[0-9a-fA-F]{64}$' || die "invalid checksum listed for $asset"
   [ "$want" = "$got" ] || die "checksum mismatch for $asset (want $want, got $got)"
   say "checksum verified"
   mkdir -p "$INSTALL_DIR"
-  cp "$tmp/$asset" "$INSTALL_DIR/$binname"
-  chmod +x "$INSTALL_DIR/$binname"
-  mach="$INSTALL_DIR/$binname"
-  say "installed $binname -> $mach"
+	candidate="$tmp/$binname.candidate"
+	cp "$tmp/$asset" "$candidate"
+	chmod +x "$candidate"
+	reported=$("$candidate" version 2>&1) || die "downloaded binary failed its version probe: $reported"
+	[ "$reported" = "machinery version $TAG" ] || die "downloaded binary reports '$reported', want 'machinery version $TAG'"
+	mach="$candidate"
 fi
 
 # --- place the skill + role docs (the binary owns this) --------------------
 # No --home flags unless MACHINERY_HOMES is set: the binary's default home
 # list already skips any home the Claude Code plugin serves, and an explicit
 # --home is the documented way to override that.
-set -- install
-for h in $HOMES; do
+if [ -n "${MACHINERY_BIN:-}" ]; then
+	set -- install
+else
+	# The verified candidate delegates the complete binary + harness + receipt
+	# mutation to machinery's locked, crash-recoverable update transaction. The
+	# bootstrap script never opens its own missing-target replacement window.
+	set -- update --version "$TAG" --repo "$REPO" --install-dir "$INSTALL_DIR" --skip-plugins
+	if [ -z "$HOMES" ] && [ -z "$TARGETS" ]; then
+		set -- "$@" --bootstrap-defaults
+	fi
+fi
+while IFS= read -r h; do
+	[ -n "$h" ] || continue
   set -- "$@" --home "$h"
-done
-for target in $TARGETS; do
+done <<EOF
+$HOMES
+EOF
+target_lines=$(printf '%s\n' "$TARGETS" | tr '[:space:]' '\n')
+while IFS= read -r target; do
+	[ -n "$target" ] || continue
   set -- "$@" --target "$target"
-done
+done <<EOF
+$target_lines
+EOF
 if [ -n "${MACHINERY_SKILL_SRC:-}" ]; then
+	[ -n "${MACHINERY_BIN:-}" ] || die "MACHINERY_SKILL_SRC requires MACHINERY_BIN for an offline bootstrap"
   set -- "$@" --from "$MACHINERY_SKILL_SRC"
 fi
-if [ "$VERSION" != "latest" ]; then
+if [ -n "${MACHINERY_BIN:-}" ] && [ "$VERSION" != "latest" ]; then
   set -- "$@" --version "$VERSION"
 fi
 "$mach" "$@"
+if [ -z "${MACHINERY_BIN:-}" ]; then
+	mach="$INSTALL_DIR/$binname"
+	say "installed $binname -> $mach"
+fi
 
-# --- best-effort environment check -----------------------------------------
-"$mach" preflight || true
+# --- environment check -----------------------------------------------------
+"$mach" preflight
 case ":${PATH}:" in
   *":$INSTALL_DIR:"*) : ;;
   *)

@@ -51,6 +51,15 @@ func TestOwnershipCompleteTablePasses(t *testing.T) {
 	}
 }
 
+func TestOwnershipRejectsMultipleOwnersInOneRow(t *testing.T) {
+	g := ownershipFixture(t, ownershipHeader+
+		"| `Deal.create`, `Deal.close` | `domain`, `tasks` |\n"+
+		"| `Task.open` | `tasks` |\n", true)
+	if !hasErr(g, "names 2 owning components") {
+		t.Fatalf("multi-owner row passed: %v", g.Errs)
+	}
+}
+
 func TestOwnershipAbsentTableCarriesNoObligation(t *testing.T) {
 	g := ownershipFixture(t, "", true)
 	if hasErr(g, "action-ownership") || hasErr(g, "ownership row") {

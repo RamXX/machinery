@@ -1,6 +1,7 @@
 checker:
   id: pii-flow
   description: "Sensitive-data flow: no sensitive attribute reaches an export sink without redaction."
+  runtime_closure: sha256:afd225b867fec907e1a80cd31984d54310eb5798d2363c0829d41538c3036129
 projection:
   include: [model, invariants, relationships]
   requires: [gx]
@@ -11,6 +12,12 @@ coverage:
       reason: "Consent is a process and record control, not a static data-flow property; enforced elsewhere."
     - id: priv-minimal-collection
       reason: "Collection minimality is a design-review judgment, not decidable from the flow graph."
+    - id: priv-purpose-present
+      reason: "Purpose presence is a runtime input-validation property, not a relationship-graph property."
+    - id: priv-redaction-effective
+      reason: "The graph checker treats the declared Redactor as a boundary; output-field removal is verified by the Redactor property tests."
+    - id: priv-export-idempotent
+      reason: "Destination side-effect idempotency is verified against the contract fake and cannot be decided from the static relationship graph."
 config:
   enforces_invariant: priv-no-unredacted-export
   sensitive: ["attr:DataSubject.email", "attr:DataSubject.nationalId"]

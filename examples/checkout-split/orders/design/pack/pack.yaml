@@ -13,4 +13,4 @@ boundaries:
   - orders.svc
 delegated_invariants:
   - no-ship-without-capture
-content_hash: d569d081d4d56341cd2920d2d660e854da6255df55885b31d80923f2c5a64037
+content_hash: 7965934639e1e13bb99f88de17440499045695aa54ef8af6093203fa8c8e6a3c

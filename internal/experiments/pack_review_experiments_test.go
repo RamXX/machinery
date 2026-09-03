@@ -227,7 +227,7 @@ func TestIntraSubsystemEventRowFailsGeneration(t *testing.T) {
 // ------------------------- PACK-3 -----------------------------------------
 
 const undelegatedInvariant = `invariants:
-  - {id: no-double-refund, definition: "A captured payment is refunded at most once. Cross-subsystem; MUST be enforced somewhere."}
+  - {id: no-double-refund, statement: "A captured payment is refunded at most once. Cross-subsystem; MUST be enforced somewhere."}
   - {id: no-ship-without-capture`
 
 func addUndelegatedInvariant(t *testing.T, parent string) {
@@ -303,8 +303,8 @@ func TestChildDroppingOwnedAttributeFailsG5(t *testing.T) {
 func TestChildRewritingEntityInvariantFailsG5(t *testing.T) {
 	_, _, payments := regenSplitFixture(t)
 	editFile(t, filepath.Join(payments, "payments.modelith.yaml"),
-		`- {id: payment-single-capture, definition: "A payment is captured at most once. Structural: capture is only handled in Requested."}`,
-		`- {id: payment-single-capture, definition: "WEAKENED: a payment may be captured many times; retries are fine."}`)
+		`- {id: payment-single-capture, statement: "A payment is captured at most once. Structural: capture is only handled in Requested."}`,
+		`- {id: payment-single-capture, statement: "WEAKENED: a payment may be captured many times; retries are fine."}`)
 	g := gates.CheckPack(payments)
 	if !containsAny(g.Errs, "invariant payment-single-capture drifted from the pack") {
 		t.Errorf("rewritten frozen entity invariant passed G5: %v", g.Errs)
@@ -490,10 +490,10 @@ func TestStaleRefinementExtraFailsG5(t *testing.T) {
 	}
 }
 
-// Rebinding the packmap to a copied contract shim regenerates
-// ShimPackRefinement.* but used to leave OrderPackRefinement.* committed and
-// unchecked: the proof the neighbors rely on silently stopped being checked.
-func TestReboundPackmapLeavesStaleArtifactsFlagged(t *testing.T) {
+// Rebinding the packmap converges the generator-owned refinement set: the new
+// ShimPackRefinement pair is installed and the obsolete Order pair is removed
+// in the same durable transaction. An exact rerun is idempotent.
+func TestReboundPackmapConvergesStaleArtifacts(t *testing.T) {
 	parent, orders, _ := regenSplitFixture(t)
 	data, err := os.ReadFile(filepath.Join(parent, "contracts", "OrdersContract.machine.json"))
 	if err != nil {
@@ -507,12 +507,17 @@ func TestReboundPackmapLeavesStaleArtifactsFlagged(t *testing.T) {
 	if _, err := pack.WriteRefinement(orders); err != nil {
 		t.Fatal(err)
 	}
-	g := gates.CheckPack(orders)
-	if !containsAny(g.Errs, "formal/OrderPackRefinement.tla") {
-		t.Errorf("stale OrderPackRefinement.tla not flagged after rebinding: %v", g.Errs)
+	if _, err := pack.WriteRefinement(orders); err != nil {
+		t.Fatalf("idempotent refinement rerun: %v", err)
 	}
-	if !containsAny(g.Errs, "formal/OrderPackRefinement.cfg") {
-		t.Errorf("stale OrderPackRefinement.cfg not flagged after rebinding: %v", g.Errs)
+	g := gates.CheckPack(orders)
+	if len(g.Errs) != 0 {
+		t.Errorf("converged rebound refinement fails G5: %v", g.Errs)
+	}
+	for _, name := range []string{"OrderPackRefinement.tla", "OrderPackRefinement.cfg"} {
+		if _, err := os.Lstat(filepath.Join(orders, "formal", name)); !os.IsNotExist(err) {
+			t.Errorf("obsolete %s remains after convergence: %v", name, err)
+		}
 	}
 }
 
@@ -568,7 +573,7 @@ func TestColonInvariantIDRoundTripsThroughManifest(t *testing.T) {
 	parent, _, _ := splitFixture(t)
 	editFile(t, filepath.Join(parent, "checkout.modelith.yaml"),
 		"invariants:\n  - {id: no-ship-without-capture",
-		"invariants:\n  - {id: \"cap: no-ship\", definition: \"colon id round-trip probe\"}\n  - {id: no-ship-without-capture")
+		"invariants:\n  - {id: \"cap: no-ship\", statement: \"colon id round-trip probe\"}\n  - {id: no-ship-without-capture")
 	editFile(t, filepath.Join(parent, "decomposition.yaml"),
 		"delegated_invariants: [no-ship-without-capture]",
 		"delegated_invariants: [no-ship-without-capture, \"cap: no-ship\"]")
@@ -604,8 +609,8 @@ func TestNonStringDelegatedInvariantEntryFailsG5(t *testing.T) {
 		"delegated_invariants:\n  - no-ship-without-capture\n  - cap: no-ship\n")
 	relaunderChildPack(t, orders)
 	g := gates.CheckPack(orders)
-	if !containsAny(g.Errs, "not a plain string") {
-		t.Errorf("non-string delegated_invariants entry silently dropped: %v", g.Errs)
+	if !containsAny(g.Errs, "delegated_invariants[1] must be a non-empty string") {
+		t.Errorf("non-string delegated_invariants entry did not produce the strict typed-schema error: %v", g.Errs)
 	}
 }
 

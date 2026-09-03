@@ -1,0 +1,11 @@
+surface_version: 1
+sources:
+  - pii-flow.modelith.yaml action list, walked for the Controller persona
+  - ARCHITECTURE.md pipeline boundary and operator responsibilities
+acts:
+  - act: DataSubject.register
+    actor: Controller
+    surface: "controller subject API: POST /subjects"
+  - act: DataSubject.erase
+    actor: Controller
+    surface: "controller privacy API: DELETE /subjects/{id}"

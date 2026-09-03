@@ -13,8 +13,9 @@ number of times (collectRetry) before the run fails cleanly.
 | `incRetries` | action | `(ctx) -> ctx` | `retries := retries + 1` | bounds the fetch retry loop | unit | none |
 | `publishReady` | action | `(ctx) -> ()` | writes the run's success and the portfolio id to stdout | operator signal | unit | captured stdout |
 | `publishFailure` | action | `(ctx) -> ()` | writes the failure cause (market data unavailable, or infeasible) to stderr, non-zero exit | operator signal | unit | captured stderr |
+| `assertTerminalAbsorbing` | action | `(state, event) -> bool` | the dispatcher has no outgoing transition for Ready or Failed and returns TerminalError for every later lifecycle event | invariant `run-terminal-absorbing`; RecommendationRun terminal entry | model + unit | generated event enumeration against both final states |
 | `fetchPrices` | actor | `(candidateSetId, lookbackDays) -> PriceMatrix` | fetches full price history for every candidate through the feed breaker; a FeedError or CircuitOpenError routes to collectRetry | C4 rel: pf.app to pf.feed to mkt | integration | contract-tested market-data fake plus a breaker-open fixture |
-| `optimize` | actor | `(candidates, prices) -> Portfolio` | selects the 16 securities minimizing max drawdown; InfeasibleError when fewer than 16 have full history | C4 rel: pf.app to pf.optimizer | integration | real optimizer on a fixed price fixture (deterministic) |
+| `optimize` | actor | `(candidates, prices) -> Portfolio` | selects 16 candidate securities minimizing max drawdown and accepts output only when every integer-basis-point weight is non-negative and the exact sum is 10000; InfeasibleError otherwise | C4 rel: pf.app to pf.optimizer; invariants `holding-weight-nonneg`, `holding-weights-sum-full` | integration + property | real optimizer on fixed and generated price/weight fixtures |
 
 ## Failure catalog
 
