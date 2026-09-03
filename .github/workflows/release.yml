@@ -106,8 +106,8 @@ jobs:
       - name: Package tarball (pvg-compatible)
         if: matrix.goos != 'windows'
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
+          TARGET_GOOS: ${{ matrix.goos }}
+          TARGET_GOARCH: ${{ matrix.goarch }}
           RELEASE_VERSION: ${{ steps.ver.outputs.version }}
         # Convergence managers that follow the goreleaser convention (pvg's
         # channel installer) expect <tool>_<ver>_<os>_<arch>.tar.gz containing
@@ -116,11 +116,11 @@ jobs:
         run: |
           set -euo pipefail
           plain="${RELEASE_VERSION#v}"
-          archive="dist/machinery_${plain}_${GOOS}_${GOARCH}.tar.gz"
-          go run ./cmd/release-archive -input "dist/machinery-${GOOS}-${GOARCH}" \
+          archive="dist/machinery_${plain}_${TARGET_GOOS}_${TARGET_GOARCH}.tar.gz"
+          go run ./cmd/release-archive -input "dist/machinery-${TARGET_GOOS}-${TARGET_GOARCH}" \
             -name machinery -epoch "$SOURCE_DATE_EPOCH" -output "$archive"
           cp "$archive" /tmp/machinery-release-first.tar.gz
-          go run ./cmd/release-archive -input "dist/machinery-${GOOS}-${GOARCH}" \
+          go run ./cmd/release-archive -input "dist/machinery-${TARGET_GOOS}-${TARGET_GOARCH}" \
             -name machinery -epoch "$SOURCE_DATE_EPOCH" -output "$archive"
           cmp /tmp/machinery-release-first.tar.gz "$archive"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

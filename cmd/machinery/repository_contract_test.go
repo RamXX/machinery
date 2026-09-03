@@ -808,6 +808,25 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		`if ! cmp -s "$expected" "$discovered"`,
 		`[ -L "dist/$artifact" ]`,
 	)
+	packageStart := strings.Index(release, "      - name: Package tarball (pvg-compatible)")
+	if packageStart < 0 {
+		t.Fatal("release workflow has no pvg-compatible package step")
+	}
+	packageEnd := strings.Index(release[packageStart:], "\n      - uses:")
+	if packageEnd < 0 {
+		t.Fatal("release workflow package step has no terminating action")
+	}
+	packageStep := release[packageStart : packageStart+packageEnd]
+	requireAll("release package step", packageStep,
+		"TARGET_GOOS: ${{ matrix.goos }}",
+		"TARGET_GOARCH: ${{ matrix.goarch }}",
+		"machinery-${TARGET_GOOS}-${TARGET_GOARCH}",
+	)
+	for _, crossEnv := range []string{"\n          GOOS:", "\n          GOARCH:"} {
+		if strings.Contains(packageStep, crossEnv) {
+			t.Errorf("release package step leaks cross-build environment %q into host go run", strings.TrimSpace(crossEnv))
+		}
+	}
 
 	fsm := mustRepositoryFile(t, filepath.Join(root, "agents", "machinery-fsm-author.md"))
 	requireAll("FSM author role", fsm,
