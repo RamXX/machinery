@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -17,12 +19,20 @@ import (
 
 	"github.com/RamXX/machinery/internal/artifactset"
 	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/lint"
 	"github.com/RamXX/machinery/internal/oracle"
 	"github.com/RamXX/machinery/internal/portablepath"
 	"github.com/RamXX/machinery/internal/processcontrol"
 )
+
+const (
+	oracleInventoryMaxEntries = 10_000
+	oracleReadDirPage         = 256
+)
+
+var oracleInventoryAfterFirst = func(string) {}
 
 func newOracleCmd() *cobra.Command {
 	c := &cobra.Command{
@@ -80,7 +90,7 @@ func oracleRunInSnapshot(snapshot *designlock.Lock, mdir string, diff bool, agai
 	if err != nil {
 		return fmt.Errorf("oracle_gen: resolve immutable machine source: %w", err)
 	}
-	entries, err := os.ReadDir(sourceDir)
+	entries, err := readOracleDirPath(sourceDir, oracleInventoryMaxEntries)
 	if err != nil {
 		fmt.Fprintf(stdoutW, "no *.machine.json under %s\n", mdir)
 		return commandExitBecause(1, err)
@@ -432,16 +442,10 @@ func staleOwnedOracles(dir string, keep map[string][]byte) (stale []artifactset.
 		return nil, err
 	}
 	defer func() { retErr = errors.Join(retErr, root.Close()) }()
-	f, err := root.Open(".")
+	entries, err := readOracleRootDir(root, ".", oracleInventoryMaxEntries)
 	if err != nil {
 		return nil, err
 	}
-	entries, readErr := f.ReadDir(-1)
-	closeErr := f.Close()
-	if err := errors.Join(readErr, closeErr); err != nil {
-		return nil, err
-	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	for _, entry := range entries {
 		name := entry.Name()
 		if entry.IsDir() || !strings.HasSuffix(name, ".oracle.md") {
@@ -735,7 +739,7 @@ func siblingMachineFiles(named []string) (files, problems []string) {
 	}
 	sort.Strings(orderedDirs)
 	for _, d := range orderedDirs {
-		entries, err := os.ReadDir(d)
+		entries, err := readOracleDirPath(d, oracleInventoryMaxEntries)
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("read sibling machine inventory %s: %v", d, err))
 			continue
@@ -753,6 +757,102 @@ func siblingMachineFiles(named []string) (files, problems []string) {
 	sort.Strings(files)
 	sort.Strings(problems)
 	return files, problems
+}
+
+func readOracleDirPath(directory string, limit int) ([]fs.DirEntry, error) {
+	entries, err := dirscan.Read(directory, limit)
+	if err != nil {
+		return nil, fmt.Errorf("oracle inventory root %s: %w", directory, err)
+	}
+	return entries, nil
+}
+
+func readOracleRootDir(root *os.Root, rel string, limit int) (_ []fs.DirEntry, retErr error) {
+	first, err := root.Open(rel)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { retErr = errors.Join(retErr, first.Close()) }()
+	initial, err := first.Stat()
+	if err != nil || !initial.IsDir() {
+		return nil, errors.Join(err, fmt.Errorf("oracle inventory root %s must be a real directory", rel))
+	}
+	changeID, err := dirscan.ChangeID(first, initial)
+	if err != nil || changeID == "" {
+		return nil, errors.Join(err, fmt.Errorf("oracle inventory root %s has no native change witness", rel))
+	}
+	entries, err := readOracleDir(first, limit)
+	if err != nil {
+		return nil, err
+	}
+	oracleInventoryAfterFirst(rel)
+	firstAfter, err := first.Stat()
+	if err != nil {
+		return nil, err
+	}
+	firstAfterChange, err := dirscan.ChangeID(first, firstAfter)
+	if err != nil || !sameOracleDirInfo(initial, firstAfter) || firstAfterChange != changeID {
+		return nil, errors.Join(err, fmt.Errorf("oracle inventory root %s changed while enumerating", rel))
+	}
+	second, err := root.Open(rel)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { retErr = errors.Join(retErr, second.Close()) }()
+	secondBefore, err := second.Stat()
+	if err != nil {
+		return nil, err
+	}
+	secondChange, err := dirscan.ChangeID(second, secondBefore)
+	if err != nil || !sameOracleDirInfo(initial, secondBefore) || secondChange != changeID {
+		return nil, errors.Join(err, fmt.Errorf("oracle inventory root %s changed before verification pass", rel))
+	}
+	verify, err := readOracleDir(second, limit)
+	if err != nil {
+		return nil, err
+	}
+	secondAfter, err := second.Stat()
+	if err != nil {
+		return nil, err
+	}
+	secondAfterChange, err := dirscan.ChangeID(second, secondAfter)
+	pathAfter, pathErr := root.Lstat(rel)
+	if err != nil || pathErr != nil || !sameOracleDirInfo(initial, secondAfter) || !sameOracleDirInfo(initial, pathAfter) || secondAfterChange != changeID ||
+		!slices.EqualFunc(entries, verify, func(a, b fs.DirEntry) bool { return a.Name() == b.Name() }) {
+		return nil, errors.Join(err, pathErr, fmt.Errorf("oracle inventory root %s changed between inventory passes", rel))
+	}
+	return entries, nil
+}
+
+func readOracleDir(dir *os.File, limit int) ([]fs.DirEntry, error) {
+	if limit < 0 {
+		return nil, fmt.Errorf("oracle inventory exceeds entry limit")
+	}
+	entries := make([]fs.DirEntry, 0, min(limit, oracleReadDirPage))
+	for {
+		remaining := limit - len(entries)
+		pageLimit := min(oracleReadDirPage, remaining)
+		if pageLimit == 0 {
+			pageLimit = 1
+		}
+		page, err := dir.ReadDir(pageLimit)
+		entries = append(entries, page...)
+		if len(entries) > limit {
+			return nil, fmt.Errorf("oracle inventory exceeds %d-entry limit", limit)
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	return entries, nil
+}
+
+func sameOracleDirInfo(before, after os.FileInfo) bool {
+	return before != nil && after != nil && os.SameFile(before, after) && before.Mode() == after.Mode() && before.Size() == after.Size() && before.ModTime().Equal(after.ModTime())
 }
 
 func countSubstr(s, sub string) int {

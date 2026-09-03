@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 func syncStateDirectory(dir string) error {
@@ -21,8 +20,5 @@ func syncStateDirectory(dir string) error {
 }
 
 func replaceStateFile(temp, target string) error {
-	if err := os.Rename(temp, target); err != nil {
-		return err
-	}
-	return syncStateDirectory(filepath.Dir(target))
+	return replaceStateFileAtomic(temp, target)
 }

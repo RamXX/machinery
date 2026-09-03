@@ -30,6 +30,37 @@ func formalNativeFileWitness(_ *os.File, info os.FileInfo) (string, error) {
 	return fmt.Sprintf("unix:%x:%x:%x:%x", stat.Dev, stat.Ino, sec, nsec), nil
 }
 
+func formalNativeInventoryWitness(file *os.File, info os.FileInfo) (string, error) {
+	identity, err := formalNativeFileWitness(file, info)
+	if err != nil {
+		return "", err
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat == nil {
+		return "", fmt.Errorf("formal inventory entry lacks native Unix change identity")
+	}
+	sec, nsec, ok := formalUnixChangeTime(stat)
+	if !ok {
+		return "", fmt.Errorf("formal inventory entry lacks native Unix change time")
+	}
+	return fmt.Sprintf("%s:change:%x:%x", identity, sec, nsec), nil
+}
+
+func formalUnixChangeTime(stat any) (int64, int64, bool) {
+	value := reflect.Indirect(reflect.ValueOf(stat))
+	for _, name := range []string{"Ctim", "Ctimespec"} {
+		field := value.FieldByName(name)
+		if field.IsValid() {
+			sec, secOK := formalUnixInteger(field.FieldByName("Sec"))
+			nsec, nsecOK := formalUnixInteger(field.FieldByName("Nsec"))
+			return sec, nsec, secOK && nsecOK
+		}
+	}
+	sec, secOK := formalUnixInteger(value.FieldByName("Ctime"))
+	nsec, nsecOK := formalUnixInteger(value.FieldByName("Ctimensec"))
+	return sec, nsec, secOK && nsecOK
+}
+
 func formalUnixStableGeneration(stat any) (int64, int64, bool) {
 	value := reflect.Indirect(reflect.ValueOf(stat))
 	for _, name := range []string{"Birthtimespec"} {

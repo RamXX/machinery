@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Discover the authoritative Modelith corpus at recipe execution time. Make's
-# $(shell ...) discards command status, so discovery must live in a strict
-# process where a failed find or sort cannot become a partial/empty success.
+# $(shell ...) discards command status, so discovery must live in a strict,
+# bounded process where traversal failure cannot become partial/empty success.
 set -euo pipefail
 
 action=${1:-check}
@@ -9,11 +9,13 @@ root=${2:-examples}
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd -P)
 
-sources=$(mktemp)
-renders=$(mktemp)
-entries=$(mktemp)
+work=$(mktemp -d)
+sources=$work/sources
+renders=$work/renders
+entries=$work/entries
+tree_inventory=$work/tree-inventory
 cleanup() {
-  rm -f "$sources" "$renders" "$entries" "$entries.git-safe" "$entries.git-safe.stderr"
+  rm -rf -- "$work"
 }
 trap cleanup EXIT
 # shellcheck source=scripts/git-safe.sh
@@ -23,10 +25,22 @@ if [[ -L "$root" || ! -d "$root" ]]; then
   echo "Modelith corpus root must be a real directory: $root" >&2
   exit 1
 fi
-if ! find "$root" -print | LC_ALL=C sort >"$entries"; then
-  echo "Modelith discovery failed during all-entry inventory; corpus is untrusted" >&2
+if ! (cd "$repo_root" && go build -o "$tree_inventory" ./scripts/tree-inventory) 2>"$work/build.stderr"; then
+  echo "build bounded tree inventory helper failed" >&2
+  cat "$work/build.stderr" >&2
   exit 1
 fi
+if [[ -s "$work/build.stderr" ]]; then
+  echo "building bounded tree inventory helper emitted stderr; warnings are forbidden" >&2
+  cat "$work/build.stderr" >&2
+  exit 1
+fi
+if ! "$tree_inventory" -root "$root" -max-entries 100000 -max-depth 64 -max-bytes 33554432 -timeout 15s >"$entries"; then
+  echo "Modelith discovery failed during bounded all-entry inventory; corpus is untrusted" >&2
+  exit 1
+fi
+: >"$sources"
+: >"$renders"
 while IFS= read -r entry; do
   [[ "$entry" == "$root" ]] && continue
   if [[ -L "$entry" ]]; then
@@ -37,18 +51,17 @@ while IFS= read -r entry; do
     echo "Modelith corpus entries must be regular files or real directories: $entry" >&2
     exit 1
   fi
+  case "$entry" in
+    */pack/*|*/packs/*) continue ;;
+  esac
+  case "$entry" in
+    *.modelith.yaml) printf '%s\n' "$entry" >>"$sources" ;;
+    *.modelith.md) printf '%s\n' "$entry" >>"$renders" ;;
+  esac
 done <"$entries"
 
-if ! find "$root" -name '*.modelith.yaml' ! -path '*/pack/*' ! -path '*/packs/*' | LC_ALL=C sort >"$sources"; then
-  echo "Modelith source discovery failed; inventory is untrusted" >&2
-  exit 1
-fi
 if [[ ! -s "$sources" ]]; then
   echo "Modelith source discovery returned an unexpected empty corpus under $root" >&2
-  exit 1
-fi
-if ! find "$root" -name '*.modelith.md' ! -path '*/pack/*' ! -path '*/packs/*' | LC_ALL=C sort >"$renders"; then
-  echo "Modelith render discovery failed; inventory is untrusted" >&2
   exit 1
 fi
 

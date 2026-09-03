@@ -62,32 +62,14 @@ func RemoveGenerated(dir string, names []string) (retErr error) {
 	if err != nil {
 		return err
 	}
-	root, syncFile, err := txOpenRoot(resolved)
-	if err != nil {
-		return err
-	}
-	defer func() { retErr = errors.Join(retErr, syncFile.Close(), root.Close()) }()
 	ordered := append([]string(nil), names...)
 	sort.Strings(ordered)
 	for _, name := range ordered {
 		if filepath.Base(name) != name || name == "" || name == "." {
 			return fmt.Errorf("unsafe generated removal target %q", name)
 		}
-		info, err := root.Lstat(name)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-			return fmt.Errorf("generated removal target %s must be a regular file", name)
-		}
-		if err := root.Remove(name); err != nil {
-			return err
-		}
 	}
-	return txSyncHeld(syncFile)
+	return txReconcile(resolved, nil, ordered, txDefaultOps(nil))
 }
 
 // Commit replaces every named artifact as one durable transaction. Recovery

@@ -166,9 +166,17 @@ func RefreshEmbeds(design string, dryRun bool) (reports []RefreshReport, changed
 			retErr = errors.Join(retErr, fmt.Errorf("close rooted embed refresh transaction: %w", err))
 		}
 	}()
-	if journal, pending, err := tx.pending(); err != nil {
+	journal, pending, err := tx.pending()
+	if err != nil {
 		return nil, nil, err
-	} else if pending {
+	}
+	if tx.reconciled {
+		if err := snapshot.Refresh(); err != nil {
+			return nil, nil, fmt.Errorf("refresh design snapshot after embed recovery reconciliation: %w", err)
+		}
+		tx.reconciled = false
+	}
+	if pending {
 		expected := make([]designlock.OutputExpectation, 0, len(journal.Items))
 		for _, item := range journal.Items {
 			target := filepath.Join(design, filepath.FromSlash(item.Path))
@@ -257,7 +265,7 @@ func RefreshEmbeds(design string, dryRun bool) (reports []RefreshReport, changed
 		expected = append(expected, designlock.ExpectFile(p.path, p.new, os.FileMode(p.mode)))
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Path < items[j].Path })
-	journal, err := newEmbedTxJournal(tx.scope, items)
+	journal, err = newEmbedTxJournal(tx.scope, items)
 	if err != nil {
 		return nil, nil, err
 	}

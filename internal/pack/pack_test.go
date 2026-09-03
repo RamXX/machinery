@@ -4,14 +4,174 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/RamXX/machinery/internal/ir"
 )
+
+func TestPackMutableFileReadsAreBoundedAgainstContinuousAppender(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		run  func(*testing.T, *os.Root) error
+	}{
+		{
+			name: "design source",
+			run: func(_ *testing.T, root *os.Root) error {
+				_, err := readPackRegularRoot(root, "source", "test source")
+				return err
+			},
+		},
+		{
+			name: "tree fingerprint",
+			run: func(_ *testing.T, root *os.Root) error {
+				_, err := capturePackTree(root, "tree")
+				return err
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "source")
+			if tc.name == "tree fingerprint" {
+				if err := os.Mkdir(filepath.Join(dir, "tree"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				path = filepath.Join(dir, "tree", "member")
+			}
+			if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			root, err := os.OpenRoot(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer root.Close() //nolint:errcheck // test cleanup
+			stop := make(chan struct{})
+			appenderDone := make(chan error, 1)
+			oldPoint := packFileReadPoint
+			started := false
+			packFileReadPoint = func(string) error {
+				if started {
+					return nil
+				}
+				started = true
+				appender, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+				if err != nil {
+					return err
+				}
+				chunk := bytes.Repeat([]byte("a"), 64<<10)
+				if _, err := appender.Write(chunk); err != nil {
+					_ = appender.Close()
+					return err
+				}
+				go func() {
+					var appendErr error
+					defer func() { appenderDone <- errors.Join(appendErr, appender.Close()) }()
+					for {
+						select {
+						case <-stop:
+							return
+						default:
+							if _, err := appender.Write(chunk); err != nil {
+								appendErr = err
+								return
+							}
+						}
+					}
+				}()
+				return nil
+			}
+			defer func() { packFileReadPoint = oldPoint }()
+			result := make(chan error, 1)
+			go func() { result <- tc.run(t, root) }()
+			select {
+			case err := <-result:
+				close(stop)
+				if appendErr := <-appenderDone; appendErr != nil {
+					t.Fatal(appendErr)
+				}
+				if !started || err == nil || !strings.Contains(err.Error(), "changed") {
+					t.Fatalf("continuous growth was accepted: started=%v err=%v", started, err)
+				}
+			case <-time.After(2 * time.Second):
+				close(stop)
+				<-appenderDone
+				t.Fatal("pack file read followed a continuous appender instead of stopping at the witnessed size")
+			}
+		})
+	}
+}
+
+func TestPackDirectoryEnumerationStopsAtFixedCeiling(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a", "b", "c"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close() //nolint:errcheck // test cleanup
+	_, err = readPackDirBounded(root, ".", 2)
+	if err == nil || !strings.Contains(err.Error(), "2-entry limit") {
+		t.Fatalf("over-limit pack directory inventory was accepted: %v", err)
+	}
+}
+
+func TestPackWriterRejectsPackAndMemberInventoriesBeforePlanning(t *testing.T) {
+	t.Run("pack count", func(t *testing.T) {
+		packs := make(map[string]map[string]string, packDirMaxEntries+1)
+		for i := 0; i <= packDirMaxEntries; i++ {
+			packs[fmt.Sprintf("p%d", i)] = nil
+		}
+		if _, err := writePacksRootedWithRename(t.TempDir(), nil, packs, nil); err == nil || !strings.Contains(err.Error(), "pack limit") {
+			t.Fatalf("over-limit pack inventory was accepted: %v", err)
+		}
+	})
+	t.Run("member count", func(t *testing.T) {
+		members := make(map[string]string, packTreeMaxEntries)
+		for i := 0; i < packTreeMaxEntries; i++ {
+			members[fmt.Sprintf("m%d", i)] = "x"
+		}
+		if _, err := writePacksRootedWithRename(t.TempDir(), nil, map[string]map[string]string{"orders": members}, nil); err == nil || !strings.Contains(err.Error(), "member limit") {
+			t.Fatalf("over-limit pack member inventory was accepted: %v", err)
+		}
+	})
+}
+
+func TestPackRegularFileLimitsRejectSparseMembers(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "tree"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "tree", "oversized")
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := errors.Join(file.Truncate(packFileMaxBytes+1), file.Close()); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close() //nolint:errcheck // test cleanup
+	if _, err := readPackRegularRoot(root, filepath.Join("tree", "oversized"), "test source"); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatalf("oversized direct read was accepted: %v", err)
+	}
+	if _, err := capturePackTree(root, "tree"); err == nil || !strings.Contains(err.Error(), "member limit") {
+		t.Fatalf("oversized tree member was accepted: %v", err)
+	}
+}
 
 func parentDesign() string {
 	return filepath.Join("..", "..", "examples", "checkout-split", "parent", "design")
@@ -452,7 +612,7 @@ func TestPackOutputAliasDiagnosticIsDeterministic(t *testing.T) {
 		"payments": {"pack.yaml": "new"},
 	}
 	for i := 0; i < 100; i++ {
-		_, err := writePacksWithRename(design, packs, renamePackRoot)
+		_, err := writePacksWithRename(design, packs, nil)
 		if err == nil || !strings.Contains(err.Error(), `'ORDERS.pack' aliases generated target 'orders.pack'`) {
 			t.Fatalf("run %d diagnostic = %v", i, err)
 		}
@@ -638,7 +798,7 @@ func TestStalePackDeletionRollsBackWithInstallFailure(t *testing.T) {
 		if strings.HasPrefix(old, ".machinery-pack-stage-") && new == "orders.pack" {
 			return injected
 		}
-		return opened.Rename(old, new)
+		return nil
 	}
 	_, err := writePacksWithRename(design, map[string]map[string]string{
 		"orders": {"marker": "new-orders"},
@@ -736,7 +896,7 @@ func TestWritePacksLaterInstallFailureRestoresWholeSet(t *testing.T) {
 			failed = true
 			return errors.New("injected later pack install failure")
 		}
-		return root.Rename(old, new)
+		return nil
 	}
 	if _, err := writePacksWithRename(design, packs, rename); err == nil || !strings.Contains(err.Error(), "injected later pack install failure") {
 		t.Fatalf("later install failure was ignored: %v", err)
@@ -767,7 +927,7 @@ func TestWritePacksJoinsCommitAndRollbackErrors(t *testing.T) {
 		if newBase == "payments.pack" && strings.HasPrefix(oldBase, ".machinery-pack-backup-") {
 			return rollbackErr
 		}
-		return root.Rename(old, new)
+		return nil
 	}
 	_, err = writePacksWithRename(design, packs, rename)
 	if !errors.Is(err, commitErr) || !errors.Is(err, rollbackErr) {
@@ -813,7 +973,7 @@ func TestWritePacksRollbackPreservesLateMutatedInstalledTarget(t *testing.T) {
 					}
 					return injected
 				}
-				return opened.Rename(old, new)
+				return nil
 			}
 			_, err := writePacksWithRename(design, map[string]map[string]string{
 				"orders":   {"marker": newOrders},
@@ -1278,7 +1438,7 @@ func TestPackRecoveryStaysOnOpenedRootDuringParentSwap(t *testing.T) {
 				return err
 			}
 		}
-		return opened.Rename(old, new)
+		return nil
 	}
 	if err := recoverPackTransaction(root, rename); err != nil {
 		t.Fatal(err)
@@ -1411,7 +1571,7 @@ func TestWritePacksRejectsJournalABABeforePublicRename(t *testing.T) {
 	renameCalled := false
 	rename := func(opened *os.Root, oldName, newName string) error {
 		renameCalled = true
-		return opened.Rename(oldName, newName)
+		return nil
 	}
 	_, err := writePacksWithRename(design, map[string]map[string]string{"orders": {"marker": "new-orders"}}, rename)
 	packJournalPoint = prior
@@ -1461,6 +1621,231 @@ func TestPackRecoveryRejectsJournalReplacementAfterParse(t *testing.T) {
 	if got, readErr := os.ReadFile(filepath.Join(root, "orders.pack", "marker")); readErr != nil || string(got) != "old-orders" {
 		t.Fatalf("stale parsed journal drove recovery: got %q, err %v", got, readErr)
 	}
+}
+
+func TestPackJournalIsolationNeverOverwritesDestinationCollision(t *testing.T) {
+	root := t.TempDir()
+	seedPackCrash(t, root, "prepared")
+	prior := packJournalPoint
+	packJournalPoint = func(point string) error {
+		if point == "recovery-before-journal-isolate" {
+			return os.WriteFile(filepath.Join(root, packJournalRetirement), []byte("foreign destination\n"), 0o600)
+		}
+		return nil
+	}
+	t.Cleanup(func() { packJournalPoint = prior })
+	_, err := acquirePackWriteLock(root)
+	packJournalPoint = prior
+	if err == nil {
+		t.Fatal("journal retirement destination collision was accepted")
+	}
+	if _, statErr := os.Lstat(filepath.Join(root, packJournalName)); statErr != nil {
+		t.Fatalf("source journal authority was lost: %v", statErr)
+	}
+	if got, readErr := os.ReadFile(filepath.Join(root, packJournalRetirement)); readErr != nil || string(got) != "foreign destination\n" {
+		t.Fatalf("journal retirement collision was overwritten: %q, %v", got, readErr)
+	}
+}
+
+func TestPackTreeRetirementNeverOverwritesDestinationCollision(t *testing.T) {
+	root := t.TempDir()
+	seedPackCrash(t, root, "prepared")
+	prior := packTreeRetirementPoint
+	var source, retirement string
+	packTreeRetirementPoint = func(gotSource, gotRetirement string) error {
+		if retirement != "" {
+			return nil
+		}
+		source, retirement = gotSource, gotRetirement
+		writePackRecoveryDir(t, root, retirement, "foreign destination")
+		return nil
+	}
+	t.Cleanup(func() { packTreeRetirementPoint = prior })
+	_, err := acquirePackWriteLock(root)
+	packTreeRetirementPoint = prior
+	if err == nil || source == "" || retirement == "" {
+		t.Fatalf("tree retirement destination collision was not rejected: source=%q retirement=%q err=%v", source, retirement, err)
+	}
+	if _, statErr := os.Lstat(filepath.Join(root, source)); statErr != nil {
+		t.Fatalf("tree retirement source was lost: %v", statErr)
+	}
+	if got, readErr := os.ReadFile(filepath.Join(root, retirement, "marker")); readErr != nil || string(got) != "foreign destination" {
+		t.Fatalf("tree retirement collision was overwritten: %q, %v", got, readErr)
+	}
+}
+
+func TestPackBackupRestoreNeverOverwritesBoundaryCollision(t *testing.T) {
+	dir := t.TempDir()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close() //nolint:errcheck // test cleanup
+	const backup = ".machinery-pack-backup-orders"
+	if err := root.Mkdir(backup, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, backup, "pack.yaml"), []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before, err := capturePackTree(root, backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := packJournalEntry{Target: "orders.pack", Backup: backup, Before: before.witness}
+	called := false
+	rename := func(root *os.Root, oldName, newName string) error {
+		called = true
+		if err := root.Mkdir(newName, 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, newName, "foreign"), []byte("concurrent"), 0o600); err != nil {
+			return err
+		}
+		return nil
+	}
+	err = restorePackBackup(root, rename, entry)
+	if err == nil || !called {
+		t.Fatalf("backup restoration collision was not rejected: called=%v err=%v", called, err)
+	}
+	for path, want := range map[string]string{
+		filepath.Join(dir, backup, "pack.yaml"):      "old",
+		filepath.Join(dir, "orders.pack", "foreign"): "concurrent",
+	} {
+		body, readErr := os.ReadFile(path)
+		if readErr != nil || string(body) != want {
+			t.Fatalf("%s = %q, %v; want %q", path, body, readErr, want)
+		}
+	}
+}
+
+func TestPackQuarantineDeletionCannotDeletePublicReplacement(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		install func(root string) func()
+	}{
+		{
+			name: "tree",
+			install: func(root string) func() {
+				prior := packTreeQuarantinePoint
+				packTreeQuarantinePoint = func(retirement string) error {
+					name := findPackTestEntry(t, root, func(name string) bool { return validPackQuarantineName(name, packTreeQuarantinePrefix) })
+					return replacePackTestQuarantine(root, name)
+				}
+				return func() { packTreeQuarantinePoint = prior }
+			},
+		},
+		{
+			name: "journal",
+			install: func(root string) func() {
+				prior := packJournalPoint
+				packJournalPoint = func(point string) error {
+					if point != "recovery-before-journal-quarantine-remove" {
+						return nil
+					}
+					name := findPackTestEntry(t, root, func(name string) bool { return validPackQuarantineName(name, packJournalQuarantinePrefix) })
+					return replacePackTestQuarantine(root, name)
+				}
+				return func() { packJournalPoint = prior }
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			seedPackCrash(t, root, "committed")
+			restore := tc.install(root)
+			t.Cleanup(restore)
+			_, err := acquirePackWriteLock(root)
+			restore()
+			if err == nil {
+				t.Fatal("public quarantine replacement did not block namespace retirement")
+			}
+			name := findPackTestEntry(t, root, func(name string) bool {
+				body, readErr := os.ReadFile(filepath.Join(root, name, "object"))
+				return readErr == nil && string(body) == "foreign replacement\n"
+			})
+			if got, readErr := os.ReadFile(filepath.Join(root, name, "object")); readErr != nil || string(got) != "foreign replacement\n" {
+				t.Fatalf("public quarantine replacement was deleted: %q, %v", got, readErr)
+			}
+		})
+	}
+}
+
+func TestPackRecoveryResumesJournalAndTreeQuarantines(t *testing.T) {
+	for _, tc := range []struct {
+		name, phase string
+		install     func(error) func(string) error
+	}{
+		{
+			name: "journal", phase: "committed",
+			install: func(injected error) func(string) error {
+				return func(point string) error {
+					if point == "recovery-after-journal-quarantine" {
+						return injected
+					}
+					return nil
+				}
+			},
+		},
+		{
+			name: "tree", phase: "prepared",
+			install: func(injected error) func(string) error {
+				return func(string) error { return injected }
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			seedPackCrash(t, root, tc.phase)
+			injected := errors.New("crash after quarantine")
+			priorJournal, priorTree := packJournalPoint, packTreeQuarantinePoint
+			if tc.name == "journal" {
+				packJournalPoint = tc.install(injected)
+			} else {
+				packTreeQuarantinePoint = tc.install(injected)
+			}
+			_, err := acquirePackWriteLock(root)
+			packJournalPoint, packTreeQuarantinePoint = priorJournal, priorTree
+			t.Cleanup(func() { packJournalPoint, packTreeQuarantinePoint = priorJournal, priorTree })
+			if !errors.Is(err, injected) {
+				t.Fatalf("quarantine crash was not reported: %v", err)
+			}
+			lock, err := acquirePackWriteLock(root)
+			if err != nil {
+				t.Fatalf("resume quarantine: %v", err)
+			}
+			if err := lock.releaseAll(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func findPackTestEntry(t *testing.T, root string, match func(string) bool) string {
+	t.Helper()
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if match(entry.Name()) {
+			return entry.Name()
+		}
+	}
+	t.Fatal("matching pack test entry not found")
+	return ""
+}
+
+func replacePackTestQuarantine(root, name string) error {
+	public := filepath.Join(root, name)
+	held := filepath.Join(root, name+"-held")
+	if err := os.Rename(public, held); err != nil {
+		return err
+	}
+	if err := os.Mkdir(public, 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(public, "object"), []byte("foreign replacement\n"), 0o600)
 }
 
 func TestPackRecoveryRejectsChangedIsolatedJournalBeforeDestructiveAction(t *testing.T) {
@@ -2202,7 +2587,7 @@ func TestWritePacksStaysOnOpenedRootDuringParentSwap(t *testing.T) {
 				return err
 			}
 		}
-		return opened.Rename(old, new)
+		return nil
 	}
 	ids, err := writePacksWithRename(design, map[string]map[string]string{
 		"orders": {"pack.yaml": "new"},

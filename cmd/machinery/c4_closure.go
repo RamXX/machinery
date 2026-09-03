@@ -11,9 +11,15 @@ import (
 	"unicode"
 
 	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/safefile"
 )
 
 var structurizrRemoteReference = regexp.MustCompile(`(?i)(?:[a-z][a-z0-9+.-]*:)?//[^\s"']+`)
+
+const c4ClosureMaxFiles = 10_000
+const c4ClosureMaxDepth = 256
+const c4ClosureFileMaxBytes int64 = 16 << 20
+const c4ClosureTotalMaxBytes int64 = 256 << 20
 
 func withDesignWorkspaceSnapshot(design string, fn func(snapshot string) error) (retErr error) {
 	lock, err := designlock.AcquireReader(design)
@@ -128,14 +134,21 @@ func validateStructurizrClosure(design, entry string) ([]string, error) {
 	}
 	state := make(map[string]uint8)
 	var closure []string
-	var visit func(string) error
-	visit = func(path string) error {
+	var totalBytes int64
+	var visit func(string, int) error
+	visit = func(path string, depth int) error {
+		if depth > c4ClosureMaxDepth {
+			return fmt.Errorf("structurizr include nesting exceeds %d-level limit", c4ClosureMaxDepth)
+		}
 		path = filepath.Clean(path)
 		switch state[path] {
 		case 1:
 			return fmt.Errorf("structurizr local include cycle reaches %s", path)
 		case 2:
 			return nil
+		}
+		if len(state) >= c4ClosureMaxFiles {
+			return fmt.Errorf("structurizr closure exceeds %d-file limit", c4ClosureMaxFiles)
 		}
 		state[path] = 1
 		info, err := os.Lstat(path)
@@ -145,10 +158,14 @@ func validateStructurizrClosure(design, entry string) ([]string, error) {
 		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 			return fmt.Errorf("structurizr input %s must be a regular non-symlink file", path)
 		}
-		body, err := os.ReadFile(path)
+		body, err := safefile.Read(path, "structurizr input", c4ClosureFileMaxBytes)
 		if err != nil {
 			return fmt.Errorf("read structurizr input %s: %w", path, err)
 		}
+		if int64(len(body)) > c4ClosureTotalMaxBytes-totalBytes {
+			return fmt.Errorf("structurizr closure exceeds %d-byte aggregate limit", c4ClosureTotalMaxBytes)
+		}
+		totalBytes += int64(len(body))
 		for lineNo, rawLine := range strings.Split(string(body), "\n") {
 			line := strings.TrimSpace(structurizrSemanticLine(rawLine))
 			if line == "" {
@@ -211,7 +228,7 @@ func validateStructurizrClosure(design, entry string) ([]string, error) {
 				if err != nil {
 					return fmt.Errorf("%s: %w", where, err)
 				}
-				if err := visit(include); err != nil {
+				if err := visit(include, depth+1); err != nil {
 					return err
 				}
 			}
@@ -220,7 +237,7 @@ func validateStructurizrClosure(design, entry string) ([]string, error) {
 		closure = append(closure, path)
 		return nil
 	}
-	if err := visit(entry); err != nil {
+	if err := visit(entry, 1); err != nil {
 		return nil, err
 	}
 	sort.Strings(closure)

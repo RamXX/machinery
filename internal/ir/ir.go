@@ -7,8 +7,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/portablepath"
 )
+
+const machineInventoryMaxEntries = 100_000
 
 // IdentPattern is machine_lint.IDENT: [A-Za-z_][A-Za-z0-9_]*.
 const IdentPattern = `[A-Za-z_][A-Za-z0-9_]*`
@@ -45,7 +48,7 @@ func TLAModuleName(root *Value) (string, error) {
 // source and to produce a basename unique under case-folding. Title-casing
 // makes foo and Foo an exact collision; FOO and Foo alias on APFS/NTFS.
 func ValidateTLAModuleInventory(dir string) error {
-	entries, err := os.ReadDir(dir)
+	entries, err := dirscan.Read(dir, machineInventoryMaxEntries)
 	if err != nil {
 		return err
 	}

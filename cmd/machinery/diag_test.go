@@ -16,6 +16,24 @@ type brokenDiagnosticWriter struct{ err error }
 
 func (writer brokenDiagnosticWriter) Write([]byte) (int, error) { return 0, writer.err }
 
+func TestReadDoctorJSONRejectsOversizedSparseInput(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(diagnosticConfigMaxBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var dst map[string]any
+	if err := readDoctorJSON(path, &dst); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatalf("doctor JSON accepted oversized sparse input: %v", err)
+	}
+}
+
 func TestRunCommandReturnsExecutionErrors(t *testing.T) {
 	_, err := runCommand(filepath.Join(t.TempDir(), "does-not-exist"), false, "--version")
 	if err == nil {

@@ -6,15 +6,32 @@ action=${1:-rows}
 manifest=${2:-examples/inventory.tsv}
 [[ ! -L "$manifest" && -f "$manifest" ]] || { echo "example inventory $manifest must be a regular non-symlink file" >&2; exit 1; }
 
-registered=$(mktemp)
-discovered=$(mktemp)
-rows=$(mktemp)
-pack_registered=$(mktemp)
-pack_discovered=$(mktemp)
-pack_relations=$(mktemp)
-design_entries=$(mktemp)
-cleanup() { rm -f "$registered" "$discovered" "$rows" "$pack_registered" "$pack_discovered" "$pack_relations" "$design_entries"; }
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
+repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd -P)
+
+work=$(mktemp -d)
+registered=$work/registered
+discovered=$work/discovered
+rows=$work/rows
+pack_registered=$work/pack-registered
+pack_discovered=$work/pack-discovered
+pack_relations=$work/pack-relations
+design_entries=$work/design-entries
+all_entries=$work/all-entries
+tree_inventory=$work/tree-inventory
+cleanup() { rm -rf -- "$work"; }
 trap cleanup EXIT
+
+if ! (cd "$repo_root" && go build -o "$tree_inventory" ./scripts/tree-inventory) 2>"$work/build.stderr"; then
+  echo "build bounded tree inventory helper failed" >&2
+  cat "$work/build.stderr" >&2
+  exit 1
+fi
+if [[ -s "$work/build.stderr" ]]; then
+  echo "building bounded tree inventory helper emitted stderr; warnings are forbidden" >&2
+  cat "$work/build.stderr" >&2
+  exit 1
+fi
 
 real_path_components() {
   local path=$1 current='' component
@@ -116,10 +133,15 @@ for capability in formal c4 impl checker complete pack-parent pack-child securit
   esac
   [[ "$count" -gt 0 ]] || { echo "example inventory unexpectedly has no $capability capability" >&2; exit 1; }
 done
-if ! find examples \( -name design -o -path '*/design/*' \) -print | LC_ALL=C sort >"$design_entries"; then
-  echo "example design discovery failed" >&2
+if ! "$tree_inventory" -root examples -max-entries 100000 -max-depth 64 -max-bytes 33554432 -timeout 15s >"$all_entries"; then
+  echo "bounded example design discovery failed" >&2
   exit 1
 fi
+while IFS= read -r entry; do
+  case "$entry" in
+    */design|*/design/*) printf '%s\n' "$entry" >>"$design_entries" ;;
+  esac
+done <"$all_entries"
 while IFS= read -r entry; do
   if [[ -L "$entry" ]]; then
     echo "example design entry must not be a symlink: $entry" >&2
@@ -130,15 +152,8 @@ while IFS= read -r entry; do
       echo "example design root must be a real directory: $entry" >&2
       exit 1
     fi
-    # Git cannot carry an empty directory tree. Observe it, but do not treat
-    # directory-only worktree residue as a shipped design root.
-    design_payload=''
-    if ! design_payload=$(find "$entry" -mindepth 1 ! -type d -print -quit); then
-      echo "example design-root discovery failed: $entry" >&2
-      exit 1
-    fi
-    [[ -n "$design_payload" ]] || continue
-    printf '%s\n' "$entry" >>"$discovered"
+    # Git cannot carry an empty directory tree. Payload entries later in the
+    # same exact inventory establish whether this root is shipped.
     continue
   fi
   if [[ -d "$entry" ]]; then

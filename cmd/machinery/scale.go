@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/lint"
 	"github.com/RamXX/machinery/internal/pack"
@@ -53,6 +54,9 @@ func remapSnapshotError(err error, snapshot, design string) error {
 var designReaderAfterSnapshot = func() {}
 var stableRegularAfterInitialRead = func(string) {}
 
+const stableRegularMaxBytes int64 = 16 << 20
+const scaleInventoryMaxEntries = 100_000
+
 type stableRegularFile struct {
 	path string
 	info os.FileInfo
@@ -70,6 +74,9 @@ func openStableRegular(path string) (*stableRegularFile, error) {
 	}
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("%s must be a regular non-symlink file", path)
+	}
+	if info.Size() < 0 || info.Size() > stableRegularMaxBytes {
+		return nil, fmt.Errorf("%s size %d exceeds %d-byte limit", path, info.Size(), stableRegularMaxBytes)
 	}
 	f, err := os.Open(abs)
 	if err != nil {
@@ -89,7 +96,14 @@ func (s *stableRegularFile) read() ([]byte, error) {
 	if _, err := s.file.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	return io.ReadAll(s.file)
+	body, err := io.ReadAll(io.LimitReader(s.file, s.info.Size()+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) != s.info.Size() {
+		return nil, fmt.Errorf("%s changed size while reading", s.path)
+	}
+	return body, nil
 }
 
 func (s *stableRegularFile) revalidate(body []byte) error {
@@ -118,6 +132,23 @@ func (s *stableRegularFile) revalidate(body []byte) error {
 }
 
 func (s *stableRegularFile) close() error { return s.file.Close() }
+
+func readStableRegular(path string) (_ []byte, retErr error) {
+	stable, err := openStableRegular(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { retErr = errors.Join(retErr, stable.close()) }()
+	body, err := stable.read()
+	if err != nil {
+		return nil, err
+	}
+	stableRegularAfterInitialRead(path)
+	if err := stable.revalidate(body); err != nil {
+		return nil, err
+	}
+	return body, nil
+}
 
 // Thresholds for the decomposition recommendation. Deliberately conservative
 // defaults; they are advisory (the report recommends, the human decides), and
@@ -157,7 +188,7 @@ func newScaleCmd() *cobra.Command {
 			machines := 0
 			states, transitions := 0, 0
 			mdir := filepath.Join(design, "machines")
-			if entries, err := os.ReadDir(mdir); err == nil {
+			if entries, err := dirscan.Read(mdir, scaleInventoryMaxEntries); err == nil {
 				for _, e := range entries {
 					if !strings.HasSuffix(e.Name(), ".machine.json") {
 						continue
@@ -179,13 +210,13 @@ func newScaleCmd() *cobra.Command {
 			}
 			entities, invariants := 0, 0
 			var modelithBytes int
-			entries, err := os.ReadDir(design)
+			entries, err := dirscan.Read(design, scaleInventoryMaxEntries)
 			if err != nil {
 				return fmt.Errorf("scale: read design directory: %w", err)
 			}
 			for _, e := range entries {
 				if strings.HasSuffix(e.Name(), ".modelith.yaml") {
-					data, err := os.ReadFile(filepath.Join(design, e.Name()))
+					data, err := readStableRegular(filepath.Join(design, e.Name()))
 					if err != nil {
 						return fmt.Errorf("scale: read model %s: %w", e.Name(), err)
 					}
@@ -213,16 +244,16 @@ func newScaleCmd() *cobra.Command {
 			eventRows := len(eventRowsRaw)
 			inputBytes := modelithBytes
 			for _, f := range []string{"ARCHITECTURE.md", "workspace.dsl"} {
-				if data, err := os.ReadFile(filepath.Join(design, f)); err == nil {
+				if data, err := readStableRegular(filepath.Join(design, f)); err == nil {
 					inputBytes += len(data)
 				} else if !os.IsNotExist(err) {
 					return fmt.Errorf("scale: read %s: %w", f, err)
 				}
 			}
-			if entries, err := os.ReadDir(mdir); err == nil {
+			if entries, err := dirscan.Read(mdir, scaleInventoryMaxEntries); err == nil {
 				for _, e := range entries {
 					if strings.HasSuffix(e.Name(), ".matrix.md") {
-						data, err := os.ReadFile(filepath.Join(mdir, e.Name()))
+						data, err := readStableRegular(filepath.Join(mdir, e.Name()))
 						if err != nil {
 							return fmt.Errorf("scale: read matrix %s: %w", e.Name(), err)
 						}

@@ -10,8 +10,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/safefile"
 )
+
+const lintMachineInventoryMaxEntries = 100_000
+const lintMatrixMaxBytes int64 = 16 << 20
 
 // RootKeys / StateKeys / InvokeKeys / StateTypes mirror machine_lint.py exactly.
 var RootKeys = map[string]bool{
@@ -1340,7 +1345,7 @@ func Lint(path string) (nStates int, errs, warns, drift []string) {
 	mx = strings.TrimSuffix(mx, filepath.Ext(mx)) // remove .json
 	mx = strings.TrimSuffix(mx, ".machine") + ".matrix.md"
 	if _, statErr := os.Stat(mx); statErr == nil {
-		data, readErr := os.ReadFile(mx)
+		data, readErr := safefile.Read(mx, "machine matrix", lintMatrixMaxBytes)
 		if readErr != nil {
 			// a matrix that exists but cannot be read must never reconcile
 			// as "no table present" (that is a silent pass)
@@ -1358,7 +1363,11 @@ func Lint(path string) (nStates int, errs, warns, drift []string) {
 
 // Run is the `machinery lint <dir>` entrypoint.
 func Run(mdir string, out, errw io.Writer) int {
-	entries, _ := os.ReadDir(mdir)
+	entries, readErr := dirscan.Read(mdir, lintMachineInventoryMaxEntries)
+	if readErr != nil {
+		fmt.Fprintf(out, "ERROR  enumerate %s: %v\n", mdir, readErr)
+		return 1
+	}
 	var files []string
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".machine.json") {

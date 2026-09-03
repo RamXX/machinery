@@ -2,6 +2,7 @@ package gates
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,12 +11,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
 )
 
+const implementationDirectoryMaxEntries = 100_000
+const implementationDirectoryMaxDepth = 64
+
 // --- imports (G4-import) ---
 
-// walkSourceFiles collects source files under one canonical source root.
+// walkSourceFiles collects source files under one canonical source root. One
+// aggregate entry ceiling and one portable depth ceiling cover the complete
+// traversal, including entries that are inspected and then ignored.
 // Symlink entries below that root are rejected: following them makes G4/Gt
 // depend on mutable bytes outside the governed source inventory, while
 // skipping a broken link silently makes the scan incomplete.
@@ -35,69 +42,177 @@ import (
 // pruned lists the root-relative directories the ignore globs pruned, so the
 // caller can keep the skipped volume visible in its counts.
 func walkSourceFiles(root string, ignore []string) (files, pruned, warns []string, err error) {
-	// Resolve once to prove the explicitly supplied source root exists. Keep
-	// the caller's exact spelling for returned paths: callers may configure a
-	// relative root, and macOS commonly maps /var to /private/var. Rewriting
-	// that trusted root would make every file appear to escape the configured
-	// implementation directory.
-	if _, err := filepath.EvalSymlinks(root); err != nil {
+	inventory, pruned, warns, err := walkSourceFilesBounded(root, ignore, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth)
+	if inventory == nil {
+		return nil, pruned, warns, err
+	}
+	files = inventory.Paths()
+	return files, pruned, warns, errors.Join(err, inventory.Close())
+}
+
+type sourceFileInventory struct {
+	root        *os.Root
+	displayRoot string
+	files       []string
+	listed      map[string]bool
+	witnesses   map[string]rootDirectoryWitness
+	closed      bool
+}
+
+func (inventory *sourceFileInventory) Files() []string {
+	return append([]string(nil), inventory.files...)
+}
+
+func (inventory *sourceFileInventory) Paths() []string {
+	paths := make([]string, 0, len(inventory.files))
+	for _, rel := range inventory.files {
+		paths = append(paths, filepath.Join(inventory.displayRoot, rel))
+	}
+	return paths
+}
+
+func (inventory *sourceFileInventory) ReadFile(rel string) ([]byte, error) {
+	if inventory == nil || inventory.closed {
+		return nil, fmt.Errorf("source inventory authority is closed")
+	}
+	if !inventory.listed[rel] {
+		return nil, fmt.Errorf("source path %s was not in the governed inventory", rel)
+	}
+	return readRootRegularFile(inventory.root, rel)
+}
+
+func (inventory *sourceFileInventory) Close() (retErr error) {
+	if inventory == nil || inventory.closed {
+		return nil
+	}
+	inventory.closed = true
+	var dirs []string
+	for rel := range inventory.witnesses {
+		dirs = append(dirs, rel)
+	}
+	sort.Strings(dirs)
+	for _, rel := range dirs {
+		retErr = errors.Join(retErr, revalidateRootDirectory(inventory.root, rel, inventory.witnesses[rel]))
+	}
+	rootWitness := inventory.witnesses["."]
+	publicInfo, pathErr := os.Lstat(inventory.displayRoot)
+	if pathErr != nil || !sameInventoryInfo(rootWitness.info, publicInfo) {
+		retErr = errors.Join(retErr, pathErr, fmt.Errorf("source inventory root %s changed identity during traversal", inventory.displayRoot))
+	} else {
+		publicDir, openErr := os.Open(inventory.displayRoot)
+		if openErr != nil {
+			retErr = errors.Join(retErr, openErr)
+		} else {
+			opened, statErr := publicDir.Stat()
+			changeID, changeErr := dirscan.ChangeID(publicDir, opened)
+			closeErr := publicDir.Close()
+			if statErr != nil || changeErr != nil || !sameInventoryInfo(rootWitness.info, opened) || changeID != rootWitness.changeID {
+				retErr = errors.Join(retErr, statErr, changeErr, fmt.Errorf("source inventory root %s changed during traversal", inventory.displayRoot))
+			}
+			retErr = errors.Join(retErr, closeErr)
+		}
+	}
+	retErr = errors.Join(retErr, inventory.root.Close())
+	return retErr
+}
+
+func walkSourceFilesBounded(root string, ignore []string, maxEntries, maxDepth int) (inventory *sourceFileInventory, pruned, warns []string, err error) {
+	if maxEntries <= 0 {
+		return nil, nil, nil, fmt.Errorf("source inventory entry limit must be positive")
+	}
+	if maxDepth < 0 {
+		return nil, nil, nil, fmt.Errorf("source inventory depth limit must be non-negative")
+	}
+	rootAuthority, displayRoot, err := openRealRoot(root)
+	if err != nil {
 		return nil, nil, nil, err
 	}
-	visited := map[string]bool{}
-	var walk func(dir string, isRoot bool) error
-	walk = func(dir string, isRoot bool) error {
+	inventory = &sourceFileInventory{
+		root:        rootAuthority,
+		displayRoot: displayRoot,
+		listed:      map[string]bool{},
+		witnesses:   map[string]rootDirectoryWitness{},
+	}
+	openedInventory := inventory
+	valid := false
+	defer func() {
+		if !valid {
+			err = errors.Join(err, openedInventory.root.Close())
+			inventory = nil
+		}
+	}()
+	entriesSeen := 0
+	var walk func(relDir string, depth int, isRoot bool) error
+	walk = func(relDir string, depth int, isRoot bool) error {
+		displayDir := displayRoot
+		if relDir != "." {
+			displayDir = filepath.Join(displayRoot, relDir)
+		}
 		fail := func(e error) error {
 			if isRoot {
 				return e
 			}
-			warns = append(warns, dir+": "+e.Error())
+			warns = append(warns, displayDir+": "+e.Error())
 			return nil
 		}
-		real, evalErr := filepath.EvalSymlinks(dir)
-		if evalErr != nil {
-			return fail(evalErr)
-		}
-		if visited[real] {
-			return nil // symlink cycle
-		}
-		visited[real] = true
-		entries, readErr := os.ReadDir(dir)
+		entries, witness, readErr := readRootDirectory(rootAuthority, relDir, maxEntries-entriesSeen)
 		if readErr != nil {
 			return fail(readErr)
 		}
+		inventory.witnesses[relDir] = witness
+		entriesSeen += len(entries)
 		for _, e := range entries {
-			p := filepath.Join(dir, e.Name())
-			isDir := e.IsDir()
-			if e.Type()&os.ModeSymlink != 0 {
-				rel, relErr := filepath.Rel(root, p)
-				if relErr == nil && sourcePathIgnored(rel, ignore) {
+			rel := e.Name()
+			if relDir != "." {
+				rel = filepath.Join(relDir, e.Name())
+			}
+			p := filepath.Join(displayRoot, rel)
+			if depth >= maxDepth {
+				return fmt.Errorf("source inventory exceeds %d-level depth limit at %s", maxDepth, p)
+			}
+			info, statErr := rootAuthority.Lstat(rel)
+			if statErr != nil {
+				warns = append(warns, p+": "+statErr.Error())
+				continue
+			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				if sourcePathIgnored(rel, ignore) {
 					continue
 				}
 				warns = append(warns, p+": symlink entries are rejected from the governed source inventory")
 				continue
 			}
-			if isDir {
-				if rel, relErr := filepath.Rel(root, p); relErr == nil && dirIgnored(rel, ignore) {
+			if info.IsDir() {
+				if dirIgnored(rel, ignore) {
 					pruned = append(pruned, rel)
 					continue
 				}
-				_ = walk(p, false) // non-root failures land in warns
+				if walkErr := walk(rel, depth+1, false); walkErr != nil {
+					return walkErr
+				}
 				continue
 			}
-			if _, ok := langExts[filepath.Ext(p)]; ok {
-				files = append(files, p)
+			if !info.Mode().IsRegular() {
+				warns = append(warns, p+": non-regular entries are rejected from the governed source inventory")
+				continue
+			}
+			if _, ok := langExts[filepath.Ext(rel)]; ok {
+				inventory.files = append(inventory.files, rel)
+				inventory.listed[rel] = true
 			} else if isTestFile(e.Name()) {
 				// *.test.mjs / *.test.cjs: test files in extensions langExts
 				// never maps for import parsing; Gt still needs them walked
-				files = append(files, p)
+				inventory.files = append(inventory.files, rel)
+				inventory.listed[rel] = true
 			}
 		}
-		return nil
+		return revalidateRootDirectory(rootAuthority, relDir, witness)
 	}
-	if walkErr := walk(root, true); walkErr != nil {
-		return files, pruned, warns, walkErr
+	if walkErr := walk(".", 0, true); walkErr != nil {
+		return nil, pruned, warns, walkErr
 	}
-	return files, pruned, warns, nil
+	valid = true
+	return inventory, pruned, warns, nil
 }
 
 func sourcePathIgnored(rel string, ignore []string) bool {
@@ -279,7 +394,7 @@ var goModuleLineRe = regexp.MustCompile(`(?m)^module\s+(\S+)`)
 // failure on impl itself is fatal.
 func goModules(impl string, ignore []string) ([]goModule, error) {
 	var mods []goModule
-	err := filepath.WalkDir(impl, func(path string, d os.DirEntry, err error) error {
+	err := walkTreeDirBounded(impl, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -306,7 +421,7 @@ func goModules(impl string, ignore []string) ([]goModule, error) {
 		if d.Name() != "go.mod" {
 			return nil
 		}
-		data, readErr := os.ReadFile(path)
+		data, readErr := readRegularFile(path)
 		if readErr != nil {
 			return readErr
 		}
@@ -346,7 +461,7 @@ type tsPackage struct {
 // import specifier could reference.
 func tsPackages(impl string, ignore []string) ([]tsPackage, error) {
 	var pkgs []tsPackage
-	err := filepath.WalkDir(impl, func(path string, d os.DirEntry, err error) error {
+	err := walkTreeDirBounded(impl, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -373,7 +488,7 @@ func tsPackages(impl string, ignore []string) ([]tsPackage, error) {
 		if d.Name() != "package.json" {
 			return nil
 		}
-		data, readErr := os.ReadFile(path)
+		data, readErr := readRegularFile(path)
 		if readErr != nil {
 			return readErr
 		}
@@ -1136,7 +1251,7 @@ type importScan struct {
 func manifestDependencies(impl string, ignore []string) (map[string]bool, []string) {
 	deps := map[string]bool{}
 	var errs []string
-	walkErr := filepath.WalkDir(impl, func(path string, d os.DirEntry, err error) error {
+	walkErr := walkTreeDirBounded(impl, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -1156,7 +1271,7 @@ func manifestDependencies(impl string, ignore []string) (map[string]bool, []stri
 			}
 			return nil
 		}
-		body, readErr := os.ReadFile(path)
+		body, readErr := readRegularFile(path)
 		if readErr != nil {
 			return readErr
 		}
@@ -1397,9 +1512,16 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 	}
 	edgeHits := map[[2]string]*edgeRec{}
 	var edgeOrder [][2]string
-	files, walkPruned, walkWarns, walkErr := walkSourceFiles(impl, ignore)
+	inventory, walkPruned, walkWarns, walkErr := walkSourceFilesBounded(impl, ignore, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth)
 	if walkErr != nil {
 		g.Errs = append(g.Errs, "walking "+impl+": "+walkErr.Error())
+	}
+	if inventory != nil {
+		defer func() {
+			if closeErr := inventory.Close(); closeErr != nil {
+				g.Errs = append(g.Errs, "walking "+impl+": source inventory changed before traversal completed: "+closeErr.Error())
+			}
+		}()
 	}
 	for range walkPruned {
 		g.Count("dirs pruned by contract ignore")
@@ -1410,10 +1532,13 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 	if scan != nil {
 		scan.WalkWarns = append([]string{}, walkWarns...)
 	}
+	var files []string
+	if inventory != nil {
+		files = inventory.Files()
+	}
 	sort.Strings(files)
 
-	for _, path := range files {
-		rel, _ := filepath.Rel(impl, path)
+	for _, rel := range files {
 		ignored := false
 		for _, ig := range ignore {
 			if matchGlob(rel, ig) {
@@ -1429,13 +1554,18 @@ func checkImports(design, impl string, scan *importScan) *Gate {
 			g.Count("test files skipped")
 			continue
 		}
-		lang := langExts[filepath.Ext(path)]
+		lang := langExts[filepath.Ext(rel)]
 		srcB, srcAmb := resolveBoundary(rel)
 		if len(srcAmb) > 0 {
 			g.Errs = append(g.Errs, "source file "+rel+" matches equally specific code globs in multiple boundaries ("+strings.Join(srcAmb, ", ")+"); boundary ownership must be unique")
 			continue
 		}
-		text := readFileOrErr(path, g)
+		body, readErr := inventory.ReadFile(rel)
+		if readErr != nil {
+			g.Errs = append(g.Errs, filepath.Join(impl, rel)+" is unreadable: "+readErr.Error())
+			continue
+		}
+		text := string(body)
 		if lang == "rust" {
 			// judge only the production portion: imports living inside a
 			// #[cfg(test)] module are test wiring (Gt's corpus), and a file

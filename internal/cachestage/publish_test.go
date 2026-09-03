@@ -5,8 +5,58 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
+
+	"github.com/RamXX/machinery/internal/fsatomic"
 )
+
+func TestHashOpenFileTerminatesUnderContinuousAppender(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "growing")
+	if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	appender, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop := make(chan struct{})
+	started := make(chan struct{})
+	var once sync.Once
+	go func() {
+		defer appender.Close()
+		for {
+			if _, err := appender.Write([]byte("xxxxxxxxxxxxxxxx")); err != nil {
+				return
+			}
+			once.Do(func() { close(started) })
+			select {
+			case <-stop:
+				return
+			default:
+			}
+		}
+	}()
+	<-started
+	reader, err := os.Open(path)
+	if err != nil {
+		close(stop)
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := hashOpenFile(reader, 1)
+		done <- errors.Join(err, reader.Close())
+	}()
+	select {
+	case <-done:
+		close(stop)
+	case <-time.After(2 * time.Second):
+		close(stop)
+		t.Fatal("hashing did not terminate under continuous appender")
+	}
+}
 
 func seedPublicationTree(t *testing.T, base string) (source, target string) {
 	t.Helper()
@@ -269,5 +319,29 @@ func TestPublishRechecksTargetAbsenceAtRenameBoundary(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(base, source)); err != nil {
 		t.Fatalf("source was moved despite late target: %v", err)
+	}
+}
+
+func TestPublishAtomicRenameNeverClobbersBoundaryCollision(t *testing.T) {
+	base := t.TempDir()
+	source, target := seedPublicationTree(t, base)
+	sentinel := filepath.Join(base, target, "sentinel")
+	err := publish(base, source, target, publishHooks{rename: func(root *os.Root, from, to string) error {
+		if err := root.Mkdir(to, 0o700); err != nil {
+			return err
+		}
+		if err := root.WriteFile(filepath.Join(to, "sentinel"), []byte("user"), 0o600); err != nil {
+			return err
+		}
+		return fsatomic.RenameNoReplace(root, from, to)
+	}})
+	if err == nil {
+		t.Fatal("atomic cache publication clobbered a boundary collision")
+	}
+	if body, err := os.ReadFile(sentinel); err != nil || string(body) != "user" {
+		t.Fatalf("collision sentinel changed: %q, %v", body, err)
+	}
+	if _, err := os.Lstat(filepath.Join(base, source)); err != nil {
+		t.Fatalf("collision moved publication source: %v", err)
 	}
 }

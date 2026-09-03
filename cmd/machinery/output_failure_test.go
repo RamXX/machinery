@@ -178,6 +178,10 @@ func TestPreflightReturnsOutputFailure(t *testing.T) {
 }
 
 func TestGeneratorCommandsReturnOutputFailureAfterPublishing(t *testing.T) {
+	goCRM := t.TempDir()
+	copyDirInto(t, "../../examples/go-crm/design", goCRM)
+	fulfillment := t.TempDir()
+	copyDirInto(t, "../../examples/fulfillment/design", fulfillment)
 	tests := []struct {
 		name      string
 		command   func() *cobra.Command
@@ -188,7 +192,7 @@ func TestGeneratorCommandsReturnOutputFailureAfterPublishing(t *testing.T) {
 			name:    "tla",
 			command: newTLACmd,
 			args: func(out string) []string {
-				return []string{"../../examples/go-crm/design/machines/Deal.machine.json", out}
+				return []string{filepath.Join(goCRM, "machines/Deal.machine.json"), out}
 			},
 			published: "Deal.tla",
 		},
@@ -196,7 +200,7 @@ func TestGeneratorCommandsReturnOutputFailureAfterPublishing(t *testing.T) {
 			name:    "refine",
 			command: newRefineCmd,
 			args: func(out string) []string {
-				return []string{"../../examples/go-crm/design/machines/Deal.machine.json", "../../examples/go-crm/design/formal/Deal.semantics.yaml", out}
+				return []string{filepath.Join(goCRM, "machines/Deal.machine.json"), filepath.Join(goCRM, "formal/Deal.semantics.yaml"), out}
 			},
 			published: "DealRefinement.tla",
 		},
@@ -204,7 +208,7 @@ func TestGeneratorCommandsReturnOutputFailureAfterPublishing(t *testing.T) {
 			name:    "compose",
 			command: newComposeCmd,
 			args: func(out string) []string {
-				return []string{"../../examples/fulfillment/design/formal/checkout.composition.yaml", "../../examples/fulfillment/design/machines/FulfillmentSaga.machine.json", out}
+				return []string{filepath.Join(fulfillment, "formal/checkout.composition.yaml"), filepath.Join(fulfillment, "machines/FulfillmentSaga.machine.json"), out}
 			},
 			published: "Checkout.tla",
 		},

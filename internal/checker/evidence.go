@@ -52,14 +52,7 @@ type Evidence struct {
 // Absence, schema drift, ambiguous JSON, inconsistent verdicts, unsafe proof
 // references, and unsupported reserved fields all fail closed.
 func LoadEvidence(path string) (*Evidence, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return nil, err
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s: evidence must be a regular, non-symlink file", path)
-	}
-	data, err := os.ReadFile(path)
+	data, err := readCheckerStructuredFile(path, "evidence")
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +93,7 @@ func LoadEvidenceConfinedBytes(design, rel string) (evidence *Evidence, data []b
 	if err != nil {
 		return nil, nil, err
 	}
-	data, err = root.readRegular(clean, "evidence", false)
+	data, err = root.readRegularBounded(clean, "evidence", checkerStructuredFileMaxBytes)
 	if err != nil {
 		return nil, nil, err
 	}

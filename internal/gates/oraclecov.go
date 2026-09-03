@@ -209,18 +209,28 @@ func testCorpus(design, impl string, g *Gate) testCorpusData {
 			ignore = append(ignore, ig.AsString())
 		}
 	}
-	files, _, walkWarns, walkErr := walkSourceFiles(impl, ignore)
+	inventory, _, walkWarns, walkErr := walkSourceFilesBounded(impl, ignore, implementationDirectoryMaxEntries, implementationDirectoryMaxDepth)
 	if walkErr != nil {
 		g.Errs = append(g.Errs, "walking "+impl+": "+walkErr.Error())
+	}
+	if inventory != nil {
+		defer func() {
+			if closeErr := inventory.Close(); closeErr != nil {
+				g.Errs = append(g.Errs, "walking "+impl+": source inventory changed before traversal completed: "+closeErr.Error())
+			}
+		}()
 	}
 	for _, w := range walkWarns {
 		g.Errs = append(g.Errs, "walk incomplete, subtree skipped: "+w)
 	}
+	var files []string
+	if inventory != nil {
+		files = inventory.Files()
+	}
 	sort.Strings(files)
 	var corpus testCorpusData
 	var texts, codeTexts []string
-	for _, path := range files {
-		rel, _ := filepath.Rel(impl, path)
+	for _, rel := range files {
 		ignored := false
 		for _, ig := range ignore {
 			if matchGlob(rel, ig) {
@@ -231,7 +241,12 @@ func testCorpus(design, impl string, g *Gate) testCorpusData {
 		if ignored {
 			continue
 		}
-		text := readFileOrErr(path, g)
+		body, readErr := inventory.ReadFile(rel)
+		if readErr != nil {
+			g.Errs = append(g.Errs, filepath.Join(impl, rel)+" is unreadable: "+readErr.Error())
+			continue
+		}
+		text := string(body)
 		switch {
 		case isTestFile(rel):
 			// the whole file is test text

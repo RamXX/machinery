@@ -22,6 +22,7 @@ import (
 
 	"github.com/RamXX/machinery/internal/checker"
 	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/processcontrol"
 	machversion "github.com/RamXX/machinery/internal/version"
 )
@@ -521,31 +522,14 @@ func checkerToolClosureHash(workDir string) (digest string, retErr error) {
 		return "", fmt.Errorf("open checker workspace root: %w", err)
 	}
 	defer func() { retErr = errors.Join(retErr, root.Close()) }()
-	var paths []string
-	for _, subtree := range []string{"tool-assets", "tool-path", "tool-snapshots"} {
-		walkRoot := filepath.Join(workDir, subtree)
-		if err := filepath.WalkDir(walkRoot, func(path string, entry fs.DirEntry, walkErr error) error {
-			if walkErr != nil {
-				return walkErr
-			}
-			rel, err := filepath.Rel(workDir, path)
-			if err != nil {
-				return err
-			}
-			paths = append(paths, rel)
-			return nil
-		}); err != nil {
-			return "", fmt.Errorf("inventory checker tool closure: %w", err)
-		}
+	paths, initialInfos, err := inventoryCheckerToolClosure(root)
+	if err != nil {
+		return "", fmt.Errorf("inventory checker tool closure: %w", err)
 	}
-	sort.Strings(paths)
 	entries := make([]checkerToolInventoryEntry, 0, len(paths))
 	var total int64
 	for _, rel := range paths {
-		info, err := root.Lstat(rel)
-		if err != nil {
-			return "", fmt.Errorf("inspect checker tool closure entry %s: %w", rel, err)
-		}
+		info := initialInfos[rel]
 		if info.Mode()&os.ModeSymlink != 0 || (!info.IsDir() && !info.Mode().IsRegular()) {
 			return "", fmt.Errorf("checker tool closure entry %s is a symlink or special file", rel)
 		}
@@ -574,7 +558,129 @@ func checkerToolClosureHash(workDir string) (digest string, retErr error) {
 			_, _ = hash.Write([]byte{'\n'})
 		}
 	}
+	finalPaths, finalInfos, err := inventoryCheckerToolClosure(root)
+	if err != nil {
+		return "", fmt.Errorf("revalidate checker tool closure inventory: %w", err)
+	}
+	if len(paths) != len(finalPaths) {
+		return "", fmt.Errorf("checker tool closure inventory changed while hashing")
+	}
+	for i, rel := range paths {
+		if finalPaths[i] != rel || !sameCheckerToolFile(initialInfos[rel], finalInfos[rel]) {
+			return "", fmt.Errorf("checker tool closure inventory changed while hashing at %s", filepath.ToSlash(rel))
+		}
+	}
 	return fmt.Sprintf("sha256:%x", hash.Sum(nil)), nil
+}
+
+func inventoryCheckerToolClosure(root *os.Root) ([]string, map[string]os.FileInfo, error) {
+	return inventoryCheckerToolClosureBounded(root, checkerToolMaxEntries, checkerToolMaxDepth)
+}
+
+func inventoryCheckerToolClosureBounded(root *os.Root, maxEntries, maxDepth int) ([]string, map[string]os.FileInfo, error) {
+	if maxEntries < 0 || maxDepth < 0 {
+		return nil, nil, fmt.Errorf("checker tool closure limits must be non-negative")
+	}
+	paths := make([]string, 0, min(maxEntries, checkerToolReadDirPage))
+	infos := make(map[string]os.FileInfo)
+	var walk func(string, int) error
+	walk = func(directory string, depth int) error {
+		if depth > maxDepth {
+			return fmt.Errorf("checker tool closure exceeds %d-level depth limit at %s", maxDepth, filepath.ToSlash(directory))
+		}
+		info, err := root.Lstat(directory)
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return fmt.Errorf("checker tool closure directory %s is not a real directory", directory)
+		}
+		if len(paths) >= maxEntries {
+			return fmt.Errorf("checker tool closure exceeds %d-entry limit", maxEntries)
+		}
+		paths = append(paths, directory)
+		infos[directory] = info
+		dir, err := root.Open(directory)
+		if err != nil {
+			return err
+		}
+		opened, openStatErr := dir.Stat()
+		children, readErr := readCheckerToolDir(dir, maxEntries-len(paths))
+		heldAfter, heldErr := dir.Stat()
+		liveAfter, liveErr := root.Lstat(directory)
+		closeErr := dir.Close()
+		if err := errors.Join(openStatErr, readErr, heldErr, liveErr, closeErr); err != nil {
+			return err
+		}
+		if !sameCheckerToolFile(info, opened) || !sameCheckerToolFile(opened, heldAfter) || !sameCheckerToolFile(heldAfter, liveAfter) {
+			return fmt.Errorf("checker tool closure directory %s changed while enumerating", filepath.ToSlash(directory))
+		}
+		for _, child := range children {
+			rel := filepath.Join(directory, child.Name())
+			if depth >= maxDepth {
+				return fmt.Errorf("checker tool closure exceeds %d-level depth limit at %s", maxDepth, filepath.ToSlash(rel))
+			}
+			childInfo, err := root.Lstat(rel)
+			if err != nil {
+				return err
+			}
+			if childInfo.IsDir() {
+				if err := walk(rel, depth+1); err != nil {
+					return err
+				}
+				continue
+			}
+			if len(paths) >= maxEntries {
+				return fmt.Errorf("checker tool closure exceeds %d-entry limit", maxEntries)
+			}
+			paths = append(paths, rel)
+			infos[rel] = childInfo
+		}
+		return nil
+	}
+	for _, subtree := range []string{"tool-assets", "tool-path", "tool-snapshots"} {
+		if err := walk(subtree, 1); err != nil {
+			return nil, nil, err
+		}
+	}
+	sort.Strings(paths)
+	return paths, infos, nil
+}
+
+type checkerToolDirectoryReader interface {
+	ReadDir(int) ([]fs.DirEntry, error)
+}
+
+func readCheckerToolDir(dir checkerToolDirectoryReader, limit int) ([]fs.DirEntry, error) {
+	if limit < 0 {
+		return nil, fmt.Errorf("checker tool closure exceeds %d-entry limit", checkerToolMaxEntries)
+	}
+	entries := make([]fs.DirEntry, 0, min(limit, checkerToolReadDirPage))
+	for {
+		remaining := limit - len(entries)
+		pageLimit := min(checkerToolReadDirPage, remaining)
+		if pageLimit == 0 {
+			// One positive request detects overflow without max+1 arithmetic,
+			// which would wrap when the caller supplies MaxInt.
+			pageLimit = 1
+		}
+		page, err := dir.ReadDir(pageLimit)
+		if len(page) == 0 && err == nil {
+			return nil, fmt.Errorf("checker tool directory returned an empty page without EOF")
+		}
+		entries = append(entries, page...)
+		if len(entries) > limit {
+			return nil, fmt.Errorf("checker tool closure exceeds %d-entry limit", limit)
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	return entries, nil
 }
 
 func verifyCheckerToolClosure(workDir, expected string) error {
@@ -613,14 +719,12 @@ func readEvidenceTrace(root, evidenceRel string, evidence *checker.Evidence) ([]
 		}
 	}
 	found := false
-	entries := 0
-	if err := filepath.WalkDir(generatedRoot, func(path string, entry fs.DirEntry, walkErr error) error {
+	if err := dirscan.WalkBounded(generatedRoot, dirscan.WalkLimits{
+		MaxEntries: checkerTraceInventoryLimit,
+		MaxDepth:   checkerTraceInventoryMaxDepth,
+	}, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
-		}
-		entries++
-		if entries > checkerTraceInventoryLimit {
-			return fmt.Errorf("generated trace inventory exceeds %d-entry limit", checkerTraceInventoryLimit)
 		}
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
@@ -659,10 +763,14 @@ func readEvidenceTrace(root, evidenceRel string, evidence *checker.Evidence) ([]
 const (
 	checkerToolMaxFileBytes  int64 = 128 << 20
 	checkerToolMaxTotalBytes int64 = 512 << 20
+	checkerToolMaxEntries          = 20_000
+	checkerToolMaxDepth            = 64
+	checkerToolReadDirPage         = 256
 
 	checkerOutputLimit            = 256 * 1024
 	checkerTraceLimit             = 16 * 1024 * 1024
 	checkerTraceInventoryLimit    = 1024
+	checkerTraceInventoryMaxDepth = 32
 	checkerWaitDelay              = 500 * time.Millisecond
 	checkerOCIControlPlaneTimeout = 15 * time.Second
 )
@@ -1130,7 +1238,7 @@ func snapshotOCIInputs(workDir, registryPath string, inputs []checker.OCIInput, 
 		if err := errors.Join(copyErr, closeErr); err != nil {
 			return nil, fmt.Errorf("snapshot runtime input %s: %w", input.Mount, err)
 		}
-		body, err := os.ReadFile(destination)
+		body, err := readCheckerFileExact(destination, checkerToolMaxFileBytes)
 		if err != nil {
 			return nil, fmt.Errorf("hash runtime input %s: %w", input.Mount, err)
 		}
@@ -1147,6 +1255,32 @@ func snapshotOCIInputs(workDir, registryPath string, inputs []checker.OCIInput, 
 		}
 	}
 	return digests, nil
+}
+
+func readCheckerFileExact(path string, limit int64) ([]byte, error) {
+	before, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() || before.Size() < 0 || before.Size() > limit {
+		return nil, fmt.Errorf("checker file %s must be a bounded regular non-symlink file", path)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	opened, statErr := file.Stat()
+	body, readErr := io.ReadAll(io.LimitReader(file, limit+1))
+	heldAfter, heldErr := file.Stat()
+	closeErr := file.Close()
+	liveAfter, liveErr := os.Lstat(path)
+	if err := errors.Join(statErr, readErr, heldErr, closeErr, liveErr); err != nil {
+		return nil, err
+	}
+	if int64(len(body)) != before.Size() || !sameCheckerToolFile(before, opened) || !sameCheckerToolFile(before, heldAfter) || !sameCheckerToolFile(before, liveAfter) {
+		return nil, fmt.Errorf("checker file %s changed while reading", path)
+	}
+	return body, nil
 }
 
 func verifyLocalOCIImage(engineArgs []string, image, digest, platform string, timeout time.Duration, workDir string) error {
@@ -1249,6 +1383,9 @@ func snapshotRootedCheckerFile(root *os.Root, sourcePath, destinationPath string
 	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() {
 		return fmt.Errorf("checker file %s must be a regular, non-symlink file", sourcePath)
 	}
+	if err := validateCheckerToolFileSize(sourcePath, before); err != nil {
+		return err
+	}
 	source, err := root.Open(sourcePath)
 	if err != nil {
 		return fmt.Errorf("open checker file %s: %w", sourcePath, err)
@@ -1266,22 +1403,25 @@ func snapshotRootedCheckerFile(root *os.Root, sourcePath, destinationPath string
 		return fmt.Errorf("create checker file snapshot: %w", err)
 	}
 	copiedHash := sha256.New()
-	_, copyErr := io.Copy(io.MultiWriter(destination, copiedHash), source)
+	copied, copyErr := io.Copy(io.MultiWriter(destination, copiedHash), io.LimitReader(source, before.Size()+1))
 	_, seekErr := source.Seek(0, io.SeekStart)
 	stableHash := sha256.New()
-	_, verifyErr := io.Copy(stableHash, source)
+	verified, verifyErr := io.Copy(stableHash, io.LimitReader(source, before.Size()+1))
+	heldAfter, heldErr := source.Stat()
 	current, currentErr := root.Lstat(sourcePath)
 	var changedErr error
-	if seekErr == nil && verifyErr == nil && !bytes.Equal(copiedHash.Sum(nil), stableHash.Sum(nil)) {
+	if copied != before.Size() || verified != before.Size() {
+		changedErr = fmt.Errorf("checker file %s changed size while it was being copied", sourcePath)
+	} else if seekErr == nil && verifyErr == nil && !bytes.Equal(copiedHash.Sum(nil), stableHash.Sum(nil)) {
 		changedErr = fmt.Errorf("checker file %s changed while it was being copied", sourcePath)
 	}
-	if currentErr == nil && !os.SameFile(before, current) {
+	if heldErr == nil && currentErr == nil && (!sameCheckerToolFile(before, heldAfter) || !sameCheckerToolFile(heldAfter, current)) {
 		changedErr = errors.Join(changedErr, fmt.Errorf("checker file %s was replaced while it was being copied", sourcePath))
 	}
 	syncErr := destination.Sync()
 	chmodErr := destination.Chmod(permissions)
 	closeErr := destination.Close()
-	if err := errors.Join(copyErr, seekErr, verifyErr, currentErr, changedErr, syncErr, chmodErr, closeErr); err != nil {
+	if err := errors.Join(copyErr, seekErr, verifyErr, heldErr, currentErr, changedErr, syncErr, chmodErr, closeErr); err != nil {
 		return fmt.Errorf("persist checker file snapshot: %w", err)
 	}
 	return nil

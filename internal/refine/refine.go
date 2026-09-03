@@ -16,10 +16,15 @@ import (
 
 	"github.com/RamXX/machinery/internal/artifactset"
 	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/portablepath"
+	"github.com/RamXX/machinery/internal/safefile"
 	"github.com/RamXX/machinery/internal/version"
 )
+
+const refinementOutputMaxEntries = 10_000
+const refinementInputMaxBytes int64 = 16 << 20
 
 // ExitError carries a hard-error (maps to Python sys.exit).
 type ExitError struct{ Msg string }
@@ -1558,7 +1563,7 @@ func ValidateControlFlowOnly(machinePath, semPath string) error {
 	if err != nil {
 		return &ExitError{Msg: "refine_gen: " + err.Error()}
 	}
-	data, err := os.ReadFile(semPath)
+	data, err := safefile.Read(semPath, "refinement semantics", refinementInputMaxBytes)
 	if err != nil {
 		return &ExitError{Msg: "refine_gen: " + err.Error()}
 	}
@@ -1852,7 +1857,7 @@ func RunWrittenInSnapshotTo(snapshot *designlock.Lock, machinePath, semPath, out
 	if err != nil {
 		return nil, &ExitError{Msg: "refine_gen: " + err.Error()}
 	}
-	data, err := os.ReadFile(semPath)
+	data, err := safefile.Read(semPath, "refinement semantics", refinementInputMaxBytes)
 	if err != nil {
 		return nil, &ExitError{Msg: "refine_gen: " + err.Error()}
 	}
@@ -2031,7 +2036,7 @@ func guardedCurrentRefinementArtifacts(outdir, machineSource, semanticsSource st
 var refinementFamilySuffixes = []string{"Data.tla", "Data.cfg", "Contract.tla", "Refinement.tla", "Refinement.cfg"}
 
 func staleOwnedRefinementArtifacts(outdir, machineDir, semanticsDir, machineSource, semanticsSource string, keep map[string][]byte) ([]artifactset.RemovalPrecondition, error) {
-	entries, err := os.ReadDir(outdir)
+	entries, err := dirscan.Read(outdir, refinementOutputMaxEntries)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}

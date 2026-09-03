@@ -14,7 +14,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -23,6 +25,118 @@ import (
 
 // SchemaVersion is the contract version this package produces and accepts.
 const SchemaVersion = "1.0"
+
+// checkerStructuredFileMaxBytes bounds every model, manifest, registry,
+// projection, and evidence document before a parser can allocate from
+// attacker-controlled cardinalities. Opaque checker traces have their own
+// caller-supplied bound.
+const checkerStructuredFileMaxBytes int64 = 16 << 20
+
+const (
+	checkerDirectoryBatch = 256
+	checkerMaxEntries     = 65_536
+)
+
+func readCheckerStructuredFile(path, kind string) (data []byte, retErr error) {
+	before, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s: %s must be a regular, non-symlink file", path, kind)
+	}
+	if before.Size() < 0 || before.Size() > checkerStructuredFileMaxBytes {
+		return nil, fmt.Errorf("%s: %s exceeds %d-byte limit", path, kind, checkerStructuredFileMaxBytes)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { retErr = errors.Join(retErr, file.Close()) }()
+	opened, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !opened.Mode().IsRegular() || !os.SameFile(before, opened) {
+		return nil, fmt.Errorf("%s: %s changed before it was opened", path, kind)
+	}
+	data, err = io.ReadAll(io.LimitReader(file, opened.Size()+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) != opened.Size() {
+		return nil, fmt.Errorf("%s: %s changed beyond its exact %d-byte snapshot", path, kind, opened.Size())
+	}
+	after, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	pathAfter, pathErr := os.Lstat(path)
+	if pathErr != nil {
+		return nil, pathErr
+	}
+	if pathAfter.Mode()&os.ModeSymlink != 0 || !pathAfter.Mode().IsRegular() ||
+		!os.SameFile(opened, after) || !os.SameFile(opened, pathAfter) ||
+		opened.Size() != after.Size() || opened.Size() != pathAfter.Size() ||
+		opened.Mode() != after.Mode() || opened.Mode() != pathAfter.Mode() ||
+		!opened.ModTime().Equal(after.ModTime()) || !opened.ModTime().Equal(pathAfter.ModTime()) ||
+		projectionControlChangeID(opened) != projectionControlChangeID(after) || projectionControlChangeID(opened) != projectionControlChangeID(pathAfter) {
+		return nil, fmt.Errorf("%s: %s changed while it was read", path, kind)
+	}
+	return data, nil
+}
+
+func readDirectoryBounded(path string, maxEntries int) ([]os.DirEntry, error) {
+	if maxEntries <= 0 {
+		return nil, fmt.Errorf("directory entry limit must be positive")
+	}
+	before, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.IsDir() {
+		return nil, fmt.Errorf("directory %s must be a real directory", path)
+	}
+	dir, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	opened, err := dir.Stat()
+	if err != nil || !opened.IsDir() || !os.SameFile(before, opened) || before.Mode() != opened.Mode() {
+		return nil, errors.Join(err, fmt.Errorf("directory %s changed while opening", path), dir.Close())
+	}
+	entries := make([]os.DirEntry, 0, min(checkerDirectoryBatch, maxEntries))
+	var readErr error
+	for {
+		batch, err := dir.ReadDir(checkerDirectoryBatch)
+		if len(batch) > maxEntries-len(entries) {
+			readErr = fmt.Errorf("directory %s exceeds %d-entry limit", path, maxEntries)
+			break
+		}
+		entries = append(entries, batch...)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			readErr = err
+			break
+		}
+	}
+	after, statErr := dir.Stat()
+	pathAfter, pathErr := os.Lstat(path)
+	closeErr := dir.Close()
+	if err := errors.Join(readErr, statErr, pathErr, closeErr); err != nil {
+		return nil, err
+	}
+	if pathAfter.Mode()&os.ModeSymlink != 0 || !pathAfter.IsDir() ||
+		!os.SameFile(opened, after) || !os.SameFile(opened, pathAfter) || opened.Mode() != after.Mode() || opened.Mode() != pathAfter.Mode() ||
+		!opened.ModTime().Equal(after.ModTime()) || !opened.ModTime().Equal(pathAfter.ModTime()) ||
+		projectionControlChangeID(opened) != projectionControlChangeID(after) || projectionControlChangeID(opened) != projectionControlChangeID(pathAfter) {
+		return nil, fmt.Errorf("directory %s changed while being inventoried", path)
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	return entries, nil
+}
 
 // encodeJSON renders v deterministically: struct field order is fixed, map keys
 // are sorted by encoding/json, and HTML escaping is off so a stable_id like
@@ -50,7 +164,7 @@ func sha256Prefixed(b []byte) string {
 // only the domain model, so it hashes that file. It is provenance carried into
 // the projection, not the binding hash (that is Projection.InputHash).
 func DesignID(modelPath string) (string, error) {
-	b, err := os.ReadFile(modelPath)
+	b, err := readCheckerStructuredFile(modelPath, "model")
 	if err != nil {
 		return "", err
 	}
@@ -75,7 +189,7 @@ func ManifestPaths(design string) ([]string, error) {
 	if !info.IsDir() {
 		return nil, fmt.Errorf("checker path %s is not a directory", dir)
 	}
-	entries, err := os.ReadDir(dir)
+	entries, err := readDirectoryBounded(dir, checkerMaxEntries)
 	if err != nil {
 		return nil, fmt.Errorf("read checker directory %s: %w", dir, err)
 	}
@@ -133,7 +247,7 @@ func ModelPath(design string) string {
 // Callers that project a design require exactly one; silently choosing the
 // first lets an arbitrary filesystem name decide which domain is checked.
 func ModelPaths(design string) []string {
-	entries, err := os.ReadDir(design)
+	entries, err := readDirectoryBounded(design, checkerMaxEntries)
 	if err != nil {
 		return nil
 	}

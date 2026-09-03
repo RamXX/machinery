@@ -14,10 +14,15 @@ import (
 
 	"github.com/RamXX/machinery/internal/artifactset"
 	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/portablepath"
+	"github.com/RamXX/machinery/internal/safefile"
 	"github.com/RamXX/machinery/internal/version"
 )
+
+const composeOutputMaxEntries = 10_000
+const composeInputMaxBytes int64 = 16 << 20
 
 // ExitError carries a hard-error (maps to Python sys.exit).
 type ExitError struct{ Msg string }
@@ -641,7 +646,7 @@ func RunWrittenInSnapshotTo(snapshot *designlock.Lock, compPath, machinePath, ou
 	if err := ir.ValidateTLAModuleInventory(filepath.Dir(machinePath)); err != nil {
 		return nil, &ExitError{Msg: "compose_gen: " + err.Error()}
 	}
-	data, err := os.ReadFile(compPath)
+	data, err := safefile.Read(compPath, "composition annotation", composeInputMaxBytes)
 	if err != nil {
 		return nil, &ExitError{Msg: "compose_gen: " + err.Error()}
 	}
@@ -774,7 +779,7 @@ func bindCompositionSource(tla, declared, actual string) (string, error) {
 }
 
 func staleOwnedComposeArtifacts(outdir, sourceDir, source string, keep map[string][]byte) ([]artifactset.RemovalPrecondition, error) {
-	entries, err := os.ReadDir(outdir)
+	entries, err := dirscan.Read(outdir, composeOutputMaxEntries)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}

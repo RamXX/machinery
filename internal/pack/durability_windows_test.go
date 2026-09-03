@@ -12,7 +12,7 @@ func TestWindowsPackDirectoryDurabilityAndRealRecovery(t *testing.T) {
 	design := t.TempDir()
 	if _, err := writePacksWithRename(design, map[string]map[string]string{
 		"orders": {"pack.yaml": "committed"},
-	}, renamePackRoot); err != nil {
+	}, nil); err != nil {
 		t.Fatalf("native durable pack commit failed: %v", err)
 	}
 	root := filepath.Join(design, "packs")

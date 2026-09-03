@@ -77,16 +77,10 @@ func (r *designRoot) confinedRel(rel string) (string, error) {
 }
 
 func (r *designRoot) modelPaths() ([]string, error) {
-	dir, err := r.root.Open(".")
+	entries, err := r.readDirBounded(".", checkerMaxEntries)
 	if err != nil {
 		return nil, err
 	}
-	entries, readErr := dir.ReadDir(-1)
-	closeErr := dir.Close()
-	if err := errors.Join(readErr, closeErr); err != nil {
-		return nil, err
-	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	var names []string
 	for _, entry := range entries {
 		if !strings.HasSuffix(entry.Name(), ".modelith.yaml") {
@@ -122,16 +116,10 @@ func (r *designRoot) manifestPaths() ([]string, error) {
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return nil, fmt.Errorf("checker directory %s must be a real directory", r.display(dirName))
 	}
-	dir, err := r.root.Open(dirName)
+	entries, err := r.readDirBounded(dirName, checkerMaxEntries)
 	if err != nil {
-		return nil, err
-	}
-	entries, readErr := dir.ReadDir(-1)
-	closeErr := dir.Close()
-	if err := errors.Join(readErr, closeErr); err != nil {
 		return nil, fmt.Errorf("read checker directory %s: %w", r.display(dirName), err)
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	var out []string
 	portableNames := map[string]string{}
 	for _, entry := range entries {
@@ -161,7 +149,7 @@ func (r *designRoot) manifestPaths() ([]string, error) {
 }
 
 func (r *designRoot) loadModel(rel string) (*Model, []byte, error) {
-	data, err := r.readRegular(rel, "model", false)
+	data, err := r.readRegularBounded(rel, "model", checkerStructuredFileMaxBytes)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -170,7 +158,7 @@ func (r *designRoot) loadModel(rel string) (*Model, []byte, error) {
 }
 
 func (r *designRoot) loadManifest(rel string) (*Manifest, error) {
-	data, err := r.readRegular(rel, "checker manifest", false)
+	data, err := r.readRegularBounded(rel, "checker manifest", checkerStructuredFileMaxBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -245,31 +233,22 @@ func (r *designRoot) lstatRegular(rel, kind string, private bool) (bool, error) 
 	return true, nil
 }
 
-func (r *designRoot) readRegular(rel, kind string, private bool) ([]byte, error) {
-	exists, err := r.lstatRegular(rel, kind, private)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, &os.PathError{Op: "open", Path: r.display(rel), Err: os.ErrNotExist}
-	}
-	data, err := r.root.ReadFile(rel)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func (r *designRoot) readRegularBounded(rel, kind string, private bool, maxBytes int64) (data []byte, retErr error) {
+func (r *designRoot) readRegularBounded(rel, kind string, maxBytes int64) (data []byte, retErr error) {
 	if maxBytes <= 0 {
 		return nil, fmt.Errorf("%s read bound must be positive", kind)
 	}
-	exists, err := r.lstatRegular(rel, kind, private)
+	if err := r.validateNoSymlink(rel); err != nil {
+		return nil, err
+	}
+	before, err := r.root.Lstat(rel)
 	if err != nil {
 		return nil, err
 	}
-	if !exists {
-		return nil, &os.PathError{Op: "open", Path: r.display(rel), Err: os.ErrNotExist}
+	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s %s must be a regular, non-symlink file", kind, r.display(rel))
+	}
+	if before.Size() < 0 || before.Size() > maxBytes {
+		return nil, fmt.Errorf("%s %s exceeds %d-byte limit", kind, r.display(rel), maxBytes)
 	}
 	file, err := r.root.Open(rel)
 	if err != nil {
@@ -280,20 +259,86 @@ func (r *designRoot) readRegularBounded(rel, kind string, private bool, maxBytes
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s %s must remain a regular file while open", kind, r.display(rel))
+	if !info.Mode().IsRegular() || !os.SameFile(before, info) || before.Mode() != info.Mode() || before.Size() != info.Size() ||
+		!before.ModTime().Equal(info.ModTime()) || projectionControlChangeID(before) != projectionControlChangeID(info) {
+		return nil, fmt.Errorf("%s %s changed while opening", kind, r.display(rel))
 	}
-	if info.Size() > maxBytes {
-		return nil, fmt.Errorf("%s %s exceeds %d-byte limit", kind, r.display(rel), maxBytes)
-	}
-	data, err = io.ReadAll(io.LimitReader(file, maxBytes+1))
+	data, err = io.ReadAll(io.LimitReader(file, info.Size()+1))
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(data)) > maxBytes {
-		return nil, fmt.Errorf("%s %s exceeds %d-byte limit", kind, r.display(rel), maxBytes)
+	if int64(len(data)) != info.Size() {
+		return nil, fmt.Errorf("%s %s changed beyond its exact %d-byte snapshot", kind, r.display(rel), info.Size())
+	}
+	after, statErr := file.Stat()
+	pathAfter, pathErr := r.root.Lstat(rel)
+	if err := errors.Join(statErr, pathErr); err != nil {
+		return nil, err
+	}
+	if pathAfter.Mode()&os.ModeSymlink != 0 || !pathAfter.Mode().IsRegular() ||
+		!os.SameFile(info, after) || !os.SameFile(info, pathAfter) ||
+		info.Mode() != after.Mode() || info.Mode() != pathAfter.Mode() ||
+		info.Size() != after.Size() || info.Size() != pathAfter.Size() ||
+		!info.ModTime().Equal(after.ModTime()) || !info.ModTime().Equal(pathAfter.ModTime()) ||
+		projectionControlChangeID(info) != projectionControlChangeID(after) || projectionControlChangeID(info) != projectionControlChangeID(pathAfter) {
+		return nil, fmt.Errorf("%s %s changed while being read", kind, r.display(rel))
 	}
 	return data, nil
+}
+
+func (r *designRoot) readDirBounded(rel string, maxEntries int) ([]os.DirEntry, error) {
+	if maxEntries <= 0 {
+		return nil, fmt.Errorf("checker directory entry limit must be positive")
+	}
+	if err := r.validateNoSymlink(rel); err != nil {
+		return nil, err
+	}
+	before, err := r.root.Lstat(rel)
+	if err != nil {
+		return nil, err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.IsDir() {
+		return nil, fmt.Errorf("checker directory %s must be a real directory", r.display(rel))
+	}
+	dir, err := r.root.Open(rel)
+	if err != nil {
+		return nil, err
+	}
+	opened, err := dir.Stat()
+	if err != nil || !opened.IsDir() || !os.SameFile(before, opened) || before.Mode() != opened.Mode() {
+		return nil, errors.Join(err, fmt.Errorf("checker directory %s changed while opening", r.display(rel)), dir.Close())
+	}
+	entries := make([]os.DirEntry, 0, min(checkerDirectoryBatch, maxEntries))
+	var readErr error
+	for {
+		batch, err := dir.ReadDir(checkerDirectoryBatch)
+		if len(batch) > maxEntries-len(entries) {
+			readErr = fmt.Errorf("checker directory %s exceeds %d-entry limit", r.display(rel), maxEntries)
+			break
+		}
+		entries = append(entries, batch...)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			readErr = err
+			break
+		}
+	}
+	after, statErr := dir.Stat()
+	pathAfter, pathErr := r.root.Lstat(rel)
+	closeErr := dir.Close()
+	if err := errors.Join(readErr, statErr, pathErr, closeErr); err != nil {
+		return nil, err
+	}
+	if pathAfter.Mode()&os.ModeSymlink != 0 || !pathAfter.IsDir() ||
+		!os.SameFile(opened, after) || !os.SameFile(opened, pathAfter) || opened.Mode() != after.Mode() || opened.Mode() != pathAfter.Mode() ||
+		!opened.ModTime().Equal(after.ModTime()) || !opened.ModTime().Equal(pathAfter.ModTime()) ||
+		projectionControlChangeID(opened) != projectionControlChangeID(after) || projectionControlChangeID(opened) != projectionControlChangeID(pathAfter) {
+		return nil, fmt.Errorf("checker directory %s changed while being inventoried", r.display(rel))
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	return entries, nil
 }
 
 func (r *designRoot) syncDir(rel string) error {

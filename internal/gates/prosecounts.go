@@ -104,7 +104,7 @@ func checkProseCounts(g *Gate, design string) {
 		}
 		return nil
 	}
-	err := filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	err := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

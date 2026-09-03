@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 )
 
-const installActivationDir = ".machinery-install-activation"
-
 func activationStagingPath() (string, error) {
 	journal, _, err := installJournalPaths()
 	if err != nil {
@@ -38,10 +36,10 @@ func cleanupActivationExecutable() error {
 	if err := os.Chmod(dir, 0o700); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(dir); err != nil {
+	if err := durableRemoveAll(dir); err != nil {
 		return err
 	}
-	return syncDir(filepath.Dir(dir))
+	return nil
 }
 
 func stageActivationExecutable(_ string, source *os.File, identity string) (string, error) {
@@ -65,6 +63,9 @@ func stageActivationExecutable(_ string, source *os.File, identity string) (stri
 	if err != nil {
 		return fail(err)
 	}
+	if !info.Mode().IsRegular() || info.Size() < 0 || info.Size() > installArtifactMaxFileBytes {
+		return fail(fmt.Errorf("activation executable exceeds fixed file bounds"))
+	}
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
 		return fail(err)
 	}
@@ -73,8 +74,13 @@ func stageActivationExecutable(_ string, source *os.File, identity string) (stri
 	if err != nil {
 		return fail(err)
 	}
-	if _, err := io.Copy(out, source); err != nil {
+	written, copyErr := io.Copy(out, io.LimitReader(source, info.Size()+1))
+	after, statErr := source.Stat()
+	if err := errors.Join(copyErr, statErr); err != nil {
 		return fail(errors.Join(err, closeInstallFile(out)))
+	}
+	if written != info.Size() || !sameInstallArtifactInfo(info, after) {
+		return fail(errors.Join(fmt.Errorf("activation executable changed while staging"), closeInstallFile(out)))
 	}
 	if err := out.Chmod(info.Mode().Perm()); err != nil {
 		return fail(errors.Join(err, closeInstallFile(out)))

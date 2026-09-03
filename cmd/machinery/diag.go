@@ -18,15 +18,19 @@ import (
 	"time"
 
 	"github.com/RamXX/machinery/internal/checker"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/install"
 	"github.com/RamXX/machinery/internal/processcontrol"
 	"github.com/RamXX/machinery/internal/runtimeclosure"
+	"github.com/RamXX/machinery/internal/safefile"
 	machversion "github.com/RamXX/machinery/internal/version"
 )
 
 const modelithVersion = "v0.4.0"
 
 const diagnosticCommandOutputLimit = 1 << 20
+const diagnosticPluginMaxEntries = 10_000
+const diagnosticConfigMaxBytes int64 = 16 << 20
 
 var (
 	diagnosticCommandTimeout   = 10 * time.Second
@@ -458,7 +462,7 @@ func readDoctorJSON(path string, dst any) error {
 	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 		return fmt.Errorf("not a real regular file")
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := safefile.Read(path, "doctor JSON", diagnosticConfigMaxBytes)
 	if err != nil {
 		return err
 	}
@@ -553,7 +557,7 @@ func validateDoctorHookManifest(path string) error {
 const canonicalHookShimSHA256 = "9dd7543bd7c3bf17adc56228e10174a6d5f1a859585c5a5b1d11906714b6ec5c"
 
 func validateDoctorHookShim(path string) error {
-	raw, err := os.ReadFile(path)
+	raw, err := safefile.Read(path, "doctor hook shim", diagnosticConfigMaxBytes)
 	if err != nil {
 		return err
 	}
@@ -648,7 +652,7 @@ func pluginRoots() ([]string, error) {
 		add(wd, false)
 	}
 	plugins := filepath.Join(os.Getenv("HOME"), ".claude", "plugins")
-	if entries, err := os.ReadDir(plugins); err == nil {
+	if entries, err := dirscan.Read(plugins, diagnosticPluginMaxEntries); err == nil {
 		for _, e := range entries {
 			if strings.Contains(strings.ToLower(e.Name()), "machinery") {
 				add(filepath.Join(plugins, e.Name()), true)

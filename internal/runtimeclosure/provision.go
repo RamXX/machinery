@@ -12,9 +12,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"time"
 
@@ -30,6 +30,45 @@ const (
 	javaExtractMaxBytes      = int64(2 << 30)
 	javaExtractMaxFiles      = 30_000
 )
+
+var javaArchiveLimits = javaTreeLimits{maxDepth: javaTreeMaxDepth, maxEntries: javaExtractMaxFiles, maxBytes: javaExtractMaxBytes}
+
+type javaArchiveBudget struct {
+	tree        javaTreeBudget
+	directories map[string]struct{}
+}
+
+func newJavaArchiveBudget(limits javaTreeLimits) *javaArchiveBudget {
+	return &javaArchiveBudget{
+		tree:        javaTreeBudget{label: "Java runtime archive", limits: limits},
+		directories: make(map[string]struct{}),
+	}
+}
+
+// addEntry charges both the archive member and every implicit parent directory
+// that extraction may materialize through MkdirAll. Explicit directory headers
+// mark their path so later children do not reset or double-spend parent state.
+func (budget *javaArchiveBudget) addEntry(name string, size int64, directory bool) error {
+	slashName := filepath.ToSlash(name)
+	parts := strings.Split(slashName, "/")
+	for index := 1; index < len(parts); index++ {
+		parent := strings.Join(parts[:index], "/")
+		if _, exists := budget.directories[parent]; exists {
+			continue
+		}
+		if err := budget.tree.addEntry(filepath.FromSlash(parent), 0); err != nil {
+			return err
+		}
+		budget.directories[parent] = struct{}{}
+	}
+	if err := budget.tree.addEntry(name, size); err != nil {
+		return err
+	}
+	if directory {
+		budget.directories[slashName] = struct{}{}
+	}
+	return nil
+}
 
 type javaArchivePin struct {
 	asset string
@@ -87,7 +126,7 @@ func provisionedJavaPath() (path string, retErr error) {
 	}()
 	archive := filepath.Join(stage, "runtime.archive")
 	url := "https://github.com/adoptium/temurin21-binaries/releases/download/" + pinnedJavaReleaseTag + "/" + pin.asset
-	if err := downloadPinnedArchive(url, archive, pin.sha); err != nil {
+	if err := downloadJavaRuntimeArchive(url, archive, pin.sha); err != nil {
 		return "", err
 	}
 	extracted := filepath.Join(stage, "extracted")
@@ -127,7 +166,7 @@ func provisionedJavaPath() (path string, retErr error) {
 	if err != nil {
 		return "", err
 	}
-	if err := cachestage.PublishTree(base, sourceRel, targetRel); err != nil {
+	if err := publishJavaRuntimeTree(base, sourceRel, targetRel); err != nil {
 		return "", fmt.Errorf("publish pinned Java runtime: %w", err)
 	}
 	home, err = javaHomeInInstall(target)
@@ -140,8 +179,13 @@ func provisionedJavaPath() (path string, retErr error) {
 	return javaLauncher(home), nil
 }
 
+var (
+	downloadJavaRuntimeArchive = downloadPinnedArchive
+	publishJavaRuntimeTree     = cachestage.PublishTree
+)
+
 func validateProvisionedJavaHome(home string, pin javaArchivePin) error {
-	body, err := os.ReadFile(filepath.Join(home, ".machinery-java-receipt"))
+	body, err := readProvisionedRegularFile(filepath.Join(home, ".machinery-java-receipt"), 1024)
 	if err != nil {
 		return err
 	}
@@ -217,14 +261,25 @@ func downloadPinnedArchive(url, destination, want string) (retErr error) {
 }
 
 func safeArchiveName(name string) (string, error) {
-	clean := filepath.Clean(filepath.FromSlash(name))
-	if name == "" || filepath.IsAbs(clean) || clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+	if name == "" || strings.Contains(name, `\`) {
 		return "", fmt.Errorf("Java runtime archive contains unsafe path %q", name)
 	}
-	return clean, nil
+	cleanSlash := path.Clean(name)
+	first, _, _ := strings.Cut(cleanSlash, "/")
+	if strings.HasPrefix(name, "/") || cleanSlash == "." || cleanSlash == ".." || strings.HasPrefix(cleanSlash, "../") || strings.Contains(first, ":") {
+		return "", fmt.Errorf("Java runtime archive contains unsafe path %q", name)
+	}
+	return filepath.FromSlash(cleanSlash), nil
 }
 
 func extractJavaTarGzip(archive, destination string) error {
+	return extractJavaTarGzipWithLimits(archive, destination, javaArchiveLimits)
+}
+
+func extractJavaTarGzipWithLimits(archive, destination string, limits javaTreeLimits) error {
+	if err := validateJavaTreeLimits("Java runtime archive", limits); err != nil {
+		return err
+	}
 	file, err := os.Open(archive)
 	if err != nil {
 		return err
@@ -236,8 +291,7 @@ func extractJavaTarGzip(archive, destination string) error {
 	}
 	defer gz.Close()
 	reader := tar.NewReader(gz)
-	files := 0
-	var total int64
+	budget := newJavaArchiveBudget(limits)
 	type pendingLink struct{ name, target string }
 	var links []pendingLink
 	for {
@@ -255,14 +309,15 @@ func extractJavaTarGzip(archive, destination string) error {
 		target := filepath.Join(destination, name)
 		switch header.Typeflag {
 		case tar.TypeDir:
+			if err := budget.addEntry(name, 0, true); err != nil {
+				return err
+			}
 			if err := os.MkdirAll(target, 0o700); err != nil {
 				return err
 			}
 		case tar.TypeReg:
-			files++
-			total += header.Size
-			if files > javaExtractMaxFiles || total > javaExtractMaxBytes {
-				return fmt.Errorf("Java runtime archive exceeds extraction bounds")
+			if err := budget.addEntry(name, header.Size, false); err != nil {
+				return err
 			}
 			if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
 				return err
@@ -280,12 +335,19 @@ func extractJavaTarGzip(archive, destination string) error {
 				return err
 			}
 		case tar.TypeSymlink:
-			if filepath.IsAbs(filepath.FromSlash(header.Linkname)) {
+			if err := budget.addEntry(name, 0, false); err != nil {
+				return err
+			}
+			if strings.Contains(header.Linkname, `\`) || path.IsAbs(header.Linkname) {
 				return fmt.Errorf("Java runtime archive symlink %q has absolute target %q", header.Name, header.Linkname)
 			}
-			targetName := filepath.Clean(filepath.Join(filepath.Dir(name), filepath.FromSlash(header.Linkname)))
-			if targetName == ".." || strings.HasPrefix(targetName, ".."+string(filepath.Separator)) {
+			targetSlash := path.Clean(path.Join(path.Dir(filepath.ToSlash(name)), header.Linkname))
+			if targetSlash == ".." || strings.HasPrefix(targetSlash, "../") {
 				return fmt.Errorf("Java runtime archive symlink %q escapes through target %q", header.Name, header.Linkname)
+			}
+			targetName, err := safeArchiveName(targetSlash)
+			if err != nil {
+				return fmt.Errorf("Java runtime archive symlink %q has unsafe target %q: %w", header.Name, header.Linkname, err)
 			}
 			links = append(links, pendingLink{name: name, target: targetName})
 		default:
@@ -298,7 +360,10 @@ func extractJavaTarGzip(archive, destination string) error {
 		if err != nil || !info.Mode().IsRegular() {
 			return errors.Join(err, fmt.Errorf("Java runtime archive symlink %q must resolve to an extracted regular file", link.name))
 		}
-		body, err := os.ReadFile(source)
+		if err := budget.tree.addBytes(link.name, info.Size()); err != nil {
+			return err
+		}
+		body, err := readProvisionedRegularFile(source, info.Size())
 		if err != nil {
 			return err
 		}
@@ -310,7 +375,15 @@ func extractJavaTarGzip(archive, destination string) error {
 		if info.Mode()&0o111 != 0 {
 			mode = 0o700
 		}
-		if err := os.WriteFile(target, body, mode); err != nil {
+		out, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+		if err != nil {
+			return err
+		}
+		written, writeErr := out.Write(body)
+		if writeErr == nil && written != len(body) {
+			writeErr = io.ErrShortWrite
+		}
+		if err := errors.Join(writeErr, out.Close()); err != nil {
 			return err
 		}
 	}
@@ -318,13 +391,19 @@ func extractJavaTarGzip(archive, destination string) error {
 }
 
 func extractJavaZip(archive, destination string) error {
+	return extractJavaZipWithLimits(archive, destination, javaArchiveLimits)
+}
+
+func extractJavaZipWithLimits(archive, destination string, limits javaTreeLimits) error {
+	if err := validateJavaTreeLimits("Java runtime archive", limits); err != nil {
+		return err
+	}
 	reader, err := zip.OpenReader(archive)
 	if err != nil {
 		return err
 	}
 	defer reader.Close()
-	files := 0
-	var total int64
+	budget := newJavaArchiveBudget(limits)
 	for _, entry := range reader.File {
 		name, err := safeArchiveName(entry.Name)
 		if err != nil {
@@ -336,15 +415,19 @@ func extractJavaZip(archive, destination string) error {
 		}
 		target := filepath.Join(destination, name)
 		if mode.IsDir() {
+			if err := budget.addEntry(name, 0, true); err != nil {
+				return err
+			}
 			if err := os.MkdirAll(target, 0o700); err != nil {
 				return err
 			}
 			continue
 		}
-		files++
-		total += int64(entry.UncompressedSize64)
-		if files > javaExtractMaxFiles || total > javaExtractMaxBytes {
-			return fmt.Errorf("Java runtime archive exceeds extraction bounds")
+		if entry.UncompressedSize64 > uint64(limits.maxBytes) {
+			return fmt.Errorf("Java runtime archive exceeds %d bytes at %s", limits.maxBytes, filepath.ToSlash(name))
+		}
+		if err := budget.addEntry(name, int64(entry.UncompressedSize64), false); err != nil {
+			return err
 		}
 		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
 			return err
@@ -362,7 +445,10 @@ func extractJavaZip(archive, destination string) error {
 			_ = in.Close()
 			return err
 		}
-		_, copyErr := io.Copy(out, io.LimitReader(in, int64(entry.UncompressedSize64)+1))
+		copied, copyErr := io.Copy(out, io.LimitReader(in, int64(entry.UncompressedSize64)+1))
+		if copyErr == nil && copied != int64(entry.UncompressedSize64) {
+			copyErr = fmt.Errorf("Java runtime archive entry %q changed size while extracting", entry.Name)
+		}
 		if err := errors.Join(copyErr, in.Close(), out.Close()); err != nil {
 			return err
 		}
@@ -371,11 +457,27 @@ func extractJavaZip(archive, destination string) error {
 }
 
 func javaHomeInInstall(install string) (string, error) {
-	entries, err := os.ReadDir(install)
+	before, err := os.Lstat(install)
 	if err != nil {
 		return "", err
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	if before.Mode()&os.ModeSymlink != 0 || !before.IsDir() {
+		return "", fmt.Errorf("pinned Java archive root must be a real directory")
+	}
+	dir, err := os.Open(install)
+	if err != nil {
+		return "", err
+	}
+	opened, statErr := dir.Stat()
+	entries, readErr := readJavaDirEntries(dir, 1)
+	closeErr := dir.Close()
+	after, pathErr := os.Lstat(install)
+	if err := errors.Join(statErr, readErr, closeErr, pathErr); err != nil {
+		return "", err
+	}
+	if !sameJavaFileSnapshot(before, opened) || !sameJavaFileSnapshot(before, after) {
+		return "", fmt.Errorf("pinned Java archive root changed while enumerating")
+	}
 	if len(entries) != 1 || !entries[0].IsDir() || entries[0].Type()&os.ModeSymlink != 0 {
 		return "", fmt.Errorf("pinned Java archive must contain exactly one real root directory")
 	}
@@ -390,6 +492,32 @@ func javaHomeInInstall(install string) (string, error) {
 		}
 	}
 	return home, nil
+}
+
+func readProvisionedRegularFile(path string, limit int64) ([]byte, error) {
+	before, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() || before.Size() < 0 || before.Size() > limit {
+		return nil, fmt.Errorf("provisioned Java file %s must be a bounded regular non-symlink file", path)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	opened, statErr := file.Stat()
+	body, readErr := io.ReadAll(io.LimitReader(file, limit+1))
+	heldAfter, heldErr := file.Stat()
+	closeErr := file.Close()
+	liveAfter, liveErr := os.Lstat(path)
+	if err := errors.Join(statErr, readErr, heldErr, closeErr, liveErr); err != nil {
+		return nil, err
+	}
+	if int64(len(body)) != before.Size() || !sameJavaFileSnapshot(before, opened) || !sameJavaFileSnapshot(before, heldAfter) || !sameJavaFileSnapshot(before, liveAfter) {
+		return nil, fmt.Errorf("provisioned Java file %s changed while reading", path)
+	}
+	return body, nil
 }
 
 func javaLauncher(home string) string {

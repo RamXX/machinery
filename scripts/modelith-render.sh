@@ -34,6 +34,7 @@ modelith_source=$(command -v modelith || true)
 work=$(mktemp -d)
 transaction=$work/modelith-tx
 run_safe=$work/run-safe
+tree_inventory=$work/tree-inventory
 modelith_bin=$work/modelith
 modelith_receipt=$work/modelith.receipt
 stage_root=$repo_root/.machinery-modelith-stage
@@ -71,6 +72,16 @@ if [[ -s "$go_build_stderr" ]]; then
   cat "$go_build_stderr" >&2
   exit 1
 fi
+if ! go build -o "$tree_inventory" ./scripts/tree-inventory 2>"$go_build_stderr"; then
+  echo "build bounded tree inventory helper failed" >&2
+  cat "$go_build_stderr" >&2
+  exit 1
+fi
+if [[ -s "$go_build_stderr" ]]; then
+  echo "building bounded tree inventory helper emitted stderr; warnings are forbidden" >&2
+  cat "$go_build_stderr" >&2
+  exit 1
+fi
 if ! "$run_safe" snapshot-executable -source "$modelith_source" -destination "$modelith_bin" -receipt "$modelith_receipt"; then
   echo "snapshot pinned Modelith executable failed" >&2
   exit 1
@@ -79,73 +90,34 @@ fi
 
 sources=$work/sources
 renders=$work/renders
+render_excludes=$work/render-excludes
 "$script_dir/modelith-inventory.sh" sources "$corpus" >"$sources"
 : >"$renders"
+: >"$render_excludes"
 while IFS= read -r source; do
-  printf '%s\n' "${source%.yaml}.md" >>"$renders"
+  rendered=${source%.yaml}.md
+  printf '%s\n' "$rendered" >>"$renders"
+  printf '%s\n' "${rendered#"$corpus"/}" >>"$render_excludes"
 done <"$sources"
 
-is_render_target() {
-  LC_ALL=C grep -F -x -q -- "${1#./}" "$renders"
-}
-
 snapshot_repo() {
-  local destination=$1 path rel checksum target paths
-  paths=$destination.paths
-  : >"$destination"
-  if ! find . -path './.git' -prune -o -print | LC_ALL=C sort >"$paths"; then
-    echo "repository inventory discovery failed" >&2
+  local destination=$1
+  if ! "$tree_inventory" -snapshot -root . -prune .git -exclude-file "$renders" \
+    -max-entries 200000 -max-depth 128 -max-bytes 67108864 \
+    -max-file-bytes 33554432 -max-total-bytes 134217728 -timeout 30s >"$destination"; then
+    echo "bounded repository snapshot failed" >&2
     return 1
   fi
-  while IFS= read -r path; do
-    [[ "$path" == "." ]] && continue
-    rel=${path#./}
-    if is_render_target "$rel"; then
-      continue
-    fi
-    if [[ -L "$path" ]]; then
-      target=$(readlink "$path")
-      printf 'L\t%s\t%s\n' "$rel" "$target" >>"$destination"
-    elif [[ -f "$path" ]]; then
-      checksum=$(cksum <"$path")
-      printf 'F\t%s\t%s\n' "$rel" "$checksum" >>"$destination"
-    elif [[ -d "$path" ]]; then
-      printf 'D\t%s\n' "$rel" >>"$destination"
-    else
-      printf 'S\t%s\n' "$rel" >>"$destination"
-    fi
-  done <"$paths"
-  rm -f -- "$paths"
 }
 
 snapshot_corpus_without_renders() {
-  local root=$1 destination=$2 path rel repo_rel checksum target paths
-  paths=$destination.paths
-  : >"$destination"
-  if ! find "$root" -print | LC_ALL=C sort >"$paths"; then
-    echo "Modelith corpus inventory discovery failed" >&2
+  local root=$1 destination=$2
+  if ! "$tree_inventory" -snapshot -root "$root" -exclude-file "$render_excludes" \
+    -max-entries 100000 -max-depth 64 -max-bytes 33554432 \
+    -max-file-bytes 8388608 -max-total-bytes 33554432 -timeout 15s >"$destination"; then
+    echo "bounded Modelith corpus snapshot failed" >&2
     return 1
   fi
-  while IFS= read -r path; do
-    [[ "$path" == "$root" ]] && continue
-    rel=${path#"$root"/}
-    repo_rel=$corpus/$rel
-    if is_render_target "$repo_rel"; then
-      continue
-    fi
-    if [[ -L "$path" ]]; then
-      target=$(readlink "$path")
-      printf 'L\t%s\t%s\n' "$rel" "$target" >>"$destination"
-    elif [[ -f "$path" ]]; then
-      checksum=$(cksum <"$path")
-      printf 'F\t%s\t%s\n' "$rel" "$checksum" >>"$destination"
-    elif [[ -d "$path" ]]; then
-      printf 'D\t%s\n' "$rel" >>"$destination"
-    else
-      printf 'S\t%s\n' "$rel" >>"$destination"
-    fi
-  done <"$paths"
-  rm -f -- "$paths"
 }
 
 snapshot_status() {

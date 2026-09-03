@@ -45,7 +45,7 @@ func TestPublishRecoversEveryCrashBoundary(t *testing.T) {
 			if string(body) != test.wantBody {
 				t.Fatalf("recovered body = %q, want %q", body, test.wantBody)
 			}
-			for _, reserved := range []string{stageName, backupName, retireName, journalName, journalNextName, journalAuthorityName, journalRetireName} {
+			for _, reserved := range []string{stageName, backupName, retireName, journalName, journalNextName, journalAuthorityName, journalPreviousName, journalRetireName} {
 				if _, err := os.Lstat(filepath.Join(repo, reserved)); !os.IsNotExist(err) {
 					t.Fatalf("reserved residue %s remains: %v", reserved, err)
 				}

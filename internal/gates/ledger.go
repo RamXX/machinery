@@ -336,7 +336,7 @@ func checkHouseStyle(g *Gate, design string) {
 	}
 	var findings []finding
 	ignored := 0
-	walkErr := filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	walkErr := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

@@ -1,6 +1,7 @@
 package filelock
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"os"
@@ -141,6 +142,108 @@ func TestAcquireWaitBlocksUntilRelease(t *testing.T) {
 		t.Fatal(err)
 	case <-time.After(2 * time.Second):
 		t.Fatal("AcquireWait did not acquire after release")
+	}
+}
+
+func TestAcquireWaitContextFailsClosedOnStuckHolder(t *testing.T) {
+	scope := t.TempDir()
+	first, err := Acquire(scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	released := false
+	t.Cleanup(func() {
+		if !released {
+			_ = first.Release()
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	lock, err := AcquireWaitContext(ctx, scope)
+	if lock != nil || !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("stuck-holder wait = lock %v, err %v; want deadline failure", lock, err)
+	}
+	if elapsed := time.Since(started); elapsed > 2*time.Second {
+		t.Fatalf("stuck-holder wait exceeded deterministic bound: %v", elapsed)
+	}
+	if err := first.Release(); err != nil {
+		t.Fatalf("release stuck holder: %v", err)
+	}
+	released = true
+	reacquired, err := Acquire(scope)
+	if err != nil {
+		t.Fatalf("deadline left a hidden waiter or retained resource: %v", err)
+	}
+	if err := reacquired.Release(); err != nil {
+		t.Fatalf("release reacquired lock: %v", err)
+	}
+}
+
+func TestAcquireWaitContextCancellationClosesEveryResource(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	var opened *Lock
+	lock, err := acquireWithContext(ctx, t.TempDir(), false, acquireHooks{tryLock: func(candidate *Lock) (bool, error) {
+		opened = candidate
+		cancel()
+		return false, nil
+	}})
+	if lock != nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled injected wait = lock %v, err %v; want cancellation", lock, err)
+	}
+	if opened == nil {
+		t.Fatal("injected lock attempt did not run")
+	}
+	if _, statErr := opened.file.Stat(); !errors.Is(statErr, os.ErrClosed) {
+		t.Fatalf("lock file remained open after cancellation: %v", statErr)
+	}
+	if _, statErr := opened.root.Lstat("."); !errors.Is(statErr, os.ErrClosed) {
+		t.Fatalf("lock root remained open after cancellation: %v", statErr)
+	}
+}
+
+func TestAcquireRemainsSingleAttemptAndClosesEveryResourceOnContention(t *testing.T) {
+	var opened *Lock
+	attempts := 0
+	lock, err := acquireWithContext(context.Background(), t.TempDir(), true, acquireHooks{tryLock: func(candidate *Lock) (bool, error) {
+		opened = candidate
+		attempts++
+		return false, nil
+	}})
+	if lock != nil || !errors.Is(err, errLockHeld) {
+		t.Fatalf("injected nonblocking acquisition = lock %v, err %v", lock, err)
+	}
+	if attempts != 1 {
+		t.Fatalf("nonblocking lock attempts = %d, want exactly 1", attempts)
+	}
+	if opened == nil {
+		t.Fatal("injected lock attempt did not run")
+	}
+	if _, statErr := opened.file.Stat(); !errors.Is(statErr, os.ErrClosed) {
+		t.Fatalf("contended lock file remained open: %v", statErr)
+	}
+	if _, statErr := opened.root.Lstat("."); !errors.Is(statErr, os.ErrClosed) {
+		t.Fatalf("contended lock root remained open: %v", statErr)
+	}
+}
+
+func TestAcquireWaitContextRejectsNilAndPreCanceledContextBeforeOpen(t *testing.T) {
+	originalOpen := filelockOpenFile
+	t.Cleanup(func() { filelockOpenFile = originalOpen })
+	filelockOpenFile = func(*os.Root, string) (*os.File, error) {
+		t.Fatal("canceled acquisition opened a lock file")
+		return nil, errors.New("unreachable")
+	}
+
+	var nilContext context.Context
+	if lock, err := AcquireWaitContext(nilContext, t.TempDir()); lock != nil || err == nil || !strings.Contains(err.Error(), "nil context") {
+		t.Fatalf("nil-context wait = lock %v, err %v", lock, err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if lock, err := AcquireWaitContext(ctx, t.TempDir()); lock != nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("pre-canceled wait = lock %v, err %v", lock, err)
 	}
 }
 

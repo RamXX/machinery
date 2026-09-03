@@ -9,7 +9,99 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestTransactionHashIsBoundedAgainstContinuousAppender(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "growing")
+	if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root, syncFile, err := txOpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()     //nolint:errcheck // test cleanup
+	defer syncFile.Close() //nolint:errcheck // test cleanup
+	stop := make(chan struct{})
+	appenderDone := make(chan error, 1)
+	ops := txDefaultOps(nil)
+	ops.root, ops.syncFile = root, syncFile
+	ops.hashAfterOpen = func(string) error {
+		appender, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+		if err != nil {
+			return err
+		}
+		chunk := bytes.Repeat([]byte("a"), 64<<10)
+		if _, err := appender.Write(chunk); err != nil {
+			_ = appender.Close()
+			return err
+		}
+		go func() {
+			var appendErr error
+			defer func() { appenderDone <- errors.Join(appendErr, appender.Close()) }()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					if _, err := appender.Write(chunk); err != nil {
+						appendErr = err
+						return
+					}
+				}
+			}
+		}()
+		return nil
+	}
+	result := make(chan error, 1)
+	go func() {
+		_, _, err := txHashPath("growing", "growing artifact", ops)
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		close(stop)
+		if appendErr := <-appenderDone; appendErr != nil {
+			t.Fatal(appendErr)
+		}
+		if err == nil || !strings.Contains(err.Error(), "changed") {
+			t.Fatalf("continuous growth was accepted: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		close(stop)
+		<-appenderDone
+		t.Fatal("hash followed a continuous appender instead of stopping at the witnessed size")
+	}
+}
+
+func TestTransactionDirectoryEnumerationStopsAtFixedCeiling(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a", "b", "c"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root, syncFile, err := txOpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()     //nolint:errcheck // test cleanup
+	defer syncFile.Close() //nolint:errcheck // test cleanup
+	_, err = txReadDirBounded(txOps{root: root}, 2)
+	if err == nil || !strings.Contains(err.Error(), "2-entry limit") {
+		t.Fatalf("over-limit directory inventory was accepted: %v", err)
+	}
+}
+
+func TestArtifactTransactionRejectsItemInventoryBeforeAllocation(t *testing.T) {
+	remove := make([]string, txMaxItemCount+1)
+	_, _, err := txValidateReconcileTargets(txOps{}, nil, remove)
+	if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("%d-item limit", txMaxItemCount)) {
+		t.Fatalf("over-limit transaction item inventory was accepted: %v", err)
+	}
+}
 
 func TestCommitRejectsPortableAlias(t *testing.T) {
 	err := Commit(t.TempDir(), map[string][]byte{"Foo.tla": []byte("a"), "foo.tla": []byte("b")})
@@ -150,11 +242,15 @@ func TestCommitRecoversEveryDurableBoundary(t *testing.T) {
 		"park:B",
 		"install:A",
 		"install:B",
+		"journal-update-isolated",
+		"journal-update-installed",
 		"committed-journal",
 		"journal-isolated",
 		"commit-cleanup:A",
 		"commit-cleanup:B",
 		"journal-retired",
+		"journal-quarantined",
+		"journal-quarantine-delete",
 		"journal-cleanup",
 	}
 	for _, point := range points {
@@ -182,7 +278,7 @@ func TestCommitRecoversEveryDurableBoundary(t *testing.T) {
 			}
 
 			wantA, wantB := "old-a", "old-b"
-			if point == "committed-journal" || point == "journal-isolated" || strings.HasPrefix(point, "commit-cleanup:") || point == "journal-retired" || point == "journal-cleanup" {
+			if point == "journal-update-installed" || point == "committed-journal" || point == "journal-isolated" || strings.HasPrefix(point, "commit-cleanup:") || point == "journal-retired" || point == "journal-quarantined" || point == "journal-quarantine-delete" || point == "journal-cleanup" {
 				wantA, wantB = "new-a", "new-b"
 			}
 			assertFile(t, filepath.Join(dir, "A"), wantA)
@@ -200,11 +296,15 @@ func TestReconcileDeletionRecoversEveryDurableBoundary(t *testing.T) {
 		"park:Z",
 		"install:A",
 		"install:Z",
+		"journal-update-isolated",
+		"journal-update-installed",
 		"committed-journal",
 		"journal-isolated",
 		"commit-cleanup:A",
 		"commit-cleanup:Z",
 		"journal-retired",
+		"journal-quarantined",
+		"journal-quarantine-delete",
 		"journal-cleanup",
 	}
 	for _, point := range points {
@@ -224,7 +324,7 @@ func TestReconcileDeletionRecoversEveryDurableBoundary(t *testing.T) {
 			if err := Commit(dir, map[string][]byte{}); err != nil {
 				t.Fatalf("recover after %s: %v", point, err)
 			}
-			committed := point == "committed-journal" || point == "journal-isolated" || strings.HasPrefix(point, "commit-cleanup:") || point == "journal-retired" || point == "journal-cleanup"
+			committed := point == "journal-update-installed" || point == "committed-journal" || point == "journal-isolated" || strings.HasPrefix(point, "commit-cleanup:") || point == "journal-retired" || point == "journal-quarantined" || point == "journal-quarantine-delete" || point == "journal-cleanup"
 			if committed {
 				assertFile(t, filepath.Join(dir, "A"), "new-a")
 				if _, err := os.Lstat(filepath.Join(dir, "Z")); !os.IsNotExist(err) {
@@ -542,10 +642,170 @@ func TestCommitFsyncsEveryRenameAndRemoveBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	// prepared journal, two parks, two installs, committed journal, journal
-	// isolation, two backup removals, journal retirement, and removal.
-	if syncs != 11 {
-		t.Fatalf("directory sync count = %d, want 11", syncs)
+	// isolation, two backup quarantine/removal pairs, journal retirement, and
+	// its quarantine/removal pair.
+	if syncs != 14 {
+		t.Fatalf("directory sync count = %d, want 14", syncs)
 	}
+}
+
+func TestJournalRetirementNeverOverwritesDestinationCollision(t *testing.T) {
+	for _, tc := range []struct {
+		name, oldName, newName string
+	}{
+		{"isolation", txJournalName, txRecoveryName},
+		{"retirement", txRecoveryName, txRetiredName},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFiles(t, dir, map[string]string{"A": "old"})
+			collided := false
+			ops := txDefaultOps(func(oldName, newName string) error {
+				if collided || oldName != tc.oldName || newName != tc.newName {
+					return nil
+				}
+				collided = true
+				return os.WriteFile(filepath.Join(dir, newName), []byte("foreign destination\n"), 0o600)
+			})
+			err := txCommit(dir, map[string][]byte{"A": []byte("new")}, ops)
+			if err == nil || !collided {
+				t.Fatalf("destination collision was not rejected: collided=%v err=%v", collided, err)
+			}
+			assertFile(t, filepath.Join(dir, tc.newName), "foreign destination\n")
+			if _, statErr := os.Lstat(filepath.Join(dir, tc.oldName)); statErr != nil {
+				t.Fatalf("source authority was lost after destination collision: %v", statErr)
+			}
+		})
+	}
+}
+
+func TestJournalInstallationNeverOverwritesBoundaryCollision(t *testing.T) {
+	for _, collideAt := range []int{1, 2} {
+		t.Run(fmt.Sprintf("journal-install-%d", collideAt), func(t *testing.T) {
+			dir := t.TempDir()
+			writeFiles(t, dir, map[string]string{"A": "old"})
+			installs := 0
+			var foreign = fmt.Sprintf("foreign journal %d\n", collideAt)
+			ops := txDefaultOps(func(oldName, newName string) error {
+				if !strings.HasPrefix(oldName, txStagePrefix) || newName != txJournalName {
+					return nil
+				}
+				installs++
+				if installs != collideAt {
+					return nil
+				}
+				return os.WriteFile(filepath.Join(dir, txJournalName), []byte(foreign), 0o600)
+			})
+			err := txCommit(dir, map[string][]byte{"A": []byte("new")}, ops)
+			if err == nil || installs != collideAt {
+				t.Fatalf("journal destination collision was not rejected: installs=%d err=%v", installs, err)
+			}
+			assertFile(t, filepath.Join(dir, txJournalName), foreign)
+			if collideAt == 1 {
+				assertFile(t, filepath.Join(dir, "A"), "old")
+			}
+			if collideAt == 2 {
+				entries, readErr := os.ReadDir(dir)
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				foundPreparedAuthority := false
+				for _, entry := range entries {
+					if txValidQuarantineName(entry.Name(), txJournalUpdateQuarantinePrefix) {
+						foundPreparedAuthority = true
+					}
+				}
+				if !foundPreparedAuthority {
+					t.Fatal("committed-journal collision lost the isolated prepared authority")
+				}
+			}
+		})
+	}
+}
+
+func TestArtifactMoveNeverOverwritesBoundaryCollision(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"A": "old"})
+	var backup string
+	ops := txDefaultOps(func(oldName, newName string) error {
+		if oldName != "A" || !strings.HasPrefix(newName, txOldPrefix) {
+			return nil
+		}
+		backup = newName
+		return os.WriteFile(filepath.Join(dir, newName), []byte("foreign backup"), 0o600)
+	})
+	err := txCommit(dir, map[string][]byte{"A": []byte("new")}, ops)
+	if err == nil || backup == "" {
+		t.Fatalf("artifact move collision was not rejected: backup=%q err=%v", backup, err)
+	}
+	assertFile(t, filepath.Join(dir, "A"), "old")
+	assertFile(t, filepath.Join(dir, backup), "foreign backup")
+}
+
+func TestQuarantinedJournalDeletionCannotDeletePublicReplacement(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"A": "old"})
+	held := filepath.Join(dir, "held-quarantine")
+	var public string
+	ops := txDefaultOps(nil)
+	ops.faultAfter = func(point string) error {
+		if point != "journal-quarantine-delete" || public != "" {
+			return nil
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			if txValidQuarantineName(entry.Name(), txJournalQuarantinePrefix) {
+				public = filepath.Join(dir, entry.Name())
+				break
+			}
+		}
+		if public == "" {
+			return fmt.Errorf("quarantine not found")
+		}
+		if err := os.Rename(public, held); err != nil {
+			return err
+		}
+		if err := os.Mkdir(public, 0o700); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(public, "object"), []byte("foreign replacement\n"), 0o600)
+	}
+	err := txCommit(dir, map[string][]byte{"A": []byte("new")}, ops)
+	if err == nil || public == "" {
+		t.Fatalf("public quarantine replacement was not exercised: %v", err)
+	}
+	assertFile(t, filepath.Join(public, "object"), "foreign replacement\n")
+	if _, statErr := os.Lstat(filepath.Join(held, "object")); !os.IsNotExist(statErr) {
+		t.Fatalf("held authority was not removed through its retained namespace: %v", statErr)
+	}
+}
+
+func TestRecoveryResumesObjectQuarantineAfterCrash(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"A": "old"})
+	injected := errors.New("power loss after object quarantine")
+	crashed := false
+	ops := txDefaultOps(nil)
+	ops.faultAfter = func(point string) error {
+		if !crashed && strings.HasPrefix(point, "object-quarantine-delete:") {
+			crashed = true
+			return injected
+		}
+		return nil
+	}
+	err := txCommit(dir, map[string][]byte{"A": []byte("new")}, ops)
+	var crash *txCrash
+	if !crashed || !errors.As(err, &crash) || !errors.Is(err, injected) {
+		t.Fatalf("object quarantine crash was not retained: crashed=%v err=%v", crashed, err)
+	}
+	if err := Commit(dir, map[string][]byte{}); err != nil {
+		t.Fatalf("resume object quarantine: %v", err)
+	}
+	assertFile(t, filepath.Join(dir, "A"), "new")
+	assertNoTransactionFiles(t, dir)
 }
 
 func TestRecoveryRejectsJournalMutationAfterParseBeforeIsolation(t *testing.T) {

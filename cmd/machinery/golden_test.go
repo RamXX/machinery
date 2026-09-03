@@ -286,8 +286,10 @@ func TestGoldenAlloy(t *testing.T) {
 		{"fulfillment", []string{"Integrity.als"}},
 	} {
 		t.Run(c.ex, func(t *testing.T) {
+			design := t.TempDir()
+			copyDirInto(t, filepath.Join(root, "examples", c.ex, "design"), design)
 			scratch := t.TempDir()
-			out, errS, code := runBin(t, "alloy", filepath.Join(root, "examples", c.ex, "design"), scratch)
+			out, errS, code := runBin(t, "alloy", design, scratch)
 			// the out-dir is a temp path; normalize it so the golden is stable
 			out = strings.ReplaceAll(out, scratch, "<out-dir>")
 			g := goldenDir(t, "alloy-"+c.ex)

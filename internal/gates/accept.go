@@ -33,6 +33,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/gitcontrol"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/processcontrol"
@@ -497,7 +498,7 @@ func scanAcceptanceDir(design string, g *Gate) (map[int]bool, map[int]*acceptRec
 	present := map[int]bool{}
 	records := map[int]*acceptRecord{}
 	dir := filepath.Join(design, AcceptanceDirName)
-	entries, err := os.ReadDir(dir)
+	entries, err := dirscan.Read(dir, designInventoryMaxEntries)
 	if err != nil {
 		g.Errs = append(g.Errs, "cannot enumerate "+AcceptanceDirName+"/: "+err.Error())
 		return present, records

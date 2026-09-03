@@ -198,15 +198,10 @@ func packFilesOnDiskRoot(root *os.Root) (map[string]string, error) {
 		return nil, fmt.Errorf("pack: %w", err)
 	}
 	defer packRoot.Close()
-	dir, err := packRoot.Open(".")
+	entries, err := readPackDir(packRoot, ".")
 	if err != nil {
 		return nil, fmt.Errorf("pack: %w", err)
 	}
-	entries, readErr := dir.ReadDir(-1)
-	if err := errors.Join(readErr, dir.Close()); err != nil {
-		return nil, fmt.Errorf("pack: %w", err)
-	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	files := map[string]string{}
 	for _, e := range entries {
 		if e.Type()&os.ModeSymlink != 0 {
@@ -535,22 +530,17 @@ func staleRefinementArtifacts(sourceDesign, liveDesign string, files map[string]
 		return nil, err
 	}
 	defer func() { retErr = errors.Join(retErr, root.Close()) }()
-	dir, err := root.Open(".")
+	entries, err := readPackDir(root, ".")
 	if err != nil {
 		return nil, err
 	}
-	entries, readErr := dir.ReadDir(-1)
-	if err := errors.Join(readErr, dir.Close()); err != nil {
-		return nil, err
-	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	liveFormal := filepath.Join(liveDesign, "formal")
 	for _, entry := range entries {
 		name := entry.Name()
 		if _, keep := files[name]; keep || !strings.HasSuffix(name, "PackRefinement.tla") {
 			continue
 		}
-		body, err := root.ReadFile(name)
+		body, err := readPackRegularRoot(root, name, "formal refinement source")
 		if err != nil {
 			return nil, err
 		}
@@ -566,7 +556,7 @@ func staleRefinementArtifacts(sourceDesign, liveDesign string, files map[string]
 		}
 		stale = append(stale, condition)
 		cfg := strings.TrimSuffix(name, ".tla") + ".cfg"
-		sourceCfg, cfgErr := root.ReadFile(cfg)
+		sourceCfg, cfgErr := readPackRegularRoot(root, cfg, "formal refinement source")
 		if os.IsNotExist(cfgErr) {
 			continue
 		}
@@ -596,7 +586,7 @@ func staleRefinementArtifacts(sourceDesign, liveDesign string, files map[string]
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
-		sourceCfg, err := root.ReadFile(name)
+		sourceCfg, err := readPackRegularRoot(root, name, "formal refinement source")
 		if err != nil {
 			return nil, err
 		}

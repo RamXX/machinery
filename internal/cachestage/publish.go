@@ -10,6 +10,16 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/RamXX/machinery/internal/fsatomic"
+)
+
+const (
+	cacheStageDirectoryBatch = 256
+	cacheStageMaxEntries     = 65_536
+	cacheStageMaxDepth       = 256
+	cacheStageMaxFileBytes   = int64(2 << 30)
+	cacheStageMaxTotalBytes  = int64(8 << 30)
 )
 
 // PublishTree durably installs one already-built private tree under base. Every
@@ -23,6 +33,7 @@ type publishHooks struct {
 	afterTreeSync func() error
 	beforeRename  func() error
 	afterRename   func() error
+	rename        func(*os.Root, string, string) error
 }
 
 func publish(base, source, target string, hooks publishHooks) (retErr error) {
@@ -103,7 +114,11 @@ func publish(base, source, target string, hooks publishHooks) (retErr error) {
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("reinspect cache publication target %s at the publish boundary: %w", target, err)
 	}
-	if err := root.Rename(source, target); err != nil {
+	rename := fsatomic.RenameNoReplace
+	if hooks.rename != nil {
+		rename = hooks.rename
+	}
+	if err := rename(root, source, target); err != nil {
 		return fmt.Errorf("publish cache tree %s: %w", target, err)
 	}
 	if hooks.afterRename != nil {
@@ -134,7 +149,7 @@ func publish(base, source, target string, hooks publishHooks) (retErr error) {
 }
 
 func rebaseTreeWitness(witness treeWitness, from, to string) treeWitness {
-	rebased := treeWitness{entries: make([]treeWitnessEntry, len(witness.entries))}
+	rebased := treeWitness{entries: make([]treeWitnessEntry, len(witness.entries)), bytes: witness.bytes}
 	for i, entry := range witness.entries {
 		rel, err := filepath.Rel(from, entry.path)
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
@@ -197,6 +212,7 @@ func ensurePrivateDir(root *os.Root, rel string) error {
 
 type treeWitness struct {
 	entries []treeWitnessEntry
+	bytes   int64
 }
 
 type treeWitnessEntry struct {
@@ -209,13 +225,19 @@ type treeWitnessEntry struct {
 
 func syncTreeWitness(root *os.Root, dir string) (treeWitness, error) {
 	var witness treeWitness
-	if err := syncTreeWitnessDir(root, dir, &witness); err != nil {
+	if err := syncTreeWitnessDir(root, dir, &witness, 0); err != nil {
 		return treeWitness{}, err
 	}
 	return witness, nil
 }
 
-func syncTreeWitnessDir(root *os.Root, dir string, witness *treeWitness) error {
+func syncTreeWitnessDir(root *os.Root, dir string, witness *treeWitness, depth int) error {
+	if depth > cacheStageMaxDepth {
+		return fmt.Errorf("cache publication tree exceeds %d-directory depth limit at %s", cacheStageMaxDepth, filepath.ToSlash(dir))
+	}
+	if len(witness.entries) >= cacheStageMaxEntries {
+		return fmt.Errorf("cache publication tree exceeds %d-entry limit", cacheStageMaxEntries)
+	}
 	dirBefore, err := root.Lstat(dir)
 	if err != nil {
 		return err
@@ -225,9 +247,14 @@ func syncTreeWitnessDir(root *os.Root, dir string, witness *treeWitness) error {
 	}
 	dirIndex := len(witness.entries)
 	witness.entries = append(witness.entries, treeWitnessEntry{})
-	entries, err := readDir(root, dir)
+	remaining := cacheStageMaxEntries - len(witness.entries)
+	readLimit := max(remaining, 1)
+	entries, err := readDirBounded(root, dir, readLimit)
 	if err != nil {
 		return err
+	}
+	if len(entries) > remaining {
+		return fmt.Errorf("cache publication tree exceeds %d-entry limit", cacheStageMaxEntries)
 	}
 	for _, entry := range entries {
 		child := filepath.Join(dir, entry.Name())
@@ -239,14 +266,21 @@ func syncTreeWitnessDir(root *os.Root, dir string, witness *treeWitness) error {
 		case info.Mode()&os.ModeSymlink != 0:
 			return fmt.Errorf("%s is a symlink", filepath.ToSlash(child))
 		case info.IsDir():
-			if err := syncTreeWitnessDir(root, child, witness); err != nil {
+			if err := syncTreeWitnessDir(root, child, witness, depth+1); err != nil {
 				return err
 			}
 		case info.Mode().IsRegular():
+			if len(witness.entries) >= cacheStageMaxEntries {
+				return fmt.Errorf("cache publication tree exceeds %d-entry limit", cacheStageMaxEntries)
+			}
 			fileWitness, err := syncFileWitness(root, child, info)
 			if err != nil {
 				return err
 			}
+			if fileWitness.info.Size() > cacheStageMaxTotalBytes-witness.bytes {
+				return fmt.Errorf("cache publication tree exceeds %d-byte aggregate limit", cacheStageMaxTotalBytes)
+			}
+			witness.bytes += fileWitness.info.Size()
 			witness.entries = append(witness.entries, fileWitness)
 		default:
 			return fmt.Errorf("%s is a special entry (%s)", filepath.ToSlash(child), info.Mode())
@@ -274,6 +308,9 @@ func syncFileWitness(root *os.Root, path string, before os.FileInfo) (entry tree
 	if !privateStageMode(before.Mode()) {
 		return entry, fmt.Errorf("%s is not private", filepath.ToSlash(path))
 	}
+	if before.Size() < 0 || before.Size() > cacheStageMaxFileBytes {
+		return entry, fmt.Errorf("%s exceeds %d-byte file limit", filepath.ToSlash(path), cacheStageMaxFileBytes)
+	}
 	file, err := root.Open(path)
 	if err != nil {
 		return entry, err
@@ -283,7 +320,7 @@ func syncFileWitness(root *os.Root, path string, before os.FileInfo) (entry tree
 	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(before, opened) || before.Mode() != opened.Mode() {
 		return entry, errors.Join(err, fmt.Errorf("cache publication file %s changed identity or mode while opening", filepath.ToSlash(path)))
 	}
-	digest, err := hashOpenFile(file)
+	digest, err := hashOpenFile(file, opened.Size())
 	if err != nil {
 		return entry, err
 	}
@@ -301,10 +338,25 @@ func syncFileWitness(root *os.Root, path string, before os.FileInfo) (entry tree
 	return treeWitnessEntry{path: path, mode: pathAfter.Mode(), info: pathAfter, hash: digest}, nil
 }
 
-func hashOpenFile(file *os.File) (string, error) {
+func hashOpenFile(file *os.File, exactSize int64) (string, error) {
+	if exactSize < 0 || exactSize > cacheStageMaxFileBytes {
+		return "", fmt.Errorf("file size %d exceeds %d-byte file limit", exactSize, cacheStageMaxFileBytes)
+	}
 	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
+	written, err := io.CopyN(hasher, file, exactSize)
+	if err != nil {
 		return "", err
+	}
+	if written != exactSize {
+		return "", fmt.Errorf("file ended after %d bytes, expected %d", written, exactSize)
+	}
+	var extra [1]byte
+	count, err := file.Read(extra[:])
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", err
+	}
+	if count != 0 {
+		return "", fmt.Errorf("file grew beyond its exact %d-byte snapshot", exactSize)
 	}
 	return "sha256:" + hex.EncodeToString(hasher.Sum(nil)), nil
 }

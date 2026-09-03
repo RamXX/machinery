@@ -13,6 +13,15 @@ import (
 
 func repoRoot() string { return "../.." }
 
+func isolatedExampleDesign(t *testing.T, rel string) string {
+	t.Helper()
+	design := filepath.Join(t.TempDir(), "design")
+	if err := os.CopyFS(design, os.DirFS(filepath.Join(repoRoot(), rel))); err != nil {
+		t.Fatalf("copy isolated example design: %v", err)
+	}
+	return design
+}
+
 func TestCompositionValidatesAndModelsBranching(t *testing.T) {
 	compPath := filepath.Join(repoRoot(), "examples/fulfillment/design/formal/checkout.composition.yaml")
 	coordPath := filepath.Join(repoRoot(), "examples/fulfillment/design/machines/FulfillmentSaga.machine.json")
@@ -160,10 +169,11 @@ func TestComposeRejectsDuplicateUndoForAggregate(t *testing.T) {
 // P-F10: the written .tla/.cfg pair carries exactly one version stamp line
 // each; the in-memory Generate output stays unstamped.
 func TestRunWrittenStampsGeneratorVersion(t *testing.T) {
+	design := isolatedExampleDesign(t, "examples/fulfillment/design")
 	outdir := t.TempDir()
 	names, err := RunWritten(
-		filepath.Join(repoRoot(), "examples/fulfillment/design/formal/checkout.composition.yaml"),
-		filepath.Join(repoRoot(), "examples/fulfillment/design/machines/FulfillmentSaga.machine.json"),
+		filepath.Join(design, "formal/checkout.composition.yaml"),
+		filepath.Join(design, "machines/FulfillmentSaga.machine.json"),
 		outdir)
 	if err != nil {
 		t.Fatal(err)
@@ -263,8 +273,9 @@ func TestRunWrittenReconcilesPriorCompositionNameOwnedBySameSource(t *testing.T)
 }
 
 func TestRunWrittenFailsClosedOnAmbiguousExternalCompositionOwnership(t *testing.T) {
-	machine := filepath.Join(repoRoot(), "examples/fulfillment/design/machines/FulfillmentSaga.machine.json")
-	body, err := os.ReadFile(filepath.Join(repoRoot(), "examples/fulfillment/design/formal/checkout.composition.yaml"))
+	design := isolatedExampleDesign(t, "examples/fulfillment/design")
+	machine := filepath.Join(design, "machines/FulfillmentSaga.machine.json")
+	body, err := os.ReadFile(filepath.Join(design, "formal/checkout.composition.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -447,7 +458,8 @@ func TestCompositionSchemaFirstUnknownKeyIsDeterministic(t *testing.T) {
 }
 
 func TestRunWrittenInvalidDiagnosticIsStableAndLogical(t *testing.T) {
-	source := filepath.Join(repoRoot(), "examples/fulfillment/design/formal/checkout.composition.yaml")
+	design := isolatedExampleDesign(t, "examples/fulfillment/design")
+	source := filepath.Join(design, "formal/checkout.composition.yaml")
 	body, err := os.ReadFile(source)
 	if err != nil {
 		t.Fatal(err)
@@ -457,7 +469,7 @@ func TestRunWrittenInvalidDiagnosticIsStableAndLogical(t *testing.T) {
 	if err := os.WriteFile(input, body, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	machine := filepath.Join(repoRoot(), "examples/fulfillment/design/machines/FulfillmentSaga.machine.json")
+	machine := filepath.Join(design, "machines/FulfillmentSaga.machine.json")
 	_, firstErr := RunWritten(input, machine, t.TempDir())
 	_, secondErr := RunWritten(input, machine, t.TempDir())
 	if firstErr == nil || secondErr == nil || firstErr.Error() != secondErr.Error() {
@@ -469,8 +481,9 @@ func TestRunWrittenInvalidDiagnosticIsStableAndLogical(t *testing.T) {
 }
 
 func TestRunWrittenRejectsSymlinkedAndMutatingCompositionInput(t *testing.T) {
-	machine := filepath.Join(repoRoot(), "examples/fulfillment/design/machines/FulfillmentSaga.machine.json")
-	source := filepath.Join(repoRoot(), "examples/fulfillment/design/formal/checkout.composition.yaml")
+	design := isolatedExampleDesign(t, "examples/fulfillment/design")
+	machine := filepath.Join(design, "machines/FulfillmentSaga.machine.json")
+	source := filepath.Join(design, "formal/checkout.composition.yaml")
 	body, err := os.ReadFile(source)
 	if err != nil {
 		t.Fatal(err)

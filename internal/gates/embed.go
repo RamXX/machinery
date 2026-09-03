@@ -75,7 +75,7 @@ func markdownFiles(design string) ([]string, error) {
 	if err := validateDesignInventory(design); err != nil {
 		return nil, err
 	}
-	err := filepath.WalkDir(design, func(path string, d os.DirEntry, err error) error {
+	err := walkTreeDirBounded(design, designInventoryMaxEntries, designInventoryMaxDepth, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

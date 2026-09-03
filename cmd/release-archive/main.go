@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"crypto/sha1" //nolint:gosec // Git SHA-1 object-format compatibility, verified as identity rather than security
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -22,38 +24,53 @@ import (
 	"time"
 
 	"github.com/RamXX/machinery/internal/filelock"
+	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/gitcontrol"
 	"github.com/RamXX/machinery/internal/portablepath"
 	"github.com/RamXX/machinery/internal/processcontrol"
 )
 
 const (
-	archiveRoot         = "machinery"
-	defaultGitTimeout   = 30 * time.Second
-	defaultGitListLimit = int64(16 << 20)
-	defaultGitBlobLimit = int64(64 << 20)
-	defaultArchiveLimit = int64(256 << 20)
-	archiveStagePrefix  = ".release-archive-"
-	archiveStageSuffix  = ".stage"
-	archiveRetireSuffix = ".retire"
+	archiveRoot                 = "machinery"
+	defaultGitTimeout           = 30 * time.Second
+	defaultGitListLimit         = int64(16 << 20)
+	defaultGitBlobLimit         = int64(64 << 20)
+	defaultArchiveLimit         = int64(256 << 20)
+	archiveOutputLimit          = int64(512 << 20)
+	archiveStagePrefix          = ".release-archive-"
+	archiveStageSuffix          = ".stage"
+	archiveRetireSuffix         = ".retire"
+	archivePublishDeletePrefix  = ".release-output-delete-"
+	archivePublishWitnessSuffix = ".publish-witness"
+	archiveWitnessStagePrefix   = ".release-archive-witness-"
+	archivePublishWitnessLimit  = int64(4096)
+	archiveMaxEntries           = 65_536
+	archiveDirBatch             = 256
 )
 
 var (
-	gitCommandTimeout   = defaultGitTimeout
-	gitListLimit        = defaultGitListLimit
-	gitBlobLimit        = defaultGitBlobLimit
-	archiveInputLimit   = defaultArchiveLimit
-	newGitCommand       = exec.CommandContext
-	afterCommitResolve  func(string)
-	afterInputInspect   func(string) error
-	afterInputRead      func(string) error
-	afterArchiveSync    func(string) error
-	archivePublishPoint = func(string) error { return nil }
-	archiveCleanupPoint = func(string, string) error { return nil }
-	closeArchiveInput   = func(file *os.File) error { return file.Close() }
-	closeArchiveRoot    = func(root *os.Root) error { return root.Close() }
-	replaceOutput       = replaceArchive
-	syncOutputDir       = syncArchiveDirectory
+	errArchivePublicationAmbiguous  = errors.New("ambiguous release archive publication")
+	gitCommandTimeout               = defaultGitTimeout
+	gitListLimit                    = defaultGitListLimit
+	gitBlobLimit                    = defaultGitBlobLimit
+	archiveInputLimit               = defaultArchiveLimit
+	newGitCommand                   = exec.CommandContext
+	afterCommitResolve              func(string)
+	afterInputInspect               func(string) error
+	afterInputRead                  func(string) error
+	afterArchiveSync                func(string) error
+	archivePublishPoint             = func(string) error { return nil }
+	archivePublicationRecoveryPoint = func(*os.Root, string) error { return nil }
+	archiveWitnessPoint             = func(string) error { return nil }
+	archiveWitnessRandomRead        = rand.Read
+	archiveCleanupPoint             = func(string, string) error { return nil }
+	archivePrivateCleanupPoint      = func(*os.Root, string) error { return nil }
+	archivePrivateRemovePoint       = func(*os.Root, string) error { return nil }
+	quarantineArchiveCleanup        = fsatomic.Quarantine
+	publishArchiveNoReplace         = fsatomic.RenameNoReplace
+	closeArchiveInput               = func(file *os.File) error { return file.Close() }
+	closeArchiveRoot                = func(root *os.Root) error { return root.Close() }
+	syncOutputDir                   = syncArchiveDirectory
 )
 
 type entryKind uint8
@@ -68,6 +85,30 @@ type entry struct {
 	mode os.FileMode
 	kind entryKind
 	data []byte
+}
+
+type archivePublicationRetirement struct {
+	handle  *fsatomic.Quarantined
+	witness archiveOutputState
+}
+
+type archivePublicationWitness struct {
+	Version     int    `json:"version"`
+	Stage       string `json:"stage"`
+	Output      string `json:"output"`
+	Authority   string `json:"authority"`
+	Identity    string `json:"identity"`
+	Hash        string `json:"hash"`
+	Mode        uint32 `json:"mode"`
+	Size        int64  `json:"size"`
+	ModTimeNano int64  `json:"mod_time_unix_nano"`
+}
+
+type archivePublicationWitnessAuthority struct {
+	name       string
+	state      archiveOutputState
+	finalState archiveOutputState
+	published  bool
 }
 
 func main() {
@@ -248,6 +289,9 @@ func committedEntries(root string) ([]entry, error) {
 	for _, record := range bytes.Split(tree, []byte{0}) {
 		if len(record) == 0 {
 			continue
+		}
+		if len(planned) >= archiveMaxEntries {
+			return nil, fmt.Errorf("committed source tree exceeds %d-entry limit", archiveMaxEntries)
 		}
 		tab := bytes.IndexByte(record, '\t')
 		if tab <= 0 || tab == len(record)-1 {
@@ -431,6 +475,9 @@ func readBounded(reader io.Reader, limit int64, label string) ([]byte, error) {
 }
 
 func writeArchive(output string, stamp time.Time, entries []entry) (retErr error) {
+	if len(entries) > archiveMaxEntries {
+		return fmt.Errorf("archive exceeds %d-entry limit", archiveMaxEntries)
+	}
 	seenPath := make(map[string]string)
 	seenPrefix := make(map[string]string)
 	var total int64
@@ -477,7 +524,28 @@ func writeArchive(output string, stamp time.Time, entries []entry) (retErr error
 	if err != nil {
 		return err
 	}
+	if err := recoverArchivePublication(directoryRoot, outputName, stageName); err != nil {
+		return err
+	}
 	if err := recoverArchiveStages(directoryRoot); err != nil {
+		return err
+	}
+	witnessName := archivePublicationWitnessName(stageName)
+	var publicationWitnessAuthority *archivePublicationWitnessAuthority
+	preservePublicationWitness := false
+	defer func() {
+		if !preservePublicationWitness {
+			retErr = errors.Join(retErr, cleanupArchivePublicationWitness(directoryRoot, witnessName, publicationWitnessAuthority))
+		}
+	}()
+	var outputBefore *archiveOutputState
+	if _, err := directoryRoot.Lstat(outputName); err == nil {
+		state, err := captureArchiveOutput(directoryRoot, outputName)
+		if err != nil {
+			return fmt.Errorf("witness existing release archive output: %w", err)
+		}
+		outputBefore = &state
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	tmp, err := directoryRoot.OpenFile(stageName, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
@@ -486,8 +554,11 @@ func writeArchive(output string, stamp time.Time, entries []entry) (retErr error
 	}
 	tmpPath := filepath.Join(directory, stageName)
 	var stageWitness *archiveOutputState
+	preserveStage := false
 	defer func() {
-		retErr = errors.Join(retErr, cleanupArchiveStageIfPresent(directoryRoot, stageName, stageWitness))
+		if !preserveStage {
+			retErr = errors.Join(retErr, cleanupArchiveStageIfPresent(directoryRoot, stageName, stageWitness))
+		}
 	}()
 	gz, err := gzip.NewWriterLevel(tmp, gzip.BestCompression)
 	if err != nil {
@@ -540,6 +611,12 @@ func writeArchive(output string, stamp time.Time, entries []entry) (retErr error
 		return fmt.Errorf("witness synced release archive stage: %w", err)
 	}
 	stageWitness = &stageState
+	publicationWitness := newArchivePublicationWitness(stageName, outputName, stageState)
+	witnessAuthority, err := writeArchivePublicationWitness(directoryRoot, witnessName, publicationWitness)
+	if err != nil {
+		return err
+	}
+	publicationWitnessAuthority = &witnessAuthority
 	if err := archivePublishPoint("before-output-rename"); err != nil {
 		return err
 	}
@@ -549,8 +626,15 @@ func writeArchive(output string, stamp time.Time, entries []entry) (retErr error
 	if err := stageState.revalidateAt(directoryRoot, stageName); err != nil {
 		return fmt.Errorf("release archive stage changed before publication: %w", err)
 	}
-	if err := replaceOutput(directoryRoot, stageName, outputName); err != nil {
+	replacedOutput, err := publishArchiveOutput(directoryRoot, stageName, outputName, stageState, outputBefore)
+	if err != nil {
+		preserveStage = errors.Is(err, errArchivePublicationAmbiguous)
+		preservePublicationWitness = preserveStage
 		return err
+	}
+	preservePublicationWitness = true
+	if replacedOutput != nil {
+		defer func() { retErr = errors.Join(retErr, replacedOutput.handle.Close()) }()
 	}
 	if err := archivePublishPoint("after-output-rename"); err != nil {
 		return err
@@ -561,6 +645,9 @@ func writeArchive(output string, stamp time.Time, entries []entry) (retErr error
 	}
 	if !os.SameFile(stageState.info, published.info) || stageState.hash != published.hash || stageState.mode != published.mode || stageState.size != published.size {
 		return fmt.Errorf("published release archive does not match its synced stage")
+	}
+	if err := publicationWitness.matches(published); err != nil {
+		return err
 	}
 	if err := archivePublishPoint("before-output-sync"); err != nil {
 		return err
@@ -587,7 +674,299 @@ func writeArchive(output string, stamp time.Time, entries []entry) (retErr error
 	if logicalOutput.Mode()&os.ModeSymlink != 0 || !logicalOutput.Mode().IsRegular() || !os.SameFile(published.info, logicalOutput) || !sameArchiveMetadata(published.info, logicalOutput) {
 		return fmt.Errorf("published release archive at its requested path changed identity or metadata before success")
 	}
+	if replacedOutput != nil {
+		if err := validateArchiveQuarantineInventory(replacedOutput.handle.Root(), true); err != nil {
+			return preserveArchiveQuarantine(replacedOutput.handle, err)
+		}
+		if err := replacedOutput.witness.revalidateAt(replacedOutput.handle.Root(), replacedOutput.handle.Name()); err != nil {
+			return preserveArchiveQuarantine(replacedOutput.handle, fmt.Errorf("prior release archive output changed before retirement: %w", err))
+		}
+		if err := replacedOutput.handle.Remove(); err != nil {
+			return err
+		}
+	}
+	if err := cleanupArchivePublicationWitness(directoryRoot, witnessName, publicationWitnessAuthority); err != nil {
+		return fmt.Errorf("retire release archive publication witness: %w", err)
+	}
+	preservePublicationWitness = false
+	publicationWitnessAuthority = nil
 	return nil
+}
+
+func publishArchiveOutput(root *os.Root, stageName, outputName string, stage archiveOutputState, previous *archiveOutputState) (*archivePublicationRetirement, error) {
+	if err := stage.revalidateAt(root, stageName); err != nil {
+		return nil, err
+	}
+	var quarantined *fsatomic.Quarantined
+	if previous != nil {
+		if err := previous.revalidateAt(root, outputName); err != nil {
+			return nil, fmt.Errorf("release archive output changed before replacement; preserving it: %w", err)
+		}
+		var err error
+		quarantined, err = fsatomic.Quarantine(root, outputName, archivePublishDeletePrefix)
+		if err != nil {
+			return nil, fmt.Errorf("quarantine previous release archive output: %w", err)
+		}
+		if err := validateArchiveQuarantineInventory(quarantined.Root(), true); err != nil {
+			return nil, preserveArchiveQuarantine(quarantined, err)
+		}
+		retired, err := captureArchiveOutput(quarantined.Root(), quarantined.Name())
+		if err != nil || !os.SameFile(previous.info, retired.info) || previous.hash != retired.hash || previous.mode != retired.mode || previous.size != retired.size || !previous.info.ModTime().Equal(retired.info.ModTime()) {
+			return nil, preserveArchiveQuarantine(quarantined, errors.Join(err, fmt.Errorf("previous release archive changed while entering private replacement authority")))
+		}
+	} else if _, err := root.Lstat(outputName); !errors.Is(err, os.ErrNotExist) {
+		if err == nil {
+			err = fmt.Errorf("release archive output appeared at publication boundary")
+		}
+		return nil, errors.Join(errArchivePublicationAmbiguous, err)
+	}
+	if err := stage.revalidateAt(root, stageName); err != nil {
+		if quarantined != nil {
+			return nil, errors.Join(err, quarantined.Restore(), quarantined.Close())
+		}
+		return nil, err
+	}
+	if err := publishArchiveNoReplace(root, stageName, outputName); err != nil {
+		if quarantined != nil {
+			return nil, errors.Join(errArchivePublicationAmbiguous, err, quarantined.Restore(), quarantined.Close())
+		}
+		return nil, errors.Join(errArchivePublicationAmbiguous, err)
+	}
+	if quarantined == nil {
+		return nil, nil
+	}
+	retired, err := captureArchiveOutput(quarantined.Root(), quarantined.Name())
+	if err != nil {
+		return nil, preserveArchiveQuarantine(quarantined, err)
+	}
+	return &archivePublicationRetirement{handle: quarantined, witness: retired}, nil
+}
+
+func recoverArchivePublication(root *os.Root, outputName, stageName string) (retErr error) {
+	entries, err := readArchiveDirectoryBounded(root, archiveMaxEntries)
+	if err != nil {
+		return err
+	}
+	witnessName := archivePublicationWitnessName(stageName)
+	var authorityName string
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), archiveWitnessStagePrefix) {
+			continue
+		}
+		if !validArchivePublicationWitnessStageName(entry.Name()) {
+			return fmt.Errorf("foreign release archive publication witness authority %q", entry.Name())
+		}
+		if authorityName != "" {
+			return fmt.Errorf("multiple release archive publication witness authorities exist")
+		}
+		authorityName = entry.Name()
+	}
+	var publicationWitness archivePublicationWitness
+	var witnessState archiveOutputState
+	witnessPresent := false
+	var witnessErr error
+	if _, err := root.Lstat(witnessName); err == nil {
+		witnessPresent = true
+		publicationWitness, witnessState, witnessErr = readArchivePublicationWitness(root, witnessName, stageName, outputName)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		witnessErr = err
+	}
+	var authorityWitness archivePublicationWitness
+	var authorityState archiveOutputState
+	var authorityErr error
+	if authorityName != "" {
+		authorityWitness, authorityState, authorityErr = readArchivePublicationWitness(root, authorityName, stageName, outputName)
+		if authorityErr == nil && authorityWitness.Authority != strings.TrimPrefix(authorityName, archiveWitnessStagePrefix) {
+			authorityErr = fmt.Errorf("release archive witness authority token does not match its private name")
+		}
+	}
+	var quarantined *fsatomic.Quarantined
+	var retired archiveOutputState
+	defer func() {
+		if quarantined != nil {
+			retErr = errors.Join(retErr, quarantined.Close())
+		}
+	}()
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), archivePublishDeletePrefix) {
+			continue
+		}
+		candidate, err := fsatomic.ResumeQuarantine(root, entry.Name(), outputName)
+		if err != nil {
+			return err
+		}
+		if quarantined != nil {
+			return errors.Join(fmt.Errorf("multiple release archive publication authorities exist"), candidate.Close())
+		}
+		quarantined = candidate
+	}
+	if quarantined != nil {
+		if _, err := quarantined.Root().Lstat(quarantined.Name()); errors.Is(err, os.ErrNotExist) {
+			if err := quarantined.FinishEmpty(); err != nil {
+				return err
+			}
+			quarantined = nil
+		} else if err != nil {
+			return err
+		} else if err := validateArchiveQuarantineInventory(quarantined.Root(), true); err != nil {
+			return err
+		} else {
+			retired, err = captureArchiveOutput(quarantined.Root(), quarantined.Name())
+			if err != nil {
+				return fmt.Errorf("witness prior release archive output during recovery: %w", err)
+			}
+		}
+	}
+	if authorityName == "" {
+		if witnessPresent || witnessErr != nil {
+			return errors.Join(witnessErr, fmt.Errorf("release archive publication witness lacks its private authority; preserving it as foreign"))
+		}
+		if quarantined != nil {
+			return fmt.Errorf("release archive publication witness authority is absent; preserving prior-output authority")
+		}
+	} else if authorityErr != nil {
+		if witnessPresent || witnessErr != nil || quarantined != nil {
+			return fmt.Errorf("release archive publication witness authority is corrupt; preserving all publication evidence: %w", errors.Join(authorityErr, witnessErr))
+		}
+		if err := cleanupArchiveStageIfPresent(root, authorityName, nil); err != nil {
+			return fmt.Errorf("retire incomplete private release archive publication witness authority: %w", err)
+		}
+		authorityName = ""
+	} else {
+		if witnessErr != nil {
+			return fmt.Errorf("release archive publication witness is corrupt; preserving publication authority: %w", witnessErr)
+		}
+		if !witnessPresent {
+			if err := authorityState.revalidateAt(root, authorityName); err != nil {
+				return fmt.Errorf("private release archive publication witness authority changed before publication: %w", err)
+			}
+			if err := root.Link(authorityName, witnessName); err != nil {
+				return fmt.Errorf("recover release archive publication witness without replacement: %w", err)
+			}
+			if err := syncOutputDir(root); err != nil {
+				return fmt.Errorf("persist recovered release archive publication witness: %w", err)
+			}
+			authorityWitness, authorityState, authorityErr = readArchivePublicationWitness(root, authorityName, stageName, outputName)
+			if authorityErr != nil {
+				return fmt.Errorf("revalidate private release archive publication witness after recovery link: %w", authorityErr)
+			}
+			publicationWitness, witnessState, witnessErr = readArchivePublicationWitness(root, witnessName, stageName, outputName)
+			if witnessErr != nil {
+				return fmt.Errorf("verify recovered release archive publication witness: %w", witnessErr)
+			}
+			witnessPresent = true
+		}
+		if publicationWitness != authorityWitness || !sameArchiveOutputState(authorityState, witnessState) {
+			return fmt.Errorf("release archive publication witness does not match its exact private authority; preserving both")
+		}
+	}
+	stage, stagePresent, err := captureArchiveOutputIfPresent(root, stageName)
+	if err != nil {
+		return err
+	}
+	output, outputPresent, err := captureArchiveOutputIfPresent(root, outputName)
+	if err != nil {
+		return err
+	}
+	if !witnessPresent {
+		return nil
+	}
+	authority := &archivePublicationWitnessAuthority{name: authorityName, state: authorityState, finalState: witnessState, published: true}
+	if stagePresent {
+		if err := publicationWitness.matches(stage); err != nil {
+			return fmt.Errorf("staged release archive does not match its durable publication witness; preserving all evidence: %w", err)
+		}
+		if quarantined != nil && outputPresent {
+			return fmt.Errorf("ambiguous release archive publication retains output, stage, witness, and prior-output authority")
+		}
+		if quarantined != nil {
+			if err := retired.revalidateAt(quarantined.Root(), quarantined.Name()); err != nil {
+				return fmt.Errorf("prior release archive output changed before restoration; preserving it: %w", err)
+			}
+			if err := quarantined.Restore(); err != nil {
+				return fmt.Errorf("restore prior release archive output before publication recovery: %w", err)
+			}
+			quarantined = nil
+		}
+		return cleanupArchivePublicationWitness(root, witnessName, authority)
+	}
+	if !outputPresent {
+		return fmt.Errorf("release archive publication lost both stage and output; preserving witness and prior-output authority")
+	}
+	if err := publicationWitness.matches(output); err != nil {
+		return fmt.Errorf("published release archive does not match its durable staged-output witness; preserving output, witness, and prior-output authority: %w", err)
+	}
+	if quarantined != nil {
+		if err := archivePublicationRecoveryPoint(root, outputName); err != nil {
+			return fmt.Errorf("release archive publication recovery boundary: %w", err)
+		}
+		if err := output.revalidateAt(root, outputName); err != nil {
+			return fmt.Errorf("published release archive changed at prior-output retirement boundary; preserving all authority: %w", err)
+		}
+		if err := retired.revalidateAt(quarantined.Root(), quarantined.Name()); err != nil {
+			return fmt.Errorf("prior release archive output changed during crash recovery; preserving it: %w", err)
+		}
+		if err := output.revalidateAt(root, outputName); err != nil {
+			return fmt.Errorf("published release archive changed immediately before prior-output retirement; preserving all authority: %w", err)
+		}
+		if err := quarantined.Remove(); err != nil {
+			return err
+		}
+		quarantined = nil
+	}
+	return cleanupArchivePublicationWitness(root, witnessName, authority)
+}
+
+func captureArchiveOutputIfPresent(root *os.Root, name string) (archiveOutputState, bool, error) {
+	if _, err := root.Lstat(name); errors.Is(err, os.ErrNotExist) {
+		return archiveOutputState{}, false, nil
+	} else if err != nil {
+		return archiveOutputState{}, false, err
+	}
+	state, err := captureArchiveOutput(root, name)
+	return state, err == nil, err
+}
+
+func readArchiveDirectoryBounded(root *os.Root, maxEntries int) ([]os.DirEntry, error) {
+	before, err := root.Lstat(".")
+	if err != nil {
+		return nil, err
+	}
+	dir, err := root.Open(".")
+	if err != nil {
+		return nil, err
+	}
+	opened, statErr := dir.Stat()
+	entries := make([]os.DirEntry, 0, min(archiveDirBatch, maxEntries))
+	var readErr error
+	for {
+		batch, err := dir.ReadDir(archiveDirBatch)
+		if len(batch) > maxEntries-len(entries) {
+			readErr = fmt.Errorf("release output directory exceeds %d-entry limit", maxEntries)
+			break
+		}
+		entries = append(entries, batch...)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			readErr = err
+			break
+		}
+	}
+	after, afterErr := dir.Stat()
+	pathAfter, pathErr := root.Lstat(".")
+	closeErr := dir.Close()
+	if err := errors.Join(statErr, readErr, afterErr, pathErr, closeErr); err != nil {
+		return nil, err
+	}
+	if !before.IsDir() || !os.SameFile(before, opened) || !os.SameFile(before, after) || !os.SameFile(before, pathAfter) ||
+		before.Mode() != opened.Mode() || before.Mode() != after.Mode() || before.Mode() != pathAfter.Mode() ||
+		!before.ModTime().Equal(opened.ModTime()) || !before.ModTime().Equal(after.ModTime()) || !before.ModTime().Equal(pathAfter.ModTime()) {
+		return nil, fmt.Errorf("release output directory changed while being inventoried")
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	return entries, nil
 }
 
 // archiveDirectoryChain retains every ancestor of the requested output
@@ -709,10 +1088,12 @@ func (chain *archiveDirectoryChain) close() error {
 }
 
 type archiveOutputState struct {
-	info os.FileInfo
-	hash string
-	mode os.FileMode
-	size int64
+	info     os.FileInfo
+	identity string
+	hash     string
+	mode     os.FileMode
+	size     int64
+	change   string
 }
 
 func captureArchiveOutput(root *os.Root, name string) (archiveOutputState, error) {
@@ -723,22 +1104,45 @@ func captureArchiveOutput(root *os.Root, name string) (archiveOutputState, error
 	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() {
 		return archiveOutputState{}, fmt.Errorf("%s must be a regular non-symlink file", name)
 	}
+	if before.Size() < 0 || before.Size() > archiveOutputLimit {
+		return archiveOutputState{}, fmt.Errorf("%s exceeds %d-byte release archive limit", name, archiveOutputLimit)
+	}
 	file, err := root.Open(name)
 	if err != nil {
 		return archiveOutputState{}, err
 	}
 	opened, statErr := file.Stat()
-	hash := sha256.New()
-	_, readErr := io.Copy(hash, file)
+	identity, identityErr := archiveNativeFileIdentity(file, opened)
+	digest, readErr := hashArchiveFile(file, before.Size())
 	closeErr := file.Close()
 	after, pathErr := root.Lstat(name)
-	if err := errors.Join(statErr, readErr, closeErr, pathErr); err != nil {
+	if err := errors.Join(statErr, identityErr, readErr, closeErr, pathErr); err != nil {
 		return archiveOutputState{}, err
 	}
 	if !os.SameFile(before, opened) || !os.SameFile(opened, after) || !sameArchiveMetadata(before, opened) || !sameArchiveMetadata(opened, after) {
 		return archiveOutputState{}, fmt.Errorf("%s changed while being witnessed", name)
 	}
-	return archiveOutputState{info: after, hash: hex.EncodeToString(hash.Sum(nil)), mode: after.Mode(), size: after.Size()}, nil
+	return archiveOutputState{info: after, identity: identity, hash: digest, mode: after.Mode(), size: after.Size(), change: archiveFileChangeID(after)}, nil
+}
+
+func hashArchiveFile(file *os.File, exactSize int64) (string, error) {
+	if exactSize < 0 || exactSize > archiveOutputLimit {
+		return "", fmt.Errorf("archive file size %d exceeds %d-byte limit", exactSize, archiveOutputLimit)
+	}
+	hash := sha256.New()
+	written, err := io.CopyN(hash, file, exactSize)
+	if err != nil {
+		return "", err
+	}
+	var extra [1]byte
+	extraCount, err := file.Read(extra[:])
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", err
+	}
+	if written != exactSize || extraCount != 0 {
+		return "", fmt.Errorf("archive file changed beyond its exact %d-byte snapshot", exactSize)
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func (state archiveOutputState) revalidateAt(root *os.Root, name string) error {
@@ -746,7 +1150,7 @@ func (state archiveOutputState) revalidateAt(root *os.Root, name string) error {
 	if err != nil {
 		return err
 	}
-	if !os.SameFile(state.info, current.info) || !sameArchiveMetadata(state.info, current.info) || state.hash != current.hash || state.mode != current.mode || state.size != current.size {
+	if !os.SameFile(state.info, current.info) || !sameArchiveMetadata(state.info, current.info) || state.identity != current.identity || state.hash != current.hash || state.mode != current.mode || state.size != current.size || state.change != current.change {
 		return fmt.Errorf("%s changed content, identity, mode, or metadata", name)
 	}
 	return nil
@@ -761,19 +1165,304 @@ func archiveStageName(output string) (string, error) {
 	return archiveStagePrefix + hex.EncodeToString(sum[:]) + archiveStageSuffix, nil
 }
 
+func archivePublicationWitnessName(stageName string) string {
+	return stageName + archivePublishWitnessSuffix
+}
+
+func validArchivePublicationWitnessName(name string) bool {
+	return strings.HasSuffix(name, archivePublishWitnessSuffix) && validArchiveStageName(strings.TrimSuffix(name, archivePublishWitnessSuffix))
+}
+
+func newArchivePublicationWitness(stageName, outputName string, state archiveOutputState) archivePublicationWitness {
+	return archivePublicationWitness{
+		Version:     2,
+		Stage:       stageName,
+		Output:      outputName,
+		Identity:    state.identity,
+		Hash:        state.hash,
+		Mode:        uint32(state.mode),
+		Size:        state.size,
+		ModTimeNano: state.info.ModTime().UnixNano(),
+	}
+}
+
+func (witness archivePublicationWitness) validate(stageName, outputName string) error {
+	if witness.Version != 2 || witness.Stage != stageName || witness.Output != outputName ||
+		len(witness.Authority) != 32 || !allASCII(witness.Authority, "0123456789abcdef") {
+		return fmt.Errorf("release archive publication witness has foreign protocol binding")
+	}
+	if witness.Identity == "" || len(witness.Hash) != sha256.Size*2 {
+		return fmt.Errorf("release archive publication witness has incomplete identity or digest")
+	}
+	decoded, err := hex.DecodeString(witness.Hash)
+	if err != nil || hex.EncodeToString(decoded) != witness.Hash {
+		return errors.Join(err, fmt.Errorf("release archive publication witness has non-canonical digest"))
+	}
+	mode := os.FileMode(witness.Mode)
+	if mode&os.ModeSymlink != 0 || !mode.IsRegular() || witness.Size < 0 || witness.Size > archiveOutputLimit {
+		return fmt.Errorf("release archive publication witness has invalid file metadata")
+	}
+	return nil
+}
+
+func (witness archivePublicationWitness) matches(state archiveOutputState) error {
+	if witness.Identity != state.identity || witness.Hash != state.hash || os.FileMode(witness.Mode) != state.mode || witness.Size != state.size || witness.ModTimeNano != state.info.ModTime().UnixNano() {
+		return fmt.Errorf("live release archive does not match durable staged-output identity, content, mode, size, or metadata")
+	}
+	return nil
+}
+
+func marshalArchivePublicationWitness(witness archivePublicationWitness) ([]byte, error) {
+	data, err := json.Marshal(witness)
+	if err != nil {
+		return nil, err
+	}
+	data = append(data, '\n')
+	if int64(len(data)) > archivePublishWitnessLimit {
+		return nil, fmt.Errorf("release archive publication witness exceeds %d-byte limit", archivePublishWitnessLimit)
+	}
+	return data, nil
+}
+
+func validArchivePublicationWitnessStageName(name string) bool {
+	prefix := archiveWitnessStagePrefix
+	return strings.HasPrefix(name, prefix) && len(name) == len(prefix)+32 && allASCII(strings.TrimPrefix(name, prefix), "0123456789abcdef")
+}
+
+func newArchivePublicationWitnessStageName() (string, string, error) {
+	var random [16]byte
+	n, err := archiveWitnessRandomRead(random[:])
+	if err != nil || n != len(random) {
+		return "", "", errors.Join(err, fmt.Errorf("generate exact release archive witness authority: read %d of %d random bytes", n, len(random)))
+	}
+	authority := hex.EncodeToString(random[:])
+	return archiveWitnessStagePrefix + authority, authority, nil
+}
+
+func writeArchivePublicationWitness(root *os.Root, name string, witness archivePublicationWitness) (authority archivePublicationWitnessAuthority, retErr error) {
+	stageName, token, err := newArchivePublicationWitnessStageName()
+	if err != nil {
+		return authority, err
+	}
+	witness.Authority = token
+	data, err := marshalArchivePublicationWitness(witness)
+	if err != nil {
+		return authority, err
+	}
+	file, err := root.OpenFile(stageName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return authority, fmt.Errorf("create private release archive publication witness authority: %w", err)
+	}
+	authority.name = stageName
+	defer func() {
+		if retErr != nil {
+			retErr = errors.Join(retErr, cleanupArchivePublicationWitness(root, name, &authority))
+		}
+	}()
+	if err := archiveWitnessPoint("create"); err != nil {
+		return authority, errors.Join(err, file.Close())
+	}
+	first := len(data) / 2
+	written, writeErr := file.Write(data[:first])
+	if writeErr == nil && written != first {
+		writeErr = io.ErrShortWrite
+	}
+	if writeErr != nil {
+		return authority, errors.Join(fmt.Errorf("write private release archive witness authority prefix: %w", writeErr), file.Close())
+	}
+	if err := archiveWitnessPoint("partial-write"); err != nil {
+		return authority, errors.Join(err, file.Close())
+	}
+	written, writeErr = file.Write(data[first:])
+	if writeErr == nil && written != len(data)-first {
+		writeErr = io.ErrShortWrite
+	}
+	if writeErr != nil {
+		return authority, errors.Join(fmt.Errorf("write private release archive witness authority: %w", writeErr), file.Close())
+	}
+	if err := archiveWitnessPoint("write"); err != nil {
+		return authority, errors.Join(err, file.Close())
+	}
+	if err := file.Sync(); err != nil {
+		return authority, errors.Join(fmt.Errorf("sync private release archive witness authority: %w", err), file.Close())
+	}
+	if err := archiveWitnessPoint("file-sync"); err != nil {
+		return authority, errors.Join(err, file.Close())
+	}
+	if err := file.Close(); err != nil {
+		return authority, fmt.Errorf("close private release archive witness authority: %w", err)
+	}
+	if err := archiveWitnessPoint("close"); err != nil {
+		return authority, err
+	}
+	if err := syncOutputDir(root); err != nil {
+		return authority, fmt.Errorf("persist private release archive publication witness authority directory entry: %w", err)
+	}
+	if err := archiveWitnessPoint("directory-sync"); err != nil {
+		return authority, err
+	}
+	got, state, err := readArchivePublicationWitness(root, stageName, witness.Stage, witness.Output)
+	if err != nil || got != witness {
+		return authority, errors.Join(err, fmt.Errorf("private release archive publication witness authority did not round-trip exactly"))
+	}
+	authority.state = state
+	if err := archiveWitnessPoint("before-publication"); err != nil {
+		return authority, err
+	}
+	if err := root.Link(stageName, name); err != nil {
+		return authority, fmt.Errorf("publish release archive witness without replacement: %w", err)
+	}
+	authority.published = true
+	if err := archiveWitnessPoint("after-publication"); err != nil {
+		return authority, err
+	}
+	if err := syncOutputDir(root); err != nil {
+		return authority, fmt.Errorf("persist release archive publication witness directory entry: %w", err)
+	}
+	if err := archiveWitnessPoint("publication-directory-sync"); err != nil {
+		return authority, err
+	}
+	gotAuthority, linkedAuthorityState, authorityErr := readArchivePublicationWitness(root, stageName, witness.Stage, witness.Output)
+	got, finalState, err := readArchivePublicationWitness(root, name, witness.Stage, witness.Output)
+	if joined := errors.Join(authorityErr, err); joined != nil || gotAuthority != witness || got != witness || !sameArchiveOutputState(linkedAuthorityState, finalState) {
+		return authority, errors.Join(joined, fmt.Errorf("durable release archive publication witness did not retain exact private authority"))
+	}
+	authority.state = linkedAuthorityState
+	authority.finalState = finalState
+	return authority, nil
+}
+
+func readArchivePublicationWitness(root *os.Root, name, stageName, outputName string) (archivePublicationWitness, archiveOutputState, error) {
+	state, err := captureArchiveOutput(root, name)
+	if err != nil {
+		return archivePublicationWitness{}, archiveOutputState{}, err
+	}
+	if state.size > archivePublishWitnessLimit {
+		return archivePublicationWitness{}, archiveOutputState{}, fmt.Errorf("release archive publication witness exceeds %d-byte limit", archivePublishWitnessLimit)
+	}
+	file, err := root.Open(name)
+	if err != nil {
+		return archivePublicationWitness{}, archiveOutputState{}, err
+	}
+	data, readErr := io.ReadAll(io.LimitReader(file, archivePublishWitnessLimit+1))
+	closeErr := file.Close()
+	if err := errors.Join(readErr, closeErr); err != nil {
+		return archivePublicationWitness{}, archiveOutputState{}, err
+	}
+	if int64(len(data)) != state.size || int64(len(data)) > archivePublishWitnessLimit {
+		return archivePublicationWitness{}, archiveOutputState{}, fmt.Errorf("release archive publication witness changed size while being read")
+	}
+	if err := state.revalidateAt(root, name); err != nil {
+		return archivePublicationWitness{}, archiveOutputState{}, fmt.Errorf("release archive publication witness changed while being read: %w", err)
+	}
+	var witness archivePublicationWitness
+	if err := json.Unmarshal(data, &witness); err != nil {
+		return archivePublicationWitness{}, archiveOutputState{}, fmt.Errorf("decode release archive publication witness: %w", err)
+	}
+	if err := witness.validate(stageName, outputName); err != nil {
+		return archivePublicationWitness{}, archiveOutputState{}, err
+	}
+	canonical, err := marshalArchivePublicationWitness(witness)
+	if err != nil || !bytes.Equal(data, canonical) {
+		return archivePublicationWitness{}, archiveOutputState{}, errors.Join(err, fmt.Errorf("release archive publication witness is not canonical"))
+	}
+	return witness, state, nil
+}
+
+func sameArchiveOutputState(left, right archiveOutputState) bool {
+	return left.info != nil && right.info != nil && os.SameFile(left.info, right.info) &&
+		sameArchiveMetadata(left.info, right.info) && left.identity == right.identity && left.hash == right.hash &&
+		left.mode == right.mode && left.size == right.size && left.change == right.change
+}
+
+func cleanupArchivePublicationWitness(root *os.Root, witnessName string, authority *archivePublicationWitnessAuthority) error {
+	if authority == nil {
+		return nil
+	}
+	if authority.published {
+		currentAuthority, authorityErr := captureArchiveOutput(root, authority.name)
+		currentWitness, witnessErr := captureArchiveOutput(root, witnessName)
+		if err := errors.Join(authorityErr, witnessErr); err != nil {
+			return fmt.Errorf("revalidate linked release archive publication witness authority: %w", err)
+		}
+		if !sameArchiveOutputState(currentAuthority, currentWitness) ||
+			authority.state.info != nil && (authority.state.identity != currentAuthority.identity || authority.state.hash != currentAuthority.hash || authority.state.mode != currentAuthority.mode || authority.state.size != currentAuthority.size || !authority.state.info.ModTime().Equal(currentAuthority.info.ModTime())) {
+			return fmt.Errorf("release archive publication witness changed before cleanup; preserving it")
+		}
+		authority.state = currentAuthority
+		authority.finalState = currentWitness
+		if err := cleanupArchiveStageIfPresent(root, witnessName, &authority.finalState); err != nil {
+			return err
+		}
+		afterUnlink, err := captureArchiveOutput(root, authority.name)
+		if err != nil {
+			return fmt.Errorf("revalidate private release archive witness authority after unlinking public name: %w", err)
+		}
+		if authority.state.identity != afterUnlink.identity || authority.state.hash != afterUnlink.hash || authority.state.mode != afterUnlink.mode || authority.state.size != afterUnlink.size || !authority.state.info.ModTime().Equal(afterUnlink.info.ModTime()) {
+			return fmt.Errorf("private release archive publication witness authority changed during public-name retirement; preserving it")
+		}
+		authority.state = afterUnlink
+	}
+	if authority.name == "" {
+		return nil
+	}
+	expected := &authority.state
+	if authority.state.info == nil {
+		expected = nil
+	}
+	return cleanupArchiveStageIfPresent(root, authority.name, expected)
+}
+
 // recoverArchiveStages validates the complete private stage namespace while
 // the directory-wide archive lock is held. A regular stage is an uncommitted,
 // fully replaceable attempt and is removed durably before recomputation. Any
 // symlink, special entry, or lookalike is foreign residue and blocks.
 func recoverArchiveStages(root *os.Root) error {
+	return recoverArchiveStagesBounded(root, archiveMaxEntries)
+}
+
+func recoverArchiveStagesBounded(root *os.Root, maxEntries int) (retErr error) {
+	if maxEntries <= 0 {
+		return fmt.Errorf("release output directory entry limit must be positive")
+	}
+	before, err := root.Lstat(".")
+	if err != nil {
+		return err
+	}
 	dir, err := root.Open(".")
 	if err != nil {
 		return fmt.Errorf("open release output directory inventory: %w", err)
 	}
-	entries, readErr := dir.ReadDir(-1)
+	opened, err := dir.Stat()
+	if err != nil || !opened.IsDir() || !os.SameFile(before, opened) || before.Mode() != opened.Mode() {
+		return errors.Join(err, fmt.Errorf("release output directory changed while opening inventory"), dir.Close())
+	}
+	entries := make([]os.DirEntry, 0, min(archiveDirBatch, maxEntries))
+	var readErr error
+	for {
+		batch, err := dir.ReadDir(archiveDirBatch)
+		if len(batch) > maxEntries-len(entries) {
+			readErr = fmt.Errorf("release output directory exceeds %d-entry limit", maxEntries)
+			break
+		}
+		entries = append(entries, batch...)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			readErr = err
+			break
+		}
+	}
+	after, statErr := dir.Stat()
+	pathAfter, pathErr := root.Lstat(".")
 	closeErr := dir.Close()
-	if err := errors.Join(readErr, closeErr); err != nil {
+	if err := errors.Join(readErr, statErr, pathErr, closeErr); err != nil {
 		return fmt.Errorf("read release output directory inventory: %w", err)
+	}
+	if !pathAfter.IsDir() || pathAfter.Mode()&os.ModeSymlink != 0 || !os.SameFile(opened, after) || !os.SameFile(opened, pathAfter) ||
+		opened.Mode() != after.Mode() || opened.Mode() != pathAfter.Mode() || !opened.ModTime().Equal(after.ModTime()) || !opened.ModTime().Equal(pathAfter.ModTime()) {
+		return fmt.Errorf("release output directory changed while being inventoried")
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	type recoveryStage struct {
@@ -781,9 +1470,51 @@ func recoverArchiveStages(root *os.Root) error {
 		witness archiveOutputState
 	}
 	stages := make([]recoveryStage, 0)
+	type recoveryQuarantine struct {
+		handle  *fsatomic.Quarantined
+		witness archiveOutputState
+		empty   bool
+	}
+	quarantines := make([]recoveryQuarantine, 0)
+	defer func() {
+		for _, quarantine := range quarantines {
+			retErr = errors.Join(retErr, quarantine.handle.Close())
+		}
+	}()
 	for _, item := range entries {
 		name := item.Name()
 		if !strings.HasPrefix(name, archiveStagePrefix) {
+			continue
+		}
+		if strings.HasPrefix(name, ".release-archive-delete-") {
+			handle, err := fsatomic.ResumeQuarantine(root, name, "")
+			if err != nil || !validArchiveStageName(handle.Source()) && !validArchiveRetirementName(handle.Source()) && !validArchivePublicationWitnessName(handle.Source()) && !validArchivePublicationWitnessAuthorityName(handle.Source()) {
+				if handle != nil {
+					_ = handle.Close()
+				}
+				return errors.Join(err, fmt.Errorf("release archive quarantine %q has invalid source authority", name))
+			}
+			if _, err := handle.Root().Lstat(handle.Name()); errors.Is(err, os.ErrNotExist) {
+				if err := validateArchiveQuarantineInventory(handle.Root(), false); err != nil {
+					_ = handle.Close()
+					return fmt.Errorf("release archive quarantine %q: %w", name, err)
+				}
+				quarantines = append(quarantines, recoveryQuarantine{handle: handle, empty: true})
+				continue
+			} else if err != nil {
+				_ = handle.Close()
+				return err
+			}
+			if err := validateArchiveQuarantineInventory(handle.Root(), true); err != nil {
+				_ = handle.Close()
+				return fmt.Errorf("release archive quarantine %q: %w", name, err)
+			}
+			witness, err := captureArchiveOutput(handle.Root(), handle.Name())
+			if err != nil {
+				_ = handle.Close()
+				return fmt.Errorf("witness release archive quarantine %q: %w", name, err)
+			}
+			quarantines = append(quarantines, recoveryQuarantine{handle: handle, witness: witness})
 			continue
 		}
 		if validArchiveRetirementName(name) {
@@ -798,10 +1529,54 @@ func recoverArchiveStages(root *os.Root) error {
 		}
 		stages = append(stages, recoveryStage{name: name, witness: witness})
 	}
+	for index := range quarantines {
+		quarantine := &quarantines[index]
+		if quarantine.empty {
+			if err := quarantine.handle.FinishEmpty(); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := quarantine.witness.revalidateAt(quarantine.handle.Root(), quarantine.handle.Name()); err != nil {
+			return fmt.Errorf("release archive quarantine changed during recovery; preserving it: %w", err)
+		}
+		if err := quarantine.handle.Remove(); err != nil {
+			return err
+		}
+	}
 	for index := range stages {
 		stage := &stages[index]
 		if err := cleanupArchiveStageIfPresent(root, stage.name, &stage.witness); err != nil {
 			return fmt.Errorf("recover interrupted release archive residue %q: %w", stage.name, err)
+		}
+	}
+	return nil
+}
+
+func validateArchiveQuarantineInventory(root *os.Root, objectExpected bool) error {
+	dir, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	entries, readErr := dir.ReadDir(2)
+	closeErr := dir.Close()
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		return errors.Join(readErr, closeErr)
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	var want []string
+	if objectExpected {
+		want = []string{"object"}
+	}
+	if len(entries) != len(want) {
+		return fmt.Errorf("private deletion authority has unexpected inventory")
+	}
+	for index := range want {
+		if entries[index].Name() != want[index] {
+			return fmt.Errorf("private deletion authority has unexpected inventory")
 		}
 	}
 	return nil
@@ -829,78 +1604,48 @@ func cleanupArchiveStageIfPresent(root *os.Root, stageName string, expected *arc
 	if err := state.revalidateAt(root, stageName); err != nil {
 		return fmt.Errorf("release archive stage %s changed before cleanup; preserving it: %w", stageName, err)
 	}
-	retiredName := stageName + archiveRetireSuffix
-	if info, err := root.Lstat(retiredName); err == nil {
-		return fmt.Errorf("release archive retirement path %s already exists (%s); preserving both", retiredName, info.Mode())
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("inspect release archive retirement path %s: %w", retiredName, err)
+	quarantined, err := quarantineArchiveCleanup(root, stageName, ".release-archive-delete-")
+	if err != nil {
+		return fmt.Errorf("quarantine release archive deletion authority: %w", err)
 	}
-	if err := root.Rename(stageName, retiredName); err != nil {
-		return fmt.Errorf("atomically isolate release archive stage %s: %w", stageName, err)
+	if err := archiveCleanupPoint("after-stage-isolate", stageName); err != nil {
+		return preserveArchiveQuarantine(quarantined, err)
 	}
-	if err := syncOutputDir(root); err != nil {
-		return fmt.Errorf("persist isolated release archive stage %s: %w", stageName, err)
+	if err := archiveCleanupPoint("before-stage-remove", stageName); err != nil {
+		return preserveArchiveQuarantine(quarantined, err)
 	}
-	retired, err := captureArchiveOutput(root, retiredName)
-	if err != nil || !os.SameFile(state.info, retired.info) || state.hash != retired.hash || state.mode != retired.mode || state.size != retired.size || !state.info.ModTime().Equal(retired.info.ModTime()) {
-		cause := errors.Join(fmt.Errorf("isolated release archive stage %s did not match its cleanup witness", stageName), err)
-		return restoreArchiveStage(root, stageName, retiredName, cause)
+	if err := archivePrivateCleanupPoint(quarantined.Root(), quarantined.Name()); err != nil {
+		return preserveArchiveQuarantine(quarantined, err)
 	}
-	if err := archiveCleanupPoint("after-stage-isolate", retiredName); err != nil {
-		return restoreArchiveStage(root, stageName, retiredName, err)
+	if err := validateArchiveQuarantineInventory(quarantined.Root(), true); err != nil {
+		return preserveArchiveQuarantine(quarantined, err)
 	}
-	if err := archiveCleanupPoint("before-stage-remove", retiredName); err != nil {
-		return restoreArchiveStage(root, stageName, retiredName, err)
+	deleting, err := captureArchiveOutput(quarantined.Root(), quarantined.Name())
+	if err != nil || !os.SameFile(state.info, deleting.info) || state.hash != deleting.hash || state.mode != deleting.mode || state.size != deleting.size || !state.info.ModTime().Equal(deleting.info.ModTime()) {
+		return preserveArchiveQuarantine(quarantined, errors.Join(err, fmt.Errorf("release archive deletion authority changed; preserving it")))
 	}
-	if err := retired.revalidateAt(root, retiredName); err != nil {
-		return restoreArchiveStage(root, stageName, retiredName, fmt.Errorf("retired release archive stage changed before deletion: %w", err))
+	if err := deleting.revalidateAt(quarantined.Root(), quarantined.Name()); err != nil {
+		return preserveArchiveQuarantine(quarantined, fmt.Errorf("release archive deletion authority changed before deletion: %w", err))
 	}
-	if err := root.Remove(retiredName); err != nil {
-		return fmt.Errorf("remove isolated release archive stage %s: %w", retiredName, err)
+	if err := archivePrivateRemovePoint(quarantined.Root(), quarantined.Name()); err != nil {
+		return preserveArchiveQuarantine(quarantined, err)
 	}
-	if err := syncOutputDir(root); err != nil {
-		return fmt.Errorf("persist release archive stage cleanup %s: %w", stageName, err)
+	if err := quarantined.Remove(); err != nil {
+		return fmt.Errorf("remove isolated release archive stage %s: %w", stageName, err)
 	}
 	return nil
 }
 
-func restoreArchiveStage(root *os.Root, stageName, retiredName string, cause error) error {
-	if info, err := root.Lstat(stageName); err == nil {
-		return errors.Join(cause, fmt.Errorf("release archive stage path %s was repopulated (%s); preserving it and retirement %s", stageName, info.Mode(), retiredName))
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return errors.Join(cause, fmt.Errorf("inspect release archive stage path before restore: %w", err))
-	}
-	retiredBefore, err := captureArchiveOutput(root, retiredName)
-	if err != nil {
-		return errors.Join(cause, fmt.Errorf("witness changed release archive retirement %s before restore: %w", retiredName, err))
-	}
-	// Link is an atomic no-replace restore: unlike rename, it cannot overwrite
-	// a stage path populated after the absence check. Keep the retirement link
-	// as conservative evidence on this already-failing path; a later run will
-	// reject the ambiguous residue rather than guess that it is safe to delete.
-	if err := root.Link(retiredName, stageName); err != nil {
-		return errors.Join(cause, fmt.Errorf("restore changed release archive retirement %s without replacement: %w", retiredName, err))
-	}
-	if err := syncOutputDir(root); err != nil {
-		return errors.Join(cause, fmt.Errorf("persist restored release archive stage %s: %w", stageName, err))
-	}
-	retiredAfter, retiredErr := captureArchiveOutput(root, retiredName)
-	stageAfter, stageErr := captureArchiveOutput(root, stageName)
-	if err := errors.Join(retiredErr, stageErr); err != nil {
-		return errors.Join(cause, fmt.Errorf("verify restored release archive stage %s: %w", stageName, err))
-	}
-	if !os.SameFile(retiredBefore.info, retiredAfter.info) || !os.SameFile(retiredAfter.info, stageAfter.info) ||
-		retiredBefore.hash != retiredAfter.hash || retiredAfter.hash != stageAfter.hash ||
-		retiredBefore.mode != retiredAfter.mode || retiredAfter.mode != stageAfter.mode ||
-		retiredBefore.size != retiredAfter.size || retiredAfter.size != stageAfter.size ||
-		!retiredBefore.info.ModTime().Equal(retiredAfter.info.ModTime()) || !retiredAfter.info.ModTime().Equal(stageAfter.info.ModTime()) {
-		return errors.Join(cause, fmt.Errorf("restored release archive stage %s changed while linking; preserving both names", stageName))
-	}
-	return errors.Join(cause, fmt.Errorf("changed release archive stage %s preserved at both its stage and retirement names", stageName))
+func preserveArchiveQuarantine(quarantined *fsatomic.Quarantined, cause error) error {
+	return errors.Join(cause, fmt.Errorf("preserving private release archive deletion authority"), quarantined.Close())
 }
 
 func validArchiveRetirementName(name string) bool {
 	return strings.HasSuffix(name, archiveRetireSuffix) && validArchiveStageName(strings.TrimSuffix(name, archiveRetireSuffix))
+}
+
+func validArchivePublicationWitnessAuthorityName(name string) bool {
+	return validArchivePublicationWitnessStageName(name)
 }
 
 func validArchiveStageName(name string) bool {

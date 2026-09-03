@@ -8,7 +8,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/RamXX/machinery/internal/dirscan"
 )
+
+const checkerInventoryMaxDepth = 64
 
 // InventoryProblems performs the reverse side of checker ownership: every
 // committed projection/evidence artifact must be owned by a manifest, and a
@@ -16,6 +20,13 @@ import (
 // Unrecognized source files inside an owned checker directory are intentionally
 // allowed (adapters and native rule files are checker-defined).
 func InventoryProblems(design string, manifests []*Manifest) []string {
+	return inventoryProblems(design, manifests, dirscan.WalkLimits{
+		MaxEntries: checkerMaxEntries,
+		MaxDepth:   checkerInventoryMaxDepth,
+	})
+}
+
+func inventoryProblems(design string, manifests []*Manifest, limits dirscan.WalkLimits) []string {
 	root, err := filepath.Abs(filepath.Join(design, "checkers"))
 	if err != nil {
 		return []string{err.Error()}
@@ -61,7 +72,7 @@ func InventoryProblems(design string, manifests []*Manifest) []string {
 		}
 	}
 
-	walkErr := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+	walkErr := dirscan.WalkBounded(root, limits, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -71,7 +82,7 @@ func InventoryProblems(design string, manifests []*Manifest) []string {
 		if entry.Type()&os.ModeSymlink != 0 {
 			problems = append(problems, "checker inventory contains symlink "+relativeInventoryPath(root, path))
 			if entry.IsDir() {
-				return filepath.SkipDir
+				return fs.SkipDir
 			}
 			return nil
 		}
@@ -100,7 +111,11 @@ func InventoryProblems(design string, manifests []*Manifest) []string {
 				return nil
 			}
 		}
-		if isCheckerOutputArtifact(path) {
+		isOutput, inspectErr := isCheckerOutputArtifact(path)
+		if inspectErr != nil {
+			return appendInventoryProblem(&problems, "inspect checker inventory entry "+relativeInventoryPath(root, path)+": "+inspectErr.Error())
+		}
+		if isOutput {
 			problems = append(problems, "orphan checker output "+relativeInventoryPath(root, path)+" is not declared by any manifest")
 		}
 		return nil
@@ -112,23 +127,36 @@ func InventoryProblems(design string, manifests []*Manifest) []string {
 	return problems
 }
 
-func isCheckerOutputArtifact(path string) bool {
+func isCheckerOutputArtifact(path string) (bool, error) {
 	base := strings.ToLower(filepath.Base(path))
 	if base == "projection.json" || base == "evidence.json" {
-		return true
+		return true, nil
 	}
 	if filepath.Ext(base) != ".json" {
-		return false
+		return false, nil
 	}
-	data, err := os.ReadFile(path)
+	data, err := readCheckerStructuredFile(path, "checker inventory JSON")
 	if err != nil {
-		return false
+		return false, err
 	}
 	var object map[string]json.RawMessage
-	if err := json.Unmarshal(data, &object); err != nil {
-		return false
+	if !isJSONObject(data, &object) {
+		return notCheckerOutputArtifact()
 	}
-	return object["projection_schema"] != nil || object["evidence_schema"] != nil
+	return object["projection_schema"] != nil || object["evidence_schema"] != nil, nil
+}
+
+func appendInventoryProblem(problems *[]string, problem string) error {
+	*problems = append(*problems, problem)
+	return nil
+}
+
+func isJSONObject(data []byte, object *map[string]json.RawMessage) bool {
+	return json.Unmarshal(data, object) == nil
+}
+
+func notCheckerOutputArtifact() (bool, error) {
+	return false, nil
 }
 
 func portablePath(path string) string {

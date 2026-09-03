@@ -368,6 +368,121 @@ func TestFingerprintJavaRootRejectsPostCensusGrowth(t *testing.T) {
 	}
 }
 
+func TestJavaInventoryRejectsEntryBeyondFixedCeiling(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"c", "a", "b"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close() //nolint:errcheck // test cleanup
+	if _, err := readJavaDirEntries(f, 2); err == nil || !strings.Contains(err.Error(), "entry limit") {
+		t.Fatalf("high-entry Java inventory was accepted: %v", err)
+	}
+}
+
+func TestJavaClosureDepthBoundaryIsPortableAndExact(t *testing.T) {
+	dir := makeTestJavaRoot(t, []byte("java"), []byte("modules"))
+	deep := filepath.Join(dir, "conf", filepath.FromSlash(javaDeepRelativePath(javaTreeMaxDepth-1)))
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close() //nolint:errcheck // test cleanup
+	if _, err := fingerprintJavaRoot(root); err != nil {
+		t.Fatalf("closure at %d-component depth rejected: %v", javaTreeMaxDepth, err)
+	}
+	if err := os.Mkdir(filepath.Join(deep, "d"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fingerprintJavaRoot(root); err == nil || !strings.Contains(err.Error(), "depth limit") {
+		t.Fatalf("closure beyond %d-component depth accepted: %v", javaTreeMaxDepth, err)
+	}
+}
+
+func TestJavaClosureUsesOneAggregateEntryAndByteBudget(t *testing.T) {
+	dir := makeTestJavaRoot(t, []byte("java"), []byte("modules"))
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close() //nolint:errcheck // test cleanup
+	wantBytes := int64(len("java") + len("modules"))
+	atLimit := javaTreeLimits{maxDepth: javaTreeMaxDepth, maxEntries: 5, maxBytes: wantBytes}
+	names, _, gotBytes, err := inventoryJavaRootWithLimits(root, atLimit)
+	if err != nil || len(names) != atLimit.maxEntries || gotBytes != wantBytes {
+		t.Fatalf("aggregate closure boundary = %d entries, %d bytes, %v; want %d, %d", len(names), gotBytes, err, atLimit.maxEntries, wantBytes)
+	}
+	for _, tc := range []struct {
+		name   string
+		limits javaTreeLimits
+		want   string
+	}{
+		{"entries", javaTreeLimits{maxDepth: javaTreeMaxDepth, maxEntries: atLimit.maxEntries - 1, maxBytes: wantBytes}, "entry limit"},
+		{"bytes", javaTreeLimits{maxDepth: javaTreeMaxDepth, maxEntries: atLimit.maxEntries, maxBytes: wantBytes - 1}, "bytes"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, _, _, err := inventoryJavaRootWithLimits(root, tc.limits); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("aggregate %s budget reset across Java subtrees: %v", tc.name, err)
+			}
+		})
+	}
+}
+
+func TestFingerprintJavaRootRejectsContinuousAppender(t *testing.T) {
+	dir := makeTestJavaRoot(t, []byte("java"), []byte(strings.Repeat("x", 1<<20)))
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close() //nolint:errcheck // test cleanup
+	modules := filepath.Join("lib", "modules")
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	started := false
+	_, err = fingerprintJavaRootWithHook(root, func(name string) error {
+		if name != modules || started {
+			return nil
+		}
+		started = true
+		first := make(chan struct{})
+		go func() {
+			defer close(stopped)
+			f, openErr := os.OpenFile(filepath.Join(dir, modules), os.O_WRONLY|os.O_APPEND, 0)
+			if openErr != nil {
+				close(first)
+				return
+			}
+			defer f.Close() //nolint:errcheck // test mutation
+			for i := 0; ; i++ {
+				_, _ = f.Write([]byte("growth"))
+				if i == 0 {
+					close(first)
+				}
+				select {
+				case <-done:
+					return
+				default:
+				}
+			}
+		}()
+		<-first
+		return nil
+	})
+	close(done)
+	<-stopped
+	if err == nil || !strings.Contains(err.Error(), "changed identity, metadata, or size while hashing") {
+		t.Fatalf("continuous appender was accepted: %v", err)
+	}
+}
+
 func makeTestJavaRoot(t *testing.T, launcher, modules []byte) string {
 	t.Helper()
 	root := t.TempDir()
@@ -383,4 +498,8 @@ func makeTestJavaRoot(t *testing.T, launcher, modules []byte) string {
 		t.Fatal(err)
 	}
 	return root
+}
+
+func javaDeepRelativePath(depth int) string {
+	return strings.TrimSuffix(strings.Repeat("d/", depth), "/")
 }

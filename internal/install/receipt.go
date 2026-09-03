@@ -861,40 +861,14 @@ func renameReplace(staged, destination string) error {
 	if err := validateActiveInstallMutation(destination); err != nil {
 		return err
 	}
-	_, _, confined, err := retainedCapabilityForMutation(destination)
-	if err != nil {
-		return err
-	}
-	if confined {
-		// os.Root has no cross-root rename primitive. The outer journal already
-		// owns the old destination, so replace through the retained destination
-		// parent and durably remove the staged scratch file afterward.
-		if err := durableRemove(destination); err != nil {
-			return err
-		}
-		if err := copyReplacement(staged, destination); err != nil {
-			return errors.Join(err, durableRemove(destination))
-		}
-		return durableRemove(staged)
-	}
-	// Keep the namespace operation separate from the durability flush. A
-	// successful rename followed by a failed directory fsync must be reported
-	// as such; treating it as a failed rename would enter the replacement
-	// fallback after the staged path has already moved.
-	if err := renameInstallPath(staged, destination); err == nil {
-		return syncDir(filepath.Dir(destination))
-	}
-	// The surrounding artifact transaction is the durable backup. Removing the
-	// destination here avoids an unjournaled .pre-update scratch file and makes
-	// a crash in the Windows replace window recover by the same protocol as all
-	// other install mutations.
 	if err := durableRemove(destination); err != nil {
 		return err
 	}
 	if err := durableRename(staged, destination); err != nil {
 		// A cross-device staged path cannot be renamed. The copy is synced before
 		// it becomes the committed transaction state; rollback restores the old
-		// destination if the copy or subsequent commit fails.
+		// destination if the copy or subsequent commit fails. O_EXCL publication
+		// preserves anything that appears at the destination boundary.
 		if copyErr := copyReplacement(staged, destination); copyErr != nil {
 			return errors.Join(fmt.Errorf("rename replacement: %w", err), fmt.Errorf("copy fallback: %w", copyErr), durableRemove(destination))
 		}
@@ -912,6 +886,13 @@ func copyReplacement(src, dst string) error {
 	if err := validateActiveInstallMutation(dst); err != nil {
 		return err
 	}
+	before, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() || before.Size() < 0 || before.Size() > installArtifactMaxFileBytes {
+		return fmt.Errorf("replacement source %s must be a bounded regular non-symlink file", src)
+	}
 	in, err := os.Open(src)
 	if err != nil {
 		return err
@@ -920,6 +901,9 @@ func copyReplacement(src, dst string) error {
 	info, err := in.Stat()
 	if err != nil {
 		return err
+	}
+	if !sameInstallArtifactInfo(before, info) {
+		return fmt.Errorf("replacement source %s changed while opening", src)
 	}
 	capability, rel, confined, err := retainedCapabilityForMutation(dst)
 	if err != nil {
@@ -937,9 +921,16 @@ func copyReplacement(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, in); err != nil {
+	written, copyErr := io.Copy(out, io.LimitReader(in, info.Size()+1))
+	heldAfter, heldErr := in.Stat()
+	liveAfter, liveErr := os.Lstat(src)
+	if err := errors.Join(copyErr, heldErr, liveErr); err != nil {
 		out.Close()
 		return err
+	}
+	if written != info.Size() || !sameInstallArtifactInfo(info, heldAfter) || !sameInstallArtifactInfo(info, liveAfter) {
+		out.Close()
+		return fmt.Errorf("replacement source %s changed while copying", src)
 	}
 	if err := out.Chmod(info.Mode().Perm()); err != nil {
 		out.Close()

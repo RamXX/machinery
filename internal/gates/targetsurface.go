@@ -40,8 +40,18 @@ func HasTargetSurfaces(design string) bool {
 // human act in the model, so deleting surfaces.yaml must activate a failure
 // rather than delete the gate.
 func HasHumanActions(design string) bool {
+	paths, inventoryErr := sortedGlobExt(design, ".modelith.yaml")
+	if inventoryErr != nil {
+		return true
+	}
+	if len(paths) == 0 {
+		return false
+	}
 	model, err := readTargetActModel(design)
-	return err == nil && len(model.obligated()) > 0
+	// An unreadable inventory must activate Gu so CheckTargetSurfaces can
+	// report the failure; treating it as "no human actions" would suppress the
+	// gate precisely when its obligation universe is unknown.
+	return err != nil || len(model.obligated()) > 0
 }
 
 // targetAct is one action of the Phase 1 target model, with the actor that
@@ -448,7 +458,10 @@ func (v *targetSurfaceValidator) checkCompleteness(obligated []targetAct) {
 // actor. A design root carries the target model only: the legacy model lives
 // under legacy/ and is not swept.
 func readTargetActModel(design string) (targetActModel, error) {
-	paths := sortedGlobExt(design, ".modelith.yaml")
+	paths, err := sortedGlobExt(design, ".modelith.yaml")
+	if err != nil {
+		return targetActModel{}, err
+	}
 	if len(paths) == 0 {
 		return targetActModel{}, fmt.Errorf("no *.modelith.yaml in the design directory")
 	}

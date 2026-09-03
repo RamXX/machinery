@@ -340,7 +340,7 @@ func validateInstallLockCapability(encoded, scope string) error {
 	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || !privateFilePermissionsOK(info) {
 		return fmt.Errorf("install lock capability is not a private regular file")
 	}
-	raw, err := os.ReadFile(parts[0])
+	raw, err := readPrivateRegularFile(parts[0], 4096)
 	if err != nil {
 		return fmt.Errorf("read install lock capability: %w", err)
 	}

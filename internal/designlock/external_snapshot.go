@@ -1,10 +1,8 @@
 package designlock
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,7 +15,7 @@ import (
 type ExternalTreeSnapshot struct {
 	path    string
 	logical string
-	cleanup string
+	cleanup *privateSnapshotCleanup
 }
 
 func (s *ExternalTreeSnapshot) Path() string    { return s.path }
@@ -27,13 +25,17 @@ func (s *ExternalTreeSnapshot) Close() error {
 	if s == nil || s.path == "" {
 		return nil
 	}
-	path := s.cleanup
-	s.path = ""
-	s.cleanup = ""
-	if path == "" {
+	cleanup := s.cleanup
+	if cleanup == nil {
+		s.path = ""
 		return nil
 	}
-	return os.RemoveAll(path)
+	if err := cleanup.Close(); err != nil {
+		return err
+	}
+	s.path = ""
+	s.cleanup = nil
+	return nil
 }
 
 // MaterializeExternalTree copies path through one held no-follow os.Root,
@@ -62,11 +64,12 @@ func (l *Lock) MaterializeExternalTree(path string) (*ExternalTreeSnapshot, erro
 	if err := l.TrackExternalTree(abs); err != nil {
 		return nil, err
 	}
-	temp, err := os.MkdirTemp("", "machinery-impl-snapshot-")
+	cleanup, err := newPrivateSnapshot("machinery-impl-snapshot-")
 	if err != nil {
 		return nil, fmt.Errorf("create private implementation snapshot: %w", err)
 	}
-	snapshot := &ExternalTreeSnapshot{path: temp, logical: path, cleanup: temp}
+	temp := cleanup.Path()
+	snapshot := &ExternalTreeSnapshot{path: temp, logical: path, cleanup: cleanup}
 	l.inputAliases = append(l.inputAliases, pathAlias{from: temp, to: abs})
 	values, err := l.copyExternalTree(abs, temp, nil, nil)
 	if err != nil {
@@ -178,7 +181,7 @@ func designUsesParentRelativeInput(root string) (bool, error) {
 		if !strings.HasSuffix(strings.ToLower(name), ".md") && !strings.EqualFold(filepath.Base(name), "workspace.dsl") {
 			continue
 		}
-		body, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		body, err := readSnapshotRegularPath(filepath.Join(root, filepath.FromSlash(name)), "design reference document "+name, 64<<20)
 		if err != nil {
 			return false, err
 		}
@@ -249,14 +252,21 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 		return nil, fmt.Errorf("implementation root changed identity while opening stable snapshot")
 	}
 	exclude := l.externalDesignRel(source)
+	if err := validateExternalTreeForCopy(root, exclude); err != nil {
+		return nil, err
+	}
 	values := map[string]string{}
-	var walk func(string) error
-	walk = func(dir string) error {
+	budget := snapshotBudget{maxEntries: snapshotInventoryMaxEntries, maxBytes: snapshotAggregateMaxBytes, maxDepth: snapshotInventoryMaxDepth}
+	var walk func(string, int) error
+	walk = func(dir string, depth int) error {
+		if err := budget.enterDirectory("implementation directory "+filepath.ToSlash(dir), depth); err != nil {
+			return err
+		}
 		handle, err := root.Open(dir)
 		if err != nil {
 			return err
 		}
-		entries, readErr := handle.ReadDir(-1)
+		entries, readErr := readSnapshotDir(handle, "implementation directory "+filepath.ToSlash(dir), &budget)
 		closeErr := handle.Close()
 		if err := errors.Join(readErr, closeErr); err != nil {
 			return err
@@ -279,6 +289,9 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 				return err
 			}
 			display := filepath.ToSlash(rel)
+			if err := budget.addFile(display, info); err != nil {
+				return err
+			}
 			destPath := filepath.Join(dest, rel)
 			switch {
 			case info.IsDir():
@@ -286,7 +299,7 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 				if err := os.Mkdir(destPath, 0o700); err != nil {
 					return err
 				}
-				if err := walk(rel); err != nil {
+				if err := walk(rel, depth+1); err != nil {
 					return err
 				}
 				if err := os.Chmod(destPath, info.Mode().Perm()); err != nil {
@@ -301,8 +314,11 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 					return err
 				}
 				openedInfo, statErr := src.Stat()
-				if statErr != nil || !os.SameFile(info, openedInfo) || !openedInfo.Mode().IsRegular() {
+				if statErr != nil || !sameFingerprintFile(info, openedInfo) {
 					_ = src.Close()
+					if afterRead != nil {
+						afterRead(rel)
+					}
 					return fmt.Errorf("implementation entry %s changed identity while opening", display)
 				}
 				dst, err := os.OpenFile(destPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
@@ -310,9 +326,9 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 					_ = src.Close()
 					return err
 				}
-				hash := sha256.New()
-				_, copyErr := io.Copy(io.MultiWriter(dst, hash), src)
-				err = errors.Join(copyErr, src.Close(), dst.Close())
+				digest, copyErr := copySnapshotFile(display, src, dst, openedInfo.Size())
+				openedAfter, retainedStatErr := src.Stat()
+				err = errors.Join(copyErr, retainedStatErr, src.Close(), dst.Close())
 				if err != nil {
 					return err
 				}
@@ -320,10 +336,10 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 					return err
 				}
 				after, statErr := root.Lstat(rel)
-				if statErr != nil || !os.SameFile(openedInfo, after) || after.Mode() != openedInfo.Mode() {
+				if statErr != nil || !sameFingerprintFile(info, openedAfter) || !sameFingerprintFile(info, after) {
 					return fmt.Errorf("implementation entry %s changed identity while reading", display)
 				}
-				values[display] = fmt.Sprintf("file:%o:%x", info.Mode().Perm(), hash.Sum(nil))
+				values[display] = fmt.Sprintf("file:%o:%x", info.Mode().Perm(), digest)
 				if afterRead != nil {
 					afterRead(rel)
 				}
@@ -335,7 +351,7 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 		}
 		return nil
 	}
-	if err := walk("."); err != nil {
+	if err := walk(".", 0); err != nil {
 		return nil, err
 	}
 	current, err := l.fingerprintExternalTree(source)
@@ -353,4 +369,71 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 		return nil, fmt.Errorf("materialized tree metadata or contents differ from its source")
 	}
 	return copied, nil
+}
+
+func validateExternalTreeForCopy(root *os.Root, exclude string) error {
+	budget := snapshotBudget{maxEntries: snapshotInventoryMaxEntries, maxBytes: snapshotAggregateMaxBytes, maxDepth: snapshotInventoryMaxDepth}
+	caseFolded := map[string]string{}
+	var walk func(string, int) error
+	walk = func(dir string, depth int) error {
+		label := "implementation preflight directory " + filepath.ToSlash(dir)
+		if err := budget.enterDirectory(label, depth); err != nil {
+			return err
+		}
+		before, err := root.Lstat(dir)
+		if err != nil || !before.IsDir() || before.Mode()&os.ModeSymlink != 0 {
+			return errors.Join(err, fmt.Errorf("%s must remain a real directory", label))
+		}
+		handle, err := root.Open(dir)
+		if err != nil {
+			return err
+		}
+		entries, readErr := readSnapshotDir(handle, label, &budget)
+		closeErr := handle.Close()
+		if err := errors.Join(readErr, closeErr); err != nil {
+			return err
+		}
+		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+		for _, entry := range entries {
+			name := entry.Name()
+			if name == ".git" {
+				continue
+			}
+			rel := name
+			if dir != "." {
+				rel = filepath.Join(dir, name)
+			}
+			if exclude != "" && (rel == exclude || strings.HasPrefix(rel, exclude+string(filepath.Separator))) {
+				continue
+			}
+			display := filepath.ToSlash(rel)
+			if err := validateInventoryPath(display, caseFolded); err != nil {
+				return err
+			}
+			info, err := root.Lstat(rel)
+			if err != nil {
+				return err
+			}
+			if err := budget.addFile(display, info); err != nil {
+				return err
+			}
+			switch {
+			case info.IsDir() && info.Mode()&os.ModeSymlink == 0:
+				if err := walk(rel, depth+1); err != nil {
+					return err
+				}
+			case info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0:
+			case info.Mode()&os.ModeSymlink != 0:
+				return fmt.Errorf("implementation inventory entry %s is a symlink", display)
+			default:
+				return fmt.Errorf("implementation inventory entry %s is a special file (%s)", display, info.Mode())
+			}
+		}
+		after, err := root.Lstat(dir)
+		if err != nil || !os.SameFile(before, after) || before.Mode() != after.Mode() {
+			return errors.Join(err, fmt.Errorf("%s changed while reading", label))
+		}
+		return nil
+	}
+	return walk(".", 0)
 }

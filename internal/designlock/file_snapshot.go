@@ -1,10 +1,8 @@
 package designlock
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +11,7 @@ import (
 // RegularFileSnapshot is a private stable copy of one generator input.
 type RegularFileSnapshot struct {
 	path    string
-	cleanup string
+	cleanup *privateSnapshotCleanup
 }
 
 func (s *RegularFileSnapshot) Path() string { return s.path }
@@ -22,13 +20,17 @@ func (s *RegularFileSnapshot) Close() error {
 	if s == nil || s.path == "" {
 		return nil
 	}
-	dir := s.cleanup
-	s.path = ""
-	s.cleanup = ""
-	if dir == "" {
+	cleanup := s.cleanup
+	if cleanup == nil {
+		s.path = ""
 		return nil
 	}
-	return os.RemoveAll(dir)
+	if err := cleanup.Close(); err != nil {
+		return err
+	}
+	s.path = ""
+	s.cleanup = nil
+	return nil
 }
 
 // MaterializeRegularFile binds one regular input to the held design snapshot
@@ -100,29 +102,34 @@ func (l *Lock) MaterializeRegularFile(path string) (*RegularFileSnapshot, error)
 		return nil, err
 	}
 	openedInfo, statErr := src.Stat()
-	if statErr != nil || !os.SameFile(info, openedInfo) || !openedInfo.Mode().IsRegular() {
+	if statErr != nil || !sameFingerprintFile(info, openedInfo) {
 		_ = src.Close()
 		return nil, fmt.Errorf("generator input %s changed identity while opening", path)
 	}
-	temp, err := os.MkdirTemp("", "machinery-input-snapshot-")
+	cleanup, err := newPrivateSnapshot("machinery-input-snapshot-")
 	if err != nil {
 		_ = src.Close()
 		return nil, err
 	}
-	snapshot := &RegularFileSnapshot{path: filepath.Join(temp, filepath.Base(abs)), cleanup: temp}
+	temp := cleanup.Path()
+	snapshot := &RegularFileSnapshot{path: filepath.Join(temp, filepath.Base(abs)), cleanup: cleanup}
 	l.inputAliases = append(l.inputAliases, pathAlias{from: snapshot.path, to: abs})
 	dst, err := os.OpenFile(snapshot.path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, info.Mode().Perm())
 	if err != nil {
 		_ = src.Close()
 		return nil, errors.Join(err, snapshot.Close())
 	}
-	hash := sha256.New()
-	_, copyErr := io.Copy(io.MultiWriter(dst, hash), src)
-	err = errors.Join(copyErr, src.Close(), dst.Close())
+	digest, copyErr := copySnapshotFile(path, src, dst, openedInfo.Size())
+	openedAfter, retainedStatErr := src.Stat()
+	after, pathStatErr := root.Lstat(rel)
+	err = errors.Join(copyErr, retainedStatErr, pathStatErr, src.Close(), dst.Close())
 	if err != nil {
 		return nil, errors.Join(err, snapshot.Close())
 	}
-	value := fmt.Sprintf("file:%o:%x", info.Mode().Perm(), hash.Sum(nil))
+	if !sameFingerprintFile(info, openedAfter) || !sameFingerprintFile(info, after) {
+		return nil, errors.Join(fmt.Errorf("generator input %s changed identity while materializing", path), snapshot.Close())
+	}
+	value := fmt.Sprintf("file:%o:%x", info.Mode().Perm(), digest)
 	if inside, _ := l.insideDesign(abs); !inside {
 		if l.external == nil {
 			l.external = map[string]externalFileState{}

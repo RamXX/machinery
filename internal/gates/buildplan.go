@@ -221,8 +221,12 @@ func planMode(text string) string {
 // planShards lists a manifest design's plan shards under BUILD/ plus the
 // number of shard-index files exempted. README.md and index.md there are
 // navigation for humans, not plan shards; they carry no plan obligation.
-func planShards(design string) (shards []string, indexFiles int) {
-	for _, shard := range sortedGlobExt(filepath.Join(design, "BUILD"), ".md") {
+func planShards(design string) (shards []string, indexFiles int, err error) {
+	paths, err := sortedGlobExt(filepath.Join(design, "BUILD"), ".md")
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, shard := range paths {
 		switch strings.ToLower(filepath.Base(shard)) {
 		case "readme.md", "index.md":
 			indexFiles++
@@ -230,7 +234,7 @@ func planShards(design string) (shards []string, indexFiles int) {
 			shards = append(shards, shard)
 		}
 	}
-	return shards, indexFiles
+	return shards, indexFiles, nil
 }
 
 // buildTemplateSections is the template's closed section list. Each entry is
@@ -416,7 +420,11 @@ func CheckBuildPlan(design string) *Gate {
 	var shards []string
 	indexFiles := 0
 	if planMode(text) == "manifest" {
-		shards, indexFiles = planShards(design)
+		var inventoryErr error
+		shards, indexFiles, inventoryErr = planShards(design)
+		if inventoryErr != nil {
+			g.Errs = append(g.Errs, inventoryErr.Error())
+		}
 	}
 	docs := []planNamedDoc{{name: "BUILD.md", text: maskFences(text)}}
 	for _, shard := range shards {
@@ -580,7 +588,11 @@ func planDocuments(design string, g *Gate) []planDoc {
 	if planMode(text) != "manifest" {
 		return out
 	}
-	shards, _ := planShards(design)
+	shards, _, inventoryErr := planShards(design)
+	if inventoryErr != nil {
+		g.Errs = append(g.Errs, inventoryErr.Error())
+		return out
+	}
 	for _, shard := range shards {
 		if ms, ok := planMilestonesOf(readDesignFileOrErr(design, shard, g)); ok {
 			out = append(out, planDoc{name: filepath.Base(shard), milestones: ms})

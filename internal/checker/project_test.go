@@ -8,10 +8,249 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/RamXX/machinery/internal/filelock"
+	"github.com/RamXX/machinery/internal/fsatomic"
 )
+
+func TestProjectionWitnessTerminatesUnderContinuousAppender(t *testing.T) {
+	design := t.TempDir()
+	path := filepath.Join(design, "projection.json")
+	if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	appender, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop := make(chan struct{})
+	started := make(chan struct{})
+	var once sync.Once
+	go func() {
+		defer appender.Close()
+		for {
+			if _, err := appender.Write([]byte("xxxxxxxxxxxxxxxx")); err != nil {
+				return
+			}
+			once.Do(func() { close(started) })
+			select {
+			case <-stop:
+				return
+			default:
+			}
+		}
+	}()
+	<-started
+	root, err := openDesignRoot(design)
+	if err != nil {
+		close(stop)
+		t.Fatal(err)
+	}
+	defer root.close()
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := captureProjectionFile(root, "projection.json", "projection")
+		done <- err
+	}()
+	select {
+	case <-done:
+		close(stop)
+	case <-time.After(2 * time.Second):
+		close(stop)
+		t.Fatal("projection witness did not terminate under continuous appender")
+	}
+}
+
+func TestProjectionRenameNoReplacePreservesBoundaryCollision(t *testing.T) {
+	dir := t.TempDir()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	if err := root.WriteFile("source", []byte("source"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	hooks := projectionTransactionHooks{renameNoReplace: func(root *os.Root, from, to string) error {
+		if err := root.WriteFile(to, []byte("user"), 0o600); err != nil {
+			return err
+		}
+		return fsatomic.RenameNoReplace(root, from, to)
+	}}
+	if err := projectionRenameNoReplace(root, hooks, "source", "destination"); err == nil {
+		t.Fatal("projection rename clobbered destination collision")
+	}
+	if body, err := root.ReadFile("destination"); err != nil || string(body) != "user" {
+		t.Fatalf("destination collision changed: %q, %v", body, err)
+	}
+	if body, err := root.ReadFile("source"); err != nil || string(body) != "source" {
+		t.Fatalf("source changed: %q, %v", body, err)
+	}
+}
+
+func TestProjectionRemovalPreservesPostCheckPrivateReplacement(t *testing.T) {
+	design := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(design, "checkers", "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(design, "checkers", "x", "projection.json")
+	if err := os.WriteFile(path, []byte("original"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := openDesignRoot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.close()
+	want, exists, err := captureProjectionFile(root, filepath.Join("checkers", "x", "projection.json"), "projection")
+	if err != nil || !exists {
+		t.Fatalf("capture projection: %v", err)
+	}
+	hooks := projectionTransactionHooks{privateMutation: func(root *os.Root, name string) error {
+		if err := root.Rename(name, name+"-original"); err != nil {
+			return err
+		}
+		return root.WriteFile(name, []byte("user"), 0o600)
+	}}
+	err = removeProjectionFileIfMatch(root, hooks, filepath.Join("checkers", "x", "projection.json"), want, "projection")
+	if err == nil || (!strings.Contains(err.Error(), "unexpected inventory") && !strings.Contains(err.Error(), "entry limit")) {
+		t.Fatalf("private replacement diagnostic = %v", err)
+	}
+	entries, err := os.ReadDir(filepath.Join(design, "checkers", "x"))
+	if err != nil || len(entries) != 1 || !strings.HasPrefix(entries[0].Name(), ".checker-projection-delete-") {
+		t.Fatalf("private replacement authority was not preserved: %v, %v", entries, err)
+	}
+}
+
+func TestProjectionRemovalStaysOnOpenedParentDuringNestedSwap(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation may require elevated Windows privileges")
+	}
+	design := t.TempDir()
+	parent := filepath.Join(design, "checkers", "x")
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(parent, "projection.json")
+	if err := os.WriteFile(target, []byte("transaction"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	outsideTarget := filepath.Join(outside, "projection.json")
+	if err := os.WriteFile(outsideTarget, []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	held := filepath.Join(design, "held-x")
+	root, err := openDesignRoot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.close() //nolint:errcheck // test cleanup
+	rel := filepath.Join("checkers", "x", "projection.json")
+	want, exists, err := captureProjectionFile(root, rel, "projection")
+	if err != nil || !exists {
+		t.Fatalf("capture projection: exists=%v err=%v", exists, err)
+	}
+	hooks := projectionTransactionHooks{privateMutation: func(*os.Root, string) error {
+		if err := os.Rename(parent, held); err != nil {
+			return err
+		}
+		return os.Symlink(outside, parent)
+	}}
+	err = removeProjectionFileIfMatch(root, hooks, rel, want, "projection")
+	if err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("nested parent swap did not fail closed after private removal: %v", err)
+	}
+	if body, err := os.ReadFile(outsideTarget); err != nil || string(body) != "outside" {
+		t.Fatalf("outside replacement was mutated: body=%q err=%v", body, err)
+	}
+	if _, err := os.Lstat(filepath.Join(held, "projection.json")); !os.IsNotExist(err) {
+		t.Fatalf("opened original parent retained removed transaction image: %v", err)
+	}
+}
+
+func TestProjectionRecoveryResumesPrivateControlQuarantine(t *testing.T) {
+	design := t.TempDir()
+	control := filepath.Join(design, projectionControlDirName)
+	if err := os.Mkdir(control, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	source := projectionPreparedName + ".retired"
+	if err := os.WriteFile(filepath.Join(control, source), []byte("retired"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	controlRoot, err := os.OpenRoot(control)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quarantined, err := fsatomic.Quarantine(controlRoot, source, "checker-project-transaction.delete-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := quarantined.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := controlRoot.Close(); err != nil {
+		t.Fatal(err)
+	}
+	root, err := openDesignRoot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.close()
+	if err := recoverProjectionTransactionRoot(root); err != nil {
+		t.Fatalf("resume control quarantine: %v", err)
+	}
+	entries, err := os.ReadDir(control)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("control quarantine residue: %v, %v", entries, err)
+	}
+}
+
+func TestProjectionRecoveryResumesPrivateFileQuarantine(t *testing.T) {
+	design := t.TempDir()
+	parent := filepath.Join(design, "checkers", "x")
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(parent, "projection.json"), []byte("projection"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := openDesignRoot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.close()
+	rel := filepath.Join("checkers", "x", "projection.json")
+	want, exists, err := captureProjectionFile(root, rel, "projection")
+	if err != nil || !exists {
+		t.Fatalf("capture projection: %v", err)
+	}
+	parentRoot, err := root.root.OpenRoot(filepath.Dir(rel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	quarantined, err := fsatomic.Quarantine(parentRoot, filepath.Base(rel), ".checker-projection-delete-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := quarantined.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := parentRoot.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverProjectionFileQuarantine(root, rel, want, "projection"); err != nil {
+		t.Fatalf("resume file quarantine: %v", err)
+	}
+	entries, err := os.ReadDir(parent)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("file quarantine residue: %v, %v", entries, err)
+	}
+}
 
 func TestProjectAll(t *testing.T) {
 	design := t.TempDir()
@@ -805,7 +1044,7 @@ func TestRootedReadRejectsParentSwapWithoutReadingOutside(t *testing.T) {
 	if err := os.Symlink(outside, parent); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := root.readRegular("checkers/privacy/projection.json", "projection", false); err == nil || !strings.Contains(err.Error(), "symlink") {
+	if _, err := root.readRegularBounded("checkers/privacy/projection.json", "projection", checkerStructuredFileMaxBytes); err == nil || !strings.Contains(err.Error(), "symlink") {
 		t.Fatalf("rooted read followed swapped parent: %v", err)
 	}
 	assertProjectionContent(t, sentinel, "outside-safe")
@@ -918,6 +1157,72 @@ func TestProjectionControlCleanupSyncFailureIsReportedAndRetryable(t *testing.T)
 	}
 	if _, err := root.root.Lstat(projectionControlDirName); !os.IsNotExist(err) {
 		t.Fatalf("retry left control directory: %v", err)
+	}
+}
+
+func TestProjectionControlCleanupPreservesPrivateReplacement(t *testing.T) {
+	design := t.TempDir()
+	root, err := openDesignRoot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.close()
+	if err := root.root.Mkdir(projectionControlDirName, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	hooks := projectionTransactionHooks{privateMutation: func(private *os.Root, name string) error {
+		if err := private.Rename(name, name+"-original"); err != nil {
+			return err
+		}
+		return private.Mkdir(name, 0o700)
+	}}
+	err = removeProjectionControlDirIfEmptyWithHooks(root, projectionControlDirName, hooks)
+	if err == nil {
+		t.Fatalf("cleanup did not reject private replacement: %v", err)
+	}
+	entries, err := root.readDirBounded(".", checkerMaxEntries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), projectionControlDeletePrefix) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("cleanup discarded private replacement evidence")
+	}
+}
+
+func TestProjectionControlCleanupResumesPrivateQuarantine(t *testing.T) {
+	design := t.TempDir()
+	root, err := openDesignRoot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.close()
+	if err := root.root.Mkdir(projectionControlDirName, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	quarantined, err := fsatomic.Quarantine(root.root, projectionControlDirName, projectionControlDeletePrefix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := quarantined.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverProjectionTransactionRoot(root); err != nil {
+		t.Fatalf("recover private control quarantine: %v", err)
+	}
+	entries, err := root.readDirBounded(".", checkerMaxEntries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.Name() == projectionControlDirName || strings.HasPrefix(entry.Name(), projectionControlDeletePrefix) {
+			t.Fatalf("recovery left checker control cleanup residue %q", entry.Name())
+		}
 	}
 }
 

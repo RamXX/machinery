@@ -18,24 +18,31 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/filelock"
+	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/portablepath"
 )
 
 const (
-	embedTxJournalName = ".machinery-embed-refresh-transaction.json"
-	embedTxStageName   = ".machinery-embed-refresh-transaction.stage"
-	embedTxVersion     = 1
-	embedTxPrepared    = "prepared"
-	embedTxCommitted   = "committed"
-	embedTxMaxJournal  = 64 << 20
-	embedTxNewPrefix   = ".machinery-embed-new-"
-	embedTxOldPrefix   = ".machinery-embed-old-"
+	embedTxJournalName         = ".machinery-embed-refresh-transaction.json"
+	embedTxStageName           = ".machinery-embed-refresh-transaction.stage"
+	embedTxVersion             = 1
+	embedTxPrepared            = "prepared"
+	embedTxCommitted           = "committed"
+	embedTxMaxJournal          = 64 << 20
+	embedTxNewPrefix           = ".machinery-embed-new-"
+	embedTxOldPrefix           = ".machinery-embed-old-"
+	embedTxDeletePrefix        = ".machinery-embed-delete-"
+	embedTxMaxInventoryEntries = 100_000
+	embedTxMaxInventoryDepth   = 64
+	embedTxReadDirPage         = 256
 )
 
 // embedTransactionPoint is a test-only power-loss/error boundary. A returned
 // error takes the ordinary rollback path. A panic models process death and
 // deliberately leaves the durable journal and outer publication sentinel.
 var embedTransactionPoint = func(string) error { return nil }
+var embedReadStateAfterOpen = func(string) {}
+var embedRenameNoReplace = fsatomic.RenameNoReplace
 
 type embedTxItem struct {
 	Path     string `json:"path"`
@@ -68,9 +75,10 @@ type embedTxPayload struct {
 }
 
 type embedRootTransaction struct {
-	design string
-	scope  string
-	root   *os.Root
+	design     string
+	scope      string
+	root       *os.Root
+	reconciled bool
 }
 
 func openEmbedRootTransaction(design string) (*embedRootTransaction, error) {
@@ -132,6 +140,13 @@ func (tx *embedRootTransaction) pending() (embedTxJournal, bool, error) {
 	if err != nil {
 		return embedTxJournal{}, false, err
 	}
+	if err := tx.resumeEmbedDeleteQuarantines(residue, nil); err != nil {
+		return embedTxJournal{}, false, err
+	}
+	residue, err = tx.embedResiduePaths()
+	if err != nil {
+		return embedTxJournal{}, false, err
+	}
 	hasJournal, hasStage := false, false
 	for _, rel := range residue {
 		hasJournal = hasJournal || rel == embedTxJournalName
@@ -163,6 +178,10 @@ func (tx *embedRootTransaction) pending() (embedTxJournal, bool, error) {
 	}
 	if journal.Scope != tx.scope {
 		return embedTxJournal{}, false, fmt.Errorf("embed refresh journal belongs to foreign design scope %q, not %q", journal.Scope, tx.scope)
+	}
+	allowed := embedRemovalAuthorities(journal)
+	if err := tx.resumeEmbedDeleteQuarantines(residue, allowed); err != nil {
+		return embedTxJournal{}, false, err
 	}
 	if err := tx.validatePhysicalInventory(journal, hasStage); err != nil {
 		return embedTxJournal{}, false, err
@@ -218,6 +237,7 @@ func (tx *embedRootTransaction) reconcileJournalStage(hasJournal bool) error {
 		return fmt.Errorf("embed refresh journal stage belongs to foreign design scope %q", staged.Scope)
 	}
 	journalState := embedFileState{}
+	var current embedTxJournal
 	if hasJournal {
 		journalState, err = tx.readState(embedTxJournalName)
 		if err != nil {
@@ -226,7 +246,7 @@ func (tx *embedRootTransaction) reconcileJournalStage(hasJournal bool) error {
 		if !journalState.exists {
 			return fmt.Errorf("embed refresh journal disappeared before stage reconciliation")
 		}
-		current, err := tx.readJournalFile(embedTxJournalName)
+		current, err = tx.readJournalFile(embedTxJournalName)
 		if err != nil {
 			return err
 		}
@@ -243,7 +263,17 @@ func (tx *embedRootTransaction) reconcileJournalStage(hasJournal bool) error {
 	if err := tx.revalidateState(embedTxJournalName, journalState); err != nil {
 		return fmt.Errorf("embed refresh journal changed before stage reconciliation: %w", err)
 	}
-	if err := tx.root.Rename(embedTxStageName, embedTxJournalName); err != nil {
+	if hasJournal {
+		// A prepared journal plus a committed stage is an intentional,
+		// non-replacing two-name phase transition. The committed stage is the
+		// authoritative recovery record until finalization removes the older
+		// journal first. Any other two-name state is ambiguous.
+		if current.Phase != embedTxPrepared || staged.Phase != embedTxCommitted {
+			return fmt.Errorf("embed refresh journal and stage do not form a prepared-to-committed transition")
+		}
+		return nil
+	}
+	if err := embedRenameNoReplace(tx.root, embedTxStageName, embedTxJournalName); err != nil {
 		return fmt.Errorf("promote recoverable embed refresh journal stage: %w", err)
 	}
 	return tx.syncDir(".")
@@ -320,7 +350,11 @@ func (tx *embedRootTransaction) recover(journal embedTxJournal) error {
 			return err
 		}
 		var readErr error
-		journal, readErr = tx.readJournalFile(embedTxJournalName)
+		name := embedTxJournalName
+		if currentErr == nil {
+			name = embedTxStageName
+		}
+		journal, readErr = tx.readJournalFile(name)
 		if readErr != nil {
 			return readErr
 		}
@@ -649,15 +683,30 @@ func (tx *embedRootTransaction) removeJournal(journal embedTxJournal) error {
 	if err != nil {
 		return err
 	}
-	if !state.exists {
+	stageState, err := tx.readState(embedTxStageName)
+	if err != nil {
+		return err
+	}
+	if !state.exists && !stageState.exists {
 		return tx.syncDir(".")
 	}
 	body, err := encodeEmbedTxJournal(journal)
 	if err != nil {
 		return err
 	}
-	if state.hash != embedTxHash(body) || state.mode != 0o600 {
-		return fmt.Errorf("embed refresh journal changed before removal; preserving it")
+	wantHash := embedTxHash(body)
+	if state.exists {
+		current, readErr := tx.readJournalFile(embedTxJournalName)
+		if readErr != nil {
+			return readErr
+		}
+		if state.mode != 0o600 || !embedTxSamePlan(current, journal) ||
+			(current.Phase != journal.Phase && (current.Phase != embedTxPrepared || journal.Phase != embedTxCommitted)) {
+			return fmt.Errorf("embed refresh journal changed before removal; preserving it")
+		}
+	}
+	if stageState.exists && (stageState.hash != wantHash || stageState.mode != 0o600) {
+		return fmt.Errorf("embed refresh journal stage changed before removal; preserving it")
 	}
 	targets := make([]embedFileState, len(journal.Items))
 	for i, item := range journal.Items {
@@ -678,8 +727,24 @@ func (tx *embedRootTransaction) removeJournal(journal embedTxJournal) error {
 			return fmt.Errorf("embed target %s changed before journal removal; preserving journal: %w", item.Path, err)
 		}
 	}
-	if err := tx.removeExact(embedTxJournalName, state, "", "embed refresh journal"); err != nil {
-		return err
+	// Remove the older prepared journal before the committed stage. A crash
+	// between these operations leaves the committed stage independently
+	// recoverable; the reverse order could expose a stale prepared phase.
+	if state.exists {
+		if err := tx.removeExact(embedTxJournalName, state, "", "embed refresh journal"); err != nil {
+			return err
+		}
+		if err := tx.syncDir("."); err != nil {
+			return err
+		}
+		if err := embedTransactionPoint("finalize-journal-removed-before-stage"); err != nil {
+			return err
+		}
+	}
+	if stageState.exists {
+		if err := tx.removeExact(embedTxStageName, stageState, "", "embed refresh journal stage"); err != nil {
+			return err
+		}
 	}
 	return tx.syncDir(".")
 }
@@ -749,7 +814,22 @@ func (tx *embedRootTransaction) persistJournal(journal embedTxJournal) error {
 	if err := tx.revalidateState(embedTxJournalName, journalState); err != nil {
 		return fmt.Errorf("embed refresh journal changed before promotion; preserving stage: %w", err)
 	}
-	if err := tx.root.Rename(embedTxStageName, embedTxJournalName); err != nil {
+	if journalState.exists {
+		// Never replace the prepared journal. Keeping the committed stage as a
+		// second durable authority makes the phase transition crash-recoverable
+		// without a namespace check/use window.
+		if journal.Phase != embedTxCommitted {
+			return fmt.Errorf("existing embed refresh journal prevents non-committed stage installation")
+		}
+		if err := embedTransactionPoint("journal-renamed:" + journal.Phase); err != nil {
+			return err
+		}
+		if err := tx.syncDir("."); err != nil {
+			return err
+		}
+		return embedTransactionPoint("journal-dir-synced:" + journal.Phase)
+	}
+	if err := embedRenameNoReplace(tx.root, embedTxStageName, embedTxJournalName); err != nil {
 		return fmt.Errorf("install embed refresh journal: %w", err)
 	}
 	if err := embedTransactionPoint("journal-renamed:" + journal.Phase); err != nil {
@@ -793,6 +873,11 @@ type embedFileState struct {
 	size   int64
 	mtime  int64
 	change string
+}
+
+type embedRemovalAuthority struct {
+	hash string
+	mode fs.FileMode
 }
 
 func embedInfoChangeID(info os.FileInfo) string {
@@ -862,8 +947,46 @@ func (tx *embedRootTransaction) removeExact(rel string, expected embedFileState,
 	if err := tx.revalidateState(rel, expected); err != nil {
 		return fmt.Errorf("refuse to remove changed %s: %w", label, err)
 	}
-	if err := tx.root.Remove(rel); err != nil {
-		return fmt.Errorf("remove %s: %w", label, err)
+	parent, base, owned, err := tx.openEmbedParent(rel)
+	if err != nil {
+		return err
+	}
+	if owned {
+		defer parent.Close()
+	}
+	if err := embedTransactionPoint("remove-before-quarantine:" + rel); err != nil {
+		return err
+	}
+	quarantine, err := fsatomic.Quarantine(parent, base, embedTxDeletePrefix)
+	if err != nil {
+		return fmt.Errorf("privately isolate %s: %w", label, err)
+	}
+	defer quarantine.Close()
+	var isolated embedFileState
+	if err := tx.withRoot(quarantine.Root(), func() error {
+		var readErr error
+		isolated, readErr = tx.readState(quarantine.Name())
+		return readErr
+	}); err != nil || !sameEmbedFileIdentity(expected, isolated) {
+		restoreErr := quarantine.Restore()
+		return errors.Join(fmt.Errorf("isolated %s differs from its exact retained witness; restoring the replacement without clobbering", label), err, restoreErr)
+	}
+	if err := embedTransactionPoint("remove-quarantined:" + rel); err != nil {
+		return err
+	}
+	var public embedFileState
+	if err := tx.withRoot(parent, func() error {
+		var readErr error
+		public, readErr = tx.readState(base)
+		return readErr
+	}); err != nil {
+		return err
+	}
+	if public.exists {
+		return fmt.Errorf("public path for %s was repopulated; preserving it and the private quarantine", label)
+	}
+	if err := quarantine.Remove(); err != nil {
+		return fmt.Errorf("remove privately isolated %s: %w", label, err)
 	}
 	return nil
 }
@@ -910,8 +1033,8 @@ func (tx *embedRootTransaction) renameExact(source, destination string, sourceSt
 	if err := tx.revalidateState(source, sourceState); err != nil {
 		return fmt.Errorf("source for %s changed after linking; preserving both names: %w", label, err)
 	}
-	if err := tx.root.Remove(source); err != nil {
-		return fmt.Errorf("remove linked source for %s: %w", label, err)
+	if err := tx.removeExact(source, sourceState, "rename-before-linked-source-remove:"+source, "linked source for "+label); err != nil {
+		return err
 	}
 	if err := tx.syncDir(path.Dir(source)); err != nil {
 		return err
@@ -930,6 +1053,9 @@ func (tx *embedRootTransaction) readState(rel string) (embedFileState, error) {
 	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 		return embedFileState{}, fmt.Errorf("embed transaction path %s must be a regular file, not a symlink or special file", rel)
 	}
+	if info.Size() < 0 || info.Size() > embedTxMaxJournal {
+		return embedFileState{}, fmt.Errorf("embed transaction path %s exceeds %d-byte state limit", rel, embedTxMaxJournal)
+	}
 	f, err := tx.root.Open(rel)
 	if err != nil {
 		return embedFileState{}, err
@@ -939,16 +1065,22 @@ func (tx *embedRootTransaction) readState(rel string) (embedFileState, error) {
 		_ = f.Close()
 		return embedFileState{}, fmt.Errorf("embed transaction path %s changed identity while opening", rel)
 	}
-	body, readErr := io.ReadAll(f)
+	embedReadStateAfterOpen(rel)
+	body, readErr := io.ReadAll(io.LimitReader(f, embedTxMaxJournal+1))
+	heldAfter, heldErr := f.Stat()
 	closeErr := f.Close()
 	after, pathErr := tx.root.Lstat(rel)
-	if err := errors.Join(readErr, closeErr, pathErr); err != nil {
+	if err := errors.Join(readErr, heldErr, closeErr, pathErr); err != nil {
 		return embedFileState{}, err
 	}
-	if !os.SameFile(info, opened) || !os.SameFile(opened, after) || opened.Mode() != after.Mode() || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) || embedInfoChangeID(opened) != embedInfoChangeID(after) {
+	if int64(len(body)) != info.Size() || !os.SameFile(info, opened) || !sameEmbedStateInfo(opened, heldAfter) || !sameEmbedStateInfo(opened, after) {
 		return embedFileState{}, fmt.Errorf("embed transaction path %s changed while reading", rel)
 	}
 	return embedFileState{exists: true, hash: embedTxHash(body), mode: opened.Mode().Perm(), info: after, size: after.Size(), mtime: after.ModTime().UnixNano(), change: embedInfoChangeID(after)}, nil
+}
+
+func sameEmbedStateInfo(before, after os.FileInfo) bool {
+	return before != nil && after != nil && os.SameFile(before, after) && before.Mode() == after.Mode() && before.Size() == after.Size() && before.ModTime().Equal(after.ModTime()) && embedInfoChangeID(before) == embedInfoChangeID(after)
 }
 
 func (tx *embedRootTransaction) validateParent(rel string) error {
@@ -967,6 +1099,169 @@ func (tx *embedRootTransaction) validateParent(rel string) error {
 			return fmt.Errorf("embed target parent %s must be a real directory", current)
 		}
 	}
+	return nil
+}
+
+func (tx *embedRootTransaction) openEmbedParent(rel string) (*os.Root, string, bool, error) {
+	dir, base := path.Dir(rel), path.Base(rel)
+	if dir == "." {
+		return tx.root, base, false, nil
+	}
+	current := tx.root
+	owned := false
+	for _, component := range strings.Split(dir, "/") {
+		info, err := current.Lstat(component)
+		if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			if owned {
+				err = errors.Join(err, current.Close())
+			}
+			return nil, "", false, errors.Join(err, fmt.Errorf("embed transaction parent component %s must be a real directory", component))
+		}
+		next, err := current.OpenRoot(component)
+		if err != nil {
+			if owned {
+				err = errors.Join(err, current.Close())
+			}
+			return nil, "", false, err
+		}
+		inside, statErr := next.Lstat(".")
+		if statErr != nil || !inside.IsDir() || !os.SameFile(info, inside) {
+			closeErr := next.Close()
+			if owned {
+				closeErr = errors.Join(closeErr, current.Close())
+			}
+			return nil, "", false, errors.Join(statErr, closeErr, fmt.Errorf("embed transaction parent component %s changed while opening", component))
+		}
+		if owned {
+			if err := current.Close(); err != nil {
+				return nil, "", false, errors.Join(err, next.Close())
+			}
+		}
+		current = next
+		owned = true
+	}
+	return current, base, owned, nil
+}
+
+func embedRemovalAuthorities(journal embedTxJournal) map[string][]embedRemovalAuthority {
+	authorities := make(map[string][]embedRemovalAuthority, 2+len(journal.Items)*3)
+	addJournal := func(name, phase string) {
+		candidate := journal
+		candidate.Phase = phase
+		body, err := encodeEmbedTxJournal(candidate)
+		if err == nil {
+			authorities[name] = append(authorities[name], embedRemovalAuthority{hash: embedTxHash(body), mode: 0o600})
+		}
+	}
+	addJournal(embedTxJournalName, embedTxPrepared)
+	addJournal(embedTxJournalName, embedTxCommitted)
+	addJournal(embedTxStageName, embedTxCommitted)
+	for _, item := range journal.Items {
+		authorities[item.Temp] = append(authorities[item.Temp], embedRemovalAuthority{hash: item.NewHash, mode: fs.FileMode(item.NewMode)})
+		authorities[item.Backup] = append(authorities[item.Backup], embedRemovalAuthority{hash: item.OldHash, mode: fs.FileMode(item.OldMode)})
+		authorities[item.Path] = append(authorities[item.Path],
+			embedRemovalAuthority{hash: item.OldHash, mode: fs.FileMode(item.OldMode)},
+			embedRemovalAuthority{hash: item.NewHash, mode: fs.FileMode(item.NewMode)})
+	}
+	return authorities
+}
+
+func embedDeleteQuarantineRel(rel string) bool {
+	return strings.HasPrefix(path.Base(rel), embedTxDeletePrefix)
+}
+
+func (tx *embedRootTransaction) resumeEmbedDeleteQuarantines(residue []string, authorities map[string][]embedRemovalAuthority) error {
+	for _, rel := range residue {
+		if !embedDeleteQuarantineRel(rel) {
+			continue
+		}
+		if err := tx.resumeEmbedDeleteQuarantine(rel, authorities); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (tx *embedRootTransaction) resumeEmbedDeleteQuarantine(rel string, authorities map[string][]embedRemovalAuthority) (retErr error) {
+	parent, directory, owned, err := tx.openEmbedParent(rel)
+	if err != nil {
+		return err
+	}
+	if owned {
+		defer func() { retErr = errors.Join(retErr, parent.Close()) }()
+	}
+	quarantine, err := fsatomic.ResumeQuarantine(parent, directory, "")
+	if err != nil {
+		return fmt.Errorf("resume embed deletion quarantine %s: %w", rel, err)
+	}
+	defer func() { retErr = errors.Join(retErr, quarantine.Close()) }()
+	source := quarantine.Source()
+	target := source
+	if dir := path.Dir(rel); dir != "." {
+		target = path.Join(dir, source)
+	}
+	wanted, authorized := authorities[target]
+	rootJournal := path.Dir(rel) == "." && (source == embedTxJournalName || source == embedTxStageName)
+	if authorities == nil {
+		if !rootJournal {
+			return nil
+		}
+		authorized = true
+	}
+	if !authorized {
+		return fmt.Errorf("embed deletion quarantine %s claims unauthorized source %s; preserving it", rel, target)
+	}
+	var isolated embedFileState
+	if err := tx.withRoot(quarantine.Root(), func() error {
+		var readErr error
+		isolated, readErr = tx.readState(quarantine.Name())
+		return readErr
+	}); err != nil {
+		return err
+	}
+	if !isolated.exists {
+		if err := quarantine.FinishEmpty(); err != nil {
+			return fmt.Errorf("finish empty embed deletion quarantine %s: %w", rel, err)
+		}
+		tx.reconciled = true
+		return nil
+	}
+	if authorities == nil {
+		var journal embedTxJournal
+		if err := tx.withRoot(quarantine.Root(), func() error {
+			var readErr error
+			journal, readErr = tx.readJournalFile(quarantine.Name())
+			return readErr
+		}); err != nil || journal.Scope != tx.scope {
+			return errors.Join(fmt.Errorf("quarantined embed journal %s is not valid for this design scope; preserving it", rel), err)
+		}
+	} else {
+		matches := false
+		for _, candidate := range wanted {
+			if isolated.hash == candidate.hash && isolated.mode == candidate.mode {
+				matches = true
+				break
+			}
+		}
+		if !matches {
+			return fmt.Errorf("embed deletion quarantine %s does not match its journal authority; preserving it", rel)
+		}
+	}
+	var public embedFileState
+	if err := tx.withRoot(parent, func() error {
+		var readErr error
+		public, readErr = tx.readState(source)
+		return readErr
+	}); err != nil {
+		return err
+	}
+	if public.exists {
+		return fmt.Errorf("embed deletion source %s was repopulated; preserving it and quarantine %s", target, rel)
+	}
+	if err := quarantine.Restore(); err != nil {
+		return fmt.Errorf("restore embed deletion quarantine %s: %w", rel, err)
+	}
+	tx.reconciled = true
 	return nil
 }
 
@@ -1005,23 +1300,32 @@ func (tx *embedRootTransaction) validatePhysicalInventory(journal embedTxJournal
 }
 
 func (tx *embedRootTransaction) embedResiduePaths() ([]string, error) {
+	return tx.embedResiduePathsBounded(embedTxMaxInventoryEntries, embedTxMaxInventoryDepth)
+}
+
+func (tx *embedRootTransaction) embedResiduePathsBounded(maxEntries, maxDepth int) ([]string, error) {
+	if maxEntries <= 0 {
+		return nil, fmt.Errorf("embed transaction inventory entry limit must be positive")
+	}
+	if maxDepth < 0 {
+		return nil, fmt.Errorf("embed transaction inventory depth limit must be non-negative")
+	}
 	var residue []string
-	var walk func(string) error
-	walk = func(dir string) error {
-		f, err := tx.root.Open(dir)
+	entriesSeen := 0
+	var walk func(string, int) error
+	walk = func(dir string, depth int) error {
+		entries, witness, err := readRootDirectory(tx.root, dir, maxEntries-entriesSeen)
 		if err != nil {
 			return err
 		}
-		entries, readErr := f.ReadDir(-1)
-		closeErr := f.Close()
-		if err := errors.Join(readErr, closeErr); err != nil {
-			return err
-		}
-		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+		entriesSeen += len(entries)
 		for _, entry := range entries {
 			rel := entry.Name()
 			if dir != "." {
 				rel = path.Join(dir, rel)
+			}
+			if depth >= maxDepth {
+				return fmt.Errorf("embed transaction inventory exceeds %d-level depth limit at %s", maxDepth, rel)
 			}
 			info, err := tx.root.Lstat(rel)
 			if err != nil {
@@ -1031,6 +1335,13 @@ func (tx *embedRootTransaction) embedResiduePaths() ([]string, error) {
 				return fmt.Errorf("embed transaction inventory entry %s is a symlink", rel)
 			}
 			base := entry.Name()
+			if embedDeleteQuarantineRel(rel) {
+				if !info.IsDir() {
+					return fmt.Errorf("embed deletion quarantine %s must be a real directory", rel)
+				}
+				residue = append(residue, rel)
+				continue
+			}
 			reserved := base == embedTxJournalName || base == embedTxStageName || strings.HasPrefix(base, embedTxNewPrefix) || strings.HasPrefix(base, embedTxOldPrefix)
 			if reserved {
 				if !info.Mode().IsRegular() {
@@ -1043,19 +1354,46 @@ func (tx *embedRootTransaction) embedResiduePaths() ([]string, error) {
 				if entry.Name() == ".git" {
 					continue
 				}
-				if err := walk(rel); err != nil {
+				if err := walk(rel, depth+1); err != nil {
 					return err
 				}
 				continue
 			}
 		}
-		return nil
+		return revalidateRootDirectory(tx.root, dir, witness)
 	}
-	if err := walk("."); err != nil {
+	if err := walk(".", 0); err != nil {
 		return nil, fmt.Errorf("inspect embed transaction residue: %w", err)
 	}
 	sort.Strings(residue)
 	return residue, nil
+}
+
+func readEmbedTxDir(dir *os.File, limit int) ([]fs.DirEntry, error) {
+	if limit < 0 {
+		return nil, fmt.Errorf("embed transaction inventory exceeds %d-entry limit", embedTxMaxInventoryEntries)
+	}
+	entries := make([]fs.DirEntry, 0, min(limit, embedTxReadDirPage))
+	for {
+		remaining := limit - len(entries)
+		pageLimit := min(embedTxReadDirPage, remaining)
+		if pageLimit == 0 {
+			pageLimit = 1
+		}
+		page, err := dir.ReadDir(pageLimit)
+		entries = append(entries, page...)
+		if len(entries) > limit {
+			return nil, fmt.Errorf("embed transaction inventory exceeds %d-entry limit", embedTxMaxInventoryEntries)
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	return entries, nil
 }
 
 func encodeEmbedTxJournal(journal embedTxJournal) ([]byte, error) {

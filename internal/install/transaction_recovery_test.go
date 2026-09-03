@@ -9,7 +9,258 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/RamXX/machinery/internal/fsatomic"
 )
+
+func TestInstallInventoryRejectsEntryBeyondFixedCeiling(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"c", "a", "b"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close() //nolint:errcheck // test cleanup
+	if _, err := readInstallDirBounded(f, 2, "test inventory"); err == nil || !strings.Contains(err.Error(), "entry limit") {
+		t.Fatalf("high-entry install inventory was accepted: %v", err)
+	}
+}
+
+func TestInstallTreeTraversalRejectsEntryBeyondFixedCeiling(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"c", "a", "b"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	visited := 0
+	err := walkInstallTreeBounded(dir, 3, func(string, os.FileInfo) error {
+		visited++
+		return nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "entry limit") {
+		t.Fatalf("high-entry install traversal was accepted: %v", err)
+	}
+	if visited > 3 {
+		t.Fatalf("install traversal exceeded its fixed allocation/visit ceiling: %d", visited)
+	}
+}
+
+func TestDurableRemovePreservesPrivateReplacement(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", t.TempDir())
+	parent := t.TempDir()
+	target := filepath.Join(parent, "target")
+	if err := os.WriteFile(target, []byte("owned"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	previous := afterInstallPrivateDeletionValidation
+	afterInstallPrivateDeletionValidation = func(root *os.Root, name string) {
+		if err := root.Rename(name, name+"-original"); err != nil {
+			t.Errorf("park private object: %v", err)
+			return
+		}
+		file, err := root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		if err != nil {
+			t.Errorf("create private replacement: %v", err)
+			return
+		}
+		if _, err := file.WriteString("replacement"); err != nil {
+			t.Errorf("write private replacement: %v", err)
+		}
+		if err := file.Close(); err != nil {
+			t.Errorf("close private replacement: %v", err)
+		}
+	}
+	t.Cleanup(func() { afterInstallPrivateDeletionValidation = previous })
+	err := durableRemove(target)
+	if err == nil {
+		t.Fatal("durable removal accepted a private replacement")
+	}
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preserved := false
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), installDeletionQuarantinePrefix) {
+			preserved = true
+		}
+	}
+	if !preserved {
+		t.Fatal("private replacement evidence was discarded")
+	}
+}
+
+func TestDurableRemoveResumesPrivateQuarantine(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", t.TempDir())
+	parent := t.TempDir()
+	target := filepath.Join(parent, "target")
+	if err := os.WriteFile(target, []byte("owned"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quarantined, err := fsatomic.Quarantine(root, filepath.Base(target), installDeletionQuarantinePrefix)
+	if err != nil {
+		_ = root.Close()
+		t.Fatal(err)
+	}
+	if err := quarantined.Close(); err != nil {
+		_ = root.Close()
+		t.Fatal(err)
+	}
+	if err := root.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := durableRemove(target); err != nil {
+		t.Fatalf("resume private deletion: %v", err)
+	}
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.Name() == filepath.Base(target) || strings.HasPrefix(entry.Name(), installDeletionQuarantinePrefix) {
+			t.Fatalf("private deletion recovery left residue %q", entry.Name())
+		}
+	}
+}
+
+func TestDurableRenameNeverClobbersBoundaryCollision(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", t.TempDir())
+	parent := t.TempDir()
+	source := filepath.Join(parent, "source")
+	destination := filepath.Join(parent, "destination")
+	if err := os.WriteFile(source, []byte("source"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	previous := renameInstallNoReplace
+	renameInstallNoReplace = func(oldRoot *os.Root, oldName string, newRoot *os.Root, newName string) error {
+		file, err := newRoot.OpenFile(newName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		if err != nil {
+			return err
+		}
+		if _, err := file.WriteString("collision"); err != nil {
+			_ = file.Close()
+			return err
+		}
+		if err := file.Close(); err != nil {
+			return err
+		}
+		return fsatomic.RenameNoReplaceBetween(oldRoot, oldName, newRoot, newName)
+	}
+	t.Cleanup(func() { renameInstallNoReplace = previous })
+	if err := durableRename(source, destination); err == nil {
+		t.Fatal("durable rename clobbered a boundary collision")
+	}
+	if body, err := os.ReadFile(destination); err != nil || string(body) != "collision" {
+		t.Fatalf("destination collision was not preserved: %q, %v", body, err)
+	}
+	if body, err := os.ReadFile(source); err != nil || string(body) != "source" {
+		t.Fatalf("rename source was not preserved: %q, %v", body, err)
+	}
+}
+
+func TestJournalMetadataReplacementResumesPrivateQuarantine(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("MACHINERY_CONFIG_DIR", config)
+	rootPath, _, err := installJournalPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(rootPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	metadata := filepath.Join(rootPath, installJournalMetadata)
+	next := metadata + ".next"
+	if err := os.WriteFile(metadata, []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(next, []byte("new"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(rootPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quarantined, err := fsatomic.Quarantine(root, installJournalMetadata, installJournalDeletePrefix)
+	if err != nil {
+		_ = root.Close()
+		t.Fatal(err)
+	}
+	if err := quarantined.Close(); err != nil {
+		_ = root.Close()
+		t.Fatal(err)
+	}
+	if err := root.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := recoverJournalMetadataReplacement(rootPath); err != nil {
+		t.Fatalf("recover journal metadata replacement: %v", err)
+	}
+	if body, err := os.ReadFile(metadata); err != nil || string(body) != "old" {
+		t.Fatalf("old journal metadata was not restored: %q, %v", body, err)
+	}
+	if _, err := os.Lstat(next); !os.IsNotExist(err) {
+		t.Fatalf("staged journal metadata remains: %v", err)
+	}
+}
+
+func TestInstallArtifactCopyRejectsContinuousAppender(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "source")
+	if err := os.WriteFile(source, []byte(strings.Repeat("x", 1<<20)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	destinationRoot, err := os.OpenRoot(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer destinationRoot.Close() //nolint:errcheck // test cleanup
+	old := installArtifactCopyAfterOpen
+	t.Cleanup(func() { installArtifactCopyAfterOpen = old })
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	installArtifactCopyAfterOpen = func(path string) {
+		if path != source {
+			return
+		}
+		installArtifactCopyAfterOpen = func(string) {}
+		first := make(chan struct{})
+		go func() {
+			defer close(stopped)
+			f, openErr := os.OpenFile(source, os.O_WRONLY|os.O_APPEND, 0)
+			if openErr != nil {
+				close(first)
+				return
+			}
+			defer f.Close() //nolint:errcheck // test mutation
+			for i := 0; ; i++ {
+				_, _ = f.Write([]byte("growth"))
+				if i == 0 {
+					close(first)
+				}
+				select {
+				case <-done:
+					return
+				default:
+				}
+			}
+		}()
+		<-first
+	}
+	err = copyEntryToRoot(source, destinationRoot, "destination")
+	close(done)
+	<-stopped
+	if err == nil || !strings.Contains(err.Error(), "changed while copying") {
+		t.Fatalf("continuous appender was accepted: %v", err)
+	}
+}
 
 func TestRootedDirectorySyncPropagatesCloseFailure(t *testing.T) {
 	root, err := os.OpenRoot(t.TempDir())
@@ -27,6 +278,7 @@ func TestRootedDirectorySyncPropagatesCloseFailure(t *testing.T) {
 }
 
 func TestScratchCleanupAndCloseFailuresPropagateThroughCallers(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
 	t.Run("directory removal", func(t *testing.T) {
 		want := errors.New("injected scratch directory cleanup failure")
 		previous := removeInstallScratchDir
@@ -371,6 +623,222 @@ func TestRollbackRevalidatesPostImageImmediatelyBeforeRemoval(t *testing.T) {
 			if got, err := os.ReadFile(target); err != nil || string(got) != "concurrent-after-validation" {
 				t.Fatalf("post-validation concurrent edit was not preserved: %q, %v", got, err)
 			}
+		})
+	}
+}
+
+func TestInstallRestorationNeverMergesIntoBoundaryDirectoryCollision(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		create func(*testing.T, string)
+	}{
+		{name: "empty directory", create: func(t *testing.T, target string) {
+			if err := os.Mkdir(target, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "nonempty directory", create: func(t *testing.T, target string) {
+			if err := os.Mkdir(target, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			write(t, filepath.Join(target, "concurrent"), "foreign")
+		}},
+		{name: "same-byte ABA directory", create: func(t *testing.T, target string) {
+			if err := os.Mkdir(target, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			write(t, filepath.Join(target, "original"), "old")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+			target := filepath.Join(t.TempDir(), "target")
+			write(t, filepath.Join(target, "original"), "old")
+			lock, err := acquireInstallOperationLock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx, err := beginArtifactTransaction([]string{target})
+			if err != nil {
+				t.Fatal(err)
+			}
+			transactionDir := filepath.Join(t.TempDir(), "transaction")
+			write(t, filepath.Join(transactionDir, "new"), "transaction")
+			if err := durableRemoveAll(target); err != nil {
+				t.Fatal(err)
+			}
+			if err := copyEntryNoFollow(transactionDir, target); err != nil {
+				t.Fatal(err)
+			}
+			oldHook := beforeInstallRestoreRename
+			beforeInstallRestoreRename = func(path string) {
+				if sameInstallPath(path, target) {
+					beforeInstallRestoreRename = nil
+					tc.create(t, target)
+				}
+			}
+			t.Cleanup(func() { beforeInstallRestoreRename = oldHook })
+			err = tx.rollback()
+			if err == nil || !strings.Contains(err.Error(), "without replacement") {
+				t.Fatalf("restoration collision was accepted: %v", err)
+			}
+			if releaseErr := lock.Release(); releaseErr != nil {
+				t.Fatal(releaseErr)
+			}
+			if _, statErr := os.Lstat(filepath.Join(target, "new")); !os.IsNotExist(statErr) {
+				t.Fatalf("restoration merged transaction content into concurrent directory: %v", statErr)
+			}
+			if tc.name == "nonempty directory" {
+				if got, readErr := os.ReadFile(filepath.Join(target, "concurrent")); readErr != nil || string(got) != "foreign" {
+					t.Fatalf("concurrent directory content changed: %q, %v", got, readErr)
+				}
+			}
+			if tc.name == "same-byte ABA directory" {
+				if got, readErr := os.ReadFile(filepath.Join(target, "original")); readErr != nil || string(got) != "old" {
+					t.Fatalf("same-byte replacement was not preserved: %q, %v", got, readErr)
+				}
+			}
+		})
+	}
+}
+
+func TestNormalInstallPublicationNeverMergesIntoBoundaryReplacement(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+	target := filepath.Join(t.TempDir(), "target")
+	write(t, filepath.Join(target, "old"), "old")
+	source := filepath.Join(t.TempDir(), "source")
+	write(t, filepath.Join(source, "new"), "new")
+	lock, err := acquireInstallOperationLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Release() //nolint:errcheck // test cleanup
+	tx, err := beginArtifactTransaction([]string{target})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldHook := beforeInstallRestoreRename
+	beforeInstallRestoreRename = func(path string) {
+		if sameInstallPath(path, target) {
+			beforeInstallRestoreRename = nil
+			if err := os.Mkdir(target, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			write(t, filepath.Join(target, "concurrent"), "foreign")
+		}
+	}
+	t.Cleanup(func() { beforeInstallRestoreRename = oldHook })
+	if err := stageInstallEntryNoReplace(source, target, installStagePublish); err == nil || !strings.Contains(err.Error(), "without replacement") {
+		t.Fatalf("normal publication collision was accepted: %v", err)
+	}
+	if err := tx.rollback(); err == nil || !strings.Contains(err.Error(), "concurrently replaced") {
+		t.Fatalf("rollback did not preserve normal-publication replacement: %v", err)
+	}
+	if got, readErr := os.ReadFile(filepath.Join(target, "concurrent")); readErr != nil || string(got) != "foreign" {
+		t.Fatalf("normal-publication replacement changed: %q, %v", got, readErr)
+	}
+}
+
+func TestInstallRestorationResumesAcrossReadyAndPublishedCrashes(t *testing.T) {
+	for _, point := range []string{"ready", "published"} {
+		t.Run(point, func(t *testing.T) {
+			t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+			target := filepath.Join(t.TempDir(), "target")
+			write(t, filepath.Join(target, "original"), "old")
+			lock, err := acquireInstallOperationLock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx, err := beginArtifactTransaction([]string{target})
+			if err != nil {
+				t.Fatal(err)
+			}
+			transactionDir := filepath.Join(t.TempDir(), "transaction")
+			write(t, filepath.Join(transactionDir, "new"), "transaction")
+			if err := durableRemoveAll(target); err != nil {
+				t.Fatal(err)
+			}
+			if err := copyEntryNoFollow(transactionDir, target); err != nil {
+				t.Fatal(err)
+			}
+			injected := errors.New("simulated restoration crash")
+			oldHook := afterInstallRestoreBoundary
+			afterInstallRestoreBoundary = func(got, path string) error {
+				if got == point && sameInstallPath(path, target) {
+					afterInstallRestoreBoundary = nil
+					return injected
+				}
+				return nil
+			}
+			t.Cleanup(func() { afterInstallRestoreBoundary = oldHook })
+			if err := tx.rollback(); !errors.Is(err, injected) {
+				t.Fatalf("restoration crash point %s was not reached: %v", point, err)
+			}
+			if err := lock.Release(); err != nil {
+				t.Fatal(err)
+			}
+			recovered, err := acquireInstallOperationLock()
+			if err != nil {
+				t.Fatalf("resume restoration after %s: %v", point, err)
+			}
+			if err := recovered.Release(); err != nil {
+				t.Fatal(err)
+			}
+			if got, readErr := os.ReadFile(filepath.Join(target, "original")); readErr != nil || string(got) != "old" {
+				t.Fatalf("restoration after %s = %q, %v", point, got, readErr)
+			}
+			assertNoInstallJournal(t)
+		})
+	}
+}
+
+func TestNormalInstallPublicationCrashResumesRollback(t *testing.T) {
+	for _, crashPoint := range []string{"removed", "published"} {
+		t.Run(crashPoint, func(t *testing.T) {
+			t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+			target := filepath.Join(t.TempDir(), "target")
+			write(t, filepath.Join(target, "original"), "old")
+			source := filepath.Join(t.TempDir(), "source")
+			write(t, filepath.Join(source, "new"), "new")
+			lock, err := acquireInstallOperationLock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			tx, err := beginArtifactTransaction([]string{target})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = tx // retained transaction state simulates the interrupted process image
+			injected := errors.New("simulated normal publication crash")
+			oldHook := afterInstallRestoreBoundary
+			afterInstallRestoreBoundary = func(point, path string) error {
+				if point == crashPoint && sameInstallPath(path, target) {
+					afterInstallRestoreBoundary = nil
+					return injected
+				}
+				return nil
+			}
+			t.Cleanup(func() { afterInstallRestoreBoundary = oldHook })
+			if err := stageInstallEntryNoReplace(source, target, installStagePublish); !errors.Is(err, injected) {
+				t.Fatalf("normal publication crash point %s was not reached: %v", crashPoint, err)
+			}
+			if err := lock.Release(); err != nil {
+				t.Fatal(err)
+			}
+			recovered, err := acquireInstallOperationLock()
+			if err != nil {
+				t.Fatalf("resume normal publication rollback after %s: %v", crashPoint, err)
+			}
+			if err := recovered.Release(); err != nil {
+				t.Fatal(err)
+			}
+			if got, readErr := os.ReadFile(filepath.Join(target, "original")); readErr != nil || string(got) != "old" {
+				t.Fatalf("original after interrupted publication at %s = %q, %v", crashPoint, got, readErr)
+			}
+			if _, statErr := os.Lstat(filepath.Join(target, "new")); !os.IsNotExist(statErr) {
+				t.Fatalf("interrupted publication at %s survived rollback: %v", crashPoint, statErr)
+			}
+			assertNoInstallJournal(t)
 		})
 	}
 }

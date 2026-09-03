@@ -19,6 +19,65 @@ func writeC4Fixture(t *testing.T, path, body string) {
 	}
 }
 
+func TestStructurizrInventoryRejectsEntryBeyondFixedCeiling(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"c", "a", "b"} {
+		writeC4Fixture(t, filepath.Join(dir, name), name)
+	}
+	f, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close() //nolint:errcheck // test cleanup
+	if _, err := readStructurizrDirEntries(f, 2, "test inventory"); err == nil || !strings.Contains(err.Error(), "inventory bound") {
+		t.Fatalf("high-entry inventory was accepted: %v", err)
+	}
+}
+
+func TestFingerprintStructurizrTreeRejectsContinuousAppender(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "tool.jar")
+	writeC4Fixture(t, path, strings.Repeat("x", 1<<20))
+	old := structurizrFingerprintAfterOpen
+	t.Cleanup(func() { structurizrFingerprintAfterOpen = old })
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	structurizrFingerprintAfterOpen = func(name string) {
+		if name != "tool.jar" {
+			return
+		}
+		structurizrFingerprintAfterOpen = func(string) {}
+		first := make(chan struct{})
+		go func() {
+			defer close(stopped)
+			f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+			if err != nil {
+				close(first)
+				return
+			}
+			defer f.Close() //nolint:errcheck // test mutation
+			for i := 0; ; i++ {
+				_, _ = f.Write([]byte("growth"))
+				if i == 0 {
+					close(first)
+				}
+				select {
+				case <-done:
+					return
+				default:
+				}
+			}
+		}()
+		<-first
+	}
+	_, err := fingerprintStructurizrTree(dir)
+	close(done)
+	<-stopped
+	if err == nil || !strings.Contains(err.Error(), "changed while hashing") {
+		t.Fatalf("continuous appender was accepted: %v", err)
+	}
+}
+
 func TestStructurizrClosureRecursivelyAcceptsBoundLocalIncludes(t *testing.T) {
 	project := t.TempDir()
 	design := filepath.Join(project, "design")
@@ -34,6 +93,38 @@ func TestStructurizrClosureRecursivelyAcceptsBoundLocalIncludes(t *testing.T) {
 	}
 	if len(closure) != 3 || closure[0] != entry || closure[1] != fragment || closure[2] != view {
 		t.Fatalf("local include closure = %v", closure)
+	}
+}
+
+func TestStructurizrClosureRejectsOversizedSparseInput(t *testing.T) {
+	design := t.TempDir()
+	entry := filepath.Join(design, "workspace.dsl")
+	file, err := os.Create(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(c4ClosureFileMaxBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := validateStructurizrClosure(design, entry); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatalf("Structurizr closure accepted oversized sparse input: %v", err)
+	}
+}
+
+func TestStructurizrClosureRejectsExcessiveIncludeDepth(t *testing.T) {
+	design := t.TempDir()
+	for index := 0; index <= c4ClosureMaxDepth; index++ {
+		body := "workspace {}\n"
+		if index < c4ClosureMaxDepth {
+			body = fmt.Sprintf("!include %03d.dsl\n", index+1)
+		}
+		writeC4Fixture(t, filepath.Join(design, fmt.Sprintf("%03d.dsl", index)), body)
+	}
+	if _, err := validateStructurizrClosure(design, filepath.Join(design, "000.dsl")); err == nil || !strings.Contains(err.Error(), "nesting") {
+		t.Fatalf("Structurizr closure accepted excessive include depth: %v", err)
 	}
 }
 

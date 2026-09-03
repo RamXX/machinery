@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	pathpkg "path"
 	"path/filepath"
 	"sort"
@@ -86,14 +85,7 @@ func ValidateManifestSet(manifests []*Manifest) error {
 // or a missing required field is an error: an unusable manifest must fail loudly,
 // never degrade to a silent skip.
 func LoadManifest(path string) (*Manifest, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return nil, err
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s: checker manifest must be a regular, non-symlink file", path)
-	}
-	data, err := os.ReadFile(path)
+	data, err := readCheckerStructuredFile(path, "checker manifest")
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +234,7 @@ func ReadConfinedFile(design, rel string) (data []byte, retErr error) {
 	if err != nil {
 		return nil, err
 	}
-	return root.readRegular(clean, "checker artifact", false)
+	return root.readRegularBounded(clean, "checker artifact", checkerStructuredFileMaxBytes)
 }
 
 // ReadConfinedFileBounded reads one strict regular file through a rooted
@@ -259,7 +251,7 @@ func ReadConfinedFileBounded(design, rel string, maxBytes int64) (data []byte, r
 	if err != nil {
 		return nil, err
 	}
-	return root.readRegularBounded(clean, "checker artifact", false, maxBytes)
+	return root.readRegularBounded(clean, "checker artifact", maxBytes)
 }
 
 func validatePortableRelativePath(rel string) error {

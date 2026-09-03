@@ -13,6 +13,15 @@ import (
 
 func repoRoot() string { return "../.." }
 
+func isolatedExampleDesign(t *testing.T, rel string) string {
+	t.Helper()
+	design := filepath.Join(t.TempDir(), "design")
+	if err := os.CopyFS(design, os.DirFS(filepath.Join(repoRoot(), rel))); err != nil {
+		t.Fatalf("copy isolated example design: %v", err)
+	}
+	return design
+}
+
 func loadJSON(t *testing.T, path string) *ir.Value {
 	t.Helper()
 	v, err := ir.LoadMachineJSON(path)
@@ -641,10 +650,11 @@ failure_terminals: [Aborted, Expired]
 // P-F10: every file RunWritten commits to design/formal carries exactly one
 // version stamp line; the in-memory Emit* output stays unstamped.
 func TestRunWrittenStampsGeneratorVersion(t *testing.T) {
+	design := isolatedExampleDesign(t, "examples/go-crm/design")
 	outdir := t.TempDir()
 	names, err := RunWritten(
-		filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json"),
-		filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"),
+		filepath.Join(design, "machines/Deal.machine.json"),
+		filepath.Join(design, "formal/Deal.semantics.yaml"),
 		outdir)
 	if err != nil {
 		t.Fatal(err)
@@ -764,8 +774,9 @@ func TestRunWrittenControlFlowOnlyReconcilesRenamedSemanticsFiveFileFamily(t *te
 }
 
 func TestRunWrittenFailsClosedOnAmbiguousExternalSemanticsOwnership(t *testing.T) {
-	machine := filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json")
-	linear, err := os.ReadFile(filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml"))
+	design := isolatedExampleDesign(t, "examples/go-crm/design")
+	machine := filepath.Join(design, "machines/Deal.machine.json")
+	linear, err := os.ReadFile(filepath.Join(design, "formal/Deal.semantics.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -966,8 +977,9 @@ func TestSemanticsSchemaFirstUnknownKeyIsDeterministic(t *testing.T) {
 }
 
 func TestRunWrittenRejectsSymlinkedAndMutatingSemanticsInput(t *testing.T) {
-	machine := filepath.Join(repoRoot(), "examples/go-crm/design/machines/Deal.machine.json")
-	source := filepath.Join(repoRoot(), "examples/go-crm/design/formal/Deal.semantics.yaml")
+	design := isolatedExampleDesign(t, "examples/go-crm/design")
+	machine := filepath.Join(design, "machines/Deal.machine.json")
+	source := filepath.Join(design, "formal/Deal.semantics.yaml")
 	body, err := os.ReadFile(source)
 	if err != nil {
 		t.Fatal(err)

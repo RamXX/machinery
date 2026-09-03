@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/filelock"
+	"github.com/RamXX/machinery/internal/fsatomic"
 )
 
 const (
@@ -27,11 +28,18 @@ const (
 	journalName          = ".machinery-modelith-journal"
 	journalNextName      = journalName + ".new"
 	journalAuthorityName = journalName + ".authority"
+	journalPreviousName  = journalAuthorityName + ".previous"
 	journalRetireName    = journalAuthorityName + ".retire"
 	targetName           = "examples"
 	journalVersion       = 2
 	journalPrepared      = "prepared"
 	journalRestoring     = "restoring"
+	modelithDirPageSize  = 128
+	modelithDirEntryMax  = 4096
+	modelithTreeEntryMax = 65536
+	modelithTreeDepthMax = 256
+	modelithFileSizeMax  = 16 << 20
+	modelithTreeBytesMax = 256 << 20
 )
 
 type journal struct {
@@ -50,6 +58,7 @@ type hooks struct {
 	beforeInstalledVerify func() error
 	afterInstall          func() error
 	beforeRetireVerify    func() error
+	beforeRetireMove      func() error
 	afterBackup           func() error
 }
 
@@ -64,10 +73,13 @@ type corpusState struct {
 	digest         string
 	identityDigest string
 	entries        map[string]corpusEntry
+	entryCount     int
+	fileBytes      int64
 }
 
 type recoveryHooks struct {
 	beforeRetireVerify        func() error
+	beforeRetireMove          func() error
 	beforeBackupRestoreVerify func() error
 	afterBackupRestore        func() error
 	afterJournalIsolation     func() error
@@ -82,6 +94,10 @@ type regularFileState struct {
 	native  string
 	change  string
 }
+
+// modelithBeforeJournalPhaseMove is a test seam at the final authority
+// revalidation/rename boundary. Production code always leaves it nil.
+var modelithBeforeJournalPhaseMove func() error
 
 // Fingerprint returns the deterministic content, type, path, and permission
 // digest of a strict real tree. Symlinks and special entries are rejected.
@@ -103,7 +119,8 @@ func Fingerprint(path string) (digest string, retErr error) {
 		return "", errors.Join(err, fmt.Errorf("modelith corpus changed identity while opening"))
 	}
 	hash := sha256.New()
-	if err := fingerprintDir(root, ".", ".", hash); err != nil {
+	budget := modelithTreeBudget{}
+	if err := fingerprintDir(root, ".", ".", hash, &budget, 0); err != nil {
 		return "", err
 	}
 	after, err := os.Lstat(path)
@@ -113,7 +130,36 @@ func Fingerprint(path string) (digest string, retErr error) {
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-func fingerprintDir(root *os.Root, dir, displayRoot string, hash io.Writer) error {
+type modelithTreeBudget struct {
+	entries int
+	bytes   int64
+}
+
+func (budget *modelithTreeBudget) add(info os.FileInfo, display string) error {
+	budget.entries++
+	if budget.entries > modelithTreeEntryMax {
+		return fmt.Errorf("modelith corpus exceeds %d-entry limit at %s", modelithTreeEntryMax, display)
+	}
+	if info.Mode().IsRegular() {
+		if info.Size() < 0 || info.Size() > modelithFileSizeMax {
+			return fmt.Errorf("modelith corpus file %s has size %d, exceeding %d-byte limit", display, info.Size(), modelithFileSizeMax)
+		}
+		if budget.bytes > modelithTreeBytesMax-info.Size() {
+			return fmt.Errorf("modelith corpus exceeds %d-byte aggregate limit at %s", modelithTreeBytesMax, display)
+		}
+		budget.bytes += info.Size()
+	}
+	return nil
+}
+
+func fingerprintDir(root *os.Root, dir, displayRoot string, hash io.Writer, budget *modelithTreeBudget, depth int) error {
+	if depth > modelithTreeDepthMax {
+		return fmt.Errorf("modelith corpus exceeds %d-directory depth limit at %s", modelithTreeDepthMax, filepath.ToSlash(dir))
+	}
+	dirBefore, err := root.Lstat(dir)
+	if err != nil || dirBefore.Mode()&os.ModeSymlink != 0 || !dirBefore.IsDir() {
+		return errors.Join(err, fmt.Errorf("modelith corpus directory %s changed type or identity before enumeration", filepath.ToSlash(dir)))
+	}
 	entries, err := readDir(root, dir)
 	if err != nil {
 		return fmt.Errorf("read Modelith corpus directory %s: %w", filepath.ToSlash(dir), err)
@@ -131,6 +177,9 @@ func fingerprintDir(root *os.Root, dir, displayRoot string, hash io.Writer) erro
 		if err != nil {
 			return fmt.Errorf("inspect Modelith corpus entry %s: %w", display, err)
 		}
+		if err := budget.add(info, display); err != nil {
+			return err
+		}
 		switch {
 		case info.Mode()&os.ModeSymlink != 0:
 			return fmt.Errorf("modelith corpus entry %s must not be a symlink", display)
@@ -138,7 +187,7 @@ func fingerprintDir(root *os.Root, dir, displayRoot string, hash io.Writer) erro
 			if _, err := fmt.Fprintf(hash, "D\x00%s\x00%04o\x00", display, info.Mode().Perm()); err != nil {
 				return err
 			}
-			if err := fingerprintDir(root, name, displayRoot, hash); err != nil {
+			if err := fingerprintDir(root, name, displayRoot, hash, budget, depth+1); err != nil {
 				return err
 			}
 		case info.Mode().IsRegular():
@@ -150,17 +199,17 @@ func fingerprintDir(root *os.Root, dir, displayRoot string, hash io.Writer) erro
 				return fmt.Errorf("open Modelith corpus file %s: %w", display, err)
 			}
 			opened, statErr := file.Stat()
-			if statErr != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
+			if statErr != nil || !os.SameFile(info, opened) || opened.Mode() != info.Mode() || opened.Size() != info.Size() {
 				return errors.Join(statErr, file.Close(), fmt.Errorf("modelith corpus file %s changed identity while opening", display))
 			}
 			fileHash := sha256.New()
-			_, copyErr := io.Copy(fileHash, file)
+			copyErr := copyModelithFileExact(fileHash, file, info.Size(), display)
 			closeErr := file.Close()
 			if err := errors.Join(copyErr, closeErr); err != nil {
 				return fmt.Errorf("hash Modelith corpus file %s: %w", display, err)
 			}
 			after, err := root.Lstat(name)
-			if err != nil || !os.SameFile(info, after) || after.Mode() != info.Mode() {
+			if err != nil || !os.SameFile(info, after) || after.Mode() != info.Mode() || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) {
 				return errors.Join(err, fmt.Errorf("modelith corpus file %s changed identity while hashing", display))
 			}
 			if _, err := fmt.Fprintf(hash, "%x\x00", fileHash.Sum(nil)); err != nil {
@@ -169,6 +218,30 @@ func fingerprintDir(root *os.Root, dir, displayRoot string, hash io.Writer) erro
 		default:
 			return fmt.Errorf("modelith corpus entry %s is special (%s)", display, info.Mode())
 		}
+	}
+	final, err := readDir(root, dir)
+	if err != nil {
+		return fmt.Errorf("re-read Modelith corpus directory %s: %w", filepath.ToSlash(dir), err)
+	}
+	dirAfter, statErr := root.Lstat(dir)
+	if statErr != nil {
+		return statErr
+	}
+	if !sameDirInventory(entries, final) || !os.SameFile(dirBefore, dirAfter) || dirBefore.Mode() != dirAfter.Mode() || !dirBefore.ModTime().Equal(dirAfter.ModTime()) {
+		return fmt.Errorf("modelith corpus directory %s changed while fingerprinting", filepath.ToSlash(dir))
+	}
+	return nil
+}
+
+func copyModelithFileExact(dst io.Writer, src *os.File, size int64, display string) error {
+	written, err := io.CopyN(dst, src, size)
+	if err != nil {
+		return fmt.Errorf("read exact Modelith corpus file %s: copied %d of %d bytes: %w", display, written, size, err)
+	}
+	var extra [1]byte
+	n, probeErr := src.Read(extra[:])
+	if n != 0 || probeErr != io.EOF {
+		return errors.Join(probeErr, fmt.Errorf("modelith corpus file %s grew while being read", display))
 	}
 	return nil
 }
@@ -203,7 +276,7 @@ func publish(repo, expectedDigest string, testHooks hooks) error {
 		if err := validateReservedInventory(root); err != nil {
 			return err
 		}
-		for _, residue := range []string{journalName, journalNextName, journalAuthorityName, journalRetireName, backupName, retireName} {
+		for _, residue := range []string{journalName, journalNextName, journalAuthorityName, journalPreviousName, journalRetireName, backupName, retireName} {
 			exists, err := pathExists(root, residue)
 			if err != nil {
 				return fmt.Errorf("inspect reserved entry %s before publishing: %w", residue, err)
@@ -278,7 +351,7 @@ func publish(repo, expectedDigest string, testHooks hooks) error {
 		if err := authority.revalidateAt(root, journalAuthorityName); err != nil {
 			return fmt.Errorf("modelith journal authority changed before parking live corpus; preserving it: %w", err)
 		}
-		if err := root.Rename(targetName, backupName); err != nil {
+		if err := fsatomic.RenameNoReplace(root, targetName, backupName); err != nil {
 			return fmt.Errorf("park old Modelith corpus: %w", err)
 		}
 		if err := syncModelithDirectory(root, "."); err != nil {
@@ -295,7 +368,7 @@ func publish(repo, expectedDigest string, testHooks hooks) error {
 		if err := authority.revalidateAt(root, journalAuthorityName); err != nil {
 			return abortParked(root, authority, fmt.Errorf("modelith journal authority changed before staged publication; preserving it: %w", err))
 		}
-		if err := root.Rename(stageCorpus, targetName); err != nil {
+		if err := fsatomic.RenameNoReplace(root, stageCorpus, targetName); err != nil {
 			return fmt.Errorf("install staged Modelith corpus: %w", err)
 		}
 		if err := syncModelithDirectory(root, "."); err != nil {
@@ -320,7 +393,7 @@ func publish(repo, expectedDigest string, testHooks hooks) error {
 		if err := authority.revalidateAt(root, journalAuthorityName); err != nil {
 			return fmt.Errorf("modelith journal authority changed before backup retirement; preserving installed target and backup: %w", err)
 		}
-		if err := retireCorpusIfUnchanged(root, live, staged, testHooks.beforeRetireVerify); err != nil {
+		if err := retireCorpusIfUnchanged(root, live, staged, testHooks.beforeRetireVerify, testHooks.beforeRetireMove); err != nil {
 			return err
 		}
 		if testHooks.afterBackup != nil {
@@ -332,22 +405,22 @@ func publish(repo, expectedDigest string, testHooks hooks) error {
 	})
 }
 
-func retireCorpusIfUnchanged(root *os.Root, expectedBackup, expectedTarget *corpusState, beforeVerify func() error) error {
+func retireCorpusIfUnchanged(root *os.Root, expectedBackup, expectedTarget *corpusState, beforeVerify, beforeMove func() error) error {
 	if _, err := root.Lstat(retireName); err == nil {
 		return fmt.Errorf("reserved Modelith retirement entry already exists")
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("inspect reserved Modelith retirement entry: %w", err)
 	}
-	if err := root.Rename(backupName, retireName); err != nil {
+	if err := fsatomic.RenameNoReplace(root, backupName, retireName); err != nil {
 		return fmt.Errorf("isolate old Modelith corpus for retirement: %w", err)
 	}
 	if err := syncModelithDirectory(root, "."); err != nil {
 		return fmt.Errorf("sync isolated Modelith corpus retirement: %w", err)
 	}
-	return deleteRetirementIfUnchanged(root, expectedBackup, expectedTarget, beforeVerify)
+	return deleteRetirementIfUnchanged(root, expectedBackup, expectedTarget, beforeVerify, beforeMove)
 }
 
-func deleteRetirementIfUnchanged(root *os.Root, expectedRetirement, expectedTarget *corpusState, beforeVerify func() error) error {
+func deleteRetirementIfUnchanged(root *os.Root, expectedRetirement, expectedTarget *corpusState, beforeVerify, beforeMove func() error) error {
 	if beforeVerify != nil {
 		if err := beforeVerify(); err != nil {
 			return err
@@ -359,7 +432,12 @@ func deleteRetirementIfUnchanged(root *os.Root, expectedRetirement, expectedTarg
 	if err := expectedRetirement.revalidateAt(root, retireName); err != nil {
 		return restoreRetirement(root, fmt.Errorf("parked Modelith backup changed at retirement boundary; preserving installed target and backup: %w", err))
 	}
-	if err := removeValidated(root, retireName); err != nil {
+	if beforeMove != nil {
+		if err := beforeMove(); err != nil {
+			return err
+		}
+	}
+	if err := removeCorpusStateExact(root, retireName, expectedRetirement); err != nil {
 		return fmt.Errorf("remove verified old Modelith corpus: %w", err)
 	}
 	if err := syncModelithDirectory(root, "."); err != nil {
@@ -374,7 +452,7 @@ func restoreRetirement(root *os.Root, cause error) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return errors.Join(cause, fmt.Errorf("inspect backup before restoring retirement tree: %w", err))
 	}
-	if err := root.Rename(retireName, backupName); err != nil {
+	if err := fsatomic.RenameNoReplace(root, retireName, backupName); err != nil {
 		return errors.Join(cause, fmt.Errorf("restore changed retirement tree as backup: %w", err))
 	}
 	if err := syncModelithDirectory(root, "."); err != nil {
@@ -396,7 +474,7 @@ func abortParked(root *os.Root, authority *regularFileState, cause error) error 
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return errors.Join(cause, fmt.Errorf("inspect publication target before restoring parked corpus: %w", err))
 	}
-	if err := root.Rename(backupName, targetName); err != nil {
+	if err := fsatomic.RenameNoReplace(root, backupName, targetName); err != nil {
 		return errors.Join(cause, fmt.Errorf("restore changed parked Modelith corpus: %w", err))
 	}
 	if err := syncModelithDirectory(root, "."); err != nil {
@@ -435,7 +513,7 @@ func captureCorpusState(root *os.Root, dir string) (*corpusState, error) {
 	state := &corpusState{root: dir, entries: make(map[string]corpusEntry)}
 	hash := sha256.New()
 	identityHash := sha256.New()
-	if err := state.captureEntry(root, dir, hash, identityHash); err != nil {
+	if err := state.captureEntry(root, dir, hash, identityHash, 0); err != nil {
 		return nil, err
 	}
 	state.digest = "sha256:" + hex.EncodeToString(hash.Sum(nil))
@@ -443,13 +521,29 @@ func captureCorpusState(root *os.Root, dir string) (*corpusState, error) {
 	return state, nil
 }
 
-func (state *corpusState) captureEntry(root *os.Root, name string, hash, identityHash io.Writer) error {
+func (state *corpusState) captureEntry(root *os.Root, name string, hash, identityHash io.Writer, depth int) error {
+	if depth > modelithTreeDepthMax {
+		return fmt.Errorf("live Modelith corpus exceeds %d-directory depth limit at %s", modelithTreeDepthMax, filepath.ToSlash(name))
+	}
 	before, err := root.Lstat(name)
 	if err != nil {
 		return fmt.Errorf("inspect live Modelith corpus entry %s: %w", filepath.ToSlash(name), err)
 	}
 	if before.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("live Modelith corpus entry %s is a symlink", filepath.ToSlash(name))
+	}
+	state.entryCount++
+	if state.entryCount > modelithTreeEntryMax {
+		return fmt.Errorf("live Modelith corpus exceeds %d-entry limit at %s", modelithTreeEntryMax, filepath.ToSlash(name))
+	}
+	if before.Mode().IsRegular() {
+		if before.Size() < 0 || before.Size() > modelithFileSizeMax {
+			return fmt.Errorf("live Modelith corpus file %s has size %d, exceeding %d-byte limit", filepath.ToSlash(name), before.Size(), modelithFileSizeMax)
+		}
+		if state.fileBytes > modelithTreeBytesMax-before.Size() {
+			return fmt.Errorf("live Modelith corpus exceeds %d-byte aggregate limit at %s", modelithTreeBytesMax, filepath.ToSlash(name))
+		}
+		state.fileBytes += before.Size()
 	}
 	display := strings.TrimPrefix(name, state.root+string(filepath.Separator))
 	if name == state.root {
@@ -466,7 +560,7 @@ func (state *corpusState) captureEntry(root *os.Root, name string, hash, identit
 			return fmt.Errorf("read live Modelith corpus directory %s: %w", filepath.ToSlash(name), err)
 		}
 		for _, child := range initial {
-			if err := state.captureEntry(root, filepath.Join(name, child.Name()), hash, identityHash); err != nil {
+			if err := state.captureEntry(root, filepath.Join(name, child.Name()), hash, identityHash, depth+1); err != nil {
 				return err
 			}
 		}
@@ -498,8 +592,11 @@ func (state *corpusState) captureEntry(root *os.Root, name string, hash, identit
 		return err
 	}
 	opened, statErr := file.Stat()
+	if statErr != nil || !os.SameFile(before, opened) || opened.Mode() != before.Mode() || opened.Size() != before.Size() {
+		return errors.Join(statErr, file.Close(), fmt.Errorf("live Modelith corpus file %s changed identity or size while opening", filepath.ToSlash(name)))
+	}
 	fileHash := sha256.New()
-	_, readErr := io.Copy(fileHash, file)
+	readErr := copyModelithFileExact(fileHash, file, before.Size(), filepath.ToSlash(name))
 	closeErr := file.Close()
 	after, pathErr := root.Lstat(name)
 	if err := errors.Join(statErr, readErr, closeErr, pathErr); err != nil {
@@ -603,7 +700,7 @@ func (state *corpusState) revalidateEntry(root *os.Root, expectedName, actualNam
 		return err
 	}
 	hash := sha256.New()
-	_, readErr := io.Copy(hash, file)
+	readErr := copyModelithFileExact(hash, file, want.info.Size(), filepath.ToSlash(actualName))
 	after, statErr := file.Stat()
 	closeErr := file.Close()
 	pathAfter, pathErr := root.Lstat(actualName)
@@ -669,6 +766,12 @@ func withRoot(repo string, operation func(*os.Root) error) (retErr error) {
 }
 
 func recoverRoot(root *os.Root, testHooks recoveryHooks) (returnErr error) {
+	if err := recoverModelithQuarantines(root); err != nil {
+		return err
+	}
+	if err := recoverJournalReplacement(root); err != nil {
+		return err
+	}
 	if err := validateReservedInventory(root); err != nil {
 		return err
 	}
@@ -750,7 +853,7 @@ func recoverRoot(root *os.Root, testHooks recoveryHooks) (returnErr error) {
 		if err := authority.revalidateAt(root, journalAuthorityName); err != nil {
 			return fmt.Errorf("modelith recovery journal changed before retirement recovery: %w", err)
 		}
-		if err := deleteRetirementIfUnchanged(root, retirement, installed, testHooks.beforeRetireVerify); err != nil {
+		if err := deleteRetirementIfUnchanged(root, retirement, installed, testHooks.beforeRetireVerify, testHooks.beforeRetireMove); err != nil {
 			return err
 		}
 	case backup && !target && !retiring:
@@ -780,7 +883,7 @@ func recoverRoot(root *os.Root, testHooks recoveryHooks) (returnErr error) {
 		if err := authority.revalidateAt(root, journalAuthorityName); err != nil {
 			return fmt.Errorf("modelith recovery journal changed before restoring backup: %w", err)
 		}
-		if err := root.Rename(backupName, targetName); err != nil {
+		if err := fsatomic.RenameNoReplace(root, backupName, targetName); err != nil {
 			return fmt.Errorf("restore parked Modelith corpus: %w", err)
 		}
 		if err := syncModelithDirectory(root, "."); err != nil {
@@ -821,7 +924,7 @@ func recoverRoot(root *os.Root, testHooks recoveryHooks) (returnErr error) {
 		if err := authority.revalidateAt(root, journalAuthorityName); err != nil {
 			return fmt.Errorf("modelith recovery journal changed before retiring backup: %w", err)
 		}
-		if err := retireCorpusIfUnchanged(root, retained, installed, testHooks.beforeRetireVerify); err != nil {
+		if err := retireCorpusIfUnchanged(root, retained, installed, testHooks.beforeRetireVerify, testHooks.beforeRetireMove); err != nil {
 			return err
 		}
 		if err := removeIfPresent(root, stageName); err != nil {
@@ -894,7 +997,7 @@ func restoreJournalAuthorityPath(root *os.Root) error {
 	if source == "" {
 		return nil
 	}
-	if err := root.Rename(source, journalName); err != nil {
+	if err := fsatomic.RenameNoReplace(root, source, journalName); err != nil {
 		return fmt.Errorf("restore Modelith journal authority after failed recovery: %w", err)
 	}
 	if err := syncModelithDirectory(root, "."); err != nil {
@@ -903,8 +1006,72 @@ func restoreJournalAuthorityPath(root *os.Root) error {
 	return nil
 }
 
+// recoverJournalReplacement resolves the two durable states of a phase
+// transition. The previous journal is moved aside without replacement before
+// the next journal is installed, so a concurrent fixed-name replacement is
+// never overwritten. Crashes either restore the previous phase or finish an
+// already-staged exact successor.
+func recoverJournalReplacement(root *os.Root) error {
+	previous, previousExists, err := readRegularState(root, journalPreviousName)
+	if err != nil || !previousExists {
+		return err
+	}
+	previousRecord, err := decodeJournal(previous.body)
+	if err != nil {
+		return fmt.Errorf("decode previous Modelith journal phase: %w", err)
+	}
+	authority, authorityExists, err := readRegularState(root, journalAuthorityName)
+	if err != nil {
+		return err
+	}
+	next, nextExists, err := readRegularState(root, journalNextName)
+	if err != nil {
+		return err
+	}
+	if authorityExists {
+		if nextExists {
+			return fmt.Errorf("modelith journal phase transition has both an installed authority and a staged successor; preserving all entries")
+		}
+		authorityRecord, err := decodeJournal(authority.body)
+		if err != nil || !isJournalPhaseSuccessor(previousRecord, authorityRecord) {
+			return errors.Join(err, fmt.Errorf("installed Modelith journal is not the exact successor of its previous phase; preserving both"))
+		}
+		if err := previous.revalidateAt(root, journalPreviousName); err != nil {
+			return fmt.Errorf("previous Modelith journal changed before phase retirement; preserving it: %w", err)
+		}
+		if err := removeRegularStateExact(root, journalPreviousName, previous); err != nil {
+			return fmt.Errorf("finish previous Modelith journal phase retirement: %w", err)
+		}
+		return syncModelithDirectory(root, ".")
+	}
+	if !nextExists {
+		if err := fsatomic.RenameNoReplace(root, journalPreviousName, journalAuthorityName); err != nil {
+			return fmt.Errorf("restore previous Modelith journal phase: %w", err)
+		}
+		return syncModelithDirectory(root, ".")
+	}
+	nextRecord, err := decodeJournal(next.body)
+	if err != nil || !isJournalPhaseSuccessor(previousRecord, nextRecord) {
+		return errors.Join(err, fmt.Errorf("staged Modelith journal is not the exact successor of its previous phase; preserving both"))
+	}
+	if err := fsatomic.RenameNoReplace(root, journalNextName, journalAuthorityName); err != nil {
+		return fmt.Errorf("finish installing next Modelith journal phase: %w", err)
+	}
+	if err := syncModelithDirectory(root, "."); err != nil {
+		return fmt.Errorf("sync recovered Modelith journal phase: %w", err)
+	}
+	installed, exists, err := readRegularState(root, journalAuthorityName)
+	if err != nil || !exists || !sameRegularFileAfterRename(next, installed) {
+		return errors.Join(err, fmt.Errorf("recovered Modelith journal successor changed at installation; preserving both phases"))
+	}
+	if err := removeRegularStateExact(root, journalPreviousName, previous); err != nil {
+		return fmt.Errorf("retire recovered previous Modelith journal phase: %w", err)
+	}
+	return syncModelithDirectory(root, ".")
+}
+
 func writeJournal(root *os.Root, record journal) (*regularFileState, error) {
-	if err := installJournal(root, record, false); err != nil {
+	if err := installJournal(root, record); err != nil {
 		return nil, err
 	}
 	authority, exists, err := isolateJournalAuthority(root)
@@ -918,37 +1085,77 @@ func replaceJournalAuthority(root *os.Root, authority *regularFileState, record 
 	if err := authority.revalidateAt(root, journalAuthorityName); err != nil {
 		return nil, fmt.Errorf("modelith journal authority changed before phase transition; preserving it: %w", err)
 	}
-	// The authoritative journal remains installed until the replacement is
-	// durably renamed over it. A journal-next file is transaction-owned scratch;
-	// removing a partial write makes a crash before that rename retryable.
+	if exists, err := pathExists(root, journalPreviousName); err != nil {
+		return nil, fmt.Errorf("inspect Modelith journal phase-transition entry %s: %w", journalPreviousName, err)
+	} else if exists {
+		return nil, fmt.Errorf("modelith journal phase-transition entry %s already exists; preserving it", journalPreviousName)
+	}
 	if err := removeIfPresent(root, journalNextName); err != nil {
-		return nil, fmt.Errorf("clear incomplete Modelith journal replacement: %w", err)
+		return nil, fmt.Errorf("clear incomplete Modelith journal successor: %w", err)
 	}
 	if err := syncModelithDirectory(root, "."); err != nil {
-		return nil, fmt.Errorf("sync incomplete Modelith journal replacement cleanup: %w", err)
+		return nil, fmt.Errorf("sync incomplete Modelith journal successor cleanup: %w", err)
 	}
-	if err := installJournalAt(root, record, true, journalAuthorityName); err != nil {
+	if err := createJournalNext(root, record); err != nil {
 		return nil, err
+	}
+	if modelithBeforeJournalPhaseMove != nil {
+		if err := modelithBeforeJournalPhaseMove(); err != nil {
+			return nil, err
+		}
+	}
+	if err := fsatomic.RenameNoReplace(root, journalAuthorityName, journalPreviousName); err != nil {
+		return nil, fmt.Errorf("isolate previous Modelith journal phase: %w", err)
+	}
+	if err := syncModelithDirectory(root, "."); err != nil {
+		return nil, fmt.Errorf("sync previous Modelith journal phase: %w", err)
+	}
+	previous, exists, err := readRegularState(root, journalPreviousName)
+	if err != nil || !exists || !sameRegularFileAfterRename(authority, previous) {
+		return nil, errors.Join(err, fmt.Errorf("modelith journal authority changed at phase-transition isolation; preserving it"))
+	}
+	if err := fsatomic.RenameNoReplace(root, journalNextName, journalAuthorityName); err != nil {
+		return nil, fmt.Errorf("install next Modelith journal phase without replacement: %w", err)
+	}
+	if err := syncModelithDirectory(root, "."); err != nil {
+		return nil, fmt.Errorf("sync next Modelith journal phase: %w", err)
 	}
 	updated, exists, err := readRegularState(root, journalAuthorityName)
 	if err != nil || !exists {
 		return nil, errors.Join(err, fmt.Errorf("replacement Modelith journal authority disappeared"))
 	}
+	previousRecord, previousErr := decodeJournal(previous.body)
+	updatedRecord, updatedErr := decodeJournal(updated.body)
+	if err := errors.Join(previousErr, updatedErr); err != nil || !isJournalPhaseSuccessor(previousRecord, updatedRecord) {
+		return nil, errors.Join(err, fmt.Errorf("replacement Modelith journal is not the exact successor of its previous authority; preserving both"))
+	}
+	if err := previous.revalidateAt(root, journalPreviousName); err != nil {
+		return nil, fmt.Errorf("previous Modelith journal changed before phase retirement; preserving it: %w", err)
+	}
+	if err := removeRegularStateExact(root, journalPreviousName, previous); err != nil {
+		return nil, fmt.Errorf("retire previous Modelith journal phase: %w", err)
+	}
 	return updated, nil
 }
 
-func installJournal(root *os.Root, record journal, replacing bool) error {
-	return installJournalAt(root, record, replacing, journalName)
+func installJournal(root *os.Root, record journal) error {
+	return installJournalAt(root, record, journalName)
 }
 
-func installJournalAt(root *os.Root, record journal, replacing bool, target string) error {
-	if replacing {
-		if exists, err := pathExists(root, target); err != nil {
-			return fmt.Errorf("inspect Modelith transaction journal before replacement: %w", err)
-		} else if !exists {
-			return fmt.Errorf("replace Modelith transaction journal: authoritative journal is missing")
-		}
+func installJournalAt(root *os.Root, record journal, target string) error {
+	if err := createJournalNext(root, record); err != nil {
+		return err
 	}
+	if err := fsatomic.RenameNoReplace(root, journalNextName, target); err != nil {
+		return fmt.Errorf("install Modelith transaction journal: %w", err)
+	}
+	if err := syncModelithDirectory(root, "."); err != nil {
+		return fmt.Errorf("sync Modelith transaction journal directory: %w", err)
+	}
+	return nil
+}
+
+func createJournalNext(root *os.Root, record journal) error {
 	body, err := json.Marshal(record)
 	if err != nil {
 		return err
@@ -964,13 +1171,16 @@ func installJournalAt(root *os.Root, record journal, replacing bool, target stri
 	if err := errors.Join(file.Sync(), file.Close()); err != nil {
 		return fmt.Errorf("sync Modelith transaction journal: %w", err)
 	}
-	if err := root.Rename(journalNextName, target); err != nil {
-		return fmt.Errorf("install Modelith transaction journal: %w", err)
-	}
 	if err := syncModelithDirectory(root, "."); err != nil {
-		return fmt.Errorf("sync Modelith transaction journal directory: %w", err)
+		return fmt.Errorf("sync staged Modelith transaction journal: %w", err)
 	}
 	return nil
+}
+
+func isJournalPhaseSuccessor(previous, next journal) bool {
+	validPhase := previous.Phase == journalPrepared && next.Phase == journalRestoring || previous.Phase == journalRestoring && next.Phase == journalRestoring
+	return validPhase && previous.Version == next.Version &&
+		previous.ExpectedDigest == next.ExpectedDigest && previous.ExpectedIdentity == next.ExpectedIdentity && previous.StagedDigest == next.StagedDigest
 }
 
 func decodeJournal(body []byte) (journal, error) {
@@ -1019,7 +1229,7 @@ func retireJournalAuthority(root *os.Root, authority *regularFileState) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	if err := root.Rename(journalAuthorityName, journalRetireName); err != nil {
+	if err := fsatomic.RenameNoReplace(root, journalAuthorityName, journalRetireName); err != nil {
 		return fmt.Errorf("atomically retire Modelith recovery journal: %w", err)
 	}
 	if err := syncModelithDirectory(root, "."); err != nil {
@@ -1029,14 +1239,8 @@ func retireJournalAuthority(root *os.Root, authority *regularFileState) error {
 	if err != nil || !exists || !sameRegularFileAfterRename(authority, retired) {
 		return errors.Join(err, fmt.Errorf("modelith recovery journal changed at retirement boundary; preserving it"))
 	}
-	if err := retired.revalidateAt(root, journalRetireName); err != nil {
-		return fmt.Errorf("modelith recovery journal changed before retirement deletion; preserving it: %w", err)
-	}
-	if err := root.Remove(journalRetireName); err != nil {
+	if err := removeRegularStateExact(root, journalRetireName, retired); err != nil {
 		return fmt.Errorf("remove retired Modelith recovery journal: %w", err)
-	}
-	if err := syncModelithDirectory(root, "."); err != nil {
-		return fmt.Errorf("sync completed Modelith recovery: %w", err)
 	}
 	return nil
 }
@@ -1051,7 +1255,7 @@ func validateReservedInventory(root *os.Root) error {
 	if err != nil {
 		return err
 	}
-	allowed := map[string]bool{stageName: true, backupName: true, retireName: true, journalName: true, journalNextName: true, journalAuthorityName: true, journalRetireName: true}
+	allowed := map[string]bool{stageName: true, backupName: true, retireName: true, journalName: true, journalNextName: true, journalAuthorityName: true, journalPreviousName: true, journalRetireName: true}
 	for _, entry := range entries {
 		name := entry.Name()
 		if !strings.HasPrefix(strings.ToLower(name), ".machinery-modelith-") {
@@ -1070,7 +1274,7 @@ func validateReservedInventory(root *os.Root) error {
 		if (name == stageName || name == backupName || name == retireName) && !info.IsDir() {
 			return fmt.Errorf("reserved Modelith transaction entry %s must be a real directory", name)
 		}
-		if (name == journalName || name == journalNextName || name == journalAuthorityName || name == journalRetireName) && !info.Mode().IsRegular() {
+		if (name == journalName || name == journalNextName || name == journalAuthorityName || name == journalPreviousName || name == journalRetireName) && !info.Mode().IsRegular() {
 			return fmt.Errorf("reserved Modelith transaction entry %s must be a regular file", name)
 		}
 	}
@@ -1089,6 +1293,14 @@ func validateReservedDir(root *os.Root, name string) error {
 }
 
 func validateTree(root *os.Root, dir string) error {
+	budget := modelithTreeBudget{}
+	return validateTreeWithBudget(root, dir, &budget, 0)
+}
+
+func validateTreeWithBudget(root *os.Root, dir string, budget *modelithTreeBudget, depth int) error {
+	if depth > modelithTreeDepthMax {
+		return fmt.Errorf("modelith transaction tree exceeds %d-directory depth limit at %s", modelithTreeDepthMax, filepath.ToSlash(dir))
+	}
 	entries, err := readDir(root, dir)
 	if err != nil {
 		return err
@@ -1099,11 +1311,14 @@ func validateTree(root *os.Root, dir string) error {
 		if err != nil {
 			return err
 		}
+		if err := budget.add(info, filepath.ToSlash(name)); err != nil {
+			return err
+		}
 		switch {
 		case info.Mode()&os.ModeSymlink != 0:
 			return fmt.Errorf("%s is a symlink", filepath.ToSlash(name))
 		case info.IsDir():
-			if err := validateTree(root, name); err != nil {
+			if err := validateTreeWithBudget(root, name, budget, depth+1); err != nil {
 				return err
 			}
 		case info.Mode().IsRegular():
@@ -1115,6 +1330,14 @@ func validateTree(root *os.Root, dir string) error {
 }
 
 func syncTree(root *os.Root, dir string) error {
+	budget := modelithTreeBudget{}
+	return syncTreeWithBudget(root, dir, &budget, 0)
+}
+
+func syncTreeWithBudget(root *os.Root, dir string, budget *modelithTreeBudget, depth int) error {
+	if depth > modelithTreeDepthMax {
+		return fmt.Errorf("staged Modelith tree exceeds %d-directory depth limit at %s", modelithTreeDepthMax, filepath.ToSlash(dir))
+	}
 	entries, err := readDir(root, dir)
 	if err != nil {
 		return err
@@ -1125,8 +1348,11 @@ func syncTree(root *os.Root, dir string) error {
 		if err != nil {
 			return err
 		}
+		if err := budget.add(info, filepath.ToSlash(name)); err != nil {
+			return err
+		}
 		if info.IsDir() {
-			if err := syncTree(root, name); err != nil {
+			if err := syncTreeWithBudget(root, name, budget, depth+1); err != nil {
 				return err
 			}
 			continue
@@ -1158,7 +1384,8 @@ func fingerprintRootDir(root *os.Root, dir string) (string, error) {
 		return "", fmt.Errorf("modelith corpus must be a real directory")
 	}
 	hash := sha256.New()
-	if err := fingerprintDir(root, dir, dir, hash); err != nil {
+	budget := modelithTreeBudget{}
+	if err := fingerprintDir(root, dir, dir, hash, &budget, 0); err != nil {
 		return "", err
 	}
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
@@ -1169,7 +1396,23 @@ func readDir(root *os.Root, dir string) ([]os.DirEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	entries, readErr := file.ReadDir(-1)
+	entries := make([]os.DirEntry, 0, modelithDirPageSize)
+	var readErr error
+	for {
+		page, err := file.ReadDir(modelithDirPageSize)
+		if len(entries) > modelithDirEntryMax-len(page) {
+			readErr = fmt.Errorf("modelith directory %s exceeds %d-entry limit", filepath.ToSlash(dir), modelithDirEntryMax)
+			break
+		}
+		entries = append(entries, page...)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			readErr = err
+			break
+		}
+	}
 	closeErr := file.Close()
 	if err := errors.Join(readErr, closeErr); err != nil {
 		return nil, err
@@ -1189,34 +1432,36 @@ func readRegularState(root *os.Root, name string) (*regularFileState, bool, erro
 	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 		return nil, false, fmt.Errorf("reserved Modelith transaction entry %s must be a regular file", name)
 	}
+	if info.Size() < 0 || info.Size() > 4096 {
+		return nil, false, fmt.Errorf("reserved Modelith transaction entry %s exceeds the 4096-byte limit", name)
+	}
 	file, err := root.Open(name)
 	if err != nil {
 		return nil, false, err
 	}
 	opened, statErr := file.Stat()
-	if statErr != nil || !os.SameFile(info, opened) || !opened.Mode().IsRegular() {
+	if statErr != nil || !os.SameFile(info, opened) || !opened.Mode().IsRegular() || opened.Size() != info.Size() {
 		return nil, false, errors.Join(statErr, file.Close(), fmt.Errorf("reserved Modelith transaction entry %s changed identity while opening", name))
 	}
 	native, nativeErr := modelithNativeEntryWitness(file, opened)
 	if nativeErr != nil {
 		return nil, false, errors.Join(nativeErr, file.Close())
 	}
-	body, readErr := io.ReadAll(io.LimitReader(file, 4097))
+	var body bytes.Buffer
+	body.Grow(int(opened.Size()))
+	readErr := copyModelithFileExact(&body, file, opened.Size(), name)
 	openedAfter, statErr := file.Stat()
 	pathAfter, pathErr := root.Lstat(name)
 	closeErr := file.Close()
 	if err := errors.Join(readErr, statErr, pathErr, closeErr); err != nil {
 		return nil, false, err
 	}
-	if len(body) > 4096 {
-		return nil, false, fmt.Errorf("modelith transaction journal is too large")
-	}
 	if !os.SameFile(opened, openedAfter) || !os.SameFile(opened, pathAfter) || opened.Mode() != openedAfter.Mode() || opened.Mode() != pathAfter.Mode() ||
 		opened.Size() != openedAfter.Size() || opened.Size() != pathAfter.Size() || !opened.ModTime().Equal(openedAfter.ModTime()) || !opened.ModTime().Equal(pathAfter.ModTime()) ||
 		modelithJournalChangeID(opened) != modelithJournalChangeID(openedAfter) || modelithJournalChangeID(opened) != modelithJournalChangeID(pathAfter) {
 		return nil, false, fmt.Errorf("reserved Modelith transaction entry %s changed while being read", name)
 	}
-	return &regularFileState{body: body, info: pathAfter, mode: pathAfter.Mode(), size: pathAfter.Size(), modTime: pathAfter.ModTime().UnixNano(), native: native, change: modelithJournalChangeID(pathAfter)}, true, nil
+	return &regularFileState{body: body.Bytes(), info: pathAfter, mode: pathAfter.Mode(), size: pathAfter.Size(), modTime: pathAfter.ModTime().UnixNano(), native: native, change: modelithJournalChangeID(pathAfter)}, true, nil
 }
 
 func (state *regularFileState) revalidateAt(root *os.Root, name string) error {
@@ -1292,7 +1537,7 @@ func isolateJournalAuthority(root *os.Root) (*regularFileState, bool, error) {
 		return nil, false, fmt.Errorf("multiple Modelith journal authority entries exist: %s", strings.Join(present, ", "))
 	}
 	if present[0] != journalAuthorityName {
-		if err := root.Rename(present[0], journalAuthorityName); err != nil {
+		if err := fsatomic.RenameNoReplace(root, present[0], journalAuthorityName); err != nil {
 			return nil, false, fmt.Errorf("atomically isolate Modelith recovery journal: %w", err)
 		}
 		if err := syncModelithDirectory(root, "."); err != nil {
@@ -1326,15 +1571,102 @@ func removeValidated(root *os.Root, name string) error {
 		return fmt.Errorf("refuse to remove symlinked Modelith transaction entry %s", name)
 	}
 	if info.IsDir() {
-		if err := validateTree(root, name); err != nil {
+		state, err := captureCorpusState(root, name)
+		if err != nil {
 			return err
 		}
-		return root.RemoveAll(name)
+		return removeCorpusStateExact(root, name, state)
 	}
 	if !info.Mode().IsRegular() {
 		return fmt.Errorf("refuse to remove special Modelith transaction entry %s", name)
 	}
-	return root.Remove(name)
+	state, exists, err := readRegularState(root, name)
+	if err != nil || !exists {
+		return errors.Join(err, fmt.Errorf("modelith transaction entry %s disappeared before deletion", name))
+	}
+	return removeRegularStateExact(root, name, state)
+}
+
+func removeCorpusStateExact(root *os.Root, name string, state *corpusState) error {
+	if state == nil {
+		return fmt.Errorf("cannot remove Modelith transaction tree %s without exact authority", name)
+	}
+	q, err := fsatomic.Quarantine(root, name, modelithQuarantinePrefix(name))
+	if err != nil {
+		return err
+	}
+	if err := syncModelithDirectory(root, "."); err != nil {
+		return errors.Join(err, q.Close())
+	}
+	if err := state.revalidateAt(q.Root(), q.Name()); err != nil {
+		return errors.Join(fmt.Errorf("modelith transaction tree %s changed at deletion isolation; preserving it: %w", name, err), q.Close())
+	}
+	if err := q.RemoveAll(); err != nil {
+		return err
+	}
+	return syncModelithDirectory(root, ".")
+}
+
+func removeRegularStateExact(root *os.Root, name string, state *regularFileState) error {
+	q, err := fsatomic.Quarantine(root, name, modelithQuarantinePrefix(name))
+	if err != nil {
+		return err
+	}
+	if err := syncModelithDirectory(root, "."); err != nil {
+		return errors.Join(err, q.Close())
+	}
+	isolated, exists, err := readRegularState(q.Root(), q.Name())
+	if err != nil || !exists || !sameRegularFileAfterRename(state, isolated) {
+		return errors.Join(err, fmt.Errorf("modelith transaction entry %s changed at deletion isolation; preserving it", name), q.Close())
+	}
+	if err := q.Remove(); err != nil {
+		return err
+	}
+	return syncModelithDirectory(root, ".")
+}
+
+func modelithQuarantinePrefix(source string) string {
+	sum := sha256.Sum256([]byte(source))
+	return ".machinery-modelith-delete-" + hex.EncodeToString(sum[:8]) + "-"
+}
+
+func recoverModelithQuarantines(root *os.Root) error {
+	entries, err := readDir(root, ".")
+	if err != nil {
+		return err
+	}
+	sources := []string{retireName, journalRetireName, journalPreviousName, stageName, journalNextName}
+	for _, entry := range entries {
+		matched := ""
+		for _, source := range sources {
+			if strings.HasPrefix(entry.Name(), modelithQuarantinePrefix(source)) {
+				matched = source
+				break
+			}
+		}
+		if matched == "" {
+			continue
+		}
+		q, err := fsatomic.ResumeQuarantine(root, entry.Name(), matched)
+		if err != nil {
+			return err
+		}
+		if _, err := q.Root().Lstat(q.Name()); errors.Is(err, os.ErrNotExist) {
+			if err := q.FinishEmpty(); err != nil {
+				return err
+			}
+			continue
+		} else if err != nil {
+			return errors.Join(err, q.Close())
+		}
+		if err := q.Restore(); err != nil {
+			return errors.Join(fmt.Errorf("restore interrupted Modelith deletion quarantine %s: %w", entry.Name(), err), q.Close())
+		}
+		if err := syncModelithDirectory(root, "."); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func pathExists(root *os.Root, name string) (bool, error) {

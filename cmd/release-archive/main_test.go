@@ -7,19 +7,554 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/testgit"
 )
 
+func TestArchiveHashTerminatesUnderContinuousAppender(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "growing")
+	if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	appender, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop := make(chan struct{})
+	started := make(chan struct{})
+	var once sync.Once
+	go func() {
+		defer appender.Close()
+		for {
+			if _, err := appender.Write([]byte("xxxxxxxxxxxxxxxx")); err != nil {
+				return
+			}
+			once.Do(func() { close(started) })
+			select {
+			case <-stop:
+				return
+			default:
+			}
+		}
+	}()
+	<-started
+	reader, err := os.Open(path)
+	if err != nil {
+		close(stop)
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := hashArchiveFile(reader, 1)
+		done <- errors.Join(err, reader.Close())
+	}()
+	select {
+	case <-done:
+		close(stop)
+	case <-time.After(2 * time.Second):
+		close(stop)
+		t.Fatal("archive hashing did not terminate under continuous appender")
+	}
+}
+
+func TestArchiveCleanupQuarantineBoundaryPreservesSourceABA(t *testing.T) {
+	dir := t.TempDir()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	stage := ".release-archive-123"
+	if err := root.WriteFile(stage, []byte("stage"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	witness, err := captureArchiveOutput(root, stage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parked := "parked-original"
+	prior := quarantineArchiveCleanup
+	quarantineArchiveCleanup = func(root *os.Root, source, prefix string) (*fsatomic.Quarantined, error) {
+		if err := root.Rename(source, parked); err != nil {
+			return nil, err
+		}
+		if err := root.WriteFile(source, []byte("user"), 0o600); err != nil {
+			return nil, err
+		}
+		return fsatomic.Quarantine(root, source, prefix)
+	}
+	defer func() { quarantineArchiveCleanup = prior }()
+	if err := cleanupArchiveStageIfPresent(root, stage, &witness); err == nil {
+		t.Fatal("release archive cleanup accepted a source ABA at the quarantine boundary")
+	}
+	if body, err := root.ReadFile(parked); err != nil || string(body) != "stage" {
+		t.Fatalf("original stage changed: %q, %v", body, err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preservedReplacement := false
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".release-archive-delete-") {
+			preservedReplacement = true
+		}
+	}
+	if !preservedReplacement {
+		t.Fatal("replacement stage quarantine was not preserved")
+	}
+}
+
+func TestArchiveRecoveryResumesPrivateQuarantineCrash(t *testing.T) {
+	dir := t.TempDir()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	stage := ".release-archive-123"
+	if err := root.WriteFile(stage, []byte("stage"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	witness, err := captureArchiveOutput(root, stage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crash := errors.New("private cleanup crash")
+	prior := archivePrivateCleanupPoint
+	archivePrivateCleanupPoint = func(*os.Root, string) error { return crash }
+	if err := cleanupArchiveStageIfPresent(root, stage, &witness); !errors.Is(err, crash) {
+		t.Fatalf("private cleanup crash = %v", err)
+	}
+	archivePrivateCleanupPoint = prior
+	defer func() { archivePrivateCleanupPoint = prior }()
+	if err := recoverArchiveStages(root); err != nil {
+		t.Fatalf("resume release archive quarantine: %v", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("release recovery residue: %v, %v", entries, err)
+	}
+}
+
+func TestArchiveRecoveryResumesLegacyPrivateRetirementQuarantine(t *testing.T) {
+	dir := t.TempDir()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := ".release-archive-123" + archiveRetireSuffix
+	if err := root.WriteFile(legacy, []byte("stage"), 0o600); err != nil {
+		_ = root.Close()
+		t.Fatal(err)
+	}
+	quarantined, err := fsatomic.Quarantine(root, legacy, ".release-archive-delete-")
+	if err != nil {
+		_ = root.Close()
+		t.Fatal(err)
+	}
+	if err := quarantined.Close(); err != nil {
+		_ = root.Close()
+		t.Fatal(err)
+	}
+	if err := recoverArchiveStages(root); err != nil {
+		_ = root.Close()
+		t.Fatalf("resume legacy private retirement quarantine: %v", err)
+	}
+	if err := root.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
+		t.Fatalf("legacy private retirement quarantine remains: %v, %v", entries, err)
+	}
+}
+
+func TestArchiveRecoveryResumesEmptyQuarantineCrashStates(t *testing.T) {
+	for _, state := range []string{"before-object-move", "after-object-delete"} {
+		t.Run(state, func(t *testing.T) {
+			dir := t.TempDir()
+			root, err := os.OpenRoot(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stage := ".release-archive-123"
+			if err := root.WriteFile(stage, []byte("stage"), 0o600); err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			quarantined, err := fsatomic.Quarantine(root, stage, ".release-archive-delete-")
+			if err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			if state == "before-object-move" {
+				err = fsatomic.RenameNoReplaceBetween(quarantined.Root(), quarantined.Name(), root, stage)
+			} else {
+				err = quarantined.Root().Remove(quarantined.Name())
+			}
+			if err != nil {
+				_ = quarantined.Close()
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			if err := quarantined.Close(); err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			if err := recoverArchiveStages(root); err != nil {
+				_ = root.Close()
+				t.Fatalf("recover %s: %v", state, err)
+			}
+			if err := root.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
+				t.Fatalf("%s recovery residue: %v, %v", state, entries, err)
+			}
+		})
+	}
+}
+
+const archiveCleanupCrashDirEnv = "MACHINERY_RELEASE_CLEANUP_CRASH_DIR"
+const archiveCleanupCrashPointEnv = "MACHINERY_RELEASE_CLEANUP_CRASH_POINT"
+
+func TestArchiveRecoveryResumesProcessCrashAtCleanupDurabilityBoundaries(t *testing.T) {
+	for _, point := range []string{"after-stage-isolate", "before-stage-remove", "private-removal-boundary"} {
+		t.Run(point, func(t *testing.T) {
+			dir := t.TempDir()
+			stage := ".release-archive-123"
+			if err := os.WriteFile(filepath.Join(dir, stage), []byte("stage"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			command := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestArchiveCleanupCrashHelper$")
+			command.Env = append(os.Environ(), archiveCleanupCrashDirEnv+"="+dir, archiveCleanupCrashPointEnv+"="+point)
+			err := command.Run()
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != 86 {
+				t.Fatalf("cleanup crash helper at %s = %v", point, err)
+			}
+			root, err := os.OpenRoot(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := recoverArchiveStages(root); err != nil {
+				_ = root.Close()
+				t.Fatalf("restart cleanup after %s: %v", point, err)
+			}
+			if err := root.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
+				t.Fatalf("restart left cleanup residue after %s: %v, %v", point, entries, err)
+			}
+		})
+	}
+}
+
+func TestArchiveCleanupCrashHelper(t *testing.T) {
+	dir := os.Getenv(archiveCleanupCrashDirEnv)
+	if dir == "" {
+		return
+	}
+	point := os.Getenv(archiveCleanupCrashPointEnv)
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		os.Exit(88)
+	}
+	stage := ".release-archive-123"
+	witness, err := captureArchiveOutput(root, stage)
+	if err != nil {
+		os.Exit(89)
+	}
+	archiveCleanupPoint = func(got, _ string) error {
+		if got == point {
+			os.Exit(86)
+		}
+		return nil
+	}
+	archivePrivateRemovePoint = func(*os.Root, string) error {
+		if point == "private-removal-boundary" {
+			os.Exit(86)
+		}
+		return nil
+	}
+	_ = cleanupArchiveStageIfPresent(root, stage, &witness)
+	os.Exit(87)
+}
+
+func TestArchivePublicationResumesPrivateOutputRetirement(t *testing.T) {
+	for _, published := range []bool{false, true} {
+		t.Run(fmt.Sprintf("published=%v", published), func(t *testing.T) {
+			directory := t.TempDir()
+			outputName := "release.tar.gz"
+			output := filepath.Join(directory, outputName)
+			if err := os.WriteFile(output, []byte("previous"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			stageName, err := archiveStageName(output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(directory, stageName), []byte("next"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			root, err := os.OpenRoot(directory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stageState, err := captureArchiveOutput(root, stageName)
+			if err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			if _, err := writeArchivePublicationWitness(root, archivePublicationWitnessName(stageName), newArchivePublicationWitness(stageName, outputName, stageState)); err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			quarantined, err := fsatomic.Quarantine(root, outputName, archivePublishDeletePrefix)
+			if err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			if published {
+				if err := fsatomic.RenameNoReplace(root, stageName, outputName); err != nil {
+					_ = quarantined.Close()
+					_ = root.Close()
+					t.Fatal(err)
+				}
+			}
+			if err := quarantined.Close(); err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			if err := recoverArchivePublication(root, outputName, stageName); err != nil {
+				_ = root.Close()
+				t.Fatalf("recover publication: %v", err)
+			}
+			if err := recoverArchiveStages(root); err != nil {
+				_ = root.Close()
+				t.Fatalf("converge publication cleanup: %v", err)
+			}
+			if err := root.Close(); err != nil {
+				t.Fatal(err)
+			}
+			want := "previous"
+			if published {
+				want = "next"
+			}
+			if body, err := os.ReadFile(output); err != nil || string(body) != want {
+				t.Fatalf("recovered output = %q, %v; want %q", body, err, want)
+			}
+			entries, err := os.ReadDir(directory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, entry := range entries {
+				if strings.HasPrefix(entry.Name(), archivePublishDeletePrefix) {
+					t.Fatalf("publication recovery left private retirement %q", entry.Name())
+				}
+				if entry.Name() == archivePublicationWitnessName(stageName) {
+					t.Fatalf("publication recovery left durable witness %q", entry.Name())
+				}
+			}
+		})
+	}
+}
+
+func TestArchivePublicationRecoveryPreservesAuthorityOnWitnessMismatch(t *testing.T) {
+	for _, mutation := range []string{"concurrent replacement", "same-byte ABA", "post-check replacement", "witness corruption", "authority absence"} {
+		t.Run(mutation, func(t *testing.T) {
+			directory := t.TempDir()
+			outputName := "release.tar.gz"
+			output := filepath.Join(directory, outputName)
+			if err := os.WriteFile(output, []byte("previous"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			stageName, err := archiveStageName(output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stagePath := filepath.Join(directory, stageName)
+			if err := os.WriteFile(stagePath, []byte("next"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			root, err := os.OpenRoot(directory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stageState, err := captureArchiveOutput(root, stageName)
+			if err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			witnessName := archivePublicationWitnessName(stageName)
+			authority, err := writeArchivePublicationWitness(root, witnessName, newArchivePublicationWitness(stageName, outputName, stageState))
+			if err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			quarantined, err := fsatomic.Quarantine(root, outputName, archivePublishDeletePrefix)
+			if err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			if err := fsatomic.RenameNoReplace(root, stageName, outputName); err != nil {
+				_ = quarantined.Close()
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			if err := quarantined.Close(); err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			switch mutation {
+			case "concurrent replacement":
+				if err := os.Rename(output, filepath.Join(directory, "published-original")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(output, []byte("foreign"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "same-byte ABA":
+				info, err := os.Lstat(output)
+				if err != nil {
+					t.Fatal(err)
+				}
+				body, err := os.ReadFile(output)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Rename(output, filepath.Join(directory, "published-original")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(output, body, info.Mode().Perm()); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Chtimes(output, info.ModTime(), info.ModTime()); err != nil {
+					t.Fatal(err)
+				}
+			case "post-check replacement":
+				prior := archivePublicationRecoveryPoint
+				archivePublicationRecoveryPoint = func(root *os.Root, name string) error {
+					if err := root.Rename(name, "published-original"); err != nil {
+						return err
+					}
+					return root.WriteFile(name, []byte("foreign"), 0o600)
+				}
+				defer func() { archivePublicationRecoveryPoint = prior }()
+			case "witness corruption":
+				if err := os.WriteFile(filepath.Join(directory, witnessName), []byte("{}\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "authority absence":
+				if err := os.Remove(filepath.Join(directory, authority.name)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err = recoverArchivePublication(root, outputName, stageName)
+			if err == nil || !strings.Contains(err.Error(), "preserv") {
+				_ = root.Close()
+				t.Fatalf("%s did not fail closed: %v", mutation, err)
+			}
+			entries, err := os.ReadDir(directory)
+			if err != nil {
+				_ = root.Close()
+				t.Fatal(err)
+			}
+			preservedPrior := false
+			for _, entry := range entries {
+				if strings.HasPrefix(entry.Name(), archivePublishDeletePrefix) {
+					preservedPrior = true
+				}
+			}
+			if !preservedPrior {
+				_ = root.Close()
+				t.Fatalf("%s retired prior-output authority", mutation)
+			}
+			if _, err := os.Lstat(output); err != nil {
+				_ = root.Close()
+				t.Fatalf("%s removed live output: %v", mutation, err)
+			}
+			if _, err := os.Lstat(filepath.Join(directory, witnessName)); err != nil {
+				_ = root.Close()
+				t.Fatalf("%s removed publication witness: %v", mutation, err)
+			}
+			if err := root.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestArchiveCleanupPreservesPostCheckPrivateReplacement(t *testing.T) {
+	dir := t.TempDir()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	stage := ".release-archive-123"
+	if err := root.WriteFile(stage, []byte("stage"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	witness, err := captureArchiveOutput(root, stage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior := archivePrivateCleanupPoint
+	archivePrivateCleanupPoint = func(root *os.Root, name string) error {
+		if err := root.Rename(name, name+"-original"); err != nil {
+			return err
+		}
+		return root.WriteFile(name, []byte("user"), 0o600)
+	}
+	defer func() { archivePrivateCleanupPoint = prior }()
+	if err := cleanupArchiveStageIfPresent(root, stage, &witness); err == nil || !strings.Contains(err.Error(), "unexpected inventory") {
+		t.Fatalf("private replacement diagnostic = %v", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) != 1 || !strings.HasPrefix(entries[0].Name(), ".release-archive-delete-") {
+		t.Fatalf("private archive replacement authority was not preserved: %v, %v", entries, err)
+	}
+}
+
+func TestArchiveRecoveryRejectsDirectoryEntryOverflow(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a", "b", "c"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	if err := recoverArchiveStagesBounded(root, 2); err == nil || !strings.Contains(err.Error(), "2-entry limit") {
+		t.Fatalf("release directory overflow diagnostic = %v", err)
+	}
+}
+
+func TestWriteArchiveRejectsEntryOverflowBeforePlanning(t *testing.T) {
+	entries := make([]entry, archiveMaxEntries+1)
+	if err := writeArchive(filepath.Join(t.TempDir(), "out.tar.gz"), time.Unix(1, 0), entries); err == nil || !strings.Contains(err.Error(), "entry limit") {
+		t.Fatalf("archive entry overflow diagnostic = %v", err)
+	}
+}
+
 const archiveCrashEnv = "MACHINERY_RELEASE_ARCHIVE_CRASH_OUTPUT"
+const archivePublicationCrashPointEnv = "MACHINERY_RELEASE_ARCHIVE_PUBLICATION_CRASH_POINT"
 
 func TestMain(m *testing.M) {
 	// Darwin exposes its default temporary tree through /var, a system
@@ -518,6 +1053,143 @@ func TestWriteArchivePublishesAfterSyncAndSurvivesPreRenameCrash(t *testing.T) {
 	}
 }
 
+func TestArchivePublicationWitnessConvergesAfterProcessCrash(t *testing.T) {
+	for _, point := range []string{"before-output-rename", "after-output-rename"} {
+		t.Run(point, func(t *testing.T) {
+			dir := t.TempDir()
+			output := filepath.Join(dir, "release.tar.gz")
+			if err := os.WriteFile(output, []byte("previous"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			command := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestArchivePublicationCrashHelper$")
+			command.Env = append(os.Environ(), archiveCrashEnv+"="+output, archivePublicationCrashPointEnv+"="+point)
+			err := command.Run()
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != 86 {
+				t.Fatalf("publication crash helper at %s = %v", point, err)
+			}
+			stageName, err := archiveStageName(output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Lstat(filepath.Join(dir, archivePublicationWitnessName(stageName))); err != nil {
+				t.Fatalf("%s crash did not retain durable staged-output witness: %v", point, err)
+			}
+			entries := []entry{{name: "machinery/file", mode: 0o644, kind: entryRegular, data: []byte("replacement")}}
+			if err := writeArchive(output, time.Unix(1_700_000_000, 0).UTC(), entries); err != nil {
+				t.Fatalf("converge after %s crash: %v", point, err)
+			}
+			if entries, err := os.ReadDir(dir); err != nil {
+				t.Fatal(err)
+			} else {
+				for _, entry := range entries {
+					if strings.HasPrefix(entry.Name(), archiveStagePrefix) || strings.HasPrefix(entry.Name(), archivePublishDeletePrefix) {
+						t.Fatalf("convergence after %s left publication residue %q", point, entry.Name())
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestArchivePublicationWitnessAuthorityConvergesAfterEveryProcessCrashBoundary(t *testing.T) {
+	points := []string{
+		"create",
+		"partial-write",
+		"write",
+		"file-sync",
+		"close",
+		"directory-sync",
+		"before-publication",
+		"after-publication",
+		"publication-directory-sync",
+	}
+	for _, point := range points {
+		t.Run(point, func(t *testing.T) {
+			directory := t.TempDir()
+			output := filepath.Join(directory, "release.tar.gz")
+			if err := os.WriteFile(output, []byte("previous"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			command := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestArchivePublicationCrashHelper$")
+			command.Env = append(os.Environ(), archiveCrashEnv+"="+output, archivePublicationCrashPointEnv+"="+point)
+			err := command.Run()
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != 86 {
+				t.Fatalf("publication witness crash helper at %s = %v", point, err)
+			}
+			if body, err := os.ReadFile(output); err != nil || string(body) != "previous" {
+				t.Fatalf("witness crash at %s changed output before archive publication: body=%q err=%v", point, body, err)
+			}
+			entries := []entry{{name: "machinery/file", mode: 0o644, kind: entryRegular, data: []byte("replacement")}}
+			if err := writeArchive(output, time.Unix(1_700_000_000, 0).UTC(), entries); err != nil {
+				t.Fatalf("converge after publication witness %s crash: %v", point, err)
+			}
+			if body, err := os.ReadFile(output); err != nil || bytes.Equal(body, []byte("previous")) {
+				t.Fatalf("convergence after %s did not publish replacement: size=%d err=%v", point, len(body), err)
+			}
+			for _, item := range mustReadDir(t, directory) {
+				if strings.HasPrefix(item.Name(), archiveStagePrefix) || strings.HasPrefix(item.Name(), archivePublishDeletePrefix) {
+					t.Fatalf("convergence after witness %s left reserved residue %q", point, item.Name())
+				}
+			}
+		})
+	}
+}
+
+func TestArchivePublicationWitnessSyscallBoundaryCollisionPreservesForeignFile(t *testing.T) {
+	directory := t.TempDir()
+	outputName := "release.tar.gz"
+	output := filepath.Join(directory, outputName)
+	stageName, err := archiveStageName(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, stageName), []byte("staged archive"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := root.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	stage, err := captureArchiveOutput(root, stageName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	witnessName := archivePublicationWitnessName(stageName)
+	previous := archiveWitnessPoint
+	archiveWitnessPoint = func(point string) error {
+		if point != "before-publication" {
+			return nil
+		}
+		return root.WriteFile(witnessName, []byte("foreign boundary witness"), 0o600)
+	}
+	t.Cleanup(func() { archiveWitnessPoint = previous })
+	if _, err := writeArchivePublicationWitness(root, witnessName, newArchivePublicationWitness(stageName, outputName, stage)); err == nil {
+		t.Fatal("publication witness replaced a syscall-boundary collision")
+	}
+	body, err := os.ReadFile(filepath.Join(directory, witnessName))
+	if err != nil || string(body) != "foreign boundary witness" {
+		t.Fatalf("foreign witness changed: body=%q err=%v", body, err)
+	}
+	for _, item := range mustReadDir(t, directory) {
+		if strings.HasPrefix(item.Name(), archiveWitnessStagePrefix) {
+			t.Fatalf("failed witness publication stranded owned authority %q", item.Name())
+		}
+	}
+	if err := recoverArchivePublication(root, outputName, stageName); err == nil || !strings.Contains(err.Error(), "foreign") {
+		t.Fatalf("recovery accepted fixed witness without private authority: %v", err)
+	}
+	if body, err := os.ReadFile(filepath.Join(directory, witnessName)); err != nil || string(body) != "foreign boundary witness" {
+		t.Fatalf("recovery changed foreign witness: body=%q err=%v", body, err)
+	}
+}
+
 func TestWriteArchiveRejectsIntermediateOutputDirectorySymlink(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation requires developer mode on Windows")
@@ -543,97 +1215,43 @@ func TestWriteArchiveStageCleanupPreservesLateMutations(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("native change-time ABA witness is platform-specific")
 	}
-	for _, tc := range []struct {
-		name   string
-		point  string
-		mutate func(*testing.T, string, string)
-	}{
-		{
-			name:  "content after isolation",
-			point: "after-stage-isolate",
-			mutate: func(t *testing.T, path, _ string) {
-				if err := os.WriteFile(path, []byte("late-content"), 0o600); err != nil {
-					t.Fatal(err)
-				}
-			},
-		},
-		{
-			name:  "path replacement before removal",
-			point: "before-stage-remove",
-			mutate: func(t *testing.T, path, parked string) {
-				body, err := os.ReadFile(path)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Rename(path, parked); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(path, body, 0o600); err != nil {
-					t.Fatal(err)
-				}
-			},
-		},
-		{
-			name:  "same-content ABA before removal",
-			point: "before-stage-remove",
-			mutate: func(t *testing.T, path, _ string) {
-				body, err := os.ReadFile(path)
-				if err != nil {
-					t.Fatal(err)
-				}
-				info, err := os.Lstat(path)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(path, []byte("different-content"), info.Mode().Perm()); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(path, body, info.Mode().Perm()); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
-					t.Fatal(err)
-				}
-			},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, mutation := range []string{"content", "same-content ABA"} {
+		t.Run(mutation, func(t *testing.T) {
 			dir := t.TempDir()
-			output := filepath.Join(dir, "release.tar.gz")
-			stageName, err := archiveStageName(output)
+			root, err := os.OpenRoot(dir)
 			if err != nil {
 				t.Fatal(err)
 			}
-			stagePath := filepath.Join(dir, stageName)
+			defer root.Close()
+			stage := ".release-archive-123"
 			original := []byte("interrupted-stage")
-			if err := os.WriteFile(stagePath, original, 0o600); err != nil {
+			if err := root.WriteFile(stage, original, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			parked := filepath.Join(dir, "parked-original-stage")
-			prior := archiveCleanupPoint
-			archiveCleanupPoint = func(point, name string) error {
-				if point == tc.point {
-					tc.mutate(t, filepath.Join(dir, name), parked)
+			witness, err := captureArchiveOutput(root, stage)
+			if err != nil {
+				t.Fatal(err)
+			}
+			prior := archivePrivateCleanupPoint
+			archivePrivateCleanupPoint = func(private *os.Root, name string) error {
+				if mutation == "content" {
+					return private.WriteFile(name, []byte("late-content"), 0o600)
 				}
-				return nil
-			}
-			entries := []entry{{name: "machinery/file", mode: 0o644, kind: entryRegular, data: []byte("new")}}
-			err = writeArchive(output, time.Unix(1_700_000_000, 0).UTC(), entries)
-			archiveCleanupPoint = prior
-			t.Cleanup(func() { archiveCleanupPoint = prior })
-			if err == nil || !strings.Contains(err.Error(), "preserv") && !strings.Contains(err.Error(), "changed") {
-				t.Fatalf("late stage mutation was accepted: %v", err)
-			}
-			if info, statErr := os.Lstat(stagePath); statErr != nil || !info.Mode().IsRegular() {
-				t.Fatalf("late stage mutation was not preserved at its stage path: info=%v err=%v", info, statErr)
-			}
-			if _, statErr := os.Lstat(output); !errors.Is(statErr, os.ErrNotExist) {
-				t.Fatalf("publication continued after unsafe recovery: %v", statErr)
-			}
-			if tc.name == "path replacement before removal" {
-				if body, readErr := os.ReadFile(parked); readErr != nil || !bytes.Equal(body, original) {
-					t.Fatalf("isolated original was not preserved: body=%q err=%v", body, readErr)
+				if err := private.Rename(name, name+"-original"); err != nil {
+					return err
 				}
+				return private.WriteFile(name, original, 0o600)
+			}
+			defer func() { archivePrivateCleanupPoint = prior }()
+			if err := cleanupArchiveStageIfPresent(root, stage, &witness); err == nil || !strings.Contains(err.Error(), "preserv") {
+				t.Fatalf("private stage %s was accepted: %v", mutation, err)
+			}
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(entries) != 1 || !strings.HasPrefix(entries[0].Name(), ".release-archive-delete-") {
+				t.Fatalf("private mutation evidence was not preserved: %v", entries)
 			}
 		})
 	}
@@ -840,6 +1458,23 @@ func TestWriteArchiveRejectsForeignOrUnsafeReservedResidue(t *testing.T) {
 	}
 }
 
+func TestWriteArchiveRejectsForeignFixedRetirementResidue(t *testing.T) {
+	dir := t.TempDir()
+	name := archiveStagePrefix + strings.Repeat("0", sha256.Size*2) + archiveStageSuffix + archiveRetireSuffix
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte("foreign"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(dir, "release.tar.gz")
+	entries := []entry{{name: "machinery/file", mode: 0o644, kind: entryRegular, data: []byte("new")}}
+	if err := writeArchive(output, time.Unix(1_700_000_000, 0).UTC(), entries); err == nil || !strings.Contains(err.Error(), "ambiguous retired") {
+		t.Fatalf("foreign fixed retirement residue was accepted: %v", err)
+	}
+	if body, err := os.ReadFile(path); err != nil || string(body) != "foreign" {
+		t.Fatalf("foreign fixed retirement residue changed: %q, %v", body, err)
+	}
+}
+
 func TestWriteArchiveValidatesCompleteResidueInventoryBeforeCleanup(t *testing.T) {
 	dir := t.TempDir()
 	valid := filepath.Join(dir, archiveStagePrefix+strings.Repeat("0", sha256.Size*2)+archiveStageSuffix)
@@ -896,6 +1531,29 @@ func TestArchiveCrashHelper(t *testing.T) {
 	afterArchiveSync = func(string) error {
 		_ = os.WriteFile(filepath.Join(filepath.Dir(output), "crash-reached"), []byte("yes"), 0o600)
 		os.Exit(86)
+		return nil
+	}
+	entries := []entry{{name: "machinery/file", mode: 0o644, kind: entryRegular, data: []byte("replacement")}}
+	_ = writeArchive(output, time.Unix(1_700_000_000, 0).UTC(), entries)
+	os.Exit(87)
+}
+
+func TestArchivePublicationCrashHelper(t *testing.T) {
+	output := os.Getenv(archiveCrashEnv)
+	point := os.Getenv(archivePublicationCrashPointEnv)
+	if output == "" || point == "" {
+		return
+	}
+	archivePublishPoint = func(got string) error {
+		if got == point {
+			os.Exit(86)
+		}
+		return nil
+	}
+	archiveWitnessPoint = func(got string) error {
+		if got == point {
+			os.Exit(86)
+		}
 		return nil
 	}
 	entries := []entry{{name: "machinery/file", mode: 0o644, kind: entryRegular, data: []byte("replacement")}}

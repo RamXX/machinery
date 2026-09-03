@@ -93,7 +93,12 @@ func HasPack(design string) bool {
 // none of these; measuring emptiness once produced a confident "single-run
 // design" recommendation for a directory that was not a design at all.
 func LooksLikeDesignDir(design string) bool {
-	if entries, err := os.ReadDir(design); err == nil {
+	if root, err := openDesignRoot(design); err == nil {
+		entries, readErr := readPackDir(root, ".")
+		closeErr := root.Close()
+		if errors.Join(readErr, closeErr) != nil {
+			return false
+		}
 		for _, e := range entries {
 			if strings.HasSuffix(e.Name(), ".modelith.yaml") {
 				return true
@@ -216,6 +221,10 @@ func openDesignRoot(design string) (*os.Root, error) {
 }
 
 func readDesignFileRoot(root *os.Root, rel string) ([]byte, error) {
+	return readPackRegularRoot(root, rel, "design source")
+}
+
+func readPackRegularRoot(root *os.Root, rel, label string) ([]byte, error) {
 	if filepath.IsAbs(rel) || rel == "" || filepath.Clean(rel) == "." || strings.HasPrefix(filepath.Clean(rel), ".."+string(filepath.Separator)) {
 		return nil, fmt.Errorf("%s resolves outside the design directory", ir.Repr(rel))
 	}
@@ -224,22 +233,41 @@ func readDesignFileRoot(root *os.Root, rel string) ([]byte, error) {
 		return nil, err
 	}
 	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s is not a regular non-symlink file", ir.Repr(rel))
+		return nil, fmt.Errorf("%s %s is not a regular non-symlink file", label, ir.Repr(rel))
+	}
+	if info.Size() < 0 || info.Size() > packFileMaxBytes {
+		return nil, fmt.Errorf("%s %s exceeds %d-byte limit", label, ir.Repr(rel), packFileMaxBytes)
 	}
 	f, err := root.Open(rel)
 	if err != nil {
 		return nil, err
 	}
 	openedInfo, statErr := f.Stat()
-	if statErr != nil || !os.SameFile(info, openedInfo) {
+	if statErr != nil || !os.SameFile(info, openedInfo) || openedInfo.Mode() != info.Mode() || openedInfo.Size() != info.Size() {
 		_ = f.Close()
 		if statErr != nil {
 			return nil, statErr
 		}
 		return nil, fmt.Errorf("%s changed while opening", ir.Repr(rel))
 	}
-	data, readErr := io.ReadAll(f)
-	return data, errors.Join(readErr, f.Close())
+	if err := packFileReadPoint(filepath.ToSlash(rel)); err != nil {
+		return nil, errors.Join(err, f.Close())
+	}
+	data, readErr := io.ReadAll(io.LimitReader(f, info.Size()+1))
+	openedAfter, afterStatErr := f.Stat()
+	closeErr := f.Close()
+	pathAfter, pathErr := root.Lstat(rel)
+	if err := errors.Join(readErr, afterStatErr, closeErr, pathErr); err != nil {
+		return nil, err
+	}
+	if int64(len(data)) != info.Size() || !os.SameFile(info, openedAfter) || !os.SameFile(info, pathAfter) ||
+		openedAfter.Mode() != info.Mode() || pathAfter.Mode() != info.Mode() ||
+		openedAfter.Size() != info.Size() || pathAfter.Size() != info.Size() ||
+		!openedAfter.ModTime().Equal(info.ModTime()) || !pathAfter.ModTime().Equal(info.ModTime()) ||
+		packChangeID(openedAfter) != packChangeID(info) || packChangeID(pathAfter) != packChangeID(info) {
+		return nil, fmt.Errorf("%s %s changed identity, size, or metadata while being read", label, ir.Repr(rel))
+	}
+	return data, nil
 }
 
 // LoadDecomposition parses and validates decomposition.yaml against the
@@ -585,15 +613,10 @@ func loadDecompositionRoot(design string, root *os.Root) (*Decomposition, error)
 }
 
 func loadModelithRoot(design string, root *os.Root) (*ir.Value, error) {
-	dir, err := root.Open(".")
+	entries, err := readPackDir(root, ".")
 	if err != nil {
 		return nil, err
 	}
-	entries, readErr := dir.ReadDir(-1)
-	if err := errors.Join(readErr, dir.Close()); err != nil {
-		return nil, err
-	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	var paths []string
 	for _, e := range entries {
 		if strings.HasSuffix(e.Name(), ".modelith.yaml") {
@@ -1391,7 +1414,7 @@ func writePacksSnapshot(design string) (ids []string, packs map[string]map[strin
 	err = snapshot.PublishExpectedRooted("pack-generate", "rerun `machinery pack generate` with the same arguments", []designlock.OutputExpectation{expectedTree}, func(outputs *designlock.OutputScope) error {
 		return outputs.WithRoot(packsDir, func(root *os.Root) error {
 			var publishErr error
-			written, publishErr = writePacksRootedWithRename(packsDir, root, packs, renamePackRoot)
+			written, publishErr = writePacksRootedWithRename(packsDir, root, packs, nil)
 			return publishErr
 		})
 	})
@@ -1427,7 +1450,7 @@ func acquirePackWriteLock(rootPath string) (*packWriteLock, error) {
 		_ = root.Close()
 		return nil, fmt.Errorf("pack: another pack transaction is active in %s: %w", rootPath, err)
 	}
-	if err := recoverPackTransaction(root, renamePackRoot); err != nil {
+	if err := recoverPackTransaction(root, nil); err != nil {
 		_ = l.Release()
 		_ = root.Close()
 		return nil, fmt.Errorf("pack: recover interrupted pack transaction: %w", err)
@@ -1440,7 +1463,7 @@ func acquirePackWriteLockRetained(rootPath string, root *os.Root) (*packWriteLoc
 	if err != nil {
 		return nil, fmt.Errorf("pack: another pack transaction is active in %s: %w", rootPath, err)
 	}
-	if err := recoverPackTransaction(root, renamePackRoot); err != nil {
+	if err := recoverPackTransaction(root, nil); err != nil {
 		_ = l.Release()
 		return nil, fmt.Errorf("pack: recover interrupted pack transaction: %w", err)
 	}
@@ -1467,6 +1490,9 @@ func writePacksWithRename(design string, packs map[string]map[string]string, ren
 }
 
 func writePacksRootedWithRename(design string, retained *os.Root, packs map[string]map[string]string, rename packRootRename) (ids []string, retErr error) {
+	if len(packs) > packDirMaxEntries {
+		return nil, fmt.Errorf("pack: generated pack set exceeds %d-pack limit", packDirMaxEntries)
+	}
 	for id := range packs {
 		ids = append(ids, id)
 	}
@@ -1529,8 +1555,12 @@ func writePacksRootedWithRename(design string, retained *os.Root, packs map[stri
 		} else if !os.IsNotExist(statErr) {
 			return nil, statErr
 		}
+		if len(packs[id]) > packTreeMaxEntries-1 {
+			return nil, fmt.Errorf("pack: subsystem %s exceeds %d-member limit", ir.Repr(id), packTreeMaxEntries-1)
+		}
 		var names []string
 		foldedNames := make(map[string]string, len(packs[id]))
+		var generatedBytes int64
 		for n := range packs[id] {
 			if filepath.Base(n) != n || n == "" || n == "." {
 				return nil, fmt.Errorf("pack: subsystem %s generated unsafe member name %s", ir.Repr(id), ir.Repr(n))
@@ -1540,6 +1570,14 @@ func writePacksRootedWithRename(design string, retained *os.Root, packs map[stri
 				return nil, fmt.Errorf("pack: subsystem %s generated members %s and %s that alias on case-insensitive filesystems", ir.Repr(id), ir.Repr(prior), ir.Repr(n))
 			}
 			foldedNames[fold] = n
+			memberBytes := int64(len(packs[id][n]))
+			if memberBytes > packFileMaxBytes {
+				return nil, fmt.Errorf("pack: subsystem %s member %s exceeds %d-byte limit", ir.Repr(id), ir.Repr(n), packFileMaxBytes)
+			}
+			if memberBytes > packTreeMaxBytes-generatedBytes {
+				return nil, fmt.Errorf("pack: subsystem %s exceeds %d-byte aggregate limit", ir.Repr(id), packTreeMaxBytes)
+			}
+			generatedBytes += memberBytes
 			names = append(names, n)
 		}
 		sort.Strings(names)
@@ -1555,16 +1593,10 @@ func writePacksRootedWithRename(design string, retained *os.Root, packs map[stri
 		}
 		plans = append(plans, &packWritePlan{id: id, target: target, names: names, stage: stage, backup: backup, retire: retire, hadTarget: existed, before: before})
 	}
-	dirFile, err := lock.root.Open(".")
+	entries, err := readPackDir(lock.root, ".")
 	if err != nil {
 		return nil, err
 	}
-	entries, readErr := dirFile.ReadDir(-1)
-	closeErr := dirFile.Close()
-	if err := errors.Join(readErr, closeErr); err != nil {
-		return nil, err
-	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	for _, entry := range entries {
 		id, targeted := foldedTargets[strings.ToLower(entry.Name())]
 		want := id + ".pack"
@@ -1733,7 +1765,7 @@ func writePacksRootedWithRename(design string, retained *os.Root, packs map[stri
 		if err := journalAuthority.revalidate(lock.root); err != nil {
 			return fmt.Errorf("pack transaction journal authority changed before publishing %s: %w", newName, err)
 		}
-		return rename(lock.root, oldName, newName)
+		return renamePackNoReplace(lock.root, rename, oldName, newName)
 	}
 	for _, plan := range plans {
 		if !plan.hadTarget {

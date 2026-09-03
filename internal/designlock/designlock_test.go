@@ -2,14 +2,18 @@ package designlock
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/RamXX/machinery/internal/fsatomic"
 )
 
 func TestCheckUnchangedRejectsNonCooperativeMutation(t *testing.T) {
@@ -1314,7 +1318,6 @@ func TestPublishRetainedSentinelAuthorityRejectsCallbackMutation(t *testing.T) {
 func TestPublishSentinelClearPreservesLatePathReplacement(t *testing.T) {
 	design := t.TempDir()
 	output := filepath.Join(design, "generated.txt")
-	parked := filepath.Join(design, "parked-original-retirement")
 	lock, err := Acquire(design)
 	if err != nil {
 		t.Fatal(err)
@@ -1322,18 +1325,10 @@ func TestPublishSentinelClearPreservesLatePathReplacement(t *testing.T) {
 	defer lock.Release()
 	prior := testPublishCleanupPoint
 	testPublishCleanupPoint = func(point, name string) error {
-		if point != "before-remove" || name != publishSentinelRetired {
+		if point != "before-remove" || name != publishSentinel {
 			return nil
 		}
-		retired := filepath.Join(design, name)
-		body, err := os.ReadFile(retired)
-		if err != nil {
-			return err
-		}
-		if err := os.Rename(retired, parked); err != nil {
-			return err
-		}
-		return os.WriteFile(retired, body, 0o600)
+		return os.WriteFile(filepath.Join(design, name), []byte("concurrent replacement\n"), 0o600)
 	}
 	expected := []OutputExpectation{ExpectFile(output, []byte("new\n"), 0o644)}
 	err = lock.PublishExpected("clear-writer", "rerun clear writer", expected, func() error {
@@ -1341,13 +1336,342 @@ func TestPublishSentinelClearPreservesLatePathReplacement(t *testing.T) {
 	})
 	testPublishCleanupPoint = prior
 	t.Cleanup(func() { testPublishCleanupPoint = prior })
-	if err == nil || !strings.Contains(err.Error(), "changed before deletion") {
-		t.Fatalf("late sentinel retirement replacement was deleted or accepted: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "was repopulated") {
+		t.Fatalf("late sentinel replacement was deleted or accepted: %v", err)
 	}
-	for _, path := range []string{filepath.Join(design, publishSentinel), filepath.Join(design, publishSentinelRetired), parked} {
-		if info, statErr := os.Lstat(path); statErr != nil || !info.Mode().IsRegular() {
-			t.Fatalf("sentinel cleanup failed to preserve %s: info=%v err=%v", path, info, statErr)
+	if body, readErr := os.ReadFile(filepath.Join(design, publishSentinel)); readErr != nil || string(body) != "concurrent replacement\n" {
+		t.Fatalf("sentinel replacement = %q, %v", body, readErr)
+	}
+	root, openErr := os.OpenRoot(design)
+	if openErr != nil {
+		t.Fatal(openErr)
+	}
+	quarantine, findErr := findPublishQuarantine(root)
+	closeErr := root.Close()
+	if findErr != nil || closeErr != nil || quarantine == "" {
+		t.Fatalf("original sentinel quarantine = %q, find %v, close %v", quarantine, findErr, closeErr)
+	}
+}
+
+func TestPublishSentinelRetirementDoesNotReplaceDestinationCollision(t *testing.T) {
+	design := t.TempDir()
+	output := filepath.Join(design, "generated.txt")
+	retired := filepath.Join(design, publishSentinelRetired)
+	lock, err := Acquire(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Release()
+	prior := testPublishCleanupPoint
+	testPublishCleanupPoint = func(point, name string) error {
+		if point == "before-retire" && name == publishSentinelRetired {
+			return os.WriteFile(retired, []byte("concurrent retirement\n"), 0o600)
 		}
+		return nil
+	}
+	err = lock.PublishExpected("collision-writer", "rerun collision writer", []OutputExpectation{ExpectFile(output, []byte("new\n"), 0o644)}, func() error {
+		return os.WriteFile(output, []byte("new\n"), 0o644)
+	})
+	testPublishCleanupPoint = prior
+	t.Cleanup(func() { testPublishCleanupPoint = prior })
+	if err == nil || !strings.Contains(err.Error(), "appeared concurrently") {
+		t.Fatalf("retirement destination collision was overwritten or accepted: %v", err)
+	}
+	for path, want := range map[string]string{
+		filepath.Join(design, publishSentinel): "\"operation\":\"collision-writer\"",
+		retired:                                "concurrent retirement\n",
+	} {
+		body, readErr := os.ReadFile(path)
+		if readErr != nil || !strings.Contains(string(body), want) {
+			t.Fatalf("preserved %s = %q, %v; want content %q", path, body, readErr, want)
+		}
+	}
+}
+
+func TestPublishSentinelInstallPreservesAtomicDestinationCollision(t *testing.T) {
+	design := t.TempDir()
+	output := filepath.Join(design, "generated.txt")
+	lock, err := Acquire(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Release()
+	concurrent := []byte("concurrent publication authority\n")
+	prior := publishRenameNoReplace
+	publishRenameNoReplace = func(root *os.Root, from, to string) error {
+		if from == publishSentinelStage && to == publishSentinel {
+			file, openErr := root.OpenFile(to, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+			if openErr != nil {
+				return openErr
+			}
+			_, writeErr := file.Write(concurrent)
+			if err := errors.Join(writeErr, file.Close()); err != nil {
+				return err
+			}
+		}
+		return prior(root, from, to)
+	}
+	err = lock.PublishExpected("install-collision", "rerun install collision", []OutputExpectation{ExpectFile(output, []byte("new\n"), 0o644)}, func() error {
+		return os.WriteFile(output, []byte("new\n"), 0o644)
+	})
+	publishRenameNoReplace = prior
+	t.Cleanup(func() { publishRenameNoReplace = prior })
+	if err == nil || !strings.Contains(err.Error(), "install design publication sentinel") {
+		t.Fatalf("destination collision was overwritten or accepted: %v", err)
+	}
+	body, readErr := os.ReadFile(filepath.Join(design, publishSentinel))
+	if readErr != nil || !bytes.Equal(body, concurrent) {
+		t.Fatalf("concurrent publication authority = %q, %v", body, readErr)
+	}
+	if _, statErr := os.Lstat(filepath.Join(design, publishSentinelStage)); statErr != nil {
+		t.Fatalf("staged publication authority was not preserved: %v", statErr)
+	}
+}
+
+func TestPublishSentinelPrivateDeletionPreservesPublicReplacement(t *testing.T) {
+	design := t.TempDir()
+	output := filepath.Join(design, "generated.txt")
+	lock, err := Acquire(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Release()
+	prior := testPublishCleanupPoint
+	testPublishCleanupPoint = func(point, name string) error {
+		if point == "after-quarantine" && name == publishSentinel {
+			return os.WriteFile(filepath.Join(design, publishSentinel), []byte("post-check replacement\n"), 0o600)
+		}
+		return nil
+	}
+	err = lock.PublishExpected("replacement-writer", "rerun replacement writer", []OutputExpectation{ExpectFile(output, []byte("new\n"), 0o644)}, func() error {
+		return os.WriteFile(output, []byte("new\n"), 0o644)
+	})
+	testPublishCleanupPoint = prior
+	t.Cleanup(func() { testPublishCleanupPoint = prior })
+	if err == nil || !strings.Contains(err.Error(), "repopulated") {
+		t.Fatalf("post-check retirement replacement was deleted or accepted: %v", err)
+	}
+	body, readErr := os.ReadFile(filepath.Join(design, publishSentinel))
+	if readErr != nil || string(body) != "post-check replacement\n" {
+		t.Fatalf("public replacement = %q, %v", body, readErr)
+	}
+	root, openErr := os.OpenRoot(design)
+	if openErr != nil {
+		t.Fatal(openErr)
+	}
+	quarantine, findErr := findPublishQuarantine(root)
+	closeErr := root.Close()
+	if findErr != nil || closeErr != nil || quarantine == "" {
+		t.Fatalf("original authority was not preserved in private quarantine: name=%q find=%v close=%v", quarantine, findErr, closeErr)
+	}
+	if err := lock.Release(); err != nil {
+		t.Fatal(err)
+	}
+	if reader, acquireErr := AcquireReader(design); acquireErr == nil {
+		_ = reader.Release()
+		t.Fatal("reader accepted design with preserved publication quarantine")
+	}
+}
+
+func TestPublishSentinelCleanupCrashBoundariesRestartCleanly(t *testing.T) {
+	for _, point := range []string{
+		"before-isolate",
+		"before-retire",
+		"before-quarantine",
+		"after-isolate",
+		"quarantine-durable",
+		"before-remove",
+		"after-quarantine",
+		"quarantine-removed",
+	} {
+		t.Run(point, func(t *testing.T) {
+			design := t.TempDir()
+			output := filepath.Join(design, "generated.txt")
+			lock, err := Acquire(design)
+			if err != nil {
+				t.Fatal(err)
+			}
+			prior := testPublishCleanupPoint
+			testPublishCleanupPoint = func(got, _ string) error {
+				if got == point {
+					panic("power loss at " + point)
+				}
+				return nil
+			}
+			func() {
+				defer func() {
+					if recovered := recover(); recovered == nil {
+						t.Fatalf("cleanup crash point %s did not fire", point)
+					}
+				}()
+				_ = lock.PublishExpected("cleanup-crash", "rerun cleanup crash", []OutputExpectation{ExpectFile(output, []byte("new\n"), 0o644)}, func() error {
+					return os.WriteFile(output, []byte("new\n"), 0o644)
+				})
+			}()
+			testPublishCleanupPoint = prior
+			t.Cleanup(func() { testPublishCleanupPoint = prior })
+			if err := lock.Release(); err != nil {
+				t.Fatal(err)
+			}
+			lock, err = Acquire(design)
+			if err != nil {
+				t.Fatalf("restart after %s: %v", point, err)
+			}
+			if err := lock.PublishExpected("cleanup-crash", "rerun cleanup crash", []OutputExpectation{ExpectFile(output, []byte("new\n"), 0o644)}, func() error {
+				return os.WriteFile(output, []byte("new\n"), 0o644)
+			}); err != nil {
+				t.Fatalf("exact retry after %s: %v", point, err)
+			}
+			if err := lock.Release(); err != nil {
+				t.Fatal(err)
+			}
+			root, err := os.OpenRoot(design)
+			if err != nil {
+				t.Fatal(err)
+			}
+			quarantine, findErr := findPublishQuarantine(root)
+			closeErr := root.Close()
+			if findErr != nil || closeErr != nil || quarantine != "" {
+				t.Fatalf("residue after %s retry: name=%q find=%v close=%v", point, quarantine, findErr, closeErr)
+			}
+		})
+	}
+}
+
+func TestPublishSentinelCleanupResumesCrashAfterPrivateObjectRemoval(t *testing.T) {
+	design := t.TempDir()
+	output := filepath.Join(design, "generated.txt")
+	lock, err := Acquire(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior := publishQuarantineRemove
+	publishQuarantineRemove = func(quarantine *fsatomic.Quarantined) error {
+		if err := quarantine.Root().Remove(quarantine.Name()); err != nil {
+			return err
+		}
+		panic("power loss after private object removal")
+	}
+	func() {
+		defer func() {
+			if recovered := recover(); recovered == nil {
+				t.Fatal("private-object removal crash did not fire")
+			}
+		}()
+		_ = lock.PublishExpected("remove-crash", "rerun remove crash", []OutputExpectation{ExpectFile(output, []byte("new\n"), 0o644)}, func() error {
+			return os.WriteFile(output, []byte("new\n"), 0o644)
+		})
+	}()
+	publishQuarantineRemove = prior
+	t.Cleanup(func() { publishQuarantineRemove = prior })
+	if err := lock.Release(); err != nil {
+		t.Fatal(err)
+	}
+	lock, err = Acquire(design)
+	if err != nil {
+		t.Fatalf("restart did not finish empty quarantine: %v", err)
+	}
+	if err := lock.Release(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPublishQuarantineRecoveryCrashBoundariesRestartCleanly(t *testing.T) {
+	for _, point := range []string{"reconcile-quarantine-open", "reconcile-before-quarantine-remove", "reconcile-quarantine-removed"} {
+		t.Run(point, func(t *testing.T) {
+			design := t.TempDir()
+			output := filepath.Join(design, "generated.txt")
+			lock, err := Acquire(design)
+			if err != nil {
+				t.Fatal(err)
+			}
+			prior := testPublishCleanupPoint
+			testPublishCleanupPoint = func(got, _ string) error {
+				if got == "after-isolate" {
+					return errors.New("leave durable quarantine")
+				}
+				return nil
+			}
+			err = lock.PublishExpected("recovery-crash", "rerun recovery crash", []OutputExpectation{ExpectFile(output, []byte("new\n"), 0o644)}, func() error {
+				return os.WriteFile(output, []byte("new\n"), 0o644)
+			})
+			testPublishCleanupPoint = prior
+			if err == nil {
+				t.Fatal("setup did not retain quarantine")
+			}
+			if err := lock.Release(); err != nil {
+				t.Fatal(err)
+			}
+			executable, err := os.Executable()
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, executable, "-test.run=^TestPublishQuarantineRecoveryCrashHelper$")
+			cmd.Env = append(os.Environ(), "MACHINERY_PUBLISH_QUARANTINE_CRASH_DESIGN="+design, "MACHINERY_PUBLISH_QUARANTINE_CRASH_POINT="+point)
+			if err := cmd.Run(); err == nil {
+				t.Fatalf("recovery helper did not crash at %s", point)
+			}
+			lock, err = Acquire(design)
+			if err != nil {
+				t.Fatalf("second restart after %s: %v", point, err)
+			}
+			if err := lock.Release(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestPublishQuarantineRecoveryCrashHelper(t *testing.T) {
+	design := os.Getenv("MACHINERY_PUBLISH_QUARANTINE_CRASH_DESIGN")
+	point := os.Getenv("MACHINERY_PUBLISH_QUARANTINE_CRASH_POINT")
+	if design == "" || point == "" {
+		return
+	}
+	testPublishCleanupPoint = func(got, _ string) error {
+		if got == point {
+			panic("simulated process death during publication quarantine recovery")
+		}
+		return nil
+	}
+	_, _ = Acquire(design)
+	t.Fatal("publication quarantine recovery crash point did not fire")
+}
+
+func TestPublishQuarantineRecoveryPreservesForeignResidue(t *testing.T) {
+	design := t.TempDir()
+	foreign := filepath.Join(design, "foreign")
+	if err := os.WriteFile(foreign, []byte("foreign\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quarantine, err := fsatomic.Quarantine(root, "foreign", publishSentinelQuarantinePrefix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := quarantine.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := root.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if lock, err := Acquire(design); err == nil {
+		_ = lock.Release()
+		t.Fatal("foreign quarantine was accepted")
+	}
+	root, err = os.OpenRoot(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	name, findErr := findPublishQuarantine(root)
+	closeErr := root.Close()
+	if findErr != nil || closeErr != nil || name == "" {
+		t.Fatalf("foreign quarantine was not preserved: name=%q find=%v close=%v", name, findErr, closeErr)
 	}
 }
 
@@ -1374,7 +1698,15 @@ func TestReconcilePublishStagePreservesLateMutation(t *testing.T) {
 			name:  "content after isolation",
 			point: "after-isolate",
 			mutate: func(t *testing.T, path, _ string) bool {
-				if err := os.WriteFile(path, []byte("late replacement\n"), 0o600); err != nil {
+				root, err := os.OpenRoot(filepath.Dir(path))
+				if err != nil {
+					t.Fatal(err)
+				}
+				quarantine, findErr := findPublishQuarantine(root)
+				if closeErr := root.Close(); findErr != nil || closeErr != nil || quarantine == "" {
+					t.Fatalf("find isolated stage: name=%q find=%v close=%v", quarantine, findErr, closeErr)
+				}
+				if err := os.WriteFile(filepath.Join(filepath.Dir(path), quarantine, "object"), []byte("late replacement\n"), 0o600); err != nil {
 					t.Fatal(err)
 				}
 				return true
@@ -1382,7 +1714,7 @@ func TestReconcilePublishStagePreservesLateMutation(t *testing.T) {
 		},
 		{
 			name:  "same-body path replacement",
-			point: "before-remove",
+			point: "before-quarantine",
 			mutate: func(t *testing.T, path, parked string) bool {
 				body, err := os.ReadFile(path)
 				if err != nil {
@@ -1399,7 +1731,7 @@ func TestReconcilePublishStagePreservesLateMutation(t *testing.T) {
 		},
 		{
 			name:  "same-byte ABA",
-			point: "before-remove",
+			point: "before-isolate",
 			mutate: func(t *testing.T, path, _ string) bool {
 				info, err := os.Lstat(path)
 				if err != nil {
@@ -1451,10 +1783,20 @@ func TestReconcilePublishStagePreservesLateMutation(t *testing.T) {
 			if !mutated {
 				t.Skip("native mutation witness unavailable on this platform")
 			}
-			if err == nil || !strings.Contains(err.Error(), "preserv") && !strings.Contains(err.Error(), "changed") {
+			if err == nil || !strings.Contains(err.Error(), "preserv") && !strings.Contains(err.Error(), "changed") && !strings.Contains(err.Error(), "restoring") {
 				t.Fatalf("reconcile-time stage mutation was accepted: %v", err)
 			}
-			if info, statErr := os.Lstat(stage); statErr != nil || !info.Mode().IsRegular() {
+			if tc.name == "content after isolation" {
+				root, openErr := os.OpenRoot(design)
+				if openErr != nil {
+					t.Fatal(openErr)
+				}
+				quarantine, findErr := findPublishQuarantine(root)
+				closeErr := root.Close()
+				if findErr != nil || closeErr != nil || quarantine == "" {
+					t.Fatalf("mutated stage quarantine was not preserved: name=%q find=%v close=%v", quarantine, findErr, closeErr)
+				}
+			} else if info, statErr := os.Lstat(stage); statErr != nil || !info.Mode().IsRegular() {
 				t.Fatalf("reconcile-time stage replacement was not preserved: info=%v err=%v", info, statErr)
 			}
 			if tc.name == "same-body path replacement" {
@@ -1511,10 +1853,17 @@ func TestReconcilePublishStageRetainsStageWhenInstalledAuthorityChanges(t *testi
 	if err == nil || !strings.Contains(err.Error(), "cleanup authority changed") {
 		t.Fatalf("reconciliation deleted its matching stage after installed-authority mutation: %v", err)
 	}
-	for _, path := range []string{stage, stage + ".retired"} {
-		if info, statErr := os.Lstat(path); statErr != nil || !info.Mode().IsRegular() {
-			t.Fatalf("reconciliation failed to preserve %s: info=%v err=%v", path, info, statErr)
-		}
+	if body, readErr := os.ReadFile(sentinel); readErr != nil || string(body) != "corrupt installed authority\n" {
+		t.Fatalf("installed replacement = %q, %v", body, readErr)
+	}
+	root, openErr := os.OpenRoot(design)
+	if openErr != nil {
+		t.Fatal(openErr)
+	}
+	quarantine, findErr := findPublishQuarantine(root)
+	closeErr := root.Close()
+	if findErr != nil || closeErr != nil || quarantine == "" {
+		t.Fatalf("matching stage was not preserved in quarantine: name=%q find=%v close=%v", quarantine, findErr, closeErr)
 	}
 }
 

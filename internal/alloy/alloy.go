@@ -22,9 +22,14 @@ import (
 
 	"github.com/RamXX/machinery/internal/artifactset"
 	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/safefile"
 	"github.com/RamXX/machinery/internal/version"
 )
+
+const alloyInputMaxBytes int64 = 16 << 20
+const alloyInventoryMaxEntries = 100_000
 
 // AnnotationName is the policy annotation file name under design/formal/.
 // Deliberately NOT *.semantics.yaml: verify-formal feeds every
@@ -156,7 +161,7 @@ func listOf(v *ir.Value) []*ir.Value {
 }
 
 func loadDomain(path string) *domain {
-	data, err := os.ReadFile(path)
+	data, err := safefile.Read(path, "modelith domain model", alloyInputMaxBytes)
 	if err != nil {
 		die("%s: %v", filepath.Base(path), err)
 	}
@@ -356,7 +361,7 @@ func parseScopeMap(o *ir.Object, roles []string, where string, hasTeam bool) []S
 // of proving a stale twin (the refine_gen rule, applied here).
 func Load(domainPath, annotationPath string) *Policy {
 	d := loadDomain(domainPath)
-	data, err := os.ReadFile(annotationPath)
+	data, err := safefile.Read(annotationPath, "policy relational annotation", alloyInputMaxBytes)
 	if err != nil {
 		die("%s: %v", filepath.Base(annotationPath), err)
 	}
@@ -1146,7 +1151,7 @@ func (p *Policy) emit() (string, Stats) {
 // owns validation. Gx-trace uses this to credit the relational model as an
 // enforcement artifact. A missing or malformed annotation yields nil.
 func CarriedIDs(annotationPath string) map[string]bool {
-	data, err := os.ReadFile(annotationPath)
+	data, err := safefile.Read(annotationPath, "policy relational annotation", alloyInputMaxBytes)
 	if err != nil {
 		return nil
 	}
@@ -1192,7 +1197,7 @@ func CarriedIDs(annotationPath string) map[string]bool {
 // to credit an explicit waiver-with-reason; a missing or malformed
 // annotation yields nil.
 func ResidualIDs(annotationPath string) map[string]bool {
-	data, err := os.ReadFile(annotationPath)
+	data, err := safefile.Read(annotationPath, "policy relational annotation", alloyInputMaxBytes)
 	if err != nil {
 		return nil
 	}
@@ -1228,7 +1233,10 @@ func ResidualIDs(annotationPath string) map[string]bool {
 // Paths resolves the domain model and annotation for a design dir.
 // The annotation path is returned even when absent (callers stat it).
 func Paths(design string) (domainPath, annotationPath string, err error) {
-	entries, _ := os.ReadDir(design)
+	entries, readErr := dirscan.Read(design, alloyInventoryMaxEntries)
+	if readErr != nil {
+		return "", "", fmt.Errorf("alloy_gen: enumerate %s: %w", design, readErr)
+	}
 	var models []string
 	for _, e := range entries {
 		if strings.HasSuffix(e.Name(), ".modelith.yaml") {

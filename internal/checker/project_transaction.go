@@ -14,15 +14,17 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/fsatomic"
 )
 
 const (
-	projectionTransactionVersion = 2
-	projectionControlDirName     = ".machinery"
-	projectionPreparedName       = "checker-project-transaction.json"
-	projectionBoundName          = "checker-project-transaction.bound.json"
-	projectionCommittedName      = "checker-project-transaction.committed.json"
-	projectionMaxControlRecord   = 16 << 20
+	projectionTransactionVersion  = 2
+	projectionControlDirName      = ".machinery"
+	projectionPreparedName        = "checker-project-transaction.json"
+	projectionBoundName           = "checker-project-transaction.bound.json"
+	projectionCommittedName       = "checker-project-transaction.committed.json"
+	projectionMaxControlRecord    = 16 << 20
+	projectionControlDeletePrefix = ".machinery-control-delete-"
 )
 
 var errSimulatedProjectionCrash = errors.New("simulated checker projection process crash")
@@ -51,10 +53,12 @@ type projectionFileWitness struct {
 }
 
 type projectionTransactionHooks struct {
-	beforeRename func(string, string) error
-	beforeRemove func(string) error
-	fault        func(string) error
-	authorize    func() error
+	beforeRename    func(string, string) error
+	beforeRemove    func(string) error
+	fault           func(string) error
+	authorize       func() error
+	renameNoReplace func(*os.Root, string, string) error
+	privateMutation func(*os.Root, string) error
 }
 
 type projectionControlSnapshot struct {
@@ -273,7 +277,14 @@ func renameProjectionPathRoot(root *designRoot, hooks projectionTransactionHooks
 	if err := root.validateNoSymlink(filepath.Dir(to)); err != nil {
 		return err
 	}
-	return root.root.Rename(from, to)
+	return projectionRenameNoReplace(root.root, hooks, from, to)
+}
+
+func projectionRenameNoReplace(root *os.Root, hooks projectionTransactionHooks, from, to string) error {
+	if hooks.renameNoReplace != nil {
+		return hooks.renameNoReplace(root, from, to)
+	}
+	return fsatomic.RenameNoReplace(root, from, to)
 }
 
 func projectionFault(hooks projectionTransactionHooks, point string) error {
@@ -298,6 +309,9 @@ func recoverProjectionTransactionRoot(root *designRoot) error {
 
 func recoverProjectionTransactionRootWithHooks(root *designRoot, hooks projectionTransactionHooks) error {
 	control := projectionControlDirName
+	if err := recoverProjectionControlDirectoryQuarantines(root, control); err != nil {
+		return err
+	}
 	if err := root.validateNoSymlink(control); err != nil {
 		return err
 	}
@@ -310,6 +324,9 @@ func recoverProjectionTransactionRootWithHooks(root *designRoot, hooks projectio
 	}
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() || !projectionControlPermissionsSafe(info.Mode()) {
 		return fmt.Errorf("checker projection transaction control %s must be a private real directory", root.display(control))
+	}
+	if err := recoverProjectionControlQuarantines(root, control, hooks); err != nil {
+		return err
 	}
 	if err := cleanupIncompleteProjectionTransactionRecords(root, control, hooks); err != nil {
 		return err
@@ -401,6 +418,12 @@ func recoverProjectionTransactionRootWithHooks(root *designRoot, hooks projectio
 	var recoveryErrs []error
 	for i := len(resolved) - 1; i >= 0; i-- {
 		entry := resolved[i]
+		if err := recoverProjectionFileQuarantine(root, entry.backup, entry.Before, "parked checker projection"); err != nil {
+			return err
+		}
+		if err := recoverProjectionFileQuarantine(root, entry.target, entry.After, "installed checker projection"); err != nil {
+			return err
+		}
 		_, backupExists, err := captureProjectionFile(root, entry.backup, "checker projection transaction backup")
 		if err != nil {
 			return err
@@ -436,6 +459,9 @@ func recoverProjectionTransactionRootWithHooks(root *designRoot, hooks projectio
 				recoveryErrs = append(recoveryErrs, err)
 			}
 		}
+		if err := recoverProjectionFileQuarantine(root, entry.stage, entry.After, "staged checker projection"); err != nil {
+			return err
+		}
 		if _, stageExists, err := captureProjectionFile(root, entry.stage, "checker projection transaction stage"); err != nil {
 			recoveryErrs = append(recoveryErrs, err)
 		} else if stageExists {
@@ -450,6 +476,81 @@ func recoverProjectionTransactionRootWithHooks(root *designRoot, hooks projectio
 	return removeProjectionTransactionRecords(root, control, hooks, authority)
 }
 
+func recoverProjectionControlQuarantines(root *designRoot, control string, hooks projectionTransactionHooks) error {
+	entries, err := root.readDirBounded(control, checkerMaxEntries)
+	if err != nil {
+		return err
+	}
+	const prefix = "checker-project-transaction.delete-"
+	validSource := map[string]bool{}
+	for _, name := range []string{projectionPreparedName, projectionBoundName, projectionCommittedName} {
+		validSource[name+".retired"] = true
+		validSource[name+".new.retired"] = true
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		if !validProjectionQuarantineName(name, prefix) {
+			return fmt.Errorf("checker projection transaction quarantine %s has an unsafe name", root.display(filepath.Join(control, name)))
+		}
+		controlRoot, err := root.root.OpenRoot(control)
+		if err != nil {
+			return err
+		}
+		quarantined, err := fsatomic.ResumeQuarantine(controlRoot, name, "")
+		if err != nil {
+			return errors.Join(err, controlRoot.Close())
+		}
+		if !validSource[quarantined.Source()] {
+			return errors.Join(fmt.Errorf("checker projection transaction quarantine records unsafe source %q", quarantined.Source()), quarantined.Close(), controlRoot.Close())
+		}
+		privateRoot := &designRoot{abs: root.display(control), root: quarantined.Root()}
+		if hooks.privateMutation != nil {
+			if err := hooks.privateMutation(quarantined.Root(), quarantined.Name()); err != nil {
+				return errors.Join(err, quarantined.Close(), controlRoot.Close())
+			}
+		}
+		_, objectErr := quarantined.Root().Lstat(quarantined.Name())
+		objectExpected := !errors.Is(objectErr, os.ErrNotExist)
+		if objectErr != nil && objectExpected {
+			return errors.Join(objectErr, quarantined.Close(), controlRoot.Close())
+		}
+		if err := validateProjectionQuarantine(privateRoot, objectExpected); err != nil {
+			return errors.Join(err, quarantined.Close(), controlRoot.Close())
+		}
+		if !objectExpected {
+			if err := quarantined.FinishEmpty(); err != nil {
+				return errors.Join(err, controlRoot.Close())
+			}
+		} else {
+			snapshot, err := captureProjectionControlSnapshot(privateRoot, quarantined.Name())
+			if err != nil {
+				return errors.Join(err, quarantined.Close(), controlRoot.Close())
+			}
+			current, err := captureProjectionControlSnapshot(privateRoot, quarantined.Name())
+			if err != nil || !sameProjectionControlSnapshot(snapshot, current) {
+				return errors.Join(err, fmt.Errorf("checker projection transaction quarantine changed during recovery; preserving it"), quarantined.Close(), controlRoot.Close())
+			}
+			if err := quarantined.Remove(); err != nil {
+				return errors.Join(err, quarantined.Close(), controlRoot.Close())
+			}
+		}
+		if err := controlRoot.Close(); err != nil {
+			return err
+		}
+	}
+	return root.syncDir(control)
+}
+
+func validProjectionQuarantineName(name, prefix string) bool {
+	// fsatomic owns the nonce and encoded-provenance grammar and validates it
+	// again in ResumeQuarantine. Keep only the protocol namespace and basename
+	// checks here rather than duplicating an internal filename format.
+	return strings.HasPrefix(name, prefix) && filepath.Base(name) == name
+}
+
 func finalizeCommittedProjectionTransaction(root *designRoot, control string, entries []resolvedProjectionTransactionEntry, hooks projectionTransactionHooks, authority projectionTransactionAuthority) error {
 	for _, entry := range entries {
 		exists, err := root.lstatRegular(entry.target, "checker projection transaction artifact", false)
@@ -459,12 +560,18 @@ func finalizeCommittedProjectionTransaction(root *designRoot, control string, en
 		if !exists {
 			return fmt.Errorf("committed projection target is missing: %s", root.display(entry.target))
 		}
+		if err := recoverProjectionFileQuarantine(root, entry.stage, entry.After, "staged checker projection"); err != nil {
+			return err
+		}
 		if _, stageExists, err := captureProjectionFile(root, entry.stage, "checker projection transaction stage"); err != nil {
 			return err
 		} else if stageExists {
 			if err := removeProjectionFileIfMatch(root, hooks, entry.stage, entry.After, "staged checker projection"); err != nil {
 				return err
 			}
+		}
+		if err := recoverProjectionFileQuarantine(root, entry.backup, entry.Before, "parked checker projection"); err != nil {
+			return err
 		}
 		if _, backupExists, err := captureProjectionFile(root, entry.backup, "checker projection transaction backup"); err != nil {
 			return err
@@ -522,6 +629,9 @@ func captureProjectionFile(root *designRoot, rel, kind string) (witness projecti
 	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() {
 		return projectionFileWitness{}, false, fmt.Errorf("%s %s must be a regular, non-symlink file", kind, root.display(rel))
 	}
+	if before.Size() < 0 || before.Size() > checkerStructuredFileMaxBytes {
+		return projectionFileWitness{}, false, fmt.Errorf("%s %s exceeds %d-byte limit", kind, root.display(rel), checkerStructuredFileMaxBytes)
+	}
 	file, err := root.root.Open(rel)
 	if err != nil {
 		return projectionFileWitness{}, false, err
@@ -536,8 +646,17 @@ func captureProjectionFile(root *designRoot, rel, kind string) (witness projecti
 		return projectionFileWitness{}, false, fmt.Errorf("identify %s %s: %w", kind, root.display(rel), err)
 	}
 	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
+	written, err := io.CopyN(hash, file, opened.Size())
+	if err != nil {
 		return projectionFileWitness{}, false, fmt.Errorf("hash %s %s: %w", kind, root.display(rel), err)
+	}
+	var extra [1]byte
+	extraCount, err := file.Read(extra[:])
+	if err != nil && !errors.Is(err, io.EOF) {
+		return projectionFileWitness{}, false, fmt.Errorf("hash %s %s: %w", kind, root.display(rel), err)
+	}
+	if written != opened.Size() || extraCount != 0 {
+		return projectionFileWitness{}, false, fmt.Errorf("%s %s changed beyond its exact %d-byte snapshot", kind, root.display(rel), opened.Size())
 	}
 	after, statErr := file.Stat()
 	pathAfter, pathErr := root.root.Lstat(rel)
@@ -592,10 +711,90 @@ func removeProjectionFileIfMatch(root *designRoot, hooks projectionTransactionHo
 			return fmt.Errorf("checker projection transaction authority changed before removing %s: %w", root.display(rel), err)
 		}
 	}
-	if err := root.root.Remove(rel); err != nil {
+	parentRel := filepath.Dir(rel)
+	parentRoot, err := root.root.OpenRoot(parentRel)
+	if err != nil {
 		return err
 	}
-	return root.syncDir(filepath.Dir(rel))
+	quarantined, err := fsatomic.Quarantine(parentRoot, filepath.Base(rel), ".checker-projection-delete-")
+	if err != nil {
+		return errors.Join(err, parentRoot.Close())
+	}
+	privateRoot := &designRoot{abs: root.display(parentRel), root: quarantined.Root()}
+	if hooks.privateMutation != nil {
+		if err := hooks.privateMutation(quarantined.Root(), quarantined.Name()); err != nil {
+			return errors.Join(err, quarantined.Close(), parentRoot.Close())
+		}
+	}
+	if err := validateProjectionQuarantine(privateRoot, true); err != nil {
+		return errors.Join(err, quarantined.Close(), parentRoot.Close())
+	}
+	current, exists, err := captureProjectionFile(privateRoot, quarantined.Name(), kind+" deletion authority")
+	if err != nil || !exists || current != want {
+		cause := errors.Join(err, fmt.Errorf("%s %s changed while entering private deletion authority; preserving it", kind, root.display(rel)))
+		return errors.Join(cause, quarantined.Close(), parentRoot.Close())
+	}
+	if err := quarantined.Remove(); err != nil {
+		return errors.Join(err, quarantined.Close(), parentRoot.Close())
+	}
+	return errors.Join(root.syncDir(parentRel), parentRoot.Close())
+}
+
+func recoverProjectionFileQuarantine(root *designRoot, rel string, want projectionFileWitness, kind string) error {
+	parentRel := filepath.Dir(rel)
+	parentRoot, err := root.root.OpenRoot(parentRel)
+	if err != nil {
+		return err
+	}
+	entriesRoot := &designRoot{abs: root.display(parentRel), root: parentRoot}
+	entries, err := entriesRoot.readDirBounded(".", checkerMaxEntries)
+	if err != nil {
+		return errors.Join(err, parentRoot.Close())
+	}
+	const prefix = ".checker-projection-delete-"
+	var match string
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), prefix) {
+			continue
+		}
+		if !validProjectionQuarantineName(entry.Name(), prefix) {
+			return errors.Join(fmt.Errorf("%s directory contains unsafe deletion authority %q", kind, entry.Name()), parentRoot.Close())
+		}
+		quarantined, err := fsatomic.ResumeQuarantine(parentRoot, entry.Name(), "")
+		if err != nil {
+			return errors.Join(err, parentRoot.Close())
+		}
+		source := quarantined.Source()
+		if err := quarantined.Close(); err != nil {
+			return errors.Join(err, parentRoot.Close())
+		}
+		if source != filepath.Base(rel) {
+			continue
+		}
+		if match != "" {
+			return errors.Join(fmt.Errorf("multiple private deletion authorities exist for %s", root.display(rel)), parentRoot.Close())
+		}
+		match = entry.Name()
+	}
+	if match == "" {
+		return parentRoot.Close()
+	}
+	quarantined, err := fsatomic.ResumeQuarantine(parentRoot, match, filepath.Base(rel))
+	if err != nil {
+		return errors.Join(err, parentRoot.Close())
+	}
+	privateRoot := &designRoot{abs: root.display(parentRel), root: quarantined.Root()}
+	if err := validateProjectionQuarantine(privateRoot, true); err != nil {
+		return errors.Join(err, quarantined.Close(), parentRoot.Close())
+	}
+	current, exists, err := captureProjectionFile(privateRoot, quarantined.Name(), kind+" deletion authority")
+	if err != nil || !exists || current != want {
+		return errors.Join(err, fmt.Errorf("%s private deletion authority no longer matches the exact transaction image; preserving it", kind), quarantined.Close(), parentRoot.Close())
+	}
+	if err := quarantined.Remove(); err != nil {
+		return errors.Join(err, quarantined.Close(), parentRoot.Close())
+	}
+	return errors.Join(root.syncDir(parentRel), parentRoot.Close())
 }
 
 func restoreProjectionBackup(root *designRoot, hooks projectionTransactionHooks, entry resolvedProjectionTransactionEntry) error {
@@ -628,13 +827,8 @@ func restoreProjectionBackup(root *designRoot, hooks projectionTransactionHooks,
 }
 
 func projectionTransactionControlNames(root *designRoot, control string) ([]string, error) {
-	dir, err := root.root.Open(control)
+	entries, err := root.readDirBounded(control, checkerMaxEntries)
 	if err != nil {
-		return nil, err
-	}
-	entries, readErr := dir.ReadDir(-1)
-	closeErr := dir.Close()
-	if err := errors.Join(readErr, closeErr); err != nil {
 		return nil, err
 	}
 	allowed := map[string]bool{}
@@ -696,7 +890,7 @@ func captureProjectionControlSnapshot(root *designRoot, path string) (snapshot p
 		!before.ModTime().Equal(opened.ModTime()) || projectionControlChangeID(before) != projectionControlChangeID(opened) {
 		return projectionControlSnapshot{}, fmt.Errorf("checker projection transaction control %s changed identity while opening", root.display(path))
 	}
-	body, err := io.ReadAll(io.LimitReader(file, projectionMaxControlRecord+1))
+	body, err := io.ReadAll(io.LimitReader(file, before.Size()+1))
 	if err != nil {
 		return projectionControlSnapshot{}, err
 	}
@@ -813,7 +1007,7 @@ func cleanupIncompleteProjectionTransactionRecords(root *designRoot, control str
 				return errors.Join(err, fmt.Errorf("incomplete checker projection transaction control %s changed at the removal boundary; preserving it", root.display(path)))
 			}
 			retiredPath := filepath.Join(control, retiredName)
-			if err := root.root.Rename(path, retiredPath); err != nil {
+			if err := projectionRenameNoReplace(root.root, hooks, path, retiredPath); err != nil {
 				return err
 			}
 			if err := root.syncDir(control); err != nil {
@@ -834,11 +1028,60 @@ func cleanupIncompleteProjectionTransactionRecords(root *designRoot, control str
 		if err != nil || !sameProjectionControlSnapshot(snapshot, current) {
 			return errors.Join(err, fmt.Errorf("retired incomplete checker projection transaction control %s changed at the deletion boundary; preserving it", root.display(path)))
 		}
-		if err := root.root.Remove(path); err != nil {
+		if err := removeProjectionControlSnapshot(root, control, snapshot, hooks); err != nil {
 			return err
 		}
 		if err := root.syncDir(control); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func removeProjectionControlSnapshot(root *designRoot, control string, snapshot projectionControlSnapshot, hooks projectionTransactionHooks) error {
+	controlRoot, err := root.root.OpenRoot(control)
+	if err != nil {
+		return err
+	}
+	quarantined, err := fsatomic.Quarantine(controlRoot, filepath.Base(snapshot.path), "checker-project-transaction.delete-")
+	if err != nil {
+		return errors.Join(err, controlRoot.Close())
+	}
+	privateRoot := &designRoot{abs: root.display(control), root: quarantined.Root()}
+	if hooks.privateMutation != nil {
+		if err := hooks.privateMutation(quarantined.Root(), quarantined.Name()); err != nil {
+			return errors.Join(err, quarantined.Close(), controlRoot.Close())
+		}
+	}
+	if err := validateProjectionQuarantine(privateRoot, true); err != nil {
+		return errors.Join(err, quarantined.Close(), controlRoot.Close())
+	}
+	current, err := captureProjectionControlSnapshot(privateRoot, quarantined.Name())
+	if err != nil || !sameProjectionControlObject(snapshot, current) {
+		cause := errors.Join(err, fmt.Errorf("checker projection transaction control %s changed while entering private deletion authority; preserving it", root.display(snapshot.path)))
+		return errors.Join(cause, quarantined.Close(), controlRoot.Close())
+	}
+	if err := quarantined.Remove(); err != nil {
+		return errors.Join(err, quarantined.Close(), controlRoot.Close())
+	}
+	return controlRoot.Close()
+}
+
+func validateProjectionQuarantine(root *designRoot, objectExpected bool) error {
+	entries, err := root.readDirBounded(".", 1)
+	if err != nil {
+		return err
+	}
+	var want []string
+	if objectExpected {
+		want = []string{"object"}
+	}
+	if len(entries) != len(want) {
+		return fmt.Errorf("checker private deletion authority has unexpected inventory")
+	}
+	for index := range want {
+		if entries[index].Name() != want[index] {
+			return fmt.Errorf("checker private deletion authority has unexpected inventory")
 		}
 	}
 	return nil
@@ -947,7 +1190,7 @@ func removeProjectionTransactionRecords(root *designRoot, control string, hooks 
 		if err := validateProjectionTransactionAuthority(root, authority); err != nil {
 			return fmt.Errorf("checker projection transaction authority changed at the retirement boundary for %s: %w", root.display(snapshot.path), err)
 		}
-		if err := root.root.Rename(snapshot.path, retiredPath); err != nil {
+		if err := projectionRenameNoReplace(root.root, hooks, snapshot.path, retiredPath); err != nil {
 			return err
 		}
 		if err := root.syncDir(control); err != nil {
@@ -981,7 +1224,7 @@ func removeProjectionTransactionRecords(root *designRoot, control string, hooks 
 		if err := validateProjectionTransactionAuthority(root, authority); err != nil {
 			return fmt.Errorf("checker projection transaction authority changed at the deletion boundary for %s: %w", root.display(snapshot.path), err)
 		}
-		if err := root.root.Remove(snapshot.path); err != nil {
+		if err := removeProjectionControlSnapshot(root, control, snapshot, hooks); err != nil {
 			return err
 		}
 		if err := root.syncDir(control); err != nil {
@@ -989,35 +1232,141 @@ func removeProjectionTransactionRecords(root *designRoot, control string, hooks 
 		}
 		delete(authority.snapshots, name)
 	}
-	return removeProjectionControlDirIfEmpty(root, control)
+	return removeProjectionControlDirIfEmptyWithHooks(root, control, hooks)
 }
 
 func removeProjectionControlDirIfEmpty(root *designRoot, control string) error {
-	err := root.root.Remove(control)
-	if os.IsNotExist(err) {
+	return removeProjectionControlDirIfEmptyWithHooks(root, control, projectionTransactionHooks{})
+}
+
+func removeProjectionControlDirIfEmptyWithHooks(root *designRoot, control string, hooks projectionTransactionHooks) error {
+	info, err := root.root.Lstat(control)
+	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 	if err != nil {
-		// A non-empty control directory is retryable state, not a cleanup error.
-		dir, openErr := root.root.Open(control)
-		if openErr == nil {
-			entries, readErr := dir.ReadDir(1)
-			closeErr := dir.Close()
-			if readErr == nil && closeErr == nil && len(entries) > 0 {
-				return nil
-			}
-		}
 		return err
 	}
-	if err := root.syncDir("."); err != nil {
-		// Keep an explicit retry point when the parent-directory durability
-		// barrier fails after removal. Recovery will see the empty private
-		// directory and retry the removal plus parent sync on the next run.
-		recreateErr := root.root.Mkdir(control, 0o700)
-		if recreateErr != nil && !os.IsExist(recreateErr) {
-			return errors.Join(err, fmt.Errorf("restore checker transaction cleanup retry point: %w", recreateErr))
-		}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() || !projectionControlPermissionsSafe(info.Mode()) {
+		return fmt.Errorf("checker projection transaction control %s must be a private real directory", root.display(control))
+	}
+	entries, err := root.readDirBounded(control, 1)
+	if err != nil {
 		return err
+	}
+	if len(entries) != 0 {
+		return nil
+	}
+	quarantined, err := fsatomic.Quarantine(root.root, control, projectionControlDeletePrefix)
+	if err != nil {
+		return fmt.Errorf("quarantine empty checker projection control directory: %w", err)
+	}
+	if hooks.privateMutation != nil {
+		if err := hooks.privateMutation(quarantined.Root(), quarantined.Name()); err != nil {
+			return errors.Join(err, quarantined.Close())
+		}
+	}
+	privateRoot := &designRoot{abs: root.display(control), root: quarantined.Root()}
+	if err := validateProjectionQuarantine(privateRoot, true); err != nil {
+		return errors.Join(err, quarantined.Close())
+	}
+	if err := validateEmptyProjectionControlDirectory(quarantined.Root(), quarantined.Name(), info); err != nil {
+		return errors.Join(fmt.Errorf("private checker projection control deletion authority changed: %w", err), quarantined.Close())
+	}
+	if err := root.syncDir("."); err != nil {
+		return errors.Join(err, quarantined.Restore(), quarantined.Close())
+	}
+	if err := quarantined.RemoveAll(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func recoverProjectionControlDirectoryQuarantines(root *designRoot, control string) (retErr error) {
+	entries, err := root.readDirBounded(".", checkerMaxEntries)
+	if err != nil {
+		return err
+	}
+	var quarantines []*fsatomic.Quarantined
+	defer func() {
+		for _, quarantine := range quarantines {
+			retErr = errors.Join(retErr, quarantine.Close())
+		}
+	}()
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, projectionControlDeletePrefix) {
+			continue
+		}
+		if !validProjectionQuarantineName(name, projectionControlDeletePrefix) {
+			return fmt.Errorf("unsafe checker projection control quarantine name %q", name)
+		}
+		quarantine, err := fsatomic.ResumeQuarantine(root.root, name, control)
+		if err != nil {
+			return fmt.Errorf("resume checker projection control quarantine %q: %w", name, err)
+		}
+		quarantines = append(quarantines, quarantine)
+		privateRoot := &designRoot{abs: root.display(name), root: quarantine.Root()}
+		info, err := quarantine.Root().Lstat(quarantine.Name())
+		if errors.Is(err, os.ErrNotExist) {
+			if err := validateProjectionQuarantine(privateRoot, false); err != nil {
+				return err
+			}
+			if err := quarantine.FinishEmpty(); err != nil {
+				return err
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if err := validateProjectionQuarantine(privateRoot, true); err != nil {
+			return err
+		}
+		if err := validateEmptyProjectionControlDirectory(quarantine.Root(), quarantine.Name(), info); err != nil {
+			return fmt.Errorf("checker projection control quarantine %q changed; preserving it: %w", name, err)
+		}
+		if err := quarantine.RemoveAll(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateEmptyProjectionControlDirectory(root *os.Root, name string, expected os.FileInfo) error {
+	before, err := root.Lstat(name)
+	if err != nil {
+		return err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.IsDir() || !projectionControlPermissionsSafe(before.Mode()) ||
+		expected == nil || !os.SameFile(expected, before) || expected.Mode() != before.Mode() {
+		return fmt.Errorf("checker projection control directory no longer matches its validated identity")
+	}
+	dir, err := root.Open(name)
+	if err != nil {
+		return err
+	}
+	opened, statErr := dir.Stat()
+	entries, readErr := dir.ReadDir(1)
+	after, afterErr := dir.Stat()
+	pathAfter, pathErr := root.Lstat(name)
+	closeErr := dir.Close()
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		return errors.Join(statErr, readErr, afterErr, pathErr, closeErr)
+	}
+	if err := errors.Join(statErr, afterErr, pathErr, closeErr); err != nil {
+		return err
+	}
+	if len(entries) != 0 {
+		return fmt.Errorf("checker projection control directory is no longer empty")
+	}
+	if !os.SameFile(before, opened) || !os.SameFile(before, after) || !os.SameFile(before, pathAfter) ||
+		before.Mode() != opened.Mode() || before.Mode() != after.Mode() || before.Mode() != pathAfter.Mode() ||
+		!before.ModTime().Equal(opened.ModTime()) || !before.ModTime().Equal(after.ModTime()) || !before.ModTime().Equal(pathAfter.ModTime()) ||
+		projectionControlChangeID(before) != projectionControlChangeID(opened) ||
+		projectionControlChangeID(before) != projectionControlChangeID(after) ||
+		projectionControlChangeID(before) != projectionControlChangeID(pathAfter) {
+		return fmt.Errorf("checker projection control directory changed while validating deletion authority")
 	}
 	return nil
 }
@@ -1117,7 +1466,9 @@ func writeProjectionTransactionRecord(root *designRoot, path string, record proj
 	if err != nil {
 		return err
 	}
-	defer func() { _ = root.root.Remove(tmpPath) }()
+	// Leave a failed fixed-name write for the bounded recovery protocol. A
+	// deferred unlink could delete a concurrent replacement of tmpPath after
+	// the write handle was closed.
 	if _, err := tmp.Write(raw); err != nil {
 		_ = tmp.Close()
 		return err

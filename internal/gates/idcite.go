@@ -75,7 +75,7 @@ func readTextOK(design, path string) (string, bool) {
 func loadCommittedIDs(design string) (ids map[string]bool, tags map[string]bool, walkErrors []string) {
 	ids = map[string]bool{}
 	tags = map[string]bool{}
-	walkErr := filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	walkErr := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -145,7 +145,7 @@ func CheckIDCitations(design string) *Gate {
 	}
 	removed := loadRemovedIDs(design)
 	filesScanned := 0
-	walkErr := filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	walkErr := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

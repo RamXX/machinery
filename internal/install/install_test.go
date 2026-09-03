@@ -520,6 +520,7 @@ func TestUninstallDeletionFailureRollsBackArtifactsAndReceipt(t *testing.T) {
 }
 
 func TestValidateSourceRejectsIncomplete(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
 	empty := t.TempDir()
 	if err := Install(Options{Homes: []string{filepath.Join(empty, "home")}, From: empty}); err == nil {
 		t.Fatal("expected an error installing from a source with no skills/machinery")
@@ -527,6 +528,7 @@ func TestValidateSourceRejectsIncomplete(t *testing.T) {
 }
 
 func TestValidateSourceMissingRoleDoc(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
 	part := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(part, "skills", "machinery"), 0o755); err != nil {
 		t.Fatal(err)

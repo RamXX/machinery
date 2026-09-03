@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -29,7 +28,53 @@ const (
 	javaClosureMaxFiles        = 10_000
 	javaClosureMaxBytes  int64 = 1 << 30
 	javaLauncherMaxBytes int64 = 16 << 20
+	javaReadDirPage            = 256
+	javaTreeMaxDepth           = 64
 )
+
+type javaTreeLimits struct {
+	maxDepth   int
+	maxEntries int
+	maxBytes   int64
+}
+
+type javaTreeBudget struct {
+	label   string
+	limits  javaTreeLimits
+	entries int
+	bytes   int64
+}
+
+func validateJavaTreeLimits(label string, limits javaTreeLimits) error {
+	if limits.maxDepth <= 0 || limits.maxEntries <= 0 || limits.maxBytes < 0 {
+		return fmt.Errorf("%s limits must have positive depth and entry bounds and a non-negative byte bound", label)
+	}
+	return nil
+}
+
+func (budget *javaTreeBudget) addEntry(name string, size int64) error {
+	depth := strings.Count(filepath.ToSlash(filepath.Clean(name)), "/") + 1
+	if depth > budget.limits.maxDepth {
+		return fmt.Errorf("%s entry %s exceeds %d-component depth limit", budget.label, filepath.ToSlash(name), budget.limits.maxDepth)
+	}
+	if budget.entries >= budget.limits.maxEntries {
+		return fmt.Errorf("%s exceeds %d-entry limit", budget.label, budget.limits.maxEntries)
+	}
+	budget.entries++
+	return budget.addBytes(name, size)
+}
+
+func (budget *javaTreeBudget) addBytes(name string, size int64) error {
+	if size < 0 || size > budget.limits.maxBytes-budget.bytes {
+		return fmt.Errorf("%s exceeds %d bytes at %s", budget.label, budget.limits.maxBytes, filepath.ToSlash(name))
+	}
+	budget.bytes += size
+	return nil
+}
+
+func (budget *javaTreeBudget) remainingEntries() int {
+	return budget.limits.maxEntries - budget.entries
+}
 
 type Java struct {
 	source      string
@@ -371,39 +416,12 @@ func fingerprintJavaRoot(root *os.Root) ([sha256.Size]byte, error) {
 
 func fingerprintJavaRootWithHook(root *os.Root, afterOpen func(string) error) ([sha256.Size]byte, error) {
 	var zero [sha256.Size]byte
-	var names []string
-	for _, subtree := range []string{"bin", "conf", "lib"} {
-		info, err := root.Lstat(subtree)
-		if err != nil {
-			return zero, fmt.Errorf("inventory Java runtime %s: %w", subtree, err)
-		}
-		if !info.IsDir() {
-			return zero, fmt.Errorf("Java runtime %s must be a directory", subtree)
-		}
-		if err := fs.WalkDir(root.FS(), subtree, func(name string, entry fs.DirEntry, walkErr error) error {
-			if walkErr != nil {
-				return walkErr
-			}
-			if name != subtree {
-				names = append(names, name)
-			}
-			return nil
-		}); err != nil {
-			return zero, fmt.Errorf("inventory Java runtime %s: %w", subtree, err)
-		}
+	names, infos, censusTotal, err := inventoryJavaRoot(root)
+	if err != nil {
+		return zero, err
 	}
-	sort.Strings(names)
-	if len(names) > javaClosureMaxFiles {
-		return zero, fmt.Errorf("Java runtime closure has %d entries; limit is %d", len(names), javaClosureMaxFiles)
-	}
-	infos := make(map[string]os.FileInfo, len(names))
-	var censusTotal int64
 	for _, name := range names {
-		info, err := root.Lstat(name)
-		if err != nil {
-			return zero, fmt.Errorf("stat Java runtime closure entry %s: %w", name, err)
-		}
-		infos[name] = info
+		info := infos[name]
 		if info.IsDir() {
 			continue
 		}
@@ -411,10 +429,6 @@ func fingerprintJavaRootWithHook(root *os.Root, afterOpen func(string) error) ([
 		if !info.Mode().IsRegular() {
 			return zero, fmt.Errorf("Java runtime closure entry %s must be a regular file or directory", slashName)
 		}
-		if info.Size() < 0 || info.Size() > javaClosureMaxBytes-censusTotal {
-			return zero, fmt.Errorf("Java runtime closure exceeds %d bytes", javaClosureMaxBytes)
-		}
-		censusTotal += info.Size()
 	}
 	hash := sha256.New()
 	var hashedTotal int64
@@ -435,12 +449,124 @@ func fingerprintJavaRootWithHook(root *os.Root, afterOpen func(string) error) ([
 	if hashedTotal != censusTotal {
 		return zero, fmt.Errorf("Java runtime closure hashed %d bytes after census recorded %d", hashedTotal, censusTotal)
 	}
+	finalNames, finalInfos, finalTotal, err := inventoryJavaRoot(root)
+	if err != nil {
+		return zero, fmt.Errorf("revalidate Java runtime closure inventory: %w", err)
+	}
+	if len(finalNames) != len(names) || finalTotal != censusTotal {
+		return zero, fmt.Errorf("Java runtime closure inventory changed while hashing")
+	}
+	for i, name := range names {
+		if finalNames[i] != name || !sameJavaFileSnapshot(infos[name], finalInfos[name]) {
+			return zero, fmt.Errorf("Java runtime closure inventory changed while hashing at %s", filepath.ToSlash(name))
+		}
+	}
 	if info, err := root.Lstat(filepath.Join("lib", "modules")); err != nil || !info.Mode().IsRegular() {
 		return zero, errors.Join(err, fmt.Errorf("Java runtime closure requires regular lib/modules"))
 	}
 	var result [sha256.Size]byte
 	copy(result[:], hash.Sum(nil))
 	return result, nil
+}
+
+func inventoryJavaRoot(root *os.Root) ([]string, map[string]os.FileInfo, int64, error) {
+	return inventoryJavaRootWithLimits(root, javaTreeLimits{maxDepth: javaTreeMaxDepth, maxEntries: javaClosureMaxFiles, maxBytes: javaClosureMaxBytes})
+}
+
+func inventoryJavaRootWithLimits(root *os.Root, limits javaTreeLimits) ([]string, map[string]os.FileInfo, int64, error) {
+	if err := validateJavaTreeLimits("Java runtime closure", limits); err != nil {
+		return nil, nil, 0, err
+	}
+	names := make([]string, 0, min(limits.maxEntries, javaReadDirPage))
+	infos := make(map[string]os.FileInfo)
+	budget := javaTreeBudget{label: "Java runtime closure", limits: limits}
+	var walk func(string) error
+	walk = func(directory string) error {
+		info, err := root.Lstat(directory)
+		if err != nil {
+			return fmt.Errorf("inventory Java runtime %s: %w", directory, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return fmt.Errorf("Java runtime %s must be a real directory", directory)
+		}
+		if err := budget.addEntry(directory, 0); err != nil {
+			return err
+		}
+		names = append(names, directory)
+		infos[directory] = info
+		dir, err := root.Open(directory)
+		if err != nil {
+			return err
+		}
+		entries, readErr := readJavaDirEntriesBounded(dir, budget.remainingEntries(), limits.maxEntries)
+		closeErr := dir.Close()
+		if err := errors.Join(readErr, closeErr); err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			name := filepath.Join(directory, entry.Name())
+			child, err := root.Lstat(name)
+			if err != nil {
+				return err
+			}
+			if child.IsDir() {
+				if err := walk(name); err != nil {
+					return err
+				}
+				continue
+			}
+			size := int64(0)
+			if child.Mode().IsRegular() {
+				size = child.Size()
+			}
+			if err := budget.addEntry(name, size); err != nil {
+				return err
+			}
+			names = append(names, name)
+			infos[name] = child
+		}
+		return nil
+	}
+	for _, subtree := range []string{"bin", "conf", "lib"} {
+		if err := walk(subtree); err != nil {
+			return nil, nil, 0, err
+		}
+	}
+	sort.Strings(names)
+	return names, infos, budget.bytes, nil
+}
+
+func readJavaDirEntries(dir *os.File, limit int) ([]os.DirEntry, error) {
+	return readJavaDirEntriesBounded(dir, limit, javaClosureMaxFiles)
+}
+
+func readJavaDirEntriesBounded(dir *os.File, limit, maxEntries int) ([]os.DirEntry, error) {
+	if limit < 0 {
+		return nil, fmt.Errorf("Java runtime closure exceeds %d-entry limit", maxEntries)
+	}
+	entries := make([]os.DirEntry, 0, min(limit, javaReadDirPage))
+	for {
+		pageLimit := javaReadDirPage
+		if remaining := limit + 1 - len(entries); remaining < pageLimit {
+			pageLimit = remaining
+		}
+		if pageLimit <= 0 {
+			return nil, fmt.Errorf("Java runtime closure exceeds %d-entry limit", maxEntries)
+		}
+		page, err := dir.ReadDir(pageLimit)
+		entries = append(entries, page...)
+		if len(entries) > limit {
+			return nil, fmt.Errorf("Java runtime closure exceeds %d-entry limit", maxEntries)
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	return entries, nil
 }
 
 func hashJavaClosureFile(root *os.Root, name string, before os.FileInfo, hash io.Writer, maxBytes int64, afterOpen func(string) error) (int64, error) {

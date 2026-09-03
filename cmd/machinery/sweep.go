@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -12,8 +11,14 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/gates"
+	"github.com/RamXX/machinery/internal/safefile"
 )
+
+const sweepMaxEntries = 100_000
+const sweepFileMaxBytes int64 = 16 << 20
+const sweepTotalMaxBytes int64 = 256 << 20
 
 // machinery sweep: the propagation sweep, productized (S18 of the dogfood systemic
 // findings). Decision propagation across the attested layer was the top
@@ -99,7 +104,8 @@ func sweepSnapshotRunTo(name, design, displayDesign string, contextN int, stdout
 	}
 	byFile := map[string][]hit{}
 	linesByFile := map[string][]string{}
-	walkErr := filepath.WalkDir(design, func(path string, d fs.DirEntry, err error) error {
+	var totalBytes int64
+	walkErr := dirscan.Walk(design, sweepMaxEntries, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -121,10 +127,14 @@ func sweepSnapshotRunTo(name, design, displayDesign string, contextN int, stdout
 		if sweepSkipsPath(rel) || !sweepTextFile(d.Name()) {
 			return nil
 		}
-		body, rerr := os.ReadFile(path)
+		body, rerr := safefile.Read(path, "sweep input", sweepFileMaxBytes)
 		if rerr != nil {
 			return rerr
 		}
+		if int64(len(body)) > sweepTotalMaxBytes-totalBytes {
+			return fmt.Errorf("sweep input exceeds %d-byte aggregate limit", sweepTotalMaxBytes)
+		}
+		totalBytes += int64(len(body))
 		lines := strings.Split(string(body), "\n")
 		for i, l := range lines {
 			if re.MatchString(l) {

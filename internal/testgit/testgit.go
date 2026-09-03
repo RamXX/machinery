@@ -4,15 +4,22 @@ package testgit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/RamXX/machinery/internal/processcontrol"
 )
 
-const commandTimeout = 10 * time.Second
+const (
+	commandTimeout       = 10 * time.Second
+	commandStdoutMaxSize = 4 << 20
+	commandStderrMaxSize = 1 << 20
+)
 
 // Run executes Git in repo with a closed configuration, signing, hook,
 // prompt, repository-redirection, and locale environment.
@@ -22,6 +29,13 @@ func Run(parent context.Context, repo string, args ...string) ([]byte, error) {
 
 // RunInput is Run with explicit standard input.
 func RunInput(parent context.Context, repo string, stdin io.Reader, args ...string) ([]byte, error) {
+	return runInputWithLimits(parent, repo, stdin, commandStdoutMaxSize, commandStderrMaxSize, args...)
+}
+
+func runInputWithLimits(parent context.Context, repo string, stdin io.Reader, stdoutLimit, stderrLimit int, args ...string) ([]byte, error) {
+	if parent == nil {
+		return nil, fmt.Errorf("run hermetic Git command: nil context")
+	}
 	hooks, err := os.MkdirTemp("", "machinery-test-git-hooks-")
 	if err != nil {
 		return nil, err
@@ -41,9 +55,13 @@ func RunInput(parent context.Context, repo string, stdin io.Reader, args ...stri
 	command := exec.CommandContext(ctx, "git", commandArgs...)
 	command.Stdin = stdin
 	command.Env = closedEnvironment(os.Environ())
-	output, runErr := command.CombinedOutput()
+	stdout, stderr, runErr := processcontrol.RunCapturedStreamLimits(ctx, command, stdoutLimit, stderrLimit)
 	if ctx.Err() != nil {
 		runErr = errors.Join(runErr, ctx.Err())
+	}
+	output := []byte(stdout + stderr)
+	if runErr == nil && strings.TrimSpace(stderr) != "" {
+		runErr = fmt.Errorf("git %s emitted stderr on success: %s", strings.Join(args, " "), strings.TrimSpace(stderr))
 	}
 	return output, runErr
 }

@@ -44,12 +44,15 @@ import (
 	"time"
 
 	"github.com/RamXX/machinery/internal/checker"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/filelock"
+	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/gates"
 	"github.com/RamXX/machinery/internal/gitcontrol"
 	"github.com/RamXX/machinery/internal/pack"
 	"github.com/RamXX/machinery/internal/portablepath"
 	"github.com/RamXX/machinery/internal/processcontrol"
+	"github.com/RamXX/machinery/internal/safefile"
 )
 
 // ConfigName is the project-root marker and configuration file.
@@ -64,6 +67,9 @@ const (
 	hookRouteMaxBytes         int64 = 64 << 10
 	hookStateMarkerMaxBytes   int64 = 4 << 10
 	hookStateIdentityMaxBytes int64 = 4 << 10
+	hookDesignMaxEntries            = 100_000
+	hookStateDirMaxEntries          = 4_096
+	hookStateLockWaitLimit          = 10 * time.Second
 )
 
 // Input is the compatible subset of the Claude Code and Codex hook stdin JSON.
@@ -1486,6 +1492,12 @@ func upgradeMixWarningAt(root, design, sourceDesign, commit string) (string, err
 	if err != nil {
 		return "", fmt.Errorf("inventory committed design at %s: %w", commit, err)
 	}
+	if len(out) > 0 && out[len(out)-1] != 0 {
+		return "", fmt.Errorf("git ls-tree returned a non-NUL-terminated design inventory")
+	}
+	if count := bytes.Count(out, []byte{0}); count > hookDesignMaxEntries {
+		return "", fmt.Errorf("committed design inventory exceeds %d-entry limit", hookDesignMaxEntries)
+	}
 	headPaths := bytes.Split(out, []byte{0})
 	if len(headPaths) > 0 && len(headPaths[len(headPaths)-1]) == 0 {
 		headPaths = headPaths[:len(headPaths)-1]
@@ -1500,7 +1512,7 @@ func upgradeMixWarningAt(root, design, sourceDesign, commit string) (string, err
 		paths[rel] = true
 		headSet[rel] = true
 	}
-	err = filepath.WalkDir(sourceDesign, func(walkPath string, entry fs.DirEntry, walkErr error) error {
+	err = dirscan.Walk(sourceDesign, hookDesignMaxEntries, func(walkPath string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -1529,7 +1541,7 @@ func upgradeMixWarningAt(root, design, sourceDesign, commit string) (string, err
 	handWritten := 0
 	for _, rel := range ordered {
 		designRelPath := strings.TrimPrefix(strings.TrimPrefix(rel, design), "/")
-		currentB, currentErr := os.ReadFile(filepath.Join(sourceDesign, filepath.FromSlash(designRelPath)))
+		currentB, currentErr := safefile.Read(filepath.Join(sourceDesign, filepath.FromSlash(designRelPath)), "immutable design path", hookMarkerMaxBytes)
 		currentExists := currentErr == nil
 		if currentErr != nil && !errors.Is(currentErr, fs.ErrNotExist) {
 			return "", fmt.Errorf("read immutable design path %s: %w", rel, currentErr)
@@ -1809,7 +1821,11 @@ func sessionStart(w io.Writer, root string, cfg Config, warn string) error {
 			"never language to repeat to the user: speak in plain step names, translate findings to their meaning, and keep " +
 			"gate ids, phase numbers, and CLI invocations out of the conversation unless the user uses them first.\n")
 	}
-	if raw, err := os.ReadFile(filepath.Join(designDir, "STATE.md")); err == nil {
+	raw, present, readErr := readConfinedRegular(designDir, "STATE.md", hookMarkerMaxBytes)
+	if readErr != nil {
+		return fmt.Errorf("read session ledger: %w", readErr)
+	}
+	if present {
 		const maxLines = 30
 		lines := strings.Split(strings.TrimRight(string(raw), "\n"), "\n")
 		trunc := ""
@@ -1873,23 +1889,74 @@ func routeStatePath(root, sessionID string) string {
 }
 
 func routeStatePaths(root string) ([]string, error) {
-	return filepath.Glob(routeStatePrefix(root) + "*.json")
+	dir := stateDirPath()
+	prefix := filepath.Base(routeStatePrefix(root))
+	return boundedHookStateMatches(dir, "hook route snapshot", func(name string) (bool, error) {
+		if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, ".json") {
+			return false, nil
+		}
+		digest := strings.TrimSuffix(strings.TrimPrefix(name, prefix), ".json")
+		if !validHookHexDigest(digest) {
+			return false, fmt.Errorf("hook route snapshot %q has a noncanonical filename", name)
+		}
+		return true, nil
+	})
 }
 
 func routeStateTemps(root string) ([]string, error) {
-	pattern := filepath.Join(stateDirPath(), "."+filepath.Base(routeStatePrefix(root))+"*.json.tmp-*")
-	paths, err := filepath.Glob(pattern)
-	if err != nil {
-		return nil, err
+	dir := stateDirPath()
+	prefix := "." + filepath.Base(routeStatePrefix(root))
+	return boundedHookStateMatches(dir, "hook route temp", func(name string) (bool, error) {
+		if !strings.HasPrefix(name, prefix) {
+			return false, nil
+		}
+		rest := strings.TrimPrefix(name, prefix)
+		separator := strings.Index(rest, ".json.tmp-")
+		if separator < 0 {
+			return false, nil
+		}
+		if !validHookHexDigest(rest[:separator]) || rest[separator+len(".json.tmp-"):] == "" {
+			return false, fmt.Errorf("hook route temp %q has a noncanonical filename", name)
+		}
+		return true, nil
+	})
+}
+
+func validHookHexDigest(value string) bool {
+	if len(value) != sha256.Size*2 {
+		return false
 	}
-	for _, temp := range paths {
-		info, err := os.Lstat(temp)
+	for _, r := range value {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func boundedHookStateMatches(dir, kind string, match func(string) (bool, error)) ([]string, error) {
+	entries, err := dirscan.Read(dir, hookStateDirMaxEntries)
+	if err != nil {
+		return nil, fmt.Errorf("inventory %s files: %w", kind, err)
+	}
+	paths := make([]string, 0)
+	for _, entry := range entries {
+		matched, err := match(entry.Name())
+		if err != nil {
+			return nil, err
+		}
+		if !matched {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		info, err := os.Lstat(path)
 		if err != nil {
 			return nil, err
 		}
 		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-			return nil, fmt.Errorf("hook route temp %s must be a regular file, not a symlink or special file", temp)
+			return nil, fmt.Errorf("%s %s must be a regular file, not a symlink or special file", kind, path)
 		}
+		paths = append(paths, path)
 	}
 	return paths, nil
 }
@@ -2053,7 +2120,7 @@ func ensureStateDir() (returnErr error) {
 	} else if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("inspect user config directory for hook state: %w", err)
 	}
-	lock, err := filelock.AcquireWait(marker)
+	lock, err := acquireHookFileLock(marker, "hook state initialization marker")
 	if err != nil {
 		return err
 	}
@@ -2215,7 +2282,7 @@ func writeStateInitializationMarker(marker string, binding stateDirectoryBinding
 	}
 	tmpPath := tmp.Name()
 	defer func() {
-		if err := os.Remove(tmpPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := removeOwnedHookFile(tmpPath, "hook state initialization marker temp", hookStateMarkerMaxBytes); err != nil {
 			returnErr = errors.Join(returnErr, err)
 		}
 	}()
@@ -2299,12 +2366,6 @@ func durableProjectStatePresent(root string) (bool, error) {
 		// turn a missing HOME/config root into output in every unrelated repo.
 		return unavailableDurableProjectState()
 	}
-	dir := filepath.Dir(stateFile)
-	patterns := []string{
-		routeStatePrefix(root) + "*.json",
-		filepath.Join(dir, "."+filepath.Base(stateFile)+".tmp-*"),
-		filepath.Join(dir, "."+filepath.Base(routeStatePrefix(root))+"*.json.tmp-*"),
-	}
 	// The store-wide initialization marker must not disturb an unrelated,
 	// unmanaged project. Establish candidate-specific evidence first; only a
 	// ledger, route, or crash temp whose filename is bound to this canonical
@@ -2315,10 +2376,20 @@ func durableProjectStatePresent(root string) (bool, error) {
 	} else if !os.IsNotExist(err) {
 		return false, err
 	}
-	for _, pattern := range patterns {
-		matches, err := filepath.Glob(pattern)
-		if err != nil {
-			return false, err
+	if _, err := os.Lstat(filepath.Dir(stateFile)); errors.Is(err, os.ErrNotExist) {
+		return candidatePresent, nil
+	} else if err != nil {
+		return false, err
+	}
+	for _, inventory := range []func() ([]string, error){
+		func() ([]string, error) { return routeStatePaths(root) },
+		func() ([]string, error) { return hookStateTemps(stateFile) },
+		func() ([]string, error) { return routeStateTemps(root) },
+		func() ([]string, error) { return hookProjectQuarantinePaths(stateFile) },
+	} {
+		matches, inventoryErr := inventory()
+		if inventoryErr != nil {
+			return false, inventoryErr
 		}
 		candidatePresent = candidatePresent || len(matches) > 0
 	}
@@ -2336,10 +2407,15 @@ func durableProjectStatePresent(root string) (bool, error) {
 		}
 		return true, nil
 	}
-	for _, pattern := range patterns {
-		matches, err := filepath.Glob(pattern)
-		if err != nil {
-			return false, err
+	for _, inventory := range []func() ([]string, error){
+		func() ([]string, error) { return routeStatePaths(root) },
+		func() ([]string, error) { return hookStateTemps(stateFile) },
+		func() ([]string, error) { return routeStateTemps(root) },
+		func() ([]string, error) { return hookProjectQuarantinePaths(stateFile) },
+	} {
+		matches, inventoryErr := inventory()
+		if inventoryErr != nil {
+			return false, inventoryErr
 		}
 		if len(matches) > 0 {
 			return true, nil
@@ -2400,7 +2476,7 @@ func validatedStateDirectoryBinding() (binding stateDirectoryBinding, returnErr 
 	if err != nil {
 		return stateDirectoryBinding{}, err
 	}
-	lock, err := filelock.AcquireWait(marker)
+	lock, err := acquireHookFileLock(marker, "hook state initialization marker")
 	if err != nil {
 		return stateDirectoryBinding{}, err
 	}
@@ -2696,7 +2772,7 @@ func writeHookStateBody(p string, body []byte, announcePhase bool) (returnErr er
 	}
 	tmpPath := tmp.Name()
 	defer func() {
-		if err := os.Remove(tmpPath); err != nil && !os.IsNotExist(err) {
+		if err := removeOwnedHookStateTemp(tmpPath, kind, limit); err != nil {
 			returnErr = errors.Join(returnErr, err)
 		}
 	}()
@@ -2724,6 +2800,28 @@ func writeHookStateBody(p string, body []byte, announcePhase bool) (returnErr er
 		hookRoutePhase("temp-synced")
 	}
 	return replaceHookStateFile(tmpPath, p)
+}
+
+func removeOwnedHookStateTemp(path, kind string, limit int64) error {
+	witness, err := readBoundedHookStateFile(path, kind+" temp", limit)
+	if err != nil {
+		return err
+	}
+	if witness == nil {
+		return nil
+	}
+	return removeHookFileWitness(path, kind+" temp", limit, witness)
+}
+
+func removeOwnedHookFile(path, kind string, limit int64) error {
+	witness, err := readBoundedHookFile(path, kind, limit)
+	if err != nil {
+		return err
+	}
+	if witness == nil {
+		return nil
+	}
+	return removeHookFileWitnessWithPrefix(path, kind, limit, witness, "d")
 }
 
 func loadRouteSnapshot(root, sessionID string) (Config, bool, error) {
@@ -2782,18 +2880,34 @@ func loadRouteSnapshot(root, sessionID string) (Config, bool, error) {
 
 type stateLock struct{ releaseFn func() error }
 
-func acquireStateLock(stateFile string) (*stateLock, error) {
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		l, err := filelock.Acquire(stateFile + ".session")
-		if err == nil {
-			return &stateLock{releaseFn: l.Release}, nil
-		}
-		if !time.Now().Before(deadline) {
-			return nil, fmt.Errorf("hook state for this session remained locked for 2s: %w", err)
-		}
-		time.Sleep(5 * time.Millisecond)
+func acquireHookFileLock(scope, kind string) (*filelock.Lock, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), hookStateLockWaitLimit)
+	defer cancel()
+	return acquireHookFileLockContext(ctx, scope, kind)
+}
+
+func acquireHookFileLockContext(ctx context.Context, scope, kind string) (*filelock.Lock, error) {
+	lock, err := filelock.AcquireWaitContext(ctx, scope)
+	if err != nil {
+		return nil, fmt.Errorf("%s remained locked within %s: %w", kind, hookStateLockWaitLimit, err)
 	}
+	return lock, nil
+}
+
+func acquireStateLock(stateFile string) (*stateLock, error) {
+	lock, err := acquireHookFileLock(stateFile+".session", "hook state for this session")
+	if err != nil {
+		return nil, err
+	}
+	return &stateLock{releaseFn: lock.Release}, nil
+}
+
+func acquireStateLockContext(ctx context.Context, stateFile string) (*stateLock, error) {
+	lock, err := acquireHookFileLockContext(ctx, stateFile+".session", "hook state for this session")
+	if err != nil {
+		return nil, err
+	}
+	return &stateLock{releaseFn: lock.Release}, nil
 }
 
 func (l *stateLock) release() error { return l.releaseFn() }
@@ -2805,39 +2919,412 @@ var (
 	hookRoutePhase          = func(string) {}
 	hookStateMarkerPhase    = func(string) {}
 	hookStateReadPhase      = func(string, string) {}
+	hookStateReplacePhase   = func(string, string) {}
 	hookStateDirectoryPhase = func(string, string) {}
 	hookStateBindingPhase   = func(string, string) {}
 )
 
+func replaceStateFileAtomic(temp, target string) (retErr error) {
+	tempAbs, err := filepath.Abs(temp)
+	if err != nil {
+		return err
+	}
+	targetAbs, err := filepath.Abs(target)
+	if err != nil {
+		return err
+	}
+	if filepath.Dir(tempAbs) != filepath.Dir(targetAbs) {
+		return fmt.Errorf("hook state replacement source and target must share one directory authority")
+	}
+	parent := filepath.Dir(targetAbs)
+	root, err := os.OpenRoot(parent)
+	if err != nil {
+		return err
+	}
+	defer func() { retErr = errors.Join(retErr, root.Close()) }()
+	tempName, targetName := filepath.Base(tempAbs), filepath.Base(targetAbs)
+	if err := recoverHookReplacementQuarantines(root, parent, targetName, hookStateMaxBytes); err != nil {
+		return err
+	}
+	newWitness, err := readBoundedHookRootFile(root, tempName, tempAbs, "hook state replacement", hookStateMaxBytes)
+	if err != nil {
+		return err
+	}
+	oldWitness, err := readBoundedHookRootFile(root, targetName, targetAbs, "hook state replacement target", hookStateMaxBytes)
+	if errors.Is(err, os.ErrNotExist) {
+		hookStateReplacePhase("before-create", targetAbs)
+		if err := fsatomic.RenameNoReplaceBetween(root, tempName, root, targetName); err != nil {
+			return err
+		}
+		if err := syncStateDirectory(parent); err != nil {
+			return err
+		}
+		published, err := readBoundedHookRootFile(root, targetName, targetAbs, "hook state replacement target", hookStateMaxBytes)
+		if err != nil || !sameHookFileAfterRename(newWitness, published) {
+			return errors.Join(err, fmt.Errorf("hook state replacement target %s changed at creation boundary", targetAbs))
+		}
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	hookStateReplacePhase("before-quarantine", targetAbs)
+	quarantined, err := fsatomic.Quarantine(root, targetName, "r")
+	if err != nil {
+		return err
+	}
+	isolated, err := readBoundedHookRootFile(quarantined.Root(), quarantined.Name(), targetAbs, "hook state replacement target", hookStateMaxBytes)
+	if err != nil || !sameHookFileAfterRename(oldWitness, isolated) {
+		cause := errors.Join(err, fmt.Errorf("hook state replacement target %s changed while entering private authority", targetAbs))
+		return errors.Join(cause, restoreHookReplacementQuarantine(quarantined), quarantined.Close())
+	}
+	if err := writeHookReplacementWitness(quarantined.Root(), newWitness); err != nil {
+		return errors.Join(err, restoreHookReplacementQuarantine(quarantined), quarantined.Close())
+	}
+	hookStateReplacePhase("after-quarantine", targetAbs)
+	if err := fsatomic.RenameNoReplaceBetween(root, tempName, root, targetName); err != nil {
+		return errors.Join(err, restoreHookReplacementQuarantine(quarantined), quarantined.Close())
+	}
+	if err := syncStateDirectory(parent); err != nil {
+		return errors.Join(err, quarantined.Close())
+	}
+	published, err := readBoundedHookRootFile(root, targetName, targetAbs, "hook state replacement target", hookStateMaxBytes)
+	if err != nil || !sameHookFileAfterRename(newWitness, published) {
+		return errors.Join(err, fmt.Errorf("hook state replacement target %s changed after publication; preserving private prior state", targetAbs), quarantined.Close())
+	}
+	if err := finishHookReplacementQuarantine(quarantined, true); err != nil {
+		return errors.Join(err, quarantined.Close())
+	}
+	published, err = readBoundedHookRootFile(root, targetName, targetAbs, "hook state replacement target", hookStateMaxBytes)
+	if err != nil || !sameHookFileAfterRename(newWitness, published) {
+		return errors.Join(err, fmt.Errorf("hook state replacement target %s changed while retiring prior state", targetAbs))
+	}
+	return syncStateDirectory(parent)
+}
+
+func recoverHookReplacementQuarantines(root *os.Root, parent, target string, limit int64) error {
+	entries, err := dirscan.Read(parent, hookStateDirMaxEntries)
+	if err != nil {
+		return err
+	}
+	const prefix = "r"
+	matches := make([]string, 0, 1)
+	for _, entry := range entries {
+		name := entry.Name()
+		if !looksLikeHookQuarantine(name, prefix) {
+			continue
+		}
+		q, err := fsatomic.ResumeQuarantine(root, name, "")
+		if err != nil {
+			return err
+		}
+		if q.Source() != target {
+			if err := q.Close(); err != nil {
+				return err
+			}
+			continue
+		}
+		matches = append(matches, name)
+		if err := q.Close(); err != nil {
+			return err
+		}
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("multiple interrupted hook state replacements exist for %s", filepath.Join(parent, target))
+	}
+	if len(matches) == 0 {
+		return nil
+	}
+	q, err := fsatomic.ResumeQuarantine(root, matches[0], target)
+	if err != nil {
+		return err
+	}
+	name := matches[0]
+	_, objectErr := q.Root().Lstat(q.Name())
+	newWitness, newErr := readBoundedHookRootFile(q.Root(), "new", filepath.Join(parent, name, "new"), "hook state replacement witness", limit)
+	if errors.Is(newErr, os.ErrNotExist) {
+		newWitness, newErr = nil, nil
+	}
+	if newErr != nil {
+		return errors.Join(newErr, q.Close())
+	}
+	public, publicErr := readBoundedHookRootFile(root, target, filepath.Join(parent, target), "hook state replacement target", limit)
+	if errors.Is(publicErr, os.ErrNotExist) {
+		if errors.Is(objectErr, os.ErrNotExist) {
+			return errors.Join(fmt.Errorf("interrupted hook state replacement lost both public and private state for %s", target), q.Close())
+		}
+		if objectErr != nil {
+			return errors.Join(objectErr, q.Close())
+		}
+		if newWitness != nil {
+			if err := q.Root().Remove("new"); err != nil {
+				return errors.Join(err, q.Close())
+			}
+			if err := syncHookRoot(q.Root()); err != nil {
+				return errors.Join(err, q.Close())
+			}
+		}
+		if err := q.Restore(); err != nil {
+			return errors.Join(err, q.Close())
+		}
+		return nil
+	}
+	if publicErr != nil {
+		return errors.Join(publicErr, q.Close())
+	}
+	if newWitness == nil {
+		if errors.Is(objectErr, os.ErrNotExist) {
+			if err := q.FinishEmpty(); err != nil {
+				return errors.Join(err, q.Close())
+			}
+			return nil
+		}
+		return errors.Join(fmt.Errorf("interrupted hook state replacement of %s has no exact new-state witness; preserving both authorities", target), q.Close())
+	}
+	if !sameHookFileContent(newWitness, public) {
+		return errors.Join(fmt.Errorf("public hook state changed during interrupted replacement of %s; preserving both authorities", target), q.Close())
+	}
+	if objectErr != nil {
+		if !errors.Is(objectErr, os.ErrNotExist) {
+			return errors.Join(objectErr, q.Close())
+		}
+	}
+	if err := finishHookReplacementQuarantine(q, !errors.Is(objectErr, os.ErrNotExist)); err != nil {
+		return errors.Join(err, q.Close())
+	}
+	return nil
+}
+
+func looksLikeHookQuarantine(name, prefix string) bool {
+	const marker = ".fsatomic."
+	if !strings.HasPrefix(name, prefix) {
+		return false
+	}
+	rest := strings.TrimPrefix(name, prefix)
+	return len(rest) > 32+len(marker) && validLowerHex(rest[:32]) && strings.HasPrefix(rest[32:], marker)
+}
+
+func writeHookReplacementWitness(root *os.Root, witness *hookFileWitness) error {
+	if witness == nil {
+		return fmt.Errorf("hook state replacement has no new-state witness")
+	}
+	file, err := root.OpenFile("new", os.O_WRONLY|os.O_CREATE|os.O_EXCL, witness.mode.Perm())
+	if err != nil {
+		return err
+	}
+	written, writeErr := file.Write(witness.body)
+	if writeErr == nil && written != len(witness.body) {
+		writeErr = io.ErrShortWrite
+	}
+	if err := errors.Join(writeErr, file.Sync(), file.Close()); err != nil {
+		return err
+	}
+	return syncHookRoot(root)
+}
+
+func finishHookReplacementQuarantine(q *fsatomic.Quarantined, objectExists bool) error {
+	if objectExists {
+		if err := q.Root().Remove(q.Name()); err != nil {
+			return err
+		}
+		if err := syncHookRoot(q.Root()); err != nil {
+			return err
+		}
+	}
+	if err := q.Root().Remove("new"); err != nil {
+		return err
+	}
+	if err := syncHookRoot(q.Root()); err != nil {
+		return err
+	}
+	return q.FinishEmpty()
+}
+
+func restoreHookReplacementQuarantine(q *fsatomic.Quarantined) error {
+	if err := q.Root().Remove("new"); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := syncHookRoot(q.Root()); err != nil {
+		return err
+	}
+	return q.Restore()
+}
+
+func syncHookRoot(root *os.Root) error {
+	dir, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	return errors.Join(dir.Sync(), dir.Close())
+}
+
 func hookStateTemps(stateFile string) ([]string, error) {
-	pattern := filepath.Join(filepath.Dir(stateFile), "."+filepath.Base(stateFile)+".tmp-*")
-	matches, err := filepath.Glob(pattern)
+	prefix := "." + filepath.Base(stateFile) + ".tmp-"
+	return boundedHookStateMatches(filepath.Dir(stateFile), "hook state temp", func(name string) (bool, error) {
+		if !strings.HasPrefix(name, prefix) {
+			return false, nil
+		}
+		if strings.TrimPrefix(name, prefix) == "" {
+			return false, fmt.Errorf("hook state temp %q has a noncanonical filename", name)
+		}
+		return true, nil
+	})
+}
+
+func hookProjectBase(stateFile string) (string, error) {
+	base := filepath.Base(stateFile)
+	base = strings.TrimPrefix(base, ".")
+	index := strings.Index(base, ".state")
+	if index != sha256.Size*2 || !validHookHexDigest(base[:index]) {
+		return "", fmt.Errorf("hook state path %s has a noncanonical project identity", stateFile)
+	}
+	return base[:index+len(".state")], nil
+}
+
+func hookDeletionQuarantinePrefix(stateFile string) (string, error) {
+	if _, err := hookProjectBase(stateFile); err != nil {
+		return "", err
+	}
+	return "d", nil
+}
+
+func hookProjectQuarantinePaths(stateFile string) ([]string, error) {
+	base, err := hookProjectBase(stateFile)
 	if err != nil {
 		return nil, err
 	}
-	for _, temp := range matches {
-		info, err := os.Lstat(temp)
+	dir := filepath.Dir(stateFile)
+	entries, err := dirscan.Read(dir, hookStateDirMaxEntries)
+	if err != nil {
+		return nil, fmt.Errorf("inventory hook state retirement directories: %w", err)
+	}
+	paths := make([]string, 0)
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	for _, entry := range entries {
+		name := entry.Name()
+		if !looksLikeHookQuarantine(name, "d") && !looksLikeHookQuarantine(name, "r") {
+			continue
+		}
+		info, err := os.Lstat(filepath.Join(dir, name))
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
 			return nil, err
 		}
-		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-			return nil, fmt.Errorf("hook state temp %s must be a regular file, not a symlink or special file", temp)
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return nil, fmt.Errorf("hook state retirement %s must be a real directory", filepath.Join(dir, name))
+		}
+		q, err := fsatomic.ResumeQuarantine(root, name, "")
+		if err != nil {
+			return nil, err
+		}
+		related := hookProjectSourceMatches(filepath.Join(dir, base), q.Source())
+		if err := q.Close(); err != nil {
+			return nil, err
+		}
+		if !related {
+			continue
+		}
+		paths = append(paths, filepath.Join(dir, name))
+	}
+	return paths, nil
+}
+
+func recoverHookDeletionQuarantines(stateFile string) (retErr error) {
+	prefix, err := hookDeletionQuarantinePrefix(stateFile)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(stateFile)
+	entries, err := dirscan.Read(dir, hookStateDirMaxEntries)
+	if err != nil {
+		return err
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer func() { retErr = errors.Join(retErr, root.Close()) }()
+	for _, entry := range entries {
+		name := entry.Name()
+		if !looksLikeHookQuarantine(name, prefix) {
+			continue
+		}
+		q, err := fsatomic.ResumeQuarantine(root, name, "")
+		if err != nil {
+			return err
+		}
+		if !hookProjectSourceMatches(stateFile, q.Source()) {
+			if err := q.Close(); err != nil {
+				return err
+			}
+			continue
+		}
+		if _, err := q.Root().Lstat(q.Name()); errors.Is(err, os.ErrNotExist) {
+			if err := q.FinishEmpty(); err != nil {
+				return errors.Join(err, q.Close())
+			}
+			continue
+		} else if err != nil {
+			return errors.Join(err, q.Close())
+		}
+		if err := q.Restore(); err != nil {
+			return errors.Join(fmt.Errorf("restore interrupted hook state deletion %q: %w", name, err), q.Close())
 		}
 	}
-	return matches, nil
+	return nil
+}
+
+func validLowerHex(value string) bool {
+	for _, r := range value {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return value != ""
+}
+
+func hookProjectSourceMatches(stateFile, source string) bool {
+	base, err := hookProjectBase(stateFile)
+	if err != nil {
+		return false
+	}
+	if source == base || strings.HasPrefix(source, "."+base+".tmp-") {
+		return true
+	}
+	routePrefix := base + ".route-"
+	if strings.HasPrefix(source, routePrefix) && strings.HasSuffix(source, ".json") {
+		return validHookHexDigest(strings.TrimSuffix(strings.TrimPrefix(source, routePrefix), ".json"))
+	}
+	routeTempPrefix := "." + routePrefix
+	if strings.HasPrefix(source, routeTempPrefix) {
+		rest := strings.TrimPrefix(source, routeTempPrefix)
+		index := strings.Index(rest, ".json.tmp-")
+		return index == sha256.Size*2 && validHookHexDigest(rest[:index]) && rest[index+len(".json.tmp-"):] != ""
+	}
+	return false
 }
 
 func cleanupHookStateTemps(stateFile string) error {
+	if err := recoverHookDeletionQuarantines(stateFile); err != nil {
+		return err
+	}
 	matches, err := hookStateTemps(stateFile)
 	if err != nil {
 		return err
 	}
 	removed := false
 	for _, temp := range matches {
-		if err := os.Remove(temp); err != nil {
+		witness, err := readBoundedHookStateFile(temp, "hook state temp", hookStateMaxBytes)
+		if err != nil {
+			return err
+		}
+		if witness == nil {
+			return fmt.Errorf("hook state temp %s disappeared during cleanup", temp)
+		}
+		if err := removeHookFileWitness(temp, "hook state temp", hookStateMaxBytes, witness); err != nil {
 			return err
 		}
 		removed = true
@@ -3077,6 +3564,9 @@ func clearStateRevision(root, sessionID string, expectedRevision uint64) (cleare
 	defer func() {
 		returnErr = errors.Join(returnErr, lock.release())
 	}()
+	if err := recoverHookDeletionQuarantines(p); err != nil {
+		return false, err
+	}
 	stateWitness, err := readBoundedHookStateFile(p, "hook state", hookStateMaxBytes)
 	if err != nil {
 		return false, err
@@ -3143,6 +3633,14 @@ func clearStateRevision(root, sessionID string, expectedRevision uint64) (cleare
 }
 
 func removeHookFileWitness(path, kind string, limit int64, want *hookFileWitness) (retErr error) {
+	prefix, err := hookDeletionQuarantinePrefix(path)
+	if err != nil {
+		return err
+	}
+	return removeHookFileWitnessWithPrefix(path, kind, limit, want, prefix)
+}
+
+func removeHookFileWitnessWithPrefix(path, kind string, limit int64, want *hookFileWitness, prefix string) (retErr error) {
 	if want == nil {
 		return fmt.Errorf("%s %s has no deletion witness", kind, path)
 	}
@@ -3168,21 +3666,87 @@ func removeHookFileWitness(path, kind string, limit int64, want *hookFileWitness
 		return err
 	}
 	defer func() { retErr = errors.Join(retErr, root.Close()) }()
-	current, err := root.Lstat(name)
-	if err != nil || !os.SameFile(want.info, current) || want.mode != current.Mode() || want.size != current.Size() || !want.modTime.Equal(current.ModTime()) ||
-		(want.changeID != "" && hookFileChangeID(current) != "" && want.changeID != hookFileChangeID(current)) {
-		return errors.Join(err, fmt.Errorf("%s %s changed at deletion boundary; preserving it", kind, path))
-	}
-	if err := root.Remove(name); err != nil {
+	quarantined, err := fsatomic.Quarantine(root, name, prefix)
+	if err != nil {
 		return err
 	}
-	return syncStateDirectory(parent)
+	hookStateReadPhase("after-quarantine", path)
+	isolated, err := readBoundedHookRootFile(quarantined.Root(), quarantined.Name(), path, kind, limit)
+	if err != nil || !sameHookFileAfterRename(want, isolated) {
+		cause := errors.Join(err, fmt.Errorf("%s %s changed while entering private deletion authority; preserving it", kind, path))
+		if restoreErr := quarantined.Restore(); restoreErr != nil {
+			return errors.Join(cause, restoreErr, quarantined.Close())
+		}
+		return cause
+	}
+	if err := quarantined.Remove(); err != nil {
+		return errors.Join(err, quarantined.Close())
+	}
+	if _, err := root.Lstat(name); err == nil {
+		return fmt.Errorf("%s %s was replaced during deletion; preserving the replacement", kind, path)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+func readBoundedHookRootFile(root *os.Root, name, display, kind string, limit int64) (witness *hookFileWitness, retErr error) {
+	before, err := root.Lstat(name)
+	if err != nil {
+		return nil, err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s %s must be a regular file, not a symlink or special file", kind, display)
+	}
+	if before.Size() > limit {
+		return nil, fmt.Errorf("%s %s exceeds %d-byte limit", kind, display, limit)
+	}
+	file, err := root.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { retErr = errors.Join(retErr, file.Close()) }()
+	opened, err := file.Stat()
+	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(before, opened) || before.Mode() != opened.Mode() || before.Size() != opened.Size() || !before.ModTime().Equal(opened.ModTime()) {
+		return nil, errors.Join(err, fmt.Errorf("%s %s changed while opening private deletion authority", kind, display))
+	}
+	body, err := io.ReadAll(io.LimitReader(file, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("%s %s exceeds %d-byte limit", kind, display, limit)
+	}
+	after, statErr := file.Stat()
+	pathAfter, pathErr := root.Lstat(name)
+	if err := errors.Join(statErr, pathErr); err != nil {
+		return nil, err
+	}
+	beforeChangeID, afterChangeID, pathChangeID := hookFileChangeID(before), hookFileChangeID(after), hookFileChangeID(pathAfter)
+	if !os.SameFile(opened, after) || !os.SameFile(opened, pathAfter) || opened.Mode() != after.Mode() || opened.Mode() != pathAfter.Mode() ||
+		opened.Size() != after.Size() || opened.Size() != pathAfter.Size() || !opened.ModTime().Equal(after.ModTime()) || !opened.ModTime().Equal(pathAfter.ModTime()) ||
+		(beforeChangeID != "" && afterChangeID != "" && beforeChangeID != afterChangeID) || (beforeChangeID != "" && pathChangeID != "" && beforeChangeID != pathChangeID) {
+		return nil, fmt.Errorf("%s %s changed inside private deletion authority", kind, display)
+	}
+	return &hookFileWitness{body: body, info: pathAfter, mode: pathAfter.Mode(), size: pathAfter.Size(), modTime: pathAfter.ModTime(), changeID: pathChangeID}, nil
 }
 
 func sameHookFileWitness(want, got *hookFileWitness) bool {
 	return want != nil && got != nil && want.info != nil && got.info != nil && os.SameFile(want.info, got.info) &&
 		want.mode == got.mode && want.size == got.size && want.modTime.Equal(got.modTime) && bytes.Equal(want.body, got.body) &&
 		(want.changeID == "" || got.changeID == "" || want.changeID == got.changeID)
+}
+
+// A rename updates change time on several platforms while preserving the
+// file object. Isolation comparisons therefore bind native identity, bytes,
+// mode, size, and modification time, but deliberately exclude change time.
+func sameHookFileAfterRename(want, got *hookFileWitness) bool {
+	return want != nil && got != nil && want.info != nil && got.info != nil && os.SameFile(want.info, got.info) &&
+		want.mode == got.mode && want.size == got.size && want.modTime.Equal(got.modTime) && bytes.Equal(want.body, got.body)
+}
+
+func sameHookFileContent(want, got *hookFileWitness) bool {
+	return want != nil && got != nil && want.mode == got.mode && want.size == got.size && bytes.Equal(want.body, got.body)
 }
 
 // --- small helpers ---

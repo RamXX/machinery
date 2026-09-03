@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -88,14 +87,7 @@ type rawEntry struct {
 // error, and an entry with an empty run command is an error: an unusable
 // registry must fail loudly, never resolve to a silent no-op.
 func LoadRegistry(path string) (*Registry, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return nil, err
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s: checker registry must be a regular, non-symlink file", path)
-	}
-	data, err := os.ReadFile(path)
+	data, err := readCheckerStructuredFile(path, "checker registry")
 	if err != nil {
 		return nil, err
 	}

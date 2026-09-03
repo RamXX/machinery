@@ -23,6 +23,23 @@ func writeMachine(t *testing.T, dir, name, src string) string {
 	return p
 }
 
+func TestOracleInventoryRejectsEntryBeyondFixedCeiling(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"c", "a", "b"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close() //nolint:errcheck // test cleanup
+	if _, err := readOracleDir(f, 2); err == nil || !strings.Contains(err.Error(), "entry limit") {
+		t.Fatalf("high-entry oracle inventory was accepted: %v", err)
+	}
+}
+
 func oracleRunFilesForTest(files []string) error {
 	return executeDirectCaptured(oracleRunFilesTo(files, false, "", stdoutW, stderrW))
 }

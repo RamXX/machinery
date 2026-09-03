@@ -5,20 +5,17 @@ package hook
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"syscall"
 	"unsafe"
 )
 
 const (
-	hookGenericWrite        = 0x40000000
-	hookFileShareRead       = 0x00000001
-	hookFileShareWrite      = 0x00000002
-	hookFileShareDelete     = 0x00000004
-	hookOpenExisting        = 3
-	hookBackupSemantics     = 0x02000000
-	hookMoveReplaceExisting = 0x00000001
-	hookMoveWriteThrough    = 0x00000008
+	hookGenericWrite    = 0x40000000
+	hookFileShareRead   = 0x00000001
+	hookFileShareWrite  = 0x00000002
+	hookFileShareDelete = 0x00000004
+	hookOpenExisting    = 3
+	hookBackupSemantics = 0x02000000
 )
 
 var (
@@ -26,7 +23,6 @@ var (
 	hookCreateFileW      = hookKernel32.NewProc("CreateFileW")
 	hookFlushFileBuffers = hookKernel32.NewProc("FlushFileBuffers")
 	hookCloseHandle      = hookKernel32.NewProc("CloseHandle")
-	hookMoveFileExW      = hookKernel32.NewProc("MoveFileExW")
 )
 
 func syncStateDirectory(dir string) error {
@@ -55,20 +51,5 @@ func syncStateDirectory(dir string) error {
 }
 
 func replaceStateFile(temp, target string) error {
-	from, err := syscall.UTF16PtrFromString(temp)
-	if err != nil {
-		return err
-	}
-	to, err := syscall.UTF16PtrFromString(target)
-	if err != nil {
-		return err
-	}
-	moved, _, moveErr := hookMoveFileExW.Call(
-		uintptr(unsafe.Pointer(from)), uintptr(unsafe.Pointer(to)),
-		hookMoveReplaceExisting|hookMoveWriteThrough,
-	)
-	if moved == 0 {
-		return fmt.Errorf("durably replace hook state %s with %s: %w", target, temp, moveErr)
-	}
-	return syncStateDirectory(filepath.Dir(target))
+	return replaceStateFileAtomic(temp, target)
 }

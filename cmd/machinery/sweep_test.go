@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -108,5 +109,23 @@ func TestSweepRejectsMutationAndSymlinkInventory(t *testing.T) {
 	}
 	if err := sweepRun("guardFoo", d, 0); err == nil || !strings.Contains(err.Error(), "symlink") {
 		t.Fatalf("sweep accepted symlink inventory: %v", err)
+	}
+}
+
+func TestSweepRejectsOversizedSparseTextBeforeAllocation(t *testing.T) {
+	design := t.TempDir()
+	path := filepath.Join(design, "BUILD.md")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(sweepFileMaxBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := sweepSnapshotRunTo("guardFoo", design, design, 0, io.Discard, io.Discard); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatalf("sweep accepted oversized sparse input: %v", err)
 	}
 }

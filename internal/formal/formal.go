@@ -5,6 +5,7 @@ package formal
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -21,10 +22,10 @@ import (
 
 	"github.com/RamXX/machinery/internal/alloy"
 	"github.com/RamXX/machinery/internal/artifactset"
-	"github.com/RamXX/machinery/internal/cachestage"
 	"github.com/RamXX/machinery/internal/compose"
 	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/filelock"
+	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/pack"
 	"github.com/RamXX/machinery/internal/portablepath"
@@ -38,7 +39,53 @@ const (
 	tlaVersion             = "v1.7.4"
 	tlaSHA256              = "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
 	formalJarDownloadLimit = int64(128 << 20)
+	formalArtifactMaxBytes = int64(16 << 20)
+	formalDirPageSize      = 128
+	formalDirEntryMax      = 4096
 )
+
+func copyFormalExact(dst io.Writer, src *os.File, size int64, label string) (int64, error) {
+	written, err := io.CopyN(dst, src, size)
+	if err != nil {
+		return written, fmt.Errorf("read exact %s: copied %d of %d bytes: %w", label, written, size, err)
+	}
+	var extra [1]byte
+	n, probeErr := src.Read(extra[:])
+	if n != 0 || probeErr != io.EOF {
+		return written, errors.Join(probeErr, fmt.Errorf("%s grew while being read", label))
+	}
+	return written, nil
+}
+
+func readFormalFileExact(path, label string) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || info.Size() < 0 || info.Size() > formalArtifactMaxBytes {
+		return nil, fmt.Errorf("%s must be a regular non-symlink file no larger than %d bytes", label, formalArtifactMaxBytes)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	opened, statErr := file.Stat()
+	if statErr != nil || !os.SameFile(info, opened) || opened.Mode() != info.Mode() || opened.Size() != info.Size() {
+		return nil, errors.Join(statErr, file.Close(), fmt.Errorf("%s changed identity while opening", label))
+	}
+	var body bytes.Buffer
+	body.Grow(int(info.Size()))
+	written, readErr := copyFormalExact(&body, file, info.Size(), label)
+	after, pathErr := os.Lstat(path)
+	closeErr := file.Close()
+	if err := errors.Join(readErr, pathErr, closeErr); err != nil {
+		return nil, err
+	}
+	if written != info.Size() || !os.SameFile(info, after) || info.Mode() != after.Mode() || info.Size() != after.Size() || !info.ModTime().Equal(after.ModTime()) {
+		return nil, fmt.Errorf("%s changed while reading", label)
+	}
+	return body.Bytes(), nil
+}
 
 var formalUserCacheDir = os.UserCacheDir
 
@@ -104,14 +151,14 @@ func fileSHA256(path string) (string, error) {
 		return "", err
 	}
 	opened, err := f.Stat()
-	if err != nil || !os.SameFile(info, opened) {
+	if err != nil || !os.SameFile(info, opened) || opened.Mode() != info.Mode() || opened.Size() != info.Size() {
 		if err != nil {
 			return "", errors.Join(err, f.Close())
 		}
 		return "", errors.Join(fmt.Errorf("%s changed while opening", path), f.Close())
 	}
 	h := sha256.New()
-	written, copyErr := io.Copy(h, io.LimitReader(f, formalJarDownloadLimit+1))
+	written, copyErr := copyFormalExact(h, f, info.Size(), path)
 	pathInfo, statErr := os.Lstat(path)
 	closeErr := f.Close()
 	if err := errors.Join(copyErr, statErr, closeErr); err != nil {
@@ -139,7 +186,7 @@ func snapshotVerifiedJar(path, wantSHA, label, dir string) (string, error) {
 		return "", err
 	}
 	opened, err := in.Stat()
-	if err != nil || !os.SameFile(info, opened) {
+	if err != nil || !os.SameFile(info, opened) || opened.Mode() != info.Mode() || opened.Size() != info.Size() {
 		if err != nil {
 			return "", errors.Join(err, in.Close())
 		}
@@ -151,7 +198,7 @@ func snapshotVerifiedJar(path, wantSHA, label, dir string) (string, error) {
 		return "", errors.Join(err, in.Close())
 	}
 	h := sha256.New()
-	written, copyErr := io.Copy(io.MultiWriter(out, h), io.LimitReader(in, formalJarDownloadLimit+1))
+	written, copyErr := copyFormalExact(io.MultiWriter(out, h), in, info.Size(), label+" jar")
 	syncErr := out.Sync()
 	closeOutErr := out.Close()
 	pathInfo, statErr := os.Lstat(path)
@@ -169,24 +216,201 @@ func snapshotVerifiedJar(path, wantSHA, label, dir string) (string, error) {
 	return dest, nil
 }
 
-// fetchJar verifies every use, including an already-cached jar. Downloads use
-// a unique sibling temporary file and atomic rename, so concurrent verifiers
-// neither trust corrupt cache bytes nor share a predictable .tmp path.
+var formalAfterJarCacheLock func(string)
+
+func formalJarStagePrefix(dest string) string {
+	sum := sha256.Sum256([]byte(filepath.Base(dest)))
+	return ".machinery-jar-" + hex.EncodeToString(sum[:8]) + "-"
+}
+
+func formalJarLockScope(parent string) string {
+	// Scope the advisory lock to the existing cache ancestor, not to any path
+	// beneath the replaceable cache parent. A predictable missing sibling could
+	// itself be created as a symlink between acquisitions and split the derived
+	// file-lock identity. Serializing sibling formal caches is conservative but
+	// keeps every acquisition bound to the same stable namespace authority.
+	return filepath.Dir(parent)
+}
+
+func sameFormalJarCacheIdentity(a, b os.FileInfo) bool {
+	return a != nil && b != nil && a.IsDir() && b.IsDir() && a.Mode()&os.ModeSymlink == 0 && b.Mode()&os.ModeSymlink == 0 && a.Mode() == b.Mode() && os.SameFile(a, b)
+}
+
+func openFormalJarCache(parent string) (*os.Root, os.FileInfo, error) {
+	before, err := os.Lstat(parent)
+	if err != nil {
+		return nil, nil, err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.IsDir() {
+		return nil, nil, fmt.Errorf("formal jar cache parent %s must be a real directory", parent)
+	}
+	root, err := os.OpenRoot(parent)
+	if err != nil {
+		return nil, nil, err
+	}
+	inside, err := root.Lstat(".")
+	if err != nil || !sameFormalJarCacheIdentity(before, inside) {
+		return nil, nil, errors.Join(err, root.Close(), fmt.Errorf("formal jar cache parent %s changed while opening", parent))
+	}
+	return root, inside, nil
+}
+
+func validateFormalJarCachePath(root *os.Root, parent string, expected os.FileInfo) error {
+	inside, insideErr := root.Lstat(".")
+	outside, outsideErr := os.Lstat(parent)
+	if err := errors.Join(insideErr, outsideErr); err != nil {
+		return errors.Join(err, fmt.Errorf("formal jar cache parent %s changed identity", parent))
+	}
+	if !sameFormalJarCacheIdentity(expected, inside) || !sameFormalJarCacheIdentity(inside, outside) {
+		return fmt.Errorf("formal jar cache parent %s changed identity", parent)
+	}
+	return nil
+}
+
+func createFormalJarTemp(root *os.Root, prefix string) (*os.File, string, error) {
+	for range 16 {
+		var nonce [16]byte
+		if n, err := rand.Read(nonce[:]); err != nil || n != len(nonce) {
+			return nil, "", errors.Join(err, fmt.Errorf("generate formal jar temporary name: random source returned %d of %d bytes", n, len(nonce)))
+		}
+		name := prefix + hex.EncodeToString(nonce[:])
+		file, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if err == nil {
+			return file, name, nil
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return nil, "", err
+		}
+	}
+	return nil, "", fmt.Errorf("allocate formal jar temporary name: exhausted 16 attempts")
+}
+
+func validFormalJarStage(name, prefix string) bool {
+	suffix := strings.TrimPrefix(name, prefix)
+	if !strings.HasPrefix(name, prefix) || len(suffix) != 32 || suffix != strings.ToLower(suffix) {
+		return false
+	}
+	_, err := hex.DecodeString(suffix)
+	return err == nil
+}
+
+func fileSHA256Root(root *os.Root, name, label string) (_ string, retErr error) {
+	info, err := root.Lstat(name)
+	if err != nil {
+		return "", err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > formalJarDownloadLimit {
+		return "", fmt.Errorf("%s must be a regular non-symlink jar with size in 1..%d bytes", label, formalJarDownloadLimit)
+	}
+	file, err := root.Open(name)
+	if err != nil {
+		return "", err
+	}
+	defer func() { retErr = errors.Join(retErr, file.Close()) }()
+	opened, err := file.Stat()
+	if err != nil || !sameFormalInventoryMetadata(info, opened) {
+		return "", errors.Join(err, fmt.Errorf("%s changed while opening", label))
+	}
+	hash := sha256.New()
+	written, err := copyFormalExact(hash, file, info.Size(), label)
+	if err != nil {
+		return "", err
+	}
+	after, err := root.Lstat(name)
+	if err != nil || !sameFormalInventoryMetadata(opened, after) || written != info.Size() {
+		return "", errors.Join(err, fmt.Errorf("%s changed while hashing", label))
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func recoverFormalJarStages(root *os.Root, prefix string) error {
+	entries, err := readFormalRootDirectory(root, "formal jar cache")
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, prefix+"delete-") {
+			q, err := fsatomic.ResumeQuarantine(root, name, "")
+			if err != nil {
+				return err
+			}
+			if !validFormalJarStage(q.Source(), prefix) {
+				return errors.Join(fmt.Errorf("formal jar deletion quarantine %s has invalid source %q", name, q.Source()), q.Close())
+			}
+			info, statErr := q.Root().Lstat(q.Name())
+			if errors.Is(statErr, os.ErrNotExist) {
+				if err := q.FinishEmpty(); err != nil {
+					return err
+				}
+				continue
+			}
+			if statErr != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+				return errors.Join(statErr, fmt.Errorf("formal jar deletion quarantine %s has invalid inventory", name), q.Close())
+			}
+			if err := q.Remove(); err != nil {
+				return err
+			}
+			continue
+		}
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		if !validFormalJarStage(name, prefix) {
+			return fmt.Errorf("formal jar cache reserved entry %q has an invalid name", name)
+		}
+		info, err := root.Lstat(name)
+		if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return errors.Join(err, fmt.Errorf("formal jar cache stage %s must be a regular non-symlink file", name))
+		}
+		q, err := fsatomic.Quarantine(root, name, prefix+"delete-")
+		if err != nil {
+			return err
+		}
+		isolated, err := q.Root().Lstat(q.Name())
+		if err != nil || !sameFormalInventoryMetadata(info, isolated) {
+			return errors.Join(err, fmt.Errorf("formal jar cache stage %s changed before cleanup; preserving it", name), q.Close())
+		}
+		if err := q.Remove(); err != nil {
+			return err
+		}
+	}
+	return syncFormalDirectory(root)
+}
+
+// fetchJar verifies every use, including an already-cached jar. The stable
+// cache-ancestor lock covers recovery, download, and installation for every
+// formal engine. After acquiring it, fetchJar retains one handle-relative root
+// for all cache-parent operations and rejects a replaced public parent path on
+// return. The destination-derived stage prefix ensures crash recovery can
+// never claim another tool's or a foreign generic temporary file.
 func fetchJar(dest, url, label, wantSHA string) (_ string, retErr error) {
 	parent := filepath.Dir(dest)
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return "", err
 	}
-	lock, err := filelock.AcquireWait(dest + ":jar-cache")
+	lock, err := filelock.AcquireWait(formalJarLockScope(parent))
 	if err != nil {
 		return "", err
 	}
 	defer func() { retErr = errors.Join(retErr, lock.Release()) }()
-	if err := cachestage.RecoverFiles(parent, ".machinery-jar-"); err != nil {
+	parentRoot, parentInfo, err := openFormalJarCache(parent)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		retErr = errors.Join(retErr, validateFormalJarCachePath(parentRoot, parent, parentInfo), parentRoot.Close())
+	}()
+	if formalAfterJarCacheLock != nil {
+		formalAfterJarCacheLock(dest)
+	}
+	stagePrefix := formalJarStagePrefix(dest)
+	if err := recoverFormalJarStages(parentRoot, stagePrefix); err != nil {
 		return "", fmt.Errorf("recover interrupted %s download: %w", label, err)
 	}
-	if _, err := os.Lstat(dest); err == nil {
-		got, herr := fileSHA256(dest)
+	destBase := filepath.Base(dest)
+	if _, err := parentRoot.Lstat(destBase); err == nil {
+		got, herr := fileSHA256Root(parentRoot, destBase, dest)
 		if herr != nil {
 			return "", herr
 		}
@@ -197,18 +421,32 @@ func fetchJar(dest, url, label, wantSHA string) (_ string, retErr error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
-	tmpFile, err := os.CreateTemp(parent, ".machinery-jar-*")
+	tmpFile, tmpBase, err := createFormalJarTemp(parentRoot, stagePrefix)
 	if err != nil {
 		return "", err
 	}
-	tmp := tmpFile.Name()
+	tmpInfo, err := tmpFile.Stat()
+	if err != nil {
+		return "", errors.Join(err, tmpFile.Close())
+	}
 	tmpOpen := true
+	tmpOwned := true
 	defer func() {
 		if tmpOpen {
 			retErr = errors.Join(retErr, tmpFile.Close())
 		}
-		if removeErr := os.Remove(tmp); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
-			retErr = errors.Join(retErr, removeErr)
+		if tmpOwned {
+			q, quarantineErr := fsatomic.Quarantine(parentRoot, tmpBase, stagePrefix+"delete-")
+			if quarantineErr != nil {
+				retErr = errors.Join(retErr, quarantineErr)
+				return
+			}
+			isolated, statErr := q.Root().Lstat(q.Name())
+			if statErr != nil || !os.SameFile(tmpInfo, isolated) {
+				retErr = errors.Join(retErr, statErr, fmt.Errorf("temporary %s download changed identity before cleanup; preserving it", label), q.Close())
+				return
+			}
+			retErr = errors.Join(retErr, q.Remove())
 		}
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -249,34 +487,31 @@ func fetchJar(dest, url, label, wantSHA string) (_ string, retErr error) {
 		return "", err
 	}
 	tmpOpen = false
-	got, err := fileSHA256(tmp)
+	got, err := fileSHA256Root(parentRoot, tmpBase, "temporary "+label)
 	if err != nil {
 		return "", err
 	}
 	if got != wantSHA {
 		return "", fmt.Errorf("checksum mismatch for %s: got %s, want %s", label, got, wantSHA)
 	}
-	if err := os.Rename(tmp, dest); err != nil {
+	installErr := fsatomic.RenameNoReplace(parentRoot, tmpBase, destBase)
+	if installErr != nil {
 		// Windows does not replace an existing destination. Another verifier
 		// may have won the cold-cache race after our initial Stat; accept that
 		// outcome only after rehashing the winner.
-		if destSHA, hashErr := fileSHA256(dest); hashErr == nil && destSHA == wantSHA {
+		if destSHA, hashErr := fileSHA256Root(parentRoot, destBase, dest); hashErr == nil && destSHA == wantSHA {
 			return dest, nil
 		}
-		return "", err
+		return "", installErr
 	}
-	if err := syncFormalPathDirectory(parent); err != nil {
+	tmpOwned = false
+	if err := syncFormalCacheDirectory(parentRoot, parent); err != nil {
 		return "", fmt.Errorf("sync %s cache directory after install: %w", label, err)
 	}
 	return dest, nil
 }
 
-var syncFormalPathDirectory = func(path string) (returnErr error) {
-	root, err := os.OpenRoot(path)
-	if err != nil {
-		return err
-	}
-	defer func() { returnErr = errors.Join(returnErr, root.Close()) }()
+var syncFormalCacheDirectory = func(root *os.Root, _ string) error {
 	return syncFormalDirectory(root)
 }
 
@@ -439,7 +674,7 @@ func (c *artifactCollector) run(owner string, fn func(string) ([]string, error))
 			return fmt.Errorf("formal generator %s reported artifact %s twice", owner, name)
 		}
 		seen[name] = true
-		body, rerr := os.ReadFile(filepath.Join(dir, name))
+		body, rerr := readFormalFileExact(filepath.Join(dir, name), "generated formal artifact "+name)
 		if rerr != nil {
 			return fmt.Errorf("formal generator %s reported %s but it is unreadable: %w", owner, name, rerr)
 		}
@@ -552,16 +787,10 @@ func commitGeneratedArtifactsRoot(root *os.Root, files map[string]generatedArtif
 		}
 		entries = append(entries, entry)
 	}
-	dirFile, err := root.Open(".")
+	dirEntries, err := readFormalRootDirectory(root, ".")
 	if err != nil {
 		return err
 	}
-	dirEntries, readErr := dirFile.ReadDir(-1)
-	closeErr := dirFile.Close()
-	if err := errors.Join(readErr, closeErr); err != nil {
-		return err
-	}
-	sort.Slice(dirEntries, func(i, j int) bool { return dirEntries[i].Name() < dirEntries[j].Name() })
 	for _, entry := range dirEntries {
 		if want, ok := foldedTargets[strings.ToLower(entry.Name())]; ok && entry.Name() != want {
 			return fmt.Errorf("existing formal artifact %q aliases generated target %q on case-insensitive filesystems", entry.Name(), want)
@@ -591,7 +820,7 @@ func commitGeneratedArtifactsRoot(root *os.Root, files map[string]generatedArtif
 				cleanupErrs = append(cleanupErrs, err)
 				continue
 			}
-			if err := root.Remove(entry.Stage); err != nil {
+			if err := removeFormalSnapshotExact(root, entry.Stage, identity, witness, info, "unjournaled stage "+entry.Stage); err != nil {
 				cleanupErrs = append(cleanupErrs, err)
 				continue
 			}
@@ -729,7 +958,7 @@ func commitGeneratedArtifactsRoot(root *os.Root, files map[string]generatedArtif
 const manualTLAMarker = `\* machinery:manual`
 
 func isDeclaredManualTLA(path string) (bool, error) {
-	b, err := os.ReadFile(path)
+	b, err := readFormalFileExact(path, "manual TLA source")
 	if err != nil {
 		return false, err
 	}
@@ -914,7 +1143,7 @@ func VerifyFormalTo(design string, genOnly bool, stdoutW, stderrW io.Writer) (ex
 	}
 	for _, sem := range semSrcs {
 		m := strings.TrimSuffix(filepath.Base(sem), ".semantics.yaml")
-		semData, serr := os.ReadFile(sem)
+		semData, serr := readFormalFileExact(sem, "formal semantics source")
 		if serr != nil {
 			genErr(serr)
 			continue
@@ -940,7 +1169,7 @@ func VerifyFormalTo(design string, genOnly bool, stdoutW, stderrW io.Writer) (ex
 		}
 	}
 	for _, comp := range compSrcs {
-		data, err := os.ReadFile(comp)
+		data, err := readFormalFileExact(comp, "formal composition source")
 		if err != nil {
 			genErr(fmt.Errorf("compose_gen: %w", err))
 			continue
@@ -1127,7 +1356,7 @@ func VerifyFormalTo(design string, genOnly bool, stdoutW, stderrW io.Writer) (ex
 		}
 		if !diskTLA || !diskCFG {
 			if diskTLA {
-				body, readErr := os.ReadFile(filepath.Join(sourceFdir, tlaName))
+				body, readErr := readFormalFileExact(filepath.Join(sourceFdir, tlaName), "formal TLA artifact "+tlaName)
 				if readErr != nil {
 					genErr(readErr)
 				} else if canonicalFormalGeneratedArtifact(tlaName, body) {
@@ -1137,7 +1366,7 @@ func VerifyFormalTo(design string, genOnly bool, stdoutW, stderrW io.Writer) (ex
 				}
 			}
 			if diskCFG {
-				body, readErr := os.ReadFile(filepath.Join(sourceFdir, cfgName))
+				body, readErr := readFormalFileExact(filepath.Join(sourceFdir, cfgName), "formal cfg artifact "+cfgName)
 				if readErr != nil {
 					genErr(readErr)
 				} else if canonicalFormalGeneratedArtifact(cfgName, body) {
@@ -1154,8 +1383,8 @@ func VerifyFormalTo(design string, genOnly bool, stdoutW, stderrW io.Writer) (ex
 			continue
 		}
 		if !manual {
-			tlaBody, tlaErr := os.ReadFile(filepath.Join(sourceFdir, tlaName))
-			cfgBody, cfgErr := os.ReadFile(filepath.Join(sourceFdir, cfgName))
+			tlaBody, tlaErr := readFormalFileExact(filepath.Join(sourceFdir, tlaName), "formal TLA artifact "+tlaName)
+			cfgBody, cfgErr := readFormalFileExact(filepath.Join(sourceFdir, cfgName), "formal cfg artifact "+cfgName)
 			if err := errors.Join(tlaErr, cfgErr); err != nil {
 				genErr(err)
 			} else if canonicalFormalGeneratedArtifact(tlaName, tlaBody) && canonicalFormalGeneratedArtifact(cfgName, cfgBody) {
@@ -1165,7 +1394,7 @@ func VerifyFormalTo(design string, genOnly bool, stdoutW, stderrW io.Writer) (ex
 			}
 			continue
 		}
-		cfgBody, cerr := os.ReadFile(filepath.Join(sourceFdir, cfgName))
+		cfgBody, cerr := readFormalFileExact(filepath.Join(sourceFdir, cfgName), "manual formal cfg artifact "+cfgName)
 		if cerr != nil {
 			genErr(cerr)
 			continue
@@ -1184,7 +1413,7 @@ func VerifyFormalTo(design string, genOnly bool, stdoutW, stderrW io.Writer) (ex
 			continue
 		}
 		if _, err := os.Lstat(filepath.Join(sourceFdir, name)); err == nil {
-			body, readErr := os.ReadFile(filepath.Join(sourceFdir, name))
+			body, readErr := readFormalFileExact(filepath.Join(sourceFdir, name), "relational formal artifact "+name)
 			if readErr != nil {
 				genErr(readErr)
 			} else if canonicalFormalGeneratedArtifact(name, body) {
@@ -1206,7 +1435,7 @@ func VerifyFormalTo(design string, genOnly bool, stdoutW, stderrW io.Writer) (ex
 		staleConditions := make([]artifactset.RemovalPrecondition, 0, len(staleNames))
 		sort.Strings(staleNames)
 		for _, name := range staleNames {
-			sourceBody, readErr := os.ReadFile(filepath.Join(sourceFdir, name))
+			sourceBody, readErr := readFormalFileExact(filepath.Join(sourceFdir, name), "stale formal artifact "+name)
 			if readErr != nil {
 				genErr(fmt.Errorf("verify-formal: read snapshotted stale artifact %s: %w", name, readErr))
 				continue
@@ -1419,7 +1648,7 @@ func materializeFormalVerificationSuite(sourceDir string, generated map[string]g
 	for _, base := range manual {
 		for _, ext := range []string{".tla", ".cfg"} {
 			name := base + ext
-			body, err := os.ReadFile(filepath.Join(sourceDir, name))
+			body, err := readFormalFileExact(filepath.Join(sourceDir, name), "manual formal artifact "+name)
 			if err != nil {
 				return fail(err)
 			}
@@ -1432,7 +1661,7 @@ func materializeFormalVerificationSuite(sourceDir string, generated map[string]g
 }
 
 func globExt(dir, ext string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
+	entries, err := readFormalDirectory(dir)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
@@ -1487,7 +1716,7 @@ func rejectSymlinkedFormalInputs(machineDir, formalDir string) error {
 		{machineDir, []string{".machine.json"}},
 		{formalDir, []string{".semantics.yaml", ".composition.yaml", ".relational.yaml", ".tla", ".cfg", ".als", ".oracle.md"}},
 	} {
-		entries, err := os.ReadDir(scan.dir)
+		entries, err := readFormalDirectory(scan.dir)
 		if os.IsNotExist(err) {
 			continue
 		}

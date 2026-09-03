@@ -2,7 +2,6 @@ package checker
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
@@ -68,14 +67,7 @@ func isLifecycleAttr(name string) bool {
 // non-mapping root, or a model with no entities is an error: the projection has
 // no meaning without a domain.
 func LoadModel(path string) (*Model, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return nil, err
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s: model must be a regular, non-symlink file", path)
-	}
-	data, err := os.ReadFile(path)
+	data, err := readCheckerStructuredFile(path, "model")
 	if err != nil {
 		return nil, err
 	}

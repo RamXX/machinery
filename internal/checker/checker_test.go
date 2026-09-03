@@ -482,3 +482,72 @@ func TestReadConfinedFileBoundedRejectsOversizedArtifact(t *testing.T) {
 		t.Fatalf("bounded confined artifact = %q, %v", got, err)
 	}
 }
+
+func TestStructuredCheckerReadersRejectOversizedFilesBeforeParsing(t *testing.T) {
+	tests := []struct {
+		name string
+		load func(string) error
+	}{
+		{"model", func(path string) error { _, err := LoadModel(path); return err }},
+		{"manifest", func(path string) error { _, err := LoadManifest(path); return err }},
+		{"evidence", func(path string) error { _, err := LoadEvidence(path); return err }},
+		{"registry", func(path string) error { _, err := LoadRegistry(path); return err }},
+		{"design-id", func(path string) error { _, err := DesignID(path); return err }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "oversized")
+			file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o600)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := file.Truncate(checkerStructuredFileMaxBytes + 1); err != nil {
+				_ = file.Close()
+				t.Fatal(err)
+			}
+			if err := file.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := test.load(path); err == nil || !strings.Contains(err.Error(), "byte limit") {
+				t.Fatalf("oversized %s diagnostic = %v", test.name, err)
+			}
+		})
+	}
+
+	design := t.TempDir()
+	path := filepath.Join(design, "projection.json")
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(checkerStructuredFileMaxBytes + 1); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadConfinedFile(design, "projection.json"); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatalf("oversized confined projection diagnostic = %v", err)
+	}
+}
+
+func TestCheckerDirectoryReadersRejectEntryOverflow(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a", "b", "c"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := readDirectoryBounded(dir, 2); err == nil || !strings.Contains(err.Error(), "2-entry limit") {
+		t.Fatalf("direct directory overflow = %v", err)
+	}
+	root, err := openDesignRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.close()
+	if _, err := root.readDirBounded(".", 2); err == nil || !strings.Contains(err.Error(), "2-entry limit") {
+		t.Fatalf("rooted directory overflow = %v", err)
+	}
+}

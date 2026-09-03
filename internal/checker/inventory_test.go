@@ -5,7 +5,42 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/RamXX/machinery/internal/dirscan"
 )
+
+func TestInventoryEnforcesAggregateCeilingBeforeWalkingEntries(t *testing.T) {
+	design := t.TempDir()
+	checkers := filepath.Join(design, "checkers")
+	if err := os.Mkdir(checkers, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"a.txt", "b.txt", "c.txt"} {
+		if err := os.WriteFile(filepath.Join(checkers, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	problems := inventoryProblems(design, nil, dirscan.WalkLimits{MaxEntries: 2, MaxDepth: 4})
+	if len(problems) != 1 || !strings.Contains(problems[0], "2-entry limit") {
+		t.Fatalf("high-entry checker inventory was accepted: %v", problems)
+	}
+}
+
+func TestInventoryEnforcesDepthCeilingBeforeWalkingEntries(t *testing.T) {
+	design := t.TempDir()
+	checkers := filepath.Join(design, "checkers")
+	if err := os.MkdirAll(filepath.Join(checkers, "owned", "nested"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	manifest := &Manifest{Path: filepath.Join(checkers, "owned.checker.yaml")}
+	manifest.Checker.ID = "owned"
+	manifest.Evidence.ProjectionOut = "checkers/owned/projection.json"
+	manifest.Evidence.EvidenceIn = "checkers/owned/evidence.json"
+	problems := inventoryProblems(design, []*Manifest{manifest}, dirscan.WalkLimits{MaxEntries: 10, MaxDepth: 1})
+	if len(problems) != 1 || !strings.Contains(problems[0], "depth limit") {
+		t.Fatalf("deep checker inventory was accepted: %v", problems)
+	}
+}
 
 func TestInventoryRejectsOrphanCheckerOutputsAndDirectories(t *testing.T) {
 	design := t.TempDir()
@@ -69,5 +104,34 @@ func TestValidateManifestSetRejectsPortableOutputAliases(t *testing.T) {
 				t.Fatal("portable alias was accepted")
 			}
 		})
+	}
+}
+
+func TestInventoryFailsClosedOnOversizedUnownedJSON(t *testing.T) {
+	design := t.TempDir()
+	checkers := filepath.Join(design, "checkers")
+	owned := filepath.Join(checkers, "owned")
+	if err := os.MkdirAll(owned, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := &Manifest{Path: filepath.Join(checkers, "owned.checker.yaml")}
+	manifest.Checker.ID = "owned"
+	manifest.Evidence.ProjectionOut = "checkers/owned/projection.json"
+	manifest.Evidence.EvidenceIn = "checkers/owned/evidence.json"
+	orphan := filepath.Join(owned, "opaque.json")
+	file, err := os.OpenFile(orphan, os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(checkerStructuredFileMaxBytes + 1); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	problems := InventoryProblems(design, []*Manifest{manifest})
+	if len(problems) != 1 || !strings.Contains(problems[0], "byte limit") {
+		t.Fatalf("oversized orphan checker JSON did not fail closed: %v", problems)
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/portablepath"
 )
 
@@ -22,6 +23,7 @@ const (
 	formalRetiredJournalName = ".machinery-formal-transaction.recovering.jsonl"
 	formalJournalMax         = 1 << 20
 	formalMaxWitness         = "unix:ffffffffffffffff:ffffffffffffffff:ffffffffffffffff:ffffffffffffffff"
+	formalQuarantinePrefix   = ".machinery-formal-delete-"
 )
 
 type formalJournalEntry struct {
@@ -502,7 +504,7 @@ func cleanupCreatedFormalJournal(root *os.Root, createdInfo os.FileInfo, created
 	if err := requireFormalJournalLive(root, post, "failed formal transaction journal cleanup candidate"); err != nil {
 		return errors.Join(err, fmt.Errorf("preserving changed formal transaction journal"))
 	}
-	if err := root.Remove(formalJournalName); err != nil {
+	if err := removeFormalSnapshotExact(root, formalJournalName, formalBodyIdentity(post.body), post.witness, post.info, "failed formal transaction journal"); err != nil {
 		return err
 	}
 	return syncFormalDir(root)
@@ -774,7 +776,7 @@ func restoreMismatchedFormalJournalIsolation(root *os.Root) error {
 	if err := requireCanonicalFormalJournalAbsent(root, "canonical journal while restoring failed isolation"); err != nil {
 		return fmt.Errorf("preserve mismatched recovery tombstone: %w", err)
 	}
-	if err := root.Rename(formalRetiredJournalName, formalJournalName); err != nil {
+	if err := fsatomic.RenameNoReplace(root, formalRetiredJournalName, formalJournalName); err != nil {
 		return fmt.Errorf("restore mismatched recovery tombstone: %w", err)
 	}
 	return syncFormalDir(root)
@@ -799,7 +801,7 @@ func restoreFormalRecoveryAuthority(root *os.Root, authority *formalJournalAutho
 	if err := requireCanonicalFormalJournalAbsent(root, "canonical journal while restoring failed recovery"); err != nil {
 		return fmt.Errorf("preserve failed recovery tombstone: %w", err)
 	}
-	if err := root.Rename(formalRetiredJournalName, formalJournalName); err != nil {
+	if err := fsatomic.RenameNoReplace(root, formalRetiredJournalName, formalJournalName); err != nil {
 		return fmt.Errorf("restore failed formal recovery journal: %w", err)
 	}
 	authority.name = formalJournalName
@@ -1055,17 +1057,20 @@ func formalRegularSnapshot(root *os.Root, name, label string) (identity string, 
 	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() {
 		return "", false, nil, fmt.Errorf("formal transaction %s must be a regular non-symlink file", label)
 	}
+	if before.Size() < 0 || before.Size() > formalArtifactMaxBytes {
+		return "", false, nil, fmt.Errorf("formal transaction %s has size %d, exceeding %d-byte limit", label, before.Size(), formalArtifactMaxBytes)
+	}
 	f, err := root.Open(name)
 	if err != nil {
 		return "", false, nil, fmt.Errorf("open formal transaction %s: %w", label, err)
 	}
 	defer func() { returnErr = errors.Join(returnErr, f.Close()) }()
 	opened, err := f.Stat()
-	if err != nil || !os.SameFile(before, opened) || !opened.Mode().IsRegular() {
+	if err != nil || !os.SameFile(before, opened) || opened.Mode() != before.Mode() || opened.Size() != before.Size() {
 		return "", false, nil, errors.Join(err, fmt.Errorf("formal transaction %s changed identity while opening", label))
 	}
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
+	if _, err := copyFormalExact(h, f, before.Size(), label); err != nil {
 		return "", false, nil, fmt.Errorf("hash formal transaction %s: %w", label, err)
 	}
 	after, err := root.Lstat(name)
@@ -1102,14 +1107,17 @@ func formalNativeWitness(root *os.Root, name, label string, expectedInfo os.File
 type formalRootRename func(*os.Root, string, string) error
 
 func renameFormalRoot(root *os.Root, oldname, newname string) error {
-	return root.Rename(oldname, newname)
+	return fsatomic.RenameNoReplace(root, oldname, newname)
 }
 
 func recoverFormalTransaction(root *os.Root, rename formalRootRename) (returnErr error) {
+	if err := recoverFormalQuarantines(root, nil, true); err != nil {
+		return err
+	}
 	_, canonicalErr := root.Lstat(formalJournalName)
 	_, retiredErr := root.Lstat(formalRetiredJournalName)
 	if os.IsNotExist(canonicalErr) && os.IsNotExist(retiredErr) {
-		return nil
+		return recoverFormalQuarantines(root, nil, false)
 	}
 	header, phase, journal, err := acquireFormalRecoveryJournal(root, rename)
 	if err != nil {
@@ -1121,6 +1129,9 @@ func recoverFormalTransaction(root *os.Root, rename formalRootRename) (returnErr
 		}
 		returnErr = errors.Join(returnErr, journal.close())
 	}()
+	if err := recoverFormalQuarantines(root, header.Entries, false); err != nil {
+		return err
+	}
 	mutate := func(label string, action func() error) error {
 		if err := journal.requireLive(root, "before "+label); err != nil {
 			return err
@@ -1209,7 +1220,9 @@ func recoverFormalTransaction(root *os.Root, rename formalRootRename) (returnErr
 					if err := requireFormalSnapshot(root, scratch.name, scratch.identity, scratch.witness, true, scratch.info, "committed scratch "+scratch.name); err != nil {
 						return err
 					}
-					if err := mutate("remove committed scratch "+scratch.name, func() error { return root.Remove(scratch.name) }); err != nil {
+					if err := mutate("remove committed scratch "+scratch.name, func() error {
+						return removeFormalSnapshotExact(root, scratch.name, scratch.identity, scratch.witness, scratch.info, "committed scratch "+scratch.name)
+					}); err != nil {
 						return err
 					}
 					if err := syncFormalDir(root); err != nil {
@@ -1229,7 +1242,9 @@ func recoverFormalTransaction(root *os.Root, rename formalRootRename) (returnErr
 					if err := requireFormalSnapshot(root, state.entry.Target, state.targetIdentity, state.targetWitness, true, state.targetInfo, "uncommitted installed target "+state.entry.Target); err != nil {
 						return err
 					}
-					if err := mutate("remove uncommitted target "+state.entry.Target, func() error { return root.Remove(state.entry.Target) }); err != nil {
+					if err := mutate("remove uncommitted target "+state.entry.Target, func() error {
+						return removeFormalSnapshotExact(root, state.entry.Target, state.targetIdentity, state.targetWitness, state.targetInfo, "uncommitted target "+state.entry.Target)
+					}); err != nil {
 						return err
 					}
 					if err := syncFormalDir(root); err != nil {
@@ -1269,7 +1284,9 @@ func recoverFormalTransaction(root *os.Root, rename formalRootRename) (returnErr
 				if err := requireFormalSnapshot(root, state.entry.Target, state.targetIdentity, state.targetWitness, true, state.targetInfo, "uncommitted new target "+state.entry.Target); err != nil {
 					return err
 				}
-				if err := mutate("remove uncommitted new target "+state.entry.Target, func() error { return root.Remove(state.entry.Target) }); err != nil {
+				if err := mutate("remove uncommitted new target "+state.entry.Target, func() error {
+					return removeFormalSnapshotExact(root, state.entry.Target, state.targetIdentity, state.targetWitness, state.targetInfo, "uncommitted new target "+state.entry.Target)
+				}); err != nil {
 					return err
 				}
 				if err := syncFormalDir(root); err != nil {
@@ -1283,7 +1300,9 @@ func recoverFormalTransaction(root *os.Root, rename formalRootRename) (returnErr
 				if err := requireFormalSnapshot(root, state.entry.Stage, state.stageIdentity, state.stageWitness, true, state.stageInfo, "uncommitted stage "+state.entry.Stage); err != nil {
 					return err
 				}
-				if err := mutate("remove uncommitted stage "+state.entry.Stage, func() error { return root.Remove(state.entry.Stage) }); err != nil {
+				if err := mutate("remove uncommitted stage "+state.entry.Stage, func() error {
+					return removeFormalSnapshotExact(root, state.entry.Stage, state.stageIdentity, state.stageWitness, state.stageInfo, "uncommitted stage "+state.entry.Stage)
+				}); err != nil {
 					return err
 				}
 				if err := syncFormalDir(root); err != nil {
@@ -1319,7 +1338,7 @@ func recoverFormalTransaction(root *os.Root, rename formalRootRename) (returnErr
 	if err := requireCanonicalFormalJournalAbsent(root, "canonical journal before final recovery cleanup"); err != nil {
 		return err
 	}
-	if err := root.Remove(formalRetiredJournalName); err != nil {
+	if err := removeFormalSnapshotExact(root, formalRetiredJournalName, formalBodyIdentity(journal.snapshot.body), journal.snapshot.witness, journal.snapshot.info, "retired formal transaction journal"); err != nil {
 		return err
 	}
 	if err := journal.requireHeldAfterUnlink(); err != nil {
@@ -1337,6 +1356,101 @@ func recoverFormalTransaction(root *os.Root, rename formalRootRename) (returnErr
 		}
 	}
 	return nil
+}
+
+func removeFormalSnapshotExact(root *os.Root, name, identity, witness string, info os.FileInfo, label string) error {
+	if info == nil || !validFormalIdentity(identity) || !validFormalNativeWitness(witness) {
+		return fmt.Errorf("cannot remove %s without exact authority", label)
+	}
+	q, err := fsatomic.Quarantine(root, name, formalQuarantinePrefix)
+	if err != nil {
+		return err
+	}
+	if err := syncFormalDir(root); err != nil {
+		return errors.Join(err, q.Close())
+	}
+	gotIdentity, exists, gotInfo, err := formalRegularSnapshot(q.Root(), q.Name(), "quarantined "+label)
+	if err != nil || !exists {
+		return errors.Join(err, fmt.Errorf("quarantined %s disappeared; preserving recovery evidence", label), q.Close())
+	}
+	gotWitness, witnessErr := formalNativeWitness(q.Root(), q.Name(), "quarantined "+label, gotInfo)
+	if witnessErr != nil || gotIdentity != identity || !os.SameFile(info, gotInfo) || !sameFormalNativeObject(witness, gotWitness) {
+		return errors.Join(witnessErr, fmt.Errorf("quarantined %s differs from its exact authority; preserving it", label), q.Close())
+	}
+	if err := q.Remove(); err != nil {
+		return err
+	}
+	return syncFormalDir(root)
+}
+
+func recoverFormalQuarantines(root *os.Root, entries []formalJournalEntry, journalsOnly bool) error {
+	inventory, err := readFormalRootDirectory(root, "formal transaction root")
+	if err != nil {
+		return err
+	}
+	allowed := map[string]bool{}
+	if journalsOnly {
+		allowed[formalRetiredJournalName] = true
+	} else {
+		for _, entry := range entries {
+			allowed[entry.Target] = true
+			allowed[entry.Stage] = true
+			allowed[entry.Backup] = true
+		}
+	}
+	for _, item := range inventory {
+		if !strings.HasPrefix(item.Name(), formalQuarantinePrefix) {
+			continue
+		}
+		q, err := fsatomic.ResumeQuarantine(root, item.Name(), "")
+		if err != nil {
+			return err
+		}
+		unjournaledStage := !journalsOnly && len(entries) == 0 && validUnjournaledFormalStage(q.Source())
+		if !allowed[q.Source()] && !unjournaledStage {
+			if journalsOnly {
+				_ = q.Close()
+				continue
+			}
+			return errors.Join(fmt.Errorf("formal deletion quarantine %s has unjournaled source %q", item.Name(), q.Source()), q.Close())
+		}
+		if _, err := q.Root().Lstat(q.Name()); errors.Is(err, os.ErrNotExist) {
+			if err := q.FinishEmpty(); err != nil {
+				return err
+			}
+			continue
+		} else if err != nil {
+			return errors.Join(err, q.Close())
+		}
+		if unjournaledStage {
+			if _, exists, _, err := formalRegularSnapshot(q.Root(), q.Name(), "unjournaled quarantined formal stage"); err != nil || !exists {
+				return errors.Join(err, fmt.Errorf("unjournaled formal stage quarantine %s is not a bounded regular file", item.Name()), q.Close())
+			}
+			if err := q.Remove(); err != nil {
+				return err
+			}
+			if err := syncFormalDir(root); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := q.Restore(); err != nil {
+			return errors.Join(fmt.Errorf("restore formal deletion quarantine %s: %w", item.Name(), err), q.Close())
+		}
+		if err := syncFormalDir(root); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validUnjournaledFormalStage(name string) bool {
+	prefix := ".machinery-formal-stage-"
+	if !strings.HasPrefix(name, prefix) || len(name) != len(prefix)+sha256.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(strings.TrimPrefix(name, prefix))
+	return err == nil && name == strings.ToLower(name)
 }
 
 func validateFormalRecoveryState(state formalRecoveryState, phase string) error {

@@ -23,12 +23,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/pack"
 	"github.com/RamXX/machinery/internal/version"
 )
 
-var readPackDir = os.ReadDir
+var readPackDir = func(path string) ([]os.DirEntry, error) {
+	return dirscan.Read(path, designInventoryMaxEntries)
+}
 
 // CheckPack implements G5-pack. Applicable when the design is a decomposed
 // parent, a decomposed child, or both (a mid-level design in a deeper tree).
@@ -243,7 +246,7 @@ func checkChildPack(design string, g *Gate) {
 		// not produce is a stale binding from a previous packmap; the one-way
 		// diff above never looked, so a rebind left the old "proof" committed
 		// and green while nothing checked it anymore
-		if entries, rerr := os.ReadDir(filepath.Join(design, "formal")); rerr == nil {
+		if entries, rerr := dirscan.Read(filepath.Join(design, "formal"), designInventoryMaxEntries); rerr == nil {
 			for _, e := range entries {
 				n := e.Name()
 				if e.IsDir() || (!strings.HasSuffix(n, "PackRefinement.tla") && !strings.HasSuffix(n, "PackRefinement.cfg")) {
@@ -253,6 +256,8 @@ func checkChildPack(design string, g *Gate) {
 					g.Errs = append(g.Errs, "committed formal/"+n+" is a refinement artifact a fresh generation does not produce (a stale binding from a previous packmap); run machinery pack refine to reconcile the owned artifact set")
 				}
 			}
+		} else if !os.IsNotExist(rerr) {
+			g.Errs = append(g.Errs, "cannot enumerate formal refinement artifacts: "+rerr.Error())
 		}
 	}
 
@@ -416,7 +421,11 @@ func checkDelegatedInvariants(design string, manifest *ir.Object, g *Gate) {
 		return
 	}
 	var cells []string
-	for _, f := range sortedGlobExt(filepath.Join(design, "machines"), ".matrix.md") {
+	matrixFiles, inventoryErr := sortedGlobExt(filepath.Join(design, "machines"), ".matrix.md")
+	if inventoryErr != nil {
+		g.Errs = append(g.Errs, inventoryErr.Error())
+	}
+	for _, f := range matrixFiles {
 		for _, tbl := range ir.ParseMdTables(readDesignFileOrErr(design, f, g)) {
 			for _, r := range tbl.Rows {
 				cells = append(cells, r...)
@@ -463,7 +472,11 @@ func checkBoundaryEvents(design, eventsMD string, g *Gate) {
 	// gather what the child's machines handle and fire
 	handled := map[string]bool{}
 	var actionCells []string
-	for _, mf := range sortedGlobExt(filepath.Join(design, "machines"), ".machine.json") {
+	machineFiles, inventoryErr := sortedGlobExt(filepath.Join(design, "machines"), ".machine.json")
+	if inventoryErr != nil {
+		g.Errs = append(g.Errs, inventoryErr.Error())
+	}
+	for _, mf := range machineFiles {
 		m, err := loadDesignMachine(design, mf)
 		if err != nil {
 			continue // G3 reports the parse error
@@ -493,7 +506,11 @@ func checkBoundaryEvents(design, eventsMD string, g *Gate) {
 			}
 		}
 	}
-	for _, f := range sortedGlobExt(filepath.Join(design, "machines"), ".matrix.md") {
+	matrixFiles, inventoryErr := sortedGlobExt(filepath.Join(design, "machines"), ".matrix.md")
+	if inventoryErr != nil {
+		g.Errs = append(g.Errs, inventoryErr.Error())
+	}
+	for _, f := range matrixFiles {
 		for _, tbl := range ir.ParseMdTables(readDesignFileOrErr(design, f, g)) {
 			for _, r := range tbl.Rows {
 				actionCells = append(actionCells, r...)

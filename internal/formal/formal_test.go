@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/RamXX/machinery/internal/alloy"
+	"github.com/RamXX/machinery/internal/filelock"
 	"github.com/RamXX/machinery/internal/runtimeclosure"
 )
 
@@ -394,8 +395,12 @@ func TestFetchJarRecoversInterruptedPrivateDownloadResidue(t *testing.T) {
 		t.Fatal(err)
 	}
 	want, _ := fileSHA256(dest)
-	residue := filepath.Join(dir, ".machinery-jar-123456")
+	residue := filepath.Join(dir, formalJarStagePrefix(dest)+strings.Repeat("a", 32))
 	if err := os.WriteFile(residue, []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	foreign := filepath.Join(dir, formalJarStagePrefix(filepath.Join(dir, "foreign.jar"))+strings.Repeat("b", 32))
+	if err := os.WriteFile(foreign, []byte("foreign"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	got, err := fetchJar(dest, "unused", "test jar", want)
@@ -404,6 +409,231 @@ func TestFetchJarRecoversInterruptedPrivateDownloadResidue(t *testing.T) {
 	}
 	if _, err := os.Lstat(residue); !os.IsNotExist(err) {
 		t.Fatalf("interrupted jar residue remains: %v", err)
+	}
+	if body, err := os.ReadFile(foreign); err != nil || string(body) != "foreign" {
+		t.Fatalf("foreign jar temporary file = %q, %v", body, err)
+	}
+}
+
+func TestConcurrentTLAAndAlloyColdCacheFetchesShareRecoveryAuthority(t *testing.T) {
+	dir := t.TempDir()
+	tlaBody := []byte("tla jar")
+	alloyBody := []byte("alloy jar")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body := tlaBody
+		if r.URL.Path == "/alloy" {
+			body = alloyBody
+		}
+		w.Header().Set("Content-Length", fmt.Sprint(len(body)))
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+	tlaDest := filepath.Join(dir, "tla2tools.jar")
+	alloyDest := filepath.Join(dir, "alloy-dist.jar")
+	tlaSum := sha256.Sum256(tlaBody)
+	alloySum := sha256.Sum256(alloyBody)
+	originalHook := formalAfterJarCacheLock
+	t.Cleanup(func() { formalAfterJarCacheLock = originalHook })
+	firstLocked := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondStarted := make(chan struct{})
+	var mu sync.Mutex
+	order := make([]string, 0, 2)
+	formalAfterJarCacheLock = func(dest string) {
+		mu.Lock()
+		order = append(order, filepath.Base(dest))
+		mu.Unlock()
+		if dest == tlaDest {
+			close(firstLocked)
+			<-releaseFirst
+		}
+	}
+	type result struct {
+		path string
+		err  error
+	}
+	tlaResult := make(chan result, 1)
+	alloyResult := make(chan result, 1)
+	go func() {
+		path, err := fetchJar(tlaDest, server.URL+"/tla", "TLA+ test jar", hex.EncodeToString(tlaSum[:]))
+		tlaResult <- result{path: path, err: err}
+	}()
+	<-firstLocked
+	go func() {
+		close(secondStarted)
+		path, err := fetchJar(alloyDest, server.URL+"/alloy", "Alloy test jar", hex.EncodeToString(alloySum[:]))
+		alloyResult <- result{path: path, err: err}
+	}()
+	<-secondStarted
+	close(releaseFirst)
+	for _, item := range []struct {
+		name string
+		ch   <-chan result
+	}{{"TLA+", tlaResult}, {"Alloy", alloyResult}} {
+		got := <-item.ch
+		if got.err != nil {
+			t.Fatalf("%s cold-cache fetch: %v", item.name, got.err)
+		}
+	}
+	mu.Lock()
+	gotOrder := append([]string(nil), order...)
+	mu.Unlock()
+	if strings.Join(gotOrder, ",") != "tla2tools.jar,alloy-dist.jar" {
+		t.Fatalf("cache lock acquisition order = %v", gotOrder)
+	}
+	for _, item := range []struct {
+		path string
+		body []byte
+	}{{tlaDest, tlaBody}, {alloyDest, alloyBody}} {
+		if got, err := os.ReadFile(item.path); err != nil || !bytes.Equal(got, item.body) {
+			t.Fatalf("cold-cache artifact %s = %q, %v", filepath.Base(item.path), got, err)
+		}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), formalJarStagePrefix(tlaDest)) || strings.HasPrefix(entry.Name(), formalJarStagePrefix(alloyDest)) {
+			t.Fatalf("cold-cache fetch left private residue %s", entry.Name())
+		}
+	}
+}
+
+func TestConcurrentTLAAndAlloyFetchesRetainOneAuthorityAcrossCacheParentReplacement(t *testing.T) {
+	ancestor := t.TempDir()
+	parent := filepath.Join(ancestor, "machinery")
+	if err := os.Mkdir(parent, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	retained := filepath.Join(ancestor, "retained-original-cache")
+	if err := os.WriteFile(filepath.Join(parent, "original-marker"), []byte("original"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockIdentityBefore, err := filelock.ScopeIdentity(formalJarLockScope(parent))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tlaBody := []byte("tla jar through retained root")
+	alloyBody := []byte("alloy jar through replacement root")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body := tlaBody
+		if r.URL.Path == "/alloy" {
+			body = alloyBody
+		}
+		w.Header().Set("Content-Length", fmt.Sprint(len(body)))
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+
+	tlaDest := filepath.Join(parent, "tla2tools.jar")
+	alloyDest := filepath.Join(parent, "alloy-dist.jar")
+	tlaSum := sha256.Sum256(tlaBody)
+	alloySum := sha256.Sum256(alloyBody)
+	originalHook := formalAfterJarCacheLock
+	t.Cleanup(func() { formalAfterJarCacheLock = originalHook })
+
+	parentReplaced := make(chan error, 1)
+	releaseTLA := make(chan struct{})
+	alloyEntered := make(chan struct{})
+	var once sync.Once
+	formalAfterJarCacheLock = func(dest string) {
+		if dest == tlaDest {
+			err := os.Rename(parent, retained)
+			if err == nil {
+				err = os.Mkdir(parent, 0o755)
+			}
+			if err == nil {
+				err = os.WriteFile(filepath.Join(parent, "replacement-marker"), []byte("replacement"), 0o600)
+			}
+			parentReplaced <- err
+			if err != nil {
+				return
+			}
+			<-releaseTLA
+			return
+		}
+		once.Do(func() { close(alloyEntered) })
+	}
+
+	type result struct {
+		path string
+		err  error
+	}
+	tlaResult := make(chan result, 1)
+	alloyResult := make(chan result, 1)
+	go func() {
+		path, err := fetchJar(tlaDest, server.URL+"/tla", "TLA+ test jar", hex.EncodeToString(tlaSum[:]))
+		tlaResult <- result{path: path, err: err}
+	}()
+	if err := <-parentReplaced; err != nil {
+		close(releaseTLA)
+		got := <-tlaResult
+		t.Fatalf("replace cache parent after retaining authority: %v (fetch result %q, %v)", err, got.path, got.err)
+	}
+	lockIdentityAfter, err := filelock.ScopeIdentity(formalJarLockScope(parent))
+	if err != nil || lockIdentityAfter != lockIdentityBefore {
+		close(releaseTLA)
+		got := <-tlaResult
+		t.Fatalf("cache-parent replacement changed lock identity: before %q, after %q, err %v (fetch result %q, %v)", lockIdentityBefore, lockIdentityAfter, err, got.path, got.err)
+	}
+	alloyStarted := make(chan struct{})
+	go func() {
+		close(alloyStarted)
+		path, err := fetchJar(alloyDest, server.URL+"/alloy", "Alloy test jar", hex.EncodeToString(alloySum[:]))
+		alloyResult <- result{path: path, err: err}
+	}()
+	<-alloyStarted
+	select {
+	case <-alloyEntered:
+		close(releaseTLA)
+		t.Fatal("Alloy acquired a split cache lock while TLA+ retained the original cache namespace")
+	case <-time.After(250 * time.Millisecond):
+	}
+	close(releaseTLA)
+
+	tlaGot := <-tlaResult
+	if tlaGot.path != tlaDest || tlaGot.err == nil || !strings.Contains(tlaGot.err.Error(), "changed identity") {
+		t.Fatalf("TLA+ operation after cache replacement = %q, %v", tlaGot.path, tlaGot.err)
+	}
+	alloyGot := <-alloyResult
+	if alloyGot.path != alloyDest || alloyGot.err != nil {
+		t.Fatalf("Alloy operation after coordinated handoff = %q, %v", alloyGot.path, alloyGot.err)
+	}
+
+	for _, item := range []struct {
+		path string
+		want []byte
+	}{
+		{filepath.Join(retained, "original-marker"), []byte("original")},
+		{filepath.Join(retained, "tla2tools.jar"), tlaBody},
+		{filepath.Join(parent, "replacement-marker"), []byte("replacement")},
+		{filepath.Join(parent, "alloy-dist.jar"), alloyBody},
+	} {
+		got, err := os.ReadFile(item.path)
+		if err != nil || !bytes.Equal(got, item.want) {
+			t.Fatalf("preserved cache entry %s = %q, %v; want %q", item.path, got, err, item.want)
+		}
+	}
+	for _, absent := range []string{
+		filepath.Join(parent, "tla2tools.jar"),
+		filepath.Join(retained, "alloy-dist.jar"),
+	} {
+		if _, err := os.Lstat(absent); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("cache operation crossed retained namespace authority at %s: %v", absent, err)
+		}
+	}
+	for _, dir := range []string{retained, parent} {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range entries {
+			if strings.HasPrefix(entry.Name(), formalJarStagePrefix(tlaDest)) || strings.HasPrefix(entry.Name(), formalJarStagePrefix(alloyDest)) {
+				t.Fatalf("cache namespace %s retained private residue %s", dir, entry.Name())
+			}
+		}
 	}
 }
 
@@ -472,13 +702,13 @@ func TestFetchJarSyncsParentDirectoryAfterRename(t *testing.T) {
 	defer server.Close()
 	dir := t.TempDir()
 	dest := filepath.Join(dir, "tool.jar")
-	original := syncFormalPathDirectory
+	original := syncFormalCacheDirectory
 	var synced []string
-	syncFormalPathDirectory = func(path string) error {
+	syncFormalCacheDirectory = func(root *os.Root, path string) error {
 		synced = append(synced, path)
-		return original(path)
+		return original(root, path)
 	}
-	t.Cleanup(func() { syncFormalPathDirectory = original })
+	t.Cleanup(func() { syncFormalCacheDirectory = original })
 
 	got, err := fetchJar(dest, server.URL, "test jar", hex.EncodeToString(sum[:]))
 	if err != nil || got != dest {
@@ -498,9 +728,9 @@ func TestFetchJarPropagatesParentDirectorySyncFailure(t *testing.T) {
 	}))
 	defer server.Close()
 	want := errors.New("injected directory sync failure")
-	original := syncFormalPathDirectory
-	syncFormalPathDirectory = func(string) error { return want }
-	t.Cleanup(func() { syncFormalPathDirectory = original })
+	original := syncFormalCacheDirectory
+	syncFormalCacheDirectory = func(*os.Root, string) error { return want }
+	t.Cleanup(func() { syncFormalCacheDirectory = original })
 
 	dest := filepath.Join(t.TempDir(), "tool.jar")
 	if _, err := fetchJar(dest, server.URL, "test jar", hex.EncodeToString(sum[:])); !errors.Is(err, want) {

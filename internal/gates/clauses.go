@@ -82,7 +82,7 @@ func checkClauseDrift(g *Gate, design string) {
 		return
 	}
 	g.Count("guards with clause declarations", len(decls))
-	err := filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	err := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

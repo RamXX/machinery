@@ -2,6 +2,7 @@ package runtimeclosure
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -16,6 +17,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/RamXX/machinery/internal/cachestage"
 )
 
 func javaProvisionTestBase(t *testing.T) string {
@@ -67,6 +70,37 @@ func writeTarGzip(t *testing.T, entries []tar.Header, bodies map[string]string) 
 		t.Fatal(err)
 	}
 	return path
+}
+
+type javaZipTestEntry struct {
+	name string
+	body string
+	mode os.FileMode
+}
+
+func writeJavaZip(t *testing.T, entries []javaZipTestEntry) string {
+	t.Helper()
+	archive := filepath.Join(t.TempDir(), "runtime.zip")
+	file, err := os.Create(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := zip.NewWriter(file)
+	for _, entry := range entries {
+		header := &zip.FileHeader{Name: entry.name, Method: zip.Store}
+		header.SetMode(entry.mode)
+		out, err := writer.CreateHeader(header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := out.Write([]byte(entry.body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := errors.Join(writer.Close(), file.Close()); err != nil {
+		t.Fatal(err)
+	}
+	return archive
 }
 
 func TestProvisionOfficialJavaArchiveAndReuseCache(t *testing.T) {
@@ -242,6 +276,155 @@ func TestExtractJavaTarRejectsEscapingAndHardLinks(t *testing.T) {
 				t.Fatalf("unsafe archive accepted or wrong error: %v", err)
 			}
 		})
+	}
+}
+
+func TestJavaArchiveDepthBoundaryIsPortableAndExact(t *testing.T) {
+	atLimit := javaDeepRelativePath(javaTreeMaxDepth-1) + "/payload"
+	overLimit := javaDeepRelativePath(javaTreeMaxDepth) + "/payload"
+	tests := []struct {
+		name    string
+		archive func(string) string
+		extract func(string, string) error
+	}{
+		{
+			name: "tar-gzip",
+			archive: func(name string) string {
+				return writeTarGzip(t, []tar.Header{{Name: name, Typeflag: tar.TypeReg, Mode: 0o644}}, map[string]string{name: "x"})
+			},
+			extract: extractJavaTarGzip,
+		},
+		{
+			name: "zip",
+			archive: func(name string) string {
+				return writeJavaZip(t, []javaZipTestEntry{{name: name, body: "x", mode: 0o644}})
+			},
+			extract: extractJavaZip,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name+"/at-limit", func(t *testing.T) {
+			destination := t.TempDir()
+			if err := tc.extract(tc.archive(atLimit), destination); err != nil {
+				t.Fatalf("archive at %d-component depth rejected: %v", javaTreeMaxDepth, err)
+			}
+			if body, err := os.ReadFile(filepath.Join(destination, filepath.FromSlash(atLimit))); err != nil || string(body) != "x" {
+				t.Fatalf("at-limit archive payload = %q, %v", body, err)
+			}
+		})
+		t.Run(tc.name+"/over-limit", func(t *testing.T) {
+			destination := t.TempDir()
+			err := tc.extract(tc.archive(overLimit), destination)
+			if err == nil || !strings.Contains(err.Error(), "depth limit") {
+				t.Fatalf("archive beyond %d-component depth accepted: %v", javaTreeMaxDepth, err)
+			}
+			if _, statErr := os.Lstat(filepath.Join(destination, filepath.FromSlash(overLimit))); !errors.Is(statErr, os.ErrNotExist) {
+				t.Fatalf("over-depth archive entry was materialized: %v", statErr)
+			}
+		})
+	}
+}
+
+func TestJavaArchiveUsesOneAggregateEntryAndByteBudget(t *testing.T) {
+	tests := []struct {
+		name    string
+		archive func() string
+		extract func(string, string, javaTreeLimits) error
+	}{
+		{
+			name: "tar-gzip",
+			archive: func() string {
+				return writeTarGzip(t, []tar.Header{
+					{Name: "a/one", Typeflag: tar.TypeReg, Mode: 0o644},
+					{Name: "b/two", Typeflag: tar.TypeReg, Mode: 0o644},
+				}, map[string]string{"a/one": "x", "b/two": "y"})
+			},
+			extract: extractJavaTarGzipWithLimits,
+		},
+		{
+			name: "zip",
+			archive: func() string {
+				return writeJavaZip(t, []javaZipTestEntry{
+					{name: "a/one", body: "x", mode: 0o644},
+					{name: "b/two", body: "y", mode: 0o644},
+				})
+			},
+			extract: extractJavaZipWithLimits,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name+"/at-limit", func(t *testing.T) {
+			if err := tc.extract(tc.archive(), t.TempDir(), javaTreeLimits{maxDepth: 2, maxEntries: 4, maxBytes: 2}); err != nil {
+				t.Fatalf("aggregate archive boundary rejected: %v", err)
+			}
+		})
+		t.Run(tc.name+"/entry-over-limit", func(t *testing.T) {
+			err := tc.extract(tc.archive(), t.TempDir(), javaTreeLimits{maxDepth: 2, maxEntries: 3, maxBytes: 2})
+			if err == nil || !strings.Contains(err.Error(), "entry limit") {
+				t.Fatalf("archive entry budget reset by directory: %v", err)
+			}
+		})
+		t.Run(tc.name+"/byte-over-limit", func(t *testing.T) {
+			err := tc.extract(tc.archive(), t.TempDir(), javaTreeLimits{maxDepth: 2, maxEntries: 4, maxBytes: 1})
+			if err == nil || !strings.Contains(err.Error(), "bytes") {
+				t.Fatalf("archive byte budget reset by directory: %v", err)
+			}
+		})
+	}
+}
+
+func TestTarSymlinkMaterializationConsumesAggregateByteBudget(t *testing.T) {
+	archive := writeTarGzip(t, []tar.Header{
+		{Name: "jdk/real", Typeflag: tar.TypeReg, Mode: 0o644},
+		{Name: "jdk/link", Typeflag: tar.TypeSymlink, Linkname: "real", Mode: 0o777},
+	}, map[string]string{"jdk/real": "x"})
+	destination := t.TempDir()
+	err := extractJavaTarGzipWithLimits(archive, destination, javaTreeLimits{maxDepth: 2, maxEntries: 3, maxBytes: 1})
+	if err == nil || !strings.Contains(err.Error(), "bytes") {
+		t.Fatalf("materialized symlink bypassed aggregate archive byte budget: %v", err)
+	}
+	if _, statErr := os.Lstat(filepath.Join(destination, "jdk", "link")); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("over-budget symlink was materialized: %v", statErr)
+	}
+}
+
+func TestProvisionJavaRejectsOverDepthArchiveBeforePublication(t *testing.T) {
+	if _, supported := javaArchivePins[runtime.GOOS+"/"+runtime.GOARCH]; !supported {
+		t.Skip("no Java archive pin for this test platform")
+	}
+	base := javaProvisionTestBase(t)
+	overLimit := javaDeepRelativePath(javaTreeMaxDepth) + "/payload"
+	archive := writeTarGzip(t, []tar.Header{{Name: overLimit, Typeflag: tar.TypeReg, Mode: 0o644}}, map[string]string{overLimit: "x"})
+	originalDownload := downloadJavaRuntimeArchive
+	originalPublish := publishJavaRuntimeTree
+	originalPin := javaArchivePins[runtime.GOOS+"/"+runtime.GOARCH]
+	t.Cleanup(func() {
+		downloadJavaRuntimeArchive = originalDownload
+		publishJavaRuntimeTree = originalPublish
+		javaArchivePins[runtime.GOOS+"/"+runtime.GOARCH] = originalPin
+	})
+	javaArchivePins[runtime.GOOS+"/"+runtime.GOARCH] = javaArchivePin{asset: "test.tar.gz", sha: strings.Repeat("0", 64)}
+	downloadJavaRuntimeArchive = func(_, destination, _ string) error {
+		body, err := os.ReadFile(archive)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(destination, body, 0o600)
+	}
+	published := false
+	publishJavaRuntimeTree = func(base, source, target string) error {
+		published = true
+		return cachestage.PublishTree(base, source, target)
+	}
+	if _, err := provisionedJavaPath(); err == nil || !strings.Contains(err.Error(), "depth limit") {
+		t.Fatalf("over-depth Java archive reached publication: %v", err)
+	}
+	if published {
+		t.Fatal("over-depth Java archive invoked cache publication")
+	}
+	target := filepath.Join(base, strings.ReplaceAll(PinnedJavaRuntimeVersion, "+", "_"), runtime.GOOS+"-"+runtime.GOARCH)
+	if _, err := os.Lstat(target); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("over-depth Java archive created public install target: %v", err)
 	}
 }
 

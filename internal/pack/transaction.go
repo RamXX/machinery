@@ -14,21 +14,34 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/portablepath"
 )
 
 const (
-	packJournalName       = ".machinery-pack-transaction.jsonl"
-	packJournalRetirement = ".machinery-pack-transaction.recovering.jsonl"
-	packJournalMax        = 1 << 20
-	packAbsentTree        = "absent"
+	packJournalName                         = ".machinery-pack-transaction.jsonl"
+	packJournalRetirement                   = ".machinery-pack-transaction.recovering.jsonl"
+	packJournalQuarantinePrefix             = ".machinery-pack-journal-quarantine-"
+	packFailedJournalQuarantinePrefix       = ".machinery-pack-failed-journal-quarantine-"
+	packTreeQuarantinePrefix                = ".machinery-pack-tree-quarantine-"
+	packJournalMax                          = 1 << 20
+	packAbsentTree                          = "absent"
+	packFileMaxBytes                  int64 = 64 << 20
+	packTreeMaxBytes                  int64 = 512 << 20
+	packTreeMaxEntries                      = 10_000
+	packTreeMaxDepth                        = 256
+	packDirMaxEntries                       = 10_000
+	packDirPageSize                         = 256
 )
 
 var (
-	packJournalPoint = func(string) error { return nil }
-	packJournalWrite = func(file *os.File, body []byte) (int, error) { return file.Write(body) }
-	packJournalSync  = func(file *os.File) error { return file.Sync() }
-	packJournalClose = func(file *os.File) error { return file.Close() }
+	packJournalPoint        = func(string) error { return nil }
+	packJournalWrite        = func(file *os.File, body []byte) (int, error) { return file.Write(body) }
+	packJournalSync         = func(file *os.File) error { return file.Sync() }
+	packJournalClose        = func(file *os.File) error { return file.Close() }
+	packFileReadPoint       = func(string) error { return nil }
+	packTreeRetirementPoint = func(string, string) error { return nil }
+	packTreeQuarantinePoint = func(string) error { return nil }
 )
 
 type packTreeWitness struct {
@@ -101,9 +114,11 @@ type packTreeEntryState struct {
 }
 
 type packTreeState struct {
-	root    string
-	witness packTreeWitness
-	entries map[string]packTreeEntryState
+	root       string
+	witness    packTreeWitness
+	entries    map[string]packTreeEntryState
+	totalBytes int64
+	entryCount int
 }
 
 type packJournalFileState struct {
@@ -178,14 +193,33 @@ func validPackTreeWitness(witness packTreeWitness, allowAbsent bool) bool {
 }
 
 func readPackDir(root *os.Root, name string) ([]os.DirEntry, error) {
+	return readPackDirBounded(root, name, packDirMaxEntries)
+}
+
+func readPackDirBounded(root *os.Root, name string, maxEntries int) ([]os.DirEntry, error) {
+	if maxEntries <= 0 {
+		return nil, fmt.Errorf("pack directory entry limit must be positive")
+	}
 	dir, err := root.Open(name)
 	if err != nil {
 		return nil, err
 	}
-	entries, readErr := dir.ReadDir(-1)
-	closeErr := dir.Close()
-	if err := errors.Join(readErr, closeErr); err != nil {
-		return nil, err
+	entries := make([]os.DirEntry, 0, min(packDirPageSize, maxEntries))
+	for {
+		page, readErr := dir.ReadDir(packDirPageSize)
+		if len(page) > maxEntries-len(entries) {
+			return nil, errors.Join(fmt.Errorf("pack directory %s exceeds %d-entry limit", filepath.ToSlash(name), maxEntries), dir.Close())
+		}
+		entries = append(entries, page...)
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil {
+			return nil, errors.Join(readErr, dir.Close())
+		}
+	}
+	if closeErr := dir.Close(); closeErr != nil {
+		return nil, closeErr
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	return entries, nil
@@ -310,6 +344,15 @@ func capturePackTree(root *os.Root, name string) (*packTreeState, error) {
 }
 
 func (state *packTreeState) capture(root *os.Root, name string, treeHash, identityHash io.Writer) error {
+	if state.entryCount >= packTreeMaxEntries {
+		return fmt.Errorf("pack tree exceeds %d-entry limit", packTreeMaxEntries)
+	}
+	state.entryCount++
+	relative := strings.TrimPrefix(name, state.root)
+	relative = strings.TrimPrefix(relative, string(filepath.Separator))
+	if relative != "" && strings.Count(relative, string(filepath.Separator))+1 > packTreeMaxDepth {
+		return fmt.Errorf("pack tree exceeds %d-level depth limit", packTreeMaxDepth)
+	}
 	before, err := root.Lstat(name)
 	if err != nil {
 		return err
@@ -326,6 +369,15 @@ func (state *packTreeState) capture(root *os.Root, name string, treeHash, identi
 		kind = "D"
 	} else if !before.Mode().IsRegular() {
 		return fmt.Errorf("pack tree entry %s is special (%s)", filepath.ToSlash(name), before.Mode())
+	}
+	if !before.IsDir() {
+		if before.Size() < 0 || before.Size() > packFileMaxBytes {
+			return fmt.Errorf("pack tree file %s exceeds %d-byte member limit", filepath.ToSlash(name), packFileMaxBytes)
+		}
+		if before.Size() > packTreeMaxBytes-state.totalBytes {
+			return fmt.Errorf("pack tree exceeds %d-byte aggregate limit", packTreeMaxBytes)
+		}
+		state.totalBytes += before.Size()
 	}
 	if _, err := fmt.Fprintf(treeHash, "%s\x00%s\x00%04o\x00", kind, filepath.ToSlash(display), before.Mode().Perm()); err != nil {
 		return err
@@ -358,14 +410,24 @@ func (state *packTreeState) capture(root *os.Root, name string, treeHash, identi
 			return err
 		}
 		opened, statErr := file.Stat()
+		if statErr == nil {
+			statErr = packFileReadPoint(filepath.ToSlash(name))
+		}
 		fileHash := sha256.New()
-		_, readErr := io.Copy(fileHash, file)
+		written, readErr := io.Copy(fileHash, io.LimitReader(file, before.Size()+1))
+		openedAfter, afterStatErr := file.Stat()
 		closeErr := file.Close()
-		if err := errors.Join(statErr, readErr, closeErr); err != nil {
+		pathAfter, pathErr := root.Lstat(name)
+		if err := errors.Join(statErr, readErr, afterStatErr, closeErr, pathErr); err != nil {
 			return err
 		}
-		if !opened.Mode().IsRegular() || !os.SameFile(before, opened) || opened.Mode() != before.Mode() {
-			return fmt.Errorf("pack tree file %s changed identity while fingerprinting", filepath.ToSlash(name))
+		if written != before.Size() || !opened.Mode().IsRegular() || !os.SameFile(before, opened) ||
+			!os.SameFile(before, openedAfter) || !os.SameFile(before, pathAfter) ||
+			opened.Mode() != before.Mode() || openedAfter.Mode() != before.Mode() || pathAfter.Mode() != before.Mode() ||
+			openedAfter.Size() != before.Size() || pathAfter.Size() != before.Size() ||
+			!openedAfter.ModTime().Equal(before.ModTime()) || !pathAfter.ModTime().Equal(before.ModTime()) ||
+			packChangeID(openedAfter) != packChangeID(before) || packChangeID(pathAfter) != packChangeID(before) {
+			return fmt.Errorf("pack tree file %s changed identity, size, or metadata while fingerprinting", filepath.ToSlash(name))
 		}
 		if _, err := fmt.Fprintf(treeHash, "%x\x00", fileHash.Sum(nil)); err != nil {
 			return err
@@ -474,7 +536,15 @@ func cleanupCreatedPackJournal(root *os.Root, created os.FileInfo) error {
 	if !os.SameFile(created, live) || !live.Mode().IsRegular() || live.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("failed pack journal path was replaced; preserving replacement")
 	}
-	if err := root.Remove(packJournalName); err != nil {
+	quarantine, err := fsatomic.Quarantine(root, packJournalName, packFailedJournalQuarantinePrefix)
+	if err != nil {
+		return err
+	}
+	current, err := quarantine.Root().Lstat(quarantine.Name())
+	if err != nil || !os.SameFile(created, current) || !current.Mode().IsRegular() || current.Mode()&os.ModeSymlink != 0 {
+		return errors.Join(fmt.Errorf("failed pack journal changed during quarantine; preserving it"), err, quarantine.Close())
+	}
+	if err := quarantine.Remove(); err != nil {
 		return err
 	}
 	return syncPackDir(root)
@@ -915,8 +985,13 @@ func packDirectoryState(root *os.Root, name, label string) (bool, error) {
 
 type packRootRename func(*os.Root, string, string) error
 
-func renamePackRoot(root *os.Root, oldname, newname string) error {
-	return root.Rename(oldname, newname)
+func renamePackNoReplace(root *os.Root, before packRootRename, oldname, newname string) error {
+	if before != nil {
+		if err := before(root, oldname, newname); err != nil {
+			return err
+		}
+	}
+	return fsatomic.RenameNoReplace(root, oldname, newname)
 }
 
 func captureExpectedPackTree(root *os.Root, name string, expected packTreeWitness, label string) (*packTreeState, error) {
@@ -944,24 +1019,43 @@ func isolateAndRemovePackTree(root *os.Root, rename packRootRename, name, retire
 	if err := state.revalidateAt(root, name); err != nil {
 		return fmt.Errorf("%s changed before retirement; preserving it: %w", label, err)
 	}
-	if err := rename(root, name, retirement); err != nil {
+	if err := packTreeRetirementPoint(name, retirement); err != nil {
+		return err
+	}
+	if err := state.revalidateAt(root, name); err != nil {
+		return fmt.Errorf("%s changed at retirement boundary; preserving it: %w", label, err)
+	}
+	if err := fsatomic.RenameNoReplace(root, name, retirement); err != nil {
 		return err
 	}
 	if err := syncPackDir(root); err != nil {
 		return err
 	}
 	if err := state.revalidateAt(root, retirement); err != nil {
-		restoreErr := rename(root, retirement, name)
+		restoreErr := renamePackNoReplace(root, rename, retirement, name)
 		return errors.Join(fmt.Errorf("%s changed at retirement boundary; preserving it: %w", label, err), restoreErr)
 	}
 	if err := packTreeRemovalPoint(name, retirement); err != nil {
 		return err
 	}
 	if err := state.revalidateAt(root, retirement); err != nil {
-		restoreErr := rename(root, retirement, name)
+		restoreErr := renamePackNoReplace(root, rename, retirement, name)
 		return errors.Join(fmt.Errorf("%s changed at deletion boundary; preserving it: %w", label, err), restoreErr)
 	}
-	if err := root.RemoveAll(retirement); err != nil {
+	quarantine, err := fsatomic.Quarantine(root, retirement, packTreeQuarantinePrefix)
+	if err != nil {
+		return err
+	}
+	if err := syncPackDir(root); err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	if err := packTreeQuarantinePoint(retirement); err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	if err := state.revalidateAt(quarantine.Root(), quarantine.Name()); err != nil {
+		return errors.Join(fmt.Errorf("%s changed inside deletion quarantine; preserving it: %w", label, err), quarantine.Close())
+	}
+	if err := quarantine.RemoveAll(); err != nil {
 		return err
 	}
 	return syncPackDir(root)
@@ -981,14 +1075,14 @@ func restorePackBackup(root *os.Root, rename packRootRename, entry packJournalEn
 	if err := state.revalidateAt(root, entry.Backup); err != nil {
 		return fmt.Errorf("parked backup %s changed before restoration; preserving it: %w", entry.Target, err)
 	}
-	if err := rename(root, entry.Backup, entry.Target); err != nil {
+	if err := renamePackNoReplace(root, rename, entry.Backup, entry.Target); err != nil {
 		return err
 	}
 	if err := syncPackDir(root); err != nil {
 		return err
 	}
 	if err := state.revalidateAt(root, entry.Target); err != nil {
-		restoreErr := rename(root, entry.Target, entry.Backup)
+		restoreErr := renamePackNoReplace(root, rename, entry.Target, entry.Backup)
 		return errors.Join(fmt.Errorf("restored target %s changed at restoration boundary; preserving backup authority: %w", entry.Target, err), restoreErr)
 	}
 	return nil
@@ -998,7 +1092,7 @@ func samePackJournalAcrossRename(before, after packJournalFileState) bool {
 	return os.SameFile(before.info, after.info) && before.info.Mode() == after.info.Mode() && before.info.Size() == after.info.Size() && before.info.ModTime().Equal(after.info.ModTime()) && bytes.Equal(before.body, after.body)
 }
 
-func isolatePackRecoveryJournal(root *os.Root, rename packRootRename, authority packJournalFileState) (packJournalFileState, error) {
+func isolatePackRecoveryJournal(root *os.Root, _ packRootRename, authority packJournalFileState) (packJournalFileState, error) {
 	if _, err := root.Lstat(packJournalRetirement); !os.IsNotExist(err) {
 		if err == nil {
 			return packJournalFileState{}, fmt.Errorf("reserved pack recovery journal already exists; preserving both journal paths")
@@ -1014,7 +1108,7 @@ func isolatePackRecoveryJournal(root *os.Root, rename packRootRename, authority 
 	if err := authority.revalidate(root); err != nil {
 		return packJournalFileState{}, fmt.Errorf("pack recovery journal changed at isolation boundary; preserving it: %w", err)
 	}
-	if err := rename(root, packJournalName, packJournalRetirement); err != nil {
+	if err := fsatomic.RenameNoReplace(root, packJournalName, packJournalRetirement); err != nil {
 		return packJournalFileState{}, err
 	}
 	if err := syncPackDir(root); err != nil {
@@ -1027,7 +1121,7 @@ func isolatePackRecoveryJournal(root *os.Root, rename packRootRename, authority 
 	if err != nil || !samePackJournalAcrossRename(authority, isolated) {
 		var restoreErr error
 		if _, liveErr := root.Lstat(packJournalName); os.IsNotExist(liveErr) {
-			restoreErr = rename(root, packJournalRetirement, packJournalName)
+			restoreErr = fsatomic.RenameNoReplace(root, packJournalRetirement, packJournalName)
 		} else if liveErr == nil {
 			restoreErr = fmt.Errorf("cannot restore changed isolated journal over a replacement; preserving both")
 		} else {
@@ -1063,7 +1157,7 @@ func requirePackRecoveryJournal(root *os.Root, authority packJournalFileState, p
 	return nil
 }
 
-func restorePackRecoveryJournal(root *os.Root, rename packRootRename, authority packJournalFileState) error {
+func restorePackRecoveryJournal(root *os.Root, _ packRootRename, authority packJournalFileState) error {
 	if err := authority.revalidateAt(root, packJournalRetirement); err != nil {
 		return fmt.Errorf("cannot restore changed isolated pack recovery journal; preserving it: %w", err)
 	}
@@ -1073,7 +1167,7 @@ func restorePackRecoveryJournal(root *os.Root, rename packRootRename, authority 
 		}
 		return err
 	}
-	if err := rename(root, packJournalRetirement, packJournalName); err != nil {
+	if err := fsatomic.RenameNoReplace(root, packJournalRetirement, packJournalName); err != nil {
 		return err
 	}
 	if err := syncPackDir(root); err != nil {
@@ -1093,13 +1187,220 @@ func removePackRecoveryJournal(root *os.Root, authority packJournalFileState) (b
 	if err := requirePackRecoveryJournal(root, authority, "journal-remove"); err != nil {
 		return false, err
 	}
-	if err := root.Remove(packJournalRetirement); err != nil {
+	quarantine, err := fsatomic.Quarantine(root, packJournalRetirement, packJournalQuarantinePrefix)
+	if err != nil {
+		return false, err
+	}
+	if err := syncPackDir(root); err != nil {
+		return false, errors.Join(err, quarantine.Close())
+	}
+	if err := packJournalPoint("recovery-after-journal-quarantine"); err != nil {
+		return false, errors.Join(err, quarantine.Close())
+	}
+	removed, err := removeOpenPackJournalQuarantine(root, quarantine, authority)
+	return removed, err
+}
+
+func removeOpenPackJournalQuarantine(root *os.Root, quarantine *fsatomic.Quarantined, authority packJournalFileState) (bool, error) {
+	current, err := capturePackJournalFileAt(quarantine.Root(), quarantine.Name())
+	if err != nil || !samePackJournalAcrossRename(authority, current) {
+		return false, errors.Join(fmt.Errorf("quarantined pack recovery journal differs from its bound authority; preserving it"), err, quarantine.Close())
+	}
+	if err := packJournalPoint("recovery-before-journal-quarantine-remove"); err != nil {
+		return false, errors.Join(err, quarantine.Close())
+	}
+	if err := current.revalidateAt(quarantine.Root(), quarantine.Name()); err != nil {
+		return false, errors.Join(fmt.Errorf("quarantined pack recovery journal changed at deletion boundary; preserving it: %w", err), quarantine.Close())
+	}
+	if err := quarantine.Remove(); err != nil {
 		return false, err
 	}
 	return true, syncPackDir(root)
 }
 
+func validPackQuarantineName(name, prefix string) bool {
+	return strings.HasPrefix(name, prefix) && len(name) > len(prefix) && portablepath.ValidateBase(name) == nil
+}
+
+func resumeFailedPackJournalQuarantine(root *os.Root) error {
+	entries, err := readPackDir(root, ".")
+	if err != nil {
+		return err
+	}
+	var names []string
+	for _, entry := range entries {
+		if validPackQuarantineName(entry.Name(), packFailedJournalQuarantinePrefix) {
+			names = append(names, entry.Name())
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	if len(names) != 1 {
+		return fmt.Errorf("multiple failed pack journal quarantines exist; preserving all")
+	}
+	quarantine, err := fsatomic.ResumeQuarantine(root, names[0], packJournalName)
+	if err != nil {
+		return err
+	}
+	_, objectErr := quarantine.Root().Lstat(quarantine.Name())
+	if os.IsNotExist(objectErr) {
+		if err := quarantine.FinishEmpty(); err != nil {
+			return errors.Join(err, quarantine.Close())
+		}
+		return syncPackDir(root)
+	}
+	if objectErr != nil {
+		return errors.Join(objectErr, quarantine.Close())
+	}
+	if _, err := root.Lstat(packJournalName); err == nil {
+		return errors.Join(fmt.Errorf("failed pack journal quarantine overlaps a live journal; preserving both"), quarantine.Close())
+	} else if !os.IsNotExist(err) {
+		return errors.Join(err, quarantine.Close())
+	}
+	info, err := quarantine.Root().Lstat(quarantine.Name())
+	if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return errors.Join(fmt.Errorf("failed pack journal quarantine does not contain a regular file; preserving it"), err, quarantine.Close())
+	}
+	if err := quarantine.Remove(); err != nil {
+		return err
+	}
+	return syncPackDir(root)
+}
+
+func resumePackJournalQuarantine(root *os.Root) (bool, error) {
+	entries, err := readPackDir(root, ".")
+	if err != nil {
+		return false, err
+	}
+	var names []string
+	for _, entry := range entries {
+		if validPackQuarantineName(entry.Name(), packJournalQuarantinePrefix) {
+			names = append(names, entry.Name())
+		}
+	}
+	if len(names) == 0 {
+		return false, nil
+	}
+	if len(names) != 1 {
+		return false, fmt.Errorf("multiple pack recovery journal quarantines exist; preserving all")
+	}
+	quarantine, err := fsatomic.ResumeQuarantine(root, names[0], "")
+	if err != nil {
+		return false, err
+	}
+	if quarantine.Source() != packJournalRetirement {
+		return false, errors.Join(fmt.Errorf("pack journal quarantine records unexpected source %q", quarantine.Source()), quarantine.Close())
+	}
+	_, objectErr := quarantine.Root().Lstat(quarantine.Name())
+	if os.IsNotExist(objectErr) {
+		if err := quarantine.FinishEmpty(); err != nil {
+			return false, errors.Join(err, quarantine.Close())
+		}
+		return false, syncPackDir(root)
+	}
+	if objectErr != nil {
+		return false, errors.Join(objectErr, quarantine.Close())
+	}
+	for _, name := range []string{packJournalName, packJournalRetirement} {
+		if _, err := root.Lstat(name); err == nil {
+			return false, errors.Join(fmt.Errorf("pack journal quarantine overlaps live authority %s; preserving both", name), quarantine.Close())
+		} else if !os.IsNotExist(err) {
+			return false, errors.Join(err, quarantine.Close())
+		}
+	}
+	_, _, authority, err := readPackJournalAt(quarantine.Root(), quarantine.Name())
+	if err != nil {
+		return false, errors.Join(err, quarantine.Close())
+	}
+	removed, err := removeOpenPackJournalQuarantine(root, quarantine, authority)
+	return removed, err
+}
+
+func resumePackTreeQuarantines(root *os.Root, header packJournalHeader) error {
+	entries, err := readPackDir(root, ".")
+	if err != nil {
+		return err
+	}
+	found := make(map[string]string, len(header.Entries))
+	expected := make(map[string]string, len(header.Entries))
+	for _, journalEntry := range header.Entries {
+		expected[journalEntry.Retire] = journalEntry.Target
+	}
+	for _, dirEntry := range entries {
+		if !validPackQuarantineName(dirEntry.Name(), packTreeQuarantinePrefix) {
+			continue
+		}
+		quarantine, err := fsatomic.ResumeQuarantine(root, dirEntry.Name(), "")
+		if err != nil {
+			return err
+		}
+		source := quarantine.Source()
+		if err := quarantine.Close(); err != nil {
+			return err
+		}
+		if _, ok := expected[source]; !ok {
+			return fmt.Errorf("pack tree quarantine records unjournaled source %q; preserving it", source)
+		}
+		if prior := found[source]; prior != "" {
+			return fmt.Errorf("multiple pack tree quarantines for %s exist; preserving %s and %s", expected[source], prior, dirEntry.Name())
+		}
+		found[source] = dirEntry.Name()
+	}
+	for _, journalEntry := range header.Entries {
+		name := found[journalEntry.Retire]
+		if name == "" {
+			continue
+		}
+		quarantine, err := fsatomic.ResumeQuarantine(root, name, "")
+		if err != nil {
+			return err
+		}
+		if quarantine.Source() != journalEntry.Retire {
+			return errors.Join(fmt.Errorf("pack tree quarantine for %s records unexpected source %q", journalEntry.Target, quarantine.Source()), quarantine.Close())
+		}
+		_, objectErr := quarantine.Root().Lstat(quarantine.Name())
+		if os.IsNotExist(objectErr) {
+			if err := quarantine.FinishEmpty(); err != nil {
+				return errors.Join(err, quarantine.Close())
+			}
+			if err := syncPackDir(root); err != nil {
+				return err
+			}
+			continue
+		}
+		if objectErr != nil {
+			return errors.Join(objectErr, quarantine.Close())
+		}
+		state, err := capturePackTree(quarantine.Root(), quarantine.Name())
+		if err != nil {
+			return errors.Join(err, quarantine.Close())
+		}
+		if state.witness != journalEntry.Before && (!validPackTreeWitness(journalEntry.after, false) || state.witness != journalEntry.after) {
+			return errors.Join(fmt.Errorf("pack tree quarantine for %s matches neither journaled before nor after witness", journalEntry.Target), quarantine.Close())
+		}
+		if _, err := root.Lstat(journalEntry.Retire); err == nil {
+			return errors.Join(fmt.Errorf("pack tree quarantine for %s overlaps its public retirement; preserving both", journalEntry.Target), quarantine.Close())
+		} else if !os.IsNotExist(err) {
+			return errors.Join(err, quarantine.Close())
+		}
+		if err := quarantine.Restore(); err != nil {
+			return errors.Join(err, quarantine.Close())
+		}
+		if err := syncPackDir(root); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func recoverPackTransaction(root *os.Root, rename packRootRename) (retErr error) {
+	if err := resumeFailedPackJournalQuarantine(root); err != nil {
+		return err
+	}
+	if _, err := resumePackJournalQuarantine(root); err != nil {
+		return err
+	}
 	_, journalErr := root.Lstat(packJournalName)
 	_, retirementErr := root.Lstat(packJournalRetirement)
 	journalExists := journalErr == nil
@@ -1141,6 +1442,9 @@ func recoverPackTransaction(root *os.Root, rename packRootRename) (retErr error)
 			retErr = errors.Join(retErr, restorePackRecoveryJournal(root, rename, authority))
 		}
 	}()
+	if err := resumePackTreeQuarantines(root, header); err != nil {
+		return err
+	}
 	states := make([]packRecoveryState, 0, len(header.Entries))
 	for _, entry := range header.Entries {
 		state := packRecoveryState{entry: entry}

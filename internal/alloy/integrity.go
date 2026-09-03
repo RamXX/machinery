@@ -25,11 +25,11 @@ package alloy
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/safefile"
 	"github.com/RamXX/machinery/internal/version"
 )
 
@@ -159,7 +159,7 @@ func inverseLone(card string) bool { return card == "1:1" || card == "1:n" }
 // domain model. Every disagreement dies (the refine_gen rule).
 func LoadIntegrity(domainPath, annotationPath string) *Integrity {
 	d := loadDomain(domainPath)
-	data, err := os.ReadFile(annotationPath)
+	data, err := safefile.Read(annotationPath, "integrity relational annotation", alloyInputMaxBytes)
 	if err != nil {
 		die("%s: %v", filepath.Base(annotationPath), err)
 	}
@@ -630,7 +630,7 @@ func mandatoryNote(mandatory bool) string {
 // claims to carry, WITHOUT validating them; the Gi gate owns validation.
 // Gx-trace uses this to credit the integrity model as an enforcement artifact.
 func CarriedIntegrityIDs(annotationPath string) map[string]bool {
-	data, err := os.ReadFile(annotationPath)
+	data, err := safefile.Read(annotationPath, "integrity relational annotation", alloyInputMaxBytes)
 	if err != nil {
 		return nil
 	}

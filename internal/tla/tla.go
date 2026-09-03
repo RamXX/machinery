@@ -15,10 +15,13 @@ import (
 
 	"github.com/RamXX/machinery/internal/artifactset"
 	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/portablepath"
 	"github.com/RamXX/machinery/internal/version"
 )
+
+const tlaOutputMaxEntries = 10_000
 
 // ExitError carries a hard-error message that maps to Python's sys.exit(msg).
 type ExitError struct{ Msg string }
@@ -193,7 +196,7 @@ func Check(path string) error {
 
 // Generate mirrors tla_gen.generate(path) -> (mid, tla, cfg).
 func Generate(path string) (mid, tla, cfg string, err error) {
-	raw, readErr := os.ReadFile(path)
+	raw, readErr := ir.ReadMachineJSONFile(path)
 	if readErr != nil {
 		return "", "", "", &ExitError{Msg: "tla_gen: " + readErr.Error()}
 	}
@@ -736,7 +739,7 @@ func guardedCurrentTLAArtifacts(outdir, machineSource string, files map[string][
 }
 
 func staleOwnedTLAArtifacts(outdir, machineDir string, keep map[string][]byte) ([]artifactset.RemovalPrecondition, error) {
-	entries, err := os.ReadDir(outdir)
+	entries, err := dirscan.Read(outdir, tlaOutputMaxEntries)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}

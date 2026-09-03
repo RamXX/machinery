@@ -11,11 +11,3 @@ func syncDirectory(path string) error {
 	}
 	return errorsJoin(f.Sync(), f.Close())
 }
-
-func syncRootDirectory(root *os.Root) error {
-	directory, err := root.Open(".")
-	if err != nil {
-		return err
-	}
-	return errorsJoin(directory.Sync(), directory.Close())
-}

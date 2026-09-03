@@ -97,7 +97,7 @@ func collectReadsDecls(g *Gate, design string) []readsClaim {
 // shape, so a mention in narrow tables does not count as a payload).
 func payloadTextFor(design string) (map[string][]string, error) {
 	out := map[string][]string{}
-	err := filepath.Walk(design, func(path string, fi os.FileInfo, err error) error {
+	err := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

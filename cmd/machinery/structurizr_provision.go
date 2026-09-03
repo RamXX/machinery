@@ -17,10 +17,12 @@ import (
 
 	"github.com/RamXX/machinery/internal/cachestage"
 	"github.com/RamXX/machinery/internal/filelock"
+	"github.com/RamXX/machinery/internal/safefile"
 	machversion "github.com/RamXX/machinery/internal/version"
 )
 
 const structurizrArchiveMaxBytes = int64(200 << 20)
+const structurizrReceiptMaxBytes int64 = 4 << 10
 
 var structurizrHTTPDo = http.DefaultClient.Do
 
@@ -108,7 +110,7 @@ func structurizrLauncher(root string) string {
 }
 
 func validateStructurizrCache(root string) error {
-	body, err := os.ReadFile(filepath.Join(root, ".machinery-structurizr-receipt"))
+	body, err := safefile.Read(filepath.Join(root, ".machinery-structurizr-receipt"), "structurizr receipt", structurizrReceiptMaxBytes)
 	if err != nil {
 		return err
 	}

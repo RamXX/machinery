@@ -23,6 +23,7 @@ type lockLocation struct {
 
 type acquireHooks struct {
 	afterLockOpen func(string) error
+	tryLock       func(*Lock) (bool, error)
 }
 
 const lockOpenAttempts = 32

@@ -4,8 +4,10 @@
 package gates
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/alloy"
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/lint"
 	"github.com/RamXX/machinery/internal/oracle"
@@ -204,21 +207,6 @@ func (g *Gate) Emit(out io.Writer) int {
 
 // --- helpers ---
 
-// readFileOrErr reads path for a gate. An absent file is "" (the callers'
-// own existence logic owns that case), but a file that EXISTS and cannot be
-// read is a hard ERROR naming the file: silently treating an unreadable
-// artifact as empty produces wrong diagnoses (NG-9).
-func readFileOrErr(path string, g *Gate) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			g.Errs = append(g.Errs, path+" is unreadable: "+err.Error())
-		}
-		return ""
-	}
-	return string(data)
-}
-
 func loadDesignMachine(design, path string) (*ir.Value, error) {
 	data, err := readDesignFile(design, path)
 	if err != nil {
@@ -273,9 +261,19 @@ func isPersisted(cell string) bool {
 	return true
 }
 
-// sortedGlobExt lists <dir>/*<ext> sorted; empty when dir does not exist.
-func sortedGlobExt(dir, ext string) []string {
-	entries, _ := os.ReadDir(dir)
+// sortedGlobExt lists <dir>/*<ext> sorted. A missing directory is an empty
+// optional inventory; every other enumeration failure is returned so no gate
+// can confuse an unreadable or unstable inventory with an absent artifact.
+var readGateDirectory = dirscan.Read
+
+func sortedGlobExt(dir, ext string) ([]string, error) {
+	entries, err := readGateDirectory(dir, designInventoryMaxEntries)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("enumerate %s: %w", dir, err)
+	}
 	var out []string
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ext) {
@@ -283,7 +281,7 @@ func sortedGlobExt(dir, ext string) []string {
 		}
 	}
 	sort.Strings(out)
-	return out
+	return out, nil
 }
 
 // tokenIn mirrors _token_in: whole-token containment (inv-1 must not match inv-12).
@@ -1652,7 +1650,7 @@ func regularGlob(dir, pattern string) (paths, invalid []string, readErr error) {
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return nil, nil, fmt.Errorf("%s must be a real directory; symlinks and non-directories are rejected", dir)
 	}
-	entries, err := os.ReadDir(dir)
+	entries, err := dirscan.Read(dir, designInventoryMaxEntries)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1995,7 +1993,10 @@ func CheckTraceability(design string) *Gate {
 
 	// invariants enforcement
 	var cells, unitCells []string
-	matrixFiles := globExt(mdir, ".matrix.md")
+	matrixFiles, inventoryErr := globExt(mdir, ".matrix.md")
+	if inventoryErr != nil {
+		g.Errs = append(g.Errs, inventoryErr.Error())
+	}
 	for _, f := range matrixFiles {
 		for _, tbl := range ir.ParseMdTables(readDesignFileOrErr(design, f, g)) {
 			mi := ir.FindCol(tbl.Header, "maps to")
@@ -2020,7 +2021,11 @@ func CheckTraceability(design string) *Gate {
 			}
 		}
 		// manifest mode shards contribute to the traceability corpus too
-		for _, shard := range sortedGlobExt(filepath.Join(design, "BUILD"), ".md") {
+		shards, inventoryErr := sortedGlobExt(filepath.Join(design, "BUILD"), ".md")
+		if inventoryErr != nil {
+			g.Errs = append(g.Errs, inventoryErr.Error())
+		}
+		for _, shard := range shards {
 			for _, tbl := range ir.ParseMdTables(maskFences(readDesignFileOrErr(design, shard, g))) {
 				for _, r := range tbl.Rows {
 					cells = append(cells, r...)
@@ -2314,14 +2319,6 @@ func backtickTokens(s string) []string {
 	return out
 }
 
-func globExt(dir, ext string) []string {
-	entries, _ := os.ReadDir(dir)
-	var out []string
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ext) {
-			out = append(out, filepath.Join(dir, e.Name()))
-		}
-	}
-	sort.Strings(out)
-	return out
+func globExt(dir, ext string) ([]string, error) {
+	return sortedGlobExt(dir, ext)
 }

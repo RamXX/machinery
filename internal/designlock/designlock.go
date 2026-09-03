@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/RamXX/machinery/internal/filelock"
+	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/portablepath"
 )
 
@@ -28,20 +29,29 @@ const publishSentinel = ".machinery-design-publish.json"
 const publishSentinelStage = ".machinery-design-publish.new"
 const publishSentinelRetired = ".machinery-design-publish.json.retired"
 const publishSentinelStageRetired = ".machinery-design-publish.new.retired"
+const publishSentinelQuarantinePrefix = ".machinery-design-publish-quarantine-"
+const publishSentinelStageQuarantinePrefix = ".machinery-design-publish-stage-quarantine-"
 const publishRecordMaxBytes = 1 << 20
 const fingerprintBufferBytes = 64 << 10
+const snapshotInventoryPageEntries = 256
+const snapshotInventoryMaxEntries = 100_000
+const snapshotInventoryMaxDepth = 64
+const snapshotRegularFileMaxBytes int64 = 1 << 30
+const snapshotAggregateMaxBytes int64 = 8 << 30
 
 // Lock is an exclusive, process-safe design snapshot lock.
 type Lock struct {
-	lock          *filelock.Lock
-	root          string
-	rootInfo      os.FileInfo
-	sourceRoot    string
-	sourceAliases []string
-	inputAliases  []pathAlias
-	snapshot      map[string]string
-	external      map[string]externalFileState
-	externalTrees map[string]externalTreeState
+	lock                  *filelock.Lock
+	root                  string
+	rootInfo              os.FileInfo
+	sourceRoot            string
+	sourceCleanup         *privateSnapshotCleanup
+	retiredSourceCleanups []*privateSnapshotCleanup
+	sourceAliases         []string
+	inputAliases          []pathAlias
+	snapshot              map[string]string
+	external              map[string]externalFileState
+	externalTrees         map[string]externalTreeState
 }
 
 type pathAlias struct{ from, to string }
@@ -57,15 +67,20 @@ type externalTreeState struct {
 }
 
 var (
-	testAfterExternalInputRead    func(string)
-	testAfterFingerprintFileOpen  func(string)
-	testAfterFingerprintReadChunk func(string)
-	testAfterFingerprintFileRead  func(string)
+	testAfterExternalInputRead     func(string)
+	testAfterFingerprintFileOpen   func(string)
+	testAfterFingerprintReadChunk  func(string)
+	testAfterFingerprintFileRead   func(string)
+	testAfterSnapshotCopyReadChunk func(string)
+	publishRenameNoReplace         = fsatomic.RenameNoReplace
 )
 
 func streamFingerprint(path string, reader io.Reader, expected int64) ([sha256.Size]byte, error) {
 	if expected < 0 {
 		return [sha256.Size]byte{}, fmt.Errorf("fingerprint input %s has negative size %d", path, expected)
+	}
+	if expected > snapshotRegularFileMaxBytes {
+		return [sha256.Size]byte{}, fmt.Errorf("fingerprint input %s exceeds %d-byte snapshot limit", path, snapshotRegularFileMaxBytes)
 	}
 	hash := sha256.New()
 	buffer := make([]byte, fingerprintBufferBytes)
@@ -110,6 +125,57 @@ func streamFingerprint(path string, reader io.Reader, expected int64) ([sha256.S
 	}
 	if err == nil {
 		return [sha256.Size]byte{}, fmt.Errorf("fingerprint input %s made no progress during overflow probe", path)
+	}
+	var digest [sha256.Size]byte
+	copy(digest[:], hash.Sum(nil))
+	return digest, nil
+}
+
+func copySnapshotFile(path string, reader io.Reader, writer io.Writer, expected int64) ([sha256.Size]byte, error) {
+	if expected < 0 || expected > snapshotRegularFileMaxBytes {
+		return [sha256.Size]byte{}, fmt.Errorf("snapshot input %s has invalid size %d (maximum %d)", path, expected, snapshotRegularFileMaxBytes)
+	}
+	hash := sha256.New()
+	output := io.MultiWriter(writer, hash)
+	buffer := make([]byte, fingerprintBufferBytes)
+	remaining := expected
+	first := true
+	for remaining > 0 {
+		chunk := int64(len(buffer))
+		if remaining < chunk {
+			chunk = remaining
+		}
+		read, err := reader.Read(buffer[:chunk])
+		if read > 0 {
+			if _, writeErr := output.Write(buffer[:read]); writeErr != nil {
+				return [sha256.Size]byte{}, writeErr
+			}
+			remaining -= int64(read)
+			if first && testAfterSnapshotCopyReadChunk != nil {
+				testAfterSnapshotCopyReadChunk(path)
+			}
+			first = false
+		}
+		if errors.Is(err, io.EOF) {
+			return [sha256.Size]byte{}, fmt.Errorf("snapshot input %s ended early with %d bytes remaining", path, remaining)
+		}
+		if err != nil {
+			return [sha256.Size]byte{}, err
+		}
+		if read == 0 {
+			return [sha256.Size]byte{}, fmt.Errorf("snapshot input %s made no read progress", path)
+		}
+	}
+	var overflow [1]byte
+	read, err := reader.Read(overflow[:])
+	if read != 0 {
+		return [sha256.Size]byte{}, fmt.Errorf("snapshot input %s exceeds witnessed size %d", path, expected)
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
+		return [sha256.Size]byte{}, err
+	}
+	if err == nil {
+		return [sha256.Size]byte{}, fmt.Errorf("snapshot input %s made no progress during overflow probe", path)
 	}
 	var digest [sha256.Size]byte
 	copy(digest[:], hash.Sum(nil))
@@ -383,25 +449,63 @@ func acquire(designRoot string, reader bool) (*Lock, error) {
 }
 
 func findInterruptedJournal(root string) (string, error) {
+	before, err := os.Lstat(root)
+	if err != nil {
+		return "", err
+	}
+	capability, err := os.OpenRoot(root)
+	if err != nil {
+		return "", err
+	}
+	defer capability.Close()
+	inside, err := capability.Lstat(".")
+	if err != nil || !os.SameFile(before, inside) {
+		return "", fmt.Errorf("design root changed identity while inspecting interrupted publications")
+	}
+	budget := snapshotBudget{maxEntries: snapshotInventoryMaxEntries, maxBytes: snapshotAggregateMaxBytes, maxDepth: snapshotInventoryMaxDepth}
 	var found []string
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+	var walk func(string, int) error
+	walk = func(dir string, depth int) error {
+		if err := budget.enterDirectory("interrupted-publication directory "+filepath.ToSlash(dir), depth); err != nil {
+			return err
 		}
-		if entry.IsDir() && entry.Name() == ".git" {
-			return filepath.SkipDir
-		}
-		rel, err := filepath.Rel(root, path)
+		handle, err := capability.Open(dir)
 		if err != nil {
 			return err
 		}
-		rel = filepath.ToSlash(rel)
-		if interruptedJournalRel(rel) {
-			found = append(found, rel)
+		entries, readErr := readSnapshotDir(handle, "interrupted-publication directory "+filepath.ToSlash(dir), &budget)
+		closeErr := handle.Close()
+		if err := errors.Join(readErr, closeErr); err != nil {
+			return err
+		}
+		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+		for _, entry := range entries {
+			if entry.Name() == ".git" {
+				continue
+			}
+			rel := entry.Name()
+			if dir != "." {
+				rel = filepath.Join(dir, entry.Name())
+			}
+			info, err := capability.Lstat(rel)
+			if err != nil {
+				return err
+			}
+			if err := budget.addFile(filepath.ToSlash(rel), info); err != nil {
+				return err
+			}
+			if interruptedJournalRel(filepath.ToSlash(rel)) {
+				found = append(found, filepath.ToSlash(rel))
+			}
+			if info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
+				if err := walk(rel, depth+1); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
-	})
-	if err != nil {
+	}
+	if err := walk(".", 0); err != nil {
 		return "", fmt.Errorf("inspect interrupted design publications: %w", err)
 	}
 	sort.Strings(found)
@@ -428,7 +532,8 @@ func interruptedJournalRel(rel string) bool {
 		".machinery-embed-refresh-transaction.stage":
 		return true
 	default:
-		return embedScratchResidueRel(rel)
+		base := filepath.Base(filepath.FromSlash(strings.TrimSuffix(filepath.ToSlash(rel), "/")))
+		return publishQuarantineName(base) || embedScratchResidueRel(rel)
 	}
 }
 
@@ -544,6 +649,7 @@ var testPublishCleanupPoint func(string, string) error
 var testAfterExpectedOutputRead func(string)
 var testBetweenExpectedTreeFingerprints func(string)
 var testBetweenFingerprintPasses func(string)
+var publishQuarantineRemove = func(quarantine *fsatomic.Quarantined) error { return quarantine.Remove() }
 
 type externalOutputRoot struct {
 	root      *os.Root
@@ -1090,24 +1196,24 @@ func (l *Lock) validateExpectedOutputs(expected []OutputExpectation, externalRoo
 			return err
 		}
 		opened, statErr := f.Stat()
-		if statErr != nil || !os.SameFile(info, opened) || !opened.Mode().IsRegular() {
+		if statErr != nil || !sameFingerprintFile(info, opened) {
 			_ = f.Close()
 			return fmt.Errorf("output %s changed identity while opening", filepath.ToSlash(rel))
 		}
-		hash := sha256.New()
-		_, readErr := io.Copy(hash, f)
+		digest, readErr := streamFingerprint(filepath.ToSlash(rel), f, opened.Size())
+		openedAfter, retainedStatErr := f.Stat()
 		closeErr := f.Close()
-		if err := errors.Join(readErr, closeErr); err != nil {
+		if err := errors.Join(readErr, retainedStatErr, closeErr); err != nil {
 			return err
 		}
 		if testAfterExpectedOutputRead != nil {
 			testAfterExpectedOutputRead(output.path)
 		}
 		after, statErr := outputRoot.Lstat(rel)
-		if statErr != nil || !os.SameFile(info, after) || after.Mode() != info.Mode() {
+		if statErr != nil || !sameFingerprintFile(info, openedAfter) || !sameFingerprintFile(info, after) {
 			return fmt.Errorf("output %s changed identity while reading", filepath.ToSlash(rel))
 		}
-		got := fmt.Sprintf("sha256:%x", hash.Sum(nil))
+		got := fmt.Sprintf("sha256:%x", digest)
 		if got != output.digest {
 			return fmt.Errorf("output %s has digest %s, want %s", filepath.ToSlash(rel), got, output.digest)
 		}
@@ -1255,56 +1361,73 @@ func removePublishFileExact(root *os.Root, name, retiredName string, state publi
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if err := root.Rename(name, retiredName); err != nil {
-		return fmt.Errorf("atomically isolate %s: %w", label, err)
+	if testPublishCleanupPoint != nil {
+		if err := testPublishCleanupPoint("before-retire", retiredName); err != nil {
+			return err
+		}
 	}
-	if err := syncRootDirectory(root); err != nil {
-		return fmt.Errorf("persist isolated %s: %w", label, err)
-	}
-	retired, err := capturePublishFile(root, retiredName, publishRecordMaxBytes+1)
-	if err != nil || !samePublishFileAcrossRename(state, retired) {
-		return restorePublishFile(root, name, retiredName, errors.Join(fmt.Errorf("isolated %s no longer matches its authority", label), err))
+	if info, err := root.Lstat(retiredName); err == nil {
+		return fmt.Errorf("%s retirement %s appeared concurrently (%s); preserving it and the source", label, retiredName, info.Mode())
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
 	}
 	if testPublishCleanupPoint != nil {
-		if err := testPublishCleanupPoint("after-isolate", retiredName); err != nil {
-			return restorePublishFile(root, name, retiredName, err)
+		if err := testPublishCleanupPoint("before-quarantine", name); err != nil {
+			return err
 		}
-		if err := testPublishCleanupPoint("before-remove", retiredName); err != nil {
-			return restorePublishFile(root, name, retiredName, err)
+	}
+	prefix := publishSentinelQuarantinePrefix
+	if name == publishSentinelStage {
+		prefix = publishSentinelStageQuarantinePrefix
+	}
+	quarantine, err := fsatomic.Quarantine(root, name, prefix)
+	if err != nil {
+		return fmt.Errorf("atomically quarantine %s: %w", label, err)
+	}
+	defer quarantine.Close()
+	isolated, err := capturePublishFile(quarantine.Root(), quarantine.Name(), publishRecordMaxBytes+1)
+	if err != nil || !samePublishFileAcrossRename(state, isolated) {
+		restoreErr := quarantine.Restore()
+		return errors.Join(fmt.Errorf("quarantined %s no longer matches its exact authority; restoring without replacement", label), err, restoreErr)
+	}
+	if testPublishCleanupPoint != nil {
+		if err := testPublishCleanupPoint("after-isolate", name); err != nil {
+			return err
+		}
+		if err := testPublishCleanupPoint("quarantine-durable", name); err != nil {
+			return err
+		}
+		if err := testPublishCleanupPoint("before-remove", name); err != nil {
+			return err
 		}
 	}
 	if guard != nil {
 		if err := guard(); err != nil {
-			return restorePublishFile(root, name, retiredName, fmt.Errorf("%s cleanup authority changed before deletion: %w", label, err))
+			return fmt.Errorf("%s cleanup authority changed before deletion; preserving quarantine: %w", label, err)
 		}
 	}
-	if err := retired.revalidateAt(root, retiredName); err != nil {
-		return restorePublishFile(root, name, retiredName, fmt.Errorf("%s changed before deletion: %w", label, err))
+	if err := isolated.revalidateAt(quarantine.Root(), quarantine.Name()); err != nil {
+		return fmt.Errorf("privately quarantined %s changed before deletion; preserving it: %w", label, err)
 	}
-	if err := root.Remove(retiredName); err != nil {
-		return fmt.Errorf("remove isolated %s: %w", label, err)
+	if testPublishCleanupPoint != nil {
+		if err := testPublishCleanupPoint("after-quarantine", name); err != nil {
+			return err
+		}
 	}
-	if err := syncRootDirectory(root); err != nil {
-		return fmt.Errorf("persist deletion of %s: %w", label, err)
+	if info, err := root.Lstat(name); err == nil {
+		return fmt.Errorf("%s public name %s was repopulated (%s); preserving it and the private quarantine", label, name, info.Mode())
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if err := publishQuarantineRemove(quarantine); err != nil {
+		return fmt.Errorf("remove privately quarantined %s: %w", label, err)
+	}
+	if testPublishCleanupPoint != nil {
+		if err := testPublishCleanupPoint("quarantine-removed", name); err != nil {
+			return err
+		}
 	}
 	return nil
-}
-
-func restorePublishFile(root *os.Root, name, retiredName string, cause error) error {
-	if info, err := root.Lstat(name); err == nil {
-		return errors.Join(cause, fmt.Errorf("%s was repopulated (%s); preserving it and %s", name, info.Mode(), retiredName))
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return errors.Join(cause, err)
-	}
-	// Link provides atomic no-replace restoration. Keep the retirement name on
-	// this already-failing path as conservative evidence for the next reader.
-	if err := root.Link(retiredName, name); err != nil {
-		return errors.Join(cause, fmt.Errorf("restore %s without replacement: %w", name, err))
-	}
-	if err := syncRootDirectory(root); err != nil {
-		return errors.Join(cause, fmt.Errorf("persist restored %s: %w", name, err))
-	}
-	return errors.Join(cause, fmt.Errorf("%s and retirement %s preserved", name, retiredName))
 }
 
 func (l *Lock) beginPublish(record publishRecord) (_ *publishAuthority, retErr error) {
@@ -1397,7 +1520,7 @@ func (l *Lock) beginPublish(record publishRecord) (_ *publishAuthority, retErr e
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
-	if err := root.Rename(publishSentinelStage, publishSentinel); err != nil {
+	if err := publishRenameNoReplace(root, publishSentinelStage, publishSentinel); err != nil {
 		return nil, fmt.Errorf("install design publication sentinel: %w", err)
 	}
 	installedState, installedRecord, err := capturePublishRecord(root, publishSentinel)
@@ -1491,6 +1614,18 @@ func reconcilePublishStage(rootPath string) error {
 		return err
 	}
 	defer root.Close()
+	quarantines, err := findPublishQuarantines(root)
+	if err != nil {
+		return err
+	}
+	if len(quarantines) > 1 {
+		return fmt.Errorf("ambiguous design publication quarantines exist: %s", strings.Join(quarantines, ", "))
+	}
+	if len(quarantines) == 1 {
+		if err := resumePublishQuarantine(root, quarantines[0]); err != nil {
+			return err
+		}
+	}
 	for _, retired := range []string{publishSentinelRetired, publishSentinelStageRetired} {
 		if info, err := root.Lstat(retired); err == nil {
 			return fmt.Errorf("ambiguous design publication retirement %s exists (%s)", retired, info.Mode())
@@ -1530,6 +1665,110 @@ func reconcilePublishStage(rootPath string) error {
 	}
 	guardInstalled := func() error { return installedState.revalidateAt(root, publishSentinel) }
 	return removePublishFileExact(root, publishSentinelStage, publishSentinelStageRetired, stageState, "redundant staged design publication sentinel", guardInstalled)
+}
+
+func findPublishQuarantine(root *os.Root) (string, error) {
+	quarantines, err := findPublishQuarantines(root)
+	if err != nil || len(quarantines) == 0 {
+		return "", err
+	}
+	return quarantines[0], nil
+}
+
+func findPublishQuarantines(root *os.Root) ([]string, error) {
+	dir, err := root.Open(".")
+	if err != nil {
+		return nil, err
+	}
+	budget := snapshotBudget{maxEntries: snapshotInventoryMaxEntries, maxBytes: snapshotAggregateMaxBytes}
+	entries, readErr := readSnapshotDir(dir, "design publication recovery inventory", &budget)
+	closeErr := dir.Close()
+	if err := errors.Join(readErr, closeErr); err != nil {
+		return nil, err
+	}
+	var quarantines []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if publishQuarantineName(name) {
+			quarantines = append(quarantines, name)
+		}
+	}
+	sort.Strings(quarantines)
+	return quarantines, nil
+}
+
+func resumePublishQuarantine(root *os.Root, directory string) (retErr error) {
+	quarantine, err := fsatomic.ResumeQuarantine(root, directory, "")
+	if err != nil {
+		return fmt.Errorf("resume design publication quarantine %s: %w", directory, err)
+	}
+	defer func() { retErr = errors.Join(retErr, quarantine.Close()) }()
+	source := quarantine.Source()
+	wantPrefix := ""
+	switch source {
+	case publishSentinel:
+		wantPrefix = publishSentinelQuarantinePrefix
+	case publishSentinelStage:
+		wantPrefix = publishSentinelStageQuarantinePrefix
+	default:
+		return fmt.Errorf("design publication quarantine %s claims foreign source %s; preserving it", directory, source)
+	}
+	if !strings.HasPrefix(directory, wantPrefix) {
+		return fmt.Errorf("design publication quarantine %s has the wrong source prefix; preserving it", directory)
+	}
+	if testPublishCleanupPoint != nil {
+		if err := testPublishCleanupPoint("reconcile-quarantine-open", source); err != nil {
+			return err
+		}
+	}
+	if info, err := root.Lstat(source); err == nil {
+		return fmt.Errorf("design publication source %s was repopulated (%s); preserving it and quarantine %s", source, info.Mode(), directory)
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	isolated, err := capturePublishFile(quarantine.Root(), quarantine.Name(), publishRecordMaxBytes+1)
+	if errors.Is(err, fs.ErrNotExist) {
+		if err := quarantine.FinishEmpty(); err != nil {
+			return fmt.Errorf("finish empty design publication quarantine %s: %w", directory, err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("witness design publication quarantine %s: %w", directory, err)
+	}
+	if source == publishSentinel {
+		if _, err := decodePublishRecord(isolated.body); err != nil {
+			return fmt.Errorf("quarantined installed publication sentinel is invalid; preserving %s: %w", directory, err)
+		}
+	} else if installedState, installed, installedErr := capturePublishRecord(root, publishSentinel); installedErr == nil {
+		stage, err := decodePublishRecord(isolated.body)
+		if err != nil || !publishRecordsEqual(installed, stage) {
+			return errors.Join(fmt.Errorf("quarantined publication stage does not match installed authority; preserving %s", directory), err)
+		}
+		if err := installedState.revalidateAt(root, publishSentinel); err != nil {
+			return fmt.Errorf("installed publication authority changed while reconciling quarantine %s: %w", directory, err)
+		}
+	} else if !errors.Is(installedErr, fs.ErrNotExist) {
+		return installedErr
+	}
+	if testPublishCleanupPoint != nil {
+		if err := testPublishCleanupPoint("reconcile-before-quarantine-remove", source); err != nil {
+			return err
+		}
+	}
+	if err := publishQuarantineRemove(quarantine); err != nil {
+		return fmt.Errorf("finish design publication quarantine %s: %w", directory, err)
+	}
+	if testPublishCleanupPoint != nil {
+		if err := testPublishCleanupPoint("reconcile-quarantine-removed", source); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func publishQuarantineName(name string) bool {
+	return strings.HasPrefix(name, publishSentinelQuarantinePrefix) || strings.HasPrefix(name, publishSentinelStageQuarantinePrefix)
 }
 
 func requirePublishFileAbsent(root *os.Root, name string) error {
@@ -1770,6 +2009,9 @@ func transactionResidueRel(rel string) bool {
 	clean := strings.TrimSuffix(slash, "/")
 	base := filepath.Base(filepath.FromSlash(clean))
 	parent := filepath.ToSlash(filepath.Dir(filepath.FromSlash(clean)))
+	if publishQuarantineName(base) {
+		return true
+	}
 	if parent == "formal" {
 		for _, prefix := range []string{".machinery-formal-stage-", ".machinery-formal-stage-delete-", ".machinery-formal-backup-"} {
 			if hasHexSuffix(base, prefix, 64) {
@@ -1793,8 +2035,17 @@ func transactionResidueRel(rel string) bool {
 }
 
 func embedScratchResidueRel(rel string) bool {
-	base := filepath.Base(filepath.FromSlash(strings.TrimSuffix(filepath.ToSlash(rel), "/")))
-	return hasDecimalSuffix(base, ".machinery-embed-new-", 6) || hasDecimalSuffix(base, ".machinery-embed-old-", 6)
+	clean := strings.TrimSuffix(filepath.ToSlash(rel), "/")
+	base := filepath.Base(filepath.FromSlash(clean))
+	if hasDecimalSuffix(base, ".machinery-embed-new-", 6) || hasDecimalSuffix(base, ".machinery-embed-old-", 6) {
+		return true
+	}
+	for _, component := range strings.Split(clean, "/") {
+		if strings.HasPrefix(component, ".machinery-embed-delete-") {
+			return true
+		}
+	}
+	return false
 }
 
 func hasDecimalSuffix(value, prefix string, size int) bool {
@@ -1935,12 +2186,19 @@ func (l *Lock) Refresh() error {
 	l.snapshot = now
 	if l.sourceRoot != "" {
 		prior := l.sourceRoot
+		priorCleanup := l.sourceCleanup
 		l.sourceRoot = ""
+		l.sourceCleanup = nil
 		if err := l.materializeDesignSource(); err != nil {
 			l.sourceRoot = prior
+			l.sourceCleanup = priorCleanup
 			return err
 		}
-		if err := os.RemoveAll(prior); err != nil {
+		if priorCleanup == nil {
+			return fmt.Errorf("prior immutable design source %s has no retained cleanup authority", prior)
+		}
+		if err := priorCleanup.Close(); err != nil {
+			l.retiredSourceCleanups = append(l.retiredSourceCleanups, priorCleanup)
 			return fmt.Errorf("remove prior immutable design source: %w", err)
 		}
 		return nil
@@ -1982,8 +2240,12 @@ func fingerprintRoot(rootPath string, skipGit bool) (out map[string]string, retE
 	}
 	out = map[string]string{}
 	caseFolded := map[string]string{}
-	var walk func(string) error
-	walk = func(dir string) error {
+	budget := snapshotBudget{maxEntries: snapshotInventoryMaxEntries, maxBytes: snapshotAggregateMaxBytes, maxDepth: snapshotInventoryMaxDepth}
+	var walk func(string, int) error
+	walk = func(dir string, depth int) error {
+		if err := budget.enterDirectory("design inventory directory "+filepath.ToSlash(dir), depth); err != nil {
+			return err
+		}
 		dirInfo, err := root.Lstat(dir)
 		if err != nil || !dirInfo.IsDir() || dirInfo.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("design inventory directory %s changed identity before reading", filepath.ToSlash(dir))
@@ -1992,7 +2254,7 @@ func fingerprintRoot(rootPath string, skipGit bool) (out map[string]string, retE
 		if err != nil {
 			return err
 		}
-		entries, readErr := f.ReadDir(-1)
+		entries, readErr := readSnapshotDir(f, "design inventory directory "+filepath.ToSlash(dir), &budget)
 		closeErr := f.Close()
 		if err := errors.Join(readErr, closeErr); err != nil {
 			return err
@@ -2015,10 +2277,13 @@ func fingerprintRoot(rootPath string, skipGit bool) (out map[string]string, retE
 			if err != nil {
 				return err
 			}
+			if err := budget.addFile(display, info); err != nil {
+				return err
+			}
 			switch {
 			case info.IsDir():
 				out[display+"/"] = fmt.Sprintf("dir:%o", info.Mode().Perm())
-				if err := walk(rel); err != nil {
+				if err := walk(rel, depth+1); err != nil {
 					return err
 				}
 			case info.Mode().IsRegular():
@@ -2064,7 +2329,7 @@ func fingerprintRoot(rootPath string, skipGit bool) (out map[string]string, retE
 		}
 		return nil
 	}
-	if err := walk("."); err != nil {
+	if err := walk(".", 0); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -2084,17 +2349,35 @@ func validateInventoryPath(display string, caseFolded map[string]string) error {
 
 // Release relinquishes the design snapshot lock.
 func (l *Lock) Release() error {
-	if l == nil || l.lock == nil {
+	if l == nil {
 		return nil
 	}
-	var cleanupErr error
+	var cleanupErrs []error
 	if l.sourceRoot != "" {
-		cleanupErr = os.RemoveAll(l.sourceRoot)
-		l.sourceRoot = ""
+		if l.sourceCleanup == nil {
+			cleanupErrs = append(cleanupErrs, fmt.Errorf("immutable design source %s has no retained cleanup authority", l.sourceRoot))
+		} else {
+			if err := l.sourceCleanup.Close(); err != nil {
+				cleanupErrs = append(cleanupErrs, err)
+			} else {
+				l.sourceRoot = ""
+				l.sourceCleanup = nil
+			}
+		}
 	}
-	err := errors.Join(cleanupErr, l.lock.Release())
-	l.lock = nil
-	return err
+	retained := l.retiredSourceCleanups[:0]
+	for _, cleanup := range l.retiredSourceCleanups {
+		if err := cleanup.Close(); err != nil {
+			cleanupErrs = append(cleanupErrs, err)
+			retained = append(retained, cleanup)
+		}
+	}
+	l.retiredSourceCleanups = retained
+	if l.lock != nil {
+		cleanupErrs = append(cleanupErrs, l.lock.Release())
+		l.lock = nil
+	}
+	return errors.Join(cleanupErrs...)
 }
 
 // With runs fn while holding one design snapshot.

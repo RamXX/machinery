@@ -41,6 +41,7 @@ const verifyC4OutputLimit = 1 << 20
 const (
 	structurizrTreeMaxFiles       = 10_000
 	structurizrTreeMaxBytes       = int64(1 << 30)
+	structurizrReadDirPage        = 256
 	structurizrExportMaxFileBytes = int64(64 << 20)
 	// This limit is deliberately independent of filesystem size metadata. A
 	// raced or corrupt size must never control how much ReadAll may allocate.
@@ -53,6 +54,7 @@ var verifyC4AfterJavaProbe = func(string) {}
 var verifyC4AfterExportInventory = func() {}
 var verifyC4AfterExportRead = func(string) {}
 var verifyC4BeforeFinalExportInventory = func() {}
+var structurizrFingerprintAfterOpen = func(string) {}
 
 type validatedC4Export struct {
 	info   os.FileInfo
@@ -88,13 +90,38 @@ func readC4ExportBody(file io.Reader) ([]byte, error) {
 }
 
 func readC4ExportEntries(dir *os.File) ([]fs.DirEntry, error) {
-	entries, err := dir.ReadDir(structurizrTreeMaxFiles + 1)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return nil, err
+	return readStructurizrDirEntries(dir, structurizrTreeMaxFiles, "structurizr export")
+}
+
+// readStructurizrDirEntries pages directory reads so a hostile directory can
+// never make the runtime allocate its complete inventory before the fixed
+// ceiling is enforced.
+func readStructurizrDirEntries(dir *os.File, limit int, label string) ([]fs.DirEntry, error) {
+	if limit < 0 {
+		return nil, fmt.Errorf("%s exceeds inventory bound", label)
 	}
-	if len(entries) > structurizrTreeMaxFiles {
-		return nil, fmt.Errorf("structurizr export exceeds inventory bound (%d files, maximum %d)", len(entries), structurizrTreeMaxFiles)
+	entries := make([]fs.DirEntry, 0, min(limit, structurizrReadDirPage))
+	for {
+		pageLimit := structurizrReadDirPage
+		if remaining := limit + 1 - len(entries); remaining < pageLimit {
+			pageLimit = remaining
+		}
+		if pageLimit <= 0 {
+			return nil, fmt.Errorf("%s exceeds inventory bound (%d entries maximum)", label, limit)
+		}
+		page, err := dir.ReadDir(pageLimit)
+		entries = append(entries, page...)
+		if len(entries) > limit {
+			return nil, fmt.Errorf("%s exceeds inventory bound (%d entries maximum)", label, limit)
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	return entries, nil
 }
 
@@ -113,7 +140,6 @@ func validateC4ExportInventory(output string) (_ []string, retErr error) {
 	if err := errors.Join(readErr, closeErr); err != nil {
 		return nil, err
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	if len(entries) == 0 {
 		return nil, fmt.Errorf("structurizr export produced no Mermaid view files")
 	}
@@ -199,7 +225,6 @@ func validateC4ExportInventory(output string) (_ []string, retErr error) {
 	if err := errors.Join(finalReadErr, finalCloseErr); err != nil {
 		return nil, fmt.Errorf("re-enumerate structurizr export directory: %w", err)
 	}
-	sort.Slice(finalEntries, func(i, j int) bool { return finalEntries[i].Name() < finalEntries[j].Name() })
 	if len(finalEntries) != len(names) {
 		return nil, fmt.Errorf("structurizr export inventory changed during validation: final entry count is %d, want %d", len(finalEntries), len(names))
 	}
@@ -330,12 +355,16 @@ func snapshotStructurizrExecutable(bin string) (path string, cleanup func() erro
 }
 
 func snapshotStructurizrTree(source, destination string) (retErr error) {
+	beforeDigest, err := fingerprintStructurizrTree(source)
+	if err != nil {
+		return fmt.Errorf("fingerprint structurizr distribution before snapshot: %w", err)
+	}
 	root, err := os.OpenRoot(source)
 	if err != nil {
 		return err
 	}
 	defer func() { retErr = errors.Join(retErr, root.Close()) }()
-	files := 0
+	entriesSeen := 0
 	var total int64
 	var copyDir func(string) error
 	copyDir = func(rel string) error {
@@ -343,13 +372,13 @@ func snapshotStructurizrTree(source, destination string) (retErr error) {
 		if err != nil {
 			return err
 		}
-		entries, readErr := dir.ReadDir(-1)
+		entries, readErr := readStructurizrDirEntries(dir, structurizrTreeMaxFiles-entriesSeen, "structurizr distribution")
 		closeErr := dir.Close()
 		if err := errors.Join(readErr, closeErr); err != nil {
 			return err
 		}
-		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 		for _, entry := range entries {
+			entriesSeen++
 			child := entry.Name()
 			if rel != "." {
 				child = filepath.Join(rel, child)
@@ -374,11 +403,10 @@ func snapshotStructurizrTree(source, destination string) (retErr error) {
 			if !info.Mode().IsRegular() {
 				return fmt.Errorf("structurizr distribution contains special file %s", child)
 			}
-			files++
-			total += info.Size()
-			if files > structurizrTreeMaxFiles || total > structurizrTreeMaxBytes {
+			if info.Size() < 0 || info.Size() > structurizrTreeMaxBytes-total {
 				return fmt.Errorf("structurizr distribution exceeds snapshot bound (%d files, %d bytes)", structurizrTreeMaxFiles, structurizrTreeMaxBytes)
 			}
+			total += info.Size()
 			src, err := root.Open(child)
 			if err != nil {
 				return err
@@ -388,12 +416,13 @@ func snapshotStructurizrTree(source, destination string) (retErr error) {
 				return errors.Join(statErr, fmt.Errorf("structurizr distribution file %s changed identity while opening", child), src.Close())
 			}
 			body, readErr := io.ReadAll(io.LimitReader(src, info.Size()+1))
+			heldAfter, heldErr := src.Stat()
 			closeErr := src.Close()
 			after, finalErr := root.Lstat(child)
-			if err := errors.Join(readErr, closeErr, finalErr); err != nil {
+			if err := errors.Join(readErr, heldErr, closeErr, finalErr); err != nil {
 				return err
 			}
-			if int64(len(body)) != info.Size() || !os.SameFile(info, after) {
+			if int64(len(body)) != info.Size() || !sameStructurizrTreeInfo(info, heldAfter) || !sameStructurizrTreeInfo(info, after) {
 				return fmt.Errorf("structurizr distribution file %s changed while snapshotting", child)
 			}
 			mode := os.FileMode(0o600)
@@ -406,7 +435,25 @@ func snapshotStructurizrTree(source, destination string) (retErr error) {
 		}
 		return nil
 	}
-	return copyDir(".")
+	if err := copyDir("."); err != nil {
+		return err
+	}
+	afterDigest, err := fingerprintStructurizrTree(source)
+	if err != nil {
+		return fmt.Errorf("fingerprint structurizr distribution after snapshot: %w", err)
+	}
+	snapshotDigest, err := fingerprintStructurizrTree(destination)
+	if err != nil {
+		return fmt.Errorf("fingerprint structurizr snapshot: %w", err)
+	}
+	if beforeDigest != afterDigest || beforeDigest != snapshotDigest {
+		return fmt.Errorf("structurizr distribution changed while snapshotting")
+	}
+	return nil
+}
+
+func sameStructurizrTreeInfo(before, after os.FileInfo) bool {
+	return before != nil && after != nil && os.SameFile(before, after) && before.Mode() == after.Mode() && before.Size() == after.Size() && before.ModTime().Equal(after.ModTime())
 }
 
 func fingerprintStructurizrTree(rootPath string) (result [sha256.Size]byte, retErr error) {
@@ -417,18 +464,18 @@ func fingerprintStructurizrTree(rootPath string) (result [sha256.Size]byte, retE
 	}
 	defer func() { retErr = errors.Join(retErr, root.Close()) }()
 	var names []string
+	infos := make(map[string]os.FileInfo)
 	var collect func(string) error
 	collect = func(rel string) error {
 		dir, err := root.Open(rel)
 		if err != nil {
 			return err
 		}
-		entries, readErr := dir.ReadDir(-1)
+		entries, readErr := readStructurizrDirEntries(dir, structurizrTreeMaxFiles-len(names), "structurizr snapshot")
 		closeErr := dir.Close()
 		if err := errors.Join(readErr, closeErr); err != nil {
 			return err
 		}
-		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 		for _, entry := range entries {
 			name := entry.Name()
 			if rel != "." {
@@ -439,6 +486,10 @@ func fingerprintStructurizrTree(rootPath string) (result [sha256.Size]byte, retE
 			if err != nil {
 				return err
 			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				return fmt.Errorf("structurizr snapshot contains symlink %s", filepath.ToSlash(name))
+			}
+			infos[name] = info
 			if info.IsDir() {
 				if err := collect(name); err != nil {
 					return err
@@ -450,19 +501,13 @@ func fingerprintStructurizrTree(rootPath string) (result [sha256.Size]byte, retE
 	if err := collect("."); err != nil {
 		return zero, err
 	}
-	if len(names) > structurizrTreeMaxFiles {
-		return zero, fmt.Errorf("structurizr snapshot has %d entries; limit is %d", len(names), structurizrTreeMaxFiles)
-	}
 	hash := sha256.New()
 	var total int64
 	for _, name := range names {
 		if filepath.Clean(name) == ".machinery-structurizr-receipt" {
 			continue
 		}
-		info, err := root.Lstat(name)
-		if err != nil {
-			return zero, err
-		}
+		info := infos[name]
 		logical := filepath.ToSlash(name)
 		if info.IsDir() {
 			_, _ = fmt.Fprintf(hash, "d\x00%s\x00", logical)
@@ -471,10 +516,10 @@ func fingerprintStructurizrTree(rootPath string) (result [sha256.Size]byte, retE
 		if !info.Mode().IsRegular() {
 			return zero, fmt.Errorf("structurizr snapshot contains special entry %s", logical)
 		}
-		total += info.Size()
-		if total > structurizrTreeMaxBytes {
+		if info.Size() < 0 || info.Size() > structurizrTreeMaxBytes-total {
 			return zero, fmt.Errorf("structurizr snapshot exceeds %d bytes", structurizrTreeMaxBytes)
 		}
+		total += info.Size()
 		file, err := root.Open(name)
 		if err != nil {
 			return zero, err
@@ -483,10 +528,57 @@ func fingerprintStructurizrTree(rootPath string) (result [sha256.Size]byte, retE
 		if statErr != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
 			return zero, errors.Join(statErr, fmt.Errorf("structurizr snapshot entry %s changed identity", logical), file.Close())
 		}
+		structurizrFingerprintAfterOpen(name)
 		_, _ = fmt.Fprintf(hash, "f\x00%s\x00%d\x00%t\x00", logical, info.Size(), info.Mode()&0o111 != 0)
-		_, copyErr := io.Copy(hash, file)
-		if err := errors.Join(copyErr, file.Close()); err != nil {
+		written, copyErr := io.Copy(hash, io.LimitReader(file, info.Size()+1))
+		heldAfter, heldErr := file.Stat()
+		liveAfter, liveErr := root.Lstat(name)
+		if err := errors.Join(copyErr, heldErr, liveErr, file.Close()); err != nil {
 			return zero, err
+		}
+		if written != info.Size() || !sameStructurizrTreeInfo(info, heldAfter) || !sameStructurizrTreeInfo(info, liveAfter) {
+			return zero, fmt.Errorf("structurizr snapshot entry %s changed while hashing", logical)
+		}
+	}
+	finalNames := make([]string, 0, len(names))
+	var revalidate func(string) error
+	revalidate = func(rel string) error {
+		dir, err := root.Open(rel)
+		if err != nil {
+			return err
+		}
+		entries, readErr := readStructurizrDirEntries(dir, structurizrTreeMaxFiles-len(finalNames), "structurizr snapshot revalidation")
+		closeErr := dir.Close()
+		if err := errors.Join(readErr, closeErr); err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			name := entry.Name()
+			if rel != "." {
+				name = filepath.Join(rel, name)
+			}
+			finalNames = append(finalNames, name)
+			info, err := root.Lstat(name)
+			if err != nil || !sameStructurizrTreeInfo(infos[name], info) {
+				return errors.Join(err, fmt.Errorf("structurizr snapshot inventory changed at %s", filepath.ToSlash(name)))
+			}
+			if info.IsDir() {
+				if err := revalidate(name); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	if err := revalidate("."); err != nil {
+		return zero, err
+	}
+	if len(finalNames) != len(names) {
+		return zero, fmt.Errorf("structurizr snapshot inventory changed while hashing")
+	}
+	for i := range names {
+		if names[i] != finalNames[i] {
+			return zero, fmt.Errorf("structurizr snapshot inventory changed while hashing")
 		}
 	}
 	copy(result[:], hash.Sum(nil))

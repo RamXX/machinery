@@ -27,8 +27,15 @@ func CheckFinalHandoff(design string) *Gate {
 	} else {
 		g.Count("required phase artifacts")
 	}
-	modelSources := sortedGlobExt(design, ".modelith.yaml")
-	modelSources = append(modelSources, sortedGlobExt(filepath.Join(design, "legacy"), ".modelith.yaml")...)
+	modelSources, err := sortedGlobExt(design, ".modelith.yaml")
+	if err != nil {
+		g.Errs = append(g.Errs, err.Error())
+	}
+	legacySources, err := sortedGlobExt(filepath.Join(design, "legacy"), ".modelith.yaml")
+	if err != nil {
+		g.Errs = append(g.Errs, err.Error())
+	}
+	modelSources = append(modelSources, legacySources...)
 	for _, source := range modelSources {
 		render := strings.TrimSuffix(source, ".yaml") + ".md"
 		fi, err := os.Stat(render)

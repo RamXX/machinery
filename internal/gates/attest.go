@@ -74,7 +74,8 @@ type attestClaim struct {
 	what string
 	// owed reports whether this design has reached the phase that owes the
 	// claim; "" from owedBy means the claim is never owed on its own.
-	owed func(design string) bool
+	owed        func(design string) bool
+	owedChecked func(design string) (bool, error)
 	// owedBy names the artifact in the coverage finding.
 	owedBy string
 }
@@ -159,10 +160,11 @@ var attestVocabulary = []attestClaim{
 		owedBy: "BUILD.md",
 	},
 	{
-		id:     "g4.standin-coverage",
-		what:   "isolated child only: the neighbor stand-in section exists, every neighboring boundary has a stand-in held to its oracle, and the environment recipe is self-contained",
-		owed:   declaresNeighborStandIns,
-		owedBy: "the BUILD.md 'Neighbor stand-ins' section",
+		id:          "g4.standin-coverage",
+		what:        "isolated child only: the neighbor stand-in section exists, every neighboring boundary has a stand-in held to its oracle, and the environment recipe is self-contained",
+		owed:        declaresNeighborStandInsConservative,
+		owedChecked: declaresNeighborStandIns,
+		owedBy:      "the BUILD.md 'Neighbor stand-ins' section",
 	},
 	{
 		id:     "g4.pack-event-discipline",
@@ -218,6 +220,12 @@ func AttestationOwed(design string) bool {
 		if claim.owed != nil && claim.owed(design) {
 			return true
 		}
+		if claim.owedChecked != nil {
+			owed, err := claim.owedChecked(design)
+			if err != nil || owed {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -227,7 +235,7 @@ func AttestationOwed(design string) bool {
 // computed: the gate compares against it and `machinery attest` prints it, so
 // an attestor never hand-rolls the value the gate will demand.
 func ContentHash(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	data, err := readRegularFile(path)
 	if err != nil {
 		return "", err
 	}
@@ -246,15 +254,24 @@ func hasArchitectureDoc(design string) bool {
 // isolated delivery posture, which is what makes the stand-in claim owed. A
 // full-environment child owes nothing here, so keying the obligation on the
 // section is keying it on the posture itself.
-func declaresNeighborStandIns(design string) bool {
+func declaresNeighborStandIns(design string) (bool, error) {
 	paths := []string{filepath.Join(design, "BUILD.md")}
-	paths = append(paths, sortedGlobExt(filepath.Join(design, "BUILD"), ".md")...)
+	shards, err := sortedGlobExt(filepath.Join(design, "BUILD"), ".md")
+	if err != nil {
+		return false, err
+	}
+	paths = append(paths, shards...)
 	for _, p := range paths {
 		if strings.Contains(strings.ToLower(readDesignOrEmpty(design, p)), "neighbor stand-ins") {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
+}
+
+func declaresNeighborStandInsConservative(design string) bool {
+	declared, err := declaresNeighborStandIns(design)
+	return err != nil || declared
 }
 
 // attestRow is one parsed attestation.
@@ -343,7 +360,7 @@ func attestationRequiredPaths(g *Gate, design, claim string) []string {
 			out = append(out, filepath.ToSlash(rel))
 		}
 	case claim == "g4.pack-event-discipline":
-		err := filepath.Walk(filepath.Join(design, "pack"), func(path string, fi os.FileInfo, err error) error {
+		err := walkTreeBounded(filepath.Join(design, "pack"), func(path string, fi os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -565,7 +582,16 @@ func checkAttestationFreshness(g *Gate, design string, row attestRow) {
 // the remaining coverage warnings to errors at final handoff.
 func checkAttestationCoverage(g *Gate, design string, attested map[string]bool) {
 	for _, claim := range attestVocabulary {
-		if claim.owed == nil || !claim.owed(design) {
+		owed := claim.owed != nil && claim.owed(design)
+		if claim.owedChecked != nil {
+			checkedOwed, err := claim.owedChecked(design)
+			if err != nil {
+				g.Errs = append(g.Errs, "cannot determine whether "+claim.id+" is owed: "+err.Error())
+				continue
+			}
+			owed = checkedOwed
+		}
+		if !owed {
 			continue
 		}
 		g.Count("claims owed")

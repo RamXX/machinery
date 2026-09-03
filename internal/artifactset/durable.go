@@ -16,31 +16,39 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/filelock"
+	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/portablepath"
 )
 
 const (
-	txPrefix       = ".machinery-artifact-"
-	txNewPrefix    = txPrefix + "new-"
-	txOldPrefix    = txPrefix + "old-"
-	txJournalName  = txPrefix + "set.journal"
-	txRecoveryName = txPrefix + "set.recovery"
-	txRetiredName  = txPrefix + "set.retired"
-	txStagePrefix  = txPrefix + "journal-stage-"
-	txVersion      = 2
-	txPrepared     = "prepared"
-	txCommitted    = "committed"
-	txMaxJournal   = 16 << 20
-	txMaxItemCount = 100_000
+	txPrefix                              = ".machinery-artifact-"
+	txNewPrefix                           = txPrefix + "new-"
+	txOldPrefix                           = txPrefix + "old-"
+	txJournalName                         = txPrefix + "set.journal"
+	txRecoveryName                        = txPrefix + "set.recovery"
+	txRetiredName                         = txPrefix + "set.retired"
+	txStagePrefix                         = txPrefix + "journal-stage-"
+	txJournalUpdateQuarantinePrefix       = txPrefix + "journal-update-quarantine-"
+	txJournalQuarantinePrefix             = txPrefix + "journal-quarantine-"
+	txObjectQuarantinePrefix              = txPrefix + "object-quarantine-"
+	txVersion                             = 2
+	txPrepared                            = "prepared"
+	txCommitted                           = "committed"
+	txMaxJournal                          = 16 << 20
+	txMaxItemCount                        = 100_000
+	txMaxFileBytes                  int64 = 64 << 20
+	txMaxDirEntries                       = txMaxItemCount*4 + 16
+	txDirPageSize                         = 256
 )
 
 type txOps struct {
-	root        *os.Root
-	syncFile    *os.File
-	acquire     func(string) (txLocker, error)
-	renameHook  func(string, string) error
-	syncObserve func(string)
-	faultAfter  func(string) error
+	root          *os.Root
+	syncFile      *os.File
+	acquire       func(string) (txLocker, error)
+	renameHook    func(string, string) error
+	hashAfterOpen func(string) error
+	syncObserve   func(string)
+	faultAfter    func(string) error
 }
 
 type txLocker interface {
@@ -93,12 +101,15 @@ type txSnapshot struct {
 }
 
 type txInventory struct {
-	journal  bool
-	recovery bool
-	retired  bool
-	stages   []string
-	temps    []string
-	backups  []string
+	journal            bool
+	recovery           bool
+	retired            bool
+	stages             []string
+	temps              []string
+	backups            []string
+	journalUpdates     []string
+	journalQuarantines []string
+	objectQuarantines  []string
 }
 
 type txJournalAuthority struct {
@@ -349,6 +360,9 @@ func txValidateTargets(ops txOps, files map[string][]byte) ([]string, error) {
 }
 
 func txValidateReconcileTargets(ops txOps, files map[string][]byte, remove []string) ([]string, map[string]bool, error) {
+	if len(files) > txMaxItemCount || len(remove) > txMaxItemCount-len(files) {
+		return nil, nil, fmt.Errorf("artifact transaction exceeds %d-item limit", txMaxItemCount)
+	}
 	names := make([]string, 0, len(files)+len(remove))
 	deletes := make(map[string]bool, len(remove))
 	for name := range files {
@@ -551,8 +565,65 @@ func txPersistJournal(dir string, journal txJournal, ops txOps) (installed bool,
 	if err != nil {
 		return false, fmt.Errorf("close journal stage: %w", err)
 	}
-	if err := ops.root.Rename(stageName, txJournalName); err != nil {
-		return false, fmt.Errorf("install transaction journal: %w", err)
+	staged, err := txSnapshotPath(stageName, "completed journal stage "+stageName, ops)
+	if err != nil {
+		return false, err
+	}
+	if !staged.exists || staged.hash != txHash(body) || staged.identity != txStableFileID(created) {
+		return false, fmt.Errorf("completed journal stage changed before installation")
+	}
+	var previous *fsatomic.Quarantined
+	var previousSnapshot txSnapshot
+	if journal.Phase == txCommitted {
+		current, readErr := txReadJournal(txJournalName, ops)
+		if readErr != nil {
+			return false, fmt.Errorf("read prepared journal before committed update: %w", readErr)
+		}
+		if current.journal.Phase != txPrepared || !txSameJournalTransaction(current.journal, journal) {
+			return false, fmt.Errorf("prepared journal does not authorize committed update")
+		}
+		previousSnapshot = current.snapshot
+		previous, err = fsatomic.Quarantine(ops.root, txJournalName, txJournalUpdateQuarantinePrefix)
+		if err != nil {
+			return false, fmt.Errorf("isolate prepared journal for committed update: %w", err)
+		}
+		if err := txSyncHeld(ops.syncFile); err != nil {
+			return false, errors.Join(err, previous.Close())
+		}
+		qops := ops
+		qops.root = previous.Root()
+		isolated, readErr := txReadJournal(previous.Name(), qops)
+		if readErr != nil || !txSameMovedSnapshot(previousSnapshot, isolated.snapshot) {
+			restoreErr := previous.Restore()
+			return false, errors.Join(fmt.Errorf("prepared journal changed at update isolation boundary"), readErr, restoreErr, previous.Close())
+		}
+		previousSnapshot = isolated.snapshot
+		if err := txPoint(ops, "journal-update-isolated"); err != nil {
+			return false, errors.Join(err, previous.Close())
+		}
+	}
+	if ops.renameHook != nil {
+		if err := ops.renameHook(stageName, txJournalName); err != nil {
+			var restoreErr error
+			if previous != nil {
+				restoreErr = previous.Restore()
+			}
+			return false, errors.Join(fmt.Errorf("journal install hook for %s to %s: %w", stageName, txJournalName, err), restoreErr, closeQuarantine(previous))
+		}
+	}
+	if err := txValidateSnapshot(stageName, "journal stage at installation boundary", staged, ops); err != nil {
+		var restoreErr error
+		if previous != nil {
+			restoreErr = previous.Restore()
+		}
+		return false, errors.Join(err, restoreErr, closeQuarantine(previous))
+	}
+	if err := fsatomic.RenameNoReplace(ops.root, stageName, txJournalName); err != nil {
+		var restoreErr error
+		if previous != nil {
+			restoreErr = previous.Restore()
+		}
+		return false, errors.Join(fmt.Errorf("install transaction journal: %w", err), restoreErr, closeQuarantine(previous))
 	}
 	ok = true
 	if err := txSyncHeld(ops.syncFile); err != nil {
@@ -561,7 +632,43 @@ func txPersistJournal(dir string, journal txJournal, ops txOps) (installed bool,
 	if ops.syncObserve != nil {
 		ops.syncObserve(dir)
 	}
+	installedJournal, err := txReadJournal(txJournalName, ops)
+	if err != nil || installedJournal.snapshot.hash != staged.hash || installedJournal.snapshot.identity != staged.identity {
+		return true, errors.Join(fmt.Errorf("installed transaction journal changed at publication boundary"), err, closeQuarantine(previous))
+	}
+	if previous != nil {
+		if err := txPoint(ops, "journal-update-installed"); err != nil {
+			return true, errors.Join(err, previous.Close())
+		}
+		qops := ops
+		qops.root = previous.Root()
+		if err := txValidateSnapshot(previous.Name(), "isolated prepared journal before retirement", previousSnapshot, qops); err != nil {
+			return true, errors.Join(err, previous.Close())
+		}
+		if err := previous.Remove(); err != nil {
+			return true, errors.Join(err, previous.Close())
+		}
+		if err := txSyncHeld(ops.syncFile); err != nil {
+			return true, err
+		}
+	}
 	return true, nil
+}
+
+func closeQuarantine(quarantine *fsatomic.Quarantined) error {
+	if quarantine == nil {
+		return nil
+	}
+	return quarantine.Close()
+}
+
+func txSameJournalTransaction(left, right txJournal) bool {
+	return left.Version == right.Version && reflect.DeepEqual(left.Items, right.Items)
+}
+
+func txSameMovedSnapshot(before, after txSnapshot) bool {
+	return before.exists && after.exists && before.hash == after.hash && before.identity != "" && before.identity == after.identity &&
+		before.info != nil && after.info != nil && before.info.Mode() == after.info.Mode() && before.info.Size() == after.info.Size() && before.info.ModTime().Equal(after.info.ModTime())
 }
 
 func txEncode(journal txJournal) ([]byte, error) {
@@ -683,6 +790,63 @@ func txRecover(dir string, ops txOps) error {
 	if err != nil {
 		return err
 	}
+	if len(inv.journalUpdates) != 0 {
+		if len(inv.journalUpdates) != 1 {
+			return fmt.Errorf("transaction has ambiguous journal-update quarantine topology")
+		}
+		if err := txRecoverJournalUpdate(dir, inv.journalUpdates[0], inv, ops); err != nil {
+			return fmt.Errorf("resume committed-journal update: %w", err)
+		}
+		inv, err = txInspect(ops)
+		if err != nil {
+			return err
+		}
+	}
+	for _, name := range inv.objectQuarantines {
+		if err := txRestoreObjectQuarantine(dir, name, ops); err != nil {
+			return fmt.Errorf("resume artifact object quarantine: %w", err)
+		}
+	}
+	if len(inv.objectQuarantines) != 0 {
+		inv, err = txInspect(ops)
+		if err != nil {
+			return err
+		}
+	}
+	if len(inv.journalQuarantines) != 0 {
+		if len(inv.journalQuarantines) != 1 {
+			return fmt.Errorf("transaction has ambiguous completed-journal quarantine topology")
+		}
+		quarantine, err := fsatomic.ResumeQuarantine(ops.root, inv.journalQuarantines[0], "")
+		if err != nil {
+			return err
+		}
+		if quarantine.Source() != txRetiredName {
+			return errors.Join(fmt.Errorf("transaction quarantine records unexpected source %q", quarantine.Source()), quarantine.Close())
+		}
+		_, objectErr := quarantine.Root().Lstat(quarantine.Name())
+		if os.IsNotExist(objectErr) {
+			if err := quarantine.FinishEmpty(); err != nil {
+				return errors.Join(err, quarantine.Close())
+			}
+			if err := txSyncHeld(ops.syncFile); err != nil {
+				return err
+			}
+		} else if objectErr != nil {
+			return errors.Join(objectErr, quarantine.Close())
+		} else {
+			if inv.journal || inv.recovery || inv.retired || len(inv.stages) != 0 || len(inv.temps) != 0 || len(inv.backups) != 0 {
+				return errors.Join(fmt.Errorf("transaction has ambiguous completed-journal quarantine topology"), quarantine.Close())
+			}
+			if err := txRemoveOpenRecoveredJournalQuarantine(dir, quarantine, ops); err != nil {
+				return fmt.Errorf("resume completed-journal quarantine cleanup: %w", err)
+			}
+		}
+		inv, err = txInspect(ops)
+		if err != nil {
+			return err
+		}
+	}
 	authorities := 0
 	for _, exists := range []bool{inv.journal, inv.recovery, inv.retired} {
 		if exists {
@@ -727,6 +891,60 @@ func txRecover(dir string, ops txOps) error {
 	return txFinalize(dir, authority, states, ops)
 }
 
+func txRecoverJournalUpdate(dir, name string, inv txInventory, ops txOps) error {
+	quarantine, err := fsatomic.ResumeQuarantine(ops.root, name, txJournalName)
+	if err != nil {
+		return err
+	}
+	if _, err := quarantine.Root().Lstat(quarantine.Name()); os.IsNotExist(err) {
+		if !inv.journal || inv.recovery || inv.retired {
+			return errors.Join(fmt.Errorf("empty journal-update quarantine lacks one live committed journal"), quarantine.Close())
+		}
+		live, readErr := txReadJournal(txJournalName, ops)
+		if readErr != nil || live.journal.Phase != txCommitted {
+			return errors.Join(fmt.Errorf("empty journal-update quarantine live journal is not committed"), readErr, quarantine.Close())
+		}
+		if err := quarantine.FinishEmpty(); err != nil {
+			return errors.Join(err, quarantine.Close())
+		}
+		return txSyncHeld(ops.syncFile)
+	} else if err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	qops := ops
+	qops.root = quarantine.Root()
+	prepared, err := txReadJournal(quarantine.Name(), qops)
+	if err != nil || prepared.journal.Phase != txPrepared {
+		return errors.Join(fmt.Errorf("journal-update quarantine does not contain a prepared journal"), err, quarantine.Close())
+	}
+	if inv.recovery || inv.retired {
+		return errors.Join(fmt.Errorf("journal-update quarantine overlaps another journal authority"), quarantine.Close())
+	}
+	if !inv.journal {
+		if err := quarantine.Restore(); err != nil {
+			return errors.Join(err, quarantine.Close())
+		}
+		if err := txSyncHeld(ops.syncFile); err != nil {
+			return err
+		}
+		if ops.syncObserve != nil {
+			ops.syncObserve(dir)
+		}
+		return nil
+	}
+	live, err := txReadJournal(txJournalName, ops)
+	if err != nil || live.journal.Phase != txCommitted || !txSameJournalTransaction(prepared.journal, live.journal) {
+		return errors.Join(fmt.Errorf("live journal does not complete the isolated prepared transaction"), err, quarantine.Close())
+	}
+	if err := txValidateSnapshot(quarantine.Name(), "isolated prepared journal before resumed retirement", prepared.snapshot, qops); err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	if err := quarantine.Remove(); err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	return txSyncHeld(ops.syncFile)
+}
+
 func txInspect(ops txOps) (txInventory, error) {
 	entries, err := txReadDir(ops)
 	if err != nil {
@@ -747,6 +965,19 @@ func txInspect(ops txOps) (txInventory, error) {
 		info, err := ops.root.Lstat(name)
 		if err != nil {
 			return txInventory{}, fmt.Errorf("inspect reserved transaction path %q: %w", name, err)
+		}
+		if txValidQuarantineName(name, txJournalUpdateQuarantinePrefix) || txValidQuarantineName(name, txJournalQuarantinePrefix) || txValidQuarantineName(name, txObjectQuarantinePrefix) {
+			if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+				return txInventory{}, fmt.Errorf("reserved transaction quarantine %q must be a real directory", name)
+			}
+			if txValidQuarantineName(name, txJournalUpdateQuarantinePrefix) {
+				inv.journalUpdates = append(inv.journalUpdates, name)
+			} else if txValidQuarantineName(name, txJournalQuarantinePrefix) {
+				inv.journalQuarantines = append(inv.journalQuarantines, name)
+			} else {
+				inv.objectQuarantines = append(inv.objectQuarantines, name)
+			}
+			continue
 		}
 		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 			return txInventory{}, fmt.Errorf("reserved transaction path %q must be a regular file, not a symlink or special file", name)
@@ -771,7 +1002,14 @@ func txInspect(ops txOps) (txInventory, error) {
 	sort.Strings(inv.stages)
 	sort.Strings(inv.temps)
 	sort.Strings(inv.backups)
+	sort.Strings(inv.journalUpdates)
+	sort.Strings(inv.journalQuarantines)
+	sort.Strings(inv.objectQuarantines)
 	return inv, nil
+}
+
+func txValidQuarantineName(name, prefix string) bool {
+	return strings.HasPrefix(name, prefix) && len(name) > len(prefix)
 }
 
 func txReadJournal(path string, ops txOps) (txJournalAuthority, error) {
@@ -864,7 +1102,7 @@ func txBeginJournalAuthority(dir string, ops txOps) (txJournalAuthority, error) 
 	if destination.exists {
 		return txJournalAuthority{}, fmt.Errorf("recovery journal destination already exists")
 	}
-	if err := txRenameSnapshots(dir, txJournalName, txRecoveryName, authority.snapshot, destination, ops); err != nil {
+	if err := txRenameNoReplaceSnapshots(dir, txJournalName, txRecoveryName, authority.snapshot, destination, ops); err != nil {
 		return txJournalAuthority{}, fmt.Errorf("isolate parsed transaction journal: %w", err)
 	}
 	if err := txPoint(ops, "journal-isolated"); err != nil {
@@ -1143,7 +1381,7 @@ func txFinish(dir string, authority txJournalAuthority, ops txOps) error {
 		if retired.exists {
 			return fmt.Errorf("retired journal destination already exists")
 		}
-		if err := txRenameSnapshots(dir, authority.name, txRetiredName, authority.snapshot, retired, ops); err != nil {
+		if err := txRenameNoReplaceSnapshots(dir, authority.name, txRetiredName, authority.snapshot, retired, ops); err != nil {
 			return fmt.Errorf("retire completed journal authority: %w", err)
 		}
 		if err := txPoint(ops, "journal-retired"); err != nil {
@@ -1161,13 +1399,113 @@ func txFinish(dir string, authority txJournalAuthority, ops txOps) error {
 		}
 		authority = retiredAuthority
 	}
-	if err := txRemoveSnapshot(dir, authority.name, "completed journal authority", authority.snapshot, ops); err != nil {
+	if err := txQuarantineAndRemoveJournal(dir, authority, ops); err != nil {
 		return fmt.Errorf("remove completed journal authority: %w", err)
 	}
 	if err := txPoint(ops, "journal-cleanup"); err != nil {
 		return err
 	}
 	return nil
+}
+
+func txQuarantineAndRemoveJournal(dir string, authority txJournalAuthority, ops txOps) error {
+	if err := txValidateJournalAuthority(authority, ops); err != nil {
+		return err
+	}
+	quarantine, err := fsatomic.Quarantine(ops.root, authority.name, txJournalQuarantinePrefix)
+	if err != nil {
+		return err
+	}
+	if err := txSyncHeld(ops.syncFile); err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	if ops.syncObserve != nil {
+		ops.syncObserve(dir)
+	}
+	if err := txPoint(ops, "journal-quarantined"); err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	return txRemoveOpenJournalQuarantine(dir, quarantine, authority.snapshot, ops)
+}
+
+func txRemoveOpenRecoveredJournalQuarantine(dir string, quarantine *fsatomic.Quarantined, ops txOps) error {
+	qops := ops
+	qops.root = quarantine.Root()
+	authority, err := txReadJournal(quarantine.Name(), qops)
+	if err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	return txRemoveOpenJournalQuarantine(dir, quarantine, authority.snapshot, ops)
+}
+
+func txRestoreObjectQuarantine(dir, name string, ops txOps) error {
+	quarantine, err := fsatomic.ResumeQuarantine(ops.root, name, "")
+	if err != nil {
+		return err
+	}
+	source := quarantine.Source()
+	if filepath.Base(source) != source || source == "" || source == "." {
+		return errors.Join(fmt.Errorf("artifact object quarantine records unsafe source %q", source), quarantine.Close())
+	}
+	_, objectErr := quarantine.Root().Lstat(quarantine.Name())
+	if os.IsNotExist(objectErr) {
+		if err := quarantine.FinishEmpty(); err != nil {
+			return errors.Join(err, quarantine.Close())
+		}
+		return txSyncHeld(ops.syncFile)
+	}
+	if objectErr != nil {
+		return errors.Join(objectErr, quarantine.Close())
+	}
+	qops := ops
+	qops.root = quarantine.Root()
+	if _, err := txSnapshotPath(quarantine.Name(), "quarantined artifact object", qops); err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	if _, err := ops.root.Lstat(source); err == nil {
+		return errors.Join(fmt.Errorf("artifact object quarantine source %s was repopulated; preserving both", source), quarantine.Close())
+	} else if !os.IsNotExist(err) {
+		return errors.Join(err, quarantine.Close())
+	}
+	if err := quarantine.Restore(); err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	if err := txSyncHeld(ops.syncFile); err != nil {
+		return err
+	}
+	if ops.syncObserve != nil {
+		ops.syncObserve(dir)
+	}
+	return nil
+}
+
+func txRemoveOpenJournalQuarantine(dir string, quarantine *fsatomic.Quarantined, expected txSnapshot, ops txOps) error {
+	qops := ops
+	qops.root = quarantine.Root()
+	qsync, err := txOpenSyncRoot(quarantine.Root())
+	if err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	qops.syncFile = qsync
+	current, err := txSnapshotPath(quarantine.Name(), "quarantined completed journal authority", qops)
+	if err != nil || current.hash != expected.hash || current.identity != expected.identity || current.info == nil || expected.info == nil ||
+		current.info.Mode() != expected.info.Mode() || current.info.Size() != expected.info.Size() || !current.info.ModTime().Equal(expected.info.ModTime()) {
+		return errors.Join(fmt.Errorf("quarantined completed journal differs from its bound authority"), err, qsync.Close(), quarantine.Close())
+	}
+	if err := txPoint(ops, "journal-quarantine-delete"); err != nil {
+		return errors.Join(err, qsync.Close(), quarantine.Close())
+	}
+	if err := txValidateSnapshot(quarantine.Name(), "quarantined completed journal authority", current, qops); err != nil {
+		return errors.Join(fmt.Errorf("quarantined completed journal changed at deletion boundary; preserving it: %w", err), qsync.Close(), quarantine.Close())
+	}
+	removeErr := quarantine.Remove()
+	privateSyncErr := txSyncHeld(qsync)
+	privateCloseErr := qsync.Close()
+	parentSyncErr := txSyncHeld(ops.syncFile)
+	if ops.syncObserve != nil {
+		ops.syncObserve(dir)
+	}
+	return errors.Join(removeErr, privateSyncErr, privateCloseErr, parentSyncErr)
 }
 
 func txSnapshotPath(path, label string, ops txOps) (txSnapshot, error) {
@@ -1235,6 +1573,9 @@ func txHashPath(path, label string, ops txOps) (string, bool, error) {
 	if before.Mode()&os.ModeSymlink != 0 || !before.Mode().IsRegular() {
 		return "", false, fmt.Errorf("%s must be a regular file, not a symlink or special file", label)
 	}
+	if before.Size() < 0 || before.Size() > txMaxFileBytes {
+		return "", false, fmt.Errorf("%s exceeds %d-byte transaction file limit", label, txMaxFileBytes)
+	}
 	f, err := ops.root.Open(name)
 	if err != nil {
 		return "", false, fmt.Errorf("open %s: %w", label, err)
@@ -1248,14 +1589,25 @@ func txHashPath(path, label string, ops txOps) (string, bool, error) {
 		_ = f.Close()
 		return "", false, fmt.Errorf("%s changed identity while opening", label)
 	}
-	hasher := sha256.New()
-	_, copyErr := io.Copy(hasher, f)
-	closeErr := f.Close()
-	if copyErr != nil {
-		return "", false, fmt.Errorf("hash %s: %w", label, copyErr)
+	if ops.hashAfterOpen != nil {
+		if err := ops.hashAfterOpen(name); err != nil {
+			return "", false, errors.Join(err, f.Close())
+		}
 	}
-	if closeErr != nil {
-		return "", false, fmt.Errorf("close %s: %w", label, closeErr)
+	hasher := sha256.New()
+	written, copyErr := io.Copy(hasher, io.LimitReader(f, before.Size()+1))
+	openedAfter, afterStatErr := f.Stat()
+	closeErr := f.Close()
+	pathAfter, pathErr := ops.root.Lstat(name)
+	if err := errors.Join(copyErr, afterStatErr, closeErr, pathErr); err != nil {
+		return "", false, fmt.Errorf("hash %s: %w", label, err)
+	}
+	if written != before.Size() || !os.SameFile(before, openedAfter) || !os.SameFile(before, pathAfter) ||
+		before.Mode() != openedAfter.Mode() || before.Mode() != pathAfter.Mode() ||
+		before.Size() != openedAfter.Size() || before.Size() != pathAfter.Size() ||
+		!before.ModTime().Equal(openedAfter.ModTime()) || !before.ModTime().Equal(pathAfter.ModTime()) ||
+		txChangeID(before) != txChangeID(openedAfter) || txChangeID(before) != txChangeID(pathAfter) {
+		return "", false, fmt.Errorf("%s changed identity, size, or metadata while hashing", label)
 	}
 	return "sha256:" + hex.EncodeToString(hasher.Sum(nil)), true, nil
 }
@@ -1386,10 +1738,33 @@ func txRenameSnapshots(dir, oldPath, newPath string, oldSnapshot, newSnapshot tx
 	return txRenameApplied(dir, oldPath, newPath, ops)
 }
 
+func txRenameNoReplaceSnapshots(dir, oldPath, newPath string, oldSnapshot, newSnapshot txSnapshot, ops txOps) error {
+	if ops.renameHook != nil {
+		if err := ops.renameHook(oldPath, newPath); err != nil {
+			return fmt.Errorf("rename hook for %s to %s: %w", oldPath, newPath, err)
+		}
+	}
+	if err := txValidateSnapshot(oldPath, "no-replace rename source "+oldPath, oldSnapshot, ops); err != nil {
+		return err
+	}
+	if err := txValidateSnapshot(newPath, "no-replace rename destination "+newPath, newSnapshot, ops); err != nil {
+		return err
+	}
+	if err := fsatomic.RenameNoReplace(ops.root, oldPath, newPath); err != nil {
+		return fmt.Errorf("rename %s to %s without replacement: %w", filepath.Base(oldPath), filepath.Base(newPath), err)
+	}
+	if err := txSyncHeld(ops.syncFile); err != nil {
+		return fmt.Errorf("sync directory after no-replace rename: %w", err)
+	}
+	if ops.syncObserve != nil {
+		ops.syncObserve(dir)
+	}
+	return nil
+}
+
 func txRenameApplied(dir, oldPath, newPath string, ops txOps) error {
-	oldName, newName := oldPath, newPath
-	if err := ops.root.Rename(oldName, newName); err != nil {
-		return fmt.Errorf("rename %s to %s: %w", filepath.Base(oldPath), filepath.Base(newPath), err)
+	if err := fsatomic.RenameNoReplace(ops.root, oldPath, newPath); err != nil {
+		return fmt.Errorf("rename %s to %s without replacement: %w", filepath.Base(oldPath), filepath.Base(newPath), err)
 	}
 	if err := txSyncHeld(ops.syncFile); err != nil {
 		return fmt.Errorf("sync directory after rename: %w", err)
@@ -1404,7 +1779,42 @@ func txRemoveSnapshot(dir, path, label string, snapshot txSnapshot, ops txOps) e
 	if err := txValidateSnapshot(path, label, snapshot, ops); err != nil {
 		return err
 	}
-	return txRemove(dir, path, ops)
+	quarantine, err := fsatomic.Quarantine(ops.root, path, txObjectQuarantinePrefix)
+	if err != nil {
+		return fmt.Errorf("quarantine %s: %w", label, err)
+	}
+	if err := txSyncHeld(ops.syncFile); err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	if ops.syncObserve != nil {
+		ops.syncObserve(dir)
+	}
+	qops := ops
+	qops.root = quarantine.Root()
+	qsync, err := txOpenSyncRoot(quarantine.Root())
+	if err != nil {
+		return errors.Join(err, quarantine.Close())
+	}
+	qops.syncFile = qsync
+	current, err := txSnapshotPath(quarantine.Name(), "quarantined "+label, qops)
+	if err != nil || current.hash != snapshot.hash || current.identity != snapshot.identity || current.info == nil || snapshot.info == nil ||
+		current.info.Mode() != snapshot.info.Mode() || current.info.Size() != snapshot.info.Size() || !current.info.ModTime().Equal(snapshot.info.ModTime()) {
+		return errors.Join(fmt.Errorf("quarantined %s differs from its bound authority; preserving it", label), err, qsync.Close(), quarantine.Close())
+	}
+	if err := txPoint(ops, "object-quarantine-delete:"+filepath.Base(path)); err != nil {
+		return errors.Join(err, qsync.Close(), quarantine.Close())
+	}
+	if err := txValidateSnapshot(quarantine.Name(), "quarantined "+label, current, qops); err != nil {
+		return errors.Join(fmt.Errorf("quarantined %s changed at deletion boundary; preserving it: %w", label, err), qsync.Close(), quarantine.Close())
+	}
+	removeErr := quarantine.Remove()
+	privateSyncErr := txSyncHeld(qsync)
+	privateCloseErr := qsync.Close()
+	parentSyncErr := txSyncHeld(ops.syncFile)
+	if ops.syncObserve != nil {
+		ops.syncObserve(dir)
+	}
+	return errors.Join(removeErr, privateSyncErr, privateCloseErr, parentSyncErr)
 }
 
 func txCleanupCreated(dir, path, label string, created os.FileInfo, ops txOps) error {
@@ -1422,30 +1832,33 @@ func txCleanupCreated(dir, path, label string, created os.FileInfo, ops txOps) e
 	return txRemoveSnapshot(dir, path, label, current, ops)
 }
 
-func txRemove(dir, path string, ops txOps) error {
-	if err := ops.root.Remove(path); err != nil {
-		return fmt.Errorf("remove %s: %w", filepath.Base(path), err)
-	}
-	if err := txSyncHeld(ops.syncFile); err != nil {
-		return fmt.Errorf("sync directory after remove: %w", err)
-	}
-	if ops.syncObserve != nil {
-		ops.syncObserve(dir)
-	}
-	return nil
+func txReadDir(ops txOps) ([]os.DirEntry, error) {
+	return txReadDirBounded(ops, txMaxDirEntries)
 }
 
-func txReadDir(ops txOps) ([]os.DirEntry, error) {
+func txReadDirBounded(ops txOps, maxEntries int) ([]os.DirEntry, error) {
+	if maxEntries <= 0 {
+		return nil, fmt.Errorf("transaction directory entry limit must be positive")
+	}
 	dir, err := ops.root.Open(".")
 	if err != nil {
 		return nil, fmt.Errorf("open rooted transaction directory: %w", err)
 	}
-	entries, readErr := dir.ReadDir(-1)
-	closeErr := dir.Close()
-	if readErr != nil {
-		return nil, fmt.Errorf("read rooted transaction directory: %w", readErr)
+	entries := make([]os.DirEntry, 0, min(txDirPageSize, maxEntries))
+	for {
+		page, readErr := dir.ReadDir(txDirPageSize)
+		if len(page) > maxEntries-len(entries) {
+			return nil, errors.Join(fmt.Errorf("rooted transaction directory exceeds %d-entry limit", maxEntries), dir.Close())
+		}
+		entries = append(entries, page...)
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil {
+			return nil, errors.Join(fmt.Errorf("read rooted transaction directory: %w", readErr), dir.Close())
+		}
 	}
-	if closeErr != nil {
+	if closeErr := dir.Close(); closeErr != nil {
 		return nil, fmt.Errorf("close rooted transaction directory: %w", closeErr)
 	}
 	sort.Slice(entries, func(i, j int) bool {

@@ -5,10 +5,13 @@ package cachestage
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/RamXX/machinery/internal/fsatomic"
 )
 
 // Recover removes every valid MkdirTemp stage carrying prefix. It validates
@@ -19,15 +22,28 @@ func Recover(base, prefix string) error {
 }
 
 type recoveryHooks struct {
-	beforeRetire func(string) error
-	afterRetire  func(string) error
-	beforeRemove func(string) error
+	beforeRetire            func(string) error
+	afterRetire             func(*os.Root, string) error
+	beforeRemove            func(string) error
+	beforePrivateRemove     func(*os.Root, string) error
+	beforePrivateTreeRemove func(*os.Root, string) error
+	quarantine              func(*os.Root, string, string) (*fsatomic.Quarantined, error)
 }
 
 type recoveryTree struct {
-	name       string
-	retirement string
-	witness    treeWitness
+	name    string
+	witness treeWitness
+}
+
+type recoveryQuarantine struct {
+	handle  *fsatomic.Quarantined
+	witness treeWitness
+	empty   bool
+}
+
+type recoveryFileQuarantine struct {
+	handle  *fsatomic.Quarantined
+	witness treeWitnessEntry
 }
 
 func recoverTrees(base, prefix string, hooks recoveryHooks) (retErr error) {
@@ -55,9 +71,57 @@ func recoverTrees(base, prefix string, hooks recoveryHooks) (retErr error) {
 		return err
 	}
 	var stages []recoveryTree
+	var quarantines []recoveryQuarantine
+	defer func() {
+		for _, quarantine := range quarantines {
+			retErr = errors.Join(retErr, quarantine.handle.Close())
+		}
+	}()
 	for _, entry := range entries {
 		name := entry.Name()
 		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		if strings.HasPrefix(name, prefix+"delete-") {
+			info, err := root.Lstat(name)
+			if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !privateStageMode(info.Mode()) {
+				return errors.Join(err, fmt.Errorf("reserved cache quarantine %s must be a private real directory", name))
+			}
+			handle, err := fsatomic.ResumeQuarantine(root, name, "")
+			if err != nil {
+				return fmt.Errorf("resume cache quarantine %s: %w", name, err)
+			}
+			source := handle.Source()
+			if legacySource := strings.TrimSuffix(source, ".machinery-retire"); legacySource != source {
+				source = legacySource
+			}
+			if !strings.HasPrefix(source, prefix) || !validRandomSuffix(strings.TrimPrefix(source, prefix)) {
+				_ = handle.Close()
+				return fmt.Errorf("cache quarantine %s records unsafe source %q", name, handle.Source())
+			}
+			object, err := handle.Root().Lstat(handle.Name())
+			if errors.Is(err, os.ErrNotExist) {
+				if err := validateCacheQuarantineInventory(handle.Root(), false); err != nil {
+					_ = handle.Close()
+					return fmt.Errorf("cache quarantine %s: %w", name, err)
+				}
+				quarantines = append(quarantines, recoveryQuarantine{handle: handle, empty: true})
+				continue
+			}
+			if err != nil || !object.IsDir() || object.Mode()&os.ModeSymlink != 0 || !privateStageMode(object.Mode()) {
+				_ = handle.Close()
+				return errors.Join(err, fmt.Errorf("cache quarantine %s object must be a private real directory", name))
+			}
+			if err := validateCacheQuarantineInventory(handle.Root(), true); err != nil {
+				_ = handle.Close()
+				return fmt.Errorf("cache quarantine %s: %w", name, err)
+			}
+			witness, err := syncTreeWitness(handle.Root(), handle.Name())
+			if err != nil {
+				_ = handle.Close()
+				return fmt.Errorf("witness cache quarantine %s: %w", name, err)
+			}
+			quarantines = append(quarantines, recoveryQuarantine{handle: handle, witness: witness})
 			continue
 		}
 		if !validRandomSuffix(strings.TrimPrefix(name, prefix)) {
@@ -74,7 +138,32 @@ func recoverTrees(base, prefix string, hooks recoveryHooks) (retErr error) {
 		if err != nil {
 			return fmt.Errorf("witness reserved cache stage %s: %w", name, err)
 		}
-		stages = append(stages, recoveryTree{name: name, retirement: name + ".machinery-retire", witness: witness})
+		stages = append(stages, recoveryTree{name: name, witness: witness})
+	}
+	for index := range quarantines {
+		quarantine := &quarantines[index]
+		if quarantine.empty {
+			if err := quarantine.handle.FinishEmpty(); err != nil {
+				return err
+			}
+			continue
+		}
+		current, err := syncTreeWitness(quarantine.handle.Root(), quarantine.handle.Name())
+		if err != nil || compareTreeWitness(quarantine.witness, current) != nil {
+			return errors.Join(err, fmt.Errorf("cache quarantine changed during recovery; preserving it"))
+		}
+		if hooks.beforePrivateTreeRemove != nil {
+			if err := hooks.beforePrivateTreeRemove(quarantine.handle.Root(), quarantine.handle.Name()); err != nil {
+				return err
+			}
+		}
+		current, err = syncTreeWitness(quarantine.handle.Root(), quarantine.handle.Name())
+		if err != nil || compareTreeWitness(quarantine.witness, current) != nil {
+			return errors.Join(err, fmt.Errorf("cache quarantine changed at private deletion boundary; preserving it"))
+		}
+		if err := quarantine.handle.RemoveAll(); err != nil {
+			return err
+		}
 	}
 	// readDir is sorted, but keep the mutation plan's order explicit.
 	sort.Slice(stages, func(i, j int) bool { return stages[i].name < stages[j].name })
@@ -84,31 +173,69 @@ func recoverTrees(base, prefix string, hooks recoveryHooks) (retErr error) {
 				return err
 			}
 		}
-		if info, err := root.Lstat(stage.retirement); err == nil {
-			return fmt.Errorf("cache stage retirement path %s already exists (%s)", stage.retirement, info.Mode())
-		} else if !os.IsNotExist(err) {
-			return err
+		quarantineTree := fsatomic.Quarantine
+		if hooks.quarantine != nil {
+			quarantineTree = hooks.quarantine
 		}
-		if err := root.Rename(stage.name, stage.retirement); err != nil {
-			return fmt.Errorf("atomically retire interrupted cache stage %s: %w", stage.name, err)
-		}
-		if err := syncStageDirectory(root, "."); err != nil {
-			return fmt.Errorf("sync retired cache stage %s: %w", stage.name, err)
+		quarantined, err := quarantineTree(root, stage.name, prefix+"delete-")
+		if err != nil {
+			return fmt.Errorf("atomically quarantine interrupted cache stage %s: %w", stage.name, err)
 		}
 		if hooks.afterRetire != nil {
-			if err := hooks.afterRetire(stage.retirement); err != nil {
-				return err
+			if err := hooks.afterRetire(quarantined.Root(), quarantined.Name()); err != nil {
+				return preserveCacheQuarantine(quarantined, err)
 			}
 		}
-		rebased := rebaseTreeWitness(stage.witness, stage.name, stage.retirement)
-		current, err := syncTreeWitness(root, stage.retirement)
+		if err := validateCacheQuarantineInventory(quarantined.Root(), true); err != nil {
+			return preserveCacheQuarantine(quarantined, err)
+		}
+		rebased := rebaseTreeWitness(stage.witness, stage.name, quarantined.Name())
+		current, err := syncTreeWitness(quarantined.Root(), quarantined.Name())
 		if err != nil {
-			return fmt.Errorf("verify retired cache stage %s: %w; preserving retirement tree", stage.name, err)
+			return preserveCacheQuarantine(quarantined, fmt.Errorf("verify quarantined cache stage %s: %w", stage.name, err))
 		}
 		if err := compareTreeWitness(rebased, current); err != nil {
-			return fmt.Errorf("retired cache stage %s changed after validation: %w; preserving retirement tree", stage.name, err)
+			return preserveCacheQuarantine(quarantined, fmt.Errorf("quarantined cache stage %s changed after validation: %w", stage.name, err))
 		}
-		if err := removeTreeWitness(root, rebased, hooks); err != nil {
+		if hooks.beforeRemove != nil {
+			for index := len(rebased.entries) - 1; index >= 0; index-- {
+				if err := hooks.beforeRemove(rebased.entries[index].path); err != nil {
+					return preserveCacheQuarantine(quarantined, err)
+				}
+			}
+		}
+		current, err = syncTreeWitness(quarantined.Root(), quarantined.Name())
+		if err != nil {
+			return preserveCacheQuarantine(quarantined, fmt.Errorf("revalidate quarantined cache stage %s at deletion boundary: %w", stage.name, err))
+		}
+		if err := compareTreeWitness(rebased, current); err != nil {
+			return preserveCacheQuarantine(quarantined, fmt.Errorf("quarantined cache stage %s changed at deletion boundary: %w", stage.name, err))
+		}
+		if hooks.beforePrivateRemove != nil {
+			if err := hooks.beforePrivateRemove(quarantined.Root(), quarantined.Name()); err != nil {
+				return preserveCacheQuarantine(quarantined, err)
+			}
+		}
+		if err := validateCacheQuarantineInventory(quarantined.Root(), true); err != nil {
+			return preserveCacheQuarantine(quarantined, err)
+		}
+		privateCurrent, err := syncTreeWitness(quarantined.Root(), quarantined.Name())
+		if err != nil {
+			return preserveCacheQuarantine(quarantined, fmt.Errorf("verify private cache deletion authority: %w", err))
+		}
+		if err := compareTreeWitness(rebased, privateCurrent); err != nil {
+			return preserveCacheQuarantine(quarantined, fmt.Errorf("private cache deletion authority changed: %w", err))
+		}
+		if hooks.beforePrivateTreeRemove != nil {
+			if err := hooks.beforePrivateTreeRemove(quarantined.Root(), quarantined.Name()); err != nil {
+				return preserveCacheQuarantine(quarantined, err)
+			}
+		}
+		privateCurrent, err = syncTreeWitness(quarantined.Root(), quarantined.Name())
+		if err != nil || compareTreeWitness(rebased, privateCurrent) != nil {
+			return preserveCacheQuarantine(quarantined, errors.Join(err, fmt.Errorf("private cache deletion authority changed at removal boundary")))
+		}
+		if err := quarantined.RemoveAll(); err != nil {
 			return fmt.Errorf("conditionally remove interrupted cache stage %s: %w", stage.name, err)
 		}
 	}
@@ -118,6 +245,30 @@ func recoverTrees(base, prefix string, hooks recoveryHooks) (retErr error) {
 		}
 	}
 	return nil
+}
+
+func validateCacheQuarantineInventory(root *os.Root, objectExpected bool) error {
+	entries, err := readDirBounded(root, ".", 1)
+	if err != nil {
+		return err
+	}
+	var want []string
+	if objectExpected {
+		want = []string{"object"}
+	}
+	if len(entries) != len(want) {
+		return fmt.Errorf("private deletion authority has unexpected inventory")
+	}
+	for index := range want {
+		if entries[index].Name() != want[index] {
+			return fmt.Errorf("private deletion authority has unexpected inventory")
+		}
+	}
+	return nil
+}
+
+func preserveCacheQuarantine(quarantined *fsatomic.Quarantined, cause error) error {
+	return errors.Join(cause, fmt.Errorf("preserving private cache deletion authority"), quarantined.Close())
 }
 
 // RecoverFiles removes valid private CreateTemp files carrying prefix. It is
@@ -154,9 +305,58 @@ func recoverFiles(base, prefix string, hooks recoveryHooks) (retErr error) {
 		return err
 	}
 	var stages []treeWitnessEntry
+	var quarantines []recoveryFileQuarantine
+	defer func() {
+		for _, quarantine := range quarantines {
+			retErr = errors.Join(retErr, quarantine.handle.Close())
+		}
+	}()
 	for _, entry := range entries {
 		name := entry.Name()
 		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		if strings.HasPrefix(name, prefix+"delete-") {
+			handle, err := fsatomic.ResumeQuarantine(root, name, "")
+			if err != nil {
+				return err
+			}
+			if !strings.HasPrefix(handle.Source(), prefix) || !validRandomSuffix(strings.TrimPrefix(handle.Source(), prefix)) {
+				_ = handle.Close()
+				return fmt.Errorf("cache file quarantine %s records unsafe source %q", name, handle.Source())
+			}
+			if _, err := handle.Root().Lstat(handle.Name()); errors.Is(err, os.ErrNotExist) {
+				if err := validateCacheQuarantineInventory(handle.Root(), false); err != nil {
+					_ = handle.Close()
+					return err
+				}
+				if err := handle.FinishEmpty(); err != nil {
+					return err
+				}
+				continue
+			} else if err != nil {
+				_ = handle.Close()
+				return err
+			}
+			if err := validateCacheQuarantineInventory(handle.Root(), true); err != nil {
+				_ = handle.Close()
+				return err
+			}
+			info, err := handle.Root().Lstat(handle.Name())
+			if err != nil {
+				_ = handle.Close()
+				return err
+			}
+			witness, err := syncFileWitness(handle.Root(), handle.Name(), info)
+			if err != nil {
+				_ = handle.Close()
+				return err
+			}
+			if err := revalidateFileWitness(handle.Root(), witness); err != nil {
+				_ = handle.Close()
+				return err
+			}
+			quarantines = append(quarantines, recoveryFileQuarantine{handle: handle, witness: witness})
 			continue
 		}
 		if !validRandomSuffix(strings.TrimPrefix(name, prefix)) {
@@ -175,8 +375,48 @@ func recoverFiles(base, prefix string, hooks recoveryHooks) (retErr error) {
 		}
 		stages = append(stages, witness)
 	}
+	for _, quarantine := range quarantines {
+		if err := validateCacheQuarantineInventory(quarantine.handle.Root(), true); err != nil {
+			return err
+		}
+		if err := revalidateFileWitness(quarantine.handle.Root(), quarantine.witness); err != nil {
+			return fmt.Errorf("cache file quarantine changed at deletion boundary; preserving it: %w", err)
+		}
+		if err := quarantine.handle.Remove(); err != nil {
+			return err
+		}
+	}
 	for _, stage := range stages {
-		if err := removeFileWitness(root, stage, hooks); err != nil {
+		if hooks.beforeRemove != nil {
+			if err := hooks.beforeRemove(stage.path); err != nil {
+				return err
+			}
+		}
+		if err := revalidateFileWitness(root, stage); err != nil {
+			return fmt.Errorf("cache stage file changed at deletion boundary: %w", err)
+		}
+		quarantined, err := fsatomic.Quarantine(root, stage.path, prefix+"delete-")
+		if err != nil {
+			return err
+		}
+		if hooks.beforePrivateRemove != nil {
+			if err := hooks.beforePrivateRemove(quarantined.Root(), quarantined.Name()); err != nil {
+				return preserveCacheQuarantine(quarantined, err)
+			}
+		}
+		if err := validateCacheQuarantineInventory(quarantined.Root(), true); err != nil {
+			return preserveCacheQuarantine(quarantined, err)
+		}
+		info, err := quarantined.Root().Lstat(quarantined.Name())
+		if err != nil {
+			return preserveCacheQuarantine(quarantined, err)
+		}
+		current, err := syncFileWitness(quarantined.Root(), quarantined.Name(), info)
+		if err != nil || stage.hash != current.hash || stage.mode != current.mode || stage.info == nil || current.info == nil ||
+			!os.SameFile(stage.info, current.info) || stage.info.Size() != current.info.Size() || !stage.info.ModTime().Equal(current.info.ModTime()) {
+			return preserveCacheQuarantine(quarantined, errors.Join(err, fmt.Errorf("private cache file deletion authority changed; preserving it")))
+		}
+		if err := quarantined.Remove(); err != nil {
 			return fmt.Errorf("conditionally remove cache file-stage %s: %w", stage.path, err)
 		}
 	}
@@ -186,40 +426,6 @@ func recoverFiles(base, prefix string, hooks recoveryHooks) (retErr error) {
 		}
 	}
 	return nil
-}
-
-func removeTreeWitness(root *os.Root, witness treeWitness, hooks recoveryHooks) error {
-	for i := len(witness.entries) - 1; i >= 0; i-- {
-		entry := witness.entries[i]
-		if entry.isDir {
-			if err := removeDirectoryWitness(root, entry, hooks); err != nil {
-				return err
-			}
-			continue
-		}
-		if err := removeFileWitness(root, entry, hooks); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func removeFileWitness(root *os.Root, want treeWitnessEntry, hooks recoveryHooks) error {
-	if err := revalidateFileWitness(root, want); err != nil {
-		return err
-	}
-	if hooks.beforeRemove != nil {
-		if err := hooks.beforeRemove(want.path); err != nil {
-			return err
-		}
-	}
-	if err := revalidateFileWitness(root, want); err != nil {
-		return fmt.Errorf("cache stage file changed at deletion boundary: %w", err)
-	}
-	if err := root.Remove(want.path); err != nil {
-		return err
-	}
-	return syncStageDirectory(root, filepath.Dir(want.path))
 }
 
 func revalidateFileWitness(root *os.Root, want treeWitnessEntry) error {
@@ -241,43 +447,6 @@ func revalidateFileWitness(root *os.Root, want treeWitnessEntry) error {
 	return nil
 }
 
-func removeDirectoryWitness(root *os.Root, want treeWitnessEntry, hooks recoveryHooks) error {
-	if err := revalidateEmptyDirectoryWitness(root, want); err != nil {
-		return err
-	}
-	if hooks.beforeRemove != nil {
-		if err := hooks.beforeRemove(want.path); err != nil {
-			return err
-		}
-	}
-	if err := revalidateEmptyDirectoryWitness(root, want); err != nil {
-		return fmt.Errorf("cache stage directory changed at deletion boundary: %w", err)
-	}
-	if err := root.Remove(want.path); err != nil {
-		return err
-	}
-	return syncStageDirectory(root, filepath.Dir(want.path))
-}
-
-func revalidateEmptyDirectoryWitness(root *os.Root, want treeWitnessEntry) error {
-	info, err := root.Lstat(want.path)
-	if err != nil {
-		return err
-	}
-	if want.info == nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() || !privateStageMode(info.Mode()) ||
-		!os.SameFile(want.info, info) || want.mode != info.Mode() {
-		return fmt.Errorf("%s no longer matches its validated directory identity; preserving it", filepath.ToSlash(want.path))
-	}
-	entries, err := readDir(root, want.path)
-	if err != nil {
-		return err
-	}
-	if len(entries) != 0 {
-		return fmt.Errorf("%s was populated during cleanup; preserving it", filepath.ToSlash(want.path))
-	}
-	return nil
-}
-
 func validRandomSuffix(suffix string) bool {
 	if suffix == "" || len(suffix) > 10 {
 		return false
@@ -291,23 +460,116 @@ func validRandomSuffix(suffix string) bool {
 }
 
 func readDir(root *os.Root, rel string) ([]os.DirEntry, error) {
+	return readDirBounded(root, rel, cacheStageMaxEntries)
+}
+
+func readDirBounded(root *os.Root, rel string, maxEntries int) ([]os.DirEntry, error) {
+	if maxEntries <= 0 {
+		return nil, fmt.Errorf("cache directory entry limit must be positive")
+	}
+	before, err := root.Lstat(rel)
+	if err != nil {
+		return nil, err
+	}
+	if before.Mode()&os.ModeSymlink != 0 || !before.IsDir() {
+		return nil, fmt.Errorf("cache directory %s must be a real directory", filepath.ToSlash(rel))
+	}
 	dir, err := root.Open(rel)
 	if err != nil {
 		return nil, err
 	}
-	entries, readErr := dir.ReadDir(-1)
+	opened, err := dir.Stat()
+	if err != nil || !opened.IsDir() || !os.SameFile(before, opened) || before.Mode() != opened.Mode() {
+		return nil, errors.Join(err, fmt.Errorf("cache directory %s changed while opening", filepath.ToSlash(rel)), dir.Close())
+	}
+	capacity := min(cacheStageDirectoryBatch, maxEntries)
+	entries := make([]os.DirEntry, 0, capacity)
+	var readErr error
+	for {
+		batch, err := dir.ReadDir(cacheStageDirectoryBatch)
+		if len(batch) > maxEntries-len(entries) {
+			readErr = fmt.Errorf("cache directory %s exceeds %d-entry limit", filepath.ToSlash(rel), maxEntries)
+			break
+		}
+		entries = append(entries, batch...)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			readErr = err
+			break
+		}
+	}
+	after, statErr := dir.Stat()
+	pathAfter, pathErr := root.Lstat(rel)
 	closeErr := dir.Close()
-	if err := errors.Join(readErr, closeErr); err != nil {
+	if err := errors.Join(readErr, statErr, pathErr, closeErr); err != nil {
 		return nil, err
+	}
+	if pathAfter.Mode()&os.ModeSymlink != 0 || !pathAfter.IsDir() ||
+		!os.SameFile(opened, after) || !os.SameFile(opened, pathAfter) || opened.Mode() != after.Mode() || opened.Mode() != pathAfter.Mode() ||
+		!opened.ModTime().Equal(after.ModTime()) || !opened.ModTime().Equal(pathAfter.ModTime()) {
+		return nil, fmt.Errorf("cache directory %s changed while being inventoried", filepath.ToSlash(rel))
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	return entries, nil
 }
 
+type cacheTreeBudget struct {
+	entries    int
+	bytes      int64
+	maxEntries int
+	maxBytes   int64
+}
+
+func (budget *cacheTreeBudget) add(info os.FileInfo, display string) error {
+	budget.entries++
+	if budget.entries > budget.maxEntries {
+		return fmt.Errorf("cache tree exceeds %d-entry limit at %s", budget.maxEntries, display)
+	}
+	if info.Mode().IsRegular() {
+		if info.Size() < 0 || info.Size() > cacheStageMaxFileBytes {
+			return fmt.Errorf("cache tree file %s has size %d, exceeding %d-byte limit", display, info.Size(), cacheStageMaxFileBytes)
+		}
+		if info.Size() > budget.maxBytes-budget.bytes {
+			return fmt.Errorf("cache tree exceeds %d-byte aggregate limit at %s", budget.maxBytes, display)
+		}
+		budget.bytes += info.Size()
+	}
+	return nil
+}
+
 func validateTree(root *os.Root, dir string) error {
-	entries, err := readDir(root, dir)
+	return validateTreeBounded(root, dir, cacheStageMaxEntries, cacheStageMaxDepth, cacheStageMaxTotalBytes)
+}
+
+func validateTreeBounded(root *os.Root, dir string, maxEntries, maxDepth int, maxBytes int64) error {
+	if maxEntries <= 0 || maxDepth < 0 || maxBytes < 0 {
+		return fmt.Errorf("cache tree limits must be non-negative with a positive entry limit")
+	}
+	budget := cacheTreeBudget{maxEntries: maxEntries, maxBytes: maxBytes}
+	return validateTreeWithBudget(root, dir, &budget, 0, maxDepth)
+}
+
+func validateTreeWithBudget(root *os.Root, dir string, budget *cacheTreeBudget, depth, maxDepth int) error {
+	if depth > maxDepth {
+		return fmt.Errorf("cache tree exceeds %d-directory depth limit at %s", maxDepth, filepath.ToSlash(dir))
+	}
+	dirInfo, err := root.Lstat(dir)
+	if err != nil || dirInfo.Mode()&os.ModeSymlink != 0 || !dirInfo.IsDir() || !privateStageMode(dirInfo.Mode()) {
+		return errors.Join(err, fmt.Errorf("%s must be a private real directory", filepath.ToSlash(dir)))
+	}
+	if err := budget.add(dirInfo, filepath.ToSlash(dir)); err != nil {
+		return err
+	}
+	remaining := budget.maxEntries - budget.entries
+	readLimit := max(remaining, 1)
+	entries, err := readDirBounded(root, dir, readLimit)
 	if err != nil {
 		return err
+	}
+	if len(entries) > remaining {
+		return fmt.Errorf("cache tree exceeds %d-entry limit at %s", budget.maxEntries, filepath.ToSlash(dir))
 	}
 	for _, entry := range entries {
 		child := filepath.Join(dir, entry.Name())
@@ -319,15 +581,15 @@ func validateTree(root *os.Root, dir string) error {
 		case info.Mode()&os.ModeSymlink != 0:
 			return fmt.Errorf("%s is a symlink", filepath.ToSlash(child))
 		case info.IsDir():
-			if !privateStageMode(info.Mode()) {
-				return fmt.Errorf("%s is not private", filepath.ToSlash(child))
-			}
-			if err := validateTree(root, child); err != nil {
+			if err := validateTreeWithBudget(root, child, budget, depth+1, maxDepth); err != nil {
 				return err
 			}
 		case info.Mode().IsRegular():
 			if !privateStageMode(info.Mode()) {
 				return fmt.Errorf("%s is not private", filepath.ToSlash(child))
+			}
+			if err := budget.add(info, filepath.ToSlash(child)); err != nil {
+				return err
 			}
 		default:
 			return fmt.Errorf("%s is a special entry (%s)", filepath.ToSlash(child), info.Mode())

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -122,6 +123,12 @@ func TestModelithInventoryDiscoveryFailsClosed(t *testing.T) {
 			t.Errorf("Modelith renderer is missing closed transaction contract %q", required)
 		}
 	}
+	inventoryScript := mustRepositoryFile(t, script)
+	for _, required := range []string{"./scripts/tree-inventory", "-max-entries 100000", "-max-depth 64", "-max-bytes 33554432", "-timeout 15s"} {
+		if !strings.Contains(inventoryScript, required) {
+			t.Errorf("Modelith inventory lacks bounded traversal contract %q", required)
+		}
+	}
 
 	corpus := t.TempDir()
 	for _, name := range []string{"domain.modelith.yaml", "domain.modelith.md"} {
@@ -219,20 +226,18 @@ func TestModelithInventoryDiscoveryFailsClosed(t *testing.T) {
 		t.Fatalf("empty discovery must fail explicitly: err=%v out=%s", err, out)
 	}
 
-	for _, failedTool := range []string{"find", "sort"} {
-		t.Run(failedTool+" failure", func(t *testing.T) {
-			bin := t.TempDir()
-			if err := os.WriteFile(filepath.Join(bin, failedTool), []byte("#!/bin/sh\nexit 23\n"), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			cmd := exec.CommandContext(t.Context(), "bash", script, "check", corpus)
-			cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-			out, err := cmd.CombinedOutput()
-			if err == nil || !strings.Contains(string(out), "discovery failed") {
-				t.Fatalf("%s failure must invalidate inventory: err=%v out=%s", failedTool, err, out)
-			}
-		})
-	}
+	t.Run("bounded helper build failure", func(t *testing.T) {
+		bin := t.TempDir()
+		if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\nexit 23\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.CommandContext(t.Context(), "bash", script, "check", corpus)
+		cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+		out, err := cmd.CombinedOutput()
+		if err == nil || !strings.Contains(string(out), "build bounded tree inventory helper failed") {
+			t.Fatalf("helper build failure must invalidate inventory: err=%v out=%s", err, out)
+		}
+	})
 }
 
 func TestPreflightC4DiscoveryFailsClosed(t *testing.T) {
@@ -266,6 +271,15 @@ func TestPreflightC4DiscoveryFailsClosed(t *testing.T) {
 	}
 
 	script := filepath.Join(repo, "scripts", "c4-inventory.sh")
+	scriptBody := mustRepositoryFile(t, script)
+	for _, required := range []string{"./scripts/tree-inventory", "-file-name workspace.dsl", "-regular-files-only", "-max-entries 4096", "-max-depth 64", "-max-bytes 8388608", "-timeout 15s"} {
+		if !strings.Contains(scriptBody, required) {
+			t.Errorf("custom-root C4 inventory lacks bounded exact contract %q", required)
+		}
+	}
+	if strings.Contains(scriptBody, "find \"$root\"") {
+		t.Fatal("custom-root C4 inventory must not use recursive find")
+	}
 	corpus := t.TempDir()
 	if out, err := exec.CommandContext(t.Context(), "bash", script, corpus).CombinedOutput(); err == nil || !strings.Contains(string(out), "unexpected empty corpus") {
 		t.Fatalf("empty C4 discovery must fail: err=%v out=%s", err, out)
@@ -273,23 +287,68 @@ func TestPreflightC4DiscoveryFailsClosed(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(corpus, "workspace.dsl"), []byte("workspace {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.CommandContext(t.Context(), "bash", script, corpus).CombinedOutput(); err != nil || !strings.Contains(string(out), "workspace.dsl") {
+	nested := filepath.Join(corpus, "nested")
+	if err := os.Mkdir(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "workspace.dsl"), []byte("workspace {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(corpus, "notworkspace.dsl"), []byte("workspace {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.CommandContext(t.Context(), "bash", script, corpus).CombinedOutput()
+	if err != nil {
 		t.Fatalf("valid C4 discovery failed: err=%v out=%s", err, out)
 	}
-	for _, failedTool := range []string{"find", "sort"} {
-		t.Run(failedTool+" failure", func(t *testing.T) {
-			bin := t.TempDir()
-			if err := os.WriteFile(filepath.Join(bin, failedTool), []byte("#!/bin/sh\nexit 29\n"), 0o755); err != nil {
+	want := filepath.Join(corpus, "nested", "workspace.dsl") + "\n" + filepath.Join(corpus, "workspace.dsl") + "\n"
+	if string(out) != want {
+		t.Fatalf("custom-root C4 inventory = %q, want exact byte-sorted regular workspaces %q", out, want)
+	}
+
+	t.Run("bounded helper build failure", func(t *testing.T) {
+		bin := t.TempDir()
+		if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\nexit 29\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.CommandContext(t.Context(), "bash", script, corpus)
+		cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+		out, err := cmd.CombinedOutput()
+		if err == nil || !strings.Contains(string(out), "build bounded tree inventory helper failed") {
+			t.Fatalf("helper build failure must invalidate C4 corpus: err=%v out=%s", err, out)
+		}
+	})
+
+	t.Run("high-entry custom root", func(t *testing.T) {
+		root := t.TempDir()
+		for index := 0; index <= 4096; index++ {
+			if err := os.WriteFile(filepath.Join(root, fmt.Sprintf("entry-%05d", index)), nil, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.CommandContext(t.Context(), "bash", script, corpus)
-			cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-			out, err := cmd.CombinedOutput()
-			if err == nil || !strings.Contains(string(out), "discovery failed") {
-				t.Fatalf("%s failure must invalidate C4 corpus: err=%v out=%s", failedTool, err, out)
-			}
-		})
-	}
+		}
+		out, err := exec.CommandContext(t.Context(), "bash", script, root).CombinedOutput()
+		if err == nil || !strings.Contains(string(out), "entry limit") {
+			t.Fatalf("high-entry custom C4 root was accepted: err=%v out=%s", err, out)
+		}
+	})
+
+	t.Run("deep custom root", func(t *testing.T) {
+		root := t.TempDir()
+		deep := root
+		for depth := 0; depth < 64; depth++ {
+			deep = filepath.Join(deep, "d")
+		}
+		if err := os.MkdirAll(deep, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(deep, "workspace.dsl"), []byte("workspace {}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		out, err := exec.CommandContext(t.Context(), "bash", script, root).CombinedOutput()
+		if err == nil || !strings.Contains(string(out), "depth limit") {
+			t.Fatalf("deep custom C4 root was accepted: err=%v out=%s", err, out)
+		}
+	})
 }
 
 func TestExampleInventoryIsClosedAndDrivesEveryRunner(t *testing.T) {
@@ -302,7 +361,7 @@ func TestExampleInventoryIsClosedAndDrivesEveryRunner(t *testing.T) {
 		t.Fatalf("canonical example inventory is invalid: %v\n%s", err, out)
 	}
 	scriptBody := mustRepositoryFile(t, script)
-	for _, required := range []string{`-name design -o -path '*/design/*'`, `if [[ "$entry" == */design ]]`, "example design root must be a real directory"} {
+	for _, required := range []string{"./scripts/tree-inventory", "-max-entries 100000", "-max-depth 64", "-max-bytes 33554432", "-timeout 15s", `if [[ "$entry" == */design ]]`, "example design root must be a real directory"} {
 		if !strings.Contains(scriptBody, required) {
 			t.Errorf("example inventory does not classify the design-root entry itself: missing %q", required)
 		}

@@ -22,8 +22,6 @@ func syncDirectoryPath(path string) error {
 	return errors.Join(f.Sync(), closeInstallFile(f))
 }
 func syncRootDirectoryFile(f *os.File, _ string) error { return f.Sync() }
-func renameInstallPath(oldPath, newPath string) error  { return os.Rename(oldPath, newPath) }
-
 func stableInstallDirIdentity(_ string, info os.FileInfo) (string, error) {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {

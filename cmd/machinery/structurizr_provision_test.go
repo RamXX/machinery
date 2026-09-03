@@ -10,6 +10,24 @@ import (
 	machversion "github.com/RamXX/machinery/internal/version"
 )
 
+func TestValidateStructurizrCacheRejectsOversizedSparseReceipt(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, ".machinery-structurizr-receipt")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(structurizrReceiptMaxBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateStructurizrCache(root); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatalf("Structurizr cache accepted oversized receipt: %v", err)
+	}
+}
+
 func structurizrProvisionTestBase(t *testing.T) string {
 	t.Helper()
 	cacheRoot := t.TempDir()

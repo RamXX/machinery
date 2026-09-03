@@ -3,9 +3,7 @@
 package designlock
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"syscall"
 )
 
@@ -30,21 +28,4 @@ func syncDirectory(path string) error {
 		return fmt.Errorf("flush design directory: %w", flushErr)
 	}
 	return nil
-}
-
-func syncRootDirectory(root *os.Root) error {
-	directory, err := root.OpenFile(".", os.O_RDONLY|os.O_CREATE|designFileFlagBackupSemantics, 0o755)
-	if err != nil {
-		return fmt.Errorf("open rooted design directory for durability: %w", err)
-	}
-	flushed, _, flushErr := designFlushFileBuffers.Call(directory.Fd())
-	closeErr := directory.Close()
-	var errs []error
-	if flushed == 0 {
-		errs = append(errs, fmt.Errorf("flush rooted design directory: %w", flushErr))
-	}
-	if closeErr != nil {
-		errs = append(errs, fmt.Errorf("close rooted design directory: %w", closeErr))
-	}
-	return errors.Join(errs...)
 }

@@ -10,11 +10,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// MaxYAMLBytes bounds the parser's secondary allocations even when a caller
+// already holds the input bytes in memory.
+const MaxYAMLBytes = 16 << 20
+
 // LoadYAML parses YAML preserving mapping key order, returning *Value (the same
 // ordered representation JSON uses). This mirrors Python's dict insertion-order
 // semantics, which the generators depend on (e.g. compose_gen iterates the
 // aggregates map in source order to build the TLA+ variable list).
 func LoadYAML(data []byte) (*Value, error) {
+	if len(data) > MaxYAMLBytes {
+		return nil, fmt.Errorf("ir: YAML size %d exceeds %d-byte limit", len(data), MaxYAMLBytes)
+	}
 	var n yaml.Node
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	if err := decoder.Decode(&n); err != nil {

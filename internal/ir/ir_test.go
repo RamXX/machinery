@@ -7,8 +7,46 @@ import (
 	"testing"
 )
 
+type endlessMachineReader struct{}
+
+func (endlessMachineReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = ' '
+	}
+	return len(p), nil
+}
+
 func writeFile(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+func TestMachineJSONReadersEnforceFixedPolicyLimit(t *testing.T) {
+	path := t.TempDir() + "/oversized.machine.json"
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(MaxMachineJSONBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadMachineJSON(path); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("file loader accepted oversized sparse input: %v", err)
+	}
+	if _, err := LoadMachineJSONReader("endless", endlessMachineReader{}); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("reader loader did not terminate at fixed limit: %v", err)
+	}
+	if _, err := LoadMachineJSONBytes("bytes", make([]byte, MaxMachineJSONBytes+1)); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("byte loader accepted oversized input: %v", err)
+	}
+}
+
+func TestYAMLParserRejectsOversizedInputBeforeDecode(t *testing.T) {
+	if _, err := LoadYAML(make([]byte, MaxYAMLBytes+1)); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("YAML parser accepted oversized input: %v", err)
+	}
 }
 
 func mustJSON(t *testing.T, src string) *Value {

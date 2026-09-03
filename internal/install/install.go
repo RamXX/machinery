@@ -391,7 +391,7 @@ func rollbackUninstallTransaction(tx *artifactTransaction, cause error) error {
 // partial cache entries: skipping a direct install is safe only when the
 // current plugin's complete owned artifact inventory is positively proven.
 var (
-	readPluginCache                  = os.ReadDir
+	readPluginCache                  = readPluginCacheBoundedPath
 	installDiscoveryLstat            = os.Lstat
 	installDiscoveryRead             = os.ReadFile
 	cachedPluginAfterOpen            = func(string) {}
@@ -400,6 +400,18 @@ var (
 	cachedPluginAfterWitnessMember   = func(int, string) {}
 	cachedPluginAfterCommitTopology  = func(int, string) {}
 )
+
+const pluginCacheMaxEntries = 10_000
+
+func readPluginCacheBoundedPath(directory string) ([]os.DirEntry, error) {
+	dir, err := os.Open(directory)
+	if err != nil {
+		return nil, err
+	}
+	entries, readErr := readInstallDirBounded(dir, pluginCacheMaxEntries, "plugin cache directory")
+	closeErr := closeInstallFile(dir)
+	return entries, errors.Join(readErr, closeErr)
+}
 
 func pluginInstalled(home string) (bool, error) {
 	cache := filepath.Join(home, "plugins", "cache")
@@ -579,6 +591,9 @@ func capturePluginCacheTopologyWithHook(cache string, afterDirectory func(int, s
 }
 
 func walkPluginCacheTopology(root *os.Root, directory string, depth, pass int, inventory map[string]pluginCacheTopologyEntry, afterDirectory func(int, string)) error {
+	if err := validateInstallTraversalDepth(depth, directory); err != nil {
+		return err
+	}
 	info, err := root.Lstat(directory)
 	if err != nil {
 		return fmt.Errorf("inspect plugin cache topology member %s: %w", directory, err)
@@ -586,12 +601,15 @@ func walkPluginCacheTopology(root *os.Root, directory string, depth, pass int, i
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return fmt.Errorf("plugin cache topology member %s is not a real directory", directory)
 	}
+	if len(inventory) >= pluginCacheMaxEntries {
+		return fmt.Errorf("plugin cache topology exceeds %d-entry limit", pluginCacheMaxEntries)
+	}
 	dir, err := root.Open(directory)
 	if err != nil {
 		return fmt.Errorf("retain plugin cache topology member %s: %w", directory, err)
 	}
 	openedInfo, statErr := dir.Stat()
-	entries, readErr := dir.ReadDir(-1)
+	entries, readErr := readInstallDirBounded(dir, pluginCacheMaxEntries-len(inventory)-1, "plugin cache topology")
 	closeErr := dir.Close()
 	if statErr != nil || !sameInstallTopologyEntry(info, openedInfo) {
 		return errors.Join(fmt.Errorf("plugin cache topology member %s changed while being retained", directory), statErr, readErr, closeErr)
@@ -600,7 +618,6 @@ func walkPluginCacheTopology(root *os.Root, directory string, depth, pass int, i
 		return errors.Join(fmt.Errorf("enumerate plugin cache topology member %s", directory), readErr, closeErr)
 	}
 	inventory[directory] = pluginCacheTopologyEntry{info: openedInfo, depth: depth, changeID: installFileChangeID(openedInfo)}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	for _, entry := range entries {
 		path := filepath.Join(directory, entry.Name())
 		childInfo, err := root.Lstat(path)
@@ -611,6 +628,9 @@ func walkPluginCacheTopology(root *os.Root, directory string, depth, pass int, i
 			return fmt.Errorf("plugin cache topology member %s is not a real directory", path)
 		}
 		childDepth := depth + 1
+		if err := validateInstallTraversalDepth(childDepth, path); err != nil {
+			return err
+		}
 		if childDepth < 3 {
 			if err := walkPluginCacheTopology(root, path, childDepth, pass, inventory, afterDirectory); err != nil {
 				return err
@@ -660,7 +680,7 @@ func revalidatePluginCacheTopologyCensus(root *os.Root, inventory map[string]plu
 			return fmt.Errorf("retain topology directory %s for census: %w", directory, err)
 		}
 		openedInfo, statErr := dir.Stat()
-		entries, readErr := dir.ReadDir(-1)
+		entries, readErr := readInstallDirBounded(dir, len(directChildren[directory]), "plugin cache topology census")
 		closeErr := dir.Close()
 		if statErr != nil || readErr != nil || closeErr != nil {
 			return errors.Join(fmt.Errorf("census topology directory %s", directory), statErr, readErr, closeErr)
@@ -927,7 +947,7 @@ func validateCachedPluginInventoryWithHook(root *os.Root, afterMember func(strin
 	inventory := map[string]cachedPluginInventoryEntry{}
 	seen := map[string]bool{}
 	for _, directory := range roots {
-		if err := walkCachedPluginInventory(root, directory, expected, expectedDirectories, seen, inventory, afterMember); err != nil {
+		if err := walkCachedPluginInventory(root, directory, expected, expectedDirectories, seen, inventory, afterMember, installRelativeTraversalDepth(directory)); err != nil {
 			return nil, err
 		}
 		for path := range expected {
@@ -939,7 +959,10 @@ func validateCachedPluginInventoryWithHook(root *os.Root, afterMember func(strin
 	return inventory, nil
 }
 
-func walkCachedPluginInventory(root *os.Root, directory string, expected, expectedDirectories, seen map[string]bool, inventory map[string]cachedPluginInventoryEntry, afterMember func(string)) error {
+func walkCachedPluginInventory(root *os.Root, directory string, expected, expectedDirectories, seen map[string]bool, inventory map[string]cachedPluginInventoryEntry, afterMember func(string), depth int) error {
+	if err := validateInstallTraversalDepth(depth, directory); err != nil {
+		return err
+	}
 	info, err := root.Lstat(directory)
 	if err != nil {
 		return err
@@ -955,12 +978,11 @@ func walkCachedPluginInventory(root *os.Root, directory string, expected, expect
 	if err != nil {
 		return err
 	}
-	entries, readErr := dir.ReadDir(-1)
+	entries, readErr := readInstallDirBounded(dir, len(expected)+len(expectedDirectories)-len(inventory), "cached plugin inventory")
 	closeErr := dir.Close()
 	if readErr != nil || closeErr != nil {
 		return errors.Join(readErr, closeErr)
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	for _, entry := range entries {
 		path := filepath.Join(directory, entry.Name())
 		info, err := root.Lstat(path)
@@ -971,7 +993,7 @@ func walkCachedPluginInventory(root *os.Root, directory string, expected, expect
 			return fmt.Errorf("cached plugin inventory member %s is a symlink", path)
 		}
 		if info.IsDir() {
-			if err := walkCachedPluginInventory(root, path, expected, expectedDirectories, seen, inventory, afterMember); err != nil {
+			if err := walkCachedPluginInventory(root, path, expected, expectedDirectories, seen, inventory, afterMember, depth+1); err != nil {
 				return err
 			}
 			continue
@@ -1454,10 +1476,7 @@ func stageAndCommit(home string, build func(stage string) error) (retErr error) 
 		if err := durableMkdirAll(filepath.Dir(dst)); err != nil {
 			return err
 		}
-		if err := durableRemoveAll(dst); err != nil {
-			return err
-		}
-		if err := copyEntryNoFollow(src, dst); err != nil {
+		if err := stageInstallEntryNoReplace(src, dst, installStagePublish); err != nil {
 			return fmt.Errorf("commit install artifact %s: %w", rel, err)
 		}
 	}
@@ -1465,27 +1484,43 @@ func stageAndCommit(home string, build func(stage string) error) (retErr error) 
 }
 
 func copyTree(src, dst string) error {
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	budget := &installArtifactBudget{}
+	return walkInstallTreeBounded(src, installArtifactMaxEntries, func(path string, info os.FileInfo) error {
 		rel, err := filepath.Rel(src, path)
 		if err != nil {
 			return err
 		}
 		target := filepath.Join(dst, rel)
 		if info.IsDir() {
+			if budget.entries >= installArtifactMaxEntries {
+				return fmt.Errorf("copy tree exceeds %d-entry limit", installArtifactMaxEntries)
+			}
+			budget.entries++
 			return os.MkdirAll(target, 0o755)
 		}
-		return copyFile(path, target)
+		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("copy tree source %s contains unsupported entry %s", src, info.Mode().Type())
+		}
+		return copyFileWithBudget(path, target, budget)
 	})
 }
 
 func copyFile(src, dst string) (retErr error) {
-	info, err := os.Stat(src)
+	return copyFileWithBudget(src, dst, &installArtifactBudget{})
+}
+
+func copyFileWithBudget(src, dst string, budget *installArtifactBudget) (retErr error) {
+	info, err := os.Lstat(src)
 	if err != nil {
 		return err
 	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || info.Size() < 0 || info.Size() > installArtifactMaxFileBytes {
+		return fmt.Errorf("copy source %s must be a bounded regular non-symlink file", src)
+	}
+	if budget.entries >= installArtifactMaxEntries || info.Size() > installArtifactMaxTotalBytes-budget.bytes {
+		return fmt.Errorf("copy source %s exceeds tree bounds", src)
+	}
+	budget.entries++
 	if err := durableMkdirAll(filepath.Dir(dst)); err != nil {
 		return err
 	}
@@ -1499,15 +1534,26 @@ func copyFile(src, dst string) (retErr error) {
 		return err
 	}
 	defer func() { retErr = errors.Join(retErr, closeInstallFile(in)) }()
+	opened, err := in.Stat()
+	if err != nil || !sameInstallArtifactInfo(info, opened) {
+		return errors.Join(err, fmt.Errorf("copy source %s changed while opening", src))
+	}
 	out, cleanup, err := installScratchFile(filepath.Dir(dst), "copy")
 	if err != nil {
 		return err
 	}
 	tmp := out.Name()
 	defer func() { retErr = errors.Join(retErr, cleanup()) }()
-	if _, err := io.Copy(out, in); err != nil {
+	written, copyErr := io.Copy(out, io.LimitReader(in, info.Size()+1))
+	heldAfter, heldErr := in.Stat()
+	liveAfter, liveErr := os.Lstat(src)
+	if err := errors.Join(copyErr, heldErr, liveErr); err != nil {
 		return errors.Join(err, closeInstallFile(out))
 	}
+	if written != info.Size() || !sameInstallArtifactInfo(info, heldAfter) || !sameInstallArtifactInfo(info, liveAfter) {
+		return errors.Join(fmt.Errorf("copy source %s changed while copying", src), closeInstallFile(out))
+	}
+	budget.bytes += written
 	if err := out.Chmod(info.Mode().Perm()); err != nil {
 		return errors.Join(err, closeInstallFile(out))
 	}
@@ -1831,6 +1877,14 @@ func extractTarGz(archive, dest string) (retErr error) {
 		if target != filepath.Clean(dest) && !strings.HasPrefix(target, root) {
 			return fmt.Errorf("archive member %q escapes extraction root", hdr.Name)
 		}
+		for parent := filepath.Dir(target); pathAtOrBelow(filepath.Clean(dest), parent); parent = filepath.Dir(parent) {
+			if _, exists := directoryModes[parent]; !exists {
+				directoryModes[parent] = 0o755
+			}
+			if parent == filepath.Clean(dest) {
+				break
+			}
+		}
 		switch hdr.Typeflag {
 		case tar.TypeDir:
 			mode := os.FileMode(hdr.Mode).Perm()
@@ -1847,9 +1901,10 @@ func extractTarGz(archive, dest string) (retErr error) {
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(out, tr); err != nil { //nolint:gosec // our own release tarball
+			written, copyErr := io.CopyN(out, tr, hdr.Size)
+			if copyErr != nil || written != hdr.Size { //nolint:gosec // our own checksummed release tarball
 				out.Close()
-				return err
+				return errors.Join(copyErr, fmt.Errorf("archive member %q yielded %d bytes, want %d", hdr.Name, written, hdr.Size))
 			}
 			if err := out.Close(); err != nil {
 				return err
@@ -1865,19 +1920,28 @@ func extractTarGz(archive, dest string) (retErr error) {
 	// Implicit parent directories have canonical 0755; explicit directory
 	// headers retain their sanitized permission. Apply after extraction so a
 	// restrictive header cannot prevent creation of later children.
-	return filepath.Walk(dest, func(path string, info os.FileInfo, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+	directories := make([]string, 0, len(directoryModes))
+	for path := range directoryModes {
+		directories = append(directories, path)
+	}
+	sort.Slice(directories, func(i, j int) bool {
+		leftDepth := strings.Count(filepath.Clean(directories[i]), string(os.PathSeparator))
+		rightDepth := strings.Count(filepath.Clean(directories[j]), string(os.PathSeparator))
+		if leftDepth != rightDepth {
+			return leftDepth > rightDepth
 		}
-		if !info.IsDir() {
-			return nil
-		}
-		mode, ok := directoryModes[path]
-		if !ok {
-			mode = 0o755
-		}
-		return os.Chmod(path, mode)
+		return directories[i] < directories[j]
 	})
+	for _, path := range directories {
+		info, err := os.Lstat(path)
+		if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return errors.Join(err, fmt.Errorf("extracted directory %s changed before permission finalization", path))
+		}
+		if err := os.Chmod(path, directoryModes[path]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type tarMemberKind uint8
@@ -1986,8 +2050,16 @@ func canonicalTarMember(hdr *tar.Header) (string, error) {
 }
 
 func singleChildDir(dir string) (string, error) {
-	entries, err := os.ReadDir(dir)
+	f, err := os.Open(dir)
 	if err != nil {
+		return "", err
+	}
+	entries, readErr := f.ReadDir(2)
+	if errors.Is(readErr, io.EOF) {
+		readErr = nil
+	}
+	closeErr := closeInstallFile(f)
+	if err := errors.Join(readErr, closeErr); err != nil {
 		return "", err
 	}
 	if len(entries) != 1 {

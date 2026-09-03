@@ -83,6 +83,59 @@ func TestRootedMachineReadRejectsParentSymlinkSwap(t *testing.T) {
 	}
 }
 
+func TestRootedReadRejectsOversizedSparseArtifactBeforeAllocation(t *testing.T) {
+	design := t.TempDir()
+	path := filepath.Join(design, "oversized.md")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(designArtifactMaxBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readRegularFile(path); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("rooted reader accepted oversized sparse artifact: %v", err)
+	}
+}
+
+func TestRootedReadRejectsSameSizeConcurrentMutation(t *testing.T) {
+	design := t.TempDir()
+	path := filepath.Join(design, "mutable.md")
+	if err := os.WriteFile(path, []byte("before"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prior := rootReadAfterInitial
+	t.Cleanup(func() { rootReadAfterInitial = prior })
+	rootReadAfterInitial = func(rel string) {
+		if rel != "mutable.md" {
+			return
+		}
+		rootReadAfterInitial = func(string) {}
+		if err := os.WriteFile(path, []byte("change"), 0o600); err != nil {
+			t.Error(err)
+		}
+	}
+	if _, err := readRegularFile(path); err == nil || !strings.Contains(err.Error(), "changed while reading") {
+		t.Fatalf("rooted reader accepted same-size mutation: %v", err)
+	}
+}
+
+func TestBoundedTreeWalkerRejectsHighEntryInventory(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a", "b", "c"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	err := walkTreeDirBounded(dir, 2, designInventoryMaxDepth, func(string, os.DirEntry, error) error { return nil })
+	if err == nil || !strings.Contains(err.Error(), "-entry limit") {
+		t.Fatalf("bounded tree walker accepted high-entry inventory: %v", err)
+	}
+}
+
 func TestSelectRejectsNonportableAndAliasedDesignPaths(t *testing.T) {
 	for _, name := range []string{"CON.md", "naïve.md", "trailing."} {
 		t.Run(name, func(t *testing.T) {

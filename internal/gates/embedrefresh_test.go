@@ -2,6 +2,7 @@ package gates
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,76 @@ import (
 	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/ir"
 )
+
+func TestEmbedInventoryRejectsEntryBeyondFixedCeiling(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"c", "a", "b"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close() //nolint:errcheck // test cleanup
+	if _, err := readEmbedTxDir(f, 2); err == nil || !strings.Contains(err.Error(), "entry limit") {
+		t.Fatalf("high-entry embed inventory was accepted: %v", err)
+	}
+}
+
+func TestEmbedReadStateRejectsContinuousAppender(t *testing.T) {
+	dir := t.TempDir()
+	name := "target.md"
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(strings.Repeat("x", 1<<20)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close() //nolint:errcheck // test cleanup
+	tx := &embedRootTransaction{design: dir, root: root}
+	old := embedReadStateAfterOpen
+	t.Cleanup(func() { embedReadStateAfterOpen = old })
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	embedReadStateAfterOpen = func(rel string) {
+		if rel != name {
+			return
+		}
+		embedReadStateAfterOpen = func(string) {}
+		first := make(chan struct{})
+		go func() {
+			defer close(stopped)
+			f, openErr := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+			if openErr != nil {
+				close(first)
+				return
+			}
+			defer f.Close() //nolint:errcheck // test mutation
+			for i := 0; ; i++ {
+				_, _ = f.Write([]byte("growth"))
+				if i == 0 {
+					close(first)
+				}
+				select {
+				case <-done:
+					return
+				default:
+				}
+			}
+		}()
+		<-first
+	}
+	_, err = tx.readState(name)
+	close(done)
+	<-stopped
+	if err == nil || !strings.Contains(err.Error(), "changed while reading") {
+		t.Fatalf("continuous appender was accepted: %v", err)
+	}
+}
 
 // refreshDesign writes a two-document design: a source and one embedding
 // document whose marker and table are given verbatim.
@@ -1046,6 +1117,219 @@ func TestEmbedJournalPromotionRejectsLateStageAndJournalABA(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestEmbedJournalInstallPreservesAtomicDestinationCollisionAndRecovers(t *testing.T) {
+	design := t.TempDir()
+	target := filepath.Join(design, "SHARD.md")
+	if err := os.WriteFile(target, []byte("old\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := openEmbedRootTransaction(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Close()
+	journal, err := newEmbedTxJournal(tx.scope, []embedTxItem{{Path: "SHARD.md", Old: []byte("old\n"), New: []byte("new\n"), OldMode: 0o644, NewMode: 0o644}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	collision := []byte("concurrent journal authority\n")
+	prior := embedRenameNoReplace
+	embedRenameNoReplace = func(root *os.Root, from, to string) error {
+		if from == embedTxStageName && to == embedTxJournalName {
+			file, openErr := root.OpenFile(to, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+			if openErr != nil {
+				return openErr
+			}
+			_, writeErr := file.Write(collision)
+			if err := errors.Join(writeErr, file.Close()); err != nil {
+				return err
+			}
+		}
+		return prior(root, from, to)
+	}
+	err = tx.persistJournal(journal)
+	embedRenameNoReplace = prior
+	t.Cleanup(func() { embedRenameNoReplace = prior })
+	if err == nil || !strings.Contains(err.Error(), "install embed refresh journal") {
+		t.Fatalf("destination collision was overwritten or accepted: %v", err)
+	}
+	journalBody, readErr := os.ReadFile(filepath.Join(design, embedTxJournalName))
+	if readErr != nil || !bytes.Equal(journalBody, collision) {
+		t.Fatalf("concurrent journal = %q, %v", journalBody, readErr)
+	}
+	if _, statErr := os.Lstat(filepath.Join(design, embedTxStageName)); statErr != nil {
+		t.Fatalf("staged recovery authority was not preserved: %v", statErr)
+	}
+	if err := os.Remove(filepath.Join(design, embedTxJournalName)); err != nil {
+		t.Fatal(err)
+	}
+	pending, ok, err := tx.pending()
+	if err != nil || !ok {
+		t.Fatalf("pending staged journal = ok %v, err %v", ok, err)
+	}
+	if err := tx.recover(pending); err != nil {
+		t.Fatalf("retry did not recover preserved stage: %v", err)
+	}
+	body, err := os.ReadFile(target)
+	if err != nil || string(body) != "new\n" {
+		t.Fatalf("recovered target = %q, %v", body, err)
+	}
+}
+
+func TestEmbedCommittedStageRecoversAfterOlderJournalRemovalCrash(t *testing.T) {
+	design := refreshDesign(t, keyedSource,
+		"<!-- machinery:embed from=\"ARCHITECTURE.md\" table=\"name,note\" claims=\"subset\" -->\n| name | note |\n|---|---|\n| `alpha` | STALE |\n")
+	prior := embedTransactionPoint
+	embedTransactionPoint = func(point string) error {
+		if point == "finalize-journal-removed-before-stage" {
+			panic("power loss after older journal removal")
+		}
+		return nil
+	}
+	func() {
+		defer func() {
+			if recovered := recover(); recovered == nil {
+				t.Fatal("journal-removal crash boundary did not fire")
+			}
+		}()
+		_, _, _ = RefreshEmbeds(design, false)
+	}()
+	embedTransactionPoint = prior
+	t.Cleanup(func() { embedTransactionPoint = prior })
+	if _, err := os.Lstat(filepath.Join(design, embedTxJournalName)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("older journal remained after crash boundary: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(design, embedTxStageName)); err != nil {
+		t.Fatalf("committed recovery stage missing: %v", err)
+	}
+	if _, _, err := RefreshEmbeds(design, false); err != nil {
+		t.Fatalf("restart did not recover committed stage: %v", err)
+	}
+	assertNoEmbedTransactionResidue(t, design)
+}
+
+func TestEmbedRemoveExactPreservesLateSameByteReplacementAndQuarantine(t *testing.T) {
+	design := t.TempDir()
+	path := filepath.Join(design, "victim.txt")
+	if err := os.WriteFile(path, []byte("owned\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := openEmbedRootTransaction(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Close()
+	state, err := tx.readState("victim.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior := embedTransactionPoint
+	embedTransactionPoint = func(point string) error {
+		if point == "remove-quarantined:victim.txt" {
+			return os.WriteFile(path, []byte("owned\n"), 0o600)
+		}
+		return nil
+	}
+	err = tx.removeExact("victim.txt", state, "", "test victim")
+	embedTransactionPoint = prior
+	t.Cleanup(func() { embedTransactionPoint = prior })
+	if err == nil || !strings.Contains(err.Error(), "was repopulated") {
+		t.Fatalf("late same-byte replacement was removed or accepted: %v", err)
+	}
+	body, readErr := os.ReadFile(path)
+	if readErr != nil || string(body) != "owned\n" {
+		t.Fatalf("public replacement = %q, %v", body, readErr)
+	}
+	residue, err := tx.embedResiduePaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	quarantines := 0
+	for _, rel := range residue {
+		if embedDeleteQuarantineRel(rel) {
+			quarantines++
+		}
+	}
+	if quarantines != 1 {
+		t.Fatalf("private deletion quarantines = %v, want exactly one", residue)
+	}
+}
+
+func TestEmbedRemoveExactRestoresABAReplacementMovedAtQuarantineBoundary(t *testing.T) {
+	design := t.TempDir()
+	path := filepath.Join(design, "victim.txt")
+	if err := os.WriteFile(path, []byte("owned\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := openEmbedRootTransaction(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Close()
+	state, err := tx.readState("victim.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior := embedTransactionPoint
+	embedTransactionPoint = func(point string) error {
+		if point == "remove-before-quarantine:victim.txt" {
+			replaceEmbedTestFile(t, path, []byte("owned\n"), 0o600)
+		}
+		return nil
+	}
+	err = tx.removeExact("victim.txt", state, "", "test victim")
+	embedTransactionPoint = prior
+	t.Cleanup(func() { embedTransactionPoint = prior })
+	if err == nil || !strings.Contains(err.Error(), "differs from its exact retained witness") {
+		t.Fatalf("same-byte ABA replacement was removed or accepted: %v", err)
+	}
+	body, readErr := os.ReadFile(path)
+	if readErr != nil || string(body) != "owned\n" {
+		t.Fatalf("ABA replacement was not restored to its public name: %q, %v", body, readErr)
+	}
+	residue, err := tx.embedResiduePaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(residue) != 0 {
+		t.Fatalf("restored ABA left deletion residue: %v", residue)
+	}
+}
+
+func TestEmbedDeletionQuarantineCrashResidueRecovers(t *testing.T) {
+	for _, crashPoint := range []string{
+		"remove-quarantined:.machinery-embed-old-000000",
+		"remove-quarantined:" + embedTxJournalName,
+		"remove-quarantined:" + embedTxStageName,
+	} {
+		t.Run(crashPoint, func(t *testing.T) {
+			design := refreshDesign(t, keyedSource,
+				"<!-- machinery:embed from=\"ARCHITECTURE.md\" table=\"name,note\" claims=\"subset\" -->\n| name | note |\n|---|---|\n| `alpha` | STALE |\n")
+			prior := embedTransactionPoint
+			embedTransactionPoint = func(point string) error {
+				if point == crashPoint {
+					panic("power loss with retained deletion quarantine")
+				}
+				return nil
+			}
+			func() {
+				defer func() {
+					if recovered := recover(); recovered == nil {
+						t.Fatalf("crash point %s did not fire", crashPoint)
+					}
+				}()
+				_, _, _ = RefreshEmbeds(design, false)
+			}()
+			embedTransactionPoint = prior
+			t.Cleanup(func() { embedTransactionPoint = prior })
+			if _, _, err := RefreshEmbeds(design, false); err != nil {
+				t.Fatalf("restart did not resume deletion quarantine: %v", err)
+			}
+			assertNoEmbedTransactionResidue(t, design)
+		})
+	}
 }
 
 func TestEmbedRefreshRootedTransactionCannotEscapeSwappedParent(t *testing.T) {

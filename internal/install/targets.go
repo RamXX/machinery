@@ -75,7 +75,7 @@ func ValidateArtifact(artifact Artifact) error {
 		if governed, err := validateReceiptArtifactDigest(artifact.Path); governed || err != nil {
 			return err
 		}
-		raw, err := os.ReadFile(filepath.Join(artifact.Path, "SKILL.md"))
+		raw, err := readInstallRegularFileExact(filepath.Join(artifact.Path, "SKILL.md"), 4<<20, false)
 		if err != nil {
 			return fmt.Errorf("read SKILL.md: %w", err)
 		}
@@ -101,7 +101,7 @@ func ValidateArtifact(artifact Artifact) error {
 	if governed, err := validateReceiptArtifactDigest(artifact.Path); governed || err != nil {
 		return err
 	}
-	raw, err := os.ReadFile(artifact.Path)
+	raw, err := readInstallRegularFileExact(artifact.Path, 4<<20, false)
 	if err != nil {
 		return err
 	}
@@ -474,7 +474,7 @@ func installOpenCodeAdapter(home, src string, out io.Writer) error {
 }
 
 func canonicalRoleBody(src string, spec roleSpec) (string, error) {
-	raw, err := os.ReadFile(filepath.Join(src, agentsRel, spec.File))
+	raw, err := readInstallRegularFileExact(filepath.Join(src, agentsRel, spec.File), 4<<20, false)
 	if err != nil {
 		return "", err
 	}

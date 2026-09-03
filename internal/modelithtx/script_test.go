@@ -81,6 +81,7 @@ func scriptFixture(t *testing.T) string {
 	sourceRepo := filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", ".."))
 	repo := t.TempDir()
 	copyFixtureFile(t, filepath.Join(sourceRepo, "go.mod"), filepath.Join(repo, "go.mod"))
+	copyFixtureFile(t, filepath.Join(sourceRepo, "go.sum"), filepath.Join(repo, "go.sum"))
 	for _, rel := range []string{
 		"scripts/git-safe.sh",
 		"scripts/git-safe/main.go",
@@ -91,7 +92,9 @@ func scriptFixture(t *testing.T) string {
 		copyFixtureFile(t, filepath.Join(sourceRepo, rel), filepath.Join(repo, rel))
 	}
 	copyFixtureTree(t, filepath.Join(sourceRepo, "scripts", "run-safe"), filepath.Join(repo, "scripts", "run-safe"), "_test.go")
+	copyFixtureTree(t, filepath.Join(sourceRepo, "scripts", "tree-inventory"), filepath.Join(repo, "scripts", "tree-inventory"), "_test.go")
 	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "modelithtx"), filepath.Join(repo, "internal", "modelithtx"), "_test.go")
+	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "fsatomic"), filepath.Join(repo, "internal", "fsatomic"), "_test.go")
 	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "filelock"), filepath.Join(repo, "internal", "filelock"), "_test.go")
 	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "gitcontrol"), filepath.Join(repo, "internal", "gitcontrol"), "_test.go")
 	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "processcontrol"), filepath.Join(repo, "internal", "processcontrol"), "_test.go")
@@ -199,7 +202,7 @@ func readFixture(t *testing.T, repo, rel string) string {
 
 func assertNoTransactionResidue(t *testing.T, repo string) {
 	t.Helper()
-	for _, name := range []string{stageName, backupName, retireName, journalName, journalNextName, journalAuthorityName, journalRetireName} {
+	for _, name := range []string{stageName, backupName, retireName, journalName, journalNextName, journalAuthorityName, journalPreviousName, journalRetireName} {
 		if _, err := os.Lstat(filepath.Join(repo, name)); !os.IsNotExist(err) {
 			t.Fatalf("transaction residue %s remains: %v", name, err)
 		}

@@ -16,18 +16,20 @@ func (l *Lock) materializeDesignSource() error {
 	if err != nil || !os.SameFile(l.rootInfo, current) {
 		return fmt.Errorf("design root changed identity before immutable source materialization")
 	}
-	temp, err := os.MkdirTemp("", "machinery-design-source-")
+	cleanup, err := newPrivateSnapshot("machinery-design-source-")
 	if err != nil {
 		return fmt.Errorf("create immutable design source: %w", err)
 	}
+	temp := cleanup.Path()
 	values, err := l.copyExternalTree(l.root, temp, designSourceBeforeOpen, designSourceAfterRead)
 	if err != nil {
-		return errors.Join(fmt.Errorf("materialize immutable design source; refusing a potentially ABA-derived generation: %w", err), os.RemoveAll(temp))
+		return errors.Join(fmt.Errorf("materialize immutable design source; refusing a potentially ABA-derived generation: %w", err), cleanup.Close())
 	}
 	if got, want := fingerprintDigest(values), fingerprintDigest(l.snapshot); got != want {
-		return errors.Join(fmt.Errorf("design changed while materializing immutable source; refusing a potentially ABA-derived generation"), os.RemoveAll(temp))
+		return errors.Join(fmt.Errorf("design changed while materializing immutable source; refusing a potentially ABA-derived generation"), cleanup.Close())
 	}
 	l.sourceRoot = temp
+	l.sourceCleanup = cleanup
 	l.sourceAliases = append(l.sourceAliases, temp)
 	return nil
 }

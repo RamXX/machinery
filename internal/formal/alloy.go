@@ -420,15 +420,20 @@ func readStableAlloyReceipt(outDir string) (_ []byte, retErr error) {
 			return nil, nil, err
 		}
 		info, statErr := f.Stat()
-		body, readErr := io.ReadAll(io.LimitReader(f, alloySolutionLimit+1))
+		if statErr == nil && (info.Size() < 0 || info.Size() > alloySolutionLimit) {
+			statErr = fmt.Errorf("receipt.json exceeds %d bytes", alloySolutionLimit)
+		}
+		var body bytes.Buffer
+		var readErr error
+		if statErr == nil {
+			body.Grow(int(info.Size()))
+			_, readErr = copyFormalExact(&body, f, info.Size(), "Alloy receipt")
+		}
 		closeErr := f.Close()
 		if err := errors.Join(statErr, readErr, closeErr); err != nil {
 			return nil, nil, err
 		}
-		if len(body) > alloySolutionLimit {
-			return nil, nil, fmt.Errorf("receipt.json exceeds %d bytes", alloySolutionLimit)
-		}
-		return body, info, nil
+		return body.Bytes(), info, nil
 	}
 	first, firstInfo, err := read()
 	if err != nil || !firstInfo.Mode().IsRegular() || !os.SameFile(before, firstInfo) || before.Mode() != firstInfo.Mode() {
@@ -440,7 +445,8 @@ func readStableAlloyReceipt(outDir string) (_ []byte, retErr error) {
 		return nil, err
 	}
 	if !secondInfo.Mode().IsRegular() || !os.SameFile(before, secondInfo) || !os.SameFile(before, final) ||
-		secondInfo.Mode() != before.Mode() || final.Mode() != before.Mode() || !bytes.Equal(first, second) {
+		secondInfo.Mode() != before.Mode() || final.Mode() != before.Mode() || secondInfo.Size() != before.Size() || final.Size() != before.Size() ||
+		!secondInfo.ModTime().Equal(before.ModTime()) || !final.ModTime().Equal(before.ModTime()) || !bytes.Equal(first, second) {
 		return nil, fmt.Errorf("receipt.json changed content, identity, or mode while validating")
 	}
 	return first, nil
@@ -515,14 +521,9 @@ func alloySolutionName(commandName string) (string, error) {
 }
 
 func validateAlloySolutionInventory(root *os.Root, expected []string) error {
-	dir, err := root.Open(".")
+	entries, err := readFormalRootDirectory(root, "Alloy output")
 	if err != nil {
 		return err
-	}
-	entries, readErr := dir.ReadDir(-1)
-	closeErr := dir.Close()
-	if readErr != nil || closeErr != nil {
-		return errors.Join(readErr, closeErr)
 	}
 	actual := make([]string, 0, len(expected))
 	for _, entry := range entries {
@@ -563,21 +564,23 @@ func readStableAlloySolution(root *os.Root, name string) (_ []byte, retErr error
 	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(before, opened) || before.Mode() != opened.Mode() {
 		return nil, errors.Join(err, fmt.Errorf("required solution %s changed identity or mode while opening", name), file.Close())
 	}
-	body, err := io.ReadAll(io.LimitReader(file, alloySolutionLimit+1))
+	if opened.Size() < 0 || opened.Size() > alloySolutionLimit {
+		return nil, errors.Join(fmt.Errorf("required solution %s exceeds %d bytes", name, alloySolutionLimit), file.Close())
+	}
+	var body bytes.Buffer
+	body.Grow(int(opened.Size()))
+	_, err = copyFormalExact(&body, file, opened.Size(), "Alloy solution "+name)
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("read required solution %s: %w", name, err), file.Close())
 	}
 	if err := file.Close(); err != nil {
 		return nil, err
 	}
-	if len(body) > alloySolutionLimit {
-		return nil, fmt.Errorf("required solution %s exceeds %d bytes", name, alloySolutionLimit)
-	}
 	after, err := root.Lstat(name)
-	if err != nil || !os.SameFile(opened, after) || opened.Mode() != after.Mode() || opened.Size() != after.Size() {
+	if err != nil || !os.SameFile(opened, after) || opened.Mode() != after.Mode() || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) {
 		return nil, errors.Join(err, fmt.Errorf("required solution %s changed while reading", name))
 	}
-	if err := validateAlloySolutionBody(body); err != nil {
+	if err := validateAlloySolutionBody(body.Bytes()); err != nil {
 		return nil, fmt.Errorf("required solution %s is not canonical: %w", name, err)
 	}
 	formalAfterAlloySolutionRead(name)
@@ -586,17 +589,26 @@ func readStableAlloySolution(root *os.Root, name string) (_ []byte, retErr error
 		return nil, fmt.Errorf("reopen required solution %s: %w", name, err)
 	}
 	againInfo, statErr := again.Stat()
-	againBody, readErr := io.ReadAll(io.LimitReader(again, alloySolutionLimit+1))
+	var againBody bytes.Buffer
+	var readErr error
+	if statErr == nil && (againInfo.Size() < 0 || againInfo.Size() > alloySolutionLimit) {
+		statErr = fmt.Errorf("required solution %s exceeds %d bytes", name, alloySolutionLimit)
+	}
+	if statErr == nil {
+		againBody.Grow(int(againInfo.Size()))
+		_, readErr = copyFormalExact(&againBody, again, againInfo.Size(), "Alloy solution "+name)
+	}
 	closeErr := again.Close()
 	final, finalErr := root.Lstat(name)
 	if err := errors.Join(statErr, readErr, closeErr, finalErr); err != nil {
 		return nil, err
 	}
 	if !againInfo.Mode().IsRegular() || !os.SameFile(before, againInfo) || !os.SameFile(before, final) ||
-		againInfo.Mode() != before.Mode() || final.Mode() != before.Mode() || !bytes.Equal(body, againBody) {
+		againInfo.Mode() != before.Mode() || final.Mode() != before.Mode() || againInfo.Size() != before.Size() || final.Size() != before.Size() ||
+		!againInfo.ModTime().Equal(before.ModTime()) || !final.ModTime().Equal(before.ModTime()) || !bytes.Equal(body.Bytes(), againBody.Bytes()) {
 		return nil, fmt.Errorf("required solution %s changed content, identity, or mode while validating", name)
 	}
-	return body, nil
+	return body.Bytes(), nil
 }
 
 func validateAlloySolutionBody(body []byte) error {

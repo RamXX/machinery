@@ -286,7 +286,11 @@ func CheckCarriers(design string) *Gate {
 	// no matrices and this corpus is empty, which costs nothing; that is
 	// the point of running from Phase 1.
 	var unitCells []string
-	for _, f := range globExt(filepath.Join(design, "machines"), ".matrix.md") {
+	matrixFiles, inventoryErr := globExt(filepath.Join(design, "machines"), ".matrix.md")
+	if inventoryErr != nil {
+		g.Errs = append(g.Errs, inventoryErr.Error())
+	}
+	for _, f := range matrixFiles {
 		for _, tbl := range ir.ParseMdTables(readDesignOrEmpty(design, f)) {
 			mi := ir.FindCol(tbl.Header, "maps to")
 			if mi < 0 {

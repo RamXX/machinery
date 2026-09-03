@@ -18,10 +18,6 @@ var (
 	releaseFlushFileBuffers = releaseKernel32.NewProc("FlushFileBuffers")
 )
 
-func replaceArchive(root *os.Root, oldName, newName string) error {
-	return root.Rename(oldName, newName)
-}
-
 func syncArchiveDirectory(root *os.Root) error {
 	// O_CREATE requests a write-capable handle without O_WRONLY/O_RDWR's
 	// FILE_NON_DIRECTORY_FILE constraint. The already-existing rooted "."
@@ -40,4 +36,12 @@ func syncArchiveDirectory(root *os.Root) error {
 		errs = append(errs, fmt.Errorf("close release output directory: %w", closeErr))
 	}
 	return errors.Join(errs...)
+}
+
+func archiveNativeFileIdentity(file *os.File, _ os.FileInfo) (string, error) {
+	var info syscall.ByHandleFileInformation
+	if err := syscall.GetFileInformationByHandle(syscall.Handle(file.Fd()), &info); err != nil {
+		return "", fmt.Errorf("inspect native Windows release archive identity: %w", err)
+	}
+	return fmt.Sprintf("windows:%x:%08x%08x:%08x%08x", info.VolumeSerialNumber, info.FileIndexHigh, info.FileIndexLow, info.CreationTime.HighDateTime, info.CreationTime.LowDateTime), nil
 }

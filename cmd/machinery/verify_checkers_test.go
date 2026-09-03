@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +25,25 @@ import (
 	machversion "github.com/RamXX/machinery/internal/version"
 )
 
+type recordingCheckerToolDirectoryReader struct {
+	requests []int
+}
+
+func (r *recordingCheckerToolDirectoryReader) ReadDir(count int) ([]fs.DirEntry, error) {
+	r.requests = append(r.requests, count)
+	return nil, io.EOF
+}
+
+func TestCheckerToolInventoryMaxIntNeverIssuesUnboundedRequest(t *testing.T) {
+	reader := &recordingCheckerToolDirectoryReader{}
+	if _, err := readCheckerToolDir(reader, math.MaxInt); err != nil {
+		t.Fatal(err)
+	}
+	if len(reader.requests) != 1 || reader.requests[0] != checkerToolReadDirPage {
+		t.Fatalf("ReadDir requests = %v, want one positive bounded page of %d", reader.requests, checkerToolReadDirPage)
+	}
+}
+
 const testRuntimeClosure = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
 const testRuntimeImage = "example.invalid/machinery/checker-test@" + testRuntimeClosure
 const testRuntimePlatform = "linux/amd64"
@@ -31,6 +53,164 @@ const (
 	checkerScratchCrashDesignEnv = "MACHINERY_CHECKER_SCRATCH_CRASH_DESIGN"
 	checkerScratchCrashRegistry  = "MACHINERY_CHECKER_SCRATCH_CRASH_REGISTRY"
 )
+
+func TestCheckerToolInventoryRejectsEntryBeyondFixedCeiling(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"c", "a", "b"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close() //nolint:errcheck // test cleanup
+	if _, err := readCheckerToolDir(f, 2); err == nil || !strings.Contains(err.Error(), "entry limit") {
+		t.Fatalf("high-entry checker inventory was accepted: %v", err)
+	}
+}
+
+func TestCheckerToolInventoryRejectsExcessiveDepth(t *testing.T) {
+	work := t.TempDir()
+	for _, dir := range []string{"tool-assets", "tool-path", "tool-snapshots"} {
+		if err := os.Mkdir(filepath.Join(work, dir), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(work, "tool-assets", "nested"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close() //nolint:errcheck // test cleanup
+	if _, _, err := inventoryCheckerToolClosureBounded(root, 10, 1); err == nil || !strings.Contains(err.Error(), "depth limit") {
+		t.Fatalf("deep checker tool inventory was accepted: %v", err)
+	}
+}
+
+func TestReadEvidenceTraceRejectsHighEntryInventory(t *testing.T) {
+	root := t.TempDir()
+	generated := filepath.Join(root, "checkers", "test", "generated")
+	if err := os.MkdirAll(generated, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i <= checkerTraceInventoryLimit; i++ {
+		name := fmt.Sprintf("trace-%04d.bin", i)
+		if err := os.WriteFile(filepath.Join(generated, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	evidence := &checker.Evidence{TraceRef: "generated/trace-0000.bin"}
+	if _, err := readEvidenceTrace(root, "checkers/test/evidence.json", evidence); err == nil || !strings.Contains(err.Error(), "entry limit") {
+		t.Fatalf("high-entry generated trace inventory was accepted: %v", err)
+	}
+}
+
+func TestCheckerToolClosureRejectsContinuousAppender(t *testing.T) {
+	work := t.TempDir()
+	for _, dir := range []string{"tool-assets", "tool-path", "tool-snapshots"} {
+		if err := os.Mkdir(filepath.Join(work, dir), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	targetRel := filepath.Join("tool-snapshots", "tool")
+	target := filepath.Join(work, targetRel)
+	if err := os.WriteFile(target, []byte(strings.Repeat("x", 1<<20)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	old := checkerToolClosurePoint
+	t.Cleanup(func() { checkerToolClosurePoint = old })
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	checkerToolClosurePoint = func(path, phase string) error {
+		if path != targetRel || phase != "after-open" {
+			return nil
+		}
+		checkerToolClosurePoint = func(string, string) error { return nil }
+		first := make(chan struct{})
+		go func() {
+			defer close(stopped)
+			f, openErr := os.OpenFile(target, os.O_WRONLY|os.O_APPEND, 0)
+			if openErr != nil {
+				close(first)
+				return
+			}
+			defer f.Close() //nolint:errcheck // test mutation
+			for i := 0; ; i++ {
+				_, _ = f.Write([]byte("growth"))
+				if i == 0 {
+					close(first)
+				}
+				select {
+				case <-done:
+					return
+				default:
+				}
+			}
+		}()
+		<-first
+		return nil
+	}
+	_, err := checkerToolClosureHash(work)
+	close(done)
+	<-stopped
+	if err == nil || !strings.Contains(err.Error(), "changed size while hashing") {
+		t.Fatalf("continuous appender was accepted: %v", err)
+	}
+}
+
+func TestCheckerSnapshotRejectsContinuousAppender(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "tool")
+	if err := os.WriteFile(source, []byte(strings.Repeat("x", 1<<20)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Lstat(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := checkerSnapshotPoint
+	t.Cleanup(func() { checkerSnapshotPoint = old })
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	checkerSnapshotPoint = func(path, phase string) error {
+		if path != source || phase != "after-open" {
+			return nil
+		}
+		checkerSnapshotPoint = func(string, string) error { return nil }
+		first := make(chan struct{})
+		go func() {
+			defer close(stopped)
+			f, openErr := os.OpenFile(source, os.O_WRONLY|os.O_APPEND, 0)
+			if openErr != nil {
+				close(first)
+				return
+			}
+			defer f.Close() //nolint:errcheck // test mutation
+			for i := 0; ; i++ {
+				_, _ = f.Write([]byte("growth"))
+				if i == 0 {
+					close(first)
+				}
+				select {
+				case <-done:
+					return
+				default:
+				}
+			}
+		}()
+		<-first
+		return nil
+	}
+	err = snapshotCheckerFile(checkerSnapshotSource{path: source, info: info}, filepath.Join(t.TempDir(), "snapshot"), 0o700)
+	close(done)
+	<-stopped
+	if err == nil || !strings.Contains(err.Error(), "changed size") {
+		t.Fatalf("continuous appender was accepted: %v", err)
+	}
+}
 
 const vcModel = `kind: DomainModel
 version: v1

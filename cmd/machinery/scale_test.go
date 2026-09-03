@@ -7,6 +7,23 @@ import (
 	"testing"
 )
 
+func TestStableRegularRejectsOversizedSparseInputBeforeRead(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "oversized.modelith.yaml")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(stableRegularMaxBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := openStableRegular(path); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("stable reader accepted oversized sparse input: %v", err)
+	}
+}
+
 func TestScalePropagatesMachineParseFailure(t *testing.T) {
 	design := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(design, "machines"), 0o755); err != nil {

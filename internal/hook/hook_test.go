@@ -2,6 +2,7 @@ package hook
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -20,6 +21,8 @@ import (
 	"github.com/RamXX/machinery/internal/testgit"
 
 	"github.com/RamXX/machinery/internal/designlock"
+	"github.com/RamXX/machinery/internal/filelock"
+	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/gates"
 )
 
@@ -1721,6 +1724,28 @@ func TestSessionStartSilentWhenUnmanaged(t *testing.T) {
 	}
 }
 
+func TestSessionStartRejectsOversizedSparseLedger(t *testing.T) {
+	root := t.TempDir()
+	design := filepath.Join(root, "design")
+	if err := os.MkdirAll(design, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(design, "STATE.md")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(hookMarkerMaxBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := sessionStart(io.Discard, root, Config{}, ""); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatalf("session start accepted oversized sparse ledger: %v", err)
+	}
+}
+
 // --- project-wide durable state ledger ---
 
 func TestStatePathIsolatesRootsAndJoinsSessions(t *testing.T) {
@@ -2524,33 +2549,229 @@ func TestStateDirectoryIsPrivateAndSymlinkLedgerFailsClosed(t *testing.T) {
 
 func TestConcurrentStateUpdatesPreserveEveryTouchClass(t *testing.T) {
 	root := t.TempDir()
-	sid := "parallel-ledger"
-	clearState(root, sid)
-	var wg sync.WaitGroup
-	errs := make(chan error, 20)
-	for i := 0; i < 20; i++ {
-		kind := "design"
-		if i%2 == 1 {
-			kind = "impl"
+	for round := 0; round < 3; round++ {
+		sid := fmt.Sprintf("parallel-ledger-%d", round)
+		clearState(root, sid)
+		var wg sync.WaitGroup
+		errs := make(chan error, 20)
+		for i := 0; i < 20; i++ {
+			kind := "design"
+			if i%2 == 1 {
+				kind = "impl"
+			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				errs <- appendState(root, sid, kind)
+			}()
 		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			errs <- appendState(root, sid, kind)
-		}()
-	}
-	wg.Wait()
-	close(errs)
-	for err := range errs {
-		if err != nil {
-			t.Fatalf("concurrent state update failed: %v", err)
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			if err != nil {
+				t.Fatalf("concurrent state update round %d failed: %v", round, err)
+			}
 		}
+		design, impl, err := readStateErr(root, sid)
+		if err != nil || !design || !impl {
+			t.Fatalf("parallel touches round %d were lost: design=%v impl=%v err=%v", round, design, impl, err)
+		}
+		clearState(root, sid)
 	}
-	design, impl, err := readStateErr(root, sid)
-	if err != nil || !design || !impl {
-		t.Fatalf("parallel touches were lost: design=%v impl=%v err=%v", design, impl, err)
+}
+
+func TestAcquireStateLockWaitsForHolderAndThenSucceeds(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "waiter.state")
+	holder, err := filelock.Acquire(stateFile + ".session")
+	if err != nil {
+		t.Fatal(err)
 	}
-	clearState(root, sid)
+	holderReleased := false
+	t.Cleanup(func() {
+		if !holderReleased {
+			_ = holder.Release()
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	type result struct {
+		lock *stateLock
+		err  error
+	}
+	started := make(chan struct{})
+	resultCh := make(chan result, 1)
+	go func() {
+		close(started)
+		lock, err := acquireStateLockContext(ctx, stateFile)
+		resultCh <- result{lock: lock, err: err}
+	}()
+	<-started
+	select {
+	case got := <-resultCh:
+		t.Fatalf("state lock waiter returned while the exact lock was held: %v", got.err)
+	case <-time.After(25 * time.Millisecond):
+	}
+	if err := holder.Release(); err != nil {
+		t.Fatal(err)
+	}
+	holderReleased = true
+	select {
+	case got := <-resultCh:
+		if got.err != nil {
+			t.Fatalf("state lock waiter failed after release: %v", got.err)
+		}
+		if err := got.lock.release(); err != nil {
+			t.Fatalf("release acquired state lock: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatalf("state lock waiter did not acquire after release: %v", ctx.Err())
+	}
+}
+
+func TestAcquireStateLockContextCancellationClosesResources(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "cancel.state")
+	holder, err := filelock.Acquire(stateFile + ".session")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if lock, err := acquireStateLockContext(ctx, stateFile); err == nil || lock != nil || !strings.Contains(err.Error(), "context canceled") {
+		t.Fatalf("pre-canceled state lock acquisition = %#v, %v", lock, err)
+	}
+	if err := holder.Release(); err != nil {
+		t.Fatal(err)
+	}
+	reacquired, err := filelock.Acquire(stateFile + ".session")
+	if err != nil {
+		t.Fatalf("canceled waiter leaked lock resources: %v", err)
+	}
+	if err := reacquired.Release(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAcquireStateLockContextDeadlineIsFinite(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "deadline.state")
+	holder, err := filelock.Acquire(stateFile + ".session")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 40*time.Millisecond)
+	defer cancel()
+	lock, err := acquireStateLockContext(ctx, stateFile)
+	if err == nil || lock != nil || !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Fatalf("deadline-bound state lock acquisition = %#v, %v", lock, err)
+	}
+	if err := holder.Release(); err != nil {
+		t.Fatal(err)
+	}
+	reacquired, err := filelock.Acquire(stateFile + ".session")
+	if err != nil {
+		t.Fatalf("deadline-bound waiter leaked lock resources: %v", err)
+	}
+	if err := reacquired.Release(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAcquireHookMarkerLockWaitsForHeldMarkerAndThenSucceeds(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), ".machinery-hook-state-test.initialized")
+	holder, err := filelock.Acquire(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	holderReleased := false
+	t.Cleanup(func() {
+		if !holderReleased {
+			_ = holder.Release()
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	type result struct {
+		lock *filelock.Lock
+		err  error
+	}
+	started := make(chan struct{})
+	resultCh := make(chan result, 1)
+	go func() {
+		close(started)
+		lock, err := acquireHookFileLockContext(ctx, marker, "hook state initialization marker")
+		resultCh <- result{lock: lock, err: err}
+	}()
+	<-started
+	select {
+	case got := <-resultCh:
+		t.Fatalf("marker lock waiter returned while the exact marker lock was held: %v", got.err)
+	case <-time.After(25 * time.Millisecond):
+	}
+	if err := holder.Release(); err != nil {
+		t.Fatal(err)
+	}
+	holderReleased = true
+	select {
+	case got := <-resultCh:
+		if got.err != nil {
+			t.Fatalf("marker lock waiter failed after release: %v", got.err)
+		}
+		if err := got.lock.Release(); err != nil {
+			t.Fatalf("release acquired marker lock: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatalf("marker lock waiter did not acquire after release: %v", ctx.Err())
+	}
+}
+
+func TestAcquireHookMarkerLockCancellationAndDeadlineCloseResources(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		context func() (context.Context, context.CancelFunc)
+		want    string
+	}{
+		{
+			name: "pre-canceled",
+			context: func() (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+				return ctx, func() {}
+			},
+			want: "context canceled",
+		},
+		{
+			name: "deadline",
+			context: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(t.Context(), 40*time.Millisecond)
+			},
+			want: "context deadline exceeded",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			marker := filepath.Join(t.TempDir(), ".machinery-hook-state-test.initialized")
+			holder, err := filelock.Acquire(marker)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := tc.context()
+			defer cancel()
+			lock, err := acquireHookFileLockContext(ctx, marker, "hook state initialization marker")
+			if err == nil || lock != nil || !strings.Contains(err.Error(), tc.want) || !strings.Contains(err.Error(), hookStateLockWaitLimit.String()) {
+				t.Fatalf("bounded marker lock acquisition = %#v, %v", lock, err)
+			}
+			if err := holder.Release(); err != nil {
+				t.Fatal(err)
+			}
+			reacquired, err := filelock.Acquire(marker)
+			if err != nil {
+				t.Fatalf("canceled marker waiter leaked lock resources: %v", err)
+			}
+			if err := reacquired.Release(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }
 
 func TestHookStateSchemaRejectsEveryNoncanonicalExistingLedger(t *testing.T) {
@@ -2623,6 +2844,156 @@ func TestReplaceStateFileNativeReplacement(t *testing.T) {
 	}
 	if _, err := os.Lstat(temp); !os.IsNotExist(err) {
 		t.Fatalf("replacement left source temp behind: %v", err)
+	}
+}
+
+func TestHookStateInventoriesFailClosedAtFixedCeiling(t *testing.T) {
+	isolateHookState(t)
+	if err := ensureStateDir(); err != nil {
+		t.Fatal(err)
+	}
+	dir := stateDirPath()
+	for i := 0; i <= hookStateDirMaxEntries; i++ {
+		path := filepath.Join(dir, fmt.Sprintf("unrelated-%05d", i))
+		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := routeStatePaths(t.TempDir()); err == nil || !strings.Contains(err.Error(), "exceeds 4096-entry limit") {
+		t.Fatalf("oversized state inventory was accepted: %v", err)
+	}
+}
+
+func TestHookStateTempCleanupPreservesConcurrentReplacement(t *testing.T) {
+	isolateHookState(t)
+	if err := ensureStateDir(); err != nil {
+		t.Fatal(err)
+	}
+	stateFile := statePath(t.TempDir(), "cleanup-replacement")
+	temp := filepath.Join(filepath.Dir(stateFile), "."+filepath.Base(stateFile)+".tmp-race")
+	writeFile(t, temp, "original\n")
+	previous := hookStateReadPhase
+	t.Cleanup(func() { hookStateReadPhase = previous })
+	var once sync.Once
+	hookStateReadPhase = func(phase, path string) {
+		if phase == "after-quarantine" && path == temp {
+			once.Do(func() {
+				if err := os.WriteFile(temp, []byte("replacement\n"), 0o600); err != nil {
+					t.Errorf("install concurrent replacement: %v", err)
+				}
+			})
+		}
+	}
+	if err := cleanupHookStateTemps(stateFile); err == nil || !strings.Contains(err.Error(), "preserving the replacement") {
+		t.Fatalf("cleanup accepted concurrent temp replacement: %v", err)
+	}
+	got, err := os.ReadFile(temp)
+	if err != nil || string(got) != "replacement\n" {
+		t.Fatalf("cleanup removed concurrent replacement: %q, %v", got, err)
+	}
+}
+
+func TestHookStateTempCleanupResumesDeletionQuarantine(t *testing.T) {
+	isolateHookState(t)
+	if err := ensureStateDir(); err != nil {
+		t.Fatal(err)
+	}
+	stateFile := statePath(t.TempDir(), "cleanup-crash")
+	temp := filepath.Join(filepath.Dir(stateFile), "."+filepath.Base(stateFile)+".tmp-crash")
+	writeFile(t, temp, "durable crash evidence\n")
+	root, err := os.OpenRoot(filepath.Dir(stateFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	quarantined, err := fsatomic.Quarantine(root, filepath.Base(temp), "d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := errors.Join(quarantined.Close(), root.Close()); err != nil {
+		t.Fatal(err)
+	}
+	if err := cleanupHookStateTemps(stateFile); err != nil {
+		t.Fatalf("resume quarantined cleanup: %v", err)
+	}
+	if temps, err := hookStateTemps(stateFile); err != nil || len(temps) != 0 {
+		t.Fatalf("resumed cleanup retained temps: %v, %v", temps, err)
+	}
+	if quarantines, err := hookProjectQuarantinePaths(stateFile); err != nil || len(quarantines) != 0 {
+		t.Fatalf("resumed cleanup retained quarantine residue: %v, %v", quarantines, err)
+	}
+}
+
+func TestReplaceStateFilePreservesBoundaryReplacement(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "session.state")
+	temp := filepath.Join(dir, "session.state.new")
+	parked := filepath.Join(dir, "session.state.parked")
+	writeFile(t, target, "old\n")
+	writeFile(t, temp, "intended\n")
+	previous := hookStateReplacePhase
+	t.Cleanup(func() { hookStateReplacePhase = previous })
+	var once sync.Once
+	hookStateReplacePhase = func(phase, path string) {
+		if phase == "before-quarantine" && path == target {
+			once.Do(func() {
+				if err := os.Rename(target, parked); err != nil {
+					t.Errorf("park original target: %v", err)
+					return
+				}
+				if err := os.WriteFile(target, []byte("replacement\n"), 0o600); err != nil {
+					t.Errorf("install replacement target: %v", err)
+				}
+			})
+		}
+	}
+	if err := replaceStateFile(temp, target); err == nil || !strings.Contains(err.Error(), "changed while entering private authority") {
+		t.Fatalf("replacement boundary race was accepted: %v", err)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil || string(got) != "replacement\n" {
+		t.Fatalf("boundary replacement was overwritten: %q, %v", got, err)
+	}
+}
+
+func TestReplaceStateFileResumesPublishedQuarantine(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "session.state")
+	firstTemp := filepath.Join(dir, "session.state.first")
+	secondTemp := filepath.Join(dir, "session.state.second")
+	writeFile(t, target, "old\n")
+	writeFile(t, firstTemp, "published-before-crash\n")
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newWitness, err := readBoundedHookRootFile(root, filepath.Base(firstTemp), firstTemp, "test replacement", hookStateMaxBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quarantined, err := fsatomic.Quarantine(root, filepath.Base(target), "r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeHookReplacementWitness(quarantined.Root(), newWitness); err != nil {
+		t.Fatal(err)
+	}
+	if err := fsatomic.RenameNoReplaceBetween(root, filepath.Base(firstTemp), root, filepath.Base(target)); err != nil {
+		t.Fatal(err)
+	}
+	if err := errors.Join(quarantined.Close(), root.Close()); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, secondTemp, "newest\n")
+	if err := replaceStateFile(secondTemp, target); err != nil {
+		t.Fatalf("replacement retry did not recover published quarantine: %v", err)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil || string(got) != "newest\n" {
+		t.Fatalf("replacement retry target = %q, %v", got, err)
 	}
 }
 
