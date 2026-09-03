@@ -188,7 +188,7 @@ func parseCargoManifest(body []byte) ([]string, error) {
 		return nil, err
 	}
 	if root == nil {
-		return nil, fmt.Errorf("Cargo.toml root must be a table")
+		return nil, fmt.Errorf("cargo manifest root must be a table")
 	}
 
 	seen := map[string]bool{}
@@ -266,36 +266,6 @@ func parseCargoManifest(body []byte) ([]string, error) {
 	}
 	sort.Strings(deps)
 	return deps, nil
-}
-
-func stripManifestComment(line string) (string, error) {
-	quote, escaped := byte(0), false
-	for i := 0; i < len(line); i++ {
-		c := line[i]
-		if escaped {
-			escaped = false
-			continue
-		}
-		if quote != 0 && c == '\\' && quote == '"' {
-			escaped = true
-			continue
-		}
-		if c == quote {
-			quote = 0
-			continue
-		}
-		if quote == 0 && (c == '"' || c == '\'') {
-			quote = c
-			continue
-		}
-		if quote == 0 && c == '#' {
-			return line[:i], nil
-		}
-	}
-	if quote != 0 {
-		return "", fmt.Errorf("unterminated quoted string")
-	}
-	return line, nil
 }
 
 func balancedManifestValue(value string) bool {
