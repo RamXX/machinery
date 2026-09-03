@@ -1518,10 +1518,14 @@ func runCheckerOCIEngineFixture(wrongDigest, wrongPlatform bool) {
 	imageAt := -1
 	work := ""
 	platform := ""
+	containerUser := ""
 	env := map[string]string{}
 	for i := range args {
 		if args[i] == "--platform" && i+1 < len(args) {
 			platform = args[i+1]
+		}
+		if args[i] == "--user" && i+1 < len(args) {
+			containerUser = args[i+1]
 		}
 		if args[i] == "--mount" && i+1 < len(args) && strings.Contains(args[i+1], "dst=/work") {
 			for _, field := range strings.Split(args[i+1], ",") {
@@ -1563,6 +1567,11 @@ func runCheckerOCIEngineFixture(wrongDigest, wrongPlatform bool) {
 		os.Exit(0)
 	}
 	if imageAt < 0 || imageAt+1 >= len(args) || work == "" || platform != testRuntimePlatform {
+		os.Exit(31)
+	}
+	expectedUserArgs := checkerOCIUserArgs()
+	if (len(expectedUserArgs) == 2 && containerUser != expectedUserArgs[1]) ||
+		(len(expectedUserArgs) == 0 && containerUser != "") {
 		os.Exit(31)
 	}
 	inner := append([]string(nil), args[imageAt+1:]...)

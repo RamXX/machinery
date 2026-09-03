@@ -386,10 +386,7 @@ func releaseAssetNameFor(goos, goarch string) (string, error) {
 	case "darwin", "linux":
 		return "machinery-" + goos + "-" + goarch, nil
 	case "windows":
-		if goarch != "amd64" {
-			return "", fmt.Errorf("unsupported self-update tuple: windows/%s (releases publish Windows amd64 only)", goarch)
-		}
-		return "machinery-windows-amd64.exe", nil
+		return "", fmt.Errorf("unsupported operating system for self-update: windows (v0.6.3 publishes Linux and macOS binaries only)")
 	default:
 		return "", fmt.Errorf("unsupported operating system for self-update: %s", goos)
 	}

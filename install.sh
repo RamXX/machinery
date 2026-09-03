@@ -57,15 +57,12 @@ case "$arch" in
   aarch64|arm64) arch=arm64 ;;
   *) die "unsupported architecture: $arch" ;;
 esac
-ext=""
 case "$os" in
   linux|darwin) ;;
-  msys*|mingw*|cygwin*|windows*) os=windows; ext=".exe" ;;
+  msys*|mingw*|cygwin*|windows*) die "Windows is not a supported binary release target in v0.6.3" ;;
   *) die "unsupported OS: $os" ;;
 esac
-[ "$os" != windows ] || [ "$arch" = amd64 ] || die "unsupported release tuple: windows/$arch (releases publish Windows amd64 only)"
 binname="machinery"
-if [ "$os" = windows ]; then binname="machinery.exe"; fi
 
 # --- obtain the binary -----------------------------------------------------
 if [ -n "${MACHINERY_BIN:-}" ]; then
@@ -93,7 +90,7 @@ else
 	printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?(\+[0-9A-Za-z][0-9A-Za-z.-]*)?$' ||
 	  die "release API returned an invalid tag: $TAG"
   say "machinery $TAG ($os/$arch)"
-  asset="machinery-${os}-${arch}${ext}"
+  asset="machinery-${os}-${arch}"
   base="https://github.com/$REPO/releases/download/$TAG"
   say "Downloading $asset..."
   curl -fsSL -o "$tmp/$asset" "$base/$asset" || die "failed to download $asset from $TAG"

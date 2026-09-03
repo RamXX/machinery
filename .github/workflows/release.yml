@@ -1,5 +1,5 @@
 # release.yml - cross-compile and publish the machinery binary on tag push.
-# Produces static binaries for the three major OSes + archs, checksums them,
+# Produces static binaries for Linux and macOS, checksums them,
 # and attaches everything to a GitHub Release. Users install without Go.
 name: release
 
@@ -40,8 +40,6 @@ jobs:
             goarch: amd64
           - goos: darwin
             goarch: arm64
-          - goos: windows
-            goarch: amd64
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -90,9 +88,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          ext=""
-          [ "$GOOS" = "windows" ] && ext=".exe"
-          binary="machinery-${GOOS}-${GOARCH}${ext}"
+          binary="machinery-${GOOS}-${GOARCH}"
           first=$(mktemp -d)
           second=$(mktemp -d)
           trap 'rm -rf "$first" "$second"' EXIT
@@ -104,7 +100,6 @@ jobs:
           install -m 0755 "$first/$binary" "dist/$binary"
           echo "Built dist/$binary"
       - name: Package tarball (pvg-compatible)
-        if: matrix.goos != 'windows'
         env:
           TARGET_GOOS: ${{ matrix.goos }}
           TARGET_GOARCH: ${{ matrix.goarch }}
@@ -230,7 +225,6 @@ jobs:
             machinery-linux-amd64 \
             machinery-linux-arm64 \
             machinery-source.tar.gz \
-            machinery-windows-amd64.exe \
             "machinery_${plain}_darwin_amd64.tar.gz" \
             "machinery_${plain}_darwin_arm64.tar.gz" \
             "machinery_${plain}_linux_amd64.tar.gz" \

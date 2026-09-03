@@ -735,9 +735,9 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 	)
 	ci := mustRepositoryFile(t, filepath.Join(root, ".github", "workflows", "ci.yml"))
 	requireAll("CI workflow", ci,
-		"os: [macos-latest, windows-latest]",
+		"runs-on: macos-latest",
+		"goos: windows",
 		"go test -count=1 -run TestGolden ./cmd/machinery",
-		"go test -count=1 -run '^TestWindows' ./...",
 		"go install github.com/stacklok/modelith/cmd/modelith@v0.4.0",
 		"make modelith-render-check",
 		"Assert committed engine trust roots",
@@ -763,6 +763,9 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		".shellcheck-linux-x86_64.sha256",
 		`"$install_dir/shellcheck" "${shell_files[@]}"`,
 	)
+	if strings.Contains(ci, "windows-latest") {
+		t.Fatal("CI claims native Windows runtime validation; Windows must remain cross-compile-only until its durability contract is proven")
+	}
 	if strings.Contains(ci, "docker image inspect --platform") {
 		t.Fatal("CI uses docker image inspect --platform, which is not supported by standard Docker Engine")
 	}
@@ -819,6 +822,9 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		`if ! cmp -s "$expected" "$discovered"`,
 		`[ -L "dist/$artifact" ]`,
 	)
+	if strings.Contains(release, "windows") {
+		t.Fatal("release workflow publishes or describes an unsupported Windows artifact")
+	}
 	packageStart := strings.Index(release, "      - name: Package tarball (pvg-compatible)")
 	if packageStart < 0 {
 		t.Fatal("release workflow has no pvg-compatible package step")

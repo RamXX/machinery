@@ -1344,6 +1344,9 @@ func runCheckerOCI(engineArgs []string, image, platform string, checkerArgs []st
 	args = append(args,
 		"run", "--rm", "--pull=never", "--platform", platform, "--network=none", "--read-only",
 		"--cap-drop=ALL", "--security-opt=no-new-privileges", "--workdir=/work",
+	)
+	args = append(args, checkerOCIUserArgs()...)
+	args = append(args,
 		"--mount", mount,
 		"--mount", inputsMount,
 		"--tmpfs", "/tmp:rw,noexec,nosuid,size=67108864",

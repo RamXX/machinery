@@ -450,7 +450,7 @@ func TestReleaseAssetMatrixMatchesPublishedTuples(t *testing.T) {
 		{"linux", "arm64", "machinery-linux-arm64", true},
 		{"darwin", "amd64", "machinery-darwin-amd64", true},
 		{"darwin", "arm64", "machinery-darwin-arm64", true},
-		{"windows", "amd64", "machinery-windows-amd64.exe", true},
+		{"windows", "amd64", "", false},
 		{"windows", "arm64", "", false},
 	}
 	for _, tc := range tests {

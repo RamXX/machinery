@@ -469,12 +469,16 @@ required versions and release checks. Neither command installs anything.
   `MACHINERY_TARGETS="codex opencode"`. `MACHINERY_HOMES` accepts one full path per line, preserving
   spaces; use a literal newline between multiple homes.
 
-  **Binary by hand** (macOS arm64/x86, Linux amd64/arm64, Windows amd64): download
+  **Binary by hand** (macOS arm64/x86, Linux amd64/arm64): download
   `machinery-<os>-<arch>` from the [releases page](https://github.com/RamXX/machinery/releases), put
   it on your `PATH`, then let it install its own skill:
   ```bash
   machinery install                        # fetches the matching skill + role docs into your agent homes
   ```
+
+  **Windows support:** v0.6.3 does not publish or support a Windows binary. The Windows source is
+  cross-compiled in CI as an early portability signal, but native Windows runtime guarantees are
+  not claimed. Use a Linux environment or macOS for this release.
 
   **Build from source** (if you have [Go](https://go.dev/dl/) 1.27+; `go.mod` pins 1.27.0):
   ```bash
@@ -604,9 +608,9 @@ recovery behavior is in the [agent portability guide](docs/agent-portability.md#
 The gate tools are a single Go binary (no Python runtime). `verify-formal` downloads a version-pinned,
 checksum-verified `tla2tools.jar` on first use. CI runs the full suite on Linux and macOS, all gate
 runs, the full formal suite with a generated-diff assertion, pinned Modelith render reproduction,
-native macOS and Windows golden corpora, targeted Windows transaction and process-control tests,
-Structurizr compilation for every example, the pinned OCI external-checker closure, cross-compile
-builds, security scanning, and the go-crm build on every push.
+the native macOS golden corpus, Structurizr compilation for every example, the pinned OCI
+external-checker closure, release-target builds, Windows cross-compilation, security scanning, and
+the go-crm build on every push.
 
 ### Claude Code plugin (optional, recommended for Claude Code)
 
@@ -826,7 +830,7 @@ CI runs `go test -race ./...`. Beyond unit tests, three stronger nets are always
   pack generate and scale on checkout-split (`make golden`;
   re-captured with `make golden-update` after intended output changes). Environment-dependent
   commands (verify-formal, doctor, preflight) are exercised by the formal-verification and CI jobs
-  instead. The same byte corpus runs natively on Linux, macOS, and Windows.
+  instead. The same byte corpus runs natively on Linux and macOS; Windows is cross-compiled only.
 - **Formal verification**: `machinery verify-formal` regenerates and TLC-model-checks all 35 TLA+
   proofs across the seven example designs that carry formal suites (8 in go-crm, 8 in surreal-crm,
   8 in fulfillment, 6 in portfolio-engine, 4 in checkout-split, two per child including the
