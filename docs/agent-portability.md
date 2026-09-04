@@ -110,6 +110,43 @@ Successful `machinery install` calls maintain the receipt, and successful `machi
 calls remove the corresponding entries. Single-target removal keeps the shared Agent Skills copy;
 complete removal deletes the empty receipt.
 
+### The non-atomic multi-root refusal
+
+An installation spanning several roots at once (a direct home group plus one or more native
+targets) cannot be activated as one atomic step, because the binary and each placement are
+separate filesystem operations. Rather than leave a half-updated tree behind, update refuses
+before touching anything:
+
+```
+refuse non-atomic multi-root update: an existing machinery binary cannot be activated together
+with 1 direct home group(s) and 3 native target(s) without exposing mixed versions; stop agent
+hosts, uninstall the recorded direct placements, update the binary, then reinstall them
+```
+
+Nothing has changed when this appears. Recover by taking the placements down, moving the binary
+alone, and putting them back from the same release. `machinery doctor` lists what is recorded.
+
+```bash
+machinery uninstall --target all   # --target and --home cannot be combined
+machinery uninstall
+machinery update --version vX.Y.Z
+machinery install
+machinery install --target all
+```
+
+Stop the agent hosts first. When the update is driven from inside one, disabling that host's
+machinery plugin and skills for the session is the practical equivalent: the point is that no
+running host reads a placement mid-swap. Re-enable them afterwards and confirm a single version
+everywhere with `machinery doctor`.
+
+The host-owned plugin cache updates on its own schedule and can therefore drift from the binary
+in either direction. That skew is detected, not tolerated:
+
+```
+cached machinery plugin version 0.6.8 does not match running machinery v0.6.7;
+run 'claude plugin update machinery@machinery'
+```
+
 ## What each target installs
 
 | Target | Shared skill | Native roles | Commands | Governance |
