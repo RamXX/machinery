@@ -114,7 +114,7 @@ done <"$sources"
 
 snapshot_repo() {
   local destination=$1
-  if ! "$tree_inventory" -snapshot -root . -prune .git -exclude-file "$renders" \
+  if ! "$tree_inventory" -snapshot -root . -prune .git -prune .codebase-memory -exclude-file "$renders" \
     -max-entries 200000 -max-depth 128 -max-bytes 67108864 \
     -max-file-bytes 33554432 -max-total-bytes 134217728 -timeout 30s >"$destination"; then
     echo "bounded repository snapshot failed" >&2

@@ -84,6 +84,25 @@ func TestRenderScriptAcceptsCanonicalPrefixedVersion(t *testing.T) {
 	assertNoTransactionResidue(t, repo)
 }
 
+func TestRenderScriptIgnoresCodebaseMemoryCacheChurn(t *testing.T) {
+	t.Parallel()
+	repo := scriptFixture(t)
+	cache := filepath.Join(repo, ".codebase-memory")
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, "graph.db.zst"), []byte("before\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := runRenderFixture(t, repo, "codebase-memory-churn"); err != nil {
+		t.Fatalf("render with concurrent codebase-memory update: %v\n%s", err, output)
+	}
+	if got := readFixture(t, repo, ".codebase-memory/graph.db.zst"); got == "before\n" {
+		t.Fatal("fixture did not exercise codebase-memory cache churn")
+	}
+	assertNoTransactionResidue(t, repo)
+}
+
 func scriptFixture(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, _ := runtime.Caller(0)
@@ -143,6 +162,10 @@ case "${1:-}" in
     if [[ "${MODELITH_FAKE_MODE:-}" == render-warning ]]; then printf 'deprecated option\n' >&2; fi
     if [[ "${MODELITH_FAKE_MODE:-}" == render-stdout ]]; then printf 'unexpected success text\n'; fi
     if [[ "${MODELITH_FAKE_MODE:-}" == extra-output ]]; then printf 'unexpected\n' > examples/unexpected.txt; fi
+    if [[ "${MODELITH_FAKE_MODE:-}" == codebase-memory-churn ]]; then
+      mkdir -p "$MODELITH_TEST_REPO_CACHE"
+      printf 'indexed %s\n' "$source" > "$MODELITH_TEST_REPO_CACHE/graph.db.zst"
+    fi
     ;;
   *) exit 2 ;;
 esac
@@ -167,7 +190,11 @@ func runRenderFixture(t *testing.T, repo, mode string) (string, error) {
 	t.Helper()
 	cmd := exec.CommandContext(t.Context(), "bash", "scripts/modelith-render.sh", "render", "examples", "v0.4.0")
 	cmd.Dir = repo
-	cmd.Env = append(os.Environ(), "PATH="+filepath.Join(repo, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"), "MODELITH_FAKE_MODE="+mode)
+	cmd.Env = append(os.Environ(),
+		"PATH="+filepath.Join(repo, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"MODELITH_FAKE_MODE="+mode,
+		"MODELITH_TEST_REPO_CACHE="+filepath.Join(repo, ".codebase-memory"),
+	)
 	body, err := cmd.CombinedOutput()
 	return string(body), err
 }

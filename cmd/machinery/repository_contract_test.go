@@ -138,6 +138,9 @@ func TestModelithInventoryDiscoveryFailsClosed(t *testing.T) {
 			t.Errorf("Modelith renderer is missing closed transaction contract %q", required)
 		}
 	}
+	if !strings.Contains(renderScript, "-prune .git -prune .codebase-memory") {
+		t.Error("Modelith renderer must quarantine the concurrent codebase-memory cache from its repository mutation boundary")
+	}
 	inventoryScript := mustRepositoryFile(t, script)
 	for _, required := range []string{"./scripts/tree-inventory", "-max-entries 100000", "-max-depth 64", "-max-bytes 33554432", "-timeout 15s"} {
 		if !strings.Contains(inventoryScript, required) {
