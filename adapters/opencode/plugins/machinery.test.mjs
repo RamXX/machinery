@@ -28,7 +28,21 @@ const postInput = { tool: "write", sessionID: "session-1", args: { path: "design
 
 test("PostToolUse throws when machinery exits nonzero", async () => {
   const after = await afterHandler({ exitCode: 17, stderr: "ledger write failed" })
-  await assert.rejects(() => after(postInput, {}), /ledger write failed/)
+  await assert.rejects(() => after(postInput, {}), (err) => {
+    assert.match(err.message, /ledger write failed/)
+    assert.match(err.message, /Run machinery doctor/)
+    assert.doesNotMatch(err.message, /reinstall.*before continuing/i)
+    return true
+  })
+})
+
+test("lock contention is diagnosed as transient rather than version skew", async () => {
+  const after = await afterHandler({ exitCode: 1, stderr: "another operation holds the lock for install.json" })
+  await assert.rejects(() => after(postInput, {}), (err) => {
+    assert.match(err.message, /Retry after the active machinery install/)
+    assert.doesNotMatch(err.message, /older than|version skew|reinstall/i)
+    return true
+  })
 })
 
 test("PostToolUse throws when machinery returns malformed JSON", async () => {

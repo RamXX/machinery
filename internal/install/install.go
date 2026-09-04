@@ -1174,7 +1174,7 @@ func installFileChangeID(info os.FileInfo) string {
 	return ""
 }
 
-const canonicalCachedHookShimSHA256 = "9dd7543bd7c3bf17adc56228e10174a6d5f1a859585c5a5b1d11906714b6ec5c"
+const canonicalCachedHookShimSHA256 = "3dc3e14ca878325a35125b85bc2db7a5d1a1cc792fdee12e8602bf1ab279e90b"
 
 func validateCachedHookManifest(raw []byte) error {
 	if err := rejectDuplicateJSONKeys(raw); err != nil {

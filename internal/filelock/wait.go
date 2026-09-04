@@ -15,6 +15,13 @@ const (
 
 var errLockHeld = errors.New("another operation holds the lock")
 
+// IsContended reports whether an acquisition failed because another process
+// currently holds an incompatible lock. Callers use this to distinguish live,
+// retryable coordination from invalid paths or broken lock infrastructure.
+func IsContended(err error) bool {
+	return errors.Is(err, errLockHeld)
+}
+
 func defaultAcquireWaitContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), acquireWaitLimit)
 }

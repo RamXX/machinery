@@ -1,6 +1,7 @@
 package install
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -249,6 +250,228 @@ func TestInstallInspectionLockRecoversPreparedTransactionBeforeCallback(t *testi
 		t.Fatal("inspection callback was not called")
 	}
 	assertNoInstallJournal(t)
+}
+
+func TestInstallInspectionReadersOverlapAndExcludeMutation(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+	firstEntered := make(chan struct{})
+	secondEntered := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 2)
+	go func() {
+		done <- WithInstallInspectionLock(func() error {
+			close(firstEntered)
+			<-release
+			return nil
+		})
+	}()
+	<-firstEntered
+	go func() {
+		done <- WithInstallInspectionLock(func() error {
+			close(secondEntered)
+			<-release
+			return nil
+		})
+	}()
+	select {
+	case <-secondEntered:
+	case <-time.After(2 * time.Second):
+		close(release)
+		t.Fatal("second inspection reader was serialized behind the first")
+	}
+
+	home := filepath.Join(t.TempDir(), "home")
+	seedHomeArtifactInventory(t, home)
+	if err := Install(Options{Homes: []string{home}, From: fakeSource(t), Out: io.Discard}); err == nil || !strings.Contains(err.Error(), "another operation holds the lock") {
+		close(release)
+		t.Fatalf("install was not excluded by active inspection readers: %v", err)
+	}
+	close(release)
+	for range 2 {
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestActivationConsistencySharesAnActiveInspectionView(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- WithInstallInspectionLock(func() error {
+			close(entered)
+			<-release
+			return nil
+		})
+	}()
+	<-entered
+
+	started := time.Now()
+	if err := EnsureActivationConsistency(); err != nil {
+		close(release)
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		close(release)
+		t.Fatalf("activation consistency serialized behind a safe reader for %v", elapsed)
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInstallInspectionWaitsForActiveMutation(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+	writer, err := acquireInstallOperationLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	entered := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- WithInstallInspectionLock(func() error {
+			close(entered)
+			return nil
+		})
+	}()
+	select {
+	case <-entered:
+		_ = writer.Release()
+		t.Fatal("inspection entered while an installation mutation was active")
+	case err := <-done:
+		_ = writer.Release()
+		t.Fatalf("inspection failed instead of waiting for the mutation: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	if err := writer.Release(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-entered:
+	case err := <-done:
+		t.Fatalf("inspection failed after mutation release: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("inspection did not proceed after mutation release")
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInstallInspectionContentionHasBoundedTransientDiagnostic(t *testing.T) {
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+	writer, err := acquireInstallOperationLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := writer.Release(); err != nil {
+			t.Error(err)
+		}
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	lock, err := acquireInstallInspectionLockContext(ctx)
+	if lock != nil || !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("contended inspection = lock %v, err %v; want bounded deadline", lock, err)
+	}
+	if !strings.Contains(err.Error(), "active machinery install, update, or uninstall") {
+		t.Fatalf("contended inspection diagnostic is not actionable: %v", err)
+	}
+}
+
+func TestInstallInspectionReadersOverlapAcrossProcesses(t *testing.T) {
+	config := privateConfigDir(t)
+	coordination := t.TempDir()
+	ready := filepath.Join(coordination, "ready")
+	release := filepath.Join(coordination, "release")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	holder := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestInstallInspectionSubprocessHelper$")
+	holder.Env = append(os.Environ(),
+		"MACHINERY_TEST_INSPECTION_HELPER=holder",
+		"MACHINERY_CONFIG_DIR="+config,
+		"MACHINERY_TEST_INSPECTION_READY="+ready,
+		"MACHINERY_TEST_INSPECTION_RELEASE="+release,
+	)
+	var holderOutput bytes.Buffer
+	holder.Stdout = &holderOutput
+	holder.Stderr = &holderOutput
+	if err := holder.Start(); err != nil {
+		t.Fatal(err)
+	}
+	holderDone := make(chan error, 1)
+	go func() { holderDone <- holder.Wait() }()
+
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if _, err := os.Stat(ready); err == nil {
+			break
+		} else if !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("inspection holder did not become ready: %s", holderOutput.String())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	probe := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestInstallInspectionSubprocessHelper$")
+	probe.Env = append(os.Environ(),
+		"MACHINERY_TEST_INSPECTION_HELPER=probe",
+		"MACHINERY_CONFIG_DIR="+config,
+	)
+	if output, err := probe.CombinedOutput(); err != nil {
+		t.Fatalf("second process could not share the inspection view: %v\n%s", err, output)
+	}
+	if err := os.WriteFile(release, []byte("release\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-holderDone; err != nil {
+		t.Fatalf("inspection holder failed: %v\n%s", err, holderOutput.String())
+	}
+}
+
+func TestInstallInspectionSubprocessHelper(t *testing.T) {
+	switch os.Getenv("MACHINERY_TEST_INSPECTION_HELPER") {
+	case "":
+		return
+	case "probe":
+		if err := EnsureActivationConsistency(); err != nil {
+			t.Fatal(err)
+		}
+	case "holder":
+		ready := os.Getenv("MACHINERY_TEST_INSPECTION_READY")
+		release := os.Getenv("MACHINERY_TEST_INSPECTION_RELEASE")
+		if ready == "" || release == "" {
+			t.Fatal("inspection helper coordination paths are missing")
+		}
+		if err := WithInstallInspectionLock(func() error {
+			if err := os.WriteFile(ready, []byte("ready\n"), 0o600); err != nil {
+				return err
+			}
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				if _, err := os.Stat(release); err == nil {
+					return nil
+				} else if !os.IsNotExist(err) {
+					return err
+				}
+				if time.Now().After(deadline) {
+					return fmt.Errorf("timed out waiting for inspection release")
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+		}); err != nil {
+			t.Fatal(err)
+		}
+	default:
+		t.Fatalf("unknown inspection helper mode %q", os.Getenv("MACHINERY_TEST_INSPECTION_HELPER"))
+	}
 }
 
 func TestHostHookInvocationRecoversPreparedInstallTransaction(t *testing.T) {

@@ -66,7 +66,7 @@ if [ -z "$bin" ]; then
 fi
 
 if ! "$bin" hook --root "$root"; then
-  echo "machinery plugin: BLOCKED because 'machinery hook' failed; the binary may be older than the plugin. Re-run the installer to upgrade." >&2
+  echo "machinery plugin: BLOCKED because 'machinery hook' could not complete; see the diagnostic above. Retry after any active machinery install, update, or uninstall finishes. If the failure persists, run 'machinery doctor'; reinstall only when doctor reports an installation or version mismatch." >&2
   exit 2
 fi
 exit 0

@@ -32,6 +32,82 @@ func TestExclusiveAndReacquirable(t *testing.T) {
 	}
 }
 
+func TestSharedReadersCoexistAndExcludeWriter(t *testing.T) {
+	scope := t.TempDir()
+	first, err := AcquireShared(scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := AcquireShared(scope)
+	if err != nil {
+		_ = first.Release()
+		t.Fatalf("second shared reader was serialized: %v", err)
+	}
+	if writer, err := Acquire(scope); writer != nil || !IsContended(err) {
+		_ = second.Release()
+		_ = first.Release()
+		t.Fatalf("writer entered while shared readers were active: lock=%v err=%v", writer, err)
+	}
+	if err := first.Release(); err != nil {
+		t.Fatal(err)
+	}
+	if writer, err := Acquire(scope); writer != nil || !IsContended(err) {
+		_ = second.Release()
+		t.Fatalf("writer entered while one shared reader remained: lock=%v err=%v", writer, err)
+	}
+	if err := second.Release(); err != nil {
+		t.Fatal(err)
+	}
+	writer, err := Acquire(scope)
+	if err != nil {
+		t.Fatalf("writer did not enter after every shared reader left: %v", err)
+	}
+	if err := writer.Release(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSharedReaderWaitsForWriterAndThenSucceeds(t *testing.T) {
+	scope := t.TempDir()
+	writer, err := Acquire(scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	acquired := make(chan *Lock, 1)
+	errs := make(chan error, 1)
+	go func() {
+		reader, err := AcquireSharedWaitContext(ctx, scope)
+		if err != nil {
+			errs <- err
+			return
+		}
+		acquired <- reader
+	}()
+	select {
+	case reader := <-acquired:
+		_ = reader.Release()
+		t.Fatal("shared reader entered while the writer was active")
+	case err := <-errs:
+		t.Fatalf("shared reader failed instead of waiting: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	if err := writer.Release(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case reader := <-acquired:
+		if err := reader.Release(); err != nil {
+			t.Fatal(err)
+		}
+	case err := <-errs:
+		t.Fatal(err)
+	case <-ctx.Done():
+		t.Fatalf("shared reader did not enter after writer release: %v", ctx.Err())
+	}
+}
+
 func TestLockCacheBaseFailsClosedWithoutUserCache(t *testing.T) {
 	originalTesting := filelockTesting
 	originalCache := filelockUserCacheDir

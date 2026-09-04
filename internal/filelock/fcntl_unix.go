@@ -57,7 +57,15 @@ func releaseExclusiveReservation(lock *Lock, descriptorClosed bool) error {
 }
 
 func tryExclusiveLock(lock *Lock) (bool, error) {
-	record := syscall.Flock_t{Type: syscall.F_WRLCK, Whence: int16(io.SeekStart)}
+	return tryRecordLock(lock, syscall.F_WRLCK)
+}
+
+func trySharedLock(lock *Lock) (bool, error) {
+	return tryRecordLock(lock, syscall.F_RDLCK)
+}
+
+func tryRecordLock(lock *Lock, lockType int16) (bool, error) {
+	record := syscall.Flock_t{Type: lockType, Whence: int16(io.SeekStart)}
 	if err := syscall.FcntlFlock(lock.file.Fd(), syscall.F_SETLK, &record); err != nil {
 		if errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.EAGAIN) {
 			return false, nil

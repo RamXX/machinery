@@ -18,6 +18,19 @@ func activationStagingPath() (string, error) {
 	return filepath.Join(filepath.Dir(journal), installActivationDir), nil
 }
 
+func activationRecoveryPending() (bool, error) {
+	path, err := activationStagingPath()
+	if err != nil {
+		return false, fmt.Errorf("resolve executable activation path: %w", err)
+	}
+	if _, err := os.Lstat(path); err == nil {
+		return true, nil
+	} else if !os.IsNotExist(err) {
+		return false, fmt.Errorf("inspect executable activation path %s: %w", path, err)
+	}
+	return false, nil
+}
+
 func cleanupActivationExecutable() error {
 	dir, err := activationStagingPath()
 	if err != nil {

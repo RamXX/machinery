@@ -73,10 +73,17 @@ function defaultRunner(root, payload) {
 }
 
 async function runMachinery(run, root, payload) {
-  const failed = (detail) => ({
-    decision: "block",
-    reason: `Machinery governance failed closed: ${detail}. Repair or reinstall the machinery binary before continuing.`,
-  })
+  const failed = (detail) => {
+    const transient = detail.includes("another operation holds the lock") ||
+      detail.includes("wait for active machinery install")
+    const action = transient
+      ? "Retry after the active machinery install, update, or uninstall finishes."
+      : "Run machinery doctor; reinstall only if it reports an installation or version mismatch."
+    return {
+      decision: "block",
+      reason: `Machinery governance failed closed: ${detail}. ${action}`,
+    }
+  }
   let result
   try {
     result = await run(root, payload)

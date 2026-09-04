@@ -1,6 +1,7 @@
 package install
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -16,6 +17,7 @@ import (
 
 const installLockCapabilityEnv = "MACHINERY_INTERNAL_INSTALL_LOCK_CAPABILITY"
 const activationCanonicalExecutableEnv = "MACHINERY_INTERNAL_CANONICAL_EXECUTABLE"
+const installInspectionWaitLimit = 10 * time.Second
 
 var (
 	installControlDirOwned = installDirectoryOwnedByCurrentUser
@@ -166,7 +168,7 @@ func acquireInstallOperationLock() (*installOperationLock, error) {
 // image. Library entry points retain the same barrier through their operation
 // lock acquisition.
 func EnsureActivationConsistency() error {
-	lock, err := acquireInstallOperationLock()
+	lock, err := acquireInstallInspectionLock()
 	if err != nil {
 		return err
 	}
@@ -227,16 +229,42 @@ func prepareExistingInstallControlDirectory() (retErr error) {
 }
 
 func acquireInstallOperationLockWait() (*installOperationLock, error) {
-	deadline := time.Now().Add(10 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), installInspectionWaitLimit)
+	defer cancel()
+	return acquireInstallOperationLockWaitContext(ctx)
+}
+
+func acquireInstallOperationLockWaitContext(ctx context.Context) (*installOperationLock, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("wait for install operation lock: nil context")
+	}
+	delay := 5 * time.Millisecond
 	for {
 		lock, err := acquireInstallOperationLock()
 		if err == nil {
 			return lock, nil
 		}
-		if !strings.Contains(err.Error(), "another operation holds the lock") || time.Now().After(deadline) {
+		if !filelock.IsContended(err) {
 			return nil, err
 		}
-		time.Sleep(10 * time.Millisecond)
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return nil, fmt.Errorf("wait for install operation lock: %w", ctx.Err())
+		case <-timer.C:
+		}
+		if delay < 100*time.Millisecond {
+			delay *= 2
+			if delay > 100*time.Millisecond {
+				delay = 100 * time.Millisecond
+			}
+		}
 	}
 }
 
@@ -247,17 +275,70 @@ func (l *installOperationLock) Release() error {
 	return l.lock.Release()
 }
 
-// WithInstallInspectionLock recovers any interrupted artifact transaction and
-// holds the same operation lock used by install/update/uninstall for the full
-// inspection callback. Doctor and preflight therefore cannot observe a
-// PREPARED transaction's partial state or race a concurrent mutation.
+// WithInstallInspectionLock recovers any interrupted artifact transaction,
+// then holds a shared view lock for the full callback. Inspection callers may
+// overlap one another, while install/update/uninstall remain exclusive.
 func WithInstallInspectionLock(inspect func() error) (retErr error) {
-	lock, err := acquireInstallOperationLock()
+	lock, err := acquireInstallInspectionLock()
 	if err != nil {
 		return err
 	}
 	defer func() { retErr = errors.Join(retErr, lock.Release()) }()
 	return inspect()
+}
+
+func acquireInstallInspectionLock() (*installOperationLock, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), installInspectionWaitLimit)
+	defer cancel()
+	return acquireInstallInspectionLockContext(ctx)
+}
+
+func acquireInstallInspectionLockContext(ctx context.Context) (*installOperationLock, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("wait for consistent installation view: nil context")
+	}
+	scope, err := installOperationScope()
+	if err != nil {
+		return nil, err
+	}
+	for {
+		lock, err := filelock.AcquireSharedWaitContext(ctx, scope)
+		if err != nil {
+			return nil, fmt.Errorf("wait for active machinery install, update, or uninstall before inspecting installation state: %w", err)
+		}
+		pending, pendingErr := installRecoveryPending()
+		if pendingErr != nil {
+			return nil, errors.Join(pendingErr, lock.Release())
+		}
+		if !pending {
+			return &installOperationLock{lock: lock}, nil
+		}
+		if err := lock.Release(); err != nil {
+			return nil, err
+		}
+		operation, err := acquireInstallOperationLockWaitContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := operation.Release(); err != nil {
+			return nil, err
+		}
+	}
+}
+
+func installRecoveryPending() (bool, error) {
+	journal, tombstone, err := installJournalPaths()
+	if err != nil {
+		return false, fmt.Errorf("resolve install recovery paths: %w", err)
+	}
+	for _, path := range []string{journal, tombstone} {
+		if _, err := os.Lstat(path); err == nil {
+			return true, nil
+		} else if !os.IsNotExist(err) {
+			return false, fmt.Errorf("inspect install recovery path %s: %w", path, err)
+		}
+	}
+	return activationRecoveryPending()
 }
 
 func installOperationScope() (string, error) {

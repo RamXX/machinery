@@ -18,6 +18,15 @@ func releaseExclusiveReservation(*Lock, bool) error {
 
 func tryExclusiveLock(lock *Lock) (bool, error) {
 	err := syscall.Flock(int(lock.file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	return flockResult(err)
+}
+
+func trySharedLock(lock *Lock) (bool, error) {
+	err := syscall.Flock(int(lock.file.Fd()), syscall.LOCK_SH|syscall.LOCK_NB)
+	return flockResult(err)
+}
+
+func flockResult(err error) (bool, error) {
 	if err == nil {
 		return true, nil
 	}

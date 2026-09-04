@@ -554,7 +554,7 @@ func validateDoctorHookManifest(path string) error {
 // canonicalHookShimSHA256 is the release identity of hooks/machinery-hook.sh.
 // TestCanonicalDoctorHookAssetsMatchRepository makes source edits fail until
 // this release contract is advanced deliberately with the shipped shim.
-const canonicalHookShimSHA256 = "9dd7543bd7c3bf17adc56228e10174a6d5f1a859585c5a5b1d11906714b6ec5c"
+const canonicalHookShimSHA256 = "3dc3e14ca878325a35125b85bc2db7a5d1a1cc792fdee12e8602bf1ab279e90b"
 
 func validateDoctorHookShim(path string) error {
 	raw, err := safefile.Read(path, "doctor hook shim", diagnosticConfigMaxBytes)

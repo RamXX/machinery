@@ -6,6 +6,8 @@ import "os"
 
 func cleanupActivationExecutable() error { return nil }
 
+func activationRecoveryPending() (bool, error) { return false, nil }
+
 func stageActivationExecutable(restored string, _ *os.File, _ string) (string, error) {
 	// openActivationExecutable retains a handle without delete/write sharing.
 	// CreateProcess maps this exact pathname before that handle is released.

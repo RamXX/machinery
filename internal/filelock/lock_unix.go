@@ -17,7 +17,7 @@ type Lock struct {
 }
 
 func Acquire(scope string) (*Lock, error) {
-	return acquireWithContext(context.Background(), scope, true, acquireHooks{})
+	return acquireWithMode(context.Background(), scope, true, false, acquireHooks{})
 }
 
 // AcquireWait takes the same exclusive advisory lock as Acquire, but waits
@@ -33,7 +33,26 @@ func AcquireWait(scope string) (*Lock, error) {
 // waits only until ctx is canceled. It uses bounded nonblocking attempts so a
 // stuck holder can never strand an uncancellable kernel wait.
 func AcquireWaitContext(ctx context.Context, scope string) (*Lock, error) {
-	return acquireWithContext(ctx, scope, false, acquireHooks{})
+	return acquireWithMode(ctx, scope, false, false, acquireHooks{})
+}
+
+// AcquireShared takes a nonblocking shared advisory lock. Multiple readers may
+// hold the same scope concurrently; exclusive acquisitions remain excluded.
+func AcquireShared(scope string) (*Lock, error) {
+	return acquireWithMode(context.Background(), scope, true, true, acquireHooks{})
+}
+
+// AcquireSharedWait waits up to the package acquisition limit for a shared
+// advisory lock. It coordinates with the exclusive Acquire APIs on one scope.
+func AcquireSharedWait(scope string) (*Lock, error) {
+	ctx, cancel := defaultAcquireWaitContext()
+	defer cancel()
+	return AcquireSharedWaitContext(ctx, scope)
+}
+
+// AcquireSharedWaitContext waits for a shared advisory lock until ctx ends.
+func AcquireSharedWaitContext(ctx context.Context, scope string) (*Lock, error) {
+	return acquireWithMode(ctx, scope, false, true, acquireHooks{})
 }
 
 func acquireWithHooks(scope string, nonBlocking bool, hooks acquireHooks) (*Lock, error) {
@@ -43,10 +62,14 @@ func acquireWithHooks(scope string, nonBlocking bool, hooks acquireHooks) (*Lock
 		ctx, cancel = defaultAcquireWaitContext()
 		defer cancel()
 	}
-	return acquireWithContext(ctx, scope, nonBlocking, hooks)
+	return acquireWithMode(ctx, scope, nonBlocking, false, hooks)
 }
 
 func acquireWithContext(ctx context.Context, scope string, nonBlocking bool, hooks acquireHooks) (*Lock, error) {
+	return acquireWithMode(ctx, scope, nonBlocking, false, hooks)
+}
+
+func acquireWithMode(ctx context.Context, scope string, nonBlocking, shared bool, hooks acquireHooks) (*Lock, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("acquire lock for %s: nil context", scope)
 	}
@@ -73,7 +96,11 @@ func acquireWithContext(ctx context.Context, scope string, nonBlocking bool, hoo
 	}
 	tryLock := hooks.tryLock
 	if tryLock == nil {
-		tryLock = tryExclusiveLock
+		if shared {
+			tryLock = trySharedLock
+		} else {
+			tryLock = tryExclusiveLock
+		}
 	}
 	if nonBlocking {
 		acquired, lockErr := tryLock(l)

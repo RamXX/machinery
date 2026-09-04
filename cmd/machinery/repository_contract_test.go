@@ -92,6 +92,21 @@ func TestOpenCodeAdapterContracts(t *testing.T) {
 	}
 }
 
+func TestHookFailureDiagnosticsDoNotGuessVersionSkew(t *testing.T) {
+	root := repoRootDir(t)
+	shim := mustRepositoryFile(t, filepath.Join(root, "hooks", "machinery-hook.sh"))
+	for _, required := range []string{"see the diagnostic above", "machinery doctor", "reinstall only when doctor reports"} {
+		if !strings.Contains(shim, required) {
+			t.Errorf("Claude hook failure diagnostic is missing %q", required)
+		}
+	}
+	for _, misleading := range []string{"binary may be older", "Re-run the installer to upgrade"} {
+		if strings.Contains(shim, misleading) {
+			t.Errorf("Claude hook failure diagnostic still guesses %q", misleading)
+		}
+	}
+}
+
 func TestOpenCodeAdapterPostToolFailures(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {
