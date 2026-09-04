@@ -240,7 +240,7 @@ func TestRunAlloyRedactsPrivateWorkdirFromEngineFailure(t *testing.T) {
 	}
 	var want string
 	for i := 0; i < 10; i++ {
-		_, err := runAlloy(als, []alloy.Command{{Name: "x", Kind: "check"}})
+		_, _, err := runAlloy(als, []alloy.Command{{Name: "x", Kind: "check"}})
 		if err == nil || strings.Contains(err.Error(), "machinery-alloy") || !strings.Contains(err.Error(), "<alloy-workdir>") {
 			t.Fatalf("private workdir leaked or stable placeholder absent: %v", err)
 		}
@@ -266,6 +266,31 @@ func TestAlloySuccessDiagnosticsAreClosedAndRejectWarnings(t *testing.T) {
 	}
 }
 
+func TestAlloySuccessDiagnosticsTolerateKodkodNativeFallbackOnly(t *testing.T) {
+	commands := []alloy.Command{{Name: "SomeWorld", Kind: "run"}, {Name: "Safe", Kind: "check"}}
+	kodkod := "[main] ERROR kodkod.solvers.api.NativeCode - findPlatform unknown Linux aarch64\n"
+	canonical := "00. run SomeWorld 0\b\b\b\b 1/1 SAT\n01. check Safe 0 UNSAT\n"
+	outcomes, tolerated, err := parseAlloySuccessOutput(kodkod+canonical, commands)
+	if err != nil {
+		t.Fatalf("kodkod native-library fallback diagnostic was not tolerated: %v", err)
+	}
+	if len(tolerated) != 1 || tolerated[0] != strings.TrimSpace(kodkod) {
+		t.Fatalf("tolerated diagnostic not returned for the caller to surface: %q", tolerated)
+	}
+	if !outcomes["SomeWorld"] || outcomes["Safe"] {
+		t.Fatalf("outcomes changed by the tolerated line: %v", outcomes)
+	}
+	if _, _, err := parseAlloySuccessOutput(canonical+kodkod, commands); err != nil {
+		t.Fatalf("trailing kodkod diagnostic was not tolerated: %v", err)
+	}
+	if _, _, err := parseAlloySuccessOutput("[main] ERROR kodkod.solvers.api.NativeCode - could not load native library\n"+canonical, commands); err == nil {
+		t.Fatal("a different kodkod diagnostic was tolerated; only the findPlatform fallback line is")
+	}
+	if _, _, err := parseAlloySuccessOutput("[main] ERROR kodkod.engine.Solver - findPlatform unknown Linux aarch64\n"+canonical, commands); err == nil {
+		t.Fatal("a findPlatform line from another logger was tolerated")
+	}
+}
+
 func TestRunAlloyRejectsExitZeroWarningWithValidReceipt(t *testing.T) {
 	dir := t.TempDir()
 	jar := filepath.Join(dir, "alloy.jar")
@@ -284,7 +309,7 @@ func TestRunAlloyRejectsExitZeroWarningWithValidReceipt(t *testing.T) {
 	if err := os.WriteFile(als, []byte("check x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runAlloy(als, []alloy.Command{{Name: "x", Kind: "check"}}); err == nil || !strings.Contains(err.Error(), "unexpected success diagnostics") {
+	if _, _, err := runAlloy(als, []alloy.Command{{Name: "x", Kind: "check"}}); err == nil || !strings.Contains(err.Error(), "unexpected success diagnostics") {
 		t.Fatalf("exit-zero Alloy warning was accepted: %v", err)
 	}
 }
@@ -307,7 +332,7 @@ func TestRunAlloyRejectsCanonicalSATWithoutSolutionArtifact(t *testing.T) {
 	if err := os.WriteFile(als, []byte("check x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runAlloy(als, []alloy.Command{{Name: "x", Kind: "check"}}); err == nil || !strings.Contains(err.Error(), "solution inventory") {
+	if _, _, err := runAlloy(als, []alloy.Command{{Name: "x", Kind: "check"}}); err == nil || !strings.Contains(err.Error(), "solution inventory") {
 		t.Fatalf("canonical SAT without a solution artifact was accepted: %v", err)
 	}
 }
@@ -340,7 +365,7 @@ func TestRunAlloyRejectsStdoutReceiptOutcomeContradictions(t *testing.T) {
 			if err := os.WriteFile(als, []byte("check x\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := runAlloy(als, []alloy.Command{{Name: "x", Kind: "check"}}); err == nil || !strings.Contains(err.Error(), "contradicts engine results") {
+			if _, _, err := runAlloy(als, []alloy.Command{{Name: "x", Kind: "check"}}); err == nil || !strings.Contains(err.Error(), "contradicts engine results") {
 				t.Fatalf("stdout/receipt contradiction was accepted: %v", err)
 			}
 		})
@@ -474,7 +499,7 @@ func TestRunAlloySeparatesToolSnapshotFromEngineOutput(t *testing.T) {
 	if err := os.WriteFile(als, []byte("check x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runAlloy(als, nil); err != nil {
+	if _, _, err := runAlloy(als, nil); err != nil {
 		t.Fatalf("separate tool/output roots rejected: %v", err)
 	}
 }

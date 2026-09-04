@@ -1540,11 +1540,14 @@ formalPublicationDone:
 		if !present {
 			return
 		}
-		vs, aerr := runAlloy(filepath.Join(verificationDir, alsName), commands)
+		vs, notes, aerr := runAlloy(filepath.Join(verificationDir, alsName), commands)
 		if aerr != nil {
 			fmt.Fprintln(stderrW, aerr)
 			fail++
 			return
+		}
+		for _, note := range notes {
+			fmt.Fprintf(stdoutW, "  NOTE  %s\n", note)
 		}
 		for _, v := range vs {
 			name := prefix + "/" + v.Command.Name

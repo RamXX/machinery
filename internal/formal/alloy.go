@@ -325,15 +325,17 @@ type AlloyVerdict struct {
 // UNSAT, run passes on SAT). Solutions are written as text (-t text): the
 // receipt's per-atom values are unreliable for inherited and total relations,
 // while the text form carries every relation in full.
-func runAlloy(alsPath string, commands []alloy.Command) (result []AlloyVerdict, retErr error) {
+// runAlloy's second result carries the tolerated engine notes (today only
+// the kodkod native-library fallback); verify-formal prints each as a NOTE.
+func runAlloy(alsPath string, commands []alloy.Command) (result []AlloyVerdict, notes []string, retErr error) {
 	jar, err := ensureAlloyJar()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	formalAfterJarResolved(jar)
 	outDir, err := os.MkdirTemp("", "machinery-alloy-output-")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() {
 		retErr = errors.Join(retErr, os.RemoveAll(outDir))
@@ -341,7 +343,7 @@ func runAlloy(alsPath string, commands []alloy.Command) (result []AlloyVerdict, 
 	}()
 	toolDir, err := os.MkdirTemp("", "machinery-alloy-tool-")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() {
 		retErr = errors.Join(retErr, os.RemoveAll(toolDir))
@@ -349,15 +351,15 @@ func runAlloy(alsPath string, commands []alloy.Command) (result []AlloyVerdict, 
 	}()
 	want, err := overrideSHA("ALLOY_TOOLS_JAR", "ALLOY_TOOLS_JAR_SHA256", alloySHA256)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	jar, err = snapshotVerifiedJar(jar, want, "Alloy dist jar", toolDir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	java, err := openFormalJava(outDir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() {
 		if validateErr := java.Validate(); validateErr != nil {
@@ -373,31 +375,35 @@ func runAlloy(alsPath string, commands []alloy.Command) (result []AlloyVerdict, 
 	processOut, runErr := runBoundedProcess(ctx, cmd, formalProcessTimeout)
 	gotJarSHA, jarErr := fileSHA256(jar)
 	if jarErr != nil || gotJarSHA != want {
-		return nil, errors.Join(jarErr, fmt.Errorf("alloy tool snapshot changed during execution"))
+		return nil, nil, errors.Join(jarErr, fmt.Errorf("alloy tool snapshot changed during execution"))
 	}
 	if runErr != nil {
-		return nil, fmt.Errorf("alloy exec failed on %s: %w\n%s", filepath.Base(alsPath), runErr, tail(processOut, 20))
+		return nil, nil, fmt.Errorf("alloy exec failed on %s: %w\n%s", filepath.Base(alsPath), runErr, tail(processOut, 20))
 	}
 	raw, err := readStableAlloyReceipt(outDir)
 	if err != nil {
-		return nil, fmt.Errorf("alloy exec wrote no receipt.json for %s: %w", filepath.Base(alsPath), err)
+		return nil, nil, fmt.Errorf("alloy exec wrote no receipt.json for %s: %w", filepath.Base(alsPath), err)
 	}
-	outcomes, err := parseAlloySuccessOutput(processOut, commands)
+	outcomes, tolerated, err := parseAlloySuccessOutput(processOut, commands)
 	if err != nil {
-		return nil, fmt.Errorf("alloy exec emitted unexpected success diagnostics for %s: %w", filepath.Base(alsPath), err)
+		return nil, nil, fmt.Errorf("alloy exec emitted unexpected success diagnostics for %s: %w", filepath.Base(alsPath), err)
+	}
+	for _, line := range tolerated {
+		notes = append(notes, "Alloy ran on the pure-Java SAT solver: kodkod has no native library for this platform ("+line+")")
 	}
 	receipt, err := loadAlloyReceipt(raw, commands)
 	if err != nil {
-		return nil, fmt.Errorf("receipt.json for %s does not parse: %w", filepath.Base(alsPath), err)
+		return nil, nil, fmt.Errorf("receipt.json for %s does not parse: %w", filepath.Base(alsPath), err)
 	}
 	if err := validateAlloyReceiptOutcomes(receipt, commands, outcomes); err != nil {
-		return nil, fmt.Errorf("receipt.json for %s contradicts engine results: %w", filepath.Base(alsPath), err)
+		return nil, nil, fmt.Errorf("receipt.json for %s contradicts engine results: %w", filepath.Base(alsPath), err)
 	}
 	details, err := loadAlloySolutionDetails(outDir, receipt, commands)
 	if err != nil {
-		return nil, fmt.Errorf("alloy exec emitted invalid solution artifacts for %s: %w", filepath.Base(alsPath), err)
+		return nil, nil, fmt.Errorf("alloy exec emitted invalid solution artifacts for %s: %w", filepath.Base(alsPath), err)
 	}
-	return verdicts(receipt, commands, func(name string) string { return details[name] })
+	vs, err := verdicts(receipt, commands, func(name string) string { return details[name] })
+	return vs, notes, err
 }
 
 func readStableAlloyReceipt(outDir string) (_ []byte, retErr error) {
@@ -647,29 +653,58 @@ func validateAlloySolutionBody(body []byte) error {
 }
 
 func validateAlloySuccessOutput(output string, commands []alloy.Command) error {
-	_, err := parseAlloySuccessOutput(output, commands)
+	_, _, err := parseAlloySuccessOutput(output, commands)
 	return err
 }
 
-func parseAlloySuccessOutput(output string, commands []alloy.Command) (map[string]bool, error) {
+// kodkodNativeCodeRe matches the one diagnostic kodkod, the model finder
+// under Alloy, logs when no native SAT library ships for the host platform
+// (Linux aarch64 today) and it falls back to the pure-Java SAT4J solver. The
+// verdicts are unaffected, only the speed is, so this line is tolerated. It
+// is never discarded silently: parseAlloySuccessOutput returns it, runAlloy
+// carries it, and verify-formal prints it as a NOTE. Every other unexpected
+// engine line still fails the run.
+var kodkodNativeCodeRe = regexp.MustCompile(`^\[main\] (?:ERROR|WARN) kodkod\.solvers\.api\.NativeCode - findPlatform unknown \S+`)
+
+// splitToleratedAlloyDiagnostics removes the tolerated kodkod diagnostic
+// lines from the engine output and returns them separately, in order.
+func splitToleratedAlloyDiagnostics(output string) (string, []string) {
+	var kept, tolerated []string
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if kodkodNativeCodeRe.MatchString(trimmed) {
+			tolerated = append(tolerated, trimmed)
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n"), tolerated
+}
+
+// parseAlloySuccessOutput maps an exit-zero engine transcript onto the
+// command list. The second result lists the tolerated kodkod diagnostics that
+// were stripped before counting (see kodkodNativeCodeRe); the caller must
+// surface them.
+func parseAlloySuccessOutput(output string, commands []alloy.Command) (map[string]bool, []string, error) {
 	clean := strings.ReplaceAll(strings.ReplaceAll(output, "\r", ""), "\b", "")
+	clean, tolerated := splitToleratedAlloyDiagnostics(clean)
 	lines := strings.Split(strings.TrimSpace(clean), "\n")
 	if len(commands) == 0 && len(lines) == 1 && lines[0] == "" {
-		return map[string]bool{}, nil
+		return map[string]bool{}, tolerated, nil
 	}
 	if len(lines) != len(commands) {
-		return nil, fmt.Errorf("got %d nonempty engine line(s), want exactly %d command result line(s)", len(lines), len(commands))
+		return nil, tolerated, fmt.Errorf("got %d nonempty engine line(s), want exactly %d command result line(s)", len(lines), len(commands))
 	}
 	outcomes := make(map[string]bool, len(commands))
 	for i, command := range commands {
 		fields := strings.Fields(lines[i])
 		wantIndex := fmt.Sprintf("%02d.", i)
 		if containsEngineDiagnostic(fields) || !canonicalAlloyProgress(fields, wantIndex, command) {
-			return nil, fmt.Errorf("line %d is not the canonical result for %s %s: %q", i+1, command.Kind, command.Name, lines[i])
+			return nil, tolerated, fmt.Errorf("line %d is not the canonical result for %s %s: %q", i+1, command.Kind, command.Name, lines[i])
 		}
 		outcomes[command.Name] = fields[len(fields)-1] == "SAT"
 	}
-	return outcomes, nil
+	return outcomes, tolerated, nil
 }
 
 func validateAlloyReceiptOutcomes(receipt alloyReceipt, commands []alloy.Command, outcomes map[string]bool) error {

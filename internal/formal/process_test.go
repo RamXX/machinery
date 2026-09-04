@@ -110,7 +110,7 @@ func TestRunAlloyRejectsOutputOverflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = runAlloy(als, nil)
+	_, _, err = runAlloy(als, nil)
 	want := fmt.Sprintf("process combined output exceeded %d-byte limit", formalOutputLimit)
 	if err == nil || !strings.Contains(err.Error(), "alloy exec failed") || !strings.Contains(err.Error(), want) {
 		t.Fatalf("Alloy output overflow was accepted: %v", err)
