@@ -143,7 +143,7 @@ The host-owned plugin cache updates on its own schedule and can therefore drift 
 in either direction. That skew is detected, not tolerated:
 
 ```
-cached machinery plugin version 0.6.8 does not match running machinery v0.6.7;
+cached machinery plugin version 0.6.9 does not match running machinery v0.6.8;
 run 'claude plugin update machinery@machinery'
 ```
 
