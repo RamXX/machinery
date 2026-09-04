@@ -770,7 +770,7 @@ func codexMachineryInstalled(raw string) (bool, error) {
 		if values["authPolicy"] != "ON_INSTALL" && values["authPolicy"] != "ON_USE" {
 			return false, fmt.Errorf("plugin %s has unsupported authPolicy %q", id, values["authPolicy"])
 		}
-		if err := validateCodexSourceObject(entry["source"], context+" source", "source", "path"); err != nil {
+		if err := validateCodexInstalledSource(entry["source"], context+" source", id == codexMachineryPluginID); err != nil {
 			return false, err
 		}
 		if rawMarketplace, ok := entry["marketplaceSource"]; ok {
@@ -836,6 +836,58 @@ func codexMachineryInstalled(raw string) (bool, error) {
 
 func validCodexInstallPolicy(value string) bool {
 	return value == "NOT_AVAILABLE" || value == "AVAILABLE" || value == "INSTALLED_BY_DEFAULT"
+}
+
+// codexMachineryPluginID is the one installed entry whose record machinery
+// acts on. Every other entry belongs to somebody else's plugin.
+const codexMachineryPluginID = "machinery@machinery"
+
+// codexSourceArms is the tagged union Codex writes for an installed entry's
+// `source`: the discriminant names the arm, and each arm carries exactly one
+// companion field. A local plugin records the path it came from; a remote one
+// records its connector id and has no path at all.
+var codexSourceArms = map[string]string{
+	"local":  "path",
+	"remote": "id",
+}
+
+// validateCodexInstalledSource validates one installed entry's source union.
+//
+// strict is true only for machinery's own entry. A source kind machinery does
+// not recognize is fatal there, because that is the record the update acts on.
+// On any other plugin's entry it is tolerated: Codex adds marketplace kinds on
+// its own schedule, and refusing to update machinery because an unrelated
+// third-party plugin grew a shape this binary predates is a failure out of all
+// proportion to what was actually not understood. The entry's identity fields
+// are still validated for every entry by the caller.
+func validateCodexInstalledSource(raw json.RawMessage, context string, strict bool) error {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &object); err != nil {
+		return fmt.Errorf("%s: %w", context, err)
+	}
+	rawKind, ok := object["source"]
+	if !ok {
+		return fmt.Errorf("%s is missing required field %q", context, "source")
+	}
+	var kind string
+	if err := json.Unmarshal(rawKind, &kind); err != nil || strings.TrimSpace(kind) == "" {
+		return fmt.Errorf("%s field %q is not a nonempty string", context, "source")
+	}
+	companion, known := codexSourceArms[kind]
+	if !known {
+		if strict {
+			return fmt.Errorf("%s has unsupported source kind %q", context, kind)
+		}
+		return nil
+	}
+	if err := requirePluginFields(object, []string{"source", companion}, context); err != nil {
+		return err
+	}
+	var value string
+	if err := json.Unmarshal(object[companion], &value); err != nil || strings.TrimSpace(value) == "" {
+		return fmt.Errorf("%s field %q is not a nonempty string", context, companion)
+	}
+	return nil
 }
 
 func validateCodexSourceObject(raw json.RawMessage, context, kindField, pathField string) error {

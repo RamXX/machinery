@@ -826,3 +826,78 @@ func updateReleaseServer(t *testing.T, tag string, candidate []byte, badChecksum
 	t.Cleanup(func() { apiBase = oldAPI })
 	return server
 }
+
+// Codex writes `source` as a tagged union. A local plugin carries the path it
+// came from; a remote one carries a connector id and no path. Machinery knew
+// only the local arm, so a single curated-marketplace plugin anywhere in the
+// inventory aborted the whole update. Shapes below are taken from a real
+// `codex plugin list --json` (openai-curated-remote entries).
+func TestCodexInventoryAcceptsRemoteSourceArm(t *testing.T) {
+	remote := `{"installed":[` +
+		`{"pluginId":"machinery@machinery","name":"machinery","marketplaceName":"machinery","version":"0.6.8",` +
+		`"installed":true,"enabled":true,"source":{"source":"local","path":"/tmp/machinery"},` +
+		`"installPolicy":"AVAILABLE","authPolicy":"ON_USE"},` +
+		`{"pluginId":"github@openai-curated-remote","name":"github","marketplaceName":"openai-curated-remote",` +
+		`"version":"0.1.12-5f7cd798dc99","installed":true,"enabled":true,` +
+		`"source":{"source":"remote","id":"plugin_connector_1p_1a69035c238881919c4190932b2df699"},` +
+		`"installPolicy":"AVAILABLE","authPolicy":"ON_INSTALL"}],"available":[]}`
+	got, err := codexMachineryInstalled(remote)
+	if err != nil {
+		t.Fatalf("remote source arm rejected: %v", err)
+	}
+	if !got {
+		t.Fatal("machinery entry not reported installed alongside a remote-source plugin")
+	}
+}
+
+// Machinery's own entry is the record the update acts on, so a source kind
+// this binary does not know is fatal there.
+func TestCodexInventoryRejectsUnknownSourceKindOnMachineryEntry(t *testing.T) {
+	raw := `{"installed":[{"pluginId":"machinery@machinery","name":"machinery","marketplaceName":"machinery",` +
+		`"version":"0.6.8","installed":true,"enabled":true,"source":{"source":"quantum","path":"/tmp/x"},` +
+		`"installPolicy":"AVAILABLE","authPolicy":"ON_USE"}],"available":[]}`
+	if _, err := codexMachineryInstalled(raw); err == nil ||
+		!strings.Contains(err.Error(), `unsupported source kind "quantum"`) {
+		t.Fatalf("machinery entry accepted an unknown source kind: %v", err)
+	}
+}
+
+// Somebody else's plugin growing a shape this binary predates must not abort
+// machinery's update. The entry's identity fields are still validated.
+func TestCodexInventoryToleratesUnknownSourceKindOnForeignEntry(t *testing.T) {
+	raw := `{"installed":[` +
+		`{"pluginId":"machinery@machinery","name":"machinery","marketplaceName":"machinery","version":"0.6.8",` +
+		`"installed":true,"enabled":true,"source":{"source":"local","path":"/tmp/machinery"},` +
+		`"installPolicy":"AVAILABLE","authPolicy":"ON_USE"},` +
+		`{"pluginId":"future@somewhere","name":"future","marketplaceName":"somewhere","version":"9.9.9",` +
+		`"installed":true,"enabled":true,"source":{"source":"orbital","satellite":"n7","beam":3},` +
+		`"installPolicy":"AVAILABLE","authPolicy":"ON_USE"}],"available":[]}`
+	got, err := codexMachineryInstalled(raw)
+	if err != nil {
+		t.Fatalf("a foreign plugin's unknown source kind aborted the update: %v", err)
+	}
+	if !got {
+		t.Fatal("machinery entry not reported installed")
+	}
+}
+
+// A known arm still has a closed schema: the companion field is required and
+// must be a nonempty string, and no extra fields are allowed.
+func TestCodexInventoryKnownSourceArmStaysClosed(t *testing.T) {
+	for name, source := range map[string]string{
+		"remote missing id":   `{"source":"remote"}`,
+		"remote empty id":     `{"source":"remote","id":"  "}`,
+		"remote extra field":  `{"source":"remote","id":"c1","path":"/tmp/x"}`,
+		"local missing path":  `{"source":"local"}`,
+		"local wrong compan.": `{"source":"local","id":"c1"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			raw := `{"installed":[{"pluginId":"machinery@machinery","name":"machinery",` +
+				`"marketplaceName":"machinery","version":"0.6.8","installed":true,"enabled":true,` +
+				`"source":` + source + `,"installPolicy":"AVAILABLE","authPolicy":"ON_USE"}],"available":[]}`
+			if _, err := codexMachineryInstalled(raw); err == nil {
+				t.Fatalf("closed schema accepted %s", source)
+			}
+		})
+	}
+}
