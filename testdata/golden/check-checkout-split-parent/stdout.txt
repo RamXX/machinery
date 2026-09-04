@@ -16,7 +16,7 @@ note: decomposed parent with no machines/; running gu,gc,g2,gl,gb,gv,g5 (G3/Gx r
   checked: 3 dated decision entries, 11 files style-scanned
   ok
 == Gb-plan  build plan structure ==
-  checked: 0 local plans (decomposed parent; the children carry the plans)
+  checked: linkage mode pairwise (execution unit: one bounded zero-context packet), 0 local plans (decomposed parent; the children carry the plans)
   ok
 == Gv-attest  attestation evidence ==
   checked: 8 covered artifacts current, 8 attested claims, 8 claims owed

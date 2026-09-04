@@ -1,5 +1,5 @@
 ---- MODULE DealRefinement ----
-\* machinery-version: v0.6.4
+\* machinery-version: v0.6.5
 \* GENERATED. Proof that DealData refines DealContract under a refinement mapping.
 EXTENDS DealData
 

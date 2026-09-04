@@ -15,7 +15,7 @@ import "strings"
 // numeric only (no -dev or other pre-release suffix): a local build reports
 // the same plain version as the release it corresponds to. A contract test
 // in cmd/machinery pins the two defaults together.
-var Version = "v0.6.4"
+var Version = "v0.6.5"
 
 // StructurizrVersion is the exact CLI engine identity supported by this
 // binary. It is embedded so installed binaries can verify arbitrary user
