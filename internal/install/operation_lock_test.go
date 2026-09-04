@@ -201,7 +201,7 @@ func TestUpdateChildCapabilityUsesParentsHeldLock(t *testing.T) {
 	}
 	defer cleanup()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestInstallLockCapabilityHelper$")
 	cmd.Env = append(os.Environ(),
@@ -565,6 +565,9 @@ func TestInstallOrphanCapabilityHelper(t *testing.T) {
 func TestInstallLockCapabilityHelper(t *testing.T) {
 	if os.Getenv("MACHINERY_TEST_INSTALL_LOCK_HELPER") != "1" {
 		return
+	}
+	if err := EnsureActivationConsistency(); err != nil {
+		t.Fatal(err)
 	}
 	lock, err := acquireInstallOperationLock()
 	if err != nil {

@@ -223,6 +223,51 @@ func TestUpdateExecutesDownloadedBinaryForHarnessRefresh(t *testing.T) {
 	}
 }
 
+func TestBinaryOnlyUpdateCandidateUsesDelegatedParentLock(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell fixture")
+	}
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+	t.Setenv("HOME", t.TempDir())
+	const tag = "v9.9.3"
+	testBinary := strings.ReplaceAll(os.Args[0], "'", "'\\''")
+	script := "#!/bin/sh\n" +
+		"[ \"$1\" = version ] || exit 2\n" +
+		"exec env MACHINERY_TEST_UPDATE_CANDIDATE_TAG=" + tag + " '" + testBinary + "' -test.run=^TestUpdateCandidateStartupHelper$\n"
+	server := updateReleaseServer(t, tag, []byte(script), false)
+	defer server.Close()
+	oldGH := githubBase
+	githubBase = server.URL
+	defer func() { githubBase = oldGH }()
+
+	destination := filepath.Join(t.TempDir(), "machinery")
+	result, err := Update(UpdateOptions{
+		Version:     tag,
+		Repo:        "acme/machinery",
+		Executable:  destination,
+		SkipPlugins: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Version != tag || result.Executable != destination || result.HomeInstalls != 0 || result.TargetInstalls != 0 {
+		t.Fatalf("binary-only update result = %+v", result)
+	}
+}
+
+func TestUpdateCandidateStartupHelper(t *testing.T) {
+	tag := os.Getenv("MACHINERY_TEST_UPDATE_CANDIDATE_TAG")
+	if tag == "" {
+		return
+	}
+	if err := EnsureActivationConsistency(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println("machinery version " + tag)
+	os.Exit(0)
+}
+
 func TestUpdateChecksumMismatchPreservesExistingBinary(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test fixture targets POSIX release assets")

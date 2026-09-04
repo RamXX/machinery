@@ -161,7 +161,11 @@ func updateLocked(opts UpdateOptions) (result UpdateResult, retErr error) {
 		}
 		transactionPaths = append(transactionPaths, receipt)
 	}
-	if direct && defaultRunner {
+	// The parent retains the exclusive operation lock while it validates the
+	// downloaded binary, even for a binary-only update. Give every real child
+	// process the scoped capability so its startup consistency barrier can
+	// authenticate the parent-held lock instead of waiting on its own parent.
+	if defaultRunner {
 		scope, scopeErr := installOperationScope()
 		if scopeErr != nil {
 			return UpdateResult{}, scopeErr

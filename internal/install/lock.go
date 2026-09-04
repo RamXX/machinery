@@ -168,6 +168,19 @@ func acquireInstallOperationLock() (*installOperationLock, error) {
 // image. Library entry points retain the same barrier through their operation
 // lock acquisition.
 func EnsureActivationConsistency() error {
+	// Update validates and then invokes the replacement binary while the parent
+	// deliberately retains the exclusive operation lock. That child receives a
+	// parent-bound capability; route it through the operation-lock path so the
+	// capability is authenticated instead of waiting on its own parent. An
+	// orphaned capability still acquires the real lock, performs recovery, and
+	// fails closed in acquireInstallOperationLock.
+	if os.Getenv(installLockCapabilityEnv) != "" {
+		lock, err := acquireInstallOperationLock()
+		if err != nil {
+			return err
+		}
+		return lock.Release()
+	}
 	lock, err := acquireInstallInspectionLock()
 	if err != nil {
 		return err
