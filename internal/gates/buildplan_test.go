@@ -88,6 +88,20 @@ func manifestPlan() string {
 		"Demo: Exercise the complete public workflow.\nDoD: all rows green.\n"
 }
 
+func matrixPlan() string {
+	return "# B\n\nMode: manifest\nLinkage: matrix\n\n## 9. Build plan\n\n" +
+		"**M0 - Walking skeleton.**\nStatus: open\n" +
+		"Shard: [core domain shard](BUILD/core.md)\nShard: [trust domain shard](BUILD/trust.md)\n" +
+		"Demo: Exercise one real transition through one real boundary.\nNFR: error envelope, logging.\nDoD: T-CMD-01 green.\n\n" +
+		"**M1 - Breadth slice.**\nStatus: open\n" +
+		"Shard: [core domain shard](BUILD/core.md)\nShard: [ops domain shard](BUILD/ops.md)\n" +
+		"Demo: Exercise the complete public workflow.\nDoD: all rows green.\n"
+}
+
+func matrixShard(name, milestones string) string {
+	return "# BUILD shard: " + name + "\n\nMilestones: " + milestones + "\n"
+}
+
 func writeBuildPlanFixture(t *testing.T, build string, extra map[string]string) string {
 	t.Helper()
 	design := t.TempDir()
@@ -266,6 +280,155 @@ func TestCheckBuildPlanManifestPackets(t *testing.T) {
 	}
 	if g.Counts["plans"] != 1 || g.Counts["milestones"] != 2 || g.Counts["execution packets"] != 2 || g.Counts["packet sections"] != 14 {
 		t.Errorf("one root plan and two complete packets: %+v", g.Counts)
+	}
+	if !strings.Contains(strings.Join(g.checkedExtra, ", "), "linkage mode pairwise") {
+		t.Errorf("checked line must name the enforced default linkage mode: %v", g.checkedExtra)
+	}
+}
+
+func TestCheckBuildPlanManifestMatrix(t *testing.T) {
+	largeCore := matrixShard("core", "M0, M1") + "\n**M9 - shard-local implementation note.**\n" + strings.Repeat("x", maxExecutionPacketBytes)
+	design := writeBuildPlanFixture(t, matrixPlan(), map[string]string{
+		"BUILD/core.md":  largeCore,
+		"BUILD/trust.md": matrixShard("trust", "M0"),
+		"BUILD/ops.md":   matrixShard("ops", "M1"),
+	})
+	g := CheckBuildPlan(design)
+	if len(g.Errs) != 0 {
+		t.Fatalf("Gb not clean on a reciprocal many-to-many shard matrix: %v", g.Errs)
+	}
+	if g.Counts["execution shards"] != 3 || g.Counts["milestone-shard links"] != 4 || g.Counts["milestone demos"] != 2 {
+		t.Errorf("three shards and four graph edges must be checked: %+v", g.Counts)
+	}
+	if !strings.Contains(strings.Join(g.checkedExtra, ", "), "linkage mode matrix") {
+		t.Errorf("checked line must name the enforced matrix mode: %v", g.checkedExtra)
+	}
+}
+
+func TestCheckBuildPlanManifestMatrixContract(t *testing.T) {
+	tests := []struct {
+		name, root string
+		shards     map[string]string
+		want       string
+	}{
+		{
+			name: "matrix shape without declaration defaults pairwise",
+			root: strings.Replace(matrixPlan(), "Linkage: matrix\n", "", 1),
+			shards: map[string]string{
+				"BUILD/core.md":  matrixShard("core", "M0, M1"),
+				"BUILD/trust.md": matrixShard("trust", "M0"),
+				"BUILD/ops.md":   matrixShard("ops", "M1"),
+			},
+			want: "has no Packet line",
+		},
+		{
+			name: "malformed linkage",
+			root: strings.Replace(matrixPlan(), "Linkage: matrix", "Linkage: graph", 1),
+			shards: map[string]string{
+				"BUILD/core.md": matrixShard("core", "M0, M1"),
+			},
+			want: "invalid Linkage value",
+		},
+		{
+			name: "duplicate root pair",
+			root: strings.Replace(matrixPlan(), "Shard: [trust domain shard](BUILD/trust.md)\n", "Shard: [core again](BUILD/core.md)\n", 1),
+			shards: map[string]string{
+				"BUILD/core.md": matrixShard("core", "M0, M1"),
+				"BUILD/ops.md":  matrixShard("ops", "M1"),
+			},
+			want: "each milestone-shard pair must be unique",
+		},
+		{
+			name: "orphan shard",
+			root: matrixPlan(),
+			shards: map[string]string{
+				"BUILD/core.md":   matrixShard("core", "M0, M1"),
+				"BUILD/trust.md":  matrixShard("trust", "M0"),
+				"BUILD/ops.md":    matrixShard("ops", "M1"),
+				"BUILD/orphan.md": matrixShard("orphan", "M1"),
+			},
+			want: "shard is not linked by any root milestone",
+		},
+		{
+			name: "orphan milestone",
+			root: strings.Replace(matrixPlan(), "Shard: [core domain shard](BUILD/core.md)\nShard: [ops domain shard](BUILD/ops.md)\nDemo: Exercise the complete", "Demo: Exercise the complete", 1),
+			shards: map[string]string{
+				"BUILD/core.md":  matrixShard("core", "M0"),
+				"BUILD/trust.md": matrixShard("trust", "M0"),
+				"BUILD/ops.md":   matrixShard("ops", "M1"),
+			},
+			want: "milestone M1 (Breadth slice) has no Shard line",
+		},
+		{
+			name: "unknown shard",
+			root: strings.Replace(matrixPlan(), "BUILD/trust.md", "BUILD/missing.md", 1),
+			shards: map[string]string{
+				"BUILD/core.md":  matrixShard("core", "M0, M1"),
+				"BUILD/trust.md": matrixShard("trust", "M0"),
+				"BUILD/ops.md":   matrixShard("ops", "M1"),
+			},
+			want: "shard BUILD/missing.md linked by M0 is not a regular non-index file",
+		},
+		{
+			name: "unknown milestone",
+			root: matrixPlan(),
+			shards: map[string]string{
+				"BUILD/core.md":  matrixShard("core", "M0, M1, M9"),
+				"BUILD/trust.md": matrixShard("trust", "M0"),
+				"BUILD/ops.md":   matrixShard("ops", "M1"),
+			},
+			want: "names M9, which is not a root milestone",
+		},
+		{
+			name: "non-reciprocal graph",
+			root: matrixPlan(),
+			shards: map[string]string{
+				"BUILD/core.md":  matrixShard("core", "M0"),
+				"BUILD/trust.md": matrixShard("trust", "M0"),
+				"BUILD/ops.md":   matrixShard("ops", "M1"),
+			},
+			want: "Milestones declaration omits M1",
+		},
+		{
+			name: "non-canonical milestone declaration",
+			root: matrixPlan(),
+			shards: map[string]string{
+				"BUILD/core.md":  matrixShard("core", "M1,M0"),
+				"BUILD/trust.md": matrixShard("trust", "M0"),
+				"BUILD/ops.md":   matrixShard("ops", "M1"),
+			},
+			want: "unique, numerically ascending",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			design := writeBuildPlanFixture(t, tc.root, tc.shards)
+			g := CheckBuildPlan(design)
+			if !strings.Contains(strings.Join(g.Errs, "\n"), tc.want) {
+				t.Fatalf("want error containing %q, got %v", tc.want, g.Errs)
+			}
+		})
+	}
+}
+
+func TestCheckBuildPlanManifestDemoLineDiagnostics(t *testing.T) {
+	root := strings.Replace(manifestPlan(), "Demo: Exercise one real transition through one real boundary.\n", "", 1)
+	design := writeBuildPlanFixture(t, root, map[string]string{
+		"BUILD/M0-walking-skeleton.md": executionPacket("0", "Walking skeleton"),
+		"BUILD/M1-breadth.md":          executionPacket("1", "Breadth slice"),
+	})
+	g := CheckBuildPlan(design)
+	if !strings.Contains(strings.Join(g.Errs, "\n"), "standalone 'Demo: <observable result>' line (label matching is case-insensitive)") {
+		t.Fatalf("the finding must explain the exact recognized Demo line form: %v", g.Errs)
+	}
+
+	lowercase := strings.Replace(manifestPlan(), "Demo: Exercise one real transition", "demo: Exercise one real transition", 1)
+	design = writeBuildPlanFixture(t, lowercase, map[string]string{
+		"BUILD/M0-walking-skeleton.md": executionPacket("0", "Walking skeleton"),
+		"BUILD/M1-breadth.md":          executionPacket("1", "Breadth slice"),
+	})
+	if g = CheckBuildPlan(design); len(g.Errs) != 0 {
+		t.Fatalf("Demo label matching is case-insensitive: %v", g.Errs)
 	}
 }
 

@@ -7,13 +7,12 @@
   the domain model, the architecture, or the state machines. Inline what matters; reference the
   `design/` files for the full source.
 - **Manifest mode** (large designs or smaller execution models): the root BUILD.md is the single
-  milestone, demo, ordering, and acceptance manifest. Every root milestone links to exactly one
-  direct `design/BUILD/M<n>-<name>.md` execution packet, and every non-index packet is linked once.
-  A packet contains all domain, architecture, behavior, oracle, TDD, implementation, risk,
-  recovery, and acceptance context for that milestone. It never declares another Build plan or
-  milestone. A `README.md` or `index.md` under `design/BUILD/` is navigation for humans and is
-  exempt from packet obligations. Read [execution-packets.md](execution-packets.md) for the exact
-  packet shape and size bound.
+  milestone, demo, ordering, and acceptance manifest. It declares `Linkage: pairwise` or
+  `Linkage: matrix`; absence defaults to pairwise for compatibility. Pairwise gives each root
+  milestone exactly one bounded, self-contained packet. Matrix gives milestones and reusable
+  domain shards an exact reciprocal many-to-many graph. A `README.md` or `index.md` under
+  `design/BUILD/` is navigation for humans and is exempt from linkage obligations. Read
+  [execution-packets.md](execution-packets.md) for both contracts.
 
 Two artifacts are never pasted by hand: the machine JSON (section 5 references the machine files)
 and the transition tables (section 7 references the generated oracles). Pasted copies drift; the
@@ -74,6 +73,7 @@ first non-blank line, and a bare or misshapen N/A fails loudly instead of waivin
 # BUILD: <System Name>
 
 Mode: full (self-contained) | manifest (root milestone/demo manifest; packets in design/BUILD/M<n>-<name>.md)
+Linkage: pairwise | matrix (manifest mode only; absent means pairwise)
 
 ## 1. Purpose and scope
 One paragraph: what this system does, who uses it, and the one-sentence reason it exists.
@@ -238,11 +238,21 @@ Format contract, held deterministically by Gb-plan:
   so "Build planning notes" and "Milestone map" name no plan section.
 - Each milestone is a bold marker `**M<n> - <title>**` with a unique number. Numbers compare
   numerically: M1 and M01 are the same milestone, and declaring both is a duplicate.
-- In manifest mode, every milestone block carries exactly one `Packet:` Markdown link to a direct
-  `BUILD/*.md` packet and exactly one non-empty `Demo:` line. Every non-index packet is linked by
-  exactly one milestone. The packet title is `# M<n> - <title>`, it is at most 64 KiB, it declares
-  no Build plan or milestone, and it contains exactly one H2 section for each heading specified in
-  [execution-packets.md](execution-packets.md).
+- In manifest mode, every milestone block carries exactly one standalone, non-empty
+  `Demo: <observable result>` line. The label match is case-insensitive, but it must be a line of
+  its own; an inline `demo:` clause in prose does not count.
+- Manifest linkage is declared by one `Linkage:` line. Absence defaults to `pairwise`; malformed or
+  repeated declarations fail.
+  - `Linkage: pairwise`: every milestone carries exactly one `Packet:` Markdown link to a direct
+    `BUILD/*.md` packet and every non-index packet is linked by exactly one milestone. The packet
+    title is `# M<n> - <title>`, it is at most 64 KiB, declares no Build plan or milestone, and has
+    exactly one H2 section for each heading in [execution-packets.md](execution-packets.md).
+  - `Linkage: matrix`: every milestone carries one or more `Shard:` Markdown links to direct
+    `BUILD/*.md` shards. Every shard is linked by one or more milestones and carries exactly one
+    reciprocal, numerically ascending declaration such as `Milestones: M1, M3`. Duplicate pairs,
+    unknown milestones, missing files, orphan shards, and disagreement between the two sides fail.
+    Matrix shards are used with the root, so pairwise filename, title, seven-section, milestone-
+    marker, and 64 KiB rules do not apply.
 - The first milestone (M0) is the walking skeleton: its title contains "walking skeleton". A
   brownfield gap plan whose skeleton already exists in production waives it with the literal line
   `Walking skeleton: N/A - <reason>`.

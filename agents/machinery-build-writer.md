@@ -60,10 +60,13 @@ output contract.
 
 ## Method
 
-1. **Declare the mode.** Full mode is one genuinely narrow self-contained document. Manifest mode
-   uses the root BUILD.md as the sole milestone/demo/acceptance manifest and one bounded,
-   self-contained `design/BUILD/M<n>-<name>.md` packet per milestone. State the mode at the top.
-   Self-containment means packets COPY the exact rows needed from source artifacts. Mark every
+1. **Declare the mode and linkage.** Full mode is one genuinely narrow self-contained document.
+   Manifest mode uses the root BUILD.md as the sole milestone/demo/acceptance manifest and makes
+   the planning-stage linkage decision explicit. `Linkage: pairwise` gives each milestone one
+   bounded, self-contained `design/BUILD/M<n>-<name>.md` packet. `Linkage: matrix` gives root
+   milestones and reusable workstream shards an exact reciprocal many-to-many graph; each
+   execution unit reads the root plus one shard. State both declarations at the top. Pairwise
+   self-containment means packets COPY the exact rows needed from source artifacts. Mark every
    copied table with a `machinery:embed` marker naming its source, selection, and claims (subset,
    complete) so Ge-embed holds the copy byte for byte; the grammar is in the template reference. A
    copy carrying only a prose promise is the shape this project has already paid for three times.
@@ -104,9 +107,11 @@ output contract.
    waiver line `Walking skeleton: N/A - <reason>`), a `DoD:` line per milestone stating oracle-row and
    test-id coverage, the skeleton DoD citing at least one committed oracle id whole-token, and the
    skeleton naming which NFR-record mechanisms it instantiates (the pattern template every later
-   milestone copies). In manifest mode each root milestone also has one `Packet:` link and one
-   user-observable `Demo:` line; write the packet with all seven required sections and keep it at or
-   below 64 KiB. The plan states the milestone-acceptance protocol from the template:
+   milestone copies). In manifest mode each root milestone also has exactly one standalone,
+   user-observable `Demo:` line. Under pairwise linkage, give it one `Packet:` link and write the
+   packet with all seven required sections at or below 64 KiB. Under matrix linkage, give it one or
+   more `Shard:` links and put the reciprocal, canonical `Milestones:` declaration in each shard.
+   The plan states the milestone-acceptance protocol from the template:
    a milestone gets its `Status: closed` line only once `design/acceptance/M<n>.yaml` is committed,
    which Ga-accept binds to the reviewed commit and to the oracle ids that milestone's DoD cites.
 11. **State the hard-TDD protocol with its gate discipline explicit** (template section 11; write
@@ -129,9 +134,9 @@ output contract.
 
 ## Output
 
-Write `design/BUILD.md` (and, in manifest mode, exactly one
-`design/BUILD/M<n>-<name>.md` packet per root milestone) following the references. Fill every
-required section; mark any as N/A only with a stated reason.
+Write `design/BUILD.md` and, in manifest mode, its declared pairwise packets or matrix workstream
+shards following the references. Fill every required section; mark any as N/A only with a stated
+reason.
 
 ## Run the checker before you return (non-negotiable)
 

@@ -117,9 +117,11 @@ four semantics patterns, including `control-flow-only`.
 
 The build plan must be executable without design archaeology. Full mode is for
 a genuinely narrow project. Large work uses a root milestone/demo manifest and
-exactly one self-contained packet per milestone. Each packet carries all domain,
-architecture, behavior, oracle, TDD, implementation, risk, recovery, and
-acceptance context needed by a smaller model.
+declares its linkage. Pairwise linkage gives every milestone exactly one bounded,
+self-contained packet for a smaller execution model. Matrix linkage gives
+milestones and reusable domain shards an exact reciprocal many-to-many graph;
+each execution unit is one milestone-shard pair and reads the root plus that
+workstream shard.
 
 Run the full `machinery check <design>` and, once code exists,
 `machinery check <design> --impl <dir>`. A green design is the RED precondition;
