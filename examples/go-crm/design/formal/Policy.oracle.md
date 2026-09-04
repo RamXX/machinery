@@ -1,7 +1,7 @@
 # Generated authorization oracle: policy
 
 Generated from `domain.modelith.yaml` + `policy.relational.yaml` by `machinery alloy`. DO NOT EDIT BY HAND.
-<!-- machinery-version: v0.6.7 -->
+<!-- machinery-version: v0.6.8 -->
 Single source of truth for the authorization tests: one row is one decision case
 for the pure authz function. Key tests on the STABLE id, not the row number; row
 numbers renumber when the design changes, stable ids do not. A design revision
