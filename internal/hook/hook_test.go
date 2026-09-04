@@ -3963,3 +3963,110 @@ func TestDialogPlainRegister(t *testing.T) {
 		}
 	})
 }
+
+// A tool that machinery allows can still be refused afterwards by the host
+// permission layer, by another PreToolUse hook, or by the user. That refusal
+// produces no PostToolUse event, so the armed token can never be cleared by
+// the normal path. Blocking on it forever wedges the session and, worse, skips
+// the gate run that would actually inspect the tree. The first Stop still
+// blocks (the crash case's chance to complete); the re-fired Stop reaps and
+// gates.
+func TestStopReapsArmedOperationThatNeverRanOnRefiredStop(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	sid := "denied-after-arm"
+	t.Cleanup(func() { _ = clearState(root, sid) })
+
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "notes.txt"))
+	pre.ToolUseID = "denied-by-permission-layer"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("allowed edit preflight unexpectedly emitted output: %s", out)
+	}
+	// The tool is refused here. No PostToolUse ever arrives.
+
+	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "in-flight tool") {
+		t.Fatalf("first Stop must still block on an unrecorded operation: %s", out)
+	}
+
+	out = runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop", StopHookActive: true})
+	if strings.Contains(out, `"decision":"block"`) {
+		t.Fatalf("re-fired Stop stayed wedged on an operation that never ran: %s", out)
+	}
+	if !strings.Contains(out, "reaped 1 tool operation") {
+		t.Fatalf("a reap must never be silent: %s", out)
+	}
+	record, err := readStateRecord(root, sid)
+	if err != nil {
+		t.Fatalf("read state after reap: %v", err)
+	}
+	if len(record.pending) != 0 {
+		t.Fatalf("reap left %d pending token(s) behind", len(record.pending))
+	}
+}
+
+// The reap must never race a live process: a background task still running is
+// evidence of exactly the concurrent mutation the pending ledger guards.
+func TestStopRefusesToReapWhileBackgroundTasksRun(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	sid := "reap-vs-background"
+	t.Cleanup(func() { _ = clearState(root, sid) })
+
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "notes.txt"))
+	pre.ToolUseID = "armed-while-background-runs"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("allowed edit preflight unexpectedly emitted output: %s", out)
+	}
+	stopRaw := `{"session_id":"` + sid + `","cwd":"` + filepath.ToSlash(root) +
+		`","hook_event_name":"Stop","stop_hook_active":true,` +
+		`"background_tasks":[{"id":"task-1","type":"local","status":"running","description":"mutating files"}]}`
+	var stopOutput bytes.Buffer
+	if err := Run(strings.NewReader(stopRaw), &stopOutput, root); err != nil {
+		t.Fatal(err)
+	}
+	out := stopOutput.String()
+	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "background task") {
+		t.Fatalf("re-fired Stop reaped while a background task was live: %s", out)
+	}
+	record, err := readStateRecord(root, sid)
+	if err != nil {
+		t.Fatalf("read state after refused reap: %v", err)
+	}
+	if len(record.pending) != 1 {
+		t.Fatalf("refused reap must retain the ledger, got %d pending", len(record.pending))
+	}
+}
+
+// Reaping clears the in-flight ledger; it must not clear the obligation to
+// gate. A red tree still blocks on the re-fired Stop.
+func TestReapedStopStillGatesTheTree(t *testing.T) {
+	isolateHookState(t)
+	root := t.TempDir()
+	copyTree(t, crmDesign, filepath.Join(root, "design"))
+	sid := "reap-then-gate"
+	t.Cleanup(func() { _ = clearState(root, sid) })
+
+	// DRIFT: a committed generated artifact tampered with by hand. This is the
+	// condition the gates exist to catch, and a reap must never hide it.
+	tampered := filepath.Join(root, "design", "machines", "Deal.oracle.md")
+	raw, err := os.ReadFile(tampered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, tampered, string(raw)+"\ntampered while the operation was armed\n")
+
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "notes.txt"))
+	pre.ToolUseID = "armed-then-refused"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("allowed edit preflight unexpectedly emitted output: %s", out)
+	}
+
+	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop", StopHookActive: true})
+	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "DRIFT") {
+		t.Fatalf("reap discharged a drifted tree without gating it: %s", out)
+	}
+	if design, _, err := readStateErr(root, sid); err != nil || !design {
+		t.Fatalf("red gates after a reap cleared the durable obligation: design=%v err=%v", design, err)
+	}
+}

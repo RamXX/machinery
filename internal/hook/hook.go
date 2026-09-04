@@ -1225,11 +1225,40 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 			}
 		}
 	}
+	reaped := 0
 	if len(state.pending) > 0 {
-		return emitJSON(w, stopOut{Decision: "block", Reason: fmt.Sprintf("machinery governance has %d in-flight tool operation(s) whose PostToolUse completion was not durably recorded; refusing to discharge or clear the project gate obligation while a mutation may still be running", len(state.pending))})
+		// A pending token is armed before the tool runs and cleared by its Post
+		// event. It can therefore outlive its operation in two indistinguishable
+		// ways: the tool ran and its Post was lost (a crash), or the tool never
+		// ran at all because the host permission layer, another PreToolUse hook,
+		// or the user denied it after machinery already allowed it. The second
+		// case never produces a Post event, so blocking on the token forever
+		// wedges the session AND skips the gate run that would actually inspect
+		// the tree.
+		//
+		// Block once, which is the crash case's chance to complete. On the
+		// re-fired Stop, reap what is left and let the gates decide: the
+		// design/impl obligation flags are armed durably and independently of
+		// these tokens, so the checks still run against the real tree and a red
+		// gate still blocks. Concurrency keeps its own guard below and is
+		// re-checked here, because reaping must never race a live process.
+		if !in.StopHookActive {
+			return emitJSON(w, stopOut{Decision: "block", Reason: fmt.Sprintf("machinery governance has %d in-flight tool operation(s) whose PostToolUse completion was not durably recorded; refusing to discharge or clear the project gate obligation while a mutation may still be running", len(state.pending))})
+		}
+		if in.BackgroundTasks > 0 {
+			return emitJSON(w, stopOut{Decision: "block", Reason: fmt.Sprintf("machinery governance sees %d background task(s) still running; refusing to reap %d unrecorded tool operation(s) while a process may still mutate the design or implementation", in.BackgroundTasks, len(state.pending))})
+		}
+		revision, count, err := reapPendingState(root, in.SessionID, state.pending)
+		if err != nil {
+			return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance cannot reap the unrecorded tool operations it is holding; refusing to end the turn on an unresolved ledger: " + err.Error()})
+		}
+		state.revision, state.pending, reaped = revision, nil, count
 	}
 	touchedDesign, touchedImpl := state.design, state.impl
 	if !touchedDesign && !touchedImpl {
+		if reaped > 0 {
+			return emitJSON(w, stopOut{SystemMessage: reapNotice(reaped) + " Nothing governed was touched, so no gate run was owed."})
+		}
 		return nil
 	}
 	if in.BackgroundTasks > 0 {
@@ -1387,14 +1416,22 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		if selWarn != "" {
 			msg = selWarn + "\n" + msg
 		}
+		if reaped > 0 {
+			msg = reapNotice(reaped) + "\n" + msg
+		}
 		return emitJSON(w, stopOut{SystemMessage: msg})
 	default:
 		if err := clearCheckedState(root, in.SessionID, state.revision); err != nil {
 			return emitJSON(w, stopOut{Decision: "block", Reason: "machinery gates passed, but the hook state ledger could not be durably cleared: " + err.Error()})
 		}
-		if selWarn != "" {
+		switch {
+		case selWarn != "" && reaped > 0:
 			// a green run still surfaces the config gap, or it never surfaces
+			return emitJSON(w, stopOut{SystemMessage: reapNotice(reaped) + " The gates then ran green.\n" + selWarn})
+		case selWarn != "":
 			return emitJSON(w, stopOut{SystemMessage: selWarn})
+		case reaped > 0:
+			return emitJSON(w, stopOut{SystemMessage: reapNotice(reaped) + " The gates then ran green."})
 		}
 		return nil
 	}
@@ -3539,6 +3576,48 @@ func readState(root, sessionID string) (design, impl bool) {
 func clearState(root, sessionID string) (returnErr error) {
 	_, returnErr = clearStateRevision(root, sessionID, 0)
 	return returnErr
+}
+
+// reapNotice states a reap in the operator's own terms. A reap is never
+// silent: the ledger changed, and the reader is told how and why.
+func reapNotice(reaped int) string {
+	return fmt.Sprintf("machinery: reaped %d tool operation(s) that were armed but never reported completion (most often a tool the permission layer, another hook, or the user denied after machinery allowed it, which produces no PostToolUse event).", reaped)
+}
+
+// reapPendingState removes exactly the pending tokens the caller observed,
+// under one lock, and returns the resulting revision. Tokens armed after that
+// observation are deliberately left in place: a reap must never discard an
+// operation the caller has not accounted for.
+func reapPendingState(root, sessionID string, observed []string) (revision uint64, reaped int, returnErr error) {
+	if err := requireStateDir(); err != nil {
+		return 0, 0, err
+	}
+	p := statePath(root, sessionID)
+	lock, err := acquireHookStateLock(p)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() { returnErr = errors.Join(returnErr, lock.release()) }()
+	if temps, err := routeStateTemps(root); err != nil {
+		return 0, 0, err
+	} else if len(temps) > 0 {
+		return 0, 0, fmt.Errorf("incomplete hook route transaction: durable temp %s exists; refusing to overwrite crash evidence", temps[0])
+	}
+	for _, token := range observed {
+		if err := updateStateLocked(p, false, false, "", token, ""); err != nil {
+			return 0, 0, err
+		}
+		reaped++
+	}
+	raw, err := readStateFile(p)
+	if err != nil {
+		return 0, 0, err
+	}
+	record, err := parseHookStateRecord(raw)
+	if err != nil {
+		return 0, 0, err
+	}
+	return record.revision, reaped, nil
 }
 
 func clearCheckedState(root, sessionID string, revision uint64) error {
