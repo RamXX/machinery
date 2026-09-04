@@ -1,6 +1,6 @@
 {
   "projection_schema": "1.0",
-  "machinery_version": "v0.6.3",
+  "machinery_version": "v0.6.4",
   "design_id": "sha256:3e61bcd868505303d65a3a89a7cefdf11a7bcbb90c34b5ba4ac6c542ddf3fe90",
   "checker_id": "pii-flow",
   "manifest_hash": "sha256:9675bf9b76b2d02fa375d96f0c7f206b0b3efeb5283b322beaffc56b31c65eeb",

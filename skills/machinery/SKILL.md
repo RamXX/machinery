@@ -1,7 +1,7 @@
 ---
 name: machinery
 metadata:
-  version: "0.6.3"
+  version: "0.6.4"
 description: >
   Design software as a build-ready blueprint for greenfield, brownfield,
   rebuild, or hybrid work. Use for domain modeling, C4 architecture, state
