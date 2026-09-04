@@ -59,7 +59,7 @@ case "$arch" in
 esac
 case "$os" in
   linux|darwin) ;;
-  msys*|mingw*|cygwin*|windows*) die "Windows is not a supported binary release target in v0.6.6" ;;
+  msys*|mingw*|cygwin*|windows*) die "Windows is not a supported binary release target in v0.6.7" ;;
   *) die "unsupported OS: $os" ;;
 esac
 binname="machinery"
