@@ -136,6 +136,8 @@ func collectClauseDecls(g *Gate, design string) []clauseSet {
 // checkClauseDrift binds machine artifacts by filename. Shared narrative can
 // name an owner explicitly; an unqualified guard is resolved only when its
 // owner is unambiguous, including machines that have no CLAUSES declaration.
+// Ambiguous clause enumerations warn; a guard mention with no clause tokens
+// remains unjudged, just as it does for a uniquely owned guard.
 // Narrative resolution cannot change the owner-local test obligations.
 func checkClauseDrift(g *Gate, design string) {
 	decls := collectClauseDecls(g, design)
@@ -216,11 +218,15 @@ func checkClauseDrift(g *Gate, design string) {
 				if artifactOwner == "" && len(owners[d.guard]) > 1 && !tokenIn(d.owner, line) {
 					var names []string
 					named := false
+					enumerates := false
+					for _, clause := range append(append([]string{}, d.active...), d.retired...) {
+						enumerates = enumerates || tokenIn(clause, line)
+					}
 					for owner := range owners[d.guard] {
 						names = append(names, owner)
 						named = named || tokenIn(owner, line)
 					}
-					if !named && !ambiguous[d.guard] {
+					if !named && enumerates && !ambiguous[d.guard] {
 						sort.Strings(names)
 						g.Warns = append(g.Warns, fmt.Sprintf("%s:%d: guard %s has ambiguous machine ownership (%s); name its owner to check narrative clause drift", rel, lineNo+1, d.guard, strings.Join(names, ", ")))
 						ambiguous[d.guard] = true
