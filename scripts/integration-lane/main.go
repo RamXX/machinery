@@ -250,7 +250,11 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 		}
 		receipt, e := execute(ctx, *root, scratch, *cache, filepath.Dir(*reportPath), s, runtimes)
 		r.Suites = append(r.Suites, receipt)
-		cleanupErr := cleanupContainers(scratch, filepath.Base(scratch), policy)
+		dockerRequired := false
+		for _, id := range s.Runtimes {
+			dockerRequired = dockerRequired || id == "docker"
+		}
+		cleanupErr := cleanupContainers(scratch, filepath.Base(scratch), policy, dockerRequired)
 		if cleanupErr != nil {
 			r.Cleanup.Status = "failed"
 		}
@@ -909,7 +913,7 @@ func execute(ctx context.Context, root, work, cache, evidence string, s suite, r
 			ImportPath                string
 			TestGoFiles, XTestGoFiles []string
 		}
-		if err = json.Unmarshal([]byte(out), &pkg); err != nil {
+		if err := json.Unmarshal([]byte(out), &pkg); err != nil {
 			return r, err
 		}
 		if pkg.ImportPath == "" {
@@ -1138,16 +1142,14 @@ func accountNode(output string, r *suiteReceipt) error {
 	return errors.Join(failures...)
 }
 
-func cleanupContainers(work, runID string, p pins) error {
+func cleanupContainers(work, runID string, p pins, dockerRequired bool) error {
 	dir := filepath.Join(work, "containers")
 	entries, err := os.ReadDir(dir)
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	var failures []error
+	ids := map[string]bool{}
 	for _, entry := range entries {
 		b, e := regularBytes(filepath.Join(dir, entry.Name()), 128)
 		if e != nil {
@@ -1159,6 +1161,32 @@ func cleanupContainers(work, runID string, p pins) error {
 			failures = append(failures, fmt.Errorf("cleanup refuses invalid container ID %q", id))
 			continue
 		}
+		ids[id] = true
+	}
+	// The unique label is a second ownership witness. It finds a container
+	// whose test exited between Docker creation and writing its cidfile.
+	if dockerRequired {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		out, errout, e := command(ctx, "", nil, 15*time.Second, 1<<20, 1<<20, "docker", "ps", "-aq", "--no-trunc", "--filter", "label="+ownerLabel+"="+runID)
+		cancel()
+		if e != nil {
+			failures = append(failures, fmt.Errorf("cleanup ownership inventory failed: %w %s", e, errout))
+		} else {
+			for _, id := range strings.Fields(out) {
+				if !regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(id) {
+					failures = append(failures, fmt.Errorf("cleanup invalid labelled container ID"))
+					continue
+				}
+				ids[id] = true
+			}
+		}
+	}
+	ordered := make([]string, 0, len(ids))
+	for id := range ids {
+		ordered = append(ordered, id)
+	}
+	sort.Strings(ordered)
+	for _, id := range ordered {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		out, errout, e := command(ctx, "", nil, 10*time.Second, 1<<20, 1<<20, "docker", "inspect", "--format", `{{index .Config.Labels "`+ownerLabel+`"}} {{.Config.Image}}`, id)
 		if e != nil && strings.Contains(strings.ToLower(out+errout), "no such object") {
