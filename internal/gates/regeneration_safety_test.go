@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -59,6 +60,40 @@ func regenerationAdvice(output string) []string {
 		}
 	}
 	return commands
+}
+
+// Match related prose instructions, never path names or scattered keywords.
+func baselineReviewGuidance(output string) bool {
+	output = regexp.MustCompile(`\S*[/\\]\S*`).ReplaceAllString(output, "")
+	output = strings.ReplaceAll(strings.ToLower(output), "ratchet.json", "ratchet")
+	output = strings.Join(strings.Fields(output), " ")
+	var rewrites, accepts, review bool
+	for _, sentence := range regexp.MustCompile(`[.!?](?:\s|$)`).Split(output, -1) {
+		has := func(pattern string) bool { return regexp.MustCompile(pattern).MatchString(sentence) }
+		rewrites = rewrites || (has(`\b(rewrites?|replaces?|overwrites?|re-snapshots?)\b`) && has(`\bratchet\b`))
+		accepts = accepts || has(`\b(may|can|could)\b.*\b(accept\w*|tolerate\w*|expand\w*)\b.*\b(new|additional|added)\b.*\boffender\w*\b`)
+		review = review || (has(`\breview\b`) && has(`\b(ratchet|offender\w*)\b`) && has(`\b(changes?|diff|growth|additions?)\b`) && has(`\bbefore\b.*\b(adopt\w*|accept\w*|commit\w*|keep\w*)\b`))
+	}
+	return rewrites && accepts && review
+}
+
+func TestRegenBaselineGuidanceSensitivity(t *testing.T) {
+	for _, tc := range []struct {
+		name, output string
+		want         bool
+	}{
+		{"genuine", "Rerunning baseline rewrites ratchet.json and may accept new offender files. Review ratchet changes before adopting them.", true},
+		{"equivalent-wrapped", "Each rerun replaces ratchet.json; it can tolerate additional\noffender files. Before adopting the result, review the\nchanges to offender files.", true},
+		{"path-bait", "== baseline boundary debt snapshot ==\nthe contract already covers every observed edge; nothing new to baseline\nwrote /tmp/review/reviews/ratchet/debt/offender/ratchet.json: 1 edge(s), 2 offender file(s)\narmed: G4 now fails when a baselined edge gains a new offender file", false},
+		{"old-rule-review-help", "Scan the implementation exactly as G4-import does, print the baseline: rules that would tolerate today's violating edges (paste them into the Architecture Contract's dependency_rules after review), and write design/ratchet.json, the set-based snapshot of every tolerated edge's offender files. From then on G4 fails when a baselined edge gains a new offender file. Rerun after burning down debt to tighten the ratchet.", false},
+		{"unrelated-review", "Rerunning baseline rewrites ratchet.json and may accept new offender files. Review dependency rules before adopting them. Ratchet changes are recorded.", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := baselineReviewGuidance(tc.output); got != tc.want {
+				t.Fatalf("guidance recognized = %v, want %v: %s", got, tc.want, tc.output)
+			}
+		})
+	}
 }
 
 func TestRegenRatchetRealCLI(t *testing.T) {
@@ -177,12 +212,23 @@ func TestRegenRatchetRealCLI(t *testing.T) {
 		requireRatchetFailure(t, design, impl)
 	})
 	t.Run("explicit-baseline-reviews-debt-change", func(t *testing.T) {
+		help := mustRun(t, "baseline", "--help")
+		t.Logf("baseline help before invocation:\n%s", help)
+		if !baselineReviewGuidance(help) {
+			t.Error("baseline help must explain ratchet replacement, possible acceptance of new offenders, and reviewing those changes before adoption")
+		}
 		design, impl := fixture(t, true)
 		newOffender(t, impl)
 		requireRatchetFailure(t, design, impl)
 		out := mustRun(t, "baseline", design, "--impl", impl)
-		lower := strings.ToLower(out)
-		if !strings.Contains(lower, "review") || !strings.Contains(lower, "ratchet") || !(strings.Contains(lower, "debt") || strings.Contains(lower, "offender")) {
+		t.Logf("explicit baseline after adding offender:\n%s", out)
+		if !strings.Contains(out, "0 need a baseline rule") {
+			t.Fatalf("fixture must exercise zero proposed rules: %s", out)
+		}
+		if strings.Contains(out, "nothing new to baseline") || strings.Contains(out, "nothing changed") {
+			t.Errorf("zero rule proposals must not imply unchanged accepted debt: %s", out)
+		}
+		if !baselineReviewGuidance(out) {
 			t.Errorf("explicit debt expansion needs ratchet/debt review guidance even for an already-baselined edge:\n%s", out)
 		}
 		ratchet, err := LoadRatchet(design)
