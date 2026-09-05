@@ -278,6 +278,33 @@ func bootstrapReceiptState(t *testing.T, path string) string {
 	return fmt.Sprintf("%v:%s", info.Mode(), bootstrapRead(t, path))
 }
 
+func bootstrapRootAlias(path, root, canonical string) string {
+	if path == root || strings.HasPrefix(path, root+string(os.PathSeparator)) {
+		return canonical + strings.TrimPrefix(path, root)
+	}
+	return path
+}
+
+func TestBootstrapReceiptRootAlias(t *testing.T) {
+	for _, tc := range []struct{ name, path, want string }{
+		{"root", "/alias", "/canonical/alias"},
+		{"descendant", "/alias/config/scratch", "/canonical/alias/config/scratch"},
+		{"canonical root", "/canonical/alias", "/canonical/alias"},
+		{"canonical descendant", "/canonical/alias/config/scratch", "/canonical/alias/config/scratch"},
+		{"similar sibling", "/alias-other/config/scratch", "/alias-other/config/scratch"},
+		{"interior alias", "/foreign/alias/config/scratch", "/foreign/alias/config/scratch"},
+		{"repeated suffix", "/alias/nested/alias/file", "/canonical/alias/nested/alias/file"},
+		{"sibling journal", "/alias/config/other-journal/scratch", "/canonical/alias/config/other-journal/scratch"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := bootstrapRootAlias(tc.path, "/alias", "/canonical/alias")
+			if got != tc.want || bootstrapRootAlias(got, "/alias", "/canonical/alias") != got {
+				t.Fatalf("alias mapped foreign path or was not idempotent: %q want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestBootstrapReceiptPlan(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
@@ -448,6 +475,7 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 	}
 	reference := bootstrapSeed(t, &bootstrapRelease{old: release.next, source: repo})
 	expected := bootstrapContentState(t, reference)
+	t.Run("standalone_receipt", func(t *testing.T) { bootstrapStandaloneReceiptCases(t, release) })
 	t.Run("parent_finalization", func(t *testing.T) {
 		// A missing receipt has no remembered copy modes. Use an explicit all-copy
 		// plan and an independently installed release reference for that plan.
@@ -638,6 +666,178 @@ type bootstrapObserver func([]byte) (int, error)
 
 func (observe bootstrapObserver) Write(p []byte) (int, error) { return observe(p) }
 
+func bootstrapAssertRecorded(t *testing.T, want installReceipt, source string) {
+	t.Helper()
+	got, exists, err := loadReceipt()
+	if err != nil || !exists {
+		t.Errorf("successful recording not loadable: %v", err)
+		return
+	}
+	want.SchemaVersion = receiptSchema
+	want.HomeInstalls = append([]homeInstall(nil), want.HomeInstalls...)
+	want.Targets = append([]targetInstall(nil), want.Targets...)
+	want.HostPlugins = append([]string(nil), want.HostPlugins...)
+	paths, err := receiptArtifactPaths(want) // fixed expected plan, not emitted membership
+	if err != nil {
+		t.Fatal(err)
+	}
+	want.Artifacts = nil
+	for _, path := range paths {
+		digest, err := artifactTreeDigest(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want.Artifacts = append(want.Artifacts, receiptArtifact{Path: path, Digest: digest})
+	}
+	normalizeReceipt(&want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("recorded topology/full inventory/real digests differ: got %+v want %+v", got, want)
+	}
+	sourceContent := bootstrapResolvedHomes(t, []string{source})
+	for _, group := range want.HomeInstalls {
+		for i, home := range group.Homes {
+			content := bootstrapResolvedHomes(t, []string{home})
+			if len(content) != len(sourceContent) {
+				t.Errorf("home release inventory differs from source: %s", home)
+			}
+			for path, digest := range sourceContent {
+				if content[home+strings.TrimPrefix(path, source)] != digest {
+					t.Errorf("home content differs from actual source: %s", path)
+				}
+			}
+			for _, path := range homeInstallArtifactPaths([]string{home}) {
+				info, err := os.Lstat(path)
+				if err != nil || (info.Mode()&os.ModeSymlink != 0) != (i > 0 && !group.Copy) {
+					t.Errorf("home copy/link topology differs: %s %v", path, err)
+				}
+				if i > 0 && !group.Copy {
+					target, err := filepath.EvalSymlinks(path)
+					canonical, canonicalErr := filepath.EvalSymlinks(group.Homes[0] + strings.TrimPrefix(path, home))
+					if err != nil || canonicalErr != nil || target != canonical {
+						t.Errorf("home link has wrong canonical destination: %s", path)
+					}
+				}
+			}
+		}
+	}
+}
+
+func bootstrapResolvedHomes(t *testing.T, homes []string) map[string]string {
+	t.Helper()
+	result := map[string]string{}
+	for _, artifact := range homeInstallArtifactPaths(homes) {
+		resolved, err := filepath.EvalSymlinks(artifact)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = filepath.WalkDir(resolved, func(path string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				result[artifact+strings.TrimPrefix(path, resolved)] = fmt.Sprintf("%x", sha256.Sum256(bootstrapRead(t, path)))
+			}
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return result
+}
+
+func bootstrapStandaloneReceiptCases(t *testing.T, release *bootstrapRelease) {
+	wantFor := func(f bootstrapInstall) installReceipt {
+		return installReceipt{HomeInstalls: []homeInstall{
+			{Homes: []string{filepath.Join(f.home, "custom-a"), filepath.Join(f.home, "custom-b")}},
+			{Homes: []string{filepath.Join(f.home, "copy-a"), filepath.Join(f.home, "copy-b")}, Copy: true},
+		}, Targets: []targetInstall{{Target: "codex"}, {Target: "opencode", Copy: true}}, HostPlugins: []string{"claude", "codex"}}
+	}
+	unchanged := func(t *testing.T, before, after map[string]string, selected []string) {
+		t.Helper()
+		for path, value := range before {
+			if path == "receipt" {
+				continue
+			}
+			owned := false
+			for _, home := range selected {
+				owned = owned || strings.HasPrefix(path, home+string(os.PathSeparator))
+			}
+			if !owned && after[path] != value {
+				t.Errorf("unselected content/topology changed: %s", path)
+			}
+		}
+	}
+	t.Run("supported_recording", func(t *testing.T) {
+		f := bootstrapSeed(t, release)
+		want := wantFor(f)
+		t.Run("fresh_mixed_groups", func(t *testing.T) { bootstrapAssertRecorded(t, want, release.source) })
+		t.Run("disjoint_additional_group", func(t *testing.T) {
+			before := bootstrapState(t, f)
+			homes := []string{filepath.Join(f.home, "new-a"), filepath.Join(f.home, "new-b")}
+			bootstrapCommand(t, f.root, f.env, f.binary, "install", "--from", release.source, "--home", homes[0], "--home", homes[1])
+			want.HomeInstalls = append(want.HomeInstalls, homeInstall{Homes: homes})
+			bootstrapAssertRecorded(t, want, release.source)
+			unchanged(t, before, bootstrapState(t, f), homes)
+			for _, path := range homeInstallArtifactPaths([]string{homes[1]}) {
+				info, err := os.Lstat(path)
+				if err != nil || info.Mode()&os.ModeSymlink == 0 {
+					t.Errorf("disjoint linked topology missing: %s %v", path, err)
+				}
+			}
+		})
+		t.Run("same_ordered_group_copy_change", func(t *testing.T) {
+			homes := want.HomeInstalls[0].Homes
+			before, contents := bootstrapState(t, f), bootstrapResolvedHomes(t, homes)
+			bootstrapCommand(t, f.root, f.env, f.binary, "install", "--from", release.source, "--home", homes[0], "--home", homes[1], "--copy")
+			want.HomeInstalls[0].Copy = true
+			bootstrapAssertRecorded(t, want, release.source)
+			unchanged(t, before, bootstrapState(t, f), homes)
+			if !reflect.DeepEqual(contents, bootstrapResolvedHomes(t, homes)) {
+				t.Error("supported copy change altered release content")
+			}
+			for _, path := range homeInstallArtifactPaths(homes) {
+				info, err := os.Lstat(path)
+				if err != nil || info.Mode()&os.ModeSymlink != 0 {
+					t.Errorf("same-group copy placement is not independent: %s %v", path, err)
+				}
+			}
+		})
+	})
+	for _, repeated := range []bool{false, true} {
+		t.Run(fmt.Sprintf("reject_cross_group_repeated_%t_then_native", repeated), func(t *testing.T) {
+			f := bootstrapSeed(t, release)
+			want := wantFor(f)
+			bootstrapAssertRecorded(t, want, release.source)
+			before := bootstrapState(t, f)
+			args := []string{"install", "--from", release.source, "--copy"}
+			names := []string{"custom-a", "custom-b", "copy-a", "copy-b"}
+			if repeated {
+				names = []string{"custom-a", "copy-a"}
+			}
+			for _, name := range names {
+				args = append(args, "--home", filepath.Join(f.home, name))
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, f.binary, args...)
+			cmd.Dir, cmd.Env = f.root, f.env
+			out, err := cmd.CombinedOutput()
+			diagnostic := strings.ToLower(string(out))
+			if err == nil || ctx.Err() != nil || !strings.Contains(string(out), filepath.Join(f.home, "copy-a")) ||
+				!(strings.Contains(diagnostic, "overlap") || strings.Contains(diagnostic, "conflict") || strings.Contains(diagnostic, "repeat")) ||
+				!(strings.Contains(diagnostic, "retry") || strings.Contains(diagnostic, "reconfigur") || strings.Contains(diagnostic, "nonconflicting")) {
+				t.Errorf("expected actionable recorded-group conflict, got err=%v deadline=%v output=%s", err, ctx.Err(), out)
+			}
+			if !reflect.DeepEqual(before, bootstrapState(t, f)) {
+				t.Error("rejected overlap did not restore exact installation and valid receipt")
+			}
+			// No manual receipt rewrite or artifact repair between conflict and next install.
+			bootstrapCommand(t, f.root, f.env, f.binary, "install", "--from", release.source, "--target", "codex", "--target", "opencode", "--copy")
+			want.Targets[0].Copy = true
+			bootstrapAssertRecorded(t, want, release.source)
+			unchanged(t, before, bootstrapState(t, f), []string{filepath.Join(f.home, ".agents"), filepath.Join(f.home, ".codex"), filepath.Join(f.home, ".config", "opencode")})
+		})
+	}
+}
+
 func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected map[string]string, absent, fault bool) {
 	t.Helper()
 	f := bootstrapSeed(t, release)
@@ -670,7 +870,7 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 	if err != nil {
 		t.Fatal(err)
 	}
-	canonical := func(path string) string { return strings.ReplaceAll(path, f.root, canonicalRoot) }
+	canonical := func(path string) string { return bootstrapRootAlias(path, f.root, canonicalRoot) }
 	checkPrepared := func() {
 		journal, phase, err := loadInstallJournal(journalRoot)
 		if err != nil || phase != "prepared" {
@@ -691,7 +891,7 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 		}
 	}
 	completed, publications := 0, 0
-	unchanged, placements := true, false
+	unchanged, placements, desiredReady := true, false, false
 	var output bytes.Buffer
 	opts.Out = bootstrapObserver(func(p []byte) (int, error) {
 		output.Write(p)
@@ -706,6 +906,20 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 				placements = reflect.DeepEqual(bootstrapContentState(t, f), expected) && bytes.Equal(bootstrapRead(t, f.binary), release.nextBytes)
 				if !placements {
 					t.Error("final child did not leave independently expected complete release placements")
+				} else {
+					wantReceipt.HomeInstalls = append([]homeInstall(nil), wantReceipt.HomeInstalls...)
+					wantReceipt.Targets = append([]targetInstall(nil), wantReceipt.Targets...)
+					wantReceipt.HostPlugins = append([]string(nil), wantReceipt.HostPlugins...)
+					wantReceipt.SchemaVersion = receiptSchema
+					for i := range wantReceipt.Artifacts {
+						digest, err := artifactTreeDigest(wantReceipt.Artifacts[i].Path)
+						if err != nil {
+							t.Fatal(err)
+						}
+						wantReceipt.Artifacts[i].Digest = digest
+					}
+					normalizeReceipt(&wantReceipt)
+					desiredReady = true
 				}
 			}
 		}
@@ -720,7 +934,7 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 			return oldClose(file)
 		}
 		publications++
-		if completed != children || !placements || !unchanged {
+		if completed != children || !placements || !unchanged || !desiredReady {
 			t.Error("parent receipt publication preceded complete children/placements/unchanged receipt")
 			return oldClose(file)
 		}
@@ -728,15 +942,6 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 		if bootstrapReceiptState(t, receiptPath) != before["receipt"] {
 			t.Error("persisted receipt changed before parent receipt close")
 		}
-		wantReceipt.SchemaVersion = receiptSchema
-		for i := range wantReceipt.Artifacts {
-			digest, err := artifactTreeDigest(wantReceipt.Artifacts[i].Path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			wantReceipt.Artifacts[i].Digest = digest
-		}
-		normalizeReceipt(&wantReceipt)
 		want, err := json.MarshalIndent(wantReceipt, "", "  ")
 		if err != nil {
 			t.Fatal(err)
@@ -758,6 +963,9 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 	deadline := time.AfterFunc(90*time.Second, func() { panic("real parent Update exceeded 90-second operation bound") })
 	defer deadline.Stop()
 	_, updateErr := Update(opts)
+	if !desiredReady {
+		t.Error("independent complete desired receipt was not established after final child")
+	}
 	if completed != children || publications != 1 {
 		t.Errorf("missing parent finalization boundary: children=%d/%d publications=%d; err=%v", completed, children, publications, updateErr)
 	}
