@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:16:48Z
-content_hash: "sha256:e37a9929f595c7b8db5d2be5ffd5e7679e5835d25e085a55f21a7d98fc467cb3"
+updated_at: 2026-09-05T21:17:10Z
+content_hash: "sha256:692e0b8c344c134d806927c7d85078ecc2bb74fd4c92f84b7c9c921e768e41ac"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx]
@@ -21,36 +21,49 @@ Users need Machinery's green results to establish the intended safety claim, not
 
 ## Context (Embedded)
 NEXT9: version-skew advice includes machinery baseline when ratchet exists. Baseline snapshots tolerated import offenders and can widen accepted architecture debt; ratchet has no version stamp. Routine regeneration must not silently authorize debt.
+Same-story AC3 defect confirmed during RED preparation: explicit baseline on an already-baselined edge with a newly added offender proposes zero dependency rules, prints "the contract already covers every observed edge; nothing new to baseline", then rewrites ratchet.json to accept the new offender. Current help's "after review" refers only to pasted dependency rules. Help and successful output must explain ratchet/offender debt acceptance and review even when no rule is proposed. Explicit deliberate baseline remains supported.
 
 ## Ownership
-Own only these paths and directly associated tests: internal/gates/gates.go, internal/gates/regeneration_safety_test.go. You are not alone in this codebase; preserve other edits and coordinate any shared-file changes with dispatcher.
+Own exactly four files: internal/gates/gates.go (routine regeneration advice), cmd/machinery/baseline.go (narrow help and successful-output debt-review messaging), internal/gates/regeneration_safety_test.go (new focused and real CLI regression coverage), and internal/gates/gates_test.go (only the independently authorized TestVersionSkewNoteNamesEveryApplicableCommand expectation repair). Preserve that existing test's ratchet-present fixture and oracle/Alloy/verify-formal/pack expectations; replace only baseline expectation with explicit baseline absence. No other existing test/assertion changes are authorized. You are not alone in this codebase; preserve other edits and coordinate shared-file changes with dispatcher.
 
 ## Boundary Map
 PRODUCES:
 - internal/gates/gates.go -> hardened behavior and regression proof
-- internal/gates/regeneration_safety_test.go -> hardened behavior and regression proof
+- internal/gates/regeneration_safety_test.go -> hardened behavior and real CLI regeneration/baseline regression proof
+- cmd/machinery/baseline.go -> help and successful output explaining deliberate ratchet/offender debt acceptance and required review
+- internal/gates/gates_test.go -> narrowly authorized baseline-absence expectation in TestVersionSkewNoteNamesEveryApplicableCommand
 CONSUMES:
 - Existing Machinery source interfaces.
-  spec: regenCommands(design string) []string
+  spec: regenCommands(design string) []string; VersionSkewNote(design string, gs []*Gate) string
+- Existing internal/gates/baseline.go (read-only behavior consumer).
+  spec: BuildBaseline(design, impl, date string) (*BaselineReport, error)
+  source: already-baselined edges are re-snapshotted using current offender files; zero Proposed rules does not mean ratchet debt is unchanged.
+- Existing cmd/machinery/baseline.go.
+  spec: newBaselineCmd() *cobra.Command
+  source: baseline <design-dir> --impl <dir>; --date controls deterministic snapshot date; successful command publishes ratchet.json.
 
 ### Story Acceptance Criteria
 1. Version-skew regeneration instructions never include machinery baseline or any debt-accepting mutation. Existing oracle/Alloy/formal/pack regeneration remains accurate and deterministic.
 2. A design with ratchet and newly introduced offender continues failing architecture checks after following all routine regeneration instructions; regenerated stamps cannot accept the offender.
-3. Explicit baseline remains a deliberate user-invoked operation with clear debt-change review guidance, not automatic migration. Do not add a version stamp as a substitute for preventing debt expansion.
+3. Explicit machinery baseline remains a supported deliberate user-invoked debt-acceptance operation. Before invocation, baseline --help must explain that rerunning rewrites ratchet.json and may accept newly added offender files, and tell users to review ratchet/offender changes before adopting them. After successful publication, output must convey the same debt-change review guidance even when zero dependency rules were proposed. The zero-rule message must describe only the absence of new rule proposals and must not claim that no debt was accepted or nothing changed. Real CLI regression: start with an already-baselined edge, add a new offender file, prove the architecture check fails, deliberately run baseline successfully, verify the new offender is now recorded/accepted with zero new rule proposals, and assert help plus successful output require ratchet/offender-change review. This deliberate acceptance is allowed; routine regeneration must never perform it. No automatic migration, new confirmation protocol, version stamp or prohibition of explicit baseline.
 4. Positive no-debt/version-skew fixture yields correct required generator commands; negative existing-ratchet/new-offender regression demonstrates failure before and after advised regeneration.
 
 ## Testing Requirements
 - Hard TDD explicitly authorized. RED author commits tests first; intended behavioral assertions fail on unchanged production, with a passing control. Compile/import/infra errors are not RED evidence. PM independently replays RED. GREEN implementer does not edit/delete frozen RED tests or fixtures; any repair requires explicit reviewer authorization and re-RED.
 - Unit tests plus Integration tests: MANDATORY (no mocks). Real CLI/filesystem/service path, no stubs, no skip-if-missing. Missing prerequisites block rather than pass.
-- Commands: go test ./internal/gates -run 'VersionSkew|Regen|Ratchet'; CLI integration on isolated ratchet design with a genuine new boundary violation.
+- Commands: go test -count=1 ./internal/gates -run 'VersionSkew|Regen|Ratchet'; real built CLI integration on an isolated ratchet design with a genuine new boundary violation. New named tests should match the scoped selection or record their exact supplemental command.
+- AC3 CLI proof is required alongside the routine-regeneration negative: capture baseline --help; then exercise the already-baselined/zero-proposed-rule/new-offender success path and assert actual ratchet expansion plus explicit debt-review guidance. A vague "after review" referring only to dependency rules is insufficient. Pin the semantic requirement, not arbitrary exact prose. Preserve actual explicit-baseline functionality and passing controls; no mocks/stubs/skips or external service dependency is needed.
+- Existing PM comment at 2026-09-05T21:14:38Z authorizes only the named gates_test.go expectation repair. That repair commit subject must include tdd-red and [test-edit-authorized]. This development coordination convention is never a product/runtime requirement. Freeze revised tests/fixtures after independent RED review; GREEN may not weaken them.
 - No full scripts/preflight.sh during this story; final epic gate owns heavy preflight. No GitHub push, sync, release, or remote mutation. Local story worktree only.
 
 ## OUT OF SCOPE
 - Other assessment subsystems are separate epic stories; include small directly related fixes needed for this guarantee rather than inventing exclusions.
 - Global heavy preflight, main merge and local release binary belong to final epic gate.
+- Baseline algorithm, ratchet schema/date semantics and new approval/confirmation mechanisms: not needed for the identified advice/messaging defect; preserve existing deliberate baseline behavior.
+- Machinery product must remain standalone; no Paivot/pvg/nd dependency, workflow labels or commit conventions in shipped behavior.
 
 ## DIFF BUDGET
-- ~2-3 files, under 300 changed LOC; material overrun requires PM investigation, not weakened requirements.
+- Exactly four owned files, under 300 total changed LOC. The file-count increase from 2-3 is justified by one bounded CLI help/output change and the independently authorized existing-test expectation repair alongside gates.go/new regression coverage. Keep the original tight LOC ceiling; report concrete real-CLI fixture needs before any material overrun instead of weakening proof.
 
 ## MANDATORY SKILLS
 - developer for implementation; codebase-memory for discovery; pm_acceptor for independent acceptance.
@@ -91,31 +104,6 @@ LEARNINGS:
 - Output assertions can accidentally match temporary test directory names; test prose rather than unrestricted substring presence.
 - Real baseline reruns expand an already-baselined edge even when output says nothing new to baseline.
 - Executing all printed advice with placeholder substitution demonstrates debt mutation directly without mocks or external services.
-## AUTHORITATIVE MAC-a89e SCOPE REPAIR — 2026-09-05
-Current canonical Description includes the concrete AC3 baseline debt-review behavior and supersedes only conflicting earlier ownership/AC3/budget wording. Previous description, PM authorization, notes and history remain preserved.
-
-Bug-triage disposition: absorb the newly confirmed explicit-baseline messaging gap into the existing P0 MAC-a89e under MAC-ui8a. It is already required by AC3 and concerns the same distinction between routine regeneration and deliberate debt acceptance. No new issue, dependency, claim or status/label transition.
-
-Scope delta: cmd/machinery/baseline.go is now explicitly owned only for help and successful-output guidance. internal/gates/gates_test.go is owned only for the PM-authorized TestVersionSkewNoteNamesEveryApplicableCommand baseline-positive expectation replacement with baseline absence, preserving its ratchet fixture and all other generator assertions. Existing gates.go and new regeneration_safety_test.go remain owned. Total four files; original under-300-LOC ceiling retained.
-
-AC3 observable contract: help explains baseline reruns rewrite ratchet.json and can accept new offender files; successful output tells users to review ratchet/offender changes before adoption even if no dependency rule was proposed. Zero proposed rules does not mean no debt change. The real isolated CLI test must demonstrate an already-baselined edge failing after a new offender, explicit baseline successfully accepting that offender with zero rule proposals, and the required help/output guidance. Deliberate baseline acceptance remains allowed. No confirmation prompt, stamp, algorithm/schema rewrite, or Paivot runtime coupling.
-
-Evidence: full latest MAC-a89e story and independent PM comment read; graph-first exact source for regenCommands, VersionSkewNote, BuildBaseline, newBaselineCmd and TestVersionSkewNoteNamesEveryApplicableCommand. Source confirms baseline is included when RatchetFile exists, existing test requires it, BuildBaseline re-snapshots current offenders on baselined edges, and CLI zero-rule path claims nothing new before writing the expanded ratchet. Graph coverage 2026-09-05T20:28:41Z reported metadata_match/no_recorded_issue for four cited source/test files; exact snippets were read. No author worktree/source/frozen tests inspected or modified and no runtime test replay performed during this tracker-only scope repair.
-
-The existing 2026-09-05T21:14:38Z TEST-EDIT AUTHORIZED comment remains the authority for that narrow existing-test change and its tdd-red/[test-edit-authorized] development commit markers. This scope repair is not RED approval, delivery or acceptance. Parent will lint and notify the author; full independent RED replay is still required before GREEN.
-
-## nd_contract
-status: in_progress
-
-### evidence
-- Canonical self-contained description repaired through supported pvg nd edit; append-only scope note written with pvg nd update --append-notes.
-- P0 MAC-a89e retains dev-MAC-a89e, hard-tdd, parent MAC-ui8a and existing blocks MAC-gcrr/MAC-ou97.
-- Four-file scope with under-300-LOC budget; all previous notes/history/comments/contracts preserved.
-
-### proof
-- [x] Scope repair: AC3 explicitly covers help and successful zero-rule output for ratchet/offender debt expansion.
-- [x] Scope repair: narrow existing-test authorization embedded without enlarging its allowed assertion changes.
-- [ ] AC #1-4: RED execution, independent approval, implementation and acceptance remain pending.
 
 
 ## nd_contract
@@ -130,6 +118,64 @@ status: in_progress
 - [ ] AC #2: real CLI regression established; independent RED approval pending.
 - [ ] AC #3: RED-DISPUTE false-positive assertion must be repaired after authorization.
 - [ ] AC #4: complete target inventory and coverage pending repair.
+
+## Historical canonical description before MAC-a89e scope repair
+Preserved verbatim as quoted history; current Description is authoritative.
+
+> ## USER INTENT
+> Users need Machinery's green results to establish the intended safety claim, not merely artifact shape.
+> 
+> ## Context (Embedded)
+> NEXT9: version-skew advice includes machinery baseline when ratchet exists. Baseline snapshots tolerated import offenders and can widen accepted architecture debt; ratchet has no version stamp. Routine regeneration must not silently authorize debt.
+> 
+> ## Ownership
+> Own only these paths and directly associated tests: internal/gates/gates.go, internal/gates/regeneration_safety_test.go. You are not alone in this codebase; preserve other edits and coordinate any shared-file changes with dispatcher.
+> 
+> ## Boundary Map
+> PRODUCES:
+> - internal/gates/gates.go -> hardened behavior and regression proof
+> - internal/gates/regeneration_safety_test.go -> hardened behavior and regression proof
+> CONSUMES:
+> - Existing Machinery source interfaces.
+>   spec: regenCommands(design string) []string
+> 
+> ### Story Acceptance Criteria
+> 1. Version-skew regeneration instructions never include machinery baseline or any debt-accepting mutation. Existing oracle/Alloy/formal/pack regeneration remains accurate and deterministic.
+> 2. A design with ratchet and newly introduced offender continues failing architecture checks after following all routine regeneration instructions; regenerated stamps cannot accept the offender.
+> 3. Explicit baseline remains a deliberate user-invoked operation with clear debt-change review guidance, not automatic migration. Do not add a version stamp as a substitute for preventing debt expansion.
+> 4. Positive no-debt/version-skew fixture yields correct required generator commands; negative existing-ratchet/new-offender regression demonstrates failure before and after advised regeneration.
+> 
+> ## Testing Requirements
+> - Hard TDD explicitly authorized. RED author commits tests first; intended behavioral assertions fail on unchanged production, with a passing control. Compile/import/infra errors are not RED evidence. PM independently replays RED. GREEN implementer does not edit/delete frozen RED tests or fixtures; any repair requires explicit reviewer authorization and re-RED.
+> - Unit tests plus Integration tests: MANDATORY (no mocks). Real CLI/filesystem/service path, no stubs, no skip-if-missing. Missing prerequisites block rather than pass.
+> - Commands: go test ./internal/gates -run 'VersionSkew|Regen|Ratchet'; CLI integration on isolated ratchet design with a genuine new boundary violation.
+> - No full scripts/preflight.sh during this story; final epic gate owns heavy preflight. No GitHub push, sync, release, or remote mutation. Local story worktree only.
+> 
+> ## OUT OF SCOPE
+> - Other assessment subsystems are separate epic stories; include small directly related fixes needed for this guarantee rather than inventing exclusions.
+> - Global heavy preflight, main merge and local release binary belong to final epic gate.
+> 
+> ## DIFF BUDGET
+> - ~2-3 files, under 300 changed LOC; material overrun requires PM investigation, not weakened requirements.
+> 
+> ## MANDATORY SKILLS
+> - developer for implementation; codebase-memory for discovery; pm_acceptor for independent acceptance.
+> 
+> ## Delivery Requirements
+> Use pvg story deliver, never close. Append RED/GREEN SHAs, exact commands and outputs, test inventory, independent proof per AC, and any residual limits to shared nd. Do not use pushing pvg story merge.
+> 
+> ## nd_contract
+> status: new
+> 
+> ### evidence
+> - Created 2026-09-05; source signatures verified at assessment base 497419ab4512fcff765cd5feb27aed4c67b5608d.
+> 
+> ### proof
+> - [ ] AC #1: independently verified
+> - [ ] AC #2: independently verified
+> - [ ] AC #3: independently verified
+> - [ ] AC #4: independently verified
+
 
 ## History
 - 2026-09-05T19:35:08Z dep_added: blocks MAC-gcrr
@@ -168,3 +214,30 @@ status: in_progress
 - [ ] AC #2: new real CLI before/after regeneration proof awaits RED author and independent review.
 - [ ] AC #3: explicit debt-change review guidance requires the bounded scope repair above.
 - [ ] AC #4: full RED proof and passing controls await independent review.
+
+## AUTHORITATIVE MAC-a89e SCOPE REPAIR — 2026-09-05
+Current canonical Description includes the concrete AC3 baseline debt-review behavior and supersedes only conflicting earlier ownership/AC3/budget wording. Previous description, PM authorization, notes and history remain preserved.
+
+Bug-triage disposition: absorb the newly confirmed explicit-baseline messaging gap into the existing P0 MAC-a89e under MAC-ui8a. It is already required by AC3 and concerns the same distinction between routine regeneration and deliberate debt acceptance. No new issue, dependency, claim or status/label transition.
+
+Scope delta: cmd/machinery/baseline.go is now explicitly owned only for help and successful-output guidance. internal/gates/gates_test.go is owned only for the PM-authorized TestVersionSkewNoteNamesEveryApplicableCommand baseline-positive expectation replacement with baseline absence, preserving its ratchet fixture and all other generator assertions. Existing gates.go and new regeneration_safety_test.go remain owned. Total four files; original under-300-LOC ceiling retained.
+
+AC3 observable contract: help explains baseline reruns rewrite ratchet.json and can accept new offender files; successful output tells users to review ratchet/offender changes before adoption even if no dependency rule was proposed. Zero proposed rules does not mean no debt change. The real isolated CLI test must demonstrate an already-baselined edge failing after a new offender, explicit baseline successfully accepting that offender with zero rule proposals, and the required help/output guidance. Deliberate baseline acceptance remains allowed. No confirmation prompt, stamp, algorithm/schema rewrite, or Paivot runtime coupling.
+
+Evidence: full latest MAC-a89e story and independent PM comment read; graph-first exact source for regenCommands, VersionSkewNote, BuildBaseline, newBaselineCmd and TestVersionSkewNoteNamesEveryApplicableCommand. Source confirms baseline is included when RatchetFile exists, existing test requires it, BuildBaseline re-snapshots current offenders on baselined edges, and CLI zero-rule path claims nothing new before writing the expanded ratchet. Graph coverage 2026-09-05T20:28:41Z reported metadata_match/no_recorded_issue for four cited source/test files; exact snippets were read. No author worktree/source/frozen tests inspected or modified and no runtime test replay performed during this tracker-only scope repair.
+
+The existing 2026-09-05T21:14:38Z TEST-EDIT AUTHORIZED comment remains the authority for that narrow existing-test change and its tdd-red/[test-edit-authorized] development commit markers. This scope repair is not RED approval, delivery or acceptance. Parent will lint and notify the author; full independent RED replay is still required before GREEN.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Canonical self-contained description repaired through supported pvg nd edit; append-only scope note written with pvg nd update --append-notes.
+- P0 MAC-a89e retains dev-MAC-a89e, hard-tdd, parent MAC-ui8a and existing blocks MAC-gcrr/MAC-ou97.
+- Four-file scope with under-300-LOC budget; all previous notes/history/comments/contracts preserved.
+
+### proof
+- [x] Scope repair: AC3 explicitly covers help and successful zero-rule output for ratchet/offender debt expansion.
+- [x] Scope repair: narrow existing-test authorization embedded without enlarging its allowed assertion changes.
+- [ ] AC #1-4: RED execution, independent approval, implementation and acceptance remain pending.
+
