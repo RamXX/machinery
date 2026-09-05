@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T22:23:05Z
-content_hash: "sha256:38b8f8ef0af23b27ccfa957aa38ae8a1bbce31cc5240820f40ecb3688ceaa5c8"
+updated_at: 2026-09-05T22:23:06Z
+content_hash: "sha256:ef5e286e3744cc06a0afaca9e6c92632d088b151aa4a332588d8125ab288374e"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -111,6 +111,38 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 ## Notes
 GREEN scope investigation: approved RED v2 already contributes 1753 lines. Closed inventory and exact native identity validation, Go JSON/Node TAP accounting, pinned OCI/Java/TLC/Node provisioning, owned scratch/container/process cleanup, and required workflow/preflight/Make wiring require an estimated 800-1200 production lines plus approximately 60 wiring lines. Dispatcher acknowledged investigation; independent PM must assess final exact delta. Frozen seven test/config/fixture files remain immutable. Implementation stays in declared production ownership and reuses processcontrol/runtimeclosure/formal primitives.
+## AUTHORITATIVE AC8 NESTED-PROCESS SCOPE TRIAGE — MAC-hpqp — 2026-09-05
+
+Disposition: retain an explicit architecture-decision hold within existing P0 MAC-hpqp, per dispatcher direction. No prerequisite was created, no implementation ownership broadened and no claim/status/label/dependency changed. Parent MAC-ui8a and existing downstream chain remain intact. MAC-2u36 installer triage is complete and untouched by this task.
+
+Source-established risk, not observed leak: retained221525d runner command uses processcontrol.Run for provision-formal helper and go test. Helper provisionFormal launches a Java identity probe through command and formal.VerifyFormalTo; formal.runTLC invokes runBoundedProcess/processcontrol. Frozen TestIntegrationLanePilotFormal invokes the same verifier; TestIntegrationLaneFullPath launches another lane and nested native commands. Unix prepare unconditionally creates a new group; close/terminate signal only that recorded group. Independent outer cancellation therefore lacks a transitive group custody guarantee. No actual outer-cancellation/nested-JVM leak experiment was run by this triage or reported as completed by GREEN.
+
+Existing interfaces: Run(context.Context,*exec.Cmd) error and captured variants offer no ancestor-scope parameter. Graph trace shows29 callers within two hops across formal/Alloy, C4, Git/checkers/hooks and run-safe; changing shared behavior requires compatibility review. Runtimeclosure.Environment creates a closed sanitized environment, so a future scope transport needs deliberate design. Existing Unix detached-session test checks bounded error return, not disappearance of that detached child; it does not supply missing AC8 liveness proof.
+
+Preserve formal custody: ensureJar uses override checksum, jar path and rooted fetch/cache lock/stage recovery/durable publication. runTLC then takes a private verified JAR snapshot, opens Java identity/closure, launches the bounded actual JVM and validates Java after execution. A ProvisionTLC()->ensureJar wrapper is only provisioning output; it neither owns actual suite descendants nor proves execution identity. Direct runner probes or a new supervisor must retain relevant snapshot/closure/source/report guarantees. No such wrapper/API/design is approved by this note.
+
+Required architecture decision: reconcile the pending containment choice with the contributor lane's current Linux CI + local macOS Docker Desktop native execution contract. Select exact custody and failure semantics, interfaces/transport, launch ordering, cancellation and cleanup acknowledgment, foreign-process/PID-reuse protection, platform proof and frozen-test compatibility. Product-wide strict assurance/adapters remain MAC-l7m0 decisions; do not silently repurpose their outcome into a contributor contract change. No Linux-only kernel or OCI policy is selected here. If new shared source ownership is required, repair it only after an approved interface/ownership contract; do not guess a broad supervisor implementation now.
+
+Verification now explicitly covers actual nested Java identity/TLC provisioning and actual formal-suite/full-path meta-test execution, with witnessed active JVM before external cancel/timeout, normal safe/unsafe completion, bounded cleanup/liveness and unrelated process/container/caller-root preservation. Include assertion/output failure, intermediate-parent exit, absent/forged/stale custody and failed ownership establishment for the selected lifecycle. Plain process matching or numeric PID files are insufficient cleanup authority; tests need independent identity and bounded emergency cleanup for only their own processes. Current native baseline is Linux amd64 and Darwin arm64; Linux arm64/Windows cross-builds are not runtime cancellation proof. Exact supplemental tests and any frozen changes require independent PM authorization; no RED authorization issued by this triage.
+
+Budget/evidence: canonical budget now records measured13files3004insertions/11deletions rather than pretending the original1800 covers the existing1753 RED +1213-line runner. A final new ceiling awaits the containment decision and concrete proof cost; never trim frozen safety tests. Current64 native Go leaves pass; prior tagged31 leaves30pass/1 cold-cache alias fail plus corrected cold-cache separate pass do not replace final full current-SHA replay. Frozen96 union includes the still-pending standalone Node pilot. Existing lint/actionlint/shellcheck/TDD checkpoint claims remain history, not full preflight or nested cancellation proof. No owned container was reported remaining at pause; Dagger remains protected.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Read current ten-AC canonical issue and final GREEN pause/correction comments through pvg issues show; read exact retained221525d runner, formal pilot/full-path test and frozen CONTRACT.md.
+- Graph Verify project Users-ramirosalas-workspace-machinery, generation2026-09-05T20:28:41Z: processcontrol run/unix/windows/capture and formal.go metadata_match/no_recorded_issue, best-effort only. Candidate runner/test missing from graph on root; read their committed source directly. Read actual Run/Unix group control, Windows job code, captured interfaces, formal process/JAR/Java flow and closed runtime environment.
+- Canonical supported nd edit clarifies AC8/hold/verification/measured budget while guarding AC1-7/9-10 verbatim. Old canonical preserved below as quoted history; all prior comments, frozen checkpoint and claim retained.
+- No runtime tests, empirical leak probe, source/test/installed edits, branch/worktree changes, new issue/dependency, push/sync/GitHub change or scripts/preflight.sh execution.
+
+### proof
+- [x] Source-established nested-group custody gap and wrapper-only insufficiency recorded accurately under existing P0 owner.
+- [x] Required real nested-JVM verification, platform evidence, foreign-state safety and formal identity preservation are explicit.
+- [ ] Containment decision and exact independently reviewed architecture/interface/ownership contract pending.
+- [ ] Concrete supplemental hard-TDD test authorization, complete final-SHA lane/Node evidence and independent AC8/AC10 acceptance pending.
+
+
 ## Historical canonical description before nested-process scope hold
 Preserved as quoted history; current Description is authoritative.
 
