@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T21:28:42Z
-content_hash: "sha256:866de56644fcf9660559aaca2e0deb0da613042115315c2c1bfbbcf5e482f7f0"
+content_hash: "sha256:44ab8e36c309316337ffa7008d127d6204dacd049cbaf7441516b568f9c218e6"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx]
@@ -104,6 +104,16 @@ LEARNINGS:
 - Output assertions can accidentally match temporary test directory names; test prose rather than unrestricted substring presence.
 - Real baseline reruns expand an already-baselined edge even when output says nothing new to baseline.
 - Executing all printed advice with placeholder substitution demonstrates debt mutation directly without mocks or external services.
+
+
+## nd_contract
+status: red-approved
+
+### evidence
+- RED tests approved via pvg story approve-red on 2026-09-05.
+
+### proof
+- [ ] GREEN developer must implement against the approved RED tests without modifying them.
 
 
 ## nd_contract
