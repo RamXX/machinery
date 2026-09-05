@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:58:39Z
-content_hash: "sha256:2642ba7e6c9a6b27b8dfa26ab1de9fc057882bb2e2089ee26bf008c004372eb3"
+updated_at: 2026-09-05T21:58:40Z
+content_hash: "sha256:24d4d8912f4e98b79dd20a2843141909a5b7e20f18a616a3a0131073d946096a"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -115,6 +115,40 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## AUTHORITATIVE STANDALONE RECEIPT OVERLAP TRIAGE — MAC-2u36 — 2026-09-05
+
+Disposition: absorb the reproduced standalone writer defect into existing P0 MAC-2u36 under MAC-ui8a. Canonical Description now contains seven ACs. Source ownership remains update.go/receipt.go/install.go and the already named tests; no sibling or new dependency is created. The existing MAC-gcrr/MAC-ou97 blocks remain intact. Scope collision inspection found no sibling implementation owning these three source files; capstone MAC-ou97 consumes update.go downstream.
+
+Product decision: successful standalone recording must never publish a receipt rejected by its own loader. Final complete normalized inventory receives existing validation before publication. A cross-group request that leaves conflicting homes under current same-canonical replacement semantics is rejected with paths and actionable retry guidance; preserve the prior valid receipt and full installation, rolling back any owned writes when transaction post-images remain unchanged. Preserve concurrent foreign-change protection and recoverable journal behavior. Fresh/disjoint installs and same-ordered-group reruns/copy-mode changes remain supported. Automatic merge/split/recanonicalization is not introduced.
+
+Rationale verified in committed source: recordHomeInstallLocked replaces only a group sharing Homes[0], normalizeReceipt only sorts, saveReceipt refreshes inventory but omits validateReceipt before rename, and validateReceipt rejects repeated/nested homes on the next load. installLocked already routes recording failures through its artifact transaction rollback. README.md 592-595 promises exact successful topology; cmd/machinery/install.go defines canonical-home and copy placement, without cross-group ownership migration semantics. Reconciliation would need decisions about unselected symlink dependents and preserved copy ownership; choosing fail-closed does not require that new feature. This is a correction to the owned publication guarantee, not a separate subsystem.
+
+Required new proof: real built temporary CLI, exact mixed-group seed and all-copy cross-group reproduction, intended nonzero conflict diagnosis, exact state/receipt restoration, then real native-install success and complete valid inventory. Retain fresh/disjoint/same-group controls and all existing safety/finalization tests. AC6 parent-PROCESS final publication, unchanged receipt through every completed child, complete real digests, late close-fault rollback and existing authenticated delegation remain unchanged. No new seam/API or production edit in RED.
+
+Budget investigation: d9d53b9 already has903 test LOC; its roughly194-line parent-boundary helper/addition implements four independently required fault/control and present/absent cases. Old1100 total would leave197 production LOC versus prior350. New estimate remains4-6files, under1400 total (~1050tests/~350production), allowing about147 additional test lines for overlap/control and independently reviewed oracle repairs. Independent PM must inspect the concrete proof/helper cost; no weakening safety tests to fit an estimate. All individual operation bounds and15m broad replay remain unchanged pending measured evidence.
+
+Evidence preserved: d9d53b980a393c527eaf856b0bba5d8bc70867ec clean retained RED worktree; original v1 and all raw logs remain history. The e1fd0a3 actual standalone corruption is product evidence but invalid parent-boundary fixture evidence. d9d53b9 only removes the independent task-owned reference receipt first to establish legitimate absence; it does not fix production. The two paused oracle defects (macOS non-prefix normalization, expected digests depending on the close hook) remain independent PM review items, not new production defects. Prior21:42:11Z explicit closeInstallFile authorization remains intact; this triage itself grants no test-edit authorization, RED approval, delivery or implementation permission.
+
+Tooling record: first supported nd edit attempt failed before mutation because EDITOR contained an executable plus argument, while this nd expects one executable path. sr_pm stopped and reported it; dispatcher explicitly authorized a task-owned executable Ruby editor correction. Corrected supported pvg nd edit succeeded. This is an nd invocation constraint, not another Machinery bug. Optional absence of repository AGENTS.md/convention files was found during initial instruction/context checks, not product preflight or a product defect.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Read full canonical issue, author pause/reproduction and prior authorization history through pvg issues show MAC-2u36 --json; independently read committed receipt.go/install.go, public CLI help and docs, and retained d9d53b9 boundary source. No runtime test replay performed by triage.
+- Canonical repaired through supported pvg nd edit; guard verified original AC6 verbatim. Read back complete canonical seven-AC Description, preserving original sections and authorization history. Prior canonical description retained as quoted history below.
+- pvg lint --backlog --epic MAC-ui8a --json: []; pvg rtm check --epic MAC-ui8a: passed (0 tagged requirements,18 checked stories,1 closed; not substantive coverage proof); pvg nd dep cycles: no cycles.
+- Existing P0/hard-tdd/in_progress, assignee dev-MAC-2u36, parent MAC-ui8a and downstream blocks preserved. No status/claim/label/dependency transition; author remains paused undelivered.
+- Root git status --short --branch: clean main...origin/main. No source/test/worktree or installed asset edits; no branch switch, sync/push/GitHub mutation or scripts/preflight.sh execution.
+
+### proof
+- [x] Triage assigned concrete standalone overlap publication bug to existing coherent owner and specified bounded fail-closed behavior with supported-rerun compatibility.
+- [x] Parent-process AC6, prior authorizations, safe missing-file repair and no-unsafe-parent/concurrent-change boundaries retained.
+- [x] New AC7 verification and measured scope/budget rationale are explicit; structural backlog checks pass.
+- [ ] Independent PM scope/budget/concrete-test review and explicit oracle/test-edit authorization pending.
+- [ ] AC1-7 final-SHA complete RED replay, separate RED approval, GREEN and independent acceptance pending.
+
+
 ## Historical canonical description before standalone overlap triage
 Preserved as quoted history; current Description is authoritative.
 
