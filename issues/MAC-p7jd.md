@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:38:45Z
-content_hash: "sha256:b63cd2e57884271e35a48671830603df4cad2b78486e655481f86ef94e4b571f"
+updated_at: 2026-09-05T19:45:34Z
+content_hash: "sha256:0b7097467b69d9e461623b8bd365f70bab155a3df496981c4b9f5812361e5fe2"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97]
 ---
 
@@ -79,7 +79,7 @@ status: new
 
 
 ## Notes
-
+ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 
 ## History
 - 2026-09-05T19:35:07Z dep_added: blocks MAC-vx24
