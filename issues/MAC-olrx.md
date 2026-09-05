@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:27:03Z
-content_hash: "sha256:ce99b2c199330e67b859c442b07a98188856c2c3650e0ff876fd812dcccd7a70"
+updated_at: 2026-09-05T20:27:19Z
+content_hash: "sha256:4d6b4886594fc3139423ba45f3d8575c57c918c44c460d108c1b0b7e02aef0cd"
 assignee: dev-MAC-olrx
 closed_at: 2026-09-05T20:27:03Z
 close_reason: "All five ACs independently verified; immutable RED72/72 pass, owner-local and parent obligations preserved, DOCS_STALE repaired at6ba45625."
@@ -554,3 +554,21 @@ status: delivered
 - [x] AC #4: actual parent CLI paths freshly pass; prior independent machine cases unchanged.
 - [x] AC #5: docs/claude-plugin.md now accurately distinguishes parent relational obligations from genuinely obligation-free parents; DOCS_STALE resolved.
 
+
+### 2026-09-05T20:27:19Z ramirosalas
+## nd_contract
+status: accepted
+
+### evidence
+- PM re-review accepted final GREEN6ba45625fd86307dd7fa996c70ff54d74ea4e0bd; canonical pvg story accept succeeded and independently verified closed+accepted.
+- Full PM GREEN Re-review evidence is preserved in Notes. Fresh independent targeted replay:72/72 leaf cases pass,0fail,0skip,9.000s,37.5% targeted coverage. verify-tdd5commits0violations; frozen RED27373f421640f644a98be89f38ce112c30f55a85 unchanged.
+- DOCS_STALE correction in docs/claude-plugin.md independently compared with actual source and CLI tests. Only documentation changed since prior fully reviewed behavioral GREEN; historical golden/expanded evidence remains accurately SHA-scoped.
+- This terminal append-only contract reconciles rendered Notes-before-Comments ordering; it supersedes the older delivered comment without changing or erasing history.
+- Epic sibling check:16 children remain not closed; epic is not eligible for closure.
+
+### proof
+- [x] AC #1: parent-owned relational coverage, source-preserving activation, positive and zero controls verified.
+- [x] AC #2: independent machine plus guard coverage/drift verified.
+- [x] AC #3: negative declaration/owner/suffix cases and stable IDs verified.
+- [x] AC #4: actual positive/negative filesystem/generator/gate/CLI tests executed.
+- [x] AC #5: precise ownership diagnostics and corrected public explanation verified.
