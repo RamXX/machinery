@@ -1,16 +1,17 @@
 ---
 id: MAC-p8ce
 title: "Bind consumer READS to each event edge"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:34Z
-content_hash: "sha256:323aab6aeb22f6eaf90972f08ca89ba6621e2f4e8476891aa5804dfe121aff91"
+updated_at: 2026-09-05T19:47:31Z
+content_hash: "sha256:b8bf18f81d9d0165f93ea5ca1be8f5e6711966070aeb4f3c6f90d24d9c7f2a11"
 blocks: [MAC-gcrr, MAC-ou97]
+assignee: dev-MAC-p8ce
 ---
 
 ## Description
@@ -83,6 +84,8 @@ ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are s
 ## History
 - 2026-09-05T19:35:08Z dep_added: blocks MAC-gcrr
 - 2026-09-05T19:36:15Z dep_added: blocks MAC-ou97
+- 2026-09-05T19:47:31Z status: open -> in_progress
+- 2026-09-05T19:47:32Z claimed by dev-MAC-p8ce
 
 ## Links
 - Parent: [[MAC-ui8a]]
