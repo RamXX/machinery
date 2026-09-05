@@ -4,11 +4,11 @@ title: "Execute every required infrastructure test deterministically"
 status: open
 priority: 0
 type: bug
-labels: [hard-tdd, delivered]
+labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:32:43Z
+updated_at: 2026-09-05T20:32:44Z
 content_hash: "sha256:005fe66164918e0434ce37af198817a37d2cb385fc6e1283fbeb33554faa5fbb"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 ---
