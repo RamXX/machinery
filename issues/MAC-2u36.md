@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:55:46Z
-content_hash: "sha256:ee18b2eb0e4107d618a18b8d9ffd8566c0b10f7824e7eee5668b5f7042560e8c"
+updated_at: 2026-09-05T20:59:56Z
+content_hash: "sha256:df0f56e13386dc2b81fd4a84c2ca9897176cc42597f893bd056170b6fa34b8ae"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -83,6 +83,37 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## DISCOVERED_BUG — exact ordinary missing-file repair control
+
+title: Ordinary multi-placement update aborts receipt inventory before repairing a missing native artifact
+discovered_during: MAC-2u36
+affected_files: internal/install/update.go (refreshDirectInstalls home-before-native order), internal/install/install.go (recordHomeInstallLocked after child placement), internal/install/receipt.go (saveReceipt -> refreshReceiptArtifacts)
+
+Context: The exact safe missing-file control required by the authoritative clarification and TEST-EDIT AUTHORIZED comment was executed BEFORE editing any frozen test. Real install seeded two mixed copy/symlink home groups and Codex/OpenCode targets with a valid receipt. Only temporary HOME/.codex/agents/machinery-fsm-author.toml was removed; safe parents, other role, receipt metadata, and ownership remained unchanged. Actual ordinary update with no selectors unexpectedly exits 1 after downloading/checksum-verifying the actual built release, replacing the binary and installing the first copy home group. Its real child then aborts receipt recording:
+"inventory installed artifacts for receipt: digest .../.codex/agents/machinery-fsm-author.toml: lstat .../.codex/agents/machinery-fsm-author.toml: no such file or directory"
+
+Source chain: refreshDirectInstalls processes home groups before native groups. Each child install saves the complete receipt; saveReceipt calls refreshReceiptArtifacts over every recorded placement, including the native artifact that has not been repaired yet. Thus the current ordinary path does not satisfy the clarified missing-file repair expectation, despite buildRefreshPlan retaining its target. Scope/ordering/receipt persistence must be reviewed before expanding production work. No stricter rejection expectation was inferred.
+
+Commands run:
+- go test -count=1 -timeout=3m ./internal/install -run '^TestBootstrapOrdinaryMissingArtifactDiagnostic$' -v
+Summary: Exact ordinary missing-file control FAIL, 35.820s; 1 leaf failure, zero skips. This is an unexpected production behavior, not a passing RED control. The diagnostic stops on the CLI error and does not independently verify final rollback state.
+Evidence: /tmp/machinery-MAC-2u36-red.qRk5DC/bootstrap_missing_diagnostic_test.go and ordinary-missing-diagnostic.txt. Diagnostic source moved out of the retained worktree; frozen candidate 99956740ae5559262790a9473b5597c1775928f2 and SHA256 8ed8636856305d50b9517c4087ecfff3582dac4fb467f92d8f49f3c836916329 remain unchanged. Previous edited-artifact ordinary repair succeeds; these are different observed outcomes.
+
+Paused per the explicit reviewer condition to report this exact unexpected failure before expanding ownership or changing expected repair semantics. No frozen revision, repair commit, delivery, release, acceptance, or closure performed. Root informed for scoped Sr PM/independent review.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Read the complete authoritative replacement AC/testing block and exact TEST-EDIT AUTHORIZED comment.
+- Executed required first ordinary missing-file control: actual CLI fails during first home group's full receipt inventory, before native repair.
+- V1 candidate and prior logs preserved; diagnostic retained outside clean worktree; no production or frozen test changes.
+
+### proof
+- [x] Revision prerequisite: exact missing-file control executed and unexpected failure reported before scope expansion.
+- [ ] Revised AC #1-5: blocked on scoped review of newly observed ordinary repair failure; prior valid bootstrap and rollback evidence remains preserved.
+
+
 ## nd_contract
 status: in_progress
 
