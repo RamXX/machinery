@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:12:43Z
-content_hash: "sha256:44404f04daaf90fcafbaac852355a34e167a60c3ec63da2333e401b8b8769afd"
+updated_at: 2026-09-05T21:13:03Z
+content_hash: "sha256:f1ecd20d7d93e0a5a4ea4555b28e39ba7e205205350d3122260cd9f8c0171820"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -106,6 +106,20 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent PM R2 pre-revision scope/commit-boundary review read canonical pvg issues show MAC-2u36 --json, complete current Description, appended R2 triage and relevant prior history; read preserved missing-file diagnostic source/result and frozen test via git show.
+- Local source inspection confirmed updateLocked transaction/commit sequencing, refreshDirectInstalls grouping, installLocked per-child receipt writes/source verification, saveReceipt full inventory, delegated prepared-journal exact-path coverage, authenticated lock capability and absent pre-state snapshot support.
+- Retained worktree remains clean at 99956740ae5559262790a9473b5597c1775928f2; bootstrap_receipt_test.go SHA256 8ed8636856305d50b9517c4087ecfff3582dac4fb467f92d8f49f3c836916329. Story diff remains one 469-line test file; root remains main.
+- Appended expanded TEST-EDIT AUTHORIZED R2 comment specifying allowed files/cases, preserved assertions, complete final publication/rollback boundary and both required commit tags tdd-red and [test-edit-authorized]. No runtime tests rerun and no source/test/live installation edits.
+
+### proof
+- [x] R2 scope: both confirmed defects belong to the same recorded-plan direct update transaction; update.go/receipt.go/install.go ownership and bounded budget reviewed.
+- [x] R2 revision authorization: exact paired edited/missing repair cases, native multi-missing, missing-prestate rollback, non-weakening convergence helper changes and bounded AC6 additions authorized.
+- [ ] AC #1-6: revised candidate author replay, full independent RED replay/approval, GREEN implementation and acceptance remain pending.
+- [ ] Final receipt failure/authority controls must prove their actual boundary; early missing-file receipt failure is not substitute evidence.
 
 
 ## DISCOVERED_BUG — exact ordinary missing-file repair control
