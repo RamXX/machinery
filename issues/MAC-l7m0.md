@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:38:46Z
-content_hash: "sha256:cb3872d159f8b8851dee12ca9b4dffd0167ffae92b7094493170be8dfad3b583"
+updated_at: 2026-09-05T19:45:35Z
+content_hash: "sha256:0865148252909fb24cc62bed41b5482236ec4ab636b4740902dee287d17528b3"
 blocks: [MAC-vx24, MAC-ou97]
 ---
 
@@ -76,6 +76,7 @@ Observable outcome: the maintainer can review a closed standalone contract that 
 
 ## Notes
 BLOCKED — USER CHOICE / ARCHITECTURE REVIEW. Do not dispatch a generic developer. Pending user decisions: supported initial native runner languages and trusted-host versus adversarial-code execution boundary. Independent architect owns exact contract. Only after answers plus reviewed contract may Sr PM repair implementation interfaces and release this blocker.
+ANCHOR ROUND-1 RUNTIME CLASSIFICATION: Architecture is read-only contract work, not an executable runtime suite. Its accepted contract must explicitly identify any native adapter runtimes consumed by implementation; MAC-vx24 must register/provision those using the required closed integration lane. No execution assurance may be claimed from schema or architectural review alone.
 
 ## History
 - 2026-09-05T19:35:06Z dep_added: blocks MAC-vx24
