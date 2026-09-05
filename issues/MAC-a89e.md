@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:57:31Z
-content_hash: "sha256:53249ff96f6b49edee7a61ebfa5accbd6bf8fbdffdc9969e572e617a482a4e5a"
+updated_at: 2026-09-05T23:57:47Z
+content_hash: "sha256:2950478f53b9f547c08bfa0cafba7fedccddf541e14519d4dce382bc629e59da"
 follows: [MAC-olrx, MAC-p8ce]
 assignee: dev-MAC-a89e
 closed_at: 2026-09-05T23:57:31Z
@@ -1259,4 +1259,58 @@ status: delivered
 - [x] AC #2: real offender remains G4 failure after every advised generator.
 - [x] AC #3: explicit baseline supported with truthful pre-invocation and successful debt-review guidance even at zero rules.
 - [x] AC #4: real no-debt positive and debt-growth negative both exercised.
+
+
+### 2026-09-05T23:57:47Z ramirosalas
+## PM GREEN Final Review — MAC-a89e — 2026-09-05
+ACCEPTED: candidate 4f339474e52ee9e788d0d5d071105fba385188b2 satisfies all four ACs after the authorized narrow documentation rework. Read current canonical description, complete delivered evidence, frozen RED review, both test-edit authorizations and previous GREEN rejection; reviewed committed source independently in detached /tmp/MAC-a89e-pm-final.HlPJ3V/checkout.
+
+Rework and scope:
+- git show 4f339474 confirms only docs/brownfield-team-guide.md former lines 451-452 changed: legacy YYYY-MM remains supported, ages from month start, retains its date without explicit date or SOURCE_DATE_EPOCH, and baseline remains deliberate reviewed debt acceptance. This exactly resolves the previous sole DOCS_STALE gap. No production/frozen-test change in rework.
+- Full candidate range from merge-base f24b2df3cb1e1521f97b406a7516f72bb7bc7890: 5 files, +267/-12 = 279 changed LOC. Fifth document and both narrow paragraphs explicitly authorized by dispatcher. Production changes only safe advice and baseline help/success prose; algorithm, schema, dates and confirmation behavior preserved.
+- Reviewed baseline/restamp documentation occurrences and both updated paragraphs; no further stale routine-baseline recommendation found.
+
+Hard-TDD and static:
+- cd /tmp/MAC-a89e-pm-final.HlPJ3V/checkout && pvg story verify-tdd --base epic/MAC-ui8a: PASS, 6 commits, 0 merges skipped, no unauthorized test edits.
+- git diff --exit-code e95be63019d89b93ae527f27ae1ce43326def038 HEAD -- internal/gates/gates_test.go internal/gates/regeneration_safety_test.go: PASS; git diff --check epic/MAC-ui8a: PASS.
+- Frozen SHA256 gates_test.go e4f630ec2ff7684eea436881b8a55706496f348c0ae7cd8748a255a6b6d439ff; regeneration_safety_test.go 2e1801d96618aaf146621e822a342b4bfdf69cdace50b94d0585d7f1ad4f20c3, identical to approved RED.
+- pvg verify internal/gates/gates.go cmd/machinery/baseline.go internal/gates/regeneration_safety_test.go internal/gates/gates_test.go docs/brownfield-team-guide.md --format text: reports exactly 4 return-empty findings in 4 scanned source files, unchanged output hash. Independently read each full function: gates.go:76 implements documented no-skew silence after collection; :219 returns empty only on read failure and actual bytes otherwise; :230 records non-missing read error then returns the error sentinel, actual bytes on success; gates_test.go:125 omits interface table only for no concrete rows and otherwise renders the full table. These are populated implementations, not stubs; precise prior dispositions confirmed, no blanket waiver or read-error-policy claim.
+- Go signatures typed; no new API/config/cross-cutting concerns. No mocks, service dependency, skipped prerequisites, Paivot runtime coupling or frozen-test changes.
+
+Independent test commands, both exit 0:
+cd /tmp/MAC-a89e-pm-final.HlPJ3V/checkout && set -o pipefail && go test -count=1 -timeout=5m ./internal/gates -run 'VersionSkew|Regen|Ratchet' -json -coverprofile=/tmp/MAC-a89e-pm-final.HlPJ3V/gates-coverage.out | tee /tmp/MAC-a89e-pm-final.HlPJ3V/gates-tests.json | tail -n 5
+cd /tmp/MAC-a89e-pm-final.HlPJ3V/checkout && set -o pipefail && go test -count=1 -timeout=5m ./cmd/machinery -run '^(TestBaselineSourceDateEpochStampIsFullDate|TestResolveBaselineDateRequiresDeterministicSourceAndReusesExisting|TestMigratedCommandDiagnosticsAreByteStableAndPrivatePathFree)$/^baseline$' -json -coverprofile=/tmp/MAC-a89e-pm-final.HlPJ3V/cli-coverage.out | tee /tmp/MAC-a89e-pm-final.HlPJ3V/cli-tests.json | tail -n 5
+Native JSON leaf inventory: gates 37 PASS, 0 FAIL, 0 SKIP (5.966s); cmd 3 PASS, 0 FAIL, 0 SKIP (0.864s). Total 40/40. Names match delivered inventory modulo temp nonce. No compile/setup/deadline/test warnings or unexpected runtime failures. Existing diagnostics test exercised baseline subprocess and did not take symlink skip.
+Coverage: gates total 9.9%, gates.go VersionSkewNote 93.8%, regenCommands 100%; cmd total 2.2%, newBaselineCmd 75%, resolveBaselineDate 84.2%. Both scoped coverage profiles match author hashes; separately built CLI subprocess is excluded from package coverage.
+Independent retained logs /tmp/MAC-a89e-pm-final.HlPJ3V:
+- gates-tests.json SHA256 4fce0fdee095587c46cab3ccb1030208570d4006fead6c0779b76328e585dbeb
+- cli-tests.json SHA256 5051b37a77de95a6941de4deace5cce7c7fcc8833f772868cfe3da9b7f058d39
+- gates-coverage.out SHA256 f1b45d80d3aeecd7157adbeda1a85594d452cf99a2905b1355715c40f3a6fbbb
+- cli-coverage.out SHA256 8f85fe7958ee02927a94af73448d5b72dbbe90e699aeb33f05047575681b325e
+- verify.txt SHA256 841ae4d70019ef05407b2c096de729ef9a86c6a39226ab76fee41a76e67b51c2
+- tdd.txt native PASS output.
+Latest author gates/CLI JSON and verify.txt hashes independently match shared proof.
+
+AC review:
+1. PASS: regenCommands removes only baseline; exact deterministic ordered family inventories, ratchet-only, individual and combined controls pass; existing generated-TLA selection preserved.
+2. PASS: real built CLI starts with accepted alpha/a.go and green G4, adds alpha/b.go and requires exact G4 growth failure, executes every advised generator, verifies fresh oracle stamp, unchanged ratchet bytes and same offender rejection.
+3. PASS: actual help before invocation and successful publication explain ratchet rewrite/possible new offender acceptance/review before adoption even at zero proposals. Zero-rule prose describes only proposal absence. Deliberate CLI baseline accepts both offenders with 0 new rules, unstamped ratchet and later G4 green. Five sensitivity controls pass. Both scoped docs paragraphs now require deliberate debt review; legacy-date statement matches independently passing date-reuse test.
+4. PASS: real no-debt oracle regeneration control resolves skew, keeps g3/g4 green and creates no ratchet; negative debt growth remains blocked after routine advice.
+User intent met: routine regeneration preserves architectural enforcement while explicit reviewed debt acceptance stays available. Prior discovered documentation issue resolved in this same story; no new unrelated bug found. LEARNINGS present in author delivery.
+Limits: focused native suite only; executable regeneration fixture carries oracle, other generator families have command-selection controls, no Alloy/TLA runtime claim. Full preflight/final integration belong to root epic gate. No remote action, merge, installed artifact change or main move.
+
+## nd_contract
+status: accepted
+
+### evidence
+- Independently reviewed and tested 4f339474e52ee9e788d0d5d071105fba385188b2: 40 PASS/0 FAIL/0 SKIP; hard-TDD and frozen hashes PASS.
+- Sole prior documentation rejection resolved by exact authorized rework; all four scanner findings independently confirmed nonstubs.
+
+### proof
+- [x] AC #1: safe deterministic complete regeneration advice.
+- [x] AC #2: actual new offender remains rejected after every routine command.
+- [x] AC #3: explicit baseline supported with truthful help/output/docs debt-review guidance and date semantics.
+- [x] AC #4: real positive no-debt and negative debt-growth paths executed.
+
+Transition readback: pvg story accept MAC-a89e succeeded without --next. Fresh canonical JSON confirms Status closed; Labels hard-tdd, red-approved, accepted; delivered removed. Epic auto-close check: 17 children, 14 remain not closed, so epic stays open. This terminal accepted contract supersedes earlier rendered delivered comments.
 
