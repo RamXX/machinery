@@ -4,7 +4,7 @@ title: "Preserve oracle ownership through decomposition"
 status: open
 priority: 0
 type: bug
-labels: [hard-tdd, red-approved]
+labels: [hard-tdd, red-approved, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
