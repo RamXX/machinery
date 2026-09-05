@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:28:10Z
-content_hash: "sha256:6dca9bc748dddc21121102063e5c748e307777ca56cc998c3fe4a559f4a6b9fb"
+updated_at: 2026-09-05T19:33:47Z
+content_hash: "sha256:cd29efb1d990340a4617fab2fb8899efe17697977675437d4bdab30c5c716b68"
 ---
 
 ## Description
@@ -58,7 +58,7 @@ status: new
 
 
 ## Notes
-
+AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 
 ## History
 
