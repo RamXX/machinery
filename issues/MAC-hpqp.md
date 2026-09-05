@@ -1,16 +1,18 @@
 ---
 id: MAC-hpqp
 title: "Execute every required infrastructure test deterministically"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:33:18Z
-content_hash: "sha256:0e90b9a450bc752e81412a28909a6f2c49295cf60ed52f6de8a980da2d323917"
+updated_at: 2026-09-05T20:33:44Z
+content_hash: "sha256:f66c311d11adc847a8e25083b05533187c9e962e15cf9daecc6ef58e821c14b0"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
+assignee: dev-MAC-hpqp
+follows: [MAC-olrx]
 ---
 
 ## Description
@@ -224,10 +226,14 @@ status: new
 - 2026-09-05T20:25:54Z status: in_progress -> in_progress
 - 2026-09-05T20:32:43Z status: in_progress -> open
 - 2026-09-05T20:32:43Z released by ramirosalas
+- 2026-09-05T20:33:44Z status: open -> in_progress
+- 2026-09-05T20:33:44Z auto-follows: linked to predecessor MAC-olrx
+- 2026-09-05T20:33:44Z claimed by dev-MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-hlae]], [[MAC-yhg5]], [[MAC-2n83]], [[MAC-hwdb]], [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]], [[MAC-hy71]]
+- Follows: [[MAC-olrx]]
 
 ## Comments
 
