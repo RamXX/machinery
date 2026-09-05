@@ -16,6 +16,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  integration-required:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Linux hosted runners provide Docker and Node; the lane verifies both
+      # and provisions its immutable OCI and private Java/TLC closure.
+      - name: Required runtime integration
+        run: go run ./scripts/integration-lane --lane required
   # ---------------------------------------------------------------- build ---
   # Compile every release target and retain a Windows cross-build as an early
   # portability signal. Windows is not a supported runtime or release target.
@@ -135,7 +150,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Go unit + experiment tests (with race detector)
-        run: go test -race -count=1 ./...
+        run: go test -race -count=1 ./... -timeout=20m
 
   # ---------------------------------------------------------------- gates ---
   # Run the deterministic gate suite on every shipped example via the Go

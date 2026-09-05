@@ -5,18 +5,12 @@
 # C4, and external-checker verification. Checks are ordered cheapest-first: a formatting slip fails in
 # under a second instead of after the 20s race suite. Any failure exits non-zero.
 #
-# Bypass in an emergency with:  SKIP_PREFLIGHT=1 git push
 # Run directly any time with:   make preflight   (or  scripts/preflight.sh)
 set -euo pipefail
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd -P)
 cd "$repo_root"
-
-if [ "${SKIP_PREFLIGHT:-0}" = "1" ]; then
-  echo "preflight: SKIP_PREFLIGHT=1 set, skipping local gate suite" >&2
-  exit 0
-fi
 
 preflight_work=$(mktemp -d)
 cleanup() { rm -rf -- "$preflight_work"; }
@@ -152,7 +146,12 @@ make build || fail "build failed"
 
 # 9. race tests (ci: test job) ---------------------------------------------
 say "go test -race ./..."
-go test -race -count=1 ./... || fail "unit/experiment tests failed"
+go test -race -count=1 ./... -timeout=20m || fail "unit/experiment tests failed"
+
+# Runtime tests carry machinery_integration and are absent from the native
+# suite above. Provision the pinned closure before selecting them here.
+say "required native integration lane (Docker, pinned Java/TLC, Node)"
+go run ./scripts/integration-lane --lane required
 
 # 10. golden corpus + adversarial experiments (ci: golden job) -------------
 say "golden corpus + gate-experiment suite"

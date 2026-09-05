@@ -12,6 +12,19 @@ permissions:
   contents: read
 
 jobs:
+  integration-required:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Required runtime integration
+        run: go run ./scripts/integration-lane --lane required
   # Regenerate every committed generated artifact (oracles AND formal specs)
   # and assert an empty git diff. Silent when fresh; a diff means a committed
   # artifact is stale or a generator drifted.
@@ -71,12 +84,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
       - name: Go unit suite
-        run: go test -count=1 ./...
+        run: go test -count=1 ./... -timeout=20m
       - name: Golden corpus
         run: go test -count=1 -run TestGolden ./cmd/machinery
 
