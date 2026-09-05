@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T21:58:39Z
-content_hash: "sha256:91e945f506e17b00b0742590291efe9a442e7ca68585cfcca25946fa549ce9c1"
+content_hash: "sha256:2642ba7e6c9a6b27b8dfa26ab1de9fc057882bb2e2089ee26bf008c004372eb3"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -115,6 +115,93 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## Historical canonical description before standalone overlap triage
+Preserved as quoted history; current Description is authoritative.
+
+> ## Description
+> ## USER INTENT
+> A user rerunning the installer or ordinary machinery update must get a complete, safely repaired installation at the requested release across all recorded placements, including a missing owned native artifact. Success must mean current content, complete receipt evidence and preserved topology; failure must preserve recoverable pre-run state.
+> 
+> ## Context (Embedded)
+> Two production defects share this full-plan update boundary:
+> - NEXT1: install.sh passes --bootstrap-defaults, but updatePlan chooses default homes before the complete recorded home/native plan.
+> - Newly reproduced in MAC-2u36: ordinary update retains the missing Codex target in its plan, but refreshDirectInstalls runs home groups first; each child install calls recordHomeInstallLocked -> saveReceipt -> refreshReceiptArtifacts over ALL recorded placements. A missing later Codex file aborts the first child's receipt inventory before native repair is reached.
+> Actual isolated CLI diagnostic on frozen v1 99956740ae5559262790a9473b5597c1775928f2 failed in 35.820s after verified binary replacement and first home-group mutation: "inventory installed artifacts for receipt: digest .../.codex/agents/machinery-fsm-author.toml: lstat ...: no such file or directory". It did not assert final rollback state. This disproves the earlier assumption that the exact missing-file ordinary run would already pass; it does NOT change the required successful repair behavior.
+> The existing ordinary intact convergence and edited-regular-file repair controls pass. Metadata validity, path/type safety and plugin ownership are distinct from repairable installed content drift or absence.
+> 
+> ## Scope decision and Ownership
+> This existing P0 bug owns both defects because both prevent the same recorded-plan convergence and use the same direct-refresh transaction. No separate issue or artificial dependency is created.
+> Production ownership expands explicitly from internal/install/update.go to:
+> - internal/install/update.go: receipt-aware bootstrap planning, full-plan refresh coordination and final commit/publication sequencing.
+> - internal/install/receipt.go: bounded receipt accumulation/finalization necessary for this transaction, preserving normal receipt validation/persistence.
+> - internal/install/install.go: child placement/receipt interaction needed for authenticated parent-owned full-plan refresh; preserve normal standalone install recording.
+> Tests: internal/install/bootstrap_receipt_test.go; directly associated regression additions in internal/install/receipt_test.go and internal/install/install_test.go only when required by the changed receipt/standalone-install boundary. Frozen existing assertions cannot be changed without explicit independent reviewer authorization.
+> Read-only consumers unless a concrete need is separately reviewed: internal/install/targets.go, internal/install/transaction.go, internal/install/lock.go, cmd/machinery/install.go and cmd/machinery/update.go. No blanket CLI/target/lock/journal rewrite is included. You are not alone in the codebase; preserve others' edits and coordinate shared paths with dispatcher.
+> 
+> ## Boundary Map
+> PRODUCES:
+> - internal/install/update.go -> complete recorded-plan convergence, including safely missing owned native artifacts, under the existing update transaction.
+> - internal/install/receipt.go -> validated complete receipt publication coordinated with successful full direct refresh.
+> - internal/install/install.go -> bounded child-refresh participation while ordinary install continues to persist validated receipts.
+> - internal/install/bootstrap_receipt_test.go -> real CLI RED/GREEN matrix for both defects and preserved controls.
+> - internal/install/receipt_test.go -> focused receipt-publication regression proof if needed.
+> - internal/install/install_test.go -> focused standalone-install regression proof if needed.
+> CONSUMES:
+> - Existing internal/install/update.go.
+>   spec: updatePlan(opts UpdateOptions) (refreshPlan, error); refreshDirectInstalls(binary, source string, plan refreshPlan, run commandRunner, out io.Writer) error.
+> - Existing internal/install/receipt.go.
+>   spec: loadReceipt() (installReceipt, bool, error); saveReceipt(receipt installReceipt) (retErr error); refreshReceiptArtifacts(receipt *installReceipt) error; recordHomeInstallLocked(homes []string, copyAll bool) error; recordTargetInstallLocked(names []string, copyAll bool) error.
+> - Existing internal/install/install.go.
+>   spec: Install(opts Options) error; installLocked(opts Options) (retErr error).
+>   fields: Options.Homes []string; Targets []string; From string; Copy bool; Record bool. Current CLI passes Record: true.
+> - Existing internal/install/transaction.go.
+>   spec: beginArtifactTransaction(paths []string) (*artifactTransaction, error); delegatedInstallOperation() bool; delegatedArtifactTransaction(paths []string) (*artifactTransaction, error).
+>   source: authenticated delegated children require the parent's prepared journal and coverage of their exact artifact paths; parent transaction snapshots binary, direct placements and receipt, and owns final commit/rollback.
+> - Existing internal/install/targets.go.
+>   spec: installTargets(names []string, src string, copyAll bool, out io.Writer, before func(string) error) error.
+>   source: validates target source before placement; receipt recording is in installLocked, not this function.
+> 
+> ### Story Acceptance Criteria
+> 1. Valid supported receipt plus --bootstrap-defaults uses the same complete recorded home/native/plugin plan and relevant discovery as ordinary machinery update without selectors. Preserve per-group copy/symlink modes. No-receipt first bootstrap retains plugin-aware defaults; explicit homes/targets remain incompatible with bootstrap.
+> 2. Fail closed with actionable diagnostics and no silent defaults for malformed/duplicate/unknown/trailing JSON, unsupported schemas, invalid topology/inventory/digest encoding, unsafe receipt permissions/type, unsafe artifact or parent path/type substitutions, and uncertain plugin ownership, including --skip-plugins. Supported schema 1 is not rejected merely because it is older. Valid receipt plus edited/missing owned regular artifact with unchanged safe parents/topology is repairable; absence alone must not be classified as unsafe ownership. Existing safety validation must not be relaxed.
+> 3. Actual ordinary and bootstrap full-plan update succeeds for intact installs, an edited regular owned Codex artifact, and a missing regular owned native artifact, restoring exact current-release content and binary, complete receipt topology/digests/plugin obligations, both mixed-mode home groups and Codex/OpenCode targets, unrelated-file preservation and same-release idempotence. Exact missing-file fixture: remove only temporary HOME/.codex/agents/machinery-fsm-author.toml after valid receipt recording; no unsafe parent/type substitution. Test both native copy-mode groups missing an owned file in the same run as a bounded guard against a fix that merely repairs one hardcoded target first. During RED the ordinary missing-file case is EXPECTED TO FAIL behaviorally on unchanged production; intact ordinary and edited-file ordinary cases remain passing controls.
+> 4. Retain actual later-target failure after binary, home and earlier native mutations with complete pre-run restoration of binary, homes/native artifacts, receipt and unrelated sentinels. Also exercise that rollback with a safely missing owned artifact in pre-state: absence must be restored as absence, not replaced by a half-repaired result. Retain real interrupted journal recovery at CLI startup and explicitly separate its pre-mutation interruption boundary from post-mutation rollback proof. Preserve independent malformed/schema/path/type/plugin-ownership negatives and mixed-copy-mode checks.
+> 5. Integration uses actual built release/CLI install/update subprocesses, real checksummed archives and temporary home/config/target/binary roots. No mocks, stubs, skip-if-missing or env-gated omissions. No live installation mutations. Machinery product behavior/tests remain standalone with no Paivot/pvg/nd, label or commit-convention dependency.
+> 6. A full direct-refresh operation must not require complete final artifact inventory before remaining selected placements can repair safely missing owned files. The Update parent PROCESS that holds the operation lock and owns the prepared transaction must perform final complete receipt inventory/publication itself, after every authenticated selected placement child has successfully returned and all direct placement/source checks have succeeded, and before that parent's direct transaction commit. During the direct-refresh phase, delegated placement children do not publish intermediate or final persisted receipts: the receipt's pre-run bytes, existence, file type and mode remain unchanged until parent finalization (if no receipt existed before the run, it remains absent until parent finalization). In-memory or journal-owned private coordination may accumulate selected topology within existing authority; it must not advertise an intermediate installation as final. The parent publishes a complete normalized receipt with real refreshed digests for the full recorded/selected plan, preserving recorded topology/copy modes/plugin obligations and existing supported-schema validation. Do not drop missing entries, retain fabricated/stale digest evidence, invent success for an incomplete plan, or bypass final validation. Any final inventory/publication failure before direct commit fails the operation and rolls back the whole direct update when transaction-written post-images are unchanged; preserve the existing refusal to overwrite concurrent foreign changes and its recoverable diagnostic/journal behavior. Standalone nondelegated install still records validated successful topology. Any receipt deferral/coordination remains restricted to authenticated parent-owned prepared journal scope; forged/absent parent authority, unprepared journal and out-of-scope paths remain rejected. No public or env-only skip-receipt switch. Host-managed plugin refresh retains its existing post-direct-commit ownership/obligation semantics, with no new atomic host-plugin rollback or schema-migration claim.
+> 
+> ## Testing Requirements
+> - Hard TDD remains explicitly authorized. After independent PM reviews this scope/contract and authorizes the revised tests, a RED-only author revises the disputed edited/missing cases, adds the bounded multi-missing and missing-pre-state rollback proof, and any focused new boundary tests needed for AC6. No production edits before independently approved RED.
+> - Preserve original candidate 99956740ae5559262790a9473b5597c1775928f2, test SHA256 8ed8636856305d50b9517c4087ecfff3582dac4fb467f92d8f49f3c836916329 and /tmp/machinery-MAC-2u36-red.qRk5DC. Existing 36-leaf replay: 32 pass, 4 fail, 0 skip, 271.751s; only three original failures are valid bootstrap defect proof. The fourth stale_artifact rejection is superseded. Missing-file ordinary FAIL 35.820s is new genuine defect evidence, separate from earlier edited-file ordinary PASS 36.508s.
+> - Preserve complete-recorded-plan, defaults/selectors, intact normal/bootstrap convergence, plugin obligations, real later-target rollback, interrupted recovery, and all legitimate safety negatives. Rename obsolete stale_artifact/disappeared_target rejection cases as repair-success requirements. Only specifically reviewer-authorized frozen-test changes are allowed.
+> - Fresh replay: go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json. This package deadline replaces 10m: the compiled 5a94840 broad matrix took 536.345s for 49 leaves (34 pass, 15 fail, 0 skip), including four invalid early authority-fixture failures. Corrected real authority controls take approximately 60s, bringing the conservative replay budget near 596.345s before the new AC6 positive/fault real updates and ordinary scheduling variance; 600s is inadequate for the complete expanded matrix. The 900s package bound provides room for those measured/required cases. Preserve every individual operation timeout, frozen test selection and assertion; no skipped cases, retries masking hangs or relaxed operation bounds. This is not permission for a hung individual update. Keep the existing GREEN 15m package command unchanged pending actual measurement; full preflight remains final-epic-only.
+> - Focused receipt/standalone-install/delegated-authority tests selected by actual test names introduced or affected. GREEN runs go test -count=1 -timeout=15m ./internal/install ./cmd/machinery for ordinary native package regression coverage. No full scripts/preflight.sh here; final epic gate owns heavy preflight.
+> - Record SHA, exact command, named leaf inventory, zero skips, assertion failure causes and passing controls. Compile/import/fixture/infra/timeout errors are not behavioral RED. Unexpected missing-file receipt-inventory failure is a valid success-contract assertion failure, not an acceptable permanent rejection.
+> - If internal deferred receipt behavior is introduced, add proof that normal standalone install still publishes correct receipts, missing/forged/out-of-scope parent authority cannot enable it, and final publication failure rolls back real prior mutations. Reuse existing authenticated delegation mechanisms; implementation details require evidence, not an assumed new public API.
+> - Finalization boundary proof is mandatory: use real Update with its default command runner, actual checksummed built release and real placement children, plus a successful no-fault counterpart. Independently observe current release binary/home/native content, full prepared-journal path coverage and unchanged persisted receipt through the final completed child. Then the parent's real final receipt scratch-file persistence must encounter a deterministic failure before receipt rename/commit. Use the EXISTING process-local closeInstallFile seam only after independent PM approves the concrete test: narrowly target the final receipt-* scratch file in the current prepared journal, actually close the real file and surface its OS close failure, prove the hook fired on that exact final publication operation, and preserve normal file behavior otherwise. Do not substitute a fabricated command result, new production hook/API, modified child executable or user/env-only bypass.
+> - Required late-failure assertions: no direct commit; exact binary/home/native/receipt pre-state restored, including absence where applicable; unrelated sentinels preserved; journal cleanup and reusable/released operation lock. The no-fault counterpart must publish complete current digests/topology and commit successfully. Compile/fixture errors, early missing-file inventory, or a never-fired hook are not this boundary proof. Existing concurrent-change rejection remains a distinct safety case; deleting a live updated artifact with os.Remove or durableRemove after a child is not a receipt-publication fault and cannot be used to demand unsafe overwrite during rollback.
+> - This parent-process/unchanged-receipt refinement and any proposed boundary test must receive independent PM review and explicit test-edit authorization before the RED author uses it. Existing authorized matrix work may continue under its prior authorization; no source edits are authorized during RED. Ownership and budget are unchanged.
+> - Separate independent PM replays revised RED before approval/freezing. GREEN preserves exact approved test/fixture/config bytes; any later repair requires explicit reviewer authorization and re-RED.
+> 
+> ## OUT OF SCOPE
+> - Arbitrary missing-root recreation, changed unsafe parents, and ownership uncertainty: this story preserves their safety boundary; it does not authorize blind repair.
+> - Redesign of host-managed plugin transactions, lock/journal format or public install selectors: outside the direct receipt-publication defect; report a concrete need for review before expanding.
+> - Other assessment subsystems stay in sibling stories. No pushes, sync, remote mutation, installed binary/plugin/skill/agent replacement, dev-link or healthy worktree cleanup. NIL uses the installed product.
+> - Final heavy preflight, main merge and isolated release candidate belong to epic gate MAC-ou97.
+> 
+> ## DIFF BUDGET
+> Expected 4-6 files, under 1100 total changed LOC: approximately 750 test LOC including the existing 469-line real fixture, and 350 production LOC across the three named files. This replaces the disproven 450-LOC estimate after newly reproduced receipt-publication scope. Do not pad to the budget; material overrun or another production file requires PM investigation and explicit scope review, not weaker tests.
+> 
+> ## Dependencies
+> Parent MAC-ui8a; remains blocking MAC-gcrr and MAC-ou97. No new inter-story dependency: one developer owns both coupled installer defects and one independent PM reviews the full outcome. No other sibling implementation declares the three owned installer source seams. Consumer guidance and epic acceptance remain blocked until this story is accepted.
+> 
+> ## MANDATORY SKILLS
+> - developer for RED/GREEN roles; codebase-memory for source discovery; pm_acceptor for independent scope/test authorization, RED replay and acceptance.
+> 
+> ## Delivery Requirements
+> This repaired scope requires independent PM review before author re-RED; the previous 20:55:32Z test-edit authorization did not authorize implementing this newly reproduced defect. Preserve that review as history and obtain explicit expanded test authorization. Do not deliver or approve v1 unchanged.
+> Use pvg story deliver, never close. Append RED/GREEN SHAs, exact commands/results, inventory, changed-file rationale, per-AC proof and residual limits. Product has no dependency on these development coordination tools.
+
+
 ## MAC-2u36 RED AUTHOR PAUSE — overlap triage and boundary-oracle review
 No delivery or claim release. Dispatcher requested a clean pause after the already-running focused replay; final full latest-SHA matrix is deferred until triage and reviewed oracle repairs settle.
 
