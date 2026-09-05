@@ -1,16 +1,18 @@
 ---
 id: MAC-a89e
 title: "Keep regeneration advice from accepting new debt"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:35Z
-content_hash: "sha256:829722c9a66d28eea1957c587e23d3bbf8f5bd8d39e8c119005801b47a8afab4"
+updated_at: 2026-09-05T21:11:54Z
+content_hash: "sha256:345dbe2c7e7d3a2a5cffd28397660b3c81c666c867d0a9dcf2a5f6d3abae9104"
 blocks: [MAC-gcrr, MAC-ou97]
+assignee: dev-MAC-a89e
+follows: [MAC-olrx]
 ---
 
 ## Description
@@ -81,9 +83,13 @@ ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are s
 ## History
 - 2026-09-05T19:35:08Z dep_added: blocks MAC-gcrr
 - 2026-09-05T19:36:15Z dep_added: blocks MAC-ou97
+- 2026-09-05T21:11:54Z status: open -> in_progress
+- 2026-09-05T21:11:54Z auto-follows: linked to predecessor MAC-olrx
+- 2026-09-05T21:11:54Z claimed by dev-MAC-a89e
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
+- Follows: [[MAC-olrx]]
 
 ## Comments

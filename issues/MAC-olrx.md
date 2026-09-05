@@ -9,11 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-05T20:28:15Z
-content_hash: "sha256:8f5db53762208f6d3f2beb2db35b66fc094d484551ae7bcd683cc727bf43eaff"
+content_hash: "sha256:1ff7d262ca6d80633289310229bccf64a2bd190821c5e511ffe88d7a0729caaf"
 assignee: dev-MAC-olrx
 closed_at: 2026-09-05T20:27:03Z
 close_reason: "All five ACs independently verified; immutable RED72/72 pass, owner-local and parent obligations preserved, DOCS_STALE repaired at6ba45625."
-led_to: [MAC-2u36, MAC-hpqp]
+led_to: [MAC-2u36, MAC-hpqp, MAC-a89e]
 ---
 
 ## Description
@@ -498,7 +498,7 @@ status: delivered
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Led to: [[MAC-2u36]], [[MAC-hpqp]]
+- Led to: [[MAC-2u36]], [[MAC-hpqp]], [[MAC-a89e]]
 
 ## Comments
 
