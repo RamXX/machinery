@@ -9,8 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:44:27Z
-content_hash: "sha256:a93932be24429ac025872db77fa2c4f1b477dd2dcab6f68c33afb38d37591be3"
-blocks: [MAC-hlae]
+content_hash: "sha256:76e766a77278fa14eb88c9c88ac0c463064a35f2fe82a4fb3438e34947230d32"
+blocks: [MAC-hlae, MAC-yhg5]
 ---
 
 ## Description
@@ -92,9 +92,10 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 ## History
 - 2026-09-05T19:45:31Z dep_added: blocks MAC-hlae
+- 2026-09-05T19:45:31Z dep_added: blocks MAC-yhg5
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-hlae]]
+- Blocks: [[MAC-hlae]], [[MAC-yhg5]]
 
 ## Comments
