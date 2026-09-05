@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T23:04:15Z
-content_hash: "sha256:cb9779c6532fe8aa70dfa76d67cd07f06013eb718255efb42d36a29fb6042b06"
+content_hash: "sha256:9ef1b2c2e73b1979991000505582e839e31d0093e2c273efa5c05e74d253a639"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx]
 ---
@@ -1163,3 +1163,56 @@ status: delivered
 - [x] AC #6: parent publication sequencing/fault outcome contract specified with corrected independent oracles; authority/cleanup controls pass; parent publication remains RED and actual late close-fault execution is not claimed.
 - [x] AC #7: exact and repeated cross-group rejection/rollback/next-native flow fails as intended; fresh/disjoint/same-ordered-group copy-change controls pass.
 
+
+### 2026-09-05T23:04:15Z ramirosalas
+FULL INDEPENDENT RED REVIEW: REJECTED — MAC-2u36, frozen 98d3b573ac493c4d7252bffb03c83f92dc99f82b. This is rejection of RED proof, not product acceptance or a GREEN implementation authorization.
+
+EXPECTED: AC2 needs independently reached fail-closed proof for malformed/unknown/duplicate/trailing JSON, wrong types, invalid topology/inventory/digest encoding, supported-schema positives, and separate permission/type safety.
+
+DELIVERED: Independent exact-SHA synchronous replay completed: go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json. Exit 1; 66 leaves, 49 PASS, 17 FAIL, 0 SKIP, 758.895s; every started leaf terminal. All outcomes match author replay exactly. New bootstrap suite has 43 leaves (26 PASS, 17 intended FAIL); selected existing tests have 23 PASS. Ten of those existing passes are not valid proof of their named parser/topology boundary: TestCorruptReceiptFailsLoudly (1), TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology (8), TestSemanticallyInvalidReceiptFailsBeforeUpdate (1). Their fresh write() fixtures use 0644 under actual umask 022; readReceiptFile rejects unsafe permissions before parsing/semantic validation, while each only requires err != nil.
+
+GAP: Removing the intended parser/semantic validation would not make those ten tests fail because earlier permission rejection still satisfies them. The digest-change test tests digest computation, not malformed schema2 receipt inventory/digest-encoding rejection; attributable input validation coverage for those required categories was not established. Passing current tests therefore would not prove all AC2 outcomes. This is a pre-existing test-oracle defect, not a newly demonstrated production parser bypass or a fourth product defect. Prior logs remain accurate runtime results but the ten misleading passes must be qualified.
+
+FIX: Apply ONLY the explicitly authorized scope below, establish genuine private matched-valid fixtures and exact intended negative reasons, then re-freeze and redeliver complete latest-SHA evidence for a separate independent RED review.
+
+INDEPENDENT EVIDENCE:
+- Detached checkout /tmp/machinery-pm-MAC-2u36.DDIEBx/checkout at 98d3b573ac493c4d7252bffb03c83f92dc99f82b; root remained main.
+- Complete raw /tmp/machinery-pm-MAC-2u36.DDIEBx/98d3b57-independent-matrix.jsonl; SHA256 9457a41c68ebdc041dc4ffcfccc71a9026dd595b858349f8429e48b2cefba778.
+- Full review and all 66 named leaf outcomes: /tmp/machinery-pm-MAC-2u36.DDIEBx/REVIEW.md.
+- Frozen bootstrap test SHA256 ee786dee86c951a5a3a4a53d9344aeb16979df19319ea77dcd14fbd7afefca23 verified before/after; checkout clean. Author raw SHA256 f2b15c4ef66ccd9b6f82c6d65795df4220364b767a4f71f92f265a7ab3a0947e independently verified.
+- gofmt/diff check clean; pvg verify PASS 1 file/0 issues; verify-tdd against local epic f24b2df3cb1e1521f97b406a7516f72bb7bc7890 PASS 9 commits, 0 skipped merges. No statement/branch coverage instrumentation or percentage claim.
+- Exact source, all 1111 candidate test lines, seven ACs, terminal delivery proof and latest canonical AC2 repair/budget read. Graph Verify project Users-ramirosalas-workspace-machinery ready, generation 2026-09-05T20:28:41Z, relevant paths metadata_match/no_recorded_issue; best-effort caveat retained.
+
+OTHER AC REVIEW:
+AC1/3 independent complete release content, binary, topology/digests/plugin obligations, preservation/idempotence assertions are substantive. Actual ordinary intact and edited controls passed (47.45s/47.06s); bootstrap/missing-file failures are desired behavioral RED. AC4 actual ordinary later-source post-mutation rollback passed 37.26s with binary/home/Codex progress and full prior state; interrupted recovery passed 17.09s and remains explicitly pre-mutation interruption proof. AC5 uses actual built CLI/releases/checksums/children and isolated temporary roots, no fake runner/output.
+AC6 corrected component-bounded alias and independently prepared desired-receipt oracle are sound in the supported POSIX execution lane; no old alias/stale-expectation diagnostics recurred. Four authority controls passed. Four parent-finalization cases remain missing-boundary/child-receipt-sequencing RED: ZERO actual final-close faults fired. Do not claim late-close rollback execution. The exact prepared scope, parent-owned scratch payload, hook count/error, no-commit, restoration/absence, journal cleanup and reusable lock assertions must remain mandatory for GREEN. Preserve concurrency/foreign-postimage protection.
+AC7 three real supported-recording controls passed. Two actual cross-group conflict flows fail desired rejection/restoration and subsequent native installs reject the emitted invalid receipt without manual repair. Independent exact topology/content/path/digest expectations and permitted early safe rejection are appropriate.
+Budget: measured 1111 bootstrap-test lines and required shared oracle/AC7 proof justify the earlier 61-line test estimate overrun, not weakening assertions. Reviewed canonical approximately 1700 combined changed LOC (~1350 tests/~350 production, same 4-6 files), with bounded ~150-200 receipt-test additions. Report actual per-file additions/deletions, helper reuse and focused/full elapsed costs; material new overrun/scope needs review. No automatic acceptance cap.
+Nonblocking out-of-lane observation: alias table literals are POSIX paths; Windows runtime would need portability work, but current contributor contract only cross-builds Windows and supports Linux/Darwin execution. No Windows runtime guarantee or result is claimed.
+
+TEST-EDIT AUTHORIZED — narrowly scoped AC2 RED proof repair, after independent review of the latest canonical seven-AC-preserving repair:
+1. Amend IN PLACE only internal/install/receipt_test.go functions TestCorruptReceiptFailsLoudly, TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology, and TestSemanticallyInvalidReceiptFailsBeforeUpdate, plus necessary local table fields/imports and minimal receipt-local private-fixture/diagnostic helper. Preserve every intended negative. No renaming is authorized; describe the semantic test accurately as loader rejection before planning, not observed binary-replacement ordering.
+2. Explicitly create private 0700 config roots and 0600 regular receipts; assert actual existence/type/mode before loadReceipt. Establish matched valid schema1 and schema2 controls through the same loader/read path. Keep global install_test.go write helper and unrelated fixtures/assertions unchanged.
+3. Each negative changes only the intended defect from an otherwise valid matched fixture and requires exists=true, a nonnil error and intended diagnostic category/detail: malformed JSON syntax; unknown root/home/target fields plus exact field names; duplicate root/nested keys plus exact keys; trailing JSON; wrong homes/copy types; semantic unknown target plus value. Unknown-home-field control must have valid nonempty safe absolute homes. Use typed errors where available or strip the exact known receipt-path wrapper before diagnostic matching: test directory/path words must not satisfy an assertion. Earlier permission/path/inventory errors cannot substitute.
+4. Add bounded fast real-filesystem schema2 cases in receipt_test.go from a valid private matched receipt with seeded real topology, independently complete known inventory and real digests. Single-category cases: missing/extra inventory count; duplicate/substituted path at unchanged count; relative/non-clean/unexpected absolute path; digest wrong prefix/length/correct-length nonhex. Require corresponding inventory-count/path/malformed-digest detail with other fields valid. Preserve valid reversed input ordering as normalization compatibility, not invented rejection.
+5. ALL internal/install/bootstrap_receipt_test.go bytes stay frozen at SHA256 ee786dee86c951a5a3a4a53d9344aeb16979df19319ea77dcd14fbd7afefca23. Reuse its actual valid-0600-to-0666 unsafe_receipt negative UNCHANGED, separately from parser proof; its malformed-receipt case overwrites an existing 0600 file and is not the old fixture bug. No bootstrap/finalization/AC7 edits, shared-write edits, unrelated assertion weakening, new production API/hook/stub, instrumented child, environment bypass or production implementation is authorized.
+6. Every amendment/addition commit subject contains BOTH tdd-red and [test-edit-authorized]. Preserve all commits/raw history and transparently reclassify ten old passes. Run focused named repaired/new receipt cases first, zero skips and exact diagnostic causes/matched controls. Correct safety controls may all PASS unchanged production; do not manufacture RED. Report any actual validator bypass for triage.
+7. After focused repairs are stable, capture ONE complete latest-SHA raw JSON replay with the existing 15m package command plus explicitly named outside-selector tests if needed. Preserve individual operation limits, every required case and all intended product RED assertions. No deadline increase, omissions, retry masking or extra broad run before focused stability. Record SHA/hashes/all named outcomes/counts/costs. Separate independent full RED review and approval remain mandatory; this is NOT approve-red or GREEN permission.
+
+## nd_contract
+status: rejected
+
+### evidence
+- Independent complete exact-SHA replay: 66 leaves, 49 PASS, 17 FAIL, 0 SKIP, 758.895s; raw/report paths and verified hashes above.
+- Blocking AC2 early-permission false-positive proof gap in ten existing leaves; current canonical repair and approximately 1700 LOC estimate independently reviewed.
+- No source/test/installed-asset edits, remote operations, root branch switches or overlapping mutable fixtures during review.
+
+### proof
+- [x] AC #1: desired recorded-plan parity and positive defaults/schema1/selectors assessed.
+- [ ] AC #2: parser/topology/inventory/digest preservation proof incomplete; exact locked-test repair authorized above.
+- [x] AC #3: substantive actual release convergence and repair-success RED assertions, with intact/edited positive controls.
+- [x] AC #4: actual ordinary post-mutation rollback and separately classified pre-mutation interrupted recovery verified; desired missing/bootstrap assertions retained.
+- [x] AC #5: actual CLI/release/children and isolated no-skip execution verified.
+- [x] AC #6: parent-sequencing/finalization desired contract and strict fault sensitivity reviewed; missing-boundary RED only, actual late-close fault rollback NOT exercised.
+- [x] AC #7: real conflict/restoration/follow-on desired outcomes and supported positive controls reviewed.
+- [ ] Revised RED proof approved; GREEN implementation and final product acceptance remain pending.
