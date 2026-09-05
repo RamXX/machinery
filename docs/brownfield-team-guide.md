@@ -448,8 +448,11 @@ folding it into a substrate boundary manufactures allow-graph cycles.
   `import {x} from "@org/b"` resolves to the boundary owning `packages/b`, longest name
   first; an import into a discovered package that no boundary owns is reported as code
   outside the contract.
-- `ratchet.json` snapshots taken before the full-date stamp carry `YYYY-MM` and age from the
-  first of that month; rerun `machinery baseline` to restamp.
+- Legacy `ratchet.json` snapshots with `YYYY-MM` remain supported and age from the
+  first of that month. Without an explicit date or `SOURCE_DATE_EPOCH`, a baseline
+  rerun retains that date; no routine restamping is needed. Baseline remains a
+  deliberate debt-acceptance operation: review ratchet and offender changes before
+  adopting its result.
 
 ## 9. What "sustainable" looks like (the exit criteria)
 
