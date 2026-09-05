@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:38:43Z
-content_hash: "sha256:827386037dcaa1914e3cbd2ce541d7c2aa2e0ff33e96d3c7a3cdb5ac7bb03b5e"
+updated_at: 2026-09-05T19:39:15Z
+content_hash: "sha256:0ffa4402c4b4f6e983ed13952e5f772fed9d623eb66430ca50ab5476ecbade15"
 ---
 
 ## Description
@@ -59,6 +59,23 @@ status: new
 
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
+BACKLOG READY FOR ANCHOR — 2026-09-05
+One epic, 16 bounded children. Scoped pvg lint --backlog --epic MAC-ui8a --json => [] (zero errors and review findings). pvg rtm check --epic MAC-ui8a => passed, 0 tagged requirements, 17 records checked. pvg nd dep cycles => none; stale => none. No close-eligible epic while work remains (expected). Source worktree clean; no branches checked out or production edits by Sr PM. All code fixes hard-tdd; pure integrated capstone uses safe/unsafe mutation sensitivity rather than manufactured RED. Architecture MAC-l7m0 explicitly blocked pending user/architect; implementation MAC-vx24 cannot dispatch before it.
+NEXT mapping: #1 MAC-2u36; #2 retain failclosed discovery policy documented MAC-gcrr; #3 MAC-olrx; #4 MAC-2n83; #5 current root-registry workaround MAC-gcrr (feature extension unapproved); #6 platform extension pending user, emulation workaround documented; #7/#8 MAC-gcrr plus release MAC-hy71; #9 MAC-a89e; #10/#11/#14 concrete model features inventoried pending scope approval; #12 MAC-p8ce; #13 hierarchy deferred until actual access-boundary need.
+Workflow observation (local tracker only, no external tool fix): pvg issues create with canonical nested headings produces duplicate managed sections; nd update --description inserts ahead of authored Markdown headings instead of replacing entire authored body. Repaired with parent-authorized pvg nd edit and exact apply_patch-backed editor, preserving notes/history/contracts. nd EDITOR requires a single executable path, not command plus arguments.
+
+## nd_contract
+status: new
+
+### evidence
+- Backlog authored from current source signatures, assessment probes, NEXT, prior hard-TDD and real-integration lessons.
+- Scoped lint [] and RTM passed; zero dependency cycles; git status --short empty.
+
+### proof
+- [x] All confirmed findings tracked with positive/negative and real-path verification criteria.
+- [x] Standalone Machinery/no installed replacement/no remote mutation constraints captured.
+- [ ] Architecture user choices settled and implementation story exact interfaces repaired.
+- [ ] Implementation, independent PM reviews, E2E and final heavy preflight completed.
 
 ## History
 
