@@ -9,9 +9,9 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:36:14Z
-content_hash: "sha256:d29100698d0c2a54293329d4ff8bf44ad9209f4b05eaa3de776eef43d40ba35e"
+content_hash: "sha256:d6ef6e8f50336a7f9977c1e098bc8994acdf81d207000d457600e2b50c5c9ef9"
 blocked_by: [MAC-l7m0, MAC-sh60, MAC-olrx, MAC-2n83, MAC-p7jd, MAC-lnu6]
-blocks: [MAC-gcrr]
+blocks: [MAC-gcrr, MAC-ou97]
 ---
 
 ## Description
@@ -113,10 +113,11 @@ CONSUMES:
 - 2026-09-05T19:35:07Z dep_added: blocked_by MAC-p7jd
 - 2026-09-05T19:35:07Z dep_added: blocks MAC-gcrr
 - 2026-09-05T19:36:14Z dep_added: blocked_by MAC-lnu6
+- 2026-09-05T19:36:17Z dep_added: blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-gcrr]]
+- Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 - Blocked by: [[MAC-l7m0]], [[MAC-sh60]], [[MAC-olrx]], [[MAC-2n83]], [[MAC-p7jd]], [[MAC-lnu6]]
 
 ## Comments
