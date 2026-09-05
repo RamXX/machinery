@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T20:32:44Z
-content_hash: "sha256:9ed63ab59f7508aac9aa11cf6997d824da4539704b868a1776897fc9a454e04e"
+content_hash: "sha256:083c2c390370eb3f6f6a7f1c6195237f8523549d320b624a0546c3343dba6ecd"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 ---
 
@@ -88,6 +88,16 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 
 ## Notes
+
+
+## nd_contract
+status: rejected
+
+### evidence
+- PM rejection applied via pvg story reject on 2026-09-05.
+
+### proof
+- [ ] Story requires another developer delivery before it can be accepted.
 
 
 ## nd_contract
