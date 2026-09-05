@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:00:19Z
-content_hash: "sha256:4cde6fafe694c75bbbd9f729d8a0fe8e01edebcace3100f2bbe9ceb4d88aeddb"
+updated_at: 2026-09-05T20:14:16Z
+content_hash: "sha256:5b97858a36ccf75aa8f2ef8a8f901ea81682be87def31f9f084451a6eda056bd"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 ---
@@ -89,6 +89,11 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 
 ## Notes
+## RED contract decisions
+Dispatcher approved the minimal fail-closed run(args, stdout, stderr) int bootstrap before authoring it. It has no validation, provisioning, execution, or cleanup behavior. Generic bootstrap rejection is not proof of correct negative validation; negative RED assertions require diagnostic categories. Dispatcher also approved the additive real Node pilot fixture. CONTRACT.md documents source selection, native events, report semantics, bounded resources, and exact container ownership. No Machinery product dependency on Paivot is introduced.
+
+Targeted preparation: existing scripts/run-safe and internal/processcontrol suites passed; exact OCI pull and RepoDigests/platform inspection passed; actionlint passed. Full preflight remains deferred. Initial Docker pilot exposed a test diagnostic portability assumption: Docker29 emits lowercase no such object, so pre-freeze cleanup assertions were corrected case-insensitively; created test containers were already removed successfully. This is test-authoring repair, not an implementation defect.
+
 ## nd_contract
 status: new
 
