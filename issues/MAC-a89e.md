@@ -1,17 +1,18 @@
 ---
 id: MAC-a89e
 title: "Keep regeneration advice from accepting new debt"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:46:44Z
-content_hash: "sha256:5fc4277a528bc9ad0026ed19512e730f5821895523ab0c8d3ec193047992b897"
+updated_at: 2026-09-05T23:47:31Z
+content_hash: "sha256:90f759f077f6717787b84a8dfd9e4e5bfb8de11fabcb04263f4191f33d8d04ca"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce]
+assignee: dev-MAC-a89e
 ---
 
 ## Description
@@ -453,6 +454,8 @@ Preserved verbatim as quoted history; current Description is authoritative.
 - 2026-09-05T23:41:17Z status: in_progress -> in_progress
 - 2026-09-05T23:46:44Z status: in_progress -> open
 - 2026-09-05T23:46:44Z released by ramirosalas
+- 2026-09-05T23:47:31Z status: open -> in_progress
+- 2026-09-05T23:47:31Z claimed by dev-MAC-a89e
 
 ## Links
 - Parent: [[MAC-ui8a]]
