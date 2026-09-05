@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T22:30:05Z
-content_hash: "sha256:d1626f7948dc0a5ae63ecf872c55ecc08a712df0129362b92f5363cf1777447a"
+updated_at: 2026-09-05T22:30:44Z
+content_hash: "sha256:a0569878953715507163d145c70cbcf2be87544dece6eb08112b5a2c244b2edb"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -1013,3 +1013,26 @@ status: in_progress
 - [x] Two precise non-weakening oracle repairs and bounded real CLI AC7 regression/positive controls authorized.
 - [ ] Corrected final-SHA RED replay and full independent RED approval pending.
 - [ ] AC1-7 implementation/acceptance and actual late close-fault rollback proof pending.
+
+### 2026-09-05T22:30:44Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- RED-only frozen98d3b573ac493c4d7252bffb03c83f92dc99f82b; internal/install/bootstrap_receipt_test.go SHA256ee786dee86c951a5a3a4a53d9344aeb16979df19319ea77dcd14fbd7afefca23; production unchanged.
+- Exact complete command: go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json, executed in /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36 with stdout/stderr directly captured to /tmp/machinery-MAC-2u36-red.qRk5DC/98d3b57-final-matrix.jsonl.
+-66leaf49PASS17FAIL0SKIP748.254s; every run has terminal outcome, no fixture/compiler/timeout/remaining oracle errors. Raw SHA256f2b15c4ef66ccd9b6f82c6d65795df4220364b767a4f71f92f265a7ab3a0947e.
+- Full Implementation Evidence, focused commands, exact named leaf inventory, failure classification, real/helper boundaries, AC mapping,1111test-LOC budget investigation and LEARNINGS persisted in Notes.
+- pvg verify PASS1file0issues; verify-tdd PASS9commits. Installed binary hash unchanged, no live product mutation. Canonical pvg story deliver was invoked ONCE successfully.
+- This terminal comment preserves prior history and supersedes older in_progress comments that rendered after the deliver-generated Notes contract. First structural readback was8/9 solely for that ordering; no second deliver invocation.
+- Independent full RED approval, GREEN implementation and actual late-parent-close fault/rollback execution remain pending; never-fired close hook is a missing-boundary RED assertion only.
+
+### proof
+- [x] AC #1: complete recorded-plan bootstrap parity specified; default/plugin/schema1/selector controls pass, parity defects fail.
+- [x] AC #2: valid repair vs unsafe ownership distinguished; existing receipt validation controls pass, unsafe bootstrap symlink fails.
+- [x] AC #3: actual complete release content/binary/topology/digests/plugin/idempotence assertions; ordinary intact/edited controls pass and missing/bootstrap defects fail.
+- [x] AC #4: real post-mutation ordinary rollback passes, missing/bootstrap boundary failures retained, pre-mutation interrupted recovery separately passes.
+- [x] AC #5: actual built CLI/releases/checksums/children/private loopback and temporary roots, no mocks/skips/live installation writes.
+- [x] AC #6: parent publication sequencing/fault outcome contract specified with corrected independent oracles; authority/cleanup controls pass; parent publication remains RED and actual late close-fault execution is not claimed.
+- [x] AC #7: exact and repeated cross-group rejection/rollback/next-native flow fails as intended; fresh/disjoint/same-ordered-group copy-change controls pass.
+
