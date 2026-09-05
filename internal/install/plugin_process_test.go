@@ -17,10 +17,16 @@ const (
 	pluginProcessWarningToken    = "machinery-install-process-warning"
 )
 
+// The flood helper writes forever, so the deadline always fires; it only has
+// to be long enough for the child to overrun the 1 MiB capture ceiling on a
+// loaded CI runner under the race detector (100ms was not: the suite has
+// failed at 720896 bytes, and at exactly the ceiling with no marker yet).
+const pluginFloodTimeout = time.Second
+
 func TestRunCombinedBoundsInfiniteOutputAndTimeout(t *testing.T) {
-	setPluginProcessTestBounds(t, 100*time.Millisecond, 100*time.Millisecond)
+	setPluginProcessTestBounds(t, pluginFloodTimeout, 100*time.Millisecond)
 	output, err := runCombined(os.Args[0], "-test.run=^TestPluginProcessHelper$", "--", pluginProcessFloodToken)
-	if err == nil || !strings.Contains(err.Error(), "timed out after 100ms") || !strings.Contains(err.Error(), "process tree was terminated") {
+	if err == nil || !strings.Contains(err.Error(), "timed out after "+pluginFloodTimeout.String()) || !strings.Contains(err.Error(), "process tree was terminated") {
 		t.Fatalf("unbounded plugin process diagnostic = %v", err)
 	}
 	wantSuffix := fmt.Sprintf("\n[output truncated at %d bytes]\n", pluginCommandOutputLimit)
@@ -52,10 +58,10 @@ func TestRunCombinedBoundsDescendantPipeRetention(t *testing.T) {
 }
 
 func TestRunCombinedWithInstallLockCapabilityBoundsOutput(t *testing.T) {
-	setPluginProcessTestBounds(t, 100*time.Millisecond, 100*time.Millisecond)
+	setPluginProcessTestBounds(t, pluginFloodTimeout, 100*time.Millisecond)
 	run := runCombinedWithInstallLockCapability(installLockCapability{path: "fixture", token: "fixture", pid: os.Getpid()})
 	output, err := run(os.Args[0], "-test.run=^TestPluginProcessHelper$", "--", pluginProcessFloodToken)
-	if err == nil || !strings.Contains(err.Error(), "timed out after 100ms") {
+	if err == nil || !strings.Contains(err.Error(), "timed out after "+pluginFloodTimeout.String()) {
 		t.Fatalf("delegated plugin process diagnostic = %v", err)
 	}
 	wantSuffix := fmt.Sprintf("\n[output truncated at %d bytes]\n", pluginCommandOutputLimit)
