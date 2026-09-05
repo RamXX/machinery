@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:30:26Z
-content_hash: "sha256:91bc70cb5cc51584bc389af1e2a1ce334f366f25dfa87130fc37ae87869ad29e"
+updated_at: 2026-09-05T19:33:47Z
+content_hash: "sha256:4b655d77f04d28a09b59a9544ce01ea5111fdf6457a1549ec89c797a12325ba0"
 ---
 
 ## Description
@@ -78,7 +78,7 @@ status: new
 
 
 ## Notes
-
+AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 
 ## History
 
