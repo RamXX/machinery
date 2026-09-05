@@ -8,8 +8,8 @@ labels: [hard-tdd, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:33:44Z
-content_hash: "sha256:f66c311d11adc847a8e25083b05533187c9e962e15cf9daecc6ef58e821c14b0"
+updated_at: 2026-09-05T20:54:28Z
+content_hash: "sha256:dfc4fdbb56c33e6cec38f76deb93250ae042a782df71462401884051317c3fbc"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -90,6 +90,85 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 
 ## Notes
+## Implementation Evidence
+
+PROOF:
+RED candidate v2, authored under the PM test-edit authorization. Candidate v1 at 612f65f3b4502a3267828507faaf0e395c8dd558 remains preserved and was NEVER approved. New SHA: e55238223961fec922896c361d8af6cafc454a8e on story/MAC-hpqp, subject includes tdd-red and [test-edit-authorized]. No operational GREEN code was written.
+
+### CI/Test Results
+
+Commands run:
+Working directory for every command: /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-hpqp
+- go test -count=1 -timeout=2m -coverprofile=/tmp/machinery-hpqp-red-v2.DQvyDf/native.cover -json ./scripts/integration-lane
+- go test -tags machinery_integration -count=1 -timeout=15m -json ./cmd/machinery -run '^TestIntegrationLane(Pilot(OCI|Formal)|FullPath|HostDescendantControl|NodeEventControls)$'
+- node --test --test-reporter=tap testdata/integration-lanes/pilot.integration.test.mjs
+- go test -count=1 -timeout=90s -json ./scripts/run-safe ./internal/processcontrol
+- go test -count=1 -timeout=2m ./scripts/integration-lane -run '^TestLane(WiringGuardsRejectDisabledExecution|PreflightFailurePropagationControl)$'
+- go test -tags machinery_integration -count=1 -timeout=2m ./cmd/machinery -run '^TestIntegrationLane(HostDescendantControl|NodeEventControls)$' -v
+- go test -tags machinery_integration -count=1 -timeout=10m ./cmd/machinery -run '^TestIntegrationLanePilotFormal$' -v
+- pvg verify scripts/integration-lane/main.go scripts/integration-lane/main_test.go cmd/machinery/integration_lane_test.go testdata/integration-lanes/pilot.integration.test.mjs --include-tests --format text
+- actionlint .github/workflows/ci.yml .github/workflows/formal.yml .github/workflows/nightly.yml
+- go tool cover -func=/tmp/machinery-hpqp-red-v2.DQvyDf/native.cover
+- git diff --check
+- git diff 612f65f3b4502a3267828507faaf0e395c8dd558 HEAD -- scripts/integration-lane/main.go
+- docker ps -a --filter label=dev.machinery.integration-run --format '{{.ID}} {{.Names}} {{.Status}}'
+- docker inspect --format '{{.Id}} {{.State.Running}}' dagger-engine-v0.21.9
+- ps -eo pid,ppid,stat,command | awk '/\/bin\/sh .*\/(owned-descendant|real-owned-child)\.sh/ && !/awk/ {print}'
+
+Summary:
+- Native: 12 roots, 70 starts/70 terminals, 34 PASS/36 intended FAIL/0 SKIP including aggregate parents. Leaf-only: 64 = 32 PASS/32 intended FAIL.
+- Runtime Go: all five registered roots, 34 starts/34 terminals, 8 PASS/26 intended FAIL/0 SKIP including aggregate parents. Leaf-only: 31 = 6 PASS/25 intended FAIL.
+- Node pilot: one exact registered native leaf PASS; zero failures/skips/cancelled/todo.
+- New RED total: 96 leaves = 39 passing controls/57 intended failing requirements/0 skipped. Existing bounded-runner controls add 20 passing leaves (18 roots,22 events,all PASS,zero skips).
+- All 25 full-path scenario identities and all five Go pilot roots ran. All native started IDs have one terminal; duplicate started/terminal inventories are empty. No selected case is missing. Raw JSON/TAP retained under /tmp/machinery-hpqp-red-v2.DQvyDf/.
+- Candidate lane assertions remain intentionally red at the replaceable fail-closed bootstrap; no compile/import/absent-infrastructure failure is counted as RED. Pipelines preserved exit status with set -o pipefail.
+- Native behavior coverage: 66.7% bootstrap statements, run100%/main0%; NOT a claim of implemented lane coverage. Outcome coverage is mapped below.
+- pvg verify PASS (3 source files scanned,0 issues); actionlint PASS; git diff --check PASS; clean worktree. main.go is byte-unchanged from v1.
+- Candidate total:8 files,1753 lines,under1800. V2 revision:4 files,+761/-74. Added volume is exact runtime/ownership assertion code plus bypass sensitivity controls; no budget weakening.
+
+### Four rejection gaps closed in the RED contract
+
+1. Candidate CLI formal positive and genuinely fresh private closure:
+TestIntegrationLaneFullPath/cold-cache now selects Go+Java+TLC, not Docker. It checks that its private cache is absent/empty before invocation, then requires candidate-provisioned launcher and jar paths. The exact native Go fixture runs safe and invariant-breaking TLC models through those paths, captures their hashes, and compares them with retained runtime records inside the private cache. Offline-formal/wrong-Java-pin/wrong-TLC-pin use the SAME native fixture. A runner rejecting every formal closure fails the cold-cache positive.
+Sensitivity/control proof: TestIntegrationLanePilotFormal retains the original real pinned safe/unsafe test and additionally executes the exact generated Go fixture with the actual provisioned Java and TLC paths. This passed. It prevents fixture/parser errors masquerading as RED but does NOT replace the separate failing candidate-CLI assertion.
+
+2. Exact native events and runtime union:
+Every full-path success now checks suite ID/adapter/source/test, selected/started/passed cardinality, zero failures/skips, retained event bytes and sha256. Go checks exact package/test run/pass identities. Node requires exact Subtest/ok identity and terminal cardinality plus native plan/counts. Runtime records must equal the selected union, with exact Go/Node version and executable hashes, immutable OCI digest/platform, pinned Java probe/archive/closure/launcher identities, and exact TLC jar version/hash. Arbitrary nonempty records are no longer acceptable.
+Sensitivity/control proof: real Node duplicate test names produced two native starts/terminals; an actually hanging Node test produced an incomplete native stream and was bounded/terminated. Both controls passed. Candidate node-duplicate and node-missing-terminal cases now require rejection; the timeout case additionally requires the body-entered marker. Existing Go duplicate/aggregate/partial-output controls remain.
+
+3. Descendant termination and caller-owned directory preservation:
+All25 scenarios now start with an existing --work-dir and user sentinel. Unconditional cleanup assertions check native directory identity, exact sentinel bytes, and removal of only runner-owned additions, including prerequisite failures. New process-success/failure/timeout/cancellation cases execute real Go tests that spawn private shell descendants; the harness records exact PID+private script path, independently checks post-return liveness, and has exact-ownership emergency cleanup.
+Sensitivity/control proof: the real descendant control first verifies PID/liveness and termination, then executes the exact generated Go fixture. The Go native parent passed/exited while its real child remained alive, proving why killing only the lane/test parent is inadequate; the control then cleaned its exact child. Both that and existing Docker lifecycle controls pass.
+
+4. Mandatory workflow/preflight enforcement:
+Parsed workflow assertions now require exactly one exact command, unconditional job AND step, Linux runner, no ignored errors/expressions, and required full history. Shell token assertions distinguish executable commands from comments/quoted diagnostics, require top-level exact bare lane execution under strict error propagation, reject bypass variables/success exits/opaque transfers/shadowed executables/disabled errexit, and preserve native-before-lane-before-formal/C4/checker ordering. Make dry-run output must be the exact command.
+Sensitivity/control proof:25 disabled wiring fixtures are rejected, including job.if, job/step continue-on-error, step.if, echoed/commented/inexact commands, renamed bypass diagnostic, ignored failures, conditional/function/subshell-only calls, wrong order and removed/early consumers. Four actual bounded Bash controls demonstrate strict failure versus ignored/conditional/renamed-bypass execution. These are small real shell programs, NOT full preflight execution or replacement runtime binaries.
+
+### AC Verification
+
+| AC | V2 frozen evidence |
+|---|---|
+|1|Existing closed schema/15 inventory mutations/source identity/union controls retained.|
+|2|Service-free actual native selection retained; mandatory runtime failures plus job/step/bypass sensitivity now explicit.|
+|3|Candidate cold formal closure positive and same-fixture offline/wrong-pin negatives; exact archive/closure/jar identities.|
+|4|Exact retained/hash-bound Go AND Node streams, exact runtime union/identity, real Node duplicate/incomplete controls.|
+|5|Exact mandatory Linux job+step and Make entrypoint; native macOS remains service-free.|
+|6|Parsed top-level strict ordering, executable bypass rejection, formal/C4/checker consumer preservation, real Bash sensitivity.|
+|7|Nonempty fragment registers all5 executable Go roots and real Node pilot; candidate formal positive is independently required.|
+|8|Real Docker and host descendants across lifecycle paths; all25 existing caller roots/sentinels protected.|
+|9|Authorized v2 tdd-red SHA, meaningful behavioral failures, passing real controls, no full preflight.|
+|10|All25 full-path cases executed; successful candidate reports must bind exact native events and runtime bytes.|
+
+### Ownership and limits
+No labeled test containers or private host descendant processes remained. Real unrelated Docker sentinel survived every full-path callback before its own exact cleanup. User dagger-engine-v0.21.9 remains running with ID18576903a871d895c8b414ee0a41897313ce31d7b5b6284c29b489553e4fae99. No shared Docker image was removed.
+No full scripts/preflight.sh, full native suite, hosted workflow, push/sync/GitHub mutation, installed binary/plugin/skill replacement, or Paivot product dependency. Candidate CLI still has no operational implementation: positive full-path tests intentionally fail until GREEN. Independent PM review remains required.
+
+LEARNINGS:
+- V1 standalone formal controls did not force candidate formal provisioning. V2 pairs positive and negative cases across the same CLI and executes the exact fixture as an independent health control.
+- Nonempty report fields are not execution evidence. Every adapter now requires exact retained native identities and runtime byte/pin bindings.
+- A real Go test can pass while leaving a host descendant alive. Container-only checks and fresh-directory-only checks missed separate process and caller-ownership obligations.
+- Mandatory source wiring must inspect job and step error/condition policies and executable shell structure. Diagnostic wording is not a bypass oracle; real Bash controls demonstrate sensitivity.
+- Pre-freeze authoring corrections (raw fixture placement and macOS lack of /bin/false) were corrected and replayed; the final v2 commit has no compilation or infrastructure failures.
 
 
 ## nd_contract
