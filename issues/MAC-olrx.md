@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:58:17Z
-content_hash: "sha256:f7c19f1bcbd30ec165dbac53c2f2ebeeed39fc13ab62a59175b1e16c22f1a710"
+updated_at: 2026-09-05T19:58:40Z
+content_hash: "sha256:daa1b39851d8c8daa130057dac583b08e319243b704ad1587f343057dfeae46b"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-olrx
 ---
@@ -82,6 +82,28 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+## Implementation Evidence
+
+RED phase only: frozen tests at 27373f421640f644a98be89f38ce112c30f55a85. Detailed PROOF, CI/Test Results, Commands run, Summary, AC Verification and LEARNINGS are in the immediately preceding evidence block. No GREEN implementation is claimed.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Frozen RED test commit: 27373f421640f644a98be89f38ce112c30f55a85.
+- go test -count=1 -timeout=5m -cover ./internal/gates -run 'Clause|Parent|Selection|Obligation' -v: 48 passing / 21 intended failing leaf cases, 0 skipped; 27.7% targeted statement coverage.
+- Separate positive-control replay: 2 passing / 0 failing leaf cases.
+- pvg verify: 1 file scanned, 0 issues.
+- Initial pvg story deliver completed; repeated deliver refused an existing delivered label. No manual label changes made.
+
+### proof
+- [x] AC #1: RED parent-selection and real CLI coverage tests authored; zero-obligation control passes.
+- [x] AC #2: RED independent machine+guard clause coverage and drift tests authored.
+- [x] AC #3: RED declaration validation, every suffix and stable-ID preservation tests authored.
+- [x] AC #4: RED full-path positive/negative inventory authored.
+- [x] AC #5: RED actual selection, Gt/Gd and owner-specific diagnostic tests authored.
+- [ ] GREEN implementation and independent acceptance remain outstanding.
+
 ## Implementation Evidence (RED DELIVERED)
 
 PROOF:
