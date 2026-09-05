@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T22:03:52Z
-content_hash: "sha256:cb4e4505a28a0dc4b8b1d793181ec9178d64dfb6fc5bddf731e381fee4fe002f"
+updated_at: 2026-09-05T22:30:04Z
+content_hash: "sha256:96486bdea047f09fe53c9a146979439aa1a88fdca46ae71867a382068fa63a9e"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -115,6 +115,147 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## Implementation Evidence
+RED ONLY — MAC-2u36. Tests frozen for independent PM review; production intentionally unchanged. This is author delivery of the seven-AC RED contract, not GREEN completion or independent RED approval.
+
+PROOF:
+
+### CI/Test Results
+Commands run:
+1. cd /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36 && go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json > /tmp/machinery-MAC-2u36-red.qRk5DC/98d3b57-final-matrix.jsonl 2>&1
+2. go test -count=1 -timeout=7m ./internal/install -run '^TestBootstrapReceiptCLI$/(standalone_receipt|parent_finalization)' -json > /tmp/machinery-MAC-2u36-red.qRk5DC/ac7-parent-focused.jsonl 2>&1 (same explicit worktree prefix, same frozen SHA).
+3. go test -count=1 -timeout=7m ./internal/install -run '^TestBootstrapReceipt(RootAlias|CLI/(standalone_receipt|parent_finalization))' -json > /tmp/machinery-MAC-2u36-red.qRk5DC/ac7-oracles-focused.jsonl 2>&1 (same worktree/SHA). This earlier selector actually selected only the eight alias leaves; it is oracle-only proof, not CLI coverage. Corrected command2 supplies the intended CLI focus.
+4. pvg verify internal/install/bootstrap_receipt_test.go --format text --include-tests
+5. pvg story verify-tdd --base f24b2df
+6. shasum -a 256 internal/install/bootstrap_receipt_test.go /tmp/machinery-MAC-2u36-red.qRk5DC/98d3b57-final-matrix.jsonl /Users/ramirosalas/.local/bin/machinery; git status --short (read-only).
+
+Summary:
+Final complete latest-SHA replay exit1 (intended RED), 66 named leaf outcomes: 49 PASS, 17 FAIL, 0 SKIP, 748.254 seconds. Every run event has a terminal outcome. New file contributes43leaves26PASS17FAIL; existing selected23leavesallPASS. No compiler/import/setup/runtime-infrastructure/timeout failure, missing terminal event, skip/env gate or remaining known oracle error. The raw file was captured directly from native Go stdout/stderr before tool-display truncation and parses completely. A later overlarge diagnostic-summary display was truncated; that does not affect the complete original raw artifact or counts derived from it.
+Focused command2:9leaves3PASS6FAIL0SKIP232.004s. Command3:8aliasleaves8PASS0FAIL0SKIP0.409s. These are separate from final matrix.
+VERIFY: PASSED (1 files scanned,0issues). Hard-TDD check:9commits checked,0merges skipped,PASS no unauthorized test edits. Worktree clean.
+Coverage: 100% of seven ACs represented (7/7 authored outcome contracts); statement/branch coverage percentage was not instrumented and is not claimed. Native darwin/arm64 actual CLI lane; no Docker/Java/Node runtime dependency in tests. No full install/cmd package regression suite, race suite or scripts/preflight.sh was run here; those belong to GREEN/final epic gates. Actual targeted runtime748.254s should inform later full/race budget measurement; no additional timeout increase was made. Existing individual30/90-second operation bounds retained.
+
+### Frozen commit and artifacts
+Branch story/MAC-2u36.
+RED SHA:98d3b573ac493c4d7252bffb03c83f92dc99f82b, based on local epic f24b2df3cb1e1521f97b406a7516f72bb7bc7890.
+Only production-repository change: internal/install/bootstrap_receipt_test.go,1111 added lines. File SHA256 ee786dee86c951a5a3a4a53d9344aeb16979df19319ea77dcd14fbd7afefca23.
+Raw final JSON /tmp/machinery-MAC-2u36-red.qRk5DC/98d3b57-final-matrix.jsonl SHA256 f2b15c4ef66ccd9b6f82c6d65795df4220364b767a4f71f92f265a7ab3a0947e.
+Named leaf inventory /tmp/machinery-MAC-2u36-red.qRk5DC/98d3b57-leaf-inventory.md (also reproduced below).
+Focused CLI raw SHA256509a3d2e5a384a9f437dad52d3c8cbdb92ac105e5e85148371ccf21627dfb37b; alias raw SHA2563a384604d50ba2ced4ea9877ae09d6a9fec699987c7ee35cbd1456063c7f750e.
+Budget investigation: current1111 test lines are61 above approximate1050 test allocation; plus the estimated350 future production would total1461 versus under1400 estimate. Latest authorized amendment +220/-12 over903 lines includes8alias sensitivity leaves,3supported recording controls,2conflict→next-native flows, full expected-source bytes/inventory/canonical-link checks, unselected-state comparisons, and moved expected receipt oracle. This modest ~4.4% combined estimate overrun retains required proof; PM must assess actual GREEN sizing. No additional file, production/API/hook or regrouping scope added.
+
+### Real integration boundary and containment
+bootstrapReleaseFixture builds actual cmd/machinery v9.9.1/v9.9.2 binaries from the worktree and produces real source bytes with cmd/release-archive. Only existing link-time version/release endpoint strings point at a private loopback server; binary and source downloads have real checksums. No command output, command runner or replacement CLI is mocked.
+Actual standalone install and update execute the built temporary binaries with process-local HOME/USERPROFILE/config/XDG/temp roots and explicit temporary binary destination. Reference installations independently establish full current content/inventory, not whatever receipt the tested updater happens to emit. Parent-finalization cases call real Update with the DEFAULT runner and unmodified actual placement children. Output observation never supplies fake child results.
+The existing closeInstallFile seam is scoped only to parent receipt-* directly in the current prepared journal scratch directory, after all real child completions, exact complete content and full journal coverage. The desired normalized real-digest receipt is constructed independently after those observations, not inside the close callback. Fault would close a real file twice and preserve os.ErrClosed. On unchanged production this hook never fires: AC6 tests are missing-parent-publication RED, NOT exercised late-close rollback proof. No artifact post-image, authority directory or journal record is changed to manufacture that fault.
+The existing MACHINERY_INTERNAL_TEST_LOCK_ROOT override is honored only in Go test (test.v flag registered). In-process parent tests set it to the real CLI's temporary HOME cache; actual CLI ignores the override and chooses the same temporary cache itself. It is not a product bypass and selects no live cache. Parent authority/finalization tests verify owned journal cleanup and actual bounded operation-lock reacquisition.
+Installed /Users/ramirosalas/.local/bin/machinery remains SHA2565205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849. No installed skills/plugins/agents, user Dagger resources, root branch, remote repository or live config were modified. No preflight/push/sync/setup/recover/dev-link/live update was run.
+
+### Exact failure classification (17 leaves)
+-1 unit: complete_recorded_mixed_plan — bootstrap chooses defaults instead of the full ordinary recorded plan.
+-2 real bootstrap intact/edited convergence — topology changes and recorded homes/native content remain stale; ordinary counterpartsPASS47.17s/43.59s with exact release bytes/version/content/digests/plugins and same-release idempotence.
+-4 missing-regular repair leaves (single Codex and simultaneous Codex/OpenCode, ordinary/bootstrap) — valid repair request aborts when early child receipt inventory sees a still-missing later target. Actual binary/source download and first placements occur; missing-file failure is the intended success-contract RED.
+-1 intact bootstrap later-source-failure leaf — omits native targets and reports success instead of reaching missing OpenCode source. Ordinary counterpartPASS38.79s: actual binary/home/Codex mutations, then real acquireInstallSourceSnapshot failure at adapters/opencode/plugins/machinery.js, full exact pre-state restored.
+-2 missing-prestate later-source leaves — early complete receipt inventory prevents reaching repaired Codex then later OpenCode failure. Exact original absence/state restoration checks retained; these do NOT prove the later boundary occurred.
+-1 unsafe native symlink bootstrap — succeeds despite unsafe artifact substitution.
+-4 parent-finalization leaves — receipt-present/absent, no-fault/fault: each child changes the persisted receipt; parent final publication count0. All selected children, full independent release placements, desired receipt readiness and prepared coverage observed; no stale desired-digest/alias errors remain. Journal cleanup/lock reuse pass. No-fault final receipt comparison succeeds on actual bytes; overall leaf correctly remains sequencing RED. No real close fault/late publication rollback was exercised.
+-2 standalone conflict leaves — exact all-four-home and compact repeated-other-group requests wrongly return success and alter valid state; subsequent real Codex+OpenCode install, with NO manual receipt repair, rejects the invalid overlap receipt. Fresh, disjoint and same-ordered-group copy-change controlsPASS, with full source contents/topology/digests and unselected ownership preserved.
+
+### AC Verification
+| AC | Authored proof and actual result |
+|---|---|
+|1|TestBootstrapReceiptPlan plus intact ordinary/bootstrap CLI convergence; mixed homes/native Copy:false/true and plugin obligations. Recorded bootstrap parityRED; no-receipt/default/plugin-aware/schema1/selector controlsPASS.|
+|2|Real corrupt/unsafe/schema/plugin-discovery/non-directory-parent controlsPASS; native-symlink bootstrapRED. Existing bounded receipt FIFO/symlink/oversize/swap/unknown/duplicate/trailing/type/semantic/digest validation testsPASS. Edited/missing safe files are repair-success requests, not unsafe ownership.|
+|3|Intact and edited ordinary full convergence/idempotencePASS; bootstrap and single/multi-missing repairRED. Complete independently expected release bytes/inventory/digests/topology/plugin/sentinel/binary checks retained.|
+|4|Real ordinary intact later-target post-mutation rollbackPASS38.79s; bootstrap and missing-prestate boundary gapsRED. Real killed held-download startup recoveryPASS20.22s, explicitly PRE-mutation interruption proof only.|
+|5|Actual built binaries/checksummed loopback downloads/source/real CLI processes/temp roots execute without skips/mocks. Helper-only plan assertions are distinguished from real CLI evidence; no external runtime lane needed.|
+|6|All4parent finalization leavesRED on actual premature child publication and missing parent close. Correct oracle/coverage/content checks execute; actual final-close error and rollback remain futureGREEN proof. All4absent/forged/unprepared/out-of-scope authority/cleanup controlsPASS; real standalone valid recording remainsPASS.|
+|7|Exact overlap+bounded repeated conflict/next-native flowsRED on false success and unusable emitted receipt. Three named fresh/disjoint/same-group-copy positivesPASS. No automatic merge/split policy or manual repair between conflict/next operation.|
+
+### Preserved history and review timing
+Original v1 99956740ae5559262790a9473b5597c1775928f2/file8ed8636856305d50b9517c4087ecfff3582dac4fb467f92d8f49f3c836916329 and36leaf32PASS4FAIL0SKIP271.751s log remain history; stale_artifact rejection was disputed and superseded, not valid RED. Actual ordinary edited repairPASS and missing repairFAIL drove reviewed R2.
+Historical5a94840 broad49leaf34PASS15FAIL0SKIP536.345s includes4invalid authority fixture errors and truncated tool diagnostics; it is not final proof. Corrected93f8e6c focus4PASS4FAIL135.883s includes the source-diagnostic oracle mismatch.
+cdb8036 diagnostic amendment committed21:38:23Z before dispatcher hold arrived; independent21:42:11Z review explicitly authorized retention AFTER the edit. Preserve chronology.
+e1fd0a3 actual standalone writer corruption is valid AC7 product evidence but invalid parent-boundary setup evidence. d9d53b9 reference-only absent-receipt workaround remains distinct from conflict tests, where no workaround occurs. Its faulty root alias/close-dependent desired digest were test-oracle defects, separately reviewed and repaired under22:03:52Z authorization in98d3b57. All original logs/commits retained; no failures relabeled as production merely to obtain RED.
+
+LEARNINGS:
+- Installed content drift/regular-file absence is not automatically unsafe ownership; actual ordinary repair controls prevented freezing an incorrect rejection contract.
+- Real delegated children expose early whole-receipt inventory and standalone publication corruption that mocked runners miss.
+- Parent-process final publication needed an explicit product sequencing contract before a process-local close seam could fairly test it.
+- Test/CLI lock roots and macOS alias normalization require real contention and sensitivity controls; incorrect fixture/oracle failures are not RED.
+- Capture full native JSON directly before display truncation, preserve every leaf and historical mismatch, and freeze the exact replayed SHA.
+
+### Complete named leaf inventory
+| Leaf | Outcome | Seconds |
+|---|---|---|
+|TestBootstrapReceiptRootAlias/root|PASS|0|
+|TestBootstrapReceiptRootAlias/descendant|PASS|0|
+|TestBootstrapReceiptRootAlias/canonical_root|PASS|0|
+|TestBootstrapReceiptRootAlias/canonical_descendant|PASS|0|
+|TestBootstrapReceiptRootAlias/similar_sibling|PASS|0|
+|TestBootstrapReceiptRootAlias/interior_alias|PASS|0|
+|TestBootstrapReceiptRootAlias/repeated_suffix|PASS|0|
+|TestBootstrapReceiptRootAlias/sibling_journal|PASS|0|
+|TestBootstrapReceiptPlan/first_bootstrap_defaults_control|PASS|0|
+|TestBootstrapReceiptPlan/supported_schema_one_control|PASS|0|
+|TestBootstrapReceiptPlan/complete_recorded_mixed_plan|FAIL|10.51|
+|TestBootstrapReceiptCLI/standalone_receipt/supported_recording/fresh_mixed_groups|PASS|0.02|
+|TestBootstrapReceiptCLI/standalone_receipt/supported_recording/disjoint_additional_group|PASS|2.9|
+|TestBootstrapReceiptCLI/standalone_receipt/supported_recording/same_ordered_group_copy_change|PASS|4.1|
+|TestBootstrapReceiptCLI/standalone_receipt/reject_cross_group_repeated_false_then_native|FAIL|28.08|
+|TestBootstrapReceiptCLI/standalone_receipt/reject_cross_group_repeated_true_then_native|FAIL|23.8|
+|TestBootstrapReceiptCLI/parent_finalization/absent_false_close_fault_false|FAIL|31.35|
+|TestBootstrapReceiptCLI/parent_finalization/absent_false_close_fault_true|FAIL|31.49|
+|TestBootstrapReceiptCLI/parent_finalization/absent_true_close_fault_false|FAIL|28.23|
+|TestBootstrapReceiptCLI/parent_finalization/absent_true_close_fault_true|FAIL|33.17|
+|TestBootstrapReceiptCLI/receipt_authority_absent|PASS|13.6|
+|TestBootstrapReceiptCLI/receipt_authority_forged|PASS|3.3|
+|TestBootstrapReceiptCLI/receipt_authority_unprepared|PASS|3.11|
+|TestBootstrapReceiptCLI/receipt_authority_out_of_scope|PASS|3.1|
+|TestBootstrapReceiptCLI/converges_bootstrap_false|PASS|47.17|
+|TestBootstrapReceiptCLI/converges_bootstrap_true|FAIL|29.88|
+|TestBootstrapReceiptCLI/repair_edited_owned_artifact_bootstrap_false|PASS|43.59|
+|TestBootstrapReceiptCLI/repair_edited_owned_artifact_bootstrap_true|FAIL|26.19|
+|TestBootstrapReceiptCLI/repair_missing_owned_artifact_bootstrap_false|FAIL|26.04|
+|TestBootstrapReceiptCLI/repair_missing_owned_artifact_bootstrap_true|FAIL|19.13|
+|TestBootstrapReceiptCLI/repair_both_native_groups_missing_bootstrap_false|FAIL|28.19|
+|TestBootstrapReceiptCLI/repair_both_native_groups_missing_bootstrap_true|FAIL|21.4|
+|TestBootstrapReceiptCLI/later_target_failure_rolls_back_bootstrap_false|PASS|38.79|
+|TestBootstrapReceiptCLI/later_target_failure_rolls_back_bootstrap_true|FAIL|19.14|
+|TestBootstrapReceiptCLI/missing_prestate_later_target_failure_rolls_back_bootstrap_false|FAIL|30.3|
+|TestBootstrapReceiptCLI/missing_prestate_later_target_failure_rolls_back_bootstrap_true|FAIL|21.96|
+|TestBootstrapReceiptCLI/corrupt_receipt|PASS|13.55|
+|TestBootstrapReceiptCLI/unsafe_receipt|PASS|12.71|
+|TestBootstrapReceiptCLI/stale_schema|PASS|13.26|
+|TestBootstrapReceiptCLI/plugin_discovery_failure|PASS|13.55|
+|TestBootstrapReceiptCLI/symlink_native_artifact|FAIL|20.18|
+|TestBootstrapReceiptCLI/non-directory_native_parent|PASS|11.34|
+|TestBootstrapReceiptCLI/interrupted_download_recovers_real_transaction|PASS|20.22|
+|TestReceiptArtifactDigestIgnoresInstallTimeButDetectsModeAndContent|PASS|3.91|
+|TestUninstallDeletionFailureRollsBackArtifactsAndReceipt|PASS|3.76|
+|TestAbandonedLegacyReceiptLockDirectoryDoesNotBlock|PASS|0.36|
+|TestLoadReceiptRejectsFIFOWithoutOpening|PASS|0|
+|TestLoadReceiptRejectsNonPrivateLeafConfigDirectory|PASS|0|
+|TestReceiptReadModifyWriteIsSerialized|PASS|6.64|
+|TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/symlink|PASS|0|
+|TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/oversize|PASS|0|
+|TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/config_directory_swap|PASS|0|
+|TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/entry_swap|PASS|0|
+|TestForgetReceiptUsesNativeCaseAliasIdentity|PASS|0.51|
+|TestCorruptReceiptFailsLoudly|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/unknown_root|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/unknown_home_field|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/unknown_target_field|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/duplicate_root|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/duplicate_nested|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/wrong_homes_type|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/wrong_copy_type|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/trailing_value|PASS|0|
+|TestSemanticallyInvalidReceiptFailsBeforeUpdate|PASS|0|
+|TestUpdateRollsBackAllHomesBinaryAndReceiptOnLaterFailure|PASS|1.92|
+|TestBootstrapDefaultPlanIsPluginAware|PASS|0.06|
+
+
 ## AUTHORITATIVE STANDALONE RECEIPT OVERLAP TRIAGE — MAC-2u36 — 2026-09-05
 
 Disposition: absorb the reproduced standalone writer defect into existing P0 MAC-2u36 under MAC-ui8a. Canonical Description now contains seven ACs. Source ownership remains update.go/receipt.go/install.go and the already named tests; no sibling or new dependency is created. The existing MAC-gcrr/MAC-ou97 blocks remain intact. Scope collision inspection found no sibling implementation owning these three source files; capstone MAC-ou97 consumes update.go downstream.
