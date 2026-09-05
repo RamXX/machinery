@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:14:16Z
-content_hash: "sha256:5b97858a36ccf75aa8f2ef8a8f901ea81682be87def31f9f084451a6eda056bd"
+updated_at: 2026-09-05T20:25:54Z
+content_hash: "sha256:b9f70de11b94bea6c3e18d7c809085770e0bea65cafe573ec940aeaeb3392626"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 ---
@@ -89,6 +89,82 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 
 ## Notes
+## Implementation Evidence
+
+PROOF:
+RED PHASE ONLY. Frozen test/config/fixture commit: 612f65f3b4502a3267828507faaf0e395c8dd558 on story/MAC-hpqp. Eight files, 1066 added lines. No operational lane implementation exists; the dispatcher-approved compile-safe run bootstrap returns a specific fail-closed status. The frozen tests do not treat its blanket nonzero return as successful negative validation.
+
+### CI/Test Results
+
+Commands run:
+- Workdir for every command: /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-hpqp
+- go test -count=1 -timeout=2m -coverprofile=/tmp/machinery-hpqp-red.f8Yslv/native.cover -json ./scripts/integration-lane
+- go test -tags machinery_integration -count=1 -timeout=15m -json ./cmd/machinery -run '^TestIntegrationLane(Pilot(OCI|Formal)|FullPath)$'
+- node --test --test-reporter=tap testdata/integration-lanes/pilot.integration.test.mjs
+- go test -count=1 -timeout=90s -json ./scripts/run-safe ./internal/processcontrol
+- go run ./scripts/integration-lane --lane required
+- go test -tags machinery_integration -run '^$' -timeout=120s ./cmd/machinery (compilation-only check, zero executions, NOT RED evidence)
+- pvg verify scripts/integration-lane/main.go scripts/integration-lane/main_test.go cmd/machinery/integration_lane_test.go testdata/integration-lanes/pilot.integration.test.mjs --include-tests --format text
+- actionlint .github/workflows/ci.yml .github/workflows/formal.yml .github/workflows/nightly.yml
+- go tool cover -func=/tmp/machinery-hpqp-red.f8Yslv/native.cover
+- git diff --check
+- docker ps -a --filter label=dev.machinery.integration-run --format '{{.ID}} {{.Names}} {{.Status}}'
+- docker inspect --format '{{.Id}} {{.State.Running}}' dagger-engine-v0.21.9
+
+Summary:
+- Native RED: 10 top-level tests; 39 started/terminated test events including aggregate parents, 3 passed / 36 intended failed / 0 skipped. Leaf-only: 35 cases, 3 passed / 32 intended failed. The parent wiring test additionally asserts preflight order and the Make target.
+- Runtime RED: all 3 registered Go pilot roots selected; 24 started/terminated test events including aggregate parents, 4 passed / 20 intended failed / 0 skipped. Leaf-only: 22 cases, 3 passed / 19 intended failed.
+- Node pilot: 1 selected / 1 executed / 1 passed / 0 failed / 0 skipped / 0 cancelled / 0 todo.
+- Existing bounded-runner controls: 18 roots, 22 started/terminated events, 22 passed / 0 failed / 0 skipped. Leaf-only: 20 passed / 0 failed.
+- Every started ID has exactly a terminal event; missing-terminal inventories are empty. Counts match all 10 native root tests, 3 Go pilot roots (OCI 2 children, formal 1 root, full-path 19 scenarios), and the single registered Node case. No expected root/scenario was omitted.
+- New leaf outcomes combined: 58 cases = 7 passing controls + 51 intended RED failures; no skips. Existing controls add 20 passing leaf cases.
+- All RED failures concern the absent operational lane, missing category-specific rejection/report/execution, or current missing/unsafe workflow ordering. No frozen test failed compilation or because a required real runtime was unavailable.
+- go run entrypoint exits 1 with 'required integration lane is not implemented', confirming the explicit bootstrap rather than a missing-package/build failure.
+- pvg verify: PASSED (3 source files scanned, 0 issues). actionlint PASS. git diff --check PASS. Worktree clean.
+- Coverage: 66.7% statements for the minimal bootstrap (run 100%, main 0%). This is NOT meaningful implementation coverage; no production lane behavior is implemented. Outcome/AC coverage is the explicit RED mapping below.
+- Raw native/runtime JSON, Node TAP, controls JSON and coverage retained in /tmp/machinery-hpqp-red.f8Yslv/. Pipelines used set -o pipefail; expected RED command exit status remained 1.
+
+### Real runtime and cleanup evidence
+
+- Pinned image pulled and verified against RepoDigests and linux/amd64: python@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc.
+- Actual OCI arithmetic returned 42; separate sleeping container was terminated. Every owned container had explicit network/read-only/memory/CPU/PID bounds, exact native cidfile, and unique ownership label. Containers were individually removed and absence checked.
+- Actual pinned Java/TLC ran from a fresh private cache. Safe two-state finite model passed; same model with an invariant-breaking transition yielded the named Broken counterexample. No ambient Java launcher substituted for pinned provisioning.
+- Actual Node pilot spawned a real child Node process, asserted different PID and computed result 42.
+- Full-path harness itself provisioned the image and created a real unrelated sentinel container. All 19 scenario cleanups verified that sentinel remained running. It was removed afterward by its exact owned ID/label. No labeled test containers remained at final inspection.
+- Existing user container dagger-engine-v0.21.9 remained running, ID 18576903a871d895c8b414ee0a41897313ce31d7b5b6284c29b489553e4fae99.
+- Important RED limit: bootstrap rejection means the full-path candidate has NOT yet executed its nested tests or proved its own lifecycle handling. Those are intentional failing requirements for GREEN, not current success claims.
+- Ordinary native selection was checked with unavailable Docker/Java environment and actual go list on ./cmd/machinery: integration_lane_test.go is explicitly excluded; no required runtime case is skipped.
+- No full native suite, hosted Linux workflow or full scripts/preflight.sh execution performed. Final cross-platform/full-lane replay remains the epic completion gate.
+
+### AC Verification
+
+| AC | Frozen RED location and outcome asserted | RED state |
+|---|---|---|
+| 1 | TestLaneClosedInventoryRejectsUnprovedSelections (15 mutations), TestLaneDiscoversUnionAndRejectsIdentityRegisteredTwice, schema.json: closed inventory, source ownership, paths, orphan/duplicate/empty/future selection | Defined; intended RED |
+| 2 | TestLaneNativeSelectionDoesNotProbeServices, TestLaneRuntimeAbsenceFailsBeforeTests, native skip/zero cases, full-path missing Docker/Node cases: explicit native exclusion and mandatory runtime failures | Passing separation control; required behavior RED |
+| 3 | TestIntegrationLanePilotOCI and PilotFormal; full-path cold-cache, wrong mutable pin/digest/platform/Java/TLC pin and offline-formal cases; runtime-pins.json | Real provisioned controls PASS; lane validation RED |
+| 4 | TestLaneSuccessRequiresActualNonzeroExecution verifies retained native events/hash and repeated real execution; native failure/forgery/duplicate cases; actual repeated m.Run control; Node zero/skip/partial/aggregate cases | Controls PASS; accounting RED |
+| 5 | TestLaneWiringIsMandatoryAndNativeJobsAreServiceFree parses all three workflows and checks Make entrypoint; actual Darwin/arm64 runtime pilot uses pinned linux/amd64 | Wiring RED; local runtime control PASS |
+| 6 | Wiring test asserts ordinary race before self-provisioning required lane before formal, mandatory invocation, no SKIP_PREFLIGHT bypass; full-history checkout checks | Existing missing lane/order/bypass RED |
+| 7 | Nonempty pilot.json registers all 3 actual Go roots and 1 actual Node case; union discovery test; real OCI, TLC and Node controls | Runtime controls PASS; shared union runner RED |
+| 8 | Real OCI success/termination, full-path leak/assertion/timeout/cancellation/provision failure challenges, exact-ID/label emergency cleanup, unrelated sentinel preservation, owned-work assertions | Standalone controls PASS; candidate lifecycle RED |
+| 9 | tdd-red commit 612f65f3b4502a3267828507faaf0e395c8dd558; meaningful assertion failures and separately passing real controls; actionlint/pvg verify | RED delivered for independent approval only |
+| 10 | TestIntegrationLaneFullPath has all 19 real-process/daemon scenarios, no replacement executables; raw events required in successful reports; no service skips | Complete RED scenario set; operational success awaits GREEN |
+
+LEARNINGS:
+- A new CLI requires an explicitly reviewed fail-closed bootstrap; missing packages and compiler errors do not constitute useful RED. Category-specific negative assertions prevent a blanket failure stub from satisfying validation tests.
+- Native Go can genuinely execute the same test twice when TestMain invokes m.Run twice. The real duplicate-execution control confirms why started/terminal cardinality must be checked, not just pass totals.
+- Go wraps test stderr into JSON stdout; resource ceilings must account for the actual adapter stream topology. Reports must retain/hash real native events rather than replace them.
+- Docker daemon resources require native cidfile plus exact label ownership and cleanup registered before launch. Docker29 lowercase no-such-object text required a pre-freeze portability adjustment.
+- Before freeze, the TLA fixture needed EXTENDS Integers and one Go declaration needed correction. Neither compiler/parser failure was counted as RED; final pinned-runtime controls pass.
+
+### Limits and deferred review
+
+Workflow checks establish wiring, not actual hosted execution. Preserve existing formal/C4/checker gates during GREEN review; full preflight is intentionally deferred. Fresh Java/TLC cache provisioning is proven; the existing shared Docker image was not removed merely to simulate a cold daemon, because that could affect the NIL agent. The CLI must verify/provision the pinned image on every path and its full-path tests cannot use fabricated runtime binaries.
+
+No push/sync/GitHub mutation, installed binary/plugin/skill replacement, Paivot product dependency, full preflight, or changes to the root checkout occurred. Story must be RED-approved, not accepted/closed.
+
+
 ## RED contract decisions
 Dispatcher approved the minimal fail-closed run(args, stdout, stderr) int bootstrap before authoring it. It has no validation, provisioning, execution, or cleanup behavior. Generic bootstrap rejection is not proof of correct negative validation; negative RED assertions require diagnostic categories. Dispatcher also approved the additive real Node pilot fixture. CONTRACT.md documents source selection, native events, report semantics, bounded resources, and exact container ownership. No Machinery product dependency on Paivot is introduced.
 
