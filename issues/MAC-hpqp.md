@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T20:54:28Z
-content_hash: "sha256:dfc4fdbb56c33e6cec38f76deb93250ae042a782df71462401884051317c3fbc"
+content_hash: "sha256:1ca820662f5e49eca88ce4b3c5774960c26ce8fb93989162034adda646c278d2"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -308,6 +308,7 @@ status: new
 - 2026-09-05T20:33:44Z status: open -> in_progress
 - 2026-09-05T20:33:44Z auto-follows: linked to predecessor MAC-olrx
 - 2026-09-05T20:33:44Z claimed by dev-MAC-hpqp
+- 2026-09-05T20:54:28Z status: in_progress -> in_progress
 
 ## Links
 - Parent: [[MAC-ui8a]]
