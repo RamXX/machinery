@@ -335,11 +335,16 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 			parentOracles := false
 			if impl != "" {
 				parts = append(parts, "g4")
+				// Source annotations retain the obligation even if the last
+				// generated oracle is removed. Gp/Gn report that missing output.
+				parentOracles = HasPolicyAnnotation(design) || HasIsolationAnnotation(design)
 				for _, name := range formalOracleNames {
-					if _, err := os.Stat(filepath.Join(design, "formal", name)); err == nil {
-						parentOracles = true
-					} else if !os.IsNotExist(err) {
+					has, err := probeRegularFile(design, filepath.Join("formal", name))
+					if err != nil {
 						return sel, fmt.Errorf("cannot inspect parent oracle %s: %w", name, err)
+					}
+					if has {
+						parentOracles = true
 					}
 				}
 				if parentOracles {
@@ -350,7 +355,7 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 			list = strings.Join(parts, ",")
 			sel.Note = "note: decomposed parent with no machines/; running " + list + " (G3/Gx run on the child designs; gt skipped: no machines)"
 			if parentOracles {
-				sel.Note = "note: decomposed parent with no machines/; running " + list + " (G3/Gx run on the child designs; gt checks parent-owned relational oracles)"
+				sel.Note = "note: decomposed parent with no machines/; running " + list + " (G3/Gx run on the child designs; gt checks parent-owned relational obligations)"
 			}
 		}
 	}

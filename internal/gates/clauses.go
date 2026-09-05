@@ -145,7 +145,10 @@ func checkClauseDrift(g *Gate, design string) {
 	g.Count("guards with clause declarations", len(decls))
 	owners := map[string]map[string]bool{}
 	for _, d := range decls {
-		owners[d.guard] = map[string]bool{d.owner: true}
+		if owners[d.guard] == nil {
+			owners[d.guard] = map[string]bool{}
+		}
+		owners[d.guard][d.owner] = true
 	}
 	oraclePaths, _ := strictSortedGlob(g, filepath.Join(design, "machines"), "*.oracle.md", "clause oracle")
 	for _, path := range oraclePaths {
@@ -194,6 +197,7 @@ func checkClauseDrift(g *Gate, design string) {
 			return readErr
 		}
 		for lineNo, line := range strings.Split(string(body), "\n") {
+			ambiguous := map[string]bool{}
 			for _, d := range decls {
 				if !tokenIn(d.guard, line) || clauseDecl.MatchString(line) {
 					continue
@@ -206,8 +210,21 @@ func checkClauseDrift(g *Gate, design string) {
 						}
 					}
 				}
-				if artifactOwner != "" && artifactOwner != d.owner ||
-					artifactOwner == "" && len(owners[d.guard]) > 1 && !tokenIn(d.owner, line) {
+				if artifactOwner != "" && artifactOwner != d.owner {
+					continue
+				}
+				if artifactOwner == "" && len(owners[d.guard]) > 1 && !tokenIn(d.owner, line) {
+					var names []string
+					named := false
+					for owner := range owners[d.guard] {
+						names = append(names, owner)
+						named = named || tokenIn(owner, line)
+					}
+					if !named && !ambiguous[d.guard] {
+						sort.Strings(names)
+						g.Warns = append(g.Warns, fmt.Sprintf("%s:%d: guard %s has ambiguous machine ownership (%s); name its owner to check narrative clause drift", rel, lineNo+1, d.guard, strings.Join(names, ", ")))
+						ambiguous[d.guard] = true
+					}
 					continue
 				}
 				var present, missing, stale []string
