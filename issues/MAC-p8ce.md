@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:47:31Z
-content_hash: "sha256:b8bf18f81d9d0165f93ea5ca1be8f5e6711966070aeb4f3c6f90d24d9c7f2a11"
+updated_at: 2026-09-05T19:56:26Z
+content_hash: "sha256:52e2c7dbdf52aeeb462fa685afbc3426588a53cad430edeca6cfbff57e1543af"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p8ce
 ---
@@ -80,6 +80,54 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+## RED delivery — MAC-p8ce
+PROOF:
+- Branch: story/MAC-p8ce. RED SHA: 0d52f43b393d961160aeea0db43b13a3fa5c284a. Subject contains tdd-red. Only internal/gates/reads_consumer_test.go added (336 lines); no production edits, no changes to prior tests. Freeze these bytes for GREEN after independent RED approval.
+- Exact main command at that SHA: go test -count=1 -timeout=240s ./internal/gates -run 'Reads|EventContract|Consumer' -v
+- Result: exit 1, 29 top-level groups / 66 leaf cases; 39 PASS, 27 intended assertion FAIL, 0 skipped. Existing matched cases: 25 PASS / 0 FAIL. New story cases: 41 leaves, 14 PASS / 27 FAIL. New CLI cases: 9 leaves, 4 PASS / 5 FAIL. No compile/import/runtime-prerequisite failure in this committed-SHA run.
+- Exact passing-control command: go test -count=1 -timeout=240s ./internal/gates -run '^TestReadsConsumerLegacySingleControl$|^TestReadsConsumerRepeatedLegacyStillHasOneOwner$|^TestReadsConsumerCLI$/legacy_control$' -v
+- Control result: exit 0, 3 leaf cases PASS / 0 FAIL / 0 skipped. Fixture passes both CheckC4 and CheckTraceability with zero errors/drift. CLI builds a native temporary candidate from this worktree via go build -o <t.TempDir>/machinery ./cmd/machinery; then real check <isolated-design> --gate g2,gx. No installed binary is used/replaced. Build and CLI processes have explicit context deadlines.
+- Runtime assertion evidence: missing_payments and missing_audit fail with 'unsafe consumer READS contract accepted'; unchanged production counts both rows declared when only one declaration exists. CLI variants fail with 'unsafe missing_audit contract returned CLI success' and '0 blocking (ERROR/DRIFT) finding(s)'. Renaming to declared archive consumer and conflicting duplicate also incorrectly exit 0. Conversely distinct valid per-consumer payloads produce unrelated sibling-field drift and exit 1. These are behavior failures, not infrastructure RED.
+- Self-check: pvg verify internal/gates/reads_consumer_test.go --include-tests --format text -> VERIFY: PASSED (1 files scanned, 0 issues). git diff --check exit 0; worktree clean after commit.
+- Coverage percentage: not measured (no coverage instrumentation; no percentage claim). Test inventory and behavioral mutation outcomes above are the measured coverage. Heavy preflight/full suite deferred to final epic gate as explicitly requested.
+
+Proposed input contract for independent PM review:
+- A READS-declaring named-unit matrix table may carry an explicit consumer column. Each declaring row names exactly one architectural event-contract participant, matched by exact cleaned participant ID (backticks/parenthesized annotations do not rename the ID). Matrix filename is NOT consumer ownership: existing Payment.matrix.md belongs to paymentSvc, and multiple machines can belong to one component.
+- Missing consumer column is legacy syntax, allowed only when the named event has one distinct consumer across all event-contract rows. Repeated identical rows do not create a second owner. Fan-out with unscoped legacy declarations, even mixed with explicit declarations, must fail with guidance to declare consumer ownership. Present but blank owner is invalid, not legacy fallback.
+- READS is an exact set for its event-consumer edge. Identical declarations in two machines sharing that consumer are compatible; conflicting exact sets are ambiguous and rejected, never first-wins or silently unioned. Duplicate members, multiple READS overrides in one cell, empty/malformed declarations and multiple-owner cells fail closed.
+- Each contract row's payload independently satisfies its owner's set. A strict-superset consumer does not widen its sibling's requirements. Repeated same-edge rows are each checked. Unknown payload fields fail whole-token reconciliation. This does not add a new general payload-to-domain-schema validator.
+- A reasoned no-reads consumer waiver is row-local; it never transfers a matrix declaration or waiver to another consumer. Empty reasons remain errors.
+- G2 continues to own participant/cell resolution; Gx owns READS completeness. Real combined --gate g2,gx cases prove the joint guarantee; unknown participant is separately exercised through --gate g2. No requirement to duplicate READS findings in G2 (dispatcher explicitly confirmed).
+
+AC verification (RED specification, not completed GREEN behavior):
+1. Exact per-consumer fields: TestReadsConsumerExactEdgesPass/distinct_sets, strict_superset_is_local, annotation_does_not_change_participant; CLI distinct_sets. Genuine RED from cross-consumer leakage.
+2. Sibling missing declaration/noninterference: TestReadsConsumerRejectsOwnershipMutations/missing_payments, missing_audit, payload_narrowed_only_for_audit/payments; strict_superset_is_local. Missing declarations fail test assertions on unchanged production; existing missing-field protection passes.
+3. Legacy compatibility/migration: LegacySingleControl and RepeatedLegacyStillHasOneOwner PASS; AmbiguousLegacyNeedsMigration both mixed cases FAIL as intended; ExplicitBlankOwnerCannotUseLegacyFallback FAIL as intended.
+4. Repeats/conflicts/malformed/rename/waivers: ExactEdgesPass repeated identical edge and two machines agreeing PASS; RejectsOwnershipMutations conflicting rows/overrides, two-machine disagreement, near-match/renamed owners, waiver sibling; MalformedDeclarationsFailClosed eight cases. Diagnostics re-run twice and compared for deterministic order after blocked outcomes.
+5. Real CLI: TestReadsConsumerCLI 9 cases covers positive control/distinct sets, each removed declaration, each narrowed payload, renamed known owner, conflicting duplicate and G2 unknown participant. 4 PASS / 5 genuine RED.
+
+LEARNINGS:
+- Matrix stems identify machines, not consumer components; a basename shortcut would encode false ownership. An explicit consumer column avoids that inference and supports multiple machines per consumer.
+- Full-path fixtures need lifecycle semantics, placement, invariant enforcement and a coherent architecture contract; otherwise unrelated gate failures can masquerade as RED. The native CLI legacy control proves this fixture is viable.
+- The existing implementation both under-enforces (missing sibling declarations pass) and over-enforces (legitimate distinct read sets fail).
+- The installed pvg verify parser rejects --format=text despite skill examples; --format text works. This is local coordination tooling only; no Machinery dependency was introduced.
+- An initial uncommitted compile typo and overly case-specific CLI message assertion were corrected before the tdd-red commit; neither is counted as RED evidence.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED 0d52f43b393d961160aeea0db43b13a3fa5c284a, only frozen test file.
+- Targeted run 39 PASS / 27 intended FAIL / 0 skipped over 66 leaf cases; controls separately 3 PASS.
+- pvg verify 1 file, 0 issues; native CLI integration, no mocks/services/installed binary changes.
+
+### proof
+- [x] AC #1: RED exact-edge and distinct payload cases authored and executed.
+- [x] AC #2: RED missing-sibling mutations reproduced through unit and CLI paths.
+- [x] AC #3: passing unique-legacy controls and failing ambiguous migration cases recorded.
+- [x] AC #4: repeat/conflict/malformed/rename/waiver negative matrix executed.
+- [x] AC #5: real G2/Gx CLI controls and mutations executed; GREEN implementation remains pending.
+
 
 ## History
 - 2026-09-05T19:35:08Z dep_added: blocks MAC-gcrr
