@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:08:04Z
-content_hash: "sha256:ff2e3eba4a8986e10586a15869809033308d22b2224942a7ec337df2784872e4"
+updated_at: 2026-09-05T20:19:58Z
+content_hash: "sha256:f3629a05a846b0aff61aebf0296d7c69ee181a22de83b497d212ed170a8f3e6c"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-olrx
 ---
@@ -82,6 +82,81 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+## Implementation Evidence (GREEN DELIVERED)
+
+PROOF:
+
+### CI/Test Results
+Commands run:
+- go test -count=1 -timeout=5m -cover ./internal/gates -run 'Clause|Parent|Selection|Obligation' -v
+- go test -count=1 -timeout=5m -cover ./internal/gates -run 'Select|IDCite|OracleCoverage|Gt|Snapshot|CheckPolicy|CheckIsolation|FailClosed|Rooted|Inventory' -v
+- go test -count=1 -timeout=5m ./cmd/machinery -run '^TestGoldenCheck' -v
+- TMPDIR=/tmp/machinery-olrx-green.WjsBu3/case-mount go test -count=1 -timeout=1m ./internal/gates -run '^TestSelectRejectsNonportableAndAliasedDesignPaths$' -v
+- pvg verify internal/gates/suite.go internal/gates/clauses.go internal/gates/clausecov.go internal/gates/obligation_ownership_green_test.go --format text --include-tests
+- pvg story verify-tdd --base epic/MAC-ui8a --json
+- git diff --check epic/MAC-ui8a...HEAD
+- git diff 27373f421640f644a98be89f38ce112c30f55a85 -- internal/gates/obligation_ownership_test.go
+- git diff --name-status 27373f421640f644a98be89f38ce112c30f55a85..HEAD
+
+Summary: GREEN PASS. At final SHA 8168b3d1d1599fd7860dd5afda5d7e55f49113aa, required targeted run: 46 top-level tests / 72 leaf cases PASS, 0 FAIL, 0 skipped, 9.701s, 37.5% internal/gates statement coverage. Includes all 23 frozen RED leaves, 46 preexisting leaves, and 3 additional GREEN leaves. Expanded affected run: 89 top-level tests / 104 leaves, 103 PASS, 0 FAIL, 1 preexisting host-filesystem skip, 5.073s, 52.5% package statement coverage. That exact skipped case was then independently executed on a task-owned case-sensitive APFS volume at the same SHA: all 4 leaves PASS, 0 FAIL, 0 skipped, 0.296s. Thus every expanded selected leaf was actually executed successfully; the native run's skip remains disclosed. CLI golden run: 4 top-level / 9 leaves PASS, 0 FAIL, 0 skipped, 4.129s, including go-crm, fulfillment, portfolio-engine, pii-flow, checkout-split parent/orders/payments, surreal-crm and external checker. Test groups overlap; counts must not be summed as unique coverage.
+
+Final logs:
+- /tmp/machinery-olrx-green.WjsBu3/targeted-final.log
+- /tmp/machinery-olrx-green.WjsBu3/affected-final.log
+- /tmp/machinery-olrx-green.WjsBu3/golden-final.log
+- /tmp/machinery-olrx-green.WjsBu3/case-sensitive.log
+
+The case-sensitive replay uses a bounded 256 MiB sparse disk image under the task's mktemp directory. hdiutil created it with the documented filesystem name 'Case-sensitive APFS', attached only the task-owned image at case-mount (disk10/disk11), and the EXIT cleanup detached it successfully: '"disk10" ejected.' Subsequent mount inventory confirms no task mount remains. No existing volume or container was altered. Initial APFSX alias attempt failed before creating any image; using hdiutil's documented filesystem name succeeded.
+
+### Commit
+- Branch: story/MAC-olrx.
+- Frozen RED: 27373f421640f644a98be89f38ce112c30f55a85.
+- GREEN implementation commits: 1b47643, 43b7357, 8168b3d.
+- Final GREEN SHA: 8168b3d1d1599fd7860dd5afda5d7e55f49113aa.
+- Final worktree clean. Entire story versus epic: 5 files, 702 additions / 32 deletions (includes frozen RED file). GREEN changes only three owned production files plus NEW obligation_ownership_green_test.go.
+- Frozen RED file diff is empty; no preexisting test, fixture, golden or configuration bytes changed.
+- verify-tdd checked 4 commits from local epic base: violations null, merge commits skipped 0.
+- pvg verify: VERIFY: PASSED (4 files scanned, 0 issues). git diff --check clean.
+
+### Wiring and ownership
+- SelectRunAndNote -> selectInSnapshot in suite.go:335 retains Gt on machine-less parents with --impl when either a Policy/Isolation source annotation or its committed oracle exists. Source activation persists after generated-output deletion; actual Gp/Gn execute and block on the missing required oracle. The parent's note names its relational obligations. Obligation-free behavior and existing selection/golden text remain unchanged, and explicit Gt reports 0 machines / 0 test files scanned honestly.
+- CheckOracleCoverage -> checkClauseCoverage in clausecov.go:62 -> collectClauseDecls in clauses.go:55. Gd's checkClauseDrift uses the same declaration/owner validation. Matrix filename stems bind declarations to that machine source and committed oracle; only matching guard rows in that owner's oracle produce suffixed obligations. No stable-ID generation changes.
+- Duplicate/conflicting/empty/malformed declarations, repeated/active-retired conflicting vocabulary, missing owner source/oracle and guard absent from its owning oracle yield blocking diagnostics containing machine and guard.
+- Machine artifact drift is scoped by filename owner. Shared narrative resolves a uniquely owned guard, or an explicitly named owner when several machines share it. An unresolved clause enumeration produces one honest ambiguity warning naming candidate owners. A guard mention with no active/retired clause tokens stays unarmed under the established all-or-none rule. Narrative never adds, removes or discharges Gt obligations. These ownership rules are documented in production comments and diagnostics.
+
+### AC Verification
+| AC # | Requirement | Code Location | Test Location | Status |
+|------|-------------|---------------|---------------|--------|
+| 1 | Retain parent Policy/Isolation coverage; zero obligations valid | suite.go:335 | frozen ParentSelectionRetainsRelationalCoverage and ParentRealCLI; new ParentDeletedRelationalOracleRemainsRequired | PASS: actual default/explicit CLI rejects each missing decision; covered and zero controls pass; deleting last output retains selected Gt and default Gp/Gn specifically block missing oracle |
+| 2 | Independent machine plus guard ownership | clauses.go:55, clausecov.go:75, checkClauseDrift | frozen IndependentMachines, UndeclaredSiblingIsNotArmed, LocalDriftNamesOwner; new SharedNarrativeOwnership | PASS: Alpha two / Beta three clauses count exactly five; no sibling contamination or accidental arming |
+| 3 | Every local falsifying clause, declaration validation, stable IDs | collectClauseDecls, checkClauseCoverage | frozen EveryLocalClauseRequired, InvalidDeclarationRejectedByBothGates, DuplicateDeclarationRejected, OwnerCannotResolveThroughSibling, SingleMachinePositiveControl | PASS: all suffix deletions reject, malformed/orphan cases reject in both Gt/Gd, generator output remains byte-identical |
+| 4 | Real positive/negative full-path coverage | suite.go, clauses.go, clausecov.go | frozen parent CLI, omitted machine, wrong owner, removed oracle, independent machine controls | PASS: actual filesystem, production oracle generator, snapshots, selected gates and subprocess CLI; no mocks |
+| 5 | Actual selection/results with precise diagnostics | selectInSnapshot, shared declaration validator, owner-local drift/coverage | frozen selectedObligationGates and requireOwnerError; new source-deletion and narrative ownership tests | PASS: owner plus guard appears within the same blocking error; local drift warnings retain owner and clause details |
+
+LEARNINGS:
+- Ownership must travel with the declaration into committed oracle row selection; guard vocabulary alone is not identity.
+- Parent source annotations preserve activation after deleting generated output; Gp/Gn independently establish missing-output failure.
+- Shared prose with zero clause tokens is deliberately unarmed. An initial overly broad ambiguity warning broke fulfillment's unchanged golden; implementation was corrected to warn only for actual unresolved clause enumeration.
+- The new source-activation test initially copied two domain model files. Its newly authored temporary fixture was corrected to use one model before the clean final run; no frozen test was repaired.
+- A native filesystem-specific skip can be independently replayed without changing the test: the task-owned APFS case-sensitive TMPDIR exercised it and was detached. All newly required cases executed without skips on native Go.
+
+Limits: Proportional suites only, as authorized; full repository suite and scripts/preflight.sh remain the final epic gate's responsibility. Coverage percentages are targeted package statement coverage, not full-suite or subprocess CLI coverage. No runtime-backed test was introduced, no live Machinery binary/plugins/skills/agents were installed or replaced, and no GitHub push/sync/mutation, tool upgrade or product Paivot dependency was added. The new parent source-deletion regression proves its selected relational gate behavior; its copied parent architecture is not represented as a complete CRM architecture.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED 27373f421640f644a98be89f38ce112c30f55a85 -> GREEN 8168b3d1d1599fd7860dd5afda5d7e55f49113aa.
+- Required 72/72 leaves pass with no skips, 37.5% targeted coverage; 9/9 CLI golden leaves pass.
+- Expanded 103 pass / 1 native host skip; exact skipped case independently passed on case-sensitive APFS, 4/4 replay leaves pass.
+- verify-tdd 4 commits / zero violations; pvg verify 4 files / zero issues; frozen bytes preserved; clean worktree.
+
+### proof
+- [x] AC #1: parent-owned relational coverage retained, source deletion remains selected and blocked, positive/zero controls pass.
+- [x] AC #2: machine plus guard isolation for coverage and drift.
+- [x] AC #3: each suffix and invalid/duplicate/orphan declarations enforced with unchanged stable IDs.
+- [x] AC #4: actual filesystem/CLI positive and negative integration cases pass.
+- [x] AC #5: actual selected gates and owner-specific blocking diagnostics pass.
 
 
 ## nd_contract
