@@ -8,8 +8,8 @@ labels: [hard-tdd, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:04:49Z
-content_hash: "sha256:ee30c94c94dbd20f7dfbf14470f48f0848b2367a62e66be65b9f49b71bcc884b"
+updated_at: 2026-09-05T23:25:58Z
+content_hash: "sha256:fc3c2af636aa583b0ca6a29af2ac87bbfc1f821e9386cd33fecd0ffc6139800e"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx]
 assignee: dev-MAC-2u36
@@ -130,6 +130,173 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## Implementation Evidence
+AC2 RED REWORK DELIVERY — MAC-2u36 — frozen496963fb7f4842d706d308dafcbd145908a6e395. Production remains unchanged; this is RED proof for independent review, not GREEN completion or RED approval.
+
+PROOF:
+
+### CI/Test Results
+Commands run:
+1. cd /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36 && go test -count=1 -timeout=2m ./internal/install -run '^(TestCorruptReceiptFailsLoudly|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology|TestSemanticallyInvalidReceiptFailsBeforeUpdate|TestReceiptPrivateSchemaControls|TestReceiptSchemaTwoInventoryValidation)$' -json > /tmp/machinery-MAC-2u36-red.qRk5DC/ac2-private-focused.jsonl 2>&1
+2. cd /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36 && go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json > /tmp/machinery-MAC-2u36-red.qRk5DC/496963f-final-matrix.jsonl 2>&1
+3. pvg verify internal/install/receipt_test.go internal/install/bootstrap_receipt_test.go --format text --include-tests
+4. pvg story verify-tdd --base f24b2df
+5. git diff f24b2df --numstat; git status --short; shasum -a256 both test files, frozen install_test.go, both raw logs and installed NIL binary (all read-only in the explicit story worktree).
+6. Raw JSON parsing enumerated every run/terminal event and compared the entire failure-name set with preserved98d3b57 raw output. No raw log was reconstructed from tool display.
+
+Summary:
+Focused:23 named leaves23PASS0FAIL0SKIP,0.461s, exit0. It ran only after correcting an uncommitted extra-closing-brace syntax typo caught by gofmt; that initial formatting failure ran no tests and is not RED evidence. Stable tested bytes were then committed unchanged as496963f.
+ONE complete latest-SHA broad replay after focus stabilized:79 leaves62PASS17FAIL0SKIP,739.525s, exit1 intended RED. Every run event has a terminal outcome. The exact failure set (including parent test outcomes) equals98d3b57; no new product/fixture/compiler/timeout failure. All23 repaired/new receipt-validation leavesPASS in this same broad invocation. Frozen bootstrap suite remains43leaves26PASS17FAIL; remaining selected36leavesallPASS.
+VERIFY PASSED2files0issues. Hard-TDD PASS10commits checked,0merges skipped,no unauthorized test edits. Worktree clean.
+Coverage:100% of7ACs represented by authored outcome contracts; statement/branch coverage was not instrumented and no numeric code-coverage claim is made. The focused cases are real-filesystem loader/unit proof, not additional CLI integration. Frozen bootstrap fixtures continue to exercise actual built CLI/binaries/checksummed source and real children. Actual native darwin/arm64 execution has zero skips; no new skip/env gate or runtime dependency added. No Linux/Windows runtime result, full package/race suite or final scripts/preflight.sh result is claimed. No timeout was increased.
+
+### Commit, frozen bytes and raw artifacts
+Branch story/MAC-2u36; RED rework SHA496963fb7f4842d706d308dafcbd145908a6e395; previous delivered98d3b573ac493c4d7252bffb03c83f92dc99f82b and all earlier commits retained.
+internal/install/receipt_test.go SHA256 a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48.
+FROZEN internal/install/bootstrap_receipt_test.go SHA256 ee786dee86c951a5a3a4a53d9344aeb16979df19319ea77dcd14fbd7afefca23 (unchanged).
+FROZEN internal/install/install_test.go SHA256 d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba (shared write helper unchanged).
+Final full raw JSON: /tmp/machinery-MAC-2u36-red.qRk5DC/496963f-final-matrix.jsonl, SHA256 a42f96c5d36651fbd835d9626057eb3f659ae6b2503668d4dd6375407dce7b03.
+Focused raw JSON: /tmp/machinery-MAC-2u36-red.qRk5DC/ac2-private-focused.jsonl, SHA25649ca8ce18f9b63d16c4be5ee3ad8f00e9ddfb1fb3785b3510a9611fe5daeae9c.
+Complete79-leaf inventory: /tmp/machinery-MAC-2u36-red.qRk5DC/496963f-leaf-inventory.md, reproduced below.
+Both raw files directly capture native stdout/stderr completely; final content parses successfully. No further broad run was performed in this rework.
+
+### Exact authorized repair and budget
+Only three existing receipt_test.go functions were amended in place, retaining names and all intended negatives: TestCorruptReceiptFailsLoudly, TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology, TestSemanticallyInvalidReceiptFailsBeforeUpdate. Added necessary errors/slices imports, three receipt-local helpers, and TestReceiptPrivateSchemaControls/TestReceiptSchemaTwoInventoryValidation. No other existing assertion, shared fixture or production file changed.
+Actual receipt-test delta +186/-25 (211 changed lines; net161), plus frozen1111-line bootstrap file. Overall repository delta from epic:1297insertions25deletions across2test files,1322changed test lines. Adding the estimated350future production lines yields1672, within approximately1700 reviewed combined forecast. The receipt delta is slightly above the150-200 estimate because it includes actual config/file mode/type assertions, matched-valid reads, exact wrapper removal, typed errors, real six-root digest fixture and normalization compatibility; no unrelated scope added.
+No new production parser bypass was found. No source/API/hook, instrumented child, fake runner/output, env-only bypass or regrouping implementation was introduced.
+
+### AC2 diagnostic attribution and valid controls
+Every negative first loads an otherwise valid matched receipt through the SAME loader and read path. The receipt-local helper verifies an actual0700 directory and an existing0600 regular file before each load. Each negative requires exists=true and nonnil error, then removes the exact known parse/invalid installation-receipt path wrapper before checking diagnostic details. Test directory names cannot satisfy the assertion; permission/path errors have the wrong wrapper and fail it.
+- Malformed original {not-json reaches typed json.SyntaxError; actual diagnostic invalid character in literal null. It no longer passes on0644 permission rejection.
+- Unknown root/home/target fields reach exact unknown-field names home_installz/copies/copied. The unknown-home matched fixture has a nonempty safe absolute home and loads successfully without the unknown field.
+- Duplicate root/nested fields reach duplicate JSON field schema_version/target.
+- Wrong homes/copy JSON types reach typed json.UnmarshalTypeError with Value string, correct field suffix and expected []string/bool type.
+- Trailing JSON reaches trailing JSON value.
+- Semantic cursor target reaches invalid-receipt unknown target "cursor". This is loader rejection ahead of planning, NOT observed binary-replacement ordering; the retained test name is now explained accurately.
+- Matched named schema1/schema2 controls use actual seeded topology and verify exact normalized loaded metadata.
+- Schema2 fixture independently enumerates all6artifact roots for2real homes (skill tree and both shipped role docs per home) with actual artifactTreeDigest values and valid copy/plugin topology. Missing/extra entries require exact5/7-versus6 inventory-count detail; duplicate/substituted/relative/non-clean/unexpected-absolute paths at unchanged count require inventory-path mismatch detail; digest prefix/length/correct-length nonhex mutations require malformed-digest detail for the intended artifact. Only the intended category is changed per case.
+- Reversed valid home-group/plugin/artifact input order is accepted and normalized to the original complete expected receipt. It is not invented as invalid.
+The full log records20intended negative diagnostics and3named positive controls; all23PASS. These are safety controls, not manufactured behavioral RED.
+
+### Independent permission proof and preserved real behavior
+Frozen TestBootstrapReceiptCLI/unsafe_receipt at bootstrap_receipt_test.go584-587 changes only os.Chmod(path,0666) after a valid0600 receipt was successfully recorded. Its complete-state/nonzero rejection remains unchanged andPASS13.47s. The bootstrap corrupt-receipt case overwrites an existing0600 file and alsoPASS; it never shared the old fresh0644 fixture bug.
+Actual ordinary complete convergencePASS51.37s and edited-file repairPASS49.65s with exact binary/current source content, full topology/modes/inventory/digests/plugin obligations/unrelated preservation and same-release idempotence.
+Actual ordinary later OpenCode-source failure after binary/home/Codex mutation rolls the entire pre-state back:PASS32.60s. Real interrupted held-download startup recoveryPASS14.67s is explicitly PRE-mutation interruption proof only.
+All4real authority/cleanup controlsPASS. Four parent-finalization leaves remain premature-child-receipt/missing-parent-publication RED; NO real final-close fault was injected. Strict scratch/coverage/content/count/error/rollback/cleanup/lock assertions remain frozen and mandatory for GREEN. Missing-native early inventory failures do not count as later-target or final-close boundary execution.
+Three real standalone supported-recording controlsPASS; two real overlap/next-native flows remain desired conflict/restoration failures with no manual repair. Exact prepared scope and concurrent foreign-postimage protections remain unchanged.
+
+### Unchanged17 product RED leaves
+1complete-recorded-plan unit;2bootstrap intact/edited convergence;4single/multiple missing-native repair success requirements;1intact bootstrap later-source requirement;2missing-prestate later-source boundary requirements;1unsafe native-symlink bootstrap;4parent-finalization present/absent no-fault/fault requirements;2standalone cross-group conflict/next-native flows. All failure identities equal the preserved prior full replay. No AC2 safety control was artificially made to fail.
+
+### AC Verification
+|AC|Current proof|
+|---|---|
+|1|Frozen complete recorded-plan parity/default/plugin/schema1/selector and real convergence tests replayed; desired bootstrap defects remainRED, positive controlsPASS.|
+|2|Ten old false-positive tests now genuinely reach typed/exact parser or semantic diagnostics after matched private reads;13additional schema/inventory/digest/order leavesPASS. Frozen mode-only CLI permission and other safety controls independently replayed.|
+|3|Frozen actual release content/binary/mode/topology/plugin/digest/idempotence proof; ordinary intact/editedPASS, bootstrap and missing-repair defectsRED.|
+|4|Frozen real ordinary post-mutation rollbackPASS32.60s; missing/bootstrap later-boundary defectsRED; pre-mutation interrupted recovery separatelyPASS14.67s.|
+|5|Frozen actual built CLI/checksummed loopback release/source/unmodified children/temp destinations; added metadata tests use real filesystem only. No mocks/skips/live installation writes.|
+|6|Frozen parent-process sequencing/fault contract remainsRED on missing publication, not claimed fault execution;4real authority/cleanup controlsPASS.|
+|7|Frozen actual conflict/next-native desired outcomes remainRED; fresh/disjoint/same-ordered-group-copy controlsPASS with independent complete content/topology checks.|
+
+### Historical proof correction and retained evidence
+The formal independent PM rejection at2026-09-05T23:04:15Z is accepted. Ten old passes in author98d3b57 (66leaves49PASS17FAIL0SKIP748.254s) and independent replay (same outcomes758.895s) stopped at unsafe0644permissions, not their named parser/topology reason. Those logs remain accurate runtime history, but those ten passes are NOT valid old AC2 proof. Prior blanket claims of complete attributed AC2 coverage are superseded by this correction. The digest-computation test alone likewise did not establish malformed schema2 receipt metadata rejection.
+Current repaired functions retain the same10leaf identities, with genuine private matched-valid/precise-negative proof. Thirteen added leaves supply supported schema controls, actual schema2 inventory/digest encoding and valid normalization proof. No fourth production defect or parser bypass is claimed.
+All prior commits/raw logs, the formal PM report /tmp/machinery-pm-MAC-2u36.DDIEBx/REVIEW.md and prior oracle/fixture disputes remain intact. The prior delivery was formally rejected and root atomically reclaimed this rework; the canonical deliver transition below is one new delivery for THIS rework, not a repeated non-idempotent call within the prior attempt.
+
+LEARNINGS:
+- A negative err!=nil assertion can silently prove an earlier permission check instead of its advertised validation boundary; inspect reached diagnostics, not test names.
+- Matched valid/private controls and actual mode/type checks make input-validation tests attributable; typed errors and exact wrapper removal prevent path-name false positives.
+- Schema2 inventory/digest encoding needs direct receipt-input mutations, distinct from digest-function content-change tests; reversed valid order is compatibility.
+- Preserve independent unchanged CLI permission/rollback proof rather than modifying a shared write helper or duplicating expensive release fixtures.
+- Separate historical runtime pass counts from valid coverage claims; this rework fixes proof attribution while retaining all17genuine product RED failures.
+
+### Containment and remaining gates
+Installed /Users/ramirosalas/.local/bin/machinery SHA256 remains5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849. No installed skill/plugin/agent/config, user Dagger resource, root branch, remote resource or unrelated edit touched. No full preflight, push/sync/setup/recover/dev-link/live update, product implementation or subagent used.
+Independent full RED re-review/approval and GREEN remain pending. Actual final-close fault/rollback proof will only be claimable when the real parent publication operation is reached. Worktree retained clean with exact frozen inputs; final shell restored to repository root.
+
+### Complete named leaf inventory
+|Leaf|Outcome|Seconds|
+|---|---|---|
+|TestBootstrapReceiptRootAlias/root|PASS|0|
+|TestBootstrapReceiptRootAlias/descendant|PASS|0|
+|TestBootstrapReceiptRootAlias/canonical_root|PASS|0|
+|TestBootstrapReceiptRootAlias/canonical_descendant|PASS|0|
+|TestBootstrapReceiptRootAlias/similar_sibling|PASS|0|
+|TestBootstrapReceiptRootAlias/interior_alias|PASS|0|
+|TestBootstrapReceiptRootAlias/repeated_suffix|PASS|0|
+|TestBootstrapReceiptRootAlias/sibling_journal|PASS|0|
+|TestBootstrapReceiptPlan/first_bootstrap_defaults_control|PASS|0|
+|TestBootstrapReceiptPlan/supported_schema_one_control|PASS|0|
+|TestBootstrapReceiptPlan/complete_recorded_mixed_plan|FAIL|9.98|
+|TestBootstrapReceiptCLI/standalone_receipt/supported_recording/fresh_mixed_groups|PASS|0.02|
+|TestBootstrapReceiptCLI/standalone_receipt/supported_recording/disjoint_additional_group|PASS|2.85|
+|TestBootstrapReceiptCLI/standalone_receipt/supported_recording/same_ordered_group_copy_change|PASS|3.94|
+|TestBootstrapReceiptCLI/standalone_receipt/reject_cross_group_repeated_false_then_native|FAIL|27.45|
+|TestBootstrapReceiptCLI/standalone_receipt/reject_cross_group_repeated_true_then_native|FAIL|24.98|
+|TestBootstrapReceiptCLI/parent_finalization/absent_false_close_fault_false|FAIL|31.07|
+|TestBootstrapReceiptCLI/parent_finalization/absent_false_close_fault_true|FAIL|30.86|
+|TestBootstrapReceiptCLI/parent_finalization/absent_true_close_fault_false|FAIL|29.53|
+|TestBootstrapReceiptCLI/parent_finalization/absent_true_close_fault_true|FAIL|30.61|
+|TestBootstrapReceiptCLI/receipt_authority_absent|PASS|14.22|
+|TestBootstrapReceiptCLI/receipt_authority_forged|PASS|3.87|
+|TestBootstrapReceiptCLI/receipt_authority_unprepared|PASS|3.83|
+|TestBootstrapReceiptCLI/receipt_authority_out_of_scope|PASS|3.99|
+|TestBootstrapReceiptCLI/converges_bootstrap_false|PASS|51.37|
+|TestBootstrapReceiptCLI/converges_bootstrap_true|FAIL|27.52|
+|TestBootstrapReceiptCLI/repair_edited_owned_artifact_bootstrap_false|PASS|49.65|
+|TestBootstrapReceiptCLI/repair_edited_owned_artifact_bootstrap_true|FAIL|27.5|
+|TestBootstrapReceiptCLI/repair_missing_owned_artifact_bootstrap_false|FAIL|30.33|
+|TestBootstrapReceiptCLI/repair_missing_owned_artifact_bootstrap_true|FAIL|21.78|
+|TestBootstrapReceiptCLI/repair_both_native_groups_missing_bootstrap_false|FAIL|28.91|
+|TestBootstrapReceiptCLI/repair_both_native_groups_missing_bootstrap_true|FAIL|21.03|
+|TestBootstrapReceiptCLI/later_target_failure_rolls_back_bootstrap_false|PASS|32.6|
+|TestBootstrapReceiptCLI/later_target_failure_rolls_back_bootstrap_true|FAIL|18.45|
+|TestBootstrapReceiptCLI/missing_prestate_later_target_failure_rolls_back_bootstrap_false|FAIL|25.68|
+|TestBootstrapReceiptCLI/missing_prestate_later_target_failure_rolls_back_bootstrap_true|FAIL|19.49|
+|TestBootstrapReceiptCLI/corrupt_receipt|PASS|12.57|
+|TestBootstrapReceiptCLI/unsafe_receipt|PASS|13.47|
+|TestBootstrapReceiptCLI/stale_schema|PASS|13.33|
+|TestBootstrapReceiptCLI/plugin_discovery_failure|PASS|13.08|
+|TestBootstrapReceiptCLI/symlink_native_artifact|FAIL|19.73|
+|TestBootstrapReceiptCLI/non-directory_native_parent|PASS|11.43|
+|TestBootstrapReceiptCLI/interrupted_download_recovers_real_transaction|PASS|14.67|
+|TestReceiptArtifactDigestIgnoresInstallTimeButDetectsModeAndContent|PASS|2.53|
+|TestUninstallDeletionFailureRollsBackArtifactsAndReceipt|PASS|2.46|
+|TestAbandonedLegacyReceiptLockDirectoryDoesNotBlock|PASS|0.25|
+|TestLoadReceiptRejectsFIFOWithoutOpening|PASS|0|
+|TestLoadReceiptRejectsNonPrivateLeafConfigDirectory|PASS|0|
+|TestReceiptReadModifyWriteIsSerialized|PASS|5.86|
+|TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/symlink|PASS|0|
+|TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/oversize|PASS|0|
+|TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/config_directory_swap|PASS|0|
+|TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/entry_swap|PASS|0|
+|TestForgetReceiptUsesNativeCaseAliasIdentity|PASS|0.48|
+|TestCorruptReceiptFailsLoudly|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/unknown_root|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/unknown_home_field|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/unknown_target_field|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/duplicate_root|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/duplicate_nested|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/wrong_homes_type|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/wrong_copy_type|PASS|0|
+|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/trailing_value|PASS|0|
+|TestSemanticallyInvalidReceiptFailsBeforeUpdate|PASS|0|
+|TestReceiptPrivateSchemaControls/schema_1|PASS|0.01|
+|TestReceiptPrivateSchemaControls/schema_2|PASS|0.01|
+|TestReceiptSchemaTwoInventoryValidation/missing_entry|PASS|0|
+|TestReceiptSchemaTwoInventoryValidation/extra_entry|PASS|0|
+|TestReceiptSchemaTwoInventoryValidation/duplicate_path|PASS|0|
+|TestReceiptSchemaTwoInventoryValidation/substituted_path|PASS|0|
+|TestReceiptSchemaTwoInventoryValidation/relative_path|PASS|0|
+|TestReceiptSchemaTwoInventoryValidation/non-clean_path|PASS|0|
+|TestReceiptSchemaTwoInventoryValidation/unexpected_absolute_path|PASS|0|
+|TestReceiptSchemaTwoInventoryValidation/digest_prefix|PASS|0|
+|TestReceiptSchemaTwoInventoryValidation/digest_length|PASS|0|
+|TestReceiptSchemaTwoInventoryValidation/digest_nonhex|PASS|0|
+|TestReceiptSchemaTwoInventoryValidation/valid_reversed_ordering|PASS|0|
+|TestUpdateRollsBackAllHomesBinaryAndReceiptOnLaterFailure|PASS|2.03|
+|TestBootstrapDefaultPlanIsPluginAware|PASS|0.06|
 
 
 ## nd_contract
