@@ -9,8 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:33:48Z
-content_hash: "sha256:3f93445ac820f374d759a37bf62435d11a2645e275b2c040c4b944b9f80a6ef9"
-blocks: [MAC-gcrr]
+content_hash: "sha256:bb8886291fe47563ef53089f6ea73a4df81cc5a1ce4d4f3969eb08a9de177cdc"
+blocks: [MAC-gcrr, MAC-ou97]
 ---
 
 ## Description
@@ -81,9 +81,10 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 
 ## History
 - 2026-09-05T19:35:08Z dep_added: blocks MAC-gcrr
+- 2026-09-05T19:36:15Z dep_added: blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-gcrr]]
+- Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 
 ## Comments
