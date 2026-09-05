@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:00:31Z
-content_hash: "sha256:d26aa865a584f0edb8bff6b335302abe2cd663c6317256c24e7a60f3dfffaf11"
+updated_at: 2026-09-05T23:00:32Z
+content_hash: "sha256:04f9d609a05f34bd6229fbeec36f43261cc77b75f4b484f43e16f56be5a51f4e"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -130,6 +130,23 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## AUTHORITATIVE AC2 PROOF-REPAIR SCOPE — MAC-2u36 — 2026-09-05
+
+Scope-only Sr PM disposition: keep this under existing P0 MAC-2u36/AC2. All seven product ACs are preserved verbatim. No new issue, dependency, source ownership, production bug claim or status/label/claim transition. Independent PM is completing its RED verdict and retains authority for rejection/approval and explicit test-edit authorization. This note does not replace its delivery/review nd_contract.
+
+Verified source chain: install_test.go write uses os.WriteFile0644; the three receipt_test.go functions named in canonical AC2 proof repair use it on fresh receipts. readReceiptFile verifies private regular-file permissions before reading JSON; Unix privateFilePermissionsOK is mode&0077==0. On the reviewed umask022, the one corrupt/eight parser/one semantic leaves can pass on permissions failure alone. The source-established evidence gap does not establish a production parser bypass. Existing bootstrap corrupt receipt preserves prior0600 mode; its unsafe receipt case explicitly changes a valid receipt to0666 and is legitimate distinct permission evidence.
+
+Required narrow repair after explicit independent PM authorization: amend those three receipt tests and minimal receipt-local fixture/assertion code, leaving shared write unchanged. Same-path private0700/0600 setup and matched valid schema1/schema2 positives must reach loadReceipt successfully. Each malformed/unknown/duplicate/trailing/wrong-type/semantic case must reach its intended detail category, protected against pathname false positives. Add actual-file schema2 missing/extra inventory, same-count duplicate/substituted/invalid paths and digest prefix/length/nonhex cases, each based on valid real topology/digests. Preserve normalization of valid ordering. Reuse the existing actual CLI unsafe-receipt leaf unchanged, verifying its isolated0600-to0666 mutation of valid bytes; bootstrap98d3b57 stays frozen. Do not add expensive CLI tests for each loader mutation or weaken any safety checks.
+
+Budget now records measured1111 current test LOC plus estimated150-200 focused repair/case LOC and prior350 production allowance, approximately1700 combined/4-6files. The older1400 forecast is superseded, with actual changed-LOC/helper/time reporting and PM overrun investigation required; neither old nor new estimate permits dropping required proof. Existing15m full command and individual bounds are unchanged. Run focused repaired tests first, then one stable/frozen full latest-SHA raw replay; no additional costly broad run during this triage.
+
+Evidence classification: author98d3b57 full replay66leaves49PASS17FAIL0SKIP748.254s remains historical raw evidence. The ten permissions-masked passes cannot be advertised as parser/topology coverage. Repaired validators may pass unchanged production and are legitimate safety controls; do not manufacture RED or interpret a passing check count as proof of its advertised cause. Independent PM subsequently reports its replay completed with matching66leaves49PASS17FAIL0SKIP758.895s; its formal verdict and exact authorization remain PM-owned and are not preempted here.
+
+Source discovery used graph Verify project Users-ramirosalas-workspace-machinery generation2026-09-05T20:28:41Z; receipt.go/receipt_test.go/install_test.go/durability_unix.go metadata_match/no_recorded_issue, best-effort only. Bootstrap candidate is missing from root graph and was inspected through git show98d3b57. Direct bounded test-source scan found no dedicated schema2 malformed-inventory/digest category tests in the selected source; no broader exhaustive coverage claim. No runtime test, source/test/worktree edit, installed binary/plugin/skill/agent change, preflight or remote operation performed.
+
+Self-review verdict: clean after narrowing scope to the three defective existing tests and reusing the existing real permission case. All prior parent-process/close-seam/AC7 authorizations remain intact; the new amendments need their own explicit TEST-EDIT AUTHORIZED from independent PM before use.
+
+
 ## Historical canonical description before AC2 proof repair
 Preserved as quoted history; current Description is authoritative.
 
