@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:38:46Z
-content_hash: "sha256:00cd1e0eb24667adecc80412e348d15003070a3ff111db542eee8e6a3d75006d"
+updated_at: 2026-09-05T19:45:33Z
+content_hash: "sha256:00195d148111f519678adeac9c82ac70358ebf17da3659fc281b5c4ead5711b5"
 blocked_by: [MAC-vx24, MAC-hy71, MAC-p7jd, MAC-p8ce, MAC-a89e, MAC-2u36, MAC-yhg5, MAC-hwdb]
 blocks: [MAC-ou97]
 ---
@@ -86,7 +86,20 @@ Observable outcome: the user can follow accurate standalone commands and see exp
 
 
 ## Notes
-
+ANCHOR ROUND-1 AUTHORITATIVE EXECUTION-LANE REPAIR
+General rule: required runtime tests need deterministic provisioning, explicit closed inventory, actual native execution accounting and teardown. Missing infrastructure must fail the REQUIRED lane, not be silently skipped. Ordinary native suites may explicitly exclude registered service-backed tests using a dedicated build tag.
+Classification: Actual checker registry/bind-path documentation example requires Docker/pinned checker closure.
+Split real OCI docs example into cmd/machinery/assurance_docs_integration_test.go; ordinary doc-contract tests remain native. Follow required lane for real example proof.
+PRODUCES:
+- testdata/integration-lanes/consumer-docs.json -> this story's closed suite fragment, with exact source/test IDs, runtime/pin requirements and bounded execution configuration
+- cmd/machinery/assurance_docs_integration_test.go -> actual named runtime cases registered in the fragment
+CONSUMES:
+- MAC-hpqp: testdata/integration-lanes/schema.json
+  schema: Closed versioned native-runner suite fragment with exact source/test identities, runtime requirements and bounded command selection.
+- MAC-hpqp: scripts/integration-lane/main.go
+  endpoint: go run ./scripts/integration-lane --lane required (Makefile test-integration invokes same entrypoint).
+Additional acceptance criteria: fragment matches actual test sources both directions; all registered cases actually start/terminate with expected positive/negative outcomes; no cached/skipped/empty/partial/fabricated-summary success; real provisioned positive and missing-runtime/fresh-cache failure diagnostics; no owned container/process leaks. Required local preflight and hosted CI execute the same union. Do not edit shared root inventory; own only this fragment. RED source, fixture, fragment and runner configuration are frozen together after review. Any exact test names introduced in RED must remain registered through GREEN.
+No heavy preflight until final gate; no GitHub mutation; no active installation replacement. This note supersedes any earlier command implying service-backed tests execute in unprovisioned ordinary package suites.
 
 ## History
 - 2026-09-05T19:35:07Z dep_added: blocked_by MAC-vx24
