@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:58:20Z
-content_hash: "sha256:d8a6c4847dcdb806e5738f9626a03b5aa473fe9665b7204805bf191f10098547"
+updated_at: 2026-09-05T19:59:01Z
+content_hash: "sha256:0f3d72eacb12eac199e78087dffefbb5679be4b952aaf0266f8d6569c6991568"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p8ce
 ---
@@ -80,6 +80,74 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+## Implementation Evidence
+
+PROOF:
+
+### CI/Test Results
+
+Commands run:
+- go test -count=1 -timeout=240s ./internal/gates -run 'Reads|EventContract|Consumer' -v
+- go test -count=1 -timeout=240s ./internal/gates -run '^TestReadsConsumerLegacySingleControl$|^TestReadsConsumerRepeatedLegacyStillHasOneOwner$|^TestReadsConsumerCLI$/legacy_control$' -v
+- pvg verify internal/gates/reads_consumer_test.go --include-tests --format text
+- git diff --check
+
+Summary: RED run has 66 leaf cases: 39 PASS, 27 intended behavioral FAIL, 0 skipped. Story-specific 41 leaf cases: 14 PASS / 27 FAIL. Existing selected cases: 25 PASS / 0 FAIL. Real CLI 9 cases: 4 PASS / 5 intended FAIL. Separate control run: 3 PASS / 0 FAIL. Quality scan PASS: 1 file, 0 issues. Diff check PASS.
+
+Coverage: statement coverage percentage was not measured. Behavioral mutation inventory is recorded above. Tests are not rerun during this evidence-format repair; outputs are reused from their honest runs at the unchanged RED SHA.
+
+Key output:
+- Unsafe missing_audit and missing_payments contracts returned real CLI success with 0 blocking findings.
+- Distinct valid per-consumer payloads were rejected because sibling fields leaked across edges.
+- The committed-SHA run contains no compile/import/infrastructure failures. All 27 failures are intended RED behavior assertions.
+
+### Commit
+
+Branch: story/MAC-p8ce
+SHA: 0d52f43b393d961160aeea0db43b13a3fa5c284a
+Only frozen file: internal/gates/reads_consumer_test.go. No source changes or test changes during this formatting repair.
+
+### Wiring
+
+The test builds a native candidate in a temporary directory from this worktree and invokes actual check --gate g2,gx against isolated complete G2/Gx fixtures. G2 validates participants, Gx validates READS; unknown-participant control invokes G2 alone. No installed binary replacement, mocks, skips, services, full preflight or remote writes.
+
+### pvg verify
+
+VERIFY: PASSED (1 files scanned, 0 issues).
+
+### AC Verification
+
+| AC # | Requirement | Code Location | Test Location | Status |
+|------|-------------|---------------|---------------|--------|
+| 1 | Exact event-consumer read set | Unchanged readscomplete.go | TestReadsConsumerExactEdgesPass; CLI/distinct_sets | RED executed |
+| 2 | Missing sibling and strict-superset independence | Unchanged readscomplete.go | RejectsOwnershipMutations; ExactEdgesPass/strict_superset_is_local | Intended RED plus passing narrowed-payload controls |
+| 3 | Unique legacy compatibility and ambiguity migration | Unchanged readscomplete.go | LegacySingleControl; RepeatedLegacyStillHasOneOwner; AmbiguousLegacyNeedsMigration; ExplicitBlankOwnerCannotUseLegacyFallback | Controls PASS and intended ambiguity RED |
+| 4 | Repeats, conflicts, malformed data, renames, waivers | Unchanged readscomplete.go | ExactEdgesPass; RejectsOwnershipMutations; MalformedDeclarationsFailClosed | Positive and negative cases executed |
+| 5 | Real G2/Gx CLI mutations | Existing CLI path | TestReadsConsumerCLI | 9 cases: 4 PASS / 5 intended FAIL |
+
+LEARNINGS:
+- Matrix stems identify machines rather than consumer components. Exact consumer-column binding avoids false inference and supports several machines per component.
+- Valid full-path controls prevent unrelated gate failures from masquerading as RED.
+- Canonical evidence shape requires exact headings and unbulleted Commands run and Summary labels.
+- A repeated deliver currently fails because the delivered label already exists; no manual label edits performed.
+- Frozen RED tests remain unchanged. Independent review and GREEN implementation remain pending.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED SHA: 0d52f43b393d961160aeea0db43b13a3fa5c284a.
+- Exact producing test commands and 39 PASS / 27 intended FAIL / 0 skipped results recorded in canonical Implementation Evidence above.
+- Controls 3 PASS; quality scan 1 file / 0 issues. Formatting repair reused recorded results.
+
+### proof
+- [x] AC 1: Exact consumer edge cases are specified and executed.
+- [x] AC 2: Missing sibling declarations reproduced through real CLI and unit paths.
+- [x] AC 3: Unique legacy controls pass; ambiguous fan-out and blank explicit owner demonstrate genuine RED.
+- [x] AC 4: Repeat, conflict, malformed, rename and waiver cases are executed.
+- [x] AC 5: Nine native CLI cases executed with four PASS and five intended FAIL. GREEN implementation remains pending.
+
+
 ## Implementation Evidence (DELIVERED — RED phase; formatting repair)
 PROOF:
 
