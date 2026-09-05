@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:23:23Z
-content_hash: "sha256:00c599af4e79c29a648b9c2007a01ed15e872da5907fab20a2162240842dbcaa"
+updated_at: 2026-09-05T21:25:31Z
+content_hash: "sha256:29a1b398f464f32b60d23bb55adb0d58e5e162396e65a82283945d5fef8c5e66"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx]
@@ -372,3 +372,111 @@ status: in_progress
 - [x] Amendment review: pathname false positive established and robust repair bounded.
 - [x] Static disposition: conditional fixture section omission is implemented behavior, not a stub.
 - [ ] AC #1-4: complete RED delivery and independent approval remain pending.
+
+### 2026-09-05T21:25:31Z ramirosalas
+## Implementation Evidence
+
+PROOF:
+
+### CI/Test Results
+Commands run:
+- cd /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-a89e && set -o pipefail && go test -count=1 -timeout=5m ./internal/gates -run 'VersionSkew|Regen|Ratchet' -json -coverprofile=/tmp/MAC-a89e-red.wlHWaG/coverage.out | tee /tmp/MAC-a89e-red.wlHWaG/tests.json
+- go tool cover -func=/tmp/MAC-a89e-red.wlHWaG/coverage.out
+- git diff --check epic/MAC-ui8a
+- pvg verify internal/gates/regeneration_safety_test.go --format text
+- pvg verify internal/gates/gates_test.go internal/gates/regeneration_safety_test.go --format text
+
+Summary: RED ONLY. 37 executed leaf tests, 32 PASS, 5 intended assertion FAIL, 0 SKIP; exit 1, package 4.832s. No compilation, setup, timeout, or missing-prerequisite failure. Five guidance matcher controls and the real no-debt CLI control pass. No test rerun during this proof-record repair.
+Coverage: internal/gates scoped total 9.9%; gates.go regenCommands 100.0%; gates.go VersionSkewNote 93.8%. Real CLI subprocess is built separately and excluded from package coverage instrumentation.
+
+### Commit
+SHA: e95be63019d89b93ae527f27ae1ce43326def038
+Branch: story/MAC-a89e
+Initial RED SHA: 9b85ef69ed426a337e4e2584867a698904676643
+Authorized existing expectation amendment SHA: f482c7683f5005e40722123e3a382e01b15219d2
+Candidate e95be63019d89b93ae527f27ae1ce43326def038 is the authorized AC3 assertion repair. Prior commits remain intact; no production changes. Two test files total +246/-1 = 247 changed LOC against epic/MAC-ui8a.
+Test hashes SHA256:
+- internal/gates/gates_test.go: e4f630ec2ff7684eea436881b8a55706496f348c0ae7cd8748a255a6b6d439ff
+- internal/gates/regeneration_safety_test.go: 2e1801d96618aaf146621e822a342b4bfdf69cdace50b94d0585d7f1ad4f20c3
+
+### Retained raw evidence
+- /tmp/MAC-a89e-red.wlHWaG/tests.json SHA256 405f556e1036a36547bf9231d38d3cdedca5d52acc6879b997f95839789584bb
+- /tmp/MAC-a89e-red.wlHWaG/coverage.out SHA256 1ff93989e5a6fb5a2c6c70dd42dc3214e241ff62a74f1429471dbc0f44e1eef0
+- /tmp/MAC-a89e-red.wlHWaG/inventory.txt SHA256 7e20dff8a081de4734b40f68cf07da4d334362e37ed1654cea2b9c121c90e8af
+- /tmp/MAC-a89e-red.wlHWaG/verify.txt contains the single reviewed static-scan finding.
+
+### Test inventory
+PASS TestG4RatchetSnapshotNote
+PASS TestG4BaselineWithoutRatchetFails
+PASS TestG4RatchetGreenAtSnapshot
+PASS TestG4RatchetGrowthFails
+PASS TestG4RatchetShrinkAndStaleEdgesNote
+PASS TestRatchetRoundTrip
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/unknown_root
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/missing_date
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/missing_edges
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/duplicate_date
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/duplicate_edges
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/duplicate_edge_name
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/date_number
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/date_null
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/edges_array
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/edge_value_string
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/edge_entry_null
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/trailing_value
+PASS TestWriteRatchetRejectsSymlinkTarget
+FAIL TestVersionSkewNoteNamesEveryApplicableCommand
+PASS TestVersionSkewNoteFormalCommandFollowsGeneratedTLA
+PASS TestRatchetSnapshotNoteBothFormatsIsClockIndependent
+FAIL TestVersionSkewRegenerationOnlySafeGenerators/ratchet-only
+PASS TestVersionSkewRegenerationOnlySafeGenerators/oracle
+PASS TestVersionSkewRegenerationOnlySafeGenerators/alloy
+PASS TestVersionSkewRegenerationOnlySafeGenerators/semantics
+PASS TestVersionSkewRegenerationOnlySafeGenerators/composition
+PASS TestVersionSkewRegenerationOnlySafeGenerators/pack
+FAIL TestVersionSkewRegenerationOnlySafeGenerators/all-with-ratchet
+PASS TestRegenBaselineGuidanceSensitivity/genuine
+PASS TestRegenBaselineGuidanceSensitivity/equivalent-wrapped
+PASS TestRegenBaselineGuidanceSensitivity/path-bait
+PASS TestRegenBaselineGuidanceSensitivity/old-rule-review-help
+PASS TestRegenBaselineGuidanceSensitivity/unrelated-review
+PASS TestRegenRatchetRealCLI/no-debt-version-skew-control
+FAIL TestRegenRatchetRealCLI/new-offender-survives-all-advice
+FAIL TestRegenRatchetRealCLI/explicit-baseline-reviews-debt-change
+
+### pvg verify
+New test file: PASSED, 1 file scanned, 0 issues.
+Both changed files: FAILED, 2 files scanned, one [stub] at gates_test.go:125 return "".
+Specific PM disposition, 2026-09-05T21:18:55Z: actual helper coveringInterfaceTable conditionally omits the Markdown section when no concrete allow-edge rows exist; otherwise it renders the full table. c4GraphFixture uses it and graph tests exercise it. This is implemented fixture behavior, not a stub. Preserve unchanged; no blanket scan waiver. Earlier provisional note naming fixtureInterfaceRows was incorrect.
+
+### AC Verification
+| AC | Test and evidence | RED result |
+|---|---|---|
+| 1 | TestVersionSkewRegenerationOnlySafeGenerators asserts exact ordered oracle/Alloy/formal/pack advice and no extra mutation. Five single-family controls pass; ratchet-only/all-with-ratchet and authorized existing test fail because advice includes baseline. Repeated calls are deterministic. | Intended assertion failures |
+| 2 | RealCLI/new-offender-survives-all-advice: CLI creates ratchet with alpha/a.go and initially green g3,g4; new alpha/b.go produces exact growth failure; every printed command runs, including unsafe baseline after impl placeholder substitution. Oracle current stamp appears, ratchet bytes change to include alpha/b.go, and subsequent G4 incorrectly returns zero findings. | Intended advice, byte-preservation and G4 assertion failures |
+| 3 | RealCLI/explicit-baseline-reviews-debt-change reads actual help before any fixture baseline invocation, adds offender to an existing ratchet, proves G4 failure, deliberately invokes baseline successfully with explicit 0 need a baseline rule, records both offenders, verifies absent version stamp, and proves subsequent G4 success. Current help/output lack required guidance and zero-rule text misleadingly says nothing new to baseline. | Genuine guidance and misleading-message failures; explicit operation still succeeds |
+| 4 | RealCLI/no-debt-version-skew-control regenerates a valid oracle through CLI, introduces stamp-only skew, follows exactly the oracle advice, proves current stamp, no residual skew, green g3,g4 and no ratchet creation. All five matcher sensitivity controls pass, including path bait and old dependency-rule help rejection. | Positive controls PASS; negative regression established |
+
+### Limits
+RED only, independent PM RED approval still required. Real CLI/native filesystem tests are unconditional, without mocks, stubs, skip/env gates or external services. The real executable fixture carries oracle generation and executes every applicable printed command; other generator families have exact advice-selection controls. No Alloy solver/TLA model checking is claimed. No full preflight, installed asset modification, push/sync/GitHub mutation, main branch movement or production Paivot dependency. GREEN remains pending.
+
+LEARNINGS:
+- Whole-output review substring initially matched a temporary pathname inherited from the test name. Independent authorization allowed path exclusion, related-prose matching and five passing sensitivity controls.
+- Zero newly proposed dependency rules can coexist with newly accepted offender files; the CLI regression proves both separately.
+- Executing every printed regeneration command exposes actual ratchet mutation and lost G4 enforcement.
+- A legitimate empty fixture section can trigger a static scanner; preserve behavior and record an exact reviewer disposition.
+- Raw JSON retention and fresh canonical readback are required; the earlier append returned success but final proof did not survive the subsequent story serialization. This comment is the supported append-only correction; it changes no tests or status.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED candidate e95be63019d89b93ae527f27ae1ce43326def038; 37 leaf tests, 32 pass / 5 intended fail / 0 skip; raw logs and hashes above.
+- This terminal comment restores proof and authoritative RED-delivered contract after prior notes did not persist. Existing delivered label is preserved; story deliver is not rerun.
+
+### proof
+- [x] AC #1: exact safe generator advice specified with intended RED and passing family controls.
+- [x] AC #2: actual CLI ratchet expansion and lost G4 failure reproduced.
+- [x] AC #3: repaired help/output assertions genuinely fail; explicit baseline and sensitivity controls exercised.
+- [x] AC #4: real positive no-debt and negative existing-ratchet paths executed with full inventory.
+
