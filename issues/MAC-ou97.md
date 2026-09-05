@@ -9,8 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:36:14Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:45:33Z
-content_hash: "sha256:7cbef9220c17ac8c90e2b5696310375663af40d348406a4cbc4ac1ff73e5bf97"
-blocked_by: [MAC-hlae, MAC-sh60, MAC-olrx, MAC-p8ce, MAC-yhg5, MAC-hwdb, MAC-2u36, MAC-a89e, MAC-p7jd, MAC-2n83, MAC-hy71, MAC-gcrr, MAC-l7m0, MAC-vx24, MAC-lnu6]
+content_hash: "sha256:11d0687759641007012920131eb8c216a5c5eeed0bebefe41efac0e35a934b60"
+blocked_by: [MAC-hlae, MAC-sh60, MAC-olrx, MAC-p8ce, MAC-yhg5, MAC-hwdb, MAC-2u36, MAC-a89e, MAC-p7jd, MAC-2n83, MAC-hy71, MAC-gcrr, MAC-l7m0, MAC-vx24, MAC-lnu6, MAC-hpqp]
 ---
 
 ## Description
@@ -140,9 +140,10 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-05T19:36:16Z dep_added: blocked_by MAC-l7m0
 - 2026-09-05T19:36:17Z dep_added: blocked_by MAC-vx24
 - 2026-09-05T19:36:17Z dep_added: blocked_by MAC-lnu6
+- 2026-09-05T19:45:33Z dep_added: blocked_by MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocked by: [[MAC-hlae]], [[MAC-sh60]], [[MAC-olrx]], [[MAC-p8ce]], [[MAC-yhg5]], [[MAC-hwdb]], [[MAC-2u36]], [[MAC-a89e]], [[MAC-p7jd]], [[MAC-2n83]], [[MAC-hy71]], [[MAC-gcrr]], [[MAC-l7m0]], [[MAC-vx24]], [[MAC-lnu6]]
+- Blocked by: [[MAC-hlae]], [[MAC-sh60]], [[MAC-olrx]], [[MAC-p8ce]], [[MAC-yhg5]], [[MAC-hwdb]], [[MAC-2u36]], [[MAC-a89e]], [[MAC-p7jd]], [[MAC-2n83]], [[MAC-hy71]], [[MAC-gcrr]], [[MAC-l7m0]], [[MAC-vx24]], [[MAC-lnu6]], [[MAC-hpqp]]
 
 ## Comments
