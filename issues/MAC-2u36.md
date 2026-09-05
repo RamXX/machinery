@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:32:28Z
-content_hash: "sha256:8622024f4102587172bafcbea0a08605261f18a13fc384283518d5928c213f0c"
+updated_at: 2026-09-05T21:36:05Z
+content_hash: "sha256:cf3125ad33e99e0a1870b5b9f54d661c53dd84715b811a2f3a575c6a13fce0c4"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -106,6 +106,47 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## AUTHORITATIVE FINALIZATION BOUNDARY REFINEMENT — MAC-2u36 — 2026-09-05
+Scope: resolve the specific AC6 process/receipt-publication testability gap identified by BOUNDARY PROPOSAL REVIEW: GAPS_FOUND at 2026-09-05T21:32:28Z. Current canonical AC6 and finalization testing bullets are authoritative; all earlier authorizations, RED evidence, comments and contracts remain history. Ownership remains update.go/receipt.go/install.go and the already scoped tests; transaction.go/lock.go/CLI remain read-only. No new production seam/API or RED production edit is authorized.
+
+### Decision and technical rationale
+Select parent-PROCESS finalization, not merely abstract parent ownership. The Update process holding the operation lock and complete prepared journal waits for every authenticated selected placement child, then inventories/publishes the normalized receipt before its own direct commit. Persisted receipt bytes/existence/type/mode stay unchanged through all children; an initially absent receipt stays absent. Normal standalone nondelegated install still records a receipt.
+
+This is a bounded refinement of the existing coordinator, not a new host-trust architecture: updateLocked already constructs the entire plan and journal, controls the new-release children, waits synchronously in refreshDirectInstalls and owns direct rollback/commit. Delegated child commit only closes its anchors. The parent already loads/validates receipts and has an existing parent-side saveReceipt path for changed plugin obligations. Making that same coordinator own the direct phase's final publication supplies a single durable commit boundary and avoids transient persisted receipts that cannot represent still-unrepaired placements. The old receipt may be stale while files are refreshed; the prepared journal/operation lock already governs that window and startup recovery. Do not advertise the old receipt as a newly finalized installation.
+
+The product benefit is complete receipt evidence coupled to completion of the entire direct plan, not convenience of a specific hook. Supported schema behavior and complete target/topology validation remain requirements; this story introduces no new cross-version schema protocol. New-release children still perform actual placement/source checks. Host plugin work remains outside the committed direct transaction exactly as before.
+
+### Alternatives considered
+- Authenticated final-child publication: compatible with previous abstract wording, but leaves a different serializer/publisher lifecycle and makes the existing parent-process failure seam unable to observe publication. Not selected for this bounded story; no cross-process final-publisher protocol is needed once the existing coordinator finalizes.
+- Process-neutral finalization instrumentation: would require a new reviewed observation/fault mechanism or production seam absent from current authorization; adds surface without improving the chosen complete-plan commit ownership.
+- Post-child os.Remove/durableRemove or directory authority corruption: rejected. Those can exercise commit post-image/concurrent-change or authority failure rather than receipt publication and may correctly prevent rollback. Never weaken transaction.go's concurrent-artifact protections to make such a test pass.
+
+### Required proof and pending authorization
+The existing closeInstallFile seam is explicitly documented for deterministic durability fault tests. A concrete Proposal-A-style test is now eligible for independent PM review: real Update/default runner/built release/real children; observe full actual mutations and prepared-journal coverage; verify persisted receipt unchanged through final child; narrowly arm actual receipt-scratch Close failure in the parent before rename; prove the exact operation encountered it, no commit, complete pre-state rollback, unrelated preservation, journal cleanup and released/reusable lock. Include a passing no-fault counterpart that observes final complete publication. The fixture must not edit live installed artifact post-images to create this fault. A hook that never fires establishes no publication-failure evidence.
+
+This decision is a contract repair, not authorization to change the frozen tests or approve RED. Independent PM must review this selected boundary plus the concrete test and record explicit test-edit authorization before author use. Earlier authorized actual-CLI matrix work may continue. Preserve current authorized commits including 5a948405..., a3282ac and 4c5e0b4, original v1 evidence and all subsequent fixture corrections; earlier fixture/lock-root errors are not behavioral RED. No source/worktree or installed product mutation occurred in this review.
+
+### Evidence
+- Read full current canonical R2 and latest PM boundary verdict through pvg nd show MAC-2u36 --json.
+- Exact source: updateLocked parent journal/commit and post-commit plugin obligation save; refreshDirectInstalls/runAndRelay synchronous buffered child completion; saveReceipt inventory/temp write/sync/Close/rename; receiptArtifactPaths; transaction commit and rollbackInstallJournal concurrent post-image checks; closeInstallFile documented existing test seam.
+- Graph Verify project Users-ramirosalas-workspace-machinery, generation 2026-09-05T20:28:41Z; four relevant update/receipt/install/transaction source files metadata_match/no_recorded_issue (best-effort), supplemented by exact source reads.
+- No new public behavior, host-trust scope, dependency, label/status/claim transition or budget expansion.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Sr. PM refined canonical AC6/testing using supported pvg nd edit and preserved prior canonical text as quoted history.
+- Appended finalization decision/options/evidence via pvg nd update --append-notes; terminal contract preserves the current in_progress claim.
+- Independent PM boundary review and concrete RED authorization remain required before use.
+
+### proof
+- [x] Contract: parent-process final publication and unchanged persisted receipt through children are explicit.
+- [x] Safety: standalone recording, authenticated delegation, supported schema validation and concurrent post-image protections remain intact.
+- [ ] AC6: concrete late real-file publication-failure test authorization and independent execution proof pending.
+- [ ] AC1-6: independent RED approval, implementation and acceptance remain pending.
+
+
 ## nd_contract
 status: in_progress
 
