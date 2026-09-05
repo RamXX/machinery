@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:42:30Z
-content_hash: "sha256:147a473b01e4f8fc67faf6e99827e78e8026cf34b1ff9f377f80f7c3880c3469"
+updated_at: 2026-09-05T19:46:12Z
+content_hash: "sha256:e9eb2505777d4d79b0b3cef6a84b5e01be9db1197f98f5a16d9b9f04c23a04f3"
 ---
 
 ## Description
@@ -64,6 +64,25 @@ One epic, 16 bounded children. Scoped pvg lint --backlog --epic MAC-ui8a --json 
 NEXT mapping: #1 MAC-2u36; #2 retain failclosed discovery policy documented MAC-gcrr; #3 MAC-olrx; #4 MAC-2n83; #5 current root-registry workaround MAC-gcrr (feature extension unapproved); #6 platform extension pending user, emulation workaround documented; #7/#8 MAC-gcrr plus release MAC-hy71; #9 MAC-a89e; #10/#11/#14 concrete model features inventoried pending scope approval; #12 MAC-p8ce; #13 hierarchy deferred until actual access-boundary need.
 Workflow observation (local tracker only, no external tool fix): pvg issues create with canonical nested headings produces duplicate managed sections; nd update --description inserts ahead of authored Markdown headings instead of replacing entire authored body. Repaired with parent-authorized pvg nd edit and exact apply_patch-backed editor, preserving notes/history/contracts. nd EDITOR requires a single executable path, not command plus arguments.
 ANCHOR ROUND-1 RULE 1 OWNERSHIP CLARIFICATION: The repair must explicitly own scripts/preflight.sh and affected .github/workflows/ci.yml/formal.yml/nightly.yml surfaces; any shared test-lane runner/closed inventory, pinned test-image or engine fixture/manifests, Makefile entrypoint and shell inventory entries if introduced; and the capstone's invocation/selected-test assertions. Add producer dependencies from affected runtime stories to the final wiring validation/capstone while keeping early reusable lane scaffolding executable without cycles. A selected named integration lane is different from t.Skip when Docker is missing: ordinary native suites may deliberately exclude an inventoried service lane, but the required local/CI lane must fail on missing prerequisites or zero selected/executed cases and must be included in final completion.
+ANCHOR ROUND-1 GENERALIZED REPAIR — READY FOR ROUND 2
+Specific gap: runtime-backed tests lacked required persistent provisioning/execution lanes.
+General rule: every mandatory external-runtime suite must be explicitly inventoried, provisioned before invocation, proven actually selected/executed, and torn down. Native portability suites may exclude only the explicitly registered integration lane; the required lane fails on missing infrastructure or any empty/skipped/incomplete execution.
+New MAC-hpqp owns contributor lane CLI, closed per-suite schema/discovery, immutable runtime pin manifest, initial real pilot, scripts/preflight.sh, CI/formal/nightly wiring, Makefile and shell inventory coverage. It is independently executable before bug stories; no placeholder suites. Release MAC-hy71 follows it for shared workflow ownership and adds lane job to exact-SHA required status policy.
+Full sweep of all original 16 children:
+- MAC-hlae: TLC/Java -> own saga fragment + lane dependency; pure generator tests stay native.
+- MAC-yhg5: Docker lifecycle -> own oci fragment + lane dependency.
+- MAC-2n83: Docker cross-identity recovery -> recovery fragment/new tagged integration file + lane dependency; native recovery stays native.
+- MAC-hwdb: Node real processes -> opencode fragment + lane dependency.
+- MAC-vx24: approved native adapter runtimes -> tdd fragment + lane dependency; architecture blocker retained.
+- MAC-gcrr: real checker documentation examples -> consumer-docs fragment/new tagged integration file + lane dependency.
+- MAC-ou97: combined full-system runtimes -> capstone fragment + lane dependency and final union/actual-case assertions; pure capstone sensitivity policy retained.
+- MAC-hy71: pinned actionlint plus native git policy; follows lane-owned shared workflows, required release status includes runtime lane.
+- MAC-sh60/MAC-olrx/MAC-p8ce/MAC-p7jd/MAC-2u36/MAC-a89e/MAC-lnu6: service-free native Go/filesystem/local-process cases; each explicitly forbids incidental runtime prerequisites and requires inventory ownership if runtime scope expands.
+- MAC-l7m0: read-only architecture, not execution evidence; exact adapter runtimes flow to MAC-vx24.
+Each runtime story owns a separate fragment, so no concurrent shared root-manifest edits. Frozen RED tests/fixtures/runner configuration include those fragments. No env-gated dormant tests or skip-if-missing added.
+Self-review: all 17 children clean within their approved or explicitly blocked scope; lane is deliberately infrastructure-focused but delivers observable real provision/run/account/cleanup flow, not static wiring alone.
+Validation after repair: pvg lint --backlog --epic MAC-ui8a --json => []; pvg rtm check --epic MAC-ui8a => passed, 0 tagged requirements, 18 records; pvg nd dep cycles => none. Full preflight not run.
+
 
 ## ANCHOR REVIEW (backlog_review, round 1 of 3)
 REVIEW_RESULT: REJECTED
