@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:54:29Z
-content_hash: "sha256:6ef65b6cd7f75ee6c0161418d933aa920c9d8c9372d9396594f2830d9e031fc4"
+updated_at: 2026-09-05T20:54:55Z
+content_hash: "sha256:5f00107da581c64e8879d53ff7bb69cd71d3bfe47425530924968a8089ccd12e"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -450,3 +450,49 @@ status: rejected
 - [ ] AC #8: real owned descendants and preexisting user work-root preservation required.
 - [x] AC #9: valid behavioral RED and bootstrap exception verified; rework authorization explicit.
 - [ ] AC #10: strengthen full-path success/evidence/lifecycle controls before approval.
+
+### 2026-09-05T20:54:55Z ramirosalas
+### Commit
+- Branch: story/MAC-hpqp
+- SHA: e55238223961fec922896c361d8af6cafc454a8e
+
+### RED candidate v2 authoritative delivery
+V2 revises rejected v1 under TEST-EDIT AUTHORIZED. V1 SHA612f65f3b4502a3267828507faaf0e395c8dd558 and all reproduction/PM evidence remain intact; neither candidate is called approved.
+
+Frozen v2 test/config/fixture inventory, exactly:
+- scripts/integration-lane/main_test.go
+- cmd/machinery/integration_lane_test.go
+- testdata/integration-lanes/schema.json
+- testdata/integration-lanes/pilot.json
+- testdata/integration-lanes/runtime-pins.json
+- testdata/integration-lanes/pilot.integration.test.mjs
+- testdata/integration-lanes/CONTRACT.md
+
+scripts/integration-lane/main.go remains the separately authorized, byte-unchanged fail-closed bootstrap. It is replaceable GREEN implementation, NOT frozen implementation bytes; GREEN must preserve the approved CLI contract and all frozen inputs above.
+
+PROOF:
+Exact v2 commands, counts, four-gap sensitivity proofs, AC1-10 mapping, coverage limits and LEARNINGS are in the new Implementation Evidence block. Canonical deliver was run once for this v2 delivery; this supported terminal comment ensures serialized Comments ordering cannot leave an older rejected contract authoritative.
+
+## nd_contract
+status: delivered
+
+### evidence
+- V2 SHA: e55238223961fec922896c361d8af6cafc454a8e;8files1753lines,within budget.
+- New leaves96=39PASS/57intendedRED/0SKIP; existing controls20leavesPASS. Exact roots,starts,terminals,missing/duplicate inventories checked.
+- Native70events34PASS36RED; runtime34events8PASS26RED; real Node pilot1PASS.
+- Raw JSON/TAP: /tmp/machinery-hpqp-red-v2.DQvyDf/.
+- pvg verify and actionlint PASS; no owned containers/host descendants remain; Dagger/user sentinel protection verified.
+- No operational implementation, full preflight, push/sync/install or installed artifact replacement.
+
+### proof
+- [x] AC #1: closed inventory/source contract preserved.
+- [x] AC #2: native separation and mandatory job/step/bypass assertions.
+- [x] AC #3: candidate cold formal closure positive with paired negatives and exact pins.
+- [x] AC #4: exact Go/Node events/runtime union plus real duplicate/incomplete controls.
+- [x] AC #5: mandatory Linux and exact shared Make invocation.
+- [x] AC #6: transparent strict ordering and executable bypass sensitivity.
+- [x] AC #7: all5 Go roots plus Node pilot registered, formal CLI positive mandatory.
+- [x] AC #8: host/container lifecycle and preexisting caller-root preservation challenges.
+- [x] AC #9: authorized v2 behavioral RED committed for independent review.
+- [x] AC #10: all25 full-path scenarios plus exact execution/report assertions.
+
