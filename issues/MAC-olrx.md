@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:57:39Z
-content_hash: "sha256:9557e0236fd77f625a164614a272ca7ce2bced0114f84861dad90f7861e84b53"
+content_hash: "sha256:d8a1785bb2d7c2e0a5145f4bd94b5e3a62cca285b6abb183ed8bcd276982622f"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-olrx
 ---
@@ -141,6 +141,7 @@ status: delivered
 - 2026-09-05T19:36:14Z dep_added: blocks MAC-ou97
 - 2026-09-05T19:47:31Z status: open -> in_progress
 - 2026-09-05T19:47:31Z claimed by dev-MAC-olrx
+- 2026-09-05T19:57:39Z status: in_progress -> in_progress
 
 ## Links
 - Parent: [[MAC-ui8a]]
