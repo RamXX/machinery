@@ -9,7 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:33:47Z
-content_hash: "sha256:f83de73b6e0da9c36a10b9c4ebea5084438bc63f084ce5364a5a13d59a08ae01"
+content_hash: "sha256:182c92af7b2b27dd51801f8f6726385c8593370ab6aa0d86babe64660b7ef5ec"
+blocks: [MAC-gcrr]
 ---
 
 ## Description
@@ -85,9 +86,10 @@ status: new
 
 
 ## History
-
+- 2026-09-05T19:35:08Z dep_added: blocks MAC-gcrr
 
 ## Links
 - Parent: [[MAC-ui8a]]
+- Blocks: [[MAC-gcrr]]
 
 ## Comments
