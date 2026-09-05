@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:01:14Z
-content_hash: "sha256:e60ef46ab7fb0eb2676f4ac76ddf6e9d52f3798a97003dfa443a0e6086ee4187"
+updated_at: 2026-09-05T21:01:37Z
+content_hash: "sha256:b9715d8cf90d96cfe51d4693bde71cfbdebea1bec0803ce51b0d993e243e04bd"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -506,4 +506,61 @@ status: delivered
 - [x] AC #8: host/container lifecycle and preexisting caller-root preservation challenges.
 - [x] AC #9: authorized v2 behavioral RED committed for independent review.
 - [x] AC #10: all25 full-path scenarios plus exact execution/report assertions.
+
+
+### 2026-09-05T21:01:37Z ramirosalas
+### Commit
+- Branch: story/MAC-hpqp
+- SHA: e55238223961fec922896c361d8af6cafc454a8e
+
+### PM RED v2 decision
+RED APPROVED after independent re-review from static gates through actual native/runtime replay. All four original rejection gaps are closed in the acceptance contract. Original rejected v1 evidence remains historical; v2 is the reviewed frozen candidate. This does not accept/close the story or claim operational GREEN behavior.
+
+PROOF:
+Working directory /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-hpqp:
+- go test -count=1 -timeout=2m -json ./scripts/integration-lane: expected exit 1; 12 roots,70 starts/70 terminals;64 leaves=32PASS/32intendedFAIL/0SKIP.
+- go test -tags machinery_integration -count=1 -timeout=15m -json ./cmd/machinery -run '^TestIntegrationLane(Pilot(OCI|Formal)|FullPath|HostDescendantControl|NodeEventControls)$': expected exit1; all5 registered roots,34 starts/34 terminals;31 leaves=6PASS/25intendedFAIL/0SKIP. All25 full-path scenario IDs individually present.
+- node --test --test-reporter=tap testdata/integration-lanes/pilot.integration.test.mjs: exact registered case1PASS/0FAIL/0SKIP/0cancel/todo.
+- go test -count=1 -timeout=90s -json ./scripts/run-safe ./internal/processcontrol:18 roots/22 starts/22 terminals,20 leafPASS/0FAIL/0SKIP.
+- Exact JSON inventories contain no missing terminal events, duplicate starts, duplicate terminals, or omitted selected identities. Combined new96 leaves=39passing controls/57intendedRED/0SKIP.
+- The39PASS controls include25 structural workflow/preflight mutation checks and4 actual small Bash sensitivity programs. Those29 are not candidate runtime successes. Actual OCI arithmetic/termination, fresh pinned Java/TLC safe/unsafe plus exact generated formal fixture, real orphan-descendant/liveness control, real duplicate/hanging Node event controls and real Node child pilot passed.
+- pvg verify scripts/integration-lane/main.go scripts/integration-lane/main_test.go cmd/machinery/integration_lane_test.go testdata/integration-lanes/pilot.integration.test.mjs --include-tests --format text PASS(3files/0issues); actionlint on ci/formal/nightly PASS; git diff --check PASS.
+- Re-read full current story and v1-to-v2 diff, plus relevant unchanged contract/tests. Candidate8files1753addedlines; v2 alters only4 authorized test/contract/fixture files. tdd-red and [test-edit-authorized] markers verified. main.go byte-identical to approved replaceable bootstrap.
+- Raw replay JSON retained /tmp/machinery-hpqp-pm-v2.BGiMqQ/{native,runtime,controls}.json. Bootstrap66.7% developer statement coverage is not operational implementation coverage.
+- Code graph remains stale/excluded for candidate paths; direct source used for all review claims. No product Paivot dependency, installed artifact edits, full preflight, full native suite, hosted run, push/sync/GitHub mutation or unrelated-worktree changes.
+
+### Original gap closure
+1. cold-cache now invokes the candidate CLI on a verified-empty private Go+Java+TLC cache. The exact generated native fixture runs safe/unsafe TLC via supplied closure paths, binds actual launcher/jar hashes to report identities and private cache paths, and pairs with wrong-pin/offline negatives. A blanket formal rejection cannot pass.
+2. Full-path positive reports require exact adapter/source/test and started/passed cardinality; retained Go JSON/Node TAP bytes and hashes are verified. Required runtime union, native versions/executable hashes and OCI/Java/TLC pin identities are checked. Node duplicate/incomplete native controls and candidate negative cases are present. Omitting Node execution cannot pass its marker/events positive.
+3. All25 paths preserve existing caller-root native identity, exact user-sentinel content and no owned residue, with cleanup assertions registered before invocation. Four actual host-descendant scenarios independently inspect exact PID/private script and require termination; standalone orphan control proves the challenge is live. Existing Docker ownership/sentinel checks remain.
+4. Mandatory workflow guards now inspect job and step conditions/error policies and exact invocation; preflight checks executable tokens, strict top-level ordering and bypasses. 25 disabled wiring fixtures plus4 actual bounded Bash controls establish sensitivity to the reported faults.
+
+### Frozen RED boundary and GREEN handoff
+Freeze scripts/integration-lane/main_test.go; cmd/machinery/integration_lane_test.go; testdata/integration-lanes/schema.json, pilot.json, runtime-pins.json, pilot.integration.test.mjs and CONTRACT.md at v2 SHA. scripts/integration-lane/main.go remains replaceable implementation, preserving the frozen public CLI contract. All57 candidate requirements remain intentionally red at that bootstrap and must pass unchanged in GREEN. Re-review complete CI/preflight wiring and final implementation; full epic preflight/hosted coverage remain deferred as authorized. GREEN may exceed the combined1800LOC estimate: investigate and justify final scope/volume; never trim approved tests to fit.
+
+LEARNINGS:
+Positive and negative integration contracts now cross the same CLI boundary. Exact native streams, runtime-byte identities, independently observed descendants and caller-owned sentinels make the previously missing outcomes observable.
+
+### Final ownership verification
+docker ps -a --filter label=dev.machinery.integration-run returned empty; bounded private shell-descendant inventory returned empty. All25 caller-root/sentinel cleanup callbacks passed. Dagger ID18576903a871d895c8b414ee0a41897313ce31d7b5b6284c29b489553e4fae99 remains running. Worktree clean. One PM ad-hoc JSON summarizer typo was corrected before final inventory checks; it was not a test or product failure.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical pvg story approve-red MAC-hpqp completed; verified open with hard-tdd,red-approved and without delivered/rejected/accepted.
+- Independent RED v2 SHA e55238223961fec922896c361d8af6cafc454a8e;96new leaves39PASS/57intendedFAIL/0SKIP;20existing controlsPASS.
+- RED-only approval returns story to ready GREEN queue. No acceptance or closure; serialized terminal contract appended after historical Comments.
+
+### proof
+- [x] AC #1: closed fragment/schema/source/identity/union RED contract reviewed.
+- [x] AC #2: service-free native exclusion and mandatory runtime/gating RED assertions verified.
+- [x] AC #3: same-CLI cold formal positive/negative closure contract and real fixture control verified.
+- [x] AC #4: exact native Go/Node events and runtime union identities required by RED.
+- [x] AC #5: mandatory Linux job/step and shared Make lane contract verified.
+- [x] AC #6: executable bypass/order guard sensitivity verified; existing consumers retained in contract.
+- [x] AC #7: five runnable Go roots plus real Node case; independent candidate formal positive mandatory.
+- [x] AC #8: caller ownership, owned host/container lifecycle and unrelated sentinel protection asserted.
+- [x] AC #9: authorized behavioral RED v2 frozen; replaceable bootstrap exception retained.
+- [x] AC #10: all25 real-process full-path challenges executed in RED, exact positive native evidence required for GREEN.
 
