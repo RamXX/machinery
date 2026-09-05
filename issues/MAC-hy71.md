@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:38:45Z
-content_hash: "sha256:893ea62b475d9790098546b6023d0cd8d06f6008f65dfbb504182bcd77a94319"
+updated_at: 2026-09-05T19:45:33Z
+content_hash: "sha256:989c2f218357432820024fb201ce03a9e4c68fd0bbec865b178bd79dea5f9433"
 blocks: [MAC-gcrr, MAC-ou97]
 ---
 
@@ -83,7 +83,15 @@ status: new
 
 
 ## Notes
-
+ANCHOR ROUND-1 AUTHORITATIVE CI OWNERSHIP REPAIR
+CONSUMES:
+- MAC-hpqp: .github/workflows/ci.yml
+  source: Required provisioned integration-lane job and service-free native suites.
+- MAC-hpqp: .github/workflows/formal.yml
+  source: Shared closed runtime inventory and formal engine provisioning.
+- MAC-hpqp: .github/workflows/nightly.yml
+  source: Explicit native versus required-lane selection.
+This story modifies these shared workflow files only after MAC-hpqp acceptance. Release required-check policy must include the required integration-lane job's actual exact identity, so a missing/skipped/failed lane prevents publication even if ordinary native tests pass. Preserve provisioning before invocation, selected-test accounting, full history and no-orphan validation. actionlint remains provisioned by existing local/CI pinned tool contract; local git policy tests remain service-free and never invoke GitHub mutations. Add targeted release-policy regression for absent/failed integration status. Do not reintroduce bare unconditional Docker tests into ordinary macOS or Linux suites.
 
 ## History
 - 2026-09-05T19:35:08Z dep_added: blocks MAC-gcrr
