@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:49:34Z
-content_hash: "sha256:22b5a07e5817e7639dea33e2befa73d0ffaf57f34906dec8a08ce5910d1fdb35"
+updated_at: 2026-09-05T21:51:53Z
+content_hash: "sha256:ad64496df5f5a5e0af9f54a8129bdd1be921fbba7d7dd3b7bf142855bb66fd25"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -109,6 +109,43 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## MAC-2u36 RED AUTHOR PAUSE — overlap triage and boundary-oracle review
+No delivery or claim release. Dispatcher requested a clean pause after the already-running focused replay; final full latest-SHA matrix is deferred until triage and reviewed oracle repairs settle.
+
+### Frozen candidate and history
+Current SHA d9d53b980a393c527eaf856b0bba5d8bc70867ec; branch story/MAC-2u36; internal/install/bootstrap_receipt_test.go SHA256 401a837755e1bb001680d33dd5516c18584c907cd1557fb00025dcc54e8cabe1; 903 added test LOC, no production edits. Boundary addition e1fd0a3 cost +194/-1, followed by three-line isolated-reference receipt removal d9d53b9. Combined budget under1100 now leaves197 LOC for eventual production versus earlier350 estimate; required four-case proof/helper cost must be investigated, not trimmed.
+Keep v1 99956740ae5559262790a9473b5597c1775928f2 and all evidence. cdb80369490db3c33586735934111f85796f9389 diagnostic amendment committed21:38:23Z before dispatcher hold reached author; explicit independent authorization at21:42:11Z followed the edit, not preceded it.
+
+### Focused commands and exact outcomes
+- e1fd0a3 compile-only: go test -count=1 -timeout=30s ./internal/install -run '^$' passed0.396s; zero selected tests, compile evidence only.
+- e1fd0a3: go test -count=1 -timeout=5m ./internal/install -run '^TestBootstrapReceiptCLI/parent_finalization' -json redirected stdout/stderr directly to /tmp/machinery-MAC-2u36-red.qRk5DC/e1fd0a3-parent-finalization.jsonl. Exit1,48.882s. Independent reference setup hit the separately reported real standalone overlapping-home receipt bug; no four boundary leaves executed. Log SHA256 bc36698fb00d9fe169db2db208ff0d7c5b5d7c20a77a19c022b216f0e7ac5ae3.
+- d9d53b9 same focused command redirected stdout/stderr directly to /tmp/machinery-MAC-2u36-red.qRk5DC/absent-reference-parent-finalization.jsonl. Exit1,166.511s. Four leaves: absent_false_close_fault_false FAIL31.18s; absent_false_close_fault_true FAIL31.48s; absent_true_close_fault_false FAIL29.36s; absent_true_close_fault_true FAIL29.13s. Leaf counts0pass/4fail/0skip. Full raw JSON parses; SHA256 0a073d3e1c2c7ed334130021b82436ea11d4efd3586ebbfd5b0063bb5ff17b63.
+- All four actual Update operations returned nil and observed all selected children (4/4 recorded mixed mode,2/2 explicit absent all-copy). Actual complete independent content comparison did not fail. Persisted receipt changed after each child: genuine AC6 sequencing defect. Parent close publication count0 on unchanged code is not late injected-fault rollback proof. Journal cleanup and bounded real lock reacquisition executed without failure.
+- Two test-oracle limitations below invalidate claiming the whole four-failure result as clean approved RED. No final matrix run.
+- pvg verify internal/install/bootstrap_receipt_test.go --format text --include-tests: PASSED1file0issues at d9d53b9. Worktree clean.
+- Live installed binary read-only SHA256 remains5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849; no live install/plugin/agent mutation, no preflight/push/sync/remote operations.
+
+### Pending narrow oracle review (no repairs made after pause)
+1. bootstrapFinalizationCase line673 canonical normalizer uses strings.ReplaceAll(path,f.root,canonicalRoot). A /private/var journal path contains the /var fixture-root substring and becomes /private/private/var. Lines679-689 therefore falsely report missing prepared coverage; line719 may fail to match a real scratch path. Not a production journal gap. Smallest proposed repair: replace only an actual prefix (HasPrefix + canonicalRoot + TrimPrefix), leave already-canonical paths unchanged, preserve exact path equality and full coverage.
+2. bootstrapFinalizationCase lines731-739 compute desired current digests and normalize wantReceipt only inside the close observer. No-fault comparison lines774-776 then sees stale desired digests if the hook never fires. That secondary receipt mismatch is an oracle dependency, not an independent production defect. Smallest proposed repair: compute independent desired normalized receipt once at the final completed-child observation after actual placements match the independent release reference; both scratch and final persisted-receipt comparisons consume that desired object without depending on the close observer firing. Keep all publication/count/scope/error/rollback expectations unchanged.
+Neither repair has been made; review/authorization required. Existing true ordinary intact later-target rollback and intact/edited convergence passing history remain separate from these new sequencing RED cases.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Retained committed tests-only d9d53b980a393c527eaf856b0bba5d8bc70867ec and complete direct raw focused logs; historical broad5a94840 has49leaves34pass15fail0skip536.345s with4invalid authority fixture failures.
+- Corrected93f8e6c focused authority/rollback history:8leaves4pass4fail0skip135.883s; ordinary intact failure was the reviewed diagnostic-oracle mismatch, not production RED. Tool diagnostics were truncated, so not final full proof.
+- No active test process remains. No delivery/approve-red/claim/status/label mutation.
+
+### proof
+- [x] Real standalone overlap defect reported with exact temporary CLI repro for Sr PM triage.
+- [x] Four real parent boundary cases attempted with all children and complete release placements observed; premature child receipt writes identified.
+- [ ] Two narrow boundary-oracle repairs pending independent review.
+- [ ] AC6 actual final publication/real close-fault rollback remains unexercised on unchanged production.
+- [ ] Full coherent latest-SHA raw15m replay, independent RED review/approval, GREEN and acceptance remain pending.
+
+
 ## DISCOVERED_BUG — standalone overlapping home receipt groups (RED author, 2026-09-05)
 title: Standalone install regrouping can publish overlapping home groups rejected by the next operation.
 context: While constructing the independent initially-absent-receipt AC6 reference, an actual built v9.9.2 CLI first recorded custom-a/custom-b with Copy:false and copy-a/copy-b with Copy:true, plus Codex Copy:false and OpenCode Copy:true. All roots were temporary. Running another actual standalone install from current source with --copy and --home custom-a --home custom-b --home copy-a --home copy-b succeeded, but the following standalone install --from current-source --target codex --target opencode --copy failed after real placement output with: invalid installation receipt .../config/install.json: home install paths overlap or repeat: .../home/copy-a and .../home/copy-a.
