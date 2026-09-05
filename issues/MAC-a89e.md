@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T23:57:31Z
-content_hash: "sha256:fc0d420a38644d9c5231847373232d8e005ede0fa1640ee8e88e0cf9969957d4"
+content_hash: "sha256:53249ff96f6b49edee7a61ebfa5accbd6bf8fbdffdc9969e572e617a482a4e5a"
 follows: [MAC-olrx, MAC-p8ce]
 assignee: dev-MAC-a89e
 closed_at: 2026-09-05T23:57:31Z
@@ -105,6 +105,18 @@ LEARNINGS:
 - Output assertions can accidentally match temporary test directory names; test prose rather than unrestricted substring presence.
 - Real baseline reruns expand an already-baselined edge even when output says nothing new to baseline.
 - Executing all printed advice with placeholder substitution demonstrates debt mutation directly without mocks or external services.
+
+
+## nd_contract
+status: accepted
+
+### evidence
+- PM closeout applied via pvg story accept on 2026-09-05.
+
+### proof
+- [x] Story closed after accepted label was applied.
+
+
 ## PM GREEN Final Review — MAC-a89e — 2026-09-05
 ACCEPTED: candidate 4f339474e52ee9e788d0d5d071105fba385188b2 satisfies all four ACs after the authorized narrow documentation rework. Read current canonical description, complete delivered evidence, frozen RED review, both test-edit authorizations and previous GREEN rejection; reviewed committed source independently in detached /tmp/MAC-a89e-pm-final.HlPJ3V/checkout.
 
