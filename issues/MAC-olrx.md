@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:23:16Z
-content_hash: "sha256:087aeb896ece6c39ba2266116de4b0998f1170024eacf6986f06e033b7b9c17e"
+updated_at: 2026-09-05T20:25:00Z
+content_hash: "sha256:64527dfd2ddd5796051c3646614669ce8fa70f58d2e12b8261a1e96cda618cf0"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-olrx
 ---
@@ -82,6 +82,64 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+## Implementation Evidence (GREEN REWORK: DOCS_STALE)
+
+PROOF:
+
+### CI/Test Results
+Commands run:
+- go test -count=1 -timeout=5m ./internal/gates -run '^TestObligationParent' -v
+- pvg verify docs/claude-plugin.md --format text
+- pvg story verify-tdd --base epic/MAC-ui8a --json
+- git diff --check epic/MAC-ui8a...HEAD
+- git diff --stat 8168b3d1d1599fd7860dd5afda5d7e55f49113aa..HEAD
+- git diff --exit-code 27373f421640f644a98be89f38ce112c30f55a85 -- internal/gates/obligation_ownership_test.go
+- git status --short
+
+Summary: Documentation-only repair at 6ba45625fd86307dd7fa996c70ff54d74ea4e0bd. Fresh parent regression run: 3 top-level / 7 leaf cases PASS, 0 FAIL, 0 skipped, 7.800s, including actual default and explicit CLI checks, source annotation activation after oracle deletion, covered parents and the obligation-free control. Coverage was not measured in this docs-only rework run. Historical full targeted 72/72 and golden 9/9 passes were produced and independently reviewed at 8168b3d1d1599fd7860dd5afda5d7e55f49113aa; they are not represented as new runs at this documentation SHA.
+
+Documentation repair: docs/claude-plugin.md:88 now explains that machine-less parents retain Gt with --impl when they own Policy/Isolation source annotations or committed decision oracles. Deleting generated output preserves source activation and Gp/Gn report the missing required output. The hook runs Gt when impl is configured. The existing CLI skip versus hook zero-machine count distinction is limited to truly obligation-free parents. Zero machines no longer implies zero relational obligations.
+
+Fresh diff from the previous delivery changes only docs/claude-plugin.md: 11 additions / 5 deletions. No production, test, fixture, golden, or configuration changes. The frozen RED file is byte-identical to 27373f421640f644a98be89f38ce112c30f55a85; TDD verification checked 5 commits with zero violations. Worktree clean, git diff --check clean. pvg verify returned PASS with 0 files scanned / 0 issues because its source scanner does not inspect Markdown; this is not claimed as automated prose validation. The exact changed paragraph was manually compared with suite.go source-annotation/oracle activation and Gp/Gn missing-output diagnostics.
+
+### Commit
+- Branch: story/MAC-olrx.
+- Frozen RED: 27373f421640f644a98be89f38ce112c30f55a85.
+- Behavioral GREEN: 8168b3d1d1599fd7860dd5afda5d7e55f49113aa.
+- Documentation rework / final GREEN: 6ba45625fd86307dd7fa996c70ff54d74ea4e0bd.
+- Subject: docs(MAC-olrx): explain parent-owned relational test obligations.
+
+### AC Verification
+| AC # | Proof | Status |
+|------|-------|--------|
+| 1 | Fresh 7-case parent replay confirms retained relational obligations, deletion activation, covered parents and zero-obligation control; public guide now matches these results | PASS |
+| 2 | Prior independent PM ownership review and targeted tests remain applicable; no behavior changed in rework | PASS |
+| 3 | Prior independent PM declaration/stable-ID review remains applicable; frozen tests unchanged and verify-tdd has zero violations | PASS |
+| 4 | Fresh actual CLI parent positive/negative cases pass; prior independent machine positive/negative proof unchanged | PASS |
+| 5 | DOCS_STALE corrected precisely in docs/claude-plugin.md:88; public explanation now agrees with implementation and fresh parent regression evidence | PASS |
+
+LEARNINGS:
+- Initial GREEN updated diagnostics and source comments but missed a contradictory public plugin paragraph. Documentation freshness must include the user-facing CLI/hook comparison for changed gate selection.
+- The prior ownership, source-activation and filesystem replay learnings remain authoritative; this rework changes only the public explanation.
+- pvg verify scans no Markdown files, so its zero-issue result supplements neither prose review nor behavioral verification.
+
+Limits: No broad suite or full preflight rerun for a documentation-only change. No pushes, syncs, GitHub mutations, installation/dev-link or live Machinery binary/plugin/skill changes. All seven freshly selected tests executed synchronously without skips.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Documentation repair committed at 6ba45625fd86307dd7fa996c70ff54d74ea4e0bd, one Markdown file only.
+- Fresh parent regression: 7 PASS / 0 FAIL / 0 skipped at the new SHA; coverage not measured.
+- verify-tdd: 5 commits / zero violations; frozen RED bytes unchanged; clean diff and worktree.
+- pvg verify: 0 Markdown files scanned / 0 issues, explicitly not proof of prose validation.
+
+### proof
+- [x] AC #1: fresh parent CLI/source-activation/zero-control replay passes; documentation corrected.
+- [x] AC #2: prior independently verified owner isolation unchanged.
+- [x] AC #3: prior independently verified declaration and stable-ID guarantees unchanged; frozen bytes preserved.
+- [x] AC #4: fresh real parent CLI positive/negative tests pass; independent machine evidence unchanged.
+- [x] AC #5: public parent-owned relational coverage description is accurate; DOCS_STALE resolved.
 
 
 ## nd_contract
