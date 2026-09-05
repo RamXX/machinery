@@ -210,6 +210,14 @@ func bootstrapSeed(t *testing.T, release *bootstrapRelease) bootstrapInstall {
 	if len(f.receipt.HomeInstalls) != 2 || len(f.receipt.Targets) != 2 {
 		t.Fatalf("real install omitted topology: %+v", f.receipt)
 	}
+	f.receipt.HostPlugins = []string{"claude", "codex"}
+	raw, err := json.Marshal(f.receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(f.config, "install.json"), raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	return f
 }
 
@@ -268,6 +276,13 @@ func TestBootstrapReceiptPlan(t *testing.T) {
 			t.Fatalf("defaults: %+v want %v", got, want)
 		}
 	})
+	t.Run("supported schema one control", func(t *testing.T) {
+		t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+		writeLegacyReceipt(t, installReceipt{})
+		if _, err := updatePlan(UpdateOptions{BootstrapDefaults: true}); err != nil {
+			t.Fatalf("supported schema one rejected: %v", err)
+		}
+	})
 	for _, opts := range []UpdateOptions{{Homes: []string{"/explicit"}}, {Targets: []string{"codex"}}} {
 		opts.BootstrapDefaults = true
 		if _, err := updatePlan(opts); err == nil || !strings.Contains(err.Error(), "cannot be combined") {
@@ -312,81 +327,180 @@ func TestBootstrapReceiptPlan(t *testing.T) {
 	})
 }
 
+// The reference is installed independently by the real release CLI from the
+// current source, before the tested updater runs. It includes every file and
+// link, rather than trusting whichever inventory that updater publishes.
+func bootstrapContentState(t *testing.T, f bootstrapInstall) map[string]string {
+	t.Helper()
+	state := bootstrapState(t, f)
+	delete(state, "receipt")
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Coordination lock names encode each fixture's distinct config scope.
+	locks := filepath.Join(cache, "machinery", "locks") + string(os.PathSeparator)
+	normalized := map[string]string{}
+	for path, value := range state {
+		if strings.HasPrefix(path, locks) {
+			continue
+		}
+		normalized[strings.ReplaceAll(path, f.root, "$ROOT")] = strings.ReplaceAll(value, f.root, "$ROOT")
+	}
+	return normalized
+}
+
+func bootstrapAssertConvergence(t *testing.T, f bootstrapInstall, release *bootstrapRelease, expected map[string]string, bootstrap bool) {
+	t.Helper()
+	before := bootstrapState(t, f)
+	bootstrapCommand(t, f.root, f.env, f.binary, f.args(bootstrap)...)
+	if !bytes.Equal(bootstrapRead(t, f.binary), release.nextBytes) {
+		t.Error("binary does not match verified release digest")
+	}
+	if got := string(bootstrapCommand(t, f.root, f.env, f.binary, "version")); got != "machinery version v9.9.2\n" {
+		t.Errorf("wrong release version: %s", got)
+	}
+	r, _, err := loadReceipt()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(r.HomeInstalls, f.receipt.HomeInstalls) || !reflect.DeepEqual(r.Targets, f.receipt.Targets) || !reflect.DeepEqual(r.HostPlugins, f.receipt.HostPlugins) {
+		t.Errorf("rerun changed recorded topology: %+v", r)
+	}
+	wantPaths, gotPaths := []string{}, []string{}
+	for _, a := range f.receipt.Artifacts {
+		wantPaths = append(wantPaths, a.Path)
+	}
+	for _, a := range r.Artifacts {
+		gotPaths = append(gotPaths, a.Path)
+	}
+	if !reflect.DeepEqual(gotPaths, wantPaths) {
+		t.Errorf("incomplete receipt inventory: got %v want %v", gotPaths, wantPaths)
+	}
+	if got := bootstrapContentState(t, f); !reflect.DeepEqual(got, expected) {
+		t.Error("installed complete content/modes/link destinations differ from independent current-release installation")
+		for path, want := range expected {
+			if got[path] != want {
+				t.Errorf("release content %s: got %s want %s", path, got[path], want)
+			}
+		}
+		for path := range got {
+			if _, ok := expected[path]; !ok {
+				t.Errorf("unexpected installed content: %s", path)
+			}
+		}
+	}
+	for _, a := range f.receipt.Artifacts {
+		err := filepath.WalkDir(a.Path, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() || d.Type()&os.ModeSymlink != 0 {
+				return nil
+			}
+			if bytes.Contains(bootstrapRead(t, path), []byte("bootstrap historical asset")) {
+				t.Errorf("recorded target remains stale: %s", path)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	for _, a := range r.Artifacts {
+		digest, err := artifactTreeDigest(a.Path)
+		if err != nil || digest != a.Digest {
+			t.Errorf("receipt digest mismatch %s: %s %v", a.Path, digest, err)
+		}
+	}
+	after := bootstrapState(t, f)
+	for path, value := range before {
+		if strings.Contains(path, "unrelated") && after[path] != value {
+			t.Errorf("unrelated file changed: %s", path)
+		}
+	}
+	bootstrapCommand(t, f.root, f.env, f.binary, f.args(bootstrap)...)
+	if !reflect.DeepEqual(after, bootstrapState(t, f)) {
+		t.Error("same release rerun is not byte/topology idempotent")
+	}
+}
+
 func TestBootstrapReceiptCLI(t *testing.T) {
 	release := bootstrapReleaseFixture(t)
+	repo, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference := bootstrapSeed(t, &bootstrapRelease{old: release.next, source: repo})
+	expected := bootstrapContentState(t, reference)
+	for _, authority := range []string{"absent", "forged", "unprepared", "out_of_scope"} {
+		t.Run("receipt_authority_"+authority, func(t *testing.T) { bootstrapAuthorityCase(t, release, repo, authority) })
+	}
 	for _, bootstrap := range []bool{false, true} {
 		t.Run(fmt.Sprintf("converges_bootstrap_%t", bootstrap), func(t *testing.T) {
 			f := bootstrapSeed(t, release)
-			before := bootstrapState(t, f)
-			bootstrapCommand(t, f.root, f.env, f.binary, f.args(bootstrap)...)
-			if !bytes.Equal(bootstrapRead(t, f.binary), release.nextBytes) {
-				t.Error("binary does not match verified release digest")
-			}
-			r, _, err := loadReceipt()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(r.HomeInstalls, f.receipt.HomeInstalls) || !reflect.DeepEqual(r.Targets, f.receipt.Targets) {
-				t.Errorf("rerun changed recorded topology: %+v", r)
-			}
-			for _, a := range f.receipt.Artifacts {
-				err := filepath.WalkDir(a.Path, func(path string, d fs.DirEntry, err error) error {
-					if err != nil {
-						return err
-					}
-					if d.IsDir() || d.Type()&os.ModeSymlink != 0 {
-						return nil
-					}
-					if bytes.Contains(bootstrapRead(t, path), []byte("bootstrap historical asset")) {
-						t.Errorf("recorded target remains stale: %s", path)
-					}
-					return nil
-				})
-				if err != nil {
-					t.Error(err)
-				}
-			}
-			for _, a := range r.Artifacts {
-				digest, err := artifactTreeDigest(a.Path)
-				if err != nil || digest != a.Digest {
-					t.Errorf("receipt digest mismatch %s: %s %v", a.Path, digest, err)
-				}
-			}
-			after := bootstrapState(t, f)
-			for path, value := range before {
-				if strings.Contains(path, "unrelated") && after[path] != value {
-					t.Errorf("unrelated file changed: %s", path)
-				}
-			}
-			bootstrapCommand(t, f.root, f.env, f.binary, f.args(bootstrap)...)
-			if !reflect.DeepEqual(after, bootstrapState(t, f)) {
-				t.Error("same release rerun is not byte/topology idempotent")
-			}
+			bootstrapAssertConvergence(t, f, release, expected, bootstrap)
 		})
 	}
-	for _, bootstrap := range []bool{false, true} {
-		t.Run(fmt.Sprintf("later_target_failure_rolls_back_bootstrap_%t", bootstrap), func(t *testing.T) {
-			f := bootstrapSeed(t, release)
-			before := bootstrapState(t, f)
-			release.broken.Store(true)
-			defer release.broken.Store(false)
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			cmd := exec.CommandContext(ctx, f.binary, f.args(bootstrap)...)
-			cmd.Dir, cmd.Env = f.root, f.env
-			out, err := cmd.CombinedOutput()
-			if err == nil {
-				t.Errorf("missing later OpenCode source unexpectedly succeeded: %s", out)
-			}
-			if !strings.Contains(string(out), "updated machinery binary") || !strings.Contains(string(out), "custom-a") || !strings.Contains(string(out), ".codex") {
-				t.Errorf("did not prove binary and earlier placements changed before later failure: %s", out)
-			}
-			if !reflect.DeepEqual(before, bootstrapState(t, f)) {
-				t.Error("later target failure did not restore old binary, all homes/native targets, and receipt")
-			}
-		})
+	for _, repair := range []string{"edited_owned_artifact", "missing_owned_artifact", "both_native_groups_missing"} {
+		for _, bootstrap := range []bool{false, true} {
+			t.Run(fmt.Sprintf("repair_%s_bootstrap_%t", repair, bootstrap), func(t *testing.T) {
+				f := bootstrapSeed(t, release)
+				path := filepath.Join(f.home, ".codex", "agents", "machinery-fsm-author.toml")
+				if repair == "edited_owned_artifact" {
+					write(t, path, "externally modified target")
+				} else if err := os.Remove(path); err != nil {
+					t.Fatal(err)
+				}
+				if repair == "both_native_groups_missing" {
+					if err := os.Remove(filepath.Join(f.home, ".config", "opencode", "plugins", "machinery.js")); err != nil {
+						t.Fatal(err)
+					}
+				}
+				bootstrapAssertConvergence(t, f, release, expected, bootstrap)
+			})
+		}
 	}
-	for _, negative := range []string{"corrupt receipt", "unsafe receipt", "stale schema", "stale artifact", "disappeared target", "plugin discovery failure"} {
+	for _, missing := range []bool{false, true} {
+		for _, bootstrap := range []bool{false, true} {
+			name := fmt.Sprintf("later_target_failure_rolls_back_bootstrap_%t", bootstrap)
+			if missing {
+				name = "missing_prestate_" + name
+			}
+			t.Run(name, func(t *testing.T) {
+				f := bootstrapSeed(t, release)
+				missingPath := filepath.Join(f.home, ".codex", "agents", "machinery-fsm-author.toml")
+				if missing {
+					if err := os.Remove(missingPath); err != nil {
+						t.Fatal(err)
+					}
+				}
+				before := bootstrapState(t, f)
+				release.broken.Store(true)
+				defer release.broken.Store(false)
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, f.binary, f.args(bootstrap)...)
+				cmd.Dir, cmd.Env = f.root, f.env
+				out, err := cmd.CombinedOutput()
+				if err == nil {
+					t.Errorf("missing later OpenCode source unexpectedly succeeded: %s", out)
+				}
+				if !strings.Contains(string(out), "updated machinery binary") || !strings.Contains(string(out), "custom-a") || !strings.Contains(string(out), ".codex") {
+					t.Errorf("did not prove binary and earlier placements changed before later failure: %s", out)
+				}
+				if !reflect.DeepEqual(before, bootstrapState(t, f)) {
+					t.Error("later target failure did not restore old binary, all homes/native targets, and receipt")
+				}
+				if missing {
+					if _, err := os.Lstat(missingPath); !os.IsNotExist(err) {
+						t.Errorf("original absence was not restored: %v", err)
+					}
+				}
+			})
+		}
+	}
+	for _, negative := range []string{"corrupt receipt", "unsafe receipt", "stale schema", "plugin discovery failure", "symlink native artifact", "non-directory native parent"} {
 		t.Run(negative, func(t *testing.T) {
 			f := bootstrapSeed(t, release)
 			path := filepath.Join(f.config, "install.json")
@@ -406,14 +520,22 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 				if err := os.WriteFile(path, raw, 0o600); err != nil {
 					t.Fatal(err)
 				}
-			case "disappeared target":
-				if err := os.Remove(filepath.Join(f.home, ".codex", "agents", "machinery-fsm-author.toml")); err != nil {
-					t.Fatal(err)
-				}
-			case "stale artifact":
-				write(t, filepath.Join(f.home, ".codex", "agents", "machinery-fsm-author.toml"), "externally modified target")
 			case "plugin discovery failure":
 				write(t, filepath.Join(f.home, ".claude", "plugins", "cache"), "not a directory")
+			case "symlink native artifact":
+				target := filepath.Join(f.home, ".codex", "agents", "machinery-fsm-author.toml")
+				if err := os.Remove(target); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(filepath.Join(f.home, "unrelated", "sentinel"), target); err != nil {
+					t.Fatal(err)
+				}
+			case "non-directory native parent":
+				parent := filepath.Join(f.home, ".codex", "agents")
+				if err := os.Rename(parent, filepath.Join(f.root, "parked-agents")); err != nil {
+					t.Fatal(err)
+				}
+				write(t, parent, "unsafe non-directory parent")
 			}
 			before := bootstrapState(t, f)
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -466,4 +588,100 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 			t.Errorf("recovery journal remains: %v", err)
 		}
 	})
+}
+
+func bootstrapAuthorityCase(t *testing.T, release *bootstrapRelease, source, authority string) {
+	t.Helper()
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	config := filepath.Join(root, "config")
+	if err := os.MkdirAll(config, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("MACHINERY_CONFIG_DIR", config)
+	env := os.Environ()
+	bootstrapCommand(t, root, env, release.next, "install", "--from", source, "--home", home)
+	receipt, exists, err := loadReceipt()
+	if err != nil || !exists || len(receipt.HomeInstalls) != 1 || len(receipt.Artifacts) != 3 {
+		t.Fatalf("standalone receipt missing/invalid: %+v %v", receipt, err)
+	}
+	for _, artifact := range receipt.Artifacts {
+		digest, err := artifactTreeDigest(artifact.Path)
+		if err != nil || digest != artifact.Digest {
+			t.Fatalf("standalone receipt digest invalid: %s %v", artifact.Path, err)
+		}
+	}
+	receiptPath := filepath.Join(config, "install.json")
+	beforeReceipt := bootstrapRead(t, receiptPath)
+	beforeHome, err := artifactTreeDigest(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := acquireInstallOperationLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := lock.Release(); err != nil {
+			t.Error(err)
+		}
+	})
+	tx, err := beginArtifactTransaction(append(homeInstallArtifactPaths([]string{home}), receiptPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := tx.rollback(); err != nil {
+			t.Error(err)
+		}
+	})
+	scope, err := installOperationScope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	capability, cleanup, err := createInstallLockCapability(scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	encoded := capability.String()
+	selected := home
+	switch authority {
+	case "absent":
+		encoded = ""
+	case "forged":
+		encoded = "forged-parent-capability"
+	case "out_of_scope":
+		selected = filepath.Join(root, "outside-coverage")
+	case "unprepared":
+		marker := filepath.Join(tx.root, installJournalPrepared)
+		raw := bootstrapRead(t, marker)
+		if err := os.Remove(marker); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			if err := os.WriteFile(marker, raw, 0o600); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, release.next, "install", "--from", release.source, "--home", selected)
+	cmd.Dir, cmd.Env = root, append(env, installLockCapabilityEnv+"="+encoded)
+	out, err := cmd.CombinedOutput()
+	if err == nil || ctx.Err() != nil {
+		t.Errorf("unauthorized receipt participant: err=%v deadline=%v output=%s", err, ctx.Err(), out)
+	}
+	afterHome, err := artifactTreeDigest(home)
+	if err != nil || beforeHome != afterHome || !bytes.Equal(beforeReceipt, bootstrapRead(t, receiptPath)) {
+		t.Errorf("rejected child changed standalone content/receipt: %v", err)
+	}
+	if selected != home {
+		if _, err := os.Lstat(selected); !os.IsNotExist(err) {
+			t.Errorf("out-of-scope child created target: %v", err)
+		}
+	}
 }
