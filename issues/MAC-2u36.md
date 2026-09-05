@@ -9,7 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:33:48Z
-content_hash: "sha256:c3b756a31ccdee4cd8125d11cac9cc0af78dfb0d45fa537e2f232cb1e95fd30f"
+content_hash: "sha256:3f93445ac820f374d759a37bf62435d11a2645e275b2c040c4b944b9f80a6ef9"
+blocks: [MAC-gcrr]
 ---
 
 ## Description
@@ -79,9 +80,10 @@ status: new
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 
 ## History
-
+- 2026-09-05T19:35:08Z dep_added: blocks MAC-gcrr
 
 ## Links
 - Parent: [[MAC-ui8a]]
+- Blocks: [[MAC-gcrr]]
 
 ## Comments
