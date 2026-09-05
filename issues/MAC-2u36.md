@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:26:33Z
-content_hash: "sha256:2e5feb335902768cdf5d7e7ec4efc43fc4e7c12edf260a0f8ec6a692cdb3495c"
+updated_at: 2026-09-05T23:26:47Z
+content_hash: "sha256:563de5def77f48d5e2f5f0dcc45317a3fef84fff7eb853baef5c62f39475bf6a"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce]
 assignee: dev-MAC-2u36
@@ -130,7 +130,8 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
-
+## Reworked RED delivery readback
+At frozen496963fb7f4842d706d308dafcbd145908a6e395, pvg story verify-delivery MAC-2u36 returned Passed:9, Failed:0 after one canonical deliver for this rework and the append-only terminal delivered comment. Fresh readback confirms in_progress plus delivered label, authoritative delivered contract, current79leaf62PASS17FAIL0SKIP proof, currentSHA and explicit historical AC2 correction. No second broad replay or repeat deliver in this attempt.
 
 ## nd_contract
 status: delivered
