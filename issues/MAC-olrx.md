@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:25:00Z
-content_hash: "sha256:4f9320b3a652c28e74c6fa326aa7d15686b9cfedd222f06e5ca0df592cf21f00"
+updated_at: 2026-09-05T20:25:34Z
+content_hash: "sha256:15bf93095a469a4f697941f5e77a1a70419ee2d81e4a44ab1fc41c4712fe1d8f"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-olrx
 ---
@@ -486,3 +486,24 @@ status: rejected
 - [x] AC #3: validation and stable-ID invariance independently verified.
 - [x] AC #4: actual-path negative and positive tests independently verified.
 - [ ] AC #5 / DOCS_STALE: docs/claude-plugin.md:88-92 must accurately explain parent-owned relational obligations.
+
+### 2026-09-05T20:25:34Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- Documentation-only rework for DOCS_STALE: 6ba45625fd86307dd7fa996c70ff54d74ea4e0bd, docs/claude-plugin.md:88; prior rejection is addressed.
+- Full fresh Implementation Evidence (GREEN REWORK: DOCS_STALE), CI/Test Results, Commands run, Summary, AC Verification and LEARNINGS are appended in Notes.
+- Fresh go test -count=1 -timeout=5m ./internal/gates -run '^TestObligationParent' -v: 7 PASS / 0 FAIL / 0 skipped, 7.800s, at this SHA. Coverage not measured.
+- pvg story verify-tdd --base epic/MAC-ui8a --json: 5 commits / zero violations. Frozen RED27373f421640f644a98be89f38ce112c30f55a85 unchanged.
+- pvg verify docs/claude-plugin.md --format text: 0 files scanned / 0 issues (Markdown is not inspected). Manual paragraph/source comparison and fresh regression replay provide the documentation proof.
+- pvg story deliver succeeded exactly once for this rework. This terminal append-only contract supersedes the prior PM rejection comment; Notes render before Comments in tracker output.
+- Only one documentation file changed since prior GREEN; clean diff/worktree. No push/sync/install/preflight or product dependency changes.
+
+### proof
+- [x] AC #1: public parent coverage explanation corrected; fresh parent positive/negative/zero/source-deletion replay passes.
+- [x] AC #2: independently reviewed machine plus guard ownership behavior unchanged.
+- [x] AC #3: independently reviewed declaration validation/stable IDs unchanged; frozen RED bytes preserved.
+- [x] AC #4: actual parent CLI paths freshly pass; prior independent machine cases unchanged.
+- [x] AC #5: docs/claude-plugin.md now accurately distinguishes parent relational obligations from genuinely obligation-free parents; DOCS_STALE resolved.
+
