@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:50:54Z
-content_hash: "sha256:1080e6403eb6e207c590df4046148bbc58bce7671431034f37305eb580dcd09f"
+updated_at: 2026-09-05T23:51:29Z
+content_hash: "sha256:6cf035ff038f33c7f007407907687f2142a64895f2ccf8d1c8a94fb90b1eef13"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce]
@@ -394,6 +394,8 @@ Supported single-executable EDITOR guarded the exact old canonical Description. 
 
 Prior canonical Description retained verbatim for append-only decision history:
 <previous_canonical_description>
+SR PM terminal canonical-scope checks: pvg lint --backlog --epic MAC-ui8a PASSED (33 issues; 0 errors, 0 review findings); pvg nd dep cycles reported no cycles; pvg rtm check --epic MAC-ui8a PASSED (18 stories, 2 closed; 0 tagged requirements extracted/0 uncovered, so this is structural coverage only, not product AC proof). Canonical readback matched approved embedded contract and all five original AC byte-for-byte; original Description retained in append-only notes. Pending independent PM test-edit/seam authorization; no approve-red or queue advance performed.
+
 ## USER INTENT
 Strengthen Machinery mission-critical assurance with observable fail-closed behavior and precise limits.
 
