@@ -255,13 +255,19 @@ and is the default attestor for that design's LLM-attested gate halves.
   matters: two individually green design PRs can merge into a stale combination.
 
 **Merge protocol for generated files.** Never hand-resolve a conflict in a generated file.
-On any conflict in `*.oracle.md`, `formal/*.tla|cfg`, `packs/`, or `ratchet.json`: take
+On any conflict in `*.oracle.md`, `formal/*.tla|cfg`, or `packs/`: take
 either side, regenerate (`machinery oracle design/machines`, `machinery verify-formal
-design`, `machinery pack generate`, or `machinery baseline design --impl .`), commit, and
+design`, or `machinery pack generate design`), commit, and
 let `machinery check` arbitrate the result. The
 sources (machine JSON, matrix, contract, domain model) merge like ordinary text and their
 conflicts are resolved by humans as usual; the generated layer is always reconstructed,
 never merged.
+
+Conflicts in `ratchet.json` require explicit review of accepted boundary debt.
+A deliberate `machinery baseline design --impl .` rerun rewrites that snapshot and
+may accept new offender files even when no dependency rules are proposed. Review
+the ratchet and offender changes before adopting them; baseline is not routine
+artifact regeneration.
 
 **STATE.md.** The session ledger is single-writer: only the steward updates it, and only
 on the branch where an interrogation session is actually running. Cross-branch status
