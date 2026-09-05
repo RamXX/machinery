@@ -9,9 +9,9 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T23:25:58Z
-content_hash: "sha256:fc3c2af636aa583b0ca6a29af2ac87bbfc1f821e9386cd33fecd0ffc6139800e"
+content_hash: "sha256:e2c1dff8f6fee937493f77d0fa90b8cf2eb778933afc9c296613eee1aff97d05"
 blocks: [MAC-gcrr, MAC-ou97]
-follows: [MAC-olrx]
+follows: [MAC-olrx, MAC-p8ce]
 assignee: dev-MAC-2u36
 ---
 
@@ -1124,11 +1124,13 @@ Preserved as quoted history; current Description is authoritative.
 - 2026-09-05T23:04:15Z released by ramirosalas
 - 2026-09-05T23:04:49Z status: open -> in_progress
 - 2026-09-05T23:04:49Z claimed by dev-MAC-2u36
+- 2026-09-05T23:25:59Z status: in_progress -> in_progress
+- 2026-09-05T23:25:59Z auto-follows: linked to predecessor MAC-p8ce
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
-- Follows: [[MAC-olrx]]
+- Follows: [[MAC-olrx]], [[MAC-p8ce]]
 
 ## Comments
 
