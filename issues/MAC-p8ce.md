@@ -1,18 +1,19 @@
 ---
 id: MAC-p8ce
 title: "Bind consumer READS to each event edge"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:07:16Z
-content_hash: "sha256:98f269e2ae95836d0ab04939965193e62dc27a3c6dfad7d62fa9172384c97e91"
-blocks: [MAC-gcrr, MAC-ou97]
+updated_at: 2026-09-05T23:07:17Z
+content_hash: "sha256:92db2ae913fd05721b8a6535c78a6ff2d3b31d184e728f282eb79ecbba6c7b9a"
 assignee: dev-MAC-p8ce
 follows: [MAC-olrx]
+closed_at: 2026-09-05T23:07:17Z
+close_reason: "Independent GREEN review: frozen RED unchanged, all 78 targeted leaves and 9 native CLI cases pass; all five ACs verified."
 ---
 
 ## Description
@@ -452,10 +453,12 @@ status: delivered
 - 2026-09-05T22:43:57Z auto-follows: linked to predecessor MAC-olrx
 - 2026-09-05T22:43:57Z claimed by dev-MAC-p8ce
 - 2026-09-05T22:54:50Z status: in_progress -> in_progress
+- 2026-09-05T23:07:17Z status: in_progress -> closed
+- 2026-09-05T23:07:17Z dep_removed: no_longer_blocks MAC-gcrr
+- 2026-09-05T23:07:17Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 - Follows: [[MAC-olrx]]
 
 ## Comments
