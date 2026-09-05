@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:01:13Z
-content_hash: "sha256:c3b5f6b35c09df2fc4fbcfc76a82292e47f89d6bdf74b6a0e25996df3f4dc002"
+updated_at: 2026-09-05T21:01:14Z
+content_hash: "sha256:e60ef46ab7fb0eb2676f4ac76ddf6e9d52f3798a97003dfa443a0e6086ee4187"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -90,6 +90,16 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 
 ## Notes
+
+
+## nd_contract
+status: red-approved
+
+### evidence
+- RED tests approved via pvg story approve-red on 2026-09-05.
+
+### proof
+- [ ] GREEN developer must implement against the approved RED tests without modifying them.
 
 
 ## nd_contract
