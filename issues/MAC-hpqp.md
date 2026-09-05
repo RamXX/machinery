@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T20:32:44Z
-content_hash: "sha256:005fe66164918e0434ce37af198817a37d2cb385fc6e1283fbeb33554faa5fbb"
+content_hash: "sha256:9ed63ab59f7508aac9aa11cf6997d824da4539704b868a1776897fc9a454e04e"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 ---
 
@@ -254,3 +254,49 @@ status: delivered
 - [x] AC #9: compile-safe behavioral RED frozen and independently reviewable.
 - [x] AC #10: all 19 full-path scenarios plus raw-report assertions defined; operational lane remains RED awaiting GREEN.
 
+
+### 2026-09-05T20:32:44Z ramirosalas
+## PM Decision
+REJECTED [2026-09-05]: RED contract needs stronger acceptance assertions before freeze. The authorized fail-closed bootstrap itself is not a rejection reason.
+
+EXPECTED: AC #3/#7/#10 require provisioned full-path success and a cold-cache positive through the required lane.
+DELIVERED: cmd/machinery/integration_lane_test.go:143 calls formal.VerifyFormalTo directly; CLI formal scenarios at lines 220-222 are only negative. success and cold-cache both select Go+Docker after the harness already pulls the image (lines 174, 198, 218), with no fresh closure/provisioning assertion.
+GAP: A lane that rejects every formal request, or never provisions a cold runtime closure, can satisfy these assertions while the separate formal control passes.
+FIX: Add a real CLI-path valid Java/TLC suite starting from a verified empty private cache, executing the provisioned closure and verifying its expected identities and native events. Keep offline and invalid-pin negatives paired with that positive; do not remove shared Docker images.
+
+EXPECTED: AC #4/#10 require exact native test identities, complete events and per-runtime evidence; reports cannot substitute for native events.
+DELIVERED: Full-path receipt (lines 342-369) decodes only Started/Passed for suites and accepts any nonempty runtime ID/Identity. Node success never reads its TAP/events file, hash, exact selected source/name, or terminal cardinality. The stronger raw-event assertion exists only for a one-test Go fixture.
+GAP: Node aggregate counts with a marker and an arbitrary runtime record pass the success assertions; exact Node event evidence and required runtime union/pins are unproved.
+FIX: Assert retained/hash-bound native events and exact source/test/terminal identities for Node and full-path Go, exact required runtime set and expected verified identities, and real duplicate/missing-terminal Node rejection controls.
+
+EXPECTED: AC #8 requires owned processes and temporary roots reclaimed on success/failure/timeout/cancellation/provision error while preserving user files.
+DELIVERED: Lifecycle fixtures create only Docker containers and fresh roots (lines 197-200, 371-387, 392-417); no independently observed descendant process or preexisting caller-owned work-root sentinel is challenged.
+GAP: Killing only the lane parent and deleting caller-owned directories can escape these tests.
+FIX: Add bounded real descendant PID/liveness challenges with exact-ownership emergency cleanup across the lifecycle paths, and an existing --work-dir containing an unrelated user sentinel whose content must survive.
+
+EXPECTED: AC #2/#5/#6 require mandatory CI/preflight execution without hidden optional gating.
+DELIVERED: Workflow parser at scripts/integration-lane/main_test.go:384-417 ignores job-level if and step-level continue-on-error; invocation/order checks are substring matches. Preflight bypass check at 432 only rejects one diagnostic text.
+GAP: A job-level false condition or continue-on-error lane step passes this mandatory-lane oracle; renaming the bypass message evades the preflight check.
+FIX: Assert execution-affecting job and step conditions/error policies, and validate executable mandatory preflight ordering/bypass behavior rather than comment/message presence. Add negative fixture controls showing each disabled or ignored lane is rejected.
+
+## nd_contract
+status: rejected
+
+### evidence
+- Reviewed full story, all eight files at 612f65f3b4502a3267828507faaf0e395c8dd558 and the documented bootstrap exception; no test/fixture edits.
+- Independent targeted native/runtime replay evidence and exact final counts are recorded in the terminal PM comment.
+
+### proof
+- [x] AC #1: closed inventory/source mutations and union contract reviewed.
+- [ ] AC #2: mandatory gating assertions incomplete.
+- [ ] AC #3: valid fresh formal closure through candidate lane unproved.
+- [ ] AC #4: exact Node/native runtime evidence incomplete.
+- [ ] AC #5: workflow job/step bypasses unchallenged.
+- [ ] AC #6: preflight bypass oracle depends on message text.
+- [ ] AC #7: formal pilot runs directly, not a valid candidate-lane closure positive.
+- [x] AC #9: behavioral RED marker and authorized bootstrap verified; full preflight deferred.
+- [ ] AC #8: host-process and existing user-root preservation unproved.
+- [ ] AC #10: full-path positive/report contract needs the above repairs.
+
+### Revised RED authorization
+TEST-EDIT AUTHORIZED: scripts/integration-lane/main_test.go; cmd/machinery/integration_lane_test.go; testdata/integration-lanes/schema.json, pilot.json, runtime-pins.json, pilot.integration.test.mjs and CONTRACT.md -- the current candidate RED has not been approved. Revise these tests/fixtures/contracts only as needed to close the four explicit gaps above, then commit a new tdd-red candidate with [test-edit-authorized] in the repair commit subject. Preserve the original 612f65f3b4502a3267828507faaf0e395c8dd558 reproduction evidence, label candidate versions clearly, and independently re-review the new SHA before freezing. Controls must reject an implementation omitting required formal or Node execution and one deleting caller-owned --work-dir content. These guarantees belong in MAC-hpqp, not a deferred capstone. The dispatcher-authorized main.go bootstrap remains replaceable implementation; this review authorizes no operational GREEN behavior in RED.
