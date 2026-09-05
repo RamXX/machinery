@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:57:39Z
-content_hash: "sha256:ced3a1d7f4c8272e8bcf15f7903ba1b4bf08d3b528706aadf8df7875279af65c"
+updated_at: 2026-09-05T19:58:17Z
+content_hash: "sha256:7315f7e4ac340cb878588daab274b94d58f467a212ef4d39f30ac9537726c157"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-olrx
 ---
@@ -82,7 +82,51 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+## Implementation Evidence (RED DELIVERED)
 
+PROOF:
+
+### CI/Test Results
+Commands run:
+- go test -count=1 -timeout=5m -cover ./internal/gates -run 'Clause|Parent|Selection|Obligation' -v
+- go test -count=1 -timeout=5m ./internal/gates -run 'TestObligationClausesSingleMachinePositiveControl$|TestObligationParentRealCLI$/obligation-free-parent-control$' -v
+- pvg verify internal/gates/obligation_ownership_test.go --format text --include-tests
+- git diff --check
+
+Summary: RED EXPECTED — targeted 44 top-level tests: 33 PASS, 11 intended behavioral FAIL; 69 leaf cases: 48 PASS, 21 intended behavioral FAIL, 0 skipped. New RED cases: 2 passing controls and 21 failing leaves. All 46 existing targeted leaves pass. Separate positive-control replay: 2 PASS, 0 FAIL, 0 skipped. Scanner PASS (1 file, 0 issues). No compile/import/infrastructure failures in final runs.
+Coverage: 27.7% internal/gates statements in targeted final run; excludes separately built CLI subprocess. Not full-suite coverage.
+Commit SHA: 27373f421640f644a98be89f38ce112c30f55a85 on story/MAC-olrx. Test-only immutable tdd-red commit; 463 lines added.
+Expected failure examples: actual default CLI returns platform-green after required parent Policy/Isolation ID deletion; owner-local clauses count 9 instead of 5; malformed/orphan declarations silently pass; owner+guard diagnostics missing. Detailed commands, outputs, complete test inventory and actual-integration design are in the preceding append-only RED evidence.
+
+### AC Verification
+| AC # | Requirement | Test Location | Status |
+|------|-------------|---------------|--------|
+| 1 | Parent selection retains relational obligations and supports honest zero obligations | obligation_ownership_test.go: TestObligationParentSelectionRetainsRelationalCoverage; TestObligationParentRealCLI | RED reproduced; zero-obligation control PASS |
+| 2 | Independent machine+guard coverage and drift | TestObligationClausesIndependentMachines; TestObligationClausesUndeclaredSiblingIsNotArmed; TestObligationClausesLocalDriftNamesOwner | RED reproduced |
+| 3 | Every clause, declaration validation, stable IDs and owner validity | SingleMachinePositiveControl; EveryLocalClauseRequired; InvalidDeclarationRejectedByBothGates; DuplicateDeclarationRejected; OwnerCannotResolveThroughSibling | RED reproduced; single-machine control PASS; oracle bytes unchanged |
+| 4 | Full-path omitted machine, wrong owner, removed oracle, parent negative and independent positives | MissingLocalCaseNamesOwner; OmittedMachineTests; OwnerCannotResolveThroughSibling; ParentRealCLI | RED reproduced across actual files, generators, Gt/Gd and CLI |
+| 5 | Real selection, actual Gt/Gd results and precise owner diagnostics | selectedObligationGates calls SelectRunAndNote; requireOwnerError checks same diagnostic; real CLI built and executed | RED reproduced; no mocks |
+
+LEARNINGS:
+- G4 positive import fixture must be real and clean to prevent unrelated errors masking missing Gt.
+- Machine matrix stems provide unambiguous local ownership without inventing narrative syntax.
+- Generated stable IDs and immutable oracle comparisons avoid assumptions about owner tags.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED commit 27373f421640f644a98be89f38ce112c30f55a85.
+- Final targeted command produced 48 PASS / 21 intended RED FAIL leaf cases; positive replay 2 PASS / 0 FAIL.
+- No production changes, full preflight, GitHub mutation or installed binary replacement.
+
+### proof
+- [x] AC #1: RED tests authored; parent selection/CLI false green reproduced; zero control passes.
+- [x] AC #2: RED owner-local Gt/Gd regressions authored and reproduced.
+- [x] AC #3: RED every-clause, malformed/duplicate/owner validation and stable-ID tests authored.
+- [x] AC #4: RED real filesystem/public gate/CLI negative and positive inventory authored.
+- [x] AC #5: RED actual selection and machine+guard diagnostic outcomes asserted.
+- [ ] GREEN implementation: not performed; fresh independent implementer and PM acceptance required.
 
 ## nd_contract
 status: delivered
