@@ -9,7 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:33:47Z
-content_hash: "sha256:4b655d77f04d28a09b59a9544ce01ea5111fdf6457a1549ec89c797a12325ba0"
+content_hash: "sha256:82bec466fccf0a24025ea78c0b5f356359a916845b89e7548eb685876d61868d"
+blocks: [MAC-vx24]
 ---
 
 ## Description
@@ -81,9 +82,10 @@ status: new
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 
 ## History
-
+- 2026-09-05T19:35:07Z dep_added: blocks MAC-vx24
 
 ## Links
 - Parent: [[MAC-ui8a]]
+- Blocks: [[MAC-vx24]]
 
 ## Comments
