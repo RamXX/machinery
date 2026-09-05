@@ -120,7 +120,8 @@ at any step restores every root to the previous generation. The only observable 
 refresh itself, during which a running host can see the new binary beside the previous release's
 skill and role docs; nothing from that window survives a completed update, and `machinery doctor`
 confirms a single version everywhere afterwards. Re-running the bootstrap installer over an
-existing install takes the same path.
+existing install updates the binary and the default home group only; it plans from the default
+homes, not from the receipt, so recorded native targets are refreshed by `machinery update`.
 
 The host-owned plugin cache updates on its own schedule and can therefore drift from the binary
 in either direction. That skew is detected, not tolerated:

@@ -617,7 +617,9 @@ from the same release, inside one transaction: if any step fails, every root is 
 previous release and the command exits non-zero naming the failed step. Between the binary swap
 and the end of the refresh, a running agent host can briefly see the new binary next to the
 previous release's skill and role docs; that window lasts as long as the refresh itself, and
-nothing in it is left behind. Re-running the one-line installer performs the same update.
+nothing in it is left behind. Re-running the one-line installer over an existing install updates
+the binary and the default home group; recorded native targets (`--target`) are refreshed by
+`machinery update`, which reads the receipt.
 
 Keep the binary and the Claude Code plugin on the same version. The plugin
 cache is host-owned and updates separately (`/plugin`), so it is possible to
