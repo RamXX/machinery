@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:04:08Z
-content_hash: "sha256:1bd3b597386f5bb503e9defd29457d11030b3d11c469f4439e6d71e56f310834"
+updated_at: 2026-09-05T21:05:02Z
+content_hash: "sha256:5a1b9b43d2fa161fbabc3a3a2afa50ef2bbc1d1109ed667684660b63f8a5b37c"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -106,6 +106,42 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## AUTHORITATIVE BUG TRIAGE R2 — MAC-2u36 — 2026-09-05
+The current canonical Description (USER INTENT through Delivery Requirements) is the authoritative complete scope, AC and testing contract. It supersedes conflicting earlier descriptions/addenda, including the assumption that ordinary missing-file update was already a passing control. Historical text and all v1 evidence are retained.
+
+Disposition: absorb the newly discovered ordinary receipt-publication defect into existing P0 MAC-2u36 under MAC-ui8a. No new bug/dependency is needed: it directly blocks the same recorded-plan repair outcome and uses the same update transaction/test fixture. Existing blocks MAC-gcrr and MAC-ou97 remain intact. Bounded epic ownership review found no sibling implementation claiming update.go, receipt.go or install.go.
+
+Before: ownership only update.go/bootstrap_receipt_test.go; the prior clarification expected ordinary missing-file success as a control and scoped revisions to two disputed cases.
+After: production ownership explicitly includes update.go, receipt.go and install.go, with conditional focused tests in receipt_test.go/install_test.go. Ordinary missing-file success is now an intended RED assertion failure against unchanged production. Intact ordinary and edited-artifact ordinary flows remain passing controls. targets.go, CLI, lock.go and transaction.go are read-only consumers unless separately justified/reviewed. Revised estimate is 4-6 files/1100 changed LOC (750 tests including existing 469; 350 production), with overrun investigation.
+
+Required direct-refresh commit boundary: parent owns complete selected placement plan, binary and receipt under the prepared bounded transaction. Remaining selected placements must be able to repair owned missing native files before complete final inventory. Only after successful direct placements and source validation may the complete normalized receipt with real digests publish before parent commit. Final inventory/publication failure rolls back the entire direct update. No omitted inventory members, stale/fabricated digest acceptance, or unauthenticated skip-receipt switch. Any internal coordination preserves authenticated delegated authority, prepared journal coverage and normal standalone install recording. Plugin refresh retains existing post-direct-commit semantics.
+
+Added proof: exact missing Codex file in ordinary/bootstrap modes; both native copy-mode groups missing an owned file together to avoid a target-order special case; later-target failure from missing-file pre-state must restore absence as absence after actual prior mutations. Retain original safety, full-plan/defaults/selectors, intact convergence, edited repair, mixed topology, actual later-target rollback and pre-mutation interrupted startup recovery. Any receipt-coordination mechanism also needs focused legitimate standalone-install and rejected untrusted-delegation proof. User product remains standalone.
+
+Independent review gate: root must obtain PM review of this expanded ownership/AC/commit contract and specific RED edit/addition authorization before author resumes re-RED. The prior 20:55:32Z comment remains historical authorization for its exact scope, not approval of this new production defect scope or v1 RED. This Sr. PM action grants no RED approval, delivery, acceptance or GREEN waiver. V1 remains unchanged and undelivered.
+
+### Reviewed evidence and limits
+- Full latest pvg nd show MAC-2u36 plus exact missing-file diagnostic source/result in /tmp/machinery-MAC-2u36-red.qRk5DC; FAIL 35.820s after first home-group mutation. That diagnostic stops at CLI failure and supplies no independent rollback conclusion.
+- Graph exact source: refreshDirectInstalls/updateLocked; recordHomeInstallLocked/recordTargetInstallLocked/saveReceipt/refreshReceiptArtifacts; installLocked/Options; newInstallCmd; beginArtifactTransaction/delegatedInstallOperation/delegatedArtifactTransaction; installTargets; existing lock capability.
+- Source confirms per-child Record: true and full receipt inventory before subsequent native groups, even though the plan retains the missing target. Existing parent journal supports absent pre-state and exact delegated path coverage. These capabilities identify a bounded repair seam, not an approved concrete implementation.
+- Coverage generation 2026-09-05T20:28:41Z: metadata_match/no_recorded_issue for update.go, receipt.go, install.go, targets.go, transaction.go, lock.go and cmd/machinery/install.go (best-effort only; exact snippets read).
+- Earlier "No new production defect established" finding is superseded by the executed missing-file diagnostic. No unresolved user product choice is needed to repair this failure.
+- No source/tests/fixtures edits, runtime tests, installed product writes, GitHub/remote operations or heavy preflight during this triage.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Sr. PM repaired canonical Description via supported pvg nd edit and preserved the original as quoted historical description; appended R2 triage through pvg nd update --append-notes.
+- P0 existing issue MAC-2u36 retains owner dev-MAC-2u36, hard-tdd, parent MAC-ui8a and downstream blocks. No new issue or status transition.
+- Frozen v1 99956740ae5559262790a9473b5597c1775928f2 and prior proof remain preserved. Independent PM scope review and expanded RED authorization pending.
+
+### proof
+- [x] Triage: confirmed concrete ordinary missing-file receipt-ordering defect and assigned coherent ownership within MAC-2u36.
+- [x] Contract: corrected disproven passing-control assumption; preserved desired repair success, safety boundaries and explicit final receipt/rollback requirements.
+- [ ] AC #1-6: revised RED replay, implementation and independent acceptance pending.
+
+
 ## DISCOVERED_BUG — exact ordinary missing-file repair control
 
 title: Ordinary multi-placement update aborts receipt inventory before repairing a missing native artifact
