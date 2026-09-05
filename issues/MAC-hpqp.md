@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:43:52Z
-content_hash: "sha256:5645f7591e19369a293055bde7200da5c1edf150e8fd1e8225fd751857a9a037"
+updated_at: 2026-09-05T21:53:03Z
+content_hash: "sha256:95615cd1db8911793f684dc3434329ec0b1d93fd501a77ff0595663f53ec4fc1"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -90,7 +90,7 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 
 ## Notes
-
+GREEN scope investigation: approved RED v2 already contributes 1753 lines. Closed inventory and exact native identity validation, Go JSON/Node TAP accounting, pinned OCI/Java/TLC/Node provisioning, owned scratch/container/process cleanup, and required workflow/preflight/Make wiring require an estimated 800-1200 production lines plus approximately 60 wiring lines. Dispatcher acknowledged investigation; independent PM must assess final exact delta. Frozen seven test/config/fixture files remain immutable. Implementation stays in declared production ownership and reuses processcontrol/runtimeclosure/formal primitives.
 
 ## nd_contract
 status: red-approved
