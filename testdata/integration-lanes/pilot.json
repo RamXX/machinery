@@ -7,7 +7,7 @@
       "adapter": "go-json",
       "package": "./cmd/machinery",
       "source_files": ["cmd/machinery/integration_lane_test.go"],
-      "tests": ["TestIntegrationLanePilotOCI", "TestIntegrationLanePilotFormal", "TestIntegrationLaneFullPath"],
+      "tests": ["TestIntegrationLanePilotOCI", "TestIntegrationLanePilotFormal", "TestIntegrationLaneFullPath", "TestIntegrationLaneHostDescendantControl", "TestIntegrationLaneNodeEventControls"],
       "runtimes": ["go", "docker", "java", "tlc", "node"],
       "timeout": "15m",
       "stdout_limit": 4194304,

@@ -381,40 +381,8 @@ func TestLaneWiringIsMandatoryAndNativeJobsAreServiceFree(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			var wf struct {
-				Jobs map[string]struct {
-					RunsOn   any  `yaml:"runs-on"`
-					Continue bool `yaml:"continue-on-error"`
-					Steps    []struct {
-						Run  string         `yaml:"run"`
-						Uses string         `yaml:"uses"`
-						If   string         `yaml:"if"`
-						With map[string]any `yaml:"with"`
-					} `yaml:"steps"`
-				} `yaml:"jobs"`
-			}
-			if e := yaml.Unmarshal(b, &wf); e != nil {
-				t.Fatal(e)
-			}
-			found := false
-			for id, j := range wf.Jobs {
-				for _, s := range j.Steps {
-					if strings.Contains(s.Run, "./scripts/integration-lane") && strings.Contains(s.Run, "--lane required") {
-						found = true
-						if j.Continue || s.If != "" || !strings.Contains(fmt.Sprint(j.RunsOn), "ubuntu") {
-							t.Errorf("%s can omit required Linux lane", id)
-						}
-					}
-					if strings.Contains(fmt.Sprint(j.RunsOn), "macos") && (strings.Contains(s.Run, "machinery_integration") || strings.Contains(s.Run, "--lane required")) {
-						t.Errorf("native macOS portability job %s requires services", id)
-					}
-					if strings.Contains(s.Uses, "actions/checkout") && (strings.Contains(id, "golden") || strings.Contains(id, "integration")) && fmt.Sprint(s.With["fetch-depth"]) != "0" {
-						t.Errorf("%s lacks ancestry required by acceptance checks", id)
-					}
-				}
-			}
-			if !found {
-				t.Error("workflow has no unconditional required integration lane")
+			if e := laneValidateWorkflow(b); e != nil {
+				t.Error(e)
 			}
 		})
 	}
@@ -422,22 +390,290 @@ func TestLaneWiringIsMandatoryAndNativeJobsAreServiceFree(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	s := string(b)
-	lane := strings.Index(s, "./scripts/integration-lane")
-	race := strings.Index(s, "go test -race -count=1 ./...")
-	formal := strings.Index(s, "make verify-formal")
-	if lane < 0 || race < 0 || lane < race || formal < lane {
-		t.Errorf("preflight must run service-free race, then self-provisioning lane, then consuming formal gates; offsets race=%d lane=%d formal=%d", race, lane, formal)
-	}
-	if strings.Contains(s, "skipping local gate suite") {
-		t.Error("required integration coverage remains bypassable via SKIP_PREFLIGHT")
+	if e := laneValidatePreflight(string(b)); e != nil {
+		t.Error(e)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "make", "-n", "test-integration")
 	cmd.Dir = repo
 	out, err := cmd.CombinedOutput()
-	if err != nil || !bytes.Contains(out, []byte("./scripts/integration-lane --lane required")) {
+	if err != nil || strings.TrimSpace(string(out)) != "go run ./scripts/integration-lane --lane required" {
 		t.Errorf("Make entrypoint differs from shared lane: %v %s", err, out)
+	}
+}
+
+const laneExactInvocation = "go run ./scripts/integration-lane --lane required"
+
+// These are assertion helpers for the repository's executable wiring. They
+// inspect data only, never provision or execute a candidate runtime lane.
+func laneValidateWorkflow(body []byte) error {
+	var wf struct {
+		Jobs map[string]struct {
+			RunsOn   any `yaml:"runs-on"`
+			If       any `yaml:"if"`
+			Continue any `yaml:"continue-on-error"`
+			Steps    []struct {
+				Run      string         `yaml:"run"`
+				Uses     string         `yaml:"uses"`
+				If       any            `yaml:"if"`
+				Continue any            `yaml:"continue-on-error"`
+				With     map[string]any `yaml:"with"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if e := yaml.Unmarshal(body, &wf); e != nil {
+		return e
+	}
+	found := 0
+	permissive := func(v any) bool { return v != nil && v != false }
+	for id, j := range wf.Jobs {
+		for _, s := range j.Steps {
+			if strings.Contains(s.Run, "./scripts/integration-lane") {
+				found++
+				if strings.TrimSpace(s.Run) != laneExactInvocation || j.If != nil || s.If != nil || permissive(j.Continue) || permissive(s.Continue) || fmt.Sprint(j.RunsOn) != "ubuntu-latest" {
+					return fmt.Errorf("%s does not execute exact mandatory Linux lane", id)
+				}
+			}
+			if strings.Contains(fmt.Sprint(j.RunsOn), "macos") && (strings.Contains(s.Run, "machinery_integration") || strings.Contains(s.Run, "--lane required")) {
+				return fmt.Errorf("native job %s probes services", id)
+			}
+			if strings.Contains(s.Uses, "actions/checkout") && (strings.Contains(id, "golden") || strings.Contains(id, "integration")) && fmt.Sprint(s.With["fetch-depth"]) != "0" {
+				return fmt.Errorf("%s lacks full history", id)
+			}
+		}
+	}
+	if found != 1 {
+		return fmt.Errorf("require exactly one unconditional required lane, got %d", found)
+	}
+	return nil
+}
+
+type laneShellToken struct {
+	text   string
+	quoted bool
+}
+
+// A deliberately conservative shell-token reader: transparent top-level
+// dispatch is required. Quoted diagnostics/comments cannot count as execution;
+// shell grouping/conditionals, continuations and separators remain visible.
+func laneShellLines(body string) ([][]laneShellToken, error) {
+	body = strings.ReplaceAll(body, "\\\n", "")
+	lines := [][]laneShellToken{{}}
+	var word strings.Builder
+	quoted := false
+	flush := func() {
+		if word.Len() > 0 || quoted {
+			lines[len(lines)-1] = append(lines[len(lines)-1], laneShellToken{word.String(), quoted})
+			word.Reset()
+			quoted = false
+		}
+	}
+	for i := 0; i < len(body); i++ {
+		c := body[i]
+		switch {
+		case c == '\'' || c == '"':
+			quoted = true
+			quote := c
+			closed := false
+			for i++; i < len(body); i++ {
+				if body[i] == quote {
+					closed = true
+					break
+				}
+				if body[i] == '\\' && quote == '"' && i+1 < len(body) {
+					i++
+				}
+				word.WriteByte(body[i])
+			}
+			if !closed {
+				return nil, fmt.Errorf("unterminated shell quote")
+			}
+		case c == '#' && word.Len() == 0:
+			for i < len(body) && body[i] != '\n' {
+				i++
+			}
+			flush()
+			lines = append(lines, []laneShellToken{})
+		case c == '\n':
+			flush()
+			lines = append(lines, []laneShellToken{})
+		case c == ' ' || c == '\t' || c == '\r':
+			flush()
+		case strings.ContainsRune(";(){}|&", rune(c)):
+			flush()
+			text := string(c)
+			if i+1 < len(body) && body[i+1] == c && (c == '|' || c == '&') {
+				text += string(c)
+				i++
+			}
+			lines[len(lines)-1] = append(lines[len(lines)-1], laneShellToken{text, false})
+		case c == '\\' && i+1 < len(body):
+			i++
+			word.WriteByte(body[i])
+			quoted = true
+		default:
+			word.WriteByte(c)
+		}
+	}
+	flush()
+	return lines, nil
+}
+
+func laneValidatePreflight(body string) error {
+	lines, e := laneShellLines(body)
+	if e != nil {
+		return e
+	}
+	stack := []string{}
+	lane, race, formal, strict := -1, -1, -1, false
+	c4, checker := -1, -1
+	for line, words := range lines {
+		plain := []string{}
+		for _, w := range words {
+			plain = append(plain, w.text)
+		}
+		text := strings.Join(plain, " ")
+		if len(stack) == 0 && text == "set -euo pipefail" {
+			strict = true
+		}
+		for i, w := range words {
+			if strings.Contains(w.text, "SKIP_PREFLIGHT") {
+				return fmt.Errorf("executable preflight bypass variable is forbidden")
+			}
+			if w.quoted {
+				continue
+			}
+			if w.text == "set" && i+1 < len(words) && strings.HasPrefix(words[i+1].text, "+") {
+				return fmt.Errorf("preflight disables error propagation")
+			}
+			if w.text == "exit" && (i+1 >= len(words) || words[i+1].text != "1") {
+				return fmt.Errorf("preflight may exit successfully without required lane")
+			}
+			if w.text == "exec" || w.text == "eval" {
+				return fmt.Errorf("opaque control transfer forbidden in preflight")
+			}
+			if w.text == "alias" || ((w.text == "go" || w.text == "make") && i+1 < len(words) && words[i+1].text == "(") {
+				return fmt.Errorf("preflight shadows required executable")
+			}
+			if w.text == "./scripts/integration-lane" {
+				if len(stack) != 0 || text != laneExactInvocation || !strict {
+					return fmt.Errorf("lane invocation is conditional, ignored, quoted or inexact")
+				}
+				if lane >= 0 {
+					return fmt.Errorf("duplicate lane invocation")
+				}
+				lane = line
+			}
+			if i == 0 && len(stack) == 0 && strings.HasPrefix(text, "go test -race -count=1 ./...") {
+				race = line
+			}
+			if i == 0 && len(stack) == 0 && strings.HasPrefix(text, "make verify-formal") {
+				formal = line
+			}
+			if w.text == "verify-c4" && i > 0 && words[i-1].text == ".bin/machinery" {
+				c4 = line
+			}
+			if w.text == "verify-checkers" && i > 0 && words[i-1].text == ".bin/machinery" {
+				checker = line
+			}
+			switch w.text {
+			case "if":
+				stack = append(stack, "fi")
+			case "case":
+				stack = append(stack, "esac")
+			case "for", "while", "until", "select":
+				stack = append(stack, "done")
+			case "{":
+				stack = append(stack, "}")
+			case "(":
+				stack = append(stack, ")")
+			case "fi", "esac", "done", "}", ")":
+				if len(stack) > 0 && stack[len(stack)-1] == w.text {
+					stack = stack[:len(stack)-1]
+				}
+			}
+		}
+	}
+	if !strict || race < 0 || lane <= race || formal <= lane || c4 <= lane || checker <= lane {
+		return fmt.Errorf("missing strict native -> required -> formal/C4/checker execution order")
+	}
+	return nil
+}
+
+func TestLaneWiringGuardsRejectDisabledExecution(t *testing.T) {
+	workflow := "jobs:\n  integration-required:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@pinned\n        with: {fetch-depth: 0}\n      - run: " + laneExactInvocation + "\n"
+	preflight := "set -euo pipefail\ngo test -race -count=1 ./...\n" + laneExactInvocation + "\nmake verify-formal\n.bin/machinery verify-c4 example\n.bin/machinery verify-checkers example\n"
+	if e := laneValidateWorkflow([]byte(workflow)); e != nil {
+		t.Fatal(e)
+	}
+	if e := laneValidatePreflight(preflight); e != nil {
+		t.Fatal(e)
+	}
+	for _, tc := range []struct{ name, old, new string }{
+		{"job-if", "    runs-on:", "    if: false\n    runs-on:"},
+		{"job-ignore", "    runs-on:", "    continue-on-error: true\n    runs-on:"},
+		{"step-if", "      - run:", "      - if: false\n        run:"},
+		{"step-ignore", "      - run:", "      - continue-on-error: true\n        run:"},
+		{"step-ignore-expression", "      - run:", "      - continue-on-error: ${{ true }}\n        run:"},
+		{"echo-only", laneExactInvocation, "echo " + laneExactInvocation},
+		{"comment-only", laneExactInvocation, "'# " + laneExactInvocation + "'"},
+		{"ignored-exit", laneExactInvocation, laneExactInvocation + " || true"},
+		{"false-prefix", laneExactInvocation, "false && " + laneExactInvocation},
+		{"wrong-lane", laneExactInvocation, "go run ./scripts/integration-lane --lane optional"},
+	} {
+		t.Run("workflow/"+tc.name, func(t *testing.T) {
+			if e := laneValidateWorkflow([]byte(strings.Replace(workflow, tc.old, tc.new, 1))); e == nil {
+				t.Fatal("disabled workflow was accepted")
+			}
+		})
+	}
+	for _, tc := range []struct{ name, body string }{
+		{"renamed-bypass-diagnostic", "if [ \"${SKIP_PREFLIGHT:-0}\" = 1 ]; then echo differently-worded; exit 0; fi\n" + preflight},
+		{"unconditional-early-success", "exit 0\n" + preflight},
+		{"conditional-lane", strings.Replace(preflight, laneExactInvocation, "if false; then\n"+laneExactInvocation+"\nfi", 1)},
+		{"function-only", strings.Replace(preflight, laneExactInvocation, "never_called() {\n"+laneExactInvocation+"\n}", 1)},
+		{"subshell-only", strings.Replace(preflight, laneExactInvocation, "(\n"+laneExactInvocation+"\n)", 1)},
+		{"comment-only", strings.Replace(preflight, laneExactInvocation, "# "+laneExactInvocation, 1)},
+		{"quoted-only", strings.Replace(preflight, laneExactInvocation, "echo '"+laneExactInvocation+"'", 1)},
+		{"ignored-failure", strings.Replace(preflight, laneExactInvocation, laneExactInvocation+" || true", 1)},
+		{"disabled-errexit", strings.Replace(preflight, laneExactInvocation, "set +e\n"+laneExactInvocation, 1)},
+		{"wrong-argv", strings.Replace(preflight, laneExactInvocation, laneExactInvocation+" --lane optional", 1)},
+		{"wrong-order", strings.Replace(preflight, "make verify-formal", "", 1) + "\n" + laneExactInvocation},
+		{"shadowed-go", "go() { return 0; }\n" + preflight},
+		{"early-consumer", ".bin/machinery verify-c4 example\n" + strings.Replace(preflight, ".bin/machinery verify-c4 example", "", 1)},
+		{"removed-c4", strings.Replace(preflight, ".bin/machinery verify-c4 example", "", 1)},
+		{"removed-checker", strings.Replace(preflight, ".bin/machinery verify-checkers example", "", 1)},
+	} {
+		t.Run("preflight/"+tc.name, func(t *testing.T) {
+			if e := laneValidatePreflight(tc.body); e == nil {
+				t.Fatal("bypassed preflight was accepted")
+			}
+		})
+	}
+}
+
+func TestLanePreflightFailurePropagationControl(t *testing.T) {
+	// Small real Bash programs establish sensitivity of the structural guards.
+	// They are not preflight itself and do not replace any native test runtime.
+	for _, tc := range []struct {
+		name, program string
+		pass          bool
+	}{
+		{"strict", "set -euo pipefail\nfalse\nprintf reached", false},
+		{"ignored", "set -euo pipefail\nfalse || true\nprintf reached", true},
+		{"conditional", "set -euo pipefail\nif false; then false; fi\nprintf reached", true},
+		{"renamed-bypass", "set -euo pipefail\nif [ \"${SKIP_PREFLIGHT:-0}\" = 1 ]; then printf reached; exit 0; fi\nfalse", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", "--noprofile", "--norc", "-c", tc.program)
+			cmd.Env = append(os.Environ(), "SKIP_PREFLIGHT=1")
+			out, e := cmd.CombinedOutput()
+			if (e == nil) != tc.pass || (string(out) == "reached") != tc.pass {
+				t.Fatalf("real shell bypass control: err=%v out=%q", e, out)
+			}
+		})
 	}
 }
