@@ -452,6 +452,9 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 		// A missing receipt has no remembered copy modes. Use an explicit all-copy
 		// plan and an independently installed release reference for that plan.
 		allCopy := bootstrapSeed(t, &bootstrapRelease{old: release.next, source: repo})
+		if err := os.Remove(filepath.Join(allCopy.config, "install.json")); err != nil {
+			t.Fatal(err)
+		}
 		args := []string{"install", "--from", repo, "--copy"}
 		for _, name := range []string{"custom-a", "custom-b", "copy-a", "copy-b"} {
 			args = append(args, "--home", filepath.Join(allCopy.home, name))
