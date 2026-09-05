@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:18:55Z
-content_hash: "sha256:6110324cae1591f3a44eea136ae76e2ea2916f20a99bed3ec8204f16bb13dd35"
+updated_at: 2026-09-05T21:23:23Z
+content_hash: "sha256:61f7e83f32c7b85efaf889107421fdb931cd63d0e41b93fb3f33202414e483da"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx]
@@ -104,6 +104,98 @@ LEARNINGS:
 - Output assertions can accidentally match temporary test directory names; test prose rather than unrestricted substring presence.
 - Real baseline reruns expand an already-baselined edge even when output says nothing new to baseline.
 - Executing all printed advice with placeholder substitution demonstrates debt mutation directly without mocks or external services.
+## RED Delivery Evidence
+
+PROOF:
+
+### Commits and immutable candidate
+- RED: 9b85ef69ed426a337e4e2584867a698904676643.
+- Narrow existing-test amendment: f482c7683f5005e40722123e3a382e01b15219d2, authorized 2026-09-05T21:14:38Z; retained ratchet fixture/all four safe generator expectations and asserted baseline absence only.
+- Authorized guidance repair / tested candidate: e95be63019d89b93ae527f27ae1ce43326def038, authorized 2026-09-05T21:18:55Z; both literal tdd-red and [test-edit-authorized] markers included. Prior commits preserved without amend/rebase.
+- Branch story/MAC-a89e; worktree /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-a89e. Production unchanged. Diff against epic/MAC-ui8a: regeneration_safety_test.go +243; gates_test.go +3/-1; 247 total changed LOC across 2 test files, leaving bounded room for 2 production files within canonical 4-file/under-300 budget.
+- Test SHA256: internal/gates/gates_test.go e4f630ec2ff7684eea436881b8a55706496f348c0ae7cd8748a255a6b6d439ff; internal/gates/regeneration_safety_test.go 2e1801d96618aaf146621e822a342b4bfdf69cdace50b94d0585d7f1ad4f20c3.
+
+### Exact commands / retained evidence
+All commands ran with explicit cd to the story worktree.
+- set -o pipefail && go test -count=1 -timeout=5m ./internal/gates -run 'VersionSkew|Regen|Ratchet' -json -coverprofile=/tmp/MAC-a89e-red.wlHWaG/coverage.out | tee /tmp/MAC-a89e-red.wlHWaG/tests.json
+- Exit 1: expected RED behavioral assertion failures. 37 leaf tests, 32 PASS, 5 FAIL, 0 SKIP; package elapsed 4.832s. No compile/setup/deadline/missing-prerequisite failures. All new tests are selected by the specified regexp; no supplemental selector needed.
+- Raw JSON /tmp/MAC-a89e-red.wlHWaG/tests.json SHA256 405f556e1036a36547bf9231d38d3cdedca5d52acc6879b997f95839789584bb.
+- Exact leaf inventory /tmp/MAC-a89e-red.wlHWaG/inventory.txt SHA256 7e20dff8a081de4734b40f68cf07da4d334362e37ed1654cea2b9c121c90e8af.
+- Coverage profile /tmp/MAC-a89e-red.wlHWaG/coverage.out SHA256 1ff93989e5a6fb5a2c6c70dd42dc3214e241ff62a74f1429471dbc0f44e1eef0.
+- go tool cover -func=/tmp/MAC-a89e-red.wlHWaG/coverage.out: internal/gates total 9.9%; gates.go regenCommands 100.0%; gates.go VersionSkewNote 93.8%. This is scoped package coverage; separately built real CLI subprocess is not included in Go package instrumentation.
+- git diff --check epic/MAC-ui8a: PASS. Worktree clean.
+- pvg verify internal/gates/regeneration_safety_test.go --format text: PASS, 1 file, 0 issues.
+- pvg verify internal/gates/gates_test.go internal/gates/regeneration_safety_test.go --format text: reports one [stub] finding, gates_test.go:125 return "". Raw result /tmp/MAC-a89e-red.wlHWaG/verify.txt. Specific independent PM false-positive disposition at 2026-09-05T21:18:55Z: coveringInterfaceTable returns empty only for no concrete allow rows; otherwise renders the full interface table, consumed by c4GraphFixture and graph tests. Preserved helper unchanged. This is a recorded single finding, not blanket scanner waiver; earlier note's helper name fixtureInterfaceRows was incorrect and is superseded by coveringInterfaceTable.
+
+### Exact test inventory
+PASS TestG4RatchetSnapshotNote
+PASS TestG4BaselineWithoutRatchetFails
+PASS TestG4RatchetGreenAtSnapshot
+PASS TestG4RatchetGrowthFails
+PASS TestG4RatchetShrinkAndStaleEdgesNote
+PASS TestRatchetRoundTrip
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/unknown_root
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/missing_date
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/missing_edges
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/duplicate_date
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/duplicate_edges
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/duplicate_edge_name
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/date_number
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/date_null
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/edges_array
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/edge_value_string
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/edge_entry_null
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/trailing_value
+PASS TestWriteRatchetRejectsSymlinkTarget
+FAIL TestVersionSkewNoteNamesEveryApplicableCommand
+PASS TestVersionSkewNoteFormalCommandFollowsGeneratedTLA
+PASS TestRatchetSnapshotNoteBothFormatsIsClockIndependent
+FAIL TestVersionSkewRegenerationOnlySafeGenerators/ratchet-only
+PASS TestVersionSkewRegenerationOnlySafeGenerators/oracle
+PASS TestVersionSkewRegenerationOnlySafeGenerators/alloy
+PASS TestVersionSkewRegenerationOnlySafeGenerators/semantics
+PASS TestVersionSkewRegenerationOnlySafeGenerators/composition
+PASS TestVersionSkewRegenerationOnlySafeGenerators/pack
+FAIL TestVersionSkewRegenerationOnlySafeGenerators/all-with-ratchet
+PASS TestRegenBaselineGuidanceSensitivity/genuine
+PASS TestRegenBaselineGuidanceSensitivity/equivalent-wrapped
+PASS TestRegenBaselineGuidanceSensitivity/path-bait
+PASS TestRegenBaselineGuidanceSensitivity/old-rule-review-help
+PASS TestRegenBaselineGuidanceSensitivity/unrelated-review
+PASS TestRegenRatchetRealCLI/no-debt-version-skew-control
+FAIL TestRegenRatchetRealCLI/new-offender-survives-all-advice
+FAIL TestRegenRatchetRealCLI/explicit-baseline-reviews-debt-change
+
+### Independent AC-to-test evidence
+| AC | Test and observable result | RED status |
+|---|---|---|
+| 1 | VersionSkewRegenerationOnlySafeGenerators pins exact ordered command list with no additional mutations for every family, individual controls and all-with-ratchet. Ratchet-only/all-with-ratchet plus authorized existing expectation fail because machinery baseline is printed. Unchanged repeated inputs produce identical advice; single-family positive controls pass. | Intended failure |
+| 2 | RealCLI/new-offender-survives-all-advice starts with CLI-created ratchet containing alpha/a.go and green g3,g4, then adds alpha/b.go and gets exact G4 growth finding. Executes EVERY printed routine command (including unsafe baseline after substituting its documented impl placeholder), proves current oracle stamp generated, then compares exact ratchet bytes and requires G4 still reject alpha/b.go. Unchanged production expands ratchet to [alpha/a.go,alpha/b.go], followed by G4 zero blocking findings. | Intended failure on advice, bytes and G4 result |
+| 3 | RealCLI/explicit-baseline-reviews-debt-change logs actual --help before baseline invocation; requires ratchet replacement, possible new-offender acceptance and review-before-adoption prose. Existing ratchet + new offender fails G4 first; deliberate real baseline succeeds with explicit "0 need a baseline rule", records both offenders, remains unstamped and subsequent G4 passes. Current help fails guidance; successful output fails guidance and "nothing new to baseline" falsely implies no debt change. | Intended failure for missing guidance / misleading zero-rule output; explicit operation remains successful |
+| 4 | RealCLI/no-debt-version-skew-control runs oracle on a valid source, introduces stamp-only skew, obtains exactly the oracle advice, executes it, verifies current stamp, no skew after regeneration, g3,g4 green, and no new ratchet. All five sensitivity controls pass (two equivalent valid prose variants, unsafe output with review/reviews path bait, old dependency-rule-only review help, unrelated review words). | Controls PASS; negative AC2 demonstrably fails |
+
+### Limits and scope
+This delivery is RED ONLY, not product completion or permission to begin GREEN without independent RED approval. Integration builds ./cmd/machinery into t.TempDir and uses real CLI/native files unconditionally, no mocks, services, skips or env gates. Real executable fixture carries oracle generation, so all applicable printed commands are executed. Other safe generator families are pinned as exact advice-selection controls; no Alloy solver/TLA model-check execution is claimed. No full preflight, installed binary/plugin/skill modification, push/sync/GitHub write, main branch move, runtime schema change or Paivot product dependency.
+
+LEARNINGS:
+- Initial AC3 check falsely passed because the temporary pathname inherited "reviews" from its subtest. After independent authorization, matching now removes path tokens and relates review/change/ratchet/offender semantics within prose, with explicit passing sensitivity controls.
+- Existing baseline rerun expands offender snapshots despite zero new dependency-rule proposals; rule proposal counts and accepted debt changes are distinct observations.
+- Executing all printed commands exposes the exact harmful mutation: regenerated current stamps alone do not preserve architecture enforcement if the advice also re-baselines debt.
+- A scanner can flag a legitimate conditional empty fixture section; preserve implemented behavior and record an exact reviewer disposition.
+- Retained raw JSON and hashes make failure provenance independently replayable; initial summarized-only evidence was insufficient for that purpose.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Candidate e95be63019d89b93ae527f27ae1ce43326def038; complete scoped RED 32 pass / 5 intended fail / 0 skip, raw evidence above.
+- Authorized repaired tests, preserved original commits and specific static-finding disposition.
+
+### proof
+- [x] AC #1: behavioral RED with exact safe advice and positive controls authored.
+- [x] AC #2: real CLI harmful mutation independently observable in ratchet bytes and G4 output.
+- [x] AC #3: missing help/output guidance now genuinely fails; explicit operation and matcher controls exercised.
+- [x] AC #4: real no-debt positive plus genuine negative path executed; full inventory recorded.
 
 
 ## nd_contract
