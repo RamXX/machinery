@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:58:40Z
-content_hash: "sha256:daa1b39851d8c8daa130057dac583b08e319243b704ad1587f343057dfeae46b"
+updated_at: 2026-09-05T20:02:02Z
+content_hash: "sha256:2297fe9aed21978256b3481d66fbadd53fc33c50d2b318fb13facbf1164a6a07"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-olrx
 ---
@@ -82,6 +82,43 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+## PM RED Review — 2026-09-05
+
+RED REVIEW: APPROVED. This approves the frozen test specification only; no GREEN implementation or story acceptance is claimed.
+
+Reviewed LOCAL epic/MAC-ui8a...story/MAC-olrx at 27373f421640f644a98be89f38ce112c30f55a85. Exactly one 463-line test file is added, with tdd-red in the immutable commit subject and no production edits. Read the complete source and actual production clause/selection paths. No stubs, TODOs, skip-if-missing, environment gates, mocks, or product Paivot dependencies are present. Fixture test identifiers are inputs to the coverage gate under test; they are not claimed as proof of a generated application implementation.
+
+Independent synchronous replay from retained dev worktree:
+- go test -count=1 -timeout=5m -cover ./internal/gates -run 'Clause|Parent|Selection|Obligation' -v: exit 1, 8.264s; 44 top-level cases (33 PASS, 11 intended FAIL), 69 leaf cases (48 PASS, 21 intended FAIL), 0 skipped; 27.7% targeted package statement coverage. All 46 preexisting leaf cases pass. No compile/import/infrastructure failures.
+- go test -count=1 -timeout=5m ./internal/gates -run 'TestObligationClausesSingleMachinePositiveControl$|TestObligationParentRealCLI$/obligation-free-parent-control$' -v: exit 0, 1.889s; 2 passing controls, 0 failed/skipped.
+- git diff --check epic/MAC-ui8a...HEAD clean; retained worktree clean and HEAD equals frozen SHA.
+- Static marker scan over the delivered file found no stub, skip, environment bypass or Paivot references.
+
+Observed failures match the contract: actual CLI default parent reports platform-green after a required Policy/Isolation ID is removed while explicit Gt rejects it; same-name guard vocabularies cross machine ownership, overcount clause coverage and contaminate drift; malformed/duplicate/conflicting/orphan declarations are accepted or lack blocking owner-specific diagnostics. These are expected behavioral assertions, not unrelated errors. Positive parent checks, recursively valid packs, compiled local implementation tests, generator-produced machine IDs and oracle-byte preservation assertions execute on actual native filesystem/CLI paths.
+
+AC assessment:
+1. Parent selection plus default/explicit CLI negatives exercise both relational oracle kinds, covered positives, and honest zero-obligation control.
+2. Different clause counts and overlapping vocabulary on Alpha/Beta require independent coverage and drift; undeclared sibling must remain unarmed.
+3. Every suffix is separately removed; duplicate/conflicting/empty/malformed declarations, missing owner/guard/oracle and stable generated IDs are explicitly asserted.
+4. Missing test IDs, omitted machine, wrong owner and removed oracle use actual gates/files; two independent correctly covered machines and same-machine positive controls prevent blanket rejection from satisfying RED.
+5. SelectRunAndNote, Gt, Gd and real CLI are exercised; owner plus guard must appear in the same blocking diagnostic. Retired/partial local drift stays checked without sibling leakage.
+
+GREEN must preserve the exact RED test bytes and pass them unchanged, retain existing behavior tests, and update relevant ownership/selection documentation. No test repair is authorized. No full preflight, push, install, binary replacement or source mutation was performed by PM.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Independent RED replay and source review at 27373f421640f644a98be89f38ce112c30f55a85 as detailed above.
+
+### proof
+- [x] AC #1: meaningful RED selection/CLI assertions and positive control verified.
+- [x] AC #2: meaningful RED owner-isolation assertions verified.
+- [x] AC #3: meaningful RED validation/stable-ID assertions verified.
+- [x] AC #4: required actual-path negative and positive cases verified.
+- [x] AC #5: actual gate execution and ownership diagnostics verified.
+- [ ] GREEN implementation and final acceptance remain required.
+
 ## Implementation Evidence
 
 RED phase only: frozen tests at 27373f421640f644a98be89f38ce112c30f55a85. Detailed PROOF, CI/Test Results, Commands run, Summary, AC Verification and LEARNINGS are in the immediately preceding evidence block. No GREEN implementation is claimed.
