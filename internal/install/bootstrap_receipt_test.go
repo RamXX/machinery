@@ -1,0 +1,469 @@
+package install
+
+import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/fs"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+// These fixtures exercise the actual Cobra CLI, release downloads, child binary
+// validation, delegated install lock, receipt persistence, and filesystem writes.
+// Only the existing release endpoint strings and release version are linked to
+// local values; no command runner or replacement executable is simulated.
+type bootstrapRelease struct {
+	old, next, source string
+	nextBytes         []byte
+	hold              atomic.Bool
+	broken            atomic.Bool
+	requested         chan struct{}
+	release           chan struct{}
+}
+
+func bootstrapCommand(t *testing.T, dir string, env []string, name string, args ...string) []byte {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	c := exec.CommandContext(ctx, name, args...)
+	c.Dir, c.Env = dir, env
+	out, err := c.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%s %v: %v\n%s", name, args, err, out)
+	}
+	return out
+}
+
+func bootstrapReleaseFixture(t *testing.T) *bootstrapRelease {
+	t.Helper()
+	repo, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &bootstrapRelease{requested: make(chan struct{}, 1), release: make(chan struct{})}
+	root := t.TempDir()
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archivePath := filepath.Join(root, "source.tar.gz")
+	bootstrapCommand(t, repo, os.Environ(), "go", "run", "./cmd/release-archive", "-git-root", repo, "-epoch", "1700000000", "-output", archivePath)
+	archive := bootstrapRead(t, archivePath)
+	broken := bootstrapWithoutAdapter(t, archive)
+	asset, err := releaseAssetName()
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		source := archive
+		if f.broken.Load() {
+			source = broken
+		}
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/repos/fixture/machinery/releases/tags/"):
+			fmt.Fprint(w, `{ "tag_name": "v9.9.2" }`)
+		case strings.HasSuffix(r.URL.Path, "/"+asset):
+			w.Write(f.nextBytes)
+		case strings.HasSuffix(r.URL.Path, "/machinery-source.tar.gz"):
+			if f.hold.Load() {
+				f.requested <- struct{}{}
+				select {
+				case <-f.release:
+				case <-r.Context().Done():
+					return
+				}
+			}
+			w.Write(source)
+		case strings.HasSuffix(r.URL.Path, "/checksums-sha256.txt"):
+			fmt.Fprintf(w, "%x  %s\n%x  machinery-source.tar.gz\n", sha256.Sum256(f.nextBytes), asset, sha256.Sum256(source))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Cleanup(func() { close(f.release) })
+	f.old, f.next = filepath.Join(root, "old"), filepath.Join(root, "next")
+	for i, binary := range []string{f.old, f.next} {
+		flags := fmt.Sprintf("-X main.version=v9.9.%d -X github.com/RamXX/machinery/internal/install.githubBase=%s -X github.com/RamXX/machinery/internal/install.apiBase=%s", i+1, server.URL, server.URL)
+		bootstrapCommand(t, repo, os.Environ(), "go", "build", "-ldflags", flags, "-o", binary, "./cmd/machinery")
+	}
+	f.nextBytes = bootstrapRead(t, f.next)
+	if err := extractTarGz(archivePath, filepath.Join(root, "source")); err != nil {
+		t.Fatal(err)
+	}
+	f.source = filepath.Join(root, "source", "machinery")
+	// A historical source fixture retains the complete real shipped inventory.
+	// Its visible marker makes stale skill, role, command, and plugin bytes observable.
+	err = filepath.WalkDir(f.source, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(path, append(body, []byte("\n// bootstrap historical asset\n")...), 0o644)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+func bootstrapWithoutAdapter(t *testing.T, archive []byte) []byte {
+	t.Helper()
+	reader, err := gzip.NewReader(bytes.NewReader(archive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	var out bytes.Buffer
+	gz := gzip.NewWriter(&out)
+	writer := tar.NewWriter(gz)
+	tr := tar.NewReader(reader)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if header.Name == "machinery/adapters/opencode/plugins/machinery.js" {
+			continue
+		}
+		if err := writer.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.Copy(writer, tr); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return out.Bytes()
+}
+
+func bootstrapRead(t *testing.T, path string) []byte {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+type bootstrapInstall struct {
+	root, home, config, binary string
+	env                        []string
+	receipt                    installReceipt
+}
+
+func bootstrapSeed(t *testing.T, release *bootstrapRelease) bootstrapInstall {
+	t.Helper()
+	f := bootstrapInstall{root: t.TempDir()}
+	f.home, f.config, f.binary = filepath.Join(f.root, "home"), filepath.Join(f.root, "config"), filepath.Join(f.root, "bin", "machinery")
+	for _, path := range []string{f.home, f.config, filepath.Dir(f.binary), filepath.Join(f.root, "tmp")} {
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(f.binary, bootstrapRead(t, release.old), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Set both process and child roots: helpers and actual CLI use the same isolated scope.
+	for key, value := range map[string]string{"HOME": f.home, "USERPROFILE": f.home, "MACHINERY_CONFIG_DIR": f.config, "XDG_CONFIG_HOME": filepath.Join(f.home, ".config"), "TMPDIR": filepath.Join(f.root, "tmp")} {
+		t.Setenv(key, value)
+	}
+	f.env = os.Environ()
+	for _, args := range [][]string{
+		{"--home", filepath.Join(f.home, "custom-a"), "--home", filepath.Join(f.home, "custom-b")},
+		{"--home", filepath.Join(f.home, "copy-a"), "--home", filepath.Join(f.home, "copy-b"), "--copy"},
+		{"--target", "codex"}, {"--target", "opencode", "--copy"},
+	} {
+		bootstrapCommand(t, f.root, f.env, f.binary, append([]string{"install", "--from", release.source}, args...)...)
+	}
+	write(t, filepath.Join(f.home, "unrelated", "sentinel"), "unrelated host content")
+	var err error
+	f.receipt, _, err = loadReceipt()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.receipt.HomeInstalls) != 2 || len(f.receipt.Targets) != 2 {
+		t.Fatalf("real install omitted topology: %+v", f.receipt)
+	}
+	return f
+}
+
+func (f bootstrapInstall) args(bootstrap bool) []string {
+	args := []string{"update", "--version", "v9.9.2", "--repo", "fixture/machinery", "--install-dir", filepath.Dir(f.binary), "--skip-plugins"}
+	if bootstrap {
+		args = append(args, "--bootstrap-defaults")
+	}
+	return args
+}
+
+func bootstrapState(t *testing.T, f bootstrapInstall) map[string]string {
+	t.Helper()
+	result := map[string]string{}
+	for _, root := range []string{f.home, filepath.Dir(f.binary)} {
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			value := ""
+			if info.Mode()&os.ModeSymlink != 0 {
+				value, err = os.Readlink(path)
+			} else {
+				var raw []byte
+				raw, err = os.ReadFile(path)
+				value = fmt.Sprintf("%x", sha256.Sum256(raw))
+			}
+			result[path] = fmt.Sprintf("%v:%s", info.Mode(), value)
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	result["receipt"] = string(bootstrapRead(t, filepath.Join(f.config, "install.json")))
+	return result
+}
+
+func TestBootstrapReceiptPlan(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+	t.Run("first bootstrap defaults control", func(t *testing.T) {
+		got, err := updatePlan(UpdateOptions{BootstrapDefaults: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, _ := DefaultHomes()
+		if len(got.HomeInstalls) != 1 || !reflect.DeepEqual(got.HomeInstalls[0].Homes, want) {
+			t.Fatalf("defaults: %+v want %v", got, want)
+		}
+	})
+	for _, opts := range []UpdateOptions{{Homes: []string{"/explicit"}}, {Targets: []string{"codex"}}} {
+		opts.BootstrapDefaults = true
+		if _, err := updatePlan(opts); err == nil || !strings.Contains(err.Error(), "cannot be combined") {
+			t.Fatalf("explicit selector accepted: %v", err)
+		}
+	}
+	t.Run("complete recorded mixed plan", func(t *testing.T) {
+		home := os.Getenv("HOME")
+		repo, err := filepath.Abs("../..")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, opts := range []Options{{Homes: []string{filepath.Join(home, "a"), filepath.Join(home, "b")}}, {Homes: []string{filepath.Join(home, "c")}, Copy: true}, {Targets: []string{"codex"}}, {Targets: []string{"opencode"}, Copy: true}} {
+			opts.From, opts.Record = repo, true
+			if err := Install(opts); err != nil {
+				t.Fatal(err)
+			}
+		}
+		r, _, err := loadReceipt()
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.HostPlugins = []string{"claude", "codex"}
+		raw, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(os.Getenv("MACHINERY_CONFIG_DIR"), "install.json"), raw, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		want, err := updatePlan(UpdateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := updatePlan(UpdateOptions{BootstrapDefaults: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("bootstrap lost receipt plan\ngot: %+v\nwant: %+v", got, want)
+		}
+	})
+}
+
+func TestBootstrapReceiptCLI(t *testing.T) {
+	release := bootstrapReleaseFixture(t)
+	for _, bootstrap := range []bool{false, true} {
+		t.Run(fmt.Sprintf("converges_bootstrap_%t", bootstrap), func(t *testing.T) {
+			f := bootstrapSeed(t, release)
+			before := bootstrapState(t, f)
+			bootstrapCommand(t, f.root, f.env, f.binary, f.args(bootstrap)...)
+			if !bytes.Equal(bootstrapRead(t, f.binary), release.nextBytes) {
+				t.Error("binary does not match verified release digest")
+			}
+			r, _, err := loadReceipt()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(r.HomeInstalls, f.receipt.HomeInstalls) || !reflect.DeepEqual(r.Targets, f.receipt.Targets) {
+				t.Errorf("rerun changed recorded topology: %+v", r)
+			}
+			for _, a := range f.receipt.Artifacts {
+				err := filepath.WalkDir(a.Path, func(path string, d fs.DirEntry, err error) error {
+					if err != nil {
+						return err
+					}
+					if d.IsDir() || d.Type()&os.ModeSymlink != 0 {
+						return nil
+					}
+					if bytes.Contains(bootstrapRead(t, path), []byte("bootstrap historical asset")) {
+						t.Errorf("recorded target remains stale: %s", path)
+					}
+					return nil
+				})
+				if err != nil {
+					t.Error(err)
+				}
+			}
+			for _, a := range r.Artifacts {
+				digest, err := artifactTreeDigest(a.Path)
+				if err != nil || digest != a.Digest {
+					t.Errorf("receipt digest mismatch %s: %s %v", a.Path, digest, err)
+				}
+			}
+			after := bootstrapState(t, f)
+			for path, value := range before {
+				if strings.Contains(path, "unrelated") && after[path] != value {
+					t.Errorf("unrelated file changed: %s", path)
+				}
+			}
+			bootstrapCommand(t, f.root, f.env, f.binary, f.args(bootstrap)...)
+			if !reflect.DeepEqual(after, bootstrapState(t, f)) {
+				t.Error("same release rerun is not byte/topology idempotent")
+			}
+		})
+	}
+	for _, bootstrap := range []bool{false, true} {
+		t.Run(fmt.Sprintf("later_target_failure_rolls_back_bootstrap_%t", bootstrap), func(t *testing.T) {
+			f := bootstrapSeed(t, release)
+			before := bootstrapState(t, f)
+			release.broken.Store(true)
+			defer release.broken.Store(false)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, f.binary, f.args(bootstrap)...)
+			cmd.Dir, cmd.Env = f.root, f.env
+			out, err := cmd.CombinedOutput()
+			if err == nil {
+				t.Errorf("missing later OpenCode source unexpectedly succeeded: %s", out)
+			}
+			if !strings.Contains(string(out), "updated machinery binary") || !strings.Contains(string(out), "custom-a") || !strings.Contains(string(out), ".codex") {
+				t.Errorf("did not prove binary and earlier placements changed before later failure: %s", out)
+			}
+			if !reflect.DeepEqual(before, bootstrapState(t, f)) {
+				t.Error("later target failure did not restore old binary, all homes/native targets, and receipt")
+			}
+		})
+	}
+	for _, negative := range []string{"corrupt receipt", "unsafe receipt", "stale schema", "stale artifact", "disappeared target", "plugin discovery failure"} {
+		t.Run(negative, func(t *testing.T) {
+			f := bootstrapSeed(t, release)
+			path := filepath.Join(f.config, "install.json")
+			switch negative {
+			case "corrupt receipt":
+				if err := os.WriteFile(path, []byte("{"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "unsafe receipt":
+				if err := os.Chmod(path, 0o666); err != nil {
+					t.Fatal(err)
+				}
+			case "stale schema":
+				r := f.receipt
+				r.SchemaVersion = 999
+				raw, _ := json.Marshal(r)
+				if err := os.WriteFile(path, raw, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "disappeared target":
+				if err := os.Remove(filepath.Join(f.home, ".codex", "agents", "machinery-fsm-author.toml")); err != nil {
+					t.Fatal(err)
+				}
+			case "stale artifact":
+				write(t, filepath.Join(f.home, ".codex", "agents", "machinery-fsm-author.toml"), "externally modified target")
+			case "plugin discovery failure":
+				write(t, filepath.Join(f.home, ".claude", "plugins", "cache"), "not a directory")
+			}
+			before := bootstrapState(t, f)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, f.binary, f.args(true)...)
+			cmd.Dir, cmd.Env = f.root, f.env
+			out, err := cmd.CombinedOutput()
+			if err == nil {
+				t.Errorf("unsafe bootstrap unexpectedly succeeded: %s", out)
+			} else if !strings.Contains(string(out), "receipt") && !strings.Contains(string(out), "plugin") && !strings.Contains(string(out), "target") && !strings.Contains(string(out), "artifact") && !strings.Contains(string(out), "digest") {
+				t.Errorf("missing actionable diagnostic: %s", out)
+			}
+			if !reflect.DeepEqual(before, bootstrapState(t, f)) {
+				t.Error("rejected bootstrap altered binary, recorded targets, receipt, or unrelated host files")
+			}
+		})
+	}
+	t.Run("interrupted download recovers real transaction", func(t *testing.T) {
+		f := bootstrapSeed(t, release)
+		before := bootstrapState(t, f)
+		release.hold.Store(true)
+		defer release.hold.Store(false)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, f.binary, f.args(true)...)
+		cmd.Dir, cmd.Env = f.root, f.env
+		if err := cmd.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = cmd.Process.Kill() }()
+		select {
+		case <-release.requested:
+		case <-ctx.Done():
+			t.Fatal("update never reached real source download")
+		}
+		if err := cmd.Process.Kill(); err != nil {
+			t.Fatal(err)
+		}
+		if err := cmd.Wait(); err == nil {
+			t.Fatal("interrupted update exited successfully")
+		}
+		if _, err := os.Stat(filepath.Join(f.config, installJournalDir, installJournalMetadata)); err != nil {
+			t.Fatalf("interruption did not leave recovery journal: %v", err)
+		}
+		bootstrapCommand(t, f.root, f.env, f.binary, "version")
+		if !reflect.DeepEqual(before, bootstrapState(t, f)) {
+			t.Error("startup recovery did not restore complete pre-update state")
+		}
+		if _, err := os.Stat(filepath.Join(f.config, installJournalDir)); !os.IsNotExist(err) {
+			t.Errorf("recovery journal remains: %v", err)
+		}
+	})
+}
