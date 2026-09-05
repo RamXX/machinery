@@ -486,8 +486,11 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 				if err == nil {
 					t.Errorf("missing later OpenCode source unexpectedly succeeded: %s", out)
 				}
-				if !strings.Contains(string(out), "updated machinery binary") || !strings.Contains(string(out), "custom-a") || !strings.Contains(string(out), ".codex") {
+				if !strings.Contains(string(out), "updated machinery binary") || !strings.Contains(string(out), "custom-a") || !strings.Contains(string(out), "installed Codex agents ->") {
 					t.Errorf("did not prove binary and earlier placements changed before later failure: %s", out)
+				}
+				if !strings.Contains(string(out), "source is missing OpenCode governance adapter") {
+					t.Errorf("did not reach intended later source failure: %s", out)
 				}
 				if !reflect.DeepEqual(before, bootstrapState(t, f)) {
 					t.Error("later target failure did not restore old binary, all homes/native targets, and receipt")
