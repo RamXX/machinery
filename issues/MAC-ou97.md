@@ -9,8 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:36:14Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:36:14Z
-content_hash: "sha256:e5800e6fb856dfe3d637c5d5d17a10335b1900672e995140d59508fc8aeab05a"
-blocked_by: [MAC-hlae, MAC-sh60, MAC-olrx, MAC-p8ce, MAC-yhg5, MAC-hwdb, MAC-2u36, MAC-a89e, MAC-p7jd]
+content_hash: "sha256:56892b7cace89fdb511bfae195919eba15fd8a2203cce9a4ed29821e3a108874"
+blocked_by: [MAC-hlae, MAC-sh60, MAC-olrx, MAC-p8ce, MAC-yhg5, MAC-hwdb, MAC-2u36, MAC-a89e, MAC-p7jd, MAC-2n83]
 ---
 
 ## Description
@@ -118,9 +118,10 @@ status: new
 - 2026-09-05T19:36:15Z dep_added: blocked_by MAC-2u36
 - 2026-09-05T19:36:15Z dep_added: blocked_by MAC-a89e
 - 2026-09-05T19:36:16Z dep_added: blocked_by MAC-p7jd
+- 2026-09-05T19:36:16Z dep_added: blocked_by MAC-2n83
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocked by: [[MAC-hlae]], [[MAC-sh60]], [[MAC-olrx]], [[MAC-p8ce]], [[MAC-yhg5]], [[MAC-hwdb]], [[MAC-2u36]], [[MAC-a89e]], [[MAC-p7jd]]
+- Blocked by: [[MAC-hlae]], [[MAC-sh60]], [[MAC-olrx]], [[MAC-p8ce]], [[MAC-yhg5]], [[MAC-hwdb]], [[MAC-2u36]], [[MAC-a89e]], [[MAC-p7jd]], [[MAC-2n83]]
 
 ## Comments
