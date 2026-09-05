@@ -415,9 +415,17 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   row for that event, which is the payload-sufficiency drift check. A design
   that arms the completeness tier (a `machinery:reads-complete` marker in
   ARCHITECTURE.md) makes the same declaration required rather than optional:
-  every event-contract row then owes one, or a `(no reads: <reason>)` waiver
-  in its consumer cell, and a declared field the row's payload does not carry
-  is an ERROR in Gx-trace instead of a warning here.
+  every event-contract row then owes one bound to its exact participant by
+  the matrix row's `consumer` column, or a `(no reads: <reason>)` waiver
+  in that contract row's consumer cell. Matrix filenames are machine names,
+  not consumer bindings. Legacy declarations without the column work only
+  when the event has one distinct consumer; fan-out requires adding the
+  explicit column. Repeated declarations for the same event and consumer
+  must agree on the exact field set, including across machines. Siblings
+  have independent sets and waivers; a field absent from that consumer's
+  own payload is an ERROR in Gx-trace instead of a warning here. Empty or
+  malformed sets, duplicate fields or consumer columns, conflicting sets,
+  and blank or unknown explicit consumers also fail the armed tier.
 - Incident-derived invariants and fixtures carry a PROVENANCE pointer to the
   primary record (the customer report, the post-mortem document), so the
   attested re-derivation set is enumerable; a fixture named after an
