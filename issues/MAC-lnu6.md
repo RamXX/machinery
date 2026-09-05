@@ -9,7 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:36:13Z
-content_hash: "sha256:081efcadaae1eff6b0ef1cd6bcc11fb7e11d6b061482b0fe397e81ea1b5c9eae"
+content_hash: "sha256:b1766fe93dd9a1b2c8fda264868713818585d8bd3d6dbfb907373fc23b549752"
+blocks: [MAC-vx24]
 ---
 
 ## Description
@@ -75,9 +76,10 @@ status: new
 
 
 ## History
-
+- 2026-09-05T19:36:14Z dep_added: blocks MAC-vx24
 
 ## Links
 - Parent: [[MAC-ui8a]]
+- Blocks: [[MAC-vx24]]
 
 ## Comments
