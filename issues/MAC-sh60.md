@@ -9,8 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:33:47Z
-content_hash: "sha256:76491a74ae7fdb623d5df1aa28a4954fbb909b0a1c7f709eeecc9d1b6a91ca76"
-blocks: [MAC-vx24]
+content_hash: "sha256:bd3f5e0adcdeb6a21b699c52f98ee39f3c48e3d2c7c172b0179ef3fc1bf9ea5a"
+blocks: [MAC-vx24, MAC-ou97]
 ---
 
 ## Description
@@ -81,9 +81,10 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 
 ## History
 - 2026-09-05T19:35:07Z dep_added: blocks MAC-vx24
+- 2026-09-05T19:36:14Z dep_added: blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-vx24]]
+- Blocks: [[MAC-vx24]], [[MAC-ou97]]
 
 ## Comments
