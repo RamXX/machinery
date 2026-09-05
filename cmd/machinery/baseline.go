@@ -26,8 +26,10 @@ Contract's dependency_rules after review), and write design/ratchet.json, the
 set-based snapshot of every tolerated edge's offender files. From then on G4
 fails when a baselined edge gains a new offender file, and machinery host
 adapters with blocking stop hooks reject import findings at turn end (the
-snapshot is what arms that blocking). Rerun after burning down debt to tighten
-the ratchet.`,
+snapshot is what arms that blocking). Rerunning baseline rewrites ratchet.json
+and may accept newly added offender files, even when no new dependency rules
+are proposed. Review ratchet changes before adopting them as accepted debt.
+Rerun after burning down debt to tighten the ratchet.`,
 		Args: cobra.ExactArgs(1),
 	}
 	var implDir, date string
@@ -86,7 +88,7 @@ the ratchet.`,
 				fmt.Fprintf(stdoutW, "    - %q   %s\n", p.Edge, comment)
 			}
 		} else {
-			fmt.Fprintln(stdoutW, "\nthe contract already covers every observed edge; nothing new to baseline")
+			fmt.Fprintln(stdoutW, "\nno new baseline dependency rules proposed")
 		}
 
 		if len(rep.IgnoreGlobs) > 0 {
@@ -120,6 +122,7 @@ the ratchet.`,
 			total += len(files)
 		}
 		fmt.Fprintf(stdoutW, "\nwrote %s/%s: %d edge(s), %d offender file(s)\n", design, gates.RatchetFile, len(rep.Ratchet.Edges), total)
+		fmt.Fprintln(stdoutW, "rerunning baseline rewrites ratchet.json and may accept newly added offender files, even when no new dependency rules are proposed. Review ratchet changes before adopting them as accepted debt.")
 		fmt.Fprintln(stdoutW, "armed: G4 now fails when a baselined edge gains a new offender file, and the machinery plugin blocks import findings at turn end")
 		return nil
 	}
