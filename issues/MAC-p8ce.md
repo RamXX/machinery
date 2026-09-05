@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:59:01Z
-content_hash: "sha256:0f3d72eacb12eac199e78087dffefbb5679be4b952aaf0266f8d6569c6991568"
+updated_at: 2026-09-05T20:07:41Z
+content_hash: "sha256:e520874a6be5ae8ea1e144b7d3882662cac33d15995590b6f5f770a134befd57"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p8ce
 ---
@@ -80,6 +80,42 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+## Independent PM RED review — 2026-09-05
+RED APPROVED: frozen SHA 0d52f43b393d961160aeea0db43b13a3fa5c284a on story/MAC-p8ce meets the hard-TDD specification bar. This is RED approval only, not GREEN acceptance or closure.
+
+Independent evidence:
+- Read the full story and all 336 lines of internal/gates/reads_consumer_test.go plus the unchanged READS implementation and legacy fixture definitions. The diff from 497419ab4512fcff765cd5feb27aed4c67b5608d adds only this test file; subject includes tdd-red. Worktree remained clean and HEAD unchanged.
+- Replayed go test -count=1 -timeout=240s ./internal/gates -run 'Reads|EventContract|Consumer' -json. Initial output exceeded tool display capacity, so repeated the same command with a jq reducer preserving terminal leaf results and every OutputType=error assertion. Exit 1; 66 leaves: 39 PASS, 27 intended assertion FAIL, 0 SKIP. New TestReadsConsumer cases: 41 leaves, 14 PASS/27 FAIL. Existing matched cases: 25 PASS. CLI: 9 leaves, 4 PASS/5 intended FAIL.
+- Independently replayed go test -count=1 -timeout=240s ./internal/gates -run '^TestReadsConsumerLegacySingleControl$|^TestReadsConsumerRepeatedLegacyStillHasOneOwner$|^TestReadsConsumerCLI$/legacy_control$' -v: exit 0, 3 leaves PASS, 0 FAIL/SKIP.
+- All 27 failures are unsafe contract acceptance or rejection of valid distinct consumer payloads. No compilation, import, subprocess-launch or prerequisite failure counted as RED. The real temporary CLI build and bounded native invocations executed; no mocks or conditional skips.
+- git diff --check 497419ab4512fcff765cd5feb27aed4c67b5608d..HEAD passed. Stub/skip scan found no markers. No product code changed, so RED does not yet change documented public behavior.
+- Codebase-memory coverage was checked; the new test file is absent in the root graph. Exact retained-worktree source was therefore read directly; no claim of graph completeness.
+- Statement coverage percentage was not measured; the above are actual behavioral test counts. No full preflight, installed binary replacement, remote mutation, or product dependency on Paivot.
+
+AC review:
+1. Exact reads are bound by explicit row-local consumer column, never machine basename. Distinct per-edge payloads and annotated participant spellings are positive cases. Real G2/Gx invocation enforces the joint guarantee: G2 participant resolution and Gx READS.
+2. Missing either owner, reassigning an owner, each independently narrowed payload, and a legitimate strict-superset sibling are sensitive cases. Existing event-wide matching fails these as intended.
+3. Unique single-consumer legacy declarations and repeated rows with one distinct owner pass controls. Ambiguous all-legacy and mixed explicit/legacy fan-out require event/consumer ownership migration guidance. Present-but-blank ownership cannot use legacy fallback.
+4. Tests cover repeated identical edges, repeated short payloads, multiple machines with agreeing exact sets, conflicting sets across machines/rows/cells, duplicate members, unknown fields, malformed/empty declarations, near-match and renamed owners, and empty waiver reasons. A reasoned waiver passes locally but cannot satisfy the sibling. Blocked ownership mutations compare repeated diagnostics for determinism.
+5. Native CLI positive control/distinct sets and missing-owner, narrowed-payload, known-consumer rename, conflicting duplicate, and G2 unknown-participant cases are real filesystem/CLI checks with exit-code and relevant finding assertions.
+
+Remaining work: GREEN implementation must make the frozen suite pass without editing its tests/fixture bytes. No RED acceptance-criteria gaps found.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Independent RED review at 0d52f43b393d961160aeea0db43b13a3fa5c284a: 39 PASS/27 intended FAIL/0 SKIP, separate controls 3 PASS.
+- RED approval recommended; canonical approve-red transition follows this record.
+
+### proof
+- [x] AC #1: exact per-consumer binding and combined G2/Gx path specified.
+- [x] AC #2: sibling isolation and strict-superset independence specified.
+- [x] AC #3: compatible unique legacy ownership and actionable ambiguity migration specified.
+- [x] AC #4: repeats, conflicts, malformed values, renames and non-transferring waivers specified.
+- [x] AC #5: native CLI mutation/control coverage independently replayed.
+
+
 ## Implementation Evidence
 
 PROOF:
