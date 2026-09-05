@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T22:55:07Z
-content_hash: "sha256:c86e2201195103a6db513119faa6a2f4f081dc4af100ba780f542112fe5f0960"
+updated_at: 2026-09-05T23:07:16Z
+content_hash: "sha256:98f269e2ae95836d0ab04939965193e62dc27a3c6dfad7d62fa9172384c97e91"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p8ce
 follows: [MAC-olrx]
@@ -81,6 +81,30 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+## Independent PM GREEN decision — 2026-09-05
+ACCEPTED: GREEN 337b9cec17a3f551a7564bed9394045b36043976 satisfies all five story ACs.
+
+Evidence:
+- First verified frozen internal/gates/reads_consumer_test.go bytes against RED 0d52f43b393d961160aeea0db43b13a3fa5c284a: empty diff. pvg story verify-tdd --base epic/MAC-ui8a PASS, local merge-base 497419a, 3 commits checked, 0 unauthorized test edits.
+- Fresh detached checkout at exact GREEN SHA. Independently ran go test -count=1 -timeout=240s ./internal/gates -run 'Reads|EventContract|Consumer' -json: exit 0; 78 PASS, 0 FAIL, 0 SKIP. Of these, 41 frozen story cases, 12 supplemental, 25 existing; all 9 actual CLI cases PASS. Raw log retained at /tmp/MAC-p8ce-pm-green.MCVdOx/targeted.jsonl. No test/source/fixture edits.
+- Reviewed complete current developer evidence and final source/supplemental tests/doc diff, including integration wiring, downstream 134 PASS plus separate EventCells 15 PASS (149 distinct leaves), source 138/141 statement coverage and explicit coverage limits. Those downstream results were trusted, not redundantly rerun.
+- verify-delivery PASS 9/9. git diff --check PASS; 6-file/652-changed-LOC scope includes frozen 336 lines and the three expressly authorized repository documentation passages. No stubs, skips, product Paivot dependency, shared-helper edit, or installed asset edit. Unarmed Gd path remains unchanged.
+- Codebase-memory lookup/coverage used for existing parser/participant semantics; root graph omits branch-only tests, so exact detached source was read directly. Documentation agrees with explicit ownership, exact-set conflicts, unique legacy migration, local waivers, malformed-input rejection and unarmed semantics.
+- No concrete new bugs or unresolved AC gaps found. Full preflight remains the final epic gate.
+
+## nd_contract
+status: accepted
+
+### evidence
+- Independent GREEN replay: 78 PASS / 0 FAIL / 0 SKIP at 337b9cec17a3f551a7564bed9394045b36043976; frozen RED unchanged.
+- Complete current proof and all changed source/docs reviewed.
+
+### proof
+- [x] AC #1: readsEdge uses exact event and cleaned consumer identity, table-local consumer columns; each row checks its own payload; real G2/Gx path passes.
+- [x] AC #2: sibling declarations cannot mask absent owners or widen/narrow sibling obligations; independent payload mutations and strict-superset control pass.
+- [x] AC #3: one distinct legacy owner resolves, repeated same-owner rows stay compatible; ambiguous fan-out produces explicit consumer-column migration guidance.
+- [x] AC #4: canonical sorted exact sets detect conflicts across rows/machines; duplicate/empty/malformed values, unknown or renamed owners and repeated short payloads fail; waiver validation is row-local and deterministic.
+- [x] AC #5: unchanged native CLI positive/distinct-set and missing-owner, narrowed-payload, rename/conflict/G2 participant cases all pass with intended exit/finding assertions.
 
 
 ## nd_contract
