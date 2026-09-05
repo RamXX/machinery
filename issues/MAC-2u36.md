@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:26:47Z
-content_hash: "sha256:563de5def77f48d5e2f5f0dcc45317a3fef84fff7eb853baef5c62f39475bf6a"
+updated_at: 2026-09-05T23:33:04Z
+content_hash: "sha256:fba27fac57a81125a34a0c21a254e152d19f98c0469b6928eac8245967ddf628"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce]
 assignee: dev-MAC-2u36
@@ -130,6 +130,91 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+# FULL INDEPENDENT RED REVIEW — MAC-2u36
+
+Decision: APPROVE-RED for frozen 496963fb7f4842d706d308dafcbd145908a6e395. The repaired tests close the prior material AC2 proof gap. This approves the RED acceptance bar only; the story is not accepted/closed, and GREEN implementation and actual final-close fault execution remain pending.
+
+## Scope, authorization and static review
+
+Reviewed current canonical seven ACs, scope, testing requirements, measured budget, latest delivery and all applicable authorizations through shared `pvg issues show MAC-2u36 --json`. Preserved distinctions among historical six-AC scope, later parent-PROCESS refinement, the retrospectively reviewed cdb8036 diagnostic amendment, AC7 overlap behavior, prior oracle repairs, and the final narrow AC2 authorization at 23:04:15Z. No prior blanket test-edit authorization was inferred.
+
+The entire 98d3b57..496963f delta is receipt_test.go +186/-25. It amends only TestCorruptReceiptFailsLoudly, TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology, and TestSemanticallyInvalidReceiptFailsBeforeUpdate, with required imports/table fields, three private receipt helpers and two new bounded test functions. Names and all intended negatives remain. Shared install_test.go and every bootstrap byte are unchanged. No production/config/API/hook/CLI/shipped asset edits occurred.
+
+Fresh deterministic checks: git diff --check f24b2df 496963f clean; gofmt -l both test files empty; pvg verify both test files --format text --include-tests PASS, 2 files/0 issues; pvg story verify-tdd --base f24b2df PASS, 10 commits/0 unauthorized edits/0 skipped merges. Every amendment subject carries tdd-red and [test-edit-authorized]. No new stub, skip, environment gate or parallel mutable fixture. Existing receipt-test platform skips remain unchanged and none executed in either relevant native replay. Go signatures provide explicit types; no new public product API/config/cross-cutting integration exists to audit. This RED-only test repair changes no documented product behavior, so no DOCS_STALE finding.
+
+Verified SHA256:
+- bootstrap_receipt_test.go: ee786dee86c951a5a3a4a53d9344aeb16979df19319ea77dcd14fbd7afefca23
+- receipt_test.go: a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48
+- install_test.go: d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba
+
+## Evidence freshness and exact counts
+
+Fresh independent focused replay in detached /tmp/machinery-pm-MAC-2u36-final.EeD9Ho/checkout at 496963f:
+
+`go test -count=1 -timeout=2m ./internal/install -run '^(TestCorruptReceiptFailsLoudly|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology|TestSemanticallyInvalidReceiptFailsBeforeUpdate|TestReceiptPrivateSchemaControls|TestReceiptSchemaTwoInventoryValidation)$' -json`
+
+Native stdout/stderr directly captured to /tmp/machinery-pm-MAC-2u36-final.EeD9Ho/496963f-independent-focused.jsonl. Exit 0; 23 leaves, 23 PASS/0 FAIL/0 SKIP, 0.441s. All 26 run events have terminal outcomes. Raw SHA256 4ce4f6378c140208a34a06eaecbbd40ddea7712bde0fbc26ffb538e0c96e13de. Twenty intended negative diagnostics and three named positive controls executed.
+
+Primary current-SHA full integration evidence is the author's complete native replay, independently parsed and audited here, NOT a fresh full PM replay:
+
+`go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json`
+
+/tmp/machinery-MAC-2u36-red.qRk5DC/496963f-final-matrix.jsonl, independently verified SHA256 a42f96c5d36651fbd835d9626057eb3f659ae6b2503668d4dd6375407dce7b03. Exit 1 intended RED; 79 leaves, 62 PASS/17 FAIL/0 SKIP, 739.525s. All 89 run events have terminal outcomes. Bootstrap subset: 43 leaves, 26 PASS/17 FAIL; other selected tests: 36 PASS. The complete named inventory is preserved in this raw log and the canonical delivery. All 23 changed/new checks also pass in this full invocation. No compiler, fixture, package/operation timeout, race warning or unexpected failure class was found. No statement/branch coverage was instrumented; seven of seven AC outcome contracts were independently assessed, not a numeric code-coverage claim.
+
+Carried-forward corroboration: prior independent 98d3b57 full replay, 66 leaves/49 PASS/17 FAIL/0 SKIP, 758.895s; /tmp/machinery-pm-MAC-2u36.DDIEBx/98d3b57-independent-matrix.jsonl, independently reverified SHA256 9457a41c68ebdc041dc4ffcfccc71a9026dd595b858349f8429e48b2cefba778. Every prior run was terminal. Exact 17 failing leaf identities equal the current replay. The old ten permission-masked PASS results are historical execution results ONLY, not old valid AC2 parser/topology proof.
+
+Why no redundant full PM replay: the complete current author evidence is trustworthy and consistent; the only changed file contains the locally isolated repaired/new loader tests, freshly independently executed above. Bootstrap test bytes, all production source, archive-building code, shipped installation content and shared helpers remain identical to the prior independent replay. The real archive includes the changed test file and built binaries may carry different revision metadata, so byte-identical archives/binaries across SHAs are NOT claimed. Current author execution supplies that current-SHA proof; prior independent integration execution corroborates the unchanged behavior/oracle closure. Test environment cleanup and absence of new package initialization/global mutations were inspected. No specific unresolved doubt warrants another approximately twelve-minute broad run. This follows the PM evidence discipline and user's targeted-verification preference; it is a complete independent review, not a claim of a second fresh full current-SHA execution.
+
+## AC-by-AC behavioral review
+
+AC1: complete-recorded-plan ordinary/bootstrap comparison includes both home groups with preserved modes, Codex/OpenCode modes and plugin obligations. Defaults and supported schema1 controls pass; selectors remain rejected. The actual plugin-aware default test passes. Recorded-plan parity fails as intended because bootstrap selects defaults. The real convergence tests prevent an apparent success that refreshes only default homes.
+
+AC2: repaired helpers call the SAME real loader with a matched valid receipt before each negative; explicitly private 0700 config and existing regular 0600 receipt modes/types are checked before each read. `exists=true`, nonnil error, exact parse/invalid wrapper removal and intended detail are mandatory. Earlier permissions/path/read failures have the wrong wrapper and cannot pass. Directory/test names cannot satisfy details. Malformed input additionally requires json.SyntaxError; wrong homes/copy require json.UnmarshalTypeError, string value, correct field suffix and []string/bool type. Unknown root/home/target fields assert their exact names; nested/root duplicates assert keys; trailing value and cursor target assert their specific diagnoses. Unknown-home fixture has nonempty safe absolute homes and passes when the field is removed. The semantic test accurately claims loader rejection before planning, not observed binary replacement.
+
+Schema2 controls seed two actual home trees, independently enumerate six known artifact roots and compute real digests. Count defects are 5/7 versus 6; unchanged-count duplicate/substituted/relative/non-clean/unexpected-absolute paths require the inventory-path mismatch category. Sorting may expose another shifted inventory entry first; this is the same intended path-membership category, not a false parser/permission attribution. Digest prefix/length/correct-length nonhex defects keep all other metadata valid and require malformed-digest diagnosis for the mutated artifact. Reversed valid ordering succeeds and normalizes. Named schema1/schema2 positives compare exact loaded metadata. The existing CLI unsafe_receipt starts from successfully recorded private data and changes only mode to0666; it passes independently of parser checks (current author 13.47s). Bootstrap malformed/schema/plugin/path/type controls remain frozen; unsafe native symlink is intended bootstrap RED. No new validator bypass was found.
+
+AC3: actual ordinary intact (51.37s) and edited regular Codex artifact repair (49.65s) pass with exact verified-release binary/version, independent real-release filesystem reference, complete topology/path inventory/current digests/plugin obligations, mode/link destinations, unrelated sentinel and same-release idempotence. Paired bootstrap and missing-native cases preserve desired successful repair assertions. The exact missing Codex file and bounded simultaneous Codex/OpenCode file absences follow valid receipt creation with safe parents. Ordinary missing currently fails during early child inventory, a genuine success-contract RED rather than unsafe-ownership success. Missing entries cannot simply be forgotten because expected content and receipt membership are independently retained.
+
+AC4: ordinary intact later OpenCode source failure passes (32.60s). The fixture removes only the archive's actual OpenCode adapter; binary/home/Codex progress witnesses, exact adapter path plus no-such-file diagnosis, nonzero result and complete pre-state snapshot restoration are mandatory. Missing-prestate cases separately require restored absence and actual later boundary, so early Codex receipt-inventory errors fail. Bootstrap later-source cases remain intended RED. Real killed held-download startup recovery passes (14.67s), with journal presence, CLI startup recovery, exact pre-state and journal disappearance. This is PRE-mutation interruption evidence; it is not substituted for post-mutation rollback.
+
+AC5: reviewed all 1111 bootstrap-test lines and relevant source seams. Tests build actual Cobra/release executables, generate checksummed real source archives, use private loopback endpoints and real subprocess/default command runners with temporary HOME/config/target/binary roots. Endpoint/version linking is fixture routing; no fake command result, modified child, production hook or public/environment-only receipt bypass. New metadata tests use real filesystem loader operations. All mandatory new integration leaves executed, zero skips. No Paivot/pvg/nd product dependency was added; coordination remains private tracker use.
+
+AC6: full parent prepared journal covers binary, complete selected artifacts and receipt. Parent observer sees genuine buffered child completion, checks persisted receipt bytes/existence/type/mode after every child, independently verifies all current content, and builds desired current normalized receipt outside the close callback. Exact component-bounded alias matching preserves foreign siblings/interior aliases and exact scratch parent identity. The existing closeInstallFile hook targets only receipt-* directly under the current journal scratch, checks prepared phase, expected-ready content/payload and unchanged receipt, successfully closes the real file, then returns actual second-close os.ErrClosed in fault cases. Required child/publication counts, retained error cause, no completion/commit, exact rollback/absence, journal cleanup and actual lock reacquisition remain strict. Both receipt-present and legitimate explicit absent-plan cases have matched no-fault controls. Current four leaves observe premature child persistence and zero parent publications: missing-boundary RED, with NO real late close injection/rollback claim. All four absent/forged/unprepared/out-of-scope authority controls pass and require bounded failure and unchanged content/receipt; no unsafe forged authority can enable success. Existing concurrent foreign-postimage refusal remains unchanged and must be preserved in GREEN.
+
+AC7: actual four-home and repeated cross-group requests require actionable path-specific conflict, exact prior installation/receipt restoration, followed immediately by successful actual native install without manual receipt repair. Their current false success, changed state and next native rejection are intended writer-validation RED. Fresh/disjoint/same-ordered-group-copy-change controls all pass with exact fixed topology, source content, link destinations and real digests; unrelated/unselected state is checked. The conflict fixture permits safe rejection before placement, and does not authorize deleting groups or inventing ownership migration. Parent finalization requirements remain separate and mandatory.
+
+## Budget, limits and learnings
+
+Total delivery from f24b2df: bootstrap +1111/-0, receipt +186/-25 =1322 changed test lines across two files. Adding the scoped approximately350 production estimate gives1672 within approximately1700 combined forecast. Receipt change is11 lines above the upper200-line repair estimate, justified by explicit actual modes, matched controls, typed/detail assertions and independent six-root inventory. Shared fixtures avoid extra CLI cost. No material scope overrun or new file is hidden; do not weaken assertions to meet an estimate.
+
+Native darwin/arm64 evidence only. No Linux/Windows runtime, full package/race suite or final preflight claim. Prior POSIX alias-literal limitation remains an out-of-lane observation, not a new blocker under the current runtime contract. No new DISCOVERED_BUG found.
+
+LEARNINGS:
+- Verify the reached validation layer, not only nonnil errors or named PASS counts. Actual private modes and matched positives prevent permission-masked proof.
+- Strip exact known wrappers before matching diagnostics; typed parser errors and real independent inventories strengthen attribution without expensive duplicate CLI fixtures.
+- Separate a RED assertion for a missing finalization boundary from actual fault execution. GREEN must prove exact hook occurrence and rollback; zero injections cannot count as late-fault coverage.
+- Carry forward only byte-closed source/oracle evidence, explicitly label historical and author-owned results, and independently rerun the changed proof when warranted.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Full independent seven-AC RED review at496963f; fresh23/23receipt checks, audited current79-leaf62PASS17FAIL0SKIP full author evidence and prior independent66-leaf replay with corrected historical attribution.
+- Fresh static/format/TDD checks passed; frozen hashes and exact authorized scope verified.
+- Root remained clean main497419ab4512fcff765cd5feb27aed4c67b5608d; review used only its own detached checkout and temp fixtures. No author checkout, installed product, external services/resources, remote refs or healthy user resources modified. Installed machinery SHA2565205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849 unchanged.
+
+### proof
+- [x] AC #1: full recorded-plan/default/plugin/schema1/selector RED contract reviewed.
+- [x] AC #2: prior blocking proof gap closed with fresh attributable23-leaf private receipt proof and frozen safety controls.
+- [x] AC #3: substantive actual full-release repair/convergence and idempotence RED contract reviewed.
+- [x] AC #4: actual later-source rollback and separately classified interruption; missing-prestate desired contract retained.
+- [x] AC #5: actual release/CLI/children/private roots and no executed skips verified.
+- [x] AC #6: strict authenticated parent publication/fault contract verified; actual late close execution remains required in GREEN.
+- [x] AC #7: conflict/restoration/next-native and supported recording controls reviewed.
+- [x] RED acceptance bar independently approved; canonical approve-red transition follows.
+- [ ] GREEN implementation, unchanged frozen tests passing, actual late-close fault rollback and final product acceptance remain pending.
+
+
 ## Reworked RED delivery readback
 At frozen496963fb7f4842d706d308dafcbd145908a6e395, pvg story verify-delivery MAC-2u36 returned Passed:9, Failed:0 after one canonical deliver for this rework and the append-only terminal delivered comment. Fresh readback confirms in_progress plus delivered label, authoritative delivered contract, current79leaf62PASS17FAIL0SKIP proof, currentSHA and explicit historical AC2 correction. No second broad replay or repeat deliver in this attempt.
 
