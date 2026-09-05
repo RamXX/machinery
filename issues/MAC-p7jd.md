@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:09:26Z
-content_hash: "sha256:ae51febaf41b5bbd6dc2caaa39ebb782bb52462fd60360ba1a63d4b0a9b55c82"
+updated_at: 2026-09-05T23:13:02Z
+content_hash: "sha256:350c7f4b917e729d2264af9aecc38de7599329731fffda068a29a14c09d5b326"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce]
@@ -82,6 +82,7 @@ status: new
 
 ## Notes
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+DISPATCHER CONTRACT HOLD: RED author verified clean story/MAC-p7jd at a82277a and stopped before source/test edits, tests, commits or delivery. Existing closed v1 attestation format and design-only CheckAttestations interface cannot express the implementation scope promised by AC1/2/5. Sr PM is reviewing the smallest source-verified contract/ownership repair; schema/CLI choices and suite.go wiring need review before RED. Healthy retained worktree and claim preserved; no recovery cleanup. User-pending strict execution containment policy is separate and must not be silently imposed on freshness binding.
 
 ## History
 - 2026-09-05T19:35:07Z dep_added: blocks MAC-vx24
