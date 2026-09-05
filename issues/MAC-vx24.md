@@ -8,13 +8,94 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:36:14Z
-content_hash: "sha256:d6ef6e8f50336a7f9977c1e098bc8994acdf81d207000d457600e2b50c5c9ef9"
+updated_at: 2026-09-05T19:36:51Z
+content_hash: "sha256:789132111bc268a6142a356e1b2e4fdadb6896832845dc8dd2914b914db7953e"
 blocked_by: [MAC-l7m0, MAC-sh60, MAC-olrx, MAC-2n83, MAC-p7jd, MAC-lnu6]
 blocks: [MAC-gcrr, MAC-ou97]
 ---
 
 ## Description
+## USER INTENT
+Provide strongest honest standalone Machinery guarantees for LLM-generated software, including test sensitivity to unsafe behavior.
+
+## Context (Embedded)
+BLOCKED ARCHITECTURE CONTRACT: do not implement until architecture story is accepted and exact interfaces/fields are copied here. User explicitly requests standalone Machinery-owned deterministic hard-TDD negative testing across its consumer process. Paivot is local development coordination only, never a runtime dependency. Existing schema-free BUILD prose and test filename keywords cannot satisfy this feature.
+
+## Ownership
+internal/tdd/manifest.go, internal/tdd/runner.go, internal/tdd/replay.go, internal/tdd/evidence.go, internal/tdd/assurance_test.go, cmd/machinery/tdd.go, cmd/machinery/tdd_test.go, cmd/machinery/main.go, internal/gates/tdd.go, internal/gates/suite.go, cmd/machinery/check.go, internal/hook/hook.go, agents/machinery-build-writer.md, skills/machinery/SKILL.md, skills/machinery/references/build-md-template.md. Not alone in codebase; preserve other edits. Newly listed files are explicitly owned outputs, not pre-existing interfaces.
+
+## Boundary Map
+PRODUCES:
+- internal/tdd/manifest.go -> standalone enforced test-assurance contract
+- internal/tdd/runner.go -> standalone enforced test-assurance contract
+- internal/tdd/replay.go -> standalone enforced test-assurance contract
+- internal/tdd/evidence.go -> standalone enforced test-assurance contract
+- internal/tdd/assurance_test.go -> standalone enforced test-assurance contract
+- cmd/machinery/tdd.go -> standalone enforced test-assurance contract
+- cmd/machinery/tdd_test.go -> standalone enforced test-assurance contract
+- cmd/machinery/main.go -> standalone enforced test-assurance contract
+- internal/gates/tdd.go -> standalone enforced test-assurance contract
+- internal/gates/suite.go -> standalone enforced test-assurance contract
+- cmd/machinery/check.go -> standalone enforced test-assurance contract
+- internal/hook/hook.go -> standalone enforced test-assurance contract
+- agents/machinery-build-writer.md -> standalone enforced test-assurance contract
+- skills/machinery/SKILL.md -> standalone enforced test-assurance contract
+- skills/machinery/references/build-md-template.md -> standalone enforced test-assurance contract
+CONSUMES:
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Approved closed native-runner replay contract; exact names must be copied after independent architecture acceptance before implementation.
+- MAC-sh60: internal/gates/oraclecov.go
+  spec: gates.CheckOracleCoverage(design, impl string) *Gate
+- MAC-olrx: internal/gates/suite.go
+  spec: gates.Select(design, gateList, impl string) (Selection, error)
+- MAC-2n83: cmd/machinery/main.go
+  source: newRootCmd() *cobra.Command command registration
+- MAC-p7jd: docs/attestation-evidence.md
+  source: Current implementation subject binding and historical acceptance distinction
+
+### Acceptance Criteria
+1. Implement the independently accepted standalone test-assurance contract using Machinery-owned native runner execution/replay. No self-reported receipt import or generic command exit code can establish execution or assertion causality.
+2. RED proves missing behavior with bound expected assertion failures and a passing harness control; required negative cases additionally distinguish safe control from approved unsafe implementation challenge using the same exact frozen test closure. Negative cases may legitimately already pass ordinary RED safe stubs.
+3. GREEN reruns the exact declared tests and frozen dependency/config/fixture closure, with all required tests selected/executed/pass. Any missing, duplicate, empty, skipped, xfail, cached, unexpected failure, compilation/panic/timeout or malformed/truncated evidence blocks rather than looking green.
+4. Strong final complete assurance independently replays retained RED/challenges and current GREEN through trusted runner. Changed current implementation/design/test inventory, removed contract/evidence, narrowed test selection, helper/config changes or forged receipt cannot evade enforcement.
+5. Wire standalone CLI, default/staged host governance and strong complete handoff consistently. Cheap freshness checks explicitly do not claim replay occurred. Unsupported adapters fail clearly under approved compatibility policy and never receive the strongest label.
+6. Remove BUILD template authorization for frozen test formatting via tokens-equal; exact byte/inventory identity is required. Tests prove spaces inside string literals and indentation changes invalidate frozen evidence even when strings.Fields normalization matches.
+7. Migrate shipped consumer examples under the accepted compatibility contract and demonstrate actual generated-software flow. Named owned runtime residual obligations connect race/replay/migration/restore/load requirements to evidence rather than prose alone; unsupported guarantees remain explicit.
+8. Positive full standalone CLI flow requires no pvg/nd installed or metadata. Negative full-path cases exercise every bypass through actual runner/hooks/complete command. No mocks, stubs or skip-if-missing. Preserve installed Machinery used in NIL.
+
+## Testing Requirements
+New focused internal/tdd and cmd/machinery TDD tests; actual native runner subprocesses on temp git snapshots; actual hook and check --complete integration. Separate RED author freezes tests; independent PM replays expected failures and GREEN/challenge results. Full preflight only final gate.
+Integration tests: MANDATORY (no mocks) for executable implementation, no skip-if-missing. Architecture review is not execution proof.
+No push/sync/GitHub mutation. No installed binary/skills/plugins/agents replacement or dev-link. Isolated candidate only. Full scripts/preflight.sh only final epic gate.
+
+## OUT OF SCOPE
+- Mathematical proof of arbitrary test semantic adequacy or malicious host safety beyond explicitly approved trust boundary: expose these as residual limits, never silently claim them.
+- Any Paivot runtime dependency: prohibited by user.
+
+## DIFF BUDGET
+- ~15-24 files, initial ceiling 3000 changed LOC; MUST split execution/replay and consumer wiring after architecture if this cannot remain reviewable.
+
+## MANDATORY SKILLS
+- architect for contract authoring/review; developer and pm_acceptor for implementation; codebase-memory for source discovery.
+
+## nd_contract
+status: new
+
+### evidence
+- Created 2026-09-05 from user requirements and independent read-only design analysis.
+
+### proof
+- [ ] AC #1: independently verified
+- [ ] AC #2: independently verified
+- [ ] AC #3: independently verified
+- [ ] AC #4: independently verified
+- [ ] AC #5: independently verified
+- [ ] AC #6: independently verified
+- [ ] AC #7: independently verified
+- [ ] AC #8: independently verified
+
+Observable outcome: the user can run standalone Machinery and receive an explicit pass or blocking diagnostic based on actual replay.
+
 ## USER INTENT
 Provide strongest honest standalone Machinery guarantees for LLM-generated software, including test sensitivity to unsafe behavior.
 
