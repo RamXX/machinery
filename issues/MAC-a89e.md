@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:14:38Z
-content_hash: "sha256:5cfd90de557fb085ca195816b1d44895c92151c300914d9e19fcccb80cbc83a7"
+updated_at: 2026-09-05T21:16:47Z
+content_hash: "sha256:1fabc3f28678f2b701a3f2ec06772cad963c4b4d6bb4fc21a73bca12f5a2f833"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx]
@@ -79,6 +79,31 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+RED-DISPUTE: paused before delivery at dispatcher direction. RED commit 9b85ef6 adds internal/gates/regeneration_safety_test.go only. Authorized superseded assertion repair commit f482c7683f5005e40722123e3a382e01b15219d2 changes only TestVersionSkewNoteNamesEveryApplicableCommand as permitted by independent PM comment (tdd-red and [test-edit-authorized] subject). Production unchanged; worktree clean.
+
+PROOF (provisional, NOT RED approval): go test -count=1 -timeout=5m ./internal/gates -run "VersionSkewRegenerationOnlySafeGenerators|RegenRatchetRealCLI" at 9b85ef6 completed in 5.046s: 10 leaves, 7 pass, 3 fail, 0 skip. Unit ratchet-only and all-with-ratchet fail because advice includes baseline; five single-family controls pass. CLI no-debt-version-skew-control passes. CLI new-offender-survives-all-advice fails on exactly unsafe advice, changed ratchet bytes, and unexpected green G4 after executing every printed command: alpha/a.go snapshot expands to alpha/a.go plus alpha/b.go and G4 returns zero findings. CLI explicit-baseline-reviews-debt-change superficially passes, but its review substring matches the temporary subtest pathname; that AC3 assertion is invalid evidence and requires bounded repair authorization. Proposed repair checks actual prose guidance and adds help-before-invocation coverage when canonical scope is repaired. No compile/setup/runtime prerequisite failures. go test -count=1 -timeout=5m ./internal/gates -run "^TestVersionSkewNoteNamesEveryApplicableCommand$" at f482c7683f5005e40722123e3a382e01b15219d2: 0 pass, 1 fail, 0 skip, intended baseline-absence assertion. Full requested target with JSON inventory and coverage remains pending after repair.
+
+pvg verify internal/gates/regeneration_safety_test.go --format text: PASS, 1 file, 0 issues. pvg verify internal/gates/gates_test.go internal/gates/regeneration_safety_test.go --format text: FAILED, 2 files, 1 stub at gates_test.go:125 return empty string; this is outside the narrowly authorized amendment and must be reviewed rather than silently edited.
+
+AC mapping: AC1 precise generator unit fixtures and authorized existing expectation fail behaviorally; AC2 real CLI byte and G4 checks fail behaviorally with initial G4 green and genuine new-offender rejection before regeneration; AC3 explicit baseline functionality works but guidance assertion is disputed; AC4 passing real no-debt control plus negative CLI reproduced, complete inventory pending. Coverage percentage not yet measured; no delivery claim. Codebase-memory Verify inherited parent exact symbols/coverage; index_status confirmed ready, worktree excluded so exact source fallback used.
+
+LEARNINGS:
+- Output assertions can accidentally match temporary test directory names; test prose rather than unrestricted substring presence.
+- Real baseline reruns expand an already-baselined edge even when output says nothing new to baseline.
+- Executing all printed advice with placeholder substitution demonstrates debt mutation directly without mocks or external services.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Provisional RED and authorized amendment committed; paused for narrow test repair authorization and AC3 scope update.
+- No delivery, claim release, production change, installed asset change, or remote mutation.
+
+### proof
+- [ ] AC #1: intended assertion failures established; independent RED approval pending.
+- [ ] AC #2: real CLI regression established; independent RED approval pending.
+- [ ] AC #3: RED-DISPUTE false-positive assertion must be repaired after authorization.
+- [ ] AC #4: complete target inventory and coverage pending repair.
 
 ## History
 - 2026-09-05T19:35:08Z dep_added: blocks MAC-gcrr
