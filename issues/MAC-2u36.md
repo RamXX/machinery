@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:53:10Z
-content_hash: "sha256:8b1fbe106ec8952b1624bf6375b2894286f949c109f93e94fe1a20c2f10b1964"
+updated_at: 2026-09-05T20:55:32Z
+content_hash: "sha256:15252ce56ef03773a347f276ccd441a0fd2fa111d941b60cab7d18c7fab75cd1"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -227,3 +227,6 @@ status: in_progress
 - Follows: [[MAC-olrx]]
 
 ## Comments
+
+### 2026-09-05T20:55:32Z ramirosalas
+TEST-EDIT AUTHORIZED: internal/install/bootstrap_receipt_test.go -- Bounded independent RED-DISPUTE review validates the 2026-09-05 Sr. PM clarification against original AC1 parity, cmd/machinery/update.go forced-refresh help, loadReceipt/validateReceipt, buildRefreshPlan/targetInstalled/fileExists, the exact frozen test mutations, and the preserved ordinary edited-artifact diagnostic. Authorize revising only TestBootstrapReceiptCLI/stale_artifact and disappeared_target from rejection expectations into clearly named edited-owned-artifact and missing-owned-artifact repair-success cases. Both mutate only HOME/.codex/agents/machinery-fsm-author.toml with safe unchanged parents/topology and valid receipt metadata. Add actual isolated ordinary-update and bootstrap CLI controls for each, with restored current-release bytes (edited content gone / missing file recreated), complete recorded home/native/plugin plan and copy/symlink modes retained, refreshed receipt digests/topology, binary release verification, unrelated-file preservation, and same-release idempotence. Only minimal shared test structure necessary for those cases is authorized; existing assertions must remain equally strong. The missing-file ordinary control has NOT yet run: execute it and report any unexpected production failure to dispatcher/Sr. PM before expanding scope or changing expected repair semantics. Preserve all legitimate metadata/schema/path/type/plugin-ownership rejection cases, complete recorded mixed-plan and normal/bootstrap convergence tests, defaults/selectors, real post-mutation rollback and interrupted journal recovery. No other frozen assertion/fixture/config changes or production edits are authorized. Candidate v1 99956740ae5559262790a9473b5597c1775928f2 (file SHA256 8ed8636856305d50b9517c4087ecfff3582dac4fb467f92d8f49f3c836916329) is NOT approved; preserve its original evidence and /tmp/machinery-MAC-2u36-red.qRk5DC logs. Every repair commit subject must carry tdd-red and [test-edit-authorized]. Re-freeze revised bytes and replay the fresh real CLI matrix against unchanged production, recording exact command, SHA/hashes, leaf counts, assertion failures, passing controls, zero skips, and justified LOC/timeout deltas, then obtain a separate independent full RED review. This is test-edit authorization only, not RED approval, delivery, GREEN waiver, acceptance, rejection, or closure.
