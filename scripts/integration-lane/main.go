@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -179,7 +180,7 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 		return 1
 	}
 	if *pinPath == "" {
-		*pinPath = filepath.Join(*root, "testdata/integration-lanes/runtime-pins.json")
+		*pinPath = filepath.Join(*root, "testdata", "integration-lanes", "runtime-pins.json")
 	}
 	var policy pins
 	if err := decodeFile(*pinPath, &policy); err != nil {
@@ -278,12 +279,12 @@ func decodeFile(path string, value any) error {
 	}
 	d := json.NewDecoder(bytes.NewReader(b))
 	d.DisallowUnknownFields()
-	if err = d.Decode(value); err != nil {
+	if err := d.Decode(value); err != nil {
 		return err
 	}
 	var extra any
-	if err = d.Decode(&extra); err != io.EOF {
-		return fmt.Errorf("invalid trailing JSON: %v", err)
+	if err := d.Decode(&extra); !errors.Is(err, io.EOF) {
+		return errors.Join(fmt.Errorf("invalid trailing JSON"), err)
 	}
 	return nil
 }
@@ -303,7 +304,7 @@ func regularBytes(path string, limit int64) ([]byte, error) {
 	b, readErr := io.ReadAll(io.LimitReader(f, limit+1))
 	opened, statErr := f.Stat()
 	closeErr := f.Close()
-	if err = errors.Join(readErr, statErr, closeErr); err != nil {
+	if err := errors.Join(readErr, statErr, closeErr); err != nil {
 		return nil, err
 	}
 	if !os.SameFile(info, opened) || len(b) > int(limit) {
@@ -350,7 +351,7 @@ func unique(values []string, label string) error {
 }
 
 func inventory(root string) ([]suite, error) {
-	dir := filepath.Join(root, "testdata/integration-lanes")
+	dir := filepath.Join(root, "testdata", "integration-lanes")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -399,7 +400,7 @@ func inventory(root string) ([]suite, error) {
 		if s.Package != "." && (!strings.HasPrefix(s.Package, "./") || !pathPattern.MatchString(pkg) || filepath.Clean(pkg) != pkg || strings.Contains(pkg, "..")) {
 			return nil, fmt.Errorf("invalid package %q", s.Package)
 		}
-		if err = errors.Join(unique(s.Sources, "source"), unique(s.Tests, "test"), unique(s.Runtimes, "runtime")); err != nil {
+		if err := errors.Join(unique(s.Sources, "source"), unique(s.Tests, "test"), unique(s.Runtimes, "runtime")); err != nil {
 			return nil, err
 		}
 		duration, e := time.ParseDuration(s.Timeout)
@@ -411,7 +412,7 @@ func inventory(root string) ([]suite, error) {
 		}
 		runtimeSet := map[string]bool{}
 		for _, r := range s.Runtimes {
-			if !strings.Contains("|go|node|docker|java|tlc|", "|"+r+"|") {
+			if r != "go" && r != "node" && r != "docker" && r != "java" && r != "tlc" {
 				return nil, fmt.Errorf("unknown runtime %s", r)
 			}
 			runtimeSet[r] = true
@@ -544,13 +545,51 @@ func command(ctx context.Context, dir string, env []string, timeout time.Duratio
 	cmd := exec.CommandContext(bounded, argv[0], argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = env
-	out, errout, err := processcontrol.RunCapturedStreamLimits(bounded, cmd, outLimit, errLimit)
+	stdout := &limitedStream{limit: outLimit, cancel: cancel}
+	stderr := &limitedStream{limit: errLimit, cancel: cancel}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	err := processcontrol.Run(bounded, cmd)
+	out, outErr := stdout.result()
+	errout, errErr := stderr.result()
+	err = errors.Join(err, outErr, errErr)
 	if ctx.Err() != nil {
 		err = errors.Join(err, fmt.Errorf("cancellation: %w", ctx.Err()))
 	} else if bounded.Err() != nil {
 		err = errors.Join(err, fmt.Errorf("timeout: %w", bounded.Err()))
 	}
 	return out, errout, err
+}
+
+// limitedStream cancels the complete owned process tree as soon as an output
+// budget is exceeded; merely truncating output would let a producer keep running.
+type limitedStream struct {
+	mu       sync.Mutex
+	body     bytes.Buffer
+	limit    int
+	overflow bool
+	cancel   context.CancelFunc
+}
+
+// Write implements io.Writer and bounds storage before copying any bytes.
+func (s *limitedStream) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	remaining := s.limit - s.body.Len()
+	if len(p) > remaining {
+		s.overflow = true
+		s.cancel()
+	}
+	_, _ = s.body.Write(p[:min(remaining, len(p))])
+	return len(p), nil
+}
+
+func (s *limitedStream) result() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.overflow {
+		return s.body.String(), fmt.Errorf("native output limit %d exceeded", s.limit)
+	}
+	return s.body.String(), nil
 }
 
 func toolReceipt(ctx context.Context, id, arg string) (runtimeReceipt, error) {
@@ -636,7 +675,7 @@ func provision(ctx context.Context, root, work, cache string, p pins, suites []s
 		}
 		b, err := regularBytes(filepath.Join(root, p.Java.File), 8192)
 		if err != nil {
-			return result, fmt.Errorf("Java pin: %w", err)
+			return result, fmt.Errorf("java pin: %w", err)
 		}
 		key := "JAVA_RUNTIME_" + strings.ToUpper(runtime.GOOS) + "_" + strings.ToUpper(runtime.GOARCH) + "_SHA256="
 		archive := ""
@@ -646,7 +685,7 @@ func provision(ctx context.Context, root, work, cache string, p pins, suites []s
 			}
 		}
 		if len(archive) != 64 || !strings.Contains(string(b), "JAVA_RUNTIME_VERSION="+p.Java.Version+"\n") {
-			return result, fmt.Errorf("Java archive/version pin missing")
+			return result, fmt.Errorf("java archive/version pin missing")
 		}
 		self, err := os.Executable()
 		if err != nil {
@@ -662,7 +701,7 @@ func provision(ctx context.Context, root, work, cache string, p pins, suites []s
 			return result, fmt.Errorf("formal provision receipt: %w", err)
 		}
 		if formalReceipts[0].ArchiveSHA != archive {
-			return result, fmt.Errorf("Java archive pin mismatch")
+			return result, fmt.Errorf("java archive pin mismatch")
 		}
 		result = append(result, formalReceipts...)
 	}
@@ -703,7 +742,7 @@ func provisionFormal(work string) (retErr error) {
 	if err != nil {
 		return err
 	}
-	if err = java.BindIdentity(out + errout); err != nil {
+	if err := java.BindIdentity(out + errout); err != nil {
 		return err
 	}
 	design, err := os.MkdirTemp(work, "formal-probe-")
@@ -711,14 +750,14 @@ func provisionFormal(work string) (retErr error) {
 		return err
 	}
 	defer func() { retErr = errors.Join(retErr, os.RemoveAll(design)) }()
-	if err = os.Mkdir(filepath.Join(design, "formal"), 0700); err != nil {
+	if err := os.Mkdir(filepath.Join(design, "formal"), 0700); err != nil {
 		return err
 	}
 	model := "\\* machinery:manual\n---- MODULE Probe ----\nEXTENDS Integers\nVARIABLE x\nInit == x = 0\nNext == x' = 1 - x\nSpec == Init /\\ [][Next]_x\nSafe == x \\in {0,1}\n====\n"
-	if err = os.WriteFile(filepath.Join(design, "formal/Probe.tla"), []byte(model), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(design, "formal", "Probe.tla"), []byte(model), 0600); err != nil {
 		return err
 	}
-	if err = os.WriteFile(filepath.Join(design, "formal/Probe.cfg"), []byte("SPECIFICATION Spec\nINVARIANT Safe\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(design, "formal", "Probe.cfg"), []byte("SPECIFICATION Spec\nINVARIANT Safe\n"), 0600); err != nil {
 		return err
 	}
 	if formal.VerifyFormalTo(design, false, os.Stderr, os.Stderr) != 0 {
@@ -728,7 +767,7 @@ func provisionFormal(work string) (retErr error) {
 	if err != nil {
 		return err
 	}
-	jar := filepath.Join(cache, "machinery/tla2tools-v1.7.4.jar")
+	jar := filepath.Join(cache, "machinery", "tla2tools-v1.7.4.jar")
 	jarBytes, err := regularBytes(jar, 128<<20)
 	if err != nil {
 		return err
@@ -749,7 +788,7 @@ func provisionFormal(work string) (retErr error) {
 		return err
 	}
 	archive := strings.TrimPrefix(strings.Split(string(receipt), "\n")[0], "archive_sha256=")
-	if err = java.Validate(); err != nil {
+	if err := java.Validate(); err != nil {
 		return err
 	}
 	return json.NewEncoder(os.Stdout).Encode([]runtimeReceipt{
@@ -809,7 +848,7 @@ func execute(ctx context.Context, root, work, cache, evidence string, s suite, r
 	}
 	r.Events = events.Name()
 	r.EventsSHA = fmt.Sprintf("%x", sha256.Sum256([]byte(out)))
-	_, writeErr := io.WriteString(events, out)
+	_, writeErr := events.WriteString(out)
 	closeErr := events.Close()
 	if err = errors.Join(writeErr, closeErr); err != nil {
 		return r, errors.Join(runErr, err)
@@ -956,11 +995,11 @@ func accountNode(output string, r *suiteReceipt) error {
 			if strings.Contains(line, "# SKIP") || strings.Contains(line, "# TODO") {
 				r.Skipped++
 				r.Tests[index].Status = "skipped"
-				failures = append(failures, fmt.Errorf("Node execution skip %s", name))
+				failures = append(failures, fmt.Errorf("node execution skip %s", name))
 			} else if match[1] != "ok" {
 				r.Failed++
 				r.Tests[index].Status = "failed"
-				failures = append(failures, fmt.Errorf("Node execution failed %s", name))
+				failures = append(failures, fmt.Errorf("node execution failed %s", name))
 			} else {
 				r.Passed++
 				r.Tests[index].Status = "passed"
@@ -973,7 +1012,7 @@ func accountNode(output string, r *suiteReceipt) error {
 		}
 	}
 	if r.Started != r.Selected || r.Passed != r.Selected {
-		failures = append(failures, fmt.Errorf("Node execution incomplete: selected %d started %d passed %d", r.Selected, r.Started, r.Passed))
+		failures = append(failures, fmt.Errorf("node execution incomplete: selected %d started %d passed %d", r.Selected, r.Started, r.Passed))
 	}
 	return errors.Join(failures...)
 }
