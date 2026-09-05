@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:41:28Z
-content_hash: "sha256:f53e3f2da384970d4cfb7226e1d5e448c8df6c63b5061082cda99423b8fa6916"
+updated_at: 2026-09-05T23:46:23Z
+content_hash: "sha256:e9075171d4af9aa8057ec8dff12bf3e22bb9ecab07294a2af80b82d46436beba"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx, MAC-p8ce]
@@ -836,3 +836,48 @@ status: delivered
 - [x] AC #3: explicit baseline supported with truthful pre-invocation and successful debt-review guidance even at zero rules.
 - [x] AC #4: real no-debt positive and debt-growth negative both exercised.
 
+
+### 2026-09-05T23:46:23Z ramirosalas
+## PM GREEN Review — MAC-a89e — 2026-09-05
+Reviewed delivered GREEN de9745067382c5de25f05d69ea05c2808eb0b2e7 against approved frozen RED e95be63019d89b93ae527f27ae1ce43326def038, current canonical four ACs, prior test-edit authorizations, dispatcher-authorized fifth documentation file and terminal Implementation Evidence. Full review restarted from TDD integrity and static checks; no earlier RED approval substituted for GREEN review.
+
+Hard-TDD / frozen proof:
+- In independent detached /tmp/MAC-a89e-pm-green.8WCpJz/checkout at de9745067382c5de25f05d69ea05c2808eb0b2e7: pvg story verify-tdd --base epic/MAC-ui8a PASS; range f24b2df3cb1e1521f97b406a7516f72bb7bc7890..HEAD, 5 commits, 0 merges skipped, no unauthorized test edits.
+- git diff --exit-code e95be63019d89b93ae527f27ae1ce43326def038 HEAD -- internal/gates/gates_test.go internal/gates/regeneration_safety_test.go PASS. GREEN changes only gates.go, cmd/machinery/baseline.go and the authorized documentation paragraph; no frozen fixture or test changes.
+- SHA256 gates_test.go e4f630ec2ff7684eea436881b8a55706496f348c0ae7cd8748a255a6b6d439ff; regeneration_safety_test.go 2e1801d96618aaf146621e822a342b4bfdf69cdace50b94d0585d7f1ad4f20c3, both identical to approved RED.
+- git diff --check epic/MAC-ui8a PASS. Five files / 272 changed LOC within expanded documented scope and LOC ceiling.
+
+Independent exact test commands (both exit 0):
+cd /tmp/MAC-a89e-pm-green.8WCpJz/checkout && set -o pipefail && go test -count=1 -timeout=5m ./internal/gates -run 'VersionSkew|Regen|Ratchet' -json -coverprofile=/tmp/MAC-a89e-pm-green.8WCpJz/gates-coverage.out | tee /tmp/MAC-a89e-pm-green.8WCpJz/gates-tests.json
+cd /tmp/MAC-a89e-pm-green.8WCpJz/checkout && set -o pipefail && go test -count=1 -timeout=5m ./cmd/machinery -run '^(TestBaselineSourceDateEpochStampIsFullDate|TestResolveBaselineDateRequiresDeterministicSourceAndReusesExisting|TestMigratedCommandDiagnosticsAreByteStableAndPrivatePathFree)$/^baseline$' -json -coverprofile=/tmp/MAC-a89e-pm-green.8WCpJz/cli-coverage.out | tee /tmp/MAC-a89e-pm-green.8WCpJz/cli-tests.json
+Results: 37/37 gates leaves PASS, 0 FAIL, 0 SKIP, 5.285s; 3/3 downstream leaves PASS, 0 FAIL, 0 SKIP, 0.767s. Total 40/40. Exact gates inventory matches delivered names; downstream names match modulo temp nonce. No compiler, prerequisite, timeout or unexpected runtime warnings/errors.
+Coverage independently reproduced: gates 9.9%, gates.VersionSkewNote 93.8%, regenCommands 100%; cmd 2.2%, newBaselineCmd 75%, resolveBaselineDate 84.2%. The separately built CLI subprocess is not in package coverage. Both profiles have identical hashes to author.
+Independent raw SHA256: gates-tests.json 98982fe66cadfc781c54f813ad6d0fc1fa7f9f76b112054487b8596aa47222e1; cli-tests.json df89b4519018763f709e8897d6249b8923f4aa234415eea05bc6c6eee7a62951; gates-coverage.out f1b45d80d3aeecd7157adbeda1a85594d452cf99a2905b1355715c40f3a6fbbb; cli-coverage.out 8f85fe7958ee02927a94af73448d5b72dbbe90e699aeb33f05047575681b325e. Author's gates/CLI raw JSON and verify.txt hashes independently match delivery.
+
+Static / implementation review:
+- pvg verify over the 5 scoped paths reproduces 4 source files scanned, 4 return-empty findings. Independent precise disposition: VersionSkewNote:76 implements documented no-skew silence after collecting version skew and otherwise emits advice; readDesignOrEmpty:219 returns real read bytes on success and an empty sentinel on error; readDesignFileOrErr:230 records non-missing read errors on the Gate then returns its empty error sentinel, returning real bytes on success; coveringInterfaceTable:125 omits a Markdown table only without concrete allow rows and otherwise renders it. All four function bodies/branches unchanged from RED and populated implementations, not stubs. No scanner modification or blanket claim that every caller's read-error policy is safe.
+- Production diff removes only baseline advice from regenCommands. Other family conditions, exact commands and ordering remain unchanged. Baseline changes only help, zero-proposal text and post-success guidance after PublishExpectedRooted; algorithm/schema/date/recovery behavior unchanged. No new API/config registration/security integration obligations; Go signatures are typed.
+- Codebase-memory Verify used indexed project Users-ramirosalas-workspace-machinery, ready generation 2026-09-05T23:08:53Z. Exact symbol search and bidirectional trace confirm regenCommands -> VersionSkewNote -> SelectRunAndNote wiring; current command source and downstream tests were read. Coverage checked all cited paths plus docs scope. Root graph lacks new regression file and excludes .claude worktrees; exact detached committed source is authoritative for GREEN differences. No exhaustive graph-completeness claim.
+
+AC review:
+- AC1 PASS in implementation/frozen proof: no baseline/debt mutation in exact deterministic generator inventories; ratchet-only, individual oracle/Alloy/formal/pack and combined cases pass.
+- AC2 PASS: real CLI begins with alpha/a.go ratchet and green G4; actual added alpha/b.go is rejected, every advised generator runs, current oracle stamp is checked, ratchet bytes remain unchanged and G4 still rejects that offender.
+- AC3 runtime PASS: actual pre-invocation help warns rerun rewrites ratchet and may accept new offenders, requires review before adoption; successful publication emits the same guidance even at 0 proposals. Deliberate baseline accepts both offender files and G4 then passes without a version stamp or new confirmation mechanism. All five matcher controls pass. Documentation portion has one concrete gap below.
+- AC4 PASS: no-debt real CLI control regenerates current oracle, resolves skew, keeps g3/g4 green, creates no ratchet; negative offender behavior remains blocked after advice.
+- Standalone product behavior preserved: real Machinery CLI/filesystem paths with no mocks, service dependencies, skip-if-missing or Paivot runtime coupling. No full preflight, installed artifact changes, remote activity or root branch switch.
+- Authorized merge-conflict paragraph correctly removes baseline from routine generation and explains separate ratchet debt review.
+
+DOCS_STALE — sole remaining gap:
+EXPECTED: AC3 calls explicit baseline a deliberate debt-acceptance operation and requires clear debt-change review guidance; routine regeneration must not cause debt acceptance. Documentation freshness is part of the deliverable.
+DELIVERED: docs/brownfield-team-guide.md:451-452 still says old YYYY-MM ratchets age from the first of the month, then instructs "rerun machinery baseline to restamp" without qualifying the debt change.
+GAP: this is still a stamp-only migration recommendation using a debt-accepting command. It also misstates current default behavior: resolveBaselineDate explicitly reuses the existing YYYY-MM date when no explicit date/epoch is supplied; the unchanged downstream test TestResolveBaselineDateRequiresDeterministicSourceAndReusesExisting verifies that exact behavior and passed independently. The nearby corrected merge paragraph does not repair this separate instruction.
+FIX: narrowly replace this final date bullet in the already-scoped document. State legacy YYYY-MM remains supported and a default rerun retains the date; do not recommend routine restamping. If mentioning replacement, describe a deliberate reviewed debt-acceptance operation with an explicitly chosen deterministic date and review of ratchet/offender changes. No production, algorithm/schema/date, frozen test or fixture edits are required. Dispatcher must extend the existing paragraph-only authorization to this exact bullet before author editing. No new test needed for this prose correction; preserve the already passing frozen evidence.
+
+DISCOVERED_BUG:
+  title: Brownfield guide still recommends baseline as a date-restamping migration
+  context: Same-story documentation freshness review found the final date-format bullet recommends rerunning baseline merely to restamp, although rerun can accept offender growth and without explicit date input retains an existing YYYY-MM date.
+  affected_files: docs/brownfield-team-guide.md:451-452
+  discovered_during: MAC-a89e
+  triage: bounded same-story documentation correction recommended; no new issue created by this reviewer.
+
+No other blocking gap found. Full GREEN proof above remains usable; final acceptance withheld only for the precise documentation correction.
