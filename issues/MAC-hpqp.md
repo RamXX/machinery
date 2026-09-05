@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:25:55Z
-content_hash: "sha256:fb3ed38a46d465cf9167a7c4df5c3adbb24b82e8b85208e4e2d40d3e768a2243"
+updated_at: 2026-09-05T20:27:03Z
+content_hash: "sha256:e287c511354ffe4c28b0f139b06362103cbd15989c5f921ab5a5ee9e7ebd6019"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 ---
@@ -219,3 +219,37 @@ status: new
 - Blocks: [[MAC-hlae]], [[MAC-yhg5]], [[MAC-2n83]], [[MAC-hwdb]], [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]], [[MAC-hy71]]
 
 ## Comments
+
+### 2026-09-05T20:27:03Z ramirosalas
+### Commit
+- Branch: story/MAC-hpqp
+- SHA: 612f65f3b4502a3267828507faaf0e395c8dd558
+
+### Frozen RED inventory clarification
+Frozen test/fixture inputs: scripts/integration-lane/main_test.go; cmd/machinery/integration_lane_test.go; testdata/integration-lanes/schema.json, pilot.json, runtime-pins.json, pilot.integration.test.mjs and CONTRACT.md. The explicitly reviewed scripts/integration-lane/main.go bootstrap is not frozen implementation: GREEN must replace its fail-closed body with operational behavior, preserving the approved CLI/test contract. Its presence is recorded to distinguish behavioral RED from a missing package or compile error.
+
+### Delivery metadata repair
+The canonical deliver transition was run exactly once. The initial verify-delivery saw an older Notes contract last in serialized issue content and did not recognize the prose SHA. This supported append-only terminal comment adds canonical SHA metadata and authoritative delivered RED contract without removing history or changing labels.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED SHA: 612f65f3b4502a3267828507faaf0e395c8dd558; 8 files, 1066 lines, within story budget.
+- New RED leaf cases: 58 total, 7 passing controls / 51 expected failing requirements / 0 skips. Existing controls: 20 passing leaf cases, 0 failures/skips.
+- Exact commands, raw native events, AC mapping, PROOF and LEARNINGS are in Implementation Evidence; logs /tmp/machinery-hpqp-red.f8Yslv.
+- pvg verify PASS; actionlint PASS; no owned runtime resources remain; user dagger-engine remains running.
+- No full preflight, push, install, or installed binary replacement. Delivery is RED only, never acceptance/closure.
+
+### proof
+- [x] AC #1: closed inventory/source ownership RED tests and schema defined.
+- [x] AC #2: mandatory-versus-native lane RED tests and passing separation controls defined.
+- [x] AC #3: pin/provisioning RED tests and actual OCI/Java/TLC controls defined.
+- [x] AC #4: native events/accounting/duplicate/truncation RED tests defined.
+- [x] AC #5: shared CI/Make/native-lane wiring RED tests defined.
+- [x] AC #6: ordering/full-history/mandatory-gate RED assertions defined.
+- [x] AC #7: nonempty executable Go/Node pilot fragment and union RED test defined.
+- [x] AC #8: owned cleanup/lifecycle challenges and real sentinel controls defined.
+- [x] AC #9: compile-safe behavioral RED frozen and independently reviewable.
+- [x] AC #10: all 19 full-path scenarios plus raw-report assertions defined; operational lane remains RED awaiting GREEN.
+
