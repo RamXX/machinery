@@ -98,7 +98,8 @@ func designSub(design, sub string) string {
 
 // regenCommands lists the regeneration commands that apply to the design, one
 // per artifact family it actually carries, in the order a full regeneration
-// runs them. A family the design does not have contributes no line.
+// runs them. A family the design does not have contributes no line. Baseline
+// accepts boundary debt and is never routine artifact regeneration.
 func regenCommands(design string) []string {
 	var cmds []string
 	if len(sortedGlob(filepath.Join(design, "machines"), "*.machine.json")) > 0 {
@@ -115,9 +116,6 @@ func regenCommands(design string) []string {
 	}
 	if pack.HasDecomposition(design) {
 		cmds = append(cmds, "machinery pack generate "+design)
-	}
-	if _, err := os.Stat(filepath.Join(design, RatchetFile)); err == nil {
-		cmds = append(cmds, "machinery baseline "+design+" --impl <dir>")
 	}
 	return cmds
 }
