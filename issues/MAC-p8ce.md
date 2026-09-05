@@ -4,7 +4,7 @@ title: "Bind consumer READS to each event edge"
 status: closed
 priority: 0
 type: bug
-labels: [hard-tdd, red-approved, delivered]
+labels: [hard-tdd, red-approved, delivered, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
