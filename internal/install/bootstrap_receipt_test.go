@@ -601,6 +601,13 @@ func bootstrapAuthorityCase(t *testing.T, release *bootstrapRelease, source, aut
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("MACHINERY_CONFIG_DIR", config)
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Go test isolates lock storage by default; point that existing test-only
+	// root at the real CLI's temporary cache so both contend on the same lock.
+	t.Setenv("MACHINERY_INTERNAL_TEST_LOCK_ROOT", cache)
 	env := os.Environ()
 	bootstrapCommand(t, root, env, release.next, "install", "--from", source, "--home", home)
 	receipt, exists, err := loadReceipt()
