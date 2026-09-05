@@ -489,7 +489,7 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 				if !strings.Contains(string(out), "updated machinery binary") || !strings.Contains(string(out), "custom-a") || !strings.Contains(string(out), "installed Codex agents ->") {
 					t.Errorf("did not prove binary and earlier placements changed before later failure: %s", out)
 				}
-				if !strings.Contains(string(out), "source is missing OpenCode governance adapter") {
+				if !strings.Contains(string(out), "adapters/opencode/plugins/machinery.js") || !strings.Contains(string(out), "no such file") {
 					t.Errorf("did not reach intended later source failure: %s", out)
 				}
 				if !reflect.DeepEqual(before, bootstrapState(t, f)) {
