@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:42:11Z
-content_hash: "sha256:70b4e27ab187b18a0262bc73716efbf696581a9d0bdd927699e8a90dcda86c36"
+updated_at: 2026-09-05T21:49:34Z
+content_hash: "sha256:22b5a07e5817e7639dea33e2befa73d0ffaf57f34906dec8a08ce5910d1fdb35"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -109,6 +109,15 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## DISCOVERED_BUG — standalone overlapping home receipt groups (RED author, 2026-09-05)
+title: Standalone install regrouping can publish overlapping home groups rejected by the next operation.
+context: While constructing the independent initially-absent-receipt AC6 reference, an actual built v9.9.2 CLI first recorded custom-a/custom-b with Copy:false and copy-a/copy-b with Copy:true, plus Codex Copy:false and OpenCode Copy:true. All roots were temporary. Running another actual standalone install from current source with --copy and --home custom-a --home custom-b --home copy-a --home copy-b succeeded, but the following standalone install --from current-source --target codex --target opencode --copy failed after real placement output with: invalid installation receipt .../config/install.json: home install paths overlap or repeat: .../home/copy-a and .../home/copy-a.
+repro: bootstrapSeed current-release reference, then machinery install --from SOURCE --copy --home HOME/custom-a --home HOME/custom-b --home HOME/copy-a --home HOME/copy-b, then machinery install --from SOURCE --target codex --target opencode --copy. Every machinery command used the built temporary reference binary, not the installed host binary.
+affected_files: internal/install/receipt.go (recordHomeInstallLocked, saveReceipt, normalizeReceipt, validateReceipt); internal/install/install.go (standalone recording call).
+discovered_during: MAC-2u36.
+Evidence: compiled e1fd0a3e072182fd21e80f6a7f4b7cddfd384565; go test -count=1 -timeout=5m ./internal/install -run '^TestBootstrapReceiptCLI/parent_finalization' -json, direct raw stdout/stderr at /tmp/machinery-MAC-2u36-red.qRk5DC/e1fd0a3-parent-finalization.jsonl, exit1 in48.882s. Failure is real standalone production behavior but invalid AC6 fixture evidence: no four boundary leaves executed, no late receipt fault proof.
+Fixture-only workaround committed d9d53b9: remove exactly the task-owned current-release reference config/install.json before the explicit all-copy install, so the independent reference legitimately starts with an absent receipt. No production change, no acceptance predicate change, no live artifact change. Preserve this bug for Sr PM triage; whether it is coupled to AC6 or separate is not decided by the author.
+Parent instructed finish the already-running focused replay only, then pause undelivered with claim retained; no final full matrix or production expansion before triage.
 
 
 ## nd_contract
