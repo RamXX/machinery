@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:25:59Z
-content_hash: "sha256:b07163ba300cbf2deba98fd6142cf5d9b0a4abcae00f1b90e45571d6cea8dc6a"
+updated_at: 2026-09-05T23:26:33Z
+content_hash: "sha256:2e5feb335902768cdf5d7e7ec4efc43fc4e7c12edf260a0f8ec6a692cdb3495c"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce]
 assignee: dev-MAC-2u36
@@ -1412,3 +1412,28 @@ status: rejected
 - [x] AC #6: parent-sequencing/finalization desired contract and strict fault sensitivity reviewed; missing-boundary RED only, actual late-close fault rollback NOT exercised.
 - [x] AC #7: real conflict/restoration/follow-on desired outcomes and supported positive controls reviewed.
 - [ ] Revised RED proof approved; GREEN implementation and final product acceptance remain pending.
+
+### 2026-09-05T23:26:33Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- RED rework frozen496963fb7f4842d706d308dafcbd145908a6e395; only authorized receipt_test.go amendment +186/-25 since98d3b57. Receipt test SHA256a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48.
+- Bootstrap hash ee786dee86c951a5a3a4a53d9344aeb16979df19319ea77dcd14fbd7afefca23 and shared install_test.go hash d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba unchanged; no production edits.
+- Focused23receipt leaves23PASS0FAIL0SKIP0.461s; intended private-read/parser/semantic/inventory/digest diagnoses logged with matched positives.
+- ONE final latest-SHA command: go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json in /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36, native stdout/stderr directly captured to /tmp/machinery-MAC-2u36-red.qRk5DC/496963f-final-matrix.jsonl.
+-79leaves62PASS17FAIL0SKIP739.525s, no missing terminals, exact17product failure set unchanged. Raw SHA256a42f96c5d36651fbd835d9626057eb3f659ae6b2503668d4dd6375407dce7b03.
+- Full current Implementation Evidence/Commands run/Summary/SHA/budget/AC mapping/79leaf inventory/LEARNINGS persisted in Notes. Ten old permission-masked passes explicitly reclassified as historical runtime results, not valid old AC2 proof.
+- pvg verify PASS2files0issues; hard-TDD PASS10commits0unauthorized edits. No runtime bypass discovered. Installed NIL binary remains5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849.
+- Canonical pvg story deliver invoked once for this formally rejected/reclaimed rework. This append-only terminal comment supersedes older rejected comments after Notes; no repeat delivery invocation.
+- Independent RED approval, GREEN and real late-parent-close fault/rollback execution remain pending.
+
+### proof
+- [x] AC #1: frozen complete recorded-plan/default/plugin/schema1/selector proof replayed; intended bootstrap parityRED.
+- [x] AC #2: all23repaired/new private matched-valid and precisely attributed parser/topology/inventory/digest/order leavesPASS; unchanged CLI mode-only rejection separatelyPASS. Semantic test proves loader rejection before planning, not binary swap ordering.
+- [x] AC #3: frozen real release content/binary/topology/digest/plugin/idempotence checks; intact/edited ordinaryPASS, desired bootstrap/missing casesRED.
+- [x] AC #4: actual ordinary post-mutation rollbackPASS32.60s; missing/bootstrap boundary failures retained; pre-mutation interrupted recovery separatelyPASS14.67s.
+- [x] AC #5: actual CLI/release/checksum/children/private roots, no mocks or executed skips; metadata additions use real filesystem.
+- [x] AC #6: strict frozen parent publication/fault contract and4authority/cleanup controls retained; missing-parent publicationRED, no actual close-fault rollback claim.
+- [x] AC #7: frozen real overlap/next-operation desired outcomesRED with3supported recording controlsPASS.
+
