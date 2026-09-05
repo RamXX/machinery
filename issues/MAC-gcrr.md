@@ -9,10 +9,10 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
 updated_at: 2026-09-05T20:14:05Z
-content_hash: "sha256:a598d9cc6611fece6158df006ae9066bff18af7d9b3713424764999ca7a5cafe"
-blocked_by: [MAC-vx24, MAC-hy71, MAC-p7jd, MAC-a89e, MAC-2u36, MAC-yhg5, MAC-hwdb, MAC-hpqp]
+content_hash: "sha256:b512e0377b77ee663ac671f6344e850fadd0e329d3e8eae264a01759d324655c"
+blocked_by: [MAC-vx24, MAC-hy71, MAC-p7jd, MAC-2u36, MAC-yhg5, MAC-hwdb, MAC-hpqp]
 blocks: [MAC-ou97]
-was_blocked_by: [MAC-p8ce]
+was_blocked_by: [MAC-p8ce, MAC-a89e]
 ---
 
 ## Description
@@ -115,11 +115,12 @@ WORKTREE HANDOFF: NEXT.md is an existing user-owned gitignored file at /Users/ra
 - 2026-09-05T19:36:16Z dep_added: blocks MAC-ou97
 - 2026-09-05T19:45:33Z dep_added: blocked_by MAC-hpqp
 - 2026-09-05T23:07:17Z dep_removed: was_blocked_by MAC-p8ce
+- 2026-09-05T23:57:31Z dep_removed: was_blocked_by MAC-a89e
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-ou97]]
-- Blocked by: [[MAC-vx24]], [[MAC-hy71]], [[MAC-p7jd]], [[MAC-a89e]], [[MAC-2u36]], [[MAC-yhg5]], [[MAC-hwdb]], [[MAC-hpqp]]
-- Was blocked by: [[MAC-p8ce]]
+- Blocked by: [[MAC-vx24]], [[MAC-hy71]], [[MAC-p7jd]], [[MAC-2u36]], [[MAC-yhg5]], [[MAC-hwdb]], [[MAC-hpqp]]
+- Was blocked by: [[MAC-p8ce]], [[MAC-a89e]]
 
 ## Comments

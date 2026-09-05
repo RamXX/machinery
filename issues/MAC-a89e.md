@@ -1,18 +1,19 @@
 ---
 id: MAC-a89e
 title: "Keep regeneration advice from accepting new debt"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:57:24Z
-content_hash: "sha256:76edf1633ef0ce8b4fa54e3704cb1dbfc315af13b58bf6c2119072b1c3613e42"
-blocks: [MAC-gcrr, MAC-ou97]
+updated_at: 2026-09-05T23:57:31Z
+content_hash: "sha256:fc0d420a38644d9c5231847373232d8e005ede0fa1640ee8e88e0cf9969957d4"
 follows: [MAC-olrx, MAC-p8ce]
 assignee: dev-MAC-a89e
+closed_at: 2026-09-05T23:57:31Z
+close_reason: "Accepted: independent 40/40 GREEN pass, frozen RED intact, exact authorized documentation correction closes sole prior gap; all four ACs verified."
 ---
 
 ## Description
@@ -650,10 +651,12 @@ Preserved verbatim as quoted history; current Description is authoritative.
 - 2026-09-05T23:47:31Z status: open -> in_progress
 - 2026-09-05T23:47:31Z claimed by dev-MAC-a89e
 - 2026-09-05T23:49:26Z status: in_progress -> in_progress
+- 2026-09-05T23:57:31Z status: in_progress -> closed
+- 2026-09-05T23:57:31Z dep_removed: no_longer_blocks MAC-gcrr
+- 2026-09-05T23:57:31Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 - Follows: [[MAC-olrx]], [[MAC-p8ce]]
 
 ## Comments
