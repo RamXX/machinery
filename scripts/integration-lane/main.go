@@ -36,6 +36,7 @@ import (
 const maxOutput = 64 << 20
 const tlcSHA = "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
 const ownerLabel = "dev.machinery.integration-run"
+const schemaSHA = "867229ec5b7f3b22d4fe2fe3b88c6ed4cea5bf9f1ec2239a3e0635b431c1e7f2"
 
 type suite struct {
 	ID           string   `json:"id"`
@@ -49,6 +50,7 @@ type suite struct {
 	StdoutLimit  int      `json:"stdout_limit"`
 	StderrLimit  int      `json:"stderr_limit"`
 	sourceByTest map[string]string
+	sourceHashes map[string]string
 }
 type fragment struct {
 	Version int     `json:"version"`
@@ -277,6 +279,9 @@ func decodeFile(path string, value any) error {
 	if err != nil {
 		return err
 	}
+	if err := uniqueJSON(json.NewDecoder(bytes.NewReader(b)), 0); err != nil {
+		return err
+	}
 	d := json.NewDecoder(bytes.NewReader(b))
 	d.DisallowUnknownFields()
 	if err := d.Decode(value); err != nil {
@@ -287,6 +292,44 @@ func decodeFile(path string, value any) error {
 		return errors.Join(fmt.Errorf("invalid trailing JSON"), err)
 	}
 	return nil
+}
+
+// JSON permits repeated keys, but a closed policy cannot have two competing
+// values for one field. Reject them before decoding into typed policy.
+func uniqueJSON(d *json.Decoder, depth int) error {
+	if depth > 32 {
+		return fmt.Errorf("JSON nesting limit exceeded")
+	}
+	t, err := d.Token()
+	if err != nil {
+		return err
+	}
+	delimiter, ok := t.(json.Delim)
+	if !ok {
+		return nil
+	}
+	seen := map[string]bool{}
+	for d.More() {
+		if delimiter == '{' {
+			key, err := d.Token()
+			if err != nil {
+				return err
+			}
+			name, ok := key.(string)
+			if !ok {
+				return fmt.Errorf("invalid JSON key")
+			}
+			if seen[name] {
+				return fmt.Errorf("duplicate JSON field %s", name)
+			}
+			seen[name] = true
+		}
+		if err := uniqueJSON(d, depth+1); err != nil {
+			return err
+		}
+	}
+	_, err = d.Token()
+	return err
 }
 
 func regularBytes(path string, limit int64) ([]byte, error) {
@@ -352,6 +395,13 @@ func unique(values []string, label string) error {
 
 func inventory(root string) ([]suite, error) {
 	dir := filepath.Join(root, "testdata", "integration-lanes")
+	schema, err := regularBytes(filepath.Join(dir, "schema.json"), 1<<20)
+	if err != nil {
+		return nil, fmt.Errorf("schema: %w", err)
+	}
+	if fmt.Sprintf("%x", sha256.Sum256(schema)) != schemaSHA {
+		return nil, fmt.Errorf("schema does not match supported closed version 1")
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -421,6 +471,7 @@ func inventory(root string) ([]suite, error) {
 			return nil, fmt.Errorf("incomplete adapter/runtime closure")
 		}
 		s.sourceByTest = map[string]string{}
+		s.sourceHashes = map[string]string{}
 		for _, source := range s.Sources {
 			if owned[source] {
 				return nil, fmt.Errorf("duplicate source identity %s", source)
@@ -434,6 +485,7 @@ func inventory(root string) ([]suite, error) {
 			if e != nil {
 				return nil, e
 			}
+			s.sourceHashes[source] = fmt.Sprintf("%x", sha256.Sum256(b))
 			var names []string
 			if s.Adapter == "go-json" {
 				if !strings.HasSuffix(source, "_test.go") || filepath.Dir(source) != pkg {
@@ -510,7 +562,15 @@ func inventory(root string) ([]suite, error) {
 			if e != nil {
 				return e
 			}
-			required = integrationTagged(b)
+			for _, line := range strings.Split(string(b), "\n") {
+				if strings.HasPrefix(line, "//go:build ") && strings.Contains(line, "machinery_integration") {
+					required = true
+					break
+				}
+				if strings.HasPrefix(line, "package ") {
+					break
+				}
+			}
 		}
 		if required && !owned[filepath.ToSlash(rel)] {
 			return fmt.Errorf("unregistered integration source %s", rel)
@@ -703,6 +763,24 @@ func provision(ctx context.Context, root, work, cache string, p pins, suites []s
 		if formalReceipts[0].ArchiveSHA != archive {
 			return result, fmt.Errorf("java archive pin mismatch")
 		}
+		// Java resolves the macOS /var -> /private/var alias. Keep receipts and
+		// test argv rooted in the caller's selected cache spelling, after checking
+		// that each resolved runtime actually belongs to that directory.
+		realCache, err := filepath.EvalSymlinks(cache)
+		if err != nil {
+			return result, err
+		}
+		for i := range formalReceipts {
+			realPath, err := filepath.EvalSymlinks(formalReceipts[i].Path)
+			if err != nil {
+				return result, err
+			}
+			rel, err := filepath.Rel(realCache, realPath)
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				return result, fmt.Errorf("provisioned formal path escaped cache")
+			}
+			formalReceipts[i].Path = filepath.Join(cache, rel)
+		}
 		result = append(result, formalReceipts...)
 	}
 	return result, nil
@@ -821,7 +899,32 @@ func execute(ctx context.Context, root, work, cache, evidence string, s suite, r
 	}
 	env := environment(overrides)
 	var argv []string
+	packageID := ""
 	if s.Adapter == "go-json" {
+		out, errout, err := command(ctx, root, env, time.Minute, 1<<20, 1<<20, paths["go"], "list", "-json", "-tags", "machinery_integration", s.Package)
+		if err != nil || errout != "" {
+			return r, fmt.Errorf("native package selection failed: %w %s", err, errout)
+		}
+		var pkg struct {
+			ImportPath                string
+			TestGoFiles, XTestGoFiles []string
+		}
+		if err = json.Unmarshal([]byte(out), &pkg); err != nil {
+			return r, err
+		}
+		if pkg.ImportPath == "" {
+			return r, fmt.Errorf("empty native package selection")
+		}
+		packageID = pkg.ImportPath
+		active := map[string]bool{}
+		for _, file := range append(pkg.TestGoFiles, pkg.XTestGoFiles...) {
+			active[filepath.Join(strings.TrimPrefix(s.Package, "./"), file)] = true
+		}
+		for _, source := range s.Sources {
+			if !active[source] {
+				return r, fmt.Errorf("registered source absent from native selection: %s", source)
+			}
+		}
 		names := make([]string, len(s.Tests))
 		for i, name := range s.Tests {
 			names[i] = regexp.QuoteMeta(name)
@@ -855,7 +958,7 @@ func execute(ctx context.Context, root, work, cache, evidence string, s suite, r
 	}
 	var eventErr error
 	if s.Adapter == "go-json" {
-		eventErr = accountGo(out, &r)
+		eventErr = accountGo(out, packageID, &r)
 	} else {
 		eventErr = accountNode(out, &r)
 	}
@@ -865,10 +968,21 @@ func execute(ctx context.Context, root, work, cache, evidence string, s suite, r
 	if runErr != nil {
 		runErr = fmt.Errorf("native execution failed: %w", runErr)
 	}
+	for source, want := range s.sourceHashes {
+		path, err := sourcePath(root, source)
+		if err != nil {
+			eventErr = errors.Join(eventErr, err)
+			continue
+		}
+		b, err := regularBytes(path, 4<<20)
+		if err != nil || fmt.Sprintf("%x", sha256.Sum256(b)) != want {
+			eventErr = errors.Join(eventErr, fmt.Errorf("native source changed during execution: %s: %w", source, err))
+		}
+	}
 	return r, errors.Join(runErr, eventErr)
 }
 
-func accountGo(output string, r *suiteReceipt) error {
+func accountGo(output, packageID string, r *suiteReceipt) error {
 	starts, terminals := map[string]int{}, map[string]int{}
 	selected := map[string]int{}
 	for i, t := range r.Tests {
@@ -884,8 +998,8 @@ func accountGo(output string, r *suiteReceipt) error {
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
 			return fmt.Errorf("malformed native execution JSON: %w", err)
 		}
-		if event.Package == "" {
-			return fmt.Errorf("native execution missing package")
+		if event.Package != packageID {
+			return fmt.Errorf("native execution package %q differs from selected package %q", event.Package, packageID)
 		}
 		if strings.Contains(event.Output, "(cached)") {
 			return fmt.Errorf("cached execution forbidden")
@@ -904,6 +1018,9 @@ func accountGo(output string, r *suiteReceipt) error {
 				packagePassed = true
 			case "fail", "skip":
 				failures = append(failures, fmt.Errorf("package execution %s failed/skip", event.Action))
+			case "output":
+			default:
+				return fmt.Errorf("unknown package execution action %q", event.Action)
 			}
 			continue
 		}
@@ -989,6 +1106,10 @@ func accountNode(output string, r *suiteReceipt) error {
 				return fmt.Errorf("unexpected Node execution terminal %q", name)
 			}
 			terminals[name]++
+			sequence, err := strconv.Atoi(match[2])
+			if err != nil || sequence != len(terminals) {
+				return fmt.Errorf("invalid Node execution terminal sequence")
+			}
 			if terminals[name] != 1 || starts[name] != 1 {
 				return fmt.Errorf("duplicate/incomplete Node execution %s", name)
 			}
