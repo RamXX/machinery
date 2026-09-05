@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:56:26Z
-content_hash: "sha256:b607876c9e1a6c75283b7514b39be3ecb54f9d2f33614a63fb7d5efcf0d67b8a"
+content_hash: "sha256:98ce450b1d2a88ff0cc5fa9b22d729225e14d627906ace62e340a6817f5b505f"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p8ce
 ---
@@ -80,6 +80,18 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-05.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
+
 ## RED delivery — MAC-p8ce
 PROOF:
 - Branch: story/MAC-p8ce. RED SHA: 0d52f43b393d961160aeea0db43b13a3fa5c284a. Subject contains tdd-red. Only internal/gates/reads_consumer_test.go added (336 lines); no production edits, no changes to prior tests. Freeze these bytes for GREEN after independent RED approval.
