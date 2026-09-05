@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T20:54:29Z
-content_hash: "sha256:1ca820662f5e49eca88ce4b3c5774960c26ce8fb93989162034adda646c278d2"
+content_hash: "sha256:6ef65b6cd7f75ee6c0161418d933aa920c9d8c9372d9396594f2830d9e031fc4"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -90,6 +90,18 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 
 ## Notes
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-05.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
+
 ## Implementation Evidence
 
 PROOF:
