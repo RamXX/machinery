@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:13:03Z
-content_hash: "sha256:f1ecd20d7d93e0a5a4ea4555b28e39ba7e205205350d3122260cd9f8c0171820"
+updated_at: 2026-09-05T21:32:28Z
+content_hash: "sha256:8622024f4102587172bafcbea0a08605261f18a13fc384283518d5928c213f0c"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -426,3 +426,34 @@ REVIEWED COMMIT BOUNDARY: one authenticated parent-owned prepared transaction co
 Every RED amendment/addition commit subject MUST carry both literal tags tdd-red and [test-edit-authorized]. Create new commits preserving ancestor v1 99956740ae5559262790a9473b5597c1775928f2, original file SHA256 8ed8636856305d50b9517c4087ecfff3582dac4fb467f92d8f49f3c836916329 and /tmp/machinery-MAC-2u36-red.qRk5DC evidence. Preserve the 36-leaf v1 32-pass/4-fail/0-skip 271.751s result as history; it is not approved RED. No other frozen-test/fixture/config edits, removals, assertion weakening or production changes are authorized.
 
 Re-freeze revised candidate bytes and obtain a separate full independent RED review/replay before GREEN. Author replay: go test -count=1 -timeout=10m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json, plus exact named focused boundary tests outside that selector. Record revised SHA/file hashes, exact commands, named leaf counts, zero skips, intended assertion failure causes, passing controls and per-AC coverage. Build/import/fixture/infra/timeout failures are not behavioral RED. The reviewed aggregate budget is 4-6 files/under 1100 changed LOC across eventual tests and production; investigate material overruns or additional files. No full preflight, live installation changes, sync/push/remote mutation, delivery, approve-red, GREEN waiver, acceptance/rejection status, claim release or closure is granted by this authorization.
+
+### 2026-09-05T21:32:28Z ramirosalas
+BOUNDARY PROPOSAL REVIEW: GAPS_FOUND — independent PM pre-RED test-contract review for MAC-2u36, 2026-09-05. This is a bounded proposal verdict only: no delivery/RED verdict, approve-red, acceptance/rejection, status/claim change, or production-edit authorization.
+
+EXPECTED: Canonical R2 AC6 and TEST-EDIT AUTHORIZED 2026-09-05T21:12:43Z require an authenticated parent-owned prepared transaction covering binary, complete selected direct plan and receipt; repair may precede complete inventory; complete normalized real-digest publication follows all direct placements/source checks and precedes direct commit; late inventory/publication failure after actual prior mutations restores the whole update. Existing concurrent-artifact protection and standalone/delegation controls remain intact.
+
+PROPOSAL A: real Update/default runner/real loopback release; observe completed final OpenCode child via UpdateOptions.Out; verify complete actual release placements; arm existing closeInstallFile only for receipt-* scratch under the current prepared journal; genuinely close twice to obtain OS ErrClosed before renameReplace; demand full rollback.
+VERDICT: Not authorized as mandatory outcome RED under the existing contract. Parent-owned transaction does not explicitly require parent-PROCESS receipt publication. An authenticated final child can finish all placements/source checks, publish the complete receipt and return while the parent still owns final commit. runAndRelay emits buffered output only after run returns, and closeInstallFile is a process-local function variable. The proposed hook therefore misses an otherwise contract-compatible final-child publication. A never-fired hook would reject an implementation choice rather than establish an AC violation. This does not dispute the hook's usefulness if parent-process finalization is explicitly selected in the contract.
+
+PROPOSAL B: assert unchanged receipt bytes after nonfinal completed children; after final child verify all release placements, then os.Remove one owned native artifact and demand final rejection/full rollback.
+VERDICT: Not authorized as substitute AC6 receipt-failure proof. In a final-child publication implementation this injection occurs after receipt publication and exercises commit post-image validation, not final receipt inventory/publication failure. More decisively, rollbackInstallJournal intentionally refuses to overwrite live artifacts that do not match their durable transaction-written post-image. Removing an updated native artifact triggers that concurrent-change boundary: complete restoration is not the existing safe outcome. Requiring it would conflict with preserved safety and read-only transaction.go scope. The byte-identical receipt assertion also needs clarification: the contract specifies final publication ordering; it does not separately define every permissible intermediate validated receipt representation. Do not freeze exact byte immutability as a proxy for that unresolved distinction.
+
+BOUNDED ALTERNATIVES CHECKED: Existing close/stage/authority hooks are process-local; default child output is buffered until child completion. Receipt directory permission/type changes may affect journal authority, publication and rollback together, can fail too early, and have platform/privilege complications. No deterministic process-neutral existing-seam fixture was established in this review. This is a scoped finding, not an exhaustive claim that no technique exists.
+
+MINIMAL NEXT CLARIFICATION FOR SR PM: Choose and record whether final normalized receipt publication is specifically a parent-process responsibility after all real children return. If yes, authorize that narrow sequencing contract explicitly, including whether the persisted receipt must remain untouched before finalization; proposal A then becomes eligible for test-edit authorization after verifying its positive control and fault sensitivity. If process placement is intentionally unconstrained, retain that outcome and separately scope/review a deterministic mechanism that observes and injects at final receipt publication in whichever actual process performs it. Do not silently add a production stub, public API, env-only bypass, instrumented fake CLI, concurrency-safety weakening, or omit the boundary proof. This note grants neither option.
+
+REQUIRED EVIDENCE ON ANY APPROVED NEXT PROPOSAL: actual built release and real children; independent expected binary/home/native content and full prepared journal coverage observed before the injected late failure; successful no-fault counterpart; proof that the intended publication/inventory operation actually encountered the fault and no commit occurred; exact full pre-state restoration, unrelated sentinels, journal cleanup and released operation lock. Earlier missing-file inventory failure, compile/fixture errors, and a hook that never runs do not satisfy the required boundary. All eventual authorized RED additions/amendments retain tdd-red and [test-edit-authorized] commit tags and require separate full independent RED review.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Read canonical current six-AC Description and exact 21:12:43Z authorization through pvg issues show MAC-2u36 --json; inspected committed test references only (a3282ac), no author uncommitted files.
+- Graph Verify tier, project Users-ramirosalas-workspace-machinery, generation 2026-09-05T20:28:41Z; exact saveReceipt/installScratchFile/delegatedArtifactTransaction/renameReplace symbols and saveReceipt both-direction trace. Relevant update.go/receipt.go/install.go/transaction.go coverage is metadata_match/no_recorded_issue, best-effort only.
+- Read local exact source: saveReceipt 263-304; installLocked 124-258; refreshDirectInstalls 472-505/runAndRelay 507-519; transaction commit 588 onward and rollbackInstallJournal 855 onward. Parent owns commit; delegated commit closes anchors; rollback preserves concurrent post-image changes.
+- No runtime tests or mutable fixtures run; no source, test, installation, branch, queue, status or claim mutations.
+
+### proof
+- [x] Bounded proposed fault mechanisms assessed against actual sequencing and safety contracts.
+- [ ] AC6 late receipt inventory/publication rollback proof remains unresolved pending the narrow contract/testability clarification above.
+- [ ] AC1-6 candidate replay, independent RED approval, implementation and acceptance remain pending.
