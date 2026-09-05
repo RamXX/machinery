@@ -4,12 +4,12 @@ title: "E2e: Consumers receive trustworthy standalone assurance"
 status: open
 priority: 1
 type: task
-labels: [hard-tdd, capstone]
+labels: [capstone]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:14Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:38:46Z
-content_hash: "sha256:3f43c43a08ed3031c2cc1234cdcf399b43b6fbabb9c55e96aad0174c0edb2d57"
+updated_at: 2026-09-05T19:38:47Z
+content_hash: "sha256:681677c880b2868882d879233d54788af6471f8b4a3955cada5ee35d9b2f424e"
 blocked_by: [MAC-hlae, MAC-sh60, MAC-olrx, MAC-p8ce, MAC-yhg5, MAC-hwdb, MAC-2u36, MAC-a89e, MAC-p7jd, MAC-2n83, MAC-hy71, MAC-gcrr, MAC-l7m0, MAC-vx24, MAC-lnu6]
 ---
 
@@ -108,7 +108,7 @@ Observable outcome: the user can complete valid software delivery and see unsafe
 
 
 ## Notes
-
+AUTHORITATIVE CAPSTONE TESTING CORRECTION: This is an integrated tests-only capstone after all implementations already pass. No manufactured missing-feature RED is required and hard-tdd label is removed. Instead every unsafe mutation must trigger the intended assertion/block while safe positive controls pass, proving sensitivity. Preserve reviewed test bytes and provide exact actual E2E execution evidence. Earlier capstone RED wording is superseded by this correction.
 
 ## History
 - 2026-09-05T19:36:14Z dep_added: blocked_by MAC-hlae
