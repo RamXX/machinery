@@ -9,8 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:44:27Z
-content_hash: "sha256:2a2c6f219fac75f261a5ad0e17f6713254aa910337baee8088fea8ffa8354675"
-blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97]
+content_hash: "sha256:80270a65681403073bb022767a6df14d07f8b34fca218a0032bb9f85153193c1"
+blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 ---
 
 ## Description
@@ -98,9 +98,10 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 - 2026-09-05T19:45:32Z dep_added: blocks MAC-vx24
 - 2026-09-05T19:45:33Z dep_added: blocks MAC-gcrr
 - 2026-09-05T19:45:33Z dep_added: blocks MAC-ou97
+- 2026-09-05T19:45:33Z dep_added: blocks MAC-hy71
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-hlae]], [[MAC-yhg5]], [[MAC-2n83]], [[MAC-hwdb]], [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]]
+- Blocks: [[MAC-hlae]], [[MAC-yhg5]], [[MAC-2n83]], [[MAC-hwdb]], [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]], [[MAC-hy71]]
 
 ## Comments

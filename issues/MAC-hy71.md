@@ -9,8 +9,9 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:45:33Z
-content_hash: "sha256:989c2f218357432820024fb201ce03a9e4c68fd0bbec865b178bd79dea5f9433"
+content_hash: "sha256:c72eb7d4f4ff25b6c3521f191e7de1213a145c58ca6cf1166c043669087c2dc9"
 blocks: [MAC-gcrr, MAC-ou97]
+blocked_by: [MAC-hpqp]
 ---
 
 ## Description
@@ -96,9 +97,11 @@ This story modifies these shared workflow files only after MAC-hpqp acceptance. 
 ## History
 - 2026-09-05T19:35:08Z dep_added: blocks MAC-gcrr
 - 2026-09-05T19:36:16Z dep_added: blocks MAC-ou97
+- 2026-09-05T19:45:33Z dep_added: blocked_by MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
+- Blocked by: [[MAC-hpqp]]
 
 ## Comments
