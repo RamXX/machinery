@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:16:47Z
-content_hash: "sha256:1fabc3f28678f2b701a3f2ec06772cad963c4b4d6bb4fc21a73bca12f5a2f833"
+updated_at: 2026-09-05T21:16:48Z
+content_hash: "sha256:e37a9929f595c7b8db5d2be5ffd5e7679e5835d25e085a55f21a7d98fc467cb3"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx]
@@ -91,6 +91,32 @@ LEARNINGS:
 - Output assertions can accidentally match temporary test directory names; test prose rather than unrestricted substring presence.
 - Real baseline reruns expand an already-baselined edge even when output says nothing new to baseline.
 - Executing all printed advice with placeholder substitution demonstrates debt mutation directly without mocks or external services.
+## AUTHORITATIVE MAC-a89e SCOPE REPAIR — 2026-09-05
+Current canonical Description includes the concrete AC3 baseline debt-review behavior and supersedes only conflicting earlier ownership/AC3/budget wording. Previous description, PM authorization, notes and history remain preserved.
+
+Bug-triage disposition: absorb the newly confirmed explicit-baseline messaging gap into the existing P0 MAC-a89e under MAC-ui8a. It is already required by AC3 and concerns the same distinction between routine regeneration and deliberate debt acceptance. No new issue, dependency, claim or status/label transition.
+
+Scope delta: cmd/machinery/baseline.go is now explicitly owned only for help and successful-output guidance. internal/gates/gates_test.go is owned only for the PM-authorized TestVersionSkewNoteNamesEveryApplicableCommand baseline-positive expectation replacement with baseline absence, preserving its ratchet fixture and all other generator assertions. Existing gates.go and new regeneration_safety_test.go remain owned. Total four files; original under-300-LOC ceiling retained.
+
+AC3 observable contract: help explains baseline reruns rewrite ratchet.json and can accept new offender files; successful output tells users to review ratchet/offender changes before adoption even if no dependency rule was proposed. Zero proposed rules does not mean no debt change. The real isolated CLI test must demonstrate an already-baselined edge failing after a new offender, explicit baseline successfully accepting that offender with zero rule proposals, and the required help/output guidance. Deliberate baseline acceptance remains allowed. No confirmation prompt, stamp, algorithm/schema rewrite, or Paivot runtime coupling.
+
+Evidence: full latest MAC-a89e story and independent PM comment read; graph-first exact source for regenCommands, VersionSkewNote, BuildBaseline, newBaselineCmd and TestVersionSkewNoteNamesEveryApplicableCommand. Source confirms baseline is included when RatchetFile exists, existing test requires it, BuildBaseline re-snapshots current offenders on baselined edges, and CLI zero-rule path claims nothing new before writing the expanded ratchet. Graph coverage 2026-09-05T20:28:41Z reported metadata_match/no_recorded_issue for four cited source/test files; exact snippets were read. No author worktree/source/frozen tests inspected or modified and no runtime test replay performed during this tracker-only scope repair.
+
+The existing 2026-09-05T21:14:38Z TEST-EDIT AUTHORIZED comment remains the authority for that narrow existing-test change and its tdd-red/[test-edit-authorized] development commit markers. This scope repair is not RED approval, delivery or acceptance. Parent will lint and notify the author; full independent RED replay is still required before GREEN.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Canonical self-contained description repaired through supported pvg nd edit; append-only scope note written with pvg nd update --append-notes.
+- P0 MAC-a89e retains dev-MAC-a89e, hard-tdd, parent MAC-ui8a and existing blocks MAC-gcrr/MAC-ou97.
+- Four-file scope with under-300-LOC budget; all previous notes/history/comments/contracts preserved.
+
+### proof
+- [x] Scope repair: AC3 explicitly covers help and successful zero-rule output for ratchet/offender debt expansion.
+- [x] Scope repair: narrow existing-test authorization embedded without enlarging its allowed assertion changes.
+- [ ] AC #1-4: RED execution, independent approval, implementation and acceptance remain pending.
+
 
 ## nd_contract
 status: in_progress
