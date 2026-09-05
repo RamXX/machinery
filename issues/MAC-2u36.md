@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:38:11Z
-content_hash: "sha256:3d60411fd65baf5fa92cc4afbb964dc4d478ef126d645f21e6cae2c56afa2076"
+updated_at: 2026-09-05T21:38:12Z
+content_hash: "sha256:ce73c983aa4a352eb10142d3405926912f2cacdec0403dd6309412189764227b"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -70,7 +70,7 @@ CONSUMES:
 - Hard TDD remains explicitly authorized. After independent PM reviews this scope/contract and authorizes the revised tests, a RED-only author revises the disputed edited/missing cases, adds the bounded multi-missing and missing-pre-state rollback proof, and any focused new boundary tests needed for AC6. No production edits before independently approved RED.
 - Preserve original candidate 99956740ae5559262790a9473b5597c1775928f2, test SHA256 8ed8636856305d50b9517c4087ecfff3582dac4fb467f92d8f49f3c836916329 and /tmp/machinery-MAC-2u36-red.qRk5DC. Existing 36-leaf replay: 32 pass, 4 fail, 0 skip, 271.751s; only three original failures are valid bootstrap defect proof. The fourth stale_artifact rejection is superseded. Missing-file ordinary FAIL 35.820s is new genuine defect evidence, separate from earlier edited-file ordinary PASS 36.508s.
 - Preserve complete-recorded-plan, defaults/selectors, intact normal/bootstrap convergence, plugin obligations, real later-target rollback, interrupted recovery, and all legitimate safety negatives. Rename obsolete stale_artifact/disappeared_target rejection cases as repair-success requirements. Only specifically reviewer-authorized frozen-test changes are allowed.
-- Fresh replay: go test -count=1 -timeout=10m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json. Timeout increased from 5m because the existing real replay already consumed 271.751s and the newly required paired repair/rollback cases add CLI executions; do not relax assertions or skip cases to fit the old timeout.
+- Fresh replay: go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json. This package deadline replaces 10m: the compiled 5a94840 broad matrix took 536.345s for 49 leaves (34 pass, 15 fail, 0 skip), including four invalid early authority-fixture failures. Corrected real authority controls take approximately 60s, bringing the conservative replay budget near 596.345s before the new AC6 positive/fault real updates and ordinary scheduling variance; 600s is inadequate for the complete expanded matrix. The 900s package bound provides room for those measured/required cases. Preserve every individual operation timeout, frozen test selection and assertion; no skipped cases, retries masking hangs or relaxed operation bounds. This is not permission for a hung individual update. Keep the existing GREEN 15m package command unchanged pending actual measurement; full preflight remains final-epic-only.
 - Focused receipt/standalone-install/delegated-authority tests selected by actual test names introduced or affected. GREEN runs go test -count=1 -timeout=15m ./internal/install ./cmd/machinery for ordinary native package regression coverage. No full scripts/preflight.sh here; final epic gate owns heavy preflight.
 - Record SHA, exact command, named leaf inventory, zero skips, assertion failure causes and passing controls. Compile/import/fixture/infra/timeout errors are not behavioral RED. Unexpected missing-file receipt-inventory failure is a valid success-contract assertion failure, not an acceptable permanent rejection.
 - If internal deferred receipt behavior is introduced, add proof that normal standalone install still publishes correct receipts, missing/forged/out-of-scope parent authority cannot enable it, and final publication failure rolls back real prior mutations. Reuse existing authenticated delegation mechanisms; implementation details require evidence, not an assumed new public API.
@@ -109,29 +109,6 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
-## MAC-2u36 TARGETED RED PACKAGE DEADLINE REFINEMENT — 2026-09-05
-Canonical targeted RED command is now:
-go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json
-
-Numeric rationale supplied by the dispatcher: compiled 5a94840 broad replay consumed 536.345s across 49 leaves (34 pass, 15 fail, 0 skip); four authority failures were invalid early fixture failures, not behavioral RED. Corrected actual authority controls take approximately 60s; a conservative runtime estimate is already near 596.345s before the new AC6 real positive/fault updates. A 600s package deadline therefore risks truncating valid complete execution. Set the package deadline to 900s.
-
-This changes only the package runtime allowance in the tracker. Retain existing individual operation bounds, all final frozen cases, exact assertions, zero-skip rules, and failure classification. No permission for a hung individual update, reduced inventory or relaxed per-operation timeout. GREEN remains go test -count=1 -timeout=15m ./internal/install ./cmd/machinery until actual evidence warrants review; no speculative increase. Full preflight remains final-epic-only.
-
-Historical canonical wording preserved:
-> - Fresh replay: go test -count=1 -timeout=10m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json. Timeout increased from 5m because the existing real replay already consumed 271.751s and the newly required paired repair/rollback cases add CLI executions; do not relax assertions or skip cases to fit the old timeout.
-
-No production/tests/worktree edits, execution/replay, source claim, approval or status/label/dependency change. Parent will lint and submit boundary plus timeout refinement for independent PM review.
-
-## nd_contract
-status: in_progress
-
-### evidence
-- Canonical RED package deadline changed via supported pvg nd edit from 10m to 15m using measured 536.345s replay, approximately 60s corrected authority controls and required added AC6 executions.
-- Existing GREEN deadline and all individual operation limits remain unchanged; no runtime test performed in this tracker-only refinement.
-
-### proof
-- [x] Verification budget: targeted RED deadline accounts for complete expanded real matrix without dropping cases or weakening assertions.
-- [ ] AC1-6: boundary/test authorization, complete RED replay, implementation and independent acceptance remain pending.
 
 
 ## nd_contract
@@ -608,4 +585,28 @@ status: in_progress
 - [x] Safety: standalone recording, authenticated delegation, supported schema validation and concurrent post-image protections remain intact.
 - [ ] AC6: concrete late real-file publication-failure test authorization and independent execution proof pending.
 - [ ] AC1-6: independent RED approval, implementation and acceptance remain pending.
+
+## MAC-2u36 TARGETED RED PACKAGE DEADLINE REFINEMENT — 2026-09-05
+Canonical targeted RED command is now:
+go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json
+
+Numeric rationale supplied by the dispatcher: compiled 5a94840 broad replay consumed 536.345s across 49 leaves (34 pass, 15 fail, 0 skip); four authority failures were invalid early fixture failures, not behavioral RED. Corrected actual authority controls take approximately 60s; a conservative runtime estimate is already near 596.345s before the new AC6 real positive/fault updates. A 600s package deadline therefore risks truncating valid complete execution. Set the package deadline to 900s.
+
+This changes only the package runtime allowance in the tracker. Retain existing individual operation bounds, all final frozen cases, exact assertions, zero-skip rules, and failure classification. No permission for a hung individual update, reduced inventory or relaxed per-operation timeout. GREEN remains go test -count=1 -timeout=15m ./internal/install ./cmd/machinery until actual evidence warrants review; no speculative increase. Full preflight remains final-epic-only.
+
+Historical canonical wording preserved:
+> - Fresh replay: go test -count=1 -timeout=10m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json. Timeout increased from 5m because the existing real replay already consumed 271.751s and the newly required paired repair/rollback cases add CLI executions; do not relax assertions or skip cases to fit the old timeout.
+
+No production/tests/worktree edits, execution/replay, source claim, approval or status/label/dependency change. Parent will lint and submit boundary plus timeout refinement for independent PM review.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Canonical RED package deadline changed via supported pvg nd edit from 10m to 15m using measured 536.345s replay, approximately 60s corrected authority controls and required added AC6 executions.
+- Existing GREEN deadline and all individual operation limits remain unchanged; no runtime test performed in this tracker-only refinement.
+
+### proof
+- [x] Verification budget: targeted RED deadline accounts for complete expanded real matrix without dropping cases or weakening assertions.
+- [ ] AC1-6: boundary/test authorization, complete RED replay, implementation and independent acceptance remain pending.
 
