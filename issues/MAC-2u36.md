@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:49:11Z
-content_hash: "sha256:16ee9ed3e2e6d49a1b9298e8bf5b11530737b27ed73402cb1130b772a689ffc9"
+updated_at: 2026-09-05T20:49:33Z
+content_hash: "sha256:ec9374cb9cec7c4656aa417acfd28bb2105ad7e0f2097fc220098ff75b0ad6aa"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -81,6 +81,25 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+RED-DISPUTE ADDENDUM — disappeared_target classification:
+The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Frozen candidate 99956740ae5559262790a9473b5597c1775928f2 preserved unchanged.
+- Paused before delivery for review of stale_artifact and disappeared_target repair semantics; all existing proof retained.
+- Ephemeral diagnostic source moved outside worktree to /tmp/machinery-MAC-2u36-red.qRk5DC; no production changes.
+
+### proof
+- [x] AC #1: receipt-plan divergence reproduced; repair-input parity requires clarification.
+- [ ] AC #2: stale receipt versus content drift and missing owned artifacts requires Sr PM/reviewer clarification.
+- [x] AC #3: real normal convergence and idempotence pass; bootstrap recorded-target staleness fails.
+- [ ] AC #4: post-mutation rollback/interruption controls pass; missing-artifact rejection expectation remains under review.
+- [x] AC #5: actual built CLI and isolated roots verified; live installation SHA unchanged.
+
+
 ## Implementation Evidence (RED CANDIDATE — PAUSED BEFORE DELIVERY)
 
 PROOF:
