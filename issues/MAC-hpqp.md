@@ -8,8 +8,8 @@ labels: [hard-tdd, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:32:44Z
-content_hash: "sha256:083c2c390370eb3f6f6a7f1c6195237f8523549d320b624a0546c3343dba6ecd"
+updated_at: 2026-09-05T20:33:18Z
+content_hash: "sha256:0e90b9a450bc752e81412a28909a6f2c49295cf60ed52f6de8a980da2d323917"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 ---
 
@@ -310,3 +310,45 @@ status: rejected
 
 ### Revised RED authorization
 TEST-EDIT AUTHORIZED: scripts/integration-lane/main_test.go; cmd/machinery/integration_lane_test.go; testdata/integration-lanes/schema.json, pilot.json, runtime-pins.json, pilot.integration.test.mjs and CONTRACT.md -- the current candidate RED has not been approved. Revise these tests/fixtures/contracts only as needed to close the four explicit gaps above, then commit a new tdd-red candidate with [test-edit-authorized] in the repair commit subject. Preserve the original 612f65f3b4502a3267828507faaf0e395c8dd558 reproduction evidence, label candidate versions clearly, and independently re-review the new SHA before freezing. Controls must reject an implementation omitting required formal or Node execution and one deleting caller-owned --work-dir content. These guarantees belong in MAC-hpqp, not a deferred capstone. The dispatcher-authorized main.go bootstrap remains replaceable implementation; this review authorizes no operational GREEN behavior in RED.
+
+### 2026-09-05T20:33:18Z ramirosalas
+### Commit
+- Branch: story/MAC-hpqp
+- SHA: 612f65f3b4502a3267828507faaf0e395c8dd558
+
+### PM independent RED review
+Canonical rejection recorded with four EXPECTED/DELIVERED/GAP/FIX findings and explicit TEST-EDIT AUTHORIZED revisions in PM Decision. This is rejected RED candidate v1, never accepted/closed or frozen as approved. Preserve its reproduction evidence; submit repaired RED v2 at a new tdd-red SHA for independent review. No deferred capstone substitution or root override.
+
+PROOF:
+Working directory /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-hpqp:
+- go test -count=1 -timeout=2m -json ./scripts/integration-lane: expected exit 1; exact 10 roots/39 starts/39 terminal events; 35 leaves = 3 PASS/32 intended FAIL/0 SKIP.
+- go test -tags machinery_integration -count=1 -timeout=15m -json ./cmd/machinery -run '^TestIntegrationLane(Pilot(OCI|Formal)|FullPath)$': expected exit 1; exact three registered roots/24 starts/24 terminals; 22 leaves = 3 PASS/19 intended FAIL/0 SKIP. All 19 declared scenario identities verified individually. Actual OCI success/termination pass; pinned fresh-cache safe/unsafe Java/TLC control passes in 62.61s.
+- node --test --test-reporter=tap testdata/integration-lanes/pilot.integration.test.mjs: 1 exact registered leaf PASS, 0 fail/skip/cancel/todo.
+- go test -count=1 -timeout=90s -json ./scripts/run-safe ./internal/processcontrol: 18 roots/22 starts/22 terminals; 20 leaves PASS, no failures/skips.
+- Parsed every JSON event: no duplicate started/terminal IDs or missing terminals in native/runtime/controls. New total 58 leaves = 7 PASS/51 intended FAIL/0 SKIP; existing controls add 20 PASS.
+- actionlint .github/workflows/ci.yml .github/workflows/formal.yml .github/workflows/nightly.yml PASS; git diff --check PASS; worktree clean.
+- docker ps -a --filter label=dev.machinery.integration-run returned empty after replay. docker inspect verified dagger-engine-v0.21.9 ID 18576903a871d895c8b414ee0a41897313ce31d7b5b6284c29b489553e4fae99 remains running. All 19 scenario cleanup callbacks preserved real unrelated sentinel.
+- Raw replay logs retained /tmp/machinery-hpqp-pm.9vqSxW/{native,runtime,controls}.json. No coverage claim added: developer bootstrap coverage 66.7% is not operational coverage.
+- Read entire eight-file/1066-line diff and closed contract. Code graph root snapshot excluded/missed candidate paths; all relevant source read directly. No production, test, fixture, other-worktree or installed artifact edits; no full preflight, GitHub/push/sync or global cleanup.
+
+LEARNINGS:
+Passing standalone runtime controls establish infrastructure health but do not force a candidate lane to provision and execute that runtime. Candidate positive and negative pairs must cross the same CLI boundary. Native events and runtime identities need exact assertions for every adapter.
+
+## nd_contract
+status: rejected
+
+### evidence
+- Independent review and exact event replay at SHA 612f65f3b4502a3267828507faaf0e395c8dd558 reproduced developer counts and safe cleanup.
+- Canonical pvg story reject MAC-hpqp completed; test-revision authorization and four actionable gaps recorded above in PM Decision.
+
+### proof
+- [x] AC #1: closed inventory and actual source-selection RED reviewed.
+- [ ] AC #2: mandatory gating assertions need job/step/bypass controls.
+- [ ] AC #3: positive cold formal closure through candidate CLI required.
+- [ ] AC #4: exact Node/full-path native events and runtime identity set required.
+- [ ] AC #5: workflow mandatory job and step policies unproved.
+- [ ] AC #6: executable preflight bypass/order assertions required.
+- [ ] AC #7: candidate-lane formal positive cannot be replaced by direct verifier control.
+- [ ] AC #8: real owned descendants and preexisting user work-root preservation required.
+- [x] AC #9: valid behavioral RED and bootstrap exception verified; rework authorization explicit.
+- [ ] AC #10: strengthen full-path success/evidence/lifecycle controls before approval.
