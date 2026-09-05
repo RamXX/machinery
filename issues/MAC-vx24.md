@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:38:46Z
-content_hash: "sha256:11bc472b7e00a72f1aa35a4f1f3f8d35ad7a78b8ff20ae80c0bc3c5cbd4d9a0d"
+updated_at: 2026-09-05T19:45:32Z
+content_hash: "sha256:924159376a194b1c1f596a4744e07b37e1fc64d45fc716d7ffc83112ee5261b7"
 blocked_by: [MAC-l7m0, MAC-sh60, MAC-olrx, MAC-2n83, MAC-p7jd, MAC-lnu6]
 blocks: [MAC-gcrr, MAC-ou97]
 ---
@@ -106,6 +106,20 @@ Observable outcome: the user can run standalone Machinery and receive an explici
 CONSUMES:
 - MAC-lnu6: skills/machinery/references/build-md-template.md
   source: Exact-byte frozen-test guidance replacing unsafe tokens-equal authorization; process integration modifies this template sequentially.
+ANCHOR ROUND-1 AUTHORITATIVE EXECUTION-LANE REPAIR
+General rule: required runtime tests need deterministic provisioning, explicit closed inventory, actual native execution accounting and teardown. Missing infrastructure must fail the REQUIRED lane, not be silently skipped. Ordinary native suites may explicitly exclude registered service-backed tests using a dedicated build tag.
+Classification: Native-runner replay/hook/complete E2E requires approved adapter runtimes; exact supported runtime contract remains architecture-blocked.
+Record standalone replay suite in required lane even if initial adapter only Go. If approved contract needs additional runtimes, provision in lane before execution. No fallback to receipt-only validation or env-gated omission.
+PRODUCES:
+- testdata/integration-lanes/tdd.json -> this story's closed suite fragment, with exact source/test IDs, runtime/pin requirements and bounded execution configuration
+- cmd/machinery/tdd_test.go -> actual named runtime cases registered in the fragment
+CONSUMES:
+- MAC-hpqp: testdata/integration-lanes/schema.json
+  schema: Closed versioned native-runner suite fragment with exact source/test identities, runtime requirements and bounded command selection.
+- MAC-hpqp: scripts/integration-lane/main.go
+  endpoint: go run ./scripts/integration-lane --lane required (Makefile test-integration invokes same entrypoint).
+Additional acceptance criteria: fragment matches actual test sources both directions; all registered cases actually start/terminate with expected positive/negative outcomes; no cached/skipped/empty/partial/fabricated-summary success; real provisioned positive and missing-runtime/fresh-cache failure diagnostics; no owned container/process leaks. Required local preflight and hosted CI execute the same union. Do not edit shared root inventory; own only this fragment. RED source, fixture, fragment and runner configuration are frozen together after review. Any exact test names introduced in RED must remain registered through GREEN.
+No heavy preflight until final gate; no GitHub mutation; no active installation replacement. This note supersedes any earlier command implying service-backed tests execute in unprovisioned ordinary package suites.
 
 ## History
 - 2026-09-05T19:35:06Z dep_added: blocked_by MAC-l7m0
