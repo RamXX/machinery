@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:38:38Z
-content_hash: "sha256:e2b6f284fd9975d1034c9ed211f475f973db2e032aee8f792e659adf9572d4bc"
+updated_at: 2026-09-05T21:42:11Z
+content_hash: "sha256:70b4e27ab187b18a0262bc73716efbf696581a9d0bdd927699e8a90dcda86c36"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -610,3 +610,37 @@ status: in_progress
 - [x] Verification budget: targeted RED deadline accounts for complete expanded real matrix without dropping cases or weakening assertions.
 - [ ] AC1-6: boundary/test authorization, complete RED replay, implementation and independent acceptance remain pending.
 
+
+### 2026-09-05T21:42:11Z ramirosalas
+TEST-EDIT AUTHORIZED: MAC-2u36 independent bounded follow-up review of parent-PROCESS AC6 refinement and exact later-source diagnostic repair. Effective with this comment; no RED approval, delivery, GREEN waiver, acceptance/rejection, claim release, or status/label change.
+
+CONTRACT REVIEW: Read current canonical six ACs, AUTHORITATIVE FINALIZATION BOUNDARY REFINEMENT and TARGETED RED PACKAGE DEADLINE REFINEMENT. The selected Update parent now explicitly owns final complete receipt inventory/publication after every authenticated placement child returns and before parent direct commit. Persisted receipt pre-run bytes/existence/type/mode remain unchanged through all children; absence stays absent. This resolves the process-choice/byte-immutability gaps in my 21:32:28Z review. Concurrent foreign-postimage protection remains unchanged. Ownership stays update.go/receipt.go/install.go for future GREEN only; no production edits during this RED phase.
+
+AUTHORIZED AC6 TEST ADDITIONS: internal/install/bootstrap_receipt_test.go only, plus minimal directly necessary helpers in that file. Add clearly named parent-finalization no-fault and close-fault cases for pre-existing and initially absent receipts, retaining an intact-artifact late-boundary fixture. Use real Update with its DEFAULT command runner, real checksummed built release/loopback archive, actual unmodified child CLI processes and isolated temporary roots. For absence cases choose a legitimate supported explicit/discovered/default plan and independently specify that plan; do not pretend a deleted receipt still supplies its lost copy/group metadata. Preserve the complete recorded mixed home/native plan in the receipt-present fixture.
+
+OBSERVATION AND FAULT CONTRACT:
+- Observe genuine relayed child completions; runAndRelay buffers output until the real runner returns. The output observer is observation only, not a fabricated command result or replacement runner. Check persisted receipt bytes/existence/type/mode after each selected child's completion, through the final completed child.
+- Before arming the fault, independently verify actual current-release binary, both relevant home/native placements and exact expected content/topology, plus the live prepared journal's coverage of the binary, complete selected direct plan and receipt. Expected content/inventory must not be derived solely from the emitted receipt. Require all selected child completions and unchanged receipt. Retain full pre-run snapshot and unrelated sentinels.
+- Use ONLY the existing closeInstallFile variable, scoped to the parent's receipt-* file directly under the current prepared journal scratch directory after that observation. Match the exact current transaction, not every receipt-like file. Verify the journal is still prepared, the persisted receipt is still pre-state, and the real scratch payload is complete/normalized with expected real digests before provoking failure. Actually close the real file successfully, then close it again and capture/return its actual OS closed-file error (errors.Is with os.ErrClosed where appropriate), before renameReplace. Record the exact operation/path and injection count. For all other files and in the no-fault counterpart call the original closer normally. Restore the global seam with cleanup; tests run sequentially with isolated environment and no t.Parallel. Do not mutate live artifact post-images, directory authority, or journal records to manufacture this failure.
+- Fault assertions: the intended parent final publication was reached and encountered the real close error; returned error retains that cause; no direct commit; exact prior binary/home/native/receipt state including required absences and modes restored; unrelated sentinels preserved; journal cleaned and operation lock released/reusable. A bounded real reacquisition control must actually establish lock reuse.
+- No-fault counterpart: same placement/finalization observations, complete normalized current receipt/digests/topology/plugin obligations, actual successful commit and clean/reusable lock. The close seam must not accidentally affect this control. Current missing-native early failure remains separate expected repair RED and cannot substitute for intact late-fault sensitivity.
+
+RED CLASSIFICATION: On unchanged production, child receipt writes and absent parent finalization can cause these desired-contract tests to fail; report their exact assertions honestly. A never-fired hook is an unmet boundary assertion, not evidence that publication-failure rollback was exercised. No claim of actual late-fault restoration or passing parent-sequencing control until that path executes. Preserve existing actual ordinary intact/edited success controls; no assertion weakening or production stubs to make the new boundary reachable during RED.
+
+EXACT DIAGNOSTIC AMENDMENT REVIEW: Author reports commit cdb80369490db3c33586735934111f85796f9389 was made at 2026-09-05T21:38:23Z before dispatcher's hold reached the author, relying on the earlier expanded R2 authorization; this explicit independent review occurs AFTER that amendment. Preserve this timing and commit; do not represent authorization as predating it. I read the committed one-line diff from 93f8e6c: replace the literal "source is missing OpenCode governance adapter" condition with both exact "adapters/opencode/plugins/machinery.js" and "no such file". Authorize retaining that exact amendment. In this fixed archive fixture only that source adapter is omitted; acquireInstallSourceSnapshot validates its explicit OpenCode entry before installTargets/validateTargetSource, so the real missing-source wrapper is legitimate. The unchanged mandatory actual "installed Codex agents ->", binary/home witnesses, nonzero failure, existing operation deadline, complete pre-state equality and missing-prestate os.IsNotExist check preserve the later source-failure boundary. Do not broaden to arbitrary missing paths/errors or permit early Codex receipt-inventory rejection. Preserve historical overly specific predicate failure as test-oracle mismatch, not a new production defect. Any further predicate change needs review under the existing frozen-test rules.
+
+REPLAY AND HISTORY: Every new amendment/addition commit subject carries BOTH tdd-red and [test-edit-authorized]. Preserve all ancestor/history and original v1 evidence. Re-freeze final test bytes and run one complete latest-SHA raw JSON replay using go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json, plus exact named boundary tests outside that selector if any. Keep all individual operation bounds unchanged. Record the untruncated raw JSON artifact, final SHA/hashes, exact command, every named leaf/outcome, zero skips, assertion causes and passing controls. Prior 5a94840 536.345s broad run is historical, including four invalid authority-fixture failures; tool-truncated diagnostics cannot serve as full final evidence. Corrected controls on 93f8e6c do not replace final-SHA replay. This authorization is not the separate full independent RED review.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Canonical contract/decision/deadline read through pvg issues show MAC-2u36 --json; reviewed exact committed 93f8e6c test lines and cdb80369490db3c33586735934111f85796f9389 diff, no uncommitted author source.
+- Exact graph/source review: acquireInstallSourceSnapshot, validateTargetSource, source traversal wrapper; prior saveReceipt, runAndRelay, prepared journal/commit/rollback review remains applicable. Six relevant source paths metadata_match/no_recorded_issue at generation 2026-09-05T20:28:41Z; best-effort caveat retained.
+- No runtime replay, author fixture interference, source/test/installation edits, branch/status/claim changes or remote operations during this review.
+
+### proof
+- [x] Parent-process/unchanged-receipt refinement resolves the earlier bounded contract gaps.
+- [x] Exact existing-seam no-fault/fault RED test contract authorized; cdb8036 semantic diagnostic repair independently reviewed after its recorded commit time.
+- [ ] AC6 actual finalization/fault execution and full restoration evidence pending.
+- [ ] AC1-6 complete final-SHA author replay, separate independent RED approval, GREEN and acceptance pending.
