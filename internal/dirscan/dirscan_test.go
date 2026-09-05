@@ -2,6 +2,7 @@ package dirscan
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -76,11 +77,26 @@ func TestReadRejectsSymlinkDirectory(t *testing.T) {
 	}
 }
 
-func TestReadRejectsConcurrentInventoryMutation(t *testing.T) {
+func quietRetries(t *testing.T) *int {
+	t.Helper()
+	priorDelay := retryDelay
+	t.Cleanup(func() { retryDelay = priorDelay })
+	attempts := 0
+	retryDelay = func(int) { attempts++ }
+	return &attempts
+}
+
+// TestReadRetriesConcurrentInventoryMutation pins the retry contract: a
+// change observed mid-enumeration discards that pass and re-enumerates, and
+// the inventory returned is the one two later passes agreed on. The hook
+// state directory is shared by every project of one user, so a concurrent
+// governance hook of another repository must not fail this one closed.
+func TestReadRetriesConcurrentInventoryMutation(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "before"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	retries := quietRetries(t)
 	prior := afterEnumeration
 	t.Cleanup(func() { afterEnumeration = prior })
 	afterEnumeration = func(path string) {
@@ -92,12 +108,43 @@ func TestReadRejectsConcurrentInventoryMutation(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if _, err := Read(dir, 10); err == nil || !strings.Contains(err.Error(), "changed while enumerating") {
-		t.Fatalf("Read accepted concurrent inventory mutation: %v", err)
+	entries, err := Read(dir, 10)
+	if err != nil {
+		t.Fatalf("Read failed closed on a transient concurrent mutation: %v", err)
+	}
+	if *retries != 1 {
+		t.Fatalf("retries = %d, want exactly one re-enumeration", *retries)
+	}
+	if len(entries) != 2 || entries[0].Name() != "after" || entries[1].Name() != "before" {
+		t.Fatalf("entries after retry = %v, want the post-change snapshot", entries)
 	}
 }
 
-func TestReadRejectsSameDirectoryCreateDeleteABA(t *testing.T) {
+func TestReadGivesUpOnPersistentMutation(t *testing.T) {
+	dir := t.TempDir()
+	retries := quietRetries(t)
+	prior := afterEnumeration
+	t.Cleanup(func() { afterEnumeration = prior })
+	n := 0
+	afterEnumeration = func(path string) {
+		if path != dir {
+			return
+		}
+		n++
+		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("churn-%d", n)), nil, 0o600); err != nil {
+			t.Error(err)
+		}
+	}
+	_, err := Read(dir, 100)
+	if err == nil || !errors.Is(err, ErrChanged) || !strings.Contains(err.Error(), "after 8 attempts") {
+		t.Fatalf("persistent mutation error = %v, want ErrChanged after the attempt budget", err)
+	}
+	if *retries != readAttempts {
+		t.Fatalf("retries = %d, want %d", *retries, readAttempts)
+	}
+}
+
+func TestReadCatchesSameDirectoryCreateDeleteABA(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "stable"), nil, 0o600); err != nil {
 		t.Fatal(err)
@@ -125,12 +172,17 @@ func TestReadRejectsSameDirectoryCreateDeleteABA(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if _, err := Read(dir, 10); err == nil || !strings.Contains(err.Error(), "changed while enumerating") {
-		t.Fatalf("Read accepted create/delete ABA: %v", err)
+	retries := quietRetries(t)
+	entries, err := Read(dir, 10)
+	if err != nil {
+		t.Fatalf("Read failed closed on a transient create/delete ABA: %v", err)
+	}
+	if *retries != 1 || len(entries) != 1 || entries[0].Name() != "stable" {
+		t.Fatalf("ABA must be caught and re-enumerated: retries=%d entries=%v", *retries, entries)
 	}
 }
 
-func TestReadRejectsSameDirectoryRenameABA(t *testing.T) {
+func TestReadCatchesSameDirectoryRenameABA(t *testing.T) {
 	dir := t.TempDir()
 	stable := filepath.Join(dir, "stable")
 	transient := filepath.Join(dir, "transient")
@@ -159,8 +211,13 @@ func TestReadRejectsSameDirectoryRenameABA(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if _, err := Read(dir, 10); err == nil || !strings.Contains(err.Error(), "changed while enumerating") {
-		t.Fatalf("Read accepted rename ABA: %v", err)
+	retries := quietRetries(t)
+	entries, err := Read(dir, 10)
+	if err != nil {
+		t.Fatalf("Read failed closed on a transient rename ABA: %v", err)
+	}
+	if *retries != 1 || len(entries) != 1 || entries[0].Name() != "stable" {
+		t.Fatalf("rename ABA must be caught and re-enumerated: retries=%d entries=%v", *retries, entries)
 	}
 }
 

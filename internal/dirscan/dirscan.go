@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"time"
 )
 
 const batchSize = 256
@@ -36,12 +37,48 @@ type directoryState struct {
 	changeID string
 }
 
+// ErrChanged marks an enumeration that observed the directory change between
+// its consistency witnesses. The inventory it would have returned is not a
+// snapshot, so it is discarded.
+var ErrChanged = errors.New("directory changed during enumeration")
+
+// readAttempts bounds how often Read re-enumerates a directory that another
+// process changed mid-pass before giving up. Each successful attempt is a
+// consistent snapshot on its own (both passes agreed and the native change
+// witness held), so retrying never weakens the result; it only absorbs the
+// transient where a concurrent writer, such as a governance hook of another
+// project sharing the per-user state directory, touched the directory while
+// this process was reading it.
+const readAttempts = 8
+
+var retryDelay = func(attempt int) {
+	time.Sleep(time.Duration(attempt+1) * 5 * time.Millisecond)
+}
+
 // Read returns at most maxEntries entries from a real directory. The ceiling
 // is enforced while paginating, before an unbounded slice can be allocated.
-func Read(path string, maxEntries int) (_ []os.DirEntry, retErr error) {
+// A concurrent change is retried a bounded number of times; the returned
+// inventory is always one that two independent passes agreed on.
+func Read(path string, maxEntries int) ([]os.DirEntry, error) {
 	if maxEntries < 0 {
 		return nil, fmt.Errorf("directory entry limit must be non-negative")
 	}
+	var err error
+	for attempt := 0; attempt < readAttempts; attempt++ {
+		var entries []os.DirEntry
+		entries, err = readOnce(path, maxEntries)
+		if err == nil {
+			return entries, nil
+		}
+		if !errors.Is(err, ErrChanged) {
+			return nil, err
+		}
+		retryDelay(attempt)
+	}
+	return nil, fmt.Errorf("%w after %d attempts", err, readAttempts)
+}
+
+func readOnce(path string, maxEntries int) (_ []os.DirEntry, retErr error) {
 	before, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
@@ -76,7 +113,7 @@ func Read(path string, maxEntries int) (_ []os.DirEntry, retErr error) {
 		return nil, err
 	}
 	if !sameDirectoryState(initial, afterFirst) {
-		return nil, fmt.Errorf("directory %s changed while enumerating", path)
+		return nil, fmt.Errorf("directory %s changed while enumerating: %w", path, ErrChanged)
 	}
 
 	// A second independently opened pass is required. Metadata alone is not
@@ -95,7 +132,7 @@ func Read(path string, maxEntries int) (_ []os.DirEntry, retErr error) {
 		return nil, err
 	}
 	if !sameDirectoryState(initial, secondInitial) {
-		return nil, fmt.Errorf("directory %s changed while opening verification pass", path)
+		return nil, fmt.Errorf("directory %s changed while opening verification pass: %w", path, ErrChanged)
 	}
 	secondEntries, err := readEntries(secondDir, path, maxEntries)
 	if err != nil {
@@ -108,10 +145,10 @@ func Read(path string, maxEntries int) (_ []os.DirEntry, retErr error) {
 	}
 	pathAfter, pathErr := os.Lstat(path)
 	if pathErr != nil || !sameDirectoryState(initial, secondFinal) || !stableInfo(initial.info, pathAfter) {
-		return nil, errors.Join(pathErr, fmt.Errorf("directory %s changed while enumerating", path))
+		return nil, errors.Join(pathErr, fmt.Errorf("directory %s changed while enumerating: %w", path, ErrChanged))
 	}
 	if !sameEntryNames(entries, secondEntries) {
-		return nil, fmt.Errorf("directory %s changed between inventory passes", path)
+		return nil, fmt.Errorf("directory %s changed between inventory passes: %w", path, ErrChanged)
 	}
 	return entries, nil
 }
