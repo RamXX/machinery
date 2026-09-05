@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "docker": {
+    "image": "python@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc",
+    "platform": "linux/amd64",
+    "memory": "128m",
+    "cpus": "0.5",
+    "pids_limit": 32
+  },
+  "java": {"pin_file": ".java-runtime-pin", "version": "21.0.12.1+1"},
+  "tlc": {"version": "v1.7.4", "sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"},
+  "node": {"minimum_major": 22}
+}

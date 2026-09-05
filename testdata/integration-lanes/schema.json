@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://machinery.dev/schemas/integration-lane-v1.json",
+  "title": "Required native integration suite fragment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "suites"],
+  "properties": {
+    "version": {"const": 1},
+    "suites": {
+      "type": "array", "minItems": 1,
+      "items": {"$ref": "#/$defs/suite"}
+    }
+  },
+  "$defs": {
+    "path": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*$"},
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "lane", "adapter", "package", "source_files", "tests", "runtimes", "timeout", "stdout_limit", "stderr_limit"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "lane": {"const": "required"},
+        "adapter": {"enum": ["go-json", "node-tap"]},
+        "package": {"type": "string", "minLength": 1},
+        "source_files": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/path"}},
+        "tests": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "runtimes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["go", "node", "docker", "java", "tlc"]}},
+        "timeout": {"type": "string", "pattern": "^[1-9][0-9]*(ms|s|m)$"},
+        "stdout_limit": {"type": "integer", "minimum": 1, "maximum": 67108864},
+        "stderr_limit": {"type": "integer", "minimum": 1, "maximum": 67108864}
+      }
+    }
+  }
+}
