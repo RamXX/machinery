@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:44:27Z
-content_hash: "sha256:80270a65681403073bb022767a6df14d07f8b34fca218a0032bb9f85153193c1"
+updated_at: 2026-09-05T19:46:12Z
+content_hash: "sha256:339213f39ea5893de9b76f0bd442051806e27a8537cb98fb74f0e1e8e693f035"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 ---
 
@@ -88,7 +88,24 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 
 ## Notes
+## nd_contract
+status: new
 
+### evidence
+- Backlog-only integration-lane contract authored from actual CI/preflight ordering and bounded runner interfaces.
+- No production edits or heavy preflight; parent-authorized Anchor round-1 repair.
+
+### proof
+- [ ] AC #1: independent execution-lane verification pending
+- [ ] AC #2: independent execution-lane verification pending
+- [ ] AC #3: independent execution-lane verification pending
+- [ ] AC #4: independent execution-lane verification pending
+- [ ] AC #5: independent execution-lane verification pending
+- [ ] AC #6: independent execution-lane verification pending
+- [ ] AC #7: independent execution-lane verification pending
+- [ ] AC #8: independent execution-lane verification pending
+- [ ] AC #9: independent execution-lane verification pending
+- [ ] AC #10: independent execution-lane verification pending
 
 ## History
 - 2026-09-05T19:45:31Z dep_added: blocks MAC-hlae
