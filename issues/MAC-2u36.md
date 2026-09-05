@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:59:56Z
-content_hash: "sha256:df0f56e13386dc2b81fd4a84c2ca9897176cc42597f893bd056170b6fa34b8ae"
+updated_at: 2026-09-05T21:04:08Z
+content_hash: "sha256:1bd3b597386f5bb503e9defd29457d11030b3d11c469f4439e6d71e56f310834"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-2u36
 follows: [MAC-olrx]
@@ -17,60 +17,83 @@ follows: [MAC-olrx]
 
 ## Description
 ## USER INTENT
-Users need Machinery's green results to establish the intended safety claim, not merely artifact shape.
+A user rerunning the installer or ordinary machinery update must get a complete, safely repaired installation at the requested release across all recorded placements, including a missing owned native artifact. Success must mean current content, complete receipt evidence and preserved topology; failure must preserve recoverable pre-run state.
 
 ## Context (Embedded)
-NEXT1: installer always passes --bootstrap-defaults; updatePlan branches to default homes before receipt planning, so recorded native targets stay stale. Receipt-based normal update already exists. NEXT2 plugin discovery is ownership-critical; do not degrade uncertain ownership to blind fallback.
+Two production defects share this full-plan update boundary:
+- NEXT1: install.sh passes --bootstrap-defaults, but updatePlan chooses default homes before the complete recorded home/native plan.
+- Newly reproduced in MAC-2u36: ordinary update retains the missing Codex target in its plan, but refreshDirectInstalls runs home groups first; each child install calls recordHomeInstallLocked -> saveReceipt -> refreshReceiptArtifacts over ALL recorded placements. A missing later Codex file aborts the first child's receipt inventory before native repair is reached.
+Actual isolated CLI diagnostic on frozen v1 99956740ae5559262790a9473b5597c1775928f2 failed in 35.820s after verified binary replacement and first home-group mutation: "inventory installed artifacts for receipt: digest .../.codex/agents/machinery-fsm-author.toml: lstat ...: no such file or directory". It did not assert final rollback state. This disproves the earlier assumption that the exact missing-file ordinary run would already pass; it does NOT change the required successful repair behavior.
+The existing ordinary intact convergence and edited-regular-file repair controls pass. Metadata validity, path/type safety and plugin ownership are distinct from repairable installed content drift or absence.
 
-## Ownership
-Own only these paths and directly associated tests: internal/install/update.go, internal/install/bootstrap_receipt_test.go. You are not alone in this codebase; preserve other edits and coordinate any shared-file changes with dispatcher.
+## Scope decision and Ownership
+This existing P0 bug owns both defects because both prevent the same recorded-plan convergence and use the same direct-refresh transaction. No separate issue or artificial dependency is created.
+Production ownership expands explicitly from internal/install/update.go to:
+- internal/install/update.go: receipt-aware bootstrap planning, full-plan refresh coordination and final commit/publication sequencing.
+- internal/install/receipt.go: bounded receipt accumulation/finalization necessary for this transaction, preserving normal receipt validation/persistence.
+- internal/install/install.go: child placement/receipt interaction needed for authenticated parent-owned full-plan refresh; preserve normal standalone install recording.
+Tests: internal/install/bootstrap_receipt_test.go; directly associated regression additions in internal/install/receipt_test.go and internal/install/install_test.go only when required by the changed receipt/standalone-install boundary. Frozen existing assertions cannot be changed without explicit independent reviewer authorization.
+Read-only consumers unless a concrete need is separately reviewed: internal/install/targets.go, internal/install/transaction.go, internal/install/lock.go, cmd/machinery/install.go and cmd/machinery/update.go. No blanket CLI/target/lock/journal rewrite is included. You are not alone in the codebase; preserve others' edits and coordinate shared paths with dispatcher.
 
 ## Boundary Map
 PRODUCES:
-- internal/install/update.go -> hardened behavior and regression proof
-- internal/install/bootstrap_receipt_test.go -> hardened behavior and regression proof
+- internal/install/update.go -> complete recorded-plan convergence, including safely missing owned native artifacts, under the existing update transaction.
+- internal/install/receipt.go -> validated complete receipt publication coordinated with successful full direct refresh.
+- internal/install/install.go -> bounded child-refresh participation while ordinary install continues to persist validated receipts.
+- internal/install/bootstrap_receipt_test.go -> real CLI RED/GREEN matrix for both defects and preserved controls.
+- internal/install/receipt_test.go -> focused receipt-publication regression proof if needed.
+- internal/install/install_test.go -> focused standalone-install regression proof if needed.
 CONSUMES:
-- Existing Machinery source interfaces.
-  spec: updatePlan(opts UpdateOptions) (refreshPlan, error)
+- Existing internal/install/update.go.
+  spec: updatePlan(opts UpdateOptions) (refreshPlan, error); refreshDirectInstalls(binary, source string, plan refreshPlan, run commandRunner, out io.Writer) error.
+- Existing internal/install/receipt.go.
+  spec: loadReceipt() (installReceipt, bool, error); saveReceipt(receipt installReceipt) (retErr error); refreshReceiptArtifacts(receipt *installReceipt) error; recordHomeInstallLocked(homes []string, copyAll bool) error; recordTargetInstallLocked(names []string, copyAll bool) error.
+- Existing internal/install/install.go.
+  spec: Install(opts Options) error; installLocked(opts Options) (retErr error).
+  fields: Options.Homes []string; Targets []string; From string; Copy bool; Record bool. Current CLI passes Record: true.
+- Existing internal/install/transaction.go.
+  spec: beginArtifactTransaction(paths []string) (*artifactTransaction, error); delegatedInstallOperation() bool; delegatedArtifactTransaction(paths []string) (*artifactTransaction, error).
+  source: authenticated delegated children require the parent's prepared journal and coverage of their exact artifact paths; parent transaction snapshots binary, direct placements and receipt, and owns final commit/rollback.
+- Existing internal/install/targets.go.
+  spec: installTargets(names []string, src string, copyAll bool, out io.Writer, before func(string) error) error.
+  source: validates target source before placement; receipt recording is in installLocked, not this function.
 
 ### Story Acceptance Criteria
-1. When a valid receipt exists, --bootstrap-defaults uses its complete recorded home/native/plugin target plan so installer rerun converges identically to machinery update; no-receipt first bootstrap retains defaults.
-2. Malformed/stale/unsafe receipt fails closed with actionable diagnostic, never silently selects defaults. Explicit homes/targets remain incompatible with bootstrap as before.
-3. Positive real isolated install followed by installer-equivalent rerun updates binary and all recorded targets, verifies receipts/digests, and is idempotent; test multiple homes plus native targets.
-4. Negative tests cover corrupt receipt, plugin ownership discovery failure even under --skip-plugins, disappeared target, mixed copy modes and interrupted update rollback without altering unrelated host files.
-5. Integration uses temporary home/target directories and actual built CLI update/install flow, not only updatePlan. No live user installation mutations in story tests.
+1. Valid supported receipt plus --bootstrap-defaults uses the same complete recorded home/native/plugin plan and relevant discovery as ordinary machinery update without selectors. Preserve per-group copy/symlink modes. No-receipt first bootstrap retains plugin-aware defaults; explicit homes/targets remain incompatible with bootstrap.
+2. Fail closed with actionable diagnostics and no silent defaults for malformed/duplicate/unknown/trailing JSON, unsupported schemas, invalid topology/inventory/digest encoding, unsafe receipt permissions/type, unsafe artifact or parent path/type substitutions, and uncertain plugin ownership, including --skip-plugins. Supported schema 1 is not rejected merely because it is older. Valid receipt plus edited/missing owned regular artifact with unchanged safe parents/topology is repairable; absence alone must not be classified as unsafe ownership. Existing safety validation must not be relaxed.
+3. Actual ordinary and bootstrap full-plan update succeeds for intact installs, an edited regular owned Codex artifact, and a missing regular owned native artifact, restoring exact current-release content and binary, complete receipt topology/digests/plugin obligations, both mixed-mode home groups and Codex/OpenCode targets, unrelated-file preservation and same-release idempotence. Exact missing-file fixture: remove only temporary HOME/.codex/agents/machinery-fsm-author.toml after valid receipt recording; no unsafe parent/type substitution. Test both native copy-mode groups missing an owned file in the same run as a bounded guard against a fix that merely repairs one hardcoded target first. During RED the ordinary missing-file case is EXPECTED TO FAIL behaviorally on unchanged production; intact ordinary and edited-file ordinary cases remain passing controls.
+4. Retain actual later-target failure after binary, home and earlier native mutations with complete pre-run restoration of binary, homes/native artifacts, receipt and unrelated sentinels. Also exercise that rollback with a safely missing owned artifact in pre-state: absence must be restored as absence, not replaced by a half-repaired result. Retain real interrupted journal recovery at CLI startup and explicitly separate its pre-mutation interruption boundary from post-mutation rollback proof. Preserve independent malformed/schema/path/type/plugin-ownership negatives and mixed-copy-mode checks.
+5. Integration uses actual built release/CLI install/update subprocesses, real checksummed archives and temporary home/config/target/binary roots. No mocks, stubs, skip-if-missing or env-gated omissions. No live installation mutations. Machinery product behavior/tests remain standalone with no Paivot/pvg/nd, label or commit-convention dependency.
+6. A full direct-refresh operation must not require complete final artifact inventory before remaining selected placements can repair safely missing owned files. Keep one parent-owned bounded transaction covering the binary, full selected direct plan and receipt. Publish a complete normalized receipt with real refreshed digests only after all selected direct placements and source checks succeed, before final direct transaction commit; any final inventory/publication failure must fail and roll back the whole direct update. Do not drop missing entries, retain fabricated/stale digest evidence, invent success for an incomplete plan, or bypass final validation. Standalone install continues to record validated successful topology. Any internal receipt deferral/coordination must be restricted to authenticated parent-owned journal scope and must not become a user/env-only skip-receipt backdoor; forged/absent parent authority, unprepared journal or out-of-scope paths remain rejected. Host-managed plugin refresh retains its existing post-direct-commit ownership/obligation semantics; no new claim of atomic host-plugin rollback.
 
 ## Testing Requirements
-- Hard TDD explicitly authorized. RED author commits tests first; intended behavioral assertions fail on unchanged production, with a passing control. Compile/import/infra errors are not RED evidence. PM independently replays RED. GREEN implementer does not edit/delete frozen RED tests or fixtures; any repair requires explicit reviewer authorization and re-RED.
-- Unit tests plus Integration tests: MANDATORY (no mocks). Real CLI/filesystem/service path, no stubs, no skip-if-missing. Missing prerequisites block rather than pass.
-- Commands: go test ./internal/install -run 'Bootstrap|Receipt|UpdatePlan'; scoped cmd install/update integration using temporary configured roots.
-- No full scripts/preflight.sh during this story; final epic gate owns heavy preflight. No GitHub push, sync, release, or remote mutation. Local story worktree only.
+- Hard TDD remains explicitly authorized. After independent PM reviews this scope/contract and authorizes the revised tests, a RED-only author revises the disputed edited/missing cases, adds the bounded multi-missing and missing-pre-state rollback proof, and any focused new boundary tests needed for AC6. No production edits before independently approved RED.
+- Preserve original candidate 99956740ae5559262790a9473b5597c1775928f2, test SHA256 8ed8636856305d50b9517c4087ecfff3582dac4fb467f92d8f49f3c836916329 and /tmp/machinery-MAC-2u36-red.qRk5DC. Existing 36-leaf replay: 32 pass, 4 fail, 0 skip, 271.751s; only three original failures are valid bootstrap defect proof. The fourth stale_artifact rejection is superseded. Missing-file ordinary FAIL 35.820s is new genuine defect evidence, separate from earlier edited-file ordinary PASS 36.508s.
+- Preserve complete-recorded-plan, defaults/selectors, intact normal/bootstrap convergence, plugin obligations, real later-target rollback, interrupted recovery, and all legitimate safety negatives. Rename obsolete stale_artifact/disappeared_target rejection cases as repair-success requirements. Only specifically reviewer-authorized frozen-test changes are allowed.
+- Fresh replay: go test -count=1 -timeout=10m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json. Timeout increased from 5m because the existing real replay already consumed 271.751s and the newly required paired repair/rollback cases add CLI executions; do not relax assertions or skip cases to fit the old timeout.
+- Focused receipt/standalone-install/delegated-authority tests selected by actual test names introduced or affected. GREEN runs go test -count=1 -timeout=15m ./internal/install ./cmd/machinery for ordinary native package regression coverage. No full scripts/preflight.sh here; final epic gate owns heavy preflight.
+- Record SHA, exact command, named leaf inventory, zero skips, assertion failure causes and passing controls. Compile/import/fixture/infra/timeout errors are not behavioral RED. Unexpected missing-file receipt-inventory failure is a valid success-contract assertion failure, not an acceptable permanent rejection.
+- If internal deferred receipt behavior is introduced, add proof that normal standalone install still publishes correct receipts, missing/forged/out-of-scope parent authority cannot enable it, and final publication failure rolls back real prior mutations. Reuse existing authenticated delegation mechanisms; implementation details require evidence, not an assumed new public API.
+- Separate independent PM replays revised RED before approval/freezing. GREEN preserves exact approved test/fixture/config bytes; any later repair requires explicit reviewer authorization and re-RED.
 
 ## OUT OF SCOPE
-- Other assessment subsystems are separate epic stories; include small directly related fixes needed for this guarantee rather than inventing exclusions.
-- Global heavy preflight, main merge and local release binary belong to final epic gate.
+- Arbitrary missing-root recreation, changed unsafe parents, and ownership uncertainty: this story preserves their safety boundary; it does not authorize blind repair.
+- Redesign of host-managed plugin transactions, lock/journal format or public install selectors: outside the direct receipt-publication defect; report a concrete need for review before expanding.
+- Other assessment subsystems stay in sibling stories. No pushes, sync, remote mutation, installed binary/plugin/skill/agent replacement, dev-link or healthy worktree cleanup. NIL uses the installed product.
+- Final heavy preflight, main merge and isolated release candidate belong to epic gate MAC-ou97.
 
 ## DIFF BUDGET
-- ~2-4 files, under 450 changed LOC; material overrun requires PM investigation, not weakened requirements.
+Expected 4-6 files, under 1100 total changed LOC: approximately 750 test LOC including the existing 469-line real fixture, and 350 production LOC across the three named files. This replaces the disproven 450-LOC estimate after newly reproduced receipt-publication scope. Do not pad to the budget; material overrun or another production file requires PM investigation and explicit scope review, not weaker tests.
+
+## Dependencies
+Parent MAC-ui8a; remains blocking MAC-gcrr and MAC-ou97. No new inter-story dependency: one developer owns both coupled installer defects and one independent PM reviews the full outcome. No other sibling implementation declares the three owned installer source seams. Consumer guidance and epic acceptance remain blocked until this story is accepted.
 
 ## MANDATORY SKILLS
-- developer for implementation; codebase-memory for discovery; pm_acceptor for independent acceptance.
+- developer for RED/GREEN roles; codebase-memory for source discovery; pm_acceptor for independent scope/test authorization, RED replay and acceptance.
 
 ## Delivery Requirements
-Use pvg story deliver, never close. Append RED/GREEN SHAs, exact commands and outputs, test inventory, independent proof per AC, and any residual limits to shared nd. Do not use pushing pvg story merge.
-
-## nd_contract
-status: new
-
-### evidence
-- Created 2026-09-05; source signatures verified at assessment base 497419ab4512fcff765cd5feb27aed4c67b5608d.
-
-### proof
-- [ ] AC #1: independently verified
-- [ ] AC #2: independently verified
-- [ ] AC #3: independently verified
-- [ ] AC #4: independently verified
-- [ ] AC #5: independently verified
+This repaired scope requires independent PM review before author re-RED; the previous 20:55:32Z test-edit authorization did not authorize implementing this newly reproduced defect. Preserve that review as history and obtain explicit expanded test authorization. Do not deliver or approve v1 unchanged.
+Use pvg story deliver, never close. Append RED/GREEN SHAs, exact commands/results, inventory, changed-file rationale, per-AC proof and residual limits. Product has no dependency on these development coordination tools.
 
 ## Acceptance Criteria
 
@@ -257,6 +280,66 @@ status: in_progress
 - [x] AC #3: real normal control passes; bootstrap staleness reproduced with digests and idempotence.
 - [x] AC #4: real mutation rollback and interrupted recovery controls pass; bootstrap skipped-target failure reproduced.
 - [x] AC #5: real built CLI, temporary scopes, unchanged live installation digest.
+
+
+## Historical canonical description before receipt-ordering triage R2
+The following original description is preserved verbatim as quoted history; the current Description is authoritative.
+
+> ## USER INTENT
+> Users need Machinery's green results to establish the intended safety claim, not merely artifact shape.
+> 
+> ## Context (Embedded)
+> NEXT1: installer always passes --bootstrap-defaults; updatePlan branches to default homes before receipt planning, so recorded native targets stay stale. Receipt-based normal update already exists. NEXT2 plugin discovery is ownership-critical; do not degrade uncertain ownership to blind fallback.
+> 
+> ## Ownership
+> Own only these paths and directly associated tests: internal/install/update.go, internal/install/bootstrap_receipt_test.go. You are not alone in this codebase; preserve other edits and coordinate any shared-file changes with dispatcher.
+> 
+> ## Boundary Map
+> PRODUCES:
+> - internal/install/update.go -> hardened behavior and regression proof
+> - internal/install/bootstrap_receipt_test.go -> hardened behavior and regression proof
+> CONSUMES:
+> - Existing Machinery source interfaces.
+>   spec: updatePlan(opts UpdateOptions) (refreshPlan, error)
+> 
+> ### Story Acceptance Criteria
+> 1. When a valid receipt exists, --bootstrap-defaults uses its complete recorded home/native/plugin target plan so installer rerun converges identically to machinery update; no-receipt first bootstrap retains defaults.
+> 2. Malformed/stale/unsafe receipt fails closed with actionable diagnostic, never silently selects defaults. Explicit homes/targets remain incompatible with bootstrap as before.
+> 3. Positive real isolated install followed by installer-equivalent rerun updates binary and all recorded targets, verifies receipts/digests, and is idempotent; test multiple homes plus native targets.
+> 4. Negative tests cover corrupt receipt, plugin ownership discovery failure even under --skip-plugins, disappeared target, mixed copy modes and interrupted update rollback without altering unrelated host files.
+> 5. Integration uses temporary home/target directories and actual built CLI update/install flow, not only updatePlan. No live user installation mutations in story tests.
+> 
+> ## Testing Requirements
+> - Hard TDD explicitly authorized. RED author commits tests first; intended behavioral assertions fail on unchanged production, with a passing control. Compile/import/infra errors are not RED evidence. PM independently replays RED. GREEN implementer does not edit/delete frozen RED tests or fixtures; any repair requires explicit reviewer authorization and re-RED.
+> - Unit tests plus Integration tests: MANDATORY (no mocks). Real CLI/filesystem/service path, no stubs, no skip-if-missing. Missing prerequisites block rather than pass.
+> - Commands: go test ./internal/install -run 'Bootstrap|Receipt|UpdatePlan'; scoped cmd install/update integration using temporary configured roots.
+> - No full scripts/preflight.sh during this story; final epic gate owns heavy preflight. No GitHub push, sync, release, or remote mutation. Local story worktree only.
+> 
+> ## OUT OF SCOPE
+> - Other assessment subsystems are separate epic stories; include small directly related fixes needed for this guarantee rather than inventing exclusions.
+> - Global heavy preflight, main merge and local release binary belong to final epic gate.
+> 
+> ## DIFF BUDGET
+> - ~2-4 files, under 450 changed LOC; material overrun requires PM investigation, not weakened requirements.
+> 
+> ## MANDATORY SKILLS
+> - developer for implementation; codebase-memory for discovery; pm_acceptor for independent acceptance.
+> 
+> ## Delivery Requirements
+> Use pvg story deliver, never close. Append RED/GREEN SHAs, exact commands and outputs, test inventory, independent proof per AC, and any residual limits to shared nd. Do not use pushing pvg story merge.
+> 
+> ## nd_contract
+> status: new
+> 
+> ### evidence
+> - Created 2026-09-05; source signatures verified at assessment base 497419ab4512fcff765cd5feb27aed4c67b5608d.
+> 
+> ### proof
+> - [ ] AC #1: independently verified
+> - [ ] AC #2: independently verified
+> - [ ] AC #3: independently verified
+> - [ ] AC #4: independently verified
+> - [ ] AC #5: independently verified
 
 
 ## History
