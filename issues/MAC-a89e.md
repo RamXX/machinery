@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T23:46:44Z
-content_hash: "sha256:2b301d94ee14ffd464375a10e761d8810d70fb38c9e4ea67770951c1f8ab5036"
+content_hash: "sha256:c2b01014326b653c0855e054f167868b35f8a88e9b5bbbc2b838a8870875906f"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce]
 ---
@@ -882,3 +882,23 @@ DISCOVERED_BUG:
   triage: bounded same-story documentation correction recommended; no new issue created by this reviewer.
 
 No other blocking gap found. Full GREEN proof above remains usable; final acceptance withheld only for the precise documentation correction.
+
+### 2026-09-05T23:46:44Z ramirosalas
+REJECTED [2026-09-05]: DOCS_STALE only; full independent GREEN review is recorded in the preceding PM comment.
+EXPECTED: AC3 requires explicit baseline to remain deliberate debt acceptance with clear review guidance; routine artifact/date regeneration must not advise accepting new debt.
+DELIVERED: docs/brownfield-team-guide.md:451-452 still recommends rerunning machinery baseline to restamp a legacy YYYY-MM ratchet.
+GAP: this recommends a debt-accepting operation as stamp-only migration and misstates default date behavior, which reuses the existing YYYY-MM date. Independent TestResolveBaselineDateRequiresDeterministicSourceAndReusesExisting passed and confirms reuse.
+FIX: dispatcher has explicitly authorized the exact additional legacy-date bullet in the already-scoped fifth document. Explain legacy YYYY-MM remains supported and ages from month start; remove routine baseline-for-restamping advice. Any deliberate baseline reference must preserve debt-review requirements and must not imply a default date upgrade. No new date behavior or broader docs ownership; no production or frozen test/fixture changes. All 40 selected tests independently pass, exact frozen hashes and verify-tdd pass; 4 scanner findings are precisely adjudicated nonstubs in the full review.
+## nd_contract
+status: rejected
+
+### evidence
+- GREEN de9745067382c5de25f05d69ea05c2808eb0b2e7: independent 37 gates + 3 downstream leaves PASS, 0 FAIL, 0 SKIP.
+- Exact frozen RED e95be63019d89b93ae527f27ae1ce43326def038 test bytes unchanged; native verify-tdd PASS.
+- Sole gap: stale legacy-date advice at docs/brownfield-team-guide.md:451-452; narrow same-file correction authorized by dispatcher.
+
+### proof
+- [x] AC #1: safe deterministic generator advice independently verified.
+- [x] AC #2: real offender remains rejected after all routine advice.
+- [ ] AC #3: runtime/help/output pass, but remaining legacy-date documentation must stop advising routine debt acceptance.
+- [x] AC #4: positive no-debt and negative debt-growth controls pass.
