@@ -1,17 +1,18 @@
 ---
 id: MAC-p8ce
 title: "Bind consumer READS to each event edge"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:07:41Z
-content_hash: "sha256:bc02542a4573f0afb3cd6610bd8ff343cd59b19e17be047f9cec2f1ff569e90e"
+updated_at: 2026-09-05T22:43:57Z
+content_hash: "sha256:5d4a1fd7bb435b0169b683427d10382c88c27baff531108d1f27576252602841"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p8ce
+follows: [MAC-olrx]
 ---
 
 ## Description
@@ -323,9 +324,13 @@ status: delivered
 - 2026-09-05T19:56:26Z status: in_progress -> in_progress
 - 2026-09-05T19:58:20Z status: in_progress -> in_progress
 - 2026-09-05T20:07:41Z status: in_progress -> open
+- 2026-09-05T22:43:57Z status: open -> in_progress
+- 2026-09-05T22:43:57Z auto-follows: linked to predecessor MAC-olrx
+- 2026-09-05T22:43:57Z claimed by dev-MAC-p8ce
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
+- Follows: [[MAC-olrx]]
 
 ## Comments
