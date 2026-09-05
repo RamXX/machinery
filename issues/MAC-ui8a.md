@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:42:17Z
-content_hash: "sha256:12398065bed8c9f421b33a79d0214c712fd540bb90309fea650c061a5cafbeef"
+updated_at: 2026-09-05T19:42:30Z
+content_hash: "sha256:147a473b01e4f8fc67faf6e99827e78e8026cf34b1ff9f377f80f7c3880c3469"
 ---
 
 ## Description
@@ -63,6 +63,8 @@ BACKLOG READY FOR ANCHOR — 2026-09-05
 One epic, 16 bounded children. Scoped pvg lint --backlog --epic MAC-ui8a --json => [] (zero errors and review findings). pvg rtm check --epic MAC-ui8a => passed, 0 tagged requirements, 17 records checked. pvg nd dep cycles => none; stale => none. No close-eligible epic while work remains (expected). Source worktree clean; no branches checked out or production edits by Sr PM. All code fixes hard-tdd; pure integrated capstone uses safe/unsafe mutation sensitivity rather than manufactured RED. Architecture MAC-l7m0 explicitly blocked pending user/architect; implementation MAC-vx24 cannot dispatch before it.
 NEXT mapping: #1 MAC-2u36; #2 retain failclosed discovery policy documented MAC-gcrr; #3 MAC-olrx; #4 MAC-2n83; #5 current root-registry workaround MAC-gcrr (feature extension unapproved); #6 platform extension pending user, emulation workaround documented; #7/#8 MAC-gcrr plus release MAC-hy71; #9 MAC-a89e; #10/#11/#14 concrete model features inventoried pending scope approval; #12 MAC-p8ce; #13 hierarchy deferred until actual access-boundary need.
 Workflow observation (local tracker only, no external tool fix): pvg issues create with canonical nested headings produces duplicate managed sections; nd update --description inserts ahead of authored Markdown headings instead of replacing entire authored body. Repaired with parent-authorized pvg nd edit and exact apply_patch-backed editor, preserving notes/history/contracts. nd EDITOR requires a single executable path, not command plus arguments.
+ANCHOR ROUND-1 RULE 1 OWNERSHIP CLARIFICATION: The repair must explicitly own scripts/preflight.sh and affected .github/workflows/ci.yml/formal.yml/nightly.yml surfaces; any shared test-lane runner/closed inventory, pinned test-image or engine fixture/manifests, Makefile entrypoint and shell inventory entries if introduced; and the capstone's invocation/selected-test assertions. Add producer dependencies from affected runtime stories to the final wiring validation/capstone while keeping early reusable lane scaffolding executable without cycles. A selected named integration lane is different from t.Skip when Docker is missing: ordinary native suites may deliberately exclude an inventoried service lane, but the required local/CI lane must fail on missing prerequisites or zero selected/executed cases and must be included in final completion.
+
 ## ANCHOR REVIEW (backlog_review, round 1 of 3)
 REVIEW_RESULT: REJECTED
 
