@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:35:06Z
-content_hash: "sha256:e423412fa5dae453d35f238565ba84caccc054060a74a49df1fdafcf30077447"
+updated_at: 2026-09-05T19:36:14Z
+content_hash: "sha256:d29100698d0c2a54293329d4ff8bf44ad9209f4b05eaa3de776eef43d40ba35e"
 blocked_by: [MAC-l7m0, MAC-sh60, MAC-olrx, MAC-2n83, MAC-p7jd, MAC-lnu6]
 blocks: [MAC-gcrr]
 ---
@@ -101,7 +101,9 @@ status: new
 
 
 ## Notes
-
+CONSUMES:
+- MAC-lnu6: skills/machinery/references/build-md-template.md
+  source: Exact-byte frozen-test guidance replacing unsafe tokens-equal authorization; process integration modifies this template sequentially.
 
 ## History
 - 2026-09-05T19:35:06Z dep_added: blocked_by MAC-l7m0
