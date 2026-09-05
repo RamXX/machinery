@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -28,6 +29,7 @@ import (
 // local values; no command runner or replacement executable is simulated.
 type bootstrapRelease struct {
 	old, next, source string
+	endpoint          string
 	nextBytes         []byte
 	hold              atomic.Bool
 	broken            atomic.Bool
@@ -95,6 +97,7 @@ func bootstrapReleaseFixture(t *testing.T) *bootstrapRelease {
 		}
 	}))
 	t.Cleanup(server.Close)
+	f.endpoint = server.URL
 	t.Cleanup(func() { close(f.release) })
 	f.old, f.next = filepath.Join(root, "old"), filepath.Join(root, "next")
 	for i, binary := range []string{f.old, f.next} {
@@ -259,8 +262,20 @@ func bootstrapState(t *testing.T, f bootstrapInstall) map[string]string {
 			t.Fatal(err)
 		}
 	}
-	result["receipt"] = string(bootstrapRead(t, filepath.Join(f.config, "install.json")))
+	result["receipt"] = bootstrapReceiptState(t, filepath.Join(f.config, "install.json"))
 	return result
+}
+
+func bootstrapReceiptState(t *testing.T, path string) string {
+	t.Helper()
+	info, err := os.Lstat(path)
+	if os.IsNotExist(err) {
+		return "absent"
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprintf("%v:%s", info.Mode(), bootstrapRead(t, path))
 }
 
 func TestBootstrapReceiptPlan(t *testing.T) {
@@ -433,6 +448,29 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 	}
 	reference := bootstrapSeed(t, &bootstrapRelease{old: release.next, source: repo})
 	expected := bootstrapContentState(t, reference)
+	t.Run("parent_finalization", func(t *testing.T) {
+		// A missing receipt has no remembered copy modes. Use an explicit all-copy
+		// plan and an independently installed release reference for that plan.
+		allCopy := bootstrapSeed(t, &bootstrapRelease{old: release.next, source: repo})
+		args := []string{"install", "--from", repo, "--copy"}
+		for _, name := range []string{"custom-a", "custom-b", "copy-a", "copy-b"} {
+			args = append(args, "--home", filepath.Join(allCopy.home, name))
+		}
+		bootstrapCommand(t, allCopy.root, allCopy.env, allCopy.binary, args...)
+		bootstrapCommand(t, allCopy.root, allCopy.env, allCopy.binary, "install", "--from", repo, "--target", "codex", "--target", "opencode", "--copy")
+		copyExpected := bootstrapContentState(t, allCopy)
+		for _, absent := range []bool{false, true} {
+			for _, fault := range []bool{false, true} {
+				t.Run(fmt.Sprintf("absent_%t_close_fault_%t", absent, fault), func(t *testing.T) {
+					want := expected
+					if absent {
+						want = copyExpected
+					}
+					bootstrapFinalizationCase(t, release, want, absent, fault)
+				})
+			}
+		}
+	})
 	for _, authority := range []string{"absent", "forged", "unprepared", "out_of_scope"} {
 		t.Run("receipt_authority_"+authority, func(t *testing.T) { bootstrapAuthorityCase(t, release, repo, authority) })
 	}
@@ -591,6 +629,161 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 			t.Errorf("recovery journal remains: %v", err)
 		}
 	})
+}
+
+type bootstrapObserver func([]byte) (int, error)
+
+func (observe bootstrapObserver) Write(p []byte) (int, error) { return observe(p) }
+
+func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected map[string]string, absent, fault bool) {
+	t.Helper()
+	f := bootstrapSeed(t, release)
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MACHINERY_INTERNAL_TEST_LOCK_ROOT", cache)
+	receiptPath := filepath.Join(f.config, "install.json")
+	opts := UpdateOptions{Version: "v9.9.2", Repo: "fixture/machinery", Executable: f.binary, SkipPlugins: true}
+	wantReceipt := f.receipt
+	wantReceipt.Artifacts = append([]receiptArtifact(nil), f.receipt.Artifacts...)
+	children := 4 // two home groups, then the two distinct native copy groups
+	if absent {
+		if err := os.Remove(receiptPath); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"custom-a", "custom-b", "copy-a", "copy-b"} {
+			opts.Homes = append(opts.Homes, filepath.Join(f.home, name))
+		}
+		opts.Targets, opts.Copy = []string{"codex", "opencode"}, true
+		wantReceipt.HomeInstalls = []homeInstall{{Homes: opts.Homes, Copy: true}}
+		wantReceipt.Targets = []targetInstall{{Target: "codex", Copy: true}, {Target: "opencode", Copy: true}}
+		wantReceipt.HostPlugins = nil
+		children = 2
+	}
+	before := bootstrapState(t, f)
+	journalRoot := filepath.Join(f.config, installJournalDir)
+	canonicalRoot, err := filepath.EvalSymlinks(f.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical := func(path string) string { return strings.ReplaceAll(path, f.root, canonicalRoot) }
+	checkPrepared := func() {
+		journal, phase, err := loadInstallJournal(journalRoot)
+		if err != nil || phase != "prepared" {
+			t.Fatalf("finalization is not inside prepared uncommitted journal: %s %v", phase, err)
+		}
+		covered := map[string]bool{}
+		for _, item := range journal.Items {
+			covered[canonical(item.Target)] = true
+		}
+		paths := []string{f.binary, receiptPath}
+		for _, artifact := range wantReceipt.Artifacts {
+			paths = append(paths, artifact.Path)
+		}
+		for _, path := range paths {
+			if !covered[canonical(path)] {
+				t.Errorf("prepared journal omits selected artifact %s", path)
+			}
+		}
+	}
+	completed, publications := 0, 0
+	unchanged, placements := true, false
+	var output bytes.Buffer
+	opts.Out = bootstrapObserver(func(p []byte) (int, error) {
+		output.Write(p)
+		if bytes.Contains(p, []byte("skill + agents ->")) || bytes.Contains(p, []byte("installed Codex agents ->")) || bytes.Contains(p, []byte("installed OpenCode agents + commands")) {
+			completed++ // output is relayed only after the actual child returns
+			if bootstrapReceiptState(t, receiptPath) != before["receipt"] {
+				t.Errorf("child %d published receipt before parent finalization", completed)
+				unchanged = false
+			}
+			if completed == children {
+				checkPrepared()
+				placements = reflect.DeepEqual(bootstrapContentState(t, f), expected) && bytes.Equal(bootstrapRead(t, f.binary), release.nextBytes)
+				if !placements {
+					t.Error("final child did not leave independently expected complete release placements")
+				}
+			}
+		}
+		return len(p), nil
+	})
+	oldBase, oldAPI, oldClose := githubBase, apiBase, closeInstallFile
+	githubBase, apiBase = release.endpoint, release.endpoint
+	t.Cleanup(func() { githubBase, apiBase, closeInstallFile = oldBase, oldAPI, oldClose })
+	var closeErr error
+	closeInstallFile = func(file *os.File) error {
+		if canonical(filepath.Dir(file.Name())) != canonical(filepath.Join(journalRoot, installJournalScratch)) || !strings.HasPrefix(filepath.Base(file.Name()), "receipt-") {
+			return oldClose(file)
+		}
+		publications++
+		if completed != children || !placements || !unchanged {
+			t.Error("parent receipt publication preceded complete children/placements/unchanged receipt")
+			return oldClose(file)
+		}
+		checkPrepared()
+		if bootstrapReceiptState(t, receiptPath) != before["receipt"] {
+			t.Error("persisted receipt changed before parent receipt close")
+		}
+		wantReceipt.SchemaVersion = receiptSchema
+		for i := range wantReceipt.Artifacts {
+			digest, err := artifactTreeDigest(wantReceipt.Artifacts[i].Path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantReceipt.Artifacts[i].Digest = digest
+		}
+		normalizeReceipt(&wantReceipt)
+		want, err := json.MarshalIndent(wantReceipt, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(bootstrapRead(t, file.Name()), append(want, '\n')) {
+			t.Error("parent final scratch receipt lacks exact normalized topology/inventory/current digests")
+		}
+		if err := oldClose(file); err != nil {
+			t.Fatalf("first real receipt close failed: %v", err)
+		}
+		if fault {
+			closeErr = file.Close()
+			t.Logf("injected real final receipt close at %s: %v", file.Name(), closeErr)
+			return closeErr
+		}
+		return nil
+	}
+	// Bound the real in-process parent too; no replacement runner is supplied.
+	deadline := time.AfterFunc(90*time.Second, func() { panic("real parent Update exceeded 90-second operation bound") })
+	defer deadline.Stop()
+	_, updateErr := Update(opts)
+	if completed != children || publications != 1 {
+		t.Errorf("missing parent finalization boundary: children=%d/%d publications=%d; err=%v", completed, children, publications, updateErr)
+	}
+	if fault {
+		if !errors.Is(closeErr, os.ErrClosed) || !errors.Is(updateErr, os.ErrClosed) {
+			t.Errorf("real late publication close fault was not exercised/retained: injected=%v returned=%v", closeErr, updateErr)
+		}
+		if strings.Contains(output.String(), "machinery update complete:") || !reflect.DeepEqual(before, bootstrapState(t, f)) {
+			t.Error("publication fault committed or failed exact binary/home/native/receipt rollback")
+		}
+	} else if updateErr != nil {
+		t.Errorf("no-fault complete publication failed: %v", updateErr)
+	} else {
+		got, exists, err := loadReceipt()
+		if err != nil || !exists || !reflect.DeepEqual(got, wantReceipt) || !strings.Contains(output.String(), "machinery update complete:") {
+			t.Errorf("no-fault final receipt/commit differs from expected complete release: %v", err)
+		}
+	}
+	if _, err := os.Lstat(journalRoot); !os.IsNotExist(err) {
+		t.Errorf("finalization left journal behind: %v", err)
+	}
+	// Same test-only cache mapping as the real children: actual lock reacquisition.
+	lock, err := acquireInstallOperationLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lock.Release(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func bootstrapAuthorityCase(t *testing.T, release *bootstrapRelease, source, authority string) {
