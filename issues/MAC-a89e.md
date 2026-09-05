@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:41:11Z
-content_hash: "sha256:cac45e064986cfdc3424d048854ab12b1f903c0852cdc02715f403d8089a7c02"
+updated_at: 2026-09-05T23:41:17Z
+content_hash: "sha256:3f548ec95c4b9934e79bcd191061a4a8018ead4b808b7c8fde2654a0d03ed892"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx, MAC-p8ce]
@@ -429,6 +429,7 @@ Preserved verbatim as quoted history; current Description is authoritative.
 - 2026-09-05T23:34:48Z status: open -> in_progress
 - 2026-09-05T23:34:48Z auto-follows: linked to predecessor MAC-p8ce
 - 2026-09-05T23:34:48Z claimed by dev-MAC-a89e
+- 2026-09-05T23:41:17Z status: in_progress -> in_progress
 
 ## Links
 - Parent: [[MAC-ui8a]]
