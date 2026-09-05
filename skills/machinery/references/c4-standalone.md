@@ -526,16 +526,35 @@ Anywhere in the document, by convention directly above the event-contract sectio
 about the whole contract, so it arms EVERY event-contract row the document carries (the contract is
 legitimately split across several tables). Armed, Gx-trace holds each row to two obligations:
 
-- some matrix line naming the event whole-token declares `READS{field, ...}` (the same declaration
-  syntax the opt-in payload-sufficiency check has always read; the natural home is a "consumed
-  events" section of the consuming machine's matrix). No declaration is an ERROR naming the row and
-  the event.
+- a matrix row naming the event whole-token declares `READS{field, ...}` and names the exact
+  event-contract participant in an explicit `consumer` column. Backticks and parenthesized
+  annotations are cleaned from participant names, as in G2. The matrix filename identifies a
+  machine, not its architectural consumer. No declaration is an ERROR naming the event and consumer.
 - every declared field appears whole-token in THAT ROW's payload cell. A field the payload does not
   carry is an ERROR: the payload-sufficiency drift, which is a warning while unarmed.
 
+For example, two consumers can read different fields of the same event:
+
+| event | consumer | reads |
+|---|---|---|
+| `ORDER_PAID` | `shipmentSvc` | READS{Order.id} |
+| `ORDER_PAID` | `billingSvc` | READS{Order.id, Order.total} |
+
+Put these declarations in the consuming machines' matrices. Each event-contract payload must carry
+its own consumer's set; one consumer's larger set never applies to its sibling. Repeated declarations,
+including across machines, must agree on the exact set (field order does not matter). Conflicting
+sets, duplicate fields or consumer columns, empty sets or members, malformed declarations, and
+unknown or blank explicit consumers are errors.
+
+Legacy declarations without a `consumer` column remain compatible only when the event contract has
+one distinct consumer for that event. Repeated rows for that same consumer remain unique. For fan-out,
+add an explicit `consumer` column to every declaring matrix table; an explicit sibling declaration
+does not resolve the remaining legacy row's ambiguity.
+
 A consumer that genuinely reads nothing off the payload (a pure signal: it reacts, then refetches by
 id) waives with `(no reads: <reason>)` in the consumer cell. The reason is mandatory, as with every
-house waiver. A `(no machine: <reason>)` waiver does NOT discharge the reads obligation: it answers
+house waiver. The waiver applies only to that row, never to a sibling consumer; duplicate or malformed
+waivers fail. A `(no machine: <reason>)` waiver does NOT discharge the reads obligation: it answers
 whether anything reacts as a machine event, and a consumer reacting through an invoke actor still
 reads the payload. The `checked:` line reports the tier: reads declared, waived, missing, and the
 declared fields carried.

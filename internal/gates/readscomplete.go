@@ -196,6 +196,10 @@ func parseConsumerReadSet(text string) ([]string, string) {
 	if len(matches) != 1 || len(readsWord.FindAllStringIndex(text, -1)) != 1 {
 		return nil, "expected exactly one complete READS{field, ...} declaration per row"
 	}
+	end := readsDecl.FindStringIndex(text)[1]
+	if end < len(text) && (text[end] == '}' || text[end] == '{' || isTokenChar(text[end])) {
+		return nil, "malformed READS declaration suffix; write READS{field, ...}"
+	}
 	var fields []string
 	seen := map[string]bool{}
 	for _, member := range strings.Split(matches[0][1], ",") {
@@ -290,7 +294,13 @@ func checkReadsComplete(g *Gate, design, archText string) {
 	rows := eventContractRows(archText)
 	decls := bindConsumerReads(g, design, rows)
 	for _, r := range rows {
-		if m := noReadsWaiverRe.FindStringSubmatch(r.Cell("consumer")); m != nil {
+		if strings.Contains(r.Cell("consumer"), "(no reads:") {
+			waivers := noReadsWaiverRe.FindAllStringSubmatch(r.Cell("consumer"), -1)
+			if len(waivers) != 1 || strings.Count(r.Cell("consumer"), "(no reads:") != 1 {
+				g.Errs = append(g.Errs, r.Where()+": malformed or duplicate READS waiver; write exactly one '(no reads: <reason>)' in this consumer cell")
+				continue
+			}
+			m := waivers[0]
 			if strings.TrimSpace(m[1]) == "" {
 				g.Errs = append(g.Errs, r.Where()+": the consumer cell's READS waiver names no reason; write '(no reads: <reason>)'")
 			} else {
