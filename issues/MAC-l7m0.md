@@ -1,14 +1,14 @@
 ---
 id: MAC-l7m0
 title: "Define standalone executable test-assurance contract"
-status: open
+status: blocked
 priority: 1
 type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:35:06Z
-content_hash: "sha256:914fd892ede056c081b4d255961931ce99121647c7c1dd81f09c523f1533adb7"
+updated_at: 2026-09-05T19:36:47Z
+content_hash: "sha256:f9d7d728209bec73f6ebd980aaafef7418ef02b033f668df60c44c1cfa8d2cb4"
 blocks: [MAC-vx24, MAC-ou97]
 ---
 
@@ -73,11 +73,12 @@ status: new
 
 
 ## Notes
-
+BLOCKED — USER CHOICE / ARCHITECTURE REVIEW. Do not dispatch a generic developer. Pending user decisions: supported initial native runner languages and trusted-host versus adversarial-code execution boundary. Independent architect owns exact contract. Only after answers plus reviewed contract may Sr PM repair implementation interfaces and release this blocker.
 
 ## History
 - 2026-09-05T19:35:06Z dep_added: blocks MAC-vx24
 - 2026-09-05T19:36:16Z dep_added: blocks MAC-ou97
+- 2026-09-05T19:36:47Z status: open -> blocked
 
 ## Links
 - Parent: [[MAC-ui8a]]
