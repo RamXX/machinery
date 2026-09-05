@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:47:19Z
-content_hash: "sha256:360c6e87ddc93f41d6a666a8411a86dec3d71ab58280d23780105b8b1ef8688a"
+updated_at: 2026-09-05T20:45:02Z
+content_hash: "sha256:7196ec769b13a0ece3221c4245e0f6ee635b8943b8da28545ca1876768b87e54"
 ---
 
 ## Description
@@ -82,6 +82,8 @@ Full sweep of all original 16 children:
 Each runtime story owns a separate fragment, so no concurrent shared root-manifest edits. Frozen RED tests/fixtures/runner configuration include those fragments. No env-gated dormant tests or skip-if-missing added.
 Self-review: all 17 children clean within their approved or explicitly blocked scope; lane is deliberately infrastructure-focused but delivers observable real provision/run/account/cleanup flow, not static wiring alone.
 Validation after repair: pvg lint --backlog --epic MAC-ui8a --json => []; pvg rtm check --epic MAC-ui8a => passed, 0 tagged requirements, 18 records; pvg nd dep cycles => none. Full preflight not run.
+LOCAL PROGRESS CHECKPOINT 2026-09-05: MAC-olrx accepted and merged locally to epic/MAC-ui8a=f24b2df3cb1e1521f97b406a7516f72bb7bc7890; merged-epic targeted ownership replay PASS10.274s. Main remains497419ab4512fcff765cd5feb27aed4c67b5608d. MAC-hpqp REDv1=612f65f3b4502a3267828507faaf0e395c8dd558 was independently rejected with four test-contract gaps; authorized RED rework active in retained worktree via /root/red_hpqp. MAC-2u36 RED=99956740ae5559262790a9473b5597c1775928f2 final targeted replay active via /root/red_2u36. MAC-p8ce RED approved0d52f43b393d961160aeea0db43b13a3fa5c284a remains queued, no GREEN yet. No full preflight completed/run intentionally; no GH mutations or installation updates. Installed binary SHA2565205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849 confirmed unchanged again. Local remote.origin.pushurl=/dev/null remains intentional guard (original unset). Do not use pushing sync/merge/setup commands; manual accepted-gated local merges only. Do not run destructive recovery while current agents are healthy. Architecture/native-adapter choices still await previously relayed user answers.
+
 ## ANCHOR REVIEW (backlog_review, round 2 of 3)
 REVIEW_RESULT: APPROVED
 
