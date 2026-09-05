@@ -250,7 +250,7 @@ func validateActivationDiscovery(design string) error {
 
 // Select resolves a --gate list (or, when gateList is empty, the default
 // suite) for design. impl is the implementation directory ("" when none was
-// supplied); it decides whether the machine-less-parent narrowing keeps G4.
+// supplied); it keeps G4 and any parent-owned relational Gt obligations.
 // The default narrows on a decomposed parent with no machines/, and an
 // unknown or empty gate name is an error.
 func Select(design, gateList, impl string) (Selection, error) {
@@ -275,7 +275,10 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
 			// layer is the children's, held by the packs; only the
-			// machine-dependent gates (G3, Gx, Gt) narrow away. G4 is NOT
+			// machine-dependent gates (G3, Gx) narrow away. Gt stays when
+			// --impl is supplied and the parent owns relational oracles:
+			// Policy/Isolation test obligations do not belong to children.
+			// G4 is NOT
 			// machine-dependent (the contract and the code suffice), so an
 			// explicit --impl keeps it: v0.3.x silently dropped G4 here and
 			// exited 0 over contract-DENIED edges (GATE-1). Every
@@ -329,12 +332,31 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 			if AttestationActive(design) || AttestationOwed(design) {
 				parts = append(parts, "gv")
 			}
+			parentOracles := false
 			if impl != "" {
 				parts = append(parts, "g4")
+				// Source annotations retain the obligation even if the last
+				// generated oracle is removed. Gp/Gn report that missing output.
+				parentOracles = HasPolicyAnnotation(design) || HasIsolationAnnotation(design)
+				for _, name := range formalOracleNames {
+					has, err := probeRegularFile(design, filepath.Join("formal", name))
+					if err != nil {
+						return sel, fmt.Errorf("cannot inspect parent oracle %s: %w", name, err)
+					}
+					if has {
+						parentOracles = true
+					}
+				}
+				if parentOracles {
+					parts = append(parts, "gt")
+				}
 			}
 			parts = append(parts, "g5")
 			list = strings.Join(parts, ",")
 			sel.Note = "note: decomposed parent with no machines/; running " + list + " (G3/Gx run on the child designs; gt skipped: no machines)"
+			if parentOracles {
+				sel.Note = "note: decomposed parent with no machines/; running " + list + " (G3/Gx run on the child designs; gt checks parent-owned relational obligations)"
+			}
 		}
 	}
 	if sel.Explicit {

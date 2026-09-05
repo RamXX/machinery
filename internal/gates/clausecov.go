@@ -15,7 +15,6 @@ package gates
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
@@ -65,25 +64,15 @@ func checkClauseCoverage(g *Gate, design string, corpus testCorpusData) {
 	if len(decls) == 0 {
 		return
 	}
-	var rows []guardedOracleRow
-	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.oracle.md") {
-		rows = append(rows, oracleGuardRows(readDesignOrEmpty(design, path))...) // read errors reported by the coverage pass
-	}
 	for _, d := range decls {
 		n := len(d.active)
-		if n == 0 {
-			g.Errs = append(g.Errs, "guard "+d.guard+" declares CLAUSES{} with no clauses; the falsifying-test obligation it announces is armed by nothing (list the clauses, or drop the declaration)")
-			continue
-		}
-		if n > 26 {
-			g.Errs = append(g.Errs, fmt.Sprintf("guard %s declares %d clauses; the suffix scheme (a-z) holds at most 26, so this declaration cannot be checked (split the guard)", d.guard, n))
+		if n == 0 || n > 26 {
+			// Shared declaration validation has already reported the error.
 			continue
 		}
 		g.Count("clause-declared guards checked")
-		for _, row := range rows {
-			if row.guard == "" || !tokenIn(d.guard, row.guard) {
-				continue
-			}
+		// Rows are resolved from this declaration's owning oracle only.
+		for _, row := range d.rows {
 			var missing []string
 			for i := range n {
 				suffixed := row.stableID + string(rune('a'+i))
@@ -94,8 +83,8 @@ func checkClauseCoverage(g *Gate, design string, corpus testCorpusData) {
 				}
 			}
 			if len(missing) > 0 {
-				g.Errs = append(g.Errs, fmt.Sprintf("guard %s declares %d clause(s) (%s) but the suite misses falsifying test(s) %s for oracle row %s; one test per clause with only that clause false (the conformance parse cannot derive these)",
-					d.guard, n, strings.Join(d.active, ", "), strings.Join(missing, ", "), row.stableID))
+				g.Errs = append(g.Errs, fmt.Sprintf("machine %s guard %s declares %d clause(s) (%s) but the suite misses falsifying test(s) %s for oracle row %s; one test per clause with only that clause false (the conformance parse cannot derive these)",
+					d.owner, d.guard, n, strings.Join(d.active, ", "), strings.Join(missing, ", "), row.stableID))
 			}
 		}
 	}
