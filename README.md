@@ -469,7 +469,7 @@ required versions and release checks. Neither command installs anything.
   This puts the `machinery` binary on `~/.local/bin` and runs `machinery install` to place the skill
   + role docs into your agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see
   [Agent homes](#agent-homes)). Override with environment variables, for example
-  `MACHINERY_VERSION=v0.6.10`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
+  `MACHINERY_VERSION=v0.6.11`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
   `MACHINERY_TARGETS="codex opencode"`. `MACHINERY_HOMES` accepts one full path per line, preserving
   spaces; use a literal newline between multiple homes.
 
@@ -480,7 +480,7 @@ required versions and release checks. Neither command installs anything.
   machinery install                        # fetches the matching skill + role docs into your agent homes
   ```
 
-  **Windows support:** v0.6.10 does not publish or support a Windows binary. The Windows source is
+  **Windows support:** v0.6.11 does not publish or support a Windows binary. The Windows source is
   cross-compiled in CI as an early portability signal, but native Windows runtime guarantees are
   not claimed. Use a Linux environment or macOS for this release.
 
@@ -598,7 +598,7 @@ version matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.6.10         # force an exact release
+machinery update --version v0.6.11         # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
@@ -625,7 +625,7 @@ move one and not the other; machinery detects the skew and refuses rather than
 running a hook against a binary it was not built for:
 
 ```
-cached machinery plugin version 0.6.10 does not match running machinery v0.6.9;
+cached machinery plugin version 0.6.11 does not match running machinery v0.6.10;
 run 'claude plugin update machinery@machinery'
 ```
 
