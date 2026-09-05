@@ -1,15 +1,15 @@
 ---
 id: MAC-olrx
 title: "Preserve oracle ownership through decomposition"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T20:02:02Z
-content_hash: "sha256:8b8a002e0c5abc895d40d0e391d234360a439d01a22f326de7837270a44d58c9"
+updated_at: 2026-09-05T20:08:04Z
+content_hash: "sha256:ff2e3eba4a8986e10586a15869809033308d22b2224942a7ec337df2784872e4"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-olrx
 ---
@@ -271,6 +271,8 @@ status: delivered
 - 2026-09-05T19:57:39Z status: in_progress -> in_progress
 - 2026-09-05T19:58:17Z status: in_progress -> in_progress
 - 2026-09-05T20:02:02Z status: in_progress -> open
+- 2026-09-05T20:08:04Z status: open -> in_progress
+- 2026-09-05T20:08:04Z claimed by dev-MAC-olrx
 
 ## Links
 - Parent: [[MAC-ui8a]]
