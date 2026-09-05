@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T23:04:15Z
-content_hash: "sha256:9ef1b2c2e73b1979991000505582e839e31d0093e2c273efa5c05e74d253a639"
+content_hash: "sha256:425fa0f9031ce5edb826fc8ca8730161d2e65070dcb254434a702262aa31e348"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx]
 ---
@@ -129,6 +129,18 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+
+
+## nd_contract
+status: rejected
+
+### evidence
+- PM rejection applied via pvg story reject on 2026-09-05.
+
+### proof
+- [ ] Story requires another developer delivery before it can be accepted.
+
+
 ## AUTHORITATIVE AC2 PROOF-REPAIR SCOPE — MAC-2u36 — 2026-09-05
 
 Scope-only Sr PM disposition: keep this under existing P0 MAC-2u36/AC2. All seven product ACs are preserved verbatim. No new issue, dependency, source ownership, production bug claim or status/label/claim transition. Independent PM is completing its RED verdict and retains authority for rejection/approval and explicit test-edit authorization. This note does not replace its delivery/review nd_contract.
