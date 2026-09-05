@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:41:17Z
-content_hash: "sha256:9152339c0bebc446af5a4963cfcbc946869f0b54b5159185ed4bd486c5111e23"
+updated_at: 2026-09-05T23:41:28Z
+content_hash: "sha256:f53e3f2da384970d4cfb7226e1d5e448c8df6c63b5061082cda99423b8fa6916"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx, MAC-p8ce]
@@ -706,3 +706,133 @@ status: new
 - [x] AC #3: approved RED deliberate-baseline and guidance contract.
 - [x] AC #4: approved RED real positive/negative controls.
 - [ ] GREEN implementation and final acceptance remain pending.
+
+### 2026-09-05T23:41:28Z ramirosalas
+## Implementation Evidence (DELIVERED GREEN — MAC-a89e)
+
+PROOF:
+
+### Commit and scope
+- Frozen approved RED: e95be63019d89b93ae527f27ae1ce43326def038.
+- GREEN production: bcba7900a042286b45ff46ae08bc04516ce34923.
+- Final tested candidate: de9745067382c5de25f05d69ea05c2808eb0b2e7 on story/MAC-a89e, worktree /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-a89e.
+- Scope expansion explicitly authorized by dispatcher during GREEN: docs/brownfield-team-guide.md only the generated-file merge paragraph around 259–265; separate ratchet conflicts as explicit debt-policy review, preserve deliberate baseline, require review of accepted offender changes, no new merge algorithm/confirmation workflow. Five files, 272 total changed LOC against local merge-base f24b2df3cb1e1521f97b406a7516f72bb7bc7890; original four production/test paths plus this one document. GREEN adds 16/removes 9 lines across three non-test files.
+- Both frozen tests remain byte-identical to approved RED (git diff e95be63 HEAD -- test paths exits 0). SHA256 gates_test.go=e4f630ec2ff7684eea436881b8a55706496f348c0ae7cd8748a255a6b6d439ff; regeneration_safety_test.go=2e1801d96618aaf146621e822a342b4bfdf69cdace50b94d0585d7f1ad4f20c3. No authored tests or fixtures edited during GREEN.
+
+### CI/Test Results
+Commands run:
+All shell commands use explicit cd /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-a89e.
+- set -o pipefail && go test -count=1 -timeout=5m ./internal/gates -run 'VersionSkew|Regen|Ratchet' -json -coverprofile=/tmp/MAC-a89e-green.xtIsDr/gates-coverage.out | tee /tmp/MAC-a89e-green.xtIsDr/gates-tests.json
+- set -o pipefail && go test -count=1 -timeout=5m ./cmd/machinery -run '^(TestBaselineSourceDateEpochStampIsFullDate|TestResolveBaselineDateRequiresDeterministicSourceAndReusesExisting|TestMigratedCommandDiagnosticsAreByteStableAndPrivatePathFree)$/^baseline$' -json -coverprofile=/tmp/MAC-a89e-green.xtIsDr/cli-coverage.out | tee /tmp/MAC-a89e-green.xtIsDr/cli-tests.json
+- go tool cover -func=/tmp/MAC-a89e-green.xtIsDr/gates-coverage.out
+- go tool cover -func=/tmp/MAC-a89e-green.xtIsDr/cli-coverage.out
+- pvg verify internal/gates/gates.go cmd/machinery/baseline.go internal/gates/regeneration_safety_test.go internal/gates/gates_test.go docs/brownfield-team-guide.md --format text
+- pvg story verify-tdd --base epic/MAC-ui8a
+- git diff --check epic/MAC-ui8a
+- git diff --exit-code e95be63019d89b93ae527f27ae1ce43326def038 HEAD -- internal/gates/gates_test.go internal/gates/regeneration_safety_test.go
+- shasum -a 256 internal/gates/gates_test.go internal/gates/regeneration_safety_test.go
+
+Summary:
+- Required gates: 37 native leaves PASS, 0 FAIL, 0 SKIP; package 5.683s, exit 0.
+- Downstream baseline date, deterministic-date sources, actual subprocess baseline diagnostics: 3 native leaves PASS, 0 FAIL, 0 SKIP; package 1.470s, exit 0.
+- Total 40/40 selected leaves PASS. No compiler/setup/runtime deadline failures or test warnings.
+- Hard-TDD PASS: local merge-base f24b2df3cb1e1521f97b406a7516f72bb7bc7890..HEAD, 5 commits checked, 0 merges skipped, no unauthorized test edits. git diff --check PASS.
+- Coverage: internal/gates scoped total 9.9%, gates.VersionSkewNote 93.8%, regenCommands 100%; cmd/machinery scoped total 2.2%, newBaselineCmd 75.0%, resolveBaselineDate 84.2%. These are scoped package figures; independently built real CLI subprocess is not included in internal/gates coverage. Downstream private-path test intentionally selects baseline only.
+- Test integration runs actual freshly built CLI and native filesystem unconditionally; no mocks/stubs/services/env-based omission. The existing downstream fixture has a symlink-platform fallback but this run created symlinks successfully and reports zero skips.
+
+### Retained raw evidence
+Directory /tmp/MAC-a89e-green.xtIsDr:
+- gates-tests.json SHA256 9f138ecab644843d7932420be54e1c2be78853b4bb558f512e33ed9890c15382
+- cli-tests.json SHA256 5945d2913263d1a197d901fcf87e80121d614b2e9ee35bf40ac9e332f14419d5
+- inventory.txt SHA256 67302005140ca8aab06f698508f6616dfc469d25d35e01493b1ed6312c609b99
+- gates-coverage.out SHA256 f1b45d80d3aeecd7157adbeda1a85594d452cf99a2905b1355715c40f3a6fbbb
+- cli-coverage.out SHA256 8f85fe7958ee02927a94af73448d5b72dbbe90e699aeb33f05047575681b325e
+- verify.txt SHA256 841ae4d70019ef05407b2c096de729ef9a86c6a39226ab76fee41a76e67b51c2
+- tdd.txt contains native hard-TDD PASS output.
+
+### pvg verify
+Native output: VERIFY: FAILED (4 files scanned, 4 issues), all [stub] return empty string. Documentation is not scanned by this source scanner.
+- internal/gates/gates.go:76 is VersionSkewNote's documented no-skew empty result. Full implementation collects/sorts skew and emits applicable advice. Existing tests TestOracleMissingStampIsFreshAndSilent and TestOracleCurrentStampIsSilent assert empty result; real no-debt regeneration control asserts skew disappears.
+- internal/gates/gates.go:219 is readDesignOrEmpty's conditional read-failure empty sentinel; success returns actual file text.
+- internal/gates/gates.go:230 is readDesignFileOrErr's conditional error sentinel; non-missing errors append an explicit gate error, success returns actual file text.
+- internal/gates/gates_test.go:125 is coveringInterfaceTable's conditional no-concrete-allow-rows result; otherwise full markdown table is rendered. Independently reviewed earlier as exact false positive.
+All four implementations/branches are unchanged from approved RED; none is a placeholder. Dispatcher independently inspected all three production paths and confirmed populated, unchanged conditional-return functions rather than empty implementations; this is a specific scanner false-positive disposition, not a claim that every caller's read-error policy is safe. Independent PM adjudication remains required before acceptance. No scanner changes or test-helper edits.
+
+### AC Verification
+| AC | Requirement and evidence | Status |
+|---|---|---|
+| 1 | gates.go regenCommands removes only baseline from the deterministic explicit generator list. Frozen VersionSkewRegenerationOnlySafeGenerators tests all individual oracle/Alloy/semantics/composition/pack families and all-with-ratchet ordered output; ratchet-only emits no command. Existing ratchet-present TestVersionSkewNoteNamesEveryApplicableCommand and generated-TLA selection remain intact. | PASS |
+| 2 | RealCLI/new-offender-survives-all-advice starts with actual CLI ratchet alpha/a.go and green G4, adds real alpha/b.go import and observes exact G4 growth failure, executes EVERY advised generator, proves current oracle stamp, compares ratchet bytes unchanged and requires same offender failure afterward. | PASS |
+| 3 | CLI help before invocation explains rerunning rewrites ratchet.json and may accept newly added offender files, tells users to review ratchet changes before adoption; identical substantive guidance prints only after successful publication, regardless of proposal count. Zero-rule line now says only no new baseline dependency rules proposed. RealCLI/explicit-baseline-reviews-debt-change begins already baselined, rejects alpha/b.go, deliberately invokes baseline, proves 0 need a baseline rule, two recorded offenders, unstamped ratchet and G4 green. All five semantic-guidance controls pass, including pathname bait rejection. Baseline algorithm/schema/date/confirmation semantics preserved; downstream date tests pass. | PASS |
+| 4 | RealCLI/no-debt-version-skew-control obtains correct oracle advice, executes it, proves fresh current stamp/no skew and green g3,g4 without creating ratchet; negative AC2 still fails after all routine advice. Advice family controls execute deterministically. | PASS |
+
+### Exact native leaf inventory
+PASS TestG4RatchetSnapshotNote
+PASS TestG4BaselineWithoutRatchetFails
+PASS TestG4RatchetGreenAtSnapshot
+PASS TestG4RatchetGrowthFails
+PASS TestG4RatchetShrinkAndStaleEdgesNote
+PASS TestRatchetRoundTrip
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/unknown_root
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/missing_date
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/missing_edges
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/duplicate_date
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/duplicate_edges
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/duplicate_edge_name
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/date_number
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/date_null
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/edges_array
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/edge_value_string
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/edge_entry_null
+PASS TestRatchetRejectsUnknownDuplicateAndMistypedJSON/trailing_value
+PASS TestWriteRatchetRejectsSymlinkTarget
+PASS TestVersionSkewNoteNamesEveryApplicableCommand
+PASS TestVersionSkewNoteFormalCommandFollowsGeneratedTLA
+PASS TestRatchetSnapshotNoteBothFormatsIsClockIndependent
+PASS TestVersionSkewRegenerationOnlySafeGenerators/ratchet-only
+PASS TestVersionSkewRegenerationOnlySafeGenerators/oracle
+PASS TestVersionSkewRegenerationOnlySafeGenerators/alloy
+PASS TestVersionSkewRegenerationOnlySafeGenerators/semantics
+PASS TestVersionSkewRegenerationOnlySafeGenerators/composition
+PASS TestVersionSkewRegenerationOnlySafeGenerators/pack
+PASS TestVersionSkewRegenerationOnlySafeGenerators/all-with-ratchet
+PASS TestRegenBaselineGuidanceSensitivity/genuine
+PASS TestRegenBaselineGuidanceSensitivity/equivalent-wrapped
+PASS TestRegenBaselineGuidanceSensitivity/path-bait
+PASS TestRegenBaselineGuidanceSensitivity/old-rule-review-help
+PASS TestRegenBaselineGuidanceSensitivity/unrelated-review
+PASS TestRegenRatchetRealCLI/no-debt-version-skew-control
+PASS TestRegenRatchetRealCLI/new-offender-survives-all-advice
+PASS TestRegenRatchetRealCLI/explicit-baseline-reviews-debt-change
+PASS TestBaselineSourceDateEpochStampIsFullDate
+PASS TestResolveBaselineDateRequiresDeterministicSourceAndReusesExisting
+PASS TestMigratedCommandDiagnosticsAreByteStableAndPrivatePathFree/baseline/--impl_/var/folders/gh/7c54cw2s52v6q6czy3xqhb_w0000gn/T/machinery-diagnostic-user-input-448099535/TestMigratedCommandDiagnosticsAreByteStableAndPrivatePathFree3077046406/003_--date_2026-01-01_/var/folders/gh/7c54cw2s52v6q6czy3xqhb_w0000gn/T/machinery-diagnostic-user-input-448099535/TestMigratedCommandDiagnosticsAreByteStableAndPrivatePathFree3077046406/001
+
+
+### Wiring, discovery, and residual limits
+- Existing machinery check -> gates.VersionSkewNote -> regenCommands remains wired; existing baseline Cobra command renders help and prints guidance after PublishExpectedRooted succeeds. No new interfaces/config/product dependencies.
+- Used developer and codebase-memory skills; inherited parent Verify structural evidence then independently checked project readiness and exact coverage. Graph generation 2026-09-05T23:08:53Z, no recorded gaps for gates.go, gates_test.go, baseline algorithm, CLI baseline/check/diagnostic paths. New regression test is absent from root graph; .claude worktree is excluded, so reviewed exact worktree source and tests directly. No completeness claim.
+- Documentation freshness scan found the same unsafe operation in generated-file conflict advice; authorized narrow paragraph correction now separates explicit ratchet debt review.
+- No full preflight or unrelated runtime suite run, as explicitly constrained; final epic gate owns those checks. Real executable fixture has oracle only; other generator families are precise command-selection tests, not claims of Alloy solver/TLA execution.
+- No remote fetch/pull/push/sync, branch integration, installed binary/skills/plugins/agents changes, Docker changes, Paivot runtime dependency, or baseline algorithm/schema/date modifications. Worktree retained, committed and clean.
+
+LEARNINGS:
+- Zero new dependency-rule proposals can still mean expanded accepted offender debt; help and successful output must distinguish them.
+- Explicit generators form the safe regeneration contract. A ratchet is debt policy rather than a version-stamped derivative.
+- Frozen RED history exposed pathname-bait guidance assertions; approved path-stripping semantic controls now reject accidental matches without weakening real explicit-baseline proof.
+- Source scanners flag valid conditional empty sentinels; retain raw findings and secure specific independent disposition instead of altering working semantics.
+- User-facing merge documentation can retain unsafe command advice after the implementation is fixed; targeted freshness review found and corrected this instance under explicit scope authorization.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Candidate de9745067382c5de25f05d69ea05c2808eb0b2e7, 40 PASS/0 FAIL/0 SKIP, scoped coverage and raw evidence above.
+- Frozen RED unchanged; hard-TDD PASS; five-file/272-LOC scope includes explicit dispatcher authorization.
+
+### proof
+- [x] AC #1: safe deterministic complete regeneration advice.
+- [x] AC #2: real offender remains G4 failure after every advised generator.
+- [x] AC #3: explicit baseline supported with truthful pre-invocation and successful debt-review guidance even at zero rules.
+- [x] AC #4: real no-debt positive and debt-growth negative both exercised.
+
