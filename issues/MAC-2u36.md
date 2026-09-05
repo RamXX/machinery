@@ -4,11 +4,11 @@ title: "Converge installer reruns on recorded targets"
 status: in_progress
 priority: 0
 type: bug
-labels: [hard-tdd, rejected]
+labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:25:58Z
+updated_at: 2026-09-05T23:25:59Z
 content_hash: "sha256:e2c1dff8f6fee937493f77d0fa90b8cf2eb778933afc9c296613eee1aff97d05"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce]
