@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:33Z
-content_hash: "sha256:1484f5732f176849d3fba9213b5248f62ea5ca6f2454717d6dde280ff42cb809"
+updated_at: 2026-09-05T20:14:05Z
+content_hash: "sha256:5287d9bd80aedfa48a59241142069de17ab813b379c9cda7ce01eda01b631051"
 blocked_by: [MAC-vx24, MAC-hy71, MAC-p7jd, MAC-p8ce, MAC-a89e, MAC-2u36, MAC-yhg5, MAC-hwdb, MAC-hpqp]
 blocks: [MAC-ou97]
 ---
@@ -100,6 +100,7 @@ CONSUMES:
   endpoint: go run ./scripts/integration-lane --lane required (Makefile test-integration invokes same entrypoint).
 Additional acceptance criteria: fragment matches actual test sources both directions; all registered cases actually start/terminate with expected positive/negative outcomes; no cached/skipped/empty/partial/fabricated-summary success; real provisioned positive and missing-runtime/fresh-cache failure diagnostics; no owned container/process leaks. Required local preflight and hosted CI execute the same union. Do not edit shared root inventory; own only this fragment. RED source, fixture, fragment and runner configuration are frozen together after review. Any exact test names introduced in RED must remain registered through GREEN.
 No heavy preflight until final gate; no GitHub mutation; no active installation replacement. This note supersedes any earlier command implying service-backed tests execute in unprovisioned ordinary package suites.
+WORKTREE HANDOFF: NEXT.md is an existing user-owned gitignored file at /Users/ramirosalas/workspace/machinery/NEXT.md, excluded intentionally via local git exclude. Do not assume story worktrees contain it and do not force-add it to git. Read the current root copy when revising dispositions; preserve unrelated user content and report how its local-only update is handed back. Repository docs/release notes must carry durable public safety guidance independently. Existing release pvg-compatible tarball wording is consumer compatibility, not a runtime dependency; preserve compatible artifact naming without requiring Paivot.
 
 ## History
 - 2026-09-05T19:35:07Z dep_added: blocked_by MAC-vx24
