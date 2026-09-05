@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:11:54Z
-content_hash: "sha256:345dbe2c7e7d3a2a5cffd28397660b3c81c666c867d0a9dcf2a5f6d3abae9104"
+updated_at: 2026-09-05T21:14:38Z
+content_hash: "sha256:5cfd90de557fb085ca195816b1d44895c92151c300914d9e19fcccb80cbc83a7"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx]
@@ -93,3 +93,27 @@ ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are s
 - Follows: [[MAC-olrx]]
 
 ## Comments
+
+### 2026-09-05T21:14:38Z ramirosalas
+TEST-EDIT AUTHORIZED: internal/gates/gates_test.go -- pre-RED repair limited to TestVersionSkewNoteNamesEveryApplicableCommand. Replace the expected "machinery baseline <design> --impl <dir>" regeneration command with an explicit assertion that the note does not contain "machinery baseline"; preserve the ratchet-present fixture and all existing oracle, Alloy, verify-formal, and pack generator expectations. Its present baseline expectation directly contradicts AC1 and encodes the unsafe behavior being removed. The repair commit subject must contain both tdd-red and [test-edit-authorized]. No other existing tests or assertions are authorized for modification by this decision.
+
+Evidence: read pvg issues show MAC-a89e --json; inspected committed main 497419ab4512fcff765cd5feb27aed4c67b5608d and epic f24b2df3cb1e1521f97b406a7516f72bb7bc7890. The reviewed gates_test.go and cmd/machinery/baseline.go are identical between these refs. gates.go regenCommands currently appends baseline solely when RatchetFile exists. No uncommitted author work inspected, tests replayed, source files edited, or story status/labels changed.
+
+AC3 SCOPE GAP: Current baseline help advises review of pasted dependency rules and rerunning after burning down debt, but does not explain that rerunning can accept newly added offender files by replacing ratchet.json. The zero-proposed-rules path prints "the contract already covers every observed edge; nothing new to baseline", then publishes the new ratchet and declares it armed, without debt-change review guidance. AC3 therefore cannot be proven by pinning the current help text.
+
+Required bounded Sr PM ownership clarification: include cmd/machinery/baseline.go for help/output messaging and directly associated regression coverage. State explicitly that baseline is a deliberate debt-acceptance operation, rerunning may expand accepted offenders, and users must review ratchet.json/offender changes before adopting them. Successful output must convey this even when no dependency rule is proposed; help should explain it before invocation. Preserve explicit baseline functionality and do not add automatic migration, a version stamp, or a new confirmation protocol. A real CLI RED case that deliberately invokes baseline on an existing edge with a new offender, demonstrates the changed ratchet/accepted offender, and requires clear review guidance covers the actual missing behavior. This note does not authorize source edits outside current story ownership; Sr PM must repair that scope first.
+
+This is narrow test-edit authorization and AC3 scope analysis only. It is NOT RED approval, delivery acceptance, rejection, or a status transition. Author must produce genuine assertion-failure RED proof and passing controls, followed by a full independent RED review before GREEN.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent pre-RED dispute review against committed main/epic source; narrowly authorized test expectation repair as recorded above.
+- AC3 help/output ownership gap reported to dispatcher for Sr PM clarification.
+
+### proof
+- [x] AC #1: existing baseline-positive expectation is contradicted by the criterion; bounded replacement authorized.
+- [ ] AC #2: new real CLI before/after regeneration proof awaits RED author and independent review.
+- [ ] AC #3: explicit debt-change review guidance requires the bounded scope repair above.
+- [ ] AC #4: full RED proof and passing controls await independent review.
