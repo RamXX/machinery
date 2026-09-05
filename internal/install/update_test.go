@@ -52,12 +52,11 @@ func TestUpdateVerifiesReleaseAndRefreshesRecordedHarnesses(t *testing.T) {
 		return "refreshed\n", nil
 	}
 	result, err := Update(UpdateOptions{
-		Version:                     tag,
-		Repo:                        "acme/machinery",
-		Executable:                  destination,
-		SkipPlugins:                 true,
-		run:                         runner,
-		allowNonAtomicDirectForTest: true,
+		Version:     tag,
+		Repo:        "acme/machinery",
+		Executable:  destination,
+		SkipPlugins: true,
+		run:         runner,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -155,12 +154,11 @@ func TestUpdateRollsBackAllHomesBinaryAndReceiptOnLaterFailure(t *testing.T) {
 		return "second failed\n", errors.New("injected later-home refresh failure")
 	}
 	_, err = Update(UpdateOptions{
-		Version:                     tag,
-		Repo:                        "acme/machinery",
-		Executable:                  destination,
-		SkipPlugins:                 true,
-		run:                         runner,
-		allowNonAtomicDirectForTest: true,
+		Version:     tag,
+		Repo:        "acme/machinery",
+		Executable:  destination,
+		SkipPlugins: true,
+		run:         runner,
 	})
 	if err == nil || !strings.Contains(err.Error(), "injected later-home refresh failure") {
 		t.Fatalf("Update error = %v", err)
@@ -202,12 +200,11 @@ func TestUpdateExecutesDownloadedBinaryForHarnessRefresh(t *testing.T) {
 	}
 	harnessHome := filepath.Join(t.TempDir(), ".agents")
 	if _, err := Update(UpdateOptions{
-		Version:                     tag,
-		Repo:                        "acme/machinery",
-		Executable:                  destination,
-		Homes:                       []string{harnessHome},
-		SkipPlugins:                 true,
-		allowNonAtomicDirectForTest: true,
+		Version:     tag,
+		Repo:        "acme/machinery",
+		Executable:  destination,
+		Homes:       []string{harnessHome},
+		SkipPlugins: true,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -375,12 +372,11 @@ func TestUpdateSourceFailurePreservesExistingBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = Update(UpdateOptions{
-		Version:                     tag,
-		Repo:                        "acme/machinery",
-		Executable:                  destination,
-		Homes:                       []string{filepath.Join(t.TempDir(), ".agents")},
-		SkipPlugins:                 true,
-		allowNonAtomicDirectForTest: true,
+		Version:     tag,
+		Repo:        "acme/machinery",
+		Executable:  destination,
+		Homes:       []string{filepath.Join(t.TempDir(), ".agents")},
+		SkipPlugins: true,
 		run: func(string, ...string) (string, error) {
 			return "machinery version " + tag, nil
 		},
@@ -411,12 +407,11 @@ func TestUpdateRefreshFailureRollsBackBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err := Update(UpdateOptions{
-		Version:                     tag,
-		Repo:                        "acme/machinery",
-		Executable:                  destination,
-		Homes:                       []string{filepath.Join(t.TempDir(), ".agents")},
-		SkipPlugins:                 true,
-		allowNonAtomicDirectForTest: true,
+		Version:     tag,
+		Repo:        "acme/machinery",
+		Executable:  destination,
+		Homes:       []string{filepath.Join(t.TempDir(), ".agents")},
+		SkipPlugins: true,
 		run: func(_ string, args ...string) (string, error) {
 			if len(args) == 1 && args[0] == "version" {
 				return "machinery version " + tag, nil
@@ -436,39 +431,79 @@ func TestUpdateRefreshFailureRollsBackBinary(t *testing.T) {
 	}
 }
 
-func TestUpdateRefusesHostVisibleMultiRootActivationBeforeMutation(t *testing.T) {
+// TestUpdateRefreshesExistingDefaultInstallInPlace pins the field contract
+// that every default install depends on: a binary that already exists next to
+// a recorded home group and native targets updates in place, with the binary
+// swapped and every placement refreshed from the same release. Refusing this
+// shape would make the documented `machinery update` (and a re-run of the
+// bootstrap installer) unusable for the default topology.
+func TestUpdateRefreshesExistingDefaultInstallInPlace(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("running-executable replacement semantics differ on Windows")
+	}
 	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	agents := filepath.Join(home, ".agents")
+	claude := filepath.Join(home, ".claude")
+	writeLegacyReceipt(t, installReceipt{
+		SchemaVersion: receiptSchema,
+		HomeInstalls:  []homeInstall{{Homes: []string{agents, claude}}},
+		Targets:       []targetInstall{{Target: "claude"}, {Target: "codex"}, {Target: "opencode"}},
+	})
+	role := filepath.Join(agents, "agents", "machinery-fsm-author.md")
+	write(t, role, "old-role")
+
+	const tag = "v9.9.9"
+	candidate := []byte("new machinery binary\n")
+	server := updateReleaseServer(t, tag, candidate, false)
+	defer server.Close()
+	oldGH := githubBase
+	githubBase = server.URL
+	defer func() { githubBase = oldGH }()
+
 	destination := filepath.Join(t.TempDir(), "machinery")
-	if err := os.WriteFile(destination, []byte("old-binary"), 0o755); err != nil {
+	if err := os.WriteFile(destination, []byte("old binary\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	home := filepath.Join(t.TempDir(), ".agents")
-	role := filepath.Join(home, "agents", "machinery-fsm-author.md")
-	write(t, role, "old-role")
-	called := false
-	_, err := Update(UpdateOptions{
-		Version:     "v9.9.9",
+	var calls [][]string
+	runner := func(name string, args ...string) (string, error) {
+		if len(args) == 1 && args[0] == "version" {
+			return "machinery version " + tag + "\n", nil
+		}
+		calls = append(calls, append([]string{name}, args...))
+		return "refreshed\n", nil
+	}
+	result, err := Update(UpdateOptions{
+		Version:     tag,
 		Repo:        "acme/machinery",
 		Executable:  destination,
-		Homes:       []string{home},
 		SkipPlugins: true,
-		run: func(string, ...string) (string, error) {
-			called = true
-			return "", nil
-		},
+		run:         runner,
 	})
-	if err == nil || !strings.Contains(err.Error(), "refuse non-atomic multi-root update") || !strings.Contains(err.Error(), "uninstall") {
-		t.Fatalf("non-atomic activation error = %v", err)
+	if err != nil {
+		t.Fatalf("existing default install refused an in-place update: %v", err)
 	}
-	if called {
-		t.Fatal("refused update performed external work")
+	if result.Version != tag || result.HomeInstalls != 1 || result.TargetInstalls != 3 {
+		t.Fatalf("result = %+v", result)
 	}
-	if got, err := os.ReadFile(destination); err != nil || string(got) != "old-binary" {
-		t.Fatalf("host observed binary mutation: %q, %v", got, err)
+	if got, err := os.ReadFile(destination); err != nil || string(got) != string(candidate) {
+		t.Fatalf("binary after update = %q, %v; want the release candidate", got, err)
 	}
-	if got, err := os.ReadFile(role); err != nil || string(got) != "old-role" {
-		t.Fatalf("host observed companion mutation: %q, %v", got, err)
+	joined := fmt.Sprint(calls)
+	for _, required := range []string{"install --from", "--home " + agents, "--home " + claude, "--target claude", "--target codex", "--target opencode"} {
+		if !strings.Contains(joined, required) {
+			t.Errorf("refresh calls missing %q: %v", required, calls)
+		}
+	}
+	resolvedDestination, err := filepath.EvalSymlinks(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, call := range calls {
+		if call[0] != resolvedDestination {
+			t.Errorf("harness refresh ran %s, want the updated binary %s", call[0], resolvedDestination)
+		}
 	}
 	assertNoInstallJournal(t)
 }

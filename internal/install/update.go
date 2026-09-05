@@ -48,10 +48,6 @@ type UpdateOptions struct {
 
 	run      commandRunner
 	lookPath pathLookup
-	// allowNonAtomicDirectForTest preserves deep rollback/failure-injection
-	// coverage for the legacy sequential direct-refresh implementation. No
-	// production caller can opt out of the atomic-observability invariant.
-	allowNonAtomicDirectForTest bool
 }
 
 // UpdateResult summarizes a completed release refresh.
@@ -78,13 +74,10 @@ func (e *PluginRefreshError) Error() string {
 
 func (e *PluginRefreshError) Unwrap() []error { return e.Failures }
 
-// Update checksum-verifies and replaces the machinery binary. An existing
-// binary plus direct homes/native targets is rejected before mutation because
-// those independent roots cannot be atomically observed by ambient host
-// processes; callers must uninstall them, update, then reinstall. Fresh
-// bootstrap may establish the complete topology because no prior version can
-// be observed. Host-owned plugin caches are refreshed through their CLIs and
-// are never edited directly.
+// Update checksum-verifies and replaces the machinery binary, then refreshes
+// every recorded direct home group and native target from the same release
+// source inside one rollback-protected transaction. Host-owned plugin caches
+// are refreshed through their CLIs and are never edited directly.
 func Update(opts UpdateOptions) (result UpdateResult, retErr error) {
 	operationLock, err := acquireInstallOperationLock()
 	if err != nil {
@@ -146,14 +139,16 @@ func updateLocked(opts UpdateOptions) (result UpdateResult, retErr error) {
 		}
 		transactionPaths = append(transactionPaths, targetPaths...)
 	}
+	// The binary and every direct placement are separate filesystem roots, so
+	// the swap is not one atomic step: between the binary rename and the end of
+	// the harness refresh, a running host can observe the new binary next to
+	// the previous release's skill and role docs. That window is bounded by
+	// the refresh itself, every root is restored on any failure, and the
+	// plugin-cache version check keeps a stale plugin from driving the new
+	// binary. Refusing to update an existing default install (which always
+	// records a home group) would leave the documented `machinery update` and
+	// the re-run installer unusable, so the update proceeds.
 	direct := len(plan.HomeInstalls) > 0 || len(plan.Targets) > 0
-	if direct && !opts.allowNonAtomicDirectForTest {
-		if _, statErr := os.Lstat(destination); statErr == nil {
-			return UpdateResult{}, fmt.Errorf("refuse non-atomic multi-root update: an existing machinery binary cannot be activated together with %d direct home group(s) and %d native target(s) without exposing mixed versions; stop agent hosts, uninstall the recorded direct placements, update the binary, then reinstall them", len(plan.HomeInstalls), len(plan.Targets))
-		} else if !os.IsNotExist(statErr) {
-			return UpdateResult{}, fmt.Errorf("inspect update destination before atomic activation: %w", statErr)
-		}
-	}
 	if direct {
 		receipt, pathErr := installationReceiptPath()
 		if pathErr != nil {
@@ -390,7 +385,7 @@ func releaseAssetNameFor(goos, goarch string) (string, error) {
 	case "darwin", "linux":
 		return "machinery-" + goos + "-" + goarch, nil
 	case "windows":
-		return "", fmt.Errorf("unsupported operating system for self-update: windows (v0.6.9 publishes Linux and macOS binaries only)")
+		return "", fmt.Errorf("unsupported operating system for self-update: windows (v0.6.10 publishes Linux and macOS binaries only)")
 	default:
 		return "", fmt.Errorf("unsupported operating system for self-update: %s", goos)
 	}

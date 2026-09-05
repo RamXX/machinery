@@ -253,7 +253,13 @@ func assertReceiptTargets(t *testing.T, path string, expected ...string) {
 	}
 }
 
-func TestInstallScriptPropagatesPreflightFailure(t *testing.T) {
+// TestInstallScriptPreflightIsAdvisory pins the installer's exit-status
+// contract: the status reports whether the install worked. A prerequisite gap
+// found by the closing `machinery preflight` (typically modelith, which only
+// Phase 1 authoring needs) is reported and the script still exits 0, so a CI
+// image that deliberately omits the tool is not failed by an install that
+// succeeded. MACHINERY_REQUIRE_PREFLIGHT=1 opts back into a fatal check.
+func TestInstallScriptPreflightIsAdvisory(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("install.sh is a POSIX shell installer")
 	}
@@ -263,20 +269,37 @@ func TestInstallScriptPropagatesPreflightFailure(t *testing.T) {
 		t.Skip("no POSIX sh available")
 	}
 	root := repoRootDir(t)
-	home := t.TempDir()
 	fake := filepath.Join(t.TempDir(), "machinery")
-	if err := os.WriteFile(fake, []byte("#!/bin/sh\ncase \"$1\" in install) exit 0;; preflight) exit 23;; *) exit 2;; esac\n"), 0o755); err != nil {
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\ncase \"$1\" in install) exit 0;; preflight) echo 'MISSING modelith'; exit 23;; *) exit 2;; esac\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.CommandContext(t.Context(), sh, filepath.Join(root, "install.sh"))
-	cmd.Env = environmentWithOverrides(os.Environ(), []string{
-		"HOME=" + home,
-		"MACHINERY_CONFIG_DIR=" + privateTestConfigDir(t),
-		"MACHINERY_BIN=" + fake,
-		"MACHINERY_SKILL_SRC=" + root,
-		"MACHINERY_HOMES=" + filepath.Join(home, ".agents"),
-	})
-	if output, err := cmd.CombinedOutput(); err == nil {
-		t.Fatalf("install.sh masked preflight failure:\n%s", output)
+	run := func(extra ...string) (string, error) {
+		home := t.TempDir()
+		cmd := exec.CommandContext(t.Context(), sh, filepath.Join(root, "install.sh"))
+		cmd.Env = environmentWithOverrides(os.Environ(), append([]string{
+			"HOME=" + home,
+			"MACHINERY_CONFIG_DIR=" + privateTestConfigDir(t),
+			"MACHINERY_BIN=" + fake,
+			"MACHINERY_SKILL_SRC=" + root,
+			"MACHINERY_HOMES=" + filepath.Join(home, ".agents"),
+		}, extra...))
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
+	output, err := run()
+	if err != nil {
+		t.Fatalf("install.sh failed on an advisory preflight gap: %v\n%s", err, output)
+	}
+	for _, want := range []string{"MISSING modelith", "the install succeeded", "machinery preflight"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("advisory output lacks %q:\n%s", want, output)
+		}
+	}
+	output, err = run("MACHINERY_REQUIRE_PREFLIGHT=1")
+	if err == nil {
+		t.Fatalf("MACHINERY_REQUIRE_PREFLIGHT=1 masked the preflight failure:\n%s", output)
+	}
+	if !strings.Contains(output, "MACHINERY_REQUIRE_PREFLIGHT=1") {
+		t.Errorf("strict failure does not name the switch:\n%s", output)
 	}
 }

@@ -462,10 +462,14 @@ required versions and release checks. Neither command installs anything.
   ```bash
   curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh
   ```
+  The script's exit status reports the install. It ends with `machinery preflight`; a gap that
+  check finds (typically modelith, which only Phase 1 authoring needs, never `machinery check`)
+  is printed and the script still exits 0. Set `MACHINERY_REQUIRE_PREFLIGHT=1` to make that
+  check fatal in images that must carry the complete toolchain.
   This puts the `machinery` binary on `~/.local/bin` and runs `machinery install` to place the skill
   + role docs into your agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see
   [Agent homes](#agent-homes)). Override with environment variables, for example
-  `MACHINERY_VERSION=v0.6.9`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
+  `MACHINERY_VERSION=v0.6.10`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
   `MACHINERY_TARGETS="codex opencode"`. `MACHINERY_HOMES` accepts one full path per line, preserving
   spaces; use a literal newline between multiple homes.
 
@@ -476,7 +480,7 @@ required versions and release checks. Neither command installs anything.
   machinery install                        # fetches the matching skill + role docs into your agent homes
   ```
 
-  **Windows support:** v0.6.9 does not publish or support a Windows binary. The Windows source is
+  **Windows support:** v0.6.10 does not publish or support a Windows binary. The Windows source is
   cross-compiled in CI as an early portability signal, but native Windows runtime guarantees are
   not claimed. Use a Linux environment or macOS for this release.
 
@@ -594,7 +598,7 @@ version matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.6.9         # force an exact release
+machinery update --version v0.6.10         # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
@@ -605,41 +609,15 @@ managed-scope refusal is reported as a warning while direct skills and adapters 
 a new Codex task or run Claude Code's `/reload-plugins` after a plugin refresh. Full failure and
 recovery behavior is in the [agent portability guide](docs/agent-portability.md#updating-a-release).
 
-#### When update refuses: "non-atomic multi-root update"
+#### What an update looks like on an existing install
 
-An installation that spans several roots at once (a direct home group plus one
-or more native targets) cannot be moved to a new version in a single atomic
-step. Rather than leave you half-updated, `machinery update` refuses up front:
-
-```
-refuse non-atomic multi-root update: an existing machinery binary cannot be
-activated together with 1 direct home group(s) and 3 native target(s) without
-exposing mixed versions; stop agent hosts, uninstall the recorded direct
-placements, update the binary, then reinstall them
-```
-
-This is a safety refusal, not a failure, and nothing has changed yet. Take the
-placements down, move the binary, then put them back. Check what is recorded
-first, with `machinery doctor`:
-
-```bash
-# 1. Stop your agent hosts. If you are running inside one, disable the
-#    machinery plugin and skills for the session instead.
-# 2. Remove the recorded placements (--target and --home cannot be combined,
-#    so this is two commands).
-machinery uninstall --target all
-machinery uninstall
-
-# 3. Now the binary moves on its own.
-machinery update --version v0.6.9
-
-# 4. Put the placements back, from the same release.
-machinery install
-machinery install --target all
-```
-
-Then `machinery doctor` to confirm one version everywhere, and re-enable the
-plugin. In Claude Code, run `/reload-plugins` and `/reload-skills` afterwards.
+An installation spans several filesystem roots (the binary, a direct home group, native
+targets). `machinery update` swaps the binary first and then refreshes every recorded placement
+from the same release, inside one transaction: if any step fails, every root is restored to the
+previous release and the command exits non-zero naming the failed step. Between the binary swap
+and the end of the refresh, a running agent host can briefly see the new binary next to the
+previous release's skill and role docs; that window lasts as long as the refresh itself, and
+nothing in it is left behind. Re-running the one-line installer performs the same update.
 
 Keep the binary and the Claude Code plugin on the same version. The plugin
 cache is host-owned and updates separately (`/plugin`), so it is possible to
@@ -647,7 +625,7 @@ move one and not the other; machinery detects the skew and refuses rather than
 running a hook against a binary it was not built for:
 
 ```
-cached machinery plugin version 0.6.9 does not match running machinery v0.6.8;
+cached machinery plugin version 0.6.10 does not match running machinery v0.6.9;
 run 'claude plugin update machinery@machinery'
 ```
 

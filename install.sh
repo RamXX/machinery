@@ -21,6 +21,10 @@
 #                          opencode, all. Cannot be combined with MACHINERY_HOMES.
 #   INSTALL_DIR            where the CLI binary lands (default: "$HOME/.local/bin")
 #   MACHINERY_REPO         owner/name to fetch from (default: RamXX/machinery)
+#   MACHINERY_REQUIRE_PREFLIGHT
+#                          set to 1 to fail the script when the closing prerequisite
+#                          check finds a gap (default: report the gap, exit 0; the
+#                          exit status reports the install, not the toolchain)
 #   MACHINERY_BIN          use this machinery binary instead of downloading (dev/test)
 #   MACHINERY_SKILL_SRC    pass a local checkout to `machinery install --from` (offline)
 set -eu
@@ -59,7 +63,7 @@ case "$arch" in
 esac
 case "$os" in
   linux|darwin) ;;
-  msys*|mingw*|cygwin*|windows*) die "Windows is not a supported binary release target in v0.6.9" ;;
+  msys*|mingw*|cygwin*|windows*) die "Windows is not a supported binary release target in v0.6.10" ;;
   *) die "unsupported OS: $os" ;;
 esac
 binname="machinery"
@@ -157,7 +161,18 @@ if [ -z "${MACHINERY_BIN:-}" ]; then
 fi
 
 # --- environment check -----------------------------------------------------
-"$mach" preflight
+# The install is complete at this point, so the exit status of this script
+# reports the install. The prerequisite check is advisory: a missing tool
+# (typically modelith, which only Phase 1 authoring needs; `machinery check`
+# does not) is printed, not fatal. MACHINERY_REQUIRE_PREFLIGHT=1 makes it fatal
+# for images that must ship the complete toolchain.
+if ! "$mach" preflight; then
+  if [ "${MACHINERY_REQUIRE_PREFLIGHT:-0}" = "1" ]; then
+    die "prerequisite check failed and MACHINERY_REQUIRE_PREFLIGHT=1 is set (the install itself succeeded)"
+  fi
+  say ""
+  say "note: the install succeeded; the prerequisite check above found gaps. Install the missing tools, then run: machinery preflight"
+fi
 case ":${PATH}:" in
   *":$INSTALL_DIR:"*) : ;;
   *)

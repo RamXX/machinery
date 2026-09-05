@@ -972,15 +972,12 @@ func walkCachedPluginInventory(root *os.Root, directory string, expected, expect
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return fmt.Errorf("cached plugin inventory member %s is not a real directory", directory)
 	}
-	if !expectedDirectories[directory] {
-		return fmt.Errorf("cached plugin inventory has unexpected directory %s", directory)
-	}
 	inventory[directory] = cachedPluginInventoryEntry{info: info, directory: true, changeID: installFileChangeID(info)}
 	dir, err := root.Open(directory)
 	if err != nil {
 		return err
 	}
-	entries, readErr := readInstallDirBounded(dir, len(expected)+len(expectedDirectories)-len(inventory), "cached plugin inventory")
+	entries, readErr := readInstallDirBounded(dir, pluginCacheMaxEntries, "cached plugin inventory")
 	closeErr := dir.Close()
 	if readErr != nil || closeErr != nil {
 		return errors.Join(readErr, closeErr)
@@ -994,17 +991,27 @@ func walkCachedPluginInventory(root *os.Root, directory string, expected, expect
 		if info.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("cached plugin inventory member %s is a symlink", path)
 		}
+		// The cache is the host's own copy of the plugin source tree, and the
+		// host and the marketplace add members machinery does not own (for
+		// example .claude-plugin/marketplace.json, which every cached version
+		// carries). Those members prove nothing about the owned inventory
+		// either way, so they are neither validated nor rejected: the proof
+		// that the plugin serves this home rests on every owned member being
+		// present, regular, non-symlinked, and identical across both passes.
 		if info.IsDir() {
+			if !expectedDirectories[path] {
+				continue
+			}
 			if err := walkCachedPluginInventory(root, path, expected, expectedDirectories, seen, inventory, afterMember, depth+1); err != nil {
 				return err
 			}
 			continue
 		}
+		if !expected[path] {
+			continue
+		}
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("cached plugin inventory member %s is not regular", path)
-		}
-		if !expected[path] {
-			return fmt.Errorf("cached plugin inventory has unexpected member %s", path)
 		}
 		raw, err := readCachedPluginFileRoot(root, path, 4<<20)
 		if err != nil {

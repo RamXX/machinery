@@ -1567,11 +1567,15 @@ formalPublicationDone:
 	runLayer(haveIntegrity, alloy.IntegrityOutputName, "Integrity", integrityCommands)
 	runLayer(haveIsolation, alloy.IsolationOutputName, "Isolation", isolationCommands)
 	fmt.Fprintln(stdoutW, "")
-	fmt.Fprintf(stdoutW, "%d passed, %d failed\n", pass, fail)
 	if genFail > 0 {
-		fmt.Fprintf(stderrW, "verify-formal: %d generator failure(s); the committed specs above were NOT regenerated from source\n", genFail)
+		// The summary must agree with the exit status: a generator or
+		// publication failure is a verification failure even when every
+		// pair that did run passed, so it is counted on the same line.
+		fmt.Fprintf(stdoutW, "%d passed, %d failed, %d generator failure(s)\n", pass, fail, genFail)
+		fmt.Fprintf(stderrW, "verify-formal: %d generator failure(s); the committed specs above were NOT regenerated from source (the failing generator or publication is named above)\n", genFail)
 		return 1
 	}
+	fmt.Fprintf(stdoutW, "%d passed, %d failed\n", pass, fail)
 	if pass+fail == 0 {
 		if len(staleNames) > 0 {
 			fmt.Fprintf(stdoutW, "verify-formal: removed %d stale generated artifact(s)\n", len(staleNames))

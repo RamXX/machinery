@@ -72,7 +72,7 @@ func preflightRunUnlockedTo(out io.Writer) error {
 			failures = append(failures, fmt.Errorf("modelith %q does not match pin %s", installed, modelithVersion))
 		}
 	} else {
-		fmt.Fprintf(out, "  MISSING  modelith (Phase 1 domain model lint/render) -- install: go install github.com/stacklok/modelith/cmd/modelith@%s (or make install-modelith)\n", modelithVersion)
+		fmt.Fprintf(out, "  MISSING  modelith (Phase 1 domain model lint/render; 'machinery check' and the hooks do not need it) -- install: go install github.com/stacklok/modelith/cmd/modelith@%s (or make install-modelith)\n", modelithVersion)
 		failures = append(failures, errors.New("modelith is not on PATH"))
 	}
 

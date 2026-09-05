@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -81,12 +82,30 @@ func TestPluginInstalledRejectsMixedVersionAndUnexpectedInventory(t *testing.T) 
 		}
 	})
 
-	t.Run("unexpected owned member", func(t *testing.T) {
+	t.Run("host-owned members are tolerated", func(t *testing.T) {
 		home := t.TempDir()
 		root := seedCachedMachineryPlugin(t, home, "market")
-		write(t, filepath.Join(root, "agents", "stale-agent.md"), "stale\n")
-		if installed, err := pluginInstalled(home); err == nil || installed || !strings.Contains(err.Error(), "unexpected member") {
-			t.Fatalf("open cache inventory = installed %v, error %v", installed, err)
+		// Members machinery does not own, in every walked root: a file the host
+		// or marketplace adds next to an owned one, and a whole directory.
+		write(t, filepath.Join(root, "agents", "host-added-agent.md"), "host\n")
+		write(t, filepath.Join(root, "hooks", "README.md"), "host\n")
+		write(t, filepath.Join(root, "skills", "machinery", "extras", "notes.md"), "host\n")
+		if installed, err := pluginInstalled(home); err != nil || !installed {
+			t.Fatalf("cache with host-owned members = installed %v, error %v; want installed", installed, err)
+		}
+	})
+
+	t.Run("symlinked host member still fails closed", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("symlink fixture")
+		}
+		home := t.TempDir()
+		root := seedCachedMachineryPlugin(t, home, "market")
+		if err := os.Symlink(filepath.Join(root, "skills", "machinery", "SKILL.md"), filepath.Join(root, "agents", "link.md")); err != nil {
+			t.Fatal(err)
+		}
+		if installed, err := pluginInstalled(home); err == nil || installed || !strings.Contains(err.Error(), "symlink") {
+			t.Fatalf("symlinked member = installed %v, error %v", installed, err)
 		}
 	})
 }
@@ -631,6 +650,9 @@ func seedCachedMachineryPlugin(t *testing.T, claudeHome, marketplace string) str
 	root := filepath.Join(claudeHome, "plugins", "cache", marketplace, "machinery", strings.TrimPrefix(machversion.Version, "v"))
 	files := []string{
 		filepath.Join(".claude-plugin", "plugin.json"),
+		// Every real cache entry is a copy of the plugin source tree and carries
+		// the marketplace manifest next to plugin.json; the fixture mirrors that.
+		filepath.Join(".claude-plugin", "marketplace.json"),
 		filepath.Join("agents", "machinery-fsm-author.md"),
 		filepath.Join("agents", "machinery-build-writer.md"),
 		filepath.Join("hooks", "hooks.json"),
