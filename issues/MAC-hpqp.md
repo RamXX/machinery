@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T22:09:12Z
-content_hash: "sha256:e30938b698ab01e16ec75aa8e419b965c46f3517427de0e0f35d0bb6493011bc"
+updated_at: 2026-09-05T22:10:13Z
+content_hash: "sha256:df6f82fbce87b8d10818fb0d9261d172414dc0787bf678707af1283df575889a"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -613,4 +613,25 @@ status: in_progress
 - [x] AC #9: approved RED bytes unchanged; no full preflight.
 - [ ] AC #8: provisioning-stage nested JVM cleanup remains under explicit scope review.
 - [ ] AC #10: final unfiltered required-lane/native proof remains outstanding after scope resolution.
+
+
+### 2026-09-05T22:10:13Z ramirosalas
+### AC8 scope-review correction: actual suite nesting also matters
+
+The provisioning-only wrapper proposal is insufficient to claim AC8 solved. The same concrete call chain exists during required test execution:
+- scripts/integration-lane/main.go execute -> command -> processcontrol.Run launches go test in its own group.
+- Frozen TestIntegrationLanePilotFormal (cmd/machinery/integration_lane_test.go) calls formal.VerifyFormalTo -> runTLC.
+- internal/formal/formal.go runTLC launches Java through runBoundedProcess/processcontrol, which creates another process group in internal/processcontrol/run_unix.go prepare.
+- The frozen full-path meta-test also launches nested integration-lane processes that establish their own groups.
+
+These nested paths executed in the real frozen runtime replay. Cancellation at the outer lane boundary while a nested verifier/JVM is active has not yet been experimentally exercised; therefore this is a source-established ownership gap with live call paths, not claimed observed leakage.
+
+Revised scope options for Sr PM:
+1. The small ProvisionTLC wrapper removes only provisioning-stage nesting. It does not eliminate nested process groups created by actual required native tests. Keep its usefulness and its limit explicit.
+2. Review a shared processcontrol ownership design that propagates a per-lane, verifiable ancestor-owned process scope through nested launches and permits cleanup of every registered owned group while preventing PID/group reuse from authorizing foreign cleanup. This materially expands file/platform scope and needs its own hard-TDD proof for Linux/macOS, normal completion, nested cancellation and failed registration. Plain numeric PID files, broad process matching or unverified group kills are not adequate.
+3. Alternatively review a suite execution supervisor that owns all nested processes (and exact closure/source snapshots) with native platform containment. The local macOS Docker lane requirement means Linux-only cgroups cannot alone satisfy this story. Running the entire lane inside a private OCI supervisor would require explicit source/cache/runtime/report contract review, not a silent implementation choice.
+
+Formal execution guarantees to preserve: runTLC snapshots the verified JAR into its private meta root and revalidates the Java identity after execution. A new exported provisioning pathname is only a checked provisioning result; it must not replace actual engine execution evidence or weaken those snapshot/revalidation guarantees. Any direct parent Java/TLC validation must retain the relevant immutable executable/JAR closure guarantees and bounded private scratch, with a new cancellation control/negative proving that the actual nested JVM disappears before lane return.
+
+No additional source/API/test/fragment changes were made for these options. Current221525d checkpoint remains undelivered with claim retained for scope review.
 
