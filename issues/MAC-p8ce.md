@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:56:26Z
-content_hash: "sha256:98ce450b1d2a88ff0cc5fa9b22d729225e14d627906ace62e340a6817f5b505f"
+updated_at: 2026-09-05T19:58:19Z
+content_hash: "sha256:e713b6e9f7c9b5e00977926f54590f43eb7d2eeb8ea19dff0b5219a3ac2ba4c1"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p8ce
 ---
@@ -80,6 +80,64 @@ status: new
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
+## Implementation Evidence (DELIVERED — RED phase; formatting repair)
+PROOF:
+
+### CI/Test Results
+- Commands run:
+  - go test -count=1 -timeout=240s ./internal/gates -run 'Reads|EventContract|Consumer' -v
+  - go test -count=1 -timeout=240s ./internal/gates -run '^TestReadsConsumerLegacySingleControl$|^TestReadsConsumerRepeatedLegacyStillHasOneOwner$|^TestReadsConsumerCLI$/legacy_control$' -v
+  - pvg verify internal/gates/reads_consumer_test.go --include-tests --format text
+  - git diff --check
+- Summary: RED verification executed 66 leaf cases: 39 PASS, 27 intended behavioral FAIL, 0 skipped. New story inventory: 41 leaf cases, 14 PASS / 27 FAIL. Existing matched cases: 25 PASS / 0 FAIL. Real CLI: 9 cases, 4 PASS / 5 intended FAIL. Separate controls: 3 PASS / 0 FAIL. Quality scan PASS (1 file, 0 issues), diff check PASS.
+- Coverage: statement percentage not measured; behavioral inventory and negative mutations are the measured evidence. No full suite or heavy preflight was run.
+- Key output: unsafe missing_audit and missing_payments contracts returned CLI success with 0 blocking findings; valid distinct per-consumer read sets incorrectly rejected. These expected RED assertions expose unchanged production behavior. No compile/import/prerequisite failures in committed-SHA evidence.
+- These are honestly reused outputs from the original committed-SHA runs, not new test executions during this formatting-only repair.
+
+### Commit
+- Branch: story/MAC-p8ce
+- SHA: 0d52f43b393d961160aeea0db43b13a3fa5c284a
+- Frozen file: internal/gates/reads_consumer_test.go (336 added lines). No production implementation. This repair makes no git changes.
+
+### Wiring
+- Native temporary CLI candidate built from this story worktree, not installed binary.
+- CLI check with --gate g2,gx exercises real architecture participant validation plus consumer READS completeness; G2 alone tests unknown participant. No mocks, skips or services.
+
+### pvg verify
+- VERIFY: PASSED (1 files scanned, 0 issues).
+- Supported installed syntax uses --format text; --format=text is rejected by the local coordination CLI.
+
+### AC Verification
+| AC # | Requirement | Test Location | Status |
+|------|-------------|---------------|--------|
+| 1 | Exact edge-local read sets | TestReadsConsumerExactEdgesPass and TestReadsConsumerCLI/distinct_sets in internal/gates/reads_consumer_test.go | RED specified and executed |
+| 2 | Missing sibling and superset independence | TestReadsConsumerRejectsOwnershipMutations and ExactEdgesPass/strict_superset_is_local | RED behavior reproduced; narrowed-payload controls PASS |
+| 3 | Unique legacy compatibility and ambiguity migration | LegacySingleControl, RepeatedLegacyStillHasOneOwner, AmbiguousLegacyNeedsMigration, ExplicitBlankOwnerCannotUseLegacyFallback | Controls PASS; ambiguity genuine RED |
+| 4 | Repeats, conflicts, malformed declarations, renames, local waivers | ExactEdgesPass, RejectsOwnershipMutations, MalformedDeclarationsFailClosed | Positive/negative cases executed |
+| 5 | Real CLI positive and negative mutations | TestReadsConsumerCLI | 4 PASS / 5 intended FAIL across 9 cases |
+
+LEARNINGS:
+- Matrix filename identifies a machine, not its architectural consumer; explicit consumer-column identity is the proposed contract, documented fully in prior append-only RED notes.
+- Multiple machines may agree on the same consumer edge; conflicting exact sets must not silently union or override one another.
+- A passing full-path legacy fixture distinguishes safety-assertion RED from unrelated infrastructure failures.
+- Delivery metadata requires canonical headings in addition to substantive proof. This entry repairs formatting only; prior notes/history are preserved.
+- GREEN implementation remains pending independent RED approval and must not alter frozen tests.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED SHA 0d52f43b393d961160aeea0db43b13a3fa5c284a.
+- Commands run: go test -count=1 -timeout=240s ./internal/gates -run 'Reads|EventContract|Consumer' -v.
+- Summary: 66 leaf cases, 39 PASS / 27 intended FAIL / 0 skipped; controls separately 3 PASS. No tests rerun for this metadata-only repair.
+- pvg verify internal/gates/reads_consumer_test.go --include-tests --format text: PASS, 1 file / 0 issues.
+
+### proof
+- [x] AC 1: Exact event-consumer READS cases authored and executed through real Gx and combined G2/Gx CLI; genuine RED recorded.
+- [x] AC 2: Missing either sibling declaration returns unsafe success today; unit and CLI mutations expose it. Strict-superset independence specified.
+- [x] AC 3: Single-consumer and repeated-unique legacy controls pass; ambiguous fan-out and blank explicit owner produce genuine RED assertions.
+- [x] AC 4: Repeated rows, same/different multiple-machine ownership, duplicates/conflicts, malformed fields, renames and local waivers covered.
+- [x] AC 5: Nine real CLI cases executed, 4 PASS / 5 intended FAIL, no mocks/skips; RED complete, GREEN behavior still pending.
 
 
 ## nd_contract
