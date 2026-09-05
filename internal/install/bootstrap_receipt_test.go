@@ -634,14 +634,24 @@ func bootstrapAuthorityCase(t *testing.T, release *bootstrapRelease, source, aut
 		if err := lock.Release(); err != nil {
 			t.Error(err)
 		}
+		reopened, err := acquireInstallOperationLock()
+		if err != nil {
+			t.Errorf("parent lock not released: %v", err)
+		} else if err := reopened.Release(); err != nil {
+			t.Error(err)
+		}
 	})
 	tx, err := beginArtifactTransaction(append(homeInstallArtifactPaths([]string{home}), receiptPath))
 	if err != nil {
 		t.Fatal(err)
 	}
+	journalRoot := tx.root
 	t.Cleanup(func() {
 		if err := tx.rollback(); err != nil {
 			t.Error(err)
+		}
+		if _, err := os.Lstat(journalRoot); !os.IsNotExist(err) {
+			t.Errorf("parent journal cleanup incomplete: %v", err)
 		}
 	})
 	scope, err := installOperationScope()
