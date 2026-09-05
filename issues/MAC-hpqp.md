@@ -1,16 +1,17 @@
 ---
 id: MAC-hpqp
 title: "Execute every required infrastructure test deterministically"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:46:12Z
-content_hash: "sha256:339213f39ea5893de9b76f0bd442051806e27a8537cb98fb74f0e1e8e693f035"
+updated_at: 2026-09-05T20:00:19Z
+content_hash: "sha256:4cde6fafe694c75bbbd9f729d8a0fe8e01edebcace3100f2bbe9ceb4d88aeddb"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
+assignee: dev-MAC-hpqp
 ---
 
 ## Description
@@ -116,6 +117,8 @@ status: new
 - 2026-09-05T19:45:33Z dep_added: blocks MAC-gcrr
 - 2026-09-05T19:45:33Z dep_added: blocks MAC-ou97
 - 2026-09-05T19:45:33Z dep_added: blocks MAC-hy71
+- 2026-09-05T20:00:19Z status: open -> in_progress
+- 2026-09-05T20:00:19Z claimed by dev-MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
