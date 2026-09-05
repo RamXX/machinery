@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T22:54:50Z
-content_hash: "sha256:a6220f110350d6484d9e6deeee60d3d30694e3c204c0bff6b45668d8642de215"
+updated_at: 2026-09-05T22:55:07Z
+content_hash: "sha256:c86e2201195103a6db513119faa6a2f4f081dc4af100ba780f542112fe5f0960"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p8ce
 follows: [MAC-olrx]
@@ -435,3 +435,96 @@ status: delivered
 - Follows: [[MAC-olrx]]
 
 ## Comments
+
+### 2026-09-05T22:55:07Z ramirosalas
+## Implementation Evidence
+
+PROOF:
+
+### CI/Test Results
+
+Commands run:
+- All shell/test commands used /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-p8ce on story/MAC-p8ce.
+- go test -count=1 -timeout=5m ./internal/gates -run 'Reads|EventContract|Consumer' -json -coverprofile=/tmp/MAC-p8ce-green-final.cover
+- go test -count=1 -timeout=5m ./internal/gates -run 'G2|C4|Traceability|EventWiring|Reads|EventContract|Consumer|Payload' -json -coverprofile=/tmp/MAC-p8ce-green-blast.cover
+- go test -count=1 -timeout=5m ./internal/gates -run '^TestEventCells' -json
+- go test -timeout=5m ./internal/gates -list 'G2|C4|Traceability|EventWiring|Reads|EventContract|Consumer|Payload'
+- go tool cover -func=/tmp/MAC-p8ce-green-final.cover
+- go tool cover -func=/tmp/MAC-p8ce-green-blast.cover
+- pvg verify internal/gates/readscomplete.go internal/gates/reads_consumer_test.go internal/gates/reads_consumer_supplemental_test.go README.md skills/machinery/references/c4-standalone.md skills/machinery/references/build-md-template.md --include-tests --format text
+- pvg story verify-tdd --base 497419ab4512fcff765cd5feb27aed4c67b5608d
+- git diff --exit-code 0d52f43b -- internal/gates/reads_consumer_test.go
+- git diff --check 497419a..HEAD
+- git diff --numstat 497419a..HEAD
+- git status --porcelain
+
+Summary: final targeted run PASS 78 leaves / 0 FAIL / 0 SKIP (41 frozen story cases including 9 actual CLI cases; 12 new supplemental cases; 25 existing cases), exit 0, 4.463s. Broader downstream run PASS 134 leaves / 0 FAIL / 0 SKIP, exit 0, 3.066s. Separate G2 EventCells run PASS 15 leaves / 0 FAIL / 0 SKIP. The broader run contains the targeted cases; combined breadth is 149 distinct passing leaves, not an additive claim over repeated executions. JSON reducers emitted every terminal leaf result and every OutputType=error; final errors arrays were empty. No mocks, environmental skips, missing prerequisites, or service dependency.
+
+Coverage: downstream package statement coverage 24.9%; readscomplete.go covered 138/141 statements (97.87%) from the targeted profile. Function coverage: readsCompleteArmed 100%, armedReadsEvents 100%, collectConsumerReads 92.3%, parseConsumerReadSet 100%, bindConsumerReads 100%, checkReadsComplete 100%. Targeted runtime printed 19.4% package coverage while go tool cover rounded its aggregate to 19.3%; source-file numerator/denominator above is measured directly from the profile. Uncovered collector statements are diagnostic/fallback paths, not an assertion of complete path coverage.
+
+Native inventory:
+- Frozen tests: LegacySingleControl (1), RepeatedLegacyStillHasOneOwner (1), ExactEdgesPass (6), RejectsOwnershipMutations (13), AmbiguousLegacyNeedsMigration (2), MalformedDeclarationsFailClosed (8), ExplicitBlankOwnerCannotUseLegacyFallback (1), CLI (9): all 41 PASS unchanged.
+- CLI cases: legacy_control, distinct_sets, missing_audit, missing_payments, audit_payload_narrowed, payments_payload_narrowed, renamed_known_consumer, conflicting_duplicate, unknown_participant_G2: all PASS. Tests compile ./cmd/machinery to a real temporary binary and execute check <temporary-design> --gate g2,gx; unknown-participant case uses g2. Both valid fixtures and intended blocking exits are asserted.
+- Supplemental: reordered/annotated owner, escaped pipe, per-table column positions, unique legacy prose, order-independent exact sets, duplicate owner columns, short explicit row, malformed closing brace, unclosed waiver, duplicate waivers, unknown extra owner, nonconsumer header: 12 PASS.
+- Downstream run includes CheckC4 and CheckTraceability against all three repository examples, event wiring/waivers, interface contracts, allow graph, unarmed READS behavior and warn-tier handoff. Separate EventCells inventory covers participant resolution, externals, nested annotations, every table, column answers and dedupe.
+- Per user scope, full package/repository suite and scripts/preflight.sh were not run. No installed binary, installed skills/plugins, Docker container, remote git or GitHub state changed.
+
+Intermediate results and errors:
+- First GREEN at 6131abf: original 66 leaves all PASS, including frozen 41 and actual CLI 9.
+- New supplemental tests initially exposed three in-scope unsafe accepts at that intermediate implementation: extra closing brace, unclosed waiver beside a valid declaration, duplicate waivers hiding an empty reason. That run was 9 PASS / 3 FAIL / 0 SKIP. All three were corrected in owned source and pass at final SHA. Frozen RED was never edited.
+- pvg issues comment --help returned exit 1 with 'flag: help requested'; documentation output was read, not counted as a product failure. pvg story deliver --help printed a misleading OK; subsequent story read confirmed status in_progress with hard-tdd/red-approved and no delivered label or mutation. Actual story delivery is performed once below.
+- No unresolved product test failures or warnings encountered.
+
+### Commit
+
+Branch: story/MAC-p8ce
+RED SHA: 0d52f43b393d961160aeea0db43b13a3fa5c284a
+GREEN SHA: 337b9cec17a3f551a7564bed9394045b36043976
+Implementation commit: 6131abf; supplemental/strict-malformed/docs commit: 337b9ce.
+Frozen RED file byte-identical to approved SHA; local-base verify-tdd PASS: checked 3 commits, skipped 0 merges, no unauthorized test edits.
+Whole story diff from 497419a: 6 files, 619 insertions / 33 deletions = 652 changed LOC, including frozen 336-line RED addition. Worktree clean; diff check PASS. No rebase or merge performed.
+
+### Wiring
+
+Existing production paths remain checkEventCells via CheckC4 at gates.go:971 and checkReadsComplete via CheckTraceability at gates.go:1992. The new binder and parser are called directly from the armed check; they use existing readDesignFile, strictSortedGlob, ir.ParseMdTables, ir.FindCol and ir.CleanCell. Product remains standalone Go with no Paivot runtime dependency. Ownership is exact cleaned event-contract consumer, never machine basename. Legacy resolution counts distinct consumers, including waived siblings; explicit sibling coverage never licenses ambiguous legacy fallback.
+
+### pvg verify
+
+VERIFY: PASSED (3 files scanned, 0 issues). All six changed paths were supplied explicitly; this tool scanned the three Go files and did not claim Markdown validation.
+Doc freshness manually reviewed: dispatcher explicitly authorized only READS passages in README.md, skills/machinery/references/c4-standalone.md and skills/machinery/references/build-md-template.md. All three now document exact participant binding, unique legacy migration, sibling isolation and malformed/conflicting declarations while preserving unarmed Gd semantics. No installed skill/plugin path or SKILL.md edited.
+Codebase-memory Verify used root project Users-ramirosalas-workspace-machinery, generation 2026-09-05T20:28:41Z; relevant graph search and both-direction trace found sole checkReadsComplete caller CheckTraceability. Coverage metadata matched original source; worktree-only tests were missing from the root graph. Every consumed/changed path was read directly in the worktree as the changed/unindexed fallback. Graph freshness is not claimed for this branch.
+
+### AC Verification
+
+| AC # | Requirement | Code Location | Test Location | Status |
+|------|-------------|---------------|---------------|--------|
+| 1 | Exact per-consumer declaration and own payload; joint G2/Gx enforcement | readscomplete.go collectConsumerReads, bindConsumerReads, checkReadsComplete; existing gates.go G2/Gx call sites | frozen ExactEdgesPass/distinct_sets, annotation_does_not_change_participant; CLI/distinct_sets and unknown_participant_G2 | PASS |
+| 2 | Missing siblings cannot be masked; strict supersets remain local | readsEdge key, per-edge canonical read set, row payload loop | frozen RejectsOwnershipMutations missing owners/reassignment/independently narrowed payloads; ExactEdgesPass/strict_superset_is_local | PASS |
+| 3 | Unique legacy retained; fan-out gives migration guidance | bindConsumerReads distinct-owner resolution and explicit-column errors | LegacySingleControl, RepeatedLegacyStillHasOneOwner, both AmbiguousLegacyNeedsMigration cases, ExplicitBlankOwnerCannotUseLegacyFallback | PASS |
+| 4 | Repeats, conflicts, unknown fields, renamed owners, malformed values and local waivers deterministic | canonical sorted sets, strict parseConsumerReadSet, exact owner lookup, row-local waiver validation | frozen repeats/multimachine agreements/conflicts/near-match/rename/malformed/waiver cases; 12 supplemental authoring-boundary cases | PASS |
+| 5 | Positive distinct sets and all prescribed negative mutations through real CLI | same G2/Gx production path | all nine frozen TestReadsConsumerCLI leaves PASS with correct success/blocking exit and intended findings | PASS |
+
+LEARNINGS:
+- Consumer identity is architectural; machine filenames cannot safely establish it. Table-local columns preserve identity across column order changes and multiple tables.
+- Comparing canonical complete sets prevents both sibling field leakage and accidental unions of conflicting declarations across machines.
+- Malformed overrides must remain visible even when a valid declaration would otherwise satisfy the edge; waiver syntax needs the same strictness.
+- The existing markdown parser preserves escaped pipes, allowing exact ownership without a second cell grammar.
+- Full-path positive controls and native leaf inventory distinguish semantic gate rejection from unrelated fixture or process failures.
+
+## nd_contract
+status: delivered
+
+### evidence
+- GREEN 337b9cec17a3f551a7564bed9394045b36043976; frozen RED 0d52f43b393d961160aeea0db43b13a3fa5c284a unchanged.
+- Targeted 78 PASS; broader G2/Gx 134 PASS; separate EventCells 15 PASS; all 0 FAIL/0 SKIP. Actual CLI 9 PASS.
+- Source statement coverage 138/141 (97.87%), downstream package 24.9%; pvg verify 3 code files/0 issues; verify-tdd local base PASS.
+
+### proof
+- [x] AC #1: exact event-consumer binding and own payload validated through production G2/Gx.
+- [x] AC #2: sibling absence and local strict-superset semantics independently verified.
+- [x] AC #3: unique legacy accepted and fan-out rejected with explicit migration guidance.
+- [x] AC #4: deterministic repeat/conflict/malformed/rename/waiver behavior verified.
+- [x] AC #5: all nine real CLI control/mutation cases pass unchanged.
+
+Delivery verification: pvg story deliver MAC-p8ce executed once, then pvg story verify-delivery MAC-p8ce passed 9/9. This terminal comment repeats the GREEN evidence because older RED comments render after the Notes section; append-only history is preserved.
+
