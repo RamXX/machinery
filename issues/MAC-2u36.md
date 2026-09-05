@@ -1,17 +1,18 @@
 ---
 id: MAC-2u36
 title: "Converge installer reruns on recorded targets"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:04:15Z
-content_hash: "sha256:425fa0f9031ce5edb826fc8ca8730161d2e65070dcb254434a702262aa31e348"
+updated_at: 2026-09-05T23:04:49Z
+content_hash: "sha256:ee30c94c94dbd20f7dfbf14470f48f0848b2367a62e66be65b9f49b71bcc884b"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx]
+assignee: dev-MAC-2u36
 ---
 
 ## Description
@@ -954,6 +955,8 @@ Preserved as quoted history; current Description is authoritative.
 - 2026-09-05T22:30:04Z status: in_progress -> in_progress
 - 2026-09-05T23:04:15Z status: in_progress -> open
 - 2026-09-05T23:04:15Z released by ramirosalas
+- 2026-09-05T23:04:49Z status: open -> in_progress
+- 2026-09-05T23:04:49Z claimed by dev-MAC-2u36
 
 ## Links
 - Parent: [[MAC-ui8a]]
