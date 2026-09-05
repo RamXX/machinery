@@ -8,8 +8,8 @@ labels: [capstone]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:14Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:38:47Z
-content_hash: "sha256:681677c880b2868882d879233d54788af6471f8b4a3955cada5ee35d9b2f424e"
+updated_at: 2026-09-05T19:45:33Z
+content_hash: "sha256:7cbef9220c17ac8c90e2b5696310375663af40d348406a4cbc4ac1ff73e5bf97"
 blocked_by: [MAC-hlae, MAC-sh60, MAC-olrx, MAC-p8ce, MAC-yhg5, MAC-hwdb, MAC-2u36, MAC-a89e, MAC-p7jd, MAC-2n83, MAC-hy71, MAC-gcrr, MAC-l7m0, MAC-vx24, MAC-lnu6]
 ---
 
@@ -109,6 +109,20 @@ Observable outcome: the user can complete valid software delivery and see unsafe
 
 ## Notes
 AUTHORITATIVE CAPSTONE TESTING CORRECTION: This is an integrated tests-only capstone after all implementations already pass. No manufactured missing-feature RED is required and hard-tdd label is removed. Instead every unsafe mutation must trigger the intended assertion/block while safe positive controls pass, proving sensitivity. Preserve reviewed test bytes and provide exact actual E2E execution evidence. Earlier capstone RED wording is superseded by this correction.
+ANCHOR ROUND-1 AUTHORITATIVE EXECUTION-LANE REPAIR
+General rule: required runtime tests need deterministic provisioning, explicit closed inventory, actual native execution accounting and teardown. Missing infrastructure must fail the REQUIRED lane, not be silently skipped. Ordinary native suites may explicitly exclude registered service-backed tests using a dedicated build tag.
+Classification: Final user-perspective tests combine Docker/Java/Node/native replay; all runtime prerequisites mandatory.
+Replace prior bare go test -run HardeningE2E command with shared required lane selecting capstone after provisioning. Validate union contains all delivered sibling fragments and every expected case ran. Pure capstone remains no hard-tdd label; safe/unsafe sensitivity required.
+PRODUCES:
+- testdata/integration-lanes/capstone.json -> this story's closed suite fragment, with exact source/test IDs, runtime/pin requirements and bounded execution configuration
+- cmd/machinery/hardening_e2e_test.go -> actual named runtime cases registered in the fragment
+CONSUMES:
+- MAC-hpqp: testdata/integration-lanes/schema.json
+  schema: Closed versioned native-runner suite fragment with exact source/test identities, runtime requirements and bounded command selection.
+- MAC-hpqp: scripts/integration-lane/main.go
+  endpoint: go run ./scripts/integration-lane --lane required (Makefile test-integration invokes same entrypoint).
+Additional acceptance criteria: fragment matches actual test sources both directions; all registered cases actually start/terminate with expected positive/negative outcomes; no cached/skipped/empty/partial/fabricated-summary success; real provisioned positive and missing-runtime/fresh-cache failure diagnostics; no owned container/process leaks. Required local preflight and hosted CI execute the same union. Do not edit shared root inventory; own only this fragment. RED source, fixture, fragment and runner configuration are frozen together after review. Any exact test names introduced in RED must remain registered through GREEN.
+No heavy preflight until final gate; no GitHub mutation; no active installation replacement. This note supersedes any earlier command implying service-backed tests execute in unprovisioned ordinary package suites.
 
 ## History
 - 2026-09-05T19:36:14Z dep_added: blocked_by MAC-hlae
