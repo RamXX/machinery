@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:28:42Z
-content_hash: "sha256:44ab8e36c309316337ffa7008d127d6204dacd049cbaf7441516b568f9c218e6"
+updated_at: 2026-09-05T21:29:03Z
+content_hash: "sha256:abb42df1e796ee664e93a91ef53724035d22b81e99d96f60af148dbf8d187cb8"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx]
@@ -542,3 +542,24 @@ status: delivered
 - [x] AC #2: real offender/regeneration/ratchet/G4 regression independently reproduced.
 - [x] AC #3: real deliberate baseline and guidance sensitivity requirements independently validated.
 - [x] AC #4: real positive control and negative behavior independently exercised.
+
+### 2026-09-05T21:29:03Z ramirosalas
+## PM RED Transition Verified — 2026-09-05
+pvg story approve-red MAC-a89e succeeded using the shared vault. Fresh canonical readback confirms Status open; Labels hard-tdd, red-approved; delivered removed. Full independent review comment and proof remain present. This terminal contract supersedes earlier rendered delivered contracts, because comments render after transition notes.
+
+Frozen RED candidate: e95be63019d89b93ae527f27ae1ce43326def038. GREEN may implement the four-file canonical scope but must preserve the exact approved test and fixture bytes. No story acceptance or closure occurred.
+
+## nd_contract
+status: new
+
+### evidence
+- Supported approve-red transition completed and canonical status/labels independently verified.
+- RED approved at e95be63019d89b93ae527f27ae1ce43326def038 after isolated 37-leaf replay: 32 PASS / 5 intended FAIL / 0 SKIP.
+- Full PM proof, raw evidence locations, frozen hashes and specific scanner false-positive disposition are retained in the preceding review comment.
+
+### proof
+- [x] AC #1: approved RED advice-selection contract.
+- [x] AC #2: approved RED real CLI debt-preservation regression.
+- [x] AC #3: approved RED deliberate-baseline and guidance contract.
+- [x] AC #4: approved RED real positive/negative controls.
+- [ ] GREEN implementation and final acceptance remain pending.
