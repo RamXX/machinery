@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:46:12Z
-content_hash: "sha256:e9eb2505777d4d79b0b3cef6a84b5e01be9db1197f98f5a16d9b9f04c23a04f3"
+updated_at: 2026-09-05T19:47:19Z
+content_hash: "sha256:360c6e87ddc93f41d6a666a8411a86dec3d71ab58280d23780105b8b1ef8688a"
 ---
 
 ## Description
@@ -82,6 +82,43 @@ Full sweep of all original 16 children:
 Each runtime story owns a separate fragment, so no concurrent shared root-manifest edits. Frozen RED tests/fixtures/runner configuration include those fragments. No env-gated dormant tests or skip-if-missing added.
 Self-review: all 17 children clean within their approved or explicitly blocked scope; lane is deliberately infrastructure-focused but delivers observable real provision/run/account/cleanup flow, not static wiring alone.
 Validation after repair: pvg lint --backlog --epic MAC-ui8a --json => []; pvg rtm check --epic MAC-ui8a => passed, 0 tagged requirements, 18 records; pvg nd dep cycles => none. Full preflight not run.
+## ANCHOR REVIEW (backlog_review, round 2 of 3)
+REVIEW_RESULT: APPROVED
+
+### Evidence
+- Independently reran pvg lint --backlog --epic MAC-ui8a --json FIRST: [].
+- Read new MAC-hpqp in full and compared authoritative repairs across every original child; reviewed epic repair summary and dependency mapping.
+- Independently ran pvg nd dep cycles: No dependency cycles found.
+- Scope is now 17 children. RTM's 0 tagged requirements is not substantive requirements proof; the round-1 manual assessment/NEXT mapping remains the basis.
+
+### Previous rule resolution
+The required real-infrastructure execution-lane gap is fixed at backlog-contract level and generalized:
+- MAC-hpqp owns a nonempty real provision/execute/account/cleanup pilot, closed fragment discovery and pin contracts, shared runner, CI/formal/nightly, preflight ordering, Makefile and shell inventory.
+- Runtime stories own distinct suite fragments and executable test identities, depend on that lane, and cannot leave service-backed cases unconditionally in ordinary native suites.
+- Service-free stories and architecture-only work are explicitly classified; additional runtime scope requires inventory/dependency repair.
+- Required local/hosted lanes reject absent infrastructure, zero/missing/skipped/cached/truncated execution and cleanup residue. Explicit native-lane exclusion is not a silent skip.
+- Release MAC-hy71 follows shared workflow ownership and requires the exact integration job status.
+- Capstone depends on the new lane and checks the delivered union plus actual selected/executed case evidence.
+
+### Judgment
+No remaining critical or major backlog findings. The standalone product constraint, no live installation replacement, no remote writes during work, exact frozen tests, independent behavioral RED review, negative mutation sensitivity, safe recovery identity preservation, and final-only heavy preflight remain intact.
+
+Approval concerns backlog readiness, not delivery or permission to bypass existing blockers. MAC-l7m0 still requires user choices and independent architecture acceptance; MAC-vx24 must receive the exact accepted contract before implementation. Pending NEXT feature scope remains visible and cannot be called completed merely by finishing bug stories. No source changes, installed-runtime changes, GitHub mutations or heavy preflight were performed in this review.
+
+## nd_contract
+status: new
+
+### evidence
+- Anchor round-2 review approved after independent clean mechanical lint and complete generalized-repair inspection.
+- 17 child contracts reviewed; independent cycle check clean.
+
+### proof
+- [x] All original assessment/NEXT bug findings have bounded owning work.
+- [x] Required integration lanes, provisioning, inventory and final preflight wiring assigned.
+- [x] Standalone/no-live-install/no-remote-write constraints preserved.
+- [x] Backlog passes independent Anchor review.
+- [ ] Architecture user choices and exact implementation contract settled.
+- [ ] Implementation, independent acceptance, capstone and final heavy preflight completed.
 
 
 ## ANCHOR REVIEW (backlog_review, round 1 of 3)
