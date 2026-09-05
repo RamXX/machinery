@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:53:03Z
-content_hash: "sha256:95615cd1db8911793f684dc3434329ec0b1d93fd501a77ff0595663f53ec4fc1"
+updated_at: 2026-09-05T22:09:12Z
+content_hash: "sha256:e30938b698ab01e16ec75aa8e419b965c46f3517427de0e0f35d0bb6493011bc"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -565,4 +565,52 @@ status: new
 - [x] AC #8: caller ownership, owned host/container lifecycle and unrelated sentinel protection asserted.
 - [x] AC #9: authorized behavioral RED v2 frozen; replaceable bootstrap exception retained.
 - [x] AC #10: all25 real-process full-path challenges executed in RED, exact positive native evidence required for GREEN.
+
+
+### 2026-09-05T22:09:12Z ramirosalas
+### GREEN scope-review pause (undelivered; claim retained)
+
+Current committed SHA: 221525d7baf7a565ece9972d09bf916132e68050 on story/MAC-hpqp. Healthy worktree retained. Dispatcher explicitly requested this scope-review pause; no additional file/API scope is authorized yet and pvg story deliver has NOT been run.
+
+PROOF (checkpoint only, not complete delivery):
+Commands run:
+- go test -count=1 -timeout=2m -json ./scripts/integration-lane: native-3.json PASS, frozen 64 leaves, 70 starts/70 terminal events, 0 failures/skips, 11.446s. Includes 25 structural mutation controls and 4 real bounded Bash controls; those are not runtime success evidence.
+- go test -count=1 -timeout=2m -coverprofile=/tmp/machinery-hpqp-green.g6rAM2/coverage.out -json ./scripts/integration-lane: native-2.json PASS at 4157200, statement coverage 58.9%; this excludes subprocess runtime coverage.
+- go test -tags machinery_integration -count=1 -timeout=15m -json ./cmd/machinery -run '^TestIntegrationLane(Pilot(OCI|Formal)|FullPath|HostDescendantControl|NodeEventControls)$': runtime-1.json at 4157200 produced 31 leaves, 30 PASS/1 FAIL/0 SKIP. Only failed leaf was cold-cache: correct actual closure hashes but Java path /private/var spelling did not remain lexically rooted in caller /var cache. All 24 other full-path scenarios and real OCI/formal/host/Node controls passed.
+- go test -tags machinery_integration -count=1 -timeout=5m -json ./cmd/machinery -run '^TestIntegrationLaneFullPath$/^cold-cache$': cold-2.json at 72bd28d PASS; exact selected cold-cache leaf passed after canonical containment plus caller-path spelling fix, 63.17s. This targeted result is not an unfiltered final runtime replay.
+- Frozen union reconciliation is exactly 64 native Go leaves +31 tagged Go runtime leaves +1 standalone Node pilot =96. Standalone Node pilot and actual go run ./scripts/integration-lane --lane required remain outstanding at final GREEN SHA.
+- golangci-lint run --config .golangci.yml --timeout 3m ./scripts/integration-lane: 0 issues on current code. actionlint .github/workflows/ci.yml .github/workflows/formal.yml .github/workflows/nightly.yml PASS. shellcheck -x scripts/preflight.sh PASS. Initial bare shellcheck lacked -x dependency following and was corrected; no source suppression.
+- scripts/shellcheck-inventory.sh PASS; scripts/shellcheck-files.txt unchanged because no shell surface added.
+- pvg verify scripts/integration-lane/main.go scripts/preflight.sh .github/workflows/ci.yml .github/workflows/formal.yml .github/workflows/nightly.yml Makefile --format text: PASS (1 supported source file scanned, 0 issues).
+- pvg story verify-tdd --range 497419ab4512fcff765cd5feb27aed4c67b5608d..HEAD --json: 6 commits checked, no violations. Includes original RED v1 and independently authorized RED v2 marker history.
+- Exact git diff against frozen e55238223961fec922896c361d8af6cafc454a8e for both frozen Go tests and entire testdata/integration-lanes: empty. No new supplemental tests yet.
+- Current combined original-base delta:13 files,3004 insertions/11 deletions; main.go1213 lines. The initial estimate was investigated explicitly; runtime/schema/native-accounting/ownership duties cannot fit47 lines remaining after1753 RED lines.
+- docker ps -a --filter label=dev.machinery.integration-run returned empty. Dagger18576903a871d895c8b414ee0a41897313ce31d7b5b6284c29b489553e4fae99 remains running. Native/runtime test cleanup checks preserved user sentinels and host descendants. No installed binary/skills/plugins/agents, root branch, unrelated worktrees, remote or GitHub changes; no full preflight.
+
+### Scope extension requested for AC8 (not authorized)
+Code-path evidence: scripts/integration-lane/main.go provision line759 launches the bounded self helper; provisionFormal line845 calls existing formal.VerifyFormalTo. internal/formal/formal.go runTLC lines546-591 creates a JVM using processcontrol; internal/processcontrol/run_unix.go prepare sets a fresh process group. If the outer runner cancels while the helper is in the formal verifier, killing the helper process group does not necessarily kill the nested JVM group. This is a material unclosed AC8 concern, not a claimed observed leak or a test dispute. Approved tests currently cover native-suite cancellation, not this specific provisioning-stage nested-group cancellation.
+
+Concrete minimal proposal:
+- Authorize NEW production internal/formal/provision.go (approximately8 lines) exposing internal-package ProvisionTLC() (string,error), delegating unchanged ensureJar() for existing checksum, cache-lock, staging/recovery semantics.
+- Replace helper formal.VerifyFormalTo with runtimeclosure.OpenJava + formal.ProvisionTLC. Keep helper provisioning free of descendant JVM groups. Runner directly owns bounded Java probe/TLC validation commands before suite selection; required frozen formal pilot still proves actual safe/unsafe verification.
+- Provision into a task-owned child of caller cache, preserve successful inspectable runtime artifacts, and remove only that exact child after failed/cancelled provisioning so interrupted cache stages cannot remain hidden.
+- Add NEW supplemental negative/control coverage for provisioning-stage cancellation and retained caller roots/resources; do not modify frozen tests/config/fixtures. Exact new test/fragment paths should be approved alongside API scope.
+- Independent PM must review extension and final combined overrun. No processcontrol shared-module changes are proposed.
+
+LEARNINGS:
+- A bounded capture buffer must cancel the producer on overflow; initial implementation waited for timeout. Immediate cancellation now reuses processcontrol.Run and bounded io.Writer.
+- macOS /var and /private/var alias equivalence must be checked canonically while preserving caller cache spelling in the report and test argv.
+- A bounded outer helper does not prove ownership of grandchildren that create separate process groups. Reuse provisioning independently of engine execution to make cancellation authority direct.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Committed221525d7baf7a565ece9972d09bf916132e68050; checkpoint logs /tmp/machinery-hpqp-green.g6rAM2/.
+- Dispatcher requested pause for canonical scope review; no delivery, acceptance or claim release.
+
+### proof
+- [x] AC #9: approved RED bytes unchanged; no full preflight.
+- [ ] AC #8: provisioning-stage nested JVM cleanup remains under explicit scope review.
+- [ ] AC #10: final unfiltered required-lane/native proof remains outstanding after scope resolution.
 
