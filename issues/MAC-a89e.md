@@ -4,7 +4,7 @@ title: "Keep regeneration advice from accepting new debt"
 status: in_progress
 priority: 0
 type: bug
-labels: [hard-tdd, red-approved, rejected]
+labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
