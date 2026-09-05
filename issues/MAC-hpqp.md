@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T20:25:54Z
-content_hash: "sha256:b9f70de11b94bea6c3e18d7c809085770e0bea65cafe573ec940aeaeb3392626"
+content_hash: "sha256:4dd2dbfb6437648c142e17d966636e68313b58f290bc6ee195eb6cbd0fd8bd32"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 ---
@@ -200,6 +200,7 @@ status: new
 - 2026-09-05T19:45:33Z dep_added: blocks MAC-hy71
 - 2026-09-05T20:00:19Z status: open -> in_progress
 - 2026-09-05T20:00:19Z claimed by dev-MAC-hpqp
+- 2026-09-05T20:25:54Z status: in_progress -> in_progress
 
 ## Links
 - Parent: [[MAC-ui8a]]
