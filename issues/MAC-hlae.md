@@ -8,8 +8,8 @@ labels: [hard-tdd, walking-skeleton]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:38:44Z
-content_hash: "sha256:13cb828bcee1026358744e1713ca051bd79c3658b145fc71d6dddb3d1d99076a"
+updated_at: 2026-09-05T19:45:31Z
+content_hash: "sha256:edde71bb9999ad12b0159c53361ca7ebc750c0faa132b37cd0ce9a122bc6a007"
 blocks: [MAC-ou97]
 ---
 
@@ -81,6 +81,20 @@ status: new
 
 ## Notes
 AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone, never require Paivot/pvg/nd, workflow labels or commit conventions. Local development coordination only may use Paivot. Another agent uses installed Machinery in NIL: do not replace installed binary/plugins/skills/agents; no dev-link or live install/update. Build isolated candidate only. No GitHub push/mutation during work. Full scripts/preflight.sh only final epic gate. RED author may update preexisting tests that encode superseded unsafe behavior with explicit review and genuine assertion-failure proof; after RED approval freeze exact tests/fixtures/config bytes.
+ANCHOR ROUND-1 AUTHORITATIVE EXECUTION-LANE REPAIR
+General rule: required runtime tests need deterministic provisioning, explicit closed inventory, actual native execution accounting and teardown. Missing infrastructure must fail the REQUIRED lane, not be silently skipped. Ordinary native suites may explicitly exclude registered service-backed tests using a dedicated build tag.
+Classification: Real verify-formal/TLC/Java scenarios; package-only refine/compose unit tests remain ordinary native.
+Run compiler assertions in native targeted suites; real solver cases through required integration lane, not unconditional go test ./cmd/machinery on macOS CI.
+PRODUCES:
+- testdata/integration-lanes/saga.json -> this story's closed suite fragment, with exact source/test IDs, runtime/pin requirements and bounded execution configuration
+- cmd/machinery/saga_closure_test.go -> actual named runtime cases registered in the fragment
+CONSUMES:
+- MAC-hpqp: testdata/integration-lanes/schema.json
+  schema: Closed versioned native-runner suite fragment with exact source/test identities, runtime requirements and bounded command selection.
+- MAC-hpqp: scripts/integration-lane/main.go
+  endpoint: go run ./scripts/integration-lane --lane required (Makefile test-integration invokes same entrypoint).
+Additional acceptance criteria: fragment matches actual test sources both directions; all registered cases actually start/terminate with expected positive/negative outcomes; no cached/skipped/empty/partial/fabricated-summary success; real provisioned positive and missing-runtime/fresh-cache failure diagnostics; no owned container/process leaks. Required local preflight and hosted CI execute the same union. Do not edit shared root inventory; own only this fragment. RED source, fixture, fragment and runner configuration are frozen together after review. Any exact test names introduced in RED must remain registered through GREEN.
+No heavy preflight until final gate; no GitHub mutation; no active installation replacement. This note supersedes any earlier command implying service-backed tests execute in unprovisioned ordinary package suites.
 
 ## History
 - 2026-09-05T19:36:14Z dep_added: blocks MAC-ou97
