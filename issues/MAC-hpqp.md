@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T22:23:06Z
-content_hash: "sha256:ef5e286e3744cc06a0afaca9e6c92632d088b151aa4a332588d8125ab288374e"
+updated_at: 2026-09-05T22:23:28Z
+content_hash: "sha256:748b4078aa32a147d87e0ababbcaf613206ada3e08194b946efd793231344bc7"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -111,6 +111,22 @@ Created 2026-09-05 to repair Anchor round-1 general execution-lane gap; source i
 
 ## Notes
 GREEN scope investigation: approved RED v2 already contributes 1753 lines. Closed inventory and exact native identity validation, Go JSON/Node TAP accounting, pinned OCI/Java/TLC/Node provisioning, owned scratch/container/process cleanup, and required workflow/preflight/Make wiring require an estimated 800-1200 production lines plus approximately 60 wiring lines. Dispatcher acknowledged investigation; independent PM must assess final exact delta. Frozen seven test/config/fixture files remain immutable. Implementation stays in declared production ownership and reuses processcontrol/runtimeclosure/formal primitives.
+## AC8 triage readback verification — 2026-09-05
+Canonical readback verifies AC1-7/9-10 verbatim; explicit architecture hold, expanded AC8 verification, measured budget and both GREEN pause comments retained. pvg lint --backlog --epic MAC-ui8a --json returned []; pvg rtm check --epic MAC-ui8a passed with0 tagged requirements/18stories1closed (limited traceability assurance); pvg nd dep cycles found no cycles. Story remains P0 in_progress hard-tdd,red-approved assigned dev-MAC-hpqp under MAC-ui8a with identical downstream dependencies. Root clean main...origin/main. Self-review verdict: clean; existing P0 outcome owner retained, no guessed custody mechanism/API or new prerequisite, exact platform/runtime residuals explicit. This is backlog/architecture-hold evidence, not empirical nested-JVM leakage or repaired cleanup evidence.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Supported canonical nd edit plus append-only history/triage completed; source and readback evidence above.
+- Scoped lint [], RTM passed0tagged requirements, no dependency cycles; claim/status/labels and worktrees unchanged.
+
+### proof
+- [x] AC8 unresolved transitive custody risk and minimum real verification recorded under existing owner.
+- [x] No provisioning-wrapper-only completion claim or unapproved host/OCI choice.
+- [ ] Pending containment decision, exact reviewed architecture/ownership and independent concrete supplemental-test authorization.
+- [ ] Complete final-SHA lane/Node replay and independent acceptance pending.
+
 ## AUTHORITATIVE AC8 NESTED-PROCESS SCOPE TRIAGE — MAC-hpqp — 2026-09-05
 
 Disposition: retain an explicit architecture-decision hold within existing P0 MAC-hpqp, per dispatcher direction. No prerequisite was created, no implementation ownership broadened and no claim/status/label/dependency changed. Parent MAC-ui8a and existing downstream chain remain intact. MAC-2u36 installer triage is complete and untouched by this task.
