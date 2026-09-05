@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:17:10Z
-content_hash: "sha256:692e0b8c344c134d806927c7d85078ecc2bb74fd4c92f84b7c9c921e768e41ac"
+updated_at: 2026-09-05T21:18:55Z
+content_hash: "sha256:6110324cae1591f3a44eea136ae76e2ea2916f20a99bed3ec8204f16bb13dd35"
 blocks: [MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-a89e
 follows: [MAC-olrx]
@@ -241,3 +241,29 @@ status: in_progress
 - [x] Scope repair: narrow existing-test authorization embedded without enlarging its allowed assertion changes.
 - [ ] AC #1-4: RED execution, independent approval, implementation and acceptance remain pending.
 
+
+### 2026-09-05T21:18:55Z ramirosalas
+TEST-EDIT AUTHORIZED: internal/gates/regeneration_safety_test.go -- bounded pre-approval AC3 assertion repair against committed 9b85ef6 and f482c7683f5005e40722123e3a382e01b15219d2. In TestRegenRatchetRealCLI/explicit-baseline-reviews-debt-change, the existing whole-output strings.Contains(lower, "review") assertion is invalid: t.TempDir incorporates the subtest name containing "reviews", and baseline prints the resulting design path in its wrote-ratchet line. Existing "ratchet", "debt", and "offender" words elsewhere complete the false positive without any actual review instruction. The author-reported AC3 pass is NOT valid evidence.
+
+Authorized repair: strengthen only the AC3 guidance proof and any small directly supporting matcher/sensitivity tests in this new regression file. Read baseline --help before deliberate baseline invocation and assert the canonical AC3 semantics: rerunning rewrites ratchet.json, may accept new offender files, and users must review those ratchet/offender changes before adopting them. Assert successful output carries that debt-change review guidance for the existing-edge/new-offender/zero-new-rule case and that its zero-rule message does not imply no accepted debt or no change. Verify zero proposed rules explicitly. Preserve the real successful baseline call, actual offender expansion, preceding G4 failure, subsequent G4 success, and absence-of-version-stamp checks. Preserve all unrelated generator/advice/no-debt/regeneration assertions and fixtures. No production edits are authorized in this RED amendment.
+
+Robustness bar: inspect actual prose, excluding fixture paths from evidence and relating review guidance to ratchet/offender changes and the possibility of accepting new debt. Unrelated mentions of words across help/output must not suffice. Add focused passing sensitivity controls: genuine guidance must be recognized; the existing unsafe zero-rule output with a temporary pathname containing review/reviews and ratchet/debt/offender bait must be rejected; existing help that reviews pasted dependency rules but never warns about accepting added offenders must be rejected. The matcher should allow natural equivalent wording and whitespace/wrapping, without prescribing one exact production sentence. These controls supplement, never replace, the real CLI assertions.
+
+Commit the repair with both literal tdd-red and [test-edit-authorized] in its subject. Preserve 9b85ef6 and f482c7683f5005e40722123e3a382e01b15219d2 in history; no amend/rebase/squash. Replay and record the scoped target, sensitivity-control results, genuine guidance assertion failures on unchanged production, passing controls, inventory/skips, coverage and exact SHA before delivery. Full independent RED review still required; this decision is not approve-red, acceptance, rejection or a status transition.
+
+Scope evidence: read latest canonical MAC-a89e Description and authoritative Sr PM scope repair; the four-file ownership and expanded observable AC3 are now recorded. Reviewed committed regression source at f482c7683f5005e40722123e3a382e01b15219d2 lines 179-195, baseline help/output source, and the prior narrow gates_test.go diff, which exactly matches the earlier authorization. Shared provisional proof records 10 leaves / 7 pass / 3 intended failures / 0 skip and invalid AC3 pass. No retained raw command-output path is supplied there; I have not independently replayed that run or inspected a raw transcript. The precise false-positive mechanism is independently established from committed source, sufficient for this bounded repair authorization; raw replay evidence remains required for full RED review.
+
+STATIC SCAN FALSE POSITIVE DISPOSITION: pvg verify flag at internal/gates/gates_test.go:125 is legitimate fixture behavior, not a stub. The actual committed helper is coveringInterfaceTable (not fixtureInterfaceRows). Lines 108-122 parse concrete allow edges and build Markdown rows; lines 124-125 return an empty string only when no concrete rows exist, correctly omitting an unnecessary interface-contract section. Lines 127-128 render a full table otherwise. c4GraphFixture line 145 includes that section in ARCHITECTURE.md then executes CheckC4; TestG2AllowGraphAcyclicity and TestG2TransitivePairsCount exercise the generated coherent graph fixtures. The helper predates this story and is unchanged in the two reviewed commits. Preserve it without removal, rewriting, disabled checks or a blanket scan waiver. Record this one explained scanner finding alongside verification evidence; the narrow gates_test.go amendment remains limited to TestVersionSkewNoteNamesEveryApplicableCommand.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent committed-source review authorized the bounded AC3 test strengthening and scoped sensitivity controls.
+- Canonical AC3 ownership repair read; prior gates_test.go amendment matches authorization.
+- One precise static scan false positive explained; raw RED output/replay remains for full review.
+
+### proof
+- [x] Amendment review: pathname false positive established and robust repair bounded.
+- [x] Static disposition: conditional fixture section omission is implemented behavior, not a stub.
+- [ ] AC #1-4: complete RED delivery and independent approval remain pending.
