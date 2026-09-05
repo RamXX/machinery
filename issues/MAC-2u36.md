@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:33:04Z
-content_hash: "sha256:d29a60ca0f9a5e8b6a453efeb3115ec18ba77abdcad4088882bf4b07e4150a91"
+updated_at: 2026-09-05T23:33:52Z
+content_hash: "sha256:2fe5368b79c8eb6d04417136145f38fadf8c14d65903aa6adc32ae5b2c88c94d"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce]
 assignee: dev-MAC-2u36
@@ -1536,3 +1536,33 @@ status: delivered
 - [x] AC #6: strict frozen parent publication/fault contract and4authority/cleanup controls retained; missing-parent publicationRED, no actual close-fault rollback claim.
 - [x] AC #7: frozen real overlap/next-operation desired outcomesRED with3supported recording controlsPASS.
 
+
+### 2026-09-05T23:33:52Z ramirosalas
+FULL INDEPENDENT RED REVIEW: APPROVED — MAC-2u36 at496963fb7f4842d706d308dafcbd145908a6e395.
+
+Canonical pvg story approve-red MAC-2u36 completed once. Fresh readback: open with hard-tdd, red-approved; delivered removed; no accepted label or closure. This terminal append corrects rendered ordering where historical delivered comments follow Notes; no repeat transition.
+
+## nd_contract
+status: new
+
+### evidence
+- Complete independent current seven-AC review and exact authorization/history audit preserved in appended Notes and /tmp/machinery-pm-MAC-2u36-final.EeD9Ho/REVIEW.md, SHA2565524442c86ab0d60a67b16215ae09a93dda85435f5ee23755257b8f0d71e2549.
+- Fresh independent496963f focused23leaves23PASS0FAIL0SKIP0.441s, every26runterminal; raw /tmp/machinery-pm-MAC-2u36-final.EeD9Ho/496963f-independent-focused.jsonl SHA2564ce4f6378c140208a34a06eaecbbd40ddea7712bde0fbc26ffb538e0c96e13de. Private modes/type, matched positives, typed/exact diagnostic attribution and independent real inventory verified.
+- Current complete author79leaves62PASS17FAIL0SKIP739.525s raw independently hashed/parsed: a42f96c5d36651fbd835d9626057eb3f659ae6b2503668d4dd6375407dce7b03; all89runterminal, exact17failure set unchanged. This is audited author-owned current integration evidence, not fresh full PM replay.
+- Carried-forward independent98d3b57 full66leaves49PASS17FAIL0SKIP758.895s hash9457a41c68ebdc041dc4ffcfccc71a9026dd595b858349f8429e48b2cefba778 corroborates unchanged bootstrap/product/source/helper closure. Ten old permission-masked passes expressly NOT old valid AC2 proof. Revision/archive-byte identity is not claimed; current author full run covers current artifacts. No unresolved inconsistency warrants another broad run.
+- Fresh verify2files0issues, hard-TDD10commits0unauthorized edits; frozen bootstrap ee786dee86c951a5a3a4a53d9344aeb16979df19319ea77dcd14fbd7afefca23 and shared install_test d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba unchanged. Only authorized receipt_test+186/-25; total1322test changed lines/projected1672with350production within~1700.
+- Real ordinary later-source postmutation rollbackPASS32.60s; interrupted recoveryPASS14.67s is premutation interruption. Parent final-close hook still not exercised: strict missing-boundary RED only. Actual close/fault/full rollback remains mandatory GREEN.
+- No production edits, new bugs, installed asset changes, remote operations, author checkout mutations or root branch switch. Root main497419a and installed binary5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849 unchanged.
+
+### proof
+- [x] AC #1: complete plan/default/plugin/schema1/selector RED bar reviewed.
+- [x] AC #2: prior blocking proof gap closed by fresh attributable23-leaf private receipt checks and preserved safety controls.
+- [x] AC #3: actual complete release repair/convergence/content/modes/digests/idempotence RED bar reviewed.
+- [x] AC #4: actual later-source rollback and separately classified interruption; missing-prestate desired contract preserved.
+- [x] AC #5: real release/CLI/children/private roots, no executed skips verified.
+- [x] AC #6: strict parent sequencing/exact scratch/real close fault/count/cause/restoration/authority/lock bar reviewed; actual late fault execution pending GREEN.
+- [x] AC #7: actual conflict/restoration/follow-on-native and supported-recording controls reviewed.
+- [x] Independent RED approved through canonical transition; story returned open/red-approved for GREEN queue.
+- [ ] GREEN implementation, unchanged RED passing, actual final-close fault rollback, and final product acceptance remain pending.
+
+LEARNINGS: Reached validation and matched private positives matter more than nominal PASS counts; distinguish fresh independent, current author and carried-forward evidence; never claim an unexecuted fault boundary as rollback proof.
