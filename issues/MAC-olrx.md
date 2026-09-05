@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-05T20:23:00Z
-content_hash: "sha256:097cd52d77f1efc4bd60c583afbc61ade6e1a8c93d4d095e5f3a49f00e6a2869"
+content_hash: "sha256:cd451d019d072dc5896aa84109e06c0ea3286c6e4d1703a76fbab32b92746e6a"
 blocks: [MAC-vx24, MAC-ou97]
 ---
 
@@ -368,3 +368,37 @@ status: delivered
 - Blocks: [[MAC-vx24]], [[MAC-ou97]]
 
 ## Comments
+
+### 2026-09-05T20:23:00Z ramirosalas
+## PM Decision
+REJECTED [2026-09-05]: DOCS_STALE only. Behavioral implementation and frozen RED replay pass; public documentation still contradicts the changed guarantee.
+
+EXPECTED: AC #1 retains parent Policy/Isolation test obligations despite zero machines, and AC #5 documents precise ownership. PM documentation-freshness gate requires user-facing descriptions of changed default selection to remain accurate. The prior RED review explicitly required relevant ownership/selection documentation to be updated.
+
+DELIVERED: GREEN 8168b3d1d1599fd7860dd5afda5d7e55f49113aa correctly retains default Gt with --impl for parent-owned relational source annotations or committed oracles, but unchanged docs/claude-plugin.md:88-92 says on a machine-less decomposed parent the default selection skips Gt; it also says with zero machines the hook has nothing to hold and reports vacuously green, calling both renderings the same fact.
+
+GAP: These statements are false when the parent owns Policy/Isolation obligations. Zero machines is not zero obligations. Users comparing CLI and hook results receive exactly the unsafe inference this story removes. Code comments alone cannot repair a contradictory public plugin guide.
+
+FIX: Update only the relevant docs/claude-plugin.md paragraph to distinguish truly obligation-free parents from parents with Policy/Isolation source annotations or committed decision oracles. With --impl, default CLI retains Gt for those obligations; deletion of generated output must not erase source activation, and Gp/Gn report the missing required output. The hook still runs Gt when impl is configured; empty counts describe only genuinely obligation-free designs, not all machine-less parents. Keep the existing zero-obligation CLI/hook distinction accurate. No unrelated README polish is required. Preserve every frozen RED test byte; no test edit is authorized. Deliver the scoped docs repair with fresh commit/diff evidence.
+
+Independent verification at the delivered SHA:
+- pvg story verify-tdd --base epic/MAC-ui8a --json: 4 commits checked, zero violations; git diff from frozen RED27373f421640f644a98be89f38ce112c30f55a85 to HEAD for obligation_ownership_test.go is empty.
+- go test -count=1 -timeout=5m -cover ./internal/gates -run 'Clause|Parent|Selection|Obligation' -v: 72/72 leaf cases PASS, zero failed/skipped, 37.5% targeted coverage, 9.669s. This includes all immutable RED cases and actual positive/negative CLI paths.
+- go test -count=1 -timeout=5m ./cmd/machinery -run '^TestGoldenCheck' -v: 9/9 leaves PASS, zero failed/skipped, 3.286s; no golden files modified.
+- go test -count=1 -timeout=5m -cover ./internal/gates -run 'Select|IDCite|OracleCoverage|Gt|Snapshot|CheckPolicy|CheckIsolation|FailClosed|Rooted|Inventory' -v: 103 PASS, zero FAIL, one preexisting case-folded host-filesystem SKIP, 52.5%, 5.442s. The skipped native case is not counted as executed by PM. Reviewed developer case-sensitive APFS replay log showing all four associated leaves passed at this SHA, and recorded bounded mount teardown; no independent APFS mount was needed.
+- Actual source review confirms shared machine+guard declaration validation, owner-local oracle rows, no sibling arming, explicit malformed/orphan diagnostics, source-preserving parent activation and honest shared-narrative ambiguity warnings. Targeted tests remove each required local suffix, omit one owner, rename/delete owner artifacts, remove parent decision IDs and delete last relational output; each mutation is blocked as required. Positive independent owners remain clean.
+- Static diff: 5 files total, 702 additions/32 deletions including frozen RED; only three production files and a new test file changed in GREEN. No stubs/production Paivot dependency, preexisting test/fixture/golden edits or source edits by PM. git diff --check clean and retained worktree clean.
+- No preflight, live binary/install/plugin/skill replacement, GitHub mutation, push or sync performed. All tests completed synchronously.
+
+## nd_contract
+status: rejected
+
+### evidence
+- Independent full GREEN review at8168b3d1d1599fd7860dd5afda5d7e55f49113aa; behavior passes, public plugin guide contradicts parent selection.
+
+### proof
+- [x] AC #1: behavior verified; corresponding public documentation repair remains required.
+- [x] AC #2: owner-local coverage/drift independently verified.
+- [x] AC #3: validation and stable-ID invariance independently verified.
+- [x] AC #4: actual-path negative and positive tests independently verified.
+- [ ] AC #5 / DOCS_STALE: docs/claude-plugin.md:88-92 must accurately explain parent-owned relational obligations.
