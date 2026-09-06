@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:16:50Z
 created_by: ramirosalas
-updated_at: 2026-09-06T19:21:45Z
-content_hash: "sha256:da986b09de20c505497656d7b7b256feee4ec20064883d25736b898cfaa68f34"
+updated_at: 2026-09-06T20:22:41Z
+content_hash: "sha256:f32a916fd743fd9ec526489ff810c4a1b7adc7b3604168748c3125247d047b62"
 blocks: [MAC-lnu6, MAC-ou97, MAC-wi5z]
 was_blocked_by: [MAC-p7jd, MAC-uzxr, MAC-lhu5]
 follows: [MAC-p7jd, MAC-uzxr, MAC-lhu5]
@@ -389,3 +389,6 @@ status: new
 - [ ] AC #5: Eight migration matrices, complete changed-subject stale negatives and all 13 unchanged helper callers pending.
 - [ ] AC #6: Exact reviewed goldens and accepted downstream handoff with nine reserved blocks pending.
 
+
+### 2026-09-06T20:22:41Z ramirosalas
+ACCEPTED 2026-09-06 — 6 commits 9db6cce..98afc6e (base b18368c). RED: 7 intended semantic subtest failures. GREEN: ExampleAttestationMigration 8/8, TestGoldenCheck all corpora, hook 6/6, gates 7/7. Classification: 95 plan / 1 current (go-crm gt over examples/go-crm/impl, CLI-generated 49-entry manifest) / 1 historical; ids/order/covers preserved; 75 rows byte-original provenance; 22 changed-subject rows carry substantive re-review. Only 4 BUILD hashes + accepted lhu5 portfolio subjects refreshed. Nine lnu6 old blocks byte-exact (6 BUILD-homed verified present + 3 non-BUILD untouched). 24 files +1271/-229, 0 outside owned set (coordinator-verified). Held anomaly: pre-existing upstream go-crm G4 boundary gap (internal/testoracle/fsm.go maps to no boundary, verified at base) — recorded truthfully in golden exit 1, NOT this story's to fix; routed to follow-up. Coordinator merged to epic + targeted checks ok. Record: .git/machinery-evidence-20260906.TEFZ7D/hgz1-migration-record.md f403407d.
