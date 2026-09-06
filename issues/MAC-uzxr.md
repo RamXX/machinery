@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:11:02Z
-content_hash: "sha256:71d6bc499e7719e9467d44cb65e8e7653152abde1c56b323e64b2c6fc19a572a"
+updated_at: 2026-09-06T07:19:00Z
+content_hash: "sha256:c46c568697c7fe6dd1626767718c815f3eaa97e273f5e86b2ce2cd9ac58d4545"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-uzxr
@@ -168,6 +168,66 @@ Read complete author checkpoint/audit.cjs/audit.jsonl and verified all suppliedh
 No further storage repair required. Author may prepare complete EXTERNAL later patch and measured per-file decomposition for separate exact PM/SrPM review. Applying all5suite/helper/parser/additive amendments stays HELD. No fullapprove-red/deliver/accept/reject transition; no new test-edit permission, AC/path/scope change, candidate parser/Taskfix proof or consumerclaimrenewal.
 SR PM MEASURED FORECAST / PRESERVATION REPAIR. Canonical eight paths and five AC unchanged; actual external proposal2450changed plus503historical=2953 cumulative beforeGREEN, aggregate2945changed. Conditional3300-3500 cumulative/3200-3400 aggregate forecast assumes prior300-450-line parser estimate and separately charges48-line scaffold replacement plus narrowTask correction. Old750-1150/provisional1500-2200 obsolete; no proof trimmed or test permission granted. First --description command succeeded but verification failed because nd treats same-level nested headings as section boundaries and retained an old canonical suffix. Original failed readback preserved in /tmp/machinery-private-triage.JF2BDG/READONLY-HANDOFF.md. Installed --body-file has the same Description semantics. Root-authorized guarded pvg nd edit bound full live raw header/body to journal export and checked an external apply_patch trial, removed ONLY duplicate canonical block under nd exclusive lock, then verified exact full body90c15690a83bd2200723fdaa8bdd27e3871e189959b4936083afe06336d35590 and identical tail/metadata except normal hash/time. Exact expected/proposed manifests and editor remain external. First hgz1 preparation-only cross-realm assertion failed before any tracker write, then root explicitly authorized scalar-array comparison correction; historical failure is not proof. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
 EXPANDED RED FREEZE CHECKPOINT: exact authorized seven-path patch2f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249 committed acf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f over4ef6baf with literal [test-edit-authorized] and tdd-red. Full report /tmp/MAC-uzxr-final-red.nOXYuf/REVIEW.md SHA2565cb98377240aa8be22f0b9d88b74a7a6bd959fbfd8f1efb2907d08b02f68ad5c. Exact seven result hashes/frozen495prefix/99committedexamplefiles/218originaltuples/twoterminalbodies verified; Task unchanged. Measured2120add330del2450changed/net1790; historical503changed separate. Actual all10 contractroots and focusednative plus3meta families ran15.526s: contracts0PASS28FAIL0SKIP, focused10supplementPASS5transitionrootFAIL0SKIP, original/candidate/remainingmeta3/3/17outerFAIL. All current parser/control failures NONQUALIFYING ErrScaffold; all intended later mutants/most nestedcontractbranches unreached. Actual23children10supplementPASS25transitionrootFAIL0SKIP,0transitionrowleaves/0mutants; all23fixturecwdsremoved. Export52files=46receipts/rawlogs+6manifests47committedinputhasheseach;17latercontrols fail before manifest export, no nonexistent manifest credited. Raw and complete native identity receipts in report. Normal verify-tdd3commits0violations/no waiver; scoped static7files0issues; gofmt/diffcheckclean. Original genuine998a5a3 threeunsafeacceptedouterFAIL200childPASS, validatedstorage4ef6baf bothmodes, historical225baseline and separate actualTaskentrydefect preserved as distinct evidence. No parserimplementation, productionedit, source/testcorrection, delivery, approve-red, GREEN, consumerclaimrenewal, remote/toolchain/service changes or background process. STOP clean for independent combined-evidence RED adjudication.
+# MAC-uzxr independent supplemental RED review
+
+Disposition: SUPPLEMENTAL RED APPROVED for exact candidate d3d257bd199801d88bdcce8ac8f89fdb8f6bd64c, not whole-story acceptance or GREEN implementation approval. New freeze: examples/go-crm/impl/internal/testoracle/fsm_field_membership_test.go,170lines,SHA256201a470a38915709aab457daa4d94011cbaea873428b05a21c2d6e8b6754583b. The original six frozen files and495-line prefix remain locked. No new test edit, grammar exception, production text or additional path is authorized by this disposition. Root must route separate GREEN within the current canonical scope.
+
+## Implementation Evidence
+
+### Commit
+
+SHA: d3d257bd199801d88bdcce8ac8f89fdb8f6bd64c. Subject: test(MAC-uzxr): tdd-red -- require exact structural field membership. Only delta from rejected dc3a8a365c21d5370c0825de992e2461ea0785a9 is the one added170-line test. Full100-file exact Git archive audited; all99 previous example files, parser,Task,modules,oracles and old tests are byte-identical. No implementation exists for the new fix yet.
+
+### CI/Test Results
+
+Commands run:
+- Own external exact Git archive, cwd /tmp/MAC-uzxr-PM-supplemental.DsuF62/examples/go-crm/impl: GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=120s ./internal/testoracle -run '^TestFSMParseExactFieldMembership$' -json
+- Same cwd/environment: go test -count=1 -timeout=120s ./internal/testoracle -run '^TestFSM(ParseCommittedMachines|Effects|Bind|ParseRejects|JSON|Invoke|OneFire|Load|Parser|Nested)' -json
+- Repository root: pvg story verify-tdd --range 70652b948bf090008b1965c85daf36ea374daea4..d3d257bd199801d88bdcce8ac8f89fdb8f6bd64c
+- Repository root: pvg verify /tmp/MAC-uzxr-PM-supplemental.DsuF62/examples/go-crm/impl/internal/testoracle/fsm_field_membership_test.go --include-tests --format text
+- Repository root: pvg story verify-delivery MAC-uzxr; git diff --check dc3a8a365c21d5370c0825de992e2461ea0785a9 d3d257bd199801d88bdcce8ac8f89fdb8f6bd64c
+- Repository root: node /tmp/MAC-uzxr-PM-supplemental.DsuF62/check.cjs (exact Git source and actual PM/author leaf/diagnostic audit).
+
+Summary: new regression24terminal leaves14PASS/10intendedFAIL/0SKIP, actual Go exit1,634ms. All68 original parser leavesPASS/0FAIL/0SKIP,exit0,354ms. Both finite Go commands completed; wrapper timeout130s, Go120s, Go1.27.1 darwin/arm64, ordinary existing build cache, -count=1 excludes test-result reuse. No compile/import/setup/timeout/stub/fake-process failure counted as RED. Static1file0issues,TDD5commits0violations,diffcheckclean. Delivery validator9OK/0FAIL verifies current record shape only; previous R2 failure remains historical and final GREEN must satisfy it again.
+
+Coverage:100% of prescribed ten malformed composite-key cases, four ordinary-unknown controls, raw/remarshaled controls and seven individual declared metadata/context positions plus combined control. All68 preserved original parser contracts executed. Not statement/branch coverage or a fresh native218-witness/43-child claim.
+
+### Exact outcomes and independent review
+
+All new170lines were read. Tests call public Parse on actual committed Session MD+JSON. Deterministic targets are root,states.Anonymous,states.Anonymous.on.login,states.Authenticating.invoke; all exist with required object types in exact committed JSON. Each negative freshly decodes the committed file, checks the key absent, inserts one arbitrary object, marshals/redecodes and checks exact insertion. Each independent subtest requires nil Suite and exact `oracle-parse: unknown field KEY`; nil error fails immediately. No copied parser, helper factoring, source-pattern assertion, source mutation, setup bypass or weakened diagnostic.
+
+All ten actual failures report60rows,error=nil and the exact scope/key:
+- root: id initial; _comment _role; context states.
+- state: on after; type entry; invoke _refusal.
+- transition: target guard; guard actions.
+- invoke: src input; onDone onError.
+
+These exactly reproduce R1 from independent rejected-candidate report /tmp/MAC-uzxr-PM-green.7BaxI6/REVIEW.md SHA256dec4dd53d5f57dac813c9290fced9c4b366484fd8fc027da6ed8d695a3d2b74a. Four notAllowed negatives PASS at the same scopes with the demanded exact diagnostic. Raw committed and remarshaled positives PASS. Eight valid_data controls PASS:comment,role,delays,counters,refusal,invoke_input,context,combined. Each valid control compares complete Name,Rows (all identities and ordered actions),States (all names/kinds/entry/exit) with the actual committed control; the original five-machine direct-cell contracts also pass. Structural-looking/composite keys occur as legitimate metadata/context data, with nested object/array/null/bool/number/string content and deliberately unresolved expression strings. This prevents a global-name/underscore ban or evaluation-based workaround. No allowed-field/API/dialect expansion.
+
+Actual run/terminal identities and complete per-leaf output were independently audited in both PM and author raw JSON, including slash-containing names and space-to-underscore normalization; no invented event streams. New test is a sound bounded regression supplement to the previously reviewed full acceptance bar. Existing broader frozen contracts still govern general parsing/effects/inventory semantics.
+
+### Custody, evidence and limits
+
+- PM red.jsonl SHA256d702ffb99ec0c29c901e5dcd3ea43aca79adbcc9d18ed7c30de7e30437129333; contracts.jsonl796f9c8b48fd18b4103433a8ad5b1216076952a155a887844c502aa9e56b855c. red-receipt.json/contracts-receipt.json carry exactargv/cwd/source/exit/deadline/duration and every actual leaf/output.
+- Independent audit.json SHA2568652260363a8d4f73ea1177cec141dffe73f3859ae67dadf33bcffe081327719; check.cjs7e379198df3b54ca4d0315d6b742c560f10642c13cfd367cab0504274d31b424. Full100source hashes, six original freezes, deterministic targets and both PM/author actual inventories retained.
+- Author REPORT.md93ccb6b88d67bfff40301efee71ddd538cbd25b967abcaf7b7e12c59ec4bd20e and FINAL.md06fe47865cab37d81da5f2265d87ba486e0469bb1ea92f1c63d8dd8f05b4ce5d fully read/hashmatched. Actual author red42a55661d42785a3adf63f98da602eb0d684c576878d205bf944648acb0d6760 and contracts8bf0c058647e700c7b4f2736834e1d1ee9f3465185e14ca6095c9cf0d2fa58a6 independently matched exact outcomes, not accepted solely from summary.
+- Six original frozen hashes exactly match previous PM audit at dc3a8a; original prefix326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba. Parser8d2675a64b04050cb11583d240db0f6932d1d1a027900861bc4c6f8c4695189e and Task3d8145088360489fde9a187be00bc89d350ceaca9619120e1721f1328e5cb252 unchanged.
+- Read live authoritative ninth-path amendment and unchanged five AC/closed contract; scope FINAL.md7451fd74ce099126a8bccca2f02c71a8b67d5bfebf41e96242f98c22fc9db3af governs added file. Graph main generation2026-09-06T02:42:16Z is best effort; new testoracle files missing, committed Session files metadata_match. Exact Git fallback used; no dev-worktree internals accessed. Mandatory PM/developer/nd/pvg/codebase-memory/vault discipline applied.
+-170newLOC,3745cumulative/3713aggregate across9paths, within conditional120–220 new-regression forecast. No proof trimmed, added runtime bound, framework/API/production seam or Paivot product dependency.
+- No extra full native/meta rerun at this test-only increment: parent explicitly reserves all original focused/43-child/20mutation/defaultcleanup/source-inventory obligations for final repaired GREEN; no concrete coupling gap found. Final GREEN must pass this new24-leaf regression plus all original68contracts,218native witnesses+10supplements,3/3/17meta and original dynamic inventory/cleanup obligations on one fresh candidate. All seven test files then remain frozen.
+- Preserve original genuine semantic RED and separate Task defect; scaffold failures remain NONQUALIFYING. Supplemental ten failures are genuine public-parser unsafe acceptance, not reclassification of old scaffold outcomes. Current old red-approved label alone did not authorize this test; explicit new PM approval is this checkpoint. No whole-story accept/close/merge, new test edit, consumer attestation or authenticated-execution claim.
+
+### AC Verification
+
+| AC | Supplemental decision |
+|---|---|
+|1|Sound exact-key regression and genuine RED independently verified; exact-membership implementation remains pending separateGREEN.|
+|2|Original implementation/tests unchanged and parser-effect contractsPASS; full repaired-candidate context/native replay pending.|
+|3|Original20unsafe-variant proof preserved, not rerun or freshly claimed; finalGREEN owes it.|
+|4|Full positive Session parser outputs preserved; no fresh218native execution inventory claim.|
+|5|Current supplemental delivery shape9/9,source custody and evidence reviewed; whole-story acceptance and final consumer handoff pending.|
+
+LEARNINGS: Pair exact structural-key negatives with full-output valid-data controls; preserve source and evidence classes across supplemental TDD. Supported phase transition results and authoritative final EOF readback are recorded separately in FINAL.md, including any partial command failure without waiver or manual labels.
 
 
 ## nd_contract
