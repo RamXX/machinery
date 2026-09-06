@@ -1,18 +1,18 @@
 ---
 id: MAC-uzxr
 title: "Bind Go CRM FSM conformance to committed oracle expectations"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:09:09Z
-content_hash: "sha256:fcb51f50cee97d0f2d2d4b9786cf954146ffbf43c7818b71aa1349031304812d"
+updated_at: 2026-09-06T06:14:21Z
+content_hash: "sha256:8e7e3685237eda6a2eedfe833437b46d527c1bea9166a30f07e684521ef524e0"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
-follows: [MAC-2u36]
+follows: [MAC-2u36, MAC-a89e]
 ---
 
 ## Description
@@ -598,11 +598,14 @@ status: new
 - 2026-09-06T03:25:44Z auto-follows: linked to predecessor MAC-2u36
 - 2026-09-06T03:25:44Z claimed by dev-MAC-uzxr
 - 2026-09-06T06:07:57Z status: in_progress -> open
+- 2026-09-06T06:14:21Z status: open -> in_progress
+- 2026-09-06T06:14:21Z auto-follows: linked to predecessor MAC-a89e
+- 2026-09-06T06:14:21Z claimed by dev-MAC-uzxr
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-ou97]], [[MAC-hgz1]]
-- Follows: [[MAC-2u36]]
+- Follows: [[MAC-2u36]], [[MAC-a89e]]
 
 ## Comments
 
