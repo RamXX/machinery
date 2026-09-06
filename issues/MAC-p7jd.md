@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T04:10:43Z
-content_hash: "sha256:26b9f85749a2d6e2b66e0dae5ebc92f07d1e211bf37e79294d9a996972448ff1"
+updated_at: 2026-09-06T04:31:42Z
+content_hash: "sha256:cb3656fd6f7c43fc3e242a05ddfc81d3269391669be08b0a6d448b6008323a94"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -862,7 +862,33 @@ Review evidence/limits:
 - Exact git show 7ec5d609 of both frozen test files and their readonly Config/decodeConfig/Load/copyDirInto dependencies; exact file hashing and raw JSONL hashing/leaf extraction above. Source inspection of the tests supplies cost evidence, not acceptance.
 - Main remained clean at 497419ab4512fcff765cd5feb27aed4c67b5608d; observed epic 70652b948bf090008b1965c85daf36ea374daea4. PM used committed refs, not the developer worktree. No PM source/test/docs edits, execution replay, installed asset change, remote mutation, full preflight or status transition.
 SAME-STORY COST CANONICALIZATION ONLY
+GREEN PAUSED — RED-DISPUTE checkpoint; not delivery or acceptance.
 
+RED-DISPUTE 1: cmd/machinery/attest_implementation_test.go TestAttestImplementationCLI/C-complete-sole-current-warning lines412–424 converts acceptance date 2026-09-03 to time.Time via yaml.Unmarshal(map[string]any), then yaml.Marshal rewrites it to 2026-09-03T00:00:00Z. Actual built complete CLI now reaches all13 generation calls and finalized Gv current review, but Ga correctly rejects all6 M0..M5 dates; 6 blocking findings, missing-current challenge UNREACHED. Ga/examples/helpers/frozen files unchanged. Exact repair requires independent PM authorization.
+
+RED-DISPUTE 2: internal/hook/attestation_snapshot_test.go hookReviewFixture scenario.Empty sets Gates="", Impl=""; unchanged progressive selectGatesCheckedInSnapshot unconditionally selects Gl. B-empty-selection and C-empty-cleanup reach callback with one gate and fail len(run)==0 before the intended empty branch/cleanup mutation. Independent PM must choose exact fixture correction; no selector/policy expansion authorized.
+
+PROOF: source390d4dc38be1ad5a16ef3cec171e08d9bf6c0036, branch story/MAC-p7jd, clean retained worktree. Initial47ba449 replay matches189 leaves/47pass/142fail/0skip (24A genuine failures,8D passes,26B missing-interface failures,92C unreached). First WIP e55d534 compilation failure int/int64 preserved; fixed999b9ab. Exact second targeted runs count1/timeout5m/json: gates -run Attest at999b9ab 133leaves/126pass/7fail/0skip,8.984s; CLI -run Attest at390d4dc 28/26/2/0,7.226s; hook -run Attestation at390d4dc 28/26/2/0,4.363s. These are separate revisions, not final combined proof. Native names and all stdout/stderr/source hashes/report are in /tmp/machinery-p7jd-green-proof.eHzGMx/. PAUSED-RED-DISPUTE.md records all failures, reached stages and cost. Coverage NOT MEASURED; no profiles/broader tests/preflight. Baseline designlock0tests is NO capability proof.
+
+Implementation failures retained: gates6 custody cases return duplicate G0 findings and1 addition diagnostic omits descendant; production fixes committed390d4dc but gates replay owed. CLI missing-input reaches real renderer exit1/empty stdout but omits BUILD.md from diagnostic; fix still owed. All26 other CLI leaves pass; all26 other hook leaves pass, including actual original/owned-copy cleanup faults across Stop/SubagentStop strict/relaxed/wave, with callback/sentinel/ledger assertions. Mandatory NEW designlock/wrapper/renderer supplements and docs remain unauthored, all final AC proof owed.
+
+WIP cost:6 production files1125add/43delete=1168lines; combined frozen RED11files2609add/46delete=2655lines. No generic designlock/external/source/inventory/portablepath/scale, Ga, cmd hook, example, golden, installed binary/asset, main/epic, dependency, service/container or remote edits. All5 approved frozen hashes unchanged. No uncommitted source or active test/build/helper process at pause. No delivery/release/acceptance/merge transition. Root acknowledged pause and will route independent review.
+
+LEARNINGS: generic YAML-map round trips can alter exact date lexemes; empty progressive hook config still activates Gl; duplicate lifecycle errors need a consumable finalized wrapper shape. Passing partial cases do not establish the complete contract.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Clean WIP390d4dc; two exact frozen-fixture disputes above; full report/raw leaf history retained. No test edits or repair authority assumed.
+- Required next step independent PM exact fixture repair decision; mandatory remaining implementation, docs and new supplemental proof remain pending.
+
+### proof
+- [ ] AC #1: final held-root/copy/limits/same-revision proof pending
+- [ ] AC #2: complete fixture and final docs pending
+- [ ] AC #3: reached migration cases require final replay/review
+- [ ] AC #4: disputed empty fixture and mandatory supplements pending
+- [ ] AC #5: complete-mode and same-revision renderer/CLI/source-closure conjunction pending
 
 ## nd_contract
 status: red-approved
