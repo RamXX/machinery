@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:35Z
-content_hash: "sha256:b7e1dd533905e6c7353e224ef7bdd9a819a8b4922e7ca2e37051d52d4b7102e7"
+updated_at: 2026-09-06T09:48:04Z
+content_hash: "sha256:a50938351e48f3c3c513765999e2df87c7e3c9adb7286af61991815f7b79574c"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -837,3 +837,27 @@ status: in_progress
 
 ### proof
 - [ ] Every existing and supplemental current AC remains required; no execution proof claimed.
+
+### 2026-09-06T09:48:04Z ramirosalas
+ROUND-1 RULE 1 CONSUMER MAPPING (SUPPLEMENTAL ONLY)
+Current ownership/claim/frozen96pilot and prior custody ACs remain unchanged. The existing dependency MAC-cn7q now explicitly produces the complete actual formal chain, including internal/formal/process.go openFormalJava, internal/formal/alloy.go runAlloy and cmd/machinery/stubs.go newVerifyFormalCmd. This is required producer coverage, not a scope bypass or duplicate probe.
+CONSUMES:
+- MAC-cn7q: internal/formal/process.go
+  source: actual identity probe with inherited owner context/scope attached after runtime environment sanitation.
+- MAC-cn7q: internal/formal/alloy.go
+  source: actual Alloy probe plus separate JVM execution with SAME verified context/scope and preserved Java/JAR identity.
+- MAC-cn7q: cmd/machinery/stubs.go
+  source: real command-to-formal context/scope handoff, preserving ordinary command compatibility.
+The already owned testdata/integration-lanes/custody.json MUST include the exact separately reviewed supplemental processscope, formal TLC/Alloy/probe and actual command-chain cases from these producers alongside its lane-level cases. Freeze that exact source/test/fixture/config union before supplemental RED; no omitted Alloy/probe branch, native-only fake script, missing leaf, skip or orphan process may pass. Both native platforms still owed; original seven files/96leaves remain byte-for-byte protected. No extra source ownership is transferred to hpqp.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent round1 findings repaired through supported append-only scope/consumer notes; no architecture/source/test/ref/runtime mutation.
+- Exact source surfaces verified against accepted epic7e36f3e7ddcf25565d5d4fe60b328df254eee91d; prior Body/status/labels/history preserved.
+- Independent Anchor ROUND2 and canonical-document acceptance remain prerequisites, not implementation evidence.
+
+### proof
+- [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
+- [ ] Independent review/native execution/final acceptance pending.
