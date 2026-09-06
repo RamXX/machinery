@@ -8,8 +8,8 @@ labels: [docs, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:22:04Z
-content_hash: "sha256:2dc9cd96d65fdf9998dedade985367ead1813e05f92dd57a2106e008263fc0ce"
+updated_at: 2026-09-06T12:22:50Z
+content_hash: "sha256:d1e55b566026a6a5656bd7010552853776042d05c6323e23b8a960cf0cbc03f0"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 assignee: dev-MAC-p9wm
@@ -325,7 +325,44 @@ status: new
 
 
 ## Notes
+## Implementation Evidence
 
+PROOF:
+
+### CI/Test Results
+- Commands run:
+  - `git diff --check a94e768adf461178e0562ad135c7c06d8163a3a4 2a63e4bb0d7b57c42dfd6f45fecfdc4f8a18cfbf -- docs/native-custody-contract.md docs/test-assurance-contract.md`
+  - exact `git diff --name-status/--numstat/--shortstat`, `wc`, `stat`, `shasum -a 256`, `git hash-object`, and `git ls-tree` inventory
+  - byte-for-byte `cmp` of the accepted base companion against the candidate with only line 5 removed
+  - relative-link, heading, fence-pair, conflict-marker, candidate-object, and bounded public-contamination checks
+  - `pvg verify docs/native-custody-contract.md docs/test-assurance-contract.md --format text`
+- Summary: documentation diff/identity/reconstruction/link/structure/contamination checks PASS (10 bounded check classes, 0 failures after corrections); product unit/integration/E2E/native tests 0 run / 0 applicable. `pvg verify` reported PASS but scanned 0 documentation files, so it is a limitation rather than semantic evidence. Markdown linter/render executable unavailable; independent complete-prose/render review pending.
+- Coverage: N/A for docs-only publication. No runtime or native proof claimed.
+- Preserved correction: initial `pvg story verify-delivery MAC-p9wm` passed 3 and failed 6 because complete evidence was recorded in Comments rather than parser-visible Notes. This block supplies the exact required Notes headings; candidate commit is unchanged.
+
+### Commit
+- Branch: `story/MAC-p9wm`
+- SHA: `2a63e4bb0d7b57c42dfd6f45fecfdc4f8a18cfbf`
+- Base: `a94e768adf461178e0562ad135c7c06d8163a3a4`
+
+### pvg verify
+- `VERIFY: PASSED (0 files scanned, 0 issues)`; documentation exclusion recorded, not used as correctness proof.
+
+### AC Verification
+| AC # | Requirement | Location/evidence | Status |
+|---|---|---|---|
+| 1 | status/trust/standalone/unproved | new doc opening, §§1/8 | PASS |
+| 2 | exact API/lifetime/ownership/budgets | new doc §§2-4 | PASS |
+| 3 | exact runtime/contributor/checker/cleanup | new doc §§5-7 | PASS |
+| 4 | live-first method/roles/migration/matrices | new doc §8 | PASS |
+| 5 | minimum companion and byte preservation | companion line 5 plus exact reconstruction | PASS |
+| 6 | coverage and negative review | full developer matrix delivered; independent PM pending | DELIVERED FOR REVIEW |
+| 7 | bounded validation | exact checks above; independent PM pending | DELIVERED FOR REVIEW |
+| 8 | exact evidence and true EOF | comments plus authoritative EOF contract | PASS |
+
+LEARNINGS:
+- Tracker verification parses Implementation Evidence from Notes, while true-EOF contract authority requires a final Comment; docs-only delivery needs both placements.
+- Byte reconstruction and semantic matrices are the meaningful evidence when a generic source verifier intentionally scans zero documentation files.
 
 ## nd_contract
 status: delivered
