@@ -1,45 +1,52 @@
-attestation_version: 1
+attestation_version: 2
 attestations:
   - claim: g2.action-ownership
+    kind: plan
     attestor: Codex CRM design review
     date: 2026-09-02
-    note: Every domain action is assigned to the component that owns its state change and boundary effects.
+    note: 'Every domain action is assigned to the component that owns its state change and boundary effects.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
   - claim: g2.interface-contract-rightness
+    kind: plan
     attestor: Codex CRM design review
     date: 2026-09-02
-    note: Interface shapes, classified errors, retry behavior, and idempotency match the Go realization.
+    note: 'Interface shapes, classified errors, retry behavior, and idempotency match the Go realization.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
   - claim: g2.placement-rightness
+    kind: plan
     attestor: Codex CRM design review
     date: 2026-09-02
-    note: Placement keeps domain decisions pure and confines LadybugDB access to the repository boundary.
+    note: 'Placement keeps domain decisions pure and confines LadybugDB access to the repository boundary.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
   - claim: g2.adoption-closure-discovery
+    kind: plan
     attestor: Codex CRM design review
     date: 2026-09-02
-    note: The local CLI, session, authorization, domain, repository, and declared externals form the complete adoption closure.
+    note: 'The local CLI, session, authorization, domain, repository, and declared externals form the complete adoption closure.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
   - claim: g2.event-contract-completeness
+    kind: plan
     attestor: Codex CRM design review
     date: 2026-09-02
-    note: The design is synchronous and declares no cross-component asynchronous event that needs a missing contract.
+    note: 'The design is synchronous and declares no cross-component asynchronous event that needs a missing contract.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
   - claim: g2.nfr-content
+    kind: plan
     attestor: Codex CRM design review
     date: 2026-09-02
-    note: Security, reliability, operability, performance, and data-integrity claims are concrete and testable for the local CLI.
+    note: 'Security, reliability, operability, performance, and data-integrity claims are concrete and testable for the local CLI.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
   - claim: g3.guard-semantics
+    kind: plan
     attestor: Codex CRM design review
     date: 2026-09-02
-    note: Every named guard was reviewed against its independent clauses, source-state structure, and invariant mapping.
+    note: 'Every named guard was reviewed against its independent clauses, source-state structure, and invariant mapping.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
       - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
@@ -52,9 +59,10 @@ attestations:
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
       - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
   - claim: g3.invariant-enforcement
+    kind: plan
     attestor: Codex CRM design review
     date: 2026-09-02
-    note: Every machine-carried invariant is bound to the guard, action, or actor unit that enforces it; non-machine carriers are explicit.
+    note: 'Every machine-carried invariant is bound to the guard, action, or actor unit that enforces it; non-machine carriers are explicit.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
       - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
@@ -67,9 +75,10 @@ attestations:
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
       - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
   - claim: g3.residual-transitions
+    kind: plan
     attestor: Codex CRM design review
     date: 2026-09-02
-    note: Classified store and session failures retain bounded retry, rollback, and fail-closed residual transitions.
+    note: 'Classified store and session failures retain bounded retry, rollback, and fail-closed residual transitions.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
       - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
@@ -82,9 +91,10 @@ attestations:
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
       - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
   - claim: g3.event-redelivery
+    kind: plan
     attestor: Codex CRM design review
     date: 2026-09-02
-    note: These invocation-local synchronous machines consume no external at-least-once event stream; retry replays are bounded per instance.
+    note: 'These invocation-local synchronous machines consume no external at-least-once event stream; retry replays are bounded per instance.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
       - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
@@ -97,21 +107,252 @@ attestations:
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
       - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
   - claim: gt.conformance-test-shape
-    attestor: Codex CRM design review
-    date: 2026-09-03
-    note: The Go tests key executable table cases on every stable oracle id and assert next state plus ordered actions.
+    kind: current
+    attestor: coordinator
+    date: 2026-09-06
+    note: 'Substantive current review of the accepted parser-backed scope (MAC-uzxr) over examples/go-crm/impl: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; native sensitivity controls fail on unsafe oracle edits and extra effects; go test ./... green over the full impl incl. real-boundary repo/session tests. Bounded: content-hash-bound scope review, not authenticated execution replay.'
     covers:
-      - {path: BUILD.md, hash: sha256:c58124cf07f7f8cdf8f4e99b2cb484aec5d4ca110543e25b2ed0711863d44c1d}
+      - {path: BUILD.md, hash: sha256:b7c5bf2897cddccb763c86b19d7b371bd9f4d02a210a3423eef009cbfe0ee7b0}
+    implementation:
+      root: ../impl
+      policy: full-root-v1
+      entries:
+          - path: .
+            type: directory
+            mode: "0755"
+          - path: go.mod
+            type: file
+            mode: "0644"
+            size: 666
+            hash: sha256:8e978f0eb6afd31e2d2a9719166b1a9866edc4c88b356c2ee3d0af898e6588e8
+          - path: go.sum
+            type: file
+            mode: "0644"
+            size: 3751
+            hash: sha256:0eb1e3b9e9320ebdfe8471a8878db81f8d62c8c682c40dad02ab89208bb928ba
+          - path: internal
+            type: directory
+            mode: "0755"
+          - path: internal/arch
+            type: directory
+            mode: "0755"
+          - path: internal/arch/arch_test.go
+            type: file
+            mode: "0644"
+            size: 3309
+            hash: sha256:28eb08b53665f65cf126b2a142739d07d7286de0b8a4f992b7ad3c7b3e067b5d
+          - path: internal/arch/doc.go
+            type: file
+            mode: "0644"
+            size: 239
+            hash: sha256:b8afb0d30d504f526f635f9248cee92dbaab6b5fb42953c227a0b913c771b9d1
+          - path: internal/authz
+            type: directory
+            mode: "0755"
+          - path: internal/authz/authz.go
+            type: file
+            mode: "0644"
+            size: 5742
+            hash: sha256:b4843cad33c65f5264210852e4145b14630e71ce69bf566a92ee53f7e1d237fd
+          - path: internal/authz/authz_test.go
+            type: file
+            mode: "0644"
+            size: 4990
+            hash: sha256:5ef0e23acdef911d56b9ac00f6979186e05738f216594aa891eda2e9c7dc0ea0
+          - path: internal/authz/oracle_test.go
+            type: file
+            mode: "0644"
+            size: 5899
+            hash: sha256:9a7e04565940dabcf71c5edcd3b5a79c155fc4f6c6a32ece54ed25191616cd41
+          - path: internal/authz/property_test.go
+            type: file
+            mode: "0644"
+            size: 3942
+            hash: sha256:f71b67188eaca6f0a121906c2c099d8376931b86262b583455d24ed2831d3b6b
+          - path: internal/authz/tenant_oracle_test.go
+            type: file
+            mode: "0644"
+            size: 3663
+            hash: sha256:3ab371f238d4b10b0841717779a5ecd9b50e865fddadb8504e13352cb168d5eb
+          - path: internal/cli
+            type: directory
+            mode: "0755"
+          - path: internal/cli/command.go
+            type: file
+            mode: "0644"
+            size: 14821
+            hash: sha256:8747c06c3c5607df65705b50a3efc5ce633544a654b1e4111a016a8689f34a4e
+          - path: internal/cli/command_test.go
+            type: file
+            mode: "0644"
+            size: 11466
+            hash: sha256:38945b9307d97dadb872ac5a261ff86d712c218282774404b432842e34577d60
+          - path: internal/cli/root.go
+            type: file
+            mode: "0644"
+            size: 980
+            hash: sha256:66820498127a6d2d4530c77c3a43b44782a90e8e70deac618f3a138240277193
+          - path: internal/domain
+            type: directory
+            mode: "0755"
+          - path: internal/domain/deal.go
+            type: file
+            mode: "0644"
+            size: 11831
+            hash: sha256:08b4e327e98ff79eb2c702ca88f1a31f775e0d82a0da9174480f385dd262b977
+          - path: internal/domain/deal_test.go
+            type: file
+            mode: "0644"
+            size: 16715
+            hash: sha256:2bfd0893253b9f3c4b6cf1badbf3402a952551f5b4f5124a3d0a9afb7bf432cd
+          - path: internal/domain/effect.go
+            type: file
+            mode: "0644"
+            size: 584
+            hash: sha256:39cbd9d69a551cc27266bc4777016815a0313fa10341619d858a2ab2e4861e9f
+          - path: internal/domain/property_test.go
+            type: file
+            mode: "0644"
+            size: 12835
+            hash: sha256:d046f05a3ae47c7eb48fc4c4b4cf61980e1f63a8f0ced4a9e13e3e147b9866ae
+          - path: internal/domain/service.go
+            type: file
+            mode: "0644"
+            size: 4651
+            hash: sha256:91332fd3db516b6f2e438b3ff6ad8cdaf5fd1827c240e85b47c5155584ee8e28
+          - path: internal/domain/task.go
+            type: file
+            mode: "0644"
+            size: 9599
+            hash: sha256:3d8145088360489fde9a187be00bc89d350ceaca9619120e1721f1328e5cb252
+          - path: internal/domain/task_test.go
+            type: file
+            mode: "0644"
+            size: 12160
+            hash: sha256:35b8a05a710792ff21dd827432d658deba1ee190b8739196b084cdc61f7b2b88
+          - path: internal/domain/user.go
+            type: file
+            mode: "0644"
+            size: 6610
+            hash: sha256:9873618eb7adb2d3d7383f28d0c12f4e4a65ff1ad379b13b1308a51ef22265bf
+          - path: internal/domain/user_test.go
+            type: file
+            mode: "0644"
+            size: 6869
+            hash: sha256:d4fab40b760e5f1a94a5cab88bea6625495c04dd1690dc197818bfd1d056b53d
+          - path: internal/model
+            type: directory
+            mode: "0755"
+          - path: internal/model/effect.go
+            type: file
+            mode: "0644"
+            size: 638
+            hash: sha256:e80469b4a5bec426f2ddcff4ea3132e116e9a908ef78c33fcc81fcc418b31cba
+          - path: internal/model/entities.go
+            type: file
+            mode: "0644"
+            size: 2378
+            hash: sha256:6e4d22240c031239fbf9b7c149396709f78681313ff3ea28a6e7406eeef1cfbd
+          - path: internal/model/enums.go
+            type: file
+            mode: "0644"
+            size: 3484
+            hash: sha256:010ecdae99786f28712c112b71fa64e4d701773029c59b3e128bd3a5c40c33e7
+          - path: internal/model/errors.go
+            type: file
+            mode: "0644"
+            size: 1398
+            hash: sha256:94da5e32faad4545f14f3d75d677e8e9214768c0b90aadd16fe50bcc04e00c02
+          - path: internal/repo
+            type: directory
+            mode: "0755"
+          - path: internal/repo/contract_core_test.go
+            type: file
+            mode: "0644"
+            size: 1364
+            hash: sha256:a0b8a435d348a93452c788fa1be48c73505ed9110b702660120315703818f902
+          - path: internal/repo/contract_ladybug_test.go
+            type: file
+            mode: "0644"
+            size: 12848
+            hash: sha256:68708623ebc7968818712f5f95b6987ac43371745c96670cc9b473177665b3c3
+          - path: internal/repo/repo.go
+            type: file
+            mode: "0644"
+            size: 2796
+            hash: sha256:7e414a876886140fb7d776515d57d8d79fe9de22057bb8ca0b7e5963418d4632
+          - path: internal/repo/repo_ladybug.go
+            type: file
+            mode: "0644"
+            size: 19081
+            hash: sha256:178ec37fead00281440c900b832fa837ab1f5c8c0811367fe8f2c9fde525b94f
+          - path: internal/session
+            type: directory
+            mode: "0755"
+          - path: internal/session/contract_test.go
+            type: file
+            mode: "0644"
+            size: 6020
+            hash: sha256:91b0154b6e6521bea6a06f1d128275aa2a8a4c7ce0a166748b7fa02ab39905b9
+          - path: internal/session/machine.go
+            type: file
+            mode: "0644"
+            size: 14660
+            hash: sha256:555619be14aad03c4367bec29f3858e23493686765deb1837cee23d2b16d3a5b
+          - path: internal/session/machine_test.go
+            type: file
+            mode: "0644"
+            size: 12753
+            hash: sha256:97e612a68e22b32010ec7c696cb1ee248115f5a41f3b80400a40160a8782a11f
+          - path: internal/session/property_test.go
+            type: file
+            mode: "0644"
+            size: 4715
+            hash: sha256:27a285af64695bc51d36c2999bcb117e12517b2da9a6754a81e595b88afe71b4
+          - path: internal/session/session.go
+            type: file
+            mode: "0644"
+            size: 11189
+            hash: sha256:02f470b2159fb3266e49ff9f4bfb17d1661452ce2983bbba7ae8998e25e32fc6
+          - path: internal/testoracle
+            type: directory
+            mode: "0755"
+          - path: internal/testoracle/fsm.go
+            type: file
+            mode: "0644"
+            size: 17657
+            hash: sha256:478a93d1b5f3b048a4df9c1be5a601b72c47a799c33cc5b64b034a1291cb3de7
+          - path: internal/testoracle/fsm_field_membership_test.go
+            type: file
+            mode: "0644"
+            size: 5750
+            hash: sha256:201a470a38915709aab457daa4d94011cbaea873428b05a21c2d6e8b6754583b
+          - path: internal/testoracle/fsm_test.go
+            type: file
+            mode: "0644"
+            size: 68160
+            hash: sha256:4578841816e77712ed249a349e1f63c13c7eac233f15eccacb2d0ee916527b25
+          - path: internal/testsupport
+            type: directory
+            mode: "0755"
+          - path: internal/testsupport/fakerepo.go
+            type: file
+            mode: "0644"
+            size: 5813
+            hash: sha256:7ddb253e6c4c2734885c69af4704df5c7350a5717ec60c5a5f454a7f3b898c53
+      hash: sha256:ae81098e391f68e3979055b3fbd64e6b65c5ebe8b30ae716676bda8bbb7d8300
   - claim: g4.zero-context
-    attestor: Codex CRM design review
-    date: 2026-09-03
-    note: BUILD.md identifies sources, contracts, machines, tests, migration, toolchain, failure handling, and milestone order without relying on conversation context.
+    kind: plan
+    attestor: coordinator
+    date: 2026-09-06
+    note: 'Re-reviewed 2026-09-06 over the corrected BUILD (bounded parser-backed suite evidence, declared rebuild migration context, x/crypto pin aligned to impl/go.mod); zero-context plan judgment stands over the corrected build document.'
     covers:
-      - {path: BUILD.md, hash: sha256:c58124cf07f7f8cdf8f4e99b2cb484aec5d4ca110543e25b2ed0711863d44c1d}
+      - {path: BUILD.md, hash: sha256:b7c5bf2897cddccb763c86b19d7b371bd9f4d02a210a3423eef009cbfe0ee7b0}
   - claim: ga.review-quality
+    kind: historical
     attestor: Codex release acceptance review
     date: 2026-09-03
-    note: Each milestone review was rerun against the named implementation commit; the DoD evidence, acceptance judgments, and empty findings lists are complete and accurate.
+    note: 'Each milestone review was rerun against the named implementation commit; the DoD evidence, acceptance judgments, and empty findings lists are complete and accurate.'
     covers:
       - {path: acceptance/M0.yaml, hash: sha256:1cce160669cd04f77bff60f1ae74e6760bdf358c08adeeddd6f03260ecc01339}
       - {path: acceptance/M1.yaml, hash: sha256:b0d518e198e5197de8e4ed132b3e58431a353a591670af867bc9590af6b11f63}
