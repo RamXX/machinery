@@ -377,9 +377,12 @@ green over the scaffolding and stubs the tests compile against, the suite runs r
 assertions, never on its own compile or import errors, and the new files are born clean under this
 project's own gates (`gofmt -l` reports nothing over them, `go vet ./...` is clean, and the RED
 commit itself is green under every non-test gate). The tests then lock; the implementer makes
-them pass without editing them. A locked file has no legal remedy for a gate it fails later,
-because nobody is allowed to touch it: that is a RED-phase defect, remedied by an owner-sanctioned
-formatting-only amendment carrying a token-identity proof, never a silent edit. GREEN is accepted only when the locked suite passes AND
+them pass without editing them. Frozen test identity is defined by exact bytes and file inventory.
+Any amendment requires explicit owner authorization, a new evidence revision, and replay
+of RED and all applicable gates before the revised tests lock. Neither formatting nor token
+equality authorizes an editing exemption.
+A gate demanding a locked-file change is a RED-phase defect requiring a design round-trip;
+the original evidence revision remains immutable. GREEN is accepted only when the locked suite passes AND
 `machinery check design --impl <dir>` is green again: no green path exists that crosses a
 boundary. Generated tests live apart from hand-written ones, so regenerating on a design change
 never clobbers them. A wrong test is a design defect: fix the design, regenerate

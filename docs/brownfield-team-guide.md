@@ -189,9 +189,13 @@ design; the tool's contribution is the oracle and its stable ids.
    holds every verdict to a committed oracle row, so the record is checkable instead of
    living in PR prose. Summarize the round in the PR as before. An unadjudicated red test is a question, not a gate. A file only
    locks once it is born clean under this project's own formatter and linters and the commit
-   carrying it is green under every non-test gate the project enforces; after the lock there
-   is no legal remedy for a gate the file fails, short of an owner-sanctioned
-   formatting-only amendment with a token-identity proof.
+   carrying it is green under every non-test gate the project enforces.
+   Frozen test identity is defined by exact bytes and file inventory.
+   Any amendment requires explicit owner authorization, a new evidence revision, and replay
+   of RED and all applicable gates before the revised tests lock. Neither formatting nor token
+   equality authorizes an editing exemption.
+   A gate demanding a locked-file change requires an explicit amendment through this process;
+   the original evidence revision remains immutable.
 
 This is the one place this guide deliberately extends SKILL.md: the hard-TDD handoff
 describes greenfield, where every oracle row is normative from birth. On brownfield, rows

@@ -410,10 +410,13 @@ Target language: Python.
       and the RED commit itself is green under every non-test gate this project runs. A locked file
       has no legal remedy for a gate it fails later, because nobody is allowed to touch it; before
       the lock is the only time to satisfy those gates.
-4. **The tests are then LOCKED.** The implementer may not modify them to pass. If a gate later
-   demands a change to a locked file, that is a RED-phase defect and not license to edit: it takes
-   an owner-sanctioned amendment that changes formatting only and carries a token-identity proof
-   (the file's token stream is identical before and after).
+4. **The tests are then LOCKED.** The implementer may not modify them to pass.
+   Frozen test identity is defined by exact bytes and file inventory.
+   Any amendment requires explicit owner authorization, a new evidence revision, and replay
+   of RED and all applicable gates before the revised tests lock. Neither formatting nor token
+   equality authorizes an editing exemption.
+   A gate demanding a locked-file change is a RED-phase defect requiring a design round-trip;
+   the original evidence revision remains immutable.
 5. **The implementer** writes `pf.model`, `pf.repo`, `pf.feed`, `pf.optimizer`, `pf.domain`,
    `pf.app`, `pf.cli` until the locked tests pass, honoring the Architecture Contract (feed is the
    sole importer of the provider client; repo the sole importer of DuckDB; no cross-boundary edge

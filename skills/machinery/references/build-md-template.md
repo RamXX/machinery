@@ -345,11 +345,13 @@ tools (including how to run `machinery oracle` and `machinery check`).
    id-checked, the suite's own skeleton respects the architecture, and the files are already clean
    under the project's own gates, so the implementer has no correct move except delivering the
    designed behavior inside the designed boundaries.
-4. The tests are then LOCKED. The implementer agent may not modify them to make them pass. If a
-   gate later demands a change to a locked file, that is a RED-phase defect and not license to
-   edit: it takes an owner-sanctioned amendment that changes formatting only and carries a
-   token-identity proof (the file's token stream is identical before and after). Anything a
-   formatting-only amendment cannot fix is a design round-trip, per step 8.
+4. The tests are then LOCKED. The implementer agent may not modify them to make them pass.
+   Frozen test identity is defined by exact bytes and file inventory.
+   Any amendment requires explicit owner authorization, a new evidence revision, and replay
+   of RED and all applicable gates before the revised tests lock. Neither formatting nor token
+   equality authorizes an editing exemption.
+   A gate demanding a locked-file change is a RED-phase defect requiring the design round-trip
+   in step 8; the original evidence revision remains immutable.
 5. The implementer agent writes the code until the locked tests pass.
 6. GREEN acceptance bar, both together: the locked suite passes AND
    `machinery check design --impl <impl-dir>` is green again. Code that passes the tests by
