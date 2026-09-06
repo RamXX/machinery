@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:37:00Z
-content_hash: "sha256:a65881145896fe9c1e66998c5229245c64d8203a071b5438f68b56907d4f2e97"
+updated_at: 2026-09-06T03:49:00Z
+content_hash: "sha256:653007c44f7722dc09a505148c14224ef1d99c7de7c7da6e17c65c24d2afe09c"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -112,6 +112,34 @@ status: new
 
 ## Notes
 TASK ENTRY-ACTION SAME-P0 CANONICAL EXTENSION
+PRE-RED PM SCOPE DISPOSITION — MAC-uzxr
+Bounded initial authoring authorization only; no delivered-state review, rejection, approve-red, acceptance, close or GREEN authorization.
+External complete review /tmp/MAC-uzxr-PM-scope-review.md SHA256 a90e7be8958cbb692f4d7595889d67023733b4eb3c58878012bb2a9e41930202. Full134-line proposal SHA256cee9d4a6ebd7cd9e920bc32260d02bf07906923f13b415cf9ef4b0727ea4363b and entire1323-line appendix SHA256d9976dcd961d178e3fc7e1e68059125e592a152cb481e602200c58c1eb8bfb36 independently read.
+
+Authorized initial stage ONLY new examples/go-crm/impl/internal/testoracle/fsm_test.go, stdlib real copy/subprocess support and exactly USER-e20d04 paired target/action variants plus pinned Session fireAnonymous/SEvResume extra-effect variant. Use full unaffected TestUserTransitions child for User and TestSessionTransitions child for Session, identical passing-control/mutant selection, genuine unsafe-native-variant-accepted failure on unchanged old suites; no missing API/parser-log/setup/compile/timeout RED. Separately record all5 original suites plus2 terminal baseline. Sequential125s context/120s Go children,270s context/300s Go outer; SHA manifests, actual native terminal inventory and exact intended diagnostic. Commit tdd-red then stop for independent replay; no complete-story RED approval. No fsm.go, old test or production edits at this stage.
+
+All218 appendix tuple-to-RowID conversions independently reconciled as mechanical later scope, not permission to partially edit old suites now. Task specific seed/Rejection checks and3-prior non-always supplement are acceptable scope; prepare exact later diff. HOLD shared five-suite/helper/scaffold/parser-test writes until full external patch shows every actual event/guard and falsifying-clause expression, closed relevant guard keys/priority, JSON positional metadata grammar, concrete effect assertions, registered-versus-real successful execution inventory, exact remaining CLI/structural/Task mutation hunks and per-file cost. Both original terminal supplement bodies stay byte-identical. No parser or inventory assertion authoring authority inferred from conceptual paragraphs.
+First fsm_test.go contents freeze at initial tdd-red. Any later additive same-file patch requires separate exact PM authorization before writing, TEST-EDIT AUTHORIZED record and [test-edit-authorized] commit marker, preserving every first-stage byte/assertion. None is granted for an unwritten future patch here. Independently review/freeze final combined RED before GREEN. Scaffold failures remain nonqualifying and original semantic RED stays replayable. Task missing-call/name-only mutation requires actual corrected candidate anchor and passing corrected control after GREEN; no synthetic fixed baseline proof before GREEN.
+
+Cost recommendation only, canonical unchanged by PM: 807 existing test lines;218 tuple replacement lines alone436 additions+deletions. Strict dual parser, closed witness builders and native mutation proofs justify SrPM forecast review. Approx decomposition1500-2150 changed LOC; recommend provisional1500-2200 across same8 paths or a concrete measured1250-1750 decomposition covering all AC. Clarify changed LOC vs net additions, preserve all proof, no extra paths/architecture. Initial5m runtime budget unchanged pending measurement.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Supported full canonical read; direct committed70652b948 read-only comparison verifies all218 original tuples/order,197 MD/JSON row identities,197 stimulus hashes,47 state declarations,118 ordered source/trigger groups. Source mapping is not actual guard/execution proof.
+- internal/oracle/oracle.go StableID excludes target/actions: USER|Active|on:disable|guardAdminAuthority hashes e20d04, so proposed paired target/action variants legitimately retain generated ID. Generator collision-prefix extension means six-only parser remains explicitly bounded current dialect.
+- Independent diagnostic log hash/count extraction: probe1PASS1FAIL0SKIP; wider225leaves224PASS1FAIL0SKIP, soleTASK-754183; no new runtime test/mutation run. Initial analytical zero-row selection and Ruby syntax attempt corrected; final positive47-state/118-priority verification only credited.
+- Graph refreshed readygeneration2026-09-06T02:42:16Z, existing cited paths metadata_match/no_recorded_issue, new helpers missing; best effort only and exact-source fallback used. Main clean497419ab4512fcff765cd5feb27aed4c67b5608d; story ref70652b948bf090008b1965c85daf36ea374daea4. No developer worktree internals, source/test/docs/evidence/remote/service/toolchain writes. Only external review and this coordination note.
+- Claim/worktree retained: in_progress,hard-tdd,dev-MAC-uzxr. All broader authoring/freeze/RED/GREEN/acceptance decisions pending; no MAC-hgz1/MAC-lnu6 claim renewal.
+
+### proof
+- [ ] AC #1: actual committed-row parser and exact closed event/guard mapping pending concrete amendment review.
+- [ ] AC #2: concrete complete-effect tests and actual Task context repair pending final RED/GREEN.
+- [ ] AC #3: independently replayed real semantic/extra-effect/missing-call controls pending.
+- [ ] AC #4: complete dynamic successful execution inventory and preserved supplements pending.
+- [ ] AC #5: complete candidate focused native and sensitivity proof pending; no consumer acceptance renewed.
+
 ## nd_contract
 status: in_progress
 
