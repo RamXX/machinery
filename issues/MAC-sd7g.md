@@ -9,7 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
 updated_at: 2026-09-06T09:03:33Z
-content_hash: "sha256:e3cf424b7497e77ccf29919313dd6b0b45ac6ecb8572d42bd3c1cbe0205bcacd"
+content_hash: "sha256:b0ced19ab8ce2593f0aedc1c04c08c599a3e62972258fb20541047bfd233ce19"
+blocked_by: [MAC-wi2u]
 ---
 
 ## Description
@@ -93,9 +94,10 @@ status: new
 
 
 ## History
-
+- 2026-09-06T09:10:05Z dep_added: blocked_by MAC-wi2u
 
 ## Links
 - Parent: [[MAC-ui8a]]
+- Blocked by: [[MAC-wi2u]]
 
 ## Comments
