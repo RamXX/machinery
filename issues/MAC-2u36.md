@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:37:14Z
-content_hash: "sha256:71aa1b68866fb40b6cb2ae3b643225c667a2c8a27618ab6f68cf8972cd0a1919"
+updated_at: 2026-09-06T02:37:58Z
+content_hash: "sha256:464bb623261a9927a94b2ca24e8bd5f0c19b5465ba4ea5343b1032813008b4fc"
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
 closed_at: 2026-09-06T02:37:14Z
@@ -3347,3 +3347,38 @@ status: delivered
 - [x] AC #7: receipt.go333 conflicting crossgroup rejection and validation before publication;5actualstandalone casesPASS(fresh/disjoint/sameorderedcopychange and2conflict exactrollback/followonnative). No ownership deletion or automatic regrouping.
 
 
+
+### 2026-09-06T02:37:58Z ramirosalas
+FULL INDEPENDENT GREEN REVIEW: ACCEPTED — MAC-2u36 at15252d255fa12a131fbc2cdb13f593a212fd4ccb, production0ad71eba545083e0836792f6f2e307604182e2dd.
+
+Canonical pvg story accept completed once; independent readback closed + accepted (hard-tdd/red-approved retained, delivered removed). This terminal append only corrects historical Comments rendering after Notes; no repeat transition.
+
+Complete independent report appended to Notes and retained at /tmp/machinery-pm-MAC-2u36-green.8BzPkJ/GREEN_REVIEW.md SHA2565597049e42d3de7794372edaa8d1200b7bff854a3a05c8e027db5cca5b4857c0. Exact source/frozen hashes, current author raw logs/inventory hashes, all7AC implementation assessment and semantic scanner disposition are in that report.
+
+Current exactSHA proof independently hashed/parsed/reconciled:85required unique behavioral leavesPASS0SKIP (32actualCLI +53nonCLI), both actual writer-close faults retain os.ErrClosed and full rollback, all4later-source rollbacks and separate premutation recovery pass. Native install434behavioralPASS+10scaffolding records0SKIP; cmd394behavioralPASS+5scaffolding+3explicit unrelatedSKIP. A8PASS184.383s; B412rawPASS145.642s463/463events189/189tops; C399rawPASS3SKIP200.934s437/437events263/263tops. Original15m package remains TIMEOUT900.473s35validPASS with originalCLI parent unfinished; composed verification approved explicitly, not relabeled monolithic success. No fresh PM runtime, code coverage/race/fullpreflight/20mfit claim. All current reported source/test bytes were independently verified;13commit TDD auditPASS0unauthorized. Scanner remains exit1 six legitimate complete fallback/unsupported heuristics, not cleanPASS or actual stubs.
+
+DOCS_STALE ownership resolved before acceptance by exact canonical binding in both2u36 andgcrr, not a waiver: gcrr owns README +agent-portability parity/repair/failclosed/directrollback/foreignchange/postcommitplugin limits plus both-file regression/release outputs. All seven implementation AC byte-for-byte unchanged against delivered readback. gcrr andfinalgate remain blocked from release until those outputs accepted. Three C skips remain explicit caseFS/officialarchive/realOCI final-lane obligations; no required installer integration skipped. No new product bug found.
+
+Epic check after acceptance:14nonclosed children remain; MAC-ui8a stays open. No --next, source/test edits, remote/main/epic mutation, liveproduct/Dagger changes or runtime processes. Own detached checkout cleanup only; evidence retained. Installed5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849 unchanged.
+
+## nd_contract
+status: accepted
+
+### evidence
+- Independent complete seven-AC implementation/source/evidence review at15252d2; all85required story leaves PASS0SKIP with genuine two writer-close faults/full rollback in exact-SHA composed evidence.
+- Fresh13commit TDD audit, exact repaired-baseline test equality, seven frozen hashes, complete raw/native inventory reconciliation and semantic six-heuristic scanner review.
+- Documentation stale findings explicitly assigned in canonical MAC-2u36/MAC-gcrr contracts, with both-file regression/release obligations and existing final-gate dependencies; no implementation AC or proof weakened.
+- No runtime rerun claimed; primary proof is trustworthy current author execution independently audited. Historical timeout, unrelated3skips and15dormant helper records retain honest classifications.
+
+### proof
+- [x] AC #1: receipt-aware complete bootstrap/ordinary plan, modes/defaults/selectors verified.
+- [x] AC #2: private attributed metadata validation, unsafe ownership fail-closed and safe content repair verified.
+- [x] AC #3: all8actual convergence/repair cases with complete current content/topology/digests/idempotence pass.
+- [x] AC #4: all4actual later-source rollbacks including absent prestate and distinct interrupted recovery pass.
+- [x] AC #5: complete required built-release CLI/temp-root integration executes with no required skip.
+- [x] AC #6: authenticated child deferral, parent normalized validated publication, two actual writer faults/full rollback and authority/foreign-change preservation verified.
+- [x] AC #7: actual overlap rejection/restoration/follow-on native and supported recording controls pass.
+- [x] Product story accepted; canonical transition/readback follows.
+- [ ] Downstream MAC-gcrr docs and MAC-ou97 final platform/archive/OCI/race/preflight/release gate remain pending; epic must remain open.
+
+LEARNINGS: query actual writer descriptor rather than pathname; preserve honest finite composed evidence after aggregate timeout; distinguish dormant helpers; explicitly bind stale-doc corrections before acceptance.
