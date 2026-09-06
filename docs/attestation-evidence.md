@@ -80,7 +80,7 @@ After reviewing the actual implementation and tests, generate a complete v2 docu
 machinery attest --design design --impl src \
   --claim gt.conformance-test-shape --kind current \
   --attestor 'Reviewer name' --date 2026-09-03 --note 'What was reviewed'
-machinery check --design design --impl src --gate gv
+machinery check design --impl src --gate gv
 ```
 
 Generation requires an explicit claim, kind, attestor and real calendar date.
