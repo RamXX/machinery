@@ -7,8 +7,8 @@ type: bug
 parent: MAC-ui8a
 created_at: 2026-09-06T16:33:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T16:33:54Z
-content_hash: "sha256:c859be61fa52a6f6a91a2ace393853207edc1d23e0f56be1177be76d78b597b0"
+updated_at: 2026-09-06T16:34:21Z
+content_hash: "sha256:19ade8c7b10471eb9d73e34f49fa2031418e19ca420afe76fbc16da9c99afb2d"
 labels: [hard-tdd]
 follows: [MAC-sh60]
 blocked_by: [MAC-hgz1]
@@ -135,3 +135,6 @@ status: new
 - Follows: [[MAC-sh60]]
 
 ## Comments
+
+### 2026-09-06T16:34:21Z ramirosalas
+SUCCESSOR BOOKKEEPING 2026-09-06: User-approved compliant successor created from independently reviewed proposal SHA256 b4dffe48f6f706460fe849a6d43c0024b25ad6cbda1567aec9960932602da8c2. Canonical links: follows MAC-sh60; blocked by MAC-hgz1; additionally blocks MAC-vx24 and MAC-ou97. MAC-sh60 remains in_progress, claimed, hard-tdd/red-approved, and remains a blocker of both consumers because installed pvg 1.64.0/nd exposes no supported cancelled/superseded terminal transition or contract status; closed is documented as completed and auto-unblocks dependents. No acceptance, custom status, settings change, force close, old-edge removal, branch/worktree/source/test/native/private-tool/remote mutation occurred. Actual baseline B remains unresolved until MAC-hgz1 acceptance. All five AC remain pending; root must review this story before source dispatch.
