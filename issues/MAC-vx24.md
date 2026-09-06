@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:35Z
-content_hash: "sha256:ffdfc505e82a4538cf7d7f3db9f4636b2793dfcf67b603b0f8e96eb371072d45"
+updated_at: 2026-09-06T09:48:00Z
+content_hash: "sha256:c2a5711dfc651e9a95dfaa8c6e5a9b78d2bc8b97acd5fe9e54ea261fe0fd6179"
 blocked_by: [MAC-l7m0, MAC-sh60, MAC-2n83, MAC-lnu6, MAC-hpqp, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-olrx, MAC-p7jd]
@@ -266,3 +266,42 @@ status: new
 
 ### proof
 - [ ] Every existing and supplemental current AC remains required; no execution proof claimed.
+
+### 2026-09-06T09:48:00Z ramirosalas
+ROUND-1 RULE 1 REPAIR: COMPLETE CURRENT INTEGRATION OUTPUT MAP
+The current root-level repository_contract_test.go references in earlier scope/provenance are a historical path typo, NOT an owned output. Do not create that root file or treat it as a replacement for existing contract tests. This complete current output map supersedes those historical declarations without deleting evidence.
+
+PRODUCES:
+- agents/machinery-build-writer.md -> truthful standalone process adoption.
+- skills/machinery/SKILL.md -> supported capture/register/RED/GREEN/replay guidance.
+- skills/machinery/references/build-md-template.md -> exact frozen closure and negative/red_control process.
+- cmd/machinery/repository_contract_test.go -> THE existing repository contract regression surface, retaining existing assertions except separately approved RED changes.
+- docs/test-assurance-integration.md -> truthful public completed-interface/guarantee coverage matrix.
+
+CONSUMES:
+- MAC-lnu6: skills/machinery/references/build-md-template.md
+  source: prior exact-byte policy repair, modified only sequentially without restoring exemptions.
+- MAC-5ft8: examples/go-crm/design/attestations.yaml
+  schema: substantive independently reviewed post-strict-test full current subject, exact generated evidence and preserved history; upstream hgz1/lnu6 current evidence cannot stand for later added tests.
+- MAC-al5u: scripts/shellcheck-files.txt
+  source: both new scripts actually registered in preserved sorted exact corpus.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: same approved canonical document; schema/store/budget is section4, obligation activation section3, adapter semantics section6, APIs section7, custody section8.
+
+CURRENT ACCEPTANCE MAP
+All nine original current integration-umbrella ACs remain required in full. For clarity their required outcomes are: (1) every bounded producer called by normal complete; (2) exact baseline assertion red_controls and safe/unsafe sensitivity; (3) complete native GREEN/inventory/checks; (4) registered retained replay and final no-launch/release/publication/output/aggregate-budget lifecycle; (5) normal four-language first-use commands/hooks with honest cheap freshness; (6) no frozen formatting exemption; (7) all legacy regressions and prospective complete-example migration; (8) actual two-platform full standalone/bypass/custody proof; (9) shipped guidance with frozen positive/negative contract tests and truthful residual limits.
+This story owns the five paths above ONLY. New/changed contract tests go into the actual cmd/machinery/repository_contract_test.go, preserve every existing regression, and require exact independent RED amendment review before any existing frozen test edit. Execute that existing package's real contract tests; a new root-package replacement is forbidden.
+Complete-example integration specifically requires the MAC-5ft8 post-change substantive judgment refresh and stale-before/current-after controls. No hash-only automatic reviewer/date renewal, Gv exemption, fixture/golden mutation or implementation downgrade.
+The current dependency DAG and all nineteen upstream obligations, original MAC-sh60 blockers, hpqp96pilot and protected claims remain unchanged. Budget remains five files/<1200 LOC. No new architecture or implementation proof is asserted.
+
+## nd_contract
+status: new
+
+### evidence
+- Independent round1 findings repaired through supported append-only scope/consumer notes; no architecture/source/test/ref/runtime mutation.
+- Exact source surfaces verified against accepted epic7e36f3e7ddcf25565d5d4fe60b328df254eee91d; prior Body/status/labels/history preserved.
+- Independent Anchor ROUND2 and canonical-document acceptance remain prerequisites, not implementation evidence.
+
+### proof
+- [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
+- [ ] Independent review/native execution/final acceptance pending.
