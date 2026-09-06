@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:07:57Z
-content_hash: "sha256:ab836584cab53b77a59bd31fcb5e04a28855274d24ee412f3c237e36a774f296"
+updated_at: 2026-09-06T06:09:09Z
+content_hash: "sha256:fcb51f50cee97d0f2d2d4b9786cf954146ffbf43c7818b71aa1349031304812d"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -768,3 +768,22 @@ status: in_progress
 - [ ] AC #3: preserved initial genuine RED; all final candidate unsafe-variant rejections pending.
 - [ ] AC #4: current transitionrows unreached at scaffold; actual successful bidirectional candidate inventory pending.
 - [ ] AC #5: complete passing candidate and consumerhandoff pending independentRED/GREEN checkpoints.
+
+### 2026-09-06T06:09:09Z ramirosalas
+## nd_contract
+status: new
+
+### evidence
+- TERMINAL INDEPENDENT RED APPROVAL — MAC-uzxr at frozenacf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f. Supported pvg story approve-red MAC-uzxr exited0 from own detached candidate, no waiver or forced transition. Readback is open with hard-tdd,red-approved; recorded assignee remains dev-MAC-uzxr as the supported command left it. No PM re-claim/claim renewal, delivery, GREEN implementation, acceptance or close.
+- Full combined-evidence decision/report /tmp/MAC-uzxr-PM-combined.au6aPZ/REVIEW.md SHA256072af4cda455158288e635968040fa0930e1f40a0fd0fead10314497341d670c is appended in Notes and authoritative for rationale/limits. Approval applies the canonical explicit allowance for scaffold-supported RED when unchanged old suites genuinely demonstrate the missing sensitivity. Fresh historical4ef6baf replay gives3 intended unsafe-accepted outerFAIL/200childPASS/0SKIP,6exactcontrols-mutants46inputs2/2/1changedfiles; rawa8f978b85b1031dac050b1f5cd49a0c7b45e816c2b67c25deb72d63622f2e968. Separate unchangedTask1normalPASS1fallbackFAIL and strict224PASS1FAIL plus historical225baseline exactidentities re-audited. Those evidence classes are distinct.
+- Current independent5groups16.396s: parser28FAIL; focused10supplementPASS5transitionrootFAIL; meta3/3/17outerFAIL. All current parser/control outcomes are NONQUALIFYING ErrScaffold.23actualchildren10supplementPASS25rootFAIL0SKIP, ZERO transitionrows/registrations/observations/mutants. FutureTaskanchors unreached.52exportfiles6manifests47inputhasheseach23cwdsremoved. Added default candidate replay2.153s verifies proof and3cwds cleaned. No current parser closure, negative sensitivity or successful inventory is credited.
+- Independent audit /tmp/MAC-uzxr-PM-combined.au6aPZ/audit.jsonl SHA256abaa51f3f769410907eb17e283f17ce7effd916b088d8523a3919d72c9d175a8 verifies author and PM raw receipts/nativeidentities,99committedfiles,exact7authorizedhashes,495lineprefix326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba and unchangedTask. Prior full218witness/197row/47state/118orderedgroup/17ASTmutant review applies to identical bytes. Normal TDD audit3commits0violations, scoped static7files0issues, clean detachedsource; no waiver. Supported approval output SHA256d2b843614b44df9dec5bef0c06ad35820b35e9a0c7b5d37d4dc5bc314b1c5095.
+- Root must dispatch FRESH GREEN separate from REDauthor context. Six Go test files atacf1bba remain immutable; implement only owned fsm.go behind reviewed minimumAPI and exactTask.fireRolledBack fallback realrecordTaskClosed plus orderedactions. Preserve tenoracles/modules/config/sourceclosure/otherproduction and sixfrozenassertionfiles. Any assertion/API/scope issue returns for exact review; no blankettestrepair or productPaivot coupling.
+- GREEN must actually pass all frozen parser contracts/nested cases, fiveparsedtransition suites and10supplements, fullbidirectional successful row/witness/nativeinventory, and all20realvariants(original3+later17) with valid matchedfullcontrols/exactdiagnostics. Full43sequentialchild families, actualhash/input/nativeoutcomeinventory,zeroSKIP,defaultcleanup/explicitexport and measuredcomplete runtime/cost remain mandatory. No currentconsumerclaim, acceptance or authenticatedexecution renewal. All originalfivefullACpending. Canonicaldescription/eightpaths/dependencies/history preserved; no sharedsource/test/example/install/remote/preflight/service changes or children.
+
+### proof
+- [ ] AC #1: actual current parser and complete input/guard binding pending GREEN.
+- [ ] AC #2: real candidate full effects/context and narrow Task correction pending GREEN.
+- [ ] AC #3: all20 candidate unsafe-variant rejections with valid controls pending GREEN.
+- [ ] AC #4: successful complete bidirectional candidate inventory pending GREEN.
+- [ ] AC #5: full focused passing candidate and reviewed consumer handoff pending GREEN/PM.
