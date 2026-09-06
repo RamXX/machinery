@@ -8,11 +8,11 @@ parent: MAC-ui8a
 created_at: 2026-09-06T16:33:51Z
 created_by: ramirosalas
 updated_at: 2026-09-06T16:35:05Z
-content_hash: "sha256:94cd9125ad42dbb571d76d856ec302843290574f10f418b4fd8eff23dc04d7a6"
+content_hash: "sha256:597d566002bdc9cb1254f72f8e9733594caf95a8f97a8838e7ec9f78a857f7fc"
 labels: [hard-tdd]
 follows: [MAC-sh60]
-blocked_by: [MAC-hgz1]
 blocks: [MAC-vx24, MAC-ou97]
+was_blocked_by: [MAC-hgz1]
 ---
 
 ## Description
@@ -127,11 +127,12 @@ status: new
 - 2026-09-06T16:34:00Z dep_added: blocked_by MAC-hgz1
 - 2026-09-06T16:34:03Z dep_added: blocks MAC-vx24
 - 2026-09-06T16:34:07Z dep_added: blocks MAC-ou97
+- 2026-09-06T20:22:41Z dep_removed: was_blocked_by MAC-hgz1
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]]
-- Blocked by: [[MAC-hgz1]]
+- Was blocked by: [[MAC-hgz1]]
 - Follows: [[MAC-sh60]]
 
 ## Comments

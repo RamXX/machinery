@@ -1,7 +1,7 @@
 ---
 id: MAC-hgz1
 title: "Migrate repaired example claims to truthful plan and current evidence"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:16:50Z
 created_by: ramirosalas
 updated_at: 2026-09-06T20:22:41Z
-content_hash: "sha256:f32a916fd743fd9ec526489ff810c4a1b7adc7b3604168748c3125247d047b62"
-blocks: [MAC-lnu6, MAC-ou97, MAC-wi5z]
+content_hash: "sha256:60c3fc3ddc629d2bfd6e682eff1909c01d8a1feb10e3f31a71f286a970247180"
 was_blocked_by: [MAC-p7jd, MAC-uzxr, MAC-lhu5]
 follows: [MAC-p7jd, MAC-uzxr, MAC-lhu5]
 assignee: dev-MAC-hgz1
+closed_at: 2026-09-06T20:22:41Z
+close_reason: "Accepted: eight attestation docs migrated to truthful v2 plan/current/historical; merged to local epic"
 ---
 
 ## Description
@@ -205,10 +206,13 @@ status: new
 - 2026-09-06T19:21:45Z auto-follows: linked to predecessor MAC-p7jd
 - 2026-09-06T19:21:45Z auto-follows: linked to predecessor MAC-uzxr
 - 2026-09-06T19:21:45Z auto-follows: linked to predecessor MAC-lhu5
+- 2026-09-06T20:22:41Z status: in_progress -> closed
+- 2026-09-06T20:22:41Z dep_removed: no_longer_blocks MAC-lnu6
+- 2026-09-06T20:22:41Z dep_removed: no_longer_blocks MAC-ou97
+- 2026-09-06T20:22:41Z dep_removed: no_longer_blocks MAC-wi5z
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-lnu6]], [[MAC-ou97]], [[MAC-wi5z]]
 - Was blocked by: [[MAC-p7jd]], [[MAC-uzxr]], [[MAC-lhu5]]
 - Follows: [[MAC-p7jd]], [[MAC-uzxr]], [[MAC-lhu5]]
 
