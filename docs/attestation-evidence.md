@@ -21,9 +21,10 @@ One file per design, `design/attestations.yaml`. Rows are keyed by a claim id fr
 closed vocabulary the gate owns.
 
 ```yaml
-attestation_version: 1
+attestation_version: 2
 attestations:
   - claim: g2.interface-contract-rightness
+    kind: plan
     attestor: Ramiro Salas
     date: 2026-08-30
     note: the payment edge's error list was extended after the PSP retry review
@@ -31,6 +32,7 @@ attestations:
       - path: ARCHITECTURE.md
         hash: sha256:3f786850e387550fdab836ed7e6dc881de23001b42caa1de5c1bd8e56c0a1a3b
   - claim: g3.guard-semantics
+    kind: plan
     attestor: Ramiro Salas
     date: 2026-08-30
     covers:
@@ -42,12 +44,14 @@ attestations:
 
 | Field | Meaning |
 |---|---|
-| `attestation_version` | the integer `1`. |
+| `attestation_version` | the integer `2`; legacy `1` has the migration rules below. |
 | `claim` | one id from the vocabulary below. Unknown ids are an ERROR: an invented claim records diligence instead of being held to it. |
+| `kind` | `plan`, `current`, or `historical`, according to the classification below. |
 | `attestor` | who or what made the judgment. An attestation without an attestor attributes nothing, so an empty value is an ERROR. This is where the named-owner rule lands, exactly as Ga's `reviewer` field does. |
 | `date` | `YYYY-MM-DD`, a real calendar date. |
 | `covers` | a non-empty list of `{path, hash}`. `path` is design-relative (never absolute, never climbing out of the design). `hash` is `sha256:<64 lower-case hex>` over the file's bytes at attestation time. |
 | `note` | optional free prose: what the judgment turned on. |
+| `implementation` | required only for `current`; forbidden for other kinds. The full-root manifest described below. |
 
 A claim appears at most once. Git history is the record of prior attestations, so a
 re-attestation edits the row rather than appending a second one, the same rule Ga uses for
@@ -68,18 +72,138 @@ added by hand; the command exists so nobody has to.
 `machinery attest --claims` prints the vocabulary from the binary, so an attestor never
 works from a transcription that has drifted.
 
+## Generate a reviewed row
+
+After reviewing the actual implementation and tests, generate a complete v2 document:
+
+```bash
+machinery attest --design design --impl src \
+  --claim gt.conformance-test-shape --kind current \
+  --attestor 'Reviewer name' --date 2026-09-03 --note 'What was reviewed'
+machinery check --design design --impl src --gate gv
+```
+
+Generation requires an explicit claim, kind, attestor and real calendar date.
+For `plan` or `historical`, omit `--impl`; it is forbidden for those kinds.
+Generation flags cannot be combined with explicit-file hashing or `--claims`.
+The command does not run tests, infer the review, sign a receipt, or write the
+evidence file. Inspect its document and merge the row into the record, replacing
+an older row for that claim. Do not redirect over the live record being read;
+use a separate output file outside the reviewed root and merge later.
+
+Discovery, validation, final unchanged checks and owned cleanup all finish before
+generation emits stdout. Failure returns exit 1 with no document bytes. A sink
+write failure also returns nonzero, but an arbitrary pipe can accept partial
+bytes: output writes are not an atomic filesystem transaction.
+
+Hashes bind the observed files and scope; they do not prove tests ran, reviewer identity, or judgment correctness. Top-level Git administration and the exact Machinery attestation record are excluded; applications that use them as runtime inputs are outside this review boundary.
+
+## Closed v2 kinds and grammar
+
+The six `g2.*` claims, four `g3.*` claims, and `g4.zero-context` allow only `plan`.
+`gt.conformance-test-shape`, `g4.pack-event-discipline`, and `g4.standin-coverage`
+allow `current`, or an explicitly limited `plan` that leaves current evidence
+missing (a warning). `ga.review-quality` allows only `historical` and never
+approves today's implementation. Existing Ga milestone semantics are unchanged.
+
+Root keys are `attestation_version`, `attestations`, and optional string
+`_comment`. Row keys are the fields above, plus optional string `_comment`.
+Duplicate or unknown keys, aliases, merges, nulls and wrong scalar types are
+errors. Covers are closed `{path, hash, optional string _comment}` mappings: unique portable ASCII
+design-relative paths, no casefold aliases, no self-reference to
+`attestations.yaml`, and lowercase SHA256 hashes. Every required design subject
+must be covered, not just any file. Version 2 requires an explicit kind.
+
+## The current implementation manifest
+
+`implementation` has exactly `root`, `policy`, `entries`, and `hash`.
+`root` is the normalized slash-separated lexical locator from the logical design
+root to the supplied `--impl` root, for example `../src`, `.`, or `src`. Leading
+`..` components are allowed only in this locator. It must match the invocation;
+it grants no authority to open a different root from the receipt. Equal roots,
+disjoint roots, implementation inside design, and design inside implementation
+are supported while retaining the original design generation.
+
+`policy` is exactly `full-root-v1`. The inventory includes the root `.` directory,
+every other directory (including empty ones), and every regular file: hidden,
+ignored, generated, vendor, configuration, documentation and test inputs alike.
+There are no include/exclude, extension, gitignore, or subtree selectors.
+Only top-level `.git` (a real directory or regular gitfile) and the exact
+Machinery design `attestations.yaml` are excluded. An unrelated file of that
+name remains an input. Nested `.git` is unsupported metadata and fails closed.
+Evidence is still bound by the retained design snapshot during each invocation;
+its exclusion only prevents persistent receipt self-reference.
+
+Entries are sorted by raw ASCII path bytes and use portable relative paths.
+Directory entries contain exactly `{path, type: directory, mode}`. File entries
+contain exactly `{path, type: file, mode, size, hash}`. Modes are four-character
+octal permission strings `0000` through `0777`; size is a nonnegative integer;
+file hashes use `sha256:<64 lowercase hexadecimal digits>`. Parents must precede
+children. Duplicate/casefold paths, file/descendant conflicts, hardlink identity
+aliases, symlinks and special files are rejected. Root and file identities are
+held and checked; copying cannot erase an original alias or replacement.
+
+The scope hash is SHA256 over this exact ASCII stream, ending every line with
+LF. Fields below are separated by one TAB, without YAML quoting:
+
+```text
+machinery-attestation-scope-v1
+root<TAB><root locator>
+policy<TAB>full-root-v1
+exclude<TAB>vcs-root:.git
+exclude<TAB>evidence:<implementation-relative exact evidence path, or none>
+directory<TAB><path><TAB><mode>
+file<TAB><path><TAB><mode><TAB><decimal size><TAB>sha256:<hex>
+```
+
+The final two line forms repeat in inventory order. The evidence descriptor is
+fixed by root topology even if the evidence file does not yet exist. The gate
+checks manifest shape and its own digest, the independently acquired inventory
+in both directions, then modes, sizes and hashes. Added and removed paths are
+stale evidence, even when all listed files still match. No current-review count
+is published until all retained-root checks and cleanup complete successfully.
+
+## Fixed evidence limits
+
+The complete logical inventory, including any retained design overlay, has one
+budget: 100,000 entries, directory depth 64 (root depth 0), 1 GiB per regular
+file, and 8 GiB aggregate regular-file bytes. Bounded traversal/copy rejects an
+excess rather than truncating or resetting the budget for each directory or
+overlay. Symlinks and special files are rejected before opening their contents.
+
+The YAML document, each required design cover, and each file in legacy explicit
+hash mode are limited to 16 MiB. Generated serialized YAML must fit 16 MiB too;
+independently generated rows must still fit the same bound when merged. A scope
+can fit its inventory budget but be too large to serialize: `GV_EVIDENCE_LIMIT`
+reports the size and limit; no partial manifest is emitted. There are no flags
+to relax these ceilings. Scope hashes do not bind environment variables,
+external services, files outside the root, or all transitive execution inputs.
+
+## Migrate version 1 deliberately
+
+Version 1 accepts only its original keys. Design-plan rows retain their original
+cover checks and receive an informational migration note, not a new warning.
+Legacy `ga.review-quality` is historical acceptance evidence only.
+Legacy rows for the three implementation-behavior claims always fail with
+`GV_MISSING_IMPLEMENTATION_SUBJECT`, even when BUILD/pack hashes match and even
+without `--impl`. Review the full implementation/test scope and generate v2
+`kind: current`, or explicitly recast the statement as v2 `kind: plan` and leave
+current evidence missing. No legacy row is silently upgraded or grandfathered.
+Checking a v2 current row without `--impl` fails with `GV_IMPL_REQUIRED`.
+
 ## What the gate checks
 
-`Gv-attest` activates on the artifact, like `Ga` and `Gj`: no `attestations.yaml`, no
-gate. A design that has not adopted the record is not failed for not having adopted it.
-Once the file exists, the gate verifies:
+`Gv-attest` activates when evidence exists or phase artifacts make claims owed.
+An owed but missing evidence file is an error. Once the file exists, the gate verifies:
 
-- the file parses, carries `attestation_version: 1`, and holds a non-empty
+- the file parses, carries a supported version, and holds a non-empty
   `attestations` list (an empty record is a failure, not a pass);
 - every `claim` resolves to the closed vocabulary, and no claim appears twice;
 - every row names an `attestor` and a real date;
 - every covered `path` is design-relative and names a file the design carries;
-- every `hash` matches that file's current bytes.
+- every `hash` matches that file's current bytes;
+- kinds match the vocabulary and current rows bind the complete supplied root;
+- retained original/copy custody and cleanup succeed before publishing results.
 
 The last one is the point of the whole design. A covered artifact edited after the
 attestation makes the row **STALE**, and STALE is a blocking ERROR:
@@ -108,15 +232,13 @@ exists, the Gate 3 claims once `machines/*.machine.json` do, and so on down the 
 below. An owed claim with no row is a WARN naming the claim and the artifact that made it
 owed.
 
-That is a deliberate departure from machinery's usual "absence is an ERROR" posture, and
-the reason is adoption. The evidence file is opt-in and is adopted in the middle of a
-design's life. If the first commit of it failed the gate for every claim not yet
-re-judged, adopting the record would cost more than not adopting it, which guarantees the
-attested halves stay in conversation forever. So a partial record is allowed to be
-partial and says so out loud, while a record that is WRONG blocks: an unknown claim, an
-unattributed row, a dangling referent, a stale hash. A misleading record is worse than a
-missing one. The absence rule still bites where it must, at the file level: an evidence
-file with no rows is an ERROR.
+A partial record may warn about owed judgments not yet recorded. An explicit
+plan for an implementation-behavior claim also warns that current evidence is
+missing. `--complete` promotes these warnings to handoff failure. Wrong or empty
+records block immediately: unknown claims, unattributed rows, dangling subjects,
+stale hashes, incomplete scope and custody failures are not warnings or DRIFT.
+Stop/SubagentStop finalize before decisions, output, or ledger clearing; custody
+failures block even under relaxed policy, an open wave, or empty gate selection.
 
 ## The vocabulary
 
@@ -147,8 +269,8 @@ Adding an attested half to SKILL.md means adding its id here; that coupling is t
 `design/acceptance/M<n>.yaml` keeps its free-prose `attestations:` list, which is what the
 milestone review checked by judgment on that commit, and nothing about existing acceptance
 files changes. The two records answer different questions: Ga's list is scoped to one
-milestone review at one commit, while a `Gv` row is the standing judgment on one artifact,
-invalidated the moment that artifact moves.
+milestone review at one commit, while a `Gv` current row is the standing judgment
+on its design and implementation scope, invalidated when that scope changes.
 
 Where an acceptance attestation string restates a Class C claim, prefer the id: write
 `ga.review-quality` (or the specific claim) as the `attestations:` entry and carry the

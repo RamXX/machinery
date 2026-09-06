@@ -529,6 +529,7 @@ func parseAttestationRow(g *Gate, where string, item *ir.Value, version string) 
 			row.kind = "plan"
 		}
 	} else {
+		row.claim, row.date = obj.GetString("claim"), obj.GetString("date")
 		validateAttestationStrings(g, where, obj, "kind")
 		class := attestationClaimKinds[row.claim]
 		if row.kind != "plan" && row.kind != "current" && row.kind != "historical" || class != "" && row.kind != class && !(class == "current" && row.kind == "plan") {
