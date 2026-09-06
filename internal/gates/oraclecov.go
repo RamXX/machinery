@@ -2,14 +2,14 @@
 // oracles match the machines and G4 proves the code respects the contract;
 // neither proves the tests actually key on the oracle rows. Gt closes that
 // gap as a DISCOVERY gate: every stable id from the committed transition
-// oracles (and from the formal decision oracles, when the design carries
-// them) must appear whole-token in genuinely executable test code, or the
-// oracle must be parsed by a test that actually runs: for Go, a valid test
-// function whose bounded call graph opens the oracle file and drives its
-// parsed content into testing assertions; for the script languages, a
-// conformance-parse citation inside an extracted active test body. Gt never
-// executes anything: static references prove discovery, not that assertions
-// ran, and the checked line says so.
+// oracles (and the formal decision oracles, when present) must occur
+// whole-token in genuinely executable test code, or the oracle must be
+// parsed by a test that actually runs: for Go, a valid test function whose
+// bounded call graph opens the oracle through a resolvable literal/const
+// path and drives the parsed content into testing assertions; for the
+// script languages, a conformance-parse citation inside an extracted active
+// test body. Gt never executes anything: static references prove discovery,
+// not that assertions ran, and the checked line says so.
 
 package gates
 
@@ -196,19 +196,19 @@ func coverOracle(g *Gate, label, base, text string, corpus testCorpusData) (whol
 // non-test declarations prove nothing.
 type testCorpusData struct {
 	files      []corpusFile
-	joinedCode string // active test bodies only; row ids must occur there
+	joinedCode string
 }
 
 type corpusFile struct {
 	rel    string
-	goFile *goTestFile // non-nil for parsed .go test files
-	bodies []string    // active test bodies / Go extracts
+	goFile *goTestFile
+	bodies []string
 }
 
 // goBuildIgnoreLine matches the header lines that exclude a Go file from
 // every build: the canonical //go:build ignore and the legacy // +build
-// ignore. Opt-in build tags (ladybug, race, ...) select extra suites; the
-// ignore constraint marks files the toolchain never runs.
+// ignore. Opt-in tags (ladybug, race, ...) select extra suites; the ignore
+// constraint marks files the toolchain never runs.
 var goBuildIgnoreLine = regexp.MustCompile(`(?m)^//go:build\s+ignore\s*$|^//\s*\+build\s+ignore\s*$`)
 
 // testCorpus gathers the impl's test files, classified per language exactly
@@ -262,8 +262,7 @@ func testCorpus(design, impl string, g *Gate) testCorpusData {
 			g.Errs = append(g.Errs, filepath.Join(impl, rel)+" is unreadable: "+readErr.Error())
 			continue
 		}
-		text := string(body)
-		ext := filepath.Ext(rel)
+		text, ext := string(body), filepath.Ext(rel)
 		switch {
 		case isTestFile(rel) && ext == ".go":
 			if goBuildIgnoreLine.MatchString(goHeader(text)) {
@@ -277,8 +276,7 @@ func testCorpus(design, impl string, g *Gate) testCorpusData {
 			corpus.files = append(corpus.files, cf)
 		case isTestFile(rel):
 			g.Count("test files scanned")
-			clean := stripTestComments(stripDocstrings(text, ext), ext)
-			corpus.files = append(corpus.files, corpusFile{rel: rel, bodies: activeTestBodies(clean, ext)})
+			corpus.files = append(corpus.files, corpusFile{rel: rel, bodies: activeTestBodies(stripTestComments(stripDocstrings(text, ext), ext), ext)})
 		case strings.HasSuffix(rel, ".rs"):
 			_, spans := rustSplitTests(text)
 			if len(spans) == 0 {
@@ -295,6 +293,8 @@ func testCorpus(design, impl string, g *Gate) testCorpusData {
 	return corpus
 }
 
+var goPackageLine = regexp.MustCompile(`(?m)^package\s+\w+`)
+
 // goHeader returns the text before the package clause, where build
 // constraints live.
 func goHeader(text string) string {
@@ -304,20 +304,14 @@ func goHeader(text string) string {
 	return text
 }
 
-var goPackageLine = regexp.MustCompile(`(?m)^package\s+\w+`)
-
 // fileNameCited reports whether some SINGLE test file carries ACTIVE
-// executable evidence that it parses the oracle named by base:
-//   - a Go file: a valid test function whose bounded call graph reads the
-//     oracle through a resolvable literal/const path and drives the parsed
-//     content into testing assertions (goTestFile.coversOracle);
-//   - a script-language file: an extracted active test body holding both a
-//     whole-token string mention of base and a markdown table-row delimiter
-//     literal, the fingerprint of a real row parser.
-//
-// Comments, docstrings, unused declarations, disabled files, uncalled
-// helpers and mentions outside test bodies earn nothing. The evidence must
-// all live in the same file (the Gt citation rule).
+// executable evidence that it parses the oracle named by base: a Go valid
+// test function with a bounded connected read-parse-assert flow
+// (goTestFile.coversOracle), or a script-language active test body holding
+// both a whole-token string mention of base and a markdown table-row
+// delimiter literal. Comments, docstrings, unused declarations, disabled
+// files, uncalled helpers and mentions outside test bodies earn nothing;
+// the evidence must all live in the same file (the Gt citation rule).
 func fileNameCited(base string, corpus testCorpusData) bool {
 	for _, f := range corpus.files {
 		if f.goFile != nil {
@@ -352,20 +346,9 @@ func fileNameMentionedInString(base, text string) bool {
 	}
 }
 
-// wholeTokenAt reports whether text[pos:pos+n] has no gluing [A-Za-z0-9_.-]
-// byte on either side.
-func wholeTokenAt(text string, pos, n int) bool {
-	if pos > 0 && isFileNameChar(text[pos-1]) {
-		return false
-	}
-	if end := pos + n; end < len(text) && isFileNameChar(text[end]) {
-		return false
-	}
-	return true
-}
-
 // wholeTokenIn reports whether base occurs in text as a whole token under
-// the file-name boundary class.
+// the file-name boundary class (used on resolved path VALUES, which are
+// already inside a string by construction).
 func wholeTokenIn(base, text string) bool {
 	idx := 0
 	for {
@@ -379,6 +362,12 @@ func wholeTokenIn(base, text string) bool {
 		}
 		idx = pos + 1
 	}
+}
+
+// wholeTokenAt reports whether text[pos:pos+n] has no gluing [A-Za-z0-9_.-]
+// byte on either side.
+func wholeTokenAt(text string, pos, n int) bool {
+	return !((pos > 0 && isFileNameChar(text[pos-1])) || (pos+n < len(text) && isFileNameChar(text[pos+n])))
 }
 
 // mentionInsideQuotes reports whether text[start:end] lies inside a
@@ -455,14 +444,12 @@ func stripPyDocstrings(text string) string {
 		first       bool
 	}
 	blocks := []block{{min: 0, indent: -1, first: true}}
-	i := 0
-	for i < len(text) {
+	for i := 0; i < len(text); {
 		eol := strings.IndexByte(text[i:], '\n')
 		if eol < 0 {
 			eol = len(text) - i
 		}
-		line := text[i : i+eol]
-		t := strings.TrimSpace(line)
+		line, t := text[i:i+eol], strings.TrimSpace(text[i:i+eol])
 		if t == "" || strings.HasPrefix(t, "#") {
 			i += eol + 1
 			continue
@@ -470,7 +457,7 @@ func stripPyDocstrings(text string) string {
 		indent := len(line) - len(strings.TrimLeft(line, " \t"))
 		for len(blocks) > 1 {
 			top := blocks[len(blocks)-1]
-			if top.indent >= 0 && indent <= top.indent || top.indent < 0 && indent < top.min {
+			if (top.indent >= 0 && indent <= top.indent) || (top.indent < 0 && indent < top.min) {
 				blocks = blocks[:len(blocks)-1]
 				continue
 			}
@@ -480,9 +467,10 @@ func stripPyDocstrings(text string) string {
 		if b.indent < 0 {
 			b.indent = indent
 		}
+		isDef := strings.HasPrefix(t, "def ") || strings.HasPrefix(t, "class ") || strings.HasPrefix(t, "async def ")
 		if b.first {
 			b.first = false
-			if m := pyDocOpen.FindStringSubmatch(line); m != nil && len(m[1]) > 0 {
+			if m := pyDocOpen.FindStringSubmatch(line); m != nil && !isDef {
 				quote := m[1]
 				if strings.Count(line, quote) >= 2 {
 					blank(i, i+eol) // opens and closes on one line
@@ -490,27 +478,23 @@ func stripPyDocstrings(text string) string {
 					continue
 				}
 				j := i + eol + 1
-				for {
-					if j >= len(text) {
-						blank(i, len(text))
-						i = len(text)
-						break
-					}
+				for j < len(text) {
 					je := strings.IndexByte(text[j:], '\n')
 					if je < 0 {
 						je = len(text) - j
 					}
 					if strings.Contains(text[j:j+je], quote) {
 						blank(i, j+je+1)
-						i = j + je + 1
+						j += je + 1
 						break
 					}
 					j += je + 1
 				}
+				i = j
 				continue
 			}
 		}
-		if strings.HasPrefix(t, "def ") || strings.HasPrefix(t, "class ") || strings.HasPrefix(t, "async def ") {
+		if isDef {
 			blocks = append(blocks, block{min: indent + 1, indent: -1, first: true})
 		}
 		i += eol + 1
@@ -518,8 +502,10 @@ func stripPyDocstrings(text string) string {
 	return string(out)
 }
 
-var exDocHeredoc = regexp.MustCompile(`^(\s*)@(moduledoc|doc)\s+("""|''')`)
-var exDocSingle = regexp.MustCompile(`^(\s*)@(moduledoc|doc)\s+(?:"([^"\n]*)"|'([^'\n]*)')`)
+var (
+	exDocHeredoc = regexp.MustCompile(`^(\s*)@(moduledoc|doc)\s+("""|''')`)
+	exDocSingle  = regexp.MustCompile(`^(\s*)@(moduledoc|doc)\s+(?:"([^"\n]*)"|'([^'\n]*)')`)
+)
 
 // stripExDocstrings blanks @moduledoc/@doc string contents, heredocs
 // included.
@@ -532,11 +518,9 @@ func stripExDocstrings(text string) string {
 		}
 		line := text[i : i+eol]
 		if m := exDocHeredoc.FindStringSubmatch(line); m != nil {
-			quote := m[3]
-			j := i + len(m[0])
 			end := len(text)
-			if k := strings.Index(text[j:], quote); k >= 0 {
-				end = j + k + len(quote)
+			if k := strings.Index(text[i+len(m[0]):], m[3]); k >= 0 {
+				end = i + len(m[0]) + k + len(m[3])
 			}
 			for p := i; p < end && p < len(out); p++ {
 				if out[p] != '\n' {
@@ -546,8 +530,8 @@ func stripExDocstrings(text string) string {
 			i = end
 			continue
 		}
-		if loc := exDocSingle.FindStringSubmatchIndex(line); loc != nil && loc[3] > 0 {
-			for p := loc[3]; p < loc[4] && p < len(out); p++ {
+		if loc := exDocSingle.FindStringSubmatchIndex(line); loc != nil && loc[6] > 0 {
+			for p := loc[6]; p < loc[7] && p < len(out); p++ {
 				if out[p] != '\n' {
 					out[p] = ' '
 				}
@@ -568,21 +552,14 @@ func stripTestComments(text, ext string) string {
 	out := append([]byte(nil), src...)
 	hashComments := ext == ".py" || ext == ".rb" || ext == ".ex" || ext == ".exs"
 	lineComments := !hashComments
-	quote := byte(0)
-	escaped := false
+	quote, escaped := byte(0), false
 	for i := 0; i < len(src); {
 		if quote != 0 {
 			if escaped {
 				escaped = false
-				i++
-				continue
-			}
-			if src[i] == '\\' {
+			} else if src[i] == '\\' {
 				escaped = true
-				i++
-				continue
-			}
-			if src[i] == quote {
+			} else if src[i] == quote {
 				quote = 0
 			}
 			i++
@@ -615,18 +592,16 @@ func stripTestComments(text, ext string) string {
 			}
 			continue
 		}
-		if lineComments && src[i] == '/' && i+1 < len(src) && src[i+1] == '/' {
-			for i < len(src) && src[i] != '\n' {
-				out[i] = ' '
-				i++
-			}
-			continue
-		}
-		if lineComments && src[i] == '/' && i+1 < len(src) && src[i+1] == '*' {
+		if lineComments && src[i] == '/' && i+1 < len(src) && (src[i+1] == '/' || src[i+1] == '*') {
+			slash := src[i+1] == '/'
 			out[i], out[i+1] = ' ', ' '
 			i += 2
 			for i < len(src) {
-				if src[i] == '*' && i+1 < len(src) && src[i+1] == '/' {
+				if slash {
+					if src[i] == '\n' {
+						break
+					}
+				} else if src[i] == '*' && i+1 < len(src) && src[i+1] == '/' {
 					out[i], out[i+1] = ' ', ' '
 					i += 2
 					break
@@ -667,10 +642,9 @@ func activeTestBodies(text, ext string) []string {
 var jsTestCall = regexp.MustCompile(`\b(?:test|it)(?:\.each)?\s*\(`)
 
 // jsTestBodies captures each test()/it()/test.each() call expression
-// (following chained call groups) and keeps, inside it, the callback body
-// after the last top-level "=>", or the last top-level brace group, or the
-// arguments themselves (data-driven forms like test.each([...]) carry the
-// ids in the argument data).
+// (following chained call groups) as one body: the callback and the argument
+// data both sit inside the balanced span (data-driven forms like
+// test.each([...]) carry the ids in the arguments).
 func jsTestBodies(text string) []string {
 	var bodies []string
 	for _, m := range jsTestCall.FindAllStringIndex(text, -1) {
@@ -698,18 +672,12 @@ func jsTestBodies(text string) []string {
 			}
 			i++
 		}
-		if end < 0 {
-			continue
-		}
-		span := text[m[1]:end]
-		if strings.TrimSpace(span) != "" {
-			bodies = append(bodies, span)
+		if end >= 0 && strings.TrimSpace(text[m[1]:end]) != "" {
+			bodies = append(bodies, text[m[1]:end])
 		}
 	}
 	return bodies
 }
-
-
 
 var pyTestDef = regexp.MustCompile(`(?m)^([ \t]*)(?:async\s+)?def\s+test_\w*\s*\(`)
 
@@ -717,8 +685,7 @@ var pyTestDef = regexp.MustCompile(`(?m)^([ \t]*)(?:async\s+)?def\s+test_\w*\s*\
 func pyTestBodies(text string) []string {
 	var bodies []string
 	for _, m := range pyTestDef.FindAllStringSubmatchIndex(text, -1) {
-		defIndent := m[3] - m[2] // group 1: the def line's leading whitespace
-		rest := text[m[1]:]
+		defIndent, rest := m[3]-m[2], text[m[1]:]
 		if nl := strings.IndexByte(rest, '\n'); nl >= 0 {
 			rest = rest[nl+1:] // the body starts on the line after the def
 		} else {
@@ -726,13 +693,10 @@ func pyTestBodies(text string) []string {
 		}
 		var body strings.Builder
 		for _, line := range strings.Split(rest, "\n") {
-			if strings.TrimSpace(line) == "" {
-				body.WriteString(line + "\n")
-				continue
-			}
-			indent := len(line) - len(strings.TrimLeft(line, " \t"))
-			if indent <= defIndent {
-				break
+			if strings.TrimSpace(line) != "" {
+				if indent := len(line) - len(strings.TrimLeft(line, " \t")); indent <= defIndent {
+					break
+				}
 			}
 			body.WriteString(line + "\n")
 		}
@@ -743,11 +707,13 @@ func pyTestBodies(text string) []string {
 	return bodies
 }
 
-var rbItLine = regexp.MustCompile(`(?m)^[ \t]*(it|specify)\b`)
-var rbDoOrBrace = regexp.MustCompile(`\bdo\b|\{`)
-var rubyBlockOpen = regexp.MustCompile(`\b(?:do|def|class|module|begin|case)\b`)
-var rubyLineBlockOpen = regexp.MustCompile(`(?:^|\n)[ \t]*(?:if|unless|while|until|for)\b`)
-var rubyEndToken = regexp.MustCompile(`\bend\b`)
+var (
+	rbItLine       = regexp.MustCompile(`(?m)^[ \t]*(it|specify)\b`)
+	rbDoOrBrace    = regexp.MustCompile(`\bdo\b|\{`)
+	rubyBlockOpen  = regexp.MustCompile(`\b(?:do|def|class|module|begin|case)\b`)
+	rubyLineOpener = regexp.MustCompile(`(?:^|\n)[ \t]*(?:if|unless|while|until|for)\b`)
+	rubyEndToken   = regexp.MustCompile(`\bend\b`)
+)
 
 // rbTestBodies returns it/specify blocks in either do...end or brace form.
 func rbTestBodies(text string) []string {
@@ -792,23 +758,24 @@ func matchBrace(text string, open int) int {
 	return -1
 }
 
-// matchRubyEnd walks do...end block structure from the opening do at
-// openDo and returns the offset just past the matching end. Line-start
-// if/unless/while/until/for count as block openers; their modifier (trailing)
-// forms do not.
+// matchRubyEnd walks do...end block structure from the opening do and
+// returns the offset just past the matching end. Line-start
+// if/unless/while/until/for count as block openers; their modifier
+// (trailing) forms do not.
 func matchRubyEnd(text string, openDo int) int {
 	type event struct {
 		pos, delta int
 	}
 	var events []event
-	collect := func(re *regexp.Regexp, delta int) {
+	for _, re := range []*regexp.Regexp{rubyBlockOpen, rubyLineOpener, rubyEndToken} {
+		delta := 1
+		if re == rubyEndToken {
+			delta = -1
+		}
 		for _, m := range re.FindAllStringIndex(text, -1) {
 			events = append(events, event{m[0], delta})
 		}
 	}
-	collect(rubyBlockOpen, 1)
-	collect(rubyLineBlockOpen, 1)
-	collect(rubyEndToken, -1)
 	sort.Slice(events, func(a, b int) bool { return events[a].pos < events[b].pos })
 	depth := 0
 	for _, ev := range events {
@@ -823,29 +790,27 @@ func matchRubyEnd(text string, openDo int) int {
 	return -1
 }
 
-var exTestLine = regexp.MustCompile(`(?m)^[ \t]*test\s+`)
-var exBlockToken = regexp.MustCompile(`\b(?:do|def|defp|defmodule|case|cond|if|unless|with|receive|fn|try|end)\b`)
+var (
+	exTestLine  = regexp.MustCompile(`(?m)^[ \t]*test\s+`)
+	exBlockOpen = regexp.MustCompile(`\b(?:do|def|defp|defmodule|case|cond|if|unless|with|receive|fn|try|end)\b`)
+)
 
-// exTestBodies returns Elixir `test ... do ... end` blocks. One-line `do:`
+// exTestBodies returns Elixir `test ... do ... end` blocks; one-line `do:`
 // forms open no block and are not spans.
 func exTestBodies(text string) []string {
 	var bodies []string
 	for _, m := range exTestLine.FindAllStringIndex(text, -1) {
 		rest := text[m[1]:]
-		toks := exBlockToken.FindAllStringIndex(rest, -1)
 		depth, end := 0, -1
-		for _, tk := range toks {
+		for _, tk := range exBlockOpen.FindAllStringIndex(rest, -1) {
 			word := rest[tk[0]:tk[1]]
 			if word == "do" && tk[1] < len(rest) && rest[tk[1]] == ':' {
-				continue // do: one-liner
+				continue
 			}
 			if word == "end" {
 				depth--
-				if depth == 0 {
+				if depth <= 0 {
 					end = tk[1]
-					break
-				}
-				if depth < 0 {
 					break
 				}
 			} else {
@@ -888,11 +853,10 @@ func executableTestText(text, rel string) string {
 		if goBuildIgnoreLine.MatchString(goHeader(text)) {
 			return ""
 		}
-		gf := parseGoTestFile(text, rel)
-		if gf == nil {
-			return ""
+		if gf := parseGoTestFile(text, rel); gf != nil {
+			return strings.Join(gf.extracts(), "\n")
 		}
-		return strings.Join(gf.extracts(), "\n")
+		return ""
 	case ".rs":
 		return strings.Join(rustTestSpans(stripTestComments(text, ext)), "\n")
 	}
@@ -905,14 +869,13 @@ func executableTestText(text, rel string) string {
 type goTestFile struct {
 	file   *ast.File
 	consts map[string]string
-	fns    map[string]*ast.FuncDecl // plain package-level funcs by name
-	tests  []*ast.FuncDecl          // functions the go test harness runs
+	fns    map[string]*ast.FuncDecl
+	tests  []*ast.FuncDecl
 }
 
 // parseGoTestFile parses text as Go; nil when it does not parse.
 func parseGoTestFile(text, rel string) *goTestFile {
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, rel, text, 0)
+	file, err := parser.ParseFile(token.NewFileSet(), rel, text, 0)
 	if err != nil {
 		return nil
 	}
@@ -931,13 +894,11 @@ func parseGoTestFile(text, rel string) *goTestFile {
 				}
 			}
 		}
-		fd, ok := decl.(*ast.FuncDecl)
-		if !ok || fd.Recv != nil {
-			continue
-		}
-		gf.fns[fd.Name.Name] = fd
-		if validGoTestFunc(fd) {
-			gf.tests = append(gf.tests, fd)
+		if fd, ok := decl.(*ast.FuncDecl); ok && fd.Recv == nil {
+			gf.fns[fd.Name.Name] = fd
+			if validGoTestFunc(fd) {
+				gf.tests = append(gf.tests, fd)
+			}
 		}
 	}
 	return gf
@@ -951,8 +912,7 @@ func validGoTestFunc(fd *ast.FuncDecl) bool {
 	if fd.Body == nil || fd.Recv != nil {
 		return false
 	}
-	name := fd.Name.Name
-	params := fd.Type.Params.List
+	name, params := fd.Name.Name, fd.Type.Params.List
 	one := func(typ string) bool {
 		if len(params) != 1 {
 			return false
@@ -972,10 +932,8 @@ func validGoTestFunc(fd *ast.FuncDecl) bool {
 	case name == "TestMain":
 		return false
 	case strings.HasPrefix(name, "Test"):
-		if len(name) > 4 {
-			if c := name[4]; c >= 'a' && c <= 'z' {
-				return false // Testhelper: never run by the harness
-			}
+		if len(name) > 4 && name[4] >= 'a' && name[4] <= 'z' {
+			return false // Testhelper: never run by the harness
 		}
 		return one("T")
 	case strings.HasPrefix(name, "Benchmark"):
@@ -994,8 +952,7 @@ func validGoTestFunc(fd *ast.FuncDecl) bool {
 func (gf *goTestFile) extracts() []string {
 	var out []string
 	for _, fd := range gf.tests {
-		var parts []string
-		parts = append(parts, fd.Name.Name)
+		parts := []string{fd.Name.Name}
 		ast.Inspect(fd.Body, func(n ast.Node) bool {
 			switch x := n.(type) {
 			case *ast.BasicLit:
@@ -1044,9 +1001,9 @@ type goEnv struct {
 	retEx    map[string]bool
 }
 
-// fnSummary is the interprocedural summary of one helper: whether its
-// result safely carries oracle content (single return, no recursion) and
-// which struct fields of that result were not derived from it.
+// fnSummary is the interprocedural summary of one helper: whether its result
+// safely carries oracle content (single return, no recursion) and which
+// struct fields of that result were not derived from it.
 type fnSummary struct {
 	safe       bool
 	retTainted bool
@@ -1058,8 +1015,8 @@ type fnSummary struct {
 type goAnalysis struct {
 	gf        *goTestFile
 	base      string
-	reach     map[string]bool // helpers reachable within maxHelperDepth
-	recursion map[string]bool // helpers inside a call cycle: unsafe
+	reach     map[string]bool
+	recursion map[string]bool
 	summ      map[string]*fnSummary
 }
 
@@ -1123,11 +1080,7 @@ func (gf *goTestFile) testProvesParse(test *ast.FuncDecl, base string) bool {
 // Helpers deeper than maxHelperDepth and helpers inside call cycles are left
 // out of reach (their results taint nothing: bounded analysis refuses).
 func (a *goAnalysis) mapReachable(test *ast.FuncDecl) {
-	const (
-		white = 0
-		grey  = 1
-		black = 2
-	)
+	const white, grey, black = 0, 1, 2
 	state := map[string]int{}
 	var visit func(fd *ast.FuncDecl, depth int)
 	visit = func(fd *ast.FuncDecl, depth int) {
@@ -1142,13 +1095,11 @@ func (a *goAnalysis) mapReachable(test *ast.FuncDecl) {
 		state[name] = grey
 		if depth < maxHelperDepth {
 			ast.Inspect(fd.Body, func(n ast.Node) bool {
-				call, ok := n.(*ast.CallExpr)
-				if !ok {
-					return true
-				}
-				if id, ok := call.Fun.(*ast.Ident); ok {
-					if callee, ok := a.gf.fns[id.Name]; ok {
-						visit(callee, depth+1)
+				if call, ok := n.(*ast.CallExpr); ok {
+					if id, ok := call.Fun.(*ast.Ident); ok {
+						if callee, ok := a.gf.fns[id.Name]; ok {
+							visit(callee, depth+1)
+						}
 					}
 				}
 				return true
@@ -1164,7 +1115,7 @@ func (a *goAnalysis) mapReachable(test *ast.FuncDecl) {
 
 // walkFunc walks fd twice in source order (loop bodies settle in the second
 // pass) propagating oracle-content taint and returns the final environment.
-// Return-statistics count once per pass: a pass resets the counter first.
+// Return-statistics count once per pass: each pass resets the counter.
 func (a *goAnalysis) walkFunc(fd *ast.FuncDecl) *goEnv {
 	env := &goEnv{tainted: map[string]bool{}, excepts: map[string]map[string]bool{}, locals: map[string]bool{}}
 	for range 2 {
@@ -1263,24 +1214,29 @@ func (a *goAnalysis) walkStmt(st ast.Stmt, env *goEnv) {
 			}
 		}
 		a.walkLoop(s.Body, env)
-	case *ast.SwitchStmt:
-		a.walkStmts(s.Body.List, env)
-	case *ast.TypeSwitchStmt:
-		a.walkStmts(s.Body.List, env)
-	case *ast.SelectStmt:
-		a.walkStmts(s.Body.List, env)
-	case *ast.BlockStmt:
-		a.walkStmts(s.List, env)
-	case *ast.ExprStmt:
-		a.eval(s.X, env)
-	case *ast.DeferStmt, *ast.GoStmt:
+	case *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.SelectStmt, *ast.BlockStmt:
+		var list []ast.Stmt
+		switch x := st.(type) {
+		case *ast.SwitchStmt:
+			list = x.Body.List
+		case *ast.TypeSwitchStmt:
+			list = x.Body.List
+		case *ast.SelectStmt:
+			list = x.Body.List
+		case *ast.BlockStmt:
+			list = x.List
+		}
+		for _, cs := range list {
+			a.walkStmt(cs, env)
+		}
 	case *ast.CaseClause:
 		a.walkStmts(s.Body, env)
+	case *ast.ExprStmt:
+		a.eval(s.X, env)
 	case *ast.ReturnStmt:
 		env.retCount++
 		for _, r := range s.Results {
-			t, ex := a.eval(r, env)
-			if t {
+			if t, ex := a.eval(r, env); t {
 				env.retDirty = true
 				if env.retEx == nil {
 					env.retEx = map[string]bool{}
@@ -1292,7 +1248,6 @@ func (a *goAnalysis) walkStmt(st ast.Stmt, env *goEnv) {
 		}
 	case *ast.LabeledStmt:
 		a.walkStmt(s.Stmt, env)
-	case *ast.IncDecStmt:
 	case *ast.SendStmt:
 		a.eval(s.Chan, env)
 	}
@@ -1303,39 +1258,7 @@ func (a *goAnalysis) walkStmt(st ast.Stmt, env *goEnv) {
 func (a *goAnalysis) eval(rhs ast.Expr, env *goEnv) (bool, map[string]bool) {
 	switch e := rhs.(type) {
 	case *ast.CallExpr:
-		if a.isOracleRead(e, env) {
-			return true, nil
-		}
-		if id, ok := e.Fun.(*ast.Ident); ok && id.Name == "append" && len(e.Args) > 0 {
-			any, ex := false, map[string]bool{}
-			for _, arg := range e.Args {
-				t, ex1 := a.eval(arg, env)
-				any = any || t
-				for f := range ex1 {
-					ex[f] = true
-				}
-			}
-			return any, ex
-		}
-		if id, ok := e.Fun.(*ast.Ident); ok && a.gf.fns[id.Name] != nil {
-			if s := a.summ[id.Name]; s != nil && s.safe && s.retTainted {
-				return true, s.exceptions
-			}
-			return false, nil
-		}
-		for _, arg := range e.Args {
-			if t, _ := a.eval(arg, env); t {
-				return true, nil
-			}
-		}
-		if sel, ok := e.Fun.(*ast.SelectorExpr); ok {
-			// a method's receiver is an implicit argument: sc.Text() carries
-			// the scanner's taint without any explicit argument
-			if t, _ := a.eval(sel.X, env); t {
-				return true, nil
-			}
-		}
-		return false, nil
+		return a.evalCall(e, env)
 	case *ast.Ident:
 		return env.tainted[e.Name], env.excepts[e.Name]
 	case *ast.SelectorExpr:
@@ -1349,39 +1272,77 @@ func (a *goAnalysis) eval(rhs ast.Expr, env *goEnv) (bool, map[string]bool) {
 	case *ast.CompositeLit:
 		any, ex := false, map[string]bool{}
 		for _, elt := range e.Elts {
+			var t bool
 			if kv, ok := elt.(*ast.KeyValueExpr); ok {
-				t, _ := a.eval(kv.Value, env)
-				any = any || t
+				t, _ = a.eval(kv.Value, env)
 				if !t {
 					if id, ok := kv.Key.(*ast.Ident); ok {
 						ex[id.Name] = true
 					}
 				}
-				continue
+			} else {
+				t, _ = a.eval(elt, env)
 			}
-			t, _ := a.eval(elt, env)
 			any = any || t
 		}
-		if !any {
-			return false, nil
-		}
-		return true, ex
+		return any, ex
 	case *ast.BinaryExpr:
 		t1, _ := a.eval(e.X, env)
 		t2, _ := a.eval(e.Y, env)
 		return t1 || t2, nil
-	case *ast.UnaryExpr:
-		return a.eval(e.X, env)
-	case *ast.ParenExpr:
-		return a.eval(e.X, env)
-	case *ast.StarExpr:
-		return a.eval(e.X, env)
-	case *ast.IndexExpr:
-		return a.eval(e.X, env)
-	case *ast.SliceExpr:
-		return a.eval(e.X, env)
-	case *ast.TypeAssertExpr:
-		return a.eval(e.X, env)
+	case *ast.UnaryExpr, *ast.ParenExpr, *ast.StarExpr, *ast.IndexExpr, *ast.SliceExpr, *ast.TypeAssertExpr:
+		var inner ast.Expr
+		switch x := e.(type) {
+		case *ast.UnaryExpr:
+			inner = x.X
+		case *ast.ParenExpr:
+			inner = x.X
+		case *ast.StarExpr:
+			inner = x.X
+		case *ast.IndexExpr:
+			inner = x.X
+		case *ast.SliceExpr:
+			inner = x.X
+		case *ast.TypeAssertExpr:
+			inner = x.X
+		}
+		return a.eval(inner, env)
+	}
+	return false, nil
+}
+
+func (a *goAnalysis) evalCall(e *ast.CallExpr, env *goEnv) (bool, map[string]bool) {
+	if a.isOracleRead(e, env) {
+		return true, nil
+	}
+	if id, ok := e.Fun.(*ast.Ident); ok && id.Name == "append" && len(e.Args) > 0 {
+		any, ex := false, map[string]bool{}
+		for _, arg := range e.Args {
+			t, ex1 := a.eval(arg, env)
+			any = any || t
+			for f := range ex1 {
+				ex[f] = true
+			}
+		}
+		return any, ex
+	}
+	if id, ok := e.Fun.(*ast.Ident); ok && a.gf.fns[id.Name] != nil {
+		if s := a.summ[id.Name]; s != nil && s.safe && s.retTainted {
+			return true, s.exceptions
+		}
+		return false, nil
+	}
+	for _, arg := range e.Args {
+		if t, _ := a.eval(arg, env); t {
+			return true, nil
+		}
+	}
+	// a method's receiver is an implicit argument: sc.Text() carries the
+	// scanner's taint without any explicit argument
+	if sel, ok := e.Fun.(*ast.SelectorExpr); ok {
+		if t, _ := a.eval(sel.X, env); t {
+			return true, nil
+		}
 	}
 	return false, nil
 }
@@ -1424,14 +1385,11 @@ func (a *goAnalysis) resolvePath(expr ast.Expr, env *goEnv) string {
 		}
 		return a.gf.consts[e.Name]
 	case *ast.BinaryExpr:
-		if e.Op != token.ADD {
-			return ""
+		if e.Op == token.ADD {
+			if x, y := a.resolvePath(e.X, env), a.resolvePath(e.Y, env); x != "" && y != "" {
+				return x + y
+			}
 		}
-		x, y := a.resolvePath(e.X, env), a.resolvePath(e.Y, env)
-		if x == "" || y == "" {
-			return ""
-		}
-		return x + y
 	case *ast.CallExpr:
 		if sel, ok := e.Fun.(*ast.SelectorExpr); ok {
 			if id, ok := sel.X.(*ast.Ident); ok && id.Name == "filepath" {
@@ -1439,11 +1397,11 @@ func (a *goAnalysis) resolvePath(expr ast.Expr, env *goEnv) string {
 				case "Join":
 					parts := make([]string, 0, len(e.Args))
 					for _, arg := range e.Args {
-						p := a.resolvePath(arg, env)
-						if p == "" {
+						if p := a.resolvePath(arg, env); p != "" {
+							parts = append(parts, p)
+						} else {
 							return ""
 						}
-						parts = append(parts, p)
 					}
 					return strings.Join(parts, "/")
 				case "FromSlash", "Clean", "Abs", "ToSlash":
@@ -1464,9 +1422,7 @@ func (a *goAnalysis) resolvePath(expr ast.Expr, env *goEnv) string {
 // assigned identifier is called somewhere in the body. A closure merely
 // defined (check := func(){...}; _ = check) never runs and proves nothing.
 func executedClosures(body ast.Node) map[*ast.FuncLit]bool {
-	run := map[*ast.FuncLit]bool{}
-	called := map[string]bool{}
-	closureOf := map[string]*ast.FuncLit{}
+	run, called, closureOf := map[*ast.FuncLit]bool{}, map[string]bool{}, map[string]*ast.FuncLit{}
 	ast.Inspect(body, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.CallExpr:
@@ -1513,7 +1469,7 @@ func testingParam(fl *ast.FuncLit) string {
 
 // guarded walks statements tracking the active if-conditions on the path; a
 // testing-receiver assertion credits when some active condition carries a
-// content-derived operand.
+// content-derived operand (see anyDerived).
 func (a *goAnalysis) guarded(n ast.Node, recv string, env *goEnv, conds []ast.Expr, executed map[*ast.FuncLit]bool) bool {
 	switch x := n.(type) {
 	case *ast.BlockStmt:
@@ -1524,11 +1480,8 @@ func (a *goAnalysis) guarded(n ast.Node, recv string, env *goEnv, conds []ast.Ex
 		}
 	case *ast.IfStmt:
 		next := append(conds[:len(conds):len(conds)], x.Cond)
-		if a.guarded(x.Body, recv, env, next, executed) {
+		if a.guarded(x.Body, recv, env, next, executed) || (x.Else != nil && a.guarded(x.Else, recv, env, conds, executed)) {
 			return true
-		}
-		if x.Else != nil {
-			return a.guarded(x.Else, recv, env, conds, executed)
 		}
 	case *ast.ForStmt:
 		return x.Body != nil && a.guarded(x.Body, recv, env, conds, executed)
@@ -1540,17 +1493,17 @@ func (a *goAnalysis) guarded(n ast.Node, recv string, env *goEnv, conds []ast.Ex
 		return x.Body != nil && a.guarded(x.Body, recv, env, conds, executed)
 	case *ast.SelectStmt:
 		return x.Body != nil && a.guarded(x.Body, recv, env, conds, executed)
+	case *ast.CaseClause:
+		for _, st := range x.Body {
+			if a.guarded(st, recv, env, conds, executed) {
+				return true
+			}
+		}
 	case *ast.ExprStmt:
 		return a.guardedExpr(x.X, recv, env, conds)
 	case *ast.AssignStmt:
 		for _, rhs := range x.Rhs {
 			if a.guardedExpr(rhs, recv, env, conds) {
-				return true
-			}
-		}
-	case *ast.CaseClause:
-		for _, st := range x.Body {
-			if a.guarded(st, recv, env, conds, executed) {
 				return true
 			}
 		}
@@ -1585,12 +1538,9 @@ func (a *goAnalysis) anyDerived(conds []ast.Expr, env *goEnv) bool {
 			if !ok {
 				return true
 			}
-			t, _ := a.eval(e, env)
-			if t {
+			if t, _ := a.eval(e, env); t {
 				found = true
-				return true
-			}
-			if sel, ok := e.(*ast.SelectorExpr); ok {
+			} else if sel, ok := e.(*ast.SelectorExpr); ok {
 				if xt, _ := a.eval(sel.X, env); xt {
 					poison = true // tainted row read through an underived field
 				}
@@ -1614,9 +1564,6 @@ func sameFields(a, b map[string]bool) bool {
 }
 
 func identOf(e ast.Expr) *ast.Ident {
-	if e == nil {
-		return nil
-	}
 	if id, ok := e.(*ast.Ident); ok {
 		return id
 	}
