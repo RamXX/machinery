@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T14:59:08Z
-content_hash: "sha256:823d687235dd457e6b603bda4e67315b73b42caf8289307c692048c310c28bad"
+updated_at: 2026-09-06T15:37:03Z
+content_hash: "sha256:10599a11c142dd4b227162563e4f15c7563ea49ccb3fcdec1ffa6fc85493cb6f"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0, MAC-p9wm]
 assignee: dev-MAC-qlw2
@@ -303,3 +303,6 @@ status: in_progress
 
 ### 2026-09-06T14:59:08Z ramirosalas
 PRE-EDIT METHOD CHECKPOINT ONLY. Frozen V2 inventory remains unapproved. Independent report /tmp/MAC-qlw2-inventory-v2-review.e5Dw60/REPORT.md SHA256 a392e384a104ed3502a13f8ee095cf1de6fdc05a68a7c792f5984314bea2a385 and immutable ADDENDUM.md SHA256 4a2f5b12ecab3c329f475732eae0b0dca8249ddd90b9d42caa8dd8246f392c51 are GAPS_FOUND, fully read and verified by root. Eight finite method corrections plus disjoint internal-service versus capability-attachment dispatch are assigned to existing /root/custody_red_inventory in a new external V3 package. No source/test authoring or RED authority. H01 external-copy calibration requires prospective actual distinct actor/chronology amendment; forecast 4900–8100 LOC is investigated but not yet canonically substituted. Exact future eight-path ownership and existing claim/status/DAG remain unchanged. No fourth architecture loop, audit exception, native acceptance, preflight, installed replacement or remote action.
+
+### 2026-09-06T15:37:03Z ramirosalas
+PRE-EDIT V3 REVIEW CHECKPOINT ONLY. Independent /tmp/MAC-qlw2-inventory-v3-review.mVxvsL/REPORT.md SHA256 e151d0bc05895dd75487627d517994d2b8bd2c63b6009fe6442b975277146b87 GAPS_FOUND: scalar bounds masked by stricter validity, unrealizable H01c constructor claim, P07e nontarget concurrency, aggregate execution budgets, and ESRCH-before-Wait ordering. Root fully read111-line report and13-line ADDENDUM.md SHA256 365d110d5795677da39cc2bcf81f1d13fe4adba2d32f8ef9707447542c48bd5d. Addendum approves simpler prospective sequence only: actual actors/forecast/external-copy H01 authority beforeedit; RED author alone freezes and commits exact tdd-red R0/setup (NOTREDapproval); cal onlythen authors external safe implementation/H01mutants/restores committedtesthashes; productS1/S2 andactualREDreview follow. No pre-freeze calibration-source authority or audit exception. External V4 correction assigned existing RED inventory author; no source/test/native permission. Existing claim/status/DAG/eightpaths unchanged; independent finalmethod approval and actual distinctcalibration appointment/canonical scope amendment remain gates.
