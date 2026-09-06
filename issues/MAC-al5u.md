@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
 updated_at: 2026-09-06T09:22:41Z
-content_hash: "sha256:6e27f4e93b882fe4003532181463ccb1ad392a22cd1b62660fa57488d31595aa"
+content_hash: "sha256:e37d285c0bb763ac999343055b2e8f37637698390aee309c2d555022502cfc64"
 blocked_by: [MAC-5ft8, MAC-bz1y]
 blocks: [MAC-1u2v, MAC-vx24, MAC-ou97]
 ---
@@ -150,3 +150,23 @@ status: new
 - [ ] AC #4: current story acceptance requirement remains pending.
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:22:41Z ramirosalas
+SCHEMA MARKER INSERTION AUDIT 2026-09-06
+Root-authorized supported nd edit inserted ONLY 2 valid indented schema signature line(s) into the newly authored canonical CONSUMES block. Every original byte/contract/status/evidence/history was preserved; no deletion/replacement. This repairs the mechanical label substitution, not the contract values.
+Before raw Body SHA256: 0e817bec99f385df73eec9da2f5ebc852a937913afb12070bfea4ecd9f2c92fe
+After insertion-only raw Body SHA256 (before this audit comment): 6e27f4e93b882fe4003532181463ccb1ad392a22cd1b62660fa57488d31595aa
+Exact inserted lines (zero-based original Body line positions shown):
+- after Body line 109: "  schema: prospective current strict plan with all legacy regression mappings and exact reviewed helper calibration."
+- after Body line 113: "  schema: complete required fragment union and two native platform accounting."
+Read-back pvg nd show Body exactly equals prior Body plus these insertions. Editor required expected hash, count, exact target and 13-entry total; installed pvg source revision c0957106a81346033d7b1d82fde5f434a9db6bab confirms scanner checks every historical entry.
+
+## nd_contract
+status: new
+
+### evidence
+- Signature syntax corrected via supported guarded editor; exact before/after evidence above.
+- No implementation/native proof; independent Anchor and canonical document holds remain.
+
+### proof
+- [ ] All current story ACs remain pending without weakening.
