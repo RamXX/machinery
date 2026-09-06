@@ -350,31 +350,13 @@ func obligationParentFixture(t *testing.T) (string, string) {
 		t.Fatalf("complete decomposition fixture invalid: %v", err)
 	}
 	requireObligationClean(t, CheckPack(design))
-	// The parent manifest delegates runtime conformance to its children. These
-	// local tests prove decision-ID ownership, not substantive FSM conformance.
-	// Keep that claim plan-only, without changing any required design covers.
-	path := filepath.Join(design, AttestationsFileName)
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(raw)
-	replace := func(old, next string) {
-		if strings.Count(text, old) != 1 {
-			t.Fatalf("fixture migration needs exactly one %q", old)
-		}
-		text = strings.Replace(text, old, next, 1)
-	}
-	replace("attestation_version: 1\n", "attestation_version: 2\n")
-	for _, claim := range []string{
-		"g2.action-ownership", "g2.interface-contract-rightness", "g2.placement-rightness",
-		"g2.adoption-closure-discovery", "g2.event-contract-completeness", "g2.nfr-content",
-		"gt.conformance-test-shape", "g4.zero-context",
-	} {
-		line := "  - claim: " + claim + "\n"
-		replace(line, line+"    kind: plan\n")
-	}
-	writeSuiteFile(t, path, text)
+	// The parent manifest delegates runtime conformance to its children. The
+	// shipped parent document is migrated to v2 with explicit kinds and the
+	// delegated-conformance gt already an explicitly reviewed plan over its
+	// unchanged BUILD bytes, so the fixture keeps it byte-exact and only
+	// verifies the frozen intent: these local tests prove decision-ID
+	// ownership, not substantive FSM conformance, and the claim stays
+	// plan-only without changing any required design covers.
 	g := CheckAttestations(design)
 	if len(g.Errs) != 0 || len(g.Drift) != 0 || len(g.Warns) != 1 || !strings.Contains(g.Warns[0], "gt.conformance-test-shape: plan only; current implementation review missing") || g.Counts["current implementation reviews"] != 0 {
 		t.Fatalf("parent fixture must remain an unfulfilled conformance plan: %+v", g)

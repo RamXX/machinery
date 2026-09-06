@@ -168,8 +168,12 @@ func copyTree(t *testing.T, src, dst string) {
 		t.Fatal(err)
 	}
 	// These Stop fixtures review design/ledger behavior, not the CRM runtime.
-	// Preserve cover bytes and historical acceptance anchors; explicitly recast
-	// the legacy implementation claim as unfulfilled test-plan intent.
+	// Preserve cover bytes and historical acceptance anchors. The shipped
+	// document is migrated to v2 with explicit kinds and its gt row is a
+	// reviewed CURRENT claim over the implementation root; this fixture
+	// recasts only that row as unfulfilled test-plan intent and drops the
+	// manifest, which would otherwise require an implementation root the
+	// fixture deliberately does not carry.
 	path := filepath.Join(dst, gates.AttestationsFileName)
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -182,22 +186,27 @@ func copyTree(t *testing.T, src, dst string) {
 		}
 		text = strings.Replace(text, old, next, 1)
 	}
-	replace("attestation_version: 1\n", "attestation_version: 2\n")
-	for _, claim := range []string{
-		"g2.action-ownership", "g2.interface-contract-rightness", "g2.placement-rightness",
-		"g2.adoption-closure-discovery", "g2.event-contract-completeness", "g2.nfr-content",
-		"g3.guard-semantics", "g3.invariant-enforcement", "g3.residual-transitions", "g3.event-redelivery",
-		"gt.conformance-test-shape", "g4.zero-context", "ga.review-quality",
-	} {
-		kind := "plan"
-		if claim == "ga.review-quality" {
-			kind = "historical"
-		}
-		line := "  - claim: " + claim + "\n"
-		replace(line, line+"    kind: "+kind+"\n")
+	replace("  - claim: gt.conformance-test-shape\n    kind: current\n", "  - claim: gt.conformance-test-shape\n    kind: plan\n")
+	start := strings.Index(text, "\n    implementation:\n")
+	if start < 0 {
+		t.Fatalf("fixture migration cannot locate the gt implementation block")
 	}
-	replace("    note: The Go tests key executable table cases on every stable oracle id and assert next state plus ordered actions.\n",
-		"    note: Fixture plan only; conformance tests are intended to cover every committed oracle row and assert next state plus ordered actions. No current implementation review or test execution is claimed.\n")
+	if end := strings.Index(text[start+1:], "\n  - claim: "); end < 0 {
+		t.Fatalf("fixture migration cannot bound the gt implementation block")
+	} else {
+		text = text[:start] + text[start+1+end:]
+	}
+	line := strings.Split(text, "\n")
+	for i, l := range line {
+		if strings.HasPrefix(l, "    note: 'Substantive current review of the accepted parser-backed scope") {
+			line[i] = "    note: 'Fixture plan only; conformance tests are intended to cover every committed oracle row and assert next state plus ordered actions. No current implementation review or test execution is claimed.'"
+			text = strings.Join(line, "\n")
+			break
+		}
+	}
+	if !strings.Contains(text, "Fixture plan only") {
+		t.Fatalf("fixture migration did not recast the shipped current-review note")
+	}
 	writeFile(t, path, text)
 	g := gates.CheckAttestations(dst)
 	if len(g.Errs) != 0 || len(g.Drift) != 0 || len(g.Warns) != 1 || !strings.Contains(g.Warns[0], "gt.conformance-test-shape: plan only; current implementation review missing") || g.Counts["current implementation reviews"] != 0 || g.Counts["historical review records"] != 1 {
