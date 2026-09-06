@@ -486,7 +486,11 @@ func RunSelected(design, impl string, sel Selection, opt RunOptions) []*Gate {
 	}
 	out := snapshot.RunSelected(impl, sel, opt)
 	if err := snapshot.Release(); err != nil {
-		out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{"release design snapshot lock: " + err.Error()}})
+		if len(out) == 1 && out[0].Title == "G0-snapshot" {
+			out[0].Errs = append(out[0].Errs, "release design snapshot lock: "+err.Error())
+		} else {
+			out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{"release design snapshot lock: " + err.Error()}})
+		}
 	}
 	return out
 }

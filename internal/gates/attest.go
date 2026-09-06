@@ -824,12 +824,20 @@ func compareAttestationManifest(recorded *attestationManifest, subject *attestat
 	sort.Strings(names)
 	// Compare both path sets before content so additions cannot hide behind a
 	// simultaneous parent-mode change or an earlier altered file.
+	var differing []string
 	for _, name := range names {
 		_, w := want[name]
 		_, g := got[name]
 		if w != g {
-			return fmt.Errorf("GV_SCOPE_INVENTORY: scope path %s added or removed (recorded %d entries, observed %d)", name, len(want), len(got))
+			differing = append(differing, name)
 		}
+	}
+	if len(differing) > 0 {
+		shown := differing
+		if len(shown) > 8 {
+			shown = shown[:8]
+		}
+		return fmt.Errorf("GV_SCOPE_INVENTORY: scope path %s added or removed (recorded %d entries, observed %d; %d changed paths: %s)", differing[0], len(want), len(got), len(differing), strings.Join(shown, ", "))
 	}
 	for _, name := range names {
 		w, g := want[name], got[name]
