@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T15:37:03Z
-content_hash: "sha256:10599a11c142dd4b227162563e4f15c7563ea49ccb3fcdec1ffa6fc85493cb6f"
+updated_at: 2026-09-06T15:46:58Z
+content_hash: "sha256:b4938cac6913f7bd621d6ec861fe158ce4a16c1ccb1683ad0c00225b142eddb4"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0, MAC-p9wm]
 assignee: dev-MAC-qlw2
@@ -306,3 +306,6 @@ PRE-EDIT METHOD CHECKPOINT ONLY. Frozen V2 inventory remains unapproved. Indepen
 
 ### 2026-09-06T15:37:03Z ramirosalas
 PRE-EDIT V3 REVIEW CHECKPOINT ONLY. Independent /tmp/MAC-qlw2-inventory-v3-review.mVxvsL/REPORT.md SHA256 e151d0bc05895dd75487627d517994d2b8bd2c63b6009fe6442b975277146b87 GAPS_FOUND: scalar bounds masked by stricter validity, unrealizable H01c constructor claim, P07e nontarget concurrency, aggregate execution budgets, and ESRCH-before-Wait ordering. Root fully read111-line report and13-line ADDENDUM.md SHA256 365d110d5795677da39cc2bcf81f1d13fe4adba2d32f8ef9707447542c48bd5d. Addendum approves simpler prospective sequence only: actual actors/forecast/external-copy H01 authority beforeedit; RED author alone freezes and commits exact tdd-red R0/setup (NOTREDapproval); cal onlythen authors external safe implementation/H01mutants/restores committedtesthashes; productS1/S2 andactualREDreview follow. No pre-freeze calibration-source authority or audit exception. External V4 correction assigned existing RED inventory author; no source/test/native permission. Existing claim/status/DAG/eightpaths unchanged; independent finalmethod approval and actual distinctcalibration appointment/canonical scope amendment remain gates.
+
+### 2026-09-06T15:46:58Z ramirosalas
+EXECUTION BLOCKER CHECKPOINT. The delegated external V4 inventory correction by /root/custody_red_inventory was stopped by platform safety controls before a candidate was delivered. Root will not route around that restriction. Frozen V3 GAPS_FOUND report/addendum and all prior evidence remain authoritative; no V4 approval, first-edit authority, source/test/calibration/native execution or acceptance is claimed. Existing claim/status/dependencies stay unchanged; no recovery/release or audit exception. Independent portfolio work may finish separately. Canonical distinct calibration appointment, approved corrected method, prospective H01/forecast authorization, native Linux executor and final gates remain pending.
