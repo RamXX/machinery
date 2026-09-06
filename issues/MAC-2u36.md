@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:04:19Z
-content_hash: "sha256:1f73abc213809c171942fe82060145c133b5c7a5f17ec6c193eb825274c8e804"
+updated_at: 2026-09-06T02:21:09Z
+content_hash: "sha256:5897d5f7c78444e20b7d69bd2abcb59981437be14e91c035f1ef62ce4d630831"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -511,6 +511,42 @@ Held CI/preflight gate reconciliation and limits:
 - MAC-2u36 composed native verification is NOT a substitute for hpqp/epic full gate and does not change its20m policy. There is currently no measured complete same-SHA native install or race package result proving fit or non-fit to that gate. Report per-stage elapsed plus deduplicated leaf timings as measurements, while distinguishing repeated setup and parallelism; do not sum shard wall times and call it a monolithic runtime. If subsequent native measurements demonstrate incompatibility, identify exact command/SHA/host/race mode, elapsed/unfinished inventory and attributable cost to root/epic gate owner before that gate; do not edit hpqp/CI/preflight, increase its bound, waive it or invent a policy choice.
 
 Preservation: candidate source0ad71eb and freeze15252d2/test hashes from COMPLETE_RERED_FREEZE.md remain authoritative; no test edit or new test authorization. Current in_progress/assignee dev-MAC-2u36/hard-tdd+red-approved/parent MAC-ui8a/blocks MAC-gcrr+MAC-ou97 and dependencies/claim stay unchanged. Main/epic, installed Machinery/NIL use, Dagger, remote/sync and product independence remain untouched. PM ran only the nonexecuting inventory command, no runtime retry/native suite/preflight, and no author-worktree mutation or cleanup.
+## GREEN composed verification complete — independent scope hold
+
+Candidate15252d255fa12a131fbc2cdb13f593a212fd4ccb remains clean on story/MAC-2u36 in retained dev-MAC-2u36; production0ad71eba545083e0836792f6f2e307604182e2dd unchanged. No test/source/config edits or live processes remain.
+
+PROOF:
+- Independent budget decision /tmp/machinery-pm-MAC-2u36-budget.FBiyzE/BUDGET_DECISION.md SHA2f87aa9e02e81028f3e2ad1a699b63ec1e038cff429d4bc2951b2b62924325cf followed exactly: A7m remainder, B15m exact install complement, C15m unfiltered cmd, each once sequentially, no-cover/no changed individual bounds.
+- A PASS184.383s8leaves0skip,9runs9terminals. B PASS145.642s412leaves0skip,463runs463terminals, exact189top names. C PASS200.934s399PASS3SKIP0FAIL,437runs437terminals, exact263top names. No missing/unexpected native selections or unterminated dynamic subtests.
+- Full composed exact85story leaves=32CLI(24prior+8A)+53nonCLI(B),85PASS0FAIL0SKIP; matches exact frozen baseline85 inventory with no missing/unexpected names. Prior900.473s fullselector invocation remains TIMEOUT; no monolithic native/race or coverage percentage claimed.
+- Full report /tmp/machinery-MAC-2u36-green.G05gWz/15252d2-COMPOSED_GREEN_REPORT.md SHA6b5d9ac79fab9bdd16c8502a2d08245458e3c2cb4a726f3eab4101d860b4ab6d includes exact commands/rawSHA,7ACmap,all frozenhashes,perfile1847LOC9files,reviewedscanner findings and limitations.
+- Full named inventory /tmp/machinery-MAC-2u36-green.G05gWz/15252d2-composed-inventory.json SHA2822be70f16dfefd6ac9d74ee73b4c91f9493b916ab55c0e71a4eefbb82d8a75. B10/C5 dormant helper records explicitly separated from behavioral proof.
+- C skips: TestValidateC4ExportInventoryIsPortableClosedAndStable(host case-alias filesystem); TestProvisionOfficialStructurizrArchiveAndReuseCache(explicit officialarchive lane); TestVerifyCheckersPiiFlowEngineGolden(explicit realOCI lane). No behavioral credit. Graph-first and clean committed source show their bodies cover export/Structurizr-cache/checker paths, not changed installer planning/placement/receipt functions. Shared receipt/lock harness tests actually PASS. Independent scope confirmation pending, not automatic waiver/bug.
+- git diff --check PASS; frozen7hashes unchanged; threeproductionfiles diff0ad..HEAD empty. pvg story verify-tdd --base f24b2df PASS13commits0unauthorized. Scanner exit1six complete-source heuristics remain PM-reviewed rather than padded/suppressed.
+- No deliver, close, release, remote, main/epic, liveinstalledassets or external lane mutation.
+
+LEARNINGS:
+- Parent finalization is the complete-inventory boundary; child receipt persistence prevented safe later-target repair.
+- Writer descriptor access mode matters; pathname-only fault matching also corrupts reader cleanup. Independent re-freeze repaired the oracle while preserving actual OS failure/rollback.
+- GREEN successful-case runtime cannot be predicted from early-exiting old-production RED failures; composed authorized exact-SHA proof preserves coverage without hiding timeout.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Exact15252d2 composed report and full named inventory above; A/B/C terminal and all85required behavioral leaves PASS0SKIP.
+- Native cmd has3explicit unrelated platform/runtime skips pending independent scope confirmation; not counted as executed proof.
+- Healthy clean worktree and claim retained; no processes remain; no delivery transition.
+
+### proof
+- [x] AC #1: complete receipt-aware bootstrap/ordinary plan and no-receipt defaults.
+- [x] AC #2: strict private parser/schema/topology/inventory/digest/path/plugin negatives and safe edited/missing repair controls.
+- [x] AC #3: all8actual fullplan convergence/repair/idempotence modes.
+- [x] AC #4: all4actual later-target fullrollbacks plus distinct startup interruption recovery.
+- [x] AC #5: actual builtCLI/checksummedrelease/tempstate integration, no required-case skip or livechanges.
+- [x] AC #6: all4parentfinalization controls including2onewriter/oneos.ErrClosed faults with complete rollback/absence/lock; all4authority controls.
+- [x] AC #7: all5standalone validrecording/conflictrejection/followonnative controls.
+- [ ] Independent native-skip scope confirmation and canonical GREEN delivery/PM acceptance.
 
 ## nd_contract
 status: in_progress
