@@ -8,9 +8,9 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T10:17:35Z
-content_hash: "sha256:6d34f2fd82d57061af5df9982c1bc27752c3a22fbf98e22b0e3170abe8869bd6"
+content_hash: "sha256:548433337578e30bd2e0c3db26fb1774ffc09b411bed38ad062b1c0111545ab6"
 blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
-follows: [MAC-uzxr, MAC-p7jd]
+follows: [MAC-uzxr, MAC-p7jd, MAC-2u36]
 assignee: dev-MAC-l7m0
 ---
 
@@ -93,11 +93,13 @@ ANCHOR ROUND-1 RUNTIME CLASSIFICATION: Architecture is read-only contract work, 
 - 2026-09-06T10:12:24Z status: open -> in_progress
 - 2026-09-06T10:12:24Z auto-follows: linked to predecessor MAC-p7jd
 - 2026-09-06T10:12:24Z claimed by dev-MAC-l7m0
+- 2026-09-06T10:17:35Z status: in_progress -> in_progress
+- 2026-09-06T10:17:35Z auto-follows: linked to predecessor MAC-2u36
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]], [[MAC-qlw2]]
-- Follows: [[MAC-uzxr]], [[MAC-p7jd]]
+- Follows: [[MAC-uzxr]], [[MAC-p7jd]], [[MAC-2u36]]
 
 ## Comments
 
