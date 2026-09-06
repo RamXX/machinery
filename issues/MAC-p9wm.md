@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
 updated_at: 2026-09-06T12:21:36Z
-content_hash: "sha256:3909be66fcd5d2289a229ece7ea1ce927e3dcaa8b56eb6188a85fa1ca5a52e69"
+content_hash: "sha256:e9c770c347f034b773498c095236ea6e6f025e990ea5e101139ca354ec0ab5be"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 assignee: dev-MAC-p9wm
@@ -325,6 +325,16 @@ status: new
 
 
 ## Notes
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-06.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
 
 
 ## History
