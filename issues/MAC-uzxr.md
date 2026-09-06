@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T04:20:48Z
-content_hash: "sha256:6b3dbe5d7a69b8c1fb8ec03e4f16331c43a97173944c04d5b28f75b392f8603b"
+updated_at: 2026-09-06T04:25:57Z
+content_hash: "sha256:57242299aa00098c68cba61418db600aabea6172c99673c247190fcd9af9cb3a"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -151,6 +151,33 @@ Flag owned solely by this test file controls evidence storage, NEVER execution g
 All mutation bytes, nativeUserLeaves/nativeSessionLeaves, cases/diagnostics/assertions, nativeRun/nativeCheckRun/nativeManifest/nativeCopy, command/timeouts and result logic byte-identical. No unrelated later parser/helper/additive amendment in this repair.
 
 Required finite actual verification after repair: run same meta command once default, once with -args -fsm-native-proof-dir=<existing-absolute-review-directory>; both actualexit1/3 intended outerFAIL/200 childPASS0SKIP. Default emitted proof path must disappear after process ends; explicit mode21 evidence files remain and six receipts/logs/46input manifests/exact2/2/1 mutation-only files are checked. All fixtures clean in both. Same env/pipefail; logs and repairedfile hashes, actual runtime/exits, only-authorized-diff, gofmt/diff/scoped pvg verify. Cleanup errors are real failures. Commit separate [test-edit-authorized] repair, then independent verification checkpoint; full RED still held.
+STORAGE_REPAIR: VALIDATED — MAC-uzxr bounded checkpoint only.
+Independent report /tmp/MAC-uzxr-PM-storage-verification.md SHA256b52cda2189988e9516cc10c59cda850e39f82502405eaec75ba0fdcc15bbd184.
+Candidate4ef6baffc4de72f2a3e935348f180283fe53c20b directly descends from original998a5a3b3107292365c7c3e6ddb85c072c534145. Subject carries [test-edit-authorized]. Solefsm_test.go14add4delete/18changedLOC/net+10; SHA256326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba. Complete byte-equality reconstruction against original proves ONLY3 authorized transformations; all semantic assertions, mutations, native names and helpers/commands/deadlines unchanged. No later additive parser/test amendment included.
+Detached /tmp/MAC-uzxr-pm-storage.Mxluug/review exactcandidateclean. pvg story verify-tdd --base70652b948bf090008b1965c85daf36ea374daea4 --json checked2commits/no violations, normal audit/no waiver; scoped pvg verify1file0issues; gofmt/diffcheckclean. Graph readygeneration02:42:16Z with branchfilemissing; full exactsource fallback, best effort only.
+
+Independent real default and export meta commands from detached examples/go-crm/impl, GOWORKoff/GOPROXYoff/GOTOOLCHAINlocal, pipefail, Go300s. Default actualexit1/wall3.492042875s; export actualexit1/wall3.062419291s. EACH3 intended unsafe-native-variant-accepted outerleafFAIL,200 checkedchildPASS0SKIP; no setup/timeout credit.
+Default /tmp/MAC-uzxr-pm-storage.Mxluug/default.jsonl SHA2569ac83cb0f357a4aa7d529872b3ba85cd60e38a5ab19178180bf036dcca6a6b8e. Emitted proof /var/folders/gh/7c54cw2s52v6q6czy3xqhb_w0000gn/T/TestFSMNativeOracleSensitivity4153478124/001 absent afterexit; all6fixturecwdsabsent. Default outerlog retains actualexit0 child summaries and checked20/20/60 controls+acceptedmutants. Raw defaultchildlogs intentionallycleaned; no retained raw per-name defaultaudit claimed.
+Export /tmp/MAC-uzxr-pm-storage.Mxluug/export.jsonl SHA256bc7148f9887ef4429231d484cd565e622c299cef4496a44b00b17ff260cb6076; proof crm-fsm-native-proof-4283665849 under same root retained21files. Independent git-object/read-only audit checked6receipts/rawhashes/exactcommands/package/name RUN/PASSonce/packagecompletion; all46 control input hashes/case; exact2/2/1 mutationonly files from unique anchors; allfixturecwdsclean.
+Read complete author checkpoint/audit.cjs/audit.jsonl and verified all suppliedhashes. Did NOT execute authorscript accessing developerworktree. Independently checked author default/export lifecycle/outcomes and retained6receipt/native/manifests against candidate gitobjects; matched report. OriginalRED/evidencepreserved.
+
+No further storage repair required. Author may prepare complete EXTERNAL later patch and measured per-file decomposition for separate exact PM/SrPM review. Applying all5suite/helper/parser/additive amendments stays HELD. No fullapprove-red/deliver/accept/reject transition; no new test-edit permission, AC/path/scope change, candidate parser/Taskfix proof or consumerclaimrenewal.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Bounded exact storage correction independently verified in both actual modes, original semantic RED preserved. Report/hash and raw proof paths above.
+- Default cleanup/exportretention meets exact authorization; all behavioralassertionsunchanged. All later source/test/helper edits still held pending concrete amendmentreview.
+- Claim/worktree retained in_progress,hard-tdd,dev-MAC-uzxr. Only own detached replay/externalreport/tracker writes; no productsource/remote/preflight/install/Docker/service/privateauditwaiver/subagents/backgroundprocesses.
+
+### proof
+- [ ] AC #1: complete parser and closed actual witnessbinding pending.
+- [ ] AC #2: complete effects/context and Taskrepair pending.
+- [ ] AC #3: initial genuineRED/storagecheckpoint verified; candidate unsafevariantrejection pending.
+- [ ] AC #4: dynamic candidate inventorypending; default raw childfiles intentionally cleaned.
+- [ ] AC #5: complete passing candidateproof/consumerhandoffpending.
+
 ## nd_contract
 status: in_progress
 
