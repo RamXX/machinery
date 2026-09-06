@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:03:26Z
-content_hash: "sha256:975d2e94882b8bbcff6bc9dd90b22408c2f896ffd22edaa9340e13ec8203478d"
+updated_at: 2026-09-06T06:04:04Z
+content_hash: "sha256:f2873ddc5393d1feb67b7c9aeb05878b48dec87bf9a47349f2b69cc0d7182a52"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
@@ -2705,3 +2705,25 @@ status: in_progress
 - [ ] AC #4: Frozen tests and all13 affected callers preserved; fresh scoped/race/broader regression and TDD audit owed.
 - [ ] AC #5: Real CLI/history and composed renderer closure require final same-SHA review; no execution/reviewer-honesty or separately injected CLI/OS-close proof claimed.
 
+
+### 2026-09-06T06:04:04Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- GREEN developer handoff for independent PM review, not acceptance. Clean committed candidate 412d01b57ae4770a6cf4fb4f48442fb7e632cdd7 on story/MAC-p7jd; production base a82277af5650b487cea1260c24ffcc1c86d69d8d. All finite verification processes completed.
+- PROOF and LEARNINGS: /tmp/machinery-p7jd-final-proof.O4NxfV/GREEN-REPORT.md, SHA256 815e8dd3c79f0b28dba51b8f7354b9cb9fe29f862327839de14d3163645bf033. Raw evidence manifest /tmp/machinery-p7jd-final-proof.O4NxfV/evidence-sha256.txt, SHA256 8c6749f50855d9ec76d7a75a0f6975b615933783d8cd29020a481bbb137599e1. Full report appended to canonical Notes.
+- Fresh same-SHA native proof: four scoped package selectors 229 PASS / 0 FAIL / 0 SKIP; targeted race 45 PASS / 0 FAIL / 0 SKIP; all 13 amended-helper callers PASS / 0 FAIL / 0 SKIP. Broader selectors 149 PASS / 0 FAIL / 1 existing filesystem SKIP. Overlapping scopes are not summed as unique coverage. Complete names, commands, timings, raw stdout/stderr and hashes are in the report/index.
+- Exact PM-authorized fixture patch ae6e9241ea5d7b0c4556b2ee02c6e2910b2663c2452761e7984f1c6663252971 applied in separate [test-edit-authorized] commit: 65 additions / 0 deletions across only internal/hook/hook_test.go and internal/gates/obligation_ownership_test.go. Both before/after hashes recorded; all seven frozen test hashes preserved. Final canonical scope 16 paths, 3396 additions + 66 deletions = 3462 changed lines.
+- pvg story verify-tdd --base a82277af5650b487cea1260c24ffcc1c86d69d8d --json: 11 commits, 0 merges, 0 violations. git diff --check and gofmt on exact changed Go paths: empty. Isolated standalone go build succeeded; no dependency or installed-tool changes.
+- Scoped pvg verify --format text --include-tests is NOT clean: 11 pre-existing hook.go heuristic findings. Full containing functions mechanically byte-identical to production base, with signatures/hashes in quality-provenance.json. No unrelated source changed to suppress findings.
+- Existing TestSelectRejectsNonportableAndAliasedDesignPaths/case_folded_collision skip is uncredited; case-sensitive Linux CI/final epic gate remains owed. No skip bypass or full preflight performed. Bundled v1 example migration and the two explicitly assigned future helper adaptations belong to hgz1 under fresh exact PM authority; no future downgrade is preauthorized.
+- AC5 actual renderer late mutation/cleanup and actual standalone CLI ordinary input/error/success outcomes are OBSERVED on the same SHA; renderer-to-Release/error-join-to-CLI-output closure is COMPOSED for independent PM source review. Standalone injected late CLI failure is UNOBSERVED, individual OS Close primitives UNFORCED, sink partial writes separate. No synthetic production fault API.
+- pvg story deliver MAC-p7jd succeeded using the shared live nd vault. Developer has not accepted, closed, merged, or changed main/epic. Independent PM must review the full R2 contract, AC5 composition, and disclosed limits before acceptance.
+
+### proof
+- [x] AC #1: Complete implementation-root manifest and retained-root custody bind added, removed, renamed, changed and narrowed implementation/test scope; frozen topology/digest/scope cases and new capability/limit controls pass on candidate 412d01b.
+- [x] AC #2: Closed v2 plan/current/historical distinctions are implemented in schema, diagnostics, CLI and documentation; actual kind/schema, historical and complete-warning controls pass.
+- [x] AC #3: Legacy behavioral evidence is never grandfathered as current; migration diagnostics and all 13 exact amended fixture callers preserve plan warnings/current zero and historical Ga semantics.
+- [x] AC #4: Required real positive/negative filesystem, code/test mutation, alias, stale replay and evidence-only cases pass without skips; the distinct pre-existing case-insensitive-filesystem skip remains uncredited and owed on Linux.
+- [x] AC #5: Same-SHA actual CLI and renderer observations plus explicit source composition support the approved guarantee and honest binding limits; independent PM final source review remains required, with UNOBSERVED/UNFORCED boundaries retained.
