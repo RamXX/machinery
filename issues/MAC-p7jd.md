@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T04:31:42Z
-content_hash: "sha256:e27e46a89e1612e88b7ce9e92e86352eb3b9cc0ffd00b24fcece639f0c311ee0"
+updated_at: 2026-09-06T04:38:18Z
+content_hash: "sha256:c14274237985d10d6ea352471ef907f32f5fc04863138a9ff42fde0fc6eca0aa"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -875,6 +875,66 @@ Implementation failures retained: gates6 custody cases return duplicate G0 findi
 WIP cost:6 production files1125add/43delete=1168lines; combined frozen RED11files2609add/46delete=2655lines. No generic designlock/external/source/inventory/portablepath/scale, Ga, cmd hook, example, golden, installed binary/asset, main/epic, dependency, service/container or remote edits. All5 approved frozen hashes unchanged. No uncommitted source or active test/build/helper process at pause. No delivery/release/acceptance/merge transition. Root acknowledged pause and will route independent review.
 
 LEARNINGS: generic YAML-map round trips can alter exact date lexemes; empty progressive hook config still activates Gl; duplicate lifecycle errors need a consumable finalized wrapper shape. Passing partial cases do not establish the complete contract.
+GREEN-PHASE RED-DISPUTE PM ADJUDICATION — MAC-p7jd — 2026-09-06
+
+Disposition: BOTH exact fixture disputes are justified; only the two repair hunks below are TEST-EDIT AUTHORIZED before editing. This is a bounded healthy dispute decision, not delivery, acceptance, rejection, approve-red or a claim of completed GREEN proof. Source checkpoint is 390d4dc38be1ad5a16ef3cec171e08d9bf6c0036; frozen repaired RED remains 47ba44906a09bc2fa010092a86b133d0d749c52c, with original 7ec5d609 retained. Preserve current in_progress / hard-tdd / red-approved / assignee dev-MAC-p7jd / parent MAC-ui8a. The existing red-approved label records earlier review; this note does not approve future amended bytes without their required evidence/audit.
+
+Authority reviewed: current shared canonical Description and final in_progress contract; compared the Description to the previously reviewed R2/AC5 canonical text and read its changed cost forecast. R2 SHA256 8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179, approved AC5 composition 5fc3193106a803b7760020b646ed4db7b3d417f5e196b2266d10cf8227733937, all five AC, four exact seam uses/read-only boundaries and current 2710–3310 forecast remain unchanged. Prior hooks:true/Load and complete-fixture MkdirAll authorizations remain valid history.
+
+TEST-EDIT AUTHORIZED 1: cmd/machinery/attest_implementation_test.go, TestAttestImplementationCLI / C-complete-sole-current-warning.
+Replace ONLY the body of the existing for _, path := range files acceptance-copy loop (currently var row map[string]any -> yaml.Unmarshal -> row["commit"]=anchor -> yaml.Marshal -> cliReviewWrite) with exactly:
+    lines := strings.Split(string(cliReviewRead(t, path)), "\n")
+    commits := 0
+    for i, line := range lines {
+        if strings.HasPrefix(line, "commit: ") {
+            lines[i] = fmt.Sprintf("commit: %q", anchor)
+            commits++
+        }
+    }
+    if commits != 1 {
+        t.Fatalf("acceptance fixture %s: want exactly one root commit line, got %d", path, commits)
+    }
+    cliReviewWrite(t, path, strings.Join(lines, "\n"))
+
+This deliberately edits only the one known root commit line in each copied fixture; every other byte, including all date lexemes, array items, findings, reviewer, milestones and attestation text is preserved. The quoted anchor remains a YAML string, including if a generated Git object ID were numeric-looking. The guard must require exactly one root commit line and fail otherwise; no fallback reserialization or hardcoded date correction is authorized. The six committed source fixtures each have exactly one unindented "commit: " line and unchanged plain "date: 2026-09-03". No new import is needed (strings/fmt already exist). Preserve the enclosing file loop and all subsequent generation, valid-current, complete-mode, plan conversion, exact exit/count and sole-warning assertions; all other file bytes unchanged except necessary local gofmt.
+
+Frozen pre-repair/current SHA256: e02ad18fe2745d23f05e69ce1e01dd2b1be358f94d99cb3a215b14f6e2cee3b8.
+
+Reason/evidence: the untyped yaml.v3 map decode resolves plain dates to time.Time; its encoder formats time.Time as RFC3339Nano. The frozen loop therefore rewrites each date to 2026-09-03T00:00:00Z. Unchanged internal/gates/accept.go parseAcceptance requires YYYY-MM-DD and correctly rejects those six altered values. Raw 390d4dc CLI output shows all 13 v2 generation calls succeeding, finalized Gv current count 1, and exactly six Ga date errors at M0–M5. The intended missing-current mutation is UNREACHED. This is a fixture transformation defect; Ga, example/golden acceptance YAML, shared helpers and product date semantics must remain unchanged. Earlier base unknown-flag/generation failures retain their interface classification, not retrospectively claimed complete-fixture validity.
+
+TEST-EDIT AUTHORIZED 2: internal/hook/attestation_snapshot_test.go, hookReviewFixture, only the scenario.Empty branch:
+    cfg.Gates = ""
+becomes:
+    cfg.Gates = "g4,gt"
+Keep the existing cfg.Impl = "" and every other byte/assertion unchanged. This selects the existing explicit configuration path that drops both implementation-facing gates when no impl is configured, yielding empty sel.Run with its existing visible warning. It does not alter selection, config parsing, event routing, hook finalization or product policy. The earlier Hooks:true and real Load validation stay intact.
+
+Frozen pre-repair/current SHA256: a3c088c095e2dba4379f548903a058eedbd5338ef872e507ab12edaa1ca06e49.
+
+Reason/evidence: selectGatesCheckedInSnapshot first validates inventory; with a nonempty explicit gates string it selects those gates, drops g4 and gt if cfg.Impl is empty, and returns their explanatory warning. Its progressive empty-string path always sets run["gl"]=true. That selector is unchanged in 390d4dc. Original B-empty-selection and C-empty-cleanup therefore reach the callback with one gate and fail "empty selection supplied gates" before the cleanup mutation. These are wrong fixture selection/setup history, not observed empty-branch proof.
+The existing no-fault assertions already permit nonblocking warning JSON and require ledger clearing. Keep the len(run)==0 check, fired-once check, no-before-finalization output, helper-process/private-TMPDIR custody, actual regular-entry-to-symlink operation, sentinel preservation, exactly-one-block/retained-ledger checks, concrete private-snapshot cleanup/symlink cause and no-private-path assertions unchanged. Post-repair no-fault success and the actual empty-branch cleanup failure must be observed independently; no credit is conferred by this authorization. In particular, any post-repair failure from empty-branch cause/path formatting remains implementation work, never a reason to weaken frozen assertions.
+
+Frozen boundaries and repair protocol:
+- Only these two hunks are authorized; no other existing test edit, helper factoring, new seam, generated/example edit or product-policy change is granted.
+- Use a separate repair commit whose subject carries the literal [test-edit-authorized]. Preserve 7ec5d609, 47ba449, all implementation commits and original raw logs; no amend/squash/rebase or replacement of failed evidence.
+- Record exact diff, repair/source SHA, before/after hashes for all five frozen files, and prove the other three remain byte-identical. The two edited files may differ only by the exact hunks above and necessary local formatting.
+- Run all four scoped selectors against one recorded post-repair revision: go test -count=1 -timeout=5m -json ./internal/gates -run Attest; corresponding ./cmd/machinery -run Attest; ./internal/hook -run Attestation; ./internal/designlock -run Attestation. Retain full output, stderr, native leaf inventory/pass/fail/skip counts and durations. No full preflight.
+- Demonstrate the complete CLI unchanged control passes all gates, then the existing missing-current mutation is reached and yields its sole promoted warning. Demonstrate B-empty-selection fires with zero gates and its no-fault outcome; C-empty-cleanup must pass its matched control, execute the actual mutation and satisfy every unchanged custody/output/path assertion.
+- Run the normal TDD audit against the approved RED/base references; carry the authorization marker into evidence and submit the exact exception diff/new hashes for independent reviewer verification. Corrected fixture bytes remain frozen after repair; no blanket follow-on edits. Re-RED/independent verification requirements of the existing frozen-test protocol are not waived.
+- Final GREEN still requires mandatory new designlock and real renderer/wrapper supplemental tests, docs, all AC proof and same-revision AC5 OBSERVED renderer/process plus REVIEWED closure conjunction. No tests-to-run in designlock is no capability proof, and these repairs do not substitute for new mandatory tests.
+
+Separate implementation failures — NO TEST EDIT AUTHORIZED:
+The seven gates failures were recorded at 999b9ab: six duplicate G0 capture/release diagnostic results and one missing added descendant. Production fixes are in 390d4dc but gates replay is owed. The 390d4dc CLI missing-input leaf passes unchanged control, removes BUILD.md and gets exit1/zero stdout, but its message omits BUILD.md; fix production diagnostics while retaining its assertion. Neither problem is an approved fixture dispute. The current empty hook branch directly formats the final error while the nonempty branch explicitly calls LogicalError; the unchanged no-private-path test must adjudicate any exposed difference after the setup repair.
+
+Observed evidence and limits:
+- Full /tmp/machinery-p7jd-green-proof.eHzGMx/PAUSED-RED-DISPUTE.md read; independently verified SHA256 16872fe3a24b8d133b235487b37e28039b2fa5a6b7d721fb4fe1bb9f15791d94.
+- Original raw round2-cli.jsonl SHA256 4af74aea7cf6da8a90bb1bc4a371b033227d478f277607ed54ea1fff48623f24 and round2-hook.jsonl SHA256 d2fe1b0d27b482c180eb6c084770a93368eeebea56008a671f34afd77f85a021 verified. Relevant full raw output inspected, including all thirteen successful generation calls, all six Ga errors, missing BUILD diagnostic and both empty callback failures. Independent terminal-leaf extraction confirms each package 28 leaves/26pass/2fail. These are recorded 390d4dc CLI/hook observations, not a fresh PM execution.
+- Gates126/133pass belongs to 999b9ab and is not aggregated with 390d4dc CLI/hook into completed same-revision proof. No PM test execution was necessary to resolve these source/log-supported fixture doubts.
+- Exact git show 390d4dc of frozen blocks, selector, Ga date validation and example M0; git grep confirms identical plain dates and one root commit line in M0–M5. git diff 47ba449..390d4dc confirms no edits to the five frozen files, Ga or acceptance examples; hook production diff is confined to finalization, selector untouched. Actual two file hashes match the report.
+- Read installed module source for pinned gopkg.in/yaml.v3 v3.0.1: decode.go scalar interface assigns the resolved value, encode.go timev uses RFC3339Nano. No package install, library modification or invented timestamp behavior.
+- Codebase-memory index/search/selector trace and coverage generation 2026-09-06T02:42:16Z are best-effort metadata_match/no recorded issue for hook.go, accept.go and six source acceptance files. Exact committed source is branch authority.
+- Measured production6files1125add/43del =1168 changed lines; combined11files2609add/46del =2655. Remaining tests/docs and actual final cost still owed; the canonical forecast is not completion proof.
+- Main497419ab4512fcff765cd5feb27aed4c67b5608d clean and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged. PM inspected committed refs and proof files only, not developer worktree internals. No source/test/docs, installed binary/assets, remote, services, Docker or preflight changes; private pvg tracker writes only. Machinery standalone constraint unchanged.
+
 
 ## nd_contract
 status: in_progress
