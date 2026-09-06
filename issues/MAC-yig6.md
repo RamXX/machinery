@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T04:08:59Z
-content_hash: "sha256:b89cbd1b9ad59bf4b72f27a7f75d7340a1e176507f5f19b4e02abe61c1f95959"
+content_hash: "sha256:ee6910ed0880df5cb5c71c8f298fc70c29b3b99b968e06541c67f6798fa44c14"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e]
@@ -537,3 +537,29 @@ status: delivered
 - [x] AC #3 RED: native distinct diagnoses observed; covered wrong-digest/platform UNREACHED and not credited.
 - [ ] AC #4 FINAL: Darwin bounded execution complete; native Linux execution pending.
 - [ ] AC #5 FINAL: frozen RED proved; independent approval and GREEN evidence pending.
+
+### 2026-09-06T04:08:59Z ramirosalas
+## PM RED Decision
+APPROVED RED ONLY on 2026-09-05 Pacific. pvg story approve-red MAC-yig6 succeeded and canonical pvg nd show verified Status open, labels hard-tdd/red-approved, no delivered/accepted label and no closure. RED approval is not GREEN acceptance and grants no existing-helper amendment permission.
+
+Independent report /tmp/machinery-yig6-pm.P55qWO/REPORT.md SHA256 28da07e6ef55f01430d00297c9aa5e7fc1fd1992f15d69cab49f8e786d08f745 was appended in full; exact replay.sh SHA256 4acc08fffef9edc190fd8d625c9ec03e5cfad364fdbe236c58bd15a700a0e357 and raw streams/profiles retained beside it. Review used detached checkout at frozen c59c89de31c7f1268a220caf0fa0d67a8e166d0f, frozen file SHA256 80b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677, exactly 246 additions/0 deletions. No source/test edits.
+
+HELPER AMENDMENT HELD: proposal SHA256 555a3ac33a1a1b5023d3f378e56719f4dee7707c3cb7b0657dab5471ddc53497 is sound in principle, but roughly 50–70 new support lines are prose, not a concrete textual patch. Fresh GREEN implementer must prepare an unapplied exact patch outside checkout; independent PM must inspect/cache failure and cancellation/source resolution/build environment/cleanup details and authorize its bytes/hash BEFORE existing-helper writes. No TEST-EDIT AUTHORIZED tag or blanket permission is granted. Scope remains three executable selectors and minimal associated support in verify_checkers_test.go. Frozen RED, original assertions/modes/arguments/markers/exits, TestMain, golden helpers, fixture dispatcher/OCI helper, production/parser/environment/workflows/coverage settings remain unchanged.
+
+## nd_contract
+status: new
+
+### evidence
+- Phase RED approved and returned open/red-approved via supported shared-vault transition; verified landed. Final story remains unfinished.
+- Independent Go 1.27.1 darwin/arm64 same-SHA replay: original native 1 PASS (0.943s package)/covered 1 behavioral FAIL (0.717s); native compiled inventory 10 leaves PASS/covered 5 PASS 5 FAIL; direct native 10 PASS; covered selection 6 PASS/8 FAIL terminal test events including parent suites. Zero skips/setup/deadline failures. Five unchanged stream/bounds/timeout leaves pass both modes.
+- Actual raw stdout 131B/153B deliberate extra, native stderr 0B, covered stderr exact 54B warning. Wrong-digest/platform covered diagnoses UNREACHED and not credited. Both profile parsers succeed; selection 2541 blocks/4015 statements/402 executed/366 verify_checkers.go, 10.0%; original 397/361, 9.9%; profiles byte-identical to author evidence.
+- pvg verify 1 file/0 issues; verify-tdd 1 commit/no violations; clean detached checkout, no live owned process, observed owned meta roots removed. Only report/log/profile artifacts and clean review checkout retained. Installed binary SHA256 5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849 unchanged.
+- AC4 native Linux GREEN runtime proof remains required. Darwin RED does not waive it. No full preflight, remote operation, installed changes, Docker service or lifecycle/Windows claim.
+
+### proof
+- [x] AC #1 RED: frozen original native complete success versus actual covered behavioral defect independently reproduced.
+- [x] AC #2 RED: actual clean/native versus contaminated/covered protocol boundary and production closed environment verified.
+- [x] AC #3 RED: native intended distinct diagnoses reached; frozen covered assertions require those diagnoses, not early-error negatives.
+- [x] AC #5 RED: tdd-red marker, frozen bytes, actual compiler/subprocess controls independently reviewed; sufficient behavioral RED bar.
+- [ ] AC #4 FINAL: same frozen GREEN native Darwin and native Linux execution, exact inventory and cleanup required.
+- [ ] AC #5 FINAL: exact helper amendment authorization HELD; unchanged frozen GREEN tests and existing checker-focused controls must pass before final acceptance.
