@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-06T02:25:28Z
-content_hash: "sha256:55bb2480b305ffe7dcc60982817b05e376bb9d547861f2f7b795253c69b56fd5"
+content_hash: "sha256:169c6344567a452ce5a2c4c4ff1385b6a720264ebbc4e3c740c4ee16fdb599b5"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -540,6 +540,18 @@ Delivery and final-gate obligations:
 - Delivery must explicitly state composed exact-SHA coverage,85required story leavesPASS0SKIP, A/B/C raw counts, exact three skips/reasons/no-overlap classification and uninvoked helper classification. The original900.473s package timeout remains historical FAIL with35valid completed leaves, not a rewritten full-suitePASS. Do not claim monolithic native/race/full-preflight success or measured race20m fit.
 - The final epic/held contributor gate still owns complete required platform and external runtime verification. Case-alias negative needs a filesystem able to materialize both names; official Structurizr cache proof needs its official-archive lane; OCI golden needs its explicitly provisioned engine lane (held221525d CI already sets MACHINERY_REQUIRE_OCI_GOLDEN in that lane). This decision neither proves those outcomes nor asserts all their enabling policy is already wired. Their final required proof stays pending with its existing owner; no new policy choice or automatic duplicate bug is inferred solely from these known prerequisites/skips.
 - If later review finds overlap, an unexpected failed assertion or a missing required MAC-2u36 outcome, this bounded confirmation does not waive it. Normal full GREEN delivery review remains independent and may reject inadequate proof. No source/test/runtime/installed asset/remote action is requested now; only the narrow scope decision is recorded.
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-05.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
+
 ## Implementation Evidence (DELIVERED) — MAC-2u36 GREEN
 
 PROOF:
