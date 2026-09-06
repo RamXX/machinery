@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:05:11Z
-content_hash: "sha256:502c54f157661f9daa32709fd9d1de6f04ec0c0ec8f10766761cacfcb42cd53a"
+updated_at: 2026-09-06T09:16:33Z
+content_hash: "sha256:fceebb37d60aeb2daf038124d5816203cc0f6bd3a9a0bda55ffaf9ca300631b1"
 blocked_by: [MAC-sqpt, MAC-wbxq]
 blocks: [MAC-u4oo, MAC-vx24, MAC-ou97]
 ---
@@ -110,3 +110,47 @@ status: new
 - Blocked by: [[MAC-sqpt]], [[MAC-wbxq]]
 
 ## Comments
+
+### 2026-09-06T09:16:33Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- internal/assuranceflow/run.go -> internal/assuranceflow -> Run(ctx context.Context, req Request, output io.Writer) (Verification, error); Request{Mode string;Design,Implementation,Store,Milestone string}, Mode red|green|verify|strict-check|complete-check. Private unexported-nonce immutable Verification constructed only after approved final lifecycle and successful output. assuranceflow imports gates/tdd/runtimeclosure/processscope; neither gates nor tdd imports assuranceflow.
+- internal/assuranceflow/verification.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/assuranceflow/run_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/assuranceflow/finalization_integration_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- testdata/integration-lanes/assurance-finalization.json -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-sqpt: internal/tdd/replay.go
+  spec: Execute(ctx context.Context,req ExecuteRequest)(Candidate,error); Verify(ctx context.Context,req VerifyRequest)(Candidate,error), provisional only.
+- MAC-sd7g: internal/assuranceflow/checks.go
+  spec: production CheckExecutor.Run(context.Context,CheckRequest)(PendingChecks,error); Final() unavailable until relevant views are released.
+- MAC-wbxq: internal/gates/tdd.go
+  spec: CheckTDDAssurance(design,impl string,inventory tdd.Inventory,status tdd.StatusReport)*Gate; RunOptions.TDDStatus/TDDRequired.
+- MAC-pe9v: internal/gates/suite.go
+  spec: RunOptions.Execution *GateExecution, ExecutionRequired bool; full Ga execution uses same owner scope and runtimeclosure.Git.
+- MAC-p9z1: internal/tdd/store.go
+  MAC-6h0s: exact registered external head and immutable run-object publication, no execution head advance.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: A consumer receives sealed Verification only after native replay, full gates, no-launch cleanup, final releases, publication and successful output.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
+- [ ] AC #7: current story acceptance requirement remains pending.
+- [ ] AC #8: current story acceptance requirement remains pending.
