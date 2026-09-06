@@ -4,7 +4,7 @@ title: "Migrate repaired example claims to truthful plan and current evidence"
 status: in_progress
 priority: 0
 type: bug
-labels: [hard-tdd]
+labels: [hard-tdd, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:16:50Z
 created_by: ramirosalas
