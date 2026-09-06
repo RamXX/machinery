@@ -4,7 +4,7 @@ title: "Publish standalone native custody contract"
 status: in_progress
 priority: 0
 type: task
-labels: [docs]
+labels: [docs, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
