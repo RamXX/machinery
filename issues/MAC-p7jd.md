@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:50:12Z
-content_hash: "sha256:19a64c1fc64129b941dd1af9148caedff7f6295e03c839685f7a1ff40f01683b"
+updated_at: 2026-09-06T06:03:21Z
+content_hash: "sha256:b4ee34a95fde639453ec3fbf82a2f81608cf3c7547b8b8d243e8d3e0cc1bf8f1"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -941,6 +941,273 @@ Observed evidence and limits:
 - Measured production6files1125add/43del =1168 changed lines; combined11files2609add/46del =2655. Remaining tests/docs and actual final cost still owed; the canonical forecast is not completion proof.
 - Main497419ab4512fcff765cd5feb27aed4c67b5608d clean and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged. PM inspected committed refs and proof files only, not developer worktree internals. No source/test/docs, installed binary/assets, remote, services, Docker or preflight changes; private pvg tracker writes only. Machinery standalone constraint unchanged.
 SR PM LEGACY FIXTURE OWNERSHIP / PROPOSAL-PREPARATION HOLD. Read complete PAUSED-BLAST-DISPUTE.md SHA256d2837c4fbd4205ba151b856e96a7747d3cc32b58b1a69b4c49fe1d6fedb6bc1f and terminal report.229scoped+45race PASS belong to4b246ba; paused51454e069ebe4039f02d6d9108acf9354c7ad6c8 is docs-only later and still owes finalsameSHA proof. Four old-fixture leaves remain held: hook_test.go TestStopGreenDesignClearsStateSilently and obligation_ownership_test.go TestObligationParentRealCLI obligation-free/Policy/Isolation default-gate legs. Legacy v1 gt correctly fails GV_MISSING_IMPLEMENTATION_SUBJECT; silence/ledger, default-vs-explicit Gt, real controls/negatives, Ga ancestry/selection and no-grandfathering are fixed. hgz1 now owns all8bundled evidence migrations AFTER p7/uzxr/lhu5; no p7 reverse dependency or bundled writes to unblock this story. Root may resume the healthy retained GREEN author for an UNAPPLIED EXTERNAL exact test-local fixture proposal against51454e0 limited to those2existingtest paths, with full old/new hunks, original-assertion byte equality, helper callers, real input/evidence inventory, warning/silence semantics and per-file cost. This is proposal preparation only, not oldtest editing or TEST-EDIT AUTHORIZED. Separate independent PM must approve exacttext before any subsequent sanctioned amendment. Verified existing APIs: gates.AttestationReview{Claim,Kind,Attestor,Date,Note string}; RenderAttestation(design,impl string,review AttestationReview)([]byte,error); CheckAttestationsWithImplementation(design,impl string)*Gate. No missing core schema/API identified. Exact valid fixture construction remains unresolved: plan warnings cannot be assumed silent; real/synthetic impl hashes do not establish substantive current conformance, especially before uzxr repair. If no fixture preserves all constraints, report exact technical conflict for independent specialist review; do not weaken assertions, invent review or change product semantics. Existing filesystem skip remains uncredited. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
+# MAC-p7jd GREEN delivery evidence
+
+PROOF:
+
+## Revision, authority, and result
+
+Candidate **412d01b57ae4770a6cf4fb4f48442fb7e632cdd7**, branch story/MAC-p7jd,
+worktree /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-p7jd.
+Production base a82277af5650b487cea1260c24ffcc1c86d69d8d. Clean worktree; all
+finite processes completed. Delivery is for independent PM review, NOT acceptance.
+
+Fresh same-candidate results:229 scoped leaves PASS,45 targeted race leaves PASS,
+all13 affected fixture-caller leaves PASS, no failures/skips in those sets.
+Broader regressions:149 PASS,0 FAIL,1 pre-existing filesystem-dependent SKIP.
+Sets overlap; they are not summed as unique total test coverage.
+
+R2 authority8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179
+and AC5 clarification5fc3193106a803b7760020b646ed4db7b3d417f5e196b2266d10cf8227733937
+remain unchanged. Exact fixture authority was read completely from
+/tmp/machinery-p7jd-pm-fixture.Mm3FM4/PM-DISPOSITION.md,
+SHA25691b9e8773a2174e0cdd30a8b8c162b442436accdbe965341b08c96ecfed8ddea,
+and the canonical live Body matched19a64c1fc64129b941dd1af9148caedff7f6295e03c839685f7a1ff40f01683b.
+
+412d01b applies ONLY the exact65-addition/0-deletion fixture patch
+ae6e9241ea5d7b0c4556b2ee02c6e2910b2663c2452761e7984f1c6663252971 against51454e0.
+Its commit contains literal [test-edit-authorized]. No production/example/golden
+or other test change was made during this final authorized resume.
+
+## Exact executed commands and native inventory
+
+All shell commands used the absolute worktree cwd. Every native test command
+below is `go test -count=1 -timeout=5m -json <package> -run '<selector>'`, plus
+`-race` only in the race rows. Raw stdout JSON and native stderr are the named
+`.jsonl`/`.stderr` files in this directory; no output was replaced by a summary.
+
+| Run | Package | Selector | PASS/FAIL/SKIP leaves | Native seconds |
+|---|---|---|---|---:|
+| gates | ./internal/gates | Attest |151/0/0|17.876|
+| cli | ./cmd/machinery | Attest |28/0/0|15.601|
+| hook | ./internal/hook | Attestation |28/0/0|8.673|
+| designlock | ./internal/designlock | Attestation |22/0/0|2.745|
+| race-gates | ./internal/gates | TestAttestGreen\|TestAttestationCRelease |23/0/0|29.950|
+| race-designlock | ./internal/designlock | Attestation |22/0/0|2.604|
+| callers-hook | ./internal/hook | full six-name selector below |6/0/0|4.551|
+| callers-parent | ./internal/gates | TestObligationParent |7/0/0|8.637|
+| blast-gates | ./internal/gates | TestSelect\|TestRunSelected\|TestCargoWorkspacePointerMutation\|TestGateSnapshot |33/0/1|2.853|
+| blast-hook | ./internal/hook | TestStop\|TestSelectGates\|TestGreenStop |24/0/0|5.943|
+| blast-accepted | ./internal/gates | TestObligation\|TestReadsConsumer |79/0/0|19.544|
+| blast-designlock | ./internal/designlock | full selector below |13/0/0|0.787|
+
+The literal callers-hook selector is:
+`TestStopGreenDesignClearsStateSilently|TestPreEditObligationSurvivesLostPostAndReplacementSession|TestWaveDeferralSurvivesCrashAndOutOfBandClose|TestStopDriftBlocks|TestStopWarnsWhenStagedImplGatesLackImpl|TestReapedStopStillGatesTheTree`.
+The literal blast-designlock selector is:
+`TestMaterializeDesignWorkspace|TestExternalTreeSnapshotCleanup|TestRegularFileSnapshotCleanup|TestExternalSnapshotRejects|TestUniversalSnapshotBoundary`.
+
+`native-summary.json` lists every producing package, elapsed time and raw hash.
+Each run's `*-native-leaves.json` contains the complete actual native leaf names,
+outcomes and times, not a sampled list. `frozen-189-lineage.json` independently
+matches all189 original baseline identities to PASS on this candidate.
+No original leaf is missing. Audit script `audit.cjs` is external proof tooling,
+not a product/build/test dependency.
+
+### Coverage and build
+
+Same-candidate coverage command:
+`go test -count=1 -timeout=5m -coverprofile=/tmp/machinery-p7jd-final-proof.O4NxfV/attestation.cover -json ./internal/gates ./cmd/machinery ./internal/hook ./internal/designlock -run 'Attest|Attestation'`.
+229PASS0FAIL0SKIP again; native designlock3.215s,hook8.133s,CLI16.051s,gates19.052s.
+`go tool cover -func=.../attestation.cover` reports **16.1%** statement coverage
+across the four complete packages under this targeted selector, NOT full-suite
+coverage. Instrumented subprocess percentage printouts are preserved, not added
+together. The stored profile's statement-weighted per-file counts are:
+new capability224/269=83.3%; gates/attest.go458/529=86.6%; CLI/attest.go85/101=84.2%.
+`coverage-by-file.json`, `coverage-functions.txt`, raw coverage output and profile
+are retained. No coverage threshold or unobserved branch is implied satisfied.
+
+`go build -o /tmp/machinery-p7jd-final-proof.O4NxfV/machinery ./cmd/machinery`
+succeeded. This isolated candidate's `attest --help` was captured, including all
+generation flags, fixed limits, merge bound and exact non-authentication text.
+Installed binaries, plugins, skills, NIL runtime and services were not changed.
+go.mod/go.sum diff is empty; shipped Machinery has no pvg/nd/Paivot dependency.
+
+## Reached A/B/C/D and supplemental proof
+
+Original RED7ec5d609acc1597ee2c0ddbf5401b92f834d5ab3, independently repaired
+frozen RED47ba44906a09bc2fa010092a86b133d0d749c52c, baseline47PASS142FAIL0SKIP,
+and every intermediate build/setup/diagnostic failure remain in
+/tmp/machinery-p7jd-green-proof.eHzGMx. A genuine baseline failures, B interface
+absence, C initially unreachable controls/challenges, and D compatibility are
+not retroactively reclassified as valid RED successes. Final exact native names
+retain these stage prefixes. All C unchanged controls and their mutation legs
+now execute successfully; previously unreached schema challenges are reached.
+
+Required production observations include:
+
+- Complete implementation root inventories bind hidden/ignored/generated/vendor/
+  config/test files and empty directories across all4 logical topologies.
+  Exact evidence-only edits/commits and top-level Git administration remain
+  compatible; unrelated attestations.yaml and nested Git metadata do not escape.
+- Real changed handlers, removed assertions, added/removed/renamed files, narrowed
+  manifests/roots, content/mode/size changes, aliases/symlinks/special files and
+  stale replay fail through the unchanged frozen assertions. The independent
+  digest vector and both-direction path-set checks pass.
+- Legacy behavioral v1 fails even on unchanged design covers; v1 plan/history
+  remains explicitly limited. V2 wrong kind/missing root/closed schema rejects.
+  Real Git ancestor Ga evidence remains historical; it does not refresh current
+  implementation approval. Complete-mode unchanged success runs first, then
+  explicit plan conversion produces the sole missing-current warning and failure.
+- Pending current counters stay absent until release. Multiple RunSelected
+  results finalize together; original mutation/root replacement/supplementary
+  failure/observed-then-restored failure suppress current counters. Repeated
+  Release returns the same disposition; post-release access fails closed.
+- Actual Stop/SubagentStop control/fault matrices cover relaxed/strict/wave and
+  empty selection. Cleanup is completed before tally/output/ledger clearing;
+  real failure blocks, retains ledger and preserves external sentinels.
+
+New GREEN proof (first added/frozen in4b246ba, unchanged thereafter) adds22
+capability and18 gates leaves. It uses only the four approved seam boundaries:
+existing Snapshot APIs; approved hook writer callback; suite first-final-Release
+callback; new-capability tests using the existing first-read callback and exact
+fixed-default/lowered-budget factory. No callback mutates a verdict or directly
+closes/replaces a retained lifecycle handle.
+
+- Capability: actual held original roots, private copies, original-generation
+  gap, same-byte/restored-mtime design identity replacement, root rename,
+  private-copy mutation, defensive Entries copy and release checks.
+- Copy: real2*64KiB reads with fired unchanged control and actual mid-read
+  file/root mutations. No fabricated reader, FileInfo or result.
+- Limits: defaults100000 entries/depth64/1GiB per file/8GiB aggregate;
+  actual lowered at/plus-one inventories for entries/depth/aggregate and one
+  combined design-overlay budget. Real sparse1GiB+1 rejection before reading
+  that file. No actual8GiB allocation claim. Actual16MiB-at/plus-one document,
+  generated document and required-cover cases return bounded errors/nil bytes.
+- Four wrappers Render/WithImplementation/package RunSelected/SelectRunAndNote:
+  native subprocess fired no-fault controls precede real original mutation or
+  verified-owned-copy symlink cleanup faults; errors/counter suppression,
+  repeated-release disposition, sentinel survival and logical-path diagnostics
+  all remain asserted. TMPDIR isolation precedes acquisition; no test-only
+  production environment switch or exported injection API exists.
+
+## AC5 observation versus composition
+
+OBSERVED on412d01b: actual Render late-original mutation and owned-copy cleanup
+faults return nil bytes plus real causes. Built standalone CLI success, ordinary
+renderer-input/alias failures, exit1/empty stdout, historical/current distinction,
+and complete-mode promotion all execute. These are conjunctive same-SHA evidence,
+not an injected standalone CLI late-failure experiment.
+
+Source closure for independent PM review:
+
+1. internal/gates/attest.go:949 RenderAttestation buffers a document; line965
+   joins render error, CheckUnchanged and Release; any error returns nil bytes.
+2. internal/gates/suite.go:82 Release runs primary capability checks and
+   supplementary lock guard, closes all captures/workspace/lock, joins failures,
+   then latches/finalizes pending results exactly once. Cleanup does not short-circuit.
+3. cmd/machinery/attest.go:120 invokes Render; its error branch reports and
+   returns exit1 BEFORE the first document-output operation atline128.
+
+Thus the late CLI guarantee is **COMPOSED**, subject to independent final source
+review. Separately injected standalone CLI late failure is **UNOBSERVED**;
+individual OS Close primitive failures are **UNFORCED**. Sink partialwrites are
+separate and may physically truncate output while returning a nonzero result.
+Hashes do not prove execution, reviewer identity or judgment correctness. The
+exact approved scope-boundary text is in finalized Gv notes, generation help/
+stderr and docs. Silent successful hooks remain silent.
+
+## Authorized fixture amendment and future consumer
+
+Two exact before/after hashes:
+
+- hook_test.go: ab6986f14b95c942f4f627579b6f5ac0e34b475e4addcc64e293d9a66c292a92
+  ->2b185970a3f69a140338cee97e14db0da82ef0aaf01250364357b104c1458b33.
+- obligation_ownership_test.go:326e63f9bb4bbe12ecb5979cd3ad13fa6d83bbdd3924e835d96b929809d66e97
+  ->cc5f5e12a0d41a6eeda60895fece31713c5f068817bb2d3f08b7f1c6ff4d4b04.
+
+All original assertions and outside-helper bytes are preserved. The full13
+caller boundary, actual complete62-file GoCRM/73-file parent/75-file formal
+variant inventories, unchanged6 acceptance files, and exact evidence YAML
+construction are independently audited in the proposal and PM disposition.
+This final candidate replays those same13 original leaves successfully.
+Added setup assertions require the actual sole plan-warning and current count0.
+No current subject, new review, refreshed date/attestor/cover hash or fake
+acceptance anchor is introduced. GoCRM runtime is not copied/executed; parent
+Go tests prove their intended decision-ID coverage, not FSM conformance.
+
+After acceptance, hgz1 consumes these exact helper bytes and full13-caller
+boundary. Its source v2/current migration WILL invalidate the current v1 guards.
+SrPM has explicitly assigned hgz1 only those two later helper adaptations,
+requiring independent exact BEFORE-EDIT PM authorization at its actual baseline.
+No future downgrade/manifest stripping/representation is preauthorized here.
+No reverse p7 dependency or source-example mutation was introduced.
+
+## Quality, immutable scope and known limits
+
+`pvg story verify-tdd --base a82277af5650b487cea1260c24ffcc1c86d69d8d --json`:
+11 commits,0 merges,0 violations. `frozen-test-sha256.txt` is byte-identical to
+the approved7-file manifest; original raw failures are retained, not rewritten.
+`git diff --check` and `gofmt -l <15 exact changed Go files>` produce empty output.
+
+`pvg verify <all16 exact changed paths> --format text --include-tests` returns
+FAILED:15 source files scanned,11 heuristic return-empty stub findings, all in
+pre-existing hook.go branches at993,1069,1103,2646,2651,2656,2671,3965,3972,3976,3986.
+This is NOT reported as a clean scan. `quality-provenance.json` proves every
+entire containing function is byte-identical to a822 production base: nil-error
+diagnostic handling, non-generated path classification, unavailable platform
+change-ID fallback, and outside/unresolvable relative-path handling. These are
+intentional existing return conventions outside the authorized stop hunks, not
+new unimplemented work. No unrelated source was changed to silence the scanner.
+
+One broader test remains SKIPPED, not passed:
+TestSelectRejectsNonportableAndAliasedDesignPaths/case_folded_collision,
+internal/gates/failclosed_io_test.go:149..162. It writes BUILD.md and build.md,
+observes fewer than2 entries on this darwin/arm64 case-insensitive filesystem,
+and takes its existing t.Skip atline158 before the collision assertion. The
+source is unchanged. Final case-sensitive Linux CI/epic gate owes that native
+leaf (e.g. `go test -count=1 -timeout=5m -json ./internal/gates -run
+'^TestSelectRejectsNonportableAndAliasedDesignPaths$/^case_folded_collision$'`).
+No filesystem/service setup or skip bypass is authorized/performed here. All
+required attestation and caller scopes have0 skips. User-directed targeted scope
+excludes full scripts/preflight.sh and unrelated integrations until epic final.
+Bundled example/golden v1 migration belongs to hgz1, not production grandfathering.
+
+Final actual scope:16 paths3396 additions+66 deletions=3462 changed lines.
+`source-numstat.txt` gives every path's additions/deletions;
+`source-sha256.txt` binds all16 files. Cost decomposition: production1184,
+original frozen tests1489, supplemental tests566, docs158, last fixture repairs65.
+Growth beyond older forecast is explicit held-root/copy/finalization proof plus
+paired real-operation tests and exact legacy compatibility repairs, not factoring
+or new APIs/seams. No proof was trimmed to fit a numerical forecast.
+
+## Acceptance-criteria verification
+
+| AC | Requirement | Implementation / proof | Developer result |
+|---|---|---|---|
+|1|Complete implementation/test scope, not only BUILD/pack; additions/removals/changes/narrowing stale|designlock/attestation_snapshot.go; gates/attest.go; frozen C scope/topology/narrowing plus new capability/limits tests|Observed PASS|
+|2|Closed plan/current/history distinction in schema, diagnostics and docs|gates/attest.go; docs/attestation-evidence.md; B kind/schema, D plan/history, real CLI history and complete-warning tests|Observed PASS|
+|3|Actionable compatibility migration, no behavioral grandfathering|A legacy unchanged/mutated tests, D compatibility, all13 authorized fixture callers; exact current0/plan warning retained|Observed PASS|
+|4|Real negative/positive code/test/scope/alias/stale/evidence-only cases|frozen C gate/CLI/hook matrices plus real held-root/copy/limit and wrapper supplements|Observed PASS; unrelated Linux leaf remains owed|
+|5|Real CLI attest/check, history/current separation, honest binding limits|same-SHA built CLI tests; actual Render late faults; source closure above; exact displayed limits|OBSERVED + COMPOSED; independent PM final review required|
+
+LEARNINGS:
+
+- Keep a current result provisional until every retained-root check and owned
+  cleanup returns; an optimistic gate counter plus later custody error is unsafe.
+- Snapshot copies do not replace original-root authority. Identity witnesses,
+  full inventory and one overlay-inclusive budget are separate obligations.
+- Fixture YAML roundtrips can silently change calendar scalars; exact guarded
+  edits preserve provenance. A missing selector is not evidence of empty selection.
+- A legacy fixture can be explicitly prospective with current0 and its warning
+  intact; ordinary check/Stop success is not current review or complete-mode approval.
+- Freeze new supplemental assertions only after their full planned matrix settles;
+  preserve failed compile/setup history, and route every later existing-test edit.
+
+## Evidence index and handoff
+
+All files referenced without an absolute prefix are in
+/tmp/machinery-p7jd-final-proof.O4NxfV. `evidence-sha256.txt` binds raw native runs,
+stderr, source/profile/audit manifests, coverage profile and isolated binary.
+This report is hashed separately. Prior stages remain in the original RED/PM
+directories, /tmp/machinery-p7jd-green-proof.eHzGMx, and the separate fixture
+proposal/PM directories; none is substituted for this final same-SHA proof.
+
+Standalone product/dependency constraint, no installed replacements, no remotes,
+main/epic/rebase/merge changes, no services/assets and no full preflight observed.
+All work is committed to the story branch. PM must independently review the full
+R2 contract and AC5 composition, known platform/quality findings and delivery
+evidence before acceptance. Developer does not accept, close or merge.
+
 ## PM EXACT LEGACY-FIXTURE AMENDMENT ADJUDICATION — 2026-09-06 — 51454e0
 
 TEST-EDIT AUTHORIZED: only the exact unapplied 65-addition/0-deletion patch below, SHA256 ae6e9241ea5d7b0c4556b2ee02c6e2910b2663c2452761e7984f1c6663252971, against committed 51454e069ebe4039f02d6d9108acf9354c7ad6c8. This is bounded GREEN-phase fixture-dispute adjudication, NOT delivery, final acceptance, rejection, RED reapproval, a status transition, or permission for other edits. Root must verify this durable disposition before resuming application. The earlier effective-application hold for unowned future incompatibility is resolved by the independently read-back SrPM canonical scope below; no implementation prerequisite or reverse dependency is invented.
