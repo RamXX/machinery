@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:03:33Z
-content_hash: "sha256:2a7e7d2f297d5ac674cc2b7692c91e8b0ca319ca9294131804e58f5061755812"
+updated_at: 2026-09-06T09:16:32Z
+content_hash: "sha256:95e34e0698cd91f8a946df7c3fc7cc558a23f284039d302c60ee0f8766daf3d0"
 blocked_by: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v]
 blocks: [MAC-sqpt, MAC-vx24, MAC-ou97]
 ---
@@ -110,3 +110,46 @@ status: new
 - Blocked by: [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-pe9v]]
 
 ## Comments
+
+### 2026-09-06T09:16:32Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- internal/assuranceflow/checks.go -> internal/assuranceflow/checks.go -> closed private production CheckExecutor implementation with CheckRequest{InvocationID,StateID string;Inputs InputView;Checks []Check;SourceDigest,ControlDigest string;Scope processscope.Scope;Runtimes []RuntimeHandle}; Run(context.Context, CheckRequest) (PendingChecks, error). PendingChecks.Provisional() ([]CheckResult, error), Final() ([]CheckResult, error), private owner-bound invocation nonce and exact section 7 profiles.
+- internal/assuranceflow/checks_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/assuranceflow/checks_integration_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- testdata/integration-lanes/assurance-checks.json -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-6h0s: internal/tdd/types.go
+  spec: CheckExecutor/CheckRequest/PendingChecks/CheckResult with InvocationID,StateID,Profile,SourceDigest,ControlDigest,Status and Diagnostics; no deserialized or callback-supplied production executor.
+- MAC-wi2u: internal/tdd/adapters/go.go
+  spec: Adapter Prepare(context.Context, SuiteRequest) (PreparedSuite,error), Run(context.Context,PreparedSuite,EventSink)(Execution,error); exact Go RuntimeHandle.
+- MAC-avfp: internal/tdd/adapters/typescript.go
+  spec: same closed Adapter interface and exact Node/TypeScript RuntimeHandle.
+- MAC-imtz: internal/tdd/adapters/python.go
+  spec: same closed Adapter interface and exact CPython RuntimeHandle.
+- MAC-8yai: internal/tdd/adapters/elixir.go
+  spec: same closed Adapter interface and exact Elixir/OTP RuntimeHandle.
+- MAC-pe9v: internal/gates/suite.go
+  spec: RunOptions.Execution *GateExecution, ExecutionRequired bool; Snapshot.RunSelected(impl string,sel Selection,opt RunOptions) []*Gate.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: Required checks return state-bound provisional results and become final only after original input release; stale invocation claims return failure.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
