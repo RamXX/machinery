@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T04:06:34Z
-content_hash: "sha256:fd9f82dcc83046d2dbc503392770e55c1448e20272bacf60e66049bf37d3b9b8"
+updated_at: 2026-09-06T04:08:21Z
+content_hash: "sha256:5df24ebc04edfe59ec659cd7f329226d8b376166b2402b0bcfc31df3909c5b49"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e]
@@ -102,6 +102,66 @@ status: new
 
 
 ## Notes
+# MAC-yig6 independent RED review
+
+Decision: APPROVED RED ONLY. `pvg story approve-red MAC-yig6` completed using the shared live vault. This is not final acceptance. Existing-helper amendment authorization is HELD pending independent review of an exact, unapplied textual patch. Native Linux GREEN execution remains mandatory.
+
+Reviewed commit c59c89de31c7f1268a220caf0fa0d67a8e166d0f, base 70652b948bf090008b1965c85daf36ea374daea4, commit subject includes tdd-red. Detached review checkout: /tmp/machinery-yig6-pm.P55qWO/checkout. Diff is exactly one new test file, 246 additions/0 deletions. Frozen cmd/machinery/checker_fixture_coverage_test.go SHA256 80b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677. No implementation or source/test amendment made in review.
+
+Author report /tmp/machinery-yig6-red.09ui51/REPORT.md SHA256 648c4d87d5facac1d46110ab796436a8a7a19ebeceadb15b8e8a53edbc4e6eb8 and HELPER-AMENDMENT-PROPOSAL.md SHA256 555a3ac33a1a1b5023d3f378e56719f4dee7707c3cb7b0657dab5471ddc53497 read completely and verified. Canonical pvg nd story, full append-only evidence/history, committed original helpers, strict parser/runner/environment, TestMain ownership, golden harness and frozen tests reviewed. Author raw JSONL/profile hashes match recorded evidence. Independent replay follows.
+
+## Reproduction and exact commands
+
+The executable script beside this report, replay.sh SHA256 4acc08fffef9edc190fd8d625c9ec03e5cfad364fdbe236c58bd15a700a0e357, records every complete command, selector, artifact path and timeout. It pins the detached checkout. All commands synchronous; /usr/bin/time -p plus Perl alarm 200s for meta runs, 90s for direct tests, 30s for profile parsing. Test deadlines are 180s outer and 60s children/builds. Actual host Go 1.27.1 darwin/arm64, GOFLAGS empty.
+
+| Run | Exit | Exact terminal outcome | Package / wall seconds |
+| --- | --- | --- | --- |
+| meta-native | 1 | Native compiled child 10 leaves PASS; covered child 5 PASS/5 FAIL; outer native PASS, covered FAIL | 6.549 / 8.56 |
+| original-native | 0 | Original unchanged TestVerifyCheckersReproducible 1 PASS | 0.943 / 1.31 |
+| original-covered | 1 | Original 1 FAIL, actual strict trailing-data assertion | 0.717 / 1.14 |
+| selection-native | 0 | 10 leaves PASS, plus protocol parent PASS | 2.035 / 2.40 |
+| selection-covered | 1 | Direct 5 PASS/5 FAIL; outer native PASS, covered FAIL; JSON test terminal totals 6 PASS/8 FAIL including parent suites | 6.929 / 7.32 |
+| cover-original / cover-selection | 0 / 0 | Actual Go profile parser succeeds | 0.17 / 0.17 wall |
+
+Meta elapsed: native-parent outer 6.205789583s (native 2.81s, covered 3.39s); covered-parent outer 5.173448917s (native 2.63s, covered 2.55s). Selected top-level inventory is TestVerifyCheckersReproducible, TestCheckerFixtureProtocolControls, TestRunCheckerBoundsOutput, TestRunCheckerReportsStreamsInDeterministicOrder, TestRunCheckerBoundsDescendantPipeWait, TestRunCheckerTimeoutDiagnostic, TestVerifyLocalOCIImageBoundsUnresponsiveEngine. Protocol children are correct, wrong-digest, wrong-platform, extra-data. No recursion; compiled child selectors exclude the outer meta. No skipped, setup/compile/import/deadline-failure leaves. Compiler stdout/stderr clean. Outer command stderr files contain timing only.
+
+Raw actual child stdout is 131 bytes for ordinary controls and 153 bytes with deliberate fourth JSON. Native stderr is empty. Covered fixture stderr is exactly 54 bytes: `warning: GOCOVERDIR not set, no coverage data emitted\n`. Both compiled modes preserve intended input identity/platform. Native correct is accepted; native wrong-digest reaches `do not contain exact reference`; wrong-platform reaches `does not match required platform`; deliberate fourth JSON reaches trailing-data rejection. Covered wrong-digest/platform are UNREACHED because instrumentation fails the preceding EOF check; these are not credited as successful sensitivity negatives. Covered extra-data also fails incidental-stderr assertion despite reaching trailing-data diagnosis. Five unchanged stream/bounds/timeout leaves pass in both modes.
+
+## Coverage and constraints
+
+Both profiles have 2541 blocks/4015 statements. Original executes 397 statements, 361 in verify_checkers.go, 9.9%. Selection executes 402 statements, 366 in verify_checkers.go, 10.0%. Independent awk summation and actual go tool cover parsing agree with frozen meta assertions. Both profiles are byte-identical to author profiles. Covered production execution is real; existing ordinary golden CLI behavior is not claimed as instrumented subprocess coverage.
+
+AC1–3: tests require original success assertions, clean actual helper streams, exact raw protocol values, strict distinct negative diagnoses, production stream ordering and existing bounds. With unchanged production and preserved assertions, these are sufficient RED behavioral constraints. AC4: required exact inventories, deadlines and owned cleanup are explicit; successful native Linux GREEN execution still required in addition to this Darwin replay. AC5: frozen tdd-red commit and independently reproduced matched native PASS/covered FAIL establish RED. GREEN must pass same frozen tests plus existing checker-focused regressions on one delivered SHA and preserve all existing assertions/modes.
+
+Static verification: no incomplete markers in new test file; pvg verify explicit file --include-tests --format text PASS (1 file, 0 issues); pvg story verify-tdd --base 70652b948bf090008b1965c85daf36ea374daea4 --json PASS (1 commit, violations null); git diff --check PASS; detached checkout clean. Delivery shape is not behavioral proof. No documentation behavior changes in RED.
+
+Codebase-memory Verify tier: project Users-ramirosalas-workspace-machinery, generation 2026-09-06T02:42:16Z. Exact helper discovery and bidirectional depth-1 fixture-engine trace read; complete relevant pages. Existing reviewed paths metadata_match/no recorded gap; frozen new file missing in main graph, read fully from exact commit. Graph is best-effort only; conclusions rely on committed source and actual replay.
+
+## Existing-helper amendment HELD
+
+The proposed three replacements of initial os.Executable/error blocks in writeRegistryFile, checkerFixtureEngineArgs and checkerProcessFixtureCommand are a reasonable narrow boundary. The sync.Once real uninstrumented helper build under unchanged cmdTestControlRoot is also sound in principle and preserves the requesting binary's production coverage. However, the proposal specifies roughly 50–70 new support lines in prose. It does not supply an exact textual patch for independent inspection of cache error/cancellation handling, runtime.Caller resolution, compiler environment, temporary ownership and bounded execution. No existing-file write or [test-edit-authorized] permission is granted by this RED approval.
+
+Required next step: fresh GREEN implementer prepares an unapplied patch outside the checkout. PM reviews its exact bytes/hash before shared existing-helper writes. Scope remains solely the three selectors and minimal support in verify_checkers_test.go; frozen new test file, TestMain, golden helpers, TestCheckerProcessFixture, runCheckerOCIEngineFixture, all existing arguments/markers/modes/assertions/exits, production/parser/environment/workflows/coverage settings remain unchanged. No blanket authorization.
+
+## Artifacts and resource state
+
+All artifacts below live in /tmp/machinery-yig6-pm.P55qWO and remain as review evidence. Test temporary trees were removed by their existing owners; both meta control roots named in raw command logs were independently checked absent. Process inventory contained only the inspecting shell/rg, no owned live checker/build process. Test/build session ended. Review checkout retained clean for traceability. No fetch/pull/push/sync/GH, Docker/service, setup/recover, full preflight, installed asset or Paivot product dependency operations. Installed /Users/ramirosalas/.local/bin/machinery SHA256 remains 5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849. No Linux, Windows runtime or Docker lifecycle assurance claimed.
+
+SHA256:
+- meta-native.stdout: e5eea4caf40c7b35c98571f8c78089f9dbf75e2b41967e363c7e231458ea541f
+- original-native.stdout: 5940dd399a0de2e88b3b8cb78bc57329a92e95cb522c216e44409b172ed4b78a
+- original-covered.stdout: c48748774c6b08890b7708051f4bd5d26deebdde436c6fd6f582a4346b8dbc4f
+- selection-native.stdout: e689c932698e83328b2652d8e21e7b800cb8e15c408fa870a78d67a1cd885b3a
+- selection-covered.stdout: 745f05cc9973dd64970d9b650e741602ec8d15deea39dddf7113e3ad69a26240
+- original-coverage.out: b6c192eddd83c4aec6a1d01a8d558bb4f4521c79e057265b71d7e454af67fa4a
+- selection-coverage.out: d2b22bcd3ca5745eea84b2ac88d720e1a97c530f7b09c31c0d896fc9b33997e5
+- meta-native.stderr: 4b5632b917e1b7296bc01054125123884ce3ac8322eb9280925591a1bba76b21
+- original-native.stderr: e68a5e318f60bf24947f1145d44df675434baa0e11c26bf07cc96f6e1859d8ad
+- original-covered.stderr: 328baf88b9810cf9e1798c162d2d5dd256d90aaee4c0d9cc9810af74d06b8466
+- selection-native.stderr: 5f05b015af94f3cba917c4659f830a0f732eed6883ddba33b5565f917a75c22a
+- selection-covered.stderr: de12e7e811d0f63d0160a2fa275912bf3fd0a3be6865247fd5f42cf2bdd6317e
+
+LEARNINGS: A failing wrong-identity test proves nothing about identity sensitivity when a prior protocol EOF check masks it. Independent same-SHA profile equality corroborates the narrow diagnosis. Exact helper authorization requires concrete implementation bytes even when a prose design boundary is sound.
 
 
 ## nd_contract
