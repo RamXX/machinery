@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:40:28Z
-content_hash: "sha256:dfd637ab30df67d826bd5ff0833c1803ba6d96098056489435248bcd85600e6d"
+updated_at: 2026-09-06T03:12:26Z
+content_hash: "sha256:0cba80cf3cae3e3de65b730a25c57c09b625e11e0e4aa7a48cc5412d554826c0"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce]
@@ -810,6 +810,58 @@ The prior canonical below is retained only as historical text; its architecture/
 > - [ ] AC #4: independently verified
 > - [ ] AC #5: independently verified
 > 
+POST-FREEZE PM TEST-EDIT AUTHORIZATION AND COST REVIEW — MAC-p7jd — 2026-09-06
+
+Disposition: the two reported defects are authored fixture SETUP errors. Exact repairs below are authorized BEFORE any edit to frozen RED commit 7ec5d609acc1597ee2c0ddbf5401b92f834d5ab3. This is neither RED approval nor GREEN acceptance, delivery or rejection. Keep in_progress / hard-tdd / assignee dev-MAC-p7jd and retain the healthy worktree/claim. All five canonical AC, R2 architecture, prior exact seam restrictions and approved AC5 conjunctive composition remain unchanged.
+
+TEST-EDIT AUTHORIZED: internal/hook/attestation_snapshot_test.go — ONLY hookReviewFixture setup:
+- Immediately before the existing Config literal, add: enabled := true
+- Change that literal from Config{Design: "design", Impl: "src", Gates: "gv", Strict: scenario.Strict} to Config{Design: "design", Impl: "src", Gates: "gv", Hooks: &enabled, Strict: scenario.Strict}.
+- Immediately after the existing writeFile of ConfigName, add:
+    if _, ok, warning := Load(root); !ok || warning != "" {
+        t.Fatalf("hook fixture configuration invalid: ok=%t warning=%s", ok, warning)
+    }
+This check must occur before appendState arms the obligation. It calls the real existing Load and must fail on invalid/disabled setup; it must not discard warnings, change closed parsing, accept hooks:null, or bypass Run. The new enabled pointer merely serializes the intended hooks:true value. Preserve every hook event/scenario, callback signature/fired check, mutation, count/output assertion, ledger assertion, child process/TMPDIR guard, sentinel, timeout and other byte outside these exact setup hunks and their necessary gofmt formatting.
+Frozen pre-edit file SHA256: c3f595d56538b97f47e9f8faa66e731fb371cba0d8256f0ddfb38f9ac421f021.
+
+Source cause: Config.Hooks is *bool with json:"hooks" and no omitempty; the original nil pointer serializes as null. decodeConfig routes hooks through decodeConfigBool and rejects null. Load returns the configuration warning before Run can acquire the intended snapshot. Original hook.jsonl contains "config key \"hooks\" must be a boolean"; all 27 new failing leaves are SETUP, including those whose existing assertion text says B INTERFACE_ABSENT. That printed label does not override the actual earlier config failure. No old hook failure may be credited as interface/custody RED. The one passing existing leaf is TestSelectGatesActivatesGvOnAttestationEvidence.
+
+TEST-EDIT AUTHORIZED: cmd/machinery/attest_implementation_test.go — ONLY TestAttestImplementationCLI / "C-complete-sole-current-warning" setup. Immediately after its existing cliReviewFixture literal and before both existing copyDirInto calls, add:
+    for _, path := range []string{f.design, f.impl} {
+        if err := os.MkdirAll(path, 0o755); err != nil {
+            t.Fatal(err)
+        }
+    }
+Targets are the two explicit descendants of that subtest's unique t.TempDir root. Keep shared copyDirInto, all copied example inputs, Git history setup, generated claim/kind selection, current control, warning mutation, exit/count/sole-warning assertions and every other frozen byte unchanged except necessary gofmt for this insertion.
+Frozen pre-edit file SHA256: 62511c2a3ab4f04cf8b4bfa9fbe7bd0e0ec2e02c850e2e4726d0d5f198ccd58a.
+
+Source cause: existing readonly cmd/machinery/golden_test.go copyDirInto enumerates the source and writes ordinary files under dst, creating nested destination directories only when it encounters source directories. It does not create dst itself. The original failure opening destination design/ARCHITECTURE.md occurred before any complete-mode CLI behavior. This one leaf is SETUP, not C sensitivity or missing-interface proof. Repairing its root setup does not establish that the subsequent complete fixture is valid under every other gate; its unchanged valid control and sole-warning challenge remain mandatory.
+
+Freeze/replay rules:
+- Keep original 7ec5d609 and original logs intact; no amend/squash/rewrite or replacement of the original failed evidence.
+- Make a separate exact repair commit with BOTH tdd-red and [test-edit-authorized] in its subject. Record original and repaired commit SHAs, exact two-file diff and before/after SHA256 for all five frozen RED files. Verify the other three frozen files unchanged and both repaired files differ only by these authorized setup hunks.
+- Re-run the complete previously scoped attestation test selections on unchanged production: gates -run Attest, cmd/machinery -run Attest, hook -run Attestation, designlock -run Attestation, with bounded recorded timeouts, leaf names/counts, elapsed times, and new raw logs. No full preflight.
+- The repaired fixtures must pass setup checks. Require actual A legacy-false-acceptance assertion failures plus passing D controls, and classify B unsupported version/flags/callback absence and C unexecuted mutation legs honestly. A new setup failure must be reported as SETUP and its exact additional repair reviewed; no further frozen edit is implicitly allowed.
+- Independently replay/review the repaired RED and freeze its final bytes before approve-red. These authorizations do not authorize GREEN dispatch or waive any unresolved acceptance evidence.
+
+Original evidence retained:
+- /tmp/machinery-p7jd-red-proof.RvOHwO/hook.jsonl SHA256 ff109b68b5b8399e54a5e57765d9d205ae831d7e646de527f859e232248cdbe0: independently counted 28 terminal leaves, 27 failures and 1 pass; failures inspected as the hooks:null setup problem.
+- /tmp/machinery-p7jd-red-proof.RvOHwO/cli.jsonl SHA256 a0fccbdfac2294d5292fc1cd879ca1ad0dbbb13128b16943401ed775373e35a6: independently counted 28 terminal leaves, 17 failures and 11 passes; exact complete fixture missing-destination error inspected. Author classification of remaining failures is 6 A legacy false acceptance and 10 B/C interface absent/unreached; complete independent behavioral replay remains pending.
+- Other original gates.jsonl/designlock.jsonl/verify-initial.txt remain alongside those logs. Reported gates 6.501s and CLI 2.866s runs are original author timings, not fresh PM replay.
+
+PM COST/SCOPE INVESTIGATION — SAME-STORY FORECAST ADJUSTMENT JUSTIFIED:
+git show --stat 7ec5d609 independently confirms five test files, 1475 insertions and 3 deletions. New files total 1426 LOC (612 gates, 457 CLI, 357 hook); existing authorized amendments are 49 net lines. The prior 850–1350 test forecast is already exceeded before mandatory GREEN supplements. A realistic current forecast is approximately 2710–3310 total: ~1485 RED after the setup repairs, 175–375 supplemental GREEN tests, 900–1250 production and 150–200 docs/help. Combined test estimate is ~1660–1860. These are estimates, not a cap, proof of completion or permission to broaden ownership.
+
+The increase is justified by the approved matrices and distinct observed boundaries: gates independently calculate receipt/inventory and exercise direct lifecycle; CLI builds an isolated executable, handles real Git/current/history/complete-mode and output/exit cases; hooks exercise configured state, Stop/SubagentStop, strict/wave policies and owned destructive-copy child processes. Reviewed source already reuses testgit.Run, copyDirInto and existing package helpers. Sharing a new cross-package fixture API would add ownership and couple proof setup; depending on the future production renderer cannot create independently frozen baseline fixtures. This does not prove no line can be saved; it explains why reducing line count is not a reason to trim the required tests or change frozen fixtures.
+
+No new file/production API/generic factoring is approved by the cost finding. Retain the canonical 13 required paths plus the already authorized optional fourteenth supplemental file and all read-only boundaries. No story split is required by this bounded overrun; splitting the same finalization/schema/CLI custody obligation would add coordination without removing required proof. SrPM should canonicalize the revised forecast and rationale under MAC-p7jd, preserving all AC/R2/AC5 proof requirements; dispatcher has this follow-up. Estimate canonicalization does not block these exact repairs/re-RED, and further actual overrun remains subject to PM investigation.
+
+Review evidence/limits:
+- Current shared canonical story, current R2 authorizations and the approved AC5 composition section were read; original pm_acceptor/developer frozen-test rules apply. Current story state is in_progress, hard-tdd, assignee dev-MAC-p7jd, parent MAC-ui8a.
+- Graph index_status/search_graph identified Config/Load and copyDirInto; coverage generation 2026-09-06T02:42:16Z reports best-effort metadata_match/no_recorded_issue for internal/hook/hook.go and cmd/machinery/golden_test.go. No claim of exhaustive graph proof.
+- Exact git show 7ec5d609 of both frozen test files and their readonly Config/decodeConfig/Load/copyDirInto dependencies; exact file hashing and raw JSONL hashing/leaf extraction above. Source inspection of the tests supplies cost evidence, not acceptance.
+- Main remained clean at 497419ab4512fcff765cd5feb27aed4c67b5608d; observed epic 70652b948bf090008b1965c85daf36ea374daea4. PM used committed refs, not the developer worktree. No PM source/test/docs edits, execution replay, installed asset change, remote mutation, full preflight or status transition.
+
 
 ## nd_contract
 status: in_progress
