@@ -1,17 +1,18 @@
 ---
 id: MAC-uzxr
 title: "Bind Go CRM FSM conformance to committed oracle expectations"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:59:51Z
-content_hash: "sha256:00997306aa982c1bc72c1a76361bb78c814d41722b1dcadaf9399c6bc614d17c"
+updated_at: 2026-09-06T07:01:37Z
+content_hash: "sha256:8da757fe938030945247e393772473e6250b89ded1cb4306dad5af1981b235f1"
 blocks: [MAC-ou97, MAC-hgz1]
-follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
+follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx]
+assignee: dev-MAC-uzxr
 ---
 
 ## Description
@@ -871,11 +872,14 @@ status: new
 - 2026-09-06T06:28:13Z auto-follows: linked to predecessor MAC-p8ce
 - 2026-09-06T06:51:32Z status: in_progress -> open
 - 2026-09-06T06:51:32Z released by ramirosalas
+- 2026-09-06T07:01:37Z status: open -> in_progress
+- 2026-09-06T07:01:37Z auto-follows: linked to predecessor MAC-olrx
+- 2026-09-06T07:01:37Z claimed by dev-MAC-uzxr
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-ou97]], [[MAC-hgz1]]
-- Follows: [[MAC-2u36]], [[MAC-a89e]], [[MAC-p8ce]]
+- Follows: [[MAC-2u36]], [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]]
 
 ## Comments
 
