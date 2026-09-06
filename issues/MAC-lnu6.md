@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:16:36Z
-content_hash: "sha256:0d4db505c9b2831c535058c0d6be219a1a09abd42156a979747f9e92b3f57a76"
+updated_at: 2026-09-06T02:18:00Z
+content_hash: "sha256:2ef19fb4634cec9ef1344bfb519bcc2fc3f63456000a0d88a4dcf47777dae25e"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce]
@@ -586,3 +586,52 @@ status: delivered
 - [x] AC #4 RED: real comparison/exit/read-error controls plus old mutation/utility tests pass; assurance remains RED.
 - [x] AC #5 RED: actual local standalone CLI, all nine real guidance paths, no skips.
 - [ ] GREEN production/guidance fix, independent acceptance, authorized evidence amendments and six Gv/compatibility proofs not yet performed.
+
+### 2026-09-06T02:18:00Z ramirosalas
+## PM Decision — independent RED review MAC-lnu6
+RED APPROVED [2026-09-05]. Conditional review question answered YES: the unchanged committed tests, together with all explicitly required GREEN source/evidence review and runtime proof, establish all five canonical AC. This approves RED only, not implementation acceptance, closure, fixture/evidence writes, or historical hash rebinding.
+
+### Independent evidence
+- Read complete shared canonical MAC-lnu6 with pvg issues show --json; active Description and five Story Acceptance Criteria govern, historical scope retained only as history. Delivered label and final developer contract were present. pvg story verify-delivery passed 9/9 shape checks; that is metadata evidence, not code proof.
+- Reviewed local story SHA 0ea1fdc730aadac15cecc8de33bb95898ad91d60 relative to epic 6cb2d974ea8aea211a5974f453cef2b5802bb11e. Commit subject carries tdd-red. Diff is exactly one new cmd/machinery/tokensequal_semantics_test.go, +229/-0. SHA256 1138fc41a835abf3769210bdbc2dbdb1d9d2ad6db9752b14c90bf41b9945c51f. Existing tests/helpers, product, guidance, golden and attestation bytes unchanged; git diff --check clean.
+- Graph Verify lookup: Users-ramirosalas-workspace-machinery generation 2026-09-05T23:58:53Z; five relevant symbol results, no remaining pages. Coverage checked thirteen evidence paths and detached worktree scope; new test missing from graph, .claude excluded. Exact committed source supplied current review; no graph completeness claim.
+- PM-owned DETACHED proof checkout retained: /Users/ramirosalas/workspace/machinery/.claude/worktrees/pm-MAC-lnu6-red at 0ea1fdc730aadac15cecc8de33bb95898ad91d60. Clean after replay.
+- Independent native command: cd /Users/ramirosalas/workspace/machinery/.claude/worktrees/pm-MAC-lnu6-red && timeout 150s go test -count=1 -timeout=120s ./cmd/machinery -run 'TokensEqual|Frozen' -json
+- Terminal exit 1, package duration 1.611s, command wall 3.380s; terminal timestamp 2026-09-05T19:15:47.682475-07:00. Raw /tmp/MAC-lnu6-pm-red-0ea1fdc.jsonl SHA256 70c0718f4fd5dde578ab4c541a1f4bdca1ff2930f54a24b3f5798a5629d03d61. Author raw SHA256 independently matched 51195a39cdff28688605ff9e6d7e899a919db71e6f1d6dc6763d49a356fc2d82.
+- Exact leaf inventory matches the developer terminal proof: 26 leaves, 12 PASS / 14 intended FAIL / 0 SKIP. Native parent-inclusive test terminal events 13 PASS / 19 FAIL / 0 SKIP. PASS: old TestTokensEqual and TestTokensEqualRejectsMutationDuringComparison; both semantic-counterexample executable_semantic_control and whitespace_token_utility leaves; six RealCLIUtilityControls (whitespace_reflow, empty_whitespace, token_value_changed, token_added, token_removed, missing_input). FAIL: both semantic no_semantic_or_frozen_edit_assurance leaves; both HelpDescribesOnlyWhitespaceTokens command/root help leaves; WhitespaceSuccessDoesNotAuthorizeFrozenEdits; all nine FrozenGuidanceRequiresExactIdentityAndEvidenceReplay path leaves.
+- Five CLI/help failures are causal actual false formatting-only assurances. Nine guidance failures identify each actual owner-sanctioned token-identity formatting amendment, before testing new wording. No build/infrastructure failure or skip caused RED. Go statement coverage not measured and not claimed; AC mapping is five/five.
+- Static review found concrete typed Go tests/helpers, no stub, no skip, no environment-gated omission, no mocks, future API or missing fixture workaround. Actual local goldenBin/runBin builds current checkout and runs the binary with existing private-config harness. Existing genuine read-mutation/custody test remains immutable.
+- Bounded exact-source scan: git grep -n -E 'tokens-equal|token-identity proof|formatting-only amendment' HEAD -- ':!cmd/machinery/tokensequal_semantics_test.go' ':!go.sum'. Reviewed all returned hits: nine unsafe guidance surfaces plus tokensequal.go comment/help remain for GREEN; README command inventory and oracle/snapshot diagnostic test references are not authorizations. This literal scan is not exhaustive natural-language validation.
+
+### Assertion adequacy and limits
+- AC1: all nine real paths are required/read with missing-file fatal, unsafe shipped phrases rejected first, and separate affirmative exact-byte/inventory identity, explicit new evidence revision/replay, and no formatting/token exemption patterns required. Both removal and replacement obligations are present.
+- AC2: both real command and root help require whitespace/token description and reject current false assurances; equal output checked on both semantic-risk pairs and a benign utility pair. Source comments and all changed user-facing prose must still be reviewed directly at GREEN.
+- AC3: Go types.Eval executes valid quoted expressions with len 8 -> 7; pinned yaml.v3 decodes valid indentation variants and verifies complete permission ownership distinction (nested user true -> false with opposite root permission). Both actual CLI calls still return equal-token exit 0, proving equality does not imply semantic preservation.
+- AC4: real whitespace reflow and empty/whitespace retain exit 0 and count prefix; token value/add/remove retain exit 1 and NOT token-identical; real missing input retains exit 1 and named diagnostic without equality. Existing mutation/custody behavior passes unchanged.
+- AC5: actual built standalone CLI, real temporary files and all nine shipped guidance cases execute service-free using Go/native facilities and already-pinned YAML; no Paivot product dependency introduced.
+- Prose regular expressions are bounded lexical checks, not natural-language semantic validators: alternate assurances could evade finite forbidden phrases, and contradictory surrounding prose could coexist with affirmative matches. They do not independently certify arbitrary rewritten documentation. The canonical independent exact-delta review and tracked-source scan remain mandatory GREEN evidence and must reject such bypasses, contradictions or misleading claims. No AC is waived. This combined bar is adequate for this narrowly scoped wording repair; passing regexes alone cannot justify GREEN acceptance.
+
+### GREEN requirements still held
+- Preserve the frozen RED file and every pre-existing test/helper/golden byte. No TEST-EDIT AUTHORIZED marker or general test-repair permission is granted.
+- BEFORE writing the nine guidance/six evidence paths, present exact proposed prose/evidence deltas for independent PM authorization. For all six actual BUILD covers, explicitly decide truthful mechanical no-new-claim refresh versus scoped new re-attestation; RED approval supplies no such decision.
+- Never hash-rebind revised BUILD bytes under old historical reviewer/date/claims where doing so misstates what was reviewed. If truthful re-attestation needs broader identity/date/schema/ownership edits, return the exact amendment for canonical review first. Current broader changes remain unauthorized.
+- Record exact old/new BUILD hashes and authorized scope. Run six actual local CLI check <design-dir> --gate gv with isolated config for baseline, changed-BUILD stale-before-refresh, and final after any authorized refresh; attribute actual outcomes. Review evidence diff for all non-BUILD subjects/hashes and every other field/history unchanged.
+- Run the immutable focused suite GREEN, affected TestGoldenCheck with unchanged goldens, review all remaining policy scan hits and exact CLI/docs changes. Required GREEN evidence is pending, not inferred from current RED or metadata gates.
+- No remote, main/epic/source/history/installed-assets mutation or other agent cleanup performed. Root remains 497419ab4512fcff765cd5feb27aed4c67b5608d.
+
+## nd_contract
+status: new
+
+### evidence
+- Independent RED approval at frozen SHA 0ea1fdc730aadac15cecc8de33bb95898ad91d60, replay 26 leaves 12 PASS / 14 intended FAIL / 0 SKIP, 1.611s package, raw log/hash above.
+- Canonical pvg story approve-red MAC-lnu6 succeeded against shared nd vault. Read-back status open, labels hard-tdd and red-approved, delivered removed, assignee dev-MAC-lnu6 retained. This final comment corrects the older delivered contract still appearing last after transition.
+- Exact prose/evidence amendment and historical binding decisions remain pending; no write or test-edit authorization from this RED decision.
+
+### proof
+- [x] AC #1 RED bar: all nine actual unsafe authorizations fail, replacement policy required; direct GREEN policy review remains mandatory.
+- [x] AC #2 RED bar: actual CLI help/output false assurances fail with bounded lexical checks plus required GREEN source review.
+- [x] AC #3 RED bar: executable semantic distinction and real equal-token calls independently verified.
+- [x] AC #4 RED bar: utility/exit/read-failure and original mutation controls pass unchanged.
+- [x] AC #5 RED bar: standalone actual CLI and all nine real guidance paths executed, no skips.
+- [ ] GREEN implementation, exact amendment/historical truth authorization, six baseline/stale/final Gv outcomes, unchanged-golden compatibility and final PM acceptance remain outstanding.
+
