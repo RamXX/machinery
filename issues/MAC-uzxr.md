@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:35:09Z
-content_hash: "sha256:95bba33a8a81b6a60aa9f1ddef51b665b19166861d28bf0fb087965c858f1c56"
+content_hash: "sha256:19871afcfdc3ebdfa1c8e391c2d69dc7b986d9e13ad5c50d2af34b2b615ddd5c"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -261,4 +261,26 @@ status: new
 - [ ] AC #3: real expected-state/action and extra-effect unsafe variants fail for intended causes.
 - [ ] AC #4: complete executed-row inventory and preserved controls.
 - [ ] AC #5: native candidate proof without automatic claim renewal.
+
+
+### 2026-09-06T03:35:09Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Sr PM bug_triage: confirmed TASK-754183 missing Cancelled entry action is folded into existing P0 MAC-uzxr by explicit root authorization; no new issue or dependency. Eight owned paths/~750-1150 LOC, only added production path task.go and only fireRolledBack fallback repair after independent RED approval.
+- Exact70652b948 source read; Task.Fire(evt TaskEvent) Effect, fireRolledBack(evt TaskEvent) Effect and recordTaskClosed() verified. Existing action clears Rejection; canonical AC2 proof must assert actual context mutation, Cancelled and ordered actions, not merely a returned name.
+- Isolated probe read/hash matched: task_entry_probe_test.go f6809da70ce0130f79020f8d032194c878e3b17acdeebfaa12f22ca54bc97e84; task.go copied/committed39af26a093f855acf269da153915fbecf6e78c0f3dbba85b087bf4b83586e35b; probe-pipefail.jsonl90e3d11c3df38725d77637bc187d7e27dcf0a2b65f0934e6b71c785b177e783c. Actual corrected exit1:1PASS normal TASK-67b0ff,1FAIL fallback TASK-754183,0SKIP,package0.286s; initial tee status0 is not success.
+- Additional copied-test exact-effects.jsonl hashc6ce626ee381f97d020a2bea090d1a626e9b9adfa421c75ffd877cdfb8ee42a4 and four copy-only diffs read:225 leaves224PASS/1FAIL samefallback/0SKIP,author-reported0.917s wall,actual exit1. These hand-reconciled diagnostics do not prove the missing parser is detected and are NOT approved/frozen RED.
+- Original five AC compared byte-exact after edit; unique canonical headings and intact quoted commands read back. Claims/status/labels preserved: in_progress,hard-tdd,dev-MAC-uzxr. No source/test/docs/evidence/golden edits, no production fix, no review approval or delivery by Sr PM.
+- All five existing-test amendments and concrete parser/reconciliation/sensitivity design still require exact independent PM authorization before edits. No production changes until RED approved; no blanket repair permission. MAC-hgz1 consumes accepted parser/test AND corrected Task source, MAC-ou97 remains blocked, MAC-lnu6 evidence hold unchanged.
+- Scoped lint37 issues PASS0 errors/0 findings; no dependency cycles. RTM22 stories,4 closed,0 extracted requirements: structural result only, NOT five-AC proof. Root main497419a remains clean.
+- Self-review fixed scope-honesty defect by including directly related tiny production correction; no new API, generated-oracle changes, broad rewrite or unsupported additional bug claimed.
+
+### proof
+- [ ] AC #1: actual committed-row parser and closed input/guard reconciliation.
+- [ ] AC #2: entry/exit-aware complete effects plus TASK-754183 actual context-effect repair and safe controls.
+- [ ] AC #3: real next-state/action/extra-effect and missing-call sensitivity, independently frozen before GREEN.
+- [ ] AC #4: complete executed-row inventory with terminal supplements and honest failure attribution.
+- [ ] AC #5: full focused native candidate proof and reviewed consumer scope handoff, without automatic claim renewal.
 
