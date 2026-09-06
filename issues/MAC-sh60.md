@@ -1,17 +1,18 @@
 ---
 id: MAC-sh60
 title: "Require executable oracle coverage evidence"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:28:17Z
-content_hash: "sha256:11a7ffe8aa9cb2f982b24e0aefed04841da12e0f5c320969f709097b4243c08c"
+updated_at: 2026-09-06T00:29:17Z
+content_hash: "sha256:99888f177c39ab2c4631b9c3c75a10cee921d7d2254753b12ccf96b2f49a3097"
 blocks: [MAC-vx24, MAC-ou97]
-follows: [MAC-a89e, MAC-p8ce]
+follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
+assignee: dev-MAC-sh60
 ---
 
 ## Description
@@ -444,11 +445,14 @@ status: in_progress
 - 2026-09-06T00:12:56Z auto-follows: linked to predecessor MAC-p8ce
 - 2026-09-06T00:28:10Z status: in_progress -> open
 - 2026-09-06T00:28:10Z released by ramirosalas
+- 2026-09-06T00:29:17Z status: open -> in_progress
+- 2026-09-06T00:29:17Z auto-follows: linked to predecessor MAC-olrx
+- 2026-09-06T00:29:17Z claimed by dev-MAC-sh60
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]]
-- Follows: [[MAC-a89e]], [[MAC-p8ce]]
+- Follows: [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]]
 
 ## Comments
 
