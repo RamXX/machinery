@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:33:11Z
-content_hash: "sha256:60ce36f602933befcb1c23ca2465db9e0cab6dd07a962161d4b80fa616617657"
+updated_at: 2026-09-06T10:36:48Z
+content_hash: "sha256:dee27dac66468fb323f402b083ec5b8a420cb54d320c0566392008f4bc2788e9"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0]
 assignee: dev-MAC-qlw2
@@ -86,7 +86,27 @@ status: new
 
 
 ## Notes
+## BEFORE-RED inventory checkpoint
 
+External immutable proposal: `/tmp/MAC-qlw2-before-red-proposal.md` SHA256 `6b1fdf8f88751ffaeced19b95ca70832aca37f50d3881286779ca8721fa82ad2`.
+
+No repository source/test/fixture/config bytes, RED commit, native process/container execution, or delivery transition occurred. Independent approval is required before authoring the exact six-file inventory. Concrete review gates: exact Go representation of contract-required `Limits` and `Diagnostic`; private authenticated `InternalIO` descriptor semantics; approval of same-test-binary producer helper; authorized native Linux amd64 executor.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Read current `pvg nd show MAC-qlw2` through EOF and contract `docs/test-assurance-contract.md` (575 lines; SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8).
+- External proposal hash: 6b1fdf8f88751ffaeced19b95ca70832aca37f50d3881286779ca8721fa82ad2.
+- Read-only feasibility: Darwin arm64 Go 1.27.1 present; available Docker server is linux/arm64, not required Linux amd64.
+
+### proof
+- [ ] AC #1: pending approved RED inventory and exact missing interface definitions.
+- [ ] AC #2: pending real native guardian proof.
+- [ ] AC #3: pending Darwin arm64 and Linux amd64 native execution.
+- [ ] AC #4: pending approved negative custody tests.
+- [ ] AC #5: pending approved cumulative-budget tests.
+- [ ] AC #6: pending downstream CLI/contributor consumer wiring.
 
 ## History
 - 2026-09-06T09:09:57Z dep_added: blocked_by MAC-l7m0
