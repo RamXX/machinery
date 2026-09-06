@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:57:47Z
-content_hash: "sha256:e6d7a2249188fe5594e7517b502bab49ee99dc3ff8267761911c60077c98b3fa"
+updated_at: 2026-09-06T00:02:54Z
+content_hash: "sha256:bcf62a671901cfea74936eadbe1c241b6b49500138ac71b4b5962431b8e3afa0"
 follows: [MAC-olrx, MAC-p8ce]
 assignee: dev-MAC-a89e
 closed_at: 2026-09-05T23:57:31Z
@@ -106,7 +106,7 @@ LEARNINGS:
 - Output assertions can accidentally match temporary test directory names; test prose rather than unrestricted substring presence.
 - Real baseline reruns expand an already-baselined edge even when output says nothing new to baseline.
 - Executing all printed advice with placeholder substitution demonstrates debt mutation directly without mocks or external services.
-
+LOCAL EPIC INTEGRATION: After independent PM closed+accepted readback for 4f339474e52ee9e788d0d5d071105fba385188b2, dispatcher merged story/MAC-a89e with --no-ff into epic/MAC-ui8a at 6cb2d974ea8aea211a5974f453cef2b5802bb11e. Combined targeted command: go test -count=1 -timeout=5m ./internal/gates -run "VersionSkew|Regen|Ratchet|Reads|EventContract|Consumer|Clause|Parent|Selection|Obligation" passed in 17.803s at merged SHA. Accepted commit ancestry verified. Developer independently verified and removed only its clean completed worktree after missing ownership-marker refusal; merged story branch removed, epic commits and raw logs retained. Root returned to clean main497419a. No main merge, remote changes, installed artifact replacement or full preflight occurred.
 
 ## nd_contract
 status: accepted
