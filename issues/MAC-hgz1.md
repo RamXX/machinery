@@ -9,12 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:16:50Z
 created_by: ramirosalas
 updated_at: 2026-09-06T20:22:41Z
-content_hash: "sha256:60c3fc3ddc629d2bfd6e682eff1909c01d8a1feb10e3f31a71f286a970247180"
+content_hash: "sha256:91a5ecc0649bbfe64b96f2c22f23068b33fc116f2538e0fd7a3f4fc99239dac3"
 was_blocked_by: [MAC-p7jd, MAC-uzxr, MAC-lhu5]
 follows: [MAC-p7jd, MAC-uzxr, MAC-lhu5]
 assignee: dev-MAC-hgz1
 closed_at: 2026-09-06T20:22:41Z
 close_reason: "Accepted: eight attestation docs migrated to truthful v2 plan/current/historical; merged to local epic"
+led_to: [MAC-lnu6]
 ---
 
 ## Description
@@ -215,6 +216,7 @@ status: new
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-p7jd]], [[MAC-uzxr]], [[MAC-lhu5]]
 - Follows: [[MAC-p7jd]], [[MAC-uzxr]], [[MAC-lhu5]]
+- Led to: [[MAC-lnu6]]
 
 ## Comments
 

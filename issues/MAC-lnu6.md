@@ -8,11 +8,11 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:21:31Z
-content_hash: "sha256:17fcf027a0a258e7fa8def796c931f03b957a9213396f463b19f7d4f1d4807af"
+updated_at: 2026-09-06T20:23:32Z
+content_hash: "sha256:ebd22982821e43c2f254c03585c293904a28f37b8a9d107b15c2037fedf8d021"
 blocks: [MAC-vx24, MAC-ou97, MAC-wbxq]
 assignee: dev-MAC-lnu6
-follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
+follows: [MAC-a89e, MAC-p8ce, MAC-olrx, MAC-hgz1]
 was_blocked_by: [MAC-hgz1]
 ---
 
@@ -592,12 +592,14 @@ Historical original canonical Description (superseded only as active scope; pres
 - 2026-09-06T03:17:09Z dep_added: blocked_by MAC-hgz1
 - 2026-09-06T09:10:09Z dep_added: blocks MAC-wbxq
 - 2026-09-06T20:22:41Z dep_removed: was_blocked_by MAC-hgz1
+- 2026-09-06T20:23:32Z status: in_progress -> in_progress
+- 2026-09-06T20:23:32Z auto-follows: linked to predecessor MAC-hgz1
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]], [[MAC-wbxq]]
 - Was blocked by: [[MAC-hgz1]]
-- Follows: [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]]
+- Follows: [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]], [[MAC-hgz1]]
 
 ## Comments
 
