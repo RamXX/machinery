@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:23:20Z
-content_hash: "sha256:f013d1217fdc1213b7025d4bcb4f1eda4e58f2ea754ecf572a804c361b154e0a"
+updated_at: 2026-09-06T01:23:55Z
+content_hash: "sha256:78ba5a453fc9a2908664e0ad7510bc4b2ddb457d11ebb364ca47ec5956ba5004"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -2432,3 +2432,23 @@ status: in_progress
 - [ ] Complete current-SHA re-RED matrix and separate independent final RED/freeze decision.
 - [ ] Full GREEN matrix/native regression, remaining complete AC1-7 verification and final product acceptance.
 
+
+### 2026-09-06T01:23:55Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- COMPLETE REPAIRED RED REPLAY READY FOR INDEPENDENT RE-FREEZE; not delivery/approval/phase or claim transition.
+- ONE exact53572efc7adfde1649c4ca305280324aa050c6e5 baseline command: go test -count=1 -timeout=15m ./internal/install -run Bootstrap|Receipt|UpdatePlan -json, with shell-quoted regex as recorded in full Notes/report. Unchanged496963f production and reviewed test bytes; candidate15252d255fa12a131fbc2cdb13f593a212fd4ccb unchanged with identical tests.
+- Actual85leaves68PASS17intendedFAIL0SKIP96runs96terminals0missing; package769.988s, expected exit1, no timeout/panic/fixture error. Failure set exactly equals original496963f full evidence.
+- Raw /tmp/machinery-MAC-2u36-joint-proof.623afI/baseline-full-rered.jsonl SHA2569898464034c6be714a48dcc7b07241e2c56ec9b2c83aa1b6adff74dc32441915,325997bytes. Full85named inventory, exactcommands, supplementalcontrols, ACmapping, reachedcauses, hashes/history/cost/LEARNINGS persisted in Notes and FULL_RERED_REPORT.md in same directory.
+- Three separately selected exact-current-SHA legacy controls alreadyPASS both sources; baseline union88uniqueleaves71PASS17intendedFAIL0SKIP, without double-counting descriptor repeats or helper scaffolding.
+- Ordinary real postmutation rollbackPASS31.50s; interrupted recoveryPASS14.95s is premutation. Baselineparent4cases stillpublications0/injections0, no latefaultrollbackclaim. Candidateparent4PASS/twoactualinjections remains separately audited focused evidence, not full candidate verification.
+- Post-run frozen test/source hashes unchanged; clean retained baseline53572ef and candidate15252d2;1847changedLOC9files. Requiredunsupportedthinfile independentlyacceptedcomplete in focusedstabilityreview; no padding.
+- No test/source edit, repeated broad run, candidate broad/native/preflight, live install/asset/cache change, remote/Dagger operation or delivery/phase/claimtransition. All command sessions ended; NILbinary unchanged.
+
+### proof
+- [x] Complete current baseline re-RED matrix with allrequiredcases and intended17failure identities.
+- [x] Existing privateparser, safecontrols, realrollback/recovery and supplementallegacy proof preserved.
+- [x] Identical revised tests and original source/history retained for independent review.
+- [ ] Independent complete repaired-RED re-freeze, candidate full/native verification and final acceptance.
