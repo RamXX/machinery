@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:30Z
-content_hash: "sha256:ed3416e8560e277c04ab47f44c5c8a3f29dccd8fa73b05d275a996f1b879f718"
+updated_at: 2026-09-06T09:22:35Z
+content_hash: "sha256:937154158517cf5f5a96b88f009ae32429694ac96247b9ada21901068acc73f3"
 blocked_by: [MAC-hpqp, MAC-6h0s]
 blocks: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-al5u, MAC-vx24, MAC-ou97]
 ---
@@ -124,8 +124,10 @@ PRODUCES:
 CONSUMES:
 - MAC-hpqp: scripts/integration-lane/main.go
   MAC-6h0s: accepted contributor registry runner, closed exact leaf inventory, required runtime lanes, failure/skip/leak accounting; preserve e55238223961fec922896c361d8af6cafc454a8e seven-file 96-case frozen pilot byte-for-byte.
+  schema: accepted contributor registry runner, closed exact leaf inventory, required runtime lanes, failure/skip/leak accounting; preserve e55238223961fec922896c361d8af6cafc454a8e seven-file 96-case frozen pilot byte-for-byte.
 - MAC-6h0s: internal/tdd/types.go
   MAC-6h0s: closed adapter IDs and RuntimeHandle contract; no consumer TDD record is a contributor-lane record.
+  schema: closed adapter IDs and RuntimeHandle contract; no consumer TDD record is a contributor-lane record.
 - MAC-l7m0: docs/test-assurance-contract.md
   schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
 
