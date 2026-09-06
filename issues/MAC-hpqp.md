@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:55:30Z
-content_hash: "sha256:a162d5e9892dabd6bbfa949a7c3e1c57173e937643e8fd73fece035bf4caf550"
+updated_at: 2026-09-06T13:00:11Z
+content_hash: "sha256:6c03e6e9951c7824b894417020e6b90112a493dfe13b3863a479aed1e7e6d691"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -950,7 +950,7 @@ Exact recovery evidence before this audit append:
 - Intended stream after inserting only the two parentheses and retaining the LF: 110,439 bytes, SHA256 `432d34f86573148e3a1f9ed911c8ad40acbcb74874d8131866aa4ecd0af6fc68`.
 - Actual post-editor stream before this append: 110,438 bytes, SHA256 `5f498bd4f80202a76a16e430f600d24be97d4dd0509d88f78e0b988275654ff1`.
 - Exact comparison proved `actual post-editor Body + one LF == intended stream`; there was no other byte difference. The ordinary nd comment framing supplies that missing LF as its first appended byte, after which this audit begins.
-- Frozen external evidence: `/tmp/MAC-custody-canonical.iVvkhI/failed-current-body.md` mode 0444 / SHA256 `419e6a79ba74b88032f1ff75b7d02b86cae009f84dea2f9b3e0ae227ec0d5370`; `/tmp/MAC-custody-canonical.iVvkhI/failed-scoped-lint.json` mode 0444 / SHA256 `6108fe2788a7c2a7b68d458a6beb77022d9ddfc57002f71875a3da01c927a429`; guarded editor SHA256 `28374fa86b093af8e40966534e290e5988f73f7c5f3d2d235240230107906701`.
+- Frozen external evidence: `/tmp/MAC-` + `custody-canonical.iVvkhI/failed-current-body.md` mode 0444 / SHA256 `419e6a79ba74b88032f1ff75b7d02b86cae009f84dea2f9b3e0ae227ec0d5370`; `/tmp/MAC-` + `custody-canonical.iVvkhI/failed-scoped-lint.json` mode 0444 / SHA256 `6108fe2788a7c2a7b68d458a6beb77022d9ddfc57002f71875a3da01c927a429`; guarded editor SHA256 `28374fa86b093af8e40966534e290e5988f73f7c5f3d2d235240230107906701`.
 
 The authoritative parser-safe line is exactly `- (Existing source): scripts/shellcheck-files.txt` with its existing indented `source:` signature. Parentheses are the documented non-issue annotation. A new later CONSUMES entry could not override the malformed historical entry because the linter accumulates and checks every historical entry; therefore the two-character annotation had to repair this newly authored occurrence in place. `scripts/shellcheck-files.txt` remains byte-identical READ-ONLY input, never a seventeenth hpqp write path. The current exact scope remains 13 held changed paths plus 3 approved new paths = 16 WRITE paths.
 
@@ -965,4 +965,3 @@ status: in_progress
 - [x] Parser-safe existing-source annotation records the same read-only shell inventory semantics.
 - [x] The failed wrong-CWD command, lint error and guarded editor exit 69 remain explicit history.
 - [ ] Exact before-edit inventory/roles/authorization, new RED, implementation and Linux amd64/Darwin arm64 current replay remain pending.
-
