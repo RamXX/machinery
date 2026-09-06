@@ -4,11 +4,11 @@ title: "Require executable oracle coverage evidence"
 status: closed
 priority: 0
 type: bug
-labels: [hard-tdd, red-approved]
+labels: [hard-tdd, red-approved, superseded]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T19:21:16Z
+updated_at: 2026-09-06T19:21:17Z
 content_hash: "sha256:1f45a591fc4bbda761c2009ea5b37f606162ba78d25c6ed87d788dba53403f99"
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
