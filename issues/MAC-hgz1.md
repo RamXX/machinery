@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:16:50Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:45:05Z
-content_hash: "sha256:d289c09f93bc11ffeac835894b222f2a9fde2fa8d0b84e0b9c725451f46bfac7"
+updated_at: 2026-09-06T05:46:14Z
+content_hash: "sha256:83540326da1fac515f297ad127f62e9a3d5075f7cb02f5659418faf935c24f13"
 blocked_by: [MAC-uzxr, MAC-lhu5, MAC-p7jd]
 blocks: [MAC-lnu6, MAC-ou97]
 ---
@@ -253,3 +253,20 @@ status: new
 - [ ] AC #4: Substantive independent review, actual generated scope and exact provenance/hash edits pending.
 - [ ] AC #5: Eight real example positive/negative CLI matrices pending; design-only plans never current proof.
 - [ ] AC #6: Exact reviewed golden amendments and downstream six-example lnu handoff pending.
+
+### 2026-09-06T05:46:14Z ramirosalas
+## nd_contract
+status: new
+
+### evidence
+- Sr PM canonical future migration ownership now41possiblepaths (prior39 plus only existing copyTree/obligationParentFixture bodies). hgz1 consumes accepted p7 exact construction/commit, independent disposition, full13-caller same-SHA blast and complete inventories. Both v1 guards WILL fail when these source YAML docs migrate to v2; later helper adaptation requires new exact BEFORE-EDIT PM review at actual accepted hgz1 baseline. Future v2 construction not selected; no automatic current-to-plan downgrade, invented review/hash/attribution or current implementation credit. Preserve every original assertion/Ga ancestry/default-versus-explicit Gt and complete provenance/acceptance/input inventory. All13 caller leaves remain mandatory, not just four failures. Separate rough65-160changedLOC helper increment and measured historical13-caller runtime added; combined rounded1170-2060forecast is conditional, never proof/cap or scope expansion. lnu6 remains exactly17paths/6examples/14conditionalrows/9policyblocks; serial dependencies unchanged.
+- Proven guarded pvg nd edit used exclusive-lock editor and apply_patch only, fullraw expected header/body + external exacttext trial + exactpostreadback; all prior Notes/History/Links/Comments and metadata retained except normal hash/time. Original story AC compared byte-exact. Source/proposal read complete; no product/test/example mutation or Paivot runtime/build/test dependency.
+- Scoped lint37issues/0errors/0review; cyclesnone; globalRTM37stories19closed0extracted requirements. Structural results only, not epic completion or AC proof. Claims/status/labels/dependencies unchanged. External preservation manifests /tmp/machinery-private-fixture-serialization.clhWCS.
+
+### proof
+- [ ] AC #1: Six BUILD conformance/context corrections pending.
+- [ ] AC #2: Go CRM local-authority wording correction pending.
+- [ ] AC #3: Eight-document closed-v2 migration pending.
+- [ ] AC #4: Substantive independent evidence and exact fixture amendment review pending; no automatic current downgrade.
+- [ ] AC #5: Eight migration matrices plus all13 unchanged helper-caller leaves and inventory/provenance proof pending.
+- [ ] AC #6: Exact reviewed goldens/accepted handoff to unchanged six-example lnu scope pending.
