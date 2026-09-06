@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:14:21Z
-content_hash: "sha256:8e7e3685237eda6a2eedfe833437b46d527c1bea9166a30f07e684521ef524e0"
+updated_at: 2026-09-06T06:28:12Z
+content_hash: "sha256:8636f75156be205adfff97858b8af0db20e6738721d71748c39a9535fbe71524"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36, MAC-a89e]
@@ -168,6 +168,124 @@ Read complete author checkpoint/audit.cjs/audit.jsonl and verified all suppliedh
 No further storage repair required. Author may prepare complete EXTERNAL later patch and measured per-file decomposition for separate exact PM/SrPM review. Applying all5suite/helper/parser/additive amendments stays HELD. No fullapprove-red/deliver/accept/reject transition; no new test-edit permission, AC/path/scope change, candidate parser/Taskfix proof or consumerclaimrenewal.
 SR PM MEASURED FORECAST / PRESERVATION REPAIR. Canonical eight paths and five AC unchanged; actual external proposal2450changed plus503historical=2953 cumulative beforeGREEN, aggregate2945changed. Conditional3300-3500 cumulative/3200-3400 aggregate forecast assumes prior300-450-line parser estimate and separately charges48-line scaffold replacement plus narrowTask correction. Old750-1150/provisional1500-2200 obsolete; no proof trimmed or test permission granted. First --description command succeeded but verification failed because nd treats same-level nested headings as section boundaries and retained an old canonical suffix. Original failed readback preserved in /tmp/machinery-private-triage.JF2BDG/READONLY-HANDOFF.md. Installed --body-file has the same Description semantics. Root-authorized guarded pvg nd edit bound full live raw header/body to journal export and checked an external apply_patch trial, removed ONLY duplicate canonical block under nd exclusive lock, then verified exact full body90c15690a83bd2200723fdaa8bdd27e3871e189959b4936083afe06336d35590 and identical tail/metadata except normal hash/time. Exact expected/proposed manifests and editor remain external. First hgz1 preparation-only cross-realm assertion failed before any tracker write, then root explicitly authorized scalar-array comparison correction; historical failure is not proof. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
 EXPANDED RED FREEZE CHECKPOINT: exact authorized seven-path patch2f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249 committed acf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f over4ef6baf with literal [test-edit-authorized] and tdd-red. Full report /tmp/MAC-uzxr-final-red.nOXYuf/REVIEW.md SHA2565cb98377240aa8be22f0b9d88b74a7a6bd959fbfd8f1efb2907d08b02f68ad5c. Exact seven result hashes/frozen495prefix/99committedexamplefiles/218originaltuples/twoterminalbodies verified; Task unchanged. Measured2120add330del2450changed/net1790; historical503changed separate. Actual all10 contractroots and focusednative plus3meta families ran15.526s: contracts0PASS28FAIL0SKIP, focused10supplementPASS5transitionrootFAIL0SKIP, original/candidate/remainingmeta3/3/17outerFAIL. All current parser/control failures NONQUALIFYING ErrScaffold; all intended later mutants/most nestedcontractbranches unreached. Actual23children10supplementPASS25transitionrootFAIL0SKIP,0transitionrowleaves/0mutants; all23fixturecwdsremoved. Export52files=46receipts/rawlogs+6manifests47committedinputhasheseach;17latercontrols fail before manifest export, no nonexistent manifest credited. Raw and complete native identity receipts in report. Normal verify-tdd3commits0violations/no waiver; scoped static7files0issues; gofmt/diffcheckclean. Original genuine998a5a3 threeunsafeacceptedouterFAIL200childPASS, validatedstorage4ef6baf bothmodes, historical225baseline and separate actualTaskentrydefect preserved as distinct evidence. No parserimplementation, productionedit, source/testcorrection, delivery, approve-red, GREEN, consumerclaimrenewal, remote/toolchain/service changes or background process. STOP clean for independent combined-evidence RED adjudication.
+# MAC-uzxr GREEN delivery
+
+Candidate: `dc3a8a365c21d5370c0825de992e2461ea0785a9`, branch `story/MAC-uzxr`, worktree `/Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-uzxr`. Implementation was committed before the complete verification. Independent PM acceptance remains pending.
+
+## Implementation and boundary
+
+Only two implementation files changed from frozen RED `acf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f`: the private Go CRM test oracle helper and the exact Task rollback fallback. The helper uses only the standard library, reads both current files, rejects duplicate JSON keys including nested data/metadata, validates the closed Markdown/JSON dialect, and reconciles states and ordered transition alternatives. Stable IDs hash stimulus identity and deliberately exclude outcomes. Bound witnesses supply actual source/event/guard facts; missing/extra facts, wrong priority, duplicate names and unused rows fail. Effects represent one Fire: source exit, transition, target entry for external/self transitions; transition only for internal transitions. Registration and successful execution remain distinct test records.
+
+The Task fallback still records the routing error and routes to Cancelled, then invokes the existing recordTaskClosed method and reports [recordRoutingError, recordTaskClosed]. It clears the actual Rejection value. No other Task guard, action, event, routing or final-state definition changed. Both frozen future Task mutation anchors matched exactly once during real mutant creation.
+
+The source audit compared all99 committed example files to the delivered git object. The only two changed files versus frozen RED are the owned implementations. Ten committed design inputs, modules/config, BUILD/acceptance/attestations, generated files, unrelated production and all six frozen assertion files remain unchanged. There is no new Machinery API, runtime parser dependency, Paivot product dependency, new source/test path, installer or installed-asset mutation.
+
+Skills: developer, nd, pvg, vlt, vault-knowledge, codebase-memory, and the mandatory pm_acceptor review lens were read. PM role transitions were not performed. Vault context was read through pvg notes. Graph-first index was ready at generation2026-09-06T02:42:16Z; testoracle files were missing from the main index and Task receiver lookup collided with Deal, so exact branch source supplied evidence. No graph completeness claim is made.
+
+## PROOF: actual commands and outcomes
+
+All Go commands ran with GOWORK=off, GOPROXY=off, GOTOOLCHAIN=local from the worktree's `examples/go-crm/impl`; host `go1.27.1 darwin/arm64`. Exact argv, cwd, environment, source SHA, raw SHA, exit, duration and full terminal identities are in each `*-receipt.json`. `run.cjs` uses synchronous spawnSync with external130s unit/focused and310s meta bounds. Frozen subprocesses retain Go120s, context125s, WaitDelay5s, sequential270s outer contexts and300s Go meta deadlines. No timeout was expanded.
+
+1. `go test -count=1 -timeout=120s ./internal/testoracle -run '^TestFSM(Parse|Effects|Bind|JSON|Invoke|OneFire|Load|Parser|Nested)' -json`: exit0,68 terminal contract leaves PASS,0FAIL,0SKIP;0.500100333s. This executes all ten contract roots and their nested cases, not just current-file positive parsing.
+2. `go test -count=1 -timeout=120s ./internal/domain ./internal/session ./internal/cli -run '^(TestDealTransitions|TestTaskTransitions|TestUserTransitions|TestSessionTransitions|TestCommandExecutionTransitions|TestTaskTerminalRejectsEverything|TestTaskRollbackNonAlwaysPreservesContext|TestCommandExecutionTerminalExits)$' -json`: exit0,228 leaves PASS,0FAIL,0SKIP;0.725994208s. Exactly218 transition witnesses and10 terminal/non-always supplements.
+3. `go test -count=1 -timeout=300s ./internal/testoracle -run '^TestFSMNativeOracleSensitivity$' -json -args -fsm-native-proof-dir=/private/tmp/MAC-uzxr-green.Td49Am`: exit0,3 outerPASS,6 actual children;3.463955917s.
+4. `go test -count=1 -timeout=300s ./internal/testoracle -run '^TestFSMCandidateExecutedInventory$' -json -args -fsm-native-proof-dir=/private/tmp/MAC-uzxr-green.Td49Am`: exit0,3 outerPASS,3 actual full candidate children;2.186817375s.
+5. `go test -count=1 -timeout=300s ./internal/testoracle -run '^TestFSMRemainingNativeSensitivity$' -json -args -fsm-native-proof-dir=/private/tmp/MAC-uzxr-green.Td49Am`: exit0,17 outerPASS,34 actual children;18.504209750s.
+
+Five-group total25.381077583s. These observations used the existing build cache with uncached test execution (`-count=1`); no cold-build measurement is claimed. Earlier targeted iteration passed immediately, before commitment, with parser package0.387s and native domain/session/CLI0.298/0.774/0.541s. No implementation test-fix iteration, compiler failure, skip or timeout occurred.
+
+Default lifecycle validation reran each meta command above without `-args -fsm-native-proof-dir`: Native3PASS in3.697098208s, Candidate3PASS in2.186476125s, Remaining17PASS in18.577842917s; total24.461417250s. Their actual output identifies three default proof directories and43 child cwd references (23 distinct child directories); all were absent after completion. These default runs execute a further43 children; exported43 children remain the primary inspectable raw native evidence.
+
+The story-scoped focused suite and every frozen parser/meta test ran. Root/full-repository tests, unrelated Go CRM tests outside the specified selection, global preflight, services and consumer attestation migration were not run or claimed. Coverage reported here is100% of current197 parsed rows and100% of218 preserved transition witnesses, plus all10 supplements; no statement/branch coverage percentage is claimed.
+
+## Actual row, witness and native inventory
+
+Independent external `node /tmp/MAC-uzxr-green.Td49Am/audit.cjs` exited0. It rereads actual JSONL output and git/source bytes; it does not fabricate process events. It verifies source closure, raw receipts, once-run/once-terminal identities, exact registered and successful observed identities, expected next/actions directly from current Markdown and state semantics, complete row coverage both ways, original source mutation anchors and resulting hashes, and cleanup paths.
+
+| Machine | Current rows | Registered witnesses | Successful observed witnesses |
+|---|---:|---:|---:|
+| Deal |58|75|75|
+| Task |31|35|35|
+| User |20|20|20|
+| Session |60|60|60|
+| CommandExecution |28|28|28|
+| Total |197|218|218|
+
+There are47 states and118 ordered source/event groups. All observed witnesses have actual native terminal PASS and matching identity/next/actions. Supplements are separately10PASS; registration alone is not execution credit. All original218 inputs, tuple order, guard clauses and native identities are retained by the six frozen byte hashes. New coherent unmapped rows fail explicitly rather than silently disappearing; implementation has no197/218 ceiling.
+
+The exported meta families contain43 real children:28 exit0 and15 intentionally failing unsafe children. Their native leaf/root terminal inventory is1398PASS,15 intendedFAIL,0SKIP. The15 failures divide into six semantic single-leaf failures and nine structural pre-Fire root failures. Five inventory-corruption mutants retain native assertion PASS and are rejected by the same actual-output inventory verifier with their pinned diagnostic; their native success is not credited as accepted inventory. Every original3 plus later17 mutation case has a complete passing unchanged control, matching package/suite selection and exact intended diagnostic checked by the frozen test. No failed control, compile/setup failure, missing anchor, timeout or unexecuted future Task anchor is counted as negative sensitivity.
+
+All20 mutations were reconstructed from actual `mutations.json` old/new bytes, each anchor matched once, and43 control/candidate/mutant manifests each contain the same47 source-input paths. All unrelated input hashes match.149 explicit-export artifacts remain:43 raw child logs,43 execution receipts,43 manifests,20 exact mutation files. All43 receipt cwd references (23 distinct directories) were removed. Raw default outer logs remain intentionally as audit artifacts while automatic inner proof storage was removed.
+
+## Raw evidence and frozen custody
+
+Primary directory: `/tmp/MAC-uzxr-green.Td49Am` (macOS real path `/private/tmp/MAC-uzxr-green.Td49Am`). `native-audit.json` records all raw child terminal identities, diagnostics, registrations, observations and cleanup paths. `source-closure.json` records all99 committed source hashes. `hash-inventory.json` records proof file SHA256 values.
+
+| Artifact | SHA256 |
+|---|---|
+| contracts.jsonl |4086c1877d155420bd14c48a8fdb2afc437f75c489b536575bcf5c569b7d5e53|
+| focused.jsonl |fa1138488cdc028ba0187e09d6d6b034ad0d1c780ea4b272c76b5070f216bb3a|
+| TestFSMNativeOracleSensitivity.jsonl |d01b8090f29237025f13098b0ffdf7bb109e829548f5730f269d9e6897e65235|
+| TestFSMCandidateExecutedInventory.jsonl |eaf540e362a2830e55acff8a42785fb7a97f13d60545f9c00aaa3c5729d08042|
+| TestFSMRemainingNativeSensitivity.jsonl |2570e36dd2e94f29ffcec7b17152a984bb28630d0f83ac4594f5797d162ab010|
+| default.jsonl |08528ab3934f400f7f8b719fbcd969bf61d895acfaa0f0c2062c67e6ce51b7e8|
+| default-native.jsonl |f71744e22b64696dca237b9dc9eaf6041c87662dd07c8683321ca5b873bc6953|
+| default-remaining.jsonl |beea1dddadb0a5ddd548273b274e3a7b74022720012baf4452bf61529bd9f407|
+| native-audit.json |1d6902dc46bf95a7a128a9c33da1cc802c79c77b2530afcbd9ee546882dc4db8|
+| source-closure.json |fba784f86918e105208e76d95a42f2b39acac8be114dbef95925a3628f877455|
+
+Six unchanged frozen hashes, paths relative to `examples/go-crm/impl`:
+
+- internal/cli/command_test.go:38945b9307d97dadb872ac5a261ff86d712c218282774404b432842e34577d60
+- internal/domain/deal_test.go:2bfd0893253b9f3c4b6cf1badbf3402a952551f5b4f5124a3d0a9afb7bf432cd
+- internal/domain/task_test.go:35b8a05a710792ff21dd827432d658deba1ee190b8739196b084cdc61f7b2b88
+- internal/domain/user_test.go:d4fab40b760e5f1a94a5cab88bea6625495c04dd1690dc197818bfd1d056b53d
+- internal/session/machine_test.go:97e612a68e22b32010ec7c696cb1ee248115f5a41f3b80400a40160a8782a11f
+- internal/testoracle/fsm_test.go:4578841816e77712ed249a349e1f63c13c7eac233f15eccacb2d0ee916527b25
+
+The original495-line fsm_test prefix remains326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba. Implementation hashes: fsm.go8d2675a64b04050cb11583d240db0f6932d1d1a027900861bc4c6f8c4695189e; task.go3d8145088360489fde9a187be00bc89d350ceaca9619120e1721f1328e5cb252.
+
+Original independent RED remains distinct historical evidence: genuine3 unsafe-accepted outerFAIL/200 childPASS and separate missing Task entry effect. Expanded scaffold outcomes previously reached zero transition rows/mutants and remain NONQUALIFYING; they are not retroactively relabeled as additional RED. The canonical closed-contract hash b3f444c5398b558916dec80a4dacf8c651420b6aa36d876326d606312baf8cdd and independent review/final hashes072af4cda455158288e635968040fa0930e1f40a0fd0fead10314497341d670c/726513393cbb8d1ee2c8539e561cabf0a9ecd6659a3959786bd4e3d60aadc4f5 were checked.
+
+## Quality, cost and limits
+
+`pvg story verify-tdd --base 70652b948bf090008b1965c85daf36ea374daea4 --json`: four commits checked, zero violations, no waiver. Scoped `pvg verify` with all eight explicit story paths, `--include-tests --format text`: PASS8files/0issues. Initial implementation-only scan also PASS2files/0issues. `gofmt` applied only to two owned implementation files; `git diff --check` passes and worktree is clean.
+
+One process-documentation discrepancy occurred: the developer skill's `--format=text` syntax was rejected by installed pvg with exit1. Read-only `pvg verify --help` specifies `--format text`; that supported syntax passed. No mutating story subcommand help was called. No product failure, unresolved warning, external service, remote operation, install/update/devlink, root/epic branch operation or background process remains.
+
+Measured GREEN delta: fsm.go607 additions/12 deletions (619 changed LOC, final643 lines); Task2 additions/1 deletion (3 changed LOC). Total609 additions/13 deletions=622 changed LOC. Cumulative story cost is2953 historical/pre-GREEN+622=3575 changed LOC. Final aggregate against epic70652b948 is3212 additions/331 deletions=3543 changed LOC across exactly eight paths. The conditional3300–3500 cumulative/3200–3400 aggregate forecast was exceeded modestly: explicit closed schema/type/metadata/duplicate-key validation, Markdown table grammar, identity-before-reachability diagnostics and typed Go error handling expanded the parser beyond the300–450-line estimate. No extra file/API/framework or proof trimming was used to meet the estimate.
+
+## AC verification
+
+| AC | Evidence | Status |
+|---|---|---|
+|1|Current Parse/Load contracts, all218 actual witness bindings and nine real structural mutants;197 rows mapped bidirectionally|PASS|
+|2|Exact one-Fire effects, every nested effect variant, real Task entry/context clearing and missing/name-only mutations|PASS|
+|3|Original three real semantic variants plus later semantic cases reject with valid full controls and exact diagnostics|PASS|
+|4|Five-machine197-row/218-successful-witness inventory, independent raw audit, all10 supplements, zero skips|PASS|
+|5|Complete required focused and parser/meta proof at committed candidate, unchanged frozen/source closure, reviewable consumer handoff|PASS; independent PM acceptance pending|
+
+## LEARNINGS
+
+- Reconcile counterpart identity/order before rejecting coherent unreachable fallback alternatives; otherwise malformed-control precedence can conceal an identity mismatch.
+- Nested duplicate JSON keys require token-level parsing before maps collapse them; inert data still needs closed structural validation.
+- Action-name equality does not establish an entry action ran. The Task context mutation and real name-only forgery close that gap.
+- Successful native leaves, registrations and parsed row identities are separate inventories.43 complete children, exact mutation manifests and lifecycle audit make the claim independently inspectable.
+
+## nd_contract
+status: delivered
+
+### evidence
+- GREEN dc3a8a365c21d5370c0825de992e2461ea0785a9, only owned parser and Task fallback implementation changed; six frozen hashes above unchanged.
+- PROOF above supplies exact source/commands/logs/native inventory/mutation controls/custody/cleanup/timing/cost.68 parser+228 focused+23 meta outer leaves PASS; exported43 actual children validate20 unsafe variants and full candidate inventories.0 unintended failures/0SKIP.
+- Normal TDD4commits0violations; scoped8files0issues; clean committed worktree. Independent PM acceptance and later consumer migration remain separate.
+
+### proof
+- [x] AC #1:197 current rows bound to218 original actual input/guard witnesses; structural closure proved.
+- [x] AC #2:exact ordered effects and real Task entry/context execution; unsafe variants rejected.
+- [x] AC #3:all20 real unsafe variants with complete passing controls and exact intended diagnostics.
+- [x] AC #4:197-row/218-successful-native-witness bidirectional inventory plus10 supplements, zero skips.
+- [x] AC #5:required focused/parser/meta candidate proof complete with exact frozen source scope and reviewable logs; no automatic acceptance/attestation renewal.
 
 
 ## nd_contract
