@@ -2,6 +2,7 @@
 
 Status: approved architecture contract, version 1. Approval establishes the required behavior, not implementation completion or native execution evidence.
 Scope: executable hard-TDD assurance for Machinery and its consumers, plus native custody for the contributor integration lane. The implementation must prove every applicable obligation below.
+The [native custody architecture contract](native-custody-contract.md) refines only this contract's native-custody portion; it neither replaces the remainder nor establishes implementation or execution evidence.
 
 ## 1. Decisions and guarantee boundary
 
