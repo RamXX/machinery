@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:07:58Z
-content_hash: "sha256:a00995d282250e2fb1f1500cc93515e88bf9136c69849cfef7963155e25c0300"
+updated_at: 2026-09-06T02:09:38Z
+content_hash: "sha256:fdae2984fbd0e4ace90720e6f6830c3187c3c5390d36be6d9700cdf12edac2ed"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce]
@@ -382,4 +382,100 @@ status: new
 - [ ] AC #3: executable quoted-literal and indentation-sensitive semantic counterexamples plus real CLI negatives.
 - [ ] AC #4: genuine whitespace utility controls and prior custody/exit behavior preserved.
 - [ ] AC #5: actual built CLI, all-nine-surface tests and six post-refresh Gv checks, service-free and standalone.
+
+
+### 2026-09-06T02:09:38Z ramirosalas
+## Implementation Evidence — MAC-lnu6 RED ONLY
+
+PROOF:
+
+### CI/Test Results
+Commands run:
+- cd /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-lnu6 && timeout 150s go test -count=1 -timeout=120s ./cmd/machinery -run 'TokensEqual|Frozen' -json
+- timeout 30s pvg verify cmd/machinery/tokensequal_semantics_test.go --include-tests --format text
+- git diff --check HEAD^ HEAD
+- git status --short
+Summary: 26 executed leaves: 12 PASS, 14 intended RED FAIL, 0 SKIP; native terminal test events including enclosing parents: 13 PASS, 19 FAIL, 0 SKIP. Package terminal exit1 elapsed1.887s. Actual local CLI builds successfully via unchanged goldenBin; genuine utility and existing mutation/custody controls PASS. All failures are intended public assurance/policy assertions, not infrastructure or compile errors.
+Coverage: five of five canonical AC mapped (100% AC mapping); Go statement coverage not measured. Full suite, TestGoldenCheck and six Gv checks not run in RED; required GREEN stale-before/refreshed-after evidence and compatibility remain pending.
+
+### Commit
+- Branch: story/MAC-lnu6
+- SHA: 0ea1fdc730aadac15cecc8de33bb95898ad91d60
+- Baseline source SHA: 6cb2d974ea8aea211a5974f453cef2b5802bb11e
+- Exactly one added file cmd/machinery/tokensequal_semantics_test.go; +229/-0. No production, prior test/helper, documentation, fixture, golden or attestation changes.
+- New test SHA256: 1138fc41a835abf3769210bdbc2dbdb1d9d2ad6db9752b14c90bf41b9945c51f
+- Raw log: /tmp/MAC-lnu6-red-0ea1fdc.jsonl; SHA256 51195a39cdff28688605ff9e6d7e899a919db71e6f1d6dc6763d49a356fc2d82
+- Log start2026-09-05T19:05:58.112992-07:00; terminal19:05:59.999786-07:00.
+
+### Exact native leaf inventory
+PASS:
+- TestTokensEqual
+- TestTokensEqualRejectsMutationDuringComparison
+- TestTokensEqualSemanticCounterexamples/quoted_literal_spacing/executable_semantic_control
+- TestTokensEqualSemanticCounterexamples/quoted_literal_spacing/whitespace_token_utility
+- TestTokensEqualSemanticCounterexamples/indentation_changes_permission_owner/executable_semantic_control
+- TestTokensEqualSemanticCounterexamples/indentation_changes_permission_owner/whitespace_token_utility
+- TestTokensEqualRealCLIUtilityControls/whitespace_reflow
+- TestTokensEqualRealCLIUtilityControls/empty_whitespace
+- TestTokensEqualRealCLIUtilityControls/token_value_changed
+- TestTokensEqualRealCLIUtilityControls/token_added
+- TestTokensEqualRealCLIUtilityControls/token_removed
+- TestTokensEqualRealCLIUtilityControls/missing_input
+
+Expected RED FAIL:
+- TestTokensEqualSemanticCounterexamples/quoted_literal_spacing/no_semantic_or_frozen_edit_assurance
+- TestTokensEqualSemanticCounterexamples/indentation_changes_permission_owner/no_semantic_or_frozen_edit_assurance
+- TestTokensEqualWhitespaceSuccessDoesNotAuthorizeFrozenEdits
+  Cause for these three: actual equality stdout claims "; the change is formatting-only".
+- TestTokensEqualHelpDescribesOnlyWhitespaceTokens/tokens-equal_--help
+- TestTokensEqualHelpDescribesOnlyWhitespaceTokens/--help
+  Cause: actual help and command listing claim "prove two files are formatting-only".
+- TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay/skills/machinery/references/build-md-template.md
+- TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay/agents/machinery-build-writer.md
+- TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay/docs/brownfield-team-guide.md
+- TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay/examples/checkout-split/orders/design/BUILD.md
+- TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay/examples/checkout-split/payments/design/BUILD.md
+- TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay/examples/fulfillment/design/BUILD.md
+- TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay/examples/go-crm/design/BUILD.md
+- TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay/examples/portfolio-engine/design/BUILD.md
+- TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay/examples/surreal-crm/design/BUILD.md
+  Cause on each of these nine: actual active owner-sanctioned formatting-only/token-identity amendment authorization. Each fails on that real authorization before replacement wording assertions; all files exist/read. GREEN must affirm exact bytes/inventory identity, explicit new evidence revision/replay, and no formatting/token exemption.
+
+### AC Verification
+| AC # | Test location and outcome |
+| 1 | TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay: all nine actual unsafe authorizations RED; affirmative exact identity/revision/replay/no-exemption requirements committed. |
+| 2 | TestTokensEqualHelpDescribesOnlyWhitespaceTokens, semantic assurance leaves, whitespace success assurance, all nine policy cases expose actual false help/output/docs. |
+| 3 | Go types.Eval executes len("pay  now")=8 versus len("pay now")=7. Pinned yaml.v3 successfully decodes valid indentation variants with nested user deletion true versus false and opposite root permission. Both pairs have equal whitespace tokens and actual CLI equality exit0. Semantic and utility controls PASS; assurance leaves RED. |
+| 4 | Six real CLI controls pin reflow/empty equality exit0 and exact token-identical count prefix, different token/add/remove exit1 with NOT token-identical, real missing input exit1/named diagnostic. Existing utility and mutation tests PASS untouched. Separate assurance test RED. |
+| 5 | Actual locally built CLI and all nine real shipped paths exercised using unchanged harness/private configuration; no mocks/skips/future API/installed binary/Paivot product dependency. |
+
+### pvg verify
+- Skill-prescribed --format=text was rejected as unknown flag. Read pvg verify --help; corrected --format text and explicit --include-tests.
+- VERIFY: PASSED (1 files scanned, 0 issues).
+- git diff --check clean, worktree clean.
+- First verify-delivery failed metadata shape: earlier Comments contracts followed append-notes and remained authoritative. This terminal full-proof comment preserves history and corrects the final contract; delivered label already set by successful canonical pvg story deliver MAC-lnu6.
+- Bounded tracked-source scan reviewed all hits from git grep -n -E 'tokens-equal|token-identity proof|formatting-only amendment'. Nine guidance authorizations and production header await GREEN; remaining README command inventory and existing diagnostic test references are not authorizations. No semantic-exhaustiveness claim.
+- Graph Verify discovery: project Users-ramirosalas-workspace-machinery generation2026-09-05T23:58:53Z; five exact symbol results, no more pages. Coverage of13 paths plus worktree identified excluded worktree/new missing test. Exact source fallback used; graph completeness not claimed.
+
+LEARNINGS:
+- Go constant evaluation and valid YAML ownership changes prove semantic differences using existing dependencies.
+- Independent utility and assurance leaves retain useful comparison behavior while exposing misleading claims.
+- Nine actual guidance cases report affirmative exemptions first, keeping baseline failures causal.
+- pvg verify requires --format text and --include-tests; old terminal Comments can outrank append-notes contracts.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED-only SHA 0ea1fdc730aadac15cecc8de33bb95898ad91d60; baseline6cb2d974ea8aea211a5974f453cef2b5802bb11e; only new test+229/-0.
+- Focused suite26 leaves12PASS/14 intendedFAIL/0SKIP; package1.887s; raw log and hashes above; pvg verify1file0issues; no code/guidance/evidence edits beyond new tests.
+- Independent RED review/freeze and GREEN remain pending. Canonical historical-evidence hold unchanged; PM must authorize exact guidance/evidence deltas before later evidence writes.
+
+### proof
+- [x] AC #1 RED: nine real policy failures; exact bytes/inventory and explicit evidence revision/replay requirements committed.
+- [x] AC #2 RED: actual help/output/docs assurance failures.
+- [x] AC #3 RED: executable quoted-spacing and indentation semantic differences; passing equality utility and failing assurance.
+- [x] AC #4 RED: real comparison/exit/read-error controls plus old mutation/utility tests pass; assurance remains RED.
+- [x] AC #5 RED: actual local standalone CLI, all nine real guidance paths, no skips.
+- [ ] GREEN production/guidance fix, independent acceptance, authorized evidence amendments and six Gv/compatibility proofs not yet performed.
 
