@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T08:49:12Z
-content_hash: "sha256:544da96441e9a7950d37e5c7fb7441ade45aefac2e007ddb2d5d428ee6b14282"
+updated_at: 2026-09-06T08:55:41Z
+content_hash: "sha256:b014ed75ef043b00da86f220c919d429b48024f15b441749c887ae0102b60251"
 blocks: [MAC-vx24, MAC-ou97]
 ---
 
@@ -163,3 +163,43 @@ status: new
 - [x] Private/public provenance boundary explicitly repaired.
 - [ ] Canonical public projection landed and independently verified.
 
+
+### 2026-09-06T08:55:41Z ramirosalas
+CURRENT COMPLETE ONE-DOCUMENT ACCEPTANCE MAP 2026-09-06
+
+This is the complete current scope/AC/proof map for MAC-l7m0, superseding every earlier landing requirement for a status index, public review file, literal private report publication, or architecture implementation. Historical contracts remain provenance only.
+
+USER INTENT: Publish the approved standalone executable assurance contract faithfully, so implementation and independent acceptance share one permanent, reviewable source.
+
+PRODUCES:
+- docs/test-assurance-contract.md -> exact 575-line public projection specified by the preceding PUBLIC CONTRACT PROJECTION CORRECTION; SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8.
+CONSUMES:
+- Approved immutable source and independent challenge recorded in the preceding notes.
+  source: 589-line source SHA256 e467a3b6c6f657e7a4cb28e85c688be0df24c56a7e3c76fdcfa224f7ff5d2624; challenge SHA256 0205b50a8eb2e135230173bbf4a7b7eccdde5934fabab5aa4b2dde95d474ac66.
+
+CURRENT ACCEPTANCE CRITERIA
+A1. Developer adds exactly the one public document above using the recorded deterministic line/word projection, verifies 575 lines and exact SHA256, and shows the diff against the approved source with every transformation accounted for. No second public status/review artifact is required or authorized.
+A2. All normative schemas, exact interfaces/argv/runtime catalog, source/control/store identities, registration/CAS/history, native assertion/custody, frozen topology/modes, replay/state, scoped Git/Ga, finalization/no-launch order, aggregate deadlines/limits, compatibility and unsupported behavior remain unchanged. No architecture extension or silent weakening is allowed.
+A3. Public content is standalone: private tracker IDs, private filesystem/workspace provenance, review chronology, user/NIL/Dagger-specific coordination are not product prerequisites or disclosures. No Paivot product/runtime/build/test dependency. Independence disclaimers are allowed.
+A4. Documentation distinguishes architecture approval from implemented behavior and actual native evidence; first-release four-language scope, two-platform proof, true first-use without PASS receipt, actual process-producer audit and cumulative deadlines remain implementation acceptance obligations, not claimed results.
+A5. Targeted document validation establishes exact-byte projection and normative preservation, with negative checks for omitted/renamed schema keys or interfaces, softened requirements, altered budgets, private-reference reintroduction, and false implementation-complete language. No heavy preflight, runtime provisioning, source/test edits outside this one document, installed replacement, remote mutation, or merge authority.
+A6. Developer delivers the document with hash/diff and AC evidence; an independent PM compares every projected normative section to the approved immutable source and accepts or rejects. Sr PM authoring and architecture approval are not implementation acceptance. Root dispatch hold remains until independent backlog review.
+
+DIFF BUDGET: 1 file, 575 added lines; investigate any overrun.
+MANDATORY SKILLS: developer for delivery, pm_acceptor for independent acceptance; no additional domain skill identified.
+OUT OF SCOPE: all runtime/code/tests implementation belongs to bounded downstream assurance stories; private source/challenge provenance stays in nd notes.
+
+## nd_contract
+status: new
+
+### evidence
+- Current one-document scope reconciled with approved architecture and root public-boundary correction.
+- No source files changed and no implementation or native proof claimed.
+
+### proof
+- [ ] A1: Exact public projection bytes/hash and accounted diff.
+- [ ] A2: Every normative requirement preserved.
+- [ ] A3: Public standalone boundary verified.
+- [ ] A4: Approval/implementation/evidence truthfulness verified.
+- [ ] A5: Targeted positive and negative document validation.
+- [ ] A6: Developer delivery followed by independent PM acceptance.
