@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T08:09:22Z
-content_hash: "sha256:09c78ae7453df061accb578e6c643647cc79bc50e5bbeb8ad368f667af9a30f2"
+content_hash: "sha256:0f70a6166482d4d732a971fd409ed36be10912e739288f1afdd9e9e7f5364d1a"
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx, MAC-p7jd]
 assignee: dev-MAC-uzxr
 closed_at: 2026-09-06T08:07:54Z
 close_reason: "Accepted: five AC verified independently at bb5205c; 24 regression, 68 parser, 228 native and 23 meta leaves PASS, exact 43-child custody audited; canonical command and stale self-index corrections recorded."
+led_to: [MAC-yig6]
 ---
 
 ## Description
@@ -1291,6 +1292,7 @@ status: new
 ## Links
 - Parent: [[MAC-ui8a]]
 - Follows: [[MAC-2u36]], [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]], [[MAC-p7jd]]
+- Led to: [[MAC-yig6]]
 
 ## Comments
 

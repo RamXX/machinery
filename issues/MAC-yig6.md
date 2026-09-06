@@ -1,18 +1,18 @@
 ---
 id: MAC-yig6
 title: "Keep checker test fixtures protocol-correct under Go coverage"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:57:10Z
-content_hash: "sha256:fa2fa5f2b4a5e90c66b7de5b5a982032523661b4ba6b0cfeef6f73e871e0bfdf"
+updated_at: 2026-09-06T10:06:07Z
+content_hash: "sha256:7d244be43e30842f98890ca90a2b23d82d8e7b6970dbfb419f56379c4c59891f"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
-follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
+follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-uzxr]
 ---
 
 ## Description
@@ -335,11 +335,14 @@ status: new
 - 2026-09-06T07:16:02Z auto-follows: linked to predecessor MAC-p8ce
 - 2026-09-06T07:16:02Z claimed by dev-MAC-yig6
 - 2026-09-06T09:47:27Z status: in_progress -> open
+- 2026-09-06T10:06:07Z status: open -> in_progress
+- 2026-09-06T10:06:07Z auto-follows: linked to predecessor MAC-uzxr
+- 2026-09-06T10:06:07Z claimed by dev-MAC-yig6
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-ou97]]
-- Follows: [[MAC-2u36]], [[MAC-a89e]], [[MAC-p8ce]]
+- Follows: [[MAC-2u36]], [[MAC-a89e]], [[MAC-p8ce]], [[MAC-uzxr]]
 
 ## Comments
 
