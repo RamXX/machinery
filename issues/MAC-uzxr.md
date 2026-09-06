@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T08:07:54Z
-content_hash: "sha256:4b6deaadfaa7c17314d06c97dfa407906ac3241fb9525981ff4183eaed3e73d9"
+updated_at: 2026-09-06T08:07:55Z
+content_hash: "sha256:63a2ef62d6bed555871266f74288f6440f86fc0daec057e67180b8977e94b656"
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx, MAC-p7jd]
 assignee: dev-MAC-uzxr
 closed_at: 2026-09-06T08:07:54Z
@@ -1660,3 +1660,21 @@ status: delivered
 - [x] AC #3: 20 variant outcomes and matched controls are retained and classified.
 - [x] AC #4: exported actual inventory covers 197 rows, 218 witnesses, 10 supplements and 48 dynamic inputs.
 - [x] AC #5: complete raw evidence, source/freeze custody, cleanup audit, and delivery shape are present; PM acceptance pending.
+
+### 2026-09-06T08:07:54Z ramirosalas
+## nd_contract
+status: accepted
+
+### evidence
+- TERMINAL INDEPENDENT GREEN ACCEPTANCE at exact bb5205c32e7b17ebefc5b050b7bf7417b0720e72, story/MAC-uzxr; normal pvg story accept succeeded and readback closed/accepted. Full PM report /tmp/MAC-uzxr-PM-final.as5QJ7/REVIEW.md SHA2560366ce468a7f9a687da3748207fb9033070dcb83a76f5f70ee7cf8b0d25b2cd5 appended intact. Root owns merge.
+- Explicit correction of prior author command/count claims: five-transition-only selector does not prove228 including10supplements; parser prefix selector with trailing$ does not execute68 suffixed contracts. These printed commands receive no such count credit. Actual independent same-candidate selectors and all terminal names are in /tmp/MAC-uzxr-PM-final.as5QJ7/run.cjs SHA2564a3be34ee04aba38b03a7a0345a10264a3e35254e6e1245bbcfd8232f4b9172f and regression/contracts/focused/meta receipts:24/68/228/23PASS0FAIL0SKIP. Correct selectors and raw digests are reproduced in the PM report. No historical log was relabeled.
+- Explicit index correction: original final proof rawhash-index.txt outer digest9ae3910d46b90e830eeda293a97751847c830379c937a5593040ef1fad7d1d2c matches actual, but its own listed self-hash0dbcbfabc9c82e44782c05ce877d6a8190f148ba6fa583ea840f71b2231869b8 is invalid for current bytes. Do not treat original index as all-valid. All155nonself entries independently match. Current custody authority is corrected independent /tmp/MAC-uzxr-PM-final.as5QJ7/corrected-rawhash-index.txt SHA256475ac2855c76fce192b783475f4edde5cdf2443877e08806a2f45f950deb1610, omitting self-entry, plus audit.json SHA25688572d7d85a3e74788c913fbae9c32135dfdce39b2ac14499680045bc6eabebe; audit.cjs1775101bf852b4765c20e6a3176415b870c8ca8a66007b5f22b5314d5c84f56a. Original evidence remains unchanged.
+- All100candidate Git sourcefiles/sevenfrozen tests/original495prefix/Task source verified;48dynamicinputs in43complete manifests. Export149artifacts=43logs+43receipts+43manifests+20mutations; all20matchedcontrols and exact native outcomes audited:1398PASS,6semantic leafFAIL,9structural pre-Fire rootFAIL,0SKIP;28exit0/15exit1. Five inventory mutants native assertionsPASS while actual malformed output is rejected. Both PM and author actual inventories197rows47states118orderedgroups218registered/successfulwitnesses plus10supplements, with actual parsed next/actions and complete full native identities.
+- Author and PM default replays each expose3ownedproofroots/23uniquecwd/69observedpaths all currently absent;149callerownedexportartifacts remain. Original genuine semanticRED/separateTaskdefect/laterNONQUALIFYINGErrScaffold and supplemental ten genuine unsafe-key RED failures remain distinct. TDD6commits0violations; scopedstatic9files0issues;diffclean;initialdelivery9OK0FAIL. No source/test/consumer/attestation/runtime service or dependency changes by PM; no authenticatedexecution/fullrepositoryclaim.
+
+### proof
+- [x] AC #1: complete committed parser/current input binding and exact structural membership verified.
+- [x] AC #2: exact entry/exit-aware ordered effects and real Task entry-context mutation verified.
+- [x] AC #3: all20 isolated variants with matched passing controls and correct sensitivity classes verified.
+- [x] AC #4: complete bidirectional actual row/registration/observation/native inventories with zero skips verified.
+- [x] AC #5: same-candidate frozen GREEN proof, corrected evidence authority, exact source custody and independent accepted handoff verified; consumer claim renewal remains separate.
