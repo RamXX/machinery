@@ -8,8 +8,8 @@ labels: [docs]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:12:01Z
-content_hash: "sha256:3680bda1d330ac984e2b795b554b761e6fcff5d6ac0d90d05e603f00388a237a"
+updated_at: 2026-09-06T12:21:36Z
+content_hash: "sha256:05fde11f0122a04da599da6c1ddb7b2b323f0a06dbcc5e72fe01f96a5d498835"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 assignee: dev-MAC-p9wm
@@ -430,3 +430,80 @@ status: new
 - [x] Self-contained projection now includes actual command context/authenticated scope/captured runtime across both checker run and replay, post-sanitation attachment, and cleanup-before-success.
 - [ ] AC #1–#8 remain pending developer delivery and independent PM acceptance, including the expanded coverage/negative-mutant review under existing AC2–AC4 and AC6–AC7.
 
+
+### 2026-09-06T12:21:36Z ramirosalas
+## Implementation Evidence (DELIVERED FOR INDEPENDENT REVIEW)
+
+PROOF:
+
+### Candidate and exact scope
+- Base: `a94e768adf461178e0562ad135c7c06d8163a3a4`
+- Candidate/producing commit: `2a63e4bb0d7b57c42dfd6f45fecfdc4f8a18cfbf` on `story/MAC-p9wm`
+- Exact changed paths: added `docs/native-custody-contract.md`; modified `docs/test-assurance-contract.md`; no others.
+- Diff: 329 insertions, 0 deletions; 27,995 net added bytes; below 600-line/60,000-byte investigation thresholds.
+- New supplement: 328 lines / 27,783 bytes / mode 0644 / SHA-256 `bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a` / Git blob `1c1581d1aec324d979593613b44976ed0007c45b`.
+- Companion candidate: 576 lines / 109,579 bytes / mode 0644 / SHA-256 `171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d` / Git blob `acce64fee8db5a7565e8fa33422334de125e913f`.
+- Companion base: mode 0644 / Git blob `50bd00288484b46ba69d40ff0a3cdd9ff7e1ed02`.
+
+### Minimal companion hunk
+One line was inserted at `docs/test-assurance-contract.md:5`:
+`The [native custody architecture contract](native-custody-contract.md) refines only this contract's native-custody portion; it neither replaces the remainder nor establishes implementation or execution evidence.`
+
+Removing only that line reconstructs the exact accepted source: 575 lines / 109,367 bytes / SHA-256 `22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8`; process-substitution `cmp` against the base Git object passed.
+
+### Coverage matrix
+| Projection/clarification | Public heading | Status |
+|---|---|---|
+| 1 status, guarantee, trust residuals, standalone and honest unproved state | opening, §§1 and 8 | PASS |
+| 2 exact constructors/Scope/records/Limits/Diagnostic/defaults/caps/positive-zero semantics/opacity | §2 | PASS |
+| 3 root/descendant relationships, bounded authentication, acquisition/handoff, Join/Serve/Close, Attach | §3 | PASS |
+| 4 cumulative wall/owner/deadline and one shared cleanup-only grace | §4 | PASS |
+| 5 runtime API, 0400 descriptor, closed JSON/canonicalization, live identity, private Docker client | §5 | PASS |
+| EOF endpoint: exact `--docker-endpoint`, once-only owned local resolution, same freeze/transport, remote/no-pull rules | §5 “Once-only endpoint preparation and transport” | PASS |
+| 6 contributor types, five programs, pinned profile/resources, observations, create/register/start, unresolved cleanup | §6 | PASS |
+| 7 checker type, run/verify registry, exact sandbox/input/evidence/replay profile | §7 | PASS |
+| EOF execution: real command context/scope/runtime for run+replay, sanitation-before-Attach, no fallback, cleanup-before-success | §7 “Real command context, scope, runtime, run, and replay” | PASS |
+| 8 live-first proof, calibration and four roles, migration, two native matrices/unproved state | §8 | PASS |
+| refinement-only discoverability and byte preservation | companion line 5 | PASS |
+
+### Developer semantic negative-mutant review
+The complete developer review rejects all 19 required mutants for contract-specific reasons: probe cancellation cannot revoke handed-off work; missing broker cannot promote root; handle Close is process-free; Attach mutation rejects before start; descriptor text is not authority; unresolved create/removal cannot succeed; observations are read-only; safe reference is not production GREEN; image architecture is not native host proof; private workflow is not a dependency; lane/checker endpoints cannot differ; ambient context cannot be reread; remote endpoints fail; replay cannot pull; `context.Background` cannot replace command context; replay cannot be unscoped; sanitation precedes Attach; required execution cannot use the service-free wrapper; and cleanup/absence precedes output/publication/release. Full per-mutant reasoning and heading pointers are frozen in the external report below. This is self-review only; independent PM verdict remains pending.
+
+### Bounded validation
+- `git diff --check <base> <candidate> -- docs/native-custody-contract.md docs/test-assurance-contract.md`: PASS.
+- `git diff --name-status`, `--numstat`, `--shortstat`: exactly A/M owned paths, 328+1 insertions, 0 deletions.
+- `wc`, `stat`, `shasum -a 256`, `git hash-object`, `git ls-tree`: exact identities above; both modes 0644.
+- Exact accepted-byte reconstruction with `cmp`: PASS.
+- Relative target `docs/native-custody-contract.md`: PASS.
+- Contamination scan limited to the complete new doc and added companion line: 0 private IDs/tool names/contract markers/user paths/names/Dagger or actor/agent handles/story/epic refs.
+- Conflict markers: 0. Heading inventory: 8 numbered sections plus both EOF clarification subsections. Fences: 14/even. Candidate-object comparisons: PASS. Worktree clean.
+- Markdown linter/render executable unavailable; direct heading/fence/link checks used. Independent PM must inspect complete prose/rendering.
+- `pvg verify docs/native-custody-contract.md docs/test-assurance-contract.md --format text`: `VERIFY: PASSED (0 files scanned, 0 issues)`; this excludes docs and is a recorded limitation, not correctness proof. The skill's `--format=text` spelling first failed as unknown and was corrected from installed help.
+- Product unit/integration/E2E/native/runtime/container tests: 0 run / 0 applicable. Documentation coverage: N/A. No preflight, infrastructure, provisioning, process, container, or native matrix executed.
+- Preserved diagnostics: an initial nonexistent epic ref check failed and was corrected by resolving the base-containing branch (`epic/MAC-ui8a`) and reading the base log; an initial fixed fence-count assertion incorrectly expected 10 and was corrected to an even-pair check after inventory showed 14. Neither exposed a document defect.
+
+### External immutable report
+- `/tmp/MAC-p9wm-delivery.sC5L4f/REPORT.md`
+- 103 lines / 12,852 bytes / mode 0444
+- SHA-256 `01ee0a554b8d405cc519911272821318b46e1030212547fac1d6af5d4bab10f9`
+- Contains the complete coverage matrix, 19-row semantic negative-mutant matrix, raw bounded results, exact object identities, minimal hunk, preserved failures, and limitations.
+
+### AC verification
+| AC | Developer delivery status |
+|---|---|
+| 1 | PASS — approved required-behavior status/trust/standalone/unproved language published. |
+| 2 | PASS — exact API, record, acquisition, ownership, attachment, and budget contract published. |
+| 3 | PASS — exact runtime, contributor/checker, profile, ordering, and conservative cleanup contract published. |
+| 4 | PASS — live-first method, distinct roles, migration, matrices, and honest proof limits published. |
+| 5 | PASS — one companion line only; accepted bytes otherwise exactly reconstructed. |
+| 6 | DELIVERED FOR INDEPENDENT REVIEW — full mapping and 19-mutant developer self-review supplied; independent verdict not claimed. |
+| 7 | PASS for developer checks; independent whole-prose/render review remains pending. |
+| 8 | PASS for exact developer delivery evidence and true-EOF contract; PM acceptance remains pending. |
+
+LEARNINGS:
+- A one-line insertion plus byte-level reconstruction preserves an accepted long-form contract more reliably than editing its native-custody section in place.
+- Documentation verifiers may intentionally scan zero files; exact byte/object/link checks and semantic review must carry the evidence without inflating them into native proof.
+
+LIMITATIONS:
+- Independent whole-prose and negative-mutant PM review is pending; no PM approval is represented.
+- No implementation, RED/GREEN, runtime, cleanup, native-host, release, or universal-correctness proof was produced by this docs-only delivery.
