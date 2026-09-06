@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T08:58:17Z
-content_hash: "sha256:48988c3be040f1d1cf1c1678398d6604d6364f18cf764da3247f9c02e4a9c3d4"
+updated_at: 2026-09-06T09:16:29Z
+content_hash: "sha256:f50313562910475bb9c4e33ec34284f84f1a2f11906a575e2998d2dcbb9eabeb"
 blocked_by: [MAC-l7m0]
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 ---
@@ -99,3 +99,38 @@ status: new
 - Blocked by: [[MAC-l7m0]]
 
 ## Comments
+
+### 2026-09-06T09:16:29Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- internal/processscope/scope.go -> internal/processscope -> Open(context.Context, Options) (Scope, error); Join(context.Context, Capability) (Scope, error); ServeInternal(args []string, io InternalIO) (handled bool, exitCode int). Scope methods Run(context.Context, Command, Streams) (Result, error), Child(context.Context) (Scope, error), Attach(Command) (Command, error), Close(context.Context) (CleanupReport, error). Exact Command/Streams/Result/Options/ResourceState fields and capability semantics are the approved section 8 contract.
+- internal/processscope/broker.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/processscope/guardian_unix.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/processscope/internal.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/processscope/scope_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/processscope/custody_integration_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-l7m0: docs/test-assurance-contract.md
+  MAC-6h0s: Section 8 complete native scope/broker/guardian contract; section 3 cumulative cleanup budgets.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: A caller receives cleaned ownership evidence only after its actual native children are terminated and reaped; unsafe or unowned cleanup attempts return a blocking error.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
