@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
-updated_at: 2026-09-06T16:51:07Z
-content_hash: "sha256:810a173fd4085f8b839ed011a77b89578525c37a98a00506a33f475fb9cd6db3"
+updated_at: 2026-09-06T19:21:06Z
+content_hash: "sha256:d92a67361417658f833fc127d320066848dfb49554125bdb7f6c7c3a70fa0578"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
@@ -605,3 +605,6 @@ FINITE VALUES/TIMESTAMP/BACKUP CHECKPOINT: GAPS_FOUND, NOT STORY REJECTION OR AC
 
 ### 2026-09-06T16:51:07Z ramirosalas
 2026-09-06 16:50 UTC — bounded external values/timestamp/backup V2 review APPROVED. Independent report /tmp/MAC-lhu5-values-backup-rereview-v2.qP3hwy/REVIEW.md SHA256 0e6b9519bb45663757c2d8264d7a99df692bc6cffe9b94ea2bf59af9b014e835. Root read full review/probes, verified 25 final manifest entries, and independently counted full148 passes132leaves16parents and additional reviewer focus9passes7leaves2parents; every selector exit0/pkgpass/no fail/skip/empty stderr. All three earlier blockers and two advisories closed within finite method; previous failures preserved. Archive .git/machinery-evidence-20260906.TEFZ7D/portfolio-values-backup-accepted-review-v2.tar.gz SHA256 08a123a661ca07660199a51ce22519e6a1eef190186ce1c30678f1c1460e3a33. This is NOT source/RED/native/full-packet/story acceptance. Whole-integration inventory/cost and real TDD still pending; no authoring authority or status transition inferred.
+
+### 2026-09-06T19:21:06Z ramirosalas
+DELIVERED+VERIFIED 2026-09-06 — 5 commits abdc4b3..41794f5 on story/MAC-lhu5 (base b4884d8). RED: 1 intended semantic failure (M3 two-completions). GREEN: 56/56 identities ok 0.352s (coordinator re-ran). Exactly 21 authorized paths; 0 protected paths; lnu6 reserved block byte-exact (relocated 396->413, unique). Isolated source-built checks: gv 49 expected stale-attestation findings attributed to MAC-hgz1 + pre-existing GV_MISSING_IMPLEMENTATION_SUBJECT; oracle diff no churn; modelith.md regenerated from yaml via pinned upstream renderer. 5346+/79-. hgz1 hash ledger archived: .git/machinery-evidence-20260906.TEFZ7D/lhu5-handoff-hgz1.md. Coordinator merged to epic (no-ff) + targeted checks pass (PortfolioPacket ok, TestVerifyCheckersReproducible ok on integrated epic).
