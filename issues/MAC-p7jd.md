@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T04:38:18Z
-content_hash: "sha256:c14274237985d10d6ea352471ef907f32f5fc04863138a9ff42fde0fc6eca0aa"
+updated_at: 2026-09-06T04:38:19Z
+content_hash: "sha256:f74af7ec521160fbc0c4293926bb1604a0579e74f055040e6f3777f5bb02c9b2"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -1953,3 +1953,22 @@ status: in_progress
 - [ ] AC #3: reached migration cases require final replay/review
 - [ ] AC #4: disputed empty fixture and mandatory supplements pending
 - [ ] AC #5: complete-mode and same-revision renderer/CLI/source-closure conjunction pending
+
+### 2026-09-06T04:38:19Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent PM GREEN-phase RED-DISPUTE adjudication recorded in Notes against clean 390d4dc and frozen47ba449: exact guarded commit-line preservation repair in C-complete-sole-current-warning, and exact Empty cfg.Gates="g4,gt" setup repair. Separate [test-edit-authorized] commit required; no wider frozen edit or new seam permitted.
+- Original Ga date and progressive Gl failures remain fixture setup history; complete missing-current challenge and empty cleanup behavior remain unreached until repaired replay. All semantic/path/cause/output/ledger assertions preserved.
+- Existing hard-tdd/red-approved labels, in_progress status and dev-MAC-p7jd claim retained; no new RED approval, delivery, rejection or GREEN acceptance performed. Exact amended hashes/diff, TDD audit and same-revision four-selector replay remain mandatory.
+- Separate gates diagnostic fixes require replay; missing BUILD.md production diagnostic fix remains owed. Mandatory new designlock/renderer supplements and docs are not yet supplied.
+- Five AC, R2 8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179, AC5 composition5fc3193106a803b7760020b646ed4db7b3d417f5e196b2266d10cf8227733937, prior seam restrictions/ownership and current cost forecast unchanged.
+
+### proof
+- [ ] AC #1: final held-root/copy/inventory/bounds and same-revision verification pending
+- [ ] AC #2: repaired complete-mode control, correct kinds and final docs pending
+- [ ] AC #3: reached migration observations require final same-revision replay/review
+- [ ] AC #4: repaired empty fixture must reach real cleanup; mandatory supplemental proof and all preserved assertions remain required
+- [ ] AC #5: complete-mode sole-current-warning and same-delivered-revision OBSERVED renderer faults/nil bytes plus OBSERVED built CLI outcomes and REVIEWED renderer-to-CLI closure remain mandatory; CLI late guarantee COMPOSED, independent standalone late injection UNOBSERVED, individual OS Close errors UNFORCED
+
