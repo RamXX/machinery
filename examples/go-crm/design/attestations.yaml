@@ -108,11 +108,11 @@ attestations:
       - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
   - claim: gt.conformance-test-shape
     kind: current
-    attestor: coordinator
+    attestor: coordinator-review-pending
     date: 2026-09-06
-    note: 'Substantive current review of the accepted parser-backed scope (MAC-uzxr) over examples/go-crm/impl: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; native sensitivity controls fail on unsafe oracle edits and extra effects; go test ./... green over the full impl incl. real-boundary repo/session tests. Bounded: content-hash-bound scope review, not authenticated execution replay.'
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
     covers:
-      - {path: BUILD.md, hash: sha256:b7c5bf2897cddccb763c86b19d7b371bd9f4d02a210a3423eef009cbfe0ee7b0}
+      - {path: BUILD.md, hash: sha256:b8c4e1e88825f43dae1a543831ce66c865d58db7440335e5072d64e5769d5a89}
     implementation:
       root: ../impl
       policy: full-root-v1
@@ -343,11 +343,11 @@ attestations:
       hash: sha256:ae81098e391f68e3979055b3fbd64e6b65c5ebe8b30ae716676bda8bbb7d8300
   - claim: g4.zero-context
     kind: plan
-    attestor: coordinator
+    attestor: coordinator-review-pending
     date: 2026-09-06
-    note: 'Re-reviewed 2026-09-06 over the corrected BUILD (bounded parser-backed suite evidence, declared rebuild migration context, x/crypto pin aligned to impl/go.mod); zero-context plan judgment stands over the corrected build document.'
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
     covers:
-      - {path: BUILD.md, hash: sha256:b7c5bf2897cddccb763c86b19d7b371bd9f4d02a210a3423eef009cbfe0ee7b0}
+      - {path: BUILD.md, hash: sha256:b8c4e1e88825f43dae1a543831ce66c865d58db7440335e5072d64e5769d5a89}
   - claim: ga.review-quality
     kind: historical
     attestor: Codex release acceptance review

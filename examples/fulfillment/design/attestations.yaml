@@ -170,17 +170,17 @@ attestations:
         hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
   - claim: gt.conformance-test-shape
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'The handoff requires one parser-backed conformance suite per machine that asserts target state and the complete ordered action list for every committed oracle row.'
+    attestor: coordinator-review-pending
+    date: 2026-09-06
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
     covers:
       - path: BUILD.md
-        hash: sha256:24a8fd8a71a7504a6bd614520ee6ca5c6b72a0bd4386d2439c59042d91853baf
+        hash: sha256:3a2a2b9649c6a0d39e114c3b3236f589be618bf50a71ce039a9e2304f75cf61f
   - claim: g4.zero-context
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'The build plan fixes topology, versions, milestones, oracle-derived test obligations, formal checks, residuals, and state-migration discipline for an implementation agent with no conversation history.'
+    attestor: coordinator-review-pending
+    date: 2026-09-06
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
     covers:
       - path: BUILD.md
-        hash: sha256:24a8fd8a71a7504a6bd614520ee6ca5c6b72a0bd4386d2439c59042d91853baf
+        hash: sha256:3a2a2b9649c6a0d39e114c3b3236f589be618bf50a71ce039a9e2304f75cf61f

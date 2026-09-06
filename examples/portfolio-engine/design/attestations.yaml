@@ -138,12 +138,12 @@ attestations:
         hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: gt.conformance-test-shape
     kind: plan
-    attestor: coordinator
+    attestor: coordinator-review-pending
     date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised root BUILD and M0-M5 packets: the packet-derived conformance obligations (per committed row: next state and expected actions, incl. M4''s ordered entry/exit obligations) remain future implementation work; prospective plan only, no portfolio implementation exists.'
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
     covers:
       - path: BUILD.md
-        hash: sha256:b75252fce0d2f6e19e968e18f8285bc9ec49058c6aac3e094355450e962fbb12
+        hash: sha256:0746b512e82e7f2a004b88347a874cf8af7a6f6f84fe4d96956a2a0190750e47
       - {path: BUILD/M0-walking-skeleton.md, hash: sha256:c9fb9657e0f8b869b6a131edd7468edd4739cb3901a48d03b66d203ae830a7ea}
       - {path: BUILD/M1-run-pipeline.md, hash: sha256:2855cba1b441f1e15266f21304255616e1b24e81c8d9d9dcaa834878022c79a4}
       - {path: BUILD/M2-feed-breaker.md, hash: sha256:ebe2f6cbee9dcd6b4c89761cb34a6e4a65a5039faea0b381fcedd368fc29121b}
@@ -152,12 +152,12 @@ attestations:
       - {path: BUILD/M5-reference-operations.md, hash: sha256:66dc1e1d762c89a14eb2f4b4001486a0aaa112137194f2fe474aec720ad3470b}
   - claim: g4.zero-context
     kind: plan
-    attestor: coordinator
+    attestor: coordinator-review-pending
     date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised packets: each milestone packet remains independently zero-context executable; the repair changed contract prose, not the packet-alone handoff.'
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
     covers:
       - path: BUILD.md
-        hash: sha256:b75252fce0d2f6e19e968e18f8285bc9ec49058c6aac3e094355450e962fbb12
+        hash: sha256:0746b512e82e7f2a004b88347a874cf8af7a6f6f84fe4d96956a2a0190750e47
       - {path: BUILD/M0-walking-skeleton.md, hash: sha256:c9fb9657e0f8b869b6a131edd7468edd4739cb3901a48d03b66d203ae830a7ea}
       - {path: BUILD/M1-run-pipeline.md, hash: sha256:2855cba1b441f1e15266f21304255616e1b24e81c8d9d9dcaa834878022c79a4}
       - {path: BUILD/M2-feed-breaker.md, hash: sha256:ebe2f6cbee9dcd6b4c89761cb34a6e4a65a5039faea0b381fcedd368fc29121b}

@@ -108,15 +108,15 @@ attestations:
       - {path: machines/User.matrix.md, hash: sha256:fdadc7d5fcda1f2beb090422d7a9e906e141ff970582ce2179aff52d0bd8cd24}
   - claim: gt.conformance-test-shape
     kind: plan
-    attestor: coordinator
+    attestor: coordinator-review-pending
     date: 2026-09-06
-    note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
     covers:
-      - {path: BUILD.md, hash: sha256:6e196222e345f9f2c7a3bba3df791ac2b9827915cffdde5a8904888dd37ba991}
+      - {path: BUILD.md, hash: sha256:09c953c352c0e896e60592dbdff0cf3ef3cd61f37022803b76862b0bccbb50ff}
   - claim: g4.zero-context
     kind: plan
-    attestor: coordinator
+    attestor: coordinator-review-pending
     date: 2026-09-06
-    note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
     covers:
-      - {path: BUILD.md, hash: sha256:6e196222e345f9f2c7a3bba3df791ac2b9827915cffdde5a8904888dd37ba991}
+      - {path: BUILD.md, hash: sha256:09c953c352c0e896e60592dbdff0cf3ef3cd61f37022803b76862b0bccbb50ff}

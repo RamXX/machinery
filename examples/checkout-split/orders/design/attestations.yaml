@@ -60,22 +60,22 @@ attestations:
       - {path: machines/Order.matrix.md, hash: sha256:62eeca0a0e06e9ce09118d31474c4f36a8001235763e8333ccf83f71c0eab06c}
   - claim: gt.conformance-test-shape
     kind: plan
-    attestor: coordinator
+    attestor: coordinator-review-pending
     date: 2026-09-06
-    note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
-    covers: [{path: BUILD.md, hash: sha256:c913adca16d86801ebcd967a810a0cde7529122be89bc8ed35e3a141596c5fcf}]
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
+    covers: [{path: BUILD.md, hash: sha256:6d0b6b28041cab288301089d3b2c18c2e456add04e09d423dced746f181a3efe}]
   - claim: g4.zero-context
     kind: plan
-    attestor: coordinator
+    attestor: coordinator-review-pending
     date: 2026-09-06
-    note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
-    covers: [{path: BUILD.md, hash: sha256:c913adca16d86801ebcd967a810a0cde7529122be89bc8ed35e3a141596c5fcf}]
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
+    covers: [{path: BUILD.md, hash: sha256:6d0b6b28041cab288301089d3b2c18c2e456add04e09d423dced746f181a3efe}]
   - claim: g4.standin-coverage
     kind: plan
-    attestor: coordinator
+    attestor: coordinator-review-pending
     date: 2026-09-06
-    note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
-    covers: [{path: BUILD.md, hash: sha256:c913adca16d86801ebcd967a810a0cde7529122be89bc8ed35e3a141596c5fcf}]
+    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
+    covers: [{path: BUILD.md, hash: sha256:6d0b6b28041cab288301089d3b2c18c2e456add04e09d423dced746f181a3efe}]
   - claim: g4.pack-event-discipline
     kind: plan
     attestor: Machinery production-readiness review
