@@ -8,11 +8,11 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:28:12Z
-content_hash: "sha256:8636f75156be205adfff97858b8af0db20e6738721d71748c39a9535fbe71524"
+updated_at: 2026-09-06T06:28:13Z
+content_hash: "sha256:efc947ab01ce5f626ef676a072496d9ede9aaf2d5104ff04f08d1d30e31ab1f4"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
-follows: [MAC-2u36, MAC-a89e]
+follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
 ---
 
 ## Description
@@ -719,11 +719,13 @@ status: new
 - 2026-09-06T06:14:21Z status: open -> in_progress
 - 2026-09-06T06:14:21Z auto-follows: linked to predecessor MAC-a89e
 - 2026-09-06T06:14:21Z claimed by dev-MAC-uzxr
+- 2026-09-06T06:28:13Z status: in_progress -> in_progress
+- 2026-09-06T06:28:13Z auto-follows: linked to predecessor MAC-p8ce
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-ou97]], [[MAC-hgz1]]
-- Follows: [[MAC-2u36]], [[MAC-a89e]]
+- Follows: [[MAC-2u36]], [[MAC-a89e]], [[MAC-p8ce]]
 
 ## Comments
 
