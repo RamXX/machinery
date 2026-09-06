@@ -9,7 +9,7 @@ created_at: 2026-09-06T16:33:51Z
 created_by: ramirosalas
 updated_at: 2026-09-06T23:26:04Z
 content_hash: "sha256:91a2a677e3c97d7d07fb123cb1ae5907dcf533c964771e65586532af4fa97693"
-labels: [hard-tdd]
+labels: [hard-tdd, accepted]
 follows: [MAC-sh60, MAC-hgz1]
 blocks: [MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-hgz1]
