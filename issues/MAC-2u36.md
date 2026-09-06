@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:50:47Z
-content_hash: "sha256:cb0c5d60e885ac721f183060fce4a1b4b724233766adacadaa66fe0edbddc325"
+updated_at: 2026-09-06T01:01:50Z
+content_hash: "sha256:0a427800ec97b8d608d99ea448d83844939123f19a7d80a45c18c6a38d0a45ae"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -394,6 +394,121 @@ EXACT REPAIR: after the successful real normal close of the SAME file, obtain it
 Record a separate amendment commit with BOTH tdd-red and [test-edit-authorized], preserve65b7d13/76eefa1 and their raw history, and apply identical revised test bytes to source496963f baseline and retained source0ad71eb candidate. Replay the same focused2m selection on both before any parent focus. Report every named leaf/terminal/count, SHA/hash and elapsed cost; these controls should pass both sources and are not product RED. The earlier authorized parent focus, independent freeze/re-RED review and later full matrix requirements remain intact; no broad replay or deadline increase is granted here.
 
 Independent evidence: read exact committed file and empty baseline..candidate descriptor-file diff. Independently verified raw baseline-controls.jsonl SHA256d9a4d823ef5fc33787e98ce783830fb19ffa9f7bfa024f625d2a845a98df9bc1 and candidate-controls.jsonl SHA256f06542bfb831e130101efb676a603c6ccee404bac431c4d490e254092d28e300 under /tmp/machinery-MAC-2u36-joint-proof.623afI. Both author runs:9leaves5PASS4assertionFAIL0SKIP,10runs10terminals;15.355s baseline/15.469s candidate. All3legacy placements/execution controls pass both. These are audited author results, not fresh PM runtime replay or clean parent-fault rollback proof. PM made no source/test/worktree changes or product/remote operations.
+## Implementation Evidence — focused authorized RED repair checkpoint
+
+Not delivery, RED approval, GREEN acceptance, rejection or claim release. The developer skill kept this test-only; codebase-memory Verify coverage identified excluded worktree source, so exact retained paths supplied the source evidence. Joint authorization and closed-query follow-up were read completely and independently authorized before the corresponding edits.
+
+### Revisions and ownership
+
+Candidate15252d255fa12a131fbc2cdb13f593a212fd4ccb = retained GREEN0ad71eba545083e0836792f6f2e307604182e2dd + tests-only65b7d13539dad9117ddff7cbadc84db021e789ea + authorized assertion amendment15252d2.
+Baseline53572efc7adfde1649c4ca305280324aa050c6e5 = original RED496963fb7f4842d706d308dafcbd145908a6e395 + identical test-only cherry-picks76eefa1ed8b2ded8e673fc9faf97e422f21a8448 and53572ef.
+Both repair commit subjects contain tdd-red and [test-edit-authorized]. Tests were explicitly repaired AFTER existing GREEN, not claimed to predate it. Original commits and all prior raw evidence remain intact.
+
+Primary retained clean worktree: /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36, story/MAC-2u36.
+Owned clean detached proof checkout retained for subsequent re-RED: /tmp/machinery-MAC-2u36-joint-proof.623afI/baseline.
+git diff53572ef15252d2 -- '*_test.go' is empty. Candidate production diff from0ad71eb and baseline production diff from496963f are empty.
+An initial git -C baseline cherry-pick HEAD resolved its own baseline HEAD and was empty; cherry-pick --skip restored that unchanged checkout, then explicit15252d2 was applied. No original commit was rewritten.
+
+### CI/Test Results
+
+Commands run:
+
+In baseline checkout, then primary candidate checkout:
+`go test -count=1 -timeout=2m ./internal/install -run '^(TestUpdateVerifiesReleaseAndRefreshesRecordedHarnesses|TestUpdateExecutesDownloadedBinaryForHarnessRefresh|TestUpdateRefreshesExistingDefaultInstallInPlace|TestBootstrapReceiptWriter.*)$' -json`
+Then in baseline checkout, then primary candidate checkout:
+`go test -count=1 -timeout=7m ./internal/install -run '^TestBootstrapReceiptCLI$/parent_finalization' -json`
+Every invocation had explicit absolute cd and native stdout/stderr redirected directly to task-owned raw JSON before any tool display.
+`pvg verify internal/install/update_test.go internal/install/update_receipt_fixture_test.go internal/install/bootstrap_receipt_test.go internal/install/bootstrap_receipt_writer_unix_test.go internal/install/bootstrap_receipt_writer_other_test.go --format text`
+
+Summary:
+
+| Current raw log | Leaves PASS/FAIL/SKIP | Run/terminal events | Package seconds | SHA256 |
+|---|---|---|---|---|
+| baseline-controls-final.jsonl | 9/0/0 | 10/10 | 15.139 | d2158e6647bac2deeefe01fa8fd256dc595b8cc8b1751919176eb62d08c3272a |
+| candidate-controls-final.jsonl | 9/0/0 | 10/10 | 16.055 | 04b38499c12d883572735dd38f442d5f1f779f405d1a78471d832929404385b1 |
+| baseline-parent-final.jsonl | 0/4/0 | 6/6 | 165.727 | dfb8008cdc16784da8460f3fb07ccf4b9089196bd9bd9a6720ca1c32aa002264 |
+| candidate-parent-final.jsonl | 4/0/0 | 6/6 | 201.231 | c22b27ade0b4de667a1e5094957c9f8f047cd7ae2b76b9631d0b003fd84c22c2 |
+
+All logs above reside in /tmp/machinery-MAC-2u36-joint-proof.623afI. All named runs terminated; no skip, missing terminal, compilation/setup/timeout error or retry masking in current runs. No full15m matrix, native package regression or preflight was run at this mandatory focused checkpoint. Statement/branch percentage was not measured.
+
+Named controls, each PASS on both (baseline/candidate seconds):
+- TestBootstrapReceiptWriterDescriptors/readonly:0/0
+- TestBootstrapReceiptWriterDescriptors/writeonly:0/0
+- TestBootstrapReceiptWriterDescriptors/readwrite:0/0
+- TestBootstrapReceiptWriterDescriptors/distinct_writeonly:0/0
+- TestBootstrapReceiptWriterInvalidHandle:0/0
+- TestBootstrapReceiptWriterSyscallError:0/0
+- TestUpdateVerifiesReleaseAndRefreshesRecordedHarnesses:6.45/6.88
+- TestUpdateExecutesDownloadedBinaryForHarnessRefresh:2.20/2.11
+- TestUpdateRefreshesExistingDefaultInstallInPlace:6.06/6.67
+
+Named parent leaves (prefix TestBootstrapReceiptCLI/parent_finalization/), baseline FAIL / candidate PASS seconds:
+- absent_false_close_fault_false:31.25/29.90
+- absent_false_close_fault_true:30.90/38.19
+- absent_true_close_fault_false:28.19/30.36
+- absent_true_close_fault_true:27.97/57.98
+
+The baseline completes4/4 remembered-plan children or2/2 explicit absent-receipt children, but every child changes the persisted receipt, and parent publications=0. Both fault cases explicitly report injections=0 and no real close error. These are intended sequencing/missing-boundary RED failures; they prove NO late-fault rollback.
+Candidate no-fault leaves enforce publications=1, unchanged receipt through all children, complete real content/prepared scope/current normalized payload and final successful receipt/commit.
+Candidate fault leaves each log exactly one actual scratch writer double-close: receipt-3466104110 (present), receipt-1074161614 (absent), both under their exact task-owned prepared journal scratch directories. Real returned and injected errors satisfy errors.Is(os.ErrClosed). Existing full state comparison, no commit, prior receipt existence/absence, sentinels, journal absence and actual lock reacquisition all PASS. Reader closes were not faulted. No residual product failure appeared in this focused candidate run.
+
+### Attribution and history
+
+First/third legacy tests are COMPONENT command-observer + real postimage-aware downloaded-source placement controls. They do not reenter Install or create custom-runner capabilities. Second is checksum-verified downloaded shell/default-runner execution-wiring proof: it logs original args, execs the actual test executable helper, uses inherited authenticated prepared-journal capability, runs EnsureActivationConsistency and Install(Record:true), checks real output success and current placements. It is NOT released Machinery CLI proof. The helper was actually invoked by this selected parent test; an uninvoked helper return earns no independent behavioral credit.
+The parent matrix uses the existing actual built CLI/release archive/server/default child runner, real artifacts, and90s parent/unchanged child operation limits. Frozen full released-CLI AC5 matrix remains primary integration proof and awaits separate current full replay.
+Private MACHINERY_INTERNAL_TEST_LOCK_ROOT mapping is test-binary-only existing behavior; component helper uses task-owned temp cache. Built CLI ignores that override and uses temporary HOME cache. No live user cache/config/home/assets selected.
+
+Historical initial65b7d13/76eefa1 controls each9leaves5PASS4assertionFAIL0SKIP10runs10terminals:15.355s/15.469s. Raw baseline-controls.jsonl SHA d9a4d823ef5fc33787e98ce783830fb19ffa9f7bfa024f625d2a845a98df9bc1 and candidate-controls.jsonl SHA f06542bfb831e130101efb676a603c6ccee404bac431c4d490e254092d28e300. Wrong os.ErrClosed expectation for SyscallConn.Control was reported BEFORE amendment; PM follow-up authorized actual same-handle Control-cause comparison. These four historical failures are assertion errors, not product RED. Actual publication double-Close still requires os.ErrClosed unchanged.
+Earlier GREEN path-only observer results (7 closes and3 injections) remain contaminated oracle history, not clean rollback proof.
+
+### Immutable hashes and cost
+
+Test SHA256 (identical both current revisions):
+- bootstrap_receipt_test.go a49618fbbfb5eb7d683beed8111677ea718fe16097c962c1c9ee18690614af80
+- bootstrap_receipt_writer_unix_test.go18bfe7e3834089b9b09b6bbdd83a064f61fefcaeb50494bc0d976b7e2624b77f
+- bootstrap_receipt_writer_other_test.go c956a651cb194a71807de2a19f6389be70c169ec41c2147f16458ec65e440391
+- update_receipt_fixture_test.go5c239c670a26fbed20a709d585ce606dc49de159cd80daf136d9c3c421a99157
+- update_test.go a9c46ba692fd28d5fccc10dae801c13542c240d79be80819f60e4e7e2657715c
+- receipt_test.go a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48 unchanged
+- install_test.go d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba unchanged
+
+Production SHA256 baseline / candidate:
+- update.go a9e3f966f9bbbd4827a1a5307dfe600242a0e03892b4d7a26f8b5193e0e0c4b8 / ccc3e1f1b4f16de4f1da382aa4b56f50add803cde26133a148026930148dae1f
+- receipt.go6042053dfce091a57ce1dc985c1e4012d85c50d9b7715fba4ee3bbcad2852f3c / a3c68f4d41037a0dc7ff5c30e6f82dbfcb522b20596dee54e75795e5e4366d3c
+- install.go8b37c03976b929ac167d028337fb56edd170fed1d190de9323ce3d77a7d65e19 /71a5e9bb1eb40fd705eeb0d84aa55169d1ee6e459073389b361d65f114550a68
+
+Full f24b2df..candidate changed LOC1847 across9files,1752tests+95preserved production, within approximately1850 forecast:
+bootstrap_receipt_test+1123/-0; writer_other+13/-0; writer_unix+134/-0; install.go+5/-2; receipt.go+56/-17; receipt_test+186/-25; update.go+13/-2; update_receipt_fixture+234/-0; update_test+31/-6.
+Repair initial+418/-8 plus closed-query follow-up+10/-2; original helpers fakeSource/sourceTarball/updateReleaseServer/shared write unchanged.
+Scanner5files reports ONE thin_file for the required complementary unsupported-platform file (9code lines vs threshold10), explicit unsupported error rather than stub/success/skip. No padding/suppression/edit; pending independent PM disposition. verify.txt preserves raw output.
+
+### AC Verification
+
+AC1–4 and7 broader existing proof untouched, not fully replayed at this checkpoint.
+AC2/5 compatibility fixtures now place actual downloaded source and prove current contents/link modes; no fake inventory/digests or off-download source. Actual release matrix unchanged apart from the authorized AC6 close matcher.
+AC6 corrected descriptor sensitivity PASS both; baseline intended sequencing RED; candidate genuine parent publication and late-fault full rollback PASS for receipt present/absent. Prepared authority/scope, unchanged-child-receipt and exact existing safety assertions retained.
+
+LEARNINGS:
+- Pathname matching cannot identify a writer: real durability readers reopen identical scratch names.
+- RawControl closing errors differ from os.File.Close errors; preserve the actual cause instead of assuming a sentinel.
+- Legacy success-only observers need real placements when successful update promises final inventory; keep component/execution/released-CLI evidence distinct.
+- Never grant rollback credit to an unreached fault; matched no-fault and real-fault runs closed that gap here.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Exact paired focused runs, SHAs/hashes, every terminal and preserved history above; no production modifications.
+- Healthy GREEN remains paused; independent focused PM review is next. No full matrix/delivery/phase/claim transition performed.
+- No active command sessions, live install/dev-link/update, remote operations, toolchain/Dagger changes. NIL installed binary remains5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849.
+
+### proof
+- [x] Authorized narrow fixture/descriptor repairs committed separately with identical baseline/candidate test bytes.
+- [x] All9compatibility/oracle controls PASS both sources, zero skips.
+- [x] Four corrected baseline parent cases retain intended sequencing RED and explicitly zero injection.
+- [x] Four candidate parent cases PASS including two actual one-injection real-error full rollbacks.
+- [ ] Independent focused review, repaired RED full baseline replay/re-freeze, GREEN full/native verification and final acceptance.
+
 
 ## nd_contract
 status: in_progress
