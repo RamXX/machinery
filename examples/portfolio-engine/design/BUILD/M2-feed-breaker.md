@@ -20,7 +20,9 @@ Breaker state is in-memory per command invocation and has no state migration.
 
 Parse `machines/MarketDataFeed.oracle.md` and assert next state/actions for `MARK-acc7d7`,
 `MARK-9e6205`, `MARK-81fc92`, `MARK-609444`, `MARK-2bed99`, and `MARK-775b8f`. Test one failure below
-threshold and one at threshold; test successful and failed half-open probes.
+threshold and one at threshold (the guard is `failures+1 >= 5`; a four-attempt run with one
+failure per attempt need not trip the breaker - do not claim it does); test successful and
+failed half-open probes; assert stale callbacks can neither reset nor trip the breaker.
 
 ## TDD and implementation
 
@@ -32,7 +34,9 @@ the small breaker object and stable error mapping, then run the complete feed co
 
 Use bounded counters and an injected monotonic clock; do not depend on wall-clock sleeps. A process
 restart safely resets this nonpersistent protective state. Provider timeout remains bounded by the
-outer run budget.
+outer run budget. These are bounded counter/scheduling behaviors over driver-accepted provider
+outcomes: the 30000 ms cooldown is the earliest allowed half-open probe threshold, and no total
+native return bound (no "never hangs" claim) is made for a blocked provider call.
 
 ## Acceptance
 
