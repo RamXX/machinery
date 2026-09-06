@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:00Z
-content_hash: "sha256:306a8c2733ca7c0a443201faabf135187932a869149dd83b7ccb1dc1be7ade60"
+updated_at: 2026-09-06T12:05:48Z
+content_hash: "sha256:58a01b398b3fc78477bd404269e9d7f7f88af0295f42b85feda54d58f52cb8ce"
 blocked_by: [MAC-sh60, MAC-2n83, MAC-lnu6, MAC-hpqp, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v, MAC-p9wm]
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-olrx, MAC-p7jd, MAC-l7m0]
@@ -307,3 +307,28 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-06T12:05:48Z ramirosalas
+NATIVE-CUSTODY PUBLIC CONTRACT CONSUMER
+
+MAC-vx24 now depends on MAC-p9wm because its owned `docs/test-assurance-integration.md` is the final public completed-interface/guarantee coverage matrix and must consume the accepted standalone native-custody contract rather than a private proposal or an unaccepted implementation claim.
+
+CONSUMES:
+- MAC-p9wm: docs/native-custody-contract.md
+  source: accepted standalone public native-custody refinements; exact APIs/schemas/profile/lifetime/cleanup/proof limits are authoritative for the integration matrix.
+- MAC-p9wm: docs/test-assurance-contract.md
+  source: accepted minimum companion link defining refinement precedence while preserving the original contract remainder.
+
+This adds no implementation ownership and does not supersede MAC-qlw2 or any existing producer. MAC-vx24 remains open/new and retains every prior blocker and acceptance obligation.
+
+## nd_contract
+status: new
+
+### evidence
+- MAC-p9wm added as a direct docs dependency for the already owned final integration document.
+- No source/test/status/label/claim change.
+
+### proof
+- [ ] Accepted native-custody publication is accurately consumed in final integration guidance.
+- [ ] All pre-existing MAC-vx24 ACs remain pending.
+
