@@ -9,10 +9,10 @@ parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:46:40Z
-content_hash: "sha256:3ac8018e2dfde04679d0d27ed7e069fbf789241da3f3c4b41e37464fb83c3e32"
+content_hash: "sha256:3b84e3d7d39e7a6299bd03e592c1083ca73ec69a3094c51079ea5ae170f7da32"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
-follows: [MAC-2u36]
+follows: [MAC-2u36, MAC-a89e]
 ---
 
 ## Description
@@ -221,11 +221,13 @@ status: new
 - 2026-09-06T03:36:07Z status: open -> in_progress
 - 2026-09-06T03:36:07Z auto-follows: linked to predecessor MAC-2u36
 - 2026-09-06T03:36:07Z claimed by dev-MAC-yig6
+- 2026-09-06T03:46:40Z status: in_progress -> in_progress
+- 2026-09-06T03:46:40Z auto-follows: linked to predecessor MAC-a89e
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-ou97]]
-- Follows: [[MAC-2u36]]
+- Follows: [[MAC-2u36]], [[MAC-a89e]]
 
 ## Comments
 
