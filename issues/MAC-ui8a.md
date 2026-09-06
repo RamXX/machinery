@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-05T21:05:36Z
-content_hash: "sha256:e1e9b3edea5e715ab5440a3f23b836faa6969cee25de01e02910d648bff1a399"
+updated_at: 2026-09-06T09:26:01Z
+content_hash: "sha256:e83cff18d1901f57e104c874d83eb4152f1254d22b7849612a2194bb72b3e0c5"
 ---
 
 ## Description
@@ -180,3 +180,177 @@ status: new
 
 ## Links
 ## Comments
+
+### 2026-09-06T09:26:01Z ramirosalas
+FINAL SR PM ASSURANCE BACKLOG HANDOFF 2026-09-06
+
+STATE: Ready for INDEPENDENT ANCHOR BACKLOG REVIEW, NOT developer dispatch. MAC-l7m0 remains blocked; every new implementation slice has a transitive prerequisite on its accepted canonical document. None of this report is implementation, native proof, final-preflight or release evidence.
+
+Immutable child/backlog content checkpoint before this report: nd/backlog e72dd2d363a20e8e7fd4a0d65f099a0fc8caee1f.
+Root source unchanged and clean: main 497419ab4512fcff765cd5feb27aed4c67b5608d; epic 7e36f3e7ddcf25565d5d4fe60b328df254eee91d.
+Approved private source SHA e467a3b6c6f657e7a4cb28e85c688be0df24c56a7e3c76fdcfa224f7ff5d2624; independent CHALLENGE-3 SHA0205b50a8eb2e135230173bbf4a7b7eccdde5934fabab5aa4b2dde95d474ac66 approved0blocking. Public one-doc projection575lines SHA22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8, exact reviewed extraction in MAC-l7m0. Private tracker/provenance/user coordination stays in nd, not the public contract.
+
+NEW BOUNDED PRODUCERS/CONSUMERS (19, all unfinished)
+| ID | Observable delivery | Actual direct prerequisites | Primary ownership |
+| --- | --- | --- | --- |
+| MAC-qlw2 | Retain native child ownership until cleanup completes | MAC-l7m0 | internal/processscope/scope.go |
+| MAC-cn7q | Keep formal subprocesses inside native custody | MAC-qlw2 | internal/processcontrol/scope.go |
+| MAC-6h0s | Reject incomplete executable assurance declarations | MAC-qlw2 | internal/tdd/manifest.go |
+| MAC-p9z1 | Retain exact replay inputs outside governed sources | MAC-6h0s | internal/tdd/bundle.go |
+| MAC-62s6 | Register reviewed assurance revisions explicitly | MAC-p9z1 | internal/assuranceflow/register.go |
+| MAC-bz1y | Require four-language native assurance conformance lanes | MAC-hpqp, MAC-6h0s, MAC-hy71 | scripts/integration-lane/assurance_catalog.go |
+| MAC-wi2u | Prove Go assertions through the native test runner | MAC-bz1y, MAC-6h0s | internal/tdd/adapters/go.go |
+| MAC-avfp | Prove TypeScript assertions through native node tests | MAC-bz1y, MAC-6h0s | internal/tdd/adapters/typescript.go |
+| MAC-imtz | Prove Python assertions through native unittest | MAC-bz1y, MAC-6h0s | internal/tdd/adapters/python.go |
+| MAC-8yai | Prove Elixir assertions through native ExUnit | MAC-bz1y, MAC-6h0s | internal/tdd/adapters/elixir.go |
+| MAC-pe9v | Keep final acceptance Git queries in the verification scope | MAC-cn7q, MAC-bz1y | internal/runtimeclosure/git.go |
+| MAC-sd7g | Run required checks against the exact replay state | MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v | internal/assuranceflow/checks.go |
+| MAC-sqpt | Reject assurance that fails retained-state replay | MAC-62s6, MAC-sd7g | internal/tdd/execute.go |
+| MAC-wbxq | Expose current assurance freshness without claiming replay | MAC-p9z1, MAC-pe9v, MAC-lnu6 | internal/gates/tdd.go |
+| MAC-rau8 | Seal verification only after the complete native lifecycle | MAC-sqpt, MAC-wbxq | internal/assuranceflow/run.go |
+| MAC-u4oo | Enforce standalone assurance through normal Machinery commands | MAC-rau8, MAC-62s6, MAC-2n83 | cmd/machinery/tdd.go |
+| MAC-5ft8 | Migrate Go CRM to prospective strict assurance | MAC-u4oo | examples/go-crm/design/assurance/plan.json |
+| MAC-al5u | Keep every complete example on the strict verification path | MAC-5ft8, MAC-bz1y | scripts/assurance-examples.sh |
+| MAC-1u2v | Exercise fresh standalone assurance in all four languages | MAC-al5u, MAC-u4oo | cmd/machinery/assurance_standalone_e2e_test.go |
+
+EXISTING STORY REPAIRS
+- MAC-l7m0: append-only complete current one-document A1-A6, exact public projection and developer-delivers/independent-PM-accepts role split; no public review/status index outputs.
+- MAC-hpqp: healthy in_progress/red-approved claim retained, original frozen96union and failed history unchanged; supplemental lane custody only after MAC-cn7q. New broker belongs MAC-qlw2, explicit formal attachment MAC-cn7q, four-language catalog MAC-bz1y, scoped final Git/Ga MAC-pe9v. No frozen pilot rewrite or native-proof assertion.
+- MAC-vx24: unfinished bounded integration/guidance umbrella; original eight behavioral ACs mapped across all19 producers, original coverage/template/example obligations retained. Five owned guidance/contract-test/matrix outputs instead of one oversized runtime implementation.
+- MAC-ou97: original all-hardening final capstone retained, extended with first-use four-language/two-platform actual proof, full bypass/custody/deadline matrix and exact final closure. Still tests-only/no hard-tdd label, blocked on every new sibling.
+- MAC-lhu5, MAC-hgz1, MAC-lnu6 and MAC-yig6 claims/scope/frozen proof untouched. Only nd-native new Blocks/history metadata on lnu6 arises from necessary MAC-wbxq ordering. hgz1 is ordered transitively, no redundant edge. MAC-sh60 has NO mutation/successor/cancellation/transfer/new edge; original vx24/ou97 obligations remain.
+
+EXACT NEW DEPENDENCY SET (77 added edges; none removed)
+- MAC-qlw2 depends on: MAC-l7m0
+- MAC-cn7q depends on: MAC-qlw2
+- MAC-6h0s depends on: MAC-qlw2
+- MAC-p9z1 depends on: MAC-6h0s
+- MAC-62s6 depends on: MAC-p9z1
+- MAC-bz1y depends on: MAC-hpqp, MAC-6h0s, MAC-hy71
+- MAC-wi2u depends on: MAC-bz1y, MAC-6h0s
+- MAC-avfp depends on: MAC-bz1y, MAC-6h0s
+- MAC-imtz depends on: MAC-bz1y, MAC-6h0s
+- MAC-8yai depends on: MAC-bz1y, MAC-6h0s
+- MAC-pe9v depends on: MAC-cn7q, MAC-bz1y
+- MAC-sd7g depends on: MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v
+- MAC-sqpt depends on: MAC-62s6, MAC-sd7g
+- MAC-wbxq depends on: MAC-p9z1, MAC-pe9v, MAC-lnu6
+- MAC-rau8 depends on: MAC-sqpt, MAC-wbxq
+- MAC-u4oo depends on: MAC-rau8, MAC-62s6, MAC-2n83
+- MAC-5ft8 depends on: MAC-u4oo
+- MAC-al5u depends on: MAC-5ft8, MAC-bz1y
+- MAC-1u2v depends on: MAC-al5u, MAC-u4oo
+- MAC-hpqp depends on: MAC-cn7q
+- MAC-vx24 depends on: MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v
+- MAC-ou97 depends on: MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v
+The direction is consumer depends on producer. Existing old dependencies remain. The normal integration path is schema/store/register + custody/lane/adapters + scoped Git/checks -> replay/Gtd -> final owner -> CLI -> prospective CRM -> complete-example lane -> four-language standalone E2E -> vx24 -> existing guidance -> final ou97. The lhu5 -> hgz1 -> lnu6 -> vx24 chain remains; required execution branches do not point back from custody into hpqp.
+
+INTEGRATION / REQUIREMENT COVERAGE
+| Requirement | Responsible delivery | Actual acceptance boundary |
+| --- | --- | --- |
+| Qualified inventory, closed schemas, reviewed negative/red_control topology | MAC-6h0s | real snapshot-derived declaration validation |
+| Exact bytes, modes, empty-directory topology, external store/history | MAC-p9z1 | capture/materialize/transport corruption matrix |
+| Empty-head first registration, explicit CAS, idempotent retry, failed history | MAC-62s6 | real store transaction, no execution/PASS prerequisite |
+| Native custody, formal/JVM path, original pilot preservation | MAC-qlw2, MAC-cn7q, MAC-hpqp | active nested pinned JVM observed before cancel on both platforms |
+| Closed first-release runtime catalog, mandatory lanes | MAC-bz1y | CI+final-preflight union, provision before execution, missing/skip/empty/leak fails |
+| Four actual native assertion adapters | MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai | pinned Go/node:test+tsc/unittest/ExUnit positive and negative conformance |
+| Actual required checks and scoped final Git/Ga | MAC-sd7g, MAC-pe9v | exact state, closed profiles, real Git2.55.0 and same execution owner |
+| Retained RED/controls/unsafe/GREEN replay | MAC-sqpt | native structured lifecycle, assertion cause, exact frozen closure |
+| Cheap freshness vs actual final replay | MAC-wbxq, MAC-rau8 | no false replay label; nine-stage final no-launch/release/publication/output lifecycle |
+| Owner4h/per-milestone cumulative budgets/shared cleanup | MAC-qlw2, MAC-sqpt, MAC-sd7g, MAC-rau8 | actual process-producing call-graph audit + real cumulative timeout tests |
+| Ordinary CLI/hook/complete standalone adoption | MAC-u4oo | real binary/payloads, explicit store, unsupported failclosed |
+| Preserve complete examples + all legacy regressions | MAC-5ft8, MAC-al5u | prospective strict revisions, no historical PASS or design-only downgrade |
+| True first-use each language without prior PASS/tracker | MAC-1u2v, MAC-ou97 | actual init/scaffold/capture/register/RED/GREEN/verify/complete/hooks |
+| Shipped exact-byte hard-TDD process | MAC-lnu6, MAC-vx24, MAC-gcrr | template/agent/skill integration, no tokens-equal exemption |
+| Final all-assessment behavior, native proof/preflight/candidate | MAC-ou97 + root final gate | every sibling accepted; full preflight only at end, isolated local binary, no installation replacement |
+
+STRUCTURAL CHECKS
+- pvg lint --backlog --epic MAC-ui8a --json: EXIT0, actual result is a JSON ARRAY, zero error findings, ten review-only vertical-slice observable-verb heuristics.
+- pvg rtm check: EXIT0, zero tagged requirements extracted/covered/uncovered (56 global stories checked,21closed). This mechanical empty-tag result is NOT semantic coverage proof; the mapping above is the manual coverage audit.
+- pvg nd dep cycles: EXIT0, no dependency cycles.
+- git status --porcelain: EXIT0, empty.
+- Root independently confirmed same scoped lint result.
+
+SELF-REVIEW / REVIEW-ONLY FINDING JUSTIFICATION
+- MAC-qlw2: accepted with rationale for wording heuristic; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. The outcome says the consumer receives a result or proof; the scanner's narrow verb list misses that wording. ACs require actual observable native outcomes, not an empty horizontal helper.
+- MAC-cn7q: clean after syntax/edge correction; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. 
+- MAC-6h0s: clean after syntax/edge correction; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. 
+- MAC-p9z1: clean after syntax/edge correction; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. 
+- MAC-62s6: clean after syntax/edge correction; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. 
+- MAC-bz1y: accepted with rationale for wording heuristic; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. The outcome says the consumer receives a result or proof; the scanner's narrow verb list misses that wording. ACs require actual observable native outcomes, not an empty horizontal helper.
+- MAC-wi2u: accepted with rationale for wording heuristic; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. The outcome says the consumer receives a result or proof; the scanner's narrow verb list misses that wording. ACs require actual observable native outcomes, not an empty horizontal helper.
+- MAC-avfp: accepted with rationale for wording heuristic; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. The outcome says the consumer receives a result or proof; the scanner's narrow verb list misses that wording. ACs require actual observable native outcomes, not an empty horizontal helper.
+- MAC-imtz: accepted with rationale for wording heuristic; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. The outcome says the consumer receives a result or proof; the scanner's narrow verb list misses that wording. ACs require actual observable native outcomes, not an empty horizontal helper.
+- MAC-8yai: accepted with rationale for wording heuristic; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. The outcome says the consumer receives a result or proof; the scanner's narrow verb list misses that wording. ACs require actual observable native outcomes, not an empty horizontal helper.
+- MAC-pe9v: clean after syntax/edge correction; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. 
+- MAC-sd7g: accepted with rationale for wording heuristic; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. The outcome says the consumer receives a result or proof; the scanner's narrow verb list misses that wording. ACs require actual observable native outcomes, not an empty horizontal helper.
+- MAC-sqpt: accepted with rationale for wording heuristic; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. The outcome says the consumer receives a result or proof; the scanner's narrow verb list misses that wording. ACs require actual observable native outcomes, not an empty horizontal helper.
+- MAC-wbxq: clean after syntax/edge correction; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. 
+- MAC-rau8: accepted with rationale for wording heuristic; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. The outcome says the consumer receives a result or proof; the scanner's narrow verb list misses that wording. ACs require actual observable native outcomes, not an empty horizontal helper.
+- MAC-u4oo: clean after syntax/edge correction; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. 
+- MAC-5ft8: accepted with rationale for wording heuristic; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. The outcome says the consumer receives a result or proof; the scanner's narrow verb list misses that wording. ACs require actual observable native outcomes, not an empty horizontal helper.
+- MAC-al5u: clean after syntax/edge correction; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. 
+- MAC-1u2v: clean after syntax/edge correction; bounded owned files, real positive+negative native/API outcome, exact approved contract, explicit downstream normal integration and frozen regressions. 
+- MAC-l7m0: fixed complete authoritative one-doc AC/proof map; no normative change/public private-coordinate leak authorized.
+- MAC-hpqp: fixed new custody scope/dependency only, retained all96frozen cases and pending empirical proof.
+- MAC-vx24: fixed honest bounded integration ownership, original semantic ACs retained.
+- MAC-ou97: clean expanded final tests-only closure, all40epic children ordered with accepted old siblings remaining historical.
+
+EXACT MUTATION AUDIT
+- 19 new feature stories created through pvg nd, then canonical parser-supported boundary/observable-outcome comments appended to each; no status transitioned to delivered/accepted.
+- MAC-l7m0 received the complete one-document AC comment in this resumed pass, in addition to the already recorded public projection repair.
+- MAC-5ft8 received dependency clarification preserving MAC-sh60 and using transitive hgz1 ordering.
+- MAC-hpqp/MAC-vx24/MAC-ou97 received approved scope/AC revisions at true EOF; hpqp/vx24 additionally received parser-supported current output maps.
+- 77 dependency adds listed above, with supported nd-managed producer Blocks/history backlinks only; no removals.
+- Exactly13 missing indented schema signature lines INSERTED in11 newly authored stories using root-authorized supported pvg nd edit with an owned deterministic editor: MAC-qlw2(1),MAC-6h0s(1),MAC-62s6(1),MAC-bz1y(2),MAC-wi2u(1),MAC-avfp(1),MAC-imtz(1),MAC-8yai(1),MAC-pe9v(1),MAC-rau8(1),MAC-al5u(2). Every original Body byte and contract was retained; per-story contemporaneous comments list exact insertions and before/after SHA256. All reads compared to prior Body plus ONLY inserted lines. No --description/body-file replacement or direct unsupervised vault edit.
+- MAC-bz1y received CI producer/consumer serialization note preserving MAC-hy71 exact-commit gates.
+- This epic handoff comment is the final planning mutation. Local nd-native snapshots only; no sync/push/fetch/pull.
+- Owned temporary editor /tmp/machinery-assurance-schema-editor.mjs was created via apply_patch under explicit root clearance, exact13entry/hash/path guards dry-checked before use; it was invoked only by supported nd edit. No source/test/worktree/branch/install/runtime/service/remote mutation.
+- Tooling observations retained honestly: read-only guessed discovery paths failed before correct locations were verified; an async invocation syntax error executed no nd command; nd comments add appends an observed terminal newline; scanner processes every historic CONSUMES entry and requires literal PRODUCES:/CONSUMES: markers. Source parser revision c0957106a81346033d7b1d82fde5f434a9db6bab matched installed pvg. Each error stopped until root clearance; no failed command claimed success.
+
+RAW BODY HASHES AFTER FINAL CHILD MUTATIONS (before this epic report)
+| ID | UTF8 bytes | SHA256 |
+| --- | ---: | --- |
+| MAC-1u2v | 10825 | 381a2a7d57c21e318d06ac0ad121482bde02e1fc03ef27cb69710ca701cb5077 |
+| MAC-2n83 | 7549 | f1d3f34f278a7bf7a685051836f7aebed15ab9d55d46d90cbcf42b885789fa41 |
+| MAC-5ft8 | 14102 | 8a69f7c31d614e4de24e4e892794c6c3ad57097d7d7cc2deb27789879fff4dcb |
+| MAC-62s6 | 12690 | 116169252a0219056e6141ba9e5843799000825b666a1172d2b50997defd1140 |
+| MAC-6h0s | 13594 | 78d3a80fb1b0c3378883ec7daf3e02d1a8e186116374e42f603100b89a993d27 |
+| MAC-8yai | 14710 | 410f643e0491f4732eb6a847de7697e6023d332c01cd2bbfd73ddac4bcfe6fdc |
+| MAC-al5u | 12894 | e37d285c0bb763ac999343055b2e8f37637698390aee309c2d555022502cfc64 |
+| MAC-avfp | 14781 | 687a2844e30e53cbec2c3d39f83c539b6a256c58e7eb154a448aadf5c4c848fa |
+| MAC-bz1y | 14754 | 1501ce46f3a25d4b9b5d0c5d0e713161ea214d787a55ec29a30d30999b0895a7 |
+| MAC-cn7q | 11756 | 228426f8b40e4a6c86f5b6a8a50f9c629e6b3b204d24f079e7b7b995f1ee401c |
+| MAC-hpqp | 95103 | b7e1dd533905e6c7353e224ef7bdd9a819a8b4922e7ca2e37051d52d4b7102e7 |
+| MAC-hy71 | 6603 | c21ba10377ffbd0f538cb3a21625ce62483ece19bc31fbff2062e998eca7e428 |
+| MAC-imtz | 14517 | 4d3a1221d7d221b36b6ef617aff40bac813568b91f6e9f6ba8c01f8aee56d952 |
+| MAC-l7m0 | 20005 | bcc47cfd554e9a4d1ccb25d5765584f69d15406aed8bf41303e1941efb2b8e5a |
+| MAC-lnu6 | 149082 | 9a49a8007a2e86bdf9c55fd01392e7844df56e109c8f70a176ddedb90c35f0ee |
+| MAC-ou97 | 17644 | 72c7746412e413506afa5755c785825a98b0da5961fee99366f31bf228147994 |
+| MAC-p9z1 | 11024 | a5f9cfd947d2b6df42e08ec1a8938a1987cd2a59b3a008014cde30ccb4e894bc |
+| MAC-pe9v | 12931 | 866dbb90980867238a342a6cc98c7eb7a69a8a71dfe89d50c09bf4d99de696ff |
+| MAC-qlw2 | 12509 | 0a1658cc39ef26aeda75639188b5c3bf90339d7956bbe113d419819278201746 |
+| MAC-rau8 | 14598 | dd97b19e34759b01aad55f6069cfacb2d587aa0655533767ed497f8920f316b9 |
+| MAC-sd7g | 11978 | 95e34e0698cd91f8a946df7c3fc7cc558a23f284039d302c60ee0f8766daf3d0 |
+| MAC-sqpt | 12136 | 5712d13f4c469adb0121ef572d33e5da9669b67fec38b1bc7518cc166130c40c |
+| MAC-u4oo | 12666 | 3bfe4c020a91e20ea912d80a677403b1610fd9a34cba3e0fc4e8bb972c93df1f |
+| MAC-vx24 | 23038 | ffdfc505e82a4538cf7d7f3db9f4636b2793dfcf67b603b0f8e96eb371072d45 |
+| MAC-wbxq | 9987 | c00ffb101f70bd3d90026a301f9e1f637bf11bec81c4a68cc9af8f47f45d53f7 |
+| MAC-wi2u | 14600 | aa6e3d4c52c06ee2c829de8a7a9bd21325d85ab40070074f4353204188b1c7e4 |
+
+DISPATCH/RELEASE HOLD
+Independent Anchor review is next. Architecture approval is not code or native evidence. No normal source developer is released by this report. Final full preflight remains last; local merge and isolated candidate only after acceptance/gates. Machinery has no Paivot product/build/test dependency. Installed Machinery/plugins/skills remain untouched until the NIL coordination and root installation clearance. No GH publication during work.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Backlog decomposition/repair completed with source/parser validation, exact mutation audit, raw Body hashes and structural gates above.
+- Nineteen required stories are new unfinished work; prior six accepted epic deliveries are not reclassified.
+
+### proof
+- [x] Approved architecture obligations mapped to bounded, producer-consumer, cycle-free stories with normal integration and final capstone.
+- [x] No lint errors; RTM/cycle checks passed; original claims/frozen histories preserved.
+- [ ] Independent Anchor backlog approval.
+- [ ] All implementation/native proof/final preflight/isolated candidate closure remain pending.
+
