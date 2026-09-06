@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -21,6 +22,8 @@ import (
 	"testing"
 	"time"
 )
+
+var nativeProofParent = flag.String("fsm-native-proof-dir", "", "Retain native proof under this existing absolute directory (default: clean test temporary output)")
 
 var nativeUserLeaves = []string{
 	"T-USER-01_USER-e20d04",
@@ -117,11 +120,18 @@ func TestFSMNativeOracleSensitivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := filepath.Clean(filepath.Join(cwd, "../../.."))
-	proof, err := os.MkdirTemp("", "crm-fsm-native-proof-")
-	if err != nil {
-		t.Fatal(err)
+	proof := t.TempDir()
+	retained := *nativeProofParent != ""
+	if retained {
+		if !filepath.IsAbs(*nativeProofParent) {
+			t.Fatal("fsm-native-proof-dir must be an existing absolute directory")
+		}
+		proof, err = os.MkdirTemp(*nativeProofParent, "crm-fsm-native-proof-")
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	t.Logf("retained native proof directory: %s; toolchain=%s %s/%s", proof, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	t.Logf("native proof directory: %s; retained=%t; toolchain=%s %s/%s", proof, retained, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	cases := []struct {
 		name, pkg, suite, target, diagnostic string
 		leaves                               []string
