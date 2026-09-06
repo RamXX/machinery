@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:23:19Z
-content_hash: "sha256:59082572185a3aa0103c5598e80f7bb277ad20eb67ff252c5ace9abc02c0aca3"
+updated_at: 2026-09-06T02:25:28Z
+content_hash: "sha256:7835a18e1f8441052e87e56af6d7655fd227fc2b33f97b48b4e46ae139739aeb"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -540,6 +540,108 @@ Delivery and final-gate obligations:
 - Delivery must explicitly state composed exact-SHA coverage,85required story leavesPASS0SKIP, A/B/C raw counts, exact three skips/reasons/no-overlap classification and uninvoked helper classification. The original900.473s package timeout remains historical FAIL with35valid completed leaves, not a rewritten full-suitePASS. Do not claim monolithic native/race/full-preflight success or measured race20m fit.
 - The final epic/held contributor gate still owns complete required platform and external runtime verification. Case-alias negative needs a filesystem able to materialize both names; official Structurizr cache proof needs its official-archive lane; OCI golden needs its explicitly provisioned engine lane (held221525d CI already sets MACHINERY_REQUIRE_OCI_GOLDEN in that lane). This decision neither proves those outcomes nor asserts all their enabling policy is already wired. Their final required proof stays pending with its existing owner; no new policy choice or automatic duplicate bug is inferred solely from these known prerequisites/skips.
 - If later review finds overlap, an unexpected failed assertion or a missing required MAC-2u36 outcome, this bounded confirmation does not waive it. Normal full GREEN delivery review remains independent and may reject inadequate proof. No source/test/runtime/installed asset/remote action is requested now; only the narrow scope decision is recorded.
+## Implementation Evidence (DELIVERED) — MAC-2u36 GREEN
+
+PROOF:
+
+### Scope authorization and Commit
+
+- Branch: story/MAC-2u36; SHA:15252d255fa12a131fbc2cdb13f593a212fd4ccb, clean retained /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36.
+- Production commit0ad71eba545083e0836792f6f2e307604182e2dd byte-identical across update.go/receipt.go/install.go. Separate RED-author authorized amendments65b7d13+15252d2 remain frozen. All seven hashes reverified at delivery; no tests/source/config changed during verification or deliver-only continuation.
+- Independent /tmp/machinery-pm-MAC-2u36-budget.FBiyzE/DELIVERY_SCOPE.md SHA86f22b8eef256784a992053bbcf6a7933e89ac9fefe85311bf4722b1fd284a41 fully read; root authorized normal delivery. Three unrelated native skips do not block user-targeted-now story delivery under developer§9; required installer integration no-skip rule remains intact. This is not acceptance or final gate waiver.
+- Full immutable historical composed report /tmp/machinery-MAC-2u36-green.G05gWz/15252d2-COMPOSED_GREEN_REPORT.md SHA6b5d9ac79fab9bdd16c8502a2d08245458e3c2cb4a726f3eab4101d860b4ab6d. Its prior in_progress hold is superseded only by this authorized delivery, not rewritten.
+- Full named inventory /tmp/machinery-MAC-2u36-green.G05gWz/15252d2-composed-inventory.json SHA2822be70f16dfefd6ac9d74ee73b4c91f9493b916ab55c0e71a4eefbb82d8a75.
+
+### CI/Test Results — Commands run
+
+
+All raw artifacts below are under /tmp/machinery-MAC-2u36-green.G05gWz. Each test command ran synchronously from the retained worktree, without coverage instrumentation. No retry, new deadline, relaxed individual timeout or test mutation occurred. A/B/C each ran ONCE, sequentially, under independent /tmp/machinery-pm-MAC-2u36-budget.FBiyzE/BUDGET_DECISION.md SHA256 2f87aa9e02e81028f3e2ad1a699b63ec1e038cff429d4bc2951b2b62924325cf.
+
+| Run | Exact command | Terminal result | Raw artifact SHA256 |
+|---|---|---|---|
+| Prior whole selector | `go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap\|Receipt\|UpdatePlan' -json` | TIMEOUT, exit1, 900.473s; 35 valid PASS leaves, 0 assertion FAIL/0 SKIP; 1 interrupted +49 unstarted at that point | 15252d2-full-green.jsonl: 2d5eb852990952e57e6bcf2c5aff3618821da4c2e16744240b25eab6f25348da |
+| A | `go test -count=1 -timeout=7m ./internal/install -run '^TestBootstrapReceiptCLI$/(missing_prestate_later_target_failure_rolls_back_bootstrap_true\|corrupt_receipt\|unsafe_receipt\|stale_schema\|plugin_discovery_failure\|symlink_native_artifact\|non-directory_native_parent\|interrupted_download_recovers_real_transaction)$' -json` | PASS, exit0,184.383s; 8 leaves PASS/0 FAIL/0 SKIP;9 starts/9 terminals incl subset parent | 15252d2-A-cli-remainder.jsonl: 6160539baab5d35556e585eedebb4261ddef556a53a21780fb596aecb67cd497 |
+| B | `go test -count=1 -timeout=15m ./internal/install -skip '^TestBootstrapReceiptCLI$' -json` | PASS, exit0,145.642s;412 leaves PASS/0 FAIL/0 SKIP;463 starts/463 terminals | 15252d2-B-install-complement.jsonl: 8178d0ee0f984fc07638b6056c79fb30dfdb043a510b38eef4aa9f62cb276724 |
+| C | `go test -count=1 -timeout=15m ./cmd/machinery -json` | PASS, exit0,200.934s;399 leaves PASS/0 FAIL/3 SKIP;437 starts/437 terminals | 15252d2-C-cmd.jsonl: bdd17c7579cfd52a54d8002350de4f2d89ce8619fc3096574ffd632f827ec0c2 |
+
+The table escapes regex pipes only for Markdown rendering; the actual shell commands used ordinary `|` alternation exactly as the decision. Prior whole run had42starts/40terminals. Its interrupted leaf was missing_prestate_later_target_failure_rolls_back_bootstrap_true, approximately0.817s old at aggregate alarm; that invocation remains a package timeout, not a full package PASS or individual90s failure.
+
+
+### Summary and coverage classification
+
+- Composed exact-SHA frozen story matrix:85unique expected leaves,85PASS0FAIL0SKIP, no missing/unexpected;32actualCLI=24prior+8A,53nonCLI=B. Prior11nonCLI duplicates and focused controls do not inflate credit.
+- B463runs463terminals, exact189/189expected native install top-level names (inventory190 minus exactly TestBootstrapReceiptCLI);412raw PASS leaves comprise402behavioral +10dormant helpers. Together with32CLI, install proof has434behavioral PASS +10scaffolding records,0skip.
+- C437runs437terminals, exact263/263native cmd top-level names;399raw PASS leaves comprise394behavioral +5dormant helpers;3real SKIP,0FAIL. No omitted/unexpected selected names or unterminated dynamic subtests.
+- B dormant helpers: TestActivationRecoveryReexecHelper, TestInstallAuthorityRecordCrashHelper, TestInstallStageCreationCrashHelper, TestExtractTarGzUmaskHelper, TestPluginProcessHelper, TestInstallInspectionSubprocessHelper, TestInstallOrphanCapabilityHelper, TestInstallLockCapabilityHelper, TestUpdateCandidateStartupHelper, TestUpdatePlacementChildHelper.
+- C dormant helpers: TestDiagnosticProcessHelper, TestSnapshotDiagnosticCommandHelper, TestC4ProcessHelper, TestCheckerProcessFixture, TestVerifyCheckerScratchCrashHelper. Uninvoked helper returns are scaffolding, not integration proof; invoking parents assert actual subprocess behavior. TestCmdTestLockSubprocess and TestGitHelpersDegradeCleanly are real passing behavioral tests, not dormant.
+- Native top-level inventory /tmp/machinery-pm-MAC-2u36-budget.FBiyzE/native-inventory.jsonl SHA90356735b0dcdeea8ec17a3483f4eb2cacf00e6925212fa98bdf6f152dcbe2f5 independently reconciled.
+- Coverage: not collected (explicit no-cover authorization; separate confirmed MAC-yig6 fixture-instrumentation issue). Native regression proof was not waived. No monolithic/race/fullpreflight PASS or20m gate fit claimed. Original900.473s package timeout stays TIMEOUT, not rewritten. A's subset parent PASS is not a terminated whole originalCLI parent.
+- Three actual unexecuted C tests: TestValidateC4ExportInventoryIsPortableClosedAndStable (host filesystem cannot materialize case-aliased filenames; initial valid assertion ran but fullcase SKIP); TestProvisionOfficialStructurizrArchiveAndReuseCache (MACHINERY_TEST_OFFICIAL_STRUCTURIZR=1 lane not enabled); TestVerifyCheckersPiiFlowEngineGolden (explicit realOCI lane not enabled). No external infrastructure absence/availability claim and no behavioral credit.
+- Independent committed source+graph scope confirmation: skipped bodies respectively call C4export inventory/portablepath, distinct Structurizr cachestage/filelock/safefile receipt, and standalone newVerifyCheckersCmd/checker/designlock/OCI; not changed installer plan/recording/publication bodies. Required receipt/inspection-lock/native/actualCLI tests executed and PASS. Final epic/platform/officialarchive/OCI/race proofs remain with existing gate owner; not enabled/waived here.
+
+### AC Verification
+
+
+| AC | Implementation and actual proof | Result |
+|---|---|---|
+|1|update.go254 updatePlan receipt-aware bootstrap; TestBootstrapReceiptPlan defaults/schema1/complete mixed plan, BootstrapDefaultPlanIsPluginAware, actual ordinary/bootstrap convergence preserving modes/plugins|PASS|
+|2|Existing loader/path/authority validation preserved; private parser/topology/schema2 inventory/digest controls in B; actual corrupt_receipt, unsafe_receipt, stale_schema, plugin_discovery_failure, symlink_native_artifact, non-directory_native_parent in A; safe edited/missing success in prior CLI|PASS|
+|3|All8actual ordinary/bootstrap intact/edited/singlemissing/multimissing cases PASS, including current release binary/content, both mixed home/native groups, complete real inventory/plugin obligations/sentinels and same-release idempotence|PASS|
+|4|All4actual later-target rollback cases PASS (intact and missing prestate, ordinary/bootstrap); prior absence restored as absence. Actual interrupted_download_recovers_real_transaction PASS separately proves premutation startup recovery. B transaction/foreign-change regressions PASS|PASS|
+|5|Frozen actual builtCLI/checksummedrelease/temp roots matrix executed without mocks/skips; legacy component and execution-wiring fixtures explicitly not credited as releasedCLI integration. No live install or Paivot dependency|PASS|
+|6|install.go156/249 authenticated tx.delegated children defer only persisted recording; update.go221 parent recordRefreshPlanLocked before225 tx.commit; receipt.go387 full-plan finalization and263 normalized validated actual inventory. All4parent_finalization cases PASS:2no-fault one-writer complete receipt,2actualonewriter/oneos.ErrClosed failure full rollback including receipt absence, unchanged receipt through every child, complete prepared journal coverage/current real digest assertions, sentinels, journal cleanup and real lock reacquisition. All4authority cases PASS; no env-only bypass or hostplugin atomicity invention|PASS|
+|7|receipt.go333 setHomeInstall rejects conflicting repeated/nested crossgroup requests without dropping ownership; saveReceipt validates real candidate before publication. All5standalone actual cases PASS: fresh mixed/disjoint/sameorderedcopychange success, both conflicting requests actionable exact rollback and follow-on native success|PASS|
+
+All85full names and per-leaf timings follow in the associated JSON; the32actualCLI timings sum980.80s across the composed invocations. That is a deduplicated leaf-duration sum, NOT a monolithic wall-clock runtime; setup is repeated and native parallelism differs. Held hpqp221525d20m race/preflight policy is neither changed nor measured by these native shards. No monolithic full native/race pass, coverage percentage, full preflight or epic-gate result is claimed. Coverage not collected per explicit no-cover authorization and separately confirmed MAC-yig6 fixture-instrumentation issue; native proof was not waived.
+
+
+### pvg verify, frozen inputs and changed-file evidence
+
+
+Independent re-freeze /tmp/machinery-pm-MAC-2u36-joint.J3jcK7/COMPLETE_RERED_FREEZE.md SHA97d7437738d815b81f411d90382a23708303f9bf6d4d802bd33e52c85cdab2c3 remains authoritative. Paired baseline53572ef retains original496production; current15252d2 retains0adproduction. Authorized repair commits65b7d13+15252d2 are by separate RED author, not GREEN.
+
+Frozen SHA256 rechecked after terminal runs:
+- bootstrap_receipt_test.go a49618fbbfb5eb7d683beed8111677ea718fe16097c962c1c9ee18690614af80
+- bootstrap_receipt_writer_unix_test.go 18bfe7e3834089b9b09b6bbdd83a064f61fefcaeb50494bc0d976b7e2624b77f
+- bootstrap_receipt_writer_other_test.go c956a651cb194a71807de2a19f6389be70c169ec41c2147f16458ec65e440391
+- update_receipt_fixture_test.go 5c239c670a26fbed20a709d585ce606dc49de159cd80daf136d9c3c421a99157
+- update_test.go a9c46ba692fd28d5fccc10dae801c13542c240d79be80819f60e4e7e2657715c
+- receipt_test.go a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48
+- install_test.go d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba
+
+`git diff --check f24b2df HEAD`:PASS. `git diff 0ad71eb HEAD -- internal/install/update.go internal/install/receipt.go internal/install/install.go`:empty. `pvg story verify-tdd --base f24b2df`:PASS13commits,0unauthorized edits,0merge skips (15252d2-final-verify-tdd.txt). One preliminary audit invocation mistakenly included story ID and was rejected as unknown flag; corrected documented command ran successfully, no workflow/source mutation.
+
+pvg verify explicit9changedfiles: exit1 six heuristics (15252d2-verify.txt), all source-reviewed complete by independent re-freeze PM: five unchanged return-empty branches (update.go993 empty-stderr diagnostic; install.go1157/1162/1167/1184 unavailable platform stat identity), and complementary-platform test file9code lines below10threshold that returns explicit unsupported error. No stub, suppression, padding or weakened test was introduced to appease scanner. Do not misreport scanner as clean PASS.
+
+| File | + | - | Rationale |
+|---|---:|---:|---|
+|internal/install/bootstrap_receipt_test.go|1123|0|frozen actualCLI full matrix|
+|internal/install/bootstrap_receipt_writer_other_test.go|13|0|explicit unsupported-platform classifier|
+|internal/install/bootstrap_receipt_writer_unix_test.go|134|0|actual writable descriptor classifier/sensitivity|
+|internal/install/install.go|5|2|authenticated child persisted-record deferral|
+|internal/install/receipt.go|56|17|complete validated finalization and conflict rejection|
+|internal/install/receipt_test.go|186|25|private parser/topology/inventory/digest proof repair|
+|internal/install/update.go|13|2|receipt-aware plan and parent finalization before commit|
+|internal/install/update_receipt_fixture_test.go|234|0|actual downloaded-source placement support|
+|internal/install/update_test.go|31|6|three authorized legacy fixture amendments|
+
+Total1847changedLOC9files=1752tests+95production(+74/-21), within reviewed approximately1850 forecast, not artificially trimmed. Shared install_test/write/fakeSource/sourceTarball/updateReleaseServer unchanged. No target/transaction/lock/CLI production edit.
+
+
+LEARNINGS:
+
+
+- Complete receipt inventory belongs at the authenticated parent completion boundary; child publication couples early homes to later missing native repairs.
+- A pathname-only close oracle cannot distinguish writer publication from digest/rollback readers. Independent writer-descriptor repair preserved real OS failure and full rollback rather than altering production durability.
+- Command-success component fixtures must materialize real downloaded artifacts when the product contract now validates final inventory; they are not substitutes for releasedCLI integration.
+- Old-production RED runtime underestimated GREEN because intended failures stopped early. Preserve completed exact-SHA outcomes and use independently authorized finite complements, never relabel aggregate timeout as fullpackage success.
+- Receipt normalization cannot legalize overlapping ownership. Reject the conflict before publication and rollback placements; do not invent automatic regrouping.
+
+
+### Safety / remaining owner
+
+No live installation, installed binary/skills/plugins/agents, Dagger, remote/sync, main/epic or preflight mutation. All owned execution sessions terminal. Retain worktree for independent PM review; developer delivers but never closes/accepts/releases. Parent final epic gate still owns final platform/runtime/race evidence.
+
 
 ## nd_contract
 status: in_progress
