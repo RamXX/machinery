@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:28:43Z
-content_hash: "sha256:035194458635770a8ddac2d20a561ac713818731488c833c5aa7e9af83015ca2"
+updated_at: 2026-09-06T01:48:00Z
+content_hash: "sha256:37f7c5dd35a4ce99962d6361004f3551350c114aef3e2bb489dd27834fab2604"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -470,6 +470,36 @@ AC-by-AC complete repaired-RED judgment:
 
 Evidence limits and containment:
 Current author complete proof is consistent with independently audited exact source, repaired paired focus and unchanged prior evidence; no concrete inconsistency warrants redundant full PM runtime. This decision is an independent complete evidence review, not a claim of fresh PM85-leaf runtime or statement/branch coverage percentage. Earlier false sentinel, path-only reader fault contamination and ten permission-masked parser passes remain honestly qualified historical evidence. No new unresolved product defect, scope gap or authorization need found at this re-freeze gate. PM performed no source/test edit, worktree cleanup, installed binary/skill/plugin/agent or Dagger mutation, remote operation, main/epic change or full preflight.
+## MAC-2u36 measured GREEN aggregate-budget hold — 15252d2
+
+PROOF:
+- Read complete independent repaired-RED freeze /tmp/machinery-pm-MAC-2u36-joint.J3jcK7/COMPLETE_RERED_FREEZE.md SHA25697d7437738d815b81f411d90382a23708303f9bf6d4d802bd33e52c85cdab2c3 and both author reports; verified canonical7AC, all7frozen hashes and unchanged0ad71eb source. No source/test/fixture/config change.
+- ONE required command: cd /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36 && go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json. Native stdout/stderr captured directly to /tmp/machinery-MAC-2u36-green.G05gWz/15252d2-full-green.jsonl SHA2562d5eb852990952e57e6bcf2c5aff3618821da4c2e16744240b25eab6f25348da.
+- Exit1, aggregate15m timeout,900.473s. Exact85expected-leaf accounting:35PASS,0assertionFAIL,0SKIP,1INTERRUPTED,49UNSTARTED;42run40terminalevents. Interrupted TestBootstrapReceiptCLI/missing_prestate_later_target_failure_rolls_back_bootstrap_true after approximately0.817s (alarm stack1s), while parentCLI elapsed14m49s. No90s individual operation timeout or source assertion failure.
+- Complete85named completed/missing inventory and scope interpretation: /tmp/machinery-MAC-2u36-green.G05gWz/15252d2-package-budget-report.md SHA2564f91e46afbc8d0ca9b4b622f09f042eb5448f58ab8948bedb3bcf9c717af82cf.
+- All8ordinary/bootstrap intact,edited,singlemissing,multimissing convergence/idempotence casesPASS; bothintact later-target rollbacks and ordinarymissing-prestate rollbackPASS. All4parent finalizationPASS including twoactualonewriter/oneos.ErrClosed complete rollback/absence/sentinel/journal/lock cases. All4authority and5standalone supported/conflict/follow-on casesPASS.
+- Remaining1interrupted+49unstarted receive no proof credit. Mandatory full native command NOT yet run and NOT waived. Root explicitly directed no retry/native/deadline change until concrete independent review. Held hpqp221525d contributor changes already specify20m; no bug inferred from main/default10m alone. No test/tag/CI change or runtime-source defect claim.
+- HardTDD13commitsPASS0unauthorizededits. pvg verify9files reports only6independently reviewed legitimate fallback/platform heuristic findings; raw15252d2-verify.txt preserved, no padding/suppression. Total1847changedLOC9files unchanged; coverage percentage not instrumented per confirmed separateMAC-yig6fixture issue.
+- After terminalsession69806, read-only ps found no owned test/fixtureCLI process remaining. Worktree clean at15252d255fa12a131fbc2cdb13f593a212fd4ccb; all7frozen hashes and installedMachinery5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849 reverified unchanged.
+LEARNINGS: Aggregatebudget exhaustion interrupted a1s leaf, not a hung90s operation; compare partial outcomes with complete frozen inventory; preserve real passing rollback evidence without claiming unexecuted safety/fullpackage success.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Root-directed measured-budget hold with exact candidateSHA, rawhash and complete85-name inventory above.
+- No deliver/release/approve-red/close, source/test edits, liveinstallation/remote/userDagger mutations or unobserved background tests.
+
+### proof
+- [x] AC #1: current full recorded-plan/default/schema1 and ordinary/bootstrap parity checksPASS.
+- [ ] AC #2: current repair andauthoritycontrolsPASS;49unstarted include required remaining safety/privatevalidation checks.
+- [x] AC #3: all8currentactual convergence/edited/single/multimissing repair+idempotence casesPASS.
+- [ ] AC #4: threepostmutation rollback casesPASS; bootstrapmissing-prestate interrupted after1s andstartuprecovery unstarted.
+- [x] AC #5: actual builtrelease/CLI/checksums/children/private roots executed withoutskips or livewrites.
+- [x] AC #6: all4currentactual oneparentwriter casesPASS including twoonefault/fullrollback/absence/journal/lock cases; authoritycontrolsPASS.
+- [x] AC #7: all5actual standalonevalid/conflict/restoration/follow-on casesPASS.
+- [ ] Complete GREEN/native proof and independent acceptance pending reviewed aggregate verification budget.
+
 
 ## nd_contract
 status: in_progress
