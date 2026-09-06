@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:51:33Z
-content_hash: "sha256:125254215a0e4987dff88151046fd2924836b0e99e4b1e1f33a4350ca5583b4b"
+updated_at: 2026-09-06T06:57:21Z
+content_hash: "sha256:9d25ef5cbeec6b54eb61cfc48f3b8ebcf10a8fef206e0a37af61df230fd9d870"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
 ---
@@ -1106,3 +1106,73 @@ status: rejected
 - [x] AC #4: Current197rows/218successfulwitnesses+10supplements bidirectionally reconciled to exact native identities with0SKIP.
 - [ ] AC #5: Story not accepted; R1 implementation repair plus R2 canonical delivery shape and fresh reviewed candidate handoff remain pending.
 
+
+### 2026-09-06T06:57:21Z ramirosalas
+## AUTHORITATIVE SAME-STORY REJECTION SCOPE AMENDMENT — MAC-uzxr
+
+This supported append-only live amendment supersedes ONLY prior eight-path ownership and conditional cost forecasts for the confirmed dc3a8a365c21d5370c0825de992e2461ea0785a9 rejection repair. All five original AC, the approved closed dialect/API, six frozen test files and original495-line prefix, previous exact amendment authority, original RED/scaffold evidence classes, metadata and dependency chain remain unchanged. The new ninth path below is current canonical ownership even though historical Description/Notes retain eight-path/no-new-file forecasts. No duplicate bug/epic, new production seam/API, Task change, existing-test amendment, phase/claim transition, GREEN approval or automatic consumer claim is introduced.
+
+## Confirmed R1 and exact boundary
+
+Independent PM REJECTED exactdc3a8a against70652b948bf090008b1965c85daf36ea374daea4. Full /tmp/MAC-uzxr-PM-green.7BaxI6/REVIEW.md SHA256dec4dd53d5f57dac813c9290fced9c4b366484fd8fc027da6ed8d695a3d2b74a and closed CONTRACT.md SHA256b3f444c5398b558916dec80a4dacf8c651420b6aa36d876326d606312baf8cdd were read in full. objectFields in already-owned examples/go-crm/impl/internal/testoracle/fsm.go uses strings.Contains over a space-delimited field list: a composite key spanning adjacent allowed names is incorrectly admitted. Public Parse actually returned60rows,nil for ten unknown keys across root/state/transition/invoke; matched Session control passed and ordinary notAllowed at each scope returned oracle-parse. Diagnostic process exit0 means the probe ran, not contract success. Existing passing tests do not close this missing negative case.
+
+PRODUCES:
+- examples/go-crm/impl/internal/testoracle/fsm_field_membership_test.go -> NEW TestFSMParseExactFieldMembership(t *testing.T), real public parser regression with isolated in-memory copies of actual committed Session inputs and deterministic structural targets. This is the only additional path, absent atdc3a8a; do not edit any of the six frozen files or factor their helpers.
+- Already-owned examples/go-crm/impl/internal/testoracle/fsm.go -> later GREEN exact structural field-name membership correction only, retaining the existing public API, allowed fields, error category and all dialect/reconciliation semantics. No implementation during RED or by SrPM. Selection of concrete implementation text belongs to the separately routed GREEN author after independent RED approval.
+
+CONSUMES:
+- Exactdc3a8a Go CRM test-support API: func Parse(oracle, machine []byte) (*Suite, error); Suite exposes Name string, Rows []Row and States []State. This package is private example test support, not a new Machinery production API. Call Parse, not objectFields directly and not a source-pattern assertion or copied parser. Existing fsm_test.go TestFSMParseCommittedMachines reads actual inputs from ../../../design/machines and calls Parse/Load; use that source-verified real-input convention without editing its helpers.
+- Read-only committed examples/go-crm/design/machines/Session.oracle.md and Session.machine.json. Deterministic verified JSON targets are root; states.Anonymous; states.Anonymous.on.login transition; states.Authenticating.invoke. Decode a fresh copy for each single-key mutation; assert expected target existence and JSON object shape, avoiding map-iteration-dependent selection and accidental replacement of a valid key. Marshal into private memory only; do not modify committed oracle/evidence files.
+
+## Fresh RED matrix and independent hold
+
+Use exactly the public Parse contract on the matched committed Session pair. At rejecteddc3a8a, the raw unchanged control must succeed with Name session and all60 current rows. Preserve row/state identities and ordered actions in valid controls, not merely a nil error or string membership. The60 count is the exact selected committed fixture expectation, not a global197/218 ceiling or future schema restriction.
+
+Ten separate unknown-key cases, each with an arbitrary object value such as {unexpectedSemanticData:true}, must fail with a nil result and specific oracle-parse unknown-field diagnostic naming that exact key:
+- root: id initial; _comment _role; context states.
+- state: on after; type entry; invoke _refusal.
+- transition: target guard; guard actions.
+- invoke: src input; onDone onError.
+
+At all four same structural targets, separate ordinary notAllowed controls must still reject with oracle-parse: unknown field notAllowed. Each case must execute independently; an earlier failing composite assertion cannot prevent later scopes from running. Baseline RED must show actual nil-error/accepted malformed input as the intended failed assertion, with matched unchanged and ordinary-unknown controls passing. Compile/import/setup/timeout failures, arbitrary errors, skipped cases or a probe program's own exit0 are not RED proof. No fixture branch may accept the unsafe baseline to manufacture a passing test.
+
+Valid declared metadata/context controls are equally mandatory: root _comment/_role strings, _delays/_counters string-to-string maps, state _refusal string-to-string map and invoke.input expression-string map remain accepted in their declared positions. Root context remains a data-only JSON object with arbitrary data values, including nested objects/arrays/null and data keys that resemble structural/composite keys; metadata map keys likewise remain data where the existing closed contract permits them. Prove these additions do not change parsed rows/states/actions and are never evaluated. This distinguishes exact structural membership from a global key-name ban or underscore ban. Unknown structural composite _comment _role remains invalid despite resembling two metadata names. Retain existing duplicate-key/type/unsupported-shape/identity semantics and all frozen dialect tests without amendment. No allowed field, metadata position, schema/API, runtime behavior, new grammar exception or name-normalization rule may change.
+
+Root must route a fresh RED author scoped solely to the new file at exactdc3a8a. Suggested native command from examples/go-crm/impl: GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=120s ./internal/testoracle -run '^TestFSMParseExactFieldMembership$' -json. Record source/test hashes, exact cwd/argv/environment, every discovered leaf terminal, actual failures/controls, durations and raw logs. Use existing local Go toolchain and ordinary package execution; no dependency/module changes, service, Docker, native harness modification, production seam, skip-if-missing, test-result fabrication or Paivot runtime dependency. Independent PM must replay/review exact new RED test bytes and genuine baseline behavior BEFORE separate GREEN makes the already-owned fsm.go correction. This scope amendment is not approve-red, old-test edit authority or GREEN application permission. Freeze the new regression hash after that independent checkpoint; all original six frozen files remain byte-identical throughout.
+
+## Preserved freeze and full final proof
+
+Frozen hashes, paths relative examples/go-crm/impl:
+- internal/cli/command_test.go:38945b9307d97dadb872ac5a261ff86d712c218282774404b432842e34577d60
+- internal/domain/deal_test.go:2bfd0893253b9f3c4b6cf1badbf3402a952551f5b4f5124a3d0a9afb7bf432cd
+- internal/domain/task_test.go:35b8a05a710792ff21dd827432d658deba1ee190b8739196b084cdc61f7b2b88
+- internal/domain/user_test.go:d4fab40b760e5f1a94a5cab88bea6625495c04dd1690dc197818bfd1d056b53d
+- internal/session/machine_test.go:97e612a68e22b32010ec7c696cb1ee248115f5a41f3b80400a40160a8782a11f
+- internal/testoracle/fsm_test.go:4578841816e77712ed249a349e1f63c13c7eac233f15eccacb2d0ee916527b25
+Original495-line prefix SHA256326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba remains exact. Preserve all218 original tuple/setup/event witnesses and original terminal supplements, approved Task real fallback/entry/context behavior and exact unsafe variant anchors. No Task/runtime/native-harness/oracle/module/BUILD/attestation/acceptance change is authorized. hgz1 consumes the accepted same-story corrected parser/source/tests/full evidence as already sequenced; no downstream edit or dependency change is necessary, and lnu6 holds stay unchanged.
+
+After GREEN, re-run the new regression and all original required parser/focused/native-sensitivity/executed-inventory families with matched controls, exact current native identity/row/registration/observation audit, all20 original unsafe variants, default cleanup/explicit export, unchanged deadlines and same-candidate source/frozen-hash/TDD/static proof. Previously reported68 parser/228 focused/3+3+17 meta leaves,43 children and197rows/218witnesses are historical measurements to reconcile, not fresh repair proof or a future hard ceiling. Preserve genuine original semantic RED and nonqualifying scaffold failures separately; no retrospective relabeling or authenticated execution claim.
+
+## Honest revised cost
+
+Exactdc3a8a base aggregate is3212 additions+331 deletions=3543 changedLOC across eight paths. Prior historical2953 plus GREEN622=3575 cumulative changedLOC. Independent PM explicitly found the modest closed-parser forecast excess justified, not a cost rejection: full closed grammar/type/metadata/duplicate/error precedence explains implementation619changed plus exactTask3changed. These measurements replace the obsolete conditional3300–3500 cumulative/3200–3400 aggregate forecast; neither was a cap.
+
+New bounded estimate:120–220 added regression LOC for14 independent negative cases plus real matched metadata/context/committed controls, deterministic object targeting and actual Parse assertions;5–20 changedLOC for exact membership in already-owned fsm.go. Nine total possible paths, conditional approximately3670–3790 aggregate changedLOC and3700–3820 cumulative changedLOC. Report exact measured additions/deletions/cumulative rework and runtime separately. This is a forecast, not a cap or permission to trim full proof; explain material overrun and escalate any new path/API/seam before editing. The direct parser matrix should be small beside unchanged native43-child cost, but no unexecuted timing is claimed and no timeout expansion is authorized.
+
+## R2 delivery record repair — later re-delivery only
+
+The independent supported verify-delivery result was3OK/6FAIL despite substantive executions, producing SHA and AC evidence actually existing. Retain that failure and all real logs; it is evidence-format/placement failure, not absent test execution. Later repaired-candidate delivery must append recognized standard ## Implementation Evidence and CI/Test Results sections, a Commands run: list with actual commands, Summary: line with actual results, exact producing commit SHA and AC checklist/table. Include the fresh regression and unchanged full native proof with explicit limits. Use supported append-only nd operations and normal delivery transition; never --description/--body-file, destructive rewrite or waiver. Put the authoritative nd_contract status: delivered at actual EOF after all evidence, and require actual pvg story verify-delivery MAC-uzxr9OK/0FAIL before PM acceptance. Do not mark delivered or run acceptance/claim choreography in this scope task, and do not recycle rejected-candidate results as fresh repaired execution.
+
+## nd_contract
+status: rejected
+
+### evidence
+- SrPM source-confirmed same-story R1/R2 scope amendment; full independent PM report/closed contract/current canonical and latest rejection evidence read. Exact source interfaces and Session target objects verified from committeddc3a8a; graph main index ready but new testoracle symbol absent, so committed-source fallback used. Existing five AC/history preserved; only append-only ninth-path/cost supersession and independent RED/re-delivery holds are added.
+- No source/test/example implementation, frozen-test permission, schema/API/native-harness/Task/dependency/claim/status/label change, acceptance, remote/preflight/install/assets/service operation. Machinery remains standalone; Paivot/nd are private coordination only. Scoped structural checks and exact append readback will be reported separately, never as AC execution or epic completion proof.
+
+### proof
+- [ ] AC #1: R1 remains pending genuine new RED, independent review and exact structural membership repair on a fresh candidate.
+- [x] AC #2: Prior independent one-Fire actions/Task entry-context and missing/name-only variant evidence retained; no fresh execution or whole-story acceptance claimed.
+- [x] AC #3: Prior specified20 real unsafe variants and matched controls retained; repaired candidate must replay them.
+- [x] AC #4: Prior exact197rows/218successfulwitnesses+10supplements/native bidirectional inventory retained; fresh candidate proof remains required.
+- [ ] AC #5: R1 repair and R2 recognized delivery9/9 plus authoritative delivered EOF contract and independent reviewed handoff remain pending.
