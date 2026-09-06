@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:42:45Z
-content_hash: "sha256:493d8059db70dba5f129b59a006365c5b4ae30c3ed05dc942720d5343e02ea94"
+updated_at: 2026-09-06T00:44:09Z
+content_hash: "sha256:956670e6f58caf9f66bafd74e49e4b638370932a6e331cfd969cc96e801802be"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
@@ -115,7 +115,45 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+## PM RED Decision
+RED APPROVED [2026-09-05]: MAC-sh60 candidate fa842ed374ad5c82d8c8f4f9e0c3aead56c9cfa3. This approves the immutable RED acceptance bar for GREEN; it does not accept or close the story and does not claim production satisfies the ACs.
 
+The previous rejection is resolved. Diff from b5d3b8c67f487195215860f3d361432f5b2b6b27 is exactly six inserted entries, zero removals, in TestOracleCoverageRejectsNonExecutableEvidence. Fixture bytes/names match the six expressly authorized Elixir @moduledoc/@doc and Ruby block-comment cases. The existing twenty cases, shared assertions, helper semantics, every other test and all production bytes are unchanged. Commit subject contains tdd-red and [test-edit-authorized]. The four older fixture repairs remain exactly their prior reviewed forms.
+
+## Independent replay evidence
+- Reviewed full five-AC canonical story, original and supplemental exact authorizations, prior rejection, new complete proof/LEARNINGS/inventory via shared pvg nd. pm_acceptor and codebase-memory skills were fully read during the first review and applied on this resumed review. Prior source/graph assessment remains valid for unchanged bytes; exact new six-line diff is the source authority, with no repeated graph completeness claim.
+- Reviewed in own clean detached /tmp/MAC-sh60-pm-rered.NMFVGG/review at fa842ed374ad5c82d8c8f4f9e0c3aead56c9cfa3. Production base remains 6cb2d974ea8aea211a5974f453cef2b5802bb11e. Rework +6/-0; cumulative 3 files, 291 insertions/8 deletions (299 changed LOC), within budget. git diff --check passed.
+- Fresh static pvg verify internal/gates/oraclecov_negative_test.go internal/gates/oraclecov_test.go cmd/machinery/oraclecov_negative_test.go --include-tests --format text: sole existing oraclecov_test.go:158 TODO marker is unchanged quoted negative fixture input. Source-confirmed test data, not a stub; no suppression/repair. No new public API/config or changed product behavior/doc claim in this RED-only delta.
+- Command 1 from detached candidate: go test -json -count=1 -timeout=120s ./internal/gates -run 'Oracle|Conformance|Coverage|GtCitationBoundaries' > /tmp/MAC-sh60-pm-rered.NMFVGG/gates.jsonl. Session 66126 completed exit 1: 96 native leaves, 68 pass/28 intended fail/0 skip.
+- Command 2: go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestOracleCoverageCLI' > /tmp/MAC-sh60-pm-rered.NMFVGG/cli.jsonl. Session 32924 completed exit 1: 10 native leaves, 4 pass/6 intended fail/0 skip.
+- Command 3: go test -json -count=1 -timeout=90s ./internal/gates -run '^TestGt' > /tmp/MAC-sh60-pm-rered.NMFVGG/gt-controls.jsonl. Completed exit 0: 7 pass/0 fail/0 skip. Two boundary leaves repeat the first run; counts are per command, not summed unique.
+- Exact independent leaf inventories: /tmp/MAC-sh60-pm-rered.NMFVGG/{gates,cli,gt-controls}-inventory.json, derived from terminal pass/fail/skip records with parent suites excluded. Raw logs retained at the paths above.
+- Every new leaf reaches oraclecov_negative_test.go:88 "non-executable evidence established coverage". elixir_moduledoc_ids, elixir_doc_ids and ruby_block_comment_ids return errs=[] and 2 literal IDs; elixir_moduledoc_parser, elixir_doc_parser and ruby_block_comment_parser return errs=[] and 1 conformance parse. All six are actual false-credit failures, not setup/parse/native-compile errors.
+- Existing 20 source negatives, mixed-disabled count/diagnosis and two discovery-label tests retain their intended causes. Actual CLI controls pass and five bypasses fail because real Gt exits 0 instead of 1. Built native CLI, temporary real trees and private HOME/config path remain unchanged and executed; no mocks/injected results.
+- Native parser control ran again: unchanged table inner TestOracle exits 0 after exactly two checked-row logs; changing only the first expected target B -> A reaches "oracle transition mismatch: got B want A", inner exit 1 and outer corrupt_true PASS. Other-language fixtures establish discovery only, not native execution. No compile/import/read-path/timeout failure is RED evidence.
+- Independently matched SHA256: internal/gates/oraclecov_negative_test.go 42f1237819cfecc4a265fd5dfa4a90050d8f0f77f9aa0baf27b42995d8834e45; internal/gates/oraclecov_test.go dd68d778605397184630447bc09b712072fe604be77c496177d121690414b994; cmd/machinery/oraclecov_negative_test.go 6ea06399d8271691f7f40f30f067e0d3270184eaca4fc2548cc7a562c7775d08; unchanged internal/gates/oraclecov.go 9f4bfabcfe43362b62068e59a59f313cd6d27a3490392f66c5fcf71be70684ad.
+- Coverage percentage not measured for intentionally failing RED with no production edits; behavioral counts and exact inventories above establish the reviewed bar. No global preflight, external-runtime suite, installation/dev-link/live binary/plugin/skill change, remote action, main/epic merge, or author worktree edit.
+- Canonical pvg story approve-red MAC-sh60 succeeded from the detached candidate. Immediate shared readback: Status open, Labels hard-tdd/red-approved (delivered/rejected absent), Assignee dev-MAC-sh60 retained by canonical transition. Root dispatcher owns the next GREEN claim. No --next or accept/close used.
+
+LEARNINGS:
+- Six precise language-comment regressions close the reproduced RED gap without weakening parser positives or native assertion-sensitivity controls.
+- GREEN must preserve all approved RED tests/fixtures byte-for-byte. Prior authorizations have been fulfilled and provide no continuing license for edits; any new repair requires a separately named reviewer authorization and re-RED.
+
+## nd_contract
+status: new
+phase: red-approved
+
+### evidence
+- RED fa842ed374ad5c82d8c8f4f9e0c3aead56c9cfa3 independently approved via canonical approve-red; shared status open with hard-tdd/red-approved. Ready for GREEN, not accepted.
+- Fresh targeted replay: gates96 = 68 pass/28 intended fail; CLI10 = 4 pass/6 intended fail; extraGt7 pass; zero skips. Exact artifacts, causes and hashes above.
+
+### proof
+- [x] AC #1 RED bar: 26 non-executable source cases plus mixed-disabled coverage constrain reproduced bypasses, including all six prior rejection cases.
+- [x] AC #2 RED bar: 11 literal language/extension and 7 parser language controls plus 2 native parser semantic/mutation controls pass unchanged; ambiguous evidence negatives remain.
+- [x] AC #3 RED bar: full CheckOracleCoverage bypass/zero/mixed/malformed/positive cases and actual CLI integration executed.
+- [x] AC #4 RED bar: unit and CLI discovery-versus-execution assertions reach intended failures; static discovery never claims assertions ran.
+- [x] AC #5 RED bar: stable-ID/file boundaries, orphan/missing-oracle, parent/clause and Rust/MJS preservation controls pass; actual CLI proof remains valid.
+- [ ] GREEN: implement all five ACs with approved RED bytes unchanged, then deliver independent production proof for PM acceptance.
 
 ## nd_contract
 status: red-approved
