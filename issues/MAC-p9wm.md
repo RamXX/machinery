@@ -9,9 +9,9 @@ parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
 updated_at: 2026-09-06T12:04:37Z
-content_hash: "sha256:afd2f378d42abcc2af76b6f39b6909d9aaf3af0026b4ece3305033abd9316eed"
+content_hash: "sha256:86a9dec496c79eaa9caa34fcf231f212114afec50d317284edb2a1ddf02a53d2"
 related: [MAC-l7m0]
-blocks: [MAC-qlw2]
+blocks: [MAC-qlw2, MAC-vx24]
 ---
 
 ## Description
@@ -327,10 +327,11 @@ status: new
 
 ## History
 - 2026-09-06T12:04:53Z dep_added: blocks MAC-qlw2
+- 2026-09-06T12:04:53Z dep_added: blocks MAC-vx24
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-qlw2]]
+- Blocks: [[MAC-qlw2]], [[MAC-vx24]]
 - Related: [[MAC-l7m0]]
 
 ## Comments
