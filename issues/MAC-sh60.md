@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:12:56Z
-content_hash: "sha256:fb8d39516d3891b27cabebd6ea29a3f560d28d05aa2f69bebde3c46065dd337d"
+updated_at: 2026-09-06T00:14:14Z
+content_hash: "sha256:e75e1394a46464618fbf9ecd66db98ccef3d6289d985beeb1e6f02a3f04274b6"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-sh60
 follows: [MAC-a89e, MAC-p8ce]
@@ -115,6 +115,61 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+## Implementation Evidence (DELIVERED)
+
+PROOF:
+
+### CI/Test Results
+- Commands run:
+  - go test -json -count=1 -timeout=120s ./internal/gates -run 'Oracle|Conformance|Coverage|GtCitationBoundaries'
+  - go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestOracleCoverageCLI'
+  - go test -json -count=1 -timeout=90s ./internal/gates -run '^TestGt'
+- Summary: RED expected failures: gates 68 PASS / 22 FAIL / 0 SKIP from 90 leaves; CLI 4 PASS / 6 FAIL / 0 SKIP from 10 leaves; extra Gt controls 7 PASS / 0 FAIL / 0 SKIP (2 boundary leaves repeated). All failures reached intended coverage assertions. Positive native parser checked both rows; changed expected target reached exact transition mismatch assertion. No compile/import/fixture/timeout failure counted.
+- Coverage: not measured (RED phase, no production edits); full behavioral matrix/raw JSON/exact leaf inventory in preceding RED Delivery note.
+- Artifacts: /tmp/MAC-sh60-red-proof.D3QqXS/gates.jsonl, cli.jsonl, gt-controls.jsonl and matching *-inventory.json.
+- Scope: targeted native Go/real local CLI/filesystem, no services; no preflight or unrelated heavy suites.
+
+### Commit
+- Branch: story/MAC-sh60
+- SHA: b5d3b8c67f487195215860f3d361432f5b2b6b27
+- RED-only tests on unchanged production 6cb2d974ea8aea211a5974f453cef2b5802bb11e; GREEN pending.
+- 3 files, 285 inserted/8 removed. Frozen hashes and four exact PM-authorized expression edits recorded above.
+
+### Wiring
+- New unit tests call actual CheckOracleCoverage.
+- New CLI tests use unchanged goldenBin -> go build -> runBinWithEnv -> built machinery check --gate gt on real temp trees.
+- Native runtime control executes actual Go fixture and asserts expected row mismatch after oracle-target mutation.
+
+### pvg verify
+- pvg verify internal/gates/oraclecov_negative_test.go internal/gates/oraclecov_test.go cmd/machinery/oraclecov_negative_test.go --include-tests --format text
+- VERIFY: FAILED (3 files scanned, 1 issues), sole intentional existing TODO comment fixture at oraclecov_test.go:158; no stub/thin files. Exact PM preservation boundary forbids editing this unrelated negative fixture. Documented input marker is not unfinished work.
+
+### AC Verification
+| AC # | Requirement | Test Location | Status |
+|---|---|---|---|
+| 1 | reject comments/docstrings/declarations/disabled source | oraclecov_negative_test.go RejectsNonExecutableEvidence/MixedActiveAndDisabled | RED assertions reached, GREEN pending |
+| 2 | preserve active literal/parser discovery, reject ambiguous evidence | LiteralLanguageControls/ActiveParserLanguageControls/ParserRuntimeControl | 20 positive native leaves PASS; semantic mutation reached |
+| 3 | full gate matrix, zero/mixed/malformed/positive | new gate/CLI negative files and existing zero-test control | Executed; expected RED only |
+| 4 | discovery versus execution label | OutputLabelsDiscoveryOnly/CLILabelsDiscoveryOnly | 2 intended RED failures |
+| 5 | boundaries/orphan/missing/clause/real CLI | preserved existing controls and CLIRealTrees | preservation controls PASS; CLI bypass RED |
+
+LEARNINGS:
+- Filename/delimiter scanning falsely credits unused or commented source; literal scanning also accepts fake Go test identities.
+- Semantic parser control must compare real fixture behavior against expected oracle results and prove the mismatch path.
+- Full proof and immutable hashes are recorded; this is RED delivery, never a claim the production ACs already pass.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED SHA b5d3b8c67f487195215860f3d361432f5b2b6b27; exact runs, counts, raw output, inventories, hashes, native semantic controls recorded.
+
+### proof
+- [x] AC #1: expected unsafe-coverage failures reached.
+- [x] AC #2: positive parser/literal controls pass.
+- [x] AC #3: full gate and actual CLI matrix executed.
+- [x] AC #4: output distinction RED reached.
+- [x] AC #5: selected preservation controls pass.
 
 
 ## nd_contract
