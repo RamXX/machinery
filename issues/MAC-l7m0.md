@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:12:24Z
-content_hash: "sha256:4d62bb6d5fd09e380be13efa49e284a8a7363fb4f22751c578489bd3225cfc59"
+updated_at: 2026-09-06T10:17:35Z
+content_hash: "sha256:6d34f2fd82d57061af5df9982c1bc27752c3a22fbf98e22b0e3170abe8869bd6"
 blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
 follows: [MAC-uzxr, MAC-p7jd]
 assignee: dev-MAC-l7m0
@@ -215,3 +215,53 @@ status: new
 - [ ] A4: Approval/implementation/evidence truthfulness verified.
 - [ ] A5: Targeted positive and negative document validation.
 - [ ] A6: Developer delivery followed by independent PM acceptance.
+
+### 2026-09-06T10:17:35Z ramirosalas
+## Implementation Evidence (DELIVERED)
+
+PROOF:
+
+### Document validation
+- Approved source checked: 589 lines, 113493 bytes, SHA256 e467a3b6c6f657e7a4cb28e85c688be0df24c56a7e3c76fdcfa224f7ff5d2624. Independent challenge checked: 32 lines, 3378 bytes, SHA256 0205b50a8eb2e135230173bbf4a7b7eccdde5934fabab5aa4b2dde95d474ac66.
+- Public projection: `wc -l -c docs/test-assurance-contract.md` => 575 lines, 109367 bytes; `shasum -a 256` => 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; mode => 0644.
+- Projection review: retained source lines 1-575; accounted line replacements 1, 3, 4, 8, 477, 519, 537, 539, 541, 545, 547, 568, 575; applied the seven recorded literal substitutions and repository-wide em-dash normalization. The resulting exact expected byte hash validates the complete deterministic projection.
+- Negative validation: no private tracker IDs, private `/tmp/machinery` or workspace paths, NIL/Dagger, challenge chronology, or implementation-complete claim; required schemas/API/argv/catalog/error/custody/replay/Ga keys remained present. `git diff --check` passed.
+- `pvg verify docs/test-assurance-contract.md --format text` passed; it reports 0 scanned files because this documentation path is excluded by the verifier, so hash/diff/key/negative checks above are the substantive document validation.
+
+### Commit
+- Branch: story/MAC-l7m0
+- SHA: 0feaebf725267f9d0045d653ef57a90af0c9d946
+- Scope: one new documentation file; no source, test, runtime, CI, installation, remote, merge, or acceptance mutation.
+
+### AC Verification
+| AC | Evidence | Status |
+|---|---|---|
+| A1 | Exact 575-line, 109367-byte public projection and SHA256; no second artifact | PASS |
+| A2 | Deterministic full projection and required normative interface/catalog/lifecycle key checks | PASS |
+| A3 | Private tracker/workspace/challenge coordination negative checks; standalone dependency statement retained | PASS |
+| A4 | Status and acceptance-obligation text explicitly distinguish approval from implementation/native evidence | PASS |
+| A5 | Bounded exact-byte, key-presence, private-leak, false-completion and diff-whitespace checks; no heavy/runtime work | PASS |
+| A6 | Committed evidence supplied for independent PM byte and normative review | PASS |
+
+### Provenance
+- A prior discarded candidate was not accepted or validated: its omitted line-477 transformation produced 109372 bytes/SHA256 4a73aa0bc6a205b3c0d672d73c398c55d2f90d1f819c342f20bafa77e775e41c and readonly mode prevented a valid patch. This fresh worktree creates the correct 0644 document and does not represent that failed attempt as proof.
+
+LEARNINGS:
+- Exact public projections need both byte verification and explicit semantic/key-preservation checks; a matching document hash is strongest when paired with an accounted transformation map.
+- Documentation-only validation is appropriately bounded: the repository verifier excludes docs, so its clean result is not a substitute for projection review.
+- The contract intentionally leaves native feasibility, two-platform custody/assertion proof, first-use lifecycle proof, process-producer audit, and cumulative deadlines to separately owned executable acceptance work.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Commit 0feaebf725267f9d0045d653ef57a90af0c9d946 on story/MAC-l7m0.
+- Exact public SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; source/challenge hashes independently checked.
+
+### proof
+- [x] A1: Exact single public projection landed.
+- [x] A2: Normative contract preserved by deterministic projection and key checks.
+- [x] A3: Public standalone boundary checked.
+- [x] A4: Approval is not claimed as implementation/native evidence.
+- [x] A5: Bounded positive and negative document validation completed.
+- [x] A6: Committed for independent PM acceptance.
