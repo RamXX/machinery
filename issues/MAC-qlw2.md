@@ -1,15 +1,15 @@
 ---
 id: MAC-qlw2
 title: "Retain native child ownership until cleanup completes"
-status: deferred
+status: open
 priority: 0
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T17:01:55Z
-content_hash: "sha256:0859eacc08fa3a7fdcdd3e57c4285c3caaac362b472d3c0966cdd6ba28f8ecd3"
+updated_at: 2026-09-06T23:26:32Z
+content_hash: "sha256:cf44b14d35c4a8e79e48d48cfc478080abb26223d82566faf0ffdf2b0fe0e0b3"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0, MAC-p9wm]
 assignee: dev-MAC-qlw2
@@ -121,6 +121,7 @@ status: in_progress
 - 2026-09-06T12:04:53Z dep_added: blocked_by MAC-p9wm
 - 2026-09-06T12:31:39Z dep_removed: was_blocked_by MAC-p9wm
 - 2026-09-06T17:01:33Z status: in_progress -> deferred
+- 2026-09-06T23:26:32Z status: deferred -> open
 
 ## Links
 - Parent: [[MAC-ui8a]]
