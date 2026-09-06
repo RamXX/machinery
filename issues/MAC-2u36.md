@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:04:04Z
-content_hash: "sha256:bf5d692fab7d2c7efccdafd18dbe6548f5ef0d1191e3fb3fb64e1161defd9268"
+updated_at: 2026-09-06T02:04:19Z
+content_hash: "sha256:1f73abc213809c171942fe82060145c133b5c7a5f17ec6c193eb825274c8e804"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -2671,4 +2671,62 @@ status: in_progress
 - [x] AC #7: actual conflict/restoration/follow-on and valid-recording controls reviewed.
 - [x] Independent repaired test freeze approved; healthy retained GREEN may resume verification with no test edits.
 - [ ] Full current GREEN matrix/native regression, complete implementation acceptance review and final product acceptance.
+
+
+### 2026-09-06T02:04:19Z ramirosalas
+INDEPENDENT AGGREGATE BUDGET DECISION: AUTHORIZE BOUNDED COMPOSED VERIFICATION — MAC-2u36, 2026-09-06 UTC.
+
+The15m package timeout is aggregate exhaustion, not an individual operation failure. Authorize the exact finite completion strategy below, replacing the requirement to repeat the whole Bootstrap|Receipt|UpdatePlan selector and then repeat it again inside one native install-package invocation. Preserve every frozen test, assertion, individual90s/other child bound and all required coverage. This is a verification-budget/selection decision only, not acceptance, delivery, RED approval, a claim/status/label/dependency transition, test/source/config edit or full-preflight permission.
+
+Run each authorized command ONCE, sequentially, on unchanged clean candidate15252d255fa12a131fbc2cdb13f593a212fd4ccb, capturing native stdout/stderr directly to separate raw JSON artifacts before display. Existing retained GREEN worktree may be used by its owner. Stop and report an assertion/infrastructure/individual-timeout failure or exhausted package with exact remaining inventory; do not repeat, expand budgets or alter tests without reviewed cause. No arbitrary retry is authorized.
+
+A. Complete exactly the8remaining actual BootstrapReceiptCLI cases, with7m package bound:
+
+go test -count=1 -timeout=7m ./internal/install -run '^TestBootstrapReceiptCLI$/(missing_prestate_later_target_failure_rolls_back_bootstrap_true|corrupt_receipt|unsafe_receipt|stale_schema|plugin_discovery_failure|symlink_native_artifact|non-directory_native_parent|interrupted_download_recovers_real_transaction)$' -json
+
+These are the one interrupted leaf plus seven unstarted CLI leaves. Expected8required terminal leaves, zero omitted/skipped; repeated fixture setup and parent container events are not extra behavioral leaves. The other24CLI leaves completed successfully in the current timed-out invocation and remain valid exact-SHA evidence. Do not rerun those900s of work. Baseline same8leaves cost135.56s; candidate missing-prestate sibling33.92s and matched safety cases/fixture setup justify the finite420s allowance with scheduling room. This is an allowance, not a claimed candidate completion time or a relaxed individual deadline.
+
+B. Complete the entire remaining native install package, with its existing15m bound, excluding ONLY the exact top-level CLI matrix already covered by A plus current completed evidence:
+
+go test -count=1 -timeout=15m ./internal/install -skip '^TestBootstrapReceiptCLI$' -json
+
+C. Complete the native CLI package unfiltered, with the existing15m bound:
+
+go test -count=1 -timeout=15m ./cmd/machinery -json
+
+The maximum additional package runtime allowances are420+900+900=2220s, not an unbounded full-suite retry. No complete same-SHA runtime estimate exists for B or C, so this decision does NOT assert they fit15m or that a monolithic native/race package fits20m. These are finite existing regression caps. If either cap is exhausted, retain all terminal results, classify interrupted/unstarted tests precisely and report for a further evidence-based decision; do not treat unexecuted tests as covered or expand automatically. Known coverage-fixture issue MAC-yig6 does not waive any command or failure.
+
+Coverage accounting is mandatory:
+- Independently compiled/listed native test inventory at exact15252d2 in PM-owned detached /tmp/machinery-pm-MAC-2u36-budget.FBiyzE/checkout using `go test -count=1 -timeout=2m -list . ./internal/install ./cmd/machinery -json`. No tests executed. Both inventory processes completed normally; checkout remained clean.
+- Raw native-inventory.jsonl in that directory SHA25690356735b0dcdeea8ec17a3483f4eb2cacf00e6925212fa98bdf6f152dcbe2f5. Exact Darwin inventory:190unique install top-level test items,263unique cmd items. Install list hash70e7411a5eadff2d68f067f2b5ae2b3d90eacaf77e584fbbfb9f70595e8d96da; cmd list hashd8a5b301710e81b85603c21267f67324bfecf66c58ff5e26ed0e2a3dafe6e347 (ordered names joined with newline plus final newline). TestMain is not a test item. No examples/fuzz functions found in the bounded committed source scope.
+- B must select exactly189install top-level items: inventory minus TestBootstrapReceiptCLI. C must select all263cmd items. Reconcile every selected top-level start/terminal and every dynamically emitted subtest; preserve all required cases. Platform/tool-specific skips and dormant helpers must be named honestly and never counted as executed required behavioral proof. Helper functions occur in inventory but an uninvoked helper return is only scaffolding. Existing actual helper invocation assertions remain required.
+- The85-leaf frozen story selector consists32CLI leaves plus53non-CLI leaves. Existing successful current invocation covers24CLI plus11non-CLI leaves; A adds8CLI; B supplies all53non-CLI selector leaves plus the remaining native install regression tests. The union therefore covers all85without omission. Three legacy update controls are outside that regex and included in B. Their existing current focused passes remain supplemental evidence, not extra duplicate credit.
+- Report this as COMPOSED exact-SHA matrix/native coverage, with command-specific package results and a union of named behavioral outcomes. The original package timed out and TestBootstrapReceiptCLI parent did not terminate; never relabel it a full package pass. A/B/C successful parts plus current completed leaves do not prove a single uninterrupted full-package run or race execution. If source/frozen inputs change, do not silently carry current evidence to the new revision; establish the affected proof requirement before claiming exact-SHA completion.
+
+Independent measured evidence:
+- Read complete15252d2-package-budget-report.md; verified SHA2564f91e46afbc8d0ca9b4b622f09f042eb5448f58ab8948bedb3bcf9c717af82cf. Independently hashed/parsed15252d2-full-green.jsonl under /tmp/machinery-MAC-2u36-green.G05gWz:2d5eb852990952e57e6bcf2c5aff3618821da4c2e16744240b25eab6f25348da.
+- Compared against exact frozen85-leaf baseline inventory:35PASS0assertionFAIL0SKIP,1interrupted,49unstarted;42run events40terminals. Package900.473s. Alarm explicitly reports TestBootstrapReceiptCLI14m49s and interrupted missing_prestate_later_target_failure_rolls_back_bootstrap_true1s; timestamps give approximately0.817s. No individual90s alarm/command deadline or assertion failure was demonstrated. Interrupted leaf has no rollback credit.
+- Current24completed CLI leaf durations sum818.04s, before outer fixture/setup. Actual convergence/idempotence all8cases, all4parent controls including both real one-injection full rollbacks, all4authority controls, all5standalone controls, both intact later-source rollbacks and ordinary missing-prestate rollback passed. Valid terminal leaf evidence is retained, not misclassified as full package success.
+- Baseline full53572ef replay769.988s is an old-production runtime where17desired-success cases fail early; it cannot predict GREEN successful-operation cost. Current focused parent201.231s and controls16.055s corroborate completed expensive operations but do not establish full native-suite duration. No historical or cross-story cmd timing is presented as same-SHA proof.
+- Read source from committed15252d2 and221525d refs, not author worktree. Go test flag documentation confirms -skip excludes exact matching top-level test and -list executes no tests. PM own exact-SHA inventory setup uses existing cmd TestMain sandbox; no live Machinery control paths were selected.
+
+Held CI/preflight gate reconciliation and limits:
+- At hpqp221525d7baf7a565ece9972d09bf916132e68050, .github/workflows/ci.yml Linux race job is `go test -race -count=1 ./... -timeout=20m`; scripts/preflight.sh uses the same20m race command. Tagged runtime integration is separate. The native-macOS CI command has no explicit timeout, but its inherited default alone is not treated here as a newly proven bug; main defaults are not the held gate's sole policy.
+- MAC-2u36 composed native verification is NOT a substitute for hpqp/epic full gate and does not change its20m policy. There is currently no measured complete same-SHA native install or race package result proving fit or non-fit to that gate. Report per-stage elapsed plus deduplicated leaf timings as measurements, while distinguishing repeated setup and parallelism; do not sum shard wall times and call it a monolithic runtime. If subsequent native measurements demonstrate incompatibility, identify exact command/SHA/host/race mode, elapsed/unfinished inventory and attributable cost to root/epic gate owner before that gate; do not edit hpqp/CI/preflight, increase its bound, waive it or invent a policy choice.
+
+Preservation: candidate source0ad71eb and freeze15252d2/test hashes from COMPLETE_RERED_FREEZE.md remain authoritative; no test edit or new test authorization. Current in_progress/assignee dev-MAC-2u36/hard-tdd+red-approved/parent MAC-ui8a/blocks MAC-gcrr+MAC-ou97 and dependencies/claim stay unchanged. Main/epic, installed Machinery/NIL use, Dagger, remote/sync and product independence remain untouched. PM ran only the nonexecuting inventory command, no runtime retry/native suite/preflight, and no author-worktree mutation or cleanup.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent actual timeout/inventory audit confirms aggregate15m exhaustion with35valid terminal passes, not an individual test timeout or full package pass.
+- Exact native inventory190install/263cmd supports bounded A/B/C complement strategy, preserving every required case and original individual bounds.
+- Held221525d20m race/preflight policy verified but not changed; full native/race gate fit remains unmeasured.
+
+### proof
+- [x] Exact frozen85-leaf matrix remainder and full native top-level inventory accounted without omitted coverage.
+- [x] Authorized one7m remainder selection, one15m install complement and one15m unfiltered CLI regression, with raw/terminal accounting and no automatic retry.
+- [ ] All remaining composed matrix/native evidence complete and independently reviewed.
+- [ ] Complete GREEN acceptance and separate final epic/native/race gate policy proof.
 
