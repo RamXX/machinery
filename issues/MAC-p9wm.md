@@ -9,7 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
 updated_at: 2026-09-06T12:04:37Z
-content_hash: "sha256:6066710f6f659c01fc349dcbb36d208ed1522692f62264f3279a872e950a9c6d"
+content_hash: "sha256:47d4b1ab18d326688a48b9d88dce21f6dc9c4ba2c8e72a4983add48dfd3d7d6b"
+related: [MAC-l7m0]
 ---
 
 ## Description
@@ -328,5 +329,6 @@ status: new
 
 ## Links
 - Parent: [[MAC-ui8a]]
+- Related: [[MAC-l7m0]]
 
 ## Comments
