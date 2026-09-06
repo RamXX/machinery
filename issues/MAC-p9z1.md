@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:50Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:30Z
-content_hash: "sha256:a5f9cfd947d2b6df42e08ec1a8938a1987cd2a59b3a008014cde30ccb4e894bc"
+updated_at: 2026-09-06T09:48:06Z
+content_hash: "sha256:fe89f7b48df3d56b8b1dd93f04632ae1c69017d8933ad6752274bf83becc1998"
 blocked_by: [MAC-6h0s]
 blocks: [MAC-62s6, MAC-wbxq, MAC-vx24, MAC-ou97]
 ---
@@ -136,3 +136,19 @@ status: new
 - [ ] AC #4: current story acceptance requirement remains pending.
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:48:06Z ramirosalas
+ROUND-1 ADVISORY: AUTHORITATIVE SECTION REFERENCE CORRECTION
+All current ownership, exact APIs/fields/limits and ACs are unchanged. Earlier references calling the closed schema/store/budget/registration material section3 or sections2-3 are superseded: these definitions are in section4 of the exact approved docs/test-assurance-contract.md projection SHA25622b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8. Section2 is component dependency direction; section3 is authoritative obligations/activation; section7 is the public internal API; section8 is custody. Preserve correct obligation/activation references to section3. This corrects cross-reference navigation only, not normative semantics or any historical evidence.
+
+## nd_contract
+status: new
+
+### evidence
+- Independent round1 findings repaired through supported append-only scope/consumer notes; no architecture/source/test/ref/runtime mutation.
+- Exact source surfaces verified against accepted epic7e36f3e7ddcf25565d5d4fe60b328df254eee91d; prior Body/status/labels/history preserved.
+- Independent Anchor ROUND2 and canonical-document acceptance remain prerequisites, not implementation evidence.
+
+### proof
+- [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
+- [ ] Independent review/native execution/final acceptance pending.
