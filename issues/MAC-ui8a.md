@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-06T16:31:15Z
-content_hash: "sha256:9e33b32d2a08a33b98cc40f35363852f8890593eb6c7d8dd80eca1bbc20fc046"
+updated_at: 2026-09-06T16:51:41Z
+content_hash: "sha256:5b4473951430887d6c2dc695fdc8fe044bd2d29dc56a7c5f36a4c2814408fd92"
 ---
 
 ## Description
@@ -746,3 +746,6 @@ LOCAL EVIDENCE CHECKPOINT 2026-09-06: bounded completed external artifacts archi
 
 ### 2026-09-06T16:31:15Z ramirosalas
 USER AUTHORIZATION UPDATE 2026-09-06: user confirmed the supplied remote executor is amd64 and authorized Machinery verification there as needed, with no disturbance to existing containers and cleanup only of our resources. Root read-only SSH readiness check confirmed Linux x86_64, Docker29.7.2 linux/amd64, four CPUs; no remote resources or tests created. Host availability is no longer a permission blocker; actual same-candidate native proof remains owed. User explicitly approved the previously proposed compliant fresh successor to MAC-sh60: retain failed history, new independently reviewed RED and fresh GREEN, no exception. Bounded Sr PM bookkeeping assigned; no successor completion or cancellation asserted yet. User requested a narrow handoff for the platform restriction; root instead prepared an official-feedback diagnostic packet and will not route blocked custody execution through an unrestricted agent or the remote host. Platform restriction remains unresolved. Independent pure portfolio finite-method correction continues separately; no product integration/RED/native acceptance from that work. Main and installed binary remain unchanged; preflight held until final integration and no remote Git publication.
+
+### 2026-09-06T16:51:41Z ramirosalas
+2026-09-06 16:52 UTC checkpoint: user-authorized native Linux amd64 access verified read-only; no remote files/containers created or existing resources changed. Compliant audit successor MAC-wi5z created, depends on hgz1 and follows sh60, but non-accepting retirement of old sh60 is unresolved; two scoped producer-collision errors retained. External portfolio values/timestamp/backup V2 independently APPROVED, full132leaves16parents and newreviewer7leaves2parents allpass; reportSHA 0e6b9519bb45663757c2d8264d7a99df692bc6cffe9b94ea2bf59af9b014e835. No source/RED/native/story credit. Eight of42 children accepted. Custody task remains platform-halted with unknown exact classifier reason; diagnostic packet .git/machinery-evidence-20260906.TEFZ7D/PLATFORM-REVIEW-REQUEST.md ready but not submitted. Overall incomplete/blocked; no defensible finish ETA. Main497419ab, epic2a73454d, installedSHA5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849 unchanged and main/integration clean. No preflight, install, push or blocked-task rerouting. Latest append-only evidence and STATUS.md retained in same private directory.
