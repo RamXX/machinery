@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:57:21Z
-content_hash: "sha256:9d25ef5cbeec6b54eb61cfc48f3b8ebcf10a8fef206e0a37af61df230fd9d870"
+updated_at: 2026-09-06T06:59:51Z
+content_hash: "sha256:00997306aa982c1bc72c1a76361bb78c814d41722b1dcadaf9399c6bc614d17c"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
 ---
@@ -1121,8 +1121,10 @@ PRODUCES:
 - Already-owned examples/go-crm/impl/internal/testoracle/fsm.go -> later GREEN exact structural field-name membership correction only, retaining the existing public API, allowed fields, error category and all dialect/reconciliation semantics. No implementation during RED or by SrPM. Selection of concrete implementation text belongs to the separately routed GREEN author after independent RED approval.
 
 CONSUMES:
-- Exactdc3a8a Go CRM test-support API: func Parse(oracle, machine []byte) (*Suite, error); Suite exposes Name string, Rows []Row and States []State. This package is private example test support, not a new Machinery production API. Call Parse, not objectFields directly and not a source-pattern assertion or copied parser. Existing fsm_test.go TestFSMParseCommittedMachines reads actual inputs from ../../../design/machines and calls Parse/Load; use that source-verified real-input convention without editing its helpers.
-- Read-only committed examples/go-crm/design/machines/Session.oracle.md and Session.machine.json. Deterministic verified JSON targets are root; states.Anonymous; states.Anonymous.on.login transition; states.Authenticating.invoke. Decode a fresh copy for each single-key mutation; assert expected target existence and JSON object shape, avoiding map-iteration-dependent selection and accidental replacement of a valid key. Marshal into private memory only; do not modify committed oracle/evidence files.
+- Existing Go CRM test-support parser.
+  spec: func Parse(oracle, machine []byte) (*Suite, error); Suite exposes Name string, Rows []Row and States []State. This package is private example test support, not a new Machinery production API. Call Parse, not objectFields directly and not a source-pattern assertion or copied parser. Existing fsm_test.go TestFSMParseCommittedMachines reads actual inputs from ../../../design/machines and calls Parse/Load; use that source-verified real-input convention without editing its helpers.
+- Existing committed Session input pair.
+  source: examples/go-crm/design/machines/Session.oracle.md and Session.machine.json. Deterministic verified JSON targets are root; states.Anonymous; states.Anonymous.on.login transition; states.Authenticating.invoke. Decode a fresh copy for each single-key mutation; assert expected target existence and JSON object shape, avoiding map-iteration-dependent selection and accidental replacement of a valid key. Marshal into private memory only; do not modify committed oracle/evidence files.
 
 ## Fresh RED matrix and independent hold
 
