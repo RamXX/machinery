@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:06:20Z
-content_hash: "sha256:26d1d129e5ae24bb0ce0b2461bbf8faed62c592daf06f133e55e54a07756f62a"
+updated_at: 2026-09-06T01:06:27Z
+content_hash: "sha256:2b0d10f4aba85cb7b48fa616bd92e4b93f51e398fae46df1d2b7bedc1292597c"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -2190,3 +2190,51 @@ status: in_progress
 - [x] Intended baseline parent-sequencing RED preserved.
 - [x] Candidate actual parent receipt close-fault/fullrollback boundary exercised twice and PASS.
 - [ ] Independent focused PM review then current full baseline re-RED/refreeze and GREEN full/native verification.
+
+### 2026-09-06T01:06:27Z ramirosalas
+INDEPENDENT FOCUSED STABILITY REVIEW: PROCEED TO ONE COMPLETE RE-RED MATRIX — MAC-2u36, 2026-09-06 UTC.
+
+No blocking gap found in the authorized joint fixture/oracle repair and closed-query amendment. The separate RED author may now run ONE complete current-SHA re-RED matrix on tests-only baseline53572efc7adfde1649c4ca305280324aa050c6e5 using unchanged496963f production:
+
+go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json
+
+This releases only the focused-stability hold. It is not final RED approval, approve-red, acceptance, delivery, rejection, claim release or any state/label/dependency transition. No test/source edit, deadline increase, retry masking, missing-case omission, extra broad run or preflight is authorized. Preserve the exact reviewed test bytes through replay and subsequent independent complete RED review. Keep the three legacy controls explicitly accounted for outside that regex; their current exact-SHA focused runs below already supply separate passing evidence. Record full raw JSON, SHA/hash, every named leaf/terminal/count, intended causes and measured cost. Unexpected failure or infrastructure/timeout error requires diagnosis before any edit or further broad replay. Candidate full matrix/native regression remains pending the separate freeze/RED review; this is not permission to skip it.
+
+Exact authority/source audit:
+- Read current canonical Description before first Acceptance Criteria delimiter, all seven ACs, complete Verification repair section and current approximately1850LOC/9-file budget. Read prior exact joint authorization and closed-query follow-up, author FOCUSED_REPORT.md and all five changed test files/diffs.
+- Candidate15252d255fa12a131fbc2cdb13f593a212fd4ccb = retained GREEN0ad71eba545083e0836792f6f2e307604182e2dd plus65b7d13539dad9117ddff7cbadc84db021e789ea and authorized15252d2 assertion amendment. Baseline53572ef = approved original RED496963fb7f4842d706d308dafcbd145908a6e395 plus identical tests-only76eefa1ed8b2ded8e673fc9faf97e422f21a8448 and53572ef amendments. All four repair subjects carry tdd-red and [test-edit-authorized]. No false claim that repaired tests predate retained GREEN.
+- Independent git diff checks: no non-test file change from0ad71eb to candidate or496963f to baseline; no *_test.go difference between current baseline and candidate; no receipt_test/install_test edit. Existing bootstrap diff is limited to bootstrapFinalizationCase descriptor discrimination/injection counter; update_test diff is confined to three authorized functions. Shared write/fakeSource/sourceTarball/updateReleaseServer bytes are preserved. Both retained checkouts clean. git diff --check passes.
+- Exact actual per-file aggregate f24b2df..candidate: bootstrap+1123/-0, writer_other+13/-0, writer_unix+134/-0, install.go+5/-2, receipt.go+56/-17, receipt_test+186/-25, update.go+13/-2, update_receipt_fixture+234/-0, update_test+31/-6 =1847changedLOC/9files (1752tests+95production). Local archive/real placement/assertion support and explicit syscall error controls explain this size; within reviewed1850 estimate, no padding/new ownership.
+
+Behavioral/source findings:
+- Strict helper rejects unknown/missing/repeated source/copy arguments, requires actual absolute downloaded source and one selector kind, and validates target vocabulary. Custom observers perform real resolveInstallSource + placeReal/placeLinks/installTargets + source.verify/cleanup within active transaction, with no Install reentry, child spawn or custom-runner capability fabrication. Actual checksummed fixture archive contains existing full fakeSource roles/adapters. Existing legacy assertions remain, with actual content/link-mode checks added.
+- Downloaded shell still validates version/logs original args and executes the actual test helper under default-runner inherited authority. Helper runs EnsureActivationConsistency and Install(Record:true), reports failures and prints completion only after success; parent asserts that output and real placements. No uninvoked-helper behavioral credit. Component, execution-wiring and frozen real released-CLI proof remain distinct.
+- Writable query uses actual F_GETFL/O_ACCMODE under SyscallConn.Control, propagating query/Control errors. Real SAME-path read/write/readwrite/distinct handles, current offset/mode/bytes/usability/normal-close checks, actual closed-Control cause and nil/EBADF controls match authorization. No flags mocks, skip, error fabrication or product changes.
+- Exact prepared scratch path/prefix predicate is retained; read descriptors delegate normal close, every writable close increments publication count, and count==1 is mandatory. Only first writer receives original Close then same-file second Close; injections==1 and real returned/injected os.ErrClosed remain mandatory. Existing completed-child/unchanged-receipt, complete current placement/prepared scope, independent payload/digest, success commit/receipt, no-commit/fault, exact prior-state including absence/sentinels, journal absence and actual lock reacquisition assertions are unchanged. Candidate PASS therefore demonstrates these actual focused outcomes; broader AC/foreign-change coverage still awaits full replay.
+- Scanner disposition: verify.txt reports one thin_file solely because bootstrap_receipt_writer_other_test.go has9code lines against threshold10. Its complementary platform constraint and complete function returning explicit unsupported-platform error are the exact required behavior. It is neither an empty implementation nor placeholder; no padding, suppression or edit is warranted. No unsupported-platform runtime PASS/Windows execution is claimed. Prior five unchanged return-empty production fallbacks retain earlier legitimate-fallback disposition.
+
+Independent raw audit (all paths under /tmp/machinery-MAC-2u36-joint-proof.623afI):
+- FOCUSED_REPORT.md hash27db205004124e1f114d61d187370ef08b25c677bd041fb06c61e25fef3bc787 verified.
+- baseline-controls-final.jsonl hashd2158e6647bac2deeefe01fa8fd256dc595b8cc8b1751919176eb62d08c3272a:9PASS0FAIL0SKIP,10runs10terminals,15.139s.
+- candidate-controls-final.jsonl hash04b38499c12d883572735dd38f442d5f1f779f405d1a78471d832929404385b1:9PASS0FAIL0SKIP,10runs10terminals,16.055s.
+- Control leaves are readonly/writeonly/readwrite/distinct_writeonly under TestBootstrapReceiptWriterDescriptors, TestBootstrapReceiptWriterInvalidHandle, TestBootstrapReceiptWriterSyscallError and the three explicitly named legacy update tests. No helper scaffolding is counted.
+- baseline-parent-final.jsonl hashdfb8008cdc16784da8460f3fb07ccf4b9089196bd9bd9a6720ca1c32aa002264:4intendedFAIL0PASS0SKIP,6runs6terminals,165.727s. Every actual child prematurely publishes the receipt; completed counts4/4 or2/2 and publications0. Both fault cases have injections0 and nil close error. The resulting state/commit failure is a consequence of an unreached boundary, not actual late-fault rollback evidence.
+- candidate-parent-final.jsonl hashc22b27ade0b4de667a1e5094957c9f8f047cd7ae2b76b9631d0b003fd84c22c2:4PASS0FAIL0SKIP,6runs6terminals,201.231s. Named leaves absent_false_close_fault_false29.90s, absent_false_close_fault_true38.19s, absent_true_close_fault_false30.36s, absent_true_close_fault_true57.98s. Fault leaves log exactly one real double-close each, on receipt-3466104110 and receipt-1074161614 inside their exact prepared scratch roots. All unchanged rollback/absence/cleanup/lock assertions pass. No repeated read injection remains.
+- PM independently hashed/parsed each raw file and inspected all parent output and exact fault/assertion source. These are complete, consistent current author runs, not fresh PM runtime replay. Per pm_acceptor evidence discipline, no duplicate runtime replay is warranted by a remaining inconsistency at this bounded checkpoint. No coverage percentage is claimed.
+- Independently verified current test hashes: bootstrap a49618fbbfb5eb7d683beed8111677ea718fe16097c962c1c9ee18690614af80; writer_unix18bfe7e3834089b9b09b6bbdd83a064f61fefcaeb50494bc0d976b7e2624b77f; writer_other c956a651cb194a71807de2a19f6389be70c169ec41c2147f16458ec65e440391; update_receipt_fixture5c239c670a26fbed20a709d585ce606dc49de159cd80daf136d9c3c421a99157; update_test a9c46ba692fd28d5fccc10dae801c13542c240d79be80819f60e4e7e2657715c; receipt_test a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48; install_test d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba.
+- Graph coverage remains generation2026-09-05T23:58:53Z, main excludes .claude and lacks new test files; complete exact retained-commit reads supplied fallback evidence, not graph completeness claims. PM ran no runtime/build tests, source/test/worktree edits, installed-product/Dagger actions, remote operations or full preflight.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent bounded focused-stability review found authorized scope and paired exact-SHA evidence sound; ONE complete baseline53572ef15m re-RED replay may proceed.
+- No workflow transition; retain dev-MAC-2u36, hard-tdd/red-approved, parent MAC-ui8a, blocks MAC-gcrr/MAC-ou97, dependencies, claim and both clean worktrees.
+
+### proof
+- [x] Authorized repaired test bytes identical across baseline/candidate; original production and all other frozen assertions preserved.
+- [x] All9compatibility/oracle controls pass both sources; baseline4parent failures remain intended AC6 sequencing RED.
+- [x] Candidate4parent cases prove actual one-writer publication and two actual one-injection full rollback outcomes in audited author focus.
+- [ ] Complete current-SHA re-RED matrix and separate independent final RED/freeze decision.
+- [ ] Full GREEN matrix/native regression, remaining complete AC1-7 verification and final product acceptance.
+
