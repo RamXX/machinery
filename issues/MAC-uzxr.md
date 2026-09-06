@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T05:39:42Z
-content_hash: "sha256:7a609d4363d7375838efa0868f4a764331ebd25e8205367b0d9a0598a9e60769"
+content_hash: "sha256:2e636e57c755a2095897bb6e7fabb7bbdaa06163e9c898e395173e845ca4bc88"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -647,3 +647,21 @@ status: in_progress
 - [ ] AC #3: preserved initial genuine RED; final candidate unsafe-variant rejection pending.
 - [ ] AC #4: full successful candidate row/witness/native inventory pending.
 - [ ] AC #5: focused passing candidate proof and consumer handoff pending.
+
+### 2026-09-06T05:39:42Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- TERMINAL EXPANDED RED FREEZE: exactauthorizedpatch2f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249 committedacf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f with [test-edit-authorized] and tdd-red. Full detailed checkpoint in preceding Notes and /tmp/MAC-uzxr-final-red.nOXYuf/REVIEW.md SHA2565cb98377240aa8be22f0b9d88b74a7a6bd959fbfd8f1efb2907d08b02f68ad5c.
+- Cleanretainedstory, exact7hashes/495prefix326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba/218tuples/2terminalbodies/197rows47states118groups preserved; full99file sourceinventorydd1a4498a35c6d7f521d68e4e0726202fe08ede5985272f142887aa550cddcd4. Task unchanged.2120add330del=2450changed/net1790; no scope/costrewrite.
+- Actualfiveboundedcommands15.526s: contract0PASS28FAIL0SKIP; focused10supplementPASS5transitionrootFAIL; meta3/3/17outerFAIL. ALL current parser/control failures NONQUALIFYING scaffold, not semanticRED or negative success.23actualchildren10supplementPASS25rootFAIL0SKIP,0transitionrows/0mutants; allcwdsremoved.52exportfiles/6manifests47hasheseach; childinventoryfb4eb1daece9f31ac602812455d63f76fcd38005f8611f8d3d6f8f29b94aed40. Latermutants/futureTaskanchors not reached, not claimed.
+- Normal verify-tdd3commits0violations/no waiver; scopedstatic7files0issues; formattingclean. Original998a5a3 genuineunsafeacceptedRED200childPASS, storage4ef6baf validation, historical225baseline and separately confirmedTaskdefect remain distinct preserved evidence; no fabricatedfixedreference or parserproof.
+- STOP for independent combined-evidence finalREDdecision. No approve-red/delivery/GREEN/acceptance/rejection/claimrenewal, sourceimplementation, furtherfrozenbytes, remote/toolchain/service/productPaivot changes or runningbackground work. Assignee/status/label retaineddev-MAC-uzxr/in_progress/hard-tdd.
+
+### proof
+- [ ] AC #1: frozen parser/closedbinding contracts; real implementation and complete execution pending.
+- [ ] AC #2: exact effects/context freeze and separateTaskdefect; real candidate repair/sensitivity pending.
+- [ ] AC #3: preserved initial genuine RED; all final candidate unsafe-variant rejections pending.
+- [ ] AC #4: current transitionrows unreached at scaffold; actual successful bidirectional candidate inventory pending.
+- [ ] AC #5: complete passing candidate and consumerhandoff pending independentRED/GREEN checkpoints.
