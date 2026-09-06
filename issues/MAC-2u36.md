@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:06:27Z
-content_hash: "sha256:2b0d10f4aba85cb7b48fa616bd92e4b93f51e398fae46df1d2b7bedc1292597c"
+updated_at: 2026-09-06T01:23:20Z
+content_hash: "sha256:f013d1217fdc1213b7025d4bcb4f1eda4e58f2ea754ecf572a804c361b154e0a"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -425,6 +425,200 @@ Independent raw audit (all paths under /tmp/machinery-MAC-2u36-joint-proof.623af
 - PM independently hashed/parsed each raw file and inspected all parent output and exact fault/assertion source. These are complete, consistent current author runs, not fresh PM runtime replay. Per pm_acceptor evidence discipline, no duplicate runtime replay is warranted by a remaining inconsistency at this bounded checkpoint. No coverage percentage is claimed.
 - Independently verified current test hashes: bootstrap a49618fbbfb5eb7d683beed8111677ea718fe16097c962c1c9ee18690614af80; writer_unix18bfe7e3834089b9b09b6bbdd83a064f61fefcaeb50494bc0d976b7e2624b77f; writer_other c956a651cb194a71807de2a19f6389be70c169ec41c2147f16458ec65e440391; update_receipt_fixture5c239c670a26fbed20a709d585ce606dc49de159cd80daf136d9c3c421a99157; update_test a9c46ba692fd28d5fccc10dae801c13542c240d79be80819f60e4e7e2657715c; receipt_test a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48; install_test d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba.
 - Graph coverage remains generation2026-09-05T23:58:53Z, main excludes .claude and lacks new test files; complete exact retained-commit reads supplied fallback evidence, not graph completeness claims. PM ran no runtime/build tests, source/test/worktree edits, installed-product/Dagger actions, remote operations or full preflight.
+## Implementation Evidence — complete repaired RED replay, ready for independent re-freeze
+
+Status remains in_progress. This is evidence publication only: NO canonical deliver, approve-red, acceptance, rejection, phase/claim/label/dependency transition. Healthy GREEN remains paused. No test/source/config edit or repeated broad run occurred during this replay.
+
+### CI/Test Results
+
+Commands run:
+
+`cd /tmp/machinery-MAC-2u36-joint-proof.623afI/baseline && go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json > /tmp/machinery-MAC-2u36-joint-proof.623afI/baseline-full-rered.jsonl 2>&1`
+
+ONE complete current-SHA command after independent focused stability authorization. Native stdout/stderr was captured directly before tool display. The synchronous session14947 was observed through termination with waits of45seconds or less. No skipped/env-gated required cases, test edits, deadline increase or retry masking.
+
+Summary:
+
+- Source/tests revision53572efc7adfde1649c4ca305280324aa050c6e5, unchanged496963f production plus separately reviewed authorized tests. Candidate15252d255fa12a131fbc2cdb13f593a212fd4ccb retains0ad71eb production with IDENTICAL revised test bytes.
+- Raw85 unique leaves:68PASS,17intendedFAIL,0SKIP.96test run events,96matching terminal events,0missing terminals. Package completed normally with expected exit1 in769.988s (not timeout/panic/fixture failure).
+- Raw log325997bytes SHA2569898464034c6be714a48dcc7b07241e2c56ec9b2c83aa1b6adff74dc32441915.
+- The actual current terminal failure set, including parent containers, exactly matches original496963f full raw evidence; all17leaf failures remain intended product RED. Original79leaves plus the6executed descriptor controls yields the observed85, not a guessed count.
+- No statement/branch coverage percentage was collected. Exact named behavioral coverage is listed below.
+- This is fresh current author full runtime evidence. Earlier independent PM focused stability was source/raw audit, not a fresh PM runtime replay. Independent complete re-freeze decision remains pending.
+
+Separate current-SHA controls outside broad regex:
+
+The three legacy tests are omitted by the authorized broad name selector and were ALREADY explicitly executed on both current revisions in the exact2m focused command (recorded in FOCUSED_REPORT.md):
+TestUpdateVerifiesReleaseAndRefreshesRecordedHarnesses PASS baseline6.45s/candidate6.88s;
+TestUpdateExecutesDownloadedBinaryForHarnessRefresh PASS2.20s/2.11s;
+TestUpdateRefreshesExistingDefaultInstallInPlace PASS6.06s/6.67s.
+That focused selection had9PASS0FAIL0SKIP on each revision,10runs10terminals,15.139s/16.055s including the same6descriptor controls. Thus current baseline evidence covers88UNIQUE required selected/supplemental leaves:71PASS,17intendedFAIL,0SKIP; descriptor repeats are NOT double-counted. Uninvoked helper scaffolding is NOT an extra behavioral leaf.
+Focused raw baseline-controls-final.jsonl SHA d2158e6647bac2deeefe01fa8fd256dc595b8cc8b1751919176eb62d08c3272a; candidate-controls-final.jsonl SHA04b38499c12d883572735dd38f442d5f1f779f405d1a78471d832929404385b1. No unnecessary duplicate compatibility run was launched.
+
+### Intended failures and reached causes
+
+All names below resolve to the complete inventory table. No new validator bypass, fixture failure or changed failure identity appeared.
+1. complete_recorded_mixed_plan: bootstrap substitutes defaults instead of complete recorded home/native/plugin plan.
+2–3. reject_cross_group_repeated_false/true_then_native: overlapping standalone request reports false success, changes prior state/emits invalid topology; following real native install rejects overlapping receipt. Fresh/disjoint/same-ordered-group copy-change controls PASS.
+4–7. parent_finalization present/absent no-fault/fault: actual children complete4/4 or2/2 but publish persisted receipt prematurely; parent publications=0. Fault cases explicitly injections=0, no retained close error. This is missing-boundary RED, NEVER actual late-fault rollback proof.
+8–9. converges_bootstrap_true and repair_edited_owned_artifact_bootstrap_true: recorded topology/inventory changes and recorded placements remain stale. Ordinary intact45.20s and edited44.11s controls PASS.
+10–13. single/multi-missing native repairs ordinary/bootstrap: real first home child fails complete recorded receipt inventory while safely missing native artifact still awaits repair. Actual downloaded CLI exits1; this violates required successful repair and is not accepted ownership rejection.
+14. later_target_failure_rolls_back_bootstrap_true: skipped recorded native refresh means omitted later OpenCode source falsely succeeds; prior mutation/later failure/full restoration bar not met.
+15–16. missing-prestate later-target rollback ordinary/bootstrap: early missing-artifact receipt inventory prevents reaching actual earlier Codex success and precise later OpenCode source failure. NO later-fault rollback credit.
+17. symlink_native_artifact: bootstrap wrongly succeeds on unsafe substituted native artifact and changes update state.
+
+Positive actual rollback/recovery:
+- Ordinary intact later-target failure PASS31.50s: existing real binary/home/earlier Codex mutation witnesses, exact omitted adapters/opencode/plugins/machinery.js source failure and full binary/home/native/receipt/sentinel restoration retained.
+- Interrupted-download recovery PASS14.95s: actual CLI startup journal recovery, explicitly PRE-mutation interruption, not changed-artifact rollback proof.
+- Separate identical-test candidate parent focus already PASS4leaves201.231s, one actual writer per case and one real os.ErrClosed injection per fault, full rollback including absent receipt/sentinels/journalcleanup/lockreuse. Raw candidate-parent-final.jsonl SHA c22b27ade0b4de667a1e5094957c9f8f047cd7ae2b76b9631d0b003fd84c22c2. This is honest candidate focused evidence, not claimed baseline behavior or candidate full verification.
+
+### Current immutable inputs and provenance
+
+Original RED496963fb7f4842d706d308dafcbd145908a6e395 and GREEN0ad71eba545083e0836792f6f2e307604182e2dd preserved. Tests were authored/repaired AFTER GREEN under exact joint authorization, with original evidence preserved, not represented as predating it.
+Candidate repair65b7d13539dad9117ddff7cbadc84db021e789ea then15252d255fa12a131fbc2cdb13f593a212fd4ccb; corresponding detached baseline76eefa1ed8b2ded8e673fc9faf97e422f21a8448 then53572efc7adfde1649c4ca305280324aa050c6e5. Both required commit tags present. Post-run baseline and candidate clean; empty test diff between them; empty baseline production diff from496963f and candidate production diff from0ad71eb.
+
+Current test SHA256, checked again AFTER full replay:
+- bootstrap_receipt_test.go a49618fbbfb5eb7d683beed8111677ea718fe16097c962c1c9ee18690614af80
+- bootstrap_receipt_writer_unix_test.go18bfe7e3834089b9b09b6bbdd83a064f61fefcaeb50494bc0d976b7e2624b77f
+- bootstrap_receipt_writer_other_test.go c956a651cb194a71807de2a19f6389be70c169ec41c2147f16458ec65e440391
+- update_receipt_fixture_test.go5c239c670a26fbed20a709d585ce606dc49de159cd80daf136d9c3c421a99157
+- update_test.go a9c46ba692fd28d5fccc10dae801c13542c240d79be80819f60e4e7e2657715c
+- receipt_test.go a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48 unchanged
+- install_test.go d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba unchanged
+
+Baseline production SHA256: update.go a9e3f966f9bbbd4827a1a5307dfe600242a0e03892b4d7a26f8b5193e0e0c4b8; receipt.go6042053dfce091a57ce1dc985c1e4012d85c50d9b7715fba4ee3bbcad2852f3c; install.go8b37c03976b929ac167d028337fb56edd170fed1d190de9323ce3d77a7d65e19.
+Candidate source hashes and all detailed repair history remain in FOCUSED_REPORT.md SHA27db205004124e1f114d61d187370ef08b25c677bd041fb06c61e25fef3bc787, copied in shared prior Notes.
+
+Measured cost remains1847changedLOC9files (1752tests+95retained production) within reviewed approximately1850; full per-file +/- retained in focused report. No new code/diff during this run.
+pvg verify focused5files reports one thin_file for the required unsupported-platform function9code lines vs10threshold. Independent FOCUSED_STABILITY.md SHA2c300ec5d2d390772c03f7497387ab404d6b53305f7e5907f47884dab5023315 explicitly accepts this complete error-return behavior; no padding/suppression/skip/edit. Previous5production return-empty findings retain independently reviewed legitimate fallback disposition.
+Historical65b7d13/76eefa1 closed-handle sentinel assertion failures remain qualified fixture-oracle history; the correction was reported before separate PM authorization. Earlier ten0644permission-masked receipt test passes likewise remain invalid old parser proof. Current private0600/0700matched parser/inventory/digest controls allPASS, no such masking.
+
+### AC Verification
+
+| AC | Current evidence |
+|---|---|
+|1|Complete recorded-plan and actual bootstrap parity intended RED; first-default/schema1/plugin-aware controlsPASS.|
+|2|All23private reached parser/topology/inventory/digest/order casesPASS; real permissions/schema/plugin/path controls preserved; unsafe native symlink intended bootstrapRED. Safe missing/edited regular content remains repair contract.|
+|3|Actual ordinary intact/edited convergencePASS with current contents/modes/inventory/digests/sentinels/idempotence; bootstrap and single/multi-missing desired repairs remain intendedRED.|
+|4|Actual ordinary postmutation later-source rollbackPASS; missing/bootstrap failure-boundary assertions remainRED; interrupted recoveryPASS separately classified premutation.|
+|5|Unchanged real built CLI/release/checksum/defaultchildren and isolated filesystem matrix completed; supplemental command observers are component placement proof and downloaded shell helper is execution-wiring only. No releasedCLI substitution claimed.|
+|6|Current descriptor controls6PASS; baseline4parent-sequencingRED with zero injections; separate identical-test candidate4parentPASS with genuine real late-close rollback. Existing authority/scope/unchanged receipt/content/journal/lock assertions retained.|
+|7|Real two overlap/conflict/follow-on casesRED; fresh/disjoint/samegroup copy-change controlsPASS, full topology/content/ownership expectations preserved.|
+
+### Complete current broad named leaf inventory
+
+| Named leaf | Outcome | Seconds |
+|---|---|---|
+| TestBootstrapReceiptRootAlias/root | PASS | 0.00 |
+| TestBootstrapReceiptRootAlias/descendant | PASS | 0.00 |
+| TestBootstrapReceiptRootAlias/canonical_root | PASS | 0.00 |
+| TestBootstrapReceiptRootAlias/canonical_descendant | PASS | 0.00 |
+| TestBootstrapReceiptRootAlias/similar_sibling | PASS | 0.00 |
+| TestBootstrapReceiptRootAlias/interior_alias | PASS | 0.00 |
+| TestBootstrapReceiptRootAlias/repeated_suffix | PASS | 0.00 |
+| TestBootstrapReceiptRootAlias/sibling_journal | PASS | 0.00 |
+| TestBootstrapReceiptPlan/first_bootstrap_defaults_control | PASS | 0.00 |
+| TestBootstrapReceiptPlan/supported_schema_one_control | PASS | 0.00 |
+| TestBootstrapReceiptPlan/complete_recorded_mixed_plan | FAIL | 12.91 |
+| TestBootstrapReceiptCLI/standalone_receipt/supported_recording/fresh_mixed_groups | PASS | 0.02 |
+| TestBootstrapReceiptCLI/standalone_receipt/supported_recording/disjoint_additional_group | PASS | 2.57 |
+| TestBootstrapReceiptCLI/standalone_receipt/supported_recording/same_ordered_group_copy_change | PASS | 3.50 |
+| TestBootstrapReceiptCLI/standalone_receipt/reject_cross_group_repeated_false_then_native | FAIL | 24.60 |
+| TestBootstrapReceiptCLI/standalone_receipt/reject_cross_group_repeated_true_then_native | FAIL | 22.36 |
+| TestBootstrapReceiptCLI/parent_finalization/absent_false_close_fault_false | FAIL | 28.40 |
+| TestBootstrapReceiptCLI/parent_finalization/absent_false_close_fault_true | FAIL | 37.31 |
+| TestBootstrapReceiptCLI/parent_finalization/absent_true_close_fault_false | FAIL | 30.90 |
+| TestBootstrapReceiptCLI/parent_finalization/absent_true_close_fault_true | FAIL | 31.62 |
+| TestBootstrapReceiptCLI/receipt_authority_absent | PASS | 14.73 |
+| TestBootstrapReceiptCLI/receipt_authority_forged | PASS | 3.40 |
+| TestBootstrapReceiptCLI/receipt_authority_unprepared | PASS | 3.28 |
+| TestBootstrapReceiptCLI/receipt_authority_out_of_scope | PASS | 3.28 |
+| TestBootstrapReceiptCLI/converges_bootstrap_false | PASS | 45.20 |
+| TestBootstrapReceiptCLI/converges_bootstrap_true | FAIL | 24.65 |
+| TestBootstrapReceiptCLI/repair_edited_owned_artifact_bootstrap_false | PASS | 44.11 |
+| TestBootstrapReceiptCLI/repair_edited_owned_artifact_bootstrap_true | FAIL | 28.01 |
+| TestBootstrapReceiptCLI/repair_missing_owned_artifact_bootstrap_false | FAIL | 30.19 |
+| TestBootstrapReceiptCLI/repair_missing_owned_artifact_bootstrap_true | FAIL | 22.56 |
+| TestBootstrapReceiptCLI/repair_both_native_groups_missing_bootstrap_false | FAIL | 36.72 |
+| TestBootstrapReceiptCLI/repair_both_native_groups_missing_bootstrap_true | FAIL | 22.64 |
+| TestBootstrapReceiptCLI/later_target_failure_rolls_back_bootstrap_false | PASS | 31.50 |
+| TestBootstrapReceiptCLI/later_target_failure_rolls_back_bootstrap_true | FAIL | 18.80 |
+| TestBootstrapReceiptCLI/missing_prestate_later_target_failure_rolls_back_bootstrap_false | FAIL | 36.03 |
+| TestBootstrapReceiptCLI/missing_prestate_later_target_failure_rolls_back_bootstrap_true | FAIL | 20.90 |
+| TestBootstrapReceiptCLI/corrupt_receipt | PASS | 11.15 |
+| TestBootstrapReceiptCLI/unsafe_receipt | PASS | 15.12 |
+| TestBootstrapReceiptCLI/stale_schema | PASS | 15.89 |
+| TestBootstrapReceiptCLI/plugin_discovery_failure | PASS | 17.49 |
+| TestBootstrapReceiptCLI/symlink_native_artifact | FAIL | 25.79 |
+| TestBootstrapReceiptCLI/non-directory_native_parent | PASS | 14.27 |
+| TestBootstrapReceiptCLI/interrupted_download_recovers_real_transaction | PASS | 14.95 |
+| TestBootstrapReceiptWriterDescriptors/readonly | PASS | 0.00 |
+| TestBootstrapReceiptWriterDescriptors/writeonly | PASS | 0.00 |
+| TestBootstrapReceiptWriterDescriptors/readwrite | PASS | 0.00 |
+| TestBootstrapReceiptWriterDescriptors/distinct_writeonly | PASS | 0.00 |
+| TestBootstrapReceiptWriterInvalidHandle | PASS | 0.00 |
+| TestBootstrapReceiptWriterSyscallError | PASS | 0.00 |
+| TestReceiptArtifactDigestIgnoresInstallTimeButDetectsModeAndContent | PASS | 2.61 |
+| TestUninstallDeletionFailureRollsBackArtifactsAndReceipt | PASS | 2.60 |
+| TestAbandonedLegacyReceiptLockDirectoryDoesNotBlock | PASS | 0.27 |
+| TestLoadReceiptRejectsFIFOWithoutOpening | PASS | 0.00 |
+| TestLoadReceiptRejectsNonPrivateLeafConfigDirectory | PASS | 0.00 |
+| TestReceiptReadModifyWriteIsSerialized | PASS | 6.29 |
+| TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/symlink | PASS | 0.00 |
+| TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/oversize | PASS | 0.00 |
+| TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/config_directory_swap | PASS | 0.00 |
+| TestLoadReceiptRejectsSymlinkOversizeAndUnstableSwap/entry_swap | PASS | 0.00 |
+| TestForgetReceiptUsesNativeCaseAliasIdentity | PASS | 0.46 |
+| TestCorruptReceiptFailsLoudly | PASS | 0.00 |
+| TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/unknown_root | PASS | 0.00 |
+| TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/unknown_home_field | PASS | 0.00 |
+| TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/unknown_target_field | PASS | 0.00 |
+| TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/duplicate_root | PASS | 0.00 |
+| TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/duplicate_nested | PASS | 0.00 |
+| TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/wrong_homes_type | PASS | 0.00 |
+| TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/wrong_copy_type | PASS | 0.00 |
+| TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology/trailing_value | PASS | 0.00 |
+| TestSemanticallyInvalidReceiptFailsBeforeUpdate | PASS | 0.00 |
+| TestReceiptPrivateSchemaControls/schema_1 | PASS | 0.00 |
+| TestReceiptPrivateSchemaControls/schema_2 | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/missing_entry | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/extra_entry | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/duplicate_path | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/substituted_path | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/relative_path | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/non-clean_path | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/unexpected_absolute_path | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/digest_prefix | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/digest_length | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/digest_nonhex | PASS | 0.00 |
+| TestReceiptSchemaTwoInventoryValidation/valid_reversed_ordering | PASS | 0.00 |
+| TestUpdateRollsBackAllHomesBinaryAndReceiptOnLaterFailure | PASS | 1.78 |
+| TestBootstrapDefaultPlanIsPluginAware | PASS | 0.05 |
+
+LEARNINGS:
+- Preserve strict outcomes while correcting demonstrated oracle errors; re-run identical repaired tests on both old and candidate source.
+- Descriptor access mode, not pathname, separates receipt writers from durability readers; real Control errors need actual-cause assertions.
+- Passing counts need validation-layer attribution and matched valid fixtures; current private parser proof replaces old permission-masked claims.
+- Distinguish baseline intended sequencing failure, candidate actual injected rollback, helper/component proof, and actual released-CLI proof.
+- Full evidence should capture raw JSON before display truncation and derive every leaf/terminal/failure-set comparison from that artifact.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Complete one-shot53572efreRED85leaves68PASS17intendedFAIL0SKIP96runs96terminals769.988s; rawSHA9898464034c6be714a48dcc7b07241e2c56ec9b2c83aa1b6adff74dc32441915, complete inventory above.
+- Three current separately focused legacy controlsPASS; no extra scaffolding credit or double-counted descriptor leaves.
+- Both retained checkouts clean and immutable hashes unchanged; all commands ended. No source/test edits, live install/dev-link/update, user cache/config/asset mutation, remote/GitHub operation, toolchain/Dagger change or preflight.
+- NIL installed binary still5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849.
+- Ready separate independent complete repaired-RED re-freeze review. No canonical delivery or phase/claim transition requested/performed.
+
+### proof
+- [x] Exact authorized reviewed test bytes replayed against unchanged baseline production.
+- [x] All85selected leaves and3separate legacy controls accounted with zero skips/missing terminals.
+- [x] Same17intended baseline product failure identities retained, no fabricated RED.
+- [x] Genuine actual candidate close-fault rollback remains separately demonstrated focused evidence.
+- [ ] Independent complete re-freeze decision, candidate full/native regressions and final product acceptance.
+
 
 ## nd_contract
 status: in_progress
