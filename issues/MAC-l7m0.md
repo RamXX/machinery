@@ -1,15 +1,17 @@
 ---
 id: MAC-l7m0
 title: "Define standalone executable test-assurance contract"
-status: blocked
+status: in_progress
 priority: 1
 type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T08:55:41Z
-content_hash: "sha256:bcc47cfd554e9a4d1ccb25d5765584f69d15406aed8bf41303e1941efb2b8e5a"
+updated_at: 2026-09-06T10:07:13Z
+content_hash: "sha256:8766e61381b16a66aee293777b4d1d4ed43927fa4c82c7933e376e507d915566"
 blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
+assignee: dev-MAC-l7m0
+follows: [MAC-uzxr]
 ---
 
 ## Description
@@ -83,10 +85,14 @@ ANCHOR ROUND-1 RUNTIME CLASSIFICATION: Architecture is read-only contract work, 
 - 2026-09-05T19:36:16Z dep_added: blocks MAC-ou97
 - 2026-09-05T19:36:47Z status: open -> blocked
 - 2026-09-06T09:09:57Z dep_added: blocks MAC-qlw2
+- 2026-09-06T10:07:13Z status: blocked -> in_progress
+- 2026-09-06T10:07:13Z auto-follows: linked to predecessor MAC-uzxr
+- 2026-09-06T10:07:13Z claimed by dev-MAC-l7m0
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]], [[MAC-qlw2]]
+- Follows: [[MAC-uzxr]]
 
 ## Comments
 
