@@ -4,11 +4,11 @@ title: "Remove unsafe frozen-test formatting exemptions"
 status: in_progress
 priority: 0
 type: bug
-labels: [hard-tdd]
+labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:07:57Z
+updated_at: 2026-09-06T02:07:58Z
 content_hash: "sha256:d82a09fa3e8cde2058b58880be64c9ccbf1d5ee3c37ad00dd4dcf7f0dfe1ab7c"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
