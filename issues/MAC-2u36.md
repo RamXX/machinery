@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:21:09Z
-content_hash: "sha256:5897d5f7c78444e20b7d69bd2abcb59981437be14e91c035f1ef62ce4d630831"
+updated_at: 2026-09-06T02:21:31Z
+content_hash: "sha256:6ce34dec3882d3cef2ab9c619fc31a9313193e3cb1afc7fa8565784fded10d8e"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -2766,3 +2766,22 @@ status: in_progress
 - [ ] All remaining composed matrix/native evidence complete and independently reviewed.
 - [ ] Complete GREEN acceptance and separate final epic/native/race gate policy proof.
 
+
+### 2026-09-06T02:21:31Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Exact15252d2 composed report and full named inventory above; A/B/C terminal and all85required behavioral leaves PASS0SKIP.
+- Native cmd has3explicit unrelated platform/runtime skips pending independent scope confirmation; not counted as executed proof.
+- Healthy clean worktree and claim retained; no processes remain; no delivery transition.
+
+### proof
+- [x] AC #1: complete receipt-aware bootstrap/ordinary plan and no-receipt defaults.
+- [x] AC #2: strict private parser/schema/topology/inventory/digest/path/plugin negatives and safe edited/missing repair controls.
+- [x] AC #3: all8actual fullplan convergence/repair/idempotence modes.
+- [x] AC #4: all4actual later-target fullrollbacks plus distinct startup interruption recovery.
+- [x] AC #5: actual builtCLI/checksummedrelease/tempstate integration, no required-case skip or livechanges.
+- [x] AC #6: all4parentfinalization controls including2onewriter/oneos.ErrClosed faults with complete rollback/absence/lock; all4authority controls.
+- [x] AC #7: all5standalone validrecording/conflictrejection/followonnative controls.
+- [ ] Independent native-skip scope confirmation and canonical GREEN delivery/PM acceptance.
