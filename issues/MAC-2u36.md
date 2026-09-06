@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-06T02:37:14Z
-content_hash: "sha256:0f4b0a55e4da6645013c70470a62545d139c79c23c7e2ab078ca087280fbe921"
+content_hash: "sha256:71aa1b68866fb40b6cb2ae3b643225c667a2c8a27618ab6f68cf8972cd0a1919"
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
 closed_at: 2026-09-06T02:37:14Z
@@ -547,6 +547,18 @@ Delivery and final-gate obligations:
 - The final epic/held contributor gate still owns complete required platform and external runtime verification. Case-alias negative needs a filesystem able to materialize both names; official Structurizr cache proof needs its official-archive lane; OCI golden needs its explicitly provisioned engine lane (held221525d CI already sets MACHINERY_REQUIRE_OCI_GOLDEN in that lane). This decision neither proves those outcomes nor asserts all their enabling policy is already wired. Their final required proof stays pending with its existing owner; no new policy choice or automatic duplicate bug is inferred solely from these known prerequisites/skips.
 - If later review finds overlap, an unexpected failed assertion or a missing required MAC-2u36 outcome, this bounded confirmation does not waive it. Normal full GREEN delivery review remains independent and may reject inadequate proof. No source/test/runtime/installed asset/remote action is requested now; only the narrow scope decision is recorded.
 CANONICAL DOCUMENTATION DIVISION — root-authorized independent PM split. No implementation or test waiver.
+
+
+## nd_contract
+status: accepted
+
+### evidence
+- PM closeout applied via pvg story accept on 2026-09-05.
+
+### proof
+- [x] Story closed after accepted label was applied.
+
+
 # Independent GREEN review — MAC-2u36
 
 Candidate: 15252d255fa12a131fbc2cdb13f593a212fd4ccb; production: 0ad71eba545083e0836792f6f2e307604182e2dd. Review date: 2026-09-06 UTC. Decision: ACCEPTED. Implementation and required proof meet all seven ACs; documentation is explicitly bound to the downstream consumer story before final release.
