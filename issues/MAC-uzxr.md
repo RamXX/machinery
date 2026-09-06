@@ -8,11 +8,10 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:19:00Z
-content_hash: "sha256:f07a2b0ac99586055561781029089bdcc123543cd76bbc97f8b474ec910e5ae0"
+updated_at: 2026-09-06T07:20:28Z
+content_hash: "sha256:8dcdc7a5bb9ffc4b6598a2913ff9167009700682902ce4e708966369ba28ad60"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx]
-assignee: dev-MAC-uzxr
 ---
 
 ## Description
@@ -1071,6 +1070,7 @@ status: new
 - 2026-09-06T07:01:37Z claimed by dev-MAC-uzxr
 - 2026-09-06T07:10:06Z status: in_progress -> in_progress
 - 2026-09-06T07:19:00Z status: in_progress -> open
+- 2026-09-06T07:20:28Z released by ramirosalas
 
 ## Links
 - Parent: [[MAC-ui8a]]
