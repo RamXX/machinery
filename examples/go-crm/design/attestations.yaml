@@ -112,7 +112,7 @@ attestations:
     date: 2026-09-06
     note: 'Substantive current review of the accepted parser-backed scope (MAC-uzxr) over examples/go-crm/impl: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; native sensitivity controls fail on unsafe oracle edits and extra effects; go test ./... green over the full impl incl. real-boundary repo/session tests. Bounded: content-hash-bound scope review, not authenticated execution replay.'
     covers:
-      - {path: BUILD.md, hash: sha256:b7c5bf2897cddccb763c86b19d7b371bd9f4d02a210a3423eef009cbfe0ee7b0}
+      - {path: BUILD.md, hash: sha256:b8c4e1e88825f43dae1a543831ce66c865d58db7440335e5072d64e5769d5a89}
     implementation:
       root: ../impl
       policy: full-root-v1
@@ -347,7 +347,7 @@ attestations:
     date: 2026-09-06
     note: 'Re-reviewed 2026-09-06 over the corrected BUILD (bounded parser-backed suite evidence, declared rebuild migration context, x/crypto pin aligned to impl/go.mod); zero-context plan judgment stands over the corrected build document.'
     covers:
-      - {path: BUILD.md, hash: sha256:b7c5bf2897cddccb763c86b19d7b371bd9f4d02a210a3423eef009cbfe0ee7b0}
+      - {path: BUILD.md, hash: sha256:b8c4e1e88825f43dae1a543831ce66c865d58db7440335e5072d64e5769d5a89}
   - claim: ga.review-quality
     kind: historical
     attestor: Codex release acceptance review

@@ -63,19 +63,19 @@ attestations:
     attestor: coordinator
     date: 2026-09-06
     note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
-    covers: [{path: BUILD.md, hash: sha256:0d7f3d4522e853f4623ccf28e7615c7f7e9ee62e3a8d8de69f792e6300c16de1}]
+    covers: [{path: BUILD.md, hash: sha256:11a30329dc19878788dbaaab569eaaaf71a580639c5393e5c37b92a6b0e258b1}]
   - claim: g4.zero-context
     kind: plan
     attestor: coordinator
     date: 2026-09-06
     note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
-    covers: [{path: BUILD.md, hash: sha256:0d7f3d4522e853f4623ccf28e7615c7f7e9ee62e3a8d8de69f792e6300c16de1}]
+    covers: [{path: BUILD.md, hash: sha256:11a30329dc19878788dbaaab569eaaaf71a580639c5393e5c37b92a6b0e258b1}]
   - claim: g4.standin-coverage
     kind: plan
     attestor: coordinator
     date: 2026-09-06
     note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
-    covers: [{path: BUILD.md, hash: sha256:0d7f3d4522e853f4623ccf28e7615c7f7e9ee62e3a8d8de69f792e6300c16de1}]
+    covers: [{path: BUILD.md, hash: sha256:11a30329dc19878788dbaaab569eaaaf71a580639c5393e5c37b92a6b0e258b1}]
   - claim: g4.pack-event-discipline
     kind: plan
     attestor: Machinery production-readiness review

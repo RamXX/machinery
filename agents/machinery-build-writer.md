@@ -122,10 +122,12 @@ output contract.
     (b) `machinery check --impl` green over the scaffolding and stubs, (c) the suite red on
     assertions, not on its own compile errors, (d) the new files born clean under the project's
     own formatter and linters, with the RED commit green under every non-test gate the project
-    enforces (a locked file has no legal remedy for a gate it fails later, because nobody may
-    touch it; a gate that does demand a change to a locked file is a RED-phase defect, remedied by
-    an owner-sanctioned formatting-only amendment carrying a token-identity proof, never a silent
-    edit). Only then do the tests lock; the implementer makes
+    enforces. Only then do the tests lock. Frozen test identity is defined by exact bytes and file inventory.
+    Any amendment requires explicit owner authorization, a new evidence revision, and replay
+    of RED and all applicable gates before the revised tests lock. Neither formatting nor token
+    equality authorizes an editing exemption.
+    A gate demanding a locked-file change is a RED-phase defect requiring a design round-trip;
+    the original evidence revision remains immutable. The implementer makes
     them pass without editing them; GREEN is accepted only with the locked tests AND
     `machinery check --impl` green together. Include the fallback for runtimes without subagents:
     the same agent runs RED then GREEN sequentially, and the two gate runs are what separate the

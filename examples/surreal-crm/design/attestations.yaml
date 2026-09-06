@@ -112,11 +112,11 @@ attestations:
     date: 2026-09-06
     note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
     covers:
-      - {path: BUILD.md, hash: sha256:6e196222e345f9f2c7a3bba3df791ac2b9827915cffdde5a8904888dd37ba991}
+      - {path: BUILD.md, hash: sha256:09c953c352c0e896e60592dbdff0cf3ef3cd61f37022803b76862b0bccbb50ff}
   - claim: g4.zero-context
     kind: plan
     attestor: coordinator
     date: 2026-09-06
     note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
     covers:
-      - {path: BUILD.md, hash: sha256:6e196222e345f9f2c7a3bba3df791ac2b9827915cffdde5a8904888dd37ba991}
+      - {path: BUILD.md, hash: sha256:09c953c352c0e896e60592dbdff0cf3ef3cd61f37022803b76862b0bccbb50ff}

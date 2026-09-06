@@ -1119,9 +1119,12 @@ implementation `go.mod` and the compose file.
       satisfy those gates.
 4. **The tests are then LOCKED.** The implementer agent may not modify, weaken, skip, or delete them to make
    them pass. Locking is structural (the test files are owned by the test-writer; changes require a design
-   round-trip). If a gate later demands a change to a locked file, that is a RED-phase defect and not
-   license to edit: it takes an owner-sanctioned amendment that changes formatting only and carries a
-   token-identity proof (the file's token stream is identical before and after).
+   round-trip). Frozen test identity is defined by exact bytes and file inventory.
+   Any amendment requires explicit owner authorization, a new evidence revision, and replay
+   of RED and all applicable gates before the revised tests lock. Neither formatting nor token
+   equality authorizes an editing exemption.
+   A gate demanding a locked-file change is a RED-phase defect requiring that design round-trip;
+   the original evidence revision remains immutable.
 5. **The implementer agent** writes production code until the locked tests pass, honoring the section 4.5
    Architecture Contract (C-ARCH-01) and the section 10 realization rules.
 6. **GREEN acceptance bar**, both together: the locked suite passes AND

@@ -175,7 +175,7 @@ attestations:
     note: 'The handoff requires one parser-backed conformance suite per machine that asserts target state and the complete ordered action list for every committed oracle row.'
     covers:
       - path: BUILD.md
-        hash: sha256:24a8fd8a71a7504a6bd614520ee6ca5c6b72a0bd4386d2439c59042d91853baf
+        hash: sha256:3a2a2b9649c6a0d39e114c3b3236f589be618bf50a71ce039a9e2304f75cf61f
   - claim: g4.zero-context
     kind: plan
     attestor: Codex production-readiness review
@@ -183,4 +183,4 @@ attestations:
     note: 'The build plan fixes topology, versions, milestones, oracle-derived test obligations, formal checks, residuals, and state-migration discipline for an implementation agent with no conversation history.'
     covers:
       - path: BUILD.md
-        hash: sha256:24a8fd8a71a7504a6bd614520ee6ca5c6b72a0bd4386d2439c59042d91853baf
+        hash: sha256:3a2a2b9649c6a0d39e114c3b3236f589be618bf50a71ce039a9e2304f75cf61f
