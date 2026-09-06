@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:07:15Z
-content_hash: "sha256:e9ed5d01558d71a2e778da4e854c17c19e5715d27bd0dead41378bbf8f5327c3"
+updated_at: 2026-09-06T09:09:30Z
+content_hash: "sha256:c28ba22874d38ff128d44581863eab2adb9386c2cbfd4199978450b33f1f87b4"
 ---
 
 ## Description
@@ -102,3 +102,25 @@ status: new
 - Parent: [[MAC-ui8a]]
 
 ## Comments
+
+### 2026-09-06T09:09:30Z ramirosalas
+DEPENDENCY CLARIFICATION 2026-09-06
+This prospective migration consumes the delivered normal CLI and existing current oracle-coverage behavior; it does NOT require a new direct dependency on MAC-sh60 and does not authorize a successor, cancellation, supersession or dependency transfer for that held story. The earlier MAC-sh60 API reference is existing integration context only, not a new producer requirement. Its original MAC-vx24/MAC-ou97 final-integration edges remain intact and those final gates rerun the complete migrated example against its eventual accepted coverage behavior. Ordering after MAC-hgz1 is already enforced transitively through MAC-u4oo -> MAC-rau8 -> MAC-wbxq -> MAC-lnu6 -> MAC-hgz1; no redundant new direct edge to hgz1.
+
+CURRENT CONSUMES:
+- MAC-u4oo: cmd/machinery/tdd.go
+  endpoint: exact standalone store init/scaffold/capture/register/red/green/verify/check --complete commands.
+- MAC-wi2u: internal/tdd/adapters/go.go
+  spec: closed go-testing/v1 Adapter and bound native assertion helper.
+- MAC-hgz1: examples/go-crm/design/BUILD.md
+  source: accepted v2 example contract, ordered transitively; no alteration of its healthy claim or frozen files.
+
+## nd_contract
+status: new
+
+### evidence
+- Dependency-only clarification preserves every migration AC and all original coverage-story authority.
+- No implementation or native execution proof claimed; independent Anchor/l7 holds remain.
+
+### proof
+- [ ] AC #1-7: original prospective migration obligations remain pending.
