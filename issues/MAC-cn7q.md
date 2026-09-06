@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
-updated_at: 2026-09-06T08:58:18Z
-content_hash: "sha256:84a84871097180c6b829cb4721c964db337824827366851f8a5c2f5e2fd97b47"
+updated_at: 2026-09-06T09:16:29Z
+content_hash: "sha256:228426f8b40e4a6c86f5b6a8a50f9c629e6b3b204d24f079e7b7b995f1ee401c"
 blocked_by: [MAC-qlw2]
 blocks: [MAC-pe9v, MAC-hpqp, MAC-vx24, MAC-ou97]
 ---
@@ -102,3 +102,41 @@ status: new
 - Blocked by: [[MAC-qlw2]]
 
 ## Comments
+
+### 2026-09-06T09:16:29Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- internal/processcontrol/scope.go -> internal/processcontrol -> WithScope(ctx, scope), AttachScope(cmd, scope), ExitStatus(err), keeping Run(ctx context.Context, cmd *exec.Cmd) error compatible. Exact new API contracts in section 8 apply; do not invent alternate error semantics. Explicit formal/runtimeclosure call sites attach the verified scope after sanitized environments. cmd/machinery/main.go -> same-binary ServeInternal interception before ordinary Cobra parsing.
+- internal/processcontrol/scope_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/formal/custody_integration_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/runtimeclosure/custody_integration_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/processcontrol/run.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/formal/formal.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/runtimeclosure/java.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- cmd/machinery/main.go -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-qlw2: internal/processscope/scope.go
+  spec: Scope.Run/Child/Attach/Close and ServeInternal(args []string, io InternalIO) (handled bool, exitCode int); first authenticate inherited authority, then normal command parsing if unhandled.
+Existing source: internal/processcontrol/run.go -> Run(ctx context.Context, cmd *exec.Cmd) error; internal/formal/formal.go -> VerifyFormalTo(design string, genOnly bool, stdoutW, stderrW io.Writer) (exitCode int); internal/runtimeclosure/java.go -> OpenJava() (*Java, error), Environment(home, temp, javaPath string) []string.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: A user can cancel real formal verification without leaving its owned nested JVM running; malformed custody returns an explicit error.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
