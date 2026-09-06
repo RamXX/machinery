@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T04:09:46Z
-content_hash: "sha256:487173515fc5d946e011f94f37c8b9dbc0fafae348990bf7433fdf6c697349d3"
+updated_at: 2026-09-06T04:16:29Z
+content_hash: "sha256:fbacf13bd4afae6342ce28db18327e30578d2fe904513a13b086d457c37a15dd"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -122,6 +122,51 @@ All218 appendix tuple-to-RowID conversions independently reconciled as mechanica
 First fsm_test.go contents freeze at initial tdd-red. Any later additive same-file patch requires separate exact PM authorization before writing, TEST-EDIT AUTHORIZED record and [test-edit-authorized] commit marker, preserving every first-stage byte/assertion. None is granted for an unwritten future patch here. Independently review/freeze final combined RED before GREEN. Scaffold failures remain nonqualifying and original semantic RED stays replayable. Task missing-call/name-only mutation requires actual corrected candidate anchor and passing corrected control after GREEN; no synthetic fixed baseline proof before GREEN.
 
 Cost recommendation only, canonical unchanged by PM: 807 existing test lines;218 tuple replacement lines alone436 additions+deletions. Strict dual parser, closed witness builders and native mutation proofs justify SrPM forecast review. Approx decomposition1500-2150 changed LOC; recommend provisional1500-2200 across same8 paths or a concrete measured1250-1750 decomposition covering all AC. Clarify changed LOC vs net additions, preserve all proof, no extra paths/architecture. Initial5m runtime budget unchanged pending measurement.
+INITIAL_RED_REPLAY: VALIDATED — MAC-uzxr initial checkpoint only.
+Independent report /tmp/MAC-uzxr-PM-initial-red-replay.md SHA25609291b1d33e9a7c77981c76f2cba2b01415eed3695de5d44f5c650fd31d119b6.
+Exact998a5a3b3107292365c7c3e6ddb85c072c534145, only485-line fsm_test.go SHAd17a16229e9139d4f9c72e9d2f6fc04801d1b7f7246ac58ffbb092f04656d396. Complete source and author report read. Detached PM checkout /tmp/MAC-uzxr-pm-initial-red.csxQrh/review clean; static pvg verify1file0issues, gofmt/diff-check clean.
+Independent actual native replay exit1, toolwall3.121269333s, exactly3 intended unsafe-native-variant-accepted enclosing failures and200 childPASS/0FAIL/0SKIP. Log /tmp/MAC-uzxr-pm-initial-red.csxQrh/replay.jsonl SHA256f8e10d43309778babbe609643c2adde672ad09c87305470745b706b5200dc67b. Separate original suite+supplements baseline actualexit0,225PASS/0FAIL/0SKIP,wall0.86440525s; baseline.jsonl SHA256ee99c3aa35061bfc763ad6566a616920e98327b79f06e1637898fde8874f4ea1.
+Commands from exact detached examples/go-crm/impl used GOWORK=off GOPROXY=off GOTOOLCHAIN=local, pipefail, Go300s meta/120s baseline. Six children complete full User20/User20/Session60 inventories for each control+mutant, all exit0. Independent verifier matched author and PM receipts/raw hashes, exact package/run/terminal identities, all46 input hashes per control against committed git objects, exact2/2/1 mutation-only files, all child fixture cwds removed, and both225 baseline inventories equal218 appendix labels+7 original supplement identities. Retained PM proof /var/folders/gh/7c54cw2s52v6q6czy3xqhb_w0000gn/T/crm-fsm-native-proof-807612870.
+This is genuine unsafe-variant acceptance RED, not parser execution, successful negative rejection, Task repair or full AC evidence. No full approve-red/deliver/accept/reject transition.
+
+TEST-EDIT AUTHORIZED: examples/go-crm/impl/internal/testoracle/fsm_test.go -- EXACT storage-only repair against998a5a3; author may change ONLY these3 regions in a separate [test-edit-authorized] commit, preserving historical998a5a3 and raw RED evidence:
+1. Add stdlib import "flag" in gofmt order.
+2. Immediately before var nativeUserLeaves, add:
+var nativeProofParent = flag.String("fsm-native-proof-dir", "", "Retain native proof under this existing absolute directory (default: clean test temporary output)")
+3. In TestFSMNativeOracleSensitivity replace only the existing proof, err := os.MkdirTemp("", "crm-fsm-native-proof-"), its if err block and retained-directory t.Logf statement with:
+proof := t.TempDir()
+retained := *nativeProofParent != ""
+if retained {
+    if !filepath.IsAbs(*nativeProofParent) {
+        t.Fatal("fsm-native-proof-dir must be an existing absolute directory")
+    }
+    proof, err = os.MkdirTemp(*nativeProofParent, "crm-fsm-native-proof-")
+    if err != nil {
+        t.Fatal(err)
+    }
+}
+t.Logf("native proof directory: %s; retained=%t; toolchain=%s %s/%s", proof, retained, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+
+Flag owned solely by this test file controls evidence storage, NEVER execution gating/skips/selection/expectations/oracle versions. Both valid modes unconditionally run all3 cases unchanged. Default uses testing.T.TempDir automatic cleanup/error reporting; do not swallow cleanup errors in a custom RemoveAll. Explicit export requires existing absolute parent and retains only the owned unique proof directory. Invalid parent is visible output setup failure, never semantic RED. All original fixtures already use t.TempDir and remain unchanged. No historical proof deletion or pruning authority. PM measured197672bytes/21 retained files per default invocation; unconditional accumulation justifies this bounded lifecycle correction but does not invalidate initial RED.
+All mutation bytes, nativeUserLeaves/nativeSessionLeaves, cases/diagnostics/assertions, nativeRun/nativeCheckRun/nativeManifest/nativeCopy, command/timeouts and result logic byte-identical. No unrelated later parser/helper/additive amendment in this repair.
+
+Required finite actual verification after repair: run same meta command once default, once with -args -fsm-native-proof-dir=<existing-absolute-review-directory>; both actualexit1/3 intended outerFAIL/200 childPASS0SKIP. Default emitted proof path must disappear after process ends; explicit mode21 evidence files remain and six receipts/logs/46input manifests/exact2/2/1 mutation-only files are checked. All fixtures clean in both. Same env/pipefail; logs and repairedfile hashes, actual runtime/exits, only-authorized-diff, gofmt/diff/scoped pvg verify. Cleanup errors are real failures. Commit separate [test-edit-authorized] repair, then independent verification checkpoint; full RED still held.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Initial998a5a3 semantic RED independently replayed and validated with exact manifests/native identities; full report/hash above. Graph readygeneration02:42:16Z best effort, new branch test absent from main graph so full committed source fallback.
+- Exact storage-only repair authorized above; not implemented by PM. HistoricalRED preserved; all complete later five-suite/parser/helper/amendment and cost decisions HELD. Canonical8paths/5AC unchanged.
+- Only own detached replay artifacts/external review/tracker writes. Main clean; developer claim/worktree retained, no product/source/service/remote/toolchain changes or background processes.
+
+### proof
+- [ ] AC #1: parser and closed actual witness binding pending.
+- [ ] AC #2: complete effects and actual Task context repair pending.
+- [ ] AC #3: initial missing-sensitivity RED validated; candidate successful unsafe rejection/missing-call proof pending.
+- [ ] AC #4: historical218+7 baseline replayed; candidate dynamic successful-row inventory pending.
+- [ ] AC #5: candidate passing focused suite/sensitivity pending; no claim renewal.
+
 ## nd_contract
 status: in_progress
 
