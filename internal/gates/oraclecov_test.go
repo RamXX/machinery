@@ -198,8 +198,7 @@ func TestGtCitationBoundaries(t *testing.T) {
 		design, impl := writeCovFixture(t, map[string]string{
 			"machines/order.oracle.md":          orderOracle,
 			"machines/purchase-order.oracle.md": purchaseOracle,
-			"impl/purchase_test.go": "package p\n\nconst oraclePath = " +
-				"\"../../design/machines/purchase-order.oracle.md\"\n" + parseEvidence,
+			"impl/purchase_test.go": covActiveParser("p", "../../design/machines/purchase-order.oracle.md"),
 		})
 		g := CheckOracleCoverage(design, impl)
 		if !strings.Contains(strings.Join(g.Errs, "\n"), "order.oracle.md: 1 of 1 stable ids appear in no test file (ORD-aaa111)") {
@@ -272,8 +271,7 @@ const parseEvidence = "\nfunc cells(line string) []string { return strings.Split
 func TestCheckOracleCoverageConformanceParse(t *testing.T) {
 	design, impl := writeCovFixture(t, map[string]string{
 		"machines/Thing.oracle.md": covOracleMD,
-		"impl/oracle_test.go": "package thing\n\nconst oraclePath = " +
-			"\"../../design/machines/Thing.oracle.md\"\n" + parseEvidence,
+		"impl/oracle_test.go": covActiveParser("thing", "../../design/machines/Thing.oracle.md"),
 	})
 	g := CheckOracleCoverage(design, impl)
 	if len(g.Errs) != 0 {
@@ -293,8 +291,7 @@ func TestCheckOracleCoverageConformanceParseIsNotSubstring(t *testing.T) {
 	design, impl := writeCovFixture(t, map[string]string{
 		"machines/Order.oracle.md":         orderOracle,
 		"machines/PurchaseOrder.oracle.md": purchaseOracle,
-		"impl/purchase_test.go": "package p\n\nconst oraclePath = " +
-			"\"../../design/machines/PurchaseOrder.oracle.md\"\n" + parseEvidence,
+		"impl/purchase_test.go": covActiveParser("p", "../../design/machines/PurchaseOrder.oracle.md"),
 	})
 	g := CheckOracleCoverage(design, impl)
 	if len(g.Errs) != 1 || !strings.Contains(g.Errs[0], "Order.oracle.md: 1 of 1 stable ids appear in no test file (ORD-aaa111)") {
@@ -354,8 +351,7 @@ func TestCheckOracleCoverageFormalOracles(t *testing.T) {
 	t.Run("covered by file-name literal", func(t *testing.T) {
 		design, impl := writeCovFixture(t, map[string]string{
 			"formal/Policy.oracle.md": covPolicyOracleMD,
-			"impl/authz_test.go": "package authz\n\nconst oraclePath = " +
-				"\"../../design/formal/Policy.oracle.md\"\n" + parseEvidence,
+			"impl/authz_test.go": covActiveParser("authz", "../../design/formal/Policy.oracle.md"),
 		})
 		g := CheckOracleCoverage(design, impl)
 		if len(g.Errs) != 0 {

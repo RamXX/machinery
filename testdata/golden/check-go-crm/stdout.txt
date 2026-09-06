@@ -54,7 +54,7 @@
   ERROR  source file internal/testoracle/fsm.go maps to no contract boundary; add it to a boundary's code globs or to the contract ignore list
   checked: 2 dirs pruned by contract ignore, 16 go files checked, 22 imports resolved, 16 test files skipped, 13 edges verified
 == Gt-tests  oracle ids in the test suite ==
-  checked: 16 test files scanned, 5 machines, 275 oracle rows, 177 ids covered by literal, 1 machines covered by conformance parse, 2 formal oracles, 2 formal oracles covered, 6 clause-declared guards checked, 36 falsifying-clause ids covered
+  checked: 16 test files scanned, 5 machines, 275 oracle rows, 177 ids covered by literal, 1 machines covered by conformance parse, 2 formal oracles, 2 formal oracles covered, 6 clause-declared guards checked, 36 falsifying-clause ids covered, static discovery; tests not executed; unsupported parser structures remain uncovered
   ok
 
 1 blocking (ERROR/DRIFT) finding(s)
