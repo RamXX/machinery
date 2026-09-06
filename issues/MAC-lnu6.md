@@ -1,19 +1,20 @@
 ---
 id: MAC-lnu6
 title: "Remove unsafe frozen-test formatting exemptions"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T23:26:03Z
-content_hash: "sha256:7d8029199614cf56bf867d25d25cd10de13ce25016d875a743b2225ee954be3b"
-blocks: [MAC-vx24, MAC-ou97, MAC-wbxq]
+updated_at: 2026-09-06T23:26:04Z
+content_hash: "sha256:578813f17c1649d35e534c22da063f7d2576dee660459300596cc3f08008a7b1"
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx, MAC-hgz1]
 was_blocked_by: [MAC-hgz1]
+closed_at: 2026-09-06T23:26:04Z
+close_reason: "Accepted: unsafe frozen-test formatting exemptions removed; nine policy surfaces truthful; merged to local epic"
 ---
 
 ## Description
@@ -594,10 +595,13 @@ Historical original canonical Description (superseded only as active scope; pres
 - 2026-09-06T20:22:41Z dep_removed: was_blocked_by MAC-hgz1
 - 2026-09-06T20:23:32Z status: in_progress -> in_progress
 - 2026-09-06T20:23:32Z auto-follows: linked to predecessor MAC-hgz1
+- 2026-09-06T23:26:04Z status: in_progress -> closed
+- 2026-09-06T23:26:04Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-06T23:26:04Z dep_removed: no_longer_blocks MAC-ou97
+- 2026-09-06T23:26:04Z dep_removed: no_longer_blocks MAC-wbxq
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-vx24]], [[MAC-ou97]], [[MAC-wbxq]]
 - Was blocked by: [[MAC-hgz1]]
 - Follows: [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]], [[MAC-hgz1]]
 
