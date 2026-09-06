@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:14:14Z
-content_hash: "sha256:e75e1394a46464618fbf9ecd66db98ccef3d6289d985beeb1e6f02a3f04274b6"
+updated_at: 2026-09-06T00:15:09Z
+content_hash: "sha256:eda97d03f064b1d86bb8c6953c144faa67d89742d8e16a7cb29d8f98444c5bfe"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-sh60
 follows: [MAC-a89e, MAC-p8ce]
@@ -115,6 +115,67 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+## Implementation Evidence
+
+PROOF:
+
+### CI/Test Results
+
+Commands run:
+- go test -json -count=1 -timeout=120s ./internal/gates -run 'Oracle|Conformance|Coverage|GtCitationBoundaries'
+- go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestOracleCoverageCLI'
+- go test -json -count=1 -timeout=90s ./internal/gates -run '^TestGt'
+
+Summary: expected RED gates 68 pass / 22 fail / 0 skip (90 leaves); CLI 4 pass / 6 fail / 0 skip (10 leaves); extra Gt 7 pass / 0 fail / 0 skip (2 repeated boundary leaves). Every failure is intended behavior: 20 unsafe-evidence acceptance unit cases, mixed-disabled unit, 5 actual CLI false-green exits and 2 discovery-label failures. Native parser controls pass after verifying 2 rows and reaching expected-target mutation error 'oracle transition mismatch: got B want A'. No compile/import/path/timeout failure used as RED evidence.
+
+Coverage: behavioral matrix enumerated in previous RED Delivery note and exact JSON inventories; code coverage percentage not measured in RED.
+Raw terminal artifacts: /tmp/MAC-sh60-red-proof.D3QqXS/gates.jsonl, cli.jsonl, gt-controls.jsonl and matching *-inventory.json. Exact leaf inventory and producing commands also preserved in Notes.
+
+### Commit
+Branch: story/MAC-sh60
+SHA: b5d3b8c67f487195215860f3d361432f5b2b6b27
+RED-only tests; unchanged production base 6cb2d974ea8aea211a5974f453cef2b5802bb11e. GREEN pending fresh agent.
+Diff budget: 3 files, 285 inserted/8 removed. New gate tests 199 lines; new real CLI tests 82 lines; existing test four exact independent PM-authorized fixture expressions (4 added/8 removed), assertions and unrelated bytes preserved.
+
+### Frozen test SHA256
+- internal/gates/oraclecov_negative_test.go: 77940442bc579b2ec64715c79555d89c44dd27e498e49d296899e2d8f90ff042
+- internal/gates/oraclecov_test.go: dd68d778605397184630447bc09b712072fe604be77c496177d121690414b994
+- cmd/machinery/oraclecov_negative_test.go: 6ea06399d8271691f7f40f30f067e0d3270184eaca4fc2548cc7a562c7775d08
+- unchanged internal/gates/oraclecov.go: 9f4bfabcfe43362b62068e59a59f313cd6d27a3490392f66c5fcf71be70684ad
+
+### pvg verify
+Command: pvg verify internal/gates/oraclecov_negative_test.go internal/gates/oraclecov_test.go cmd/machinery/oraclecov_negative_test.go --include-tests --format text
+Output: VERIFY: FAILED (3 files scanned, 1 issues). Sole issue is deliberate existing quoted TODO input at oraclecov_test.go:158. No stub/thin findings. PM explicitly preserves this existing comment-rejection fixture; marker is test data, not unfinished implementation. Initial unsupported --format=text was corrected after reading help. git diff --check passed; worktree clean.
+
+### Wiring and limits
+Actual CheckOracleCoverage calls; actual built worktree CLI via unchanged goldenBin/runBinWithEnv -> machinery check --gate gt using real temporary design/impl files and isolated HOME/config. Native Go parser fixture executes without service/mocks or skips. Other-language parser/literal fixtures establish discovery only, not runtime execution. No Docker/Java/Node runtime introduced. Full preflight deferred explicitly to final epic, no installed binary/skills/main/remote mutation.
+
+### AC Verification
+- [x] AC #1: 20 non-executable source negatives + mixed disabled test reach intended unsafe-coverage assertions; GREEN pending.
+- [x] AC #2: 11 literal extension controls, 7 active parser language controls and 2 native semantic/mutation controls PASS; ambiguous evidence rejected by RED expectations.
+- [x] AC #3: every assessment bypass, real full gate fixture, zero/mixed/malformed/positive and actual CLI matrix executed.
+- [x] AC #4: unit and real CLI discovery-versus-execution label assertions fail as intended.
+- [x] AC #5: stable-ID/file boundaries, orphan/missing-oracle, parent/clause, Rust/MJS preservation tests pass; real CLI path exercises false-green bypasses with expected RED.
+
+LEARNINGS:
+- Filename/delimiter matching credits unused/commented source; Go Test-prefix matching additionally credits native non-test helpers.
+- Semantic parser control needs real result-vs-expected comparison and an altered expected-result assertion control.
+- Static source discovery remains distinct from test execution; no production AC completion claimed by this RED delivery.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED b5d3b8c67f487195215860f3d361432f5b2b6b27; gate90=68 pass/22 intended fail, CLI10=4 pass/6 intended fail, extraGt7 pass; raw JSON/inventory/hashes above. Implementation pending GREEN.
+
+### proof
+- [x] AC #1: executable-evidence RED bar frozen and false-positive assertions reached.
+- [x] AC #2: actual positive discovery fixtures and native semantic control pass.
+- [x] AC #3: full CheckOracleCoverage and real CLI regression matrix ran.
+- [x] AC #4: discovery-versus-execution RED assertions reached.
+- [x] AC #5: selected existing preservation controls pass; actual CLI exercised.
+
+
 ## Implementation Evidence (DELIVERED)
 
 PROOF:
