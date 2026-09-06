@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:40:27Z
-content_hash: "sha256:f4de5ecd23b919f6f4286bfaff9c4e0e450b4f152c35a7b3cce01a8adf30b64a"
+updated_at: 2026-09-06T00:40:28Z
+content_hash: "sha256:dfd637ab30df67d826bd5ff0833c1803ba6d96098056489435248bcd85600e6d"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce]
@@ -949,3 +949,25 @@ status: in_progress
 - Follows: [[MAC-p8ce]]
 
 ## Comments
+
+### 2026-09-06T00:40:28Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Architecture revision 2 independently APPROVED; unchanged authority SHA256 8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179.
+- Exact two existing-test amendments and four bounded seam uses already authorized by independent PRE-RED PM review, preserved in full; this Sr PM clarification grants no additional seam or test scope.
+- Original architect and challenger independently APPROVED AC5 composition clarification SHA256 5fc3193106a803b7760020b646ed4db7b3d417f5e196b2266d10cf8227733937. Canonical exact row, conjunctive same-GREEN-revision evidence bar and observation limits now embedded.
+- Five product AC byte-identical; previous canonical and all existing history preserved. Actual command strings and unique active section structure semantically reread after literal-safe supported edit; no reliance on constructed-text equality alone.
+- Current a82277a CLI contains old stableAttestationHashes path, NOT future RenderAttestation generation integration. Delivered source/output/error/defer closure remains an unexecuted mandatory final review obligation.
+- Bounded RED authoring may resume under the existing PM authorization and dispatcher scheduling. Independent RED replay/approve-red, GREEN implementation, tests and final acceptance remain pending. No observed behavioral proof is claimed by this contract repair.
+- Status in_progress, hard-tdd, assignee dev-MAC-p7jd, dependencies and healthy retained worktree/claim unchanged; no source/test/docs, installed assets, remote or preflight changes.
+
+### proof
+- [ ] AC #1: complete scope/inventory binding requires frozen RED and GREEN proof
+- [ ] AC #2: closed plan/current/history semantics require behavioral replay
+- [ ] AC #3: legacy migration requires A failures on base and D passing compatibility controls
+- [ ] AC #4: authorized real mutation/custody/lifecycle tests require reached final proof
+- [ ] AC #5: same delivered GREEN revision must supply OBSERVED real renderer late validation/cleanup failure with nil bytes; OBSERVED built CLI success and ordinary real renderer-error/alias failures with exact output/exit; REVIEWED final renderer-to-CLI output/error/defer closure. Late CLI guarantee is COMPOSED, not independently observed injection; standalone late injection remains UNOBSERVED and individual OS Close errors UNFORCED. Actual cleanup cause, existing real CLI freshness/history/migration cases and output-sink partial-write limit remain mandatory.
+
+Structural checks: scoped backlog lint PASSED (33 issues, 0 errors, 0 review findings); no dependency cycles; scoped RTM PASSED (18 stories/3 closed; 0 tagged requirements extracted/0 uncovered). These checks are structural, not product AC proof. This terminal full contract supersedes older trailing architecture-pending blocks without deleting history.
