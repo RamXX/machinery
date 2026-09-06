@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:18:17Z
-content_hash: "sha256:0aa5cd511ed0696447f450542549a6bf336b00e94edb481c2a09f9314af4d613"
+updated_at: 2026-09-06T10:19:48Z
+content_hash: "sha256:8c746ee79314da79fa7fee44bd5a45db014dd200df3b650f8f94afd2f1218c25"
 blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36, MAC-a89e]
 assignee: dev-MAC-l7m0
@@ -80,6 +80,34 @@ Observable outcome: the maintainer can review a closed standalone contract that 
 ## Notes
 BLOCKED — USER CHOICE / ARCHITECTURE REVIEW. Do not dispatch a generic developer. Pending user decisions: supported initial native runner languages and trusted-host versus adversarial-code execution boundary. Independent architect owns exact contract. Only after answers plus reviewed contract may Sr PM repair implementation interfaces and release this blocker.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: Architecture is read-only contract work, not an executable runtime suite. Its accepted contract must explicitly identify any native adapter runtimes consumed by implementation; MAC-vx24 must register/provision those using the required closed integration lane. No execution assurance may be claimed from schema or architectural review alone.
+## Adversarial Document Validation (post-delivery evidence)
+
+- External disposable validation artifact directory retained at `/tmp/machinery-assurance-negative.RSUL9B` (not tracked and outside the repository).
+- Exact validator: `validator.sh`, SHA256 `2288fefa6d128cc47215457cb4f24d945d7a06891179397249bf5c905a02de2b`; raw result log: `raw-results.txt`, SHA256 `9a30ab935c5d236ca31767332382ec89fb11cdf61c7e8f5992a37e65c062c909`.
+- Canonical candidate semantic and exact-byte binding: PASS, SHA256 `22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8`.
+- Negative candidates rejected by semantic validator and exact-byte binding:
+  - renamed exact `LoadPlan` interface: `029e61885d093e87ab900721a4d16e5d5ddd0036f2fddba0b9448d9b908e0f47`; rejected `missing-exact-interface`.
+  - weakened replay requirement: `fb784c6e58214e70d457ba0d10f299ce780e4a92bf5c2c9b2a5cf6ff2e3bf931`; rejected `weakened-replay-requirement`.
+  - altered 14,400,000-ms aggregate owner deadline: `1b0486a7b1c21cbd14a2ee33aa6cf6ef382396689563f58dd4877739f7823875`; rejected `altered-owner-deadline`.
+  - reintroduced private MAC ID and `/tmp/machinery` path: `d93c21673dfbb416a58aea72989147dc165e33fbc7a5626e2e7105d1602ebd14`; rejected `private-or-false-completion`.
+  - false implementation-complete status: `fe7a5d6b45d4d9546d6e2f4a1ae44df4169e5a0d8e272c6112236ce1e738e89d`; rejected `private-or-false-completion`.
+- Full normative preservation remains the deterministic complete-source projection: exact public bytes were derived from source lines 1-575 under the recorded 13 whole-line, seven literal, and global em-dash transformations; matching only selected keys is not represented as semantic review. Independent PM comparison of every normative section remains required and pending.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Commit 0feaebf725267f9d0045d653ef57a90af0c9d946; canonical public SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8.
+- External adversarial validator and five rejected mutation candidates retained with raw results/hashes above.
+
+### proof
+- [x] A1: Exact public projection landed.
+- [x] A2: Complete deterministic projection preserves normative contract; PM semantic comparison remains pending.
+- [x] A3: Standalone public boundary checked, including a rejected private-leak mutation.
+- [x] A4: Approval/implementation distinction retained, including a rejected false-completion mutation.
+- [x] A5: Canonical positive and five adversarial negative document controls passed.
+- [ ] A6: Independent PM acceptance is pending; developer delivery evidence is complete.
+
 ## Implementation Evidence
 
 ### CI/Test Results
