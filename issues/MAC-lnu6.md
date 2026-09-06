@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:21:31Z
-content_hash: "sha256:200bcdf6d65cbf8915c692fb3ef3deb578b02cc214ad406dda26009390583caa"
+content_hash: "sha256:f2f86f301bbb53b8065c6350cee8972997e173bb0c3ce77b9300e67d84a817ca"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
@@ -1258,4 +1258,24 @@ status: in_progress
 - [ ] AC #3: existing executable semantic counterexamples remain frozen; actual shipped guidance replay pending.
 - [x] AC #4: prior recorded CLI utility/exit/custody controls remain unchanged; no comparison implementation change found.
 - [ ] AC #5: final all-nine contract, six stale and six final Gv outcomes, unchanged-golden TestGoldenCheck and GREEN PM acceptance remain owed.
+
+
+### 2026-09-06T03:21:31Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Dispatcher-authorized serial graph: MAC-uzxr + MAC-lhu5 + MAC-p7jd -> MAC-hgz1 -> MAC-lnu6; MAC-ou97 also directly depends on the consumer. Existing lnu claim/dev-MAC-lnu6, status and hard-tdd/red-approved labels retained. This is shared-file sequencing, not new core architecture or proof.
+- MAC-hgz1 exclusively owns six BUILD/evidence migration/context corrections and only exact-before-edit PM-authorized affected golden updates. It preserves all nine old policy blocks; MAC-lnu6 alone owns policy replacements afterward. No concurrent shared-file writers.
+- Original five AC, frozen RED0ea1fdc730aadac15cecc8de33bb95898ad91d60 and CLI713184db16a12b8c3763b4aa8f5bf025721abf22 remain intact. No old-test/golden edits by lnu; upstream accepted golden changes require separately recorded authority/provenance.
+- All14 evidence amendments remain HELD today. Prior nine-block prose approval at713184d is historical; fresh exact post-migration prose AND full-claim/evidence review is required before new writes. No reviewer/date prefill or automatic schema/kind/scope/non-BUILD-hash edits.
+- Accepted upstream source/schema/subject/golden baseline is consumed explicitly; retain historical original logs and rerun all6 actual baseline,6 stale-before-amendment and6 final Gv outcomes with honest plan/current warning limits. Current Go CRM uses actual --impl; no invented implementation for design-only examples. Unchanged-golden compatibility means the accepted upstream expected bytes, not silent mutation of old baselines.
+- Scope stays17 paths/~500 lnu-only forecast; upstream migration budget is separately reported. No source/test/docs/evidence/worktree/installed asset changes by this triage.
+
+### proof
+- [ ] AC #1: original nine policy amendments and actual frozen-suite replay after accepted migration/fresh review.
+- [ ] AC #2: retained CLI honesty with final truthful documentation.
+- [ ] AC #3: frozen semantic/utility controls and final actual guidance checks.
+- [x] AC #4: prior reported CLI utility/exit/custody controls remain unchanged; final compatibility replay still owed.
+- [ ] AC #5: actual CLI/all-nine contract plus new six baseline/stale/final checks and accepted upstream golden compatibility; no Paivot dependency.
 
