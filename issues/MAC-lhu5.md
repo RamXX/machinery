@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
-updated_at: 2026-09-06T15:08:05Z
-content_hash: "sha256:180a62240cc3c0a939154a1fbfd748318204f78e6776c9766677bd39154bd52a"
+updated_at: 2026-09-06T15:26:16Z
+content_hash: "sha256:f1ee4f30c3fb383d086728a1cb4a8a48d7dfbc6b2aaf55fd76c051b435405cdf"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
@@ -593,3 +593,6 @@ FINITE FSM METHOD CHECKPOINT — NO SOURCE/RED/STORY TRANSITION. Frozen candidat
 
 ### 2026-09-06T15:08:05Z ramirosalas
 FINITE FSM V2 REVIEW CHECKPOINT ONLY. External V2 original and full suites pass (140 and202 test actions), but independent /tmp/MAC-lhu5-FSM-review-v2.zvcA96/REVIEW.md SHA256 bc21178c745294a4e2f5c1a500c9762654c071bcd0d96adc43e0e08a28d245d4 is GAPS_FOUND. Root fully read218-line report/new adversarial probe and verified both manifests. Actual17 failed leaves+5 failed parents, one arbitrary-data-null positive passes: typed semantic null/case-folded aliases and M0/M3 tilde/indented code or top-level-section relocation false admissions. Previous effect-sequence gap is CLOSED; four local-prerequisite/literal-effect controls remain unchanged with Step/ledger/old140 actions/14fixtures. Corrective external-only V3 assigned original /root/portfolio_fsm_method, retaining every PM probe and failed raw artifact. No source/RED/story/native/full21-path acceptance; remaining typed-value/timestamp/backup and exact packet/source-hunk inventory still owed. Existing in_progress contract/five pending AC and all earlier bounded method approvals unchanged.
+
+### 2026-09-06T15:26:15Z ramirosalas
+FINITE FSM V3 CHECKPOINT ONLY. Independent /tmp/MAC-lhu5-FSM-review-v3.5NxDTt/REVIEW.md SHA256 f627bcb1e57eaf0f92a22f5215dd2131ad868c514884e697be4d61c36d9f9aaa closes exact JSON/key/null and effect controls. One narrow section-boundary gap remains: tab-separated or empty H1/H2 ATX headings fail to close the normative section. Actual eight failing leaves/three failing parents retained; candidate310passes(281leaves29parents) does not override them. Root fully read151-line report/new40-line probe and verified both manifests. External V4 assigned original author for minimal finite heading-boundary correction, all prior tests/probes/Step/ledger/14fixtures unchanged. No source/RED/story/native/full21-path authority; earlier bounded approvals and current in_progress contract/five pending AC unchanged.
