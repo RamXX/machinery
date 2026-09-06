@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T04:06:34Z
-content_hash: "sha256:98e2f59834c38a79d75b676f51c7ab4e9a5d74d470cf8b3533ff5725c8a210dc"
+content_hash: "sha256:fd9f82dcc83046d2dbc503392770e55c1448e20272bacf60e66049bf37d3b9b8"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e]
@@ -102,6 +102,16 @@ status: new
 
 
 ## Notes
+
+
+## nd_contract
+status: red-approved
+
+### evidence
+- RED tests approved via pvg story approve-red on 2026-09-05.
+
+### proof
+- [ ] GREEN developer must implement against the approved RED tests without modifying them.
 
 
 ## nd_contract
