@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:12:26Z
-content_hash: "sha256:58eb28d021926752a4e4e82968914dd13f904a55762e8e65d434ee16b88148bc"
+updated_at: 2026-09-06T03:19:43Z
+content_hash: "sha256:7ce5475e409c330c8dc952d2adb97012146e25e9e951843c4a2f50fe61db7304"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce]
@@ -861,7 +861,128 @@ Review evidence/limits:
 - Graph index_status/search_graph identified Config/Load and copyDirInto; coverage generation 2026-09-06T02:42:16Z reports best-effort metadata_match/no_recorded_issue for internal/hook/hook.go and cmd/machinery/golden_test.go. No claim of exhaustive graph proof.
 - Exact git show 7ec5d609 of both frozen test files and their readonly Config/decodeConfig/Load/copyDirInto dependencies; exact file hashing and raw JSONL hashing/leaf extraction above. Source inspection of the tests supplies cost evidence, not acceptance.
 - Main remained clean at 497419ab4512fcff765cd5feb27aed4c67b5608d; observed epic 70652b948bf090008b1965c85daf36ea374daea4. PM used committed refs, not the developer worktree. No PM source/test/docs edits, execution replay, installed asset change, remote mutation, full preflight or status transition.
+## Implementation Evidence
 
+PROOF: RED-only delivery for MAC-p7jd. Product implementation and AC acceptance are NOT complete. Independent PM replay/approval and all GREEN proof remain pending.
+
+### Revision and ownership
+
+- Approved unchanged production base: a82277af5650b487cea1260c24ffcc1c86d69d8d.
+- Original frozen RED: 7ec5d609acc1597ee2c0ddbf5401b92f834d5ab3.
+- Exact PM-authorized setup repair: 47ba44906a09bc2fa010092a86b133d0d749c52c, subject `test(MAC-p7jd): tdd-red [test-edit-authorized] repair two fixture setup prerequisites`.
+- Branch story/MAC-p7jd; retained worktree /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-p7jd. Clean after repair. No production/docs edits. Five changed test files: 1484 insertions, 3 deletions against base. Three new files total 1435 LOC (612 gates, 462 CLI, 361 hook).
+- Exact repair diff: /tmp/machinery-p7jd-red-proof.RvOHwO/repair.patch, SHA256 2292e7da2123bdbc3890564468d52853c53306aa44e2efd0c9f60ef184e2a5e4. It contains only checked MkdirAll of the complete CLI fixture's two destinations, and hooks:true serialization plus immediate real Load(root) validation. All other bytes preserved. No amend/squash/rewrite.
+- Remaining canonical scope: unchanged 13 required/optional 14 paths; PM-supported forecast 2710–3310 total, not a cap or authority to trim proof or expand ownership.
+
+### CI/Test Results
+
+Commands run:
+
+Every command ran from `cd /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-p7jd`; no installed binary, network service, Docker, or Paivot product dependency. Go reports `go version go1.27.1 darwin/arm64`. Each selection uses native Go, real temporary filesystem; CLI tests build a private executable and use real bounded Git/process calls. CLI build digest logged: sha256:04e5c6fcd1f94574f547391ee2c3f39507db5b7df2b1ec0f09deda0db054dbbf.
+
+1. `go test -count=1 -timeout=5m -json ./internal/gates -run Attest`
+2. `go test -count=1 -timeout=5m -json ./cmd/machinery -run Attest`
+3. `go test -count=1 -timeout=5m -json ./internal/hook -run Attestation`
+4. `go test -count=1 -timeout=5m -json ./internal/designlock -run Attestation`
+5. `pvg verify internal/gates/attest_implementation_test.go internal/gates/attest_test.go cmd/machinery/attest_implementation_test.go cmd/machinery/attest_test.go internal/hook/attestation_snapshot_test.go --format text`
+6. `pvg story verify-tdd --range a82277af5650b487cea1260c24ffcc1c86d69d8d..47ba44906a09bc2fa010092a86b133d0d749c52c`
+7. `git diff --check`; `git diff 7ec5d609 HEAD`; `git diff a82277a HEAD --stat`; SHA256 of all five files and original committed versions; raw JSONL/timing/leaf inventory hashes.
+
+Tests were wrapped with shell `time`, with stdout in `<package>-repair.jsonl` and stderr/time in `<package>-repair.timing` under this report's directory. Exit status explicitly captured after each command. All processes terminated; no timeout, skip, build failure or missing runtime. No full preflight and no -cover, per dispatcher constraint pending separately owned MAC-yig6 fixture repair. Coverage percentage: NOT MEASURED; package selections are not line/branch coverage.
+
+Summary:
+
+| Package selection | Native leaves | Pass | Fail | D pass | Genuine A fail | B absent/diagnostic fail | C control unavailable, challenge unreached | Starts/terminals | Exit | Wall seconds |
+|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|
+| gates Attest | 133 | 31 | 102 | 2 | 18 | 21 | 63 | 142/142 | 1 | 6.993 |
+| cmd/machinery Attest | 28 | 11 | 17 | 2 | 6 | 1 | 10 | 29/29 | 1 | 4.005 |
+| hook Attestation | 28 | 5 | 23 | 4 | 0 | 4 | 19 | 30/30 | 1 | 4.601 |
+| designlock Attestation | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0/0 | 0 | 0.506 |
+| Total | 189 | 47 | 142 | 8 | 24 | 26 | 92 | 201/201 | — | — |
+
+No skips. Non-D passes: 28 existing gates controls plus one independent digest fixture vector, nine existing CLI controls, one existing hook selection control. The B digest-vector pass validates independent test grammar, not product capability. Gates B failures include the one authorized wrong-version diagnostic expectation (integer 1 or 2), 17 v2-plan/closed-schema leaves and three kind/root leaves. Sixteen schema challenge legs fail their valid v2 control first; no schema sensitivity is credited. Hook C's 19 failures are also callback INTERFACE_ABSENT mechanically; categorized C to retain intended fault/control family and prevent claiming mutation execution. Count categories are mutually exclusive reporting buckets, not 26+92 distinct observed negative semantics.
+
+The designlock command reports `testing: warning: no tests to run`; zero tests is explicitly NO capability proof. New designlock APIs and their tests are GREEN-only obligations, not baseline-compatible RED.
+
+Native leaf inventories, including exact names, terminal status and per-leaf elapsed values:
+
+- gates-repair-leaves.tsv SHA256 20ce84c46812bc7653788bb6e2c56a800a085b58bb607549868fad6aa177573b.
+- cli-repair-leaves.tsv SHA256 c0472619543abcf439c6d48c3dc2b6c58da87c63560bed28606049d15d8b6f3b.
+- hook-repair-leaves.tsv SHA256 73f7e4cb7d0924743fcf36e90e649b544d6419658d948113984147432504e324.
+- designlock-repair-leaves.tsv is empty SHA256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.
+
+Inventories derive from full parsed JSONL: collect unique run Test names, retain pass/fail/skip terminal events whose names have no child name prefix. Starts/terminals include parent tests; leaves do not double count them. Raw hook subprocess output is embedded in parent logs; 23 child scenario executions are represented by the 23 parent scenario leaves, not inflated into additional independent passes.
+
+Raw replay log SHA256:
+
+- gates-repair.jsonl 367b42cff448d0840cdfe203a0791c0bdeaaa3c6b693d94978bfdb67e9b5bad4; timing 0dff428ebfff1778c7244969c0f87014f41a023a12b0b6aecd49a9877116fda4. JSON event range 2026-09-05T20:15:01.640304-07:00 through 20:15:07.963944-07:00.
+- cli-repair.jsonl ca105ed15d24a1175dad98838990e3f0bff658e03bbd5fa9018b43635dd48820; timing 79bc63b5a34e496c74b420b139f64860c51258233f8b518eee11a56a3bbc197a. Event range 20:15:16.671789-07:00 through 20:15:19.597079-07:00.
+- hook-repair.jsonl 88f19ff77121699d9912a72cedb3c349f2de9cbc79b900260e5fd8d3fabe9e7c; timing 13d70c223fbf448579366ede2016968fc0eb5ea0c7ce211d886170eb758c08a1. Event range 20:15:26.911037-07:00 through 20:15:31.019569-07:00.
+- designlock-repair.jsonl d731200774545f86037c6783d0b64c95e4cb128dbdf7379d2461926da376e109; timing da3c1b29f5d0b71939c14248ef68286204d65b22ad3c504d8e9d790987d201e8. Event range 20:15:38.259971-07:00 through 20:15:38.563773-07:00.
+- verify-repair.txt 58f6786769382040ae1cc2005d92b28a359605afa74eac5115ac10dd7266e57d: `VERIFY: PASSED (5 files scanned, 0 issues)`.
+- hard-TDD guard: checked two commits, skipped zero merges, PASS no unauthorized test edits. This is structural, not independent behavioral approval.
+
+### Failure causes and positive controls
+
+A is reached genuine baseline false acceptance: three legacy behavioral claims (gt.conformance-test-shape, g4.standin-coverage, g4.pack-event-discipline), each unchanged or after actual handler/assertion mutation. Gates exercise direct CheckAttestations, suite with implementation and suite without it: 18 cases accept design covers without GV_MISSING_IMPLEMENTATION_SUBJECT. Six actual CLI cases return exit 0 instead of required exit 1/missing-subject diagnostic. These are existing-interface behavioral assertion failures, not parse/permission/runtime failures.
+
+D passes: gates full/partial six-claim g2 legacy plan controls preserve counts and 0/5 warnings; built CLI preserves filehash, --claims precedence, legacy plan and real Git ancestor Ga acceptance; four hook Stop/SubagentStop/semantic-warning/wave policies pass on actual existing Run with valid configuration and plain writer. New Hooks:true fixtures now pass immediate Load(root) with no warning.
+
+B/C limits: current production rejects v2 with `attestation_version must be the integer 1`, rejects generation flags with `unknown flag: --design`, and never invokes the optional hook writer callback. Callback fired count is explicitly zero with no fault credited. C tests require unchanged current/valid-v2 control before performing mutation/fault and final assertions; these legs are NOT YET EXERCISED. Frozen optional interface compiles against existing types but does not imply production activation.
+
+Complete-mode precise stage now reached: checked design/src destinations were created; full real go-crm fixture copied, Git initialized/committed, acceptance anchor fields rewritten, old claims read. The first real generation call for g2.action-ownership kind plan exits 1, stdout empty, `unknown flag: --design`. No full-v2 document, unchanged --complete control or sole-current-warning mutation has yet executed. The repair proves that setup advanced to the intended missing interface, NOT that all later complete-mode gates will pass.
+
+### Frozen file SHA256 before/after repair
+
+| File | Original 7ec5d609 | Repaired 47ba449 |
+|---|---|---|
+| internal/gates/attest_implementation_test.go | fcae6e3a9dc66d8fb9abb1d151129604f59a3e38d9ac221d4f16ce91a8086260 | identical |
+| internal/gates/attest_test.go | f0eef53c28fdf940654700832887f2c326a478c5df1d741ae9f538a3d24db253 | identical |
+| cmd/machinery/attest_test.go | beb2d58af4d3144316f3789c3b7cbb726a4761af57ea85f0017297b9c24cd6cd | identical |
+| cmd/machinery/attest_implementation_test.go | 62511c2a3ab4f04cf8b4bfa9fbe7bd0e0ec2e02c850e2e4726d0d5f198ccd58a | e02ad18fe2745d23f05e69ce1e01dd2b1be358f94d99cb3a215b14f6e2cee3b8 |
+| internal/hook/attestation_snapshot_test.go | c3f595d56538b97f47e9f8faa66e731fb371cba0d8256f0ddfb38f9ac421f021 | a3c088c095e2dba4379f548903a058eedbd5338ef872e507ab12edaa1ca06e49 |
+
+Original evidence preserved unchanged in this directory: gates.jsonl SHA256 4a62a3ee993dd8b082b6a4299342333fa735ad65bc0ece6007a336febf725749 (133 leaves,31 pass,102 fail,6.501s); cli.jsonl a0fccbdfac2294d5292fc1cd879ca1ad0dbbb13128b16943401ed775373e35a6 (28,11 pass,17 fail,2.866s); hook.jsonl ff109b68b5b8399e54a5e57765d9d205ae831d7e646de527f859e232248cdbe0 (28,1 pass,27 SETUP fail,1.345s); designlock.jsonl 1fdbaf715ac9fe57f94a40d00e9ab27fe55433926478adb7d6aaaaeeea2d92f5 (zero tests,0.288s). Original CLI includes one SETUP failure (missing destination), six A, ten B/C. Original hook's hooks:null errors are SETUP regardless of their printed B assertion label. Independent PM authorized exact repairs before edits and retained all original history. No further fixture repairs were made.
+
+### AC Verification
+
+| AC | Frozen test mapping | RED evidence / remaining final proof |
+|---|---|---|
+| 1 complete implementation inventory and content | gates CScopeMutations, CTopologyAndEvidenceBoundary, CReceiptCannotNarrowScope; CLI B-generation-inventory/C-real-process | Independent digest fixture control passes; complete entries/content/topology mutation legs wait for valid v2. Whole root including hidden/untracked/ignored/vendor/build/config and exact exclusions asserted, not observed implemented. |
+| 2 plan/current/historical separation | gates BKindAndMissingRoot/BV2PlanAndMalformedSchema; CLI C-historical-current-replay/C-plan-warning-promotion/C-complete-sole-current-warning | D real Ga ancestor and legacy plan pass. New schema/kind/current/history/sole-warning semantics interface-absent or unreached. Docs/help/consumer diagnostics await GREEN. |
+| 3 explicit legacy migration | gates ARejectsLegacyBehavior and DBaselinePlanControls; CLI A-legacy and D-filehash-claims-plan | 24 genuine false-acceptance A failures and eight D compatibility controls across selected packages; missing-subject behavior requires GREEN. |
+| 4 real negative and positive scope/custody cases | gates C mutation/topology/receipt/lifecycle families; CLI C real-process/history; hook process matrix | Frozen assertions cover real files, scope alias/symlink, assertion removal, handler change, stale replay, evidence-only commit, retained capability finalization. Current controls/fault stages unreached; callback absent. All must reach unchanged/fired controls on GREEN. |
+| 5 actual CLI and truthful guarantees | built CLI suite plus hook matrix; optional GREEN renderer file and new designlock tests owed | OBSERVED existing CLI A/D integration only. Future generation/current output/custody not observed. Same delivered GREEN revision must meet the conjunctive AC5 composition below. |
+
+### Mandatory GREEN supplements and observation boundary
+
+Frozen files remain unchanged throughout GREEN. New API tests go only in authorized new internal/designlock/attestation_snapshot_test.go and optional internal/gates/attest_green_test.go. Required: real held-root capability and inventory bounds (including overlay aggregate); approved lower fixed budget factory and exact existing read-chunk callback uses; actual late original mutation and real owned private-copy cleanup failure; mandatory callback-fired counts and matched no-fault controls. Do not fake Gate values/errors, recursively Release from callback, or add fault env flags. Every v2 negative must pass its valid control before the challenge. Hook finalization before output/ledger clear must fail closed even strict:false/wave/empty selection; direct lifecycle must publish all-or-none only after release and preserve latching/idempotency.
+
+AC5 is conjunctive on the SAME final GREEN revision: OBSERVED actual RenderAttestation late original mutation and real cleanup failure return nil bytes, with reached/no-fault callback controls; OBSERVED built CLI full document success and ordinary real renderer input/alias failures exit 1 with empty stdout; REVIEWED final CLI -> RenderAttestation -> Release/error joining -> output/defer/fallback closure. Late CLI guarantee is COMPOSED, not independently injected standalone late-process proof. Individual OS Close errors are UNFORCED. Output-sink partial writes remain a separate limit. Current a82277a production is still old stableAttestationHashes, not future renderer integration. Hashes bind observed scope/files, not execution, reviewer identity or judgment correctness.
+
+### LEARNINGS
+
+- Immediate real config validation prevents a hooks:null setup error from being mislabeled callback absence. Original misleading labels were corrected in evidence, never counted as RED behavior.
+- Existing copyDirInto requires the destination root; preserve shared helpers and repair only explicitly authorized fixture prerequisites.
+- Interface-absent controls must halt mutation credit. A callback-shaped test method is not evidence that production finalization reached it.
+- Full independent scope and real CLI/hook lifecycle proof costs more than the original test estimate; PM investigated the overrun rather than trimming proof or introducing shared unapproved APIs.
+- A packaging-only hash loop briefly used zsh's special `path` variable, hiding commands in that one shell. It changed no files or tests; rerun with task_file produced all hashes and exact diff. Test logs/runs are unaffected.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED-only tests committed at 47ba44906a09bc2fa010092a86b133d0d749c52c, preserving original 7ec5d609 and unchanged a82277a production. Exact independent PM repair authorization followed.
+- Full scoped replay: 189 native leaves, 47 passes, 142 expected/absent-interface failures, zero skips; 24 genuine A failures, eight D passes, 26 B failures, 92 unreached C family cases. No setup failures remain in this replay; no current custody guarantee claimed.
+- pvg verify PASS five files/zero issues; verify-tdd PASS two commits/no unauthorized edits. Independent PM review/approve-red pending; this is not GREEN acceptance.
+- Complete report, exact leaf inventories, raw logs, timings, hashes and repair diff: /tmp/machinery-p7jd-red-proof.RvOHwO/.
+
+### proof
+- [x] RED AC #1: frozen full-scope/inventory cases compile and valid-control failures are classified; final GREEN implementation proof pending.
+- [x] RED AC #2: plan/current/history tests and real legacy controls supplied; new semantics remain unexercised until GREEN.
+- [x] RED AC #3: 24 genuine legacy false-acceptance failures with passing compatibility controls supplied.
+- [x] RED AC #4: negative/positive scope and custody contracts frozen; C fault execution and approved new API supplements remain mandatory in GREEN.
+- [x] RED AC #5: actual baseline CLI integration and explicit same-revision AC5 composition limits recorded; renderer late faults, new CLI behavior and final wiring review remain mandatory in GREEN.
 
 ## nd_contract
 status: in_progress
