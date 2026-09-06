@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
-updated_at: 2026-09-06T14:40:40Z
-content_hash: "sha256:d6348062f5168be322a0f8ce0dbd32b6344761abb3795014e0526359ac564f5e"
+updated_at: 2026-09-06T15:08:05Z
+content_hash: "sha256:180a62240cc3c0a939154a1fbfd748318204f78e6776c9766677bd39154bd52a"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
@@ -590,3 +590,6 @@ BOUNDED METHOD CHECKPOINT — NO SOURCE/RED/STORY ACCEPTANCE. D4/D6 admission/re
 
 ### 2026-09-06T14:40:40Z ramirosalas
 FINITE FSM METHOD CHECKPOINT — NO SOURCE/RED/STORY TRANSITION. Frozen candidate /tmp/MAC-lhu5-FSM-method.onQfzo report SHA256aa0111e07d63406968bf62283fb52e4e5b88b01c6b6bcc8e06fc97ab029e83cc has1356source/test/ledger lines, all46literal row/effect expectations, and fresh140passes(130leaves/10parents),0fail/skip. Independent /tmp/MAC-lhu5-FSM-review.FD9Q7e/REVIEW.md SHA256dc89953c7aafa8e98037d50be83270e00ab8fcb24aa2cb72f73e6c29708a75ef GAPS_FOUND: strictcompleteJSON accepts trailingvalues/nullstate/invalidUTF8; M0/M3 presence/globalregex accepts comments/code/unrelatedclauses and omits spans; frozen suite lacks explicit omitted/nonemptyextra/terminalentry mutation categories. Actual independent7pass/6topfail plus supplementary6leaf/2parentfail preserved; focused effect probes6pass show evaluator sensitivity but not frozen inclusion. Root fully read allsource/report/both238probe lines, verified manifests/raw hashes and agrees3boundedcorrections. External-only V2 assigned originalauthor /root/portfolio_fsm_method; both PMprobe files remain byte-identical compiled controls. All earlier bounded D1/D4/D5/D6 approvals unchanged. Full21-path packet/root/source-hunk/remainingtypedvalue/timestamp/backup and actualRED/native obligations remain pending. Metadata: PM rendered STORY-BODY.md is rawBody+oneLF; report hash71634fd6... is renderedcopy, actual rawBody at review110581f182b745219f09a658caffb3c6c9ba98992dae4d6444ceabee912b3cba. Existing in_progress contract and five pending AC remain authoritative.
+
+### 2026-09-06T15:08:05Z ramirosalas
+FINITE FSM V2 REVIEW CHECKPOINT ONLY. External V2 original and full suites pass (140 and202 test actions), but independent /tmp/MAC-lhu5-FSM-review-v2.zvcA96/REVIEW.md SHA256 bc21178c745294a4e2f5c1a500c9762654c071bcd0d96adc43e0e08a28d245d4 is GAPS_FOUND. Root fully read218-line report/new adversarial probe and verified both manifests. Actual17 failed leaves+5 failed parents, one arbitrary-data-null positive passes: typed semantic null/case-folded aliases and M0/M3 tilde/indented code or top-level-section relocation false admissions. Previous effect-sequence gap is CLOSED; four local-prerequisite/literal-effect controls remain unchanged with Step/ledger/old140 actions/14fixtures. Corrective external-only V3 assigned original /root/portfolio_fsm_method, retaining every PM probe and failed raw artifact. No source/RED/story/native/full21-path acceptance; remaining typed-value/timestamp/backup and exact packet/source-hunk inventory still owed. Existing in_progress contract/five pending AC and all earlier bounded method approvals unchanged.
