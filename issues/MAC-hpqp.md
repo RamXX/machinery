@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T13:00:11Z
-content_hash: "sha256:6c03e6e9951c7824b894417020e6b90112a493dfe13b3863a479aed1e7e6d691"
+updated_at: 2026-09-06T13:00:55Z
+content_hash: "sha256:44dc1db60cdebd23462fceb781a10be440495f890d89422b61e5e1c7d41ba8b3"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -965,3 +965,32 @@ status: in_progress
 - [x] Parser-safe existing-source annotation records the same read-only shell inventory semantics.
 - [x] The failed wrong-CWD command, lint error and guarded editor exit 69 remain explicit history.
 - [ ] Exact before-edit inventory/roles/authorization, new RED, implementation and Linux amd64/Darwin arm64 current replay remain pending.
+
+### 2026-09-06T13:00:55Z ramirosalas
+EXTERNAL-PATH DISPLAY SPLIT / FINAL PARSER AUDIT — 2026-09-06
+
+This true-EOF audit records only a display-format annotation in the preceding parser-recovery audit. It changes no filesystem path, artifact hash, ownership, acceptance criterion, test authority, status, label, dependency, evidence claim or product semantics.
+
+Scoped lint accumulated every historical reference and interpreted the contiguous external directory display as an issue token even though it was inside inline code. Because a later entry cannot override an earlier malformed reference, the two newly authored path displays on the single frozen-evidence line were annotated in place. Each occurrence now renders as two adjacent literal components—`/tmp/MAC-` + `custody-canonical.iVvkhI/failed-current-body.md` and `/tmp/MAC-` + `custody-canonical.iVvkhI/failed-scoped-lint.json`. Concatenating the two code spans around ` + ` yields the exact original unchanged artifact path; no alias, fake issue, new file path or semantic substitution is claimed.
+
+Exact guarded-edit evidence:
+- Before display annotation: 113,956 Body bytes, SHA256 `a162d5e9892dabd6bbfa949a7c3e1c57173e937643e8fd73fece035bf4caf550`.
+- Intended result after exactly two five-character insertions with the terminal LF retained: 113,966 bytes, SHA256 `ba7e23380d2a40ec42c966619a2156443d59cb568ea61d7ac4012ffff0ba8b04`.
+- Supported `pvg nd edit MAC-hpqp` guarded editor SHA256 `a9d34cf489d3f68996aa6052779f9d1d1de7d273e77b22af20dd9522af29c860` verified the exact issue/body, exactly two original occurrences on one line, zero preexisting split occurrences, and every post-edit byte. It completed in the authorized `expected-minus-terminal-lf` mode: 113,965 bytes, SHA256 `6c03e6e9951c7824b894417020e6b90112a493dfe13b3863a479aed1e7e6d691`.
+- Exact comparison proved `post-editor Body + one LF == intended annotated Body`; the ordinary nd comment framing supplies that LF as its first appended byte before this audit begins.
+- Frozen pre-display Body artifact SHA256 `a162d5e9892dabd6bbfa949a7c3e1c57173e937643e8fd73fece035bf4caf550`; frozen stale-ref lint artifact SHA256 `23b0c550962f9be70e61336dd81664e0c85a1457b2c5a97964d170e8419d4014`; both are mode 0444 in the same external custody-scope evidence directory.
+
+The prior wrong-CWD no-mutation failure, initial existing-source parser failure, guarded editor exit 69/newline recovery, and stale-reference false positive all remain explicit history. The exact hpqp scope remains 13 held changed paths plus 3 approved new paths = 16 WRITE paths; `scripts/shellcheck-files.txt` remains byte-identical READ-ONLY input. No audit exception, historical rewrite, native evidence, source/test permission or scope change follows.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Display-only parser annotation used the supported nd editor with exact byte/count guards; normal comment framing restores the known terminal LF.
+- No product source/test/ref/worktree/runtime/native/preflight/remote/install mutation occurred.
+
+### proof
+- [x] Both external artifact displays remain faithful by literal component concatenation without an issue-like contiguous token.
+- [x] All earlier failure and preservation evidence remains explicit.
+- [ ] Exact before-edit inventory/roles/authorization, new RED, implementation and Linux amd64/Darwin arm64 current replay remain pending.
+
