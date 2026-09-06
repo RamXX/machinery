@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-06T00:42:45Z
-content_hash: "sha256:4a8c416062120736149ce97f7fca12e7750f12f06e87575e0b5e90edce133674"
+content_hash: "sha256:493d8059db70dba5f129b59a006365c5b4ae30c3ed05dc942720d5343e02ea94"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
@@ -115,6 +115,16 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+
+
+## nd_contract
+status: red-approved
+
+### evidence
+- RED tests approved via pvg story approve-red on 2026-09-05.
+
+### proof
+- [ ] GREEN developer must implement against the approved RED tests without modifying them.
 
 
 ## nd_contract
