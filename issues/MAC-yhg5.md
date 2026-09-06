@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:31Z
-content_hash: "sha256:f0f75517639c79eac183f30ddcfcd4ee681c7a1908fc79c86fdbc4bef82ddc9a"
+updated_at: 2026-09-06T12:46:06Z
+content_hash: "sha256:4ea242ed6273d5b0c09c45e330a82ee71095ab38adf168bc627326545b9b7235"
 blocks: [MAC-gcrr, MAC-ou97]
 blocked_by: [MAC-hpqp]
 ---
@@ -105,3 +105,60 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - Blocked by: [[MAC-hpqp]]
 
 ## Comments
+
+### 2026-09-06T12:46:06Z ramirosalas
+ACCEPTED PUBLIC CUSTODY CONTRACT / AUTHORITATIVE CURRENT CHECKER SCOPE — 2026-09-06
+
+This true-EOF amendment supersedes the earlier two-path/~900-LOC checker-lifecycle forecast with the approved six-path closed-profile scope. Every prior stronger regression, real-daemon, sandbox, no-skip and independent-acceptance constraint remains. This is prospective backlog scope only—not source/test authorization, RED approval, implementation, runtime/native proof, delivery or acceptance.
+
+ACCEPTED PRODUCER GROUNDING
+- MAC-p9wm is closed/accepted. Epic `2a73454d5f133a7b5fb4db0346232fd389810d28` contains native contract blob `1c1581d1aec324d979593613b44976ed0007c45b` / SHA256 `bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a` and companion blob `acce64fee8db5a7565e8fa33422334de125e913f` / SHA256 `171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d`.
+- Independent acceptance report SHA256 `19c0c4be6b4eb4b7035db3e9e576352ad1cfd3b24f414e287be7d8dfded38f8e`; approved V4 proposal/review SHA256 `d56d0104e965cace70e89b3be383ff3f51377c33ea8227c86833ef731be331be` / `dfa09b70d599a83d8cde10ab31d19fe5debd1eadf4c19f86c3aea79c0a9ac1e3`.
+
+PRODUCES:
+- cmd/machinery/verify_checkers.go -> real command-context custody and once-only `--docker-endpoint` preparation/transport through verifyCheckersTo, verifyOneChecker, run and committed-evidence replay; closed RunCheckerDocker use replaces direct generic `docker run --rm` on the required path.
+- cmd/machinery/checker_oci_lifecycle_test.go -> new exact real checker lifecycle, live-first, output/resource/failure and foreign-survival tests only; existing unrelated/frozen checker tests are not a broad edit grant.
+- testdata/integration-lanes/oci.json -> closed exact checker source/test/runtime/pin/leaf inventory consumed by the required lane.
+- internal/processscope/checker_docker.go -> closed `RunCheckerDocker(context.Context, Scope, *DockerRuntime, CheckerDockerRequest, Streams, chan<- ContainerObservation) (Result, error)` profile with exact registry, work/input/runtime/config/sandbox and cleanup binding.
+- internal/processscope/checker_docker_test.go -> exact profile validation, real daemon lifecycle, run/replay and calibration controls.
+- internal/processscope/broker.go -> ONLY the finite checker-profile dispatch/validation arm, modified sequentially AFTER accepted MAC-qlw2 broker work; no base broker redesign or qlw2 test mutation.
+
+CONSUMES:
+- MAC-qlw2: internal/processscope/scope.go
+  spec: authenticated Scope.Run/Child/Attach/Close, exact cumulative Limits/Result/CleanupReport and fail-closed admission/cleanup behavior.
+- MAC-qlw2: internal/processscope/contributor_docker.go
+  spec: CaptureDockerRuntime/InheritedDockerRuntime with live Descriptor/Validate/Close plus exact ContainerObservation and read-only InspectDockerContainer semantics reused by the checker profile.
+- MAC-hpqp: scripts/integration-lane/main.go
+  endpoint: `go run ./scripts/integration-lane --lane required` with explicit `--docker-endpoint`, pinned provisioning, runtime capture before selection/replay and exact native event/accounting/cleanup.
+- MAC-hpqp: testdata/integration-lanes/schema.json
+  schema: closed compatible current fragment contract that discovers `testdata/integration-lanes/oci.json` and requires every registered leaf to execute.
+- MAC-p9wm: docs/native-custody-contract.md
+  schema: exact accepted checker API/profile, work-root/input/runtime binding, real context/scope across run and replay, sanitation-before-Attach, once-only endpoint capture and cleanup-before-output/evidence/release at SHA256 bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a.
+- MAC-p9wm: docs/test-assurance-contract.md
+  source: exact accepted contributor/checker, cumulative-budget, native-matrix and finalization rules at SHA256 171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d.
+
+CURRENT PROSPECTIVE ACCEPTANCE / TEST WORKFLOW
+1. Scope is exactly SIX paths above. `internal/processscope/broker.go` is shared only through the real dependency sequence: MAC-qlw2 owns the base broker first; this story later adds the checker-only arm while preserving all frozen qlw2 tests and existing MAC-yig6/Y regression bytes. No concurrent broker edit is authorized.
+2. The real normal checker command uses `cmd.Context()` and the SAME authenticated owner/root/scope and captured DockerRuntime through orchestration, validation, primary run and committed-evidence replay. Deterministic checker environment/sandbox sanitation occurs before Attach. Nil/stale/foreign/cancelled/closed/mismatched/unscoped authority fails before target start; required execution never calls or falls back to a service-free/unscoped wrapper.
+3. Own the closed checker request and actual profile only: canonical retained `WorkRoot`/private WorkPath, read-only inputs topology/digest, registry image/platform, runtime closure, phase `run|verify`, original RunArgs/VerifyArgs, UID/GID, timeout and exact config. Preserve current PiiFlow adapter, canonical token/config/manifest projection, `{design}` rejection, file-only evidence, `/work/evidence.json` and `/work/committed/evidence.json` replay, evidence/trace comparisons and snapshot CheckUnchanged/Release. No arbitrary argv, environment, mounts, engine prefixes, resource flags or dynamic profile is accepted.
+4. Preserve exact sandbox: pull=never, network=none, read-only root, cap-drop ALL, no-new-privileges, `/work` writable only from the held work root, `/checker` read-only, fixed `/tmp` tmpfs, fixed sanitized environment, validated user, memory 134217728, NanoCPUs 500000000 and PidsLimit 32 with no overrides. Target result and cleanup remain distinct; exact cleanup/absence precedes successful output, evidence publication, WorkRoot release and runtime release.
+5. `--docker-endpoint` accepts only an absolute local socket. An explicit endpoint wins; otherwise existing context resolution occurs exactly once during owned bounded preparation, then freezes the concrete endpoint. Capture/run/replay/cleanup use the same runtime/daemon/private-client binding and never reread ambient Docker context; remote endpoints fail before replay; run/replay never pull.
+6. Freeze an exact new leaf/helper/fixture/config/dependency-lock and calibration inventory before RED; preserve existing qlw2 and MAC-yig6/Y tests. Real live-first tests independently observe the exact checker container running before actual PiiFlow assertion failure, genuine container stdout/stderr overflow, timeout, SIGINT/SIGTERM, owner loss, SIGTERM-ignoring workload and resource exhaustion. Cover registration/create/start ambiguity, cancellation races, repeated runs and cleanup failure. Exact owned absence and helper reaping precede return while unrelated process/container controls survive; no fake provision script, no never-started resource and no label/PID history proves success.
+7. One cumulative wall deadline and fixed owner ceiling govern run plus replay; one shared cleanup grace governs registered cleanup-only helpers. No Background/unscoped fallback, grace renewal, new work after CLOSING, post-runtime-release probe or unresolved create/start false-clean. Linux amd64 AND Darwin arm64 must run the same candidate and frozen inventory before acceptance.
+8. MAC-hpqp’s 96-obligation pilot is NOT product checker gating proof and is not a prerequisite beyond the existing one-way dependency `MAC-hpqp -> MAC-yhg5`. Do not add `MAC-yhg5 -> MAC-hpqp` or any cycle. qlw2/cn7q -> hpqp -> yhg5 remains the execution chain. DIFF BUDGET: exactly 6 files, forecast 2,200–4,200 changed LOC; investigate overrun, never trim required tests. All no-preflight-until-final-gate, no remote/install/unrelated cleanup and standalone Machinery constraints remain.
+
+CURRENT HOLD / OWNER
+- Story remains open/new and unassigned, blocked only by the existing MAC-hpqp chain. Before first RED/test authoring, record the actual RED-author handle and a DIFFERENT actual calibration-author handle with the exact inventory. Select the independent PM before its review; select the separate actual production GREEN author only after RED approval and before GREEN dispatch. Pre-inventory planning may run before those later roles are selected, but no source/test write precedes its applicable before-edit gate. Accepted MAC-p9wm is satisfied context, not an additional blocker.
+
+## nd_contract
+status: new
+
+### evidence
+- Accepted producer hashes, exact six-path map, sequential broker ownership and one-way dependency are fixed above.
+- Canonical repair is tracker-only; no source/test/ref/worktree/runtime/native/preflight/remote/install action occurred.
+
+### proof
+- [x] Closed real checker profile and exact real command/run/replay ownership are prospectively bounded.
+- [x] Existing qlw2/MAC-yig6 tests, hpqp chain and public custody invariants are preserved.
+- [ ] Exact before-RED inventory, staged actual-role selection, implementation and both native-host matrices remain pending.
+
