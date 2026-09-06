@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:36:48Z
-content_hash: "sha256:dee27dac66468fb323f402b083ec5b8a420cb54d320c0566392008f4bc2788e9"
+updated_at: 2026-09-06T10:45:29Z
+content_hash: "sha256:3e00cb77d7917cc6628a94e6b01effe9915220b1ab0a215774fb12d4ff891023"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0]
 assignee: dev-MAC-qlw2
@@ -197,3 +197,20 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-06T10:45:29Z ramirosalas
+BEFORE-RED CHECKPOINT ORDER CORRECTION 2026-09-06
+The earlier proposal checkpoint was inserted in Notes before historical Comments. This true-EOF comment is authoritative; prior records are preserved. Proposal /tmp/MAC-qlw2-before-red-proposal.md SHA256 6b1fdf8f88751ffaeced19b95ca70832aca37f50d3881286779ca8721fa82ad2 is not approved RED. No source/test bytes or native custody evidence were produced. Independent boundary/method adjudication is active: distinguish genuine cross-package constructor gaps from permitted private implementation choices. Native Linux amd64 remains required at delivery, not a waiver or a barrier to permitted Darwin work.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Canonical status and claim remain in_progress / dev-MAC-qlw2.
+- Twelve proposed test headings are planning only, not executed tests or frozen proof.
+- Root could not resume the completed metadata worker because the collaboration tool returned agent thread limit reached; root applies only this coordination correction.
+
+### proof
+- [ ] AC #1–5: exact method approval, implementation, adversarial calibration and required native proof remain pending.
+- [ ] AC #6: producer same-binary helper plus real scope API consumer conformance remains required; downstream normal CLI wiring is not this producer's acceptance claim.
+
