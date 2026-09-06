@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:12:13Z
-content_hash: "sha256:da460b131c01bdea1bddf249eb8d889c4bc726eea1ca5754550a5182e11abb2d"
+updated_at: 2026-09-06T10:15:26Z
+content_hash: "sha256:f767bd08fb5e6d039d3c68db73f7af56b16d4a2808008539b2d349bba7c10a26"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-uzxr]
@@ -817,3 +817,26 @@ status: in_progress
 - [x] AC #3 Darwin: correct, wrong digest, wrong platform, and trailing-data controls pass in both modes.
 - [ ] AC #4 FINAL HOLD: run the exact same candidate command matrix on native Linux amd64; retain raw stdout/stderr/exits, both profiles plus go tool cover output, host/toolchain, inventory/zero-skip counts, raw protocol diagnostics, and owned cleanup scan. Docker linux/aarch64, cross-compilation, and emulation do not satisfy this.
 - [ ] AC #5 FINAL HOLD: independent PM review/acceptance after Linux proof; the preceding required pvg verify result remains a documented unchanged-source heuristic finding.
+
+### 2026-09-06T10:15:26Z ramirosalas
+## GREEN EVIDENCE COUNT CORRECTION
+
+- Correction to the preceding Darwin evidence: selected-native and selected-covered each have 24 test/subtest PASS events plus 1 package PASS event (25 total pass events), with 0 FAIL and 0 SKIP. They do not have 25 test events.
+- Dedicated original-native and original-covered each have 1 test PASS plus 1 package PASS event (2 total pass events), with 0 FAIL and 0 SKIP. The covered counts were independently parsed from raw JSONL.
+- Immutable external report: /tmp/machinery-yig6-green.hZtIWT/REPORT.md SHA256 a2b4c9be1286a5bcd08631ba8cfc4690e075477a9de1df7d5fe6f5dfa57bba09. It contains exact inventory, commands, raw artifact hashes, parsed coverage, static/TDD/cleanup provenance, AC mapping, and full native Linux amd64 matrix.
+- Earlier original raw test artifacts did not include static/TDD/cleanup outputs; current bounded rechecks are retained in the same directory and are explicitly not presented as retroactive raw test evidence.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Candidate ef505052dc73cb9032dd91f1a3f99837f76204a8 remains unchanged, committed, and clean.
+- Darwin raw event accounting is corrected above; original static heuristic finding and TDD result remain visible.
+- Native Linux amd64 has not been executed and remains an unwaived healthy hold.
+
+### proof
+- [x] AC #1 Darwin: original native/covered control has one test pass plus package pass in each mode and parsed profiles.
+- [x] AC #2 Darwin: selected covered run has clean real fixture streams; 24 test/subtest passes plus package pass.
+- [x] AC #3 Darwin: selected native/covered inventory includes strict protocol and stream/bounds/timeout controls with zero skips.
+- [ ] AC #4 FINAL HOLD: execute full report matrix on native Linux amd64 with required environment, source identity, profiles, raw logs, and cleanup proof.
+- [ ] AC #5 FINAL HOLD: independent PM review/acceptance after Linux proof; no delivery/acceptance/closure was invoked.
