@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T07:55:20Z
-content_hash: "sha256:16a7e4f909fe0d7a912300de64981d5056a34204c636ad1b9ed64d14a926fd9f"
+content_hash: "sha256:6742d83b6464ef5c7846bd87e02e3ba222c626d7a97410fd4e41d034349ad764"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx, MAC-p7jd]
 assignee: dev-MAC-uzxr
@@ -1538,3 +1538,18 @@ status: delivered
 - [x] AC #3: expected-state/action, extra-effect, and mutation sensitivity families pass.
 - [x] AC #4: direct native suites and inventory meta family pass with 228 executed leaves and zero skips.
 - [x] AC #5: fresh candidate evidence, frozen custody, static verification, and recognized delivery evidence are recorded; PM acceptance remains pending.
+
+### 2026-09-06T07:55:20Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- Final candidate `bb5205c32e7b17ebefc5b050b7bf7417b0720e72` proof completion retained at `/tmp/MAC-uzxr-final-proof.Pjb6M2/FINAL-PROOF.md`: explicit 43-child export, 20 variants with matched controls, 149 JSON/JSONL artifacts, dynamic 48-input and 100-source custody, and default cleanup audit.
+- Fresh export PASS 23.113s and fresh default cleanup PASS 22.831s; no source, test, Task, or commit change.
+
+### proof
+- [x] AC #1: exact structural membership regression remains green with retained same-candidate proof.
+- [x] AC #2: reconciliation/control evidence passes; Task source remains unchanged.
+- [x] AC #3: 20 variant outcomes and matched controls are retained and classified.
+- [x] AC #4: exported actual inventory covers 197 rows, 218 witnesses, 10 supplements and 48 dynamic inputs.
+- [x] AC #5: complete raw evidence, source/freeze custody, cleanup audit, and delivery shape are present; PM acceptance pending.
