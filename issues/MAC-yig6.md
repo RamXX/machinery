@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:47:27Z
-content_hash: "sha256:2db0a7f18ca4e3f3da1fcee8e5d7addb10771984bcdd9224ce6f040d920a46df"
+updated_at: 2026-09-06T09:54:54Z
+content_hash: "sha256:61d06e726ba34551a0d957bde4ca3c686d7bc4137d5bba342cebda03e7cf948f"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
@@ -704,3 +704,38 @@ status: in_progress
 - [x] Supplemental RED: baseline behavioral defect and missing-helper behavior are expressed in committed exact tests.
 - [x] Frozen original test/helper identity preserved.
 - [ ] GREEN/final requirements: explicitly pending independent supplemental freeze and later authorized phase.
+
+### 2026-09-06T09:54:54Z ramirosalas
+## PM SUPPLEMENTAL COMMITTED RED APPROVAL — 2026-09-06
+
+APPROVED SUPPLEMENTAL RED ONLY: ac439c517de169addb68637c50040a9434bc8cca, parent c59c89de31c7f1268a220caf0fa0d67a8e166d0f. This is the independent reviewer's genuine exact committed freeze recorded through supported pvg nd comments add. It is not GREEN delivery/acceptance and does not claim the failed pvg story approve-red command succeeded.
+
+Frozen supplemental cmd/machinery/checker_fixture_helper_red_test.go is exactly 147 additions/0 deletions, SHA256 ea67a87453e92d0f3e056ffa15367a0ad85cb6592cb6ce826bfd83ff84e93fcd. Original cmd/machinery/checker_fixture_coverage_test.go remains immutable 246 lines, SHA256 80b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677. Existing helper cmd/machinery/verify_checkers_test.go remains SHA256 ce795eb21f6598df29d9cfa327e8b4019bcb0130e37332f2e646a374faf6c4fe. Prospective44 is absent from this RED commit.
+
+Independent exact-commit archive review/replay: /tmp/machinery-yig6-pm-supplemental.gOsP36/REPORT.md SHA256 855fc6566c7ced40ee3c5133bb3b3fd373a92e6f4ec555b475464a3d26013b4c; replay.sh SHA256 3fc4f6611715cd86db16ed10d8fb6b37b7f919f95a9540e9a5c4727429aaecc2.
+- Native Go1.27.1 darwin/arm64 bounded supplemental selection: exact2 intended top-level FAIL, package4.329s, actual ambient/persisted54-byte protocol warning and frozen cached-selector child exit0 correctly rejected; no compiler/setup/deadline/panic/skip outcome credited.
+- Exact same-commit unchanged original native TestVerifyCheckersReproducible: 1 PASS, test0.81s/package1.104s. Both stderr artifacts empty.
+- Full story audit 70652b948bf090008b1965c85daf36ea374daea4..ac439c517de169addb68637c50040a9434bc8cca:2 tdd-red commits, zero violations, only2 newly added RED files(+393/-0). Helper/production/processcontrol/TestMain/goldens unchanged. Static verify1file/0issues; gofmt empty.
+- Raw supplemental stdout SHA256 a0c973328da9a6495826e7c9e0a639ca0ecddd7498483c973e9225449fa7ebfe; original-native.jsonl SHA256 fa46ac3ac581026330b150abbad3427e3f5cd63c1e8eb950f52f32d08effde9d, both beside the report. No new behavioral rerun is claimed by this completion note.
+
+Partial-transition provenance, preserved: pvg story approve-red MAC-yig6 exited1 because label red-approved already existed. It first changed metadata Status to open; Assignee dev-MAC-yig6 and hard-tdd/red-approved labels were retained. It did not append its approval contract or run its remaining nd doctor --fix. Installed pvg1.64.0 build revision c0957106a81346033d7b1d82fde5f434a9db6bab was verified against clean matching source. No label removal, retry, acceptance, claim, waiver, private-code fix or tool replacement occurred.
+
+The dispatcher explicitly authorized completion of the remaining NOTE plus DOCTOR operations separately, with this failure visible. This comment records the NOTE step using valid global contract status:new for existing open metadata. The DOCTOR step remains pending fresh zero-finding precheck, dispatcher clearance and before/after comparison of all56issue metadata and Body hashes. No installed nd source parity is claimed: actual documented help and actual doctor outputs govern verification.
+
+Helper amendment authorization remains HELD until that supported completion is verified. Original storyAC1-5 and repaired four-path scope remain intact: actual same-revision Darwin AND Linux GREEN, clean raw protocol, distinct negative diagnoses, real production-executed profiles, exactinventory/zero skips/owned cleanup and final independent acceptance remain required. No installed Machinery/NIL/Dagger/service, remote, preflight, source or ref changes by this PM.
+
+## nd_contract
+status: new
+
+### evidence
+- Exact committed supplemental RED independently approved/frozen above, preserving original frozen246 and all history.
+- Full2commit TDD audit and actual semanticRED/nativepositivecontrol complete.
+- Failed approve-red partial transition is documented, not represented as success; supported remaining doctor completion pending.
+
+### proof
+- [x] Current scope phase2: exact147 committed and independently reviewed/frozen on unchanged helper/original246 baseline.
+- [x] Original AC5 RED: both frozen identities and genuine baseline behavioral evidence preserved.
+- [ ] Remaining workflow completion: actual zero-finding doctor precheck/fix and allissue invariance.
+- [ ] Current phase3: narrow exacthelper+44 authorization remains held until completion.
+- [ ] Original AC1-5 GREEN/current phase6-7: same-revision nativeDarwin/Linux, real profile/protocol/control/cleanup proof and independent final acceptance pending.
+
