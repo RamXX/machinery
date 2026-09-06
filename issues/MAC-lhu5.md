@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
-updated_at: 2026-09-06T16:05:36Z
-content_hash: "sha256:56bd37284b5806bc427d61eed4bab58cf8d4c6e0b058e59e89a3726706d3c042"
+updated_at: 2026-09-06T16:51:07Z
+content_hash: "sha256:810a173fd4085f8b839ed011a77b89578525c37a98a00506a33f475fb9cd6db3"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
@@ -602,3 +602,6 @@ FINITE FSM METHOD APPROVED ONLY. External V4 /tmp/MAC-lhu5-FSM-method-v4.OfMOnm 
 
 ### 2026-09-06T16:05:36Z ramirosalas
 FINITE VALUES/TIMESTAMP/BACKUP CHECKPOINT: GAPS_FOUND, NOT STORY REJECTION OR ACCEPTANCE. Candidate /tmp/MAC-lhu5-values-backup-method.2Jtoe8 REPORT.md SHA256 c1dd18ee2f7f634df8b1445600b438d9818996ecb34ea99c458aecfba89fded8, manifest 53966a634d2883aa7c5e4bbf2759fff0d3b286ac7c92d6927bc5b6c79cef2dfb (35 entries verified). Independent /tmp/MAC-lhu5-values-backup-review.byhfYR/REVIEW.md SHA256 44c1c2f7edc3ed96e66d1f5d1b440bb925c8506c088570723760142b53cd4204, FINAL-2.sha256 557552db210bc9d840991acc5440f3b1c2ad4343fe8d3086fe54851258a9bb1b (22 entries verified). Root fully read all 823 implementation lines, 612 test lines, 15 prose lines, report/matrix, independent report/probe, and approved policy error-class basis. Three blocking finite-method gaps: injected clock capture absent beyond label permission; validation-order fact inert with no causal reorder operator; required ValidationError/CorruptError class unobservable. Qualified carrier advisories: semantic integer tag interpretation and inconsistent zero-byte/schema1 observations, not native bugs. Fresh full 108 passes (96 leaves,12 parents), method81 (74/7), causal27 (22/5), all exit0 package pass and zero failure/skip; overlapping runs not additive. Independent probe11 actions (10 leaves,1 parent) has9 passes,2 advisory failures, package fail/exit1 retained. Earlier intermediate probe count9 leaves/2 parents corrected to10/1 without byte change. Candidate and review archived outside product source; original failures preserved. Existing bounded D1/D5/admission/FSM approvals remain limited; all five AC remain pending under existing in_progress contract. No further corrective authoring started at session checkpoint: custody platform restriction blocks the broader chain. Actual packet integration, exact hunks/cost inventory, RED/GREEN and native assurance remain unfinished. No source/ref/installed/preflight/remote action authorized by this note.
+
+### 2026-09-06T16:51:07Z ramirosalas
+2026-09-06 16:50 UTC — bounded external values/timestamp/backup V2 review APPROVED. Independent report /tmp/MAC-lhu5-values-backup-rereview-v2.qP3hwy/REVIEW.md SHA256 0e6b9519bb45663757c2d8264d7a99df692bc6cffe9b94ea2bf59af9b014e835. Root read full review/probes, verified 25 final manifest entries, and independently counted full148 passes132leaves16parents and additional reviewer focus9passes7leaves2parents; every selector exit0/pkgpass/no fail/skip/empty stderr. All three earlier blockers and two advisories closed within finite method; previous failures preserved. Archive .git/machinery-evidence-20260906.TEFZ7D/portfolio-values-backup-accepted-review-v2.tar.gz SHA256 08a123a661ca07660199a51ce22519e6a1eef190186ce1c30678f1c1460e3a33. This is NOT source/RED/native/full-packet/story acceptance. Whole-integration inventory/cost and real TDD still pending; no authoring authority or status transition inferred.
