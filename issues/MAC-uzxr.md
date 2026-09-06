@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T08:07:55Z
-content_hash: "sha256:63a2ef62d6bed555871266f74288f6440f86fc0daec057e67180b8977e94b656"
+updated_at: 2026-09-06T08:09:22Z
+content_hash: "sha256:09c78ae7453df061accb578e6c643647cc79bc50e5bbeb8ad368f667af9a30f2"
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx, MAC-p7jd]
 assignee: dev-MAC-uzxr
 closed_at: 2026-09-06T08:07:54Z
@@ -1678,3 +1678,16 @@ status: accepted
 - [x] AC #3: all20 isolated variants with matched passing controls and correct sensitivity classes verified.
 - [x] AC #4: complete bidirectional actual row/registration/observation/native inventories with zero skips verified.
 - [x] AC #5: same-candidate frozen GREEN proof, corrected evidence authority, exact source custody and independent accepted handoff verified; consumer claim renewal remains separate.
+
+### 2026-09-06T08:09:22Z ramirosalas
+Local integration completed: loop: story branch already merged into epic/MAC-ui8a at 7e36f3e7ddcf25565d5d4fe60b328df254eee91d, accepted source bb5205c32e7b17ebefc5b050b7bf7417b0720e72. Post-merge native offline command from examples/go-crm/impl: go test -count=1 -timeout=300s ./internal/testoracle ./internal/domain ./internal/session ./internal/cli passed all four packages exit0, including the full testoracle mutation harness. No per-leaf aggregate or statement coverage inferred from plain output. PM canonical corrections for wrong selectors and invalid self-index remain authoritative. Completed clean dispatcher-owned dev-MAC-uzxr checkout removed; commits preserved in merge history. No remote/sync/push, installed-assets action, preflight, or consumer review renewal. Main remains 497419ab4512fcff765cd5feb27aed4c67b5608d.
+
+## nd_contract
+status: accepted
+
+### evidence
+- Independent PM accepted exact bb5205c; local merge 7e36f3e and four-package native integration PASS.
+
+### proof
+- [x] Five story AC independently accepted with explicit corrected evidence; source integrated locally.
+- [ ] Consumer migration and final epic gates remain separate pending work.
