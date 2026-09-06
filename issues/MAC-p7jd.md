@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:47:13Z
-content_hash: "sha256:ab18905abc65fc5e21f6727bdbb45c196fafddd793b0a88196d79d06f78bec86"
+updated_at: 2026-09-06T07:50:56Z
+content_hash: "sha256:6c6755aba147c776682296d2c9ac7695d865d56b6a9b7fc1da6e898f255a9eb9"
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 assignee: dev-MAC-p7jd
 closed_at: 2026-09-06T07:47:13Z
@@ -3334,3 +3334,16 @@ status: accepted
 - [x] AC #3: Explicit migration/no-grandfathering and preserved compatibility pass.
 - [x] AC #4: Real mutation/scope/alias/custody/replay negatives and unchanged/evidence-only controls pass with frozen bytes.
 - [x] AC #5: Real CLI generation/check and approved bounded renderer/output proof pass with honest execution/judgment limits.
+
+### 2026-09-06T07:50:56Z ramirosalas
+Local integration completed: loop: story branch already merged into epic/MAC-ui8a at dee74d15cfb081833a5c4175d3ad728d2251895d, accepted source 39a498164fc6e09169ea5b33d470890d315f6a50. Native offline targeted post-merge command go test -count=1 -timeout=5m ./internal/gates ./cmd/machinery ./internal/hook ./internal/designlock -run Attest|Attestation passed all four packages, exit0; no full preflight or coverage claim. Completed clean dispatcher-owned dev-MAC-p7jd checkout removed; commits preserved in merge history. No remote/sync/push or installed-assets action. Main remains 497419ab4512fcff765cd5feb27aed4c67b5608d. Linux casefold and final epic gate remain pending.
+
+## nd_contract
+status: accepted
+
+### evidence
+- Independent PM accepted exact39a4981; local merge dee74d1 and four-package targeted integration PASS.
+
+### proof
+- [x] Five story AC independently accepted; source integrated locally.
+- [ ] Epic completion and final preflight are separate pending gates.
