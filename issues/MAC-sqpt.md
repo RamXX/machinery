@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:03:33Z
-content_hash: "sha256:e0927c359f736f22028fa5e68d915a80cde6aa120312a76877d39c022cada773"
+updated_at: 2026-09-06T09:16:32Z
+content_hash: "sha256:5712d13f4c469adb0121ef572d33e5da9669b67fec38b1bc7518cc166130c40c"
 blocked_by: [MAC-62s6, MAC-sd7g]
 blocks: [MAC-rau8, MAC-vx24, MAC-ou97]
 ---
@@ -105,3 +105,43 @@ status: new
 - Blocked by: [[MAC-62s6]], [[MAC-sd7g]]
 
 ## Comments
+
+### 2026-09-06T09:16:32Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- internal/tdd/execute.go -> internal/tdd -> Execute(ctx context.Context, req ExecuteRequest) (Candidate, error); Verify(ctx context.Context, req VerifyRequest) (Candidate, error). Exact section 7 requests, private provisional Candidate, retained run/failed records and phase transition state machine. tdd MUST NOT import gates or assuranceflow.
+- internal/tdd/replay.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/tdd/evidence.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/tdd/execute_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/assuranceflow/replay_integration_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- testdata/integration-lanes/assurance-replay.json -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-62s6: internal/assuranceflow/register.go
+  spec: Register(ctx context.Context,req RegisterRequest,output io.Writer)(Registration,error); exact registered external head/revision graph, no implicit registration.
+- MAC-p9z1: internal/tdd/capture.go
+  spec: Capture(ctx context.Context,req CaptureRequest)(BundleRef,error); Status(ctx context.Context,req StatusRequest)(StatusReport,error), immutable bundles and control/head identities.
+- MAC-sd7g: internal/assuranceflow/checks.go
+  spec: closed production CheckExecutor.Run(context.Context,CheckRequest)(PendingChecks,error), Final() unavailable until owner releases views. Integration tests in assuranceflow use this actual production executor with the four upstream native adapters.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: A consumer receives provisional successful replay only when retained RED, controls, negative challenges and current GREEN genuinely satisfy the contract.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
+- [ ] AC #7: current story acceptance requirement remains pending.
