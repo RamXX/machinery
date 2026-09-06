@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
 updated_at: 2026-09-06T02:07:58Z
-content_hash: "sha256:d82a09fa3e8cde2058b58880be64c9ccbf1d5ee3c37ad00dd4dcf7f0dfe1ab7c"
+content_hash: "sha256:a00995d282250e2fb1f1500cc93515e88bf9136c69849cfef7963155e25c0300"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce]
@@ -104,6 +104,18 @@ SCOPE REPAIR / SOURCE-VERIFIED COMPLETE SHIPPED GUIDANCE
 EVIDENCE-TRUTH HOLD FOR INDEPENDENT PM (does not block new RED authoring)
 Source at epic 6cb2d974, examples/go-crm/design/attestations.yaml:99-110, records gt.conformance-test-shape and g4.zero-context under attestor Codex CRM design review, date 2026-09-03, both covering BUILD.md. Rebinding changed BUILD bytes while mechanically preserving that identity/date/note may misrepresent historical review. The canonical conditional hash-only allowance is NOT authorization where it would imply those historical reviewers covered new bytes.
 Unresolved reviewer question before ANY evidence write: is the exact prose delta a truthful mechanical no-new-claim refresh, or does it require an explicitly scoped new re-attestation with truthful reviewer/date/context? PM must decide from the actual delta and preserve historical evidence; if re-attestation requires field/schema/ownership changes beyond the current hash-only boundary, return the exact amendment for canonical review first. No blanket identity renewal, forged review or automatic rehash. No product protocol change is implied. New RED tests and unchanged existing tests may proceed through normal independent authorization while this evidence decision remains held.
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-05.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
+
 ## RED phase delivery — MAC-lnu6
 
 PROOF:
