@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:23:55Z
-content_hash: "sha256:cf9fb6f400bd5f8b46ebc6076b3ba0f2bfff19a9eea9bd4ee38bf1405de72571"
+updated_at: 2026-09-06T01:27:41Z
+content_hash: "sha256:30b9b641b2a835c0c58fb803af85b8d800a662cd0246ee8850a351f7565dc726"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
@@ -115,6 +115,77 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+## MAC-sh60 golden RED amendment proof
+
+This amendment was authorized AFTER the healthy GREEN checkpoint 3d47b80ce59af1f521539e0b48e67be9ee4e9a71. It is an honest later tests-only amendment, not evidence claimed to predate GREEN implementation. The independent scope/golden authorization in /tmp/MAC-sh60-pm-scope.mXj9lU/scope-golden-authorization.md was read completely. No GREEN checkout/source/branch was modified.
+
+### Commit and exact boundary
+- New detached commit: 8f843256d30068816234d008a85239d662e8bb15
+- Subject: test(MAC-sh60): tdd-red [test-edit-authorized] disclose static discovery in go-crm golden
+- Parent: pure approved RED fa842ed374ad5c82d8c8f4f9e0c3aead56c9cfa3; production still 6cb2d974ea8aea211a5974f453cef2b5802bb11e.
+- Retained own clean detached proof checkout: /tmp/MAC-sh60-golden-red.E4Jh4K/review. No story branch moved.
+- Exact entire diff: testdata/golden/check-go-crm/stdout.txt line 55 only, one insertion/one deletion. Appended exactly ", static discovery; tests not executed; unsupported parser structures remain uncovered" before the existing newline.
+- Every old count preserved, including 2 formal oracles covered. All other stdout bytes, stderr.txt empty and exitcode.txt 0 plus newline unchanged. No update/regeneration flag, test/helper/example/source edit, golden bulk rewrite, or additional fixture.
+- git diff --check passed; git status --short empty.
+
+### Commands and native outcomes
+All commands executed from /tmp/MAC-sh60-golden-red.E4Jh4K/review at the new committed SHA.
+
+1. go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestGoldenCheck$/^go-crm$' > /tmp/MAC-sh60-golden-red.E4Jh4K/golden.jsonl
+   Exit 1 EXPECTED RED. Exactly one native leaf: TestGoldenCheck/go-crm FAIL. TestGoldenCheck and package FAIL records are parents, not extra leaves. No skips.
+   Sole assertion is golden_test.go:246 stdout golden mismatch. No stderr/exitcode mismatch; no compile/import/path/timeout error.
+2. go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestCheckGreenSummaryLines$' > /tmp/MAC-sh60-golden-red.E4Jh4K/control.jsonl
+   Exit 0. Exactly one native leaf: TestCheckGreenSummaryLines PASS; no fail/skip. Full positive behavior preserved on unchanged production.
+3. go build -o /tmp/MAC-sh60-golden-red.E4Jh4K/machinery ./cmd/machinery
+   Exit 0, isolated candidate binary only.
+4. env HOME=/tmp/MAC-sh60-golden-red.E4Jh4K/private-home MACHINERY_CONFIG_DIR=/tmp/MAC-sh60-golden-red.E4Jh4K/private-config /tmp/MAC-sh60-golden-red.E4Jh4K/machinery check /tmp/MAC-sh60-golden-red.E4Jh4K/review/examples/go-crm/design --impl /tmp/MAC-sh60-golden-red.E4Jh4K/review/examples/go-crm/impl > /tmp/MAC-sh60-golden-red.E4Jh4K/actual-stdout.txt 2> /tmp/MAC-sh60-golden-red.E4Jh4K/actual-stderr.txt
+   Exit 0. Actual stderr zero bytes. Actual stdout matches the original approved RED golden byte for byte: cmp with git show fa842ed3:testdata/golden/check-go-crm/stdout.txt exits 0. All original counts and platform-green preserved.
+5. diff -u /tmp/MAC-sh60-golden-red.E4Jh4K/actual-stdout.txt testdata/golden/check-go-crm/stdout.txt > /tmp/MAC-sh60-golden-red.E4Jh4K/stdout.diff
+   Exit 1 EXPECTED single exact line difference; full raw stdout captured because golden harness clips after 4000 bytes.
+6. pvg verify testdata/golden/check-go-crm/stdout.txt --include-tests --format text
+   VERIFY: PASSED (0 files scanned, 0 issues). This source scanner does not inspect the text golden; exact git diff, cmp, hashes and native assertion above provide the relevant proof, not the zero-file scan.
+
+### Exact changed line (actual -> expected)
+Actual:
+  checked: 14 test files scanned, 5 machines, 275 oracle rows, 197 ids covered by literal, 2 formal oracles, 2 formal oracles covered, 6 clause-declared guards checked, 36 falsifying-clause ids covered
+Expected:
+  checked: 14 test files scanned, 5 machines, 275 oracle rows, 197 ids covered by literal, 2 formal oracles, 2 formal oracles covered, 6 clause-declared guards checked, 36 falsifying-clause ids covered, static discovery; tests not executed; unsupported parser structures remain uncovered
+
+### SHA256
+- stdout.txt BEFORE and actual CLI stdout: 2abeaf18bcc08300ffcf6083f0715c4790e12d26e017f59df0c71d8c89f0e12f
+- stdout.txt AFTER: d14ccc0e945d7bd21bbb681894682aa64240a8eb9c995a815f3bf4068b77b184
+- exitcode.txt unchanged: 9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa
+- stderr.txt unchanged and actual CLI stderr: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- frozen gate negatives unchanged: 42f1237819cfecc4a265fd5dfa4a90050d8f0f77f9aa0baf27b42995d8834e45
+- frozen original gate tests unchanged: dd68d778605397184630447bc09b712072fe604be77c496177d121690414b994
+- frozen CLI negatives unchanged: 6ea06399d8271691f7f40f30f067e0d3270184eaca4fc2548cc7a562c7775d08
+- unchanged RED production oraclecov.go: 9f4bfabcfe43362b62068e59a59f313cd6d27a3490392f66c5fcf71be70684ad
+
+### Limits and preserved state
+- Canonical readback remains in_progress, assignee dev-MAC-sh60, hard-tdd/red-approved, parent MAC-ui8a. No deliver/approve-red/accept/reject/claim/release/state transition was invoked.
+- Parent owns independent re-freeze review and integration into healthy GREEN; this amendment has not itself been approved or integrated.
+- No full preflight, external runtime lane, coverage instrumentation, installed binary/asset/skill/plugin, remote/main/epic change or worktree removal. All bounded processes completed.
+- Previous approved tests/authorizations and original RED evidence remain intact; only exact AC4 golden disclosure changes here. GREEN helper compatibility and broader verification remain the other agent's pending work.
+
+LEARNINGS:
+- Golden disclosure must preserve complete legacy counts; a missing formal-oracle recognition result is production regression, not golden expected behavior.
+- Full CLI capture resolves golden output clipping and establishes the missing suffix as the sole behavioral RED cause.
+
+## nd_contract
+status: in_progress
+phase: golden-red-amendment-awaiting-independent-review
+
+### evidence
+- Original RED author committed 8f843256d30068816234d008a85239d662e8bb15 on isolated approved-RED checkout after healthy GREEN checkpoint; exact authorized single-line golden change only.
+- One intended golden native leaf FAIL, one positive summary leaf PASS, zero skips; actual CLI exits 0 with empty stderr and complete original counts. Full proof/raw logs/diff in /tmp/MAC-sh60-golden-red.E4Jh4K.
+
+### proof
+- [x] AC #4 amendment: exact disclosure suffix required by real golden assertion and RED cause independently reviewable.
+- [x] Preservation: original counts, zero exit, empty stderr and three previously frozen test hashes unchanged.
+- [ ] Independent amended-RED review/re-freeze and parent integration pending.
+- [ ] GREEN AC2 helper compatibility and complete five-AC production delivery remain pending; no acceptance claim.
+
+
 ## PM bounded scope and golden authorization — MAC-sh60
 Reviewed healthy GREEN checkpoint 3d47b80ce59af1f521539e0b48e67be9ee4e9a71 on 2026-09-05. This is a scope/budget and exact fixture-edit decision only. It is NOT delivery, rejection, re-RED approval, acceptance, claim release or authorization to merge. The current GREEN hold remains until the dispatcher completes the separate RED-amendment review and explicitly resumes GREEN.
 
