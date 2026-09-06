@@ -1,17 +1,17 @@
 ---
 id: MAC-2u36
 title: "Converge installer reruns on recorded targets"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:33:52Z
-content_hash: "sha256:2fe5368b79c8eb6d04417136145f38fadf8c14d65903aa6adc32ae5b2c88c94d"
+updated_at: 2026-09-06T00:09:30Z
+content_hash: "sha256:c89ba91c98384c3fd9c1e23e7e867a518de0d0ca795ea0ed5f367af302e73276"
 blocks: [MAC-gcrr, MAC-ou97]
-follows: [MAC-olrx, MAC-p8ce]
+follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
 ---
 
@@ -1237,11 +1237,14 @@ Preserved as quoted history; current Description is authoritative.
 - 2026-09-05T23:25:59Z status: in_progress -> in_progress
 - 2026-09-05T23:25:59Z auto-follows: linked to predecessor MAC-p8ce
 - 2026-09-05T23:33:04Z status: in_progress -> open
+- 2026-09-06T00:09:30Z status: open -> in_progress
+- 2026-09-06T00:09:30Z auto-follows: linked to predecessor MAC-a89e
+- 2026-09-06T00:09:30Z claimed by dev-MAC-2u36
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
-- Follows: [[MAC-olrx]], [[MAC-p8ce]]
+- Follows: [[MAC-olrx]], [[MAC-p8ce]], [[MAC-a89e]]
 
 ## Comments
 
