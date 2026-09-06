@@ -9,8 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:12:26Z
-content_hash: "sha256:9dd94148141b8a2371773874ee33fa05d338baeedb0e331d868b4b131120e433"
-blocks: [MAC-vx24, MAC-gcrr, MAC-ou97]
+content_hash: "sha256:58eb28d021926752a4e4e82968914dd13f904a55762e8e65d434ee16b88148bc"
+blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce]
 ---
@@ -994,10 +994,11 @@ status: in_progress
 - 2026-09-05T23:09:26Z status: open -> in_progress
 - 2026-09-05T23:09:26Z auto-follows: linked to predecessor MAC-p8ce
 - 2026-09-05T23:09:26Z claimed by dev-MAC-p7jd
+- 2026-09-06T03:17:09Z dep_added: blocks MAC-hgz1
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]]
+- Blocks: [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]], [[MAC-hgz1]]
 - Follows: [[MAC-p8ce]]
 
 ## Comments
