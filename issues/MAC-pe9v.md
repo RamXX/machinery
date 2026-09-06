@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:03:33Z
-content_hash: "sha256:cf3cb6bb68e169ddea1d15357d43415e233f4b6a281892ed6f0b4e3e833b3ff0"
+updated_at: 2026-09-06T09:16:32Z
+content_hash: "sha256:67f964284807dc1352354b61e115d04dbff076f3083a7ad6a2ce0543303e4ef0"
 blocked_by: [MAC-cn7q, MAC-bz1y]
 blocks: [MAC-sd7g, MAC-wbxq, MAC-vx24, MAC-ou97]
 ---
@@ -104,3 +104,42 @@ status: new
 - Blocked by: [[MAC-cn7q]], [[MAC-bz1y]]
 
 ## Comments
+
+### 2026-09-06T09:16:32Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- internal/runtimeclosure/git.go -> internal/runtimeclosure/git.go -> OpenGit(context.Context, GitRequest) (*Git, error), GitRequest{RuntimeRoot string;ExpectedClosure string;Scope processscope.Scope}; Git.Executable() string, Digest() string, Validate(context.Context, processscope.Scope) error, Close() error. internal/gates/suite.go -> GateExecution{Context context.Context;Scope processscope.Scope;Git *runtimeclosure.Git}; RunOptions.Execution *GateExecution, ExecutionRequired bool. Scoped Ga helpers per approved section 7.
+- internal/runtimeclosure/git_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/gates/accept.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/gates/suite.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/gates/accept_execution_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- testdata/integration-lanes/assurance-git.json -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-cn7q: internal/processcontrol/scope.go
+  spec: WithScope(ctx, scope), AttachScope(cmd, scope), ExitStatus(err); attach AFTER gitcontrol.Environment sanitization.
+- MAC-bz1y: testdata/integration-lanes/assurance-runtime-pins.json
+  MAC-6h0s: real native Git 2.55.0 exact closure plus Linux amd64/Darwin arm64 required accounting.
+Existing internal/gates/suite.go
+  spec: (s *Snapshot) RunSelected(impl string, sel Selection, opt RunOptions) []*Gate; (s *Snapshot) Release() error. Existing accepted snapshot/finalization guarantees are preserved.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: Final acceptance returns valid real Git commit/ancestry results only inside the live verification scope, with cancellation-owned cleanup.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
