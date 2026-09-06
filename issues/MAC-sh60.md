@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:49:29Z
-content_hash: "sha256:ade8707d7172ff5b2fd560f919262795e324cd33dc4b24701bf02b95084da66a"
+updated_at: 2026-09-06T02:13:22Z
+content_hash: "sha256:888a1a5e45fe9f1196f40e514a64efd322a84c67400b7e2701d471d62df718e9"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
@@ -115,6 +115,57 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+## Independent PM supplemental TDD audit adjudication — MAC-sh60
+Reviewed candidate a6ac10ebadc0e6b6a344d50aa10d0b810ce6b940 on 2026-09-05. Disposition: NO FROZEN RED TAMPERING FOUND in the three flagged deltas; the mechanical verify-tdd result remains FAIL and has not been waived or converted to PASS. This is a bounded audit adjudication, not acceptance, rejection, delivery, claim release or a workflow transition.
+
+### Exact timeline and delta findings
+1. The approved original RED tip is fa842ed374ad5c82d8c8f4f9e0c3aead56c9cfa3. The supplemental path internal/gates/oraclecov_scope_test.go does not exist there. git log a6ac10e --diff-filter=A identifies first addition as GREEN commit 4cda3c388c3efef2cdf952adb31d6c7507c307da at 2026-09-05T17:58:06-07:00, after production GREEN commits 6f2c165/e13a2fd. It is not an original RED file.
+2. Commit 3d47b80ce59af1f521539e0b48e67be9ee4e9a71, 17:58:43-07:00, changes only construction of that new file's Python source_after_test fixture (+5/-1). Previously the appended Python body retained four spaces and therefore belonged to the preceding test function. The correction removes one indentation level when emitting source_after_test, making it the intended non-test source. It preserves all assertion conditions, helper_after_test/active fixtures and case names. This is correction of a newly created GREEN fixture, not repair, weakening or retroactive replacement of frozen RED.
+3. My canonical scope review was recorded at 2026-09-06T01:23:55Z, explicitly authorizing additional regression tests in this existing GREEN supplemental file and stating they are not historical pre-GREEN RED. It reviewed the corrected 3d47b80 checkpoint and required the current 18 scope cases remain intact. My re-freeze/continuation decision at 01:32:02Z retained that same allowance. These authorizations precede both subsequent helper commits.
+4. Commit 088ef8a6453df139aec6dcc9386f1021ab7ca6fc, 18:38:51-07:00, appends 66 lines containing TestOracleHelperDiscoveryRequiresConnectedRows. The already-reviewed first 54 lines and all 18 earlier cases are unchanged. The new positive direct/assigned helper-return cases and uncalled/unused/constant/wrong-oracle/uncalled-closure/recursive/ambiguous-path/unrelated-receiver/depth-bound negatives implement the previously authorized connected-provenance and bounded-analysis scope. No prior assertion is removed or weakened.
+5. Commit a6ac10ebadc0e6b6a344d50aa10d0b810ce6b940, 18:41:02-07:00, adds only two supplemental matrix entries: constant_target_field and call_budget. They prevent inferred row provenance from a constant target and require exhausted helper work to remain uncovered. Both are within the same earlier authorized provenance/bounds scope. Assertions and preexisting fixtures remain unchanged.
+6. git diff --numstat 3d47b80..a6ac10e -- internal/gates/oraclecov_scope_test.go is exactly 68 insertions/0 deletions. Cumulative candidate diff from 6cb2d974 is 932 changed LOC across the six authorized paths, inside the reviewed 1000-line/six-path ceiling. No history/commit marker edits are part of this review.
+
+### Frozen evidence independently verified
+The exact candidate git-object bytes hash to all four approved values:
+- internal/gates/oraclecov_negative_test.go: 42f1237819cfecc4a265fd5dfa4a90050d8f0f77f9aa0baf27b42995d8834e45
+- internal/gates/oraclecov_test.go: dd68d778605397184630447bc09b712072fe604be77c496177d121690414b994
+- cmd/machinery/oraclecov_negative_test.go: 6ea06399d8271691f7f40f30f067e0d3270184eaca4fc2548cc7a562c7775d08
+- testdata/golden/check-go-crm/stdout.txt: d14ccc0e945d7bd21bbb681894682aa64240a8eb9c995a815f3bf4068b77b184
+
+Golden integration 7b200b6 carries only the separately approved/re-frozen disclosure amendment. No authorizations here permit further frozen-test changes. The supplemental additions are honestly GREEN-time work; they must not be relabeled as pre-GREEN RED.
+
+### Mechanical audit and remaining policy boundary
+Raw /tmp/MAC-sh60-green-final.8U4Ho2/tdd-audit.txt says the nine-commit range checked zero skipped merges and FAILS exactly the three supplemental-file commits above for lacking a tdd-red or [test-edit-authorized] commit-subject marker. The raw result is real and remains authoritative as the tool's result. The file-origin/delta evidence shows the flagged actions do not violate the substantive immutable-RED boundary, and the two later additive edits had prior explicit PM scope authorization. That is not the same as producing a clean audit.
+
+The current pm_acceptor skill, /Users/ramirosalas/.codex/skills/pm_acceptor/SKILL.md:84, explicitly states: "A `verify-tdd` failure is a rejection." That sentence governs a future GREEN acceptance review. Neither the earlier bounded implementation/test-scope allowance nor this request to adjudicate the audit explicitly waives that categorical acceptance rule. Therefore this PM does not silently manufacture an audit pass or grant acceptance despite it. Since this is not a delivered acceptance review, no rejection transition is applied now.
+
+Available bounded resolutions for the dispatcher to seek, without changing the product or rewriting evidence:
+- Explicit user direction authorizing a one-time exception to the skill's mechanical-audit acceptance rule for exactly commits 3d47b80/088ef8a/a6ac10e and exactly internal/gates/oraclecov_scope_test.go, based on this independent no-frozen-RED-tampering finding. Keep the raw audit FAIL visible and all four frozen hashes protected. This would permit subsequent ordinary GREEN delivery/review; it would not itself accept the implementation.
+- Separately authorize a future correction to the private audit's treatment of GREEN-created supplemental files, with dedicated proof, then rerun the audit. Such tool work is outside the current authorization and must not become a Machinery product dependency or a silent bypass. No such change is performed or assumed here.
+
+History rewrite/rewording, retroactive tdd-red/test-edit marker insertion, product changes to satisfy private Paivot tooling, or claiming this command passed are not valid resolutions under the present constraints. Prior PM scope approval is recognized as evidence of authorized test work; it is not retrospectively presented as a waiver of the audit-return-code rule.
+
+### Evidence scope and limitations
+- Fully read healthy-hold-audit.md, tdd-audit.txt and all three referenced tdd-supplement-*.diff artifacts. Inspected the exact candidate commit sequence and first-added supplemental file, independently verified +68/-0 since the reviewed checkpoint and all four git-object hashes, and checked shared authorization timestamps/current status.
+- The report records final exact native gates 130 PASS/0 FAIL/0 SKIP, CLI 10 PASS/0 FAIL/0 SKIP; full native gates 1187 PASS/1 SKIP and cmd 409 PASS/3 SKIP, with command package completing in 273.048s. Actual example proof records 74 passing native subtest leaves plus four unreachable Policy rows deliberately excluded. These are delivery artifacts for later full acceptance review, not a new acceptance decision in this bounded audit. No native rerun was needed to determine the three history/delta findings.
+- Earlier covered-run failures remain separate historical evidence; MAC-yig6 owns the independently proved representative instrumentation/protocol defect. No claim attributes all 23 earlier failures to it. Filesystem/runtime opt-in skips remain unexecuted assurance. Earlier timeout correction remains intact: TestInstallCommand passed; three other installer tests were still active.
+- Retained author worktree readback is clean at a6ac10ebadc0e6b6a344d50aa10d0b810ce6b940. No code, test, fixture, history, private tooling, installed assets, worktree or process state was modified. Only append-only review notes/comment are written. No full preflight, external runtime lane, remote/main/epic action or workflow transition occurred.
+
+## nd_contract
+status: in_progress
+phase: green-audit-policy-disposition-pending
+
+### evidence
+- Independently verified the three flags are GREEN supplemental-only edits: initial fixture correction then previously authorized additive helper controls; all four approved frozen hashes unchanged, exact candidate 932 LOC/six paths.
+- Mechanical verify-tdd remains FAIL for three missing-marker commits. No audit waiver, fabricated pass or acceptance decision made; exact policy sentence and bounded resolution choices recorded above.
+
+### proof
+- [x] Frozen RED preservation verified; no weakening in the three flagged supplemental deltas.
+- [x] Prior authorization timeline for helper additions verified; corrected Python fixture was new GREEN work reviewed before helper expansion.
+- [ ] Explicit disposition of mechanical-audit acceptance-rule conflict pending before a successful GREEN acceptance can be claimed.
+- [ ] Formal GREEN delivery and full independent five-AC acceptance review remain pending.
+
 ## Independent PM golden RED re-freeze — MAC-sh60
 APPROVED [2026-09-05]: exact golden amendment 8f843256d30068816234d008a85239d662e8bb15 is reviewed and re-frozen. The golden-amendment hold on healthy GREEN is released. The dispatcher may integrate ONLY this approved tests-only commit into retained healthy GREEN 3d47b80ce59af1f521539e0b48e67be9ee4e9a71, then resume the already authorized bounded helper compatibility work. This is not story acceptance, production approval or a workflow transition; no approve-red/deliver/accept/reject/claim/release command was invoked.
 
