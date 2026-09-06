@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:01:50Z
-content_hash: "sha256:0a427800ec97b8d608d99ea448d83844939123f19a7d80a45c18c6a38d0a45ae"
+updated_at: 2026-09-06T01:02:17Z
+content_hash: "sha256:2ace520d857712f6f55c2bd35aff7dd8e03492e3093feeb7b7c64daa674e4610"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -2124,3 +2124,22 @@ status: in_progress
 - [ ] Revised focused controls on both sources and independent corrected freeze/re-RED review.
 - [ ] Actual clean parent-fault rollback, complete GREEN verification and product acceptance.
 
+
+### 2026-09-06T01:02:17Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Authorized joint RED repair focused checkpoint complete, not delivery/phase transition. Candidate15252d255fa12a131fbc2cdb13f593a212fd4ccb; identical revised tests on baseline53572efc7adfde1649c4ca305280324aa050c6e5. Production0ad71eb/496963f byte-identical respectively.
+- Full focused report, exact commands/hashes/leaf inventory/history/budget/LEARNINGS appended in Notes and /tmp/machinery-MAC-2u36-joint-proof.623afI/FOCUSED_REPORT.md.
+- Both 2m controls9PASS0FAIL0SKIP10runs10terminals15.139s/16.055s.
+- Baseline four parent cases4intendedFAIL0SKIP6runs6terminals165.727s: child receipt writes, publications0, injections0; no late rollback credit.
+- Candidate four parent cases4PASS0FAIL0SKIP6runs6terminals201.231s: one writer each, one actual os.ErrClosed injection per fault, all complete-content/receipt/fullrollback/absence/journal/lock assertions PASS.
+- Exact1847 changedLOC9files within~1850 forecast. pvg verify5files reports required unsupported-platform error file as thin_file9code lines; no padding/suppression, PM disposition pending.
+- No full15m/native/preflight run, delivery, acceptance, release, production edit, installed/remote/Dagger mutation. Clean retained primary and owned detached baseline, all raw logs retained.
+
+### proof
+- [x] Authorized separate test repair and paired focused compatibility/oracle proof complete.
+- [x] Intended baseline parent-sequencing RED preserved.
+- [x] Candidate actual parent receipt close-fault/fullrollback boundary exercised twice and PASS.
+- [ ] Independent focused PM review then current full baseline re-RED/refreeze and GREEN full/native verification.
