@@ -8,8 +8,8 @@ labels: [capstone]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:14Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:33Z
-content_hash: "sha256:7d3910e1e3973b7d425aa935637216d3f70b4025ce8516ef2cdfc8a48b070c62"
+updated_at: 2026-09-06T09:15:16Z
+content_hash: "sha256:72c7746412e413506afa5755c785825a98b0da5961fee99366f31bf228147994"
 blocked_by: [MAC-hlae, MAC-sh60, MAC-yhg5, MAC-hwdb, MAC-2n83, MAC-hy71, MAC-gcrr, MAC-l7m0, MAC-vx24, MAC-lnu6, MAC-hpqp, MAC-yig6, MAC-lhu5, MAC-hgz1, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
 was_blocked_by: [MAC-olrx, MAC-p8ce, MAC-a89e, MAC-2u36, MAC-p7jd, MAC-uzxr]
 ---
@@ -178,3 +178,41 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - Was blocked by: [[MAC-olrx]], [[MAC-p8ce]], [[MAC-a89e]], [[MAC-2u36]], [[MAC-p7jd]], [[MAC-uzxr]]
 
 ## Comments
+
+### 2026-09-06T09:15:16Z ramirosalas
+FINAL CAPSTONE ASSURANCE EXPANSION 2026-09-06
+
+All original final capstone AC1-AC8 remain required, including saga, coverage/ownership, reads, OCI, OpenCode, installer/recovery, baselines, attestation and release policy behavior. This append-only expansion adds the complete approved assurance contract and blocks this story on EVERY new bounded deliverable. No original dependency is transferred or removed; MAC-sh60 decision/hold is unchanged.
+
+CONSUMES:
+- MAC-vx24: docs/test-assurance-integration.md
+  source: accepted full original-AC integration map and standalone process guidance.
+- MAC-1u2v: cmd/machinery/assurance_standalone_e2e_test.go
+  source: accepted fresh first-use native flows for all four languages with exact sensitivity evidence.
+- MAC-bz1y: scripts/integration-lane/assurance_catalog.go
+  schema: complete closed required-fragment union including original frozen 96-case pilot, supplemental custody, four adapters, checks/replay/Git/finalization/CLI/examples/E2E.
+- MAC-rau8: internal/assuranceflow/run.go
+  spec: Run(ctx context.Context,req Request,output io.Writer)(Verification,error), actual normal CLI only for capstone tests.
+
+ADDITIONAL REQUIRED E2E/FULL-CLOSURE PROOF
+A9. From empty stores/consumer checkouts, EACH Go, TypeScript, Python and Elixir user completes actual init/scaffold/capture/register/RED/GREEN/verify/complete and hooks with no previous PASS receipt and no pvg/nd/toolchain manager. Explicit reviewed current state, bound native assertions and same-frozen safe/unsafe sensitivity must be observed, not inferred from an adapter unit fixture.
+A10. Exercise the complete bypass matrix through actual public commands: forged/imported summary/receipt, stale/missing/deleted head/object/plan, wrong expected-head CAS, hidden milestone/owner/test/negative/control, frozen literal/indentation/mode/empty-directory mutation, compilation/setup/import/panic/timeout/skip/xfail/empty/extra failure, unsupported language framework/runtime and current-code mutation. Validate exact causal diagnostic/assertion plus passing controls.
+A11. Obtain genuine Linux amd64 and Darwin arm64 native custody/assertion/Git/finalizer proof for the SAME final candidate source and exact runtime/fixture inventories. Local native runs or cross-compilation cannot substitute for the other platform. No unavailable infrastructure waiver. Run actual process-producer call-graph audit plus real cumulative deadline/owner-budget tests, no late launch after barrier and no seal on release/cleanup/publication/output failure.
+A12. Tests-only final capstone remains WITHOUT hard-tdd label: do not manufacture missing-feature RED after accepted implementation. Freeze new E2E cases and demonstrate safe/unsafe mutation sensitivity; every missing required feature becomes a blocking reviewed P0 repair, never a weakened test. All exact leaves appear in the required lane; no skip-if-missing, env dormancy, mocks or empty/fabricated/partial completion.
+A13. Only after ALL siblings and this capstone are independently accepted does root run the full scripts/preflight.sh on the fully integrated candidate, with provision-before-test ordering, complete original+supplemental fragment union, all complete examples/legacy regressions and positive/negative counts. Any fix after that invalidates affected final proof and requires targeted plus full final rerun. Do not run heavy preflight during earlier stories.
+A14. Root's final completion owns local accepted epic-to-main merge and an isolated candidate binary only after final gate; record exact version/source SHA/binary SHA256 and real smoke verification. No GH push or mutation until explicitly coordinated at the user-authorized end; no installed binary/plugins/skills/agents replacement until NIL is done and root obtains installation clearance. This story cannot replace an active installation or erase unrelated user processes/containers.
+
+The capstone retains its existing test/fixture/fragment ownership, no production source ownership. Expanded scenarios reuse accepted focused fixtures when safe but must exercise actual final candidate paths. DIFF BUDGET remains bounded tests-only ~2-8 files/<1500 changed LOC; separately reviewed expansion required if integrating all scenarios cannot fit. No false acceptance of architecture as native implementation evidence.
+
+## nd_contract
+status: new
+
+### evidence
+- Final capstone now depends on all nineteen new required assurance deliveries, preserving every original prerequisite.
+- No implementation, native execution, preflight, merge, build or publication performed by this backlog repair.
+
+### proof
+- [ ] Original AC1-AC8: all hardening outcomes and final local closure remain required.
+- [ ] A9-A12: complete four-language/two-platform real E2E and adversarial/custody/deadline proof.
+- [ ] A13-A14: final full preflight and isolated local candidate closure after independent acceptance.
+
