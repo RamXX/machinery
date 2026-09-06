@@ -87,8 +87,16 @@ func TestBootstrapReceiptWriterDescriptors(t *testing.T) {
 			if err := closeInstallFile(file); err != nil {
 				t.Fatalf("normal close failed: %v", err)
 			}
-			if _, err := bootstrapReceiptWritable(file); !errors.Is(err, os.ErrClosed) {
-				t.Fatalf("closed handle query = %v", err)
+			conn, err := file.SyscallConn()
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualControlErr := conn.Control(func(uintptr) {})
+			if actualControlErr == nil {
+				t.Fatal("closed handle Control unexpectedly succeeded")
+			}
+			if writable, err := bootstrapReceiptWritable(file); writable || err == nil || !errors.Is(err, actualControlErr) {
+				t.Fatalf("closed handle query = %v, %v; want actual Control error %v", writable, err, actualControlErr)
 			}
 		})
 	}
