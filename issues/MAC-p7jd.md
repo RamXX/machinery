@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:21:32Z
-content_hash: "sha256:e808277196cbc9111323e212788d94470e8783ac8e316ab0083474e5f1438a57"
+updated_at: 2026-09-06T03:27:43Z
+content_hash: "sha256:f5acab196cacb2d294a9a9c563be52d86694b0d42fc580928c9a082ac9f9feb2"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36]
@@ -862,6 +862,100 @@ Review evidence/limits:
 - Exact git show 7ec5d609 of both frozen test files and their readonly Config/decodeConfig/Load/copyDirInto dependencies; exact file hashing and raw JSONL hashing/leaf extraction above. Source inspection of the tests supplies cost evidence, not acceptance.
 - Main remained clean at 497419ab4512fcff765cd5feb27aed4c67b5608d; observed epic 70652b948bf090008b1965c85daf36ea374daea4. PM used committed refs, not the developer worktree. No PM source/test/docs edits, execution replay, installed asset change, remote mutation, full preflight or status transition.
 SAME-STORY COST CANONICALIZATION ONLY
+# Independent PM RED review — MAC-p7jd
+
+Decision: APPROVED for RED transition only. The frozen suite together with the explicit mandatory GREEN supplements and same-revision source/proof bars can prove the approved story. This is not product acceptance, implemented custody proof, or permission to modify frozen tests.
+
+Reviewed candidate 47ba44906a09bc2fa010092a86b133d0d749c52c against unchanged production base a82277af5650b487cea1260c24ffcc1c86d69d8d in the independent detached checkout /tmp/machinery-p7jd-pm-red.fnQSrl/checkout. Original RED 7ec5d609acc1597ee2c0ddbf5401b92f834d5ab3 remains intact. Both commits carry tdd-red and [test-edit-authorized]. Canonical pvg issues show MAC-p7jd --json current body, exact PRE-RED and POST-FREEZE authorizations, approved AC5 clarification, complete author RED-REPORT.md, latest terminal delivered contract and SrPM 03:21:32Z cost-only canonicalization reviewed. Historical contracts were not treated as current authority.
+
+## Scope, repair and evidence integrity
+
+Full changed-source review: internal/gates/attest_implementation_test.go (612 lines); cmd/machinery/attest_implementation_test.go (462); internal/hook/attestation_snapshot_test.go (361); exact full diffs of both existing attest_test.go files. Total five tests, 1484 additions/3 deletions. No production, example, golden, dependency, documentation or generic helper edits. All original existing-test edits match prior authorization: wrong version 2 to 3 plus integer-1-or-2 diagnostic and separate v2 cases; os.Link skip to mandatory Fatal only. The subsequent two-file repair is exactly the checked two destination MkdirAll loop and hook Hooks:true plus real Load(root) no-warning check before ledger arming. Other three frozen hashes remain identical. Exact repair patch SHA256 2292e7da2123bdbc3890564468d52853c53306aa44e2efd0c9f60ef184e2a5e4.
+
+Author report SHA256 independently matched 17843fb0be042d7a0b661933611de53cd3cfc7c6666aad0a7c9012b32ec15c70. Approved R2 proposal hash independently matched 8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179; AC5 clarification hash matched 5fc3193106a803b7760020b646ed4db7b3d417f5e196b2266d10cf8227733937. Author raw repaired logs/leaf inventories match their recorded hashes. Normalizing their package/name/action TSV against independent action/name TSV produces identical names and terminal outcomes for every selection; elapsed columns intentionally differ.
+
+Graph-first codebase-memory review refreshed list_projects/index_status: ready, main 497419ab4512fcff765cd5feb27aed4c67b5608d, generation 2026-09-06T02:42:16Z. search_graph located Config, Load and stop in internal/hook/hook.go and copyDirInto in cmd/machinery/golden_test.go; all seven results read, has_more false. check_index_coverage covered the five changed tests, both attest.go, suite.go, hook.go, golden_test.go and designlock scope. Existing cited files metadata_match/no recorded issue; three new test files missing from main graph. This is best-effort, not completeness proof. Exact candidate source read from detached committed checkout supplied ground truth, including Config/Load/copyDirInto and stop ordering. Source confirms original hooks:null parsing and absent destination setup defects, and current hook deferred Release after possible emission/ledger clear. New optional writer method does not manufacture verdicts or activate itself.
+
+## Independent synchronous replay
+
+Every command ran from /tmp/machinery-p7jd-pm-red.fnQSrl/checkout on Go go1.27.1 darwin/arm64, with shell time and exact exit capture. No service or remote was used. All four invocations terminated synchronously.
+
+1. go test -count=1 -timeout=5m -json ./internal/gates -run Attest
+2. go test -count=1 -timeout=5m -json ./cmd/machinery -run Attest
+3. go test -count=1 -timeout=5m -json ./internal/hook -run Attestation
+4. go test -count=1 -timeout=5m -json ./internal/designlock -run Attestation
+
+| Selection | Native leaves | Pass | Fail | A genuine fail | B interface/diagnostic fail | C family control unavailable | D pass | Starts/terminals | Exit | Shell wall seconds |
+|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|
+| gates Attest | 133 | 31 | 102 | 18 | 21 | 63 | 2 | 142/142 | 1 | 7.929 |
+| CLI Attest | 28 | 11 | 17 | 6 | 1 | 10 | 2 | 29/29 | 1 | 4.390 |
+| hook Attestation | 28 | 5 | 23 | 0 | 4 | 19 | 4 | 30/30 | 1 | 4.380 |
+| designlock Attestation | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0/0 | 0 | 0.667 |
+| Total | 189 | 47 | 142 | 24 | 26 | 92 | 8 | 201/201 | — | — |
+
+Zero skips, no compilation/import/setup/runtime/timeout failure. designlock prints `testing: warning: no tests to run`: zero capability coverage, not a passing capability test. No -cover run; line/branch coverage NOT MEASURED. Shell wall time was returned by time to the tool transcript; stderr artifact files are not claimed to contain shell timing. Native package JSON event windows: gates 2026-09-05T20:23:42.039071-07:00 to 20:23:48.584112-07:00; CLI 20:23:50.056936 to 20:23:53.017055; hook 20:23:53.519814 to 20:23:57.429602; designlock 20:23:57.865657 to 20:23:58.150333.
+
+The real CLI was built privately by the frozen test with `go build -o <t.TempDir>/machinery .`; independent binary digest 08151cca48bfd3d66886f1139a77f5d196552a87d99930d7ff038ac122759e1d is recorded in cli.jsonl. Binary/build paths can affect its digest versus the author's build. Tests use bounded real process/Git calls and isolated existing test harness state; no mocks or substituted runtime.
+
+## Actual causes and test strength
+
+A: 18 gates leaves execute three legacy behavioral claims in unchanged/mutated variants through direct, suite-with-impl and suite-without-impl routes. All report errors=[] and one attested claim; the required GV_MISSING_IMPLEMENTATION_SUBJECT assertion fails. Six real CLI leaves return code 0 instead of required 1 for the same three claims/variants. Handler/assertion mutations occur on real fixtures before checks. These 24 are qualifying existing-interface behavioral RED. The compatibility control is separate, never the unsafe legacy success.
+
+D: two gates full/partial six-g2 controls pass preserving claims and 0/5 warnings; two CLI controls preserve exact filehash/claims precedence/legacy plan and actual local Git ancestor acceptance; four valid configured hook semantic/wave/Stop/SubagentStop controls pass. Additional passes are 28 existing gates leaves, the independent digest fixture vector, nine existing CLI leaves and one existing hook selection control. The digest-vector pass is fixture grammar verification, not product capability.
+
+B/C: baseline v2 rejection is `attestation_version must be the integer 1`; generation is `unknown flag: --design`; hook callback firing is zero. All 63 gates C cases abort at valid-v2 control, ten CLI C cases abort at first generation, and 19 hook C-family cases abort in matched no-fault callback control. Their actual mutations/cleanup are not credited. Sixteen B malformed-schema challenge legs also abort at the valid plan control. B/C are frozen desired behavior, not extra observed staleness or custody failures. The repaired complete CLI fixture now copies real go-crm data, initializes/commits local Git, rewrites acceptance anchors and reads old claims; its first g2.action-ownership generation fails on --design. It has not established an unchanged --complete pass or isolated final warning, and approval does not promise that later fixture prerequisites are valid.
+
+Reviewed assertions require independent complete inventory/digest including hidden/ignored/vendor/build/config inputs; additions/removals/renames, assertion removal, handler/config/mode changes; all four design/impl topologies and exact evidence exclusion; forged narrowing with and without recomputed digest; symlink/hardlink/FIFO/nested metadata; schema/kind/missing-root; provisional counter suppression, two pending runs, final release publication/failure, latching after restoration, repeated release and post-release refusal. C cases require the valid control before challenge. No skip-if-missing, accept-any-error or baseline-vs-GREEN pass branch exists. Existing helper returned nil after Fatal is unreachable, not a production stub.
+
+Real CLI coverage binds generation to independent filesystem inventory/digest checks, stale assertion/handler/config/addition, missing root, ordinary real renderer missing-input and hardlink alias errors with exact exit 1/empty stdout, real Ga/current stale replay including old --commit, reserved evidence-only commit, ordinary/warnings-as-errors and sole-warning --complete controls. Hook cases require the exact callback, no prior output, real operation, matched no-fault child-process control, one block, retained ledger, suppressed counters, concrete cleanup/symlink cause and intact outside sentinel across Stop/SubagentStop and strict/relaxed/wave policies; empty selection and existing semantic-warning/wave behavior are included. Faults remain unobserved until GREEN.
+
+## Frozen SHA256 acceptance bar
+
+- internal/gates/attest_implementation_test.go: fcae6e3a9dc66d8fb9abb1d151129604f59a3e38d9ac221d4f16ce91a8086260
+- internal/gates/attest_test.go: f0eef53c28fdf940654700832887f2c326a478c5df1d741ae9f538a3d24db253
+- cmd/machinery/attest_test.go: beb2d58af4d3144316f3789c3b7cbb726a4761af57ea85f0017297b9c24cd6cd
+- cmd/machinery/attest_implementation_test.go: e02ad18fe2745d23f05e69ce1e01dd2b1be358f94d99cb3a215b14f6e2cee3b8
+- internal/hook/attestation_snapshot_test.go: a3c088c095e2dba4379f548903a058eedbd5338ef872e507ab12edaa1ca06e49
+
+Independent raw JSONL SHA256 under /tmp/machinery-p7jd-pm-red.fnQSrl:
+
+- gates.jsonl: 8741817e07aec80322ef798fb9b255562e8a009da4c90d6fc51fcfe1ac5ed347
+- cli.jsonl: 77971a1fc1d3e46b2f9242d5b62a0ee1fe87b2b6342c98c5a5cde7d9ab96f6a0
+- hook.jsonl: a88930673c853b49e0a2d8df49668c7da044cfca757cb1ae27f6fbbf2b6407fd
+- designlock.jsonl: 2c204e18e49d4e1e28b2d4a7d4e283f20e28bff73dda95a9a3e9a52f1226403c
+
+Exact native leaf names, terminal actions and per-leaf elapsed values are in gates-leaves.tsv (4460a2be7ca1922de70e50062863712abb83a63480d11f7f7fac72d1a3ab1b36), cli-leaves.tsv (1e3a93ffc10db02d452da8dc44aae310ee8703ae6c5ae024d292d0db81e80c59), hook-leaves.tsv (235ec2339e3bc561e5db42b17ecc8099ec365b69fee72eb636bd48bd384362d6), designlock-leaves.tsv (empty e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855). Inventory extraction used unique native run names and terminal pass/fail/skip names with no descendant prefix; parent totals are not duplicate leaves. Hook child output is embedded in its 23 parent scenario leaves.
+
+## Mandatory GREEN bar, unchanged
+
+All five frozen files must remain unchanged and every frozen test pass. Independently verify-tdd again and verify every C/schema fault reaches its passing control and actual operation. A pass of these five files alone is insufficient: new internal/designlock/attestation_snapshot_test.go and the approved supplemental internal/gates/attest_green_test.go must supply the already-authorized new API/held-root and wrapper/renderer evidence. No additional ownership, seam or test edit is granted.
+
+Required supplements preserve exact R2 capabilities, four topology held-root acquisition/name/identity/content/copy/overlay proof, defensive Entries copy, actual root/file replacement and read-chunk mutation with fired/no-fault controls, entries/depth/aggregate at-limit and limit+1 under approved lowered budgets with one combined overlay budget, actual oversized sparse file per-file limit, and evidence/document bounds. Lower-budget proof must not claim actual 8 GiB hashing. Full closed-schema grammar/category/limit correctness remains a final implementation/source review obligation; frozen parser samples do not license an open schema.
+
+Suite-owned first-Release callback supplements must exercise real SelectRunAndNote, package RunSelected, WithImplementation and RenderAttestation, matched fired no-fault/original-mutation/actual-owned-cleanup cases, error joining and nil renderer bytes, suppression/finalization, logical paths and idempotency. Child TMPDIR isolation, original/copy distinction and sentinel safety remain exact. Generic helper files and outer CLI hook are read-only. Hook finalization must precede tally/output/ledger clear and remain blocking on custody failure despite relaxed/wave/empty selection. Any later genuine frozen-fixture defect requires a new exact dispute/review; no example/golden or test repair is preauthorized.
+
+AC5 is conjunctive on the SAME final GREEN revision: OBSERVED real renderer late original mutation and actual private cleanup failure -> nil bytes with concrete causes and fired/no-fault controls; OBSERVED ordinary built CLI complete generation success and renderer-input/alias failure -> exact exit 1/empty stdout; REVIEWED actual delivered generation CLI -> RenderAttestation -> Release/error join -> command output/defer/error exit closure, including no alternate/fallback/error emission. COMPOSED late renderer failure -> CLI exit 1/empty stdout. UNOBSERVED independently injected standalone CLI late failure. UNFORCED individual OS Close primitive errors. Output-sink partial writes remain a separate documented limit. Hashing does not authenticate execution, reviewer identity or judgment correctness. Docs/help/all displayed current reports must retain the exact scope limits.
+
+Cost-only forecast 2710–3310 and 13 required/optional14 paths is reasonable for reviewed separate gates/process/Git/hook/custody proof; actual RED 1487 changed lines is independently measured. Forecast is neither a cap nor acceptance or permission to trim proof/factor helpers. Final actual cost and material overrun remain reviewable.
+
+## Verification and custody
+
+Independent `pvg story verify-tdd --range a82277af5650b487cea1260c24ffcc1c86d69d8d..47ba44906a09bc2fa010092a86b133d0d749c52c` PASS: two commits, zero skipped merges, no unauthorized test edits. `pvg story verify-delivery MAC-p7jd` 9/9 shape checks, explicitly not source/behavioral approval. `git diff --check a82277a HEAD` clean; detached checkout clean. No full preflight, remote, install/update/settings, service, Dagger/container, installed binary or developer worktree action. Installed machinery SHA256 checked as 5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849. All review processes completed; independent logs/report retained. Transition must be approve-red only, then status/labels read back.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent RED review APPROVED candidate47ba449 against unchanged a82277a after exact authorized repair audit and complete synchronous scoped replay:189 leaves,47 pass,142 fail,0 skip;24 genuine A failures,8 D passing controls,26 B interface/diagnostic failures,92 C family unreached cases.
+- Frozen hashes and complete source/assertion/cause/AC/mandatory-supplement analysis above; raw logs and exact leaves in /tmp/machinery-p7jd-pm-red.fnQSrl. This is RED approval only, not GREEN acceptance.
+- Independent verify-tdd PASS two commits; verify-delivery9/9 shape only; no production/test/docs edits by PM. Proper approve-red transition and readback follow.
+
+### proof
+- [x] RED AC #1: independent complete-scope/digest and topology/forgery/mutation assertions frozen; actual v2 sensitivity and held-root/bounds supplements mandatory GREEN.
+- [x] RED AC #2: schema/kind/current-history/complete-warning contracts reviewed; real Ga/plan compatibility observed; future v2/history/complete control and docs remain mandatory.
+- [x] RED AC #3: independently observed24 real legacy false-acceptance failures with8 D controls; explicit migration diagnostic assertions frozen.
+- [x] RED AC #4: actual filesystem/lifecycle/hook fault assertions with control gates and exact seam/safety constraints reviewed; mutation legs presently unreached and not credited.
+- [x] RED AC #5: real CLI A/D baseline observed; generation/current/ordinary-error and same-revision mandatory renderer plus CLI plus source-closure conjunctive proof retained with honest COMPOSED/UNOBSERVED/UNFORCED limits.
 
 ## nd_contract
 status: delivered
