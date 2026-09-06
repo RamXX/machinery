@@ -9,11 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
 updated_at: 2026-09-06T12:21:36Z
-content_hash: "sha256:05fde11f0122a04da599da6c1ddb7b2b323f0a06dbcc5e72fe01f96a5d498835"
+content_hash: "sha256:3909be66fcd5d2289a229ece7ea1ce927e3dcaa8b56eb6188a85fa1ca5a52e69"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 assignee: dev-MAC-p9wm
-follows: [MAC-l7m0]
+follows: [MAC-l7m0, MAC-uzxr]
 ---
 
 ## Description
@@ -334,12 +334,14 @@ status: new
 - 2026-09-06T12:12:01Z status: open -> in_progress
 - 2026-09-06T12:12:01Z auto-follows: linked to predecessor MAC-l7m0
 - 2026-09-06T12:12:01Z claimed by dev-MAC-p9wm
+- 2026-09-06T12:21:36Z status: in_progress -> in_progress
+- 2026-09-06T12:21:36Z auto-follows: linked to predecessor MAC-uzxr
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-qlw2]], [[MAC-vx24]], [[MAC-ou97]]
 - Related: [[MAC-l7m0]]
-- Follows: [[MAC-l7m0]]
+- Follows: [[MAC-l7m0]], [[MAC-uzxr]]
 
 ## Comments
 
