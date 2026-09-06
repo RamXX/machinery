@@ -1,17 +1,19 @@
 ---
 id: MAC-qlw2
 title: "Retain native child ownership until cleanup completes"
-status: open
+status: in_progress
 priority: 0
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:05Z
-content_hash: "sha256:571eb38312e8923bbae12c850028ad0b94d77e3e377cc10f1dab30fa326dd4eb"
+updated_at: 2026-09-06T10:33:11Z
+content_hash: "sha256:60ce36f602933befcb1c23ca2465db9e0cab6dd07a962161d4b80fa616617657"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0]
+assignee: dev-MAC-qlw2
+follows: [MAC-l7m0]
 ---
 
 ## Description
@@ -93,11 +95,15 @@ status: new
 - 2026-09-06T09:10:14Z dep_added: blocks MAC-vx24
 - 2026-09-06T09:10:15Z dep_added: blocks MAC-ou97
 - 2026-09-06T10:30:30Z dep_removed: was_blocked_by MAC-l7m0
+- 2026-09-06T10:33:11Z status: open -> in_progress
+- 2026-09-06T10:33:11Z auto-follows: linked to predecessor MAC-l7m0
+- 2026-09-06T10:33:11Z claimed by dev-MAC-qlw2
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-cn7q]], [[MAC-6h0s]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-l7m0]]
+- Follows: [[MAC-l7m0]]
 
 ## Comments
 

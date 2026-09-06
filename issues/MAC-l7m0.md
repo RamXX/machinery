@@ -8,12 +8,13 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T10:31:16Z
-content_hash: "sha256:704436045d6c1235ddd7b1d3e935f7afb0e7748d6baa724f8c8d520f49ea9755"
+content_hash: "sha256:2c037e9b4259c32ad9374f5e871cc26d2ad7873427376817839aed7f67618618"
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36, MAC-a89e]
 assignee: dev-MAC-l7m0
 labels: [accepted]
 closed_at: 2026-09-06T10:30:30Z
 close_reason: "Independent PM approved exact standalone documentation projection and all A1-A6; full review SHA256 b7c57fcb51d64b332c1baef0b8d9d2f986968042b58e9dc233de1f9865a1cc8d; no native implementation proof claimed."
+led_to: [MAC-qlw2]
 ---
 
 ## Description
@@ -240,6 +241,7 @@ status: delivered
 ## Links
 - Parent: [[MAC-ui8a]]
 - Follows: [[MAC-uzxr]], [[MAC-p7jd]], [[MAC-2u36]], [[MAC-a89e]]
+- Led to: [[MAC-qlw2]]
 
 ## Comments
 
