@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
 updated_at: 2026-09-06T02:38:47Z
-content_hash: "sha256:9c4d7c077510c8f86d606feff03c696146194a6920da6b729642b09303a4e12c"
+content_hash: "sha256:5106121187989f62fb066abdf936bb3a129d2abdcf2d2d8751475f61e64bebae"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
@@ -829,4 +829,27 @@ status: in_progress
 - [ ] AC #3: executable quoted-space and valid indentation semantic controls, real equal-token calls and CLI honesty pass; guidance condition pending.
 - [x] AC #4: genuine whitespace/empty utility, count prefix, exit/read-error and original mutation/custody controls pass unchanged.
 - [ ] AC #5: actual standalone CLI and all nine real guidance cases execute without skips; full shipped contract, post-amendment Gv and unchanged-golden compatibility remain pending.
+
+
+### 2026-09-06T02:38:47Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Sr PM conditional canonical scope extension only, root-authorized: fourteen named records in the existing six evidence files may be considered for actual reviewer/date/note + BUILD-hash amendment AFTER independent substantive review and exact PM authorization. Nine prose and six evidence writes remain held. No current re-attestation or implementation acceptance/replay claimed.
+- All five original AC, independently approved RED 0ea1fdc730aadac15cecc8de33bb95898ad91d60, tests/goldens, state/claim/dependencies unchanged. Scope remains seventeen paths/~500 LOC; measured/proposed 337 pre-evidence plus forecast60-100 evidence LOC.
+- Fully read REVIEW.md (319 lines), guidance-deltas.json and subject-inventory.json; exact stated SHA256 values match. Source at713184d matches all9 original/proposed prose hashes and all6 evidence-file hashes. Graph coverage metadata_match/no recorded gaps is best effort, not semantic completeness.
+- Independent reviewer must inspect nine exact prose deltas and FULL covers/claim semantics of all14 records, including portfolio7-subject records and Go CRM executable-test assertion, provide actual identity/date/specific findings and approve provenance representation. Missing verification remains an evidence hold, never automatic rehash. All claim IDs/schema/membership/order/non-BUILD hashes/other records/acceptance/history preserved.
+- Six baseline Gv passes are structural only; six stale-before-amendment, six final Gv and unchanged-golden compatibility remain mandatory. No source/test/docs/evidence/installed/worktree changes during this repair.
+- CLI commit 713184db16a12b8c3763b4aa8f5bf025721abf22; frozen RED unchanged; focused 26 leaves: 17 PASS / 9 expected guidance FAIL / 0 SKIP; six actual Gv baselines PASS.
+- Exact review artifact and SHA256 above. Nine guidance files and six evidence files remain untouched; independent amendment/historical-truth authorization pending.
+- Healthy hold retains the atomic claim and clean worktree. No delivery, release, closure, renewed acceptance or current re-attestation claimed.
+
+### proof
+- [ ] AC #1: exact nine guidance amendments proposed; application and replay await authorization.
+- [ ] AC #2: actual CLI help/output honesty passes; documentation changes pending.
+- [ ] AC #3: executable quoted-space and valid indentation semantic controls, real equal-token calls and CLI honesty pass; guidance condition pending.
+- [x] AC #4: genuine whitespace/empty utility, count prefix, exit/read-error and original mutation/custody controls pass unchanged.
+- [ ] AC #5: actual standalone CLI and all nine real guidance cases execute without skips; full shipped contract, post-amendment Gv and unchanged-golden compatibility remain pending.
+
 
