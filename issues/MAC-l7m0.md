@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:21:01Z
-content_hash: "sha256:66c836a4406831411d331b87797a4780bb184ae168d535975cc28b89e9aa9914"
+updated_at: 2026-09-06T10:30:24Z
+content_hash: "sha256:7714f9d609321e83187207617a7882612108ce2ade188e0286a06bcabadd1abd"
 blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36, MAC-a89e]
 assignee: dev-MAC-l7m0
@@ -80,6 +80,29 @@ Observable outcome: the maintainer can review a closed standalone contract that 
 ## Notes
 BLOCKED — USER CHOICE / ARCHITECTURE REVIEW. Do not dispatch a generic developer. Pending user decisions: supported initial native runner languages and trusted-host versus adversarial-code execution boundary. Independent architect owns exact contract. Only after answers plus reviewed contract may Sr PM repair implementation interfaces and release this blocker.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: Architecture is read-only contract work, not an executable runtime suite. Its accepted contract must explicitly identify any native adapter runtimes consumed by implementation; MAC-vx24 must register/provision those using the required closed integration lane. No execution assurance may be claimed from schema or architectural review alone.
+## PM Decision
+APPROVED [2026-09-06]: Independent review of candidate 0feaebf725267f9d0045d653ef57a90af0c9d946 against base 7e36f3e7ddcf25565d5d4fe60b328df254eee91d fulfills the complete one-document A1-A6 map. Documentation acceptance only; no implementation/native proof is claimed.
+
+Immutable complete review: /tmp/machinery-assurance-pm.pYsE8w/REVIEW.md; SHA256 b7c57fcb51d64b332c1baef0b8d9d2f986968042b58e9dc233de1f9865a1cc8d. All 589 approved source, 32 challenge and 575 public lines were read; exact projection and every normative section independently compared. External actual validator run /tmp/machinery-assurance-negative.VW7RGK reproduces the retained raw table SHA256 9a30ab935c5d236ca31767332382ec89fb11cdf61c7e8f5992a37e65c062c909. Twelve actual semantic/binding function statuses independently asserted: canonical 0/0, each of five intended mutants 1/1. Literal sentinels are not general semantic proof; the full projection and section review supply that judgment. Coverage N/A for documentation-only change, no runtime tests or zero-test result credited. verify-delivery 9/9 is shape only. Historical failed developer attempts and reviewer diagnostics remain recorded in the review; none is counted as a passing result. Supported-help ambiguity resolved without tracker mutation as retained in TRANSITION-NOTE.md.
+
+## nd_contract
+status: accepted
+
+### evidence
+- Independent PM approved exact 575-line, 109367-byte single-document diff, Git mode 100644; public SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8.
+- Complete byte projection accounts for 13 whole-line changes, seven literal rules, em-dash normalization, removed private chronology and final LF; no normative changes.
+- All 12 sections independently compared, preserving closed interfaces/schemas/argv/catalog, source/control/store binding, registration/CAS/history, same-assertion replay, custody, scoped Git/Ga, final no-launch/release/publication/output ordering and cumulative budgets.
+- Fresh read-only doctor: all 56 issues passed validation. Root cleared exclusive acceptance window after Sr PM completed tracker writes. Canonical supported acceptance transition follows this review and must be verified before claiming closed+accepted.
+
+### proof
+- [x] A1: Exact single public projection bytes, scope and mode verified.
+- [x] A2: Every normative section semantically preserved against approved immutable source.
+- [x] A3: Standalone public boundary; no private provenance or Paivot dependency.
+- [x] A4: Architecture approval remains distinct from actual four-language/two-platform, first-use, custody/assertion, process-producer and cumulative-budget implementation proof.
+- [x] A5: Exact-byte/static/privacy checks and actual canonical-positive plus five intended negative document controls verified; no source/runtime/preflight/install/remote changes.
+- [x] A6: Genuine independent PM review APPROVED; canonical acceptance transition is the next supported action.
+
+
 ## Adversarial Document Validation (post-delivery evidence)
 
 - External disposable validation artifact directory retained at `/tmp/machinery-assurance-negative.RSUL9B` (not tracked and outside the repository).
