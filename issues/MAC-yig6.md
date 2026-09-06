@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:16:02Z
-content_hash: "sha256:1ebac7547332419529431aa5fb14eca53ef299f09598b5287b4b5aae8cef0d68"
+updated_at: 2026-09-06T08:29:57Z
+content_hash: "sha256:54c018c2b98ae982f7a86d92f40ae1d8e1a8dff3bcbecbfbec3ba6f3b289e15c"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
@@ -566,3 +566,19 @@ status: new
 - [x] AC #5 RED: tdd-red marker, frozen bytes, actual compiler/subprocess controls independently reviewed; sufficient behavioral RED bar.
 - [ ] AC #4 FINAL: same frozen GREEN native Darwin and native Linux execution, exact inventory and cleanup required.
 - [ ] AC #5 FINAL: exact helper amendment authorization HELD; unchanged frozen GREEN tests and existing checker-focused controls must pass before final acceptance.
+
+### 2026-09-06T08:29:57Z ramirosalas
+Dispatcher checkpoint: healthy claimed GREEN attempt remains PAUSED-AMENDMENT, not delivered or rejected. No helper edit authorized. Exact unapplied proposal /tmp/machinery-yig6-green-candidate.LPCYyO/MAC-yig6-helper-amendment.patch SHA256 e1a35cf42389c7e8de2e856686499a8a099b3e17aa7bc9b448c55fe723631f8c and REVIEW-INDEX.md SHA256 8d8c663656a090f14c2b2d99275555d2a41871dbe07a3e03a772e4fb4f0d87ab were read by root. Its coverpkg-empty argument re-enables helper instrumentation on the observed Go 1.27.1 host; proposal diagnostics are not GREEN proof. Independent PM must first review a revised compiler/environment boundary, then exact revised unapplied bytes before any existing-helper edit. Frozen c59c89de31c7f1268a220caf0fa0d67a8e166d0f and new-test SHA256 80b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677 remain authoritative. Production parser/env, TestMain, fixture dispatcher, assertions and coverage settings remain outside amendment permission. Native final verification is now user-authorized; actual Linux execution remains owed and is not replaced by Darwin or cross-compilation. Installed assets, preflight and remotes untouched.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- External candidate proposal exposed compiler-flag incompatibility before existing-helper writes; independent revised-amendment review pending.
+- Root inspected proposal/report and canonical story only; no new behavioral test execution claimed.
+
+### proof
+- [x] AC #5 RED: prior independent RED approval and exact frozen history preserved.
+- [ ] AC #1-3 GREEN: revised exact helper authorization and native/covered same-SHA proof pending.
+- [ ] AC #4 FINAL: actual bounded Darwin and Linux execution and cleanup pending.
+- [ ] AC #5 FINAL: independent GREEN acceptance pending.
