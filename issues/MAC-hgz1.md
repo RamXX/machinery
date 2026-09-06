@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:16:50Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:24:07Z
-content_hash: "sha256:b5160c7cdec3320cce415261f01a5eef963eadb0db2887e3fd59c4848046e900"
+updated_at: 2026-09-06T05:26:05Z
+content_hash: "sha256:8c9dab5785c3c61787c8cd52eb5318accb22122ed2762988541d640ffeae2933"
 blocked_by: [MAC-uzxr, MAC-lhu5, MAC-p7jd]
 blocks: [MAC-lnu6, MAC-ou97]
 ---
@@ -153,6 +153,7 @@ status: new
 
 ## Notes
 TERMINAL SERIALIZATION SELF-REVIEW
+SR PM COMPLETE BUNDLED INVENTORY CORRECTION. Canonical39 possible paths now comprise sixBUILD/eightattestations/24conditionalstandardgoldens/one new test;97 total rows across8documents,12 behavioral rows. Added checkout-split/parent and pii-flow evidence plus their6standard golden outputs. Their BUILD files and check-pii-flow-gk remain read-only. Six AC retained with migration proof expanded to8examples; exact evidence/golden amendments still require prior independent substantive/PM review, true reviewer/date/note, complete covers/scope and old provenance. No hash-only review renewal. Serial accepted p7+uzxr+lhu5 -> hgz1 -> lnu6 unchanged; lnu6 still exactly17paths/6examples/14conditionalrows/9policyblocks. Guarded ndedit external trial and exact live full-byte comparison passed; bodyb5160c7cdec3320cce415261f01a5eef963eadb0db2887e3fd59c4848046e900 verified, all prior Notes/History/Links/Comments and metadata preserved except expected hash/time. Approx1100-1900 changedLOC is a forecast, not evidence/test-edit permission. No reverse p7 dependency. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
 
 ## nd_contract
 status: new
