@@ -8,13 +8,14 @@ parent: MAC-ui8a
 created_at: 2026-09-06T16:33:51Z
 created_by: ramirosalas
 updated_at: 2026-09-06T23:26:04Z
-content_hash: "sha256:ffa328198f5684add3af0ce0f0d445a196164e8ed80fc2e36d18c02676192672"
+content_hash: "sha256:199c2f768e015a7b87e5b5469a5ed16b4633c1b3a30d0ce302f39a8ef2a624ba"
 labels: [hard-tdd, accepted]
 follows: [MAC-sh60, MAC-hgz1]
 was_blocked_by: [MAC-hgz1]
 assignee: dev-MAC-wi5z
 closed_at: 2026-09-06T23:26:04Z
 close_reason: "Accepted: active oracle discovery evidence enforced; compliant successor to MAC-sh60 complete; merged to local epic"
+led_to: [MAC-jcl0]
 ---
 
 ## Description
@@ -140,6 +141,7 @@ status: new
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-hgz1]]
 - Follows: [[MAC-sh60]], [[MAC-hgz1]]
+- Led to: [[MAC-jcl0]]
 
 ## Comments
 
