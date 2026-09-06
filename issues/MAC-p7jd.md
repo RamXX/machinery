@@ -1,7 +1,7 @@
 ---
 id: MAC-p7jd
 title: "Invalidate reviews when implementation subjects change"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, delivered]
@@ -9,10 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T07:47:13Z
-content_hash: "sha256:17d005a847de357b051948a281f775173d88a47ea2c2ec9ad5e87c8af0eee994"
-blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
+content_hash: "sha256:778c11d52019bf51d616c6a8dd8d252bc6f8ee4681ef2496b5f0f90b0198e0e6"
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 assignee: dev-MAC-p7jd
+closed_at: 2026-09-06T07:47:13Z
+close_reason: "Accepted exact 39a498164fc6e09169ea5b33d470890d315f6a50: five AC independently reviewed; 349 fresh scoped leaves pass, frozen tests unchanged, complete same-candidate proof and stated final-epic limits retained."
 ---
 
 ## Description
@@ -2706,10 +2707,14 @@ status: in_progress
 - 2026-09-06T07:29:40Z status: open -> in_progress
 - 2026-09-06T07:29:40Z claimed by dev-MAC-p7jd
 - 2026-09-06T07:38:05Z status: in_progress -> in_progress
+- 2026-09-06T07:47:13Z status: in_progress -> closed
+- 2026-09-06T07:47:13Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-06T07:47:13Z dep_removed: no_longer_blocks MAC-gcrr
+- 2026-09-06T07:47:13Z dep_removed: no_longer_blocks MAC-ou97
+- 2026-09-06T07:47:13Z dep_removed: no_longer_blocks MAC-hgz1
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]], [[MAC-hgz1]]
 - Follows: [[MAC-p8ce]], [[MAC-2u36]], [[MAC-a89e]], [[MAC-olrx]]
 
 ## Comments
