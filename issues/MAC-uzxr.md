@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:49:41Z
-content_hash: "sha256:f93362167cd4314cf496bdeb54a40f10dcc1478e679bea70429cd7f890127a77"
+updated_at: 2026-09-06T04:09:46Z
+content_hash: "sha256:487173515fc5d946e011f94f37c8b9dbc0fafae348990bf7433fdf6c697349d3"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -122,6 +122,22 @@ All218 appendix tuple-to-RowID conversions independently reconciled as mechanica
 First fsm_test.go contents freeze at initial tdd-red. Any later additive same-file patch requires separate exact PM authorization before writing, TEST-EDIT AUTHORIZED record and [test-edit-authorized] commit marker, preserving every first-stage byte/assertion. None is granted for an unwritten future patch here. Independently review/freeze final combined RED before GREEN. Scaffold failures remain nonqualifying and original semantic RED stays replayable. Task missing-call/name-only mutation requires actual corrected candidate anchor and passing corrected control after GREEN; no synthetic fixed baseline proof before GREEN.
 
 Cost recommendation only, canonical unchanged by PM: 807 existing test lines;218 tuple replacement lines alone436 additions+deletions. Strict dual parser, closed witness builders and native mutation proofs justify SrPM forecast review. Approx decomposition1500-2150 changed LOC; recommend provisional1500-2200 across same8 paths or a concrete measured1250-1750 decomposition covering all AC. Clarify changed LOC vs net additions, preserve all proof, no extra paths/architecture. Initial5m runtime budget unchanged pending measurement.
+## nd_contract
+status: in_progress
+
+### evidence
+- Initial independent-authorized semantic RED committed998a5a3b3107292365c7c3e6ddb85c072c534145,parent70652b948. Only new internal/testoracle/fsm_test.go485additions0deletions;changedLOC485/net+485,SHA256d17a16229e9139d4f9c72e9d2f6fc04801d1b7f7246ac58ffbb092f04656d396. Old suites/production/design/modules unchanged; worktree clean. Authorization /tmp/MAC-uzxr-PM-scope-review.md a90e7be8958cbb692f4d7595889d67023733b4eb3c58878012bb2a9e41930202 fully read.
+- Real go test -count=1 -timeout=300s ./internal/testoracle -run ^TestFSMNativeOracleSensitivity$ -json from impl: actual exit1;3 enclosing leaves FAIL exactly unsafe native variant was accepted. Full User controls/mutants20leaves each for2cases,Session60each=>200 native PASS0FAIL0SKIP across6children,all child exit0. No compile/API/setup/timeout outcome credited. Toolchain go1.27.1darwin/arm64,final command wall4.756s including verify.
+- Raw final /tmp/MAC-uzxr-initial-red-frozen.jsonl SHA256dfbfc3a81e32d75463646dc82db5a825e74f37b38ae3d3942491372517d13c94. Complete raw children/input manifests/exact mutations/command-exit-duration JSON retained /tmp/MAC-uzxr-initial-red-native-proof. Detailed review handoff /tmp/MAC-uzxr-initial-red-checkpoint.md. Native original all5+2terminal supplements baseline225PASS0FAIL0SKIP,exit0,wall0.930s; /tmp/MAC-uzxr-original-baseline.jsonl SHA256b7bfa3f43ae9c7db0a3cbbca262381a226d2735954e3832da38662d5ec4a21c3.
+- Initial Session anchor matched twice and failed setup; that attempt excluded from semantic proof. Exact fireAnonymous header anchor fixed before freeze, authorized one-line mutation unchanged. pvg verify skill flag spelling corrected to --format text --include-tests; final VERIFY1file0issues. gofmt/diff-check clean.
+- STOP for independent replay of initial commit; no story delivery/approve-red/GREEN or later shared amendments. Frozen initial file requires exact separate PM authorization for any additive later patch. Complete larger external amendment still outstanding; no claim it is ready. No remote/install/preflight/service/consumer writes; claim retained.
+
+### proof
+- [ ] AC #1: full parsed current rows and actual closed guard/event bindings pending.
+- [ ] AC #2: complete effects/context assertions and Task GREEN correction pending.
+- [ ] AC #3: initial3 semantic RED cases committed, independent replay and eventual correct rejection plus remaining variants pending.
+- [ ] AC #4: full candidate successful-execution inventory pending; native control names are not parser proof.
+- [ ] AC #5: focused corrected candidate proof and consumer handoff pending.
 
 ## nd_contract
 status: in_progress
