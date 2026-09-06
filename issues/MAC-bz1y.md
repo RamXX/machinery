@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:23:51Z
-content_hash: "sha256:1501ce46f3a25d4b9b5d0c5d0e713161ea214d787a55ec29a30d30999b0895a7"
+updated_at: 2026-09-06T09:48:04Z
+content_hash: "sha256:9b5d9e2ad2a9dc9078ffd64c65d7d1fb94f6e81cb4c18dfedf80994d66aaabab"
 blocked_by: [MAC-hpqp, MAC-6h0s, MAC-hy71]
 blocks: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-al5u, MAC-vx24, MAC-ou97]
 ---
@@ -186,3 +186,29 @@ status: new
 
 ### proof
 - [ ] All six current lane ACs plus preserved upstream exact-commit CI gate semantics remain required.
+
+### 2026-09-06T09:48:04Z ramirosalas
+ROUND-1 RULE 1 REQUIRED-ASSET INVENTORY CONSUMER
+All six existing lane ACs and the sequential CI ownership remain required. Each of the four adapter producers now unambiguously owns its bounded executable asset directory and embedding/wiring in its corresponding production adapter file, not only a README.
+DOWNSTREAM FRAGMENT OBLIGATIONS (not new upstream dependencies):
+- MAC-wi2u: internal/tdd/adapters/assets/go
+  source: exact independently reviewed pre-RED helper/assertion transport inventory embedded by its go.go adapter.
+- MAC-avfp: internal/tdd/adapters/assets/typescript
+  source: exact independently reviewed pre-RED helper/bootstrap/reporter inventory embedded by its typescript.go adapter.
+- MAC-imtz: internal/tdd/adapters/assets/python
+  source: exact independently reviewed pre-RED assertion/bootstrap/result transport inventory embedded by its python.go adapter.
+- MAC-8yai: internal/tdd/adapters/assets/elixir
+  source: exact independently reviewed pre-RED helper/bootstrap/formatter inventory embedded by its elixir.go adapter.
+These are downstream producer obligations validated by the existing closed catalog when their fragments arrive; no dependency from this prerequisite catalog back to the adapters is added. Final union acceptance must account for actual asset hashes/materialization and native execution, not README existence or undiscovered files. Missing/unembedded/substituted/unused asset fails. Preserve schema/runtime caps and original frozen pilot; schema/store/budget references mean approved section4.
+
+## nd_contract
+status: new
+
+### evidence
+- Independent round1 findings repaired through supported append-only scope/consumer notes; no architecture/source/test/ref/runtime mutation.
+- Exact source surfaces verified against accepted epic7e36f3e7ddcf25565d5d4fe60b328df254eee91d; prior Body/status/labels/history preserved.
+- Independent Anchor ROUND2 and canonical-document acceptance remain prerequisites, not implementation evidence.
+
+### proof
+- [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
+- [ ] Independent review/native execution/final acceptance pending.
