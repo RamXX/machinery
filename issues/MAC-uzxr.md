@@ -4,7 +4,7 @@ title: "Bind Go CRM FSM conformance to committed oracle expectations"
 status: closed
 priority: 0
 type: bug
-labels: [hard-tdd, red-approved, delivered, accepted]
+labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
