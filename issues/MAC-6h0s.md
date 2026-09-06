@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:22:34Z
-content_hash: "sha256:78d3a80fb1b0c3378883ec7daf3e02d1a8e186116374e42f603100b89a993d27"
+updated_at: 2026-09-06T09:48:06Z
+content_hash: "sha256:362676f2ba11fe3ad04f4a5a8c43c2234c4cab240a5fc66c69c5eea48729eaa9"
 blocked_by: [MAC-qlw2]
 blocks: [MAC-p9z1, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-vx24, MAC-ou97]
 ---
@@ -167,3 +167,19 @@ status: new
 
 ### proof
 - [ ] All current story ACs remain pending without weakening.
+
+### 2026-09-06T09:48:06Z ramirosalas
+ROUND-1 ADVISORY: AUTHORITATIVE SECTION REFERENCE CORRECTION
+All current ownership, exact APIs/fields/limits and ACs are unchanged. Earlier references calling the closed schema/store/budget/registration material section3 or sections2-3 are superseded: these definitions are in section4 of the exact approved docs/test-assurance-contract.md projection SHA25622b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8. Section2 is component dependency direction; section3 is authoritative obligations/activation; section7 is the public internal API; section8 is custody. Preserve correct obligation/activation references to section3. This corrects cross-reference navigation only, not normative semantics or any historical evidence.
+
+## nd_contract
+status: new
+
+### evidence
+- Independent round1 findings repaired through supported append-only scope/consumer notes; no architecture/source/test/ref/runtime mutation.
+- Exact source surfaces verified against accepted epic7e36f3e7ddcf25565d5d4fe60b328df254eee91d; prior Body/status/labels/history preserved.
+- Independent Anchor ROUND2 and canonical-document acceptance remain prerequisites, not implementation evidence.
+
+### proof
+- [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
+- [ ] Independent review/native execution/final acceptance pending.
