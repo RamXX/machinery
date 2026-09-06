@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:45:56Z
-content_hash: "sha256:419e6a79ba74b88032f1ff75b7d02b86cae009f84dea2f9b3e0ae227ec0d5370"
+updated_at: 2026-09-06T12:55:30Z
+content_hash: "sha256:a162d5e9892dabd6bbfa949a7c3e1c57173e937643e8fd73fece035bf4caf550"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -906,7 +906,7 @@ CONSUMES:
   schema: exact accepted endpoint/runtime/contributor/observation/unresolved-create/live-first/current-migration contract at SHA256 bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a.
 - MAC-p9wm: docs/test-assurance-contract.md
   source: exact accepted contributor-lane, cumulative-budget, formal/nested-process and historical migration obligations at SHA256 171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d.
-- Existing source: scripts/shellcheck-files.txt
+- (Existing source): scripts/shellcheck-files.txt
   source: READ-ONLY closed executable-shell inventory used for mandatory validation; preserve its bytes exactly. If an actual later registry edit is necessary, stop for separate scope/budget investigation rather than silently creating a seventeenth write path.
 
 CURRENT PROSPECTIVE ACCEPTANCE / MIGRATION
@@ -937,4 +937,32 @@ status: in_progress
 - [x] Historical frozen bytes/evidence and one-way dependency chain are preserved.
 - [ ] Exact before-edit inventory, staged actual-role selection, authorized test-edit markers and new RED approval remain pending.
 - [ ] All 96 current mappings plus new custody leaves on the same Linux amd64/Darwin arm64 candidate remain pending.
+
+### 2026-09-06T12:55:30Z ramirosalas
+PARSER ANNOTATION / EDITOR-NEWLINE RECOVERY AUDIT — 2026-09-06
+
+This true-EOF audit records a formatting-only correction to the newly authored custody-scope amendment. It changes no ownership, acceptance criterion, test authority, status, label, dependency, evidence claim or product semantics.
+
+The first comment-add attempt was made from the external draft directory and failed before vault resolution (`could not find local .vault`); no story mutation occurred. After the corrected four scope comments were added from the pinned repository CWD, scoped lint correctly exposed one parser error: the new hpqp line `- Existing source: scripts/shellcheck-files.txt` was treated as an issue reference. A later supported `pvg nd edit MAC-hpqp` used a guarded apply_patch editor to add only `(` and `)` around `Existing source`. The editor deliberately returned exit 69 because apply_patch also removed the then-terminal LF: it observed one corrected target, zero malformed targets, +1 net byte rather than +2, and a normalized whole-file mismatch. No retry or alternative editor mutation occurred.
+
+Exact recovery evidence before this audit append:
+- Frozen failed-lint Body: 110,437 bytes, SHA256 `419e6a79ba74b88032f1ff75b7d02b86cae009f84dea2f9b3e0ae227ec0d5370`.
+- Intended stream after inserting only the two parentheses and retaining the LF: 110,439 bytes, SHA256 `432d34f86573148e3a1f9ed911c8ad40acbcb74874d8131866aa4ecd0af6fc68`.
+- Actual post-editor stream before this append: 110,438 bytes, SHA256 `5f498bd4f80202a76a16e430f600d24be97d4dd0509d88f78e0b988275654ff1`.
+- Exact comparison proved `actual post-editor Body + one LF == intended stream`; there was no other byte difference. The ordinary nd comment framing supplies that missing LF as its first appended byte, after which this audit begins.
+- Frozen external evidence: `/tmp/MAC-custody-canonical.iVvkhI/failed-current-body.md` mode 0444 / SHA256 `419e6a79ba74b88032f1ff75b7d02b86cae009f84dea2f9b3e0ae227ec0d5370`; `/tmp/MAC-custody-canonical.iVvkhI/failed-scoped-lint.json` mode 0444 / SHA256 `6108fe2788a7c2a7b68d458a6beb77022d9ddfc57002f71875a3da01c927a429`; guarded editor SHA256 `28374fa86b093af8e40966534e290e5988f73f7c5f3d2d235240230107906701`.
+
+The authoritative parser-safe line is exactly `- (Existing source): scripts/shellcheck-files.txt` with its existing indented `source:` signature. Parentheses are the documented non-issue annotation. A new later CONSUMES entry could not override the malformed historical entry because the linter accumulates and checks every historical entry; therefore the two-character annotation had to repair this newly authored occurrence in place. `scripts/shellcheck-files.txt` remains byte-identical READ-ONLY input, never a seventeenth hpqp write path. The current exact scope remains 13 held changed paths plus 3 approved new paths = 16 WRITE paths.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Formatting recovery only; original story history and the complete new scope amendment remain preserved.
+- No product source/test/ref/worktree/runtime/native/preflight/remote/install mutation or evidence claim occurred.
+
+### proof
+- [x] Parser-safe existing-source annotation records the same read-only shell inventory semantics.
+- [x] The failed wrong-CWD command, lint error and guarded editor exit 69 remain explicit history.
+- [ ] Exact before-edit inventory/roles/authorization, new RED, implementation and Linux amd64/Darwin arm64 current replay remain pending.
 
