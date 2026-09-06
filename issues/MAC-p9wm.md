@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
 updated_at: 2026-09-06T12:31:39Z
-content_hash: "sha256:e3e7436904c211526cb43067b88718713a055c3e4d9bdab6c1d624a06f80f8d5"
+content_hash: "sha256:6dc2465b87e9cb6d4d6d9aa951ad0b82bd15aa3f83794e0c8015f802cc99b9ee"
 related: [MAC-l7m0]
 assignee: dev-MAC-p9wm
 follows: [MAC-l7m0, MAC-uzxr]
@@ -326,6 +326,18 @@ status: new
 
 
 ## Notes
+
+
+## nd_contract
+status: accepted
+
+### evidence
+- PM closeout applied via pvg story accept on 2026-09-06.
+
+### proof
+- [x] Story closed after accepted label was applied.
+
+
 ## Implementation Evidence
 
 PROOF:
