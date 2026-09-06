@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:36:56Z
-content_hash: "sha256:3d3cb362bf1c5281045f4a8ed83ca9df7d96bb3c8d474372052230fbf5dac9aa"
+updated_at: 2026-09-06T09:54:20Z
+content_hash: "sha256:f5cfe52b4de7196b4f30cd3c97b9a8d9ed69d6c0f1ed662f53624a519fff1171"
 ---
 
 ## Description
@@ -416,4 +416,156 @@ status: in_progress
 - [x] Mechanical lint/RTM/cycle results and exact source-backed integration gaps recorded honestly.
 - [ ] Independent assurance backlog approval: REJECTED pending the two bounded general-rule repairs.
 - [ ] Implementation/native two-platform proof/final preflight/isolated candidate remain pending.
+
+
+### 2026-09-06T09:54:20Z ramirosalas
+## Assurance backlog ROUND1 general-rule repair — sealed handoff for independent ROUND2
+
+This is an append-only Sr PM repair report, not approval, delivery, test execution evidence, or dispatch authorization. Architecture and user scope are unchanged. Root's explicit independent-review hold remains authoritative for l7 and every new assurance slice.
+
+### Review basis and exact source verification
+
+- Entire independent ROUND1 review read: /tmp/machinery-assurance-anchor-r1.Xehbyn/REVIEW.md, SHA256 ce2fdf7a20b2bf32ad6189553e0559ef0c6af75a4bab38f37de2f566f23a5a63. Its two critical findings were generalized across all 19 new stories and affected existing consumers; its non-blocking section-navigation advisory was also repaired.
+- Pre-repair review handoff: epic Body SHA256 3d3cb362bf1c5281045f4a8ed83ca9df7d96bb3c8d474372052230fbf5dac9aa at nd/backlog aa958077fa5e796869df32fed6c31973b050cc06. No historical review text was replaced.
+- Read-only source verified against accepted epic 7e36f3e7ddcf25565d5d4fe60b328df254eee91d. Verify-tier graph generation 2026-09-06T08:09:26Z was ready; direct callers/callees traced for openFormalJava, runAlloy and VerifyFormalTo. Relevant coverage was metadata_match; scripts/shellcheck-files.txt had not_tracked coverage and was read directly. Coverage metadata is not a completeness theorem.
+- Actual normal path includes cmd/machinery/stubs.go:newVerifyFormalCmd -> formal.VerifyFormalTo -> TLC and Alloy, shared openFormalJava -> runBoundedProcess. Existing openFormalJava uses its own Background timeout; Alloy separately uses Background after Environment. Thus process.go, alloy.go AND the narrow stubs.go command context handoff are explicitly owned by cn7q. Compatibility wrappers may remain; the scoped normal path must never silently fall through an unscoped wrapper.
+- Actual existing repository contract suite is cmd/machinery/repository_contract_test.go; no root-level file exists. Current vx24 scope withdraws the historical wrong path without deleting its historical bytes.
+- Read actual full ShellCheck inventory and inventory validator; both new al5u scripts require exact persistent corpus entries. Read actual Gv inventory-first/current-content checks in internal/gates/attest.go and current CLI generator in cmd/machinery/attest.go; full-root subject additions yield GV_SCOPE_INVENTORY and later modifications yield GV_STALE_CONTENT. No new exclusion or weakened judgment is permitted.
+
+### General rule 1: every real executable path has an owner and consumer
+
+cn7q now has a complete 11-file scoped custody/formal/CLI map with both TLC and Alloy, their shared probe, explicit context/scope after every environment sanitization, and real native two-platform integration. hpqp consumes the exact reviewed supplemental process/JVM/probe/command case inventory in custody.json while its seven frozen 96-case pilot files and all prior proof remain unchanged. This is a prospective supplemental inventory requirement, not invention or retroactive acceptance of future test IDs.
+
+Each of the four adapter stories explicitly owns its language-specific executable asset directory under internal/tdd/adapters/assets, bounded to eight executable/config files plus README; existing adapter source owns embedding, materialization, byte validation and transport. Every exact filename/role/entrypoint/import and planned test is independently inventoried before RED; README alone is not a helper. Production adapter -> replay/complete must execute the actual embedded helper. Missing, altered, unembedded, extra or unused assets fail; frozen byte closure includes their real support/config inputs. Maximum 15 actual files and 2100 lines per adapter is a review boundary, not permission to expand silently.
+
+al5u owns scripts/shellcheck-files.txt in its complete current output map and must prove both scripts are actually linted with omission/duplicate/phantom/ordering/missing-script negative controls. It consumes the existing corpus rather than inserting nonexistent future paths earlier. vx24 owns the actual cmd package regression suite and must retain/run existing regressions under its reviewed RED amendment rules. bz1y records downstream asset-inventory obligations without a reverse dependency; final lane union must account for actual production helper execution, not README presence.
+
+### General rule 2: changes to a current assured subject require new substantive judgment
+
+MAC-5ft8 now explicitly owns examples/go-crm/design/attestations.yaml and cmd/machinery/go_crm_assurance_migration_test.go alongside its existing strict migration outputs. Its complete ten-AC revision preserves all legacy regressions, full implementation/test inventory, prior histories, and the preceding lhu5 -> hgz1 -> lnu6 ordering.
+
+All new authored tests, controls, helpers, config and immutable variant references must be final before the independent judgment and execution they support. The real current Gv path must reject retained pre-migration records after root additions. A substantive independent review then examines the entire changed current subject, assertion adequacy and actual runtime/legacy evidence; only after that may the existing standalone CLI generate exact v2 current records for affected claims with real attribution and dates. Hash generation is not judgment or authenticated identity. Historical rows and unaffected evidence remain intact. Current-after normal Gv/strict complete must succeed, while old-record reinsertion, missing judgment or subsequent subject mutation must fail.
+
+The authored migration driver supplies stale-before/current-after negative controls; it does not mutate the canonical repository during acceptance. No automatic reviewer/date, hash-only refresh, newly excluded test/helper path, downgraded claim, historical/current relabeling or implementation-only narrower root is authorized. Later actual golden/fixture changes require separately reviewed exact ownership and renewed substantive judgment. al5u, vx24 and final ou97 explicitly consume this current full-root assurance; they receive no authority to manufacture it or edit later fixtures. These obligations do not authorize rewriting hgz1/lnu6 protected scope, evidence or frozen tests.
+
+### Complete 19-story sweep
+
+| Story | Generalized rule disposition |
+|---|---|
+| MAC-qlw2 | Custody scope, limits and deadline producer retained; schema/store/budget navigation corrected to section 4; no persistent GoCRM subject edits. |
+| MAC-cn7q | Complete owned real call graph now includes formal/process.go openFormalJava, formal/alloy.go runAlloy and cmd/machinery/stubs.go newVerifyFormalCmd; context/scope after sanitation and both JVM branches explicitly tested. |
+| MAC-6h0s | Closed manifest/inventory/topology producer retained; section 4 navigation corrected; no adapter/helper or GoCRM ownership assumed. |
+| MAC-p9z1 | External store/capture/CAS producer retained; section 4 navigation corrected; captures do not confer judgment or execution proof. |
+| MAC-62s6 | Explicit registration/head-CAS producer retained; section 4 navigation corrected; no implicit initial PASS or hash-only attestation. |
+| MAC-bz1y | Existing closed integration lane/catalog producer retained; exact executable adapter-asset inventories are downstream producer obligations, verified by final union without a reverse dependency. |
+| MAC-wi2u | Go adapter owns assets/go directory, executable support, embedding/materialization/byte binding and transport in go.go; exact bounded asset/file inventory reviewed before RED. |
+| MAC-avfp | TypeScript adapter owns assets/typescript directory, executable support, embedding/materialization/byte binding and transport in typescript.go; exact bounded inventory reviewed before RED. |
+| MAC-imtz | Python adapter owns assets/python directory, executable support, embedding/materialization/byte binding and transport in python.go; exact bounded inventory reviewed before RED. |
+| MAC-8yai | Elixir adapter owns assets/elixir directory, executable support, embedding/materialization/byte binding and transport in elixir.go; exact bounded inventory reviewed before RED. |
+| MAC-pe9v | Scoped ordinary-Git runtime closure and replayed materialization ownership retained; consumes corrected custody/formal producer rather than creating hidden helper authority. |
+| MAC-sd7g | Closed native check executor ownership retained; all four real executable adapters remain required producers, no generic output-regex substitute. |
+| MAC-sqpt | Retained-source RED/control/challenge/GREEN replay and cumulative budget ownership retained; adapters supply executable assets, receipts do not replace execution. |
+| MAC-wbxq | Gt/Gd freshness and scoped Ga gate ownership retained; current implementation versus historical milestone distinction unchanged; no Gv exclusion introduced. |
+| MAC-rau8 | Assurance finalization/release/publication ownership retained; real native call graph and cumulative owner/milestone deadlines remain mandatory; no early publish/launch shortcut. |
+| MAC-u4oo | Standalone normal CLI/check/complete/hook integration ownership retained; root context reaches actual producers; no Paivot runtime/build/test dependence. |
+| MAC-5ft8 | Owns prospective strict GoCRM subjects, exact current attestations.yaml and new bounded real-CLI migration driver; all authored controls precede substantive independent full-root judgment and execution; stale-before/current-after/invalidated-after controls required. |
+| MAC-al5u | Owns exact sorted ShellCheck corpus for both new scripts, plus example lane/CI/preflight wiring; consumes 5ft8's current substantive judgment, keeps one complete GoCRM and seven design-only examples. |
+| MAC-1u2v | Standalone true-first-use and two-platform capstone retained; consumes completed example migration through existing ordering, no prior PASS receipt or private tracker prerequisites. |
+
+Affected existing consumers repaired: hpqp supplemental execution inventory; vx24 complete real-file integration and current-assurance consumption; ou97 final real-path/current-judgment closure. l7, hy71, hgz1 and lnu6 Bodies/statuses/labels/dependency arrays remain exactly unchanged by this round. sh60 has no successor, cancellation, exception or dependency transfer. Protected Y received no Sr PM mutation this round; a concurrent actor appended supplemental RED evidence, recorded separately below rather than being overwritten.
+
+Section-reference-only notes in qlw2, 6h0s, p9z1 and 62s6 correct schema/store/registration/budget citations to section 4. Section 3 still correctly governs obligations/activation. No normative schema/API/argv/status/limit or approved public projection changed.
+
+### Exact mutation audit
+
+Exactly 15 child operations were supported pvg nd comments add; each actual full Body was read back, original Body preserved as exact prefix, and submitted text verified at true EOF with only nd's observed extra terminal newline. All 15 prior statuses, labels, BlockedBy and Blocks arrays were verified unchanged. No dependency operation, guarded editor, status/label/claim mutation or original-byte modification occurred. Historical path text did not need editing because scoped lint has no errors.
+
+| Story | Body SHA256 before | Body SHA256 after |
+|---|---|---|
+| MAC-cn7q | 228426f8b40e4a6c86f5b6a8a50f9c629e6b3b204d24f079e7b7b995f1ee401c | cbb959ca1a5a75f0d13b30272568c66f102d752fa748d80bf8741760cc0bd0ca |
+| MAC-al5u | e37d285c0bb763ac999343055b2e8f37637698390aee309c2d555022502cfc64 | f5581cc389f1660f1a31770d13c18aac3feb973f3a67ee5dbc4d070ec252679c |
+| MAC-vx24 | ffdfc505e82a4538cf7d7f3db9f4636b2793dfcf67b603b0f8e96eb371072d45 | c2a5711dfc651e9a95dfaa8c6e5a9b78d2bc8b97acd5fe9e54ea261fe0fd6179 |
+| MAC-wi2u | aa6e3d4c52c06ee2c829de8a7a9bd21325d85ab40070074f4353204188b1c7e4 | c7be0c62a9f24ad96290d46cd4f6a9e472ed96b8f984d4e6ee5ceebc00a14cb9 |
+| MAC-avfp | 687a2844e30e53cbec2c3d39f83c539b6a256c58e7eb154a448aadf5c4c848fa | 48b9cd47a3512c4eee8da38b9b655c193a51001af8d5d1a4bc778fcbcbe5a8b6 |
+| MAC-imtz | 4d3a1221d7d221b36b6ef617aff40bac813568b91f6e9f6ba8c01f8aee56d952 | 2612ac65099577d73467d9a59c9440e56c235f687449d0bed288fcd661830b75 |
+| MAC-8yai | 410f643e0491f4732eb6a847de7697e6023d332c01cd2bbfd73ddac4bcfe6fdc | 706977331aa519bed965eea14fa11d3d72e8abd49dc7ac4e9c789e858ff1dea7 |
+| MAC-5ft8 | 8a69f7c31d614e4de24e4e892794c6c3ad57097d7d7cc2deb27789879fff4dcb | 86d60c6279716347f7c022a7353108aceedcd8ef90cec0c0e16749f13b66fa16 |
+| MAC-hpqp | b7e1dd533905e6c7353e224ef7bdd9a819a8b4922e7ca2e37051d52d4b7102e7 | a50938351e48f3c3c513765999e2df87c7e3c9adb7286af61991815f7b79574c |
+| MAC-bz1y | 1501ce46f3a25d4b9b5d0c5d0e713161ea214d787a55ec29a30d30999b0895a7 | 9b5d9e2ad2a9dc9078ffd64c65d7d1fb94f6e81cb4c18dfedf80994d66aaabab |
+| MAC-ou97 | 72c7746412e413506afa5755c785825a98b0da5961fee99366f31bf228147994 | a946be6cc705da9843c8060965ce9a6708114d29c6930ea15b639d5bdd713274 |
+| MAC-qlw2 | 0a1658cc39ef26aeda75639188b5c3bf90339d7956bbe113d419819278201746 | a2f58a0d549beb3cd50bd1b7069026f1d996477d12acbdd4e41d456e291e9850 |
+| MAC-6h0s | 78d3a80fb1b0c3378883ec7daf3e02d1a8e186116374e42f603100b89a993d27 | 362676f2ba11fe3ad04f4a5a8c43c2234c4cab240a5fc66c69c5eea48729eaa9 |
+| MAC-p9z1 | a5f9cfd947d2b6df42e08ec1a8938a1987cd2a59b3a008014cde30ccb4e894bc | fe89f7b48df3d56b8b1dd93f04632ae1c69017d8933ad6752274bf83becc1998 |
+| MAC-62s6 | 116169252a0219056e6141ba9e5843799000825b666a1172d2b50997defd1140 | 22e96e7e11727b13ab2f74af098ee2a7e954be43f3b21f5fc62f807a4a1a3b65 |
+
+Other observed current Body hashes:
+- MAC-pe9v: 866dbb90980867238a342a6cc98c7eb7a69a8a71dfe89d50c09bf4d99de696ff; unchanged.
+- MAC-sd7g: 95e34e0698cd91f8a946df7c3fc7cc558a23f284039d302c60ee0f8766daf3d0; unchanged.
+- MAC-sqpt: 5712d13f4c469adb0121ef572d33e5da9669b67fec38b1bc7518cc166130c40c; unchanged.
+- MAC-wbxq: c00ffb101f70bd3d90026a301f9e1f637bf11bec81c4a68cc9af8f47f45d53f7; unchanged.
+- MAC-rau8: dd97b19e34759b01aad55f6069cfacb2d587aa0655533767ed497f8920f316b9; unchanged.
+- MAC-u4oo: 3bfe4c020a91e20ea912d80a677403b1610fd9a34cba3e0fc4e8bb972c93df1f; unchanged.
+- MAC-1u2v: 381a2a7d57c21e318d06ac0ad121482bde02e1fc03ef27cb69710ca701cb5077; unchanged.
+- MAC-l7m0: bcc47cfd554e9a4d1ccb25d5765584f69d15406aed8bf41303e1941efb2b8e5a; unchanged.
+- MAC-hy71: c21ba10377ffbd0f538cb3a21625ce62483ece19bc31fbff2062e998eca7e428; unchanged.
+- MAC-hgz1: 2a323bafd5f50877286b79ea45243945c109ad9e7dcfcd59933a22dab9c5e82e; unchanged.
+- MAC-lnu6: 9a49a8007a2e86bdf9c55fd01392e7844df56e109c8f70a176ddedb90c35f0ee; unchanged.
+- MAC-yig6: 2db0a7f18ca4e3f3da1fcee8e5d7addb10771984bcdd9224ce6f040d920a46df; concurrently changed by another actor; no mutation by Sr PM.
+
+Y's concurrent current Body ends in supplemental RED commit ac439c517de169addb68637c50040a9434bc8cca evidence; this report makes no independent acceptance claim for that work. Its concurrent change is not part of these 15 mutations.
+
+### Existing dependency DAG retained — zero new edges
+
+- MAC-qlw2 depends on: MAC-l7m0.
+- MAC-cn7q depends on: MAC-qlw2.
+- MAC-6h0s depends on: MAC-qlw2.
+- MAC-p9z1 depends on: MAC-6h0s.
+- MAC-62s6 depends on: MAC-p9z1.
+- MAC-bz1y depends on: MAC-hpqp, MAC-6h0s, MAC-hy71.
+- MAC-wi2u depends on: MAC-bz1y, MAC-6h0s.
+- MAC-avfp depends on: MAC-bz1y, MAC-6h0s.
+- MAC-imtz depends on: MAC-bz1y, MAC-6h0s.
+- MAC-8yai depends on: MAC-bz1y, MAC-6h0s.
+- MAC-pe9v depends on: MAC-cn7q, MAC-bz1y.
+- MAC-sd7g depends on: MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v.
+- MAC-sqpt depends on: MAC-62s6, MAC-sd7g.
+- MAC-wbxq depends on: MAC-p9z1, MAC-pe9v, MAC-lnu6.
+- MAC-rau8 depends on: MAC-sqpt, MAC-wbxq.
+- MAC-u4oo depends on: MAC-rau8, MAC-62s6, MAC-2n83.
+- MAC-5ft8 depends on: MAC-u4oo.
+- MAC-al5u depends on: MAC-5ft8, MAC-bz1y.
+- MAC-1u2v depends on: MAC-al5u, MAC-u4oo.
+- MAC-l7m0 depends on: (none; explicit review hold still applies).
+- MAC-hpqp depends on: MAC-cn7q.
+- MAC-hy71 depends on: MAC-hpqp.
+- MAC-hgz1 depends on: MAC-lhu5.
+- MAC-lnu6 depends on: MAC-hgz1.
+- MAC-vx24 depends on: MAC-l7m0, MAC-sh60, MAC-2n83, MAC-lnu6, MAC-hpqp, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v.
+- MAC-ou97 depends on: MAC-hlae, MAC-sh60, MAC-yhg5, MAC-hwdb, MAC-2n83, MAC-hy71, MAC-gcrr, MAC-l7m0, MAC-vx24, MAC-lnu6, MAC-hpqp, MAC-yig6, MAC-lhu5, MAC-hgz1, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v.
+
+The full graph has no cycles. Already-sufficient producer/consumer ordering is retained, including hgz1 -> lnu6 -> vx24 and hpqp -> hy71 -> bz1y serialization. All 19 required deliveries remain blockers of vx24 and ou97; final capstone is not bypassed.
+
+### Scoped mechanical checks and limits
+
+- pvg lint --backlog --epic MAC-ui8a --json: exit 0. Output is a JSON ARRAY, not an object. Exactly ten review-only vertical-slice observable-verb heuristics for 5ft8, 8yai, avfp, bz1y, imtz, qlw2, rau8, sd7g, sqpt and wi2u; zero errors. These are the same non-blocking heuristics identified by independent ROUND1, not claimed semantic approval.
+- pvg rtm check: exit 0; zero extracted/covered/uncovered tagged requirements, 56 global stories checked, 21 closed. Empty tagged extraction is not evidence of full semantic coverage; the explicit rule sweep above is the review artifact.
+- pvg nd dep cycles: exit 0, No dependency cycles found.
+- git status --porcelain: empty. HEAD remains 497419ab4512fcff765cd5feb27aed4c67b5608d; accepted epic remains 7e36f3e7ddcf25565d5d4fe60b328df254eee91d. No source/test edits, worktree/ref/remote changes, services, installations, heavy preflight, source builds or runtime execution were performed.
+- Read-only diagnostics were honestly corrected: graph index_status first needed the documented project argument; a prior-turn missing in-memory map was reconstructed from canonical live notes; one large raw nd show exceeded output size and was rerun through a compact exact Body-hash/prefix verifier. None caused partial tracker mutations or a claim of successful truncated inspection.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Both independent ROUND1 general rules and the section-navigation advisory repaired by 15 append-only child notes; all current child scope/AC contracts validated at actual EOF.
+- Full 19-story rule sweep, unchanged dependency DAG, exact before/after hashes and protected-state distinctions recorded above.
+- Scoped lint exits 0 with zero errors; RTM and dependency-cycle checks exit 0, with their limits stated.
+- No normal developer dispatch, implementation acceptance, native proof, heavy preflight, installation replacement or remote publication claimed.
+
+### proof
+- [x] Every missing actual integration surface has bounded producer ownership and required consumer accounting.
+- [x] GoCRM post-change substantive current judgment, stale/current controls and evidence refresh have an explicit owner and ordering.
+- [x] Prior histories/frozen contracts preserved; no dependency, status, label or claim changes by this repair.
+- [ ] Independent assurance backlog ROUND2 approval remains required.
+- [ ] Actual implementation, native two-platform proof, final integrated preflight and isolated local candidate remain pending.
 
