@@ -258,6 +258,19 @@ func (f ppFacts) safe() bool {
 		f.Admission == admissionWhole
 }
 
+// wsPattern builds a whitespace-flexible pattern: spaces in the source pattern match
+// any run of whitespace (packet prose wraps lines), so obligations are recognized
+// regardless of line wrapping.
+func wsPattern(src string) *regexp.Regexp {
+	parts := strings.Split(src, " ")
+	for i, part := range parts {
+		parts[i] = regexp.QuoteMeta(part)
+	}
+	joined := strings.Join(parts, `\s+`)
+	// pipes in the source pattern mean top-level alternation, never a literal "|"
+	return regexp.MustCompile(strings.ReplaceAll(joined, `\|`, `|`))
+}
+
 // --- live M3 packet recognizer: pattern obligations in packet prose -------------
 
 var m3Patterns = []struct {
@@ -265,37 +278,37 @@ var m3Patterns = []struct {
 	pattern  *regexp.Regexp
 	ordinary func(*ppFacts) error
 }{
-	{"objective", regexp.MustCompile(`MINIMUM exact historical maximum drawdown|minimizes exact historical maximum drawdown|chooses the least exact historical maximum drawdown`),
+	{"objective", wsPattern("MINIMUM exact historical maximum drawdown|minimizes exact historical maximum drawdown|chooses the least exact historical maximum drawdown"),
 		func(f *ppFacts) error { return ppAssign(&f.Direction, dirMin, dirUnset, "objective") }},
-	{"objective-max", regexp.MustCompile(`maximizes exact historical maximum drawdown|MAXIMUM exact historical maximum drawdown`),
+	{"objective-max", wsPattern("maximizes exact historical maximum drawdown|MAXIMUM exact historical maximum drawdown"),
 		func(f *ppFacts) error { return ppAssign(&f.Direction, dirMax, dirUnset, "objective") }},
-	{"value", regexp.MustCompile(`value rule is\s+normalized buy-and-hold|normalized buy-and-hold quantities`),
+	{"value", wsPattern("value rule is normalized buy-and-hold|normalized buy-and-hold quantities"),
 		func(f *ppFacts) error { return ppAssign(&f.Value, valueBuyHold, valueUnset, "value") }},
-	{"value-raw", regexp.MustCompile(`weight raw prices without per-asset initial normalization`),
+	{"value-raw", wsPattern("weight raw prices without per-asset initial normalization"),
 		func(f *ppFacts) error { return ppAssign(&f.Value, valueRaw, valueUnset, "value") }},
-	{"value-rebalanced", regexp.MustCompile(`rebalance to the initial weights`),
+	{"value-rebalanced", wsPattern("rebalance to the initial weights"),
 		func(f *ppFacts) error { return ppAssign(&f.Value, valueRebalanced, valueUnset, "value") }},
-	{"comparison", regexp.MustCompile(`(?i)compares exact rational drawdowns? before`),
+	{"comparison", regexp.MustCompile(`(?i)compares\s+exact\s+rational\s+drawdowns?\s+before`),
 		func(f *ppFacts) error { return ppAssign(&f.Compare, compareExact, compareUnset, "comparison") }},
-	{"comparison-rounded", regexp.MustCompile(`(?i)compares stored rounded basis-point drawdown`),
+	{"comparison-rounded", regexp.MustCompile(`(?i)compares\s+stored\s+rounded\s+basis-point\s+drawdown`),
 		func(f *ppFacts) error { return ppAssign(&f.Compare, compareRounded, compareUnset, "comparison") }},
-	{"tie", regexp.MustCompile(`ascending ASCII ticker vector, then the (whole )?weight vector`),
+	{"tie", wsPattern("ascending ASCII ticker vector, then the whole weight vector|ascending ASCII ticker vector, then the weight vector"),
 		func(f *ppFacts) error { return ppAssign(&f.Tie, tieVectors, tieUnset, "tie") }},
-	{"tie-interleaved", regexp.MustCompile(`alternately compare each ticker and its weight`),
+	{"tie-interleaved", wsPattern("alternately compare each ticker and its weight"),
 		func(f *ppFacts) error { return ppAssign(&f.Tie, tieInterleaved, tieUnset, "tie") }},
-	{"admission", regexp.MustCompile(`Admission is whole-input|whole candidate universe is rejected when any candidate history is invalid`),
+	{"admission", wsPattern("Admission is whole-input|whole candidate universe is rejected when any candidate history is invalid"),
 		func(f *ppFacts) error { return ppAssign(&f.Admission, admissionWhole, admissionUnset, "admission") }},
-	{"admission-filter", regexp.MustCompile(`Invalid candidate histories are filtered before proposal selection`),
+	{"admission-filter", wsPattern("Invalid candidate histories are filtered before proposal selection"),
 		func(f *ppFacts) error { return ppAssign(&f.Admission, admissionFilter, admissionUnset, "admission") }},
-	{"holdings", regexp.MustCompile(`exactly 16 (Holding records|unique candidates)`),
+	{"holdings", wsPattern("exactly 16 Holding records|exactly 16 unique candidates"),
 		func(f *ppFacts) error { f.Holdings = true; return nil }},
-	{"calendar", regexp.MustCompile(`strictly increasing (distinct real Gregorian dates|Gregorian YYYY-MM-DD observation dates) common to every candidate`),
+	{"calendar", regexp.MustCompile(`strictly\s+increasing\s+(distinct\s+real\s+Gregorian\s+dates|Gregorian\s+YYYY-MM-DD\s+observation\s+dates)`),
 		func(f *ppFacts) error { f.Calendar = true; return nil }},
-	{"prices", regexp.MustCompile(`Prices are (strictly )?positive finite exact decimal strings`),
+	{"prices", wsPattern("Prices are strictly positive finite exact decimal strings|Prices are positive finite exact decimal strings"),
 		func(f *ppFacts) error { f.Prices = true; return nil }},
 	{"limits", regexp.MustCompile(`maxCandidates\s*(at least|>=)\s*16`),
 		func(f *ppFacts) error { f.Limits = true; return nil }},
-	{"original-refusals", regexp.MustCompile(`use the declared ticker ordering\s+as the total deterministic tie-break; reject missing, non-finite, or insufficient histories`),
+	{"original-refusals", wsPattern("use the declared ticker ordering as the total deterministic tie-break; reject missing, non-finite, or insufficient histories"),
 		func(f *ppFacts) error { f.OriginalRefusals = true; return nil }},
 }
 
