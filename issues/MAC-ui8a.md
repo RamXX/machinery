@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:06:32Z
-content_hash: "sha256:59c723586447f5fc365324271d4aa5fafeac7d213f4c2da7d2d4a705bf2b9cb0"
+updated_at: 2026-09-06T10:35:03Z
+content_hash: "sha256:e6d1d5bbd6e5f4a55d822aa5074e12234dadda9bc6fc1b2d51e99294c24d5574"
 ---
 
 ## Description
@@ -691,4 +691,29 @@ status: in_progress
 - [x] Frozen original proof, legacy regressions, existing failed audit and serial ownership remain protected.
 - [ ] Canonical document landing, implementation, native proof and final integrated epic preflight remain pending.
 
+
+
+### 2026-09-06T10:35:03Z ramirosalas
+LOCAL INTEGRATION CHECKPOINT — 2026-09-06
+
+MAC-l7m0 independently accepted documentation-only at candidate 0feaebf725267f9d0045d653ef57a90af0c9d946 and merged locally with --no-ff to epic/MAC-ui8a a94e768adf461178e0562ad135c7c06d8163a3a4. Exact public document SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8 retained after merge; aggregate doc diff whitespace check and candidate ancestry pass. Main remains 497419ab4512fcff765cd5feb27aed4c67b5608d and root checkout stayed on main. Root-owned integration checkout .claude/worktrees/integrate-MAC-ui8a holds epic for subsequent local accepted-gated merges. Clean accepted story checkout removed and merged story branch deleted; its commit remains reachable from epic. No remote operation or preflight/install occurred.
+
+Current accepted/merged count: 7 of 40 children. Independent review /tmp/machinery-assurance-pm.pYsE8w/REVIEW.md SHA256 b7c57fcb51d64b332c1baef0b8d9d2f986968042b58e9dc233de1f9865a1cc8d; completion SHA256 1fbfbaca291222927f6f7d3551b64e0748612140b4b46f863a0a847ea5b460cd. Documentation approval does not establish native custody, adapters, replay or release completeness.
+
+MAC-yig6 candidate ef505052dc73cb9032dd91f1a3f99837f76204a8 contains only exact authorized helper+44 amendment, original246/supplemental147 RED hashes unchanged. Native Darwin paired selected runs each have24 test/subtest PASS plus1package PASS (11top-level tests), original paired runs1test plus1package; no skip/fail. Previous package-as-test miscount corrected append-only. Full report /tmp/machinery-yig6-green.hZtIWT/REPORT.md SHA256 8ecba89eb785887bfe8c4d5f145740bac01f8c04145fef6bd5fc9d80ce15e8c6. Mandatory same-revision native Linux amd64 proof remains absent/unwaived; story retained healthy in_progress, not delivered or accepted.
+
+Portfolio policy V3 approved; bounded21-path lhu5 and existing hgz1 substantive12-row consumer scope repaired append-only, lnu6 unchanged. Independent exact scope/source/method/fixture review remains before any source/RED edits. External proposal writer /root/portfolio_exact_proposal_terra is working without source/tracker mutation. MAC-qlw2 selected by pvg loop next as freshRED, atomically claimed and worktree created at epic a94e768; /root/qlw2_red_inventory_terra is limited to pre-RED exact inventory/method proposal, no source/stub/tests authored before independent review. Minimum compilable contracts/stubs are permitted by developer skill only after that review; compile/setup failures are not RED evidence.
+
+Pending user input: native Linux amd64 host/runner or approved provisioning; compliant MAC-sh60 successor proposal approval. Old sh60 failed audit remains intact, no exception/cancellation/successor/transfer performed. Installed Machinery and Dagger remain protected. Full preflight is still final integrated gate only.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Seven accepted local story merges; main/installed/remote state unchanged.
+- Current child actors and exact candidates/holds recorded above; no global recovery/setup/sync.
+
+### proof
+- [x] Accepted standalone contract has exact local canonical landing and independent positive/negative review.
+- [ ] Remaining implementation, actual native Linux proof, independent acceptance and final integrated preflight/local release remain pending.
 
