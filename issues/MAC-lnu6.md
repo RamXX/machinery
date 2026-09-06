@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:31:41Z
-content_hash: "sha256:561712ee3a493d15813ead3351ce9e87bd92ecfd57db9f986c947ff4786a9198"
+updated_at: 2026-09-06T02:38:11Z
+content_hash: "sha256:e6548f768b9e8018ff001d1a1d750cbc052b795965e03f87d809b89193d6a293"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
@@ -36,21 +36,37 @@ Nine guidance surfaces, restricted to unsafe frozen-test authorization and its r
 - examples/go-crm/design/BUILD.md
 - examples/portfolio-engine/design/BUILD.md
 - examples/surreal-crm/design/BUILD.md
-Six conditional evidence paths, restricted to covers hashes whose exact subject path is BUILD.md:
+Six conditional evidence paths: only the fourteen records explicitly listed below may amend attestor/date/note and the exact BUILD.md cover hash, and only after independent substantive review and exact PM authorization:
 - examples/checkout-split/orders/design/attestations.yaml
 - examples/checkout-split/payments/design/attestations.yaml
 - examples/fulfillment/design/attestations.yaml
 - examples/go-crm/design/attestations.yaml
 - examples/portfolio-engine/design/attestations.yaml
 - examples/surreal-crm/design/attestations.yaml
-Canonical ownership is NOT independent PM authorization to amend frozen fixtures or evidence. Before those writes, the reviewer must explicitly authorize the exact affected guidance/evidence amendment. Refresh only the actual reviewed BUILD subject hashes AFTER independent review of each prose delta; preserve every other subject/hash, claim, schema, attestor/date/note, acceptance and historical fact. Hash recomputation does not fabricate a new review or execution; no blanket rehash or renewed acceptance. Record the reviewer decision and exact old/new BUILD hashes.
+Canonical ownership is NOT independent PM authorization to amend guidance, frozen fixtures or evidence. All nine guidance and six evidence writes remain held. This bounded current-review scope supersedes the earlier hash-only boundary ONLY as a conditional scope extension, not an actual re-attestation or grant to write.
+
+## Conditional current-review amendment boundary
+The fully read proposal is /tmp/MAC-lnu6-proposal.NZsERt/REVIEW.md SHA256 48889c0b61afae030244dcd90f394515a183f9e90d9126dffe0602ffbe31b21f; exact nine prose deltas are guidance-deltas.json SHA256 d21d80e66e18356110be1a4c1753adebf6a3440846c8286b3664da945deac011; full old records/subject hashes are subject-inventory.json SHA256 e08121e72aa07e230276a1e1227f761a4d7b193c52af1f5be22e5f43dfc9c0e5 in the same directory. Exact committed-source comparison at 713184db16a12b8c3763b4aa8f5bf025721abf22 matched all nine old/proposed prose hashes and all six current attestation-file hashes. The proposal remains pending, not approved prose/evidence.
+Exactly fourteen affected records in the six owned attestation paths:
+- examples/checkout-split/orders/design/attestations.yaml: gt.conformance-test-shape, g4.zero-context, g4.standin-coverage (3).
+- examples/checkout-split/payments/design/attestations.yaml: gt.conformance-test-shape, g4.zero-context, g4.standin-coverage (3).
+- examples/fulfillment/design/attestations.yaml: gt.conformance-test-shape, g4.zero-context (2).
+- examples/go-crm/design/attestations.yaml: gt.conformance-test-shape, g4.zero-context (2).
+- examples/portfolio-engine/design/attestations.yaml: gt.conformance-test-shape, g4.zero-context (2).
+- examples/surreal-crm/design/attestations.yaml: gt.conformance-test-shape, g4.zero-context (2).
+All fourteen records carry historical reviewer/date attribution; mechanically rebinding new policy bytes to those old reviews is not authorized.
+Before any write, independent PM must substantively review the nine exact prose deltas AND every affected claim against its FULL current covers set, then explicitly authorize the exact guidance/evidence edits, actual new reviewer identity/date and verified claim-specific note. Do not prefill an attestor or date, imply review is complete, or infer evidence permission from prose approval. Where applicable, inspect/replay the relevant evidence needed to support the claim; narrow CLI wording tests and Gv only establish their bounded outcomes.
+Only those fourteen records may change attestor, date, note (including adding a note if originally absent), and the hash of their existing BUILD.md cover. Preserve claim IDs, schema/attestation_version, record order, covers membership/order, every non-BUILD subject/hash, all other records, acceptance files and git history. No broader claim renewal, schema/archive/duplicate-claim mechanism or new evidence file.
+The actual reviewer/date must identify the actual new independent review. A reviewer-approved note must distinguish the specific current verified finding from history and explicitly disclaim renewed implementation acceptance or implementation replay not performed. Preserve exact old attestor/date/BUILD hash and original note verbatim (or explicitly absent) inline, identifying immutable RED 0ea1fdc730aadac15cecc8de33bb95898ad91d60. Full old records remain intact in that commit and the hashed subject inventory. This replacement/provenance representation itself requires PM confirmation of truthfulness; if insufficient, keep evidence held and return the exact alternative for explicit review, rather than inventing an archive or duplicate record.
+For portfolio-engine, BOTH records cover BUILD.md plus BUILD/M0-walking-skeleton.md, M1-run-pipeline.md, M2-feed-breaker.md, M3-optimizer.md, M4-portfolio-review.md and M5-reference-operations.md: all seven subjects must support each new review, with the six packet hashes unchanged. Go CRM's gt note asserts that real Go tests key executable table cases on every stable oracle ID and assert next state plus ordered actions; a prose-only/Gv check cannot establish that execution-related claim. No automatic carry-forward of historical implementation acceptance.
+If any complete claim or provenance representation cannot be truthfully supported in this scope, report the exact missing verification and keep evidence held; do not hide stale evidence, narrow the claim to obtain green, or deliver incomplete GREEN. This scope preparation changes no product protocol and grants no test/assertion/golden changes. Existing independently approved RED and its review bar remain intact.
 
 ## Boundary Map
 PRODUCES:
 - cmd/machinery/tokensequal.go -> honest whitespace-token CLI; equality is not semantic equivalence or frozen-edit permission.
 - cmd/machinery/tokensequal_semantics_test.go -> real binary semantic-risk and utility controls plus all-nine-surface policy coverage.
 - Nine explicitly owned guidance files -> no formatting/token-identity exception; frozen identity is exact bytes plus inventory, amendments require explicit new evidence revision and replay.
-- Six explicitly owned attestations.yaml files -> only independently reviewed changed BUILD subject hashes, preserving all other evidence.
+- Six explicitly owned attestations.yaml files -> conditional truthful current-review amendment of exactly fourteen named records (attestor/date/note + existing BUILD hash only), after substantive independent authorization and preserved provenance; no current amendment claimed.
 CONSUMES:
 - newTokensEqualCmd() *cobra.Command; tokensEqualRunTo(oldPath, newPath string, stdoutW, stderrW io.Writer) error; strings.Fields and existing stable-file custody in cmd/machinery/tokensequal.go. Do not add a language parser to the product.
   source: cmd/machinery/tokensequal.go at epic 6cb2d974, functions newTokensEqualCmd and tokensEqualRunTo.
@@ -74,7 +90,7 @@ Hard TDD: author only the new owned test file for RED; no existing test/golden/h
 - Positive genuine whitespace-only controls retain exit 0 and the token-identical: N tokens prefix; token-value/count differences retain exit 1 and NOT token-identical diagnostics; ordinary read failure remains exit 1. Preserve existing real mutation/custody tests and all old bytes, including oracle_test.go and golden_test.go.
 - Table-driven contract tests read ALL nine actual shipped guidance paths (missing paths fail, no skips). Each baseline case must fail because its actual unsafe authorization remains; GREEN requires affirmative exact-byte/inventory identity and explicit new evidence revision plus replay, and absence of token-identity/formatting exemptions. Include the agent, brownfield guide and six example BUILD files, not only the template. Record the tracked-source policy scan and review any remaining hits rather than hiding them with an overbroad filter.
 - Keep semantic-risk negatives separate from passing utility controls: token equality remains useful, but never authorizes a frozen edit. No false RED from a missing future API, unknown CLI flag or missing fixture.
-- After independently authorized BUILD/evidence edits, run the actual built CLI check <design-dir> --gate gv for all six owned example design directories with isolated config. Show changed BUILD is stale before its exact authorized hash refresh and that afterward no stale/invalid attestation is introduced; record baseline and final outcomes. Inspect the evidence diff to prove all non-BUILD fields/hashes and acceptance/history unchanged. Preserve existing golden bytes and rerun affected real example check tests; any pre-existing unrelated failure must be attributed explicitly, not concealed by evidence rewriting.
+- After independently authorized BUILD/evidence edits, run the actual built CLI check <design-dir> --gate gv for all six owned example design directories with isolated config. Show changed BUILD is stale before its exact authorized evidence amendment and that afterward no stale/invalid attestation is introduced; record all six baseline, six stale-before-amendment and six final outcomes. Inspect the exact evidence diff to prove only the fourteen approved attestor/date/note/BUILD-hash deltas, exact inline provenance, unchanged claim IDs/schema/covers membership/order, all non-BUILD hashes/other records and acceptance/history. Six actual baselines at 713184d already passed (reported structural evidence, not substantive review); stale and final stages remain pending. Preserve existing golden bytes and rerun affected real example check tests; any pre-existing unrelated failure must be attributed explicitly, not concealed by evidence rewriting.
 - Focused command: go test -count=1 ./cmd/machinery -run 'TokensEqual|Frozen' -json
 - Compatibility command: go test -count=1 ./cmd/machinery -run 'TestGoldenCheck' -json
 Runtime classification: service-free Go/native filesystem/local CLI only; no Docker, Python, Java or Node requirement and no Paivot product dependency. Record exact selected leaves, baseline/GREEN SHAs, terminal counts, duration and raw logs. No skip-if-missing, full preflight, remote mutations or installed binary replacement.
@@ -82,12 +98,12 @@ Runtime classification: service-free Go/native filesystem/local CLI only; no Doc
 ## OUT OF SCOPE
 - Full language parser or semantic equivalence proof.
 - Replay protocol implementation (MAC-vx24); no weakening or delayed removal of current policy.
-- Shared helper rewrites, existing test/golden edits, wholesale BUILD rewrites, arbitrary attestation rehash, new claims/acceptance/history, generated oracle changes or unrelated guidance changes.
+- Shared helper rewrites, existing test/golden edits, wholesale BUILD rewrites, arbitrary attestation rehash, new claim IDs/renewed implementation acceptance/history rewriting or evidence changes outside the fourteen-record conditional boundary, generated oracle changes or unrelated guidance changes.
 
 ## DIFF BUDGET
 - Revised forecast: 17 files, approximately 500 changed LOC combined, superseding the original 3 files/under 300 forecast because AC1 spans nine shipped surfaces and six adjacent evidence files.
-- Approximate allocation: CLI 20-50; new tests 250-330; nine narrow guidance edits 60-100; six narrow evidence deltas 20-40. Report actual additions/deletions, files and runtime; this is an estimate, not automatic permission to exceed scope or trim proof. Escalate material growth with evidence.
-- One native CLI build plus bounded real CLI calls and six Gv checks; actual runtime remains to be measured.
+- Updated measured/proposed allocation: frozen RED + CLI + nine proposed prose deltas total 337 changed lines before evidence; the prose alone is +57/-31 (88). Fourteen provenance-preserving current-review amendments forecast 60-100 evidence changed LOC rather than the old 20-40 hash-only allocation, for approximately 397-437 combined, retaining the approximately 500 forecast and 17 paths. Report actual additions/deletions, files and runtime; this is an estimate, not automatic permission to exceed scope or trim proof. Escalate material growth with evidence.
+- Preserve real CLI, all six baseline/stale/final Gv stages and unchanged-golden compatibility. Substantive full-claim review cost is additional and must be reported; the existing partial 26-leaf CLI focus and six baselines are not evidence that this pending review or final compatibility completed.
 
 ## MANDATORY SKILLS
 - developer; codebase-memory; pm_acceptor.
