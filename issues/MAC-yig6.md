@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T18:23:51Z
-content_hash: "sha256:63fcdc7c67428919fe5a27336efb81737e7706d19b901a7d8299513722d24790"
+updated_at: 2026-09-06T18:24:05Z
+content_hash: "sha256:9bec208c94d842d228bc3b7f382b5176aa934b87e30485d2f6c45a2421de18c4"
 blocks: [MAC-ou97]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-uzxr, MAC-p9wm]
 assignee: dev-MAC-yig6
@@ -871,3 +871,33 @@ status: in_progress
 
 ### 2026-09-06T17:17:25Z ramirosalas
 USER-REQUESTED HANDOFF 2026-09-06: verification worker /root/yig6_linux_verification completed safe pause, not delivery. Exact candidate ef505052dc73cb9032dd91f1a3f99837f76204a8 unchanged. Native Linux x86_64 Go1.27.1 cold compile and selected-native command passed; root independently counts24testactions20leaves4parents,1packagepass,0fail/skip,exit0,empty stderr, JSONSHA2d350e259d49969906149442d6160d0fd53288279dcedd7f8e2655302f2a3d01. Top-level selected-covered and both dedicated original commands NOT RUN; full Linux matrix/PM acceptance remain pending. Local /tmp/machinery-MAC-yig6-linux.hTo7li/HANDOFF.md SHAcbf401b319e3958868cfff21a70b111033b94519d29f5b5811c8cb5f74a5a6ad and ADDENDUM.md SHAc176335ab99c631d60e763abe97b42ccbe11f20dd2208cee1235662930111c44 fully read by root. All30file manifest verified; fresh exact-archive vs source-after manifests equal8d9de65d1fac3ffeb37480f86d2aac402b2d3a2c4a2f4f9ddde11d1cd2c441a6. Initialofflinecachefailure and missingbaselinecmp exit2 retained, not testfailures/successes. Worker removed verified owned remote /tmp/machinery-MAC-yig6-PoNHCY and task-created /root/.config/go/telemetry then empty /root/.config/go; preexisting .config preserved but parentmtime/ctimechanged. No activecommand/ownedprocess; unrelatedcontainersuntouched. Futureprovisioning must isolate/verify effective Go configuration and telemetry paths before Go commands, not assume portable toolchain alone suffices; worker recommendsGOENV=off GOTELEMETRY=off, verify actualeffect and keep writable config under ownedroot. Preserve healthyclaim; no globalrecover/delivery/acceptance/source/ref/install/preflight/push. Root initial counter script syntax and wrongcwd manifest checks failed diagnostically, correctedchecks passedwithoutbytechanges.
+
+### 2026-09-06T18:24:05Z ramirosalas
+DELIVERY EVIDENCE — 2026-09-06 (coordinator-recorded on behalf of verification worker; no code changes in this step)
+
+CANDIDATE: ef505052dc73cb9032dd91f1a3f99837f76204a8 on story/MAC-yig6 (range 70652b9..ef50505, 3 commits, clean recorded TDD audit). Aggregate authorized change: four paths, +528/-12.
+
+FROZEN IDENTITIES (verified at candidate):
+- cmd/machinery/checker_fixture_coverage_test.go 246 lines SHA256 80b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677
+- cmd/machinery/checker_fixture_helper_red_test.go 147 lines SHA256 ea67a87453e92d0f3e056ffa15367a0ad85cb6592cb6ce826bfd83ff84e93fcd
+- cmd/machinery/checker_fixture_helper_build_test.go 44 lines SHA256 6274d5685e6804912780761cafbbfb8f370d8f2863430f65f399720a960575ef
+- verify_checkers_test.go helper amendment +91/-12 committed with [test-edit-authorized]
+
+DARWIN (arm64, Go 1.27.1) — /tmp/machinery-yig6-green.hZtIWT/REPORT.md SHA256 8ecba89eb785887bfe8c4d5f145740bac01f8c04145fef6bd5fc9d80ce15e8c6: selected native/covered 24 test actions + 1 package pass each; dedicated original native/covered 1+1 each; zero fail/skip; real profiles parsed incl. executed production statements; correct/wrong-digest/wrong-platform/extra-data reach intended distinct results.
+
+LINUX (fresh coherent full 4-command rerun; Linux 6.8.0-138-generic x86_64, Go 1.27.1 linux/amd64 portable toolchain, GOMAXPROCS=2, fully owned root, GOENV=off GOTELEMETRY=off) — /tmp/machinery-MAC-yig6-linux-rerun.eo7i1c/REPORT.md SHA256 889ed42681cebed6d36e50dfbfc5632df63e81ba6518acb58375597f2105b11b, all evidence files verify against evidence-files.sha256:
+- selected-native: exit 0, 13s, 24 pass (20 leaves + 4 parents), 0 fail, 0 skip, 1 package pass, empty stderr
+- selected-covered: exit 0, 12s, same 24/0/0 + 1 package; top-level profile valid via go tool cover -func: 574/4,015 statements executed (14.3%), verify_checkers.go 555 executed, 2,541 blocks; nested child profile independently logged identical stats
+- dedicated-native: exit 0, 1 test + 1 package pass
+- dedicated-covered: exit 0, 1+1; profile 564/4,015 (14.0%), verify_checkers.go 545
+- Protocol: children stdout 131/131/131 bytes + extra-data 153, stderr 0; correct identity accepted; wrong-digest / wrong-platform / trailing-data diagnoses each reached distinctly in both selected runs
+- Source invariance: before/after manifests identical (SHA256 4dcea568..., 965 files); all input hashes verified local+remote; cold compile 23s exit 0
+- Cleanup: owned root removed+verified absent; no owned processes; 15 unrelated containers untouched
+
+ANOMALIES (preserved truthfully): (D2) GOTELEMETRY=off did not suppress local telemetry counters; residue snapshotted into evidence, removed, pre-run absence restored. (D1) first inventory cmp quoting slip, re-ran clean. (D3) top-level selected stats coincidentally equal prior nested stats.
+
+RETAINED PRIOR EVIDENCE: /tmp/machinery-MAC-yig6-linux.hTo7li (HANDOFF cbf401b3..., ADDENDUM c176335a...) and archive .git/machinery-evidence-20260906.TEFZ7D/yig6-linux-partial-handoff.tar.gz d3ebf7a8dfd65fd2442573d9cce5cc2eb92af5e3d9cc36f4396251457c7f7c3a with preserved setup failures.
+
+OPEN FOR PM ADJUDICATION: retained static finding verify_checkers_test.go:1595 [stub] 'return empty string' — legitimate no-match return vs stub-pattern; PM must read actual source. Diff budget: 3 new test files + authorized amendment = 528 added vs forecast 2 files/250-400 LOC — material overrun reporting per budget rule, controls not trimmed.
+
+No source/test/git/tracker/installed-asset changes during verification. Awaiting independent PM acceptance.
