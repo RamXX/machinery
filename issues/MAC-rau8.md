@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:22:40Z
-content_hash: "sha256:3e1435627dc1e057bf13dad4123741bb30384840946606d1e3969cdfcff9cdad"
+updated_at: 2026-09-06T09:22:41Z
+content_hash: "sha256:dd97b19e34759b01aad55f6069cfacb2d587aa0655533767ed497f8920f316b9"
 blocked_by: [MAC-sqpt, MAC-wbxq]
 blocks: [MAC-u4oo, MAC-vx24, MAC-ou97]
 ---
@@ -155,3 +155,22 @@ status: new
 - [ ] AC #6: current story acceptance requirement remains pending.
 - [ ] AC #7: current story acceptance requirement remains pending.
 - [ ] AC #8: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:22:41Z ramirosalas
+SCHEMA MARKER INSERTION AUDIT 2026-09-06
+Root-authorized supported nd edit inserted ONLY 1 valid indented schema signature line(s) into the newly authored canonical CONSUMES block. Every original byte/contract/status/evidence/history was preserved; no deletion/replacement. This repairs the mechanical label substitution, not the contract values.
+Before raw Body SHA256: fceebb37d60aeb2daf038124d5816203cc0f6bd3a9a0bda55ffaf9ca300631b1
+After insertion-only raw Body SHA256 (before this audit comment): 3e1435627dc1e057bf13dad4123741bb30384840946606d1e3969cdfcff9cdad
+Exact inserted lines (zero-based original Body line positions shown):
+- after Body line 119: "  schema: exact registered external head and immutable run-object publication, no execution head advance."
+Read-back pvg nd show Body exactly equals prior Body plus these insertions. Editor required expected hash, count, exact target and 13-entry total; installed pvg source revision c0957106a81346033d7b1d82fde5f434a9db6bab confirms scanner checks every historical entry.
+
+## nd_contract
+status: new
+
+### evidence
+- Signature syntax corrected via supported guarded editor; exact before/after evidence above.
+- No implementation/native proof; independent Anchor and canonical document holds remain.
+
+### proof
+- [ ] All current story ACs remain pending without weakening.
