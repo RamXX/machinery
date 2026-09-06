@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:38:47Z
-content_hash: "sha256:5106121187989f62fb066abdf936bb3a129d2abdcf2d2d8751475f61e64bebae"
+updated_at: 2026-09-06T02:53:50Z
+content_hash: "sha256:79d713154ad255a7e5570cd9c871a4d49f3a5d0c43a98564ea589921e12d0f75"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
@@ -853,3 +853,232 @@ status: in_progress
 - [ ] AC #5: actual standalone CLI and all nine real guidance cases execute without skips; full shipped contract, post-amendment Gv and unchanged-golden compatibility remain pending.
 
 
+
+### 2026-09-06T02:53:50Z ramirosalas
+# MAC-lnu6 independent amendment review
+
+Reviewer: Codex independent PM reviewer, agent /root/pm_lnu6_red.
+Review date: 2026-09-06 UTC (2026-09-05 America/Los_Angeles).
+Review source: 713184db16a12b8c3763b4aa8f5bf025721abf22.
+Immutable RED: 0ea1fdc730aadac15cecc8de33bb95898ad91d60.
+
+## Decision
+
+AUTHORIZE ONLY the nine exact old/new guidance replacements in
+`/tmp/MAC-lnu6-proposal.NZsERt/guidance-deltas.json`, SHA256
+`d21d80e66e18356110be1a4c1753adebf6a3440846c8286b3664da945deac011`.
+This authorizes those precise prose edits, +57/-31, with every other byte
+preserved. No source, guidance, evidence or test was changed during this review.
+
+HOLD ALL evidence amendments. No new attestor/date/note or BUILD cover hash is
+authorized in any of the fourteen records. Complete current conformance claims
+cannot be truthfully established from the present evidence. Some other claims
+have positive design-review support, enumerated below; this does not authorize
+partial evidence writes or certify the unsupported claims.
+
+The story remains in_progress, hard-tdd/red-approved, claimed by dev-MAC-lnu6.
+This is neither a GREEN review nor a deliver/accept/reject transition. The
+independent RED approval remains intact. No test-edit authorization is granted.
+
+## Exact authorized prose and provenance
+
+Read all 319 lines of REVIEW.md, all guidance-deltas.json, and all
+subject-inventory.json. Their SHA256 values independently match:
+
+- REVIEW.md: 48889c0b61afae030244dcd90f394515a183f9e90d9126dffe0602ffbe31b21f.
+- subject-inventory.json: e08121e72aa07e230276a1e1227f761a4d7b193c52af1f5be22e5f43dfc9c0e5.
+
+Reviewed the nine replacements in their surrounding hard-TDD/adjudication
+protocols, the full six covered BUILD documents, and all six portfolio packets.
+For Surreal CRM, complete Go CRM source plus the complete zero-context diff
+between the two documents established the unchanged text and every difference.
+The replacements require exact bytes AND file inventory, explicit owner
+authorization, a new evidence revision, RED plus all applicable gate replay,
+and an immutable original revision. They remove the existing formatting/token
+exception without allowing an implementer to edit tests to pass. Brownfield's
+adjudication remains required; its new replay paragraph does not waive it.
+The retained pre-lock “no legal remedy” language is a prohibition on editing the
+locked revision, read with the new explicit new-revision process, not a surviving
+token exception. No additional prose correction is authorized or required for
+this particular formatting-exemption change.
+
+Each old block occurs exactly once. Replacements computed in memory from the
+independent checkout yield these exact prospective full-file hashes:
+
+| Guidance path | Old SHA256 | Authorized proposed SHA256 |
+|---|---|---|
+| skills/machinery/references/build-md-template.md | 3de68ee2e0fccd5167b218d957095b7d45be5f6cfbad99efc3214923f74ce144 | bd00c17071f39b6956b9e0f9468349726c033606818db69c7c4034379262c6e6 |
+| agents/machinery-build-writer.md | dede53d1088ee90d853bdca15d4dadcf92858eb134b7116a63708810ee973674 | 23bb84add3d714bc8d794c9246bd45c12b54d5055c05361966884b9ea2d9114e |
+| docs/brownfield-team-guide.md | b70193e00f2767856d6e444c24901dd88b91398a0db44c4fac267c5fff0ff176 | ffca5be6bfe2d6debf114740ef299f8a636a7612cd34f3f95f19db43e35cb298 |
+| examples/checkout-split/orders/design/BUILD.md | 04822dd9ab8e3e3386a99082f3bd720cd43d5830fea27c614cfaddd70442fb5a | 9cbed7b78871a1a4632867a63849d126177888abc89282dae36efa4e490fbd06 |
+| examples/checkout-split/payments/design/BUILD.md | 5fc797d0edafbed7fe24d7429f55f6b257613737a557b13e2e420d4fbf861869 | 04f3980416e75e0bf185f349ad088118e45ee64221248ce85339609cc147eb47 |
+| examples/fulfillment/design/BUILD.md | 24a8fd8a71a7504a6bd614520ee6ca5c6b72a0bd4386d2439c59042d91853baf | 3a2a2b9649c6a0d39e114c3b3236f589be618bf50a71ce039a9e2304f75cf61f |
+| examples/go-crm/design/BUILD.md | c58124cf07f7f8cdf8f4e99b2cb484aec5d4ca110543e25b2ed0711863d44c1d | 4555d4da472129153a6650c48ac9b760fad7583fff5867516a0c1d69bc249ac4 |
+| examples/portfolio-engine/design/BUILD.md | 2c1240dfd86c84c253cf4da5b08cd0f6c04d62c8cf29ea6267ea2f2e636aa38a | abd0d3c8a23fbefaa945128ad2ce763f08c8835443cb09847332da27f06c2178 |
+| examples/surreal-crm/design/BUILD.md | 426bf956676e9bcf47c7559339c1f5fb9467397f90c183a828cbca124a0d298e | 1fa87c359b95f5ca10a820ebbec932a81068c0dee6175ce34c1431d3c4743e52 |
+
+These are prose authorization hashes, NOT authorized attestation hash changes.
+All six current attestation-file hashes independently match subject-inventory.
+All six portfolio packet hashes match the complete covers lists in both records.
+
+The proposed inline provenance representation is capable of being truthful:
+the actual new reviewer/date and specific new judgment must be distinguished
+from a verbatim historical attestor/date/BUILD hash/note (or explicit absence),
+with the complete old record still available at immutable RED and in the hashed
+inventory. A new reviewer cannot merely repeat the old claim. This representation
+is not the blocker; missing support for current complete claims is. Therefore I
+do not authorize instantiating that representation for the fourteen records now.
+Do not prefill this report's reviewer/date as an attestor for a claim held below.
+
+## Complete fourteen-record claim review
+
+The current claim vocabulary at internal/gates/attest.go:151 describes
+gt.conformance-test-shape as: a wholesale test parses the committed oracle table
+and asserts each row's next state AND expected actions. The build-writer's
+attestation instruction repeats this. It is not merely a stable-ID citation
+claim, a future-plan claim, or proof supplied by Gv's hash checks.
+
+| Design / record | Full covers reviewed | Finding |
+|---|---|---|
+| orders / gt.conformance-test-shape | BUILD.md | Unsupported. Section 7 requires every stable row, but neither a wholesale committed-table parser nor next-state AND expected-action assertions. No implementation/test tree exists in this child. |
+| orders / g4.zero-context | BUILD.md | Positive design support: domain dictionary/invariants, command and event contracts, row-lock/outbox realization, failures, test obligations and ordered milestones are present. Conformance gap above remains a separate unresolved obligation; no renewed implementation acceptance. |
+| orders / g4.standin-coverage | BUILD.md | Positive design support: its single payments neighbor is covered by a named PaymentsContract stand-in, stable-row oracle obligations, duplicate/reordered delivery, and an isolated Postgres/NATS/stand-in/fixtures recipe. Referenced parent contract exists. No compose or stand-in runtime was executed. |
+| payments / gt.conformance-test-shape | BUILD.md | Unsupported for the same exact missing parser/next-state/action obligations as orders; no implementation/test tree exists. |
+| payments / g4.zero-context | BUILD.md | Positive design support: Payment dictionary, settlement/error contracts, row-lock/outbox realization, dedupe, failures and ordered milestones are present. No implementation or production acceptance claimed. |
+| payments / g4.standin-coverage | BUILD.md | Positive design support: its single orders neighbor is covered by an OrdersContract stand-in, stable-row oracle obligations and duplicate/reordering cases; isolated Postgres/NATS/stand-in/fixtures recipe is present. Parent contract exists. No runtime executed. |
+| fulfillment / gt.conformance-test-shape | BUILD.md | Its section 8 lines 231-234 explicitly requires a wholesale parser, target state and complete ordered actions for all rows. This supports a prospective design obligation. The example is explicitly design-only with no impl, so it cannot establish that the current test actually exists and performs the claim. No plan/current-claim narrowing authorized. |
+| fulfillment / g4.zero-context | BUILD.md | Positive design support: six machine/oracle/matrix sources, twenty-five-invariant traceability, concrete service milestones, ExUnit/OTP/Elixir and real-boundary requirements, migration and failure recovery are laid out. References supply full source detail as expressly declared by the handoff. No Elixir, service or TLC replay performed. |
+| go-crm / gt.conformance-test-shape | BUILD.md plus inspected current implementation | Unsupported as the complete current claim. All five handwritten FSM tables run and cover all 197 current stable IDs by executed name, asserting state and ordered action containment. They do not parse the committed FSM oracles and do not reject arbitrary extra actions. See actual replay and assertion analysis below. |
+| go-crm / g4.zero-context | BUILD.md | Source locations, dictionary, interface signatures/errors, five lifecycles, test obligations, migration, toolchain and milestone ordering are present. Caveat: the text mixes a prototype migration plan with a greenfield/no-production-data statement and has a stale x/crypto v0.53 pin while go.mod is v0.55 with the latter declared authoritative. These are existing clarification/drift concerns; this review does not certify complete zero-context correctness or renew its record while they remain unresolved. |
+| portfolio-engine / gt.conformance-test-shape | BUILD.md and all six M0-M5 packets | Unsupported as a current executable claim: no implementation exists. Even the prospective claim is incomplete: M4 says parse every row and assert ordered actions but omits explicit target-state assertion; M5 names twelve parsed rows and timeout/error recording but does not specify next state and complete ordered actions. Root return signatures describe implementation output, not the required assertion. M3 is intentionally a pure transform, so it needs properties, not an invented machine. |
+| portfolio-engine / g4.zero-context | BUILD.md and all six M0-M5 packets | Unsupported under the stated packet-alone claim. M3 does not state minimization of maximum drawdown, exact sum 10000 bps or a concrete numeric tolerance/representation; it instead refers to a chosen representation/domain tolerance. These facts live in the root or elsewhere. Other packets reference domain schema/ports without exact local forms. This review does not silently substitute root-plus-packet execution for the explicit independent packet-alone promise. |
+| surreal-crm / gt.conformance-test-shape | BUILD.md | Unsupported. Section 7 specifies stable-row derivation and policy/tenant decision parsers, but no wholesale FSM-table parser/assertions. The legacy Go CRM test reference does not close that gap; it is handwritten and accepts extra actions. This example has no target implementation. |
+| surreal-crm / g4.zero-context | BUILD.md | Positive design support: target repository interface, typed store/container failures, unchanged domain lifecycles, migration phases, contracts, toolchain, milestones and runbook/deferred command distinction are present. This does not establish runtime migration, container behavior or acceptance. |
+
+“Positive design support” records the substance found, not a narrowed claim or a
+current attestation authorization. The full fourteen-record request is held.
+
+## Go CRM runtime and assertion evidence
+
+PM-owned independent detached checkout:
+`/Users/ramirosalas/workspace/machinery/.claude/worktrees/pm-MAC-lnu6-amendment`.
+It remains clean at 713184d. Frozen RED and all existing tests are unchanged.
+
+Exact synchronous command, from that checkout's examples/go-crm/impl:
+
+```sh
+timeout 150s go test -count=1 -timeout=120s ./internal/domain ./internal/session ./internal/cli -run '^(TestDealTransitions|TestTaskTransitions|TestUserTransitions|TestSessionTransitions|TestCommandExecutionTransitions)$' -json
+```
+
+Terminal exit 0, wall 1.503486s. 218 executed leaves, 218 PASS, 0 FAIL, 0 SKIP:
+Deal 75, Task 35, User 20, Session 60, CommandExecution 28.
+Package durations: domain 0.590s; session 0.361s; cli 0.917s.
+Raw log preserves all test names:
+`/tmp/MAC-lnu6-pm-go-crm-transitions-713184d.jsonl`, SHA256
+`8a88436b9d6212a45eb422c4f4d609902679a15343ba796b1c72174aff03a662`.
+
+Independent text-set comparison of the five committed FSM oracle files to
+PASS subtest names found 197 distinct committed IDs and zero missing names.
+This is executed-name coverage, not parser linkage or independently recomputed
+assertion correctness. Compound guards account for additional cases. This run
+did not select terminal-exit supplements, authz/tenant, repository, end-to-end,
+full suite, coverage instrumentation or external services.
+
+Concrete assertions are in domain/deal_test.go:160-168, task_test.go:110-118,
+user_test.go:73-81, session/machine_test.go:153-161 and cli/command_test.go:118-126.
+They call the actual Fire methods and compare the resulting State.
+The domain firedInOrder at deal_test.go:213 and analogous session/CLI helpers
+test whether wanted actions are an ordered SUBSEQUENCE of actual actions.
+Thus actual [unexpected, commitStage] passes expected [commitStage], and every
+actual list passes an empty expected list. This conclusion follows directly
+from the reviewed loop; it is not a claimed mutant runtime run.
+
+The local comments expressly choose containment because state-entry actions
+are not in the transition-action column. Legitimate entry/exit actions must be
+accounted for using the committed machine/oracle semantics. That explanation
+does not establish a license for arbitrary additional effects or prove the
+complete expected action sequence. The claim vocabulary says expected actions;
+it does not expressly say exact-list equality. Therefore the definite claim
+failure is absent wholesale committed-table parsing. Action completeness is an
+additional unresolved semantic adequacy gap, not an invented quotation from
+the registry. The proposal/historical phrase “ordered actions” alone does not
+turn containment into exact equality.
+
+The only implementation oracle parsers found by bounded source search are
+authz/oracle_test.go and tenant_oracle_test.go for Policy and Isolation decision
+tables. They do not prove the five FSM tables. Earlier authz evidence on another
+Machinery revision was not used as proof here.
+
+## Scope-owner findings and minimum next proof
+
+DISCOVERED_BUG:
+  title: Existing BUILD conformance attestations overstate current FSM oracle linkage
+  discovered_during: MAC-lnu6 substantive amendment review
+  affected_claims: gt.conformance-test-shape in all six owned example attestations.yaml files
+  affected_files: six owned BUILD.md files; portfolio BUILD/M4-portfolio-review.md and M5-reference-operations.md; go-crm impl/internal/domain/deal_test.go, task_test.go, user_test.go, internal/session/machine_test.go, internal/cli/command_test.go; existing claim vocabulary internal/gates/attest.go
+  expected: a current wholesale conformance test parses committed oracle rows and checks next state and expected actions; a design obligation must not masquerade as existing executable proof
+  present: 218 native Go FSM leaves PASS with all 197 current IDs named, but handwritten inputs/expectations and ordered-subsequence action checks; five other examples have no implementation, with missing or incomplete prospective obligations except fulfillment
+  gap: ID presence and Gv hash currency do not bind expected state/actions to current committed tables; plan-only examples do not establish present test execution
+  minimum_proof: review the exact current claim semantics; for executable claims produce parser-backed row/guard/input/next-state/action reconciliation and complete executed row inventory, explicitly account for entry/exit actions and reject unexpected effects; for design-only claims a separately reviewed truthful plan/current distinction is needed before a current attestation can be represented
+  ownership_overlap: MAC-p7jd may address plan/current/historical semantics; concrete Go CRM/example test-shape and portfolio packet edits exceed this MAC-lnu6 wording-only boundary and require scope-owner triage; no dependency, future delivery or test edit is authorized by this report
+
+DISCOVERED_BUG:
+  title: Portfolio packet-alone zero-context claim lacks concrete optimizer obligation
+  discovered_during: MAC-lnu6 full portfolio covers review
+  affected_claims: portfolio-engine g4.zero-context
+  affected_files: examples/portfolio-engine/design/BUILD.md and BUILD/M3-optimizer.md (reviewed all M0-M5 packets)
+  expected: each milestone can be executed from its packet alone under the explicit root promise
+  present: M3 states selection/properties but omits minimum maximum-drawdown objective and exact 10000-bps allocation, referring to a chosen representation or domain tolerance
+  minimum_proof: explicitly review and supply the missing exact obligations within the packet or separately authorize a truthful root-plus-packet contract; review all packet subjects under the chosen semantics
+  ownership_overlap: example/packet scope-owner work outside the nine exact approved policy replacements; do not amend the packet or relabel the claim under MAC-lnu6 without canonical review
+
+No automatic backlog expansion, dependency, test repair, or future MAC-p7jd /
+MAC-vx24 assurance is inferred. The new policy is not the cause of these old
+claim deficiencies; it exposed the need to repeat their substantive judgments.
+
+## Cost, limits and next execution
+
+Review read the complete proposal and full covered BUILD/packet content,
+current registry and relevant current implementation assertions; one native
+218-leaf transition replay was performed. Graph discovery was attempted first;
+the graph returned the claim definitions but no matching narrowed implementation
+symbols. Coverage later reported generation 2026-09-06T02:42:16Z, metadata matches
+for material paths, excluded detached .claude worktree and unrelated partial
+formal config ranges. Exact source and tracked-file inventory supplied bounded
+negative evidence; no graph completeness claim or formal proof is made.
+
+The CLI-only 713184d diff was directly reviewed: comments/help/equality wording
+only, comparison/custody untouched. Its prior 26-leaf 17-pass/9-held-guidance-fail
+run and six baseline Gv passes are supporting historical stage evidence, not
+repeated or substituted for this review. No installed binary was used/replaced.
+
+Forecast remains 337 changed lines before evidence (229 RED, 20 CLI, 88 prose),
+17 paths if the evidence problem is subsequently resolved. No evidence-line
+forecast can be treated as an approved implementation now. The broader test or
+packet/claim corrections above need independent scope review and costing.
+
+After applying the authorized prose, capture all six actual stale Gv outcomes
+before any later authorized evidence amendment. Complete final Gv outcomes,
+focused unchanged RED GREEN, unchanged-golden TestGoldenCheck and final direct
+source/remaining-policy scan remain owed. Do not deliver incomplete GREEN or
+conceal the resulting stale evidence. Preserve all record IDs/schema/order,
+covers membership/order, non-BUILD hashes, other records, acceptance files and
+history. Main/epic, installed assets, user services and other worktrees were not
+modified. No process remains running.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent bounded amendment review completed at 713184db16a12b8c3763b4aa8f5bf025721abf22, immutable RED 0ea1fdc730aadac15cecc8de33bb95898ad91d60 unchanged.
+- Exactly nine prose replacements authorized by guidance-deltas SHA256 d21d80e66e18356110be1a4c1753adebf6a3440846c8286b3664da945deac011 and full-file hashes above; none applied during PM review.
+- All fourteen records reviewed against full covers, including all seven portfolio subjects. All six evidence files remain held; no attestor/date/note/BUILD-hash write authorization. Missing current wholesale FSM parsing and action-completeness proof, design-only/current-claim mismatch, and packet/context concerns recorded explicitly above.
+- Independent native Go CRM transition replay: 218 PASS, 0 FAIL, 0 SKIP; all 197 committed FSM IDs present in executed names; three package durations 0.590/0.361/0.917s, command wall1.503486s; raw log and SHA256 above. This is bounded transition proof, not wholesale parser or full implementation acceptance.
+- Detached PM checkout retained clean; source/tests/goldens/evidence/main/epic/installed assets/user services unchanged. No state transition, release, new dependency or backlog expansion; existing in_progress/hard-tdd/red-approved/dev-MAC-lnu6 claim preserved.
+
+### proof
+- [ ] AC #1: nine exact policy changes authorized; actual application and immutable-suite replay pending, evidence amendments held.
+- [ ] AC #2: CLI-only wording reviewed; authorized documentation still unapplied.
+- [ ] AC #3: existing executable semantic counterexamples remain frozen; actual shipped guidance replay pending.
+- [x] AC #4: prior recorded CLI utility/exit/custody controls remain unchanged; no comparison implementation change found.
+- [ ] AC #5: final all-nine contract, six stale and six final Gv outcomes, unchanged-golden TestGoldenCheck and GREEN PM acceptance remain owed.
