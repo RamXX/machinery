@@ -4,11 +4,11 @@ title: "Keep checker test fixtures protocol-correct under Go coverage"
 status: in_progress
 priority: 0
 type: bug
-labels: [hard-tdd, red-approved]
+labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T17:17:25Z
+updated_at: 2026-09-06T18:23:51Z
 content_hash: "sha256:63fcdc7c67428919fe5a27336efb81737e7706d19b901a7d8299513722d24790"
 blocks: [MAC-ou97]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-uzxr, MAC-p9wm]
