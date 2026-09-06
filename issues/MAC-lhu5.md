@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:24:20Z
-content_hash: "sha256:efc2d20c1e570aa09556db450cbc8e859b9ad476454ce3e1af76dad148776d84"
+updated_at: 2026-09-06T11:16:45Z
+content_hash: "sha256:11db507b7cb07d76998e27d87557675ed993a4311fd88f0c324b5186bad0f32e"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
@@ -555,4 +555,24 @@ status: in_progress
 - [ ] AC #3: Explicit bound actors/operation API and confirmed-publication/unknown-outcome obligations pending proof; native consumer implementation not claimed.
 - [ ] AC #4: Full FSM inventories, semantic controls and dedicated durable Ready/Failed negatives pending independent PRE-RED review and actual assertion failures.
 - [ ] AC #5: Isolated source-built checks, complete old/new subject/hash handoff and separate substantive consumer evidence review pending.
+
+
+### 2026-09-06T11:16:45Z ramirosalas
+BOUNDED D1 METHOD APPROVED — NOT SOURCE OR RED APPROVAL
+Independent reviewer approved only the external finite D1 method at /tmp/MAC-lhu5-D1-method-repair-v4.PQFSHg. Main test SHA256147094fbfe1998374d1b9487c303272931378e7345186c101f5371ca5fba057a; survivor test e057ae71ef5b2a26086c6ba3640a7497543cd12be99e3ed2a868c073c5bde85e; canonical M3fixture621255b4ece8863c50c70cc0f9bc7ac3e831a6ad702a23408f5b41f80a3e3c67; authorreport42e649f9209449bcc639561992322abc3815c5703784b5d548c4946298a746c6.
+Independent /tmp/MAC-lhu5-D1-PM-v4.QCW6qi/REVIEW.md SHA2568df8549325cb687abd8582a2deb917783ed2b0f31afbcea1729a8d13f1894e4e: fresh52test/subtestPASS+1packagePASS0FAIL/SKIP, plus exactunchangedpriorPMprobes5PASS+1packagePASS. Both previously failing selection leaves now reject removed members without panic. Prior /tmp/MAC-lhu5-D1-PM.Qeo409/REVIEW.md8816901aad8f65552dc633a2a043df41c9ce61ed797c401f143033e04a2c9e83 and failedprobes9d2af4364af2e0ca2f829e3bea35cf52293b4f2b4166a6190724aac59eb8fa75 remain retained, not reclassified.
+Root read complete review, code through exact revisions, new67line survivor regression, and verified earlier method hashes/counts. Approval covers finite controlled-clause→typedfact→actual outcome witnesses (normalization, rebalancing, rounding, ties, input bounds/shape and survivor selection), NOT a native finance engine, global optimum or full packet interpretation.
+Whole packet/root authority mapping, concrete decoder types, D2–D6, output/stored-value validation, full FSM row/target/ordered-effects witnesses, actual21-path source projection, generated mirror and repository RED remain pending. External prototype additional files are NOT new repository ownership. Full integration inventory/diff budget must be reviewed before any source/test write; all existing reserved lnu6 blocks and downstream hgz1 obligations remain protected.
+New external-only bounded D5/D6 operation-fencing/publication-arbitration module assigned to /root/portfolio_d1_method_repair (Sol), no repository/tracker writes authorized for that actor.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent bounded module review approved; no source commit, RED freeze, delivery or story acceptance occurred.
+- Earlier failed drafts/probes preserved with disclosed chronology.
+
+### proof
+- [x] Bounded D1 arithmetic and negative-model survivor semantics independently exercised.
+- [ ] All story ACs still require their complete integrated source/test/evidence proof.
 
