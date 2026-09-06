@@ -10,13 +10,20 @@ later events.
 
 RecommendationRun owns `status`, retry count, candidate-set identity, and the resulting portfolio
 identity. Enforce `run-ready-has-portfolio`, `run-forward-only`, and `run-terminal-absorbing`.
-Retry overlay state is execution-only and is never persisted.
+Retry overlay state is execution-only and is never persisted. `lookbackDays` counts observed
+closing-price dates including the initial valuation date (integer >= 2; gaps permitted).
 
 ## Architecture context
 
 `pf.app` is the single writer. It invokes the feed port during Collecting, invokes the pure
 optimizer during Optimizing, and persists only domain states through `pf.repo`. Both invokes have
-explicit timeout/error mapping. Keep retry/backoff deterministic under an injected clock.
+explicit admission-deadline/error mapping: repository admission (LoadCandidateSet) runs once
+BEFORE the run exists and its typed NotFound/Corrupt/IO/Busy failures create no run, make no
+feed call and consume zero collection retries; fetch (20000 ms/attempt) and optimizer
+(60000 ms) budgets are result-admission deadlines under an injected monotonic clock; retry
+backoff is 1000/2000/4000 ms with MaxRetries=3 and no jitter. The frozen CandidateSnapshot,
+limits and per-attempt custody are immutable across retries; a binding mismatch fails before
+any port call.
 
 ## Behavior and oracles
 
@@ -35,7 +42,10 @@ orchestration without editing locked tests.
 
 Bound attempts, backoff, and invocation time. Persist no transient retry state. A crash before the
 durable terminal write leaves a resumable nonterminal run; a crash after it re-reads the terminal
-result and performs no duplicate optimizer or persistence effect.
+result and performs no duplicate optimizer or persistence effect. Durable Ready and durable
+Failed both require a confirmed atomic CommitRecommendation receipt; an unresolved publication
+is reported as an unknown-outcome residual (exit 12), never as a durable terminal state - test
+the persistence barrier independently of the pure transition rows.
 
 ## Acceptance
 

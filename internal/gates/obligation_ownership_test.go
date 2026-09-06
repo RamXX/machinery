@@ -350,6 +350,17 @@ func obligationParentFixture(t *testing.T) (string, string) {
 		t.Fatalf("complete decomposition fixture invalid: %v", err)
 	}
 	requireObligationClean(t, CheckPack(design))
+	// The parent manifest delegates runtime conformance to its children. The
+	// shipped parent document is migrated to v2 with explicit kinds and the
+	// delegated-conformance gt already an explicitly reviewed plan over its
+	// unchanged BUILD bytes, so the fixture keeps it byte-exact and only
+	// verifies the frozen intent: these local tests prove decision-ID
+	// ownership, not substantive FSM conformance, and the claim stays
+	// plan-only without changing any required design covers.
+	g := CheckAttestations(design)
+	if len(g.Errs) != 0 || len(g.Drift) != 0 || len(g.Warns) != 1 || !strings.Contains(g.Warns[0], "gt.conformance-test-shape: plan only; current implementation review missing") || g.Counts["current implementation reviews"] != 0 {
+		t.Fatalf("parent fixture must remain an unfulfilled conformance plan: %+v", g)
+	}
 	return design, impl
 }
 

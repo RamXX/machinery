@@ -19,8 +19,8 @@ note: decomposed parent with no machines/; running gu,gc,g2,gl,gb,gv,g5 (G3/Gx r
   checked: linkage mode pairwise (execution unit: one bounded zero-context packet), 0 local plans (decomposed parent; the children carry the plans)
   ok
 == Gv-attest  attestation evidence ==
-  checked: 8 covered artifacts current, 8 attested claims, 8 claims owed
-  ok
+  warn   gt.conformance-test-shape: plan only; current implementation review missing
+  checked: 8 covered artifacts current, 8 attested claims, 8 plan judgments, 8 claims owed
 == G5-pack  contract packs ==
   checked: 2 subsystems, 2 packs fresh, 2 children pinned, boundary events: orders 3, payments 3, pack revision 1
   ok

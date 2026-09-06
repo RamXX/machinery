@@ -168,15 +168,22 @@ map one-to-one to the named domain action before calling the owning component.
 
 | actor | domain action | command |
 |---|---|---|
-| Analyst | `Index.refresh` | `pf index refresh <index-id>` |
-| Analyst | `Security.upsert` | `pf security upsert --ticker <ticker> --name <name> --sector <sector>` |
-| Analyst | `CandidateSet.build` | `pf candidates build --index <index-id> [--index <index-id> ...]` |
-| Analyst | `RecommendationRun.start` | `pf recommend --candidate-set <candidate-set-id> --lookback-days <days>` |
+| Analyst | `Index.refresh` | `pf index refresh <index-id> --max-provider-rows <R> --max-scalar-bytes <B>` |
+| Analyst | `Security.upsert` | `pf security upsert --ticker <ticker> --name <name> --sector <sector> --max-scalar-bytes <B>` |
+| Analyst | `CandidateSet.build` | `pf candidates build --index <index-id> [--index <index-id> ...] --max-source-indices <N> --max-scalar-bytes <B>` |
+| Analyst | `RecommendationRun.start` | `pf recommend --candidate-set <candidate-set-id> --lookback-days <days> --max-candidates <N> --max-lookback-days <L> --max-scalar-bytes <B>` |
 | Analyst | `RecommendationRun.abort` | `pf run abort <run-id>` |
 | Manager or Admin | `Portfolio.advance` | `pf portfolio advance <portfolio-id>` |
 | Manager or Admin | `Portfolio.accept` | `pf portfolio accept <portfolio-id>` |
 | Manager or Admin | `Portfolio.reject` | `pf portfolio reject <portfolio-id>` |
 | Manager or Admin | `Portfolio.reopen` | `pf portfolio reopen <portfolio-id>` |
+
+All limit flags are parsed once before any run, actor, or provider is created; a missing or
+malformed flag is `ValidationError` with no run created and no feed call made. The operational
+commands `pf backup <file> --max-bytes <B> --deadline-ms <T>` (stdout receipt JSON) and
+`pf restore <file> --expected-bytes <N> --expected-sha256 <H> --expected-schema-version 1
+--max-bytes <B> --deadline-ms <T>` are tool-level operations, not domain acts; they are
+specified in `BUILD/M5-reference-operations.md`.
 
 ### Architecture Contract (boundaries + dependency rules)
 
@@ -198,7 +205,10 @@ realized with the commit overlay; RecommendationRun is single-writer (no lock ov
 is a pure transform; Index/Security/CandidateSet/Holding are versioned rows without a lifecycle
 machine. NFR: role-based authz for portfolio decisions; market-data key from env, never logged; store
 file 0600; thousands of securities not millions; correctness over speed; residual failures print a
-loud, distinct message with a distinct exit code.
+loud, distinct message with a distinct exit code. Error rows receive only RESOLVED outcomes:
+an invoke error reaches an `onError` row only when nonpublication is confirmed; timeout rows
+act only after admission denial and completed drain; an unresolved publication is reported as
+`IOError(PUBLICATION_OUTCOME_UNKNOWN)` with exit 12 and no lifecycle transition.
 
 ## 5. Behavior: machine sources and milestone packets
 
@@ -263,7 +273,10 @@ hand-written ones.
 ### 7.2 Contract tests per boundary
 
 - cli->app: result and exit-code mapping.
-- app->repo: Save/Load under version guards (ConflictError on a stale version).
+- app->repo: Save/Load under version guards (ConflictError on a stale version);
+  LoadCandidateSet admission typed errors with no run/feed effects; publication outcomes
+  (Published / confirmed-Unpublished / drained-Unresolved) with retry limited to
+  confirmed-Unpublished ConflictError, BusyError or timeout-won IOError(COMMIT_TIMEOUT).
 - feed->mkt: error mapping and breaker behavior (breaker specifics in `BUILD/M2-feed-breaker.md`).
 - app->optimizer: shape and InfeasibleError.
 
@@ -365,6 +378,10 @@ Target language: Python.
   `machinery oracle design/machines` (regenerate and commit the oracles after any machine change);
   `machinery check design` (all design gates; add `--impl .` once code exists);
   `machinery verify-formal design` (regenerate and TLC-check the formal suite; needs Java 11+).
+  Formal/control-flow termination statements apply only to abstract traces with their
+  prescribed transition/timer progress and resolution assumptions; they do not prove native
+  cancellation, blocked-call return, or resolution of unknown publication, and unchanged
+  graph rows or formal artifacts claim no runtime refinement credit.
 
 ## 11. Hard-TDD protocol (read before writing any code)
 
@@ -416,9 +433,11 @@ Target language: Python.
 - **Objective is single (min drawdown), by design.** The recommender optimizes only for lowest
   maximum drawdown; it ignores return, liquidity, and sector concentration. Named risk: the 16-stock
   minimum-drawdown portfolio may be poorly diversified or low-return. Out of scope to fix here.
-- **Optimizer feasibility depends on data coverage.** If fewer than 16 candidates have full price
-  history over the lookback, the run ends Failed (InfeasibleError). Residual: a thin candidate
-  universe yields no recommendation; the operator sees the infeasibility cause.
+- **Optimizer feasibility depends on data coverage.** If ANY candidate history is missing,
+  malformed or misaligned, or fewer than 16 candidates exist, the run ends Failed
+  (InfeasibleError with the closed reason set); partial-universe filtering is not performed.
+  Residual: a thin or defective candidate universe yields no recommendation; the operator
+  sees the infeasibility cause.
 - **Market-data provider has no deployable mitigation.** The circuit breaker bounds the damage
   (fast-fail, bounded run retries) but cannot manufacture data; a prolonged outage means no fresh
   recommendation. Cached prices allow offline reruns.

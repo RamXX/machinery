@@ -226,7 +226,8 @@ func (t *Task) fireRolledBack(evt TaskEvent) Effect {
 	default:
 		t.recordRoutingError()
 		t.State = TSCancelled
-		return effect("recordRoutingError")
+		t.recordTaskClosed()
+		return effect("recordRoutingError", "recordTaskClosed")
 	}
 	return Effect{}
 }

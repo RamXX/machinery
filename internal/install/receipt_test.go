@@ -2,10 +2,12 @@ package install
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -293,45 +295,204 @@ func TestBuildRefreshPlanRecognizesNativeTargetTopology(t *testing.T) {
 }
 
 func TestCorruptReceiptFailsLoudly(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("MACHINERY_CONFIG_DIR", dir)
-	write(t, filepath.Join(dir, "install.json"), "{not-json")
-	if _, _, err := loadReceipt(); err == nil {
-		t.Fatal("corrupt receipt must not be silently replaced")
+	err := assertPrivateReceiptRejected(t, `{"schema_version":1}`, `{not-json`, "parse", "invalid character")
+	var syntax *json.SyntaxError
+	if !errors.As(err, &syntax) {
+		t.Fatalf("malformed JSON did not reach syntax validation: %v", err)
 	}
 }
 
 func TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology(t *testing.T) {
+	home, err := json.Marshal(filepath.Join(t.TempDir(), "home"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	tests := []struct {
-		name string
-		raw  string
+		name, valid, raw, diagnostic, typeField, typeName string
 	}{
-		{"unknown root", `{"schema_version":1,"home_installz":[]}`},
-		{"unknown home field", `{"schema_version":1,"home_installs":[{"homes":[],"copies":true}]}`},
-		{"unknown target field", `{"schema_version":1,"targets":[{"target":"codex","copied":true}]}`},
-		{"duplicate root", `{"schema_version":1,"schema_version":1}`},
-		{"duplicate nested", `{"schema_version":1,"targets":[{"target":"codex","target":"opencode"}]}`},
-		{"wrong homes type", `{"schema_version":1,"home_installs":[{"homes":"/tmp/home"}]}`},
-		{"wrong copy type", `{"schema_version":1,"targets":[{"target":"codex","copy":"yes"}]}`},
-		{"trailing value", `{"schema_version":1} {"schema_version":1}`},
+		{"unknown root", `{"schema_version":1}`, `{"schema_version":1,"home_installz":[]}`, `unknown field "home_installz"`, "", ""},
+		{"unknown home field", fmt.Sprintf(`{"schema_version":1,"home_installs":[{"homes":[%s]}]}`, home), fmt.Sprintf(`{"schema_version":1,"home_installs":[{"homes":[%s],"copies":true}]}`, home), `unknown field "copies"`, "", ""},
+		{"unknown target field", `{"schema_version":1,"targets":[{"target":"codex"}]}`, `{"schema_version":1,"targets":[{"target":"codex","copied":true}]}`, `unknown field "copied"`, "", ""},
+		{"duplicate root", `{"schema_version":1}`, `{"schema_version":1,"schema_version":1}`, `duplicate JSON field "schema_version"`, "", ""},
+		{"duplicate nested", `{"schema_version":1,"targets":[{"target":"codex"}]}`, `{"schema_version":1,"targets":[{"target":"codex","target":"opencode"}]}`, `duplicate JSON field "target"`, "", ""},
+		{"wrong homes type", fmt.Sprintf(`{"schema_version":1,"home_installs":[{"homes":[%s]}]}`, home), fmt.Sprintf(`{"schema_version":1,"home_installs":[{"homes":%s}]}`, home), "cannot unmarshal string", "homes", "[]string"},
+		{"wrong copy type", `{"schema_version":1,"targets":[{"target":"codex","copy":true}]}`, `{"schema_version":1,"targets":[{"target":"codex","copy":"yes"}]}`, "cannot unmarshal string", "copy", "bool"},
+		{"trailing value", `{"schema_version":1}`, `{"schema_version":1} {"schema_version":1}`, "trailing JSON value", "", ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			t.Setenv("MACHINERY_CONFIG_DIR", dir)
-			write(t, filepath.Join(dir, "install.json"), tc.raw)
-			if _, _, err := loadReceipt(); err == nil {
-				t.Fatalf("receipt accepted: %s", tc.raw)
+			err := assertPrivateReceiptRejected(t, tc.valid, tc.raw, "parse", tc.diagnostic)
+			if tc.typeField != "" {
+				var typed *json.UnmarshalTypeError
+				if !errors.As(err, &typed) || typed.Value != "string" || !strings.HasSuffix(typed.Field, "."+tc.typeField) || typed.Type.String() != tc.typeName {
+					t.Fatalf("wrong typed-field diagnosis: %v", err)
+				}
 			}
 		})
 	}
 }
 
 func TestSemanticallyInvalidReceiptFailsBeforeUpdate(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("MACHINERY_CONFIG_DIR", dir)
-	write(t, filepath.Join(dir, "install.json"), `{"schema_version":1,"targets":[{"target":"cursor"}]}`)
-	if _, _, err := loadReceipt(); err == nil {
-		t.Fatal("unknown receipt target must fail before binary replacement")
+	// This is loader rejection before planning, not an observed binary swap.
+	assertPrivateReceiptRejected(t, `{"schema_version":1,"targets":[{"target":"codex"}]}`, `{"schema_version":1,"targets":[{"target":"cursor"}]}`, "invalid", `unknown target "cursor"`)
+}
+
+func readPrivateReceiptFixture(t *testing.T, raw string) (installReceipt, bool, error) {
+	t.Helper()
+	path, err := installationReceiptPath()
+	if err != nil {
+		t.Fatal(err)
 	}
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.Lstat(filepath.Dir(path))
+	if err != nil || !dir.IsDir() || dir.Mode().Perm() != 0o700 {
+		t.Fatalf("receipt fixture config is not an actual private directory: %v", err)
+	}
+	file, err := os.Lstat(path)
+	if err != nil || !file.Mode().IsRegular() || file.Mode().Perm() != 0o600 {
+		t.Fatalf("receipt fixture is not an actual 0600 regular file: %v", err)
+	}
+	return loadReceipt()
+}
+
+func assertPrivateReceiptRejected(t *testing.T, valid, invalid, category string, details ...string) error {
+	t.Helper()
+	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+	if _, exists, err := readPrivateReceiptFixture(t, valid); err != nil || !exists {
+		t.Fatalf("matched private valid receipt was not accepted: exists=%v err=%v", exists, err)
+	}
+	_, exists, err := readPrivateReceiptFixture(t, invalid)
+	if !exists || err == nil {
+		t.Fatalf("intended invalid receipt accepted/missing: exists=%v err=%v", exists, err)
+	}
+	path, pathErr := installationReceiptPath()
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+	// Strip only the exact known wrapper: directory/test names cannot satisfy details.
+	prefix := category + " installation receipt " + path + ": "
+	if !strings.HasPrefix(err.Error(), prefix) {
+		t.Fatalf("did not reach intended %s validation: %v", category, err)
+	}
+	diagnostic := strings.TrimPrefix(err.Error(), prefix)
+	for _, detail := range details {
+		if !strings.Contains(diagnostic, detail) {
+			t.Fatalf("intended diagnostic %q missing from %q", detail, diagnostic)
+		}
+	}
+	t.Logf("reached %s validation: %s", category, diagnostic)
+	return err
+}
+
+func realSchemaTwoReceiptFixture(t *testing.T) installReceipt {
+	t.Helper()
+	root := t.TempDir()
+	receipt := installReceipt{SchemaVersion: 2, HostPlugins: []string{"claude", "codex"}}
+	for i, name := range []string{"home-a", "home-b"} {
+		home := filepath.Join(root, name)
+		seedHomeArtifactInventory(t, home)
+		receipt.HomeInstalls = append(receipt.HomeInstalls, homeInstall{Homes: []string{home}, Copy: i == 1})
+		// Independently enumerate all three shipped artifact roots per home.
+		for _, relative := range []string{"skills/machinery", "agents/machinery-fsm-author.md", "agents/machinery-build-writer.md"} {
+			path := filepath.Join(home, filepath.FromSlash(relative))
+			digest, err := artifactTreeDigest(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			receipt.Artifacts = append(receipt.Artifacts, receiptArtifact{Path: path, Digest: digest})
+		}
+	}
+	normalizeReceipt(&receipt)
+	return receipt
+}
+
+func TestReceiptPrivateSchemaControls(t *testing.T) {
+	for _, schema := range []int{1, 2} {
+		t.Run(fmt.Sprintf("schema_%d", schema), func(t *testing.T) {
+			t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+			want := realSchemaTwoReceiptFixture(t)
+			want.SchemaVersion = schema
+			if schema == 1 {
+				want.HostPlugins, want.Artifacts = nil, nil
+			}
+			raw, err := json.Marshal(want)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, exists, err := readPrivateReceiptFixture(t, string(raw))
+			encoded, encodeErr := json.Marshal(got)
+			if err != nil || !exists || encodeErr != nil || string(encoded) != string(raw) {
+				t.Fatalf("valid private schema%d topology/inventory changed: %v %v", schema, err, encodeErr)
+			}
+		})
+	}
+}
+
+func TestReceiptSchemaTwoInventoryValidation(t *testing.T) {
+	want := realSchemaTwoReceiptFixture(t)
+	valid, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name, diagnostic string
+		mutate           func(*installReceipt)
+	}{
+		{"missing entry", "artifact inventory has 5 entries, want 6", func(r *installReceipt) { r.Artifacts = r.Artifacts[:5] }},
+		{"extra entry", "artifact inventory has 7 entries, want 6", func(r *installReceipt) {
+			r.Artifacts = append(r.Artifacts, receiptArtifact{Path: filepath.Join(t.TempDir(), "extra"), Digest: r.Artifacts[0].Digest})
+		}},
+		{"duplicate path", "artifact inventory path", func(r *installReceipt) { r.Artifacts[1].Path = r.Artifacts[0].Path }},
+		{"substituted path", "artifact inventory path", func(r *installReceipt) {
+			r.Artifacts[0].Path = filepath.Join(r.HomeInstalls[0].Homes[0], "agents", "substitute.md")
+		}},
+		{"relative path", "artifact inventory path", func(r *installReceipt) { r.Artifacts[0].Path = "relative/artifact" }},
+		{"non-clean path", "artifact inventory path", func(r *installReceipt) {
+			r.Artifacts[0].Path = filepath.Dir(r.Artifacts[0].Path) + string(os.PathSeparator) + "." + string(os.PathSeparator) + filepath.Base(r.Artifacts[0].Path)
+		}},
+		{"unexpected absolute path", "artifact inventory path", func(r *installReceipt) { r.Artifacts[0].Path = filepath.Join(t.TempDir(), "outside") }},
+		{"digest prefix", "artifact inventory digest for", func(r *installReceipt) {
+			r.Artifacts[0].Digest = "sha512:" + strings.TrimPrefix(r.Artifacts[0].Digest, "sha256:")
+		}},
+		{"digest length", "artifact inventory digest for", func(r *installReceipt) { r.Artifacts[0].Digest = r.Artifacts[0].Digest[:len(r.Artifacts[0].Digest)-1] }},
+		{"digest nonhex", "artifact inventory digest for", func(r *installReceipt) { r.Artifacts[0].Digest = "sha256:" + strings.Repeat("g", 64) }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var invalid installReceipt
+			if err := json.Unmarshal(valid, &invalid); err != nil {
+				t.Fatal(err)
+			}
+			tc.mutate(&invalid)
+			raw, err := json.Marshal(invalid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			details := []string{tc.diagnostic}
+			if strings.Contains(tc.name, "path") {
+				details = append(details, "does not match recorded topology path")
+			}
+			if strings.HasPrefix(tc.name, "digest") {
+				details = append(details, "is malformed", invalid.Artifacts[0].Path)
+			}
+			assertPrivateReceiptRejected(t, string(valid), string(raw), "invalid", details...)
+		})
+	}
+	t.Run("valid reversed ordering", func(t *testing.T) {
+		t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+		slices.Reverse(want.HomeInstalls)
+		slices.Reverse(want.HostPlugins)
+		slices.Reverse(want.Artifacts)
+		raw, err := json.Marshal(want)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, exists, err := readPrivateReceiptFixture(t, string(raw))
+		encoded, encodeErr := json.Marshal(got)
+		if err != nil || !exists || encodeErr != nil || string(encoded) != string(valid) {
+			t.Fatalf("valid reversed inventory/topology not normalized: %v %v", err, encodeErr)
+		}
+	})
 }

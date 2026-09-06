@@ -4,7 +4,9 @@
 
 `pf recommend` accepts a fixed two-index fixture, builds a deduplicated candidate set, fetches
 cached prices, runs the real optimizer, persists one Ready recommendation and Proposed portfolio
-in DuckDB, and prints the portfolio id. The demo also forces one feed failure and observes retry.
+in DuckDB via ONE atomic CommitRecommendation publication (run + portfolio + 16 holdings), and
+prints the portfolio id only after the Published receipt. The demo also forces one feed failure
+and observes retry.
 
 ## Domain context
 
@@ -18,8 +20,13 @@ in `domain.modelith.yaml`; do not introduce parallel schemas.
 
 Own `pf.cli` command parsing, `pf.app` orchestration, the `pf.feed` port, pure `pf.optimizer`, and
 `pf.repo` DuckDB persistence only. Dependency flow is CLI -> app -> domain ports, with adapters
-implementing ports. Use one real temporary DuckDB file. Read the market-data key from environment,
-never log it, create store files as 0600, and map each residual failure to a distinct loud exit.
+implementing ports. Use one real temporary DuckDB file: Open on a NONEXISTENT path exclusively
+creates the store and initializes schemaVersion=1 atomically; an existing empty, missing,
+duplicate, malformed or unsupported metadata value is CorruptError and is never silently
+stamped. Recommend parses `--max-candidates/--max-lookback-days/--max-scalar-bytes` once into
+an immutable OptimizerLimits before any run or actor exists. Read the market-data key from
+environment, never log it, create store files as 0600, and map each residual failure to a
+distinct loud exit (closed exit-code map in ARCHITECTURE.md section 7).
 
 ## Behavior and oracles
 
@@ -38,7 +45,10 @@ tests. Implement the narrow path in `pf/domain`, `pf/app`, `pf/feed`, `pf/optimi
 
 Bound retry count and all provider calls; never fall back to live unpinned market data in tests.
 Rollback a failed transaction so neither a half-written run nor portfolio remains. A repeated
-command must resolve its idempotency key to the same durable result.
+command creates a NEW run with retries initialized to zero; it is not an idempotency-key
+lookup, and no idempotency feature is added. A Failed run persists its empty-result variant
+through the same atomic publication contract; inability to persist is reported, never treated
+as a proven durable terminal state.
 
 ## Acceptance
 
