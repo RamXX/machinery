@@ -4,11 +4,11 @@ title: "Publish standalone native custody contract"
 status: closed
 priority: 0
 type: task
-labels: [docs, delivered]
+labels: [docs, delivered, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:31:38Z
+updated_at: 2026-09-06T12:31:39Z
 content_hash: "sha256:e3e7436904c211526cb43067b88718713a055c3e4d9bdab6c1d624a06f80f8d5"
 related: [MAC-l7m0]
 assignee: dev-MAC-p9wm
