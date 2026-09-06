@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:47:41Z
-content_hash: "sha256:659c588db6cddee9305ea2d3a27475f3616c20ed3fbd3b91bf026083f9ca90cb"
+updated_at: 2026-09-06T07:48:08Z
+content_hash: "sha256:b898683b820ac1d2c917b26d4b1871eb71d2cf1fdcbf60341948c56b06b0e5a0"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx, MAC-p7jd]
 assignee: dev-MAC-uzxr
@@ -1491,3 +1491,18 @@ status: new
 - [ ] AC #4: fresh complete dynamic native/row/witness inventory remains finalGREEN obligation.
 - [ ] AC #5: fresh final candidate proof/recognizeddelivery/independentPMacceptance and consumerhandoff pending.
 
+
+### 2026-09-06T07:48:08Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- Candidate `bb5205c32e7b17ebefc5b050b7bf7417b0720e72`: exact space-delimited field-token membership replaces substring matching in `examples/go-crm/impl/internal/testoracle/fsm.go`; no other source path changed.
+- Fresh candidate proof: regression 24/24 PASS; preserved parser contracts 68/68 PASS; direct native transition suites 228/228 PASS; full testoracle meta suite PASS in 23.105s; static and hard-TDD guards PASS.
+
+### proof
+- [x] AC #1: all ten composite structural keys reject while valid metadata/context data is preserved.
+- [x] AC #2: existing action reconciliation and Task behavior are preserved; Task bytes are unchanged.
+- [x] AC #3: expected-state/action, extra-effect, and mutation sensitivity families pass.
+- [x] AC #4: direct native suites and inventory meta family pass with 228 executed leaves and zero skips.
+- [x] AC #5: fresh candidate evidence, frozen custody, static verification, and recognized delivery evidence are recorded; PM acceptance remains pending.
