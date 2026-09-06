@@ -8,8 +8,8 @@ labels: [docs, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:21:36Z
-content_hash: "sha256:e9c770c347f034b773498c095236ea6e6f025e990ea5e101139ca354ec0ab5be"
+updated_at: 2026-09-06T12:22:04Z
+content_hash: "sha256:2dc9cd96d65fdf9998dedade985367ead1813e05f92dd57a2106e008263fc0ce"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 assignee: dev-MAC-p9wm
@@ -519,3 +519,29 @@ LEARNINGS:
 LIMITATIONS:
 - Independent whole-prose and negative-mutant PM review is pending; no PM approval is represented.
 - No implementation, RED/GREEN, runtime, cleanup, native-host, release, or universal-correctness proof was produced by this docs-only delivery.
+
+### 2026-09-06T12:22:04Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- Base `a94e768adf461178e0562ad135c7c06d8163a3a4`; candidate `2a63e4bb0d7b57c42dfd6f45fecfdc4f8a18cfbf`; branch `story/MAC-p9wm`.
+- Exactly two owned documentation paths changed: 329 insertions, 0 deletions, 27,995 net added bytes; both mode 0644.
+- New document: SHA-256 `bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a`, Git blob `1c1581d1aec324d979593613b44976ed0007c45b`.
+- Companion candidate: SHA-256 `171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d`, Git blob `acce64fee8db5a7565e8fa33422334de125e913f`; base blob `50bd00288484b46ba69d40ff0a3cdd9ff7e1ed02`.
+- Removing only companion line 5 reconstructs the accepted 575-line / 109,367-byte / SHA-256 `22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8` source byte-for-byte.
+- Bounded validation PASS: diff check, exact path/numstat/object/mode inventory, byte reconstruction, relative link target, fence pairing, heading inventory, candidate-object equality, 0 conflict markers, and 0 bounded public-contamination matches.
+- Complete developer coverage matrix maps projection §§1-8 plus both true-EOF clarifications to public headings. Developer semantic review rejects all 19 required negative mutants for contract-specific reasons.
+- External immutable evidence: `/tmp/MAC-p9wm-delivery.sC5L4f/REPORT.md`, mode 0444, 103 lines / 12,852 bytes, SHA-256 `01ee0a554b8d405cc519911272821318b46e1030212547fac1d6af5d4bab10f9`.
+- Documentation verifier limitation recorded: corrected `pvg verify ... --format text` returned `VERIFY: PASSED (0 files scanned, 0 issues)` and is not used as semantic proof. Markdown linter/render executable unavailable; direct structure/link checks passed.
+- Product/native tests: 0 run / 0 applicable; coverage N/A. No runtime, provisioning, process, container, preflight, native matrix, remote, merge, or release action occurred.
+
+### proof
+- [x] AC #1: standalone approved required-behavior status, trust residuals, and honest unproved state published without private dependency or execution claim.
+- [x] AC #2: exact constructor/type/record/limit/acquisition/handoff/Join/Close/Attach/cumulative-budget contract published.
+- [x] AC #3: exact Docker runtime codec/private client, contributor/checker APIs and profiles, ordering, unresolved-create, endpoint preparation, and real run/replay lifecycle published.
+- [x] AC #4: live-first proof method, distinct pre-feature/reference-unsafe/reference-safe/production roles, migration, two native matrices, and proof limits published.
+- [x] AC #5: one minimal companion line; every other accepted byte preserved exactly.
+- [ ] AC #6: developer coverage and 19-mutant semantic self-review delivered; independent whole-prose PM verdict remains pending and is not claimed.
+- [ ] AC #7: bounded developer checks completed; independent complete-prose/render review remains pending and is not claimed.
+- [x] AC #8: exact developer hashes, counts, modes, minimal hunk, matrices, scans, limitations, and true-EOF delivery contract recorded; PM acceptance remains separate.
