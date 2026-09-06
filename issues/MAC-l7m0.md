@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T08:47:43Z
-content_hash: "sha256:d4244516b254d7a05ce468e6add52130548f9be48732c6aca52da14161096c9c"
+updated_at: 2026-09-06T08:49:12Z
+content_hash: "sha256:544da96441e9a7950d37e5c7fb7441ade45aefac2e007ddb2d5d428ee6b14282"
 blocks: [MAC-vx24, MAC-ou97]
 ---
 
@@ -122,4 +122,44 @@ status: new
 ### proof
 - [x] Approved immutable sources and exact landing scope identified.
 - [ ] AC A1-A6: canonical docs landed and independently accepted.
+
+
+### 2026-09-06T08:49:12Z ramirosalas
+PUBLIC CONTRACT PROJECTION CORRECTION 2026-09-06 — supersedes literal-publication AC A1/status-index ownership above
+Root requires the open-source document to be standalone and free of private tracker/workspace/user coordination. Private original architecture, challenge files, hashes and audit history remain in nd only. DO NOT publish CHALLENGE-3, private source-note path, tracker handoffs or an index of them. Current owned source output is ONLY docs/test-assurance-contract.md, a deterministic projection of immutable e467a3b6c6f657e7a4cb28e85c688be0df24c56a7e3c76fdcfa224f7ff5d2624. docs/test-assurance-review.md and docs/test-assurance-status.md from prior scope are withdrawn proposed outputs, never created; historical note retained.
+
+Exact projection algorithm:
+1. Keep original source lines1–575 inclusive; drop576–589 (private revision/source inspection chronology only).
+2. Replace the following entire original lines with exact text:
+L1: # Standalone executable test assurance — architecture contract
+L3: Status: approved architecture contract, version 1. Approval establishes the required behavior, not implementation completion or native execution evidence.
+L4: Scope: executable hard-TDD assurance for Machinery and its consumers, plus native custody for the contributor integration lane. The implementation must prove every applicable obligation below.
+L8: Native final verification supports Go, TypeScript, Python, and Elixir in the first release through four CLOSED adapters, not an arbitrary shell-command protocol. A supported language does not mean every framework in that language is supported.
+L477: ## 8. Native custody contract and contributor integration
+L519: Contributor integration requires the reviewed `internal/processscope`, `internal/processcontrol`, and explicit formal/runtimeclosure call-site wiring, plus separately owned supplemental tests and fragments. Final-Ga scoped execution additionally requires `internal/gates/accept.go`, suite RunOptions, runtimeclosure.Git and assuranceflow wiring. Preserve every original frozen RED/config/test inventory and failed record byte-for-byte. A provisioning-only wrapper is insufficient. Approve exact supplemental test names and ownership before authoring their RED.
+L537: The strict Go profile is NOT automatically compatible with existing Go CRM or Machinery contributor tests: direct T.Fatal patterns remain valid under their EXISTING native contributor/test contracts, but do not establish strict assertion-specific RED. Do not rewrite frozen tests under unrelated change authority, hide them through selectors, or claim compatibility from an old native PASS. Prospective adapter/example migration requires a new reviewed test revision and full required-test mapping. Retain original approved/failing RED and accepted history, preserve every existing required regression (running legacy native regressions independently until properly migrated), and provide the NEW strict tests' own same-assertion calibration. Existing BUILD/evidence/golden/helper maintenance does not authorize wholesale Go CRM test rewrites. Machinery's contributor registry remains independently authoritative; it need not masquerade as a consumer TDD manifest or accept imported TDD receipts.
+L539: Implement this contract in bounded, explicitly owned units: core schema/inventory/storage and authored-revision registration; native custody; four adapter implementations; replay/state machine; CLI/gate/hook integration including scoped final-Ga Git; example/runtime-residual migration; standalone final capstones. Every interface must have real producer/consumer wiring and frozen positive/negative tests. No helper or adapter may ship uncalled by normal complete verification.
+L541: The contributor runtime inventory must include provisioned Python, TypeScript compiler, Elixir/OTP, the separately scoped pinned Git closure for final Ga, and their exact source/runtime identities through separately owned fragments rather than editing a frozen pilot. Preserve existing lane semantics; if a frozen schema cannot express a new adapter requirement, retain it as v1 history and introduce an independently reviewed compatible v2 lane contract plus complete union migration. Never silently edit frozen v1 and call it the same RED.
+L545: ## 11. Implementation acceptance obligations
+L547: These obligations require executable acceptance evidence; the document alone is not sufficient:
+L568: - The first release requires all four languages. Supporting every framework immediately would be an unbounded promise; unsupported frameworks receive actionable migration diagnostics.
+L575: Technical feasibility requires actual implementation evidence, especially guardian custody and adapter assertion/event/source correlation. If real tests cannot meet these contracts, stop and revise the architecture through independent review rather than weaken a required outcome to match available code.
+3. Apply these exact literal replacements to retained text:
+"accepted p7 " -> "existing "
+"Accepted p7 " -> "Existing "
+"P7 behavior" -> "Existing attestation behavior"
+"Never touch the user's existing Dagger container or other unrelated resources." -> "Never touch unrelated containers or other user-owned resources."
+"Global final preflight remains the user's explicitly final heavy operation." -> "Global final preflight remains the final integrated heavy operation."
+"These were present locally during architecture feasibility inspection; availability is not adapter verification." -> "Availability of a runtime is not adapter verification."
+"no provisioning or Git installation is authorized by this architecture task." -> "runtime provisioning is an explicit implementation operation, not evidence supplied by this document."
+4. Replace each Unicode em dash with ASCII space-hyphen-space for repository documentation style. Preserve every other byte and one final newline. No normative record/field/argv/signature/limit/lifecycle obligation changes.
+Expected public projection: 575lines, 109367UTF8bytes, SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8. Independent PM must reproduce this projection from the private approved source, compare exact bytes AND verify all schemas/interfaces/lifecycle/limits/guarantees remain intact; hash matching alone is not normative review.
+Public AC: document contains no private MAC tracker IDs, /tmp paths, NIL/Dagger/user-specific coordination or private challenge chronology; a negative standalone-dependency statement is permissible. All three review advisories remain executable story obligations, not source-document success claims. No production/tests/runtime changes. Earlier user-choice blocker is resolved, but root backlog-review/landing hold remains.
+## nd_contract
+status: new
+### evidence
+- Approved589-line source fully read; deterministic public575-line projection defined without changing source or repository.
+### proof
+- [x] Private/public provenance boundary explicitly repaired.
+- [ ] Canonical public projection landed and independently verified.
 
