@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:09:30Z
-content_hash: "sha256:c89ba91c98384c3fd9c1e23e7e867a518de0d0ca795ea0ed5f367af302e73276"
+updated_at: 2026-09-06T00:22:29Z
+content_hash: "sha256:dcf257daa63358bc7694e0edc6bb96731c71ae9243977efbed58aee61eb1f4ed"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -130,6 +130,41 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+## MAC-2u36 GREEN checkpoint — intentional verification-review hold
+
+Implementation committed 0ad71eb on retained story/MAC-2u36 at /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36. Only update.go, receipt.go, install.go changed (+74/-21,95 changed production LOC). Bootstrap uses full recorded/discovered plan when receipt exists; authenticated delegated tx children defer receipt writes; parent merges completed selections into prior ownership and publishes complete normalized real inventory before commit; standalone conflicting home groups reject with actionable paths and validated receipts remain required. No frozen tests, journal/lock/target/CLI implementation, public bypass or installed assets changed.
+
+PROOF (checkpoint, not delivery):
+- Fast focused canonical planning/private validators: go test -count=1 -timeout=2m ./internal/install -run '^(TestCorruptReceiptFailsLoudly|TestReceiptRejectsUnknownDuplicateAndWrongTypedTopology|TestSemanticallyInvalidReceiptFailsBeforeUpdate|TestReceiptPrivateSchemaControls|TestReceiptSchemaTwoInventoryValidation|TestBootstrapReceiptPlan|TestBootstrapDefaultPlanIsPluginAware)$' -json. Exit0,27 leaves PASS,12.020s; tool display only, no complete raw artifact claimed.
+- Three legacy runner checks: go test -count=1 -timeout=2m ./internal/install -run '^(TestUpdateVerifiesReleaseAndRefreshesRecordedHarnesses|TestUpdateExecutesDownloadedBinaryForHarnessRefresh|TestUpdateRefreshesExistingDefaultInstallInPlace)$' -json. Exit1,3FAIL0SKIP. Complete raw /tmp/machinery-MAC-2u36-green.G05gWz/legacy-runner-focused.jsonl SHA256da0548ffac4b9cce7dd51a7ac9d75958c88484662b97f4e26c793c78a3129cf9. Their untouched mocked runners/shell only report or log success without materializing recorded artifacts; final real receipt inventory correctly detects missing machinery-build-writer.md. RED-DISPUTE reported; no production inventory bypass or test amendment.
+- Actual frozen focus: go test -count=1 -timeout=7m ./internal/install -run '^TestBootstrapReceiptCLI$/(standalone_receipt|parent_finalization)' -json. Exit1,9leaves5PASS4FAIL0SKIP269.131s; all13run events terminal. Raw /tmp/machinery-MAC-2u36-green.G05gWz/parent-standalone-focused.jsonl SHA256e05ffbcc615cb5c9dee66e731607da43adf1e70cdec81c7a924c7268a67bcf5d.
+- All5 standalone supported/conflict/next-native leaves PASS, including exact restoration. All4 parent leaves reach parent finalization but frozen pathname-only close matcher also captures subsequent READ descriptors: no-fault7matches each though real Update succeeds and complete receipt matches; fault3matches/injections each, contaminating cleanup/rollback. Source: saveReceipt303 actual writer; digestArtifactEntry in transaction.go1743/1755 opens same scratch with os.Open and routes read Close through same seam. Full clean fault rollback not yet proven. Separate RED-DISPUTE and actual-handle F_GETFL discriminator proposal sent to dispatcher/Sr PM; no edits authorized or made.
+- pvg verify reports5 heuristic stub findings in unchanged legitimate return-empty branches: update.go993 pluginStderrDiagnostic empty stderr; install.go1157/1162/1167/1184 installFileChangeID unavailable platform-stat identity. No new stub/suppression/whitespace workaround. Independent reviewer disposition requested.
+- pvg story verify-tdd --base f24b2df PASS11commits0unauthorized edits; git diff --check PASS. Frozen bootstrap SHA256ee786dee86c951a5a3a4a53d9344aeb16979df19319ea77dcd14fbd7afefca23, receipt SHA256a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48, shared install SHA256d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba unchanged.
+- Required full latest-SHA matrix/native regression remains pending. Coverage not instrumented. No broad replay or full preflight; all test sessions terminated normally with recorded exit codes.
+
+LEARNINGS:
+- Parent real inventory exposes legacy command-only success fixtures; materialize actual downloaded-source placements without pretending those component tests are real CLI evidence.
+- A scratch pathname identifies a file, not its publication writer handle; read-close fault injection can break independent rollback inventory and invalidate the oracle.
+- Preserve correct real inventory/durability behavior; independently review exact frozen-fixture repairs before changing tests.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Clean committed GREEN checkpoint0ad71eb; root-directed intentional hold after completed focus, retaining claim/worktree.
+- No story deliver/release/approve/close, test edits, remote operations or installed product changes.
+- Exact raw evidence and narrow repair proposals supplied for independent same-story review.
+
+### proof
+- [x] AC #1: focused recorded/default/schema1 plan checks pass.
+- [x] AC #2:23private receipt parser/topology/inventory/digest controls pass; broad safety replay pending.
+- [ ] AC #3: full real convergence/missing repair/idempotence replay pending.
+- [ ] AC #4: full rollback/interruption replay pending.
+- [x] AC #5: actual frozen focused CLI/children executed; no skip/live install mutations.
+- [ ] AC #6: actual parent finalization reached; overbroad frozen close oracle requires independent repair, clean late-fault proof pending.
+- [x] AC #7:5actual standalone supported/conflict/restoration/follow-on cases pass.
+- [ ] Final unchanged/reapproved tests, complete package regression and independent acceptance pending.
 
 
 ## nd_contract
