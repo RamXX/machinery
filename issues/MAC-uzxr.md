@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:43:22Z
-content_hash: "sha256:f8effc7e5d6101f01cc7cfc685fa31faec755de17d50fb6c2c90d1aa01a66c2f"
+updated_at: 2026-09-06T07:47:16Z
+content_hash: "sha256:5e87b61c5c8c7d100bf5943c30352a6d8d480803be73c4a55380c32372b2bfde"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-uzxr
@@ -168,6 +168,53 @@ Read complete author checkpoint/audit.cjs/audit.jsonl and verified all suppliedh
 No further storage repair required. Author may prepare complete EXTERNAL later patch and measured per-file decomposition for separate exact PM/SrPM review. Applying all5suite/helper/parser/additive amendments stays HELD. No fullapprove-red/deliver/accept/reject transition; no new test-edit permission, AC/path/scope change, candidate parser/Taskfix proof or consumerclaimrenewal.
 SR PM MEASURED FORECAST / PRESERVATION REPAIR. Canonical eight paths and five AC unchanged; actual external proposal2450changed plus503historical=2953 cumulative beforeGREEN, aggregate2945changed. Conditional3300-3500 cumulative/3200-3400 aggregate forecast assumes prior300-450-line parser estimate and separately charges48-line scaffold replacement plus narrowTask correction. Old750-1150/provisional1500-2200 obsolete; no proof trimmed or test permission granted. First --description command succeeded but verification failed because nd treats same-level nested headings as section boundaries and retained an old canonical suffix. Original failed readback preserved in /tmp/machinery-private-triage.JF2BDG/READONLY-HANDOFF.md. Installed --body-file has the same Description semantics. Root-authorized guarded pvg nd edit bound full live raw header/body to journal export and checked an external apply_patch trial, removed ONLY duplicate canonical block under nd exclusive lock, then verified exact full body90c15690a83bd2200723fdaa8bdd27e3871e189959b4936083afe06336d35590 and identical tail/metadata except normal hash/time. Exact expected/proposed manifests and editor remain external. First hgz1 preparation-only cross-realm assertion failed before any tracker write, then root explicitly authorized scalar-array comparison correction; historical failure is not proof. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
 EXPANDED RED FREEZE CHECKPOINT: exact authorized seven-path patch2f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249 committed acf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f over4ef6baf with literal [test-edit-authorized] and tdd-red. Full report /tmp/MAC-uzxr-final-red.nOXYuf/REVIEW.md SHA2565cb98377240aa8be22f0b9d88b74a7a6bd959fbfd8f1efb2907d08b02f68ad5c. Exact seven result hashes/frozen495prefix/99committedexamplefiles/218originaltuples/twoterminalbodies verified; Task unchanged. Measured2120add330del2450changed/net1790; historical503changed separate. Actual all10 contractroots and focusednative plus3meta families ran15.526s: contracts0PASS28FAIL0SKIP, focused10supplementPASS5transitionrootFAIL0SKIP, original/candidate/remainingmeta3/3/17outerFAIL. All current parser/control failures NONQUALIFYING ErrScaffold; all intended later mutants/most nestedcontractbranches unreached. Actual23children10supplementPASS25transitionrootFAIL0SKIP,0transitionrowleaves/0mutants; all23fixturecwdsremoved. Export52files=46receipts/rawlogs+6manifests47committedinputhasheseach;17latercontrols fail before manifest export, no nonexistent manifest credited. Raw and complete native identity receipts in report. Normal verify-tdd3commits0violations/no waiver; scoped static7files0issues; gofmt/diffcheckclean. Original genuine998a5a3 threeunsafeacceptedouterFAIL200childPASS, validatedstorage4ef6baf bothmodes, historical225baseline and separate actualTaskentrydefect preserved as distinct evidence. No parserimplementation, productionedit, source/testcorrection, delivery, approve-red, GREEN, consumerclaimrenewal, remote/toolchain/service changes or background process. STOP clean for independent combined-evidence RED adjudication.
+## Implementation Evidence (DELIVERED)
+
+PROOF:
+
+### CI/Test Results
+
+Commands run:
+- `cd examples/go-crm/impl && GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=120s ./internal/testoracle -run '^TestFSMParseExactFieldMembership$' -json` (pre-fix RED: 24 leaves, 14 PASS / 10 intended FAIL / 0 SKIP; every failure was an accepted composite structural key).
+- `cd examples/go-crm/impl && GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=300s ./internal/testoracle -json` (PASS; full parser, native-sensitivity, inventory, cleanup and 20-mutant meta families; 23.105s).
+- `cd examples/go-crm/impl && GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=120s ./internal/domain ./internal/session ./internal/cli -run '^(TestDealTransitions|TestTaskTransitions|TestUserTransitions|TestSessionTransitions|TestCommandExecutionTransitions)$' -json` (PASS; 228 native leaves: 218 oracle witnesses plus 10 terminal supplements; 0 FAIL / 0 SKIP).
+- `cd examples/go-crm/impl && GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=120s ./internal/testoracle -run '^TestFSM(ParseCommittedMachines|Effects|Bind|ParseRejects|JSON|Invoke|OneFire|Load|Parser|Nested)$'` (PASS; 68 preserved parser contracts).
+- `pvg verify examples/go-crm/impl/internal/testoracle/fsm.go` (PASS: 1 file, 0 issues).
+- `pvg story verify-tdd --range 70652b948bf090008b1965c85daf36ea374daea4..HEAD` (PASS: 6 commits, no unauthorized test edits).
+- `git diff --check 70652b948bf090008b1965c85daf36ea374daea4..HEAD` (PASS).
+
+Summary: repaired regression is green: 24/24 PASS, 0 FAIL, 0 SKIP. The complete testoracle candidate run PASSed in 23.105s; direct native run PASSed all 228 leaves; preserved parser run PASSed 68 contracts. Coverage: prescribed regression and behavior coverage executed; statement/branch coverage not measured.
+
+### Commit
+
+- Branch: `story/MAC-uzxr`
+- SHA: `bb5205c32e7b17ebefc5b050b7bf7417b0720e72`
+- Scope: `examples/go-crm/impl/internal/testoracle/fsm.go` only; exact string-token membership replaces substring matching. No Task change.
+
+### Custody
+
+- Six original frozen test hashes, supplemental field-membership test hash `201a470a38915709aab457daa4d94011cbaea873428b05a21c2d6e8b6754583b`, original 495-line fsm_test prefix, and Task hash were rechecked unchanged.
+- `git diff --check` clean; hard-TDD guard passed. No frozen test was edited.
+
+### pvg verify
+
+- `VERIFY: PASSED (1 files scanned, 0 issues)`
+
+### AC Verification
+
+| AC | Requirement | Evidence | Status |
+|---|---|---|---|
+| 1 | Exact closed structural-field membership | Public Parse rejects all ten composite unknown keys at root/state/transition/invoke while declared data controls remain unchanged | PASS |
+| 2 | Preserve reconciliation and existing Task behavior | Full parser/native run passes; Task source hash unchanged | PASS |
+| 3 | Preserve sensitivity proof | Full testoracle run passes native expected-state/action and extra-effect sensitivity families | PASS |
+| 4 | Preserve executed inventory | Direct five-suite run passes 228 leaves; full inventory meta family passes | PASS |
+| 5 | Fresh candidate proof and deliverable scope | Focused parser/native/meta runs pass, frozen custody and static/TDD checks pass | PASS |
+
+LEARNINGS:
+- Space-delimited allowlists need token equality; boundary substring matching admits composite keys.
+- Structural-name validation must remain scoped to structural objects so metadata/context data keys stay inert.
+- The supplemental frozen public-Parse regression makes this parser boundary directly auditable.
+
 # MAC-uzxr independent supplemental RED review
 
 Disposition: SUPPLEMENTAL RED APPROVED for exact candidate d3d257bd199801d88bdcce8ac8f89fdb8f6bd64c, not whole-story acceptance or GREEN implementation approval. New freeze: examples/go-crm/impl/internal/testoracle/fsm_field_membership_test.go,170lines,SHA256201a470a38915709aab457daa4d94011cbaea873428b05a21c2d6e8b6754583b. The original six frozen files and495-line prefix remain locked. No new test edit, grammar exception, production text or additional path is authorized by this disposition. Root must route separate GREEN within the current canonical scope.
