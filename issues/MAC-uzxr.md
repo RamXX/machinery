@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T06:51:32Z
-content_hash: "sha256:b1270f6a7f9a2a7d61989fbfc98706d5900b343baa93f39e754a78c23627baf8"
+content_hash: "sha256:66ee2a3209be9d6d6e38a8f61bc500c67bda62097f59d3c8e5e2a4d206d79b98"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
 ---
@@ -1071,3 +1071,6 @@ status: delivered
 - [x] AC #4:197 current rows mapped bidirectionally to218 successful actual witnesses;10 separate supplements;0SKIP.
 - [x] AC #5: all required frozen focused/parser/meta proof passed on committed candidate; unchanged source closure and reviewable consumer handoff; PM acceptance pending.
 
+
+### 2026-09-06T06:51:32Z ramirosalas
+REJECTED: R1 AC1/closed contract: public Parse at exact dc3a8a accepts ten unknown composite JSON keys across root/state/transition/invoke because fsm.go objectFields uses substring membership. Matched committed Session60-row control and four ordinary unknown-key rejections prove the gap. FIX: regression-first separate new test ownership via root/SrPM, exact-key implementation repair only in owned fsm.go, retain all six frozen tests; no test edit/grammar waiver or new RED approval. R2: actual verify-delivery3OK/6FAIL requires recognized canonical Implementation Evidence, CI/Test Results, Commands run, Summary, producing SHA and AC verification plus authoritative EOF contract; correct append-only on re-delivery and require9/9. Full independent report /tmp/MAC-uzxr-PM-green.7BaxI6/REVIEW.md SHA256dec4dd53d5f57dac813c9290fced9c4b366484fd8fc027da6ed8d695a3d2b74a. Frozen68/228/3/3/17 and default3/3/17 allPASS, no tampering; current raw proof preserved. No acceptance or source edits.
