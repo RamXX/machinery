@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:12:48Z
-content_hash: "sha256:fd46c93ddd93f6ab54f08862ceee01b70c7a13d65de4a157efee882e017478a5"
+updated_at: 2026-09-06T09:16:35Z
+content_hash: "sha256:b7e1dd533905e6c7353e224ef7bdd9a819a8b4922e7ca2e37051d52d4b7102e7"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -821,3 +821,19 @@ status: in_progress
 - [ ] Existing AC1-AC8 and pending same-source 96-case lane evidence remain required.
 - [ ] A8a-A8e: actual new supplemental custody proof pending.
 
+
+### 2026-09-06T09:16:35Z ramirosalas
+CANONICAL SUPPLEMENTAL OUTPUT MAP 2026-09-06
+PRODUCES:
+- scripts/integration-lane/main.go -> exact bounded current ownership in preceding approved scope revision; no additional implementation authority
+- scripts/integration-lane/custody_integration_test.go -> exact bounded current ownership in preceding approved scope revision; no additional implementation authority
+- testdata/integration-lanes/custody.json -> exact bounded current ownership in preceding approved scope revision; no additional implementation authority
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Parser-supported output declaration only; earlier current AC/proof map and healthy claim preserved.
+
+### proof
+- [ ] Every existing and supplemental current AC remains required; no execution proof claimed.
