@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T18:24:05Z
-content_hash: "sha256:9bec208c94d842d228bc3b7f382b5176aa934b87e30485d2f6c45a2421de18c4"
+updated_at: 2026-09-06T18:35:57Z
+content_hash: "sha256:2ef025352e14120cb1dcc2bf0e9704b422c474ebe1ead0c794430173ed4a6de1"
 blocks: [MAC-ou97]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-uzxr, MAC-p9wm]
 assignee: dev-MAC-yig6
@@ -901,3 +901,6 @@ RETAINED PRIOR EVIDENCE: /tmp/machinery-MAC-yig6-linux.hTo7li (HANDOFF cbf401b3.
 OPEN FOR PM ADJUDICATION: retained static finding verify_checkers_test.go:1595 [stub] 'return empty string' — legitimate no-match return vs stub-pattern; PM must read actual source. Diff budget: 3 new test files + authorized amendment = 528 added vs forecast 2 files/250-400 LOC — material overrun reporting per budget rule, controls not trimmed.
 
 No source/test/git/tracker/installed-asset changes during verification. Awaiting independent PM acceptance.
+
+### 2026-09-06T18:35:57Z ramirosalas
+ACCEPTED 2026-09-06 — independent PM verdict ACCEPTED (all 5 AC MET; stub finding adjudicated acceptable pre-existing no-match path; diff overrun pre-authorized 2026-09-06T09:29Z; Darwin replay by PM + coherent full Linux 4-command matrix). Merged story/MAC-yig6 ef50505 into epic/MAC-ui8a (no-ff); targeted selected-suite check on integrated epic: ok 15.186s. Review archive: /tmp/pm-yig6 acceptance verdict in session record.
