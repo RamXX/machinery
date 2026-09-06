@@ -876,11 +876,13 @@ func (s *Snapshot) captureAttestationSubject(impl string) (*attestationSubject, 
 		return nil, stable, fmt.Errorf("GV_SCOPE_ROOT: nonportable implementation locator %s", subject.manifest.Root)
 	}
 	excluded, err := filepath.Rel(stable.Logical(), filepath.Join(design, AttestationsFileName))
+	hasExcludedEntry := false
 	if err == nil && !escapesDesign(excluded) {
 		subject.exclusion = filepath.ToSlash(excluded)
+		hasExcludedEntry = true
 	}
 	for _, e := range stable.Entries() {
-		if e.Path == subject.exclusion {
+		if hasExcludedEntry && e.Path == subject.exclusion {
 			continue
 		}
 		entry := attestationEntry{Path: e.Path, Type: "directory", Mode: fmt.Sprintf("%04o", e.Mode)}
