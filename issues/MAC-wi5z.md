@@ -7,8 +7,8 @@ type: bug
 parent: MAC-ui8a
 created_at: 2026-09-06T16:33:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T16:34:21Z
-content_hash: "sha256:19ade8c7b10471eb9d73e34f49fa2031418e19ca420afe76fbc16da9c99afb2d"
+updated_at: 2026-09-06T16:35:05Z
+content_hash: "sha256:94cd9125ad42dbb571d76d856ec302843290574f10f418b4fd8eff23dc04d7a6"
 labels: [hard-tdd]
 follows: [MAC-sh60]
 blocked_by: [MAC-hgz1]
@@ -138,3 +138,6 @@ status: new
 
 ### 2026-09-06T16:34:21Z ramirosalas
 SUCCESSOR BOOKKEEPING 2026-09-06: User-approved compliant successor created from independently reviewed proposal SHA256 b4dffe48f6f706460fe849a6d43c0024b25ad6cbda1567aec9960932602da8c2. Canonical links: follows MAC-sh60; blocked by MAC-hgz1; additionally blocks MAC-vx24 and MAC-ou97. MAC-sh60 remains in_progress, claimed, hard-tdd/red-approved, and remains a blocker of both consumers because installed pvg 1.64.0/nd exposes no supported cancelled/superseded terminal transition or contract status; closed is documented as completed and auto-unblocks dependents. No acceptance, custom status, settings change, force close, old-edge removal, branch/worktree/source/test/native/private-tool/remote mutation occurred. Actual baseline B remains unresolved until MAC-hgz1 acceptance. All five AC remain pending; root must review this story before source dispatch.
+
+### 2026-09-06T16:35:05Z ramirosalas
+STRUCTURAL CHECKPOINT 2026-09-06: pvg nd dep cycles PASS (none); scoped RTM PASS (43 stories, 0 extracted/covered/uncovered). Scoped backlog lint scanned 58 issues and returned exit 1 with exactly two errors: produces-collision for internal/gates/oraclecov.go and internal/gates/oraclecov_negative_test.go, each simultaneously claimed by retained MAC-sh60 and successor MAC-wi5z without a dependency chain. Nine unrelated pre-existing vertical-slice review findings were also reported. The two errors are the expected consequence of unavailable canonical cancellation/supersession bookkeeping. No artificial successor-to-old completion dependency, old scope edit, terminal close, label/status change, edge removal, or queue bypass is authorized; MAC-wi5z remains open and blocked by MAC-hgz1, and must remain held/not dispatched pending root review plus a supported disposition policy. This lint result is structural evidence only, not AC/test/native proof.
