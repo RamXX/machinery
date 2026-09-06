@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:48:13Z
-content_hash: "sha256:b9bdb08d61caa0965e9e47b4c3a801d5353d3722b05f8c88626cdcb0edec78f7"
+updated_at: 2026-09-06T05:56:54Z
+content_hash: "sha256:c9e8e22f7bd55389e4e941fde2368cf6eed510a741a4e65d3282e3eadb739343"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
@@ -101,6 +101,30 @@ status: new
 
 
 ## Notes
+## Pre-RED method checkpoint (not delivery)
+
+External proposal: /tmp/MAC-lhu5-method.A1so4U/PROPOSAL.md; 299 lines; SHA256 1dd258d9b228e68e5b6bf8763653a591469c07264d56852a5d9b187f89668886. Prepared on clean story/MAC-lhu5 at 70652b948bf090008b1965c85daf36ea374daea4, Darwin 25.6.0 arm64. Read all six packets, root BUILD, domain YAML/rendered MD, architecture and all four committed machine/oracle/matrix triplets. Graph generation 2026-09-06T02:42:16Z used for bounded orientation; exact source fallback and best-effort limitations recorded.
+
+Source-established gaps: missing local schemas/ports/errors/bounds, M3 min-drawdown/integer-bps/exact10000 obligation, M4 next-state and M5 next-state/full-action obligations. M0 repeat-command idempotency contradicts architecture177/191 and Run.machine11 new-run rule. Review decisions required for price/value representation and exact comparison, stored rounding, complete ticker/weight tie rule, admission/limits/error policy, cross-source port errors (BusyError/TerminalError) and necessary M5 value/operational bounds. No numerical policy or adapter mapping silently selected.
+
+Method proposes actual packet-only allowed outcome/witness evaluation, independently sourced expected outcomes, matched complete/original/mutant file inputs, full parsed committed oracle plus entry/exit obligations and real source-built isolated CLI gates. It explicitly does not implement or claim a future optimizer/runtime. Exact decision and method approval remain required before any RED writes. Seven-path forecast640-945 changed lines versus original350-650 is justified in proposal; no cost measured and no proof omitted to fit. Initial future selector PortfolioPacket remains120s. All old packet hashes and stale gt.conformance-test-shape/g4.zero-context cover ownership handed off for later MAC-hgz1, after accepted p7+uzxr+lhu5 and before lnu6.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- git status --short empty; branch story/MAC-lhu5; HEAD70652b948bf090008b1965c85daf36ea374daea4. External proposal SHA256 verified as above.
+- No shared tests/packets/source/goldens/evidence edited; no build/tests/service/formal/design gate run, RED commit, delivery, release, approval or acceptance. Installed assets and remote state untouched.
+- STOP at story-required independent method/technical review checkpoint; root routes the reviewer. Five AC remain pending.
+
+### proof
+- [ ] AC #1: Complete source-consistent packet-alone contracts pending.
+- [ ] AC #2: Optimizer numerical decisions, obligations and properties pending independent review.
+- [ ] AC #3: Full next-state/ordered entry-transition-exit prospective conformance pending.
+- [ ] AC #4: Approved real packet-input positive/negative semantic proof and fresh-context review pending.
+- [ ] AC #5: Actual isolated checks, unchanged golden accounting and old/new hash handoff pending.
+
+
 ## nd_contract
 status: new
 
