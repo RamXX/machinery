@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:04Z
-content_hash: "sha256:a50938351e48f3c3c513765999e2df87c7e3c9adb7286af61991815f7b79574c"
+updated_at: 2026-09-06T12:45:56Z
+content_hash: "sha256:419e6a79ba74b88032f1ff75b7d02b86cae009f84dea2f9b3e0ae227ec0d5370"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -861,3 +861,80 @@ status: in_progress
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-06T12:45:56Z ramirosalas
+ACCEPTED PUBLIC CUSTODY CONTRACT / AUTHORITATIVE CURRENT 96-OBLIGATION MIGRATION SCOPE — 2026-09-06
+
+This true-EOF amendment selects the approved FULL prospective current-revision strategy. It supersedes only the earlier supplemental-only three-file/650-LOC addendum and, FOR THE FUTURE CURRENT REVISION ONLY, the prior absolute seven-file unchanged rule—subject to the independent before-edit gates below. It preserves every historical Body byte, failed/approved record, original seven-file Git identity, raw 96-obligation assertion/event record, current claim, held GREEN source and all stronger AC1–AC10/AC8 duties. It is not test-edit authorization, RED approval, source authorization, native proof, delivery or acceptance.
+
+ACCEPTED PRODUCER GROUNDING
+- MAC-p9wm is closed/accepted. Epic `2a73454d5f133a7b5fb4db0346232fd389810d28` contains native contract blob `1c1581d1aec324d979593613b44976ed0007c45b` / SHA256 `bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a` and companion blob `acce64fee8db5a7565e8fa33422334de125e913f` / SHA256 `171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d`.
+- Independent acceptance report SHA256 `19c0c4be6b4eb4b7035db3e9e576352ad1cfd3b24f414e287be7d8dfded38f8e`; approved V4 proposal/review SHA256 `d56d0104e965cace70e89b3be383ff3f51377c33ea8227c86833ef731be331be` / `dfa09b70d599a83d8cde10ab31d19fe5debd1eadf4c19f86c3aea79c0a9ac1e3`.
+
+PRODUCES:
+- scripts/integration-lane/main.go -> current required-lane implementation with explicit `--docker-endpoint`, once-only owned endpoint preparation input, authenticated pre-parser ServeInternal handling, root/child scope propagation, captured DockerRuntime after pinned provisioning and before native selection/replay, closed contributor service calls and exact execution/accounting/cleanup.
+- scripts/integration-lane/main_test.go -> prospectively revised current-revision native runner/inventory/accounting/wiring tests, only after exact before-edit authorization; historical bytes remain immutable evidence.
+- testdata/integration-lanes/schema.json -> prospectively versioned compatible closed current suite-fragment schema, preserving v1 history.
+- testdata/integration-lanes/pilot.json -> current required pilot registry with every old obligation mapped and executed.
+- testdata/integration-lanes/runtime-pins.json -> frozen v1 pin history plus only an independently reviewed compatible current revision where necessary; never fake-add local daemon identity/hash.
+- testdata/integration-lanes/pilot.integration.test.mjs -> current real Node pilot obligations, preserving historical identity/evidence.
+- testdata/integration-lanes/CONTRACT.md -> exact current contributor execution/migration contract; this is the held-tree thirteenth original owned path.
+- cmd/machinery/integration_lane_test.go -> current real OCI/formal/Node/full-path/generated-nested-Go native tests and independent foreign-owner harness controls.
+- scripts/preflight.sh -> same mandatory owned `python-version` custody leaf after owned provisioning and before preserved formal/C4/checker gates; remove the direct unowned step-15 `docker run --rm` smoke only in the authorized current revision.
+- .github/workflows/ci.yml -> mandatory Linux amd64 required-lane execution and service-free native separation.
+- .github/workflows/formal.yml -> preserved formal provisioning/execution ordering through the shared current lane.
+- .github/workflows/nightly.yml -> explicit provisioned versus service-free execution and no optional bypass.
+- Makefile -> exact shared required-lane entrypoint.
+- scripts/integration-lane/custody_integration_test.go -> NEW current native custody cases across lane/provisioning/helper/formal/suite/meta-test and conservative daemon lifecycle.
+- testdata/integration-lanes/custody.json -> NEW closed current custody fragment registering processscope, TLC, Alloy, probe, normal command, contributor service and lane-level leaves.
+- testdata/integration-lanes/custody-migration.json -> NEW exact 96-row historical-to-current obligation mapping with schema `machinery.integration.custody-migration/v1`, `old_source` `e55238223961fec922896c361d8af6cafc454a8e`, `new_revision` `custody-v3`.
+
+CONSUMES:
+- MAC-qlw2: internal/processscope/scope.go
+  spec: error-first InheritedInternalIO(context.Context) (InternalIO,bool,error); Open(context.Context,Options) (Scope,error); Scope.Run/Child/Attach/Close; ServeInternal([]string,InternalIO) (bool,int); exact Limits/Diagnostic and authenticated owner/cumulative cleanup semantics.
+- MAC-qlw2: internal/processscope/contributor_docker.go
+  spec: CaptureDockerRuntime(context.Context,Scope,DockerRuntimeRequest) (*DockerRuntime,error); InheritedDockerRuntime(context.Context,Scope,string) (*DockerRuntime,error); DockerRuntime.Descriptor/Validate/Close; OpenContributorDocker(context.Context,Scope,*DockerRuntime) (*ContributorDocker,error); ContributorDocker.Run/Close; InspectDockerContainer exact-ID read-only observation.
+- MAC-cn7q: internal/processcontrol/scope.go
+  spec: Run(context.Context,*exec.Cmd) error compatibility; WithScope(ctx,scope), AttachScope(cmd,scope), ExitStatus(err), with actual formal/runtimeclosure attachment after sanitation.
+- MAC-cn7q: internal/formal/process.go
+  source: actual openFormalJava identity probe and runBoundedProcess use inherited owner context/scope.
+- MAC-cn7q: internal/formal/alloy.go
+  source: actual Alloy probe and separate JVM launch use the SAME verified owner context/scope after sanitation.
+- MAC-cn7q: cmd/machinery/stubs.go
+  source: real newVerifyFormalCmd command-to-formal context/scope handoff.
+- MAC-p9wm: docs/native-custody-contract.md
+  schema: exact accepted endpoint/runtime/contributor/observation/unresolved-create/live-first/current-migration contract at SHA256 bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a.
+- MAC-p9wm: docs/test-assurance-contract.md
+  source: exact accepted contributor-lane, cumulative-budget, formal/nested-process and historical migration obligations at SHA256 171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d.
+- Existing source: scripts/shellcheck-files.txt
+  source: READ-ONLY closed executable-shell inventory used for mandatory validation; preserve its bytes exactly. If an actual later registry edit is necessary, stop for separate scope/budget investigation rather than silently creating a seventeenth write path.
+
+CURRENT PROSPECTIVE ACCEPTANCE / MIGRATION
+1. Scope is exactly SIXTEEN total WRITE paths: the 13 actual changed paths in exact Git diff `497419ab4512fcff765cd5feb27aed4c67b5608d..221525d7baf7a565ece9972d09bf916132e68050` listed above, plus `scripts/integration-lane/custody_integration_test.go`, `testdata/integration-lanes/custody.json` and `testdata/integration-lanes/custody-migration.json`. This corrects the earlier measured-versus-owned count: `scripts/shellcheck-files.txt` was previously declared owned but is unchanged in the held 13-path delta and is now a byte-identical READ-ONLY consumed validation input, not a seventeenth write path. Do not drop the Node pilot, CONTRACT.md or any old outcome. No `internal/processscope`, `internal/processcontrol`, `internal/formal` or `internal/runtimeclosure` source ownership transfers here.
+2. Historical v2 RED source `e55238223961fec922896c361d8af6cafc454a8e`, original v1 history, the seven old frozen byte identities, all old failed/passing raw events and exactly 96 unique old identities/assertion obligations remain immutable. Held unaccepted GREEN `221525d7baf7a565ece9972d09bf916132e68050` on original base `497419ab4512fcff765cd5feb27aed4c67b5608d` remains preserved and undelivered.
+3. Before ANY edit to the seven formerly frozen current paths, Sr PM plus an independent PM must review the exact proposed source/test/helper/fixture/config/dependency-lock inventory, every necessary byte edit and authorized test-edit commit markers. Before first RED/test authoring, record the actual RED author and a DIFFERENT actual calibration author; select the independent PM before review and the separate production GREEN author only after RED approval and before GREEN dispatch. Pre-inventory planning may precede those later role selections, but no source/test write precedes its applicable before-edit gate. Authorization is prospective and narrow. It does not rewrite history, waive a failed audit, bless held GREEN or allow test repair during GREEN.
+4. `custody-migration.json` contains exactly 96 unique old rows and no omission, extra or duplicate. Each row maps exact old source file, native test identity and assertion IDs to current file/test/assertion IDs plus bounded reason. Every prior outcome is preserved or strengthened and every mapped current leaf is registered and actually executes. No status/count-only mapping, historical-only selection, omitted old assertion, invented replacement or inflation by new custody leaves is accepted.
+5. Current replay executes ALL 96 mapped obligations plus separately inventoried new custody leaves on the same candidate on native Linux amd64 AND Darwin arm64, with no skip/cache/empty/lost/duplicate/partial/fabricated-summary success. Preserve the known historical checkpoint truth: 64 native leaves passed; tagged 31 were 30 pass/1 cold-cache alias fail with the corrected cold-cache leaf separately passing; standalone Node and full current-lane replay remain owed. These are history, not current acceptance.
+6. Replace direct Docker ownership seams only through real authenticated custody: integrationOwnContainer, generated nested-Go TestPilot daemon work, the independently owned `sleep-900` foreign sentinel and preflight step-15 Python-version smoke. The replacement Python-version leaf remains mandatory after owned provisioning and before every preserved checker gate. Generated/native tests retain actual assertion, timeout, output and accounting semantics; source/receipt-only checks do not replace execution.
+7. `--docker-endpoint` is an explicit exact transport. Preflight resolves its local Unix socket once during owned bounded preparation unless explicitly supplied, freezes/passes the same value to lane and checker, and no capture/run/replay/cleanup rereads ambient Docker context. Pinned image provisioning occurs under registered custody first; runtime capture follows and precedes selection/replay. Unsupported remote endpoints fail. The generated per-invocation 0400 Docker descriptor is external and live-bound; it is not committed and no fake daemon hash is added to frozen runtime-pins v1.
+8. Actual helper, TLC, Alloy, probe, native suite and recursive full-path/meta-test processes inherit the same owner scope AFTER environment sanitation. One cumulative wall deadline and fixed owner ceiling cover all work; one shared cleanup grace covers cleanup-only helpers registered under the original grace. No Background/unscoped fallback, per-phase renewal, post-release runtime probe or unresolved create/start false-clean is allowed.
+9. Live-first tests independently observe the exact real container/JVM/helper before the actual failure/cancel/overflow/signal/owner-loss trigger; exact owned absence precedes return while separate foreign owner and caller sentinel survive. Historical PID/PGID/label/CID text is never cleanup authority. Same-assertion prospective unsafe/safe variants freeze before replay; reference safe success never substitutes for production GREEN.
+10. DIFF BUDGET: forecast 4,500–6,500 changed LOC TOTAL from original base `497419ab4512fcff765cd5feb27aed4c67b5608d`, INCLUDING the held 3,015 changed LOC. This is not 3,015 plus another ceiling. Investigate overrun explicitly and never trim the 96 mapped obligations or new custody/native proofs to fit.
+11. MAC-hpqp remains the lane/current-revision producer for MAC-yhg5. Product checker implementation is not a prerequisite for the 96-obligation pilot beyond the existing one-way `MAC-hpqp -> MAC-yhg5`; do not add a reverse edge or cycle. All original stronger AC1–AC10, no-preflight-until-final-gate, no remote/install/unrelated cleanup and standalone Machinery rules remain.
+
+CURRENT HOLD / OWNER
+- Owner remains `dev-MAC-hpqp`; status remains in_progress. Upstream attachment implementation from MAC-qlw2/MAC-cn7q and the exact before-edit independent review are required before resuming the architecture-dependent current revision. Accepted MAC-p9wm is satisfied context, not a blocker.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Exact accepted producer, original RED, held GREEN, historical counts, sixteen paths and current migration schema are fixed above.
+- Canonical repair is tracker-only; no source/test/ref/worktree/runtime/native/preflight/remote/install action occurred.
+
+### proof
+- [x] Full prospective current 96-obligation migration strategy and sixteen-path budget are bounded.
+- [x] Historical frozen bytes/evidence and one-way dependency chain are preserved.
+- [ ] Exact before-edit inventory, staged actual-role selection, authorized test-edit markers and new RED approval remain pending.
+- [ ] All 96 current mappings plus new custody leaves on the same Linux amd64/Darwin arm64 candidate remain pending.
+
