@@ -9,9 +9,9 @@ parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
 updated_at: 2026-09-06T08:58:18Z
-content_hash: "sha256:40845d883e8b289085a0afa70fa0a4d2d5db53ed51e8ddf744bd1a93511d7617"
+content_hash: "sha256:8105e71322bf7c296439b14f84f6c00699d660ea2099b66f1ae4ef04256b7046"
 blocked_by: [MAC-qlw2]
-blocks: [MAC-pe9v, MAC-hpqp]
+blocks: [MAC-pe9v, MAC-hpqp, MAC-vx24]
 ---
 
 ## Description
@@ -93,10 +93,11 @@ status: new
 - 2026-09-06T09:09:57Z dep_added: blocked_by MAC-qlw2
 - 2026-09-06T09:10:04Z dep_added: blocks MAC-pe9v
 - 2026-09-06T09:10:14Z dep_added: blocks MAC-hpqp
+- 2026-09-06T09:10:15Z dep_added: blocks MAC-vx24
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-pe9v]], [[MAC-hpqp]]
+- Blocks: [[MAC-pe9v]], [[MAC-hpqp]], [[MAC-vx24]]
 - Blocked by: [[MAC-qlw2]]
 
 ## Comments
