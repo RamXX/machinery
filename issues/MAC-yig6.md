@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:15:26Z
-content_hash: "sha256:f767bd08fb5e6d039d3c68db73f7af56b16d4a2808008539b2d349bba7c10a26"
+updated_at: 2026-09-06T10:15:38Z
+content_hash: "sha256:fec0a703f4045809d7802a1eedfce0285c60465b9a1545b7053dc00ea19260eb"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-uzxr]
@@ -840,3 +840,23 @@ status: in_progress
 - [x] AC #3 Darwin: selected native/covered inventory includes strict protocol and stream/bounds/timeout controls with zero skips.
 - [ ] AC #4 FINAL HOLD: execute full report matrix on native Linux amd64 with required environment, source identity, profiles, raw logs, and cleanup proof.
 - [ ] AC #5 FINAL HOLD: independent PM review/acceptance after Linux proof; no delivery/acceptance/closure was invoked.
+
+### 2026-09-06T10:15:38Z ramirosalas
+## REPORT HASH CORRECTION
+
+- The actual SHA256 of /tmp/machinery-yig6-green.hZtIWT/REPORT.md is 8ecba89eb785887bfe8c4d5f145740bac01f8c04145fef6bd5fc9d80ce15e8c6. The preceding a2b4... value was erroneous and is superseded by this line.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Candidate ef505052dc73cb9032dd91f1a3f99837f76204a8 is unchanged and clean.
+- Corrected event accounting and immutable report hash are recorded; no source, ref, test, or runtime rerun changed.
+- Native Linux amd64 remains unavailable and unwaived.
+
+### proof
+- [x] AC #1 Darwin: original native/covered evidence is retained with correct event classification.
+- [x] AC #2 Darwin: selected covered real fixture execution passes with 24 test/subtest PASS plus one package PASS.
+- [x] AC #3 Darwin: strict protocol plus stream/bounds/timeout controls executed with zero skips.
+- [ ] AC #4 FINAL HOLD: execute the report matrix on a native Linux amd64 host.
+- [ ] AC #5 FINAL HOLD: independent PM review/acceptance after Linux evidence.
