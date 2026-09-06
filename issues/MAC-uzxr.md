@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:29:31Z
-content_hash: "sha256:951353e0a0bdb2f241d90ac530cfff97863a921e407aec110a2b277a3098cffa"
+updated_at: 2026-09-06T06:50:36Z
+content_hash: "sha256:81df109e1ee530a45f2d4ac4aa19b25010fad210442ad5d0943357121618fc7b"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
@@ -168,6 +168,111 @@ Read complete author checkpoint/audit.cjs/audit.jsonl and verified all suppliedh
 No further storage repair required. Author may prepare complete EXTERNAL later patch and measured per-file decomposition for separate exact PM/SrPM review. Applying all5suite/helper/parser/additive amendments stays HELD. No fullapprove-red/deliver/accept/reject transition; no new test-edit permission, AC/path/scope change, candidate parser/Taskfix proof or consumerclaimrenewal.
 SR PM MEASURED FORECAST / PRESERVATION REPAIR. Canonical eight paths and five AC unchanged; actual external proposal2450changed plus503historical=2953 cumulative beforeGREEN, aggregate2945changed. Conditional3300-3500 cumulative/3200-3400 aggregate forecast assumes prior300-450-line parser estimate and separately charges48-line scaffold replacement plus narrowTask correction. Old750-1150/provisional1500-2200 obsolete; no proof trimmed or test permission granted. First --description command succeeded but verification failed because nd treats same-level nested headings as section boundaries and retained an old canonical suffix. Original failed readback preserved in /tmp/machinery-private-triage.JF2BDG/READONLY-HANDOFF.md. Installed --body-file has the same Description semantics. Root-authorized guarded pvg nd edit bound full live raw header/body to journal export and checked an external apply_patch trial, removed ONLY duplicate canonical block under nd exclusive lock, then verified exact full body90c15690a83bd2200723fdaa8bdd27e3871e189959b4936083afe06336d35590 and identical tail/metadata except normal hash/time. Exact expected/proposed manifests and editor remain external. First hgz1 preparation-only cross-realm assertion failed before any tracker write, then root explicitly authorized scalar-array comparison correction; historical failure is not proof. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
 EXPANDED RED FREEZE CHECKPOINT: exact authorized seven-path patch2f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249 committed acf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f over4ef6baf with literal [test-edit-authorized] and tdd-red. Full report /tmp/MAC-uzxr-final-red.nOXYuf/REVIEW.md SHA2565cb98377240aa8be22f0b9d88b74a7a6bd959fbfd8f1efb2907d08b02f68ad5c. Exact seven result hashes/frozen495prefix/99committedexamplefiles/218originaltuples/twoterminalbodies verified; Task unchanged. Measured2120add330del2450changed/net1790; historical503changed separate. Actual all10 contractroots and focusednative plus3meta families ran15.526s: contracts0PASS28FAIL0SKIP, focused10supplementPASS5transitionrootFAIL0SKIP, original/candidate/remainingmeta3/3/17outerFAIL. All current parser/control failures NONQUALIFYING ErrScaffold; all intended later mutants/most nestedcontractbranches unreached. Actual23children10supplementPASS25transitionrootFAIL0SKIP,0transitionrowleaves/0mutants; all23fixturecwdsremoved. Export52files=46receipts/rawlogs+6manifests47committedinputhasheseach;17latercontrols fail before manifest export, no nonexistent manifest credited. Raw and complete native identity receipts in report. Normal verify-tdd3commits0violations/no waiver; scoped static7files0issues; gofmt/diffcheckclean. Original genuine998a5a3 threeunsafeacceptedouterFAIL200childPASS, validatedstorage4ef6baf bothmodes, historical225baseline and separate actualTaskentrydefect preserved as distinct evidence. No parserimplementation, productionedit, source/testcorrection, delivery, approve-red, GREEN, consumerclaimrenewal, remote/toolchain/service changes or background process. STOP clean for independent combined-evidence RED adjudication.
+# MAC-uzxr independent GREEN review — REJECTED
+
+Candidate: dc3a8a365c21d5370c0825de992e2461ea0785a9. Base: 70652b948bf090008b1965c85daf36ea374daea4. Frozen RED: acf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f.
+
+## Decision and exhaustive established blockers
+
+REJECTED: one reproduced implementation defect in the agreed closed parser contract, plus a separate delivery-record shape failure. The six frozen files are unchanged and every required frozen test passes. No frozen test is alleged wrong, and no test edit or grammar exception is authorized by this decision.
+
+### R1 — unknown composite JSON fields bypass the closed structural allowlist
+
+EXPECTED: AC1 requires malformed inputs to fail; the independently reviewed closed CONTRACT.md expressly says unknown fields fail even when underscore-prefixed, only listed metadata positions are data, and unsupported structural shapes produce oracle-parse. Root, state, transition and invoke allowed-field sets are exact field names.
+
+DELIVERED: examples/go-crm/impl/internal/testoracle/fsm.go:305–316 uses strings.Contains(" "+allowed+" ", " "+key+" ") for membership. A key containing two adjacent allowed names matches that substring and is silently ignored. Call sites at lines372,415,462,500 expose the error in all four structural scopes.
+
+Actual public Parse counterexample (unmodified candidate package, separate external diagnostic module crm/pmprobe with local replace to the exact Git archive): `GOWORK=off GOPROXY=off GOTOOLCHAIN=local go run -mod=mod .`, cwd /tmp/MAC-uzxr-PM-green.7BaxI6/probe, wrapper deadline130s, actual356ms, exit0, no stderr. Exit0 means the diagnostic program ran, NOT that closed parsing met its contract. The matched committed Session pair yields60rows,nil; ten added unknown composite fields also incorrectly yield60rows,nil:
+
+| Structural scope | Incorrectly accepted unknown keys |
+|---|---|
+| Root | `id initial`, `_comment _role`, `context states` |
+| State | `on after`, `type entry`, `invoke _refusal` |
+| Transition | `target guard`, `guard actions` |
+| Invoke | `src input`, `onDone onError` |
+
+Every inserted value is an arbitrary object `{unexpectedSemanticData:true}`, not allowed metadata. A matched ordinary `notAllowed` key at each of the same four scopes correctly yields0rows, `oracle-parse: unknown field notAllowed`. Thus the rejection path is reached for ordinary unknowns while composite names bypass it. The real parser is called directly; no stub, rewritten parser, fake process result, test edit, or synthetic success log. The separate diagnostic selects existing Session structural objects; its map iteration does not alter the invariant outcome. It never writes the candidate source/oracles.
+
+GAP: exact allowlist membership is not enforced. The passing frozen negative cases cover ordinary unknown keys but do not cover names spanning adjacent allowlist tokens. This is an implementation counterexample to the existing closed contract, not an invented broader grammar, execution-authentication requirement, or demand to relax frozen tests.
+
+FIX: root/Sr PM should arrange bounded same-story regression-first ownership for a separate new regression file (not any of the six frozen files). The regression must call the public parser with matched valid controls and assert oracle-parse for these composite keys at all four scopes, including `_comment _role`; retain acceptance of the actual declared metadata/context dialect. Demonstrate genuine failing assertions on dc3a8a before the separate implementation repair. Replace substring membership with exact field-name membership in owned fsm.go; do not change allowed fields, parser API, existing frozen tests, generated oracles, Task behavior, or unrelated source. Return through the independent regression/RED checkpoint and subsequent GREEN proof; this review does not approve that future RED or grant a new path implicitly. The existing six test hashes remain locked.
+
+Raw probe.stdout SHA2566158b871c33f6ced2ce1e9dc2a442247dae0b81a66c9e4c73032a73cfa80b2e2. Probe main.go SHA256913a35384167fe1432ac45e228c1c99c1d7cefad77096786a409aaeeb77dbd51; probe/go.mod SHA256bca848201dbb16aafff54eee53bb39304f093678cf1149359a9c5222f37b4fac. Exact command/environment/deadline/hash receipt: probe-receipt.json. Candidate fsm.go SHA2568d2675a64b04050cb11583d240db0f6932d1d1a027900861bc4c6f8c4695189e.
+
+### R2 — supported delivery proof validation fails six shape checks
+
+EXPECTED: supported canonical implementation evidence, CI/Test Results, Commands run:, Summary:, producing commit SHA, and AC verification must be recognized by pvg story verify-delivery, with an authoritative delivered contract at EOF.
+
+DELIVERED: substantive command/results/commit/AC evidence really exists in the fully read report and live Body. Nevertheless the actual supported verifier exits1:3OK (delivered label, last contract, EOF),6FAIL (missing recognized `## Implementation Evidence`, CI/Test Results section, `Commands run:` list, `Summary:` line, commit SHA, AC checklist/table). This is a record shape/placement defect, not absence of executed tests or their source SHA.
+
+GAP: the normal delivery validator is not green; no waiver or manual acceptance is appropriate.
+
+FIX: during re-delivery add correctly shaped canonical evidence through supported append-only nd operations, preserving all prior substantive evidence, historical failures and terminal contracts. Never --description or --body-file. Verify the actual last contract is delivered at EOF, and require verify-delivery9OK/0FAIL before PM acceptance. Do not alter source just to correct tracker formatting. Raw delivery-shape.stdout SHA256f71c17f110481fd8250dd75e25e278ed5e3a03a0aeb2560a270250a7f61904be; full command receipt preserved.
+
+No other implementation, scope, test-integrity, action semantics, process-lifecycle, runtime-inventory, or cost blocker was established by this complete bounded review. This is not a claim of absence of every possible defect.
+
+## Review method and source closure
+
+Applied pm_acceptor GREEN lens, developer/nd/pvg/vault-knowledge/codebase-memory discipline. Fully read current canonical ownership, five AC, authoritative Notes/contracts, current author report and closed CONTRACT.md SHA256b3f444c5398b558916dec80a4dacf8c651420b6aa36d876326d606312baf8cdd. Prior exact amendment review296a026c28fcaf4b3b25bfdcaccf7edc423d5801b7c93d6dac89a253350b14d2 remains applicable to byte-identical frozen tests, not a substitute for current source/runtime checks.
+
+Graph project Users-ramirosalas-workspace-machinery is ready and indexes main generation2026-09-06T02:42:16Z. Six existing paths report metadata_match/no_recorded_issue best effort; new testoracle files are missing from that main index. Exact committed Git objects and a new external `git archive dc3a8a... examples/go-crm` supply candidate source. No developer-worktree internals were accessed. The author external audit.cjs was read as evidence, NOT executed (it references its dev checkout); independent audit uses only exact Git objects, own archive and external raw proofs.
+
+All99 committed example files match own archive byte-for-byte after all diagnostics. Exactly two implementation paths differ from frozen RED; six frozen test hashes and all other source/config/module/oracle/BUILD/evidence bytes remain intact. Global base..candidate diff has exactly the original eight story paths. Complete99-path hash inventory is in audit.json. Six frozen hashes:
+
+- internal/cli/command_test.go:38945b9307d97dadb872ac5a261ff86d712c218282774404b432842e34577d60
+- internal/domain/deal_test.go:2bfd0893253b9f3c4b6cf1badbf3402a952551f5b4f5124a3d0a9afb7bf432cd
+- internal/domain/task_test.go:35b8a05a710792ff21dd827432d658deba1ee190b8739196b084cdc61f7b2b88
+- internal/domain/user_test.go:d4fab40b760e5f1a94a5cab88bea6625495c04dd1690dc197818bfd1d056b53d
+- internal/session/machine_test.go:97e612a68e22b32010ec7c696cb1ee248115f5a41f3b80400a40160a8782a11f
+- internal/testoracle/fsm_test.go:4578841816e77712ed249a349e1f63c13c7eac233f15eccacb2d0ee916527b25
+
+All paths above relative examples/go-crm/impl. Original495-line prefix remains326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba.
+
+The full643-line implementation was read. Token-wise JSON decoding detects nested duplicates/trailing values; typed root/state/transition/invoke validation, exact state/row counterpart reconciliation and alternative order precede fallback reachability. Markdown validates required headings/tables/columns/separators/footer, identities, stable stimulus hashes, references and final-state outgoing edges. Stable IDs deliberately exclude target/actions. Bind uses actual pre-Fire closed guard facts and first enabled alternative; Finish detects unused parsed rows. Check uses full ordered equality; external/self effects are exit+transition+entry, internal transition-only, no implicit always or initial entry. The allowlist defect above is the established exception to structural closure.
+
+All five typed wrappers remain the previously reviewed exact frozen bytes: original218 setup/event tuples/order preserved, fact derivation independent of expected row outcome, CLI fixture argv/callback purity and Session pre-Fire time bounds intact, registrations before Fire, observations only after all assertions and exact actual native-name check. Source and runtime confirm real Fire calls, no fake execution seam. Candidate verifier checks real package/test lifecycle and bidirectional row/registration/observation/native sets, slash-bearing names, missing/duplicate/extra identities;218 mandatory witnesses are a subset, not a row ceiling.
+
+Task SHA2563d8145088360489fde9a187be00bc89d350ceaca9619120e1721f1328e5cb252. Exact fallback diff2add/1delete executes existing recordTaskClosed after recordRoutingError and Cancelled assignment, returns both action names in order. Actual Rejection clearing is checked for fallback754183, normalCancelled67b0ff and Donec56bd7. Valid prior branches, non-always context and terminal supplements are preserved. Both exact Task regression anchors match once; missing-call/name-only mutations fail at intended exact actions/context diagnostics. No other production edit.
+
+Documentation inventory/search found no changed public command/config contract requiring an in-scope doc update; BUILD/consumer evidence are explicitly out of scope and unchanged. Native proof flag/storage behavior stays frozen. No Paivot product dependency, framework, API seam, toolchain/source-selector mechanism, or service dependency was added.
+
+## Independent required execution and raw hashes
+
+Own exact archive cwd /tmp/MAC-uzxr-PM-green.7BaxI6/examples/go-crm/impl; Go1.27.1 darwin/arm64; GOWORK=off GOPROXY=off GOTOOLCHAIN=local. Every Go test command uses -count=1. Full argv/environment/cwd, bounded durations, actual terminals and raw SHA are in named `*-receipt.json`. Go120s contracts/native and300s meta; diagnostic runner130s/310s; frozen child context125s/WaitDelay5s and outer270s unchanged. All synchronous, no timeout, panic, compile-only, skip or unexpected stderr credited.
+
+| Group | Actual terminal leaves | Wall ms | Raw JSONL SHA256 |
+|---|---:|---:|---|
+| contracts |68PASS/0FAIL/0SKIP|601|f7990a6b9ed4390b79654bc01d1fe5bfb734aa609dbf8a3b34a6388ff5994465|
+| focused |228PASS/0FAIL/0SKIP|1107|469ad67226e53e9a0b0dc362c6a08fcaf88e7df6a6ea49bab6cf667eb2dc33ac|
+| TestFSMNativeOracleSensitivity |3PASS/0FAIL/0SKIP|3421|ca86d48c08e658c13960f75486eeaf2b24f27588ef864bbe2df9a4c9f8e13ac1|
+| TestFSMCandidateExecutedInventory |3PASS/0FAIL/0SKIP|2114|d6a999812a2942501bf4b1fcd78a11614b6a04e423f9fc674b2cbaf26f188d9b|
+| TestFSMRemainingNativeSensitivity |17PASS/0FAIL/0SKIP|18556|8d84f0fe567bcd29903da1016c5c1b5b537f113fe00704d2d5e3d205cc2c5904|
+| default NativeOracleSensitivity |3PASS/0FAIL/0SKIP|3425|9acb41262ea1ef212120ba9687ee19863ccb1b0d199868ea8b82d432b6ac2108|
+| default CandidateExecutedInventory |3PASS/0FAIL/0SKIP|2172|3f1c3557e4fe8a7af46a2ca3134f768da6be90c74c87f82539ee38eaa8e3f376|
+| default RemainingNativeSensitivity |17PASS/0FAIL/0SKIP|18496|e8859a3bf441cc854a497edb85dcdf5bd708914a2d63cf64cda1599199ff8565|
+
+Five-group total25.799s; three default families24.093s. Existing Go build cache used, not a cold-build claim. Explicit full command selectors are in run.cjs and receipts; all three exported meta groups additionally use `-args -fsm-native-proof-dir=/private/tmp/MAC-uzxr-PM-green.7BaxI6`. Default families omit that flag.
+
+Independent audit reads BOTH own and author raw artifacts and reconstructs source expectations from Git, not author summaries. For each:197rows,47states,118orderedgroups,218registered/218successful observations and10separate supplements. Deal58rows/75witnesses,Task31/35,User20/20,Session60/60,CommandExecution28/28. Exact actual full native leaf set agrees with preserved frozen witness arrays, including slash labels, and all observations occur between native run and terminalPASS after registration. Expected next/actions independently reconciled from committed MD cells and JSON entry/exit data; rows covered both ways. Current row/witness coverage100%; no statement/branch/full-repository coverage claim.
+
+For each exported family set:43real children,28exit0/15intendedexit1; exact all native identities and individual outcomes checked:1398PASS plus15intendedFAIL (6semantic target leaves,9structural pre-Fire roots),0SKIP. Twenty exact unsafe mutations reconstructed from once-only original-byte anchors,47paths in each of43complete manifests,149export artifacts. Later17exact mutation vectors match the independently reviewed AST inventory. All matched controls pass complete selected suites. Five inventory mutants have actual native assertionsPASS but real malformed output: duplicate registration120/60reg/obs; missing0/60; unknown60/60 with UnknownNative identities; missingexecution60/0; duplicateexecution60/120. Frozen verifier rejects each at its required diagnostic; structural outcomes are not semantic proof.
+
+43export receipt cwd references resolve to23removed fixtures. Each default replay set adds43actual children; all3default proof paths and23distinct fixture paths are absent after completion (46references/26distinctpaths). Explicit exports retained intentionally. All99archive source hashes remain exact after execution.
+
+Audit artifact audit.json SHA256f5e3902319197e3394b6ac19f3b6ad2a6be71286c32bdc2e6994db5f8a203926; audit.cjs08d62eb4ce5522397fbf2a0457c5b2bb7e477d1e79e451ab0426ffdce84420d1; audit.stdout2389ac7b438d1950b24d2c3b992cec557e3cc7c9eb9c27af8cf23bd95dd399f1. Raw receipts, full per-child native names/outcomes,47-input hashes, mutations and default cleanup paths are retained. These are ordinary reviewable execution artifacts, NOT authenticated provenance or an attestation.
+
+## Quality, cost, history and AC disposition
+
+- Normal pvg story verify-tdd explicit base..candidate range:4commits,0violations; raw e3f056818bfe3379bd7bd1984daf3af39d28e5b43c9093107627942878d7aa36. Eight explicitly scoped source/test files static0issues; raw c927a11a18cf52ecaa85f4a1b108adc1e2c3200cc88af9cff2d2abe9f874f236. Go signatures typed, no scaffold/TODO stubs credited, git diff --check clean. Static success is not parser correctness.
+- Actual GREEN parser607add/12delete=619changed,Task2add/1delete=3, total622. Prior2953+622=3575cumulative; base aggregate3212add/331delete=3543changed across8paths. Conditional3300–3500/3200–3400 forecasts were not caps; explicit closed validation explains modest excess and no scope/path/API expansion. Cost is not a rejection reason and no proof is trimmed. Author25.381s vs PM25.799s required groups is consistent.
+- Preserved original genuine semantic RED3unsafe-accepted outerFAIL/200childPASS, storage verification and separate unchanged Task defect are not rewritten. Expanded scaffold ErrScaffold failures remain NONQUALIFYING historical evidence. Current GREEN passes do not retroactively convert them to RED evidence.
+- Reviewer utility first audited diagnostic substrings against escaped raw JSON and failed its own assertion; corrected the external audit to inspect decoded Output, then all audit checks pass. This utility failure is not a product/native failure or proof credit. A nonexistent top-level example README lookup was corrected with exact archived Markdown inventory; no source action resulted.
+- AC1 NOT MET because of R1. AC2 verified for current semantics, Task context and frozen adversarial controls. AC3 verified for all specified real native variants. AC4 verified current bidirectional inventory. AC5 full story handoff NOT ACCEPTED pending R1 repair and recognized R2 delivery evidence, despite required native proof passing. All newly repaired behavior must return with fresh candidate proof.
+- LEARNINGS: exact allowed-name membership cannot use a substring shortcut; passing ordinary unknown-key tests does not establish a closed schema. Preserve negative evidence by class and validate delivery record shape separately from substantive runtime evidence.
+
+No acceptance/close/merge/claim renewal, remote/preflight/install/update/assets/service/Dagger operation, developer-worktree access, or source/test edit was performed by PM. Root owns routing and any new regression ownership. Main497419ab4512fcff765cd5feb27aed4c67b5608d and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged. Supported rejection and authoritative EOF readback are recorded separately in FINAL.md after this report is hashed.
+
+
 ## nd_contract
 status: delivered
 
