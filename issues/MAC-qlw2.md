@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T17:01:33Z
-content_hash: "sha256:4b191be01691ba9751457178b2a89d26d1e8b3f42844576aee348f574922c9a9"
+updated_at: 2026-09-06T17:01:55Z
+content_hash: "sha256:0859eacc08fa3a7fdcdd3e57c4285c3caaac362b472d3c0966cdd6ba28f8ecd3"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0, MAC-p9wm]
 assignee: dev-MAC-qlw2
@@ -310,3 +310,6 @@ PRE-EDIT V3 REVIEW CHECKPOINT ONLY. Independent /tmp/MAC-qlw2-inventory-v3-revie
 
 ### 2026-09-06T15:46:58Z ramirosalas
 EXECUTION BLOCKER CHECKPOINT. The delegated external V4 inventory correction by /root/custody_red_inventory was stopped by platform safety controls before a candidate was delivered. Root will not route around that restriction. Frozen V3 GAPS_FOUND report/addendum and all prior evidence remain authoritative; no V4 approval, first-edit authority, source/test/calibration/native execution or acceptance is claimed. Existing claim/status/dependencies stay unchanged; no recovery/release or audit exception. Independent portfolio work may finish separately. Canonical distinct calibration appointment, approved corrected method, prospective H01/forecast authorization, native Linux executor and final gates remain pending.
+
+### 2026-09-06T17:01:55Z ramirosalas
+USER-TABLED 2026-09-06: user explicitly asked to table this issue and continue independent areas. Supported pvg nd defer MAC-qlw2 changed only scheduling status to deferred; prior claim, hard-TDD label, dependencies, branch and failed/review history retained. This is not completion, cancellation, test approval, or waiver of the final assurance requirement. No new custody planning/source/test execution assigned. Consumers remain blocked. Resume only when the owner reopens this issue; independent work may continue without claiming full custody/final assurance.
