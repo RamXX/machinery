@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:37:21Z
-content_hash: "sha256:17236940b63fd5a10e94391015e00d1387b38530b75a0555b6858a063871bd0e"
+updated_at: 2026-09-06T05:44:51Z
+content_hash: "sha256:9112d023322b6a6a898b337c1cbed4abf2d24f18cca72b514a023fb7eb906cd4"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -23,7 +23,7 @@ Strengthen Machinery mission-critical assurance with observable fail-closed beha
 Assessment F3: gt.conformance-test-shape covers BUILD artifacts, while g4.pack-event-discipline covers pack. Neither binds tested/reviewed implementation. Historic Ga ancestor acceptance is valid history, not current-tree assurance. Preserve judgment-vs-mechanical distinction.
 
 ## Ownership
-The following 13 required files are the reviewed ownership boundary; implementation and test editing remain subject to their independent phase authorizations. You are not alone: preserve other edits, especially accepted MAC-p8ce/MAC-olrx behavior; coordinate shared paths. No generic helper factoring is authorized. Optional internal/gates/attest_green_test.go is the reported fourteenth file only for independent supplemental GREEN proof.
+The original13 required files plus the already used optional fourteenth GREEN supplemental file remain the implementation boundary. Two additional existing test files are CONDITIONALLY scoped below solely for the exact independently reviewed fixture amendment; this bookkeeping is not TEST-EDIT AUTHORIZED. The following original13 required files are the reviewed ownership boundary; implementation and test editing remain subject to their independent phase authorizations. You are not alone: preserve other edits, especially accepted MAC-p8ce/MAC-olrx behavior; coordinate shared paths. No generic helper factoring is authorized. Optional internal/gates/attest_green_test.go is the reported fourteenth file only for independent supplemental GREEN proof.
 
 ## Boundary Map
 PRODUCES:
@@ -41,6 +41,8 @@ PRODUCES:
 - internal/hook/hook.go -> stop snapshot finalization before decision/state-clear ordering only
 - internal/hook/attestation_snapshot_test.go -> NEW real Stop/SubagentStop configured ledger/custody proof
 - internal/gates/attest_green_test.go -> OPTIONAL new-symbol GREEN supplemental tests only, report purpose and cost; never edit frozen RED
+- internal/hook/hook_test.go -> CONDITIONAL only func copyTree(t *testing.T, src, dst string), exact36-line additive temporary-fixture v1-to-v2 plan/history construction proposed against51454e0, patch ae6e9241ea5d7b0c4556b2ee02c6e2910b2663c2452761e7984f1c6663252971; editable only after separate explicit independent PM exact-text authorization. Preserve all original helper/caller/assertion bytes outside that exact hunk.
+- internal/gates/obligation_ownership_test.go -> CONDITIONAL only func obligationParentFixture(t *testing.T) (string,string), exact29-line additive parent temporary-fixture construction in the same patch, under the same separate independent PM authorization. No assertion/Ga/selector/current-credit relaxation.
 CONSUMES:
 - Existing Machinery implementation at epic a82277a; preserve compatibility and generic snapshot semantics.
   spec: CheckAttestations(design string) *Gate; attestationRequiredPaths(g *Gate, design, claim string) []string; stableAttestationHashes(paths []string) ([]string, error); (*Snapshot).RunSelected(impl string, sel Selection, opt RunOptions) []*Gate; SelectRunAndNote(design, impl, gateList string, opt RunOptions) (Selection, []*Gate, string, error); (*designlock.Lock).MaterializeExternalTree(path string) (*ExternalTreeSnapshot, error) remains generic-only, not strict-subject authority.
@@ -65,7 +67,11 @@ CONSUMES:
 - Other assessment areas have sibling stories; final preflight/local main merge/isolated candidate binary are final gate responsibilities. Do not omit small directly related safety fixes.
 
 ## DIFF BUDGET
-- Current independently reviewed forecast: 13 required paths plus the already-authorized optional fourteenth GREEN-supplemental file, approximately 2710–3310 total changed LOC (~1485 RED,175–375 supplemental GREEN tests,900–1250 production,150–200 docs/help; combined tests~1660–1860). Supersedes the former1900–2900 and original4–7/<1000 estimates as cost history only. Measured repaired RED47ba44906a09bc2fa010092a86b133d0d749c52c is five test files,1484 insertions/3 deletions (1487 changed lines); original7ec5d609 had1475 insertions/3 deletions. Rounded forecasts are not exact final totals, caps, completion proof or permission to expand ownership/trim proof.
+- Measured paused51454e069ebe4039f02d6d9108acf9354c7ad6c8 remains14 paths,3331 additions+66 deletions=3397 changedLOC. Exact UNAPPLIED fixture proposal ae6e9241ea5d7b0c4556b2ee02c6e2910b2663c2452761e7984f1c6663252971 adds65 lines/0deletions across2existingtest helpers (copyTree36,obligationParentFixture29). IF separately independently PM-authorized and applied unchanged, aggregate becomes16 paths,3396 additions+66 deletions=3462 changedLOC. Conditional scope/cost is not application, exact-test authorization, same-SHA replay or delivery proof. Existing 2710-3310 and older estimates remain historical cost forecasts; no proof trimming or broader helper/test/framework scope.
+
+## Conditional fixture consumer handoff
+Exact source proposal /tmp/machinery-p7jd-fixture-proposal.geNVdA/PROPOSAL-INDEX.md SHA2561049ea7adf1eaa142948f2f6cd3d4d8327ae20a9b3326222f57041f7f19c9169 documents only the two named helpers and full13-caller external replay. Its shared application remains HELD until the independent PM issues exact TEST-EDIT AUTHORIZED disposition. The five AC and no-grandfathering remain unchanged. No existing acceptance record/date/attestor/cover hash is refreshed; GoCRM becomes12plan+1historical and parent8plan only in copied test inputs, with explicit missing-current warning/current0. Actual original silence/ledger, Ga ancestry, default-versus-explicit Gt and intended positive/negative assertions stay exact.
+Once this story is accepted, MAC-hgz1 consumes the exact accepted helper bytes/SHA, accepted substantive review boundary, full input/acceptance inventory and all13-caller same-SHA blast evidence. Its later source-example migration WILL invalidate these exact v1 guards; hgz1 now owns only the later independently exact-before-edit reviewed adaptation inside these same two helpers. That later v2 construction is not selected or authorized here and cannot silently downgrade a shipped current review into apparent new evidence. p7 never depends on hgz1/uzxr to establish this temporary-fixture repair; no reverse dependency, new story or criterion is introduced.
 
 ## Approved architecture authority and executable clarifications
 Independent contract review APPROVED revision 2. Authority: proposal SHA256 8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179, read in full and embedded below; rejected revision 1 remains historical only. Architecture revision 2 is independently approved, and the subsequent PRE-RED PM EXACT TEST-EDIT / SEAM AUTHORIZATION has authorized bounded RED authoring for its exact two existing-test amendments and four seam uses. This is not approve-red, GREEN dispatch authorization, delivery or executed AC proof. Earlier architecture-pending/authoring-pending statements remain history, not the current phase disposition. Dispatcher may resume the healthy retained RED author within that existing authorization; independent RED review is still required.
