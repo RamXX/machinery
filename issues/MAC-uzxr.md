@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:29:10Z
-content_hash: "sha256:125409ae00415f089ba0d444657c1880fb1ae1740e6e189b4a89fc5d64968320"
+updated_at: 2026-09-06T06:29:31Z
+content_hash: "sha256:951353e0a0bdb2f241d90ac530cfff97863a921e407aec110a2b277a3098cffa"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
@@ -942,3 +942,26 @@ status: new
 - [ ] AC #3: all20 candidate unsafe-variant rejections with valid controls pending GREEN.
 - [ ] AC #4: successful complete bidirectional candidate inventory pending GREEN.
 - [ ] AC #5: full focused passing candidate and reviewed consumer handoff pending GREEN/PM.
+
+### 2026-09-06T06:29:31Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- Terminal GREEN delivery MAC-uzxr: supported pvg story deliver MAC-uzxr exited0 without waiver. Candidate dc3a8a365c21d5370c0825de992e2461ea0785a9 on story/MAC-uzxr. Worktree clean. Independent PM accepts or rejects; this developer did not accept/close/merge.
+- Full PROOF, LEARNINGS, exact eight-path source scope, command argv and outcomes are in the preceding appended report and /tmp/MAC-uzxr-green.Td49Am/REVIEW.md SHA256918947599ceb237b56b1a87492f4127eee45f8c625e070ad558ef623d7762727. Primary native-audit.json SHA2561d6902dc46bf95a7a128a9c33da1cc802c79c77b2530afcbd9ee546882dc4db8; source-closure.json SHA256fba784f86918e105208e76d95a42f2b39acac8be114dbef95925a3628f877455. All exact producing Go commands/argv/cwd/sourceSHA/durations/rawSHA/full native identities are retained in named receipt files; all used GOWORK=off GOPROXY=off GOTOOLCHAIN=local and -count=1, Go120s native/unit and300s meta with unchanged125s/270s contexts and5s child WaitDelay.
+- Actual required run:68 parser nested leavesPASS,228 focused native leavesPASS (218 transition witnesses+10 supplements),23 meta outer leavesPASS (3 original mutations+3 candidate packages+17 remaining mutations),0 unexpectedFAIL/0SKIP. Exact current inventory197rows/47states/118orderedgroups,218registrations and218successful observations: Deal58/75,Task31/35,User20/20,Session60/60,CommandExecution28/28 rows/witnesses. Coverage100% current rows and original witnesses; no statement coverage or full-repository test claim.
+- All20 actual unsafe variants rejected with matched complete passing controls and exact intended diagnostics.43 exported sequential children:28exit0/15 intendedexit1;1398 native leaf/rootPASS+15 intendedFAIL (6semantic leaves,9structural pre-Fire roots),0SKIP. Five inventory mutants keep native assertionsPASS but the actual-output verifier rejects their malformed registration/execution inventory. Both Task future anchors matched once and real missing/name-only entry mutations failed at exact actions/context assertions.
+- Custody:99 committed examplefiles verified;47 current inputpaths in43 complete manifests; all20 mutation hunks reconstructed from original bytes with once-only anchors and exact resulting hashes.149 exported raw/receipt/manifest/mutation artifacts retained;43 receipt cwd references resolve to23 removed fixture directories. All three default meta families independentlyPASS with43 further actual children;3 default proof directories and23 distinct child directories removed. Test-cache reuse excluded by -count=1. Export five-group25.381077583s; default lifecycle families24.461417250s on existing build cache; no cold-build measurement claimed.
+- Six frozen SHA256 unchanged (paths relative examples/go-crm/impl): internal/cli/command_test.go38945b9307d97dadb872ac5a261ff86d712c218282774404b432842e34577d60; internal/domain/deal_test.go2bfd0893253b9f3c4b6cf1badbf3402a952551f5b4f5124a3d0a9afb7bf432cd; internal/domain/task_test.go35b8a05a710792ff21dd827432d658deba1ee190b8739196b084cdc61f7b2b88; internal/domain/user_test.god4fab40b760e5f1a94a5cab88bea6625495c04dd1690dc197818bfd1d056b53d; internal/session/machine_test.go97e612a68e22b32010ec7c696cb1ee248115f5a41f3b80400a40160a8782a11f; internal/testoracle/fsm_test.go4578841816e77712ed249a349e1f63c13c7eac233f15eccacb2d0ee916527b25. Original495lineprefix326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba. Only owned parser implementation and Task.fireRolledBack fallback changed; no test/API/path broadening.
+- Normal pvg story verify-tdd --base70652b948bf090008b1965c85daf36ea374daea4 checked4commits0violations/no waiver; eight explicitly scoped pvg verify paths --include-tests --format text PASS8files0issues; gofmt and git diff --check clean. Initial skill-documented --format=text was rejected by installed pvg, corrected using read-only help to supported --format text. No mutating subcommand help, unresolved product failure, remote/install/preflight/service/background operation.
+- Measured cost: fsm.go607add/12delete final643lines; Task2add/1delete; GREEN622changedLOC. Historical2953+GREEN622=3575cumulative; aggregate3212add/331delete=3543changedLOC across8paths. Explicit closed grammar/type/metadata/duplicate-key checks and error precedence exceed the conditional parser estimate; no additional file/framework or proof trimming.
+- Historical genuine RED3unsafe-accepted outerFAIL/200childPASS and separate Task defect are preserved. Expanded scaffold zero-row/zero-mutant failures remain NONQUALIFYING historical evidence, not new RED credit. Independent PM review and consumer migration remain pending; no automatic attestation/acceptance/authenticated-execution renewal.
+
+### proof
+- [x] AC #1: complete current parsing and original actual input/guard binding; missing/duplicate/malformed/unmapped/unused identity sensitivity with real controls.
+- [x] AC #2: exact one-Fire ordered effects plus real Task entry/context repair and missing/name-only regression sensitivity.
+- [x] AC #3: all20 actual unsafe variants rejected with complete passing controls and pinned intended diagnostics.
+- [x] AC #4:197 current rows mapped bidirectionally to218 successful actual witnesses;10 separate supplements;0SKIP.
+- [x] AC #5: all required frozen focused/parser/meta proof passed on committed candidate; unchanged source closure and reviewable consumer handoff; PM acceptance pending.
+
