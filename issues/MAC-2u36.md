@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:37:58Z
-content_hash: "sha256:464bb623261a9927a94b2ca24e8bd5f0c19b5465ba4ea5343b1032813008b4fc"
+updated_at: 2026-09-06T02:42:36Z
+content_hash: "sha256:b8ce31ceef71cb65838a564ce5eb54da337fa5d118b3751183b1bec861dc5cbb"
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
 closed_at: 2026-09-06T02:37:14Z
@@ -3382,3 +3382,6 @@ status: accepted
 - [ ] Downstream MAC-gcrr docs and MAC-ou97 final platform/archive/OCI/race/preflight/release gate remain pending; epic must remain open.
 
 LEARNINGS: query actual writer descriptor rather than pathname; preserve honest finite composed evidence after aggregate timeout; distinguish dormant helpers; explicitly bind stale-doc corrections before acceptance.
+
+### 2026-09-06T02:42:36Z ramirosalas
+Local integration evidence (dispatcher, 2026-09-06 UTC): accepted MAC-2u36 commit 15252d255fa12a131fbc2cdb13f593a212fd4ccb merged with --no-ff into epic/MAC-ui8a as 70652b948bf090008b1965c85daf36ea374daea4. Installer tree is byte-identical to accepted candidate. Targeted merged-tree command: go test -count=1 -timeout=120s ./internal/install -run '^(TestBootstrapReceiptWriterDescriptors|TestBootstrapReceiptWriterInvalidHandle|TestBootstrapReceiptWriterSyscallError|TestReceiptSchemaTwoInventoryValidation|TestReceiptPrivateSchemaControls)$' -json. Result: 19 leaves PASS, 0 FAIL, 0 SKIP, package 0.359s. Raw /tmp/machinery-epic-integration.Ii1OlI/installer-smoke.jsonl SHA256 c5e9d40794b99681b585c2b656c7a2f6592381a3768072b3e83fd037069294a0. Clean accepted dev worktree and now-merged local story branch removed; source remains reachable in epic merge and external full proofs retained. Agent handles cleared. Root returned to clean main 497419ab4512fcff765cd5feb27aed4c67b5608d; no main merge, installed replacement, remote sync/push or full preflight. This does not replace the final epic full/runtime/race gate.
