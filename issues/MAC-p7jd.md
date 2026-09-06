@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:06:11Z
-content_hash: "sha256:949d7bcd5fde8dfe89563e9bed4aec45b00a06ff02ba46b36b9a0976b5713bff"
+updated_at: 2026-09-06T05:06:12Z
+content_hash: "sha256:58b7ed0c5e887e5ca7c0b9c0dd235b0c96d0f29776c7d8678bfc337515799787"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -2183,3 +2183,20 @@ status: in_progress
 
 ### 2026-09-06T05:05:18Z ramirosalas
 RED-DISPUTE: GREEN paused at clean4b246baf7f9384f373d4935f01bbe07c7fcf7076. Full PAUSED-BLAST-DISPUTE.md appended in Notes:229 scoped leaves+45 targeted race leaves PASS/no skips; broader replay4 legacy v1 fixture conflicts and1 existing filesystem skip unresolved. No fixture/helper/example changes, no delivery. Latest nd_contract status: in_progress; proof pending exact repair authority, docs-only positional check command correction and final review. No active/background process.
+
+### 2026-09-06T05:06:12Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Clean paused head51454e069ebe4039f02d6d9108acf9354c7ad6c8; last commit docs-only corrects `machinery check --design design --impl src --gate gv` to `machinery check design --impl src --gate gv`. Docs SHA256d7ca4cc79a2af87e6946dba3bba445b21cee9639da13309ec2384033d0a8ed41. Full source/test implementation remains4b246baf7f9384f373d4935f01bbe07c7fcf7076;229 scoped and45 race leaves passed with0 failures/0 skips on4b246ba, not claimed as a51454e0 replay. Fresh same-SHA proof is owed on eventual delivery.
+- Full pause report /tmp/machinery-p7jd-green-proof.eHzGMx/PAUSED-BLAST-DISPUTE.md SHA256d2837c4fbd4205ba151b856e96a7747d3cc32b58b1a69b4c49fe1d6fedb6bc1f preserved and appended in Notes. Raw/native inventories/hash files there bind4 existing fixture conflicts,1 existing filesystem skip, all passing observations and failed command histories. Final scope14 paths3331 additions66 deletions=3397 unchanged.
+- RED-DISPUTE remains: internal/hook/hook_test.go TestStopGreenDesignClearsStateSilently uses examples/go-crm/design; internal/gates/obligation_ownership_test.go TestObligationParentRealCLI/{obligation-free-parent-control,Policy.oracle.md,Isolation.oracle.md} uses examples/checkout-split/parent/design. Their unchanged v1 gt.conformance-test-shape rows correctly fail GV_MISSING_IMPLEMENTATION_SUBJECT. No grandfathering/fixture/helper/example/Ga/selector change authorized or made. Root routes migration ownership independently.
+- Broad native replay: gates33PASS0FAIL1SKIP (existing case_folded_collision on case-insensitive filesystem); hook23PASS1FAIL0SKIP; accepted-stories76PASS3FAIL0SKIP; designlock13PASS0FAIL0SKIP. No skipped case credited. No active/background process, no delivery/acceptance/merge/install/remote/preflight operation.
+
+### proof
+- [ ] AC #1: scoped v2/current/plan/history observations pass; independent overall review pending.
+- [ ] AC #2: full inventory/digest/kinds/docs observations supplied; final same-SHA proof pending.
+- [ ] AC #3: required scope migration passes;4 broader legacy fixture conflicts need exact ownership/repair authority.
+- [ ] AC #4: real capability/limits/hook and45 race observations pass; broader fixture/platform-skip resolution pending.
+- [ ] AC #5: observed Render late faults return nil bytes; built CLI ordinary success/failure observed; composed source closure recorded; independent review and final same-SHA replay pending. Standalone CLI late injection UNOBSERVED, individual OS Close errors UNFORCED, sink partialwrites separate.
