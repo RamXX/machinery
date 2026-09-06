@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:12:20Z
-content_hash: "sha256:427c10e889632bdbbd92b008c2c584a6a8408626b87811691b863f44dc640bde"
+updated_at: 2026-09-06T07:12:52Z
+content_hash: "sha256:dda2c80cea80f67b783f9536642e314fd56306de76727723db5864e990dec48e"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 ---
@@ -3039,3 +3039,78 @@ status: delivered
 - [x] RED AC #5: Real ordinary locally built CLI and filesystem/Git, precise exit/count/category/path and limits; previous OBSERVED/REVIEWED/COMPOSED/UNOBSERVED limits preserved.
 - [ ] Supplemental RED approval: independent PM exact-text replay/review pending.
 - [ ] GREEN completion and whole-story acceptance: not delivered; separately routed production correction and all required final proof pending.
+
+### 2026-09-06T07:12:52Z ramirosalas
+# MAC-p7jd independent supplemental RED review
+
+SUPPLEMENTAL RED APPROVED [2026-09-06]. Exact test-text approval only. The product remains rejected for AC1/4 until separately routed GREEN and independent final review; this is never whole-story acceptance or closure.
+
+Candidate c71faeab997d176224ed6f38437de4604cda0b98 adds only cmd/machinery/attest_scope_none_test.go, 364 lines, SHA256 3d9d8250f759807795251685e1cb924ba8eceb4c819b3fa0376bd15b254f9fc0. These exact new regression bytes are now frozen alongside the seven previously frozen files and both exact authorized fixture helpers. No existing-test amendment, production code text, new seam/API, schema/digest change or extra exclusion is approved here. Root owns the separately routed GREEN task within the current seventeen-path authority.
+
+## Authority and review boundary
+
+Read canonical MAC-p7jd through pvg nd show --json: status in_progress, delivered, final contract explicitly supplemental RED held; incoming Body SHA256 637552bee833225207fc94724b006550575eb686cb817d5ce52d8346f31ffee1. Read all five original AC and the complete authoritative 2026-09-06T06:44:43Z scope amendment. Read in full and independently hash-verified: R2 PROPOSAL.md 8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179; AC5-COMPOSITIONAL-CLARIFICATION.md 5fc3193106a803b7760020b646ed4db7b3d417f5e196b2266d10cf8227733937; prior whole-story PM-FINAL-REVIEW.md c3950515759f8cf148b4e2469102bbe1a7b7dabfc4c9b22bdb14297ec07071d6; source-scope FINAL.md 70569f479256af07d65d3a48c29211d895d26a49b9e0ee0692fda7bde95e5ae8; author RED-REPORT.md b75488049a3dff0f681a8e2e815c2e01a5c5f97f831f21c2a4a509e0f7bbc996 and FINAL.md d1a49c6de6016035af471bf87f768ecd3faca1bf01371871d6b6d51908db58eb.
+
+PM used an external git archive of the exact candidate in /tmp/machinery-p7jd-none-pm.bUihT1. No developer-worktree internals were inspected. All seventeen changed archived paths were independently compared byte-for-byte to exact Git blobs. The only difference from rejected412d01b57ae4770a6cf4fb4f48442fb7e632cdd7 is the one new test file. Production, docs, all earlier tests and helper files are unchanged.
+
+Graph first: project Users-ramirosalas-workspace-machinery, ready generation2026-09-06T02:42:16Z; function search returned goldenBin lines37-66 without additional pages. Coverage checked once for nine task paths. New story paths are missing in this main index; metadata_match of old source is not exact-candidate coverage. Two provisional coverage names main_test.go/testgit/git.go were corrected by exact archive search to testmain_test.go/testgit/testgit.go. All material source claims use exact candidate fallback, never index completeness. Vault search returned no matching new context.
+
+Read the entire364-line test, actual readonly cliReview helpers, goldenBin, TestMain isolation/cleanup and hermetic bounded testgit implementation; complete464-line attestation capability and the relevant manifest/checker/render/suite/CLI closure. The strict held-root traversal includes the real none entry. captureAttestationSubject lines874-885 projects it away by comparing the path against a digest absence descriptor. Both real generation and check use that projection. compareAttestationManifest checks submitted self-hash, both path sets, then content; strict snapshots and Release retain their independent custody checks. This explains the observed separate-invocation freshness defect without inventing a different cause. Prior wider source/custody/AC5 review at412d01b remains retained evidence, not newly replayed here.
+
+## Test quality decision
+
+If all new tests pass unchanged, together with the frozen previous bar they prove the literal-none AC1/4 gap is closed while preserving the intended exclusions for these four topologies and two input types. This is bounded regression proof, not exhaustive whole-program assurance.
+
+The oracle walks original files using filepath.WalkDir, DirEntry.Info, os.ReadFile and SHA256; it does not invoke production inventory/projection/digest helpers. It independently builds every directory/file key and value, exact root locator, full-root-v1 policy and R2 digest. JSON comparison normalizes YAML numeric widths without discarding keys or values. Only actual top-level .git and exact logical design/attestations.yaml are filtered by independently resolved paths. The absent-evidence descriptor remains grammar, never an extra filename filter.
+
+Each of120 leaves owns a real filesystem/Git fixture: four topologies x file/empty-directory x fifteen cases. Actual types/modes are verified with Lstat; files have recorded input hashes, directories remain empty; meaningful file byte change or0755-to0700 mode change is performed. Add/remove/rename are real filesystem operations, not receipt-only approximations. All generation/check commands run the ordinary freshly built CLI; native setup, Git and subprocess errors are fatal, with no mock, feature probe, skip gate or injected verdict.
+
+Independent inventory assertions, full-manifest validity and each mutation are separate leaves. Thus an omitted-entry assertion never prevents another leaf's challenge. Both omission variants start from a complete independently enumerated inventory, remove exactly one none entry, and either retain its original full digest or independently hash the narrowed inventory. All eight old-digest cases exercise GV_SCOPE_HASH; the rehashed cases separately exercise actual-root comparison. The independent complete receipt is accepted in equal/ancestor and rejected in the four affected cells, explicitly observed in separate leaves rather than hidden as an unexecuted control.
+
+Positive evidence controls change record presence/content and, for evidence-only, actual mode plus a real commit. Both real .git directories and regular --separate-git-dir gitfiles undergo local commits. Their digest stability/freshness legs run before the post-control independent inventory comparison. Unrelated sibling and nested attestations.yaml content changes require GV_STALE_CONTENT for their exact logical paths; nested .git must produce GV_SCOPE_UNSUPPORTED_METADATA at its actual path. Existing frozen root-narrowing/alias/custody restrictions remain unchanged.
+
+Joined category-plus-message assertions prevent a temporary path containing none from satisfying the expected failing path. The rename expectation is justified: a complete sorted inventory contains removed none and added none-renamed; raw-ASCII first difference is none. R2 requires deterministic first differing portable path, and the unchanged comparator sorts the union before comparing. This is not arbitrary selection between unrelated paths. The four failing rename leaves correctly reject already; they expose the missing removed-path diagnostic and are not falsely classified as unsafe current.
+
+## Independent execution and exact outcomes
+
+One complete containing selector independently replayed all120 new leaves and28 existing CLI leaves on this exact candidate, avoiding redundant overlap:
+
+`env GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=5m -json ./cmd/machinery -run '^TestAttest'`
+
+Go1.27.1 darwin/arm64, offline existing cache. goldenBin builds an ordinary isolated CLI with go build -o <temporary-binary> . from exact archived command source; actual binary path/digest are in raw JSONL. Existing TestMain isolates user control/configuration and cleans it after completion. cliReviewExec retains30s timeout and hermetic testgit retains10s bounds. No installed binary is used. No timeout expansion or new seam.
+
+- New matrix:80 PASS /40 expected behavioral FAIL /0 SKIP, exactly120 terminal leaves.
+- Existing compatibility:28 PASS /0 FAIL /0 SKIP, exactly28 terminal leaves.
+- Total unique selector:108 PASS /40 FAIL /0 SKIP. Go package37.324s; synchronous runner wall39.406s. Go exits1 for expected RED assertions; runner exits0 after checking all required outcomes/reachability.
+- All112 generated unchanged controls and104 post-control challenges reached, including all72 intended negative mutations. Zero missing leaf terminals, compile/import/setup/timeout/infrastructure errors, zero unreached challenges, zero unclassified failures. Raw command stderr is empty.
+- Equal/ancestor:60 PASS. Each disjoint/inside-design type cell:5 PASS /10 FAIL.
+-40 failures:16 independent inventory mismatches;4 complete independent manifests rejected;16 unsafe exit0/current1 results from content-or-mode/addition/removal/rehashed omission;4 rename removed-path diagnostic failures with actual exit1 and no current success.
+- All8 old-digest forgeries,16 unrelated sibling/nested evidence mutations and8 nested-Git rejection cases pass. The12 affected post-control inventory failures follow successful actual evidence/Git freshness and stable digest legs.
+
+Raw JSONL pm-attest.jsonl SHA2567fdf3a78ee5a3ce6803d9b7629981a8e4c7eaab55b67c30166489d68af036f5a retains full leaf identities, outcomes, exact argv, generated/submitted receipts, actual input metadata/hash and CLI output. pm-replay.json SHA25692f1a4636ee67e8fb8e2a7cf3d7f5e9dfac81bb05b14bb468284241ddfeb1e5d retains every leaf and full per-leaf output. pm-source-audit.json SHA256319038127f5c3ce73090731cac1e396646383341d313bbc10f7dbfaf443228da retains source/frozen/helper hashes, lineage, failure attribution and exact topology counts. Reproduction scripts: pm-replay.cjs SHA25602873c25598da71facf85fb21c723fd8b22300194a92defd902ed0155e70203b; pm-audit.cjs SHA256ae5c9d16830c7fa67d817fd249c5985864b2321476b24645b5dc6c8bdb9f8ad7. All are under the external PM directory above.
+
+Minimal BUILD fixtures retain the ordinary nonblocking missing-g4.zero-context warning, equally present in passing controls and failing challenges. This is expected fixture semantics and previously documented, not a --complete or zero-warning claim. Exact failure category/path/exit/count assertions cannot be discharged by that warning. No coverage percentage was measured in this independent CLI replay; ordinary spawned CLI execution is real but uninstrumented. Prior broader quality findings and case-sensitive Linux final-gate leaf remain owed.
+
+## Freeze, cost and completion hold
+
+Seven frozen hashes independently match the prior manifest. Both full helper files are exact412d01b bytes: internal/hook/hook_test.go SHA2562b185970a3f69a140338cee97e14db0da82ef0aaf01250364357b104c1458b33 and internal/gates/obligation_ownership_test.go SHA256cc5f5e12a0d41a6eeda60895fece31713c5f068817bb2d3f08b7f1c6ff4d4b04. Exact function texts retain hashes copyTree58e8d45f3abe36516fa2a4436a4e8895b1aacada86dd40db5b30bb2697b3b31c and obligationParentFixture677c09b9b2f39072c3d30a9f2ff911f5a4b216b850a5b1fe7972ffea6dd4c846. The previously authorized36+29 additive fixture lines remain unchanged; no future hgz1 amendment is inferred.
+
+pvg verify cmd/machinery/attest_scope_none_test.go --format text:1 file,0 issues. pvg story verify-tdd --range a82277a..c71faeab997d176224ed6f38437de4604cda0b98 --json:12 commits,0 merge skips,0 violations; candidate subject carries tdd-red before this independent replay. git diff --check is empty. Aggregate17 paths,3760 additions+66 deletions=3826 changedLOC; this increment364 added test lines, no production repair. Author113.199 cumulative package-seconds plus this PM37.324 =150.523 package-seconds; this arithmetic is not unique test coverage. Forecast was not treated as a proof cap.
+
+Final GREEN must pass this new120-leaf frozen matrix plus original scoped attestation/designlock/hook proof, all13 helper callers, relevant broader and race proof, exact frozen/hash/TDD audit and independent whole-story review on one candidate. Original AC2/3/5 positive evidence and the approved OBSERVED/REVIEWED/COMPOSED/UNOBSERVED AC5 limits remain intact. Case-sensitive Linux and full preflight remain final-epic obligations. Product AC1/4 is still unresolved now. No production patch is prescribed or applied.
+
+Only supported phase/claim operations and the append-only exact-review record are in scope. pvg story approve-red exited1 after moving status to open and removing delivered, because the historical red-approved label already existed. Readback confirmed open, old assignee retained, hard-tdd/red-approved, and the prior delivered contract still at EOF. This partial transition is not reported as command success. Supported pvg story release then cleared the old claim, preserving red-approved and open. This independently approved exact-test report is appended at actual EOF so the historical label no longer stands in for new review authority. No manual label choreography or loop recovery was used. design.machinery is off; no design gate waiver or installed Machinery invocation is needed. No accept/close/merge, source/test edit, remote operation, package/tool installation, agent/skill replacement, preflight, service/Docker/engine mutation occurred. Main497419ab4512fcff765cd5feb27aed4c67b5608d and epic70652b948bf090008b1965c85daf36ea374daea4 are unchanged; main working tree is clean. Every finite verification process completed. External evidence is retained.
+
+## nd_contract
+status: new
+
+### evidence
+- SUPPLEMENTAL RED APPROVED exact candidatec71faeab997d176224ed6f38437de4604cda0b98 and new-test SHA2563d9d8250f759807795251685e1cb924ba8eceb4c819b3fa0376bd15b254f9fc0. This new independent disposition supersedes the supplemental RED hold only; historical whole-story rejection remains valid until GREEN repair and final independent review.
+- Independent actual replay: new80PASS/40behavioralFAIL/0SKIP; prior CLI28PASS/0FAIL/0SKIP; all120new leaves,112controls,104postcontrol challenges and72negatives reached. Full raw/source artifacts listed above.
+- Seven old frozen files, both exact authorized helpers and new364-line test are immutable. The partially completed approve-red plus supported release returned the story to open/unassigned with hard-tdd/red-approved; this exact independent approval supplies new supplemental authority at EOF. Root owns the separate GREEN route. No acceptance, closure, production-text authority or product completion is claimed.
+
+### proof
+- [x] Supplemental RED AC1/4: exact-text independent review and real CLI replay establish a sound bounded regression bar, complete independent inventory/digest, meaningful reached negatives and preserved exclusions.
+- [x] Supplemental RED AC2/3/5: prior semantics and immutable evidence retained;28 actual CLI compatibility leaves pass. Prior bounded AC5 classification preserved without claiming new late-fault execution.
+- [ ] Product AC1/4: production correction and complete same-candidate GREEN proof remain required.
+- [ ] Whole-story acceptance: independent final GREEN review pending; do not accept, close or merge from this RED approval.
