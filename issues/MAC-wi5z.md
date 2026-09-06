@@ -1,18 +1,19 @@
 ---
 id: MAC-wi5z
 title: "Require active oracle discovery evidence — compliant successor to MAC-sh60"
-status: open
+status: in_progress
 priority: 0
 type: bug
 parent: MAC-ui8a
 created_at: 2026-09-06T16:33:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T16:35:05Z
-content_hash: "sha256:597d566002bdc9cb1254f72f8e9733594caf95a8f97a8838e7ec9f78a857f7fc"
+updated_at: 2026-09-06T20:23:32Z
+content_hash: "sha256:7ac2ddeccab531c81a02344e4d8743a24bf2ae0fcc5ded1ebe2e76b02384f61c"
 labels: [hard-tdd]
-follows: [MAC-sh60]
+follows: [MAC-sh60, MAC-hgz1]
 blocks: [MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-hgz1]
+assignee: dev-MAC-wi5z
 ---
 
 ## Description
@@ -128,12 +129,14 @@ status: new
 - 2026-09-06T16:34:03Z dep_added: blocks MAC-vx24
 - 2026-09-06T16:34:07Z dep_added: blocks MAC-ou97
 - 2026-09-06T20:22:41Z dep_removed: was_blocked_by MAC-hgz1
+- 2026-09-06T20:23:32Z status: open -> in_progress
+- 2026-09-06T20:23:32Z auto-follows: linked to predecessor MAC-hgz1
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-hgz1]]
-- Follows: [[MAC-sh60]]
+- Follows: [[MAC-sh60]], [[MAC-hgz1]]
 
 ## Comments
 
