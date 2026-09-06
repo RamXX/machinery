@@ -167,6 +167,42 @@ func copyTree(t *testing.T, src, dst string) {
 	if err := copyDesignTree(src, dst); err != nil {
 		t.Fatal(err)
 	}
+	// These Stop fixtures review design/ledger behavior, not the CRM runtime.
+	// Preserve cover bytes and historical acceptance anchors; explicitly recast
+	// the legacy implementation claim as unfulfilled test-plan intent.
+	path := filepath.Join(dst, gates.AttestationsFileName)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	replace := func(old, next string) {
+		if strings.Count(text, old) != 1 {
+			t.Fatalf("fixture migration needs exactly one %q", old)
+		}
+		text = strings.Replace(text, old, next, 1)
+	}
+	replace("attestation_version: 1\n", "attestation_version: 2\n")
+	for _, claim := range []string{
+		"g2.action-ownership", "g2.interface-contract-rightness", "g2.placement-rightness",
+		"g2.adoption-closure-discovery", "g2.event-contract-completeness", "g2.nfr-content",
+		"g3.guard-semantics", "g3.invariant-enforcement", "g3.residual-transitions", "g3.event-redelivery",
+		"gt.conformance-test-shape", "g4.zero-context", "ga.review-quality",
+	} {
+		kind := "plan"
+		if claim == "ga.review-quality" {
+			kind = "historical"
+		}
+		line := "  - claim: " + claim + "\n"
+		replace(line, line+"    kind: "+kind+"\n")
+	}
+	replace("    note: The Go tests key executable table cases on every stable oracle id and assert next state plus ordered actions.\n",
+		"    note: Fixture plan only; conformance tests are intended to cover every committed oracle row and assert next state plus ordered actions. No current implementation review or test execution is claimed.\n")
+	writeFile(t, path, text)
+	g := gates.CheckAttestations(dst)
+	if len(g.Errs) != 0 || len(g.Drift) != 0 || len(g.Warns) != 1 || !strings.Contains(g.Warns[0], "gt.conformance-test-shape: plan only; current implementation review missing") || g.Counts["current implementation reviews"] != 0 || g.Counts["historical review records"] != 1 {
+		t.Fatalf("fixture must retain missing-current warning and historical evidence: %+v", g)
+	}
 }
 
 // copyDesignTree takes a governed reader snapshot before copying a shared
