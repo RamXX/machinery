@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:33Z
-content_hash: "sha256:fceebb37d60aeb2daf038124d5816203cc0f6bd3a9a0bda55ffaf9ca300631b1"
+updated_at: 2026-09-06T09:22:40Z
+content_hash: "sha256:3e1435627dc1e057bf13dad4123741bb30384840946606d1e3969cdfcff9cdad"
 blocked_by: [MAC-sqpt, MAC-wbxq]
 blocks: [MAC-u4oo, MAC-vx24, MAC-ou97]
 ---
@@ -133,6 +133,7 @@ CONSUMES:
   spec: RunOptions.Execution *GateExecution, ExecutionRequired bool; full Ga execution uses same owner scope and runtimeclosure.Git.
 - MAC-p9z1: internal/tdd/store.go
   MAC-6h0s: exact registered external head and immutable run-object publication, no execution head advance.
+  schema: exact registered external head and immutable run-object publication, no execution head advance.
 - MAC-l7m0: docs/test-assurance-contract.md
   schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
 
