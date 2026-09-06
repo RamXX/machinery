@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:47:17Z
-content_hash: "sha256:e37379513c6f85dd2c1f72e62e1bba80724120cdaabaf28d52ade8596ddcf850"
+updated_at: 2026-09-06T07:47:41Z
+content_hash: "sha256:659c588db6cddee9305ea2d3a27475f3616c20ed3fbd3b91bf026083f9ca90cb"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx, MAC-p7jd]
 assignee: dev-MAC-uzxr
@@ -168,7 +168,19 @@ Read complete author checkpoint/audit.cjs/audit.jsonl and verified all suppliedh
 No further storage repair required. Author may prepare complete EXTERNAL later patch and measured per-file decomposition for separate exact PM/SrPM review. Applying all5suite/helper/parser/additive amendments stays HELD. No fullapprove-red/deliver/accept/reject transition; no new test-edit permission, AC/path/scope change, candidate parser/Taskfix proof or consumerclaimrenewal.
 SR PM MEASURED FORECAST / PRESERVATION REPAIR. Canonical eight paths and five AC unchanged; actual external proposal2450changed plus503historical=2953 cumulative beforeGREEN, aggregate2945changed. Conditional3300-3500 cumulative/3200-3400 aggregate forecast assumes prior300-450-line parser estimate and separately charges48-line scaffold replacement plus narrowTask correction. Old750-1150/provisional1500-2200 obsolete; no proof trimmed or test permission granted. First --description command succeeded but verification failed because nd treats same-level nested headings as section boundaries and retained an old canonical suffix. Original failed readback preserved in /tmp/machinery-private-triage.JF2BDG/READONLY-HANDOFF.md. Installed --body-file has the same Description semantics. Root-authorized guarded pvg nd edit bound full live raw header/body to journal export and checked an external apply_patch trial, removed ONLY duplicate canonical block under nd exclusive lock, then verified exact full body90c15690a83bd2200723fdaa8bdd27e3871e189959b4936083afe06336d35590 and identical tail/metadata except normal hash/time. Exact expected/proposed manifests and editor remain external. First hgz1 preparation-only cross-realm assertion failed before any tracker write, then root explicitly authorized scalar-array comparison correction; historical failure is not proof. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
 EXPANDED RED FREEZE CHECKPOINT: exact authorized seven-path patch2f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249 committed acf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f over4ef6baf with literal [test-edit-authorized] and tdd-red. Full report /tmp/MAC-uzxr-final-red.nOXYuf/REVIEW.md SHA2565cb98377240aa8be22f0b9d88b74a7a6bd959fbfd8f1efb2907d08b02f68ad5c. Exact seven result hashes/frozen495prefix/99committedexamplefiles/218originaltuples/twoterminalbodies verified; Task unchanged. Measured2120add330del2450changed/net1790; historical503changed separate. Actual all10 contractroots and focusednative plus3meta families ran15.526s: contracts0PASS28FAIL0SKIP, focused10supplementPASS5transitionrootFAIL0SKIP, original/candidate/remainingmeta3/3/17outerFAIL. All current parser/control failures NONQUALIFYING ErrScaffold; all intended later mutants/most nestedcontractbranches unreached. Actual23children10supplementPASS25transitionrootFAIL0SKIP,0transitionrowleaves/0mutants; all23fixturecwdsremoved. Export52files=46receipts/rawlogs+6manifests47committedinputhasheseach;17latercontrols fail before manifest export, no nonexistent manifest credited. Raw and complete native identity receipts in report. Normal verify-tdd3commits0violations/no waiver; scoped static7files0issues; gofmt/diffcheckclean. Original genuine998a5a3 threeunsafeacceptedouterFAIL200childPASS, validatedstorage4ef6baf bothmodes, historical225baseline and separate actualTaskentrydefect preserved as distinct evidence. No parserimplementation, productionedit, source/testcorrection, delivery, approve-red, GREEN, consumerclaimrenewal, remote/toolchain/service changes or background process. STOP clean for independent combined-evidence RED adjudication.
+## nd_contract
+status: delivered
 
+### evidence
+- Candidate `bb5205c32e7b17ebefc5b050b7bf7417b0720e72` replaces substring allowlist matching with exact space-delimited field-token membership in `examples/go-crm/impl/internal/testoracle/fsm.go`; no other source path changed.
+- Fresh candidate proof: repaired regression 24/24 PASS; preserved parser contracts 68/68 PASS; direct native transition suites 228/228 PASS; full testoracle meta suite PASS in 23.105s; static and hard-TDD guards PASS.
+
+### proof
+- [x] AC #1: Exact field membership rejects all ten composite structural unknown keys while valid metadata/context data is preserved.
+- [x] AC #2: Existing action reconciliation and Task behavior are preserved; full parser/native run passes and Task bytes are unchanged.
+- [x] AC #3: Existing expected-state/action, extra-effect, and mutation sensitivity families pass on the repaired candidate.
+- [x] AC #4: Direct native suites and the inventory meta family pass with 228 executed leaves and zero skips.
+- [x] AC #5: Fresh candidate evidence, frozen custody, static verification, and recognized delivery evidence are recorded; PM acceptance remains pending.
 
 ## nd_contract
 status: delivered
