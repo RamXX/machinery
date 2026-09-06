@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T04:38:19Z
-content_hash: "sha256:f74af7ec521160fbc0c4293926bb1604a0579e74f055040e6f3777f5bb02c9b2"
+updated_at: 2026-09-06T05:05:18Z
+content_hash: "sha256:5f626641e91b529bff81960d4c7490169f3d8933cb400a00f6dea2b2f6fc7b16"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -934,7 +934,199 @@ Observed evidence and limits:
 - Codebase-memory index/search/selector trace and coverage generation 2026-09-06T02:42:16Z are best-effort metadata_match/no recorded issue for hook.go, accept.go and six source acceptance files. Exact committed source is branch authority.
 - Measured production6files1125add/43del =1168 changed lines; combined11files2609add/46del =2655. Remaining tests/docs and actual final cost still owed; the canonical forecast is not completion proof.
 - Main497419ab4512fcff765cd5feb27aed4c67b5608d clean and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged. PM inspected committed refs and proof files only, not developer worktree internals. No source/test/docs, installed binary/assets, remote, services, Docker or preflight changes; private pvg tracker writes only. Machinery standalone constraint unchanged.
+# MAC-p7jd GREEN paused: legacy fixture migration outside ownership
 
+Candidate: 4b246baf7f9384f373d4935f01bbe07c7fcf7076, story/MAC-p7jd.
+Production base: a82277af5650b487cea1260c24ffcc1c86d69d8d.
+Worktree: /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-p7jd.
+Clean worktree; all bounded native processes completed. No delivery, acceptance,
+closure, merge, rebase, remote operation, install, preflight or example mutation.
+
+## Exact dispute
+
+Four existing, read-only regression leaves assume that unchanged example v1
+implementation-behavior attestations remain green. The approved MAC-p7jd contract
+instead requires GV_MISSING_IMPLEMENTATION_SUBJECT for every such v1 row, with
+no grandfathering. Their semantic fixtures now conflict with that requirement:
+
+1. internal/hook/hook_test.go:833 TestStopGreenDesignClearsStateSilently copies
+   examples/go-crm/design through copyTree, records a design obligation, and
+   expects silent Stop before checking ledger clearing. Its exact failure at
+   line840 is one ordinary mid-phase systemMessage reporting one gate ERROR.
+   The ledger assertion after Fatalf is NOT reached in this leaf.
+2. internal/gates/obligation_ownership_test.go:395 TestObligationParentRealCLI:
+   obligation-free-parent-control fails line423 on its default-gate positive
+   control; the subsequent explicit zero-obligation Gt assertions are NOT reached.
+3. The same test's Policy.oracle.md leaf reports line445 default-gate failure.
+4. The same test's Isolation.oracle.md leaf reports the same default-gate failure.
+   For 3/4 the actual parent Go tests execute, explicit Gt positive controls run
+   successfully, and default gates fail solely on legacy Gv. Existing later
+   negative assertions are retained and were allowed to execute (Errorf, not Fatalf).
+
+obligationParentFixture copies the complete examples/checkout-split tree, then
+creates local module/dependency/code inputs. Its parent/design/attestations.yaml
+is unchanged v1 with gt.conformance-test-shape. Default parent selection remains
+the accepted source behavior; no selector expansion or production amnesty is justified.
+All reads-consumer leaves in this replay pass.
+
+Direct actual candidate command `go run ./cmd/machinery check
+examples/go-crm/design --gate gv` shows exactly one blocking error:
+GV_MISSING_IMPLEMENTATION_SUBJECT: gt.conformance-test-shape has legacy design-only
+covers; review the complete implementation/test scope and run machinery attest
+with explicit current kind/root/reviewer/date, or explicitly recast as v2 plan.
+All plan/history migration notes remain informational.
+
+No repair is proposed as approved. Review must select exact test-local fixture
+migration hunks or a separately scoped example migration. All existing assertions,
+helpers, accepted semantics and examples remain untouched pending exact authority.
+The two newly added supplemental test files are frozen at their first addition
+commit 4b246ba; this dispute does not license changing them.
+
+## Same-revision observations (all at 4b246ba)
+
+Each scoped command uses `go test -count=1 -timeout=5m -json`:
+
+| Package / selector | Leaves | Pass | Fail | Skip | Native seconds |
+|---|---:|---:|---:|---:|---:|
+| internal/gates / Attest | 151 | 151 | 0 | 0 | 19.303 |
+| cmd/machinery / Attest | 28 | 28 | 0 | 0 | 16.104 |
+| internal/hook / Attestation | 28 | 28 | 0 | 0 | 7.931 |
+| internal/designlock / Attestation | 22 | 22 | 0 | 0 | 2.004 |
+
+229/229 scoped leaves pass, including all 189 frozen leaves and 40 new leaves.
+Original baseline47PASS142FAIL0SKIP and all compile/setup failures remain preserved.
+The original A/B/C/D native names remain in final-*-native-leaves.json. Every C
+control/challenge now executes in GREEN; the16 schema mutation legs that only
+appeared green through unreachable baseline setup now actually execute. The prior
+complete/date and empty/Gl fixture disputes are resolved by the exact separately
+authorized commit2e897a4; their earlier failures remain setup history.
+
+Targeted race replay uses the same command plus `-race`:
+
+- internal/designlock / Attestation: 22PASS0FAIL0SKIP, 2.744s.
+- internal/gates / TestAttestGreen|TestAttestationCRelease: 23PASS0FAIL0SKIP, 31.065s.
+
+Broader read-only replay is NOT clean proof:
+
+- gates / TestSelect|TestRunSelected|TestCargoWorkspacePointerMutation|TestGateSnapshot:
+  33PASS0FAIL1SKIP, 3.282s. The existing
+  TestSelectRejectsNonportableAndAliasedDesignPaths/case_folded_collision skips
+  on this case-insensitive filesystem. No skip was added or credited as proof.
+- hook / TestStop|TestSelectGates|TestGreenStop: 23PASS1FAIL0SKIP, 4.958s.
+- gates / TestObligation|TestReadsConsumer: 76PASS3FAIL0SKIP, 11.689s.
+- designlock / TestMaterializeDesignWorkspace|TestExternalTreeSnapshotCleanup|
+  TestRegularFileSnapshotCleanup|TestExternalSnapshotRejects|TestUniversalSnapshotBoundary:
+  13PASS0FAIL0SKIP, 0.693s.
+
+## New proof reached
+
+Capability tests use actual original held roots across4 topologies, full entries,
+design overlay hash, private copy hash, defensive Entries copy, repeated Close,
+released CheckUnchanged/Materialize rejection. Real original-file mutation,
+same-byte restored-mtime design file identity replacement, original/design root
+renames, private-copy mutation and post-reader/pre-capture design generation gap
+all fail custody after matched unchanged observations.
+
+Existing read-chunk callback runs on real2*64KiB file copy; unchanged, actual file
+mutation and root rename/replacement cases execute (no fake FileInfo/readers).
+Factory defaults assert100000 entries/depth64/1GiB/8GiB. Lowered actual-tree
+at/plus-one entry, depth and aggregate controls execute, including one10-byte
+aggregate over5-byte implementation+5-byte design overlay. Actual sparse1GiB+1
+file is rejected before that file's read callback. No real8GiB-tree claim.
+
+Four real wrappers Render, WithImplementation, package RunSelected, and
+SelectRunAndNote each execute native subprocess no-fault/original/owned-copy
+cleanup cases. Every fault invocation first executes its fired matched no-fault
+control. Only the approved before-final-Release callback mutates real filesystem
+objects, never results or lifecycle handles. Cleanup swaps a verified owned
+BUILD.md for a sentinel symlink under child-private TMPDIR. Callbacks fire once,
+current counters are still absent before release, final faults suppress them,
+repeated Release is latched, outside sentinel survives, actual cleanup/symlink
+cause is exposed without private paths, and released Snapshot APIs fail closed.
+
+Actual Render input/output document and design-cover16MiB-at/plus-one cases
+execute, with nil bytes and GV_EVIDENCE_LIMIT at plus-one. Exact v2 claim/date/
+cover-hash whitespace mutations reject after current success controls.
+
+AC5 OBSERVED: Render late original mutation and owned-copy cleanup return nil
+bytes plus actual errors; built CLI success and ordinary renderer-input/alias
+failures execute, returning exit1/empty stdout on failures. COMPOSED source
+closure: internal/gates/attest.go:949 Render buffers then line965 errors.Join of
+render/check/Release errors; nonnil returns nil bytes. suite.go:82 Release checks
+strict originals, supplementary lock, closes capabilities/workspace/lock, joins
+errors and finalizes once. cmd/machinery/attest.go:120 receives Render; line123
+error branch reports and returns1 before line128 output. Independent PM source
+review remains required. Standalone CLI injected late failure UNOBSERVED;
+individual OS Close primitive failures UNFORCED. Sink partialwrites are separate.
+
+## Remaining owned work / diagnostics
+
+The newly written docs line in the generation example mistakenly spells
+`machinery check --design design --impl src --gate gv`; check's design path is
+positional. It must become `machinery check design --impl src --gate gv` in a
+docs-only correction after pause direction, followed by same-revision proof.
+An initial diagnostic repeated this invalid flag; its stderr is preserved as
+blast-hook-example-gv.*, then the corrected successful diagnostic execution is
+preserved separately as blast-hook-example-gv-corrected.*. This is not product
+failure and not authorization to change check's CLI grammar.
+
+Quality scan `pvg verify <14 exact owned paths> --format text --include-tests`
+scans13 source files (docs ignored), reports11 return-empty stub heuristics in
+existing hook.go lines993,1069,1103,2646,2651,2656,2671,3965,3972,3976,3986.
+All lie outside this story's changed stop hunks1318..1386; no new stub finding.
+This is not reported as a clean scan or repaired by unrelated source edits.
+TDD range audit checks9 commits,0 merges,0 violations. An initial invocation
+erroneously included story positional ID and was rejected; preserved stderr,
+then documented range-only and base/json invocations succeeded.
+
+## Measured scope and immutability
+
+14 exact owned paths,3331 additions+66 deletions=3397 changed lines;87 above the
+upper forecast3310. Decomposition: production1184, frozen tests1489 (including
+two exact fixture repairs), new tests566, docs158. New tests grew191 beyond the
+375-line upper estimate to keep real paired subprocess operations, full root/
+limit matrix, explicit cleanup/identity assertions, and document boundaries.
+No generic helper factoring, new public API/seam, or ownership expansion.
+
+| Path | Add | Delete |
+|---|---:|---:|
+| cmd/machinery/attest.go | 43 | 1 |
+| cmd/machinery/attest_implementation_test.go | 464 | 0 |
+| cmd/machinery/attest_test.go | 1 | 1 |
+| cmd/machinery/check.go | 2 | 2 |
+| docs/attestation-evidence.md | 140 | 18 |
+| internal/designlock/attestation_snapshot.go | 464 | 0 |
+| internal/designlock/attestation_snapshot_test.go | 310 | 0 |
+| internal/gates/attest.go | 514 | 13 |
+| internal/gates/attest_green_test.go | 256 | 0 |
+| internal/gates/attest_implementation_test.go | 612 | 0 |
+| internal/gates/attest_test.go | 48 | 2 |
+| internal/gates/suite.go | 98 | 22 |
+| internal/hook/attestation_snapshot_test.go | 361 | 0 |
+| internal/hook/hook.go | 18 | 7 |
+
+All5 approved frozen hashes and both new-file hashes are final-test-sha256.txt.
+All14 source hashes are paused-final-source-sha256.txt. Raw stdout/stderr,
+exact native leaf inventories and elapsed times use final-*, race-* and blast-*
+files in this same evidence directory; paused-blast-evidence-sha256.txt binds
+raw JSON and the4 disputed input source files. paused-build-profile.txt records
+Go/platform/CGO settings. Prior RED and failed intermediate outputs are retained.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Candidate4b246ba;229 scoped leaves and45 race leaves pass, no skips in either.
+- Broader replay exposes4 out-of-scope legacy fixture conflicts and1 existing
+  filesystem-conditional skip. No repair or delivery asserted.
+- Exact authorization needed before any existing fixture/helper/example change.
+
+### proof
+- [ ] AC #1: v2 grammar/current/plan/history observations pass; pending overall review.
+- [ ] AC #2: full scope inventory/hash observations pass; pending overall review.
+- [ ] AC #3: suite/current/history/complete behavior passes; legacy regression fixture authority unresolved.
+- [ ] AC #4: held-root/copy/bounds and hooks observed; broader fixture/skip unresolved.
+- [ ] AC #5: generation and composed finalization observations recorded; docs command correction and independent source closure remain.
 
 ## nd_contract
 status: in_progress
