@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-06T02:35:50Z
-content_hash: "sha256:7fd3307ae7f79d4d07414bac15667a9955b4cb2f5e3d0f10cbb0e70ff4b61a93"
+content_hash: "sha256:c70b783cabd904cb4d2246310c92aacabed990c05cbcaea46409c30884d69ccc"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -3194,4 +3194,34 @@ status: delivered
 - [x] AC #5: all required integration uses frozen actual builtCLI/checksummedrelease/temp roots, no mocks/required skips/liveinstallation mutation or product Paivot dependency. Legacy component/execution fixtures are not substituted for releasedCLI proof.
 - [x] AC #6: install.go156/249 authenticated tx.delegated child deferral, update.go221 parent finalization before225commit, receipt.go387/263 complete normalized validated realinventory. All4parent casesPASS:2onewriter nofault complete receipts and2onewriter/oneactualos.ErrClosed complete rollbacks including receiptabsence/sentinels/journalcleanup/reallockreacquisition; persistedreceipt unchanged through all real children;4authority controlsPASS; hostplugin semantics preserved.
 - [x] AC #7: receipt.go333 conflicting crossgroup rejection and validation before publication;5actualstandalone casesPASS(fresh/disjoint/sameorderedcopychange and2conflict exactrollback/followonnative). No ownership deletion or automatic regrouping.
+
+
+### 2026-09-06T02:35:50Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- Sr PM canonical documentation division only: MAC-gcrr owns README.md + docs/agent-portability.md and safety regression/release guidance; installer seven AC/frozen proof unchanged, independent PM acceptance pending. Source 15252d2 confirms receipt-aware parity, safe repair, strict inspection, direct rollback/foreign-change protection and post-direct-commit host-plugin error boundary. Existing dependencies retained; no docs/source/test writes or status/claim change.
+- GREEN candidate SHA15252d255fa12a131fbc2cdb13f593a212fd4ccb, branch story/MAC-2u36, retained clean /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36. Production0ad71eba545083e0836792f6f2e307604182e2dd remains byte-identical in three owned source files. Seven frozen hashes unchanged;13commit TDD audit PASS0unauthorized; diffcheckPASS. No new test/source/config edits or live processes.
+- Root authorized canonical delivery after independent DELIVERY_SCOPE.md SHA86f22b8eef256784a992053bbcf6a7933e89ac9fefe85311bf4722b1fd284a41 under /tmp/machinery-pm-MAC-2u36-budget.FBiyzE. Independent BUDGET_DECISION.md SHA2f87aa9e02e81028f3e2ad1a699b63ec1e038cff429d4bc2951b2b62924325cf and joint COMPLETE_RERED_FREEZE.md SHA97d7437738d815b81f411d90382a23708303f9bf6d4d802bd33e52c85cdab2c3 remain authority.
+- Full named proof /tmp/machinery-MAC-2u36-green.G05gWz/15252d2-COMPOSED_GREEN_REPORT.md SHA6b5d9ac79fab9bdd16c8502a2d08245458e3c2cb4a726f3eab4101d860b4ab6d; inventory15252d2-composed-inventory.json in same directory SHA2822be70f16dfefd6ac9d74ee73b4c91f9493b916ab55c0e71a4eefbb82d8a75. Prior report hold superseded by this delivered contract; original history not rewritten.
+- Prior command: go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json. TIMEOUT900.473s/exit1 remains historical failure;35valid terminal PASS leaves0assertionFAIL0SKIP,1interrupted49unstarted then. Raw15252d2-full-green.jsonl SHA2d5eb852990952e57e6bcf2c5aff3618821da4c2e16744240b25eab6f25348da under report directory.
+- A: go test -count=1 -timeout=7m ./internal/install -run '^TestBootstrapReceiptCLI$/(missing_prestate_later_target_failure_rolls_back_bootstrap_true|corrupt_receipt|unsafe_receipt|stale_schema|plugin_discovery_failure|symlink_native_artifact|non-directory_native_parent|interrupted_download_recovers_real_transaction)$' -json. PASS184.383s8leaves0FAIL0SKIP9runs9terminals. Raw15252d2-A-cli-remainder.jsonl SHA6160539baab5d35556e585eedebb4261ddef556a53a21780fb596aecb67cd497.
+- B: go test -count=1 -timeout=15m ./internal/install -skip '^TestBootstrapReceiptCLI$' -json. PASS145.642s, exact189top selected names,463runs463terminals,412PASS0FAIL0SKIP leaves=402behavioral+10dormant helpers. Raw15252d2-B-install-complement.jsonl SHA8178d0ee0f984fc07638b6056c79fb30dfdb043a510b38eef4aa9f62cb276724.
+- C: go test -count=1 -timeout=15m ./cmd/machinery -json. PASS200.934s, exact263top names,437runs437terminals,399PASS3SKIP0FAIL leaves=394behavioral+5dormant helpers+3skips. Raw15252d2-C-cmd.jsonl SHAbdd17c7579cfd52a54d8002350de4f2d89ce8619fc3096574ffd632f827ec0c2.
+- A/B/C ran once sequentially with direct raw JSON and unchanged individual bounds. All raw paths above are under /tmp/machinery-MAC-2u36-green.G05gWz. No missing/unexpected native names or unfinished dynamic subtests. Required85unique story leavesPASS0SKIP =32actualCLI(24prior+8A)+53nonCLI(B); no duplicate/helper credit. Native install union434behavioralPASS+10scaffolding records,0skip; exact190top inventory accounted with originalCLI parent explicitly COMPOSED, not whole-parent termination.
+- All15dormant helpers named/classified in full Notes and JSON; actual parent invocation assertions supply behavior. TestCmdTestLockSubprocess is a real passing receipt/lock test, not dormant.
+- C's only skips: TestValidateC4ExportInventoryIsPortableClosedAndStable(host cannot materialize case-aliased filenames), TestProvisionOfficialStructurizrArchiveAndReuseCache(officialarchive lane not enabled), TestVerifyCheckersPiiFlowEngineGolden(explicitOCI lane not enabled). Independent exact-source+graph review confirms skipped bodies outside changed installer call paths; no behavioral credit, no external availability/absence claim. Under explicit user-targeted scope they do not block this delivery; final platform/archive/OCI/race gate remains pending and unwaived.
+- pvg verify explicit9files reports6heuristics exit1, independently source-reviewed complete:5unchanged empty-result platform/diagnostic fallbacks and9code-line explicit unsupported-platform test function. No padding/suppression/weakening; do not claim scanner cleanPASS. Full delta1847LOC9files=1752tests+95production(+74/-21), within reviewed~1850forecast.
+- Coverage percentage not collected per explicit no-cover authority; no monolithic/native-race/fullpreflight or measured20mfit claim. No installed assets, Dagger, main/epic, remote/sync or fullpreflight changed. Retain worktree/claim; independent PM acceptance remains pending.
+
+### proof
+- [x] AC #1: update.go254 receipt-aware bootstrap complete recorded/discovered plan preserves mixed group modes/plugins; defaults/schema1/complete plan tests and actual convergence PASS.
+- [x] AC #2: B private JSON/schema/topology/inventory/digest controls and A actual permission/path/type/plugin negatives PASS; safe edited/missing owned content repair PASS without validation relaxation.
+- [x] AC #3: all8actual ordinary/bootstrap intact/edited/singlemissing/multimissing cases PASS with current binary/content, complete real inventory, topology/modes/plugin obligations, sentinels and same-release idempotence.
+- [x] AC #4: all4actual later-target rollback cases PASS including missing-prestate absence; actual startup interrupted_download recovery separatelyPASS; native transaction/foreign-change regressionsPASS.
+- [x] AC #5: all required integration uses frozen actual builtCLI/checksummedrelease/temp roots, no mocks/required skips/liveinstallation mutation or product Paivot dependency. Legacy component/execution fixtures are not substituted for releasedCLI proof.
+- [x] AC #6: install.go156/249 authenticated tx.delegated child deferral, update.go221 parent finalization before225commit, receipt.go387/263 complete normalized validated realinventory. All4parent casesPASS:2onewriter nofault complete receipts and2onewriter/oneactualos.ErrClosed complete rollbacks including receiptabsence/sentinels/journalcleanup/reallockreacquisition; persistedreceipt unchanged through all real children;4authority controlsPASS; hostplugin semantics preserved.
+- [x] AC #7: receipt.go333 conflicting crossgroup rejection and validation before publication;5actualstandalone casesPASS(fresh/disjoint/sameorderedcopychange and2conflict exactrollback/followonnative). No ownership deletion or automatic regrouping.
+
 
