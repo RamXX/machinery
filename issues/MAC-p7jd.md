@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:21:32Z
-content_hash: "sha256:1eef23298c7d6e75183625fce77906252edf08f8a8ca87c680c43877fe54b10f"
+content_hash: "sha256:e808277196cbc9111323e212788d94470e8783ac8e316ab0083474e5f1438a57"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36]
@@ -1687,3 +1687,24 @@ status: delivered
 - [x] RED AC #3: 24 genuine legacy false-acceptance failures with passing compatibility controls supplied.
 - [x] RED AC #4: negative/positive scope and custody contracts frozen; C fault execution and approved new API supplements remain mandatory in GREEN.
 - [x] RED AC #5: actual baseline CLI integration and explicit same-revision AC5 composition limits recorded; renderer late faults, new CLI behavior and final wiring review remain mandatory in GREEN.
+
+### 2026-09-06T03:21:32Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- Sr PM canonicalized only the final independent POST-FREEZE PM COST REVIEW: same-story forecast approximately2710–3310 total,13 required/optional14 paths unchanged. Components ~1485 RED +175–375 GREEN tests +900–1250 production +150–200 docs/help; no cap, new ownership/API/seam or proof trimming.
+- Independently read exact PM authority and source stats: 7ec5d609 five files1475 insertions/3 deletions; repaired47ba449 five files1484 insertions/3 deletions (=1487 changed lines). Rounded forecast is honest estimate, not final measured total. Distinct gates/CLI/Git/hook custody matrices and existing helper reuse justify preserving proof rather than forced factoring.
+- Only two canonical forecast paragraphs changed; all five AC, R2, AC5 compositional bar, frozen tests, exact existing amendments/seams and read-only boundaries unchanged. Existing RED-only delivered contract/state retained; no approve-red/GREEN acceptance by Sr PM.
+- RED-only tests committed at 47ba44906a09bc2fa010092a86b133d0d749c52c, preserving original 7ec5d609 and unchanged a82277a production. Exact independent PM repair authorization followed.
+- Full scoped replay: 189 native leaves, 47 passes, 142 expected/absent-interface failures, zero skips; 24 genuine A failures, eight D passes, 26 B failures, 92 unreached C family cases. No setup failures remain in this replay; no current custody guarantee claimed.
+- pvg verify PASS five files/zero issues; verify-tdd PASS two commits/no unauthorized edits. Independent PM review/approve-red pending; this is not GREEN acceptance.
+- Complete report, exact leaf inventories, raw logs, timings, hashes and repair diff: /tmp/machinery-p7jd-red-proof.RvOHwO/.
+
+### proof
+- [x] RED AC #1: frozen full-scope/inventory cases compile and valid-control failures are classified; final GREEN implementation proof pending.
+- [x] RED AC #2: plan/current/history tests and real legacy controls supplied; new semantics remain unexercised until GREEN.
+- [x] RED AC #3: 24 genuine legacy false-acceptance failures with passing compatibility controls supplied.
+- [x] RED AC #4: negative/positive scope and custody contracts frozen; C fault execution and approved new API supplements remain mandatory in GREEN.
+- [x] RED AC #5: actual baseline CLI integration and explicit same-revision AC5 composition limits recorded; renderer late faults, new CLI behavior and final wiring review remain mandatory in GREEN.
+
