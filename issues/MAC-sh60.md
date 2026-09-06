@@ -8,8 +8,8 @@ labels: [hard-tdd, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:28:10Z
-content_hash: "sha256:1d6677091f49003c6b87d15241b005bfd07914af317e6994b36622510ddc3a6e"
+updated_at: 2026-09-06T00:28:17Z
+content_hash: "sha256:11a7ffe8aa9cb2f982b24e0aefed04841da12e0f5c320969f709097b4243c08c"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce]
 ---
@@ -515,6 +515,57 @@ status: delivered
 
 
 ### 2026-09-06T00:28:10Z ramirosalas
+## PM Decision
+REJECTED [2026-09-05]: RED coverage gap, not a rejection of expected RED failures. Reviewed candidate b5d3b8c67f487195215860f3d361432f5b2b6b27 on unchanged production 6cb2d974ea8aea211a5974f453cef2b5802bb11e.
+
+EXPECTED: AC1 says "Comments, docstrings-only citations ... cannot establish oracle-row or wholesale table coverage." AC2 preserves currently supported languages. RED must constrain that outcome before GREEN freezes the suite.
+DELIVERED: The 20-case negative matrix tests Python docstrings and Elixir hash comments, but contains no Elixir @doc/@moduledoc or Ruby =begin/=end block-comment case. Both languages have positive literal/parser fixtures and remain supported. Direct source inspection of executableTestText/stripTestComments/fileNameCited plus six independent real CLI probes confirms these exact omissions each currently yield Gt ok, zero blocking findings and exit 0 with empty stderr: elixir_moduledoc_ids, elixir_doc_ids, ruby_block_comment_ids credit 2 literal IDs; elixir_moduledoc_parser, elixir_doc_parser, ruby_block_comment_parser credit 1 whole conformance parse.
+GAP: A GREEN implementation could satisfy every frozen RED assertion by handling Python triple quotes and Elixir # comments while still manufacturing coverage from Elixir documentation and Ruby block comments, violating AC1. This is a reproduced supported-language hole, not a request for a general parser architecture or external language runtimes.
+FIX: Add the six exact cases below to TestOracleCoverageRejectsNonExecutableEvidence. Reuse its real CheckOracleCoverage fixture and existing assertions (nonempty coverage diagnosis, zero literal IDs, zero wholesale machines). Replay on unchanged production: each must fail because unsafe coverage was credited; preserve all existing positive/runtime/preservation controls and actual CLI proof. Deliver an amended tdd-red commit with updated SHA/hashes/counts for fresh independent review. No production implementation or RED approval yet.
+
+TEST-EDIT AUTHORIZED: internal/gates/oraclecov_negative_test.go -- add ONLY six entries to the existing TestOracleCoverageRejectsNonExecutableEvidence cases slice, using the exact fixture forms below. Preserve the current 20 entries, shared assertion body, helper semantics, other tests and all unrelated bytes. This supplements the prior four-expression authorization; it does not reopen internal/gates/oraclecov_test.go or cmd/machinery/oraclecov_negative_test.go. Repair commit subject must carry both tdd-red and [test-edit-authorized].
+
+1. elixir_moduledoc_ids, rows_test.exs: `defmodule RowsTest do\n  @moduledoc """\n  THIN-aaa111 THIN-bbb222\n  """\nend\n`
+2. elixir_doc_ids, rows_test.exs: `defmodule RowsTest do\n  @doc """\n  THIN-aaa111 THIN-bbb222\n  """\n  def helper, do: :ok\nend\n`
+3. elixir_moduledoc_parser, rows_test.exs: `defmodule RowsTest do\n  @moduledoc """\n  parse "Thing.oracle.md" using "|"\n  """\nend\n`
+4. elixir_doc_parser, rows_test.exs: `defmodule RowsTest do\n  @doc """\n  parse "Thing.oracle.md" using "|"\n  """\n  def helper, do: :ok\nend\n`
+5. ruby_block_comment_ids, rows_spec.rb: `=begin\nTHIN-aaa111 THIN-bbb222\n=end\n`
+6. ruby_block_comment_parser, rows_spec.rb: `=begin\nparse "Thing.oracle.md" using "|"\n=end\n`
+
+The displayed \n sequences designate actual source line breaks; ordinary Go string escaping is allowed when inserting these fixture bytes. Exact standalone fixture files are preserved under /tmp/MAC-sh60-pm-red.2yPht9/probes/<case>/.
+
+## Independent PM evidence
+- Full shared canonical story, five AC, four-fixture authorization, complete delivery proof/LEARNINGS read via pvg nd show MAC-sh60 --json. Candidate inspected in own detached /tmp/MAC-sh60-pm-red.2yPht9/review; author worktree retained untouched. Actual branch is epic/MAC-ui8a; initial concatenated branch spelling in dispatcher prompt was resolved read-only.
+- Graph list_projects/index_status and check_index_coverage: generation 2026-09-05T23:58:53Z, production/original-test/CLI-harness metadata_match with no recorded issues. New negative files absent from main index; full exact candidate source read is authoritative fallback. No completeness claim from the graph.
+- Static source scan and pvg verify internal/gates/oraclecov_negative_test.go internal/gates/oraclecov_test.go cmd/machinery/oraclecov_negative_test.go --include-tests --format text: sole scanner finding is existing oraclecov_test.go:158 quoted TODO inside the negative comment fixture; verified source, not unfinished work. No suppression or edit. No stubs, skip gates or missing type signatures. RED changes only tests; implementation/doc freshness awaits GREEN.
+- Diff from 6cb2d974 to candidate: 3 files, 285 insertions/8 deletions. Existing oraclecov_test.go diff is exactly the four authorized source expressions; original assertions, names, counts, paths, parseEvidence preserved. Production unchanged. git diff --check passed.
+- Frozen SHA256 independently matched: gate negatives 77940442bc579b2ec64715c79555d89c44dd27e498e49d296899e2d8f90ff042; original gate tests dd68d778605397184630447bc09b712072fe604be77c496177d121690414b994; CLI negatives 6ea06399d8271691f7f40f30f067e0d3270184eaca4fc2548cc7a562c7775d08; oraclecov.go 9f4bfabcfe43362b62068e59a59f313cd6d27a3490392f66c5fcf71be70684ad.
+- Independent command 1, from detached candidate: go test -json -count=1 -timeout=120s ./internal/gates -run 'Oracle|Conformance|Coverage|GtCitationBoundaries' > /tmp/MAC-sh60-pm-red.2yPht9/gates.jsonl. Session 3851 completed exit 1, 90 leaves = 68 pass/22 intended fail/0 skip. Twenty unsafe acceptance failures plus mixed-disabled and discovery-label failures, with actual returned counts/errors inspected.
+- Independent command 2: go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestOracleCoverageCLI' > /tmp/MAC-sh60-pm-red.2yPht9/cli.jsonl. Session 28279 completed exit 1, 10 leaves = 4 pass/6 intended fail/0 skip. Five real CLI false-green exits plus discovery-label failure. All reach Gt with empty stderr.
+- Independent command 3: go test -json -count=1 -timeout=90s ./internal/gates -run '^TestGt' > /tmp/MAC-sh60-pm-red.2yPht9/gt-controls.jsonl. Exit 0, 7 pass/0 fail/0 skip, including 2 repeated boundary leaves. Exact leaf inventories stored alongside as gates-inventory.json, cli-inventory.json, gt-controls-inventory.json; no sums claimed as unique tests.
+- Native Go fixture control passes after two checked-row logs. Altering only first oracle target B -> A reaches exact assertion "oracle transition mismatch: got B want A"; corrupt_true outer test passes. No compile/import/read/timeout error counts as RED. Other-language fixtures establish static discovery only. Go lowercase/wrong-signature source negatives test discovery, not native execution.
+- Read unchanged goldenBin/runBinWithEnv source: actual local go build and subprocess against real temporary filesystem trees, private HOME/config, no mocks or injected coverage. CLI disabled_go has an empty detail expectation, but checks actual Gt identity, clean stderr and blocking exit; paired disabled unit cases constrain zero credit/coverage diagnosis. It is not an independent rejection ground and no existing CLI edit is authorized.
+- Probe binary command: go build -o /tmp/MAC-sh60-pm-red.2yPht9/machinery ./cmd/machinery. For each exact six case names above, ran from detached candidate: env HOME=/tmp/MAC-sh60-pm-red.2yPht9/private-home MACHINERY_CONFIG_DIR=/tmp/MAC-sh60-pm-red.2yPht9/private-config /tmp/MAC-sh60-pm-red.2yPht9/machinery check /tmp/MAC-sh60-pm-red.2yPht9/probes/design --impl /tmp/MAC-sh60-pm-red.2yPht9/probes/<case> --gate gt > /tmp/MAC-sh60-pm-red.2yPht9/<case>.out 2> /tmp/MAC-sh60-pm-red.2yPht9/<case>.err. All six exit 0; all stderr files zero bytes. These diagnostic fixture additions are outside all checkouts and are not edits to delivered code/tests.
+- Coverage percentage not measured in intentionally failing RED; exact behavioral inventory supplied. No full preflight, external runtime suite, install/dev-link/toolchain/live binary/plugin/skill change, remote mutation, main change or merge.
+
+LEARNINGS:
+- Supported-language comment/docstring boundaries need explicit regression examples: recognizing Python triple quotes and Elixir hash comments alone does not constrain Elixir documentation attributes or Ruby embedded documents.
+- The parser control and immutable four-fixture repair are adequate; preserve them during this narrow RED rework.
+
+## nd_contract
+status: rejected
+
+### evidence
+- Independent candidate replay and six real CLI probes recorded above. Canonical rejection is for incomplete RED coverage only; production completion remains pending.
+
+### proof
+- [ ] AC #1: add six reproduced Elixir documentation/Ruby block-comment negatives before RED approval.
+- [x] AC #2: existing literal/parser positives and native assertion-sensitivity control are valid; retain unchanged.
+- [ ] AC #3: extend full CheckOracleCoverage negative matrix with the six exact newly confirmed bypasses; existing assessment/zero/mixed/malformed matrix ran as claimed.
+- [x] AC #4: current unit and actual CLI label assertions are valid intended RED; no static execution claim.
+- [x] AC #5: boundaries/orphan/missing/clause controls pass; real CLI integration is proven.
+
+### 2026-09-06T00:28:17Z ramirosalas
 ## PM Decision
 REJECTED [2026-09-05]: RED coverage gap, not a rejection of expected RED failures. Reviewed candidate b5d3b8c67f487195215860f3d361432f5b2b6b27 on unchanged production 6cb2d974ea8aea211a5974f453cef2b5802bb11e.
 
