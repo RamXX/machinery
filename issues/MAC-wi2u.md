@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:01:51Z
-content_hash: "sha256:09660b92075caf8ab26670b6baba517f1f656f40bc89ea9cafad9a2d28a39c56"
+updated_at: 2026-09-06T09:16:31Z
+content_hash: "sha256:76a9499fbd7153ed2662fb8617540734366a630f16080d8f31d137d6f13019ca"
 blocked_by: [MAC-bz1y, MAC-6h0s]
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 ---
@@ -106,3 +106,44 @@ status: new
 - Blocked by: [[MAC-bz1y]], [[MAC-6h0s]]
 
 ## Comments
+
+### 2026-09-06T09:16:31Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- internal/tdd/adapters/go.go -> internal/tdd/adapters/go.go -> the closed go-testing/v1 implementation of Adapter { ID() string; Prepare(context.Context, SuiteRequest) (PreparedSuite, error); Run(context.Context, PreparedSuite, EventSink) (Execution, error) }; embedded go assertion/harness assets under the owned assets directory; internal/runtimeclosure/go.go -> exact approved RuntimeHandle implementation for Go 1.27.1, no new user-selectable adapter API; named required contributor fragment.
+- internal/tdd/adapters/go_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/tdd/adapters/go_integration_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/tdd/adapters/assets/go/README.md -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/runtimeclosure/go.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/runtimeclosure/go_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- testdata/integration-lanes/assurance-go.json -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-6h0s: internal/tdd/types.go
+  spec: Adapter, SuiteRequest{Inputs InputView;Suite Suite;Source BundleRef;Scratch string;Runtime RuntimeHandle;Scope processscope.Scope;Limits Limits}, EventSink func(Event) error and machinery.tdd.event/v1 normalized identities; PreparedSuite is opaque and cannot be deserialized.
+- MAC-bz1y: scripts/integration-lane/assurance_catalog.go
+  MAC-6h0s: closed required fragment union with exact Go 1.27.1 native closure and Linux amd64/Darwin arm64 execution accounting.
+- MAC-qlw2: internal/processscope/scope.go
+  spec: Scope.Run(context.Context, Command, Streams) (Result, error); use remaining absolute budget and owned child scope, never direct unowned subprocess.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: A Go consumer receives native assertion-specific outcomes, and setup/compile or forged output cannot return successful RED.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
+- [ ] AC #7: current story acceptance requirement remains pending.
