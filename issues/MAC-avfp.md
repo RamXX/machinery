@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:01:51Z
 created_by: ramirosalas
 updated_at: 2026-09-06T09:22:37Z
-content_hash: "sha256:2f5c4fbb44998fe45b43c5ca955a87a1cacc19cc5fcb33e99b2ca1601f333487"
+content_hash: "sha256:687a2844e30e53cbec2c3d39f83c539b6a256c58e7eb154a448aadf5c4c848fa"
 blocked_by: [MAC-bz1y, MAC-6h0s]
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 ---
@@ -148,3 +148,22 @@ status: new
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
 - [ ] AC #7: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:22:37Z ramirosalas
+SCHEMA MARKER INSERTION AUDIT 2026-09-06
+Root-authorized supported nd edit inserted ONLY 1 valid indented schema signature line(s) into the newly authored canonical CONSUMES block. Every original byte/contract/status/evidence/history was preserved; no deletion/replacement. This repairs the mechanical label substitution, not the contract values.
+Before raw Body SHA256: 8ef8b342d4606020379116dce60d97a755229942285c40f7c78acdcc612ced72
+After insertion-only raw Body SHA256 (before this audit comment): 2f5c4fbb44998fe45b43c5ca955a87a1cacc19cc5fcb33e99b2ca1601f333487
+Exact inserted lines (zero-based original Body line positions shown):
+- after Body line 111: "  schema: closed required fragment union with exact Node 26.8.1 and TypeScript 7.0.2 native closure and Linux amd64/Darwin arm64 execution accounting."
+Read-back pvg nd show Body exactly equals prior Body plus these insertions. Editor required expected hash, count, exact target and 13-entry total; installed pvg source revision c0957106a81346033d7b1d82fde5f434a9db6bab confirms scanner checks every historical entry.
+
+## nd_contract
+status: new
+
+### evidence
+- Signature syntax corrected via supported guarded editor; exact before/after evidence above.
+- No implementation/native proof; independent Anchor and canonical document holds remain.
+
+### proof
+- [ ] All current story ACs remain pending without weakening.
