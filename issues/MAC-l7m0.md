@@ -12,6 +12,7 @@ content_hash: "sha256:548433337578e30bd2e0c3db26fb1774ffc09b411bed38ad062b1c0111
 blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36]
 assignee: dev-MAC-l7m0
+labels: [delivered]
 ---
 
 ## Description
