@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T06:03:26Z
-content_hash: "sha256:f9e4d1b1b52421ef8ad1157e58f26eb1177f1ba527874f0cf9df8ac38bc3adc7"
+content_hash: "sha256:975d2e94882b8bbcff6bc9dd90b22408c2f896ffd22edaa9340e13ec8203478d"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
@@ -941,6 +941,18 @@ Observed evidence and limits:
 - Measured production6files1125add/43del =1168 changed lines; combined11files2609add/46del =2655. Remaining tests/docs and actual final cost still owed; the canonical forecast is not completion proof.
 - Main497419ab4512fcff765cd5feb27aed4c67b5608d clean and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged. PM inspected committed refs and proof files only, not developer worktree internals. No source/test/docs, installed binary/assets, remote, services, Docker or preflight changes; private pvg tracker writes only. Machinery standalone constraint unchanged.
 SR PM LEGACY FIXTURE OWNERSHIP / PROPOSAL-PREPARATION HOLD. Read complete PAUSED-BLAST-DISPUTE.md SHA256d2837c4fbd4205ba151b856e96a7747d3cc32b58b1a69b4c49fe1d6fedb6bc1f and terminal report.229scoped+45race PASS belong to4b246ba; paused51454e069ebe4039f02d6d9108acf9354c7ad6c8 is docs-only later and still owes finalsameSHA proof. Four old-fixture leaves remain held: hook_test.go TestStopGreenDesignClearsStateSilently and obligation_ownership_test.go TestObligationParentRealCLI obligation-free/Policy/Isolation default-gate legs. Legacy v1 gt correctly fails GV_MISSING_IMPLEMENTATION_SUBJECT; silence/ledger, default-vs-explicit Gt, real controls/negatives, Ga ancestry/selection and no-grandfathering are fixed. hgz1 now owns all8bundled evidence migrations AFTER p7/uzxr/lhu5; no p7 reverse dependency or bundled writes to unblock this story. Root may resume the healthy retained GREEN author for an UNAPPLIED EXTERNAL exact test-local fixture proposal against51454e0 limited to those2existingtest paths, with full old/new hunks, original-assertion byte equality, helper callers, real input/evidence inventory, warning/silence semantics and per-file cost. This is proposal preparation only, not oldtest editing or TEST-EDIT AUTHORIZED. Separate independent PM must approve exacttext before any subsequent sanctioned amendment. Verified existing APIs: gates.AttestationReview{Claim,Kind,Attestor,Date,Note string}; RenderAttestation(design,impl string,review AttestationReview)([]byte,error); CheckAttestationsWithImplementation(design,impl string)*Gate. No missing core schema/API identified. Exact valid fixture construction remains unresolved: plan warnings cannot be assumed silent; real/synthetic impl hashes do not establish substantive current conformance, especially before uzxr repair. If no fixture preserves all constraints, report exact technical conflict for independent specialist review; do not weaken assertions, invent review or change product semantics. Existing filesystem skip remains uncredited. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-05.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
+
 # MAC-p7jd GREEN delivery evidence
 
 PROOF:
