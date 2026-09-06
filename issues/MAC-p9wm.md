@@ -8,8 +8,8 @@ labels: [docs, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:23:20Z
-content_hash: "sha256:e493db202a47359fc1cbbf67241528bc39f0151132007e709e4495bf847ebaf4"
+updated_at: 2026-09-06T12:24:03Z
+content_hash: "sha256:3fd5b939a9415988877fb4fe0e6a09e860e7dda5e1f7c0632843aac26b20df61"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 assignee: dev-MAC-p9wm
@@ -611,3 +611,26 @@ status: delivered
 - [ ] AC #6: developer coverage and 19-mutant semantic self-review delivered; independent whole-prose PM verdict remains pending and is not claimed.
 - [ ] AC #7: bounded developer checks completed; independent complete-prose/render review remains pending and is not claimed.
 - [x] AC #8: exact developer hashes, counts, modes, minimal hunk, matrices, scans, limitations, and true-EOF delivery contract recorded; PM acceptance remains separate.
+
+### 2026-09-06T12:24:03Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- Frozen base/candidate: `a94e768adf461178e0562ad135c7c06d8163a3a4` -> `2a63e4bb0d7b57c42dfd6f45fecfdc4f8a18cfbf`; exactly two owned docs, 329 insertions / 0 deletions / 27,995 net added bytes, both 0644.
+- Git blobs: new contract `1c1581d1aec324d979593613b44976ed0007c45b`; companion `acce64fee8db5a7565e8fa33422334de125e913f`; accepted companion base `50bd00288484b46ba69d40ff0a3cdd9ff7e1ed02`.
+- SHA-256: new contract `bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a`; companion `171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d`; reconstructed accepted body `22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8`.
+- Bounded document checks passed; developer coverage maps every projection and both endpoint/run-replay clarifications; all 19 required negative mutants rejected for specific contract reasons. Product/native tests 0 run / 0 applicable; no execution proof claimed.
+- Primary immutable report: `/tmp/MAC-p9wm-delivery.sC5L4f/REPORT.md`, mode 0444, SHA-256 `01ee0a554b8d405cc519911272821318b46e1030212547fac1d6af5d4bab10f9`.
+- Delivery-gate addendum: `/tmp/MAC-p9wm-delivery.sC5L4f/POST_DELIVERY.md`, mode 0444, SHA-256 `b97c47cd51e8c02856d09e9c990f160f9912ef5a6020bd0cd0ee9f48a88cb88c`.
+- `pvg story verify-delivery MAC-p9wm` final result: 9 passed / 0 failed. Earlier 3/6 and 6/3 parser failures and their tracker-only corrections are preserved in the addendum; candidate objects never changed.
+
+### proof
+- [x] AC #1: status/trust/standalone/unproved contract published.
+- [x] AC #2: exact API/lifetime/ownership/budget contract published.
+- [x] AC #3: exact runtime/contributor/checker/profile/cleanup plus endpoint and real run/replay contract published.
+- [x] AC #4: live-first method, distinct roles, migration, and two native matrices/unproved state published.
+- [x] AC #5: one minimum companion line and exact accepted-byte reconstruction.
+- [ ] AC #6: complete developer mapping and 19-mutant self-review delivered for independent whole-prose PM review; no PM verdict claimed.
+- [ ] AC #7: bounded developer validation complete; independent prose/render review pending.
+- [x] AC #8: exact evidence and authoritative true-EOF delivered contract recorded; acceptance remains separate.
