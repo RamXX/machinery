@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T07:20:28Z
-content_hash: "sha256:8dcdc7a5bb9ffc4b6598a2913ff9167009700682902ce4e708966369ba28ad60"
+content_hash: "sha256:2a455436261350e248b348f9b23137275a196d6fa44573b44208f5c3669b8b7e"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx]
 ---
@@ -1392,4 +1392,26 @@ status: delivered
 - [ ] AC #1 full contract repair requires separate GREEN after independent RED approval.
 - [ ] AC #2/#3/#4 complete final native/context/mutation/inventory evidence must be replayed on repaired candidate.
 - [ ] AC #5 whole-story acceptance and consumer handoff remain pending; this delivery is supplemental RED only.
+
+
+### 2026-09-06T07:20:28Z ramirosalas
+## nd_contract
+status: new
+
+### evidence
+- TERMINAL INDEPENDENT SUPPLEMENTAL RED APPROVAL MAC-uzxr: exactd3d257bd199801d88bdcce8ac8f89fdb8f6bd64c, new170-line examples/go-crm/impl/internal/testoracle/fsm_field_membership_test.go frozenSHA256201a470a38915709aab457daa4d94011cbaea873428b05a21c2d6e8b6754583b. Full review /tmp/MAC-uzxr-PM-supplemental.DsuF62/REVIEW.md SHA2567e7328ccdce810e62a65e108402b010ab0012b6064da2882febb520f50c0c545 appended intact. This is the explicit new supplemental approval, not reliance on the old label; no whole-story acceptance/close or new test-edit permission.
+- Independently read all170lines, current nine-path amendment and unchanged closed contract/fiveAC. Public Parse on real committed Session inputs; exact deterministic root/Anonymous/Anonymous.on.login/Authenticating.invoke objects. Ten independent unknown-composite cases demand nil Suite and exact oracle-parse naming actualkey; four ordinary unknown controls and raw/remarshaled plus8metadata/context controls preserve full Name/Rows/States/orderedactions. Structural-looking data keys and unresolved inert expressions exclude global-name bans/evaluation. No copied parser, fixture/source mutation, weakening or schema/API change.
+- Own exact Git archive actual Go tests:24leaves14PASS10genuine unsafe-acceptedFAIL0SKIP,exit1,634ms; all68originalcontractsPASS0FAIL0SKIP,exit0,354ms. Ten actual failures60rows,nil reproduce R1; not compile/setup/timeout/stub proof. Go1.27.1 darwin/arm64,GOWORKoff,GOPROXYoff,GOTOOLCHAINlocal,-count=1,Go120s/wrapper130s,all synchronous. Rawred d702ffb99ec0c29c901e5dcd3ea43aca79adbcc9d18ed7c30de7e30437129333; contracts796f9c8b48fd18b4103433a8ad5b1216076952a155a887844c502aa9e56b855c. Full exact actual PM+author leaf/outcome/diagnostic and100source custody audit8652260363a8d4f73ea1177cec141dffe73f3859ae67dadf33bcffe081327719. All99priorfiles/sixfrozenhashes/original495prefix326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba unchanged. Parser/Task remain rejected-source bytes; no implementation correction yet.
+- Normal TDD5commits0violations; scopedstatic1file0issues;diffcheckclean. Current supplemental delivery verify-delivery9OK0FAIL independently observed; old R2sixshapeFAIL history preserved and finalGREEN must pass9/9 again.170newLOC,3745cumulative3713aggregate/9paths within conditionalforecast; no proof trimming.
+- Actual supported pvg story approve-red exited1 because historical red-approved label already existed AFTER it moved stateopen and removed delivered/rejected. Rawstderr/receipt and intermediate readback retained; no successful-command fiction, waiver or manual labels. Root-authorized supported pvg story release then exited0 and cleared retained assignee. This exact approved EOF comment records independent supplemental approval; verified ready stateopen/unassigned/hard-tdd,red-approved, no delivered/rejected/accepted. No recovery or claim renewal.
+- Root must dispatch separateGREEN within canonical existing fsm.go exact-membership scope; this PM chooses no production text. Seven testfiles now frozen. Final fresh candidate must pass new24regression plus alloriginal68parser/218native+10supplement/3+3+17meta families, all20unsafevariants43children, dynamic row/registration/observation/native audit, defaultcleanup/explicitexport and source/freeze/quality/delivery checks. No repeated fullnative proof claimed for this test-only increment. Original genuineRED, separateTaskdefect and NONQUALIFYING scaffold evidence remain separate. No authenticatedexecution/attestation/consumeracceptance claim. No PMsource/test changes, remote/preflight/install/assets/service/Dagger actions, developer-worktree reads, children or merge.
+
+### proof
+- [x] Supplemental RED: exact new regression and all10 genuine malformed-key assertion failures with14matchedpassingcontrols independently validated and frozen.
+- [x] Supplemental custody: one addedfile only,all99priorfiles/sixfreezes/495prefix unchanged; original68parsercontractsPASS.
+- [ ] AC #1: actual exact-key implementation repair remains pending separately dispatchedGREEN.
+- [ ] AC #2: complete repaired-candidate effects/context and native proof pending; prior evidence preserved.
+- [ ] AC #3: all20originalrealunsafevariant/43child candidate proof remains finalGREEN obligation.
+- [ ] AC #4: fresh complete dynamic native/row/witness inventory remains finalGREEN obligation.
+- [ ] AC #5: fresh final candidate proof/recognizeddelivery/independentPMacceptance and consumerhandoff pending.
 
