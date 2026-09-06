@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:32:02Z
-content_hash: "sha256:5b0c19fda2cf5787d0dd10cfe99c1d50c35ffa3e94a9054da7859954afb2d0b1"
+updated_at: 2026-09-06T01:49:29Z
+content_hash: "sha256:ade8707d7172ff5b2fd560f919262795e324cd33dc4b24701bf02b95084da66a"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
@@ -1500,3 +1500,22 @@ phase: green-ready-after-golden-refreeze
 - [ ] Dispatcher integration and AC2 bounded helper compatibility/negative tests pending.
 - [ ] Native examples, required targeted checks and complete full-cmd correctness verification pending.
 - [ ] Five-AC GREEN delivery and independent acceptance pending; no production completion claimed.
+
+### 2026-09-06T01:49:29Z ramirosalas
+GREEN HEALTHY HOLD FOR INDEPENDENT TDD AUDIT REVIEW: final clean a6ac10ebadc0e6b6a344d50aa10d0b810ce6b940; implementation native proof complete, no delivery. Report /tmp/MAC-sh60-green-final.8U4Ho2/healthy-hold-audit.md includes exact authorization timeline, all4frozenhashes,932LOC/6paths, raw inventories and three flagged supplemental-only commit diffs. Final exact gate130pass/0fail/0skip; CLI10pass/0fail/0skip; full native gates1187pass/0fail/1skip; full cmd409pass/0fail/3skip completed273.048s; unchanged native examples74pass,4unreachable Policy rows explicitly excluded. Original18supplement cases preserved;16helper controls pass. pvg verify-tdd flags3d47b80/088ef8a/a6ac10e only for GREEN supplemental file edits without markers; no frozen bytes changed or history rewritten. Dispatcher requests PM adjudication before delivery. All terminal sessions completed; claim retained.
+
+## nd_contract
+status: in_progress
+phase: green-native-complete-audit-hold
+
+### evidence
+- HEAD a6ac10ebadc0e6b6a344d50aa10d0b810ce6b940; report/raw outputs/exact inventories /tmp/MAC-sh60-green-final.8U4Ho2.
+- Approved golden8f843256 integrated as7b200b6; all4frozenhashes match.
+
+### proof
+- [x] AC #1: frozen non-executable/mixed negatives pass.
+- [x] AC #2: preserved direct/literal/helper/native example positives and connected-provenance negatives pass.
+- [x] AC #3: full gate matrix and actual10case CLI pass.
+- [x] AC #4: explicit discovery-only output and exact approved golden pass.
+- [x] AC #5: shared full gate/CLI preservation controls pass.
+- [ ] Independent private TDD audit adjudication pending; do not deliver until resolved.
