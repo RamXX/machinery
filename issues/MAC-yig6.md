@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T17:02:09Z
-content_hash: "sha256:eb51591a566f590505651ba900ebfce1c1bd8c8dcd924180101a087503ebbad3"
+updated_at: 2026-09-06T17:03:15Z
+content_hash: "sha256:082bad096e16a836ffd75a35b8af9916f85b0563cff4be19476cadec7a3f4d6c"
 blocks: [MAC-ou97]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-uzxr, MAC-p9wm]
 assignee: dev-MAC-yig6
@@ -865,3 +865,6 @@ status: in_progress
 - [x] AC #3 Darwin: strict protocol plus stream/bounds/timeout controls executed with zero skips.
 - [ ] AC #4 FINAL HOLD: execute the report matrix on a native Linux amd64 host.
 - [ ] AC #5 FINAL HOLD: independent PM review/acceptance after Linux evidence.
+
+### 2026-09-06T17:03:15Z ramirosalas
+2026-09-06 independent continuation: user supplied/authorized native Linux amd64 server and now asks to table qlw2 and continue other areas. Only this healthy committed story was released/reselected via pvg loop next(developer_new GREEN)/atomically reclaimed; original branch/test history retained. Assigned /root/yig6_linux_verification, Sol high, verification-only exact candidate ef505052dc73cb9032dd91f1a3f99837f76204a8. Native remote has no go on PATH; bounded portable exact Go1.27.1 provisioning under unique owned /tmp directory and transfer of exact public candidate/deps permitted, no global install/Docker execution/services/system changes. Before-write setup provenance required. Four-command native report matrix unchanged; no source/test writes, no rejected custody task resumption, no final preflight/install/ref/push. Retain raw evidence, verify task-scoped cleanup and copy evidence home; no delivery until root reviews completion, final PM acceptance remains separate.
