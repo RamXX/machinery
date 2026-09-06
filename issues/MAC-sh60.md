@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-06T00:32:37Z
-content_hash: "sha256:6ff3ac26cea82b152cfec7e3db3b98a262e8bf339b919ce4ae81e40447e92764"
+content_hash: "sha256:7a4b6ce5ab550c65f2c7c0b23cf67e5f5969e2a1b97505608ede42b78076890b"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
@@ -115,6 +115,18 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-05.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
+
 ## Implementation Evidence
 
 PROOF:
