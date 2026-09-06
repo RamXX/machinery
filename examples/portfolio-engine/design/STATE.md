@@ -9,7 +9,14 @@
 | Formal layer | gate-passed | 2026-09-02 | machinery verify-formal 7/7: control-flow x4, PortfolioData+Refinement with routingFault stutter, RecommendationRunData; zero failures. |
 | Phase 4 BUILD.md | gate-passed | 2026-09-02 | strict full design check: 18 invariants = 13 unit-backed + 5 reasoned waivers; Gu 9/9 surfaces and Gv 12/12 attestations; zero warnings. |
 
-All gates green. Design only.
+All gates green as of the reviewed bytes above (the gate-passed rows are historical records of
+those dates; they are not a claim about later edits). Design only.
+
+Applicability (2026-09-06): the MAC-lhu5 policy revision (approved illustrative contract v3)
+changes canonical contracts across architecture/model/matrices/packets/machine metadata.
+Verification of the revised bytes is pending; the historical gate/proof rows above were not
+re-run and no acceptance is claimed for the revised content. Formal artifacts remain
+mathematical/historical statements of the abstract model.
 
 ## Phase-exit self-reviews (retrofit, 2026-07-22)
 

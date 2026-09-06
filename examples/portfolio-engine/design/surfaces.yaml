@@ -5,19 +5,19 @@ sources:
 acts:
   - act: Index.refresh
     actor: Analyst
-    surface: "analyst CLI: pf index refresh <index-id>"
+    surface: "analyst CLI: pf index refresh <index-id> --max-provider-rows <R> --max-scalar-bytes <B>"
     milestone: M5
   - act: Security.upsert
     actor: Analyst
-    surface: "analyst CLI: pf security upsert --ticker <ticker> --name <name> --sector <sector>"
+    surface: "analyst CLI: pf security upsert --ticker <ticker> --name <name> --sector <sector> --max-scalar-bytes <B>"
     milestone: M5
   - act: CandidateSet.build
     actor: Analyst
-    surface: "analyst CLI: pf candidates build --index <index-id> [--index <index-id> ...]"
+    surface: "analyst CLI: pf candidates build --index <index-id> [--index <index-id> ...] --max-source-indices <N> --max-scalar-bytes <B>"
     milestone: M5
   - act: RecommendationRun.start
     actor: Analyst
-    surface: "analyst CLI: pf recommend --candidate-set <candidate-set-id> --lookback-days <days>"
+    surface: "analyst CLI: pf recommend --candidate-set <candidate-set-id> --lookback-days <days> --max-candidates <N> --max-lookback-days <L> --max-scalar-bytes <B>"
     milestone: M0
   - act: RecommendationRun.abort
     actor: Analyst

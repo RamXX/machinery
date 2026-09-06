@@ -82,3 +82,17 @@ formal artifacts are untouched.
   liveness nor TLC depends on an unproved total-guard assertion.
 - 2026-09-02 Codex: All twelve judgment claims are committed in `attestations.yaml` and bound to
   the exact architecture, behavior, matrix, and build bytes reviewed in this hardening pass.
+## Illustrative contract policy revision (2026-09-06)
+
+- 2026-09-06: Approved illustrative policy v3 (`/tmp/MAC-lhu5-policy-v3.8zFT4P/PROPOSAL.md`,
+  SHA256 dbaf1181...; independent challenge round 3 APPROVED, 29aa5701...). Exact D1 scoring/
+  projection, D2 integer storage (half-up), D3 identities/ties, D4 admission budgets and
+  pre-run repository admission, D5 error/deadline/publication contract with the RepoSession
+  operation API, D6 reference limits and raw-copy backup with BackupReceipt. These answers
+  postdate and extend the original interrogation; earlier answers above are unchanged
+  historical records.
+- 2026-09-06: Abstract termination vs runtime applicability. Formal/control-flow termination
+  statements apply only to abstract traces; unchanged graph rows and formal artifacts claim no
+  native cancellation, blocked-call return, or unknown-publication resolution. Unresolved
+  operations and the expanded interfaces (OptimizerLimits/ReferenceLimits/operation handles)
+  are operational contracts stated in ARCHITECTURE.md and the packets, not new domain states.
