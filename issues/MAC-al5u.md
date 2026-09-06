@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:07:15Z
-content_hash: "sha256:b8b700119ce8e7b709f16bdc8af11aadbff5a4257422142fdddf7a70b93c61eb"
+updated_at: 2026-09-06T09:16:34Z
+content_hash: "sha256:0e817bec99f385df73eec9da2f5ebc852a937913afb12070bfea4ecd9f2c92fe"
 blocked_by: [MAC-5ft8, MAC-bz1y]
 blocks: [MAC-1u2v, MAC-vx24, MAC-ou97]
 ---
@@ -106,3 +106,45 @@ status: new
 - Blocked by: [[MAC-5ft8]], [[MAC-bz1y]]
 
 ## Comments
+
+### 2026-09-06T09:16:34Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- scripts/assurance-examples.sh -> scripts/assurance-examples.sh -> closed current example inventory-to-explicit-store strict workflow; existing Makefile/CI/preflight complete-example entrypoints invoke current native replay. scripts/example-inventory.sh classification remains truthful; no implemented example downgrade.
+- scripts/assurance-examples-test.sh -> owned bounded artifact; behavior and tests specified in the current story AC
+- scripts/example-inventory.sh -> owned bounded artifact; behavior and tests specified in the current story AC
+- Makefile -> owned bounded artifact; behavior and tests specified in the current story AC
+- .github/workflows/ci.yml -> owned bounded artifact; behavior and tests specified in the current story AC
+- scripts/preflight.sh -> owned bounded artifact; behavior and tests specified in the current story AC
+- testdata/integration-lanes/assurance-examples.json -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-5ft8: examples/go-crm/design/assurance/plan.json
+  MAC-6h0s: prospective current strict plan with all legacy regression mappings and exact reviewed helper calibration.
+- MAC-u4oo: cmd/machinery/tdd.go
+  endpoint: machinery tdd store init/export/import/capture/register/red/green/verify; machinery check <design> --impl <path> --store <path> --complete.
+- MAC-bz1y: scripts/integration-lane/assurance_catalog.go
+  MAC-6h0s: complete required fragment union and two native platform accounting.
+Existing scripts/example-inventory.sh
+  source: rows output consumed by Makefile check and CI/preflight; row[0] design, row[1] impl, row[5] complete.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: A maintainer receives a complete-example lane that runs actual strict verification for every implemented example; a missing migration returns failure.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
