@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:32Z
-content_hash: "sha256:ea102d219a087ef39eeaca66a7fce195637bd3dae252fe0ad2609eef014353fb"
+updated_at: 2026-09-06T09:15:16Z
+content_hash: "sha256:295be7fb68e8a23d2e243c5adc828399a9a5d6f190f00e61cc8039b062b514bc"
 blocked_by: [MAC-l7m0, MAC-sh60, MAC-2n83, MAC-lnu6, MAC-hpqp, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-olrx, MAC-p7jd]
@@ -161,3 +161,90 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - Was blocked by: [[MAC-olrx]], [[MAC-p7jd]]
 
 ## Comments
+
+### 2026-09-06T09:15:16Z ramirosalas
+CURRENT BOUNDED INTEGRATION UMBRELLA 2026-09-06
+
+This is an honest unfinished integration umbrella, not cancelled/superseded/accepted. The original eight behavioral ACs and every positive/negative test obligation remain required and are mapped below to bounded producers. Earlier broad production ownership (manifest/runner/replay/CLI/gates/hook) and ~3000-LOC one-story estimate are replaced by those producers; this note does not authorize editing their frozen tests. The historical proposed internal/tdd/runner.go and aggregate tdd.json are no longer separate implementation obligations; exact executable coverage is supplied by all named mandatory producer fragments, never discarded. MAC-sh60 original dependency remains unchanged; no successor, transfer or cancellation is authorized.
+
+CURRENT OWNERSHIP / PRODUCES:
+- agents/machinery-build-writer.md -> standalone hard-TDD authoring process using the actual supported Machinery commands, no Paivot prerequisite.
+- skills/machinery/SKILL.md -> truthful standalone capture/register/RED/GREEN/replay guidance.
+- skills/machinery/references/build-md-template.md -> executable obligation/test inventory, negative sensitivity/red_controls, exact frozen closure and current-vs-historical assurance instructions.
+- repository_contract_test.go -> focused positive/negative guidance-contract regressions (existing file modified after upstream template repair).
+- docs/test-assurance-integration.md -> public implementation/interface/guarantee coverage matrix, without private tracker IDs, workspace paths, chronology or unearned native claims.
+All runtime implementation ownership is upstream. Consumer code is not rewritten under this umbrella.
+
+CONSUMES:
+- MAC-qlw2: internal/processscope/scope.go
+  source: accepted bounded custody producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-cn7q: internal/processcontrol/scope.go
+  source: accepted bounded attach producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-6h0s: internal/tdd/manifest.go
+  source: accepted bounded schema producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-p9z1: internal/tdd/bundle.go
+  source: accepted bounded store producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-62s6: internal/assuranceflow/register.go
+  source: accepted bounded register producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-bz1y: scripts/integration-lane/assurance_catalog.go
+  source: accepted bounded lane producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-wi2u: internal/tdd/adapters/go.go
+  source: accepted bounded go producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-avfp: internal/tdd/adapters/typescript.go
+  source: accepted bounded ts producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-imtz: internal/tdd/adapters/python.go
+  source: accepted bounded python producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-8yai: internal/tdd/adapters/elixir.go
+  source: accepted bounded elixir producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-pe9v: internal/runtimeclosure/git.go
+  source: accepted bounded git producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-sd7g: internal/assuranceflow/checks.go
+  source: accepted bounded checks producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-sqpt: internal/tdd/execute.go
+  source: accepted bounded replay producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-wbxq: internal/gates/tdd.go
+  source: accepted bounded gtd producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-rau8: internal/assuranceflow/run.go
+  source: accepted bounded flow producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-u4oo: cmd/machinery/tdd.go
+  source: accepted bounded cli producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-5ft8: examples/go-crm/design/assurance/plan.json
+  source: accepted bounded crm producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-al5u: scripts/assurance-examples.sh
+  source: accepted bounded examples producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-1u2v: cmd/machinery/assurance_standalone_e2e_test.go
+  source: accepted bounded standalone producer contract and real integration proof; exact signatures copied in its canonical story and approved docs/test-assurance-contract.md.
+- MAC-lnu6: skills/machinery/references/build-md-template.md
+  source: accepted exact-byte frozen test guidance, preserved sequentially.
+- MAC-sh60: internal/gates/oraclecov.go
+  spec: CheckOracleCoverage(design,impl string)*Gate; original unfinished coverage integration obligation retained.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: approved 575-line standalone canonical contract and exact API/schema/argv/lifecycle requirements.
+
+COMPLETE CURRENT ACCEPTANCE MAP
+1. Original AC1 (standalone execution/replay) is supplied by MAC-6h0s/MAC-p9z1/MAC-62s6, all four adapters, MAC-sqpt/MAC-rau8/MAC-u4oo. Verify every producer is called by the NORMAL complete command; reject uncalled helpers, imported writable evidence, generic nonzero-exit assertion claims or any Paivot dependency.
+2. Original AC2 (honest RED and negative sensitivity) is supplied by four native adapters and replay: all baseline failures have same-assertion passing red_controls; every required negative distinguishes frozen safe/unsafe implementation-only variants with exact target/non-target outcomes and passing health controls.
+3. Original AC3 (exact GREEN completeness) is supplied by schema/inventory/store/adapters/replay/lane. Verify complete identity/byte/mode/topology inventory, native start/terminal/assertion accounting, no cached/empty/skipped/xfail/malformed/extra/missing failure success and all required checks.
+4. Original AC4 (independent current replay) is supplied by store/register/replay/scoped Git/Gtd/finalizer: explicit head CAS, failed history, immutable retained states, source/control/judgment freshness, real final Ga/Gv/Gtd, no-launch/release/publication/output order and aggregate deadlines. Historical acceptance cannot certify current implementation.
+5. Original AC5 (normal adoption) is supplied by MAC-u4oo and MAC-wbxq plus THIS shipped guidance. Demonstrate fresh standalone store init/scaffold/capture/register/RED/GREEN/verify/complete and hooks, for all four languages, without a previous PASS receipt. Cheap checks explicitly say replay not performed; strict unsupported cases fail closed with actionable migration diagnostics.
+6. Original AC6 (unsafe formatting exemption) remains MAC-lnu6 plus this guidance and store/replay adversarial proof: whitespace inside string literals and indentation, helper/config/lock/mode/topology changes invalidate frozen identity; any amendment starts a newly reviewed revision and replay. Never restore tokens-equal authorization.
+7. Original AC7 (consumer migration/runtime residuals) is supplied by MAC-5ft8/MAC-al5u/MAC-1u2v: every complete example remains required, all legacy regressions retained separately, prospective strict tests calibrated and all qualified runtime categories accounted for. No completed example downgrade or old PASS substitution.
+8. Original AC8 (full standalone positive/negative paths) is supplied by actual native Linux amd64 AND Darwin arm64 conformance, MAC-1u2v and retained original saga/coverage/OCI/OpenCode/recovery gates at final MAC-ou97. Audit actual process-producing call graph and cumulative owner/milestone deadlines. No mocks, skips, private tracker/runtime dependency or installed binary replacement.
+9. This story's own guidance/test changes follow hard-TDD: expected old unsafe/missing wording fails specific assertions before edits; freeze those tests. Integration matrix records actual accepted producer evidence and residual limits accurately (unauthenticated-host/native-cooperative, not malicious-host isolation, semantic completeness or chronology). Developer delivers, independent PM verifies and accepts.
+
+MANDATORY SKILLS: developer and pm_acceptor; no architecture redesign authority.
+DIFF BUDGET: ~5 files, under 1200 changed LOC; investigate overrun.
+OUT OF SCOPE: production fixes go to their explicit bounded owner or a newly reviewed blocking P0 story; remote/install/final preflight operations remain root final gate only.
+
+## nd_contract
+status: new
+
+### evidence
+- Nineteen bounded required producer/consumer stories created; none is claimed implemented or accepted.
+- All original semantic ACs mapped without dropping original MAC-sh60 or example/template chain.
+- Independent Anchor backlog review and MAC-l7m0 acceptance remain dispatch prerequisites.
+
+### proof
+- [ ] AC1-AC8: original behavioral obligations and actual normal integration verified after all producers accepted.
+- [ ] AC9: standalone guidance, frozen negative doc tests and truthful public matrix delivered/independently accepted.
+
