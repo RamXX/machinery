@@ -3,6 +3,7 @@
 # Drawdown Portfolio Recommender
 
 A local tool that recommends a stock portfolio. It draws the top 30 constituents of each configured market index, dedupes them into a candidate universe, then runs an optimization that selects exactly 16 stocks minimizing historical maximum drawdown. A run collects price history, optimizes, and produces a portfolio a manager may review and accept or reject.
+Model applicability: the state machines below model lifecycle transitions for RESOLVED command outcomes. Operational publication of a terminal state is a separate driver boundary: durable Ready and durable Failed both require a confirmed atomic publication receipt, and a publication that remains unresolved after drain is an explicitly reported unknown-outcome residual with no lifecycle transition - it is never represented as a new PortfolioStatus or RunStatus value, a rollback, or an ordinary failure row.
 
 ## Glossary
 
@@ -79,7 +80,7 @@ One position in a `Portfolio`: a candidate `Security` and the fraction of the po
 | Name | Type | Description |
 | --- | --- | --- |
 | `id` | string | Stable unique identifier. |
-| `weight` | integer | Allocation in basis points; the weights of a portfolio sum to 10000. |
+| `weight` | integer | Allocation in basis points; a mathematical integer >= 0 (boolean and floating-point typed values are invalid); the 16 records of a portfolio sum to exactly 10000, and zero-weight records are retained, never dropped or replaced. |
 
 **Actions**
 
@@ -128,10 +129,10 @@ A recommended set of exactly 16 holdings with a computed maximum drawdown, produ
 | Name | Type | Description |
 | --- | --- | --- |
 | `id` | string | Stable unique identifier. |
-| `maxDrawdown` | integer | The largest peak-to-trough decline over the lookback, in basis points; the objective minimized. |
+| `maxDrawdown` | integer | The largest peak-to-trough decline over the lookback, stored as floor(10000 x D + 1/2) integer basis points (nearest, ties upward) where D is the exact rational drawdown compared before any rounding; valid 0 through 10000 inclusive; intermediate values are never rounded. |
 | `status` | PortfolioStatus | Review lifecycle state. This is the lifecycle. |
 | `proposedAt` | timestamp | When the run produced it. |
-| `acceptedAt` | timestamp | When it was accepted; set on reaching Accepted, unset otherwise. |
+| `acceptedAt` | timestamp | When it was accepted; set on reaching Accepted, unset otherwise. Timestamps are captured from an injected app/repository clock at microsecond resolution and rendered YYYY-MM-DDTHH:MM:SS.ffffffZ in UTC; the pure optimizer never supplies them; acceptedAt is the only timestamp that may be null. |
 
 **Actions**
 
@@ -167,7 +168,7 @@ One optimization job: it takes a `CandidateSet`, collects the price history for 
 | --- | --- | --- |
 | `id` | string | Stable unique identifier. |
 | `requestedAt` | timestamp | When the run was started. |
-| `lookbackDays` | integer | How many days of price history the drawdown is computed over. |
+| `lookbackDays` | integer | The number of observed daily closing-price dates the drawdown is computed over, INCLUDING the initial valuation date; an integer >= 2. Calendar elapsed days are not its meaning, and gaps between observation dates are permitted; no trading-calendar service is implied. |
 | `status` | RunStatus | Current lifecycle phase. This is the lifecycle. |
 
 **Actions**
