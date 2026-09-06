@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:22:39Z
-content_hash: "sha256:e7550e0a048565d5290c7d4b339e3f0a813a873e063edef752da5736b2bb122c"
+updated_at: 2026-09-06T09:22:40Z
+content_hash: "sha256:866dbb90980867238a342a6cc98c7eb7a69a8a71dfe89d50c09bf4d99de696ff"
 blocked_by: [MAC-cn7q, MAC-bz1y]
 blocks: [MAC-sd7g, MAC-wbxq, MAC-vx24, MAC-ou97]
 ---
@@ -144,3 +144,22 @@ status: new
 - [ ] AC #4: current story acceptance requirement remains pending.
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:22:40Z ramirosalas
+SCHEMA MARKER INSERTION AUDIT 2026-09-06
+Root-authorized supported nd edit inserted ONLY 1 valid indented schema signature line(s) into the newly authored canonical CONSUMES block. Every original byte/contract/status/evidence/history was preserved; no deletion/replacement. This repairs the mechanical label substitution, not the contract values.
+Before raw Body SHA256: 67f964284807dc1352354b61e115d04dbff076f3083a7ad6a2ce0543303e4ef0
+After insertion-only raw Body SHA256 (before this audit comment): e7550e0a048565d5290c7d4b339e3f0a813a873e063edef752da5736b2bb122c
+Exact inserted lines (zero-based original Body line positions shown):
+- after Body line 108: "  schema: real native Git 2.55.0 exact closure plus Linux amd64/Darwin arm64 required accounting."
+Read-back pvg nd show Body exactly equals prior Body plus these insertions. Editor required expected hash, count, exact target and 13-entry total; installed pvg source revision c0957106a81346033d7b1d82fde5f434a9db6bab confirms scanner checks every historical entry.
+
+## nd_contract
+status: new
+
+### evidence
+- Signature syntax corrected via supported guarded editor; exact before/after evidence above.
+- No implementation/native proof; independent Anchor and canonical document holds remain.
+
+### proof
+- [ ] All current story ACs remain pending without weakening.
