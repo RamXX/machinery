@@ -9,12 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T07:50:56Z
-content_hash: "sha256:c6e49c77b52e34bdd6cea7ac2cfbc78b01e04e3afb4c43594bb0384aff5c7848"
+content_hash: "sha256:6c25a2e3783917340d6120304ed047c9cb186014dec21ff6d15ae8c405b29477"
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 assignee: dev-MAC-p7jd
 closed_at: 2026-09-06T07:47:13Z
 close_reason: "Accepted exact 39a498164fc6e09169ea5b33d470890d315f6a50: five AC independently reviewed; 349 fresh scoped leaves pass, frozen tests unchanged, complete same-candidate proof and stated final-epic limits retained."
-led_to: [MAC-uzxr, MAC-l7m0]
+led_to: [MAC-uzxr, MAC-l7m0, MAC-hgz1]
 ---
 
 ## Description
@@ -2729,7 +2729,7 @@ status: in_progress
 ## Links
 - Parent: [[MAC-ui8a]]
 - Follows: [[MAC-p8ce]], [[MAC-2u36]], [[MAC-a89e]], [[MAC-olrx]]
-- Led to: [[MAC-uzxr]], [[MAC-l7m0]]
+- Led to: [[MAC-uzxr]], [[MAC-l7m0]], [[MAC-hgz1]]
 
 ## Comments
 

@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
 updated_at: 2026-09-06T19:21:06Z
-content_hash: "sha256:3c9660433b21e0cfaf168192a7a33cfce5765a6ad541ceae0806ec503bdf5147"
+content_hash: "sha256:4b50588011e3a986555ae06e1df28f26b909ddef11ef7fa8283dcec46df58862"
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
 closed_at: 2026-09-06T19:21:06Z
 close_reason: "Accepted: portfolio packets satisfy standalone handoff contract; RED/GREEN proven; merged to local epic"
+led_to: [MAC-hgz1]
 ---
 
 ## Description
@@ -158,6 +159,7 @@ status: new
 ## Links
 - Parent: [[MAC-ui8a]]
 - Follows: [[MAC-2u36]]
+- Led to: [[MAC-hgz1]]
 
 ## Comments
 
