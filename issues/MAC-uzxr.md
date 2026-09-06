@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:35:09Z
-content_hash: "sha256:19871afcfdc3ebdfa1c8e391c2d69dc7b986d9e13ad5c50d2af34b2b615ddd5c"
+updated_at: 2026-09-06T03:37:00Z
+content_hash: "sha256:a65881145896fe9c1e66998c5229245c64d8203a071b5438f68b56907d4f2e97"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -112,6 +112,22 @@ status: new
 
 ## Notes
 TASK ENTRY-ACTION SAME-P0 CANONICAL EXTENSION
+## nd_contract
+status: in_progress
+
+### evidence
+- READ-ONLY RED proposal checkpoint at story/MAC-uzxr 70652b948bf090008b1965c85daf36ea374daea4. Canonical story and 03:35 UTC eight-path Task extension read completely. Developer/nd/codebase-memory skills applied; parent Verify graph plus direct exact source review, coverage generation 2026-09-06T02:42:16Z best effort.
+- External proposal /tmp/MAC-uzxr-RED-proposal.md and exact /tmp/MAC-uzxr-witness-inventory.md prepared for independent PM; 197 committed rows/218 existing witness tuples, Deal58/75 Task31/35 User20/20 Session60/60 Command28/28. No source/helper/test edits, RED commit/approval, or delivery. All original suites and shared production remain clean.
+- Runtime DISCOVERED_BUG TASK-754183 reported and canonically folded into this P0 by SrPM: isolated real control TASK-67b0ff PASS; fallback Cancelled missing recordTaskClosed FAIL. Probe-pipefail.jsonl SHA25690e3d11c3df38725d77637bc187d7e27dcf0a2b65f0934e6b71c785b177e783c, actual exit1,1PASS1FAIL0SKIP,package0.286s.
+- Additional copy-only hand-reconciled exact-effect reconnaissance all5 suites +2 terminal supplements:224PASS1FAIL0SKIP/225leaves, sole TASK-754183. Log /tmp/MAC-uzxr-task-entry-probe.FGj02Q/exact-effects.jsonl SHA256c6ce626ee381f97d020a2bea090d1a626e9b9adfa421c75ffd877cdfb8ee42a4,actual exit1,outer0.917s. Neither probe is parser-backed approved RED.
+- Proposal explicitly requires real Task Rejection clearing and name-only missing-call variant; unchanged old-suite semantic mutation failure must establish parser RED before scaffold errors. Eight-path canonical750-1150LOC forecast may grow to1250-1750 for closed guard bindings/strict paired-source parser/real subprocess controls; material growth submitted for independent review, no safety coverage trimmed. Claim/worktree retained for checkpoint; no remote/toolchain/service/consumer writes.
+
+### proof
+- [ ] AC #1: parsed current rows and closed actual witness binding pending independent exact amendment review.
+- [ ] AC #2: complete entry/exit effects and actual Task context effect pending RED/GREEN.
+- [ ] AC #3: genuine paired subprocess oracle/state/actions/extra-effect/name-only sensitivity pending.
+- [ ] AC #4: dynamic bidirectional actual execution inventory pending; external source inventory is not execution proof.
+- [ ] AC #5: candidate focused suite proof pending; no claim renewed.
 
 ## nd_contract
 status: in_progress
