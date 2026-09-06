@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:18:01Z
-content_hash: "sha256:10087975eec31149e6db3114c6e59e7d7d05e54ff81f3f1735208e1e1e49b926"
+updated_at: 2026-09-06T10:18:17Z
+content_hash: "sha256:0aa5cd511ed0696447f450542549a6bf336b00e94edb481c2a09f9314af4d613"
 blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36, MAC-a89e]
 assignee: dev-MAC-l7m0
@@ -80,6 +80,35 @@ Observable outcome: the maintainer can review a closed standalone contract that 
 ## Notes
 BLOCKED — USER CHOICE / ARCHITECTURE REVIEW. Do not dispatch a generic developer. Pending user decisions: supported initial native runner languages and trusted-host versus adversarial-code execution boundary. Independent architect owns exact contract. Only after answers plus reviewed contract may Sr PM repair implementation interfaces and release this blocker.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: Architecture is read-only contract work, not an executable runtime suite. Its accepted contract must explicitly identify any native adapter runtimes consumed by implementation; MAC-vx24 must register/provision those using the required closed integration lane. No execution assurance may be claimed from schema or architectural review alone.
+## Implementation Evidence
+
+### CI/Test Results
+Commands run:
+- wc -l -c docs/test-assurance-contract.md
+- shasum -a 256 docs/test-assurance-contract.md
+- stat -f %Lp docs/test-assurance-contract.md
+- bounded private-reference/key checks; git diff --check
+- pvg verify docs/test-assurance-contract.md --format text
+Summary: PASS — exact projection 575 lines / 109367 bytes / SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; mode 0644; targeted negative and normative-key checks passed; no runtime tests apply to this documentation-only story.
+
+### Commit
+- SHA: 0feaebf725267f9d0045d653ef57a90af0c9d946
+
+## nd_contract
+status: delivered
+
+### evidence
+- Delivery proof format repaired after the first checker output; previous document validation remains unchanged.
+- Commit 0feaebf725267f9d0045d653ef57a90af0c9d946.
+
+### proof
+- [x] A1: Exact public projection landed.
+- [x] A2: Normative contract preserved.
+- [x] A3: Standalone public boundary checked.
+- [x] A4: No implementation/native-proof claim made.
+- [x] A5: Targeted validation completed.
+- [x] A6: Ready for independent PM acceptance.
+
 ## Implementation Evidence
 
 ### CI/Test Results
