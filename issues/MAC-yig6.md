@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T08:29:57Z
-content_hash: "sha256:54c018c2b98ae982f7a86d92f40ae1d8e1a8dff3bcbecbfbec3ba6f3b289e15c"
+updated_at: 2026-09-06T08:47:53Z
+content_hash: "sha256:f87379f6b3e6c8f8336a58707f094f2497ccfb357c09f99c302075b514ffe44f"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
@@ -581,4 +581,20 @@ status: in_progress
 - [x] AC #5 RED: prior independent RED approval and exact frozen history preserved.
 - [ ] AC #1-3 GREEN: revised exact helper authorization and native/covered same-SHA proof pending.
 - [ ] AC #4 FINAL: actual bounded Darwin and Linux execution and cleanup pending.
+- [ ] AC #5 FINAL: independent GREEN acceptance pending.
+
+### 2026-09-06T08:47:53Z ramirosalas
+Independent compiler-boundary method review completed, not a story rejection/acceptance transition: /tmp/machinery-yig6-pm-boundary.f5p6dZ/REPORT.md SHA256 70dbbe39244148680e842dfecdef981f6cafb87a8a860013c19c11aaf397171b, read fully and hash-verified by dispatcher. REVIEW_RESULT: REJECTED for BEFORE-WRITE readiness only. Corrected compiler direction is sound in principle: child-only nonempty GOFLAGS=-cover=false, no coverpkg reset, unchanged processcontrol.Run plus bounded WaitDelay, validated absolute source, cached errors/no fallback, preserved parent instrumentation. Real frozen-archive compiler diagnostics are not GREEN proof. Feasible persistent negatives are missing for deliberate ambient/persisted coverage flags, helper compiler cancellation/setup failure, cached failure/no retry and unavailable source. Healthy GREEN author resumed for external exact revised helper patch plus concrete supplemental-test proposal only; provisional third test file is NOT yet owned or authorized. Original two-path scope and all frozen bytes remain unchanged until independent exact review and supported Sr PM scope repair. No installed/preflight/remote/service changes.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent method review and root verification above; no behavioral delivery claimed and no helper writes authorized.
+- Healthy existing claim preserved; external proposal preparation active.
+
+### proof
+- [x] AC #5 RED: original independent RED and frozen 246-line file preserved.
+- [ ] AC #1-3 GREEN: exact revised helper/supplemental-test readiness and actual protocol/coverage proofs pending.
+- [ ] AC #4 FINAL: actual same-SHA Darwin/Linux execution and cleanup pending.
 - [ ] AC #5 FINAL: independent GREEN acceptance pending.
