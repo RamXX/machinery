@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:19:48Z
-content_hash: "sha256:8c746ee79314da79fa7fee44bd5a45db014dd200df3b650f8f94afd2f1218c25"
+updated_at: 2026-09-06T10:21:01Z
+content_hash: "sha256:66c836a4406831411d331b87797a4780bb184ae168d535975cc28b89e9aa9914"
 blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36, MAC-a89e]
 assignee: dev-MAC-l7m0
@@ -368,3 +368,30 @@ status: delivered
 - [x] A4: Approval is not claimed as implementation/native evidence.
 - [x] A5: Bounded positive and negative document validation completed.
 - [x] A6: Committed for independent PM acceptance.
+
+### 2026-09-06T10:21:01Z ramirosalas
+## Final Delivery Contract (metadata correction)
+
+PROOF:
+- Commit: `0feaebf725267f9d0045d653ef57a90af0c9d946`; canonical document: 575 lines, 109367 bytes, SHA256 `22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8`, mode 0644.
+- A1: exact single public projection landed; A2: full deterministic source projection retains normative schemas/interfaces/argv/catalog/lifecycle/limits; A3: standalone boundary retained; A4: approval is not implementation/native evidence; A5: targeted positive plus adversarial negative controls complete; A6: developer delivery complete, independent PM acceptance pending.
+- External retained validation artifacts: validator `2288fefa6d128cc47215457cb4f24d945d7a06891179397249bf5c905a02de2b`; raw results `9a30ab935c5d236ca31767332382ec89fb11cdf61c7e8f5992a37e65c062c909`; renamed interface `029e61885d093e87ab900721a4d16e5d5ddd0036f2fddba0b9448d9b908e0f47`; weakened requirement `fb784c6e58214e70d457ba0d10f299ce780e4a92bf5c2c9b2a5cf6ff2e3bf931`; altered budget `1b0486a7b1c21cbd14a2ee33aa6cf6ef382396689563f58dd4877739f7823875`; private leak `d93c21673dfbb416a58aea72989147dc165e33fbc7a5626e2e7105d1602ebd14`; false completion `fe7a5d6b45d4d9546d6e2f4a1ae44df4169e5a0d8e272c6112236ce1e738e89d`. Canonical passed; all five mutants rejected semantically and by exact-byte binding.
+- Delivery-proof shape remains `pvg story verify-delivery MAC-l7m0`: Passed 9, Failed 0. The earlier 5/9 failed verification remains preserved in history.
+
+LEARNINGS:
+- Exact-byte projection and semantic mutation controls are complementary; neither is presented as independent PM acceptance.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Metadata-only final comment; no source/ref/status/label/branch mutation.
+- Commit 0feaebf725267f9d0045d653ef57a90af0c9d946 and canonical document hash recorded above.
+
+### proof
+- [x] A1: Exact public projection.
+- [x] A2: Normative projection preservation.
+- [x] A3: Standalone boundary.
+- [x] A4: Truthful approval/evidence distinction.
+- [x] A5: Positive and negative document validation.
+- [ ] A6: Independent PM acceptance pending.
