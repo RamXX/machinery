@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T20:23:32Z
-content_hash: "sha256:ebd22982821e43c2f254c03585c293904a28f37b8a9d107b15c2037fedf8d021"
+updated_at: 2026-09-06T23:26:03Z
+content_hash: "sha256:7d8029199614cf56bf867d25d25cd10de13ce25016d875a743b2225ee954be3b"
 blocks: [MAC-vx24, MAC-ou97, MAC-wbxq]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx, MAC-hgz1]
@@ -1283,3 +1283,6 @@ status: in_progress
 - [x] AC #4: prior reported CLI utility/exit/custody controls remain unchanged; final compatibility replay still owed.
 - [ ] AC #5: actual CLI/all-nine contract plus new six baseline/stale/final checks and accepted upstream golden compatibility; no Paivot dependency.
 
+
+### 2026-09-06T23:26:03Z ramirosalas
+ACCEPTED 2026-09-06 (user decision 2a) — 3 commits af4f1ae..274e53a over df8dce0. Frozen RED 0ea1fdc retained byte-exact; nine byte-exact policy replacements applied (4 match PM prospective hashes, 5 differ only by intervening hgz1 edits); fourteen evidence rows: BUILD-hash refresh with pinned attribution preserved (user accepted — substantive review is this acceptance); v2 schema/kinds/inventories byte-preserved. Upstream suites ok; isolated CLI checks green on five design-only examples; go-crm Gv green with pre-existing G4 ERROR (proven at baseline). 15 files +71/-45. Coordinator merged to epic + targeted suites ok. Record: .git/machinery-evidence-20260906.TEFZ7D/lnu6-record.md
