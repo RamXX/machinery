@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:38:06Z
-content_hash: "sha256:8c3c827bf6ce2c4cc035335edf8e4f1b3ea3d200f809917828f6fe8d7e0ed367"
+updated_at: 2026-09-06T07:38:21Z
+content_hash: "sha256:1f5212ee309938c30c321c0748c53b29a3f0e8b0e09bb29ff1d43869dd9576dc"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 assignee: dev-MAC-p7jd
@@ -3177,3 +3177,25 @@ status: new
 - [x] Supplemental RED AC2/3/5: prior semantics and immutable evidence retained;28 actual CLI compatibility leaves pass. Prior bounded AC5 classification preserved without claiming new late-fault execution.
 - [ ] Product AC1/4: production correction and complete same-candidate GREEN proof remain required.
 - [ ] Whole-story acceptance: independent final GREEN review pending; do not accept, close or merge from this RED approval.
+
+### 2026-09-06T07:38:21Z ramirosalas
+## GREEN delivery authority (EOF)
+
+Implementation Evidence: commit `39a498164fc6e09169ea5b33d470890d315f6a50` makes the single bounded production correction in `internal/gates/attest.go`; a real entry named `none` is excluded only when a real in-root attestation evidence path was resolved. Report/raw JSON/test identities/controls/negatives: `/tmp/machinery-p7jd-none-green.eMIDLD/GREEN-REPORT.md`, evidence manifest SHA256 `30867e546b29a2b691215409f41ed97b196bbdaa42d4213f74cc883b0b6d516a`.
+
+CI Results / Commands run: offline native Go 1.27.1 bounded 5m JSON replays passed: new120/0/0; gates151; original CLI28 plus new120; hook28; designlock22; race gates23/designlock22; six hook callers6; seven parent callers7; broader149 PASS/0 FAIL/1 existing Darwin casefold SKIP. `pvg verify internal/gates/attest.go --format text` PASS (1/0); TDD range `a82277a..39a4981`: 13 commits, 0 violations; diff-check/gofmt clean. The 11 existing hook quality heuristics remain disclosed, not clean.
+
+Frozen new test SHA256 `3d9d8250f759807795251685e1cb924ba8eceb4c819b3fa0376bd15b254f9fc0`; authorized helpers retain `2b185970a3f69a140338cee97e14db0da82ef0aaf01250364357b104c1458b33` and `cc5f5e12a0d41a6eeda60895fece31713c5f068817bb2d3f08b7f1c6ff4d4b04`. Linux casefold and epic preflight remain unpaid final-gate work.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Same-SHA repair, raw external proof, frozen hashes, targeted/race/caller/broader results above.
+
+### proof
+- [x] AC #1: literal none scope entries bind inventory and subsequent changes invalidate.
+- [x] AC #2: existing classification proof replayed.
+- [x] AC #3: existing migration proof replayed.
+- [x] AC #4: all approved topology/type controls and negatives pass.
+- [x] AC #5: required bounded CLI/custody/caller proof replayed; approved limits retained.
