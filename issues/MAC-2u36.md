@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:27:05Z
-content_hash: "sha256:5a6466c827306866ba8a0e3dcfa7333c3a622aa84e1c38cd18b708d65cfd89e8"
+updated_at: 2026-09-06T00:27:45Z
+content_hash: "sha256:6c372f5e3ad5d23fe4329dad0beca5b2e501106f9732606e2c36b1005ca855ea"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -196,6 +196,8 @@ Five scanner returns source-attributed to unchanged empty-stderr/unavailable-sta
 Initial instruction/context/source checks only, not scripts/preflight.sh. Graph source discovery and exact candidate/base diff used; graph generation2026-09-05T23:58:53Z best-effort metadata_match for existing installer paths; new bootstrap file absent from main index was read directly at retained story checkpoint. An earlier guessed log filename was a reported lookup error, parent authorized exact supplied path continuation; not a product finding.
 
 Prior canonical budget preserved verbatim:
+SR PM terminal structural checks for the joint verification repair: pvg lint --backlog --epic MAC-ui8a PASSED, 33 issues, 0 errors/0 review findings; pvg nd dep cycles none; pvg rtm check --epic MAC-ui8a PASSED with 18 stories/3 closed, 0 tagged requirements extracted/0 uncovered (structural result, not product AC proof). Independent PM exact test-edit authorization and separate RED rework remain pending. Root main497419a; no state transition or production/test edits.
+
 ## DIFF BUDGET
 Expected 4-6 files, approximately1700 combined changed LOC: roughly1350 tests and350 production across the same three owned source files. Measured98d3b57 bootstrap suite is1111 lines, already above the earlier1050 test forecast; bounded AC2 private-fixture/precise-diagnostic repair and schema2 cases are estimated at another150-200 changed test lines, retaining the prior350 production allowance and modest rounding headroom. This supersedes the under1400 forecast transparently, not an automatic acceptance cap or permission to compress away proof. Keep shared write unchanged and reuse the existing real CLI permission negative; no duplicate costly CLI fixtures for loader cases. Report actual per-file additions/deletions, helper reuse and elapsed focused/full replay costs; independent PM investigates material overrun or any new file/scope before authorization. Preserve required safety tests, individual operation bounds and the15m package command. Earlier budget measurements and authorizations remain historical.
 
