@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:22:35Z
-content_hash: "sha256:937154158517cf5f5a96b88f009ae32429694ac96247b9ada21901068acc73f3"
+updated_at: 2026-09-06T09:22:36Z
+content_hash: "sha256:4e492ba3c5485d86d86d3fdb16660740e788cb06fd755787fdc3a195577860a3"
 blocked_by: [MAC-hpqp, MAC-6h0s]
 blocks: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-al5u, MAC-vx24, MAC-ou97]
 ---
@@ -147,3 +147,23 @@ status: new
 - [ ] AC #4: current story acceptance requirement remains pending.
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:22:36Z ramirosalas
+SCHEMA MARKER INSERTION AUDIT 2026-09-06
+Root-authorized supported nd edit inserted ONLY 2 valid indented schema signature line(s) into the newly authored canonical CONSUMES block. Every original byte/contract/status/evidence/history was preserved; no deletion/replacement. This repairs the mechanical label substitution, not the contract values.
+Before raw Body SHA256: ed3416e8560e277c04ab47f44c5c8a3f29dccd8fa73b05d275a996f1b879f718
+After insertion-only raw Body SHA256 (before this audit comment): 937154158517cf5f5a96b88f009ae32429694ac96247b9ada21901068acc73f3
+Exact inserted lines (zero-based original Body line positions shown):
+- after Body line 110: "  schema: accepted contributor registry runner, closed exact leaf inventory, required runtime lanes, failure/skip/leak accounting; preserve e55238223961fec922896c361d8af6cafc454a8e seven-file 96-case frozen pilot byte-for-byte."
+- after Body line 112: "  schema: closed adapter IDs and RuntimeHandle contract; no consumer TDD record is a contributor-lane record."
+Read-back pvg nd show Body exactly equals prior Body plus these insertions. Editor required expected hash, count, exact target and 13-entry total; installed pvg source revision c0957106a81346033d7b1d82fde5f434a9db6bab confirms scanner checks every historical entry.
+
+## nd_contract
+status: new
+
+### evidence
+- Signature syntax corrected via supported guarded editor; exact before/after evidence above.
+- No implementation/native proof; independent Anchor and canonical document holds remain.
+
+### proof
+- [ ] All current story ACs remain pending without weakening.
