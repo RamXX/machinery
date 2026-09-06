@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T17:03:15Z
-content_hash: "sha256:082bad096e16a836ffd75a35b8af9916f85b0563cff4be19476cadec7a3f4d6c"
+updated_at: 2026-09-06T17:17:25Z
+content_hash: "sha256:63fcdc7c67428919fe5a27336efb81737e7706d19b901a7d8299513722d24790"
 blocks: [MAC-ou97]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-uzxr, MAC-p9wm]
 assignee: dev-MAC-yig6
@@ -868,3 +868,6 @@ status: in_progress
 
 ### 2026-09-06T17:03:15Z ramirosalas
 2026-09-06 independent continuation: user supplied/authorized native Linux amd64 server and now asks to table qlw2 and continue other areas. Only this healthy committed story was released/reselected via pvg loop next(developer_new GREEN)/atomically reclaimed; original branch/test history retained. Assigned /root/yig6_linux_verification, Sol high, verification-only exact candidate ef505052dc73cb9032dd91f1a3f99837f76204a8. Native remote has no go on PATH; bounded portable exact Go1.27.1 provisioning under unique owned /tmp directory and transfer of exact public candidate/deps permitted, no global install/Docker execution/services/system changes. Before-write setup provenance required. Four-command native report matrix unchanged; no source/test writes, no rejected custody task resumption, no final preflight/install/ref/push. Retain raw evidence, verify task-scoped cleanup and copy evidence home; no delivery until root reviews completion, final PM acceptance remains separate.
+
+### 2026-09-06T17:17:25Z ramirosalas
+USER-REQUESTED HANDOFF 2026-09-06: verification worker /root/yig6_linux_verification completed safe pause, not delivery. Exact candidate ef505052dc73cb9032dd91f1a3f99837f76204a8 unchanged. Native Linux x86_64 Go1.27.1 cold compile and selected-native command passed; root independently counts24testactions20leaves4parents,1packagepass,0fail/skip,exit0,empty stderr, JSONSHA2d350e259d49969906149442d6160d0fd53288279dcedd7f8e2655302f2a3d01. Top-level selected-covered and both dedicated original commands NOT RUN; full Linux matrix/PM acceptance remain pending. Local /tmp/machinery-MAC-yig6-linux.hTo7li/HANDOFF.md SHAcbf401b319e3958868cfff21a70b111033b94519d29f5b5811c8cb5f74a5a6ad and ADDENDUM.md SHAc176335ab99c631d60e763abe97b42ccbe11f20dd2208cee1235662930111c44 fully read by root. All30file manifest verified; fresh exact-archive vs source-after manifests equal8d9de65d1fac3ffeb37480f86d2aac402b2d3a2c4a2f4f9ddde11d1cd2c441a6. Initialofflinecachefailure and missingbaselinecmp exit2 retained, not testfailures/successes. Worker removed verified owned remote /tmp/machinery-MAC-yig6-PoNHCY and task-created /root/.config/go/telemetry then empty /root/.config/go; preexisting .config preserved but parentmtime/ctimechanged. No activecommand/ownedprocess; unrelatedcontainersuntouched. Futureprovisioning must isolate/verify effective Go configuration and telemetry paths before Go commands, not assume portable toolchain alone suffices; worker recommendsGOENV=off GOTELEMETRY=off, verify actualeffect and keep writable config under ownedroot. Preserve healthyclaim; no globalrecover/delivery/acceptance/source/ref/install/preflight/push. Root initial counter script syntax and wrongcwd manifest checks failed diagnostically, correctedchecks passedwithoutbytechanges.
