@@ -1,18 +1,19 @@
 ---
 id: MAC-l7m0
 title: "Define standalone executable test-assurance contract"
-status: in_progress
+status: closed
 priority: 1
 type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:30:24Z
-content_hash: "sha256:7a440ed13396c81a9b9f8fdf25f58ec09668ad285b9ba6172a2c69d0d60ceb36"
-blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
+updated_at: 2026-09-06T10:30:30Z
+content_hash: "sha256:89bbcf98abc5131e1198e8841aa28b3fa3c570862ef2be898b85b1352dfdafdc"
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36, MAC-a89e]
 assignee: dev-MAC-l7m0
 labels: [delivered]
+closed_at: 2026-09-06T10:30:30Z
+close_reason: "Independent PM approved exact standalone documentation projection and all A1-A6; full review SHA256 b7c57fcb51d64b332c1baef0b8d9d2f986968042b58e9dc233de1f9865a1cc8d; no native implementation proof claimed."
 ---
 
 ## Description
@@ -219,10 +220,13 @@ status: delivered
 - 2026-09-06T10:17:35Z auto-follows: linked to predecessor MAC-2u36
 - 2026-09-06T10:18:01Z status: in_progress -> in_progress
 - 2026-09-06T10:18:01Z auto-follows: linked to predecessor MAC-a89e
+- 2026-09-06T10:30:30Z status: in_progress -> closed
+- 2026-09-06T10:30:30Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-06T10:30:30Z dep_removed: no_longer_blocks MAC-ou97
+- 2026-09-06T10:30:30Z dep_removed: no_longer_blocks MAC-qlw2
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-vx24]], [[MAC-ou97]], [[MAC-qlw2]]
 - Follows: [[MAC-uzxr]], [[MAC-p7jd]], [[MAC-2u36]], [[MAC-a89e]]
 
 ## Comments
