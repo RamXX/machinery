@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T04:25:57Z
-content_hash: "sha256:5dcd4a92ed15f1579abdf52e46169a630a6dfe71dd696aced9986e06f1682d9f"
+updated_at: 2026-09-06T05:04:27Z
+content_hash: "sha256:c22cd3b9897f011f1a5af9d68879367d4b899684584347501efaed87122706ca"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -162,6 +162,28 @@ Export /tmp/MAC-uzxr-pm-storage.Mxluug/export.jsonl SHA256bc7148f9887ef4429231d4
 Read complete author checkpoint/audit.cjs/audit.jsonl and verified all suppliedhashes. Did NOT execute authorscript accessing developerworktree. Independently checked author default/export lifecycle/outcomes and retained6receipt/native/manifests against candidate gitobjects; matched report. OriginalRED/evidencepreserved.
 
 No further storage repair required. Author may prepare complete EXTERNAL later patch and measured per-file decomposition for separate exact PM/SrPM review. Applying all5suite/helper/parser/additive amendments stays HELD. No fullapprove-red/deliver/accept/reject transition; no new test-edit permission, AC/path/scope change, candidate parser/Taskfix proof or consumerclaimrenewal.
+## External complete amendment proposal checkpoint
+
+The complete external proposal against clean retained story commit 4ef6baffc4de72f2a3e935348f180283fe53c20b is ready for independent review. No shared source edits, commits, production Task fix, delivery or approve-red transition performed. All eight paths/five AC unchanged; root routes the measured cost to SrPM.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Authoritative review index /tmp/MAC-uzxr-amendment.QYZfzX/REVIEW.md; closed contract CONTRACT.md; source-hashes.json contains baseline/proposed seven paths, unchanged Task and ten design inputs.
+- Full unapplied patch /tmp/MAC-uzxr-amendment.QYZfzX/complete-later-amendment.patch SHA256 2f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249. Separate frozen-file-additive.patch SHA256 9b3129d5095717e25c46b940e6d1918c0d4a88c7047aac4137fefe23467c0f43; exact initial semantic/storage495-line prefix SHA256326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba preserved.
+- Measured git diff --no-index --numstat: CLI192add61del, Deal221add107del, Tasktests175add47del, User117add33del, Session193add82del, scaffold48add, frozen-test append1174add. Later proposal2120add330del=2450changed/net1790. Historical initial RED/storage503changed remains separate. Estimates are not canonical scope edits.
+- Scratch read-only git apply --check complete-later-amendment.patch against copied baseline exited0. Actual pre-Fire builder diagnostic5top-levelPASS0SKIP emits218facts; author audit reconciles all197rows/47states/118orderedgroups/stablehashes, exact tuple preservation and unchanged original terminal bodies. Diagnostic/audit explicitly NONQUALIFYING: no parser or Fire conformance execution in diagnostic copy.
+- Scratch compile-only go test -count=1 -run ^$ -timeout=120s on four packages -json exited0 with ZERO behavioral tests; NONQUALIFYING. Minimum48-line API scaffold returns ErrScaffold; no whole parser implementation or fabricated passing Task baseline. Initial real semantic RED998a5a3 and independent storage validation4ef6baf remain separate actual evidence.
+- Exact remaining17 AST-extracted mutation hunks at exact-remaining-mutations.json SHA2565808dd7a440a7a66c7cf161d9127757db5f456870712e53c1b75a109f1a3e5b0:9structural/3semantic/5actual-output inventory variants, each matched full affected-suite controls. Actual candidate success inventory is proposed, not yet passing evidence. Future Task anchor remains absent before authorized GREEN.
+- No background processes, external services, remote/install/preflight changes, Paivot product dependency or claim renewal. Separate exact TEST-EDIT AUTHORIZED review remains required before shared application.
+
+### proof
+- [ ] AC #1: Complete parsed current-row conformance remains pending approved amendment and real GREEN implementation/replay.
+- [ ] AC #2: Closed structural/witness mapping rejection assertions proposed; final candidate execution pending.
+- [ ] AC #3: Complete ordered effects and actual Task entry-context assertions proposed; real repair and sensitivity pending.
+- [ ] AC #4: Initial genuine semantic RED independently validated; complete remaining native/inventory sensitivity pending final freeze and replay.
+- [ ] AC #5: All218 witnesses preserved in external audit; complete successful candidate row/witness/native bidirectional inventory and final review pending.
 
 ## nd_contract
 status: in_progress
