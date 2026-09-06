@@ -890,7 +890,7 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 			}
 		}
 	}
-	completed, publications := 0, 0
+	completed, publications, injections := 0, 0, 0
 	unchanged, placements, desiredReady := true, false, false
 	var output bytes.Buffer
 	opts.Out = bootstrapObserver(func(p []byte) (int, error) {
@@ -933,6 +933,14 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 		if canonical(filepath.Dir(file.Name())) != canonical(filepath.Join(journalRoot, installJournalScratch)) || !strings.HasPrefix(filepath.Base(file.Name()), "receipt-") {
 			return oldClose(file)
 		}
+		writable, err := bootstrapReceiptWritable(file)
+		if err != nil {
+			t.Errorf("query final receipt descriptor: %v", err)
+			return errors.Join(err, oldClose(file))
+		}
+		if !writable {
+			return oldClose(file)
+		}
 		publications++
 		if completed != children || !placements || !unchanged || !desiredReady {
 			t.Error("parent receipt publication preceded complete children/placements/unchanged receipt")
@@ -952,7 +960,8 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 		if err := oldClose(file); err != nil {
 			t.Fatalf("first real receipt close failed: %v", err)
 		}
-		if fault {
+		if fault && publications == 1 {
+			injections++
 			closeErr = file.Close()
 			t.Logf("injected real final receipt close at %s: %v", file.Name(), closeErr)
 			return closeErr
@@ -970,6 +979,9 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 		t.Errorf("missing parent finalization boundary: children=%d/%d publications=%d; err=%v", completed, children, publications, updateErr)
 	}
 	if fault {
+		if injections != 1 {
+			t.Errorf("actual writer fault injections = %d, want 1", injections)
+		}
 		if !errors.Is(closeErr, os.ErrClosed) || !errors.Is(updateErr, os.ErrClosed) {
 			t.Errorf("real late publication close fault was not exercised/retained: injected=%v returned=%v", closeErr, updateErr)
 		}
