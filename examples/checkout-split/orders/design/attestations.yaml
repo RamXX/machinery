@@ -1,66 +1,83 @@
-attestation_version: 1
+attestation_version: 2
 attestations:
   - claim: g2.action-ownership
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
   - claim: g2.interface-contract-rightness
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
   - claim: g2.placement-rightness
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
   - claim: g2.adoption-closure-discovery
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
   - claim: g2.event-contract-completeness
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
   - claim: g2.nfr-content
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers: [{path: ARCHITECTURE.md, hash: sha256:f0efc82ce23ee9b48ae4e3ce475b1e5fa475fe2c8dfc1b6644b4d5923837644d}]
   - claim: g3.guard-semantics
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers:
       - {path: machines/Order.machine.json, hash: sha256:31bc66d23446cb85c7227d5e65d6dc22e531edcc4df4d62ddab9ed3f23343913}
       - {path: machines/Order.matrix.md, hash: sha256:62eeca0a0e06e9ce09118d31474c4f36a8001235763e8333ccf83f71c0eab06c}
   - claim: g3.invariant-enforcement
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers:
       - {path: machines/Order.machine.json, hash: sha256:31bc66d23446cb85c7227d5e65d6dc22e531edcc4df4d62ddab9ed3f23343913}
       - {path: machines/Order.matrix.md, hash: sha256:62eeca0a0e06e9ce09118d31474c4f36a8001235763e8333ccf83f71c0eab06c}
   - claim: g3.residual-transitions
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers:
       - {path: machines/Order.machine.json, hash: sha256:31bc66d23446cb85c7227d5e65d6dc22e531edcc4df4d62ddab9ed3f23343913}
       - {path: machines/Order.matrix.md, hash: sha256:62eeca0a0e06e9ce09118d31474c4f36a8001235763e8333ccf83f71c0eab06c}
   - claim: g3.event-redelivery
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers:
       - {path: machines/Order.machine.json, hash: sha256:31bc66d23446cb85c7227d5e65d6dc22e531edcc4df4d62ddab9ed3f23343913}
       - {path: machines/Order.matrix.md, hash: sha256:62eeca0a0e06e9ce09118d31474c4f36a8001235763e8333ccf83f71c0eab06c}
   - claim: gt.conformance-test-shape
-    attestor: Machinery production-readiness review
-    date: 2026-09-02
-    covers: [{path: BUILD.md, hash: sha256:04822dd9ab8e3e3386a99082f3bd720cd43d5830fea27c614cfaddd70442fb5a}]
+    kind: plan
+    attestor: coordinator
+    date: 2026-09-06
+    note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
+    covers: [{path: BUILD.md, hash: sha256:c913adca16d86801ebcd967a810a0cde7529122be89bc8ed35e3a141596c5fcf}]
   - claim: g4.zero-context
-    attestor: Machinery production-readiness review
-    date: 2026-09-02
-    covers: [{path: BUILD.md, hash: sha256:04822dd9ab8e3e3386a99082f3bd720cd43d5830fea27c614cfaddd70442fb5a}]
+    kind: plan
+    attestor: coordinator
+    date: 2026-09-06
+    note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
+    covers: [{path: BUILD.md, hash: sha256:c913adca16d86801ebcd967a810a0cde7529122be89bc8ed35e3a141596c5fcf}]
   - claim: g4.standin-coverage
-    attestor: Machinery production-readiness review
-    date: 2026-09-02
-    covers: [{path: BUILD.md, hash: sha256:04822dd9ab8e3e3386a99082f3bd720cd43d5830fea27c614cfaddd70442fb5a}]
+    kind: plan
+    attestor: coordinator
+    date: 2026-09-06
+    note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
+    covers: [{path: BUILD.md, hash: sha256:c913adca16d86801ebcd967a810a0cde7529122be89bc8ed35e3a141596c5fcf}]
   - claim: g4.pack-event-discipline
+    kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers:
