@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-06T11:03:02Z
-content_hash: "sha256:6df7446595a48de9fa605569ce29cc8aae0c7ab584b0e15ae515ea08d081d4fc"
+updated_at: 2026-09-06T11:42:35Z
+content_hash: "sha256:52d8fe43e579713191f6841c742802519138fda6442a766e85c4f51901b924d8"
 ---
 
 ## Description
@@ -740,3 +740,6 @@ status: in_progress
 - [x] Unsupported/tautological preliminary test claims were rejected before source authoring.
 - [ ] Remaining implementation, source/method approval, two-platform native proof and final integrated preflight/local release remain pending.
 
+
+### 2026-09-06T11:42:35Z ramirosalas
+LOCAL EVIDENCE CHECKPOINT 2026-09-06: bounded completed external artifacts archived under git common dir at .git/machinery-evidence-20260906.TEFZ7D/bounded-methods-checkpoint.tar.gz, SHA256 8cfaff4bcd0775813b5bebe4080a6c8de34bad9cdcddcb6585feca8ad5ac5c16; adjacent README states contents and limits. Original artifacts retained. Includes approved policy V3, D1 V3/V4 and both failed/successful independent probe history, unapproved D5/D6 candidate, custody V2/V3 rejection history, pending sh60 successor proposal. Listing and two extracted frozen-source hashes verified. Not an archive of all earlier proof. No source/ref/install/remote/preflight change. main497419a and epica94e768 unchanged; 7/40 children accepted. D5/D6 independent method review and custody V4 authoring remain active, not repository RED approval.
