@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-06T01:23:55Z
-content_hash: "sha256:c561a97db47649e23e00298838d9550f8290d6e383ddd815bba45a12af09d472"
+content_hash: "sha256:cf9fb6f400bd5f8b46ebc6076b3ba0f2bfff19a9eea9bd4ee38bf1405de72571"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
@@ -1199,3 +1199,78 @@ status: in_progress
 - [x] Frozen RED bytes preserved; required direct-parser/literal/discovery controls pass.
 - [ ] AC #2: retain existing go-crm helper parser discovery after PM scope review.
 - [ ] Full delivery: resolve scoped regression and review output golden before delivery.
+
+### 2026-09-06T01:23:55Z ramirosalas
+## PM bounded scope and golden authorization — MAC-sh60
+Reviewed healthy GREEN checkpoint 3d47b80ce59af1f521539e0b48e67be9ee4e9a71 on 2026-09-05. This is a scope/budget and exact fixture-edit decision only. It is NOT delivery, rejection, re-RED approval, acceptance, claim release or authorization to merge. The current GREEN hold remains until the dispatcher completes the separate RED-amendment review and explicitly resumes GREEN.
+
+### Scope decision: authorized within AC2
+AC2 requires genuine conformance parsers to remain discoverable. The unchanged go-crm examples are concrete necessary compatibility, not speculative expansion:
+- examples/go-crm/impl/internal/authz/oracle_test.go:25/31/131: literal const oraclePath -> loadOracle(t) -> os.Open(filepath.FromSlash(oraclePath)) -> bufio.NewScanner(f), sc.Scan/sc.Text -> strings.Split and trimmed cells -> append oracleRow fields -> returned rows -> active TestOracleConformance range -> want derived from row.expectation -> t.Run/nested ranges -> got.Allowed != want -> t.Errorf.
+- examples/go-crm/impl/internal/authz/tenant_oracle_test.go:26/32/95: same connected loader/typed-row pipeline for Isolation.oracle.md; active TestTenantOracleConformance assigns returned rows, ranges them, derives want from row.expectation and checks AuthorizeLink(...).Allowed inside t.Run.
+- The loader's own read-error, malformed-row and empty-result failures do not establish row conformance. The decisive evidence is the returned-row-dependent comparison in the active test. The Policy test intentionally excludes rows marked unreachable; discovery still must not assert that every row executed.
+- Current fileNameCited rebuilds only active test declarations, so same-file loaders/constants are absent; goOracleParser handles direct ReadFile/range/Split and cannot follow these Scanner/typed-return/t.Run shapes. TestCheckGreenSummaryLines and TestGoldenCheck/go-crm demonstrate the regression. Preserving the examples rather than rewriting them into a new parser idiom is necessary for AC2.
+
+Authorized implementation boundary: internal/gates/oraclecov.go only, plus directly associated additional regression tests in the existing GREEN supplemental internal/gates/oraclecov_scope_test.go. Permit bounded same-file reachable helper summaries, literal immutable path resolution including filepath.FromSlash, os.Open -> Scanner Scan/Text provenance, typed append/composite/selector propagation, returned rows consumed by active test ranges, and recognized testing.T.Run callbacks. This is an implementation allowance, not an assertion that any particular proposed algorithm is correct.
+
+Required constraints:
+1. Every wholesale credit must retain a connected target-oracle read -> actual parsed cells/row values -> returned collection -> active caller iteration -> row-dependent failing comparison. A parser-shaped helper, file name, delimiter, helper name, unused return value or unrelated assertion cannot confer credit.
+2. Follow only resolvable same-file calls reached from valid active Go tests. Do not treat every function declaration or arbitrary function literal as invoked. Recognize t.Run through the active testing parameter/callback context; an uncalled closure or unrelated receiver's Errorf must not become a test assertion.
+3. Resolve only proven literal/immutable path bindings and reject shadowed/reassigned or otherwise ambiguous bindings. Preserve exact target filename boundaries; a loader for a different oracle cannot cover the requested oracle. Do not pool unrelated helpers/files into a synthetic proof chain.
+4. Use explicit finite cycle/depth bounds. Cycles, unresolved calls, ambiguous returns and exhausted analysis limits remain uncovered; limits cannot turn into success or hang the scanner. No general inter-package call analysis, external compiler/runtime, network execution or new dependency is authorized.
+5. Preserve existing active test/build selection, comment/docstring rejection, stable-ID boundaries, orphan/missing-oracle and clause obligations. Static discovery remains distinct from execution.
+
+Required supplementary proof before GREEN delivery: actual CheckOracleCoverage fixtures for both direct-range helper return and assign-then-range forms, representing literal const/FromSlash/Open/Scanner/typed rows/selectors/t.Run. Negative controls must cover uncalled loader; loaded-but-unused returned rows; real loader plus unrelated constant assertion; wrong-oracle loader; an uncalled assertion closure; and bounded recursion/ambiguous path reassignment remaining uncovered. These may be table-driven/additive in oraclecov_scope_test.go; use connected positive fixtures and exact no-credit diagnostics/counts. They are GREEN supplemental regression tests, not historical pre-GREEN RED. Current 18 supplementary cases and all frozen original tests remain intact.
+
+Budget investigation: current cumulative diff against 6cb2d974 is exactly 709 changed LOC across five files (649 additions/60 deletions), with 54 lines of supplemental test coverage and no padding. The forecast 140–200 additional lines is justified by preserving the existing real parser idiom and adding safety controls. Authorize up to 1000 cumulative changed LOC across SIX exact paths: internal/gates/oraclecov.go, internal/gates/oraclecov_scope_test.go, the three already-frozen test files, and testdata/golden/check-go-crm/stdout.txt. Forecast remains about 850–910 plus explicit safety-test room; 1000 is a review ceiling, not a target. Any additional file or material growth beyond that bound needs renewed concrete review. No architect decision is presently required for this bounded same-file compatibility repair.
+
+### Exact golden amendment authorization
+TEST-EDIT AUTHORIZED: testdata/golden/check-go-crm/stdout.txt — change ONLY the existing Gt checked line (line 55 at this checkpoint) by appending exactly `, static discovery; tests not executed; unsupported parser structures remain uncovered` before its existing newline. This is required AC4 disclosure. Preserve every existing count, all other lines/bytes, stderr.txt (empty), exitcode.txt (`0\n`) and all command test assertions. No golden regeneration/update switch or broad fixture rewrite is authorized.
+
+Exact OLD line:
+```text
+  checked: 14 test files scanned, 5 machines, 275 oracle rows, 197 ids covered by literal, 2 formal oracles, 2 formal oracles covered, 6 clause-declared guards checked, 36 falsifying-clause ids covered
+```
+Exact NEW line:
+```text
+  checked: 14 test files scanned, 5 machines, 275 oracle rows, 197 ids covered by literal, 2 formal oracles, 2 formal oracles covered, 6 clause-declared guards checked, 36 falsifying-clause ids covered, static discovery; tests not executed; unsupported parser structures remain uncovered
+```
+
+The two missing formal-oracle errors and loss of `2 formal oracles covered` in healthy GREEN are a production regression to fix. They must NOT be captured as expected golden output. Gate.Emit appends checkedExtra after the existing ordered counts with comma-space separation, supporting this exact suffix-only expectation once helper compatibility is repaired.
+
+Before amendment SHA256 independently read from 3d47b80:
+- stdout.txt: 2abeaf18bcc08300ffcf6083f0715c4790e12d26e017f59df0c71d8c89f0e12f
+- exitcode.txt: 9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa
+- stderr.txt: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+Separate original RED author owns this amendment, not the GREEN implementer. Produce a tests-only commit on the pure approved RED candidate fa842ed374ad5c82d8c8f4f9e0c3aead56c9cfa3 (production still 6cb2d974), with both `tdd-red` and `[test-edit-authorized]` in its subject. Only the single golden line may change. Independently replay `go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestGoldenCheck$/^go-crm$'`: expected RED must be specifically the missing disclosure suffix while actual exit stays zero, old counts remain complete and stderr stays empty. Preserve full raw CLI stdout or an exact line diff if the golden harness clips its mismatch. Positive control `go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestCheckGreenSummaryLines$'` must pass on that unchanged production. Record SHA, diff, hashes, counts and assertion causes for separate independent PM re-RED review. This authorization does not itself approve the amended RED. The dispatcher owns integration with the paused healthy GREEN; no source/test edits occur in this review.
+
+The three previously frozen tests remain byte-for-byte immutable at their approved hashes: gate negative 42f1237819cfecc4a265fd5dfa4a90050d8f0f77f9aa0baf27b42995d8834e45; original gate tests dd68d778605397184630447bc09b712072fe604be77c496177d121690414b994; CLI negatives 6ea06399d8271691f7f40f30f067e0d3270184eaca4fc2548cc7a562c7775d08. git diff fa842ed3..3d47b80 over those paths is empty. The golden authorization grants no permission to edit them or either real go-crm example.
+
+### Verification allowance and honest limits
+- After resumed implementation and approved golden amendment: rerun frozen gate/CLI tests and all supplementary helper/scope cases; run TestCheckGreenSummaryLines and TestGoldenCheck/go-crm unchanged. Also run actual local `go test -json -count=1 -timeout=120s ./internal/authz -run '^(TestOracleConformance|TestTenantOracleConformance)$'` from examples/go-crm/impl as real native example proof; keep any intentional unreachable-row exclusion explicit. No source-discovery claim substitutes for native execution.
+- For the needed full cmd package correctness replay, authorize `go test -json -count=1 -timeout=10m ./cmd/machinery` without coverage instrumentation. This is a finite package budget, not a waiver for hung tests. Local `go help testflag` confirms Go's default timeout is ten minutes; repository CI/preflight native/race commands omit a shorter timeout. The broad instrumented package had already spent about 139 seconds before its final parallel installer group resumed, with TestGoldenGen 18.23s and TestPreflightReturnsOutputFailure 19.73s among observed costs. Three minutes was not evidence of an appropriately budgeted complete run. Ten minutes restores the tool's normal cap while preserving test/process deadlines and requiring terminal results. If it times out, diagnose/report the actual running tests; do not call it a pass or increase indefinitely.
+- Correction to healthy-hold.md: the raw log shows TestInstallCommand PASSED in 8.96s. At the 180-second package timeout, the running tests were TestInstallAndDoctorTargetAll, TestInstallScript and TestInstallScriptHostTargets, each shown at 41s. This review does not assign their cause. Existing installer work remains separately owned. The fuller timeout is permission for accurate verification, not assurance those tests are healthy.
+- Broader instrumented run remains gates 1171 pass/0 fail/1 skip; cmd 381 pass/23 fail/3 skip terminal leaves plus timeout. It did not complete. Report all failures and unexecuted conditions; do not claim all 23 share one cause. Read-only baseline diagnostic proves only the representative TestVerifyCheckersReproducible instrumentation protocol issue (native main pass 1.203s, covered fail 0.747s; GOCOVERDIR warning appended to strict OCI JSON). Root's separate P0 MAC-yig6 owns that defect; no OCI/parser/environment changes are authorized here and strict identity validation must remain intact.
+- Case-sensitive filesystem tests and the official Structurizr/OCI engine opt-in cases remain unexecuted assurance in the supplied run. Their explicit lanes/final gate own required prerequisite coverage; list skips exactly and do not count them as passes. No full scripts/preflight.sh or external runtime lane is authorized during this review/story step.
+
+### Review evidence and source boundary
+- Read full /tmp/MAC-sh60-green.GtkNbt/healthy-hold.md and /tmp/machinery-coverage-diagnostic.hKOuC4/REPORT.md; reread canonical five AC and exact prior test-edit restrictions/current GREEN checkpoint via shared pvg nd.
+- Read exact candidate oraclecov.go/supplemental test source, complete two actual go-crm oracle tests, golden stdout/exit/stderr, TestGoldenCheck, TestCheckGreenSummaryLines, Gate.Emit and relevant installer test sources. No candidate implementation was modified or executed in this scope-only review; existing raw test evidence is identified as author/root evidence above.
+- Graph search found seven exact scoped symbols with has_more false; TestOracleConformance outbound trace included loadOracle and its actual authorizer callees. Direct source established the testing.T.Run and value flows; graph's unrelated heuristic CLI Run edge was not relied upon. Coverage generation 2026-09-05T23:58:53Z reports metadata_match/no recorded issues for unchanged examples and harness, but main-index metadata does not establish GREEN source freshness. New supplementary/golden paths were missing/not_tracked in graph metadata; exact git-show source is authoritative fallback. No graph completeness claim.
+- Initial/final state must remain in_progress, hard-tdd/red-approved, assignee dev-MAC-sh60. No story transition, delivery, test/source/golden edit, worktree cleanup, installation, live binary/plugin/skill mutation, remote mutation or main/epic change performed. Only append-only shared review notes/comment are written.
+
+## nd_contract
+status: in_progress
+phase: green-healthy-hold
+
+### evidence
+- Bounded same-file helper compatibility and <=1000 changed LOC / six-path scope authorized for AC2; exact one-line AC4 golden amendment authorized to separate original RED author, pending tests-only replay and independent review.
+- Healthy checkpoint 3d47b80ce59af1f521539e0b48e67be9ee4e9a71 retained; frozen three-file delta empty. No workflow state transition in this review.
+
+### proof
+- [x] Scope review: genuine existing helper/Scanner/typed-row/t.Run evidence and safety constraints identified.
+- [x] Exact golden edit authority: disclosure suffix only; counts, exit zero and empty stderr preserved.
+- [ ] Separate tests-only golden RED amendment and independent review pending.
+- [ ] AC2 GREEN helper compatibility, supplementary negative controls and actual example replay pending.
+- [ ] Complete native correctness verification and honest failure/skip accounting pending; no acceptance or completion claimed.
