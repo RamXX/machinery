@@ -31,6 +31,8 @@ type AttestationTreeSnapshot struct {
 	designInfo, implInfo os.FileInfo
 	entries              []AttestationTreeEntry
 	witnesses            map[string]os.FileInfo
+	designWitnesses      map[string]os.FileInfo
+	copySkip             string
 	cleanup              *privateSnapshotCleanup
 	closed               bool
 	closeErr             error
@@ -133,7 +135,7 @@ func (l *Lock) MaterializeAttestationTree(path string) (result *AttestationTreeS
 			return nil, fmt.Errorf("GV_SCOPE_CUSTODY: unrecognized private source path")
 		}
 	}
-	s := &AttestationTreeSnapshot{lock: l, logical: abs, witnesses: map[string]os.FileInfo{}}
+	s := &AttestationTreeSnapshot{lock: l, logical: abs, witnesses: map[string]os.FileInfo{}, designWitnesses: map[string]os.FileInfo{}}
 	defer func() {
 		if retErr != nil {
 			retErr = l.LogicalError(errors.Join(fmt.Errorf("GV_SCOPE_CUSTODY: %w", retErr), s.Close()))
@@ -188,10 +190,8 @@ func (l *Lock) MaterializeAttestationTree(path string) (result *AttestationTreeS
 	if err != nil {
 		return nil, err
 	}
+	s.copySkip = policy.copySkip
 	if err := s.CheckUnchanged(); err != nil {
-		return nil, err
-	}
-	if err := s.checkCopy(policy.copySkip); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -213,7 +213,7 @@ func attestationFingerprint(entries []AttestationTreeEntry) map[string]string {
 }
 
 func (s *AttestationTreeSnapshot) checkDesign() error {
-	entries, err := captureAttestationRoot(s.design, s.lock.root, attestationInventoryPolicy{}, "")
+	entries, err := captureAttestationRoot(s.design, s.lock.root, attestationInventoryPolicy{witnesses: s.designWitnesses}, "")
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func (s *AttestationTreeSnapshot) CheckUnchanged() error {
 	if err == nil && !reflect.DeepEqual(entries, s.entries) {
 		errs = append(errs, fmt.Errorf("original implementation inventory changed at %s", firstFingerprintChange(attestationFingerprint(s.entries), attestationFingerprint(entries))))
 	}
-	errs = append(errs, s.checkDesign())
+	errs = append(errs, s.checkDesign(), s.checkCopy(s.copySkip))
 	if err := errors.Join(errs...); err != nil {
 		return s.lock.LogicalError(fmt.Errorf("GV_SCOPE_CUSTODY: %w", err))
 	}

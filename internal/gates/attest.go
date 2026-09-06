@@ -463,7 +463,7 @@ func parseAttestations(g *Gate, design, path string) []attestRow {
 	}()
 	raw, err := readDesignFile(design, path)
 	if err != nil {
-		g.Errs = append(g.Errs, AttestationsFileName+" is unreadable: "+err.Error())
+		g.Errs = append(g.Errs, attestationReadCategory(err)+": "+AttestationsFileName+" is unreadable: "+err.Error())
 		return nil
 	}
 	value, err := ir.LoadYAML(raw)
@@ -602,7 +602,7 @@ func parseAttestationCover(g *Gate, where string, item *ir.Value) (attestCover, 
 	}
 	cover := attestCover{
 		path: strings.TrimSpace(obj.GetString("path")),
-		hash: strings.TrimSpace(obj.GetString("hash")),
+		hash: obj.GetString("hash"),
 	}
 	validateAttestationStrings(g, where, obj, "path", "hash", "_comment")
 	ok := true
@@ -742,7 +742,7 @@ func parseAttestationManifest(g *Gate, where string, value *ir.Value) *attestati
 		if err != nil || len(e.Mode) != 4 || e.Mode[0] != '0' || mode > 0777 {
 			g.Errs = append(g.Errs, "GV_SCHEMA: entry "+e.Path+" mode must be a four-character octal permission string 0000..0777")
 		}
-		if strings.Count(e.Path, "/") > 64 {
+		if strings.Count(e.Path, "/") > 64 || e.Type == "directory" && e.Path != "." && strings.Count(e.Path, "/")+1 > 64 {
 			g.Errs = append(g.Errs, "GV_EVIDENCE_LIMIT: scope path exceeds depth 64: "+e.Path)
 		}
 		size := eo.Get2("size")
@@ -985,7 +985,7 @@ func renderAttestationInSnapshot(design string, subject *attestationSubject, rev
 	g := NewGate("Gv-attest")
 	paths := attestationRequiredPaths(g, design, review.Claim)
 	if len(paths) == 0 || len(g.Errs) > 0 {
-		return nil, fmt.Errorf("GV_MISSING_IMPLEMENTATION_SUBJECT: %s has no available required design subject: %s", review.Claim, strings.Join(g.Errs, "; "))
+		return nil, fmt.Errorf("GV_MISSING_IMPLEMENTATION_SUBJECT: %s requires %s; no available required design subject: %s", review.Claim, attestClaimByID[review.Claim].owedBy, strings.Join(g.Errs, "; "))
 	}
 	covers := make([]map[string]string, 0, len(paths))
 	for _, path := range paths {
@@ -994,7 +994,7 @@ func renderAttestationInSnapshot(design string, subject *attestationSubject, rev
 		}
 		body, err := readDesignFile(design, filepath.Join(design, filepath.FromSlash(path)))
 		if err != nil {
-			return nil, fmt.Errorf("GV_SCOPE_CUSTODY: read required subject %s: %w", path, err)
+			return nil, fmt.Errorf("%s: read required subject %s: %w", attestationReadCategory(err), path, err)
 		}
 		covers = append(covers, map[string]string{"path": path, "hash": fmt.Sprintf("sha256:%x", sha256.Sum256(body))})
 	}
@@ -1022,6 +1022,15 @@ func escapesDesign(rel string) bool {
 	return clean == ".." || strings.HasPrefix(clean, "../")
 }
 
+// The shared bounded reader owns the fixed ceiling; preserve its diagnostic
+// while classifying evidence-limit failures at this attestation boundary.
+func attestationReadCategory(err error) string {
+	if strings.Contains(err.Error(), fmt.Sprintf("exceeds %d-byte limit", designArtifactMaxBytes)) {
+		return "GV_EVIDENCE_LIMIT"
+	}
+	return "GV_SCOPE_CUSTODY"
+}
+
 // checkAttestationFreshness holds one row to its referents: every covered
 // artifact still exists, and its bytes still hash to what the attestor saw.
 // A moved artifact makes the row STALE, an ERROR rather than a DRIFT: DRIFT
@@ -1034,6 +1043,8 @@ func checkAttestationFreshness(g *Gate, design string, row attestRow) {
 		data, err := readDesignFile(design, full)
 		if err != nil {
 			switch {
+			case attestationReadCategory(err) == "GV_EVIDENCE_LIMIT":
+				g.Errs = append(g.Errs, "GV_EVIDENCE_LIMIT: "+err.Error())
 			case os.IsNotExist(err):
 				g.Errs = append(g.Errs, fmt.Sprintf("%s: %s covers %s, which the design does not carry; an attestation over an absent artifact covers nothing", AttestationsFileName, row.claim, ir.Repr(cover.path)))
 			case strings.Contains(err.Error(), "is a directory"):
