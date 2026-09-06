@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:26:12Z
-content_hash: "sha256:95eac63fa10b35be06ef596db091fff060aa301be8d05157e8b371b92f1c2154"
+updated_at: 2026-09-06T05:37:21Z
+content_hash: "sha256:c045ea6544365153b2449c30738b3fdff72746adeca038f875912bff620616e7"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -935,6 +935,23 @@ Observed evidence and limits:
 - Measured production6files1125add/43del =1168 changed lines; combined11files2609add/46del =2655. Remaining tests/docs and actual final cost still owed; the canonical forecast is not completion proof.
 - Main497419ab4512fcff765cd5feb27aed4c67b5608d clean and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged. PM inspected committed refs and proof files only, not developer worktree internals. No source/test/docs, installed binary/assets, remote, services, Docker or preflight changes; private pvg tracker writes only. Machinery standalone constraint unchanged.
 SR PM LEGACY FIXTURE OWNERSHIP / PROPOSAL-PREPARATION HOLD. Read complete PAUSED-BLAST-DISPUTE.md SHA256d2837c4fbd4205ba151b856e96a7747d3cc32b58b1a69b4c49fe1d6fedb6bc1f and terminal report.229scoped+45race PASS belong to4b246ba; paused51454e069ebe4039f02d6d9108acf9354c7ad6c8 is docs-only later and still owes finalsameSHA proof. Four old-fixture leaves remain held: hook_test.go TestStopGreenDesignClearsStateSilently and obligation_ownership_test.go TestObligationParentRealCLI obligation-free/Policy/Isolation default-gate legs. Legacy v1 gt correctly fails GV_MISSING_IMPLEMENTATION_SUBJECT; silence/ledger, default-vs-explicit Gt, real controls/negatives, Ga ancestry/selection and no-grandfathering are fixed. hgz1 now owns all8bundled evidence migrations AFTER p7/uzxr/lhu5; no p7 reverse dependency or bundled writes to unblock this story. Root may resume the healthy retained GREEN author for an UNAPPLIED EXTERNAL exact test-local fixture proposal against51454e0 limited to those2existingtest paths, with full old/new hunks, original-assertion byte equality, helper callers, real input/evidence inventory, warning/silence semantics and per-file cost. This is proposal preparation only, not oldtest editing or TEST-EDIT AUTHORIZED. Separate independent PM must approve exacttext before any subsequent sanctioned amendment. Verified existing APIs: gates.AttestationReview{Claim,Kind,Attestor,Date,Note string}; RenderAttestation(design,impl string,review AttestationReview)([]byte,error); CheckAttestationsWithImplementation(design,impl string)*Gate. No missing core schema/API identified. Exact valid fixture construction remains unresolved: plan warnings cannot be assumed silent; real/synthetic impl hashes do not establish substantive current conformance, especially before uzxr repair. If no fixture preserves all constraints, report exact technical conflict for independent specialist review; do not weaken assertions, invent review or change product semantics. Existing filesystem skip remains uncredited. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
+## nd_contract
+status: in_progress
+
+### evidence
+- PROPOSAL ONLY, UNAPPLIED, NOT TEST-EDIT AUTHORIZATION: exact test-local fixture amendment against clean51454e069ebe4039f02d6d9108acf9354c7ad6c8. Shared source/tests/examples unchanged; no delivery or RED approval. Independent PM review required before any [test-edit-authorized] commit.
+- Index /tmp/machinery-p7jd-fixture-proposal.geNVdA/PROPOSAL-INDEX.md SHA2561049ea7adf1eaa142948f2f6cd3d4d8327ae20a9b3326222f57041f7f19c9169. Exact fixture-amendment.patch SHA256ae6e9241ea5d7b0c4556b2ee02c6e2910b2663c2452761e7984f1c6663252971,65 additions0 deletions in only internal/hook/hook_test.go copyTree and internal/gates/obligation_ownership_test.go obligationParentFixture. Proposed total16 paths3462 changed lines, not approved scope.
+- External archive diagnostic only: all13 original affected-helper leaves PASS0FAIL0SKIP (6hook4.704s,7parent9.320s). Exact original assertions/outside-helper bytes unchanged; zero deleted original lines. Raw Gv explicitly retains missing-current warning and current_reviews0. Actual Stop stdout empty/ledger cleared. Actual parent default+explicit positive controls exit0 and removed-ID challenges exit1 with original assertions. These are NONQUALIFYING external observations, not same-SHA shared story proof.
+- Full before/after evidence YAML, all6 acceptance-byte hashes, full62-file GoCRM design inventory (implementation absent),73-file complete parent control and75-file Policy/Isolation control/missing-ID inventories, raw CLI/Stop outputs, exact native names, audit scripts and provenance in that directory. Only copied evidence changes; cover hashes/attestor/date unchanged; ga historical and all acceptance anchors unchanged. No GoCRM runtime/parser or parent decision-ID synthetic code is claimed as current substantive conformance.
+- Precise forward consequence: hgz1 planned source v2 migration WILL fail both exactv1 fixture guards. Its later GoCRM current row is not this fixture's current evidence. PM/Sr PM must explicitly route future exact amendment/decoupling authority for these2 constructors before hgz1 regression completion; its present scope does not own these files. No automatic broadening or reverse dependency proposed. This65-line proposal is intentionally unchanged pending judgment.
+- Earlier4 broader failures,1 filesystem skip,229 scoped+45race passes at4b246ba remain preserved and unresolved shared-state evidence. Clean shared51454e0; all finite diagnostics complete; no background process, install, asset/service operation, remote, preflight, merge or production dependency added.
+
+### proof
+- [ ] AC #1: prior observations retained; final independent review and same-SHA replay pending.
+- [ ] AC #2: exact proposal preserves honest plan/current/history distinction; no shared repair authorized yet.
+- [ ] AC #3: four existing fixture conflicts have an externally demonstrated construction; PM must adjudicate exact patch and forward hgz1 boundary.
+- [ ] AC #4: prior held-root/hook/race proof retained; existing unrelated platform skip remains unresolved.
+- [ ] AC #5: prior composed renderer/CLI observations retained; final same-SHA verification and independent source closure remain mandatory.
 
 ## nd_contract
 status: in_progress
