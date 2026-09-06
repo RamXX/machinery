@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:36:07Z
-content_hash: "sha256:8c75cf730a938a8e18e1e828de0ce297cb8517cabe6903f2a9126a37cb606203"
+updated_at: 2026-09-06T03:46:40Z
+content_hash: "sha256:19a1a754123bf115efa8421b338eb1b1337f1261e7221a82d5e52fa02b7f3bd4"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36]
@@ -102,6 +102,53 @@ status: new
 
 
 ## Notes
+# MAC-yig6 frozen RED evidence
+
+Revision c59c89de31c7f1268a220caf0fa0d67a8e166d0f, story/MAC-yig6, base 70652b948bf090008b1965c85daf36ea374daea4. One new file, 246 additions/0 deletions. Frozen file cmd/machinery/checker_fixture_coverage_test.go SHA256 80b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677. No existing test/helper/production changes.
+
+Actual host/toolchain: Go 1.27.1 darwin/arm64. GOFLAGS empty. Installed machinery SHA256 remained 5205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849. No Linux execution claimed. No Docker daemon, installed-asset operation, full preflight or remote operation occurred.
+
+All shell commands ran after `cd /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-yig6`. Each test command used `/usr/bin/time -p perl -e 'alarm N; exec @ARGV'` before `go`: N=200 for outer-meta commands, N=90 for ordinary targeted commands. Standard output and stderr/timing were recorded separately under this report directory. Tests themselves used 180s outer deadlines and 60s child/test/compiler bounds; production controls retained 5s or existing 100ms operation limits.
+
+## Exact commands and outcomes
+
+- `go test -json -count=1 -timeout=180s ./cmd/machinery -run '^TestCheckerFixtureCoverageRegression$'`: exit 1, behavioral RED. Native child 10 terminal leaves pass; covered child 5 pass/5 fail. Outer native subtest PASS2.99s; covered FAIL3.47s; meta6.46s; package6.964s; wall8.87s. Files meta-native.jsonl/meta-native.stderr.
+- `go test -json -count=1 -timeout=60s ./cmd/machinery -run '^TestVerifyCheckersReproducible$'`: exit0, 1 pass/0 fail/0 skip, original unchanged assertions all completed. Package0.998s, wall1.40s. Files original-native.jsonl/original-native.stderr.
+- `go test -json -count=1 -timeout=60s -coverprofile=/tmp/machinery-yig6-red.09ui51/original-coverage.out ./cmd/machinery -run '^TestVerifyCheckersReproducible$'`: exit1, 0 pass/1 fail/0 skip, assertion at verify_checkers_test.go:486 fails because strict OCI parser rejects trailing data before subsequent reproduced/config/summary assertions. Package0.800s, wall1.23s. Files original-covered.jsonl/original-covered.stderr.
+- `go test -json -count=1 -timeout=60s ./cmd/machinery -run '^(TestCheckerFixtureProtocolControls|TestVerifyCheckersReproducible|TestRunCheckerBoundsOutput|TestRunCheckerReportsStreamsInDeterministicOrder|TestRunCheckerBoundsDescendantPipeWait|TestRunCheckerTimeoutDiagnostic|TestVerifyLocalOCIImageBoundsUnresponsiveEngine)$'`: exit0, 10 terminal leaves pass/0 fail/0 skip; 11 terminal test events including protocol parent. Wall2.45s. Files selection-native.jsonl/selection-native.stderr.
+- `go test -json -count=1 -timeout=180s -coverprofile=/tmp/machinery-yig6-red.09ui51/selection-coverage.out ./cmd/machinery -run '^(TestCheckerFixtureCoverageRegression|TestCheckerFixtureProtocolControls|TestVerifyCheckersReproducible|TestRunCheckerBoundsOutput|TestRunCheckerReportsStreamsInDeterministicOrder|TestRunCheckerBoundsDescendantPipeWait|TestRunCheckerTimeoutDiagnostic|TestVerifyLocalOCIImageBoundsUnresponsiveEngine)$'`: exit1, expected RED. Direct leaves5 pass/5 fail; outer meta native PASS2.69s/covered FAIL2.55s; meta5.24s; wall7.37s. JSON terminal events6 pass/8 fail including parent suites; zero skips. Files selection-covered.jsonl/selection-covered.stderr.
+- `go tool cover -func=/tmp/machinery-yig6-red.09ui51/original-coverage.out` and equivalent selection-coverage.out: both exit0. Original profile2541 blocks/4015 statements/397 executed, including361 executed verify_checkers.go statements, total9.9%. Selection profile2541 blocks/4015 statements/402 executed, including366 production statements, total10.0%. Frozen meta independently parses block grammar, asserts executed production statements, and asks Go to parse its own covered profile.
+- `pvg verify cmd/machinery/checker_fixture_coverage_test.go --include-tests --format text`: PASS1file0issues.
+- `pvg story verify-tdd --base 70652b948bf090008b1965c85daf36ea374daea4 --json`: PASS1commit0violations.
+- `git diff --check`: PASS; worktree clean after commit.
+
+## Selected leaves and diagnosis
+
+Exact inner top-level inventory is TestVerifyCheckersReproducible, TestCheckerFixtureProtocolControls, TestRunCheckerBoundsOutput, TestRunCheckerReportsStreamsInDeterministicOrder, TestRunCheckerBoundsDescendantPipeWait, TestRunCheckerTimeoutDiagnostic, TestVerifyLocalOCIImageBoundsUnresponsiveEngine. The protocol parent contains correct, wrong-digest, wrong-platform, extra-data. Inner selectors exclude the outer meta-test, preventing recursion. The meta explicitly asserts entry of all seven top-level selections and all four protocol children and rejects any skip.
+
+Native correct accepts expected digest/platform; wrong-digest reaches `do not contain exact reference`; wrong-platform reaches `does not match required platform`; deliberate fourth JSON reaches `OCI RepoDigests response has trailing data`. Their raw fixture stdout is131B, except deliberate extra153B; stderr0B.
+
+Covered raw stdout contains the same intended input values, but every fixture adds54B stderr `warning: GOCOVERDIR not set, no coverage data emitted\n`. Correct is rejected early, and wrong-digest/platform are explicitly reported UNREACHED at their intended diagnosis because instrumentation triggers trailing data. Extra-data has the deliberate fourth JSON physically observed and strict trailing-data diagnosis reached, but its overall covered control still FAILS for incidental stderr; it is not credited as a clean covered sensitivity proof. All five existing stream/bounds/timeout leaves pass in native and covered runs. No compiler/import/setup/deadline error, timeout hang or skip underlies RED.
+
+Separate raw streams are observed under the unchanged deterministic environment. A subsequent actual runChecker invocation must equal stdout followed by stderr exactly. Actual unchanged verifyLocalOCIImage then checks each control. No mock compiler/process/result, arbitrary warning filter, parser change or package coverage disabling exists in RED.
+
+## AC mapping and remaining work
+
+AC1: frozen outer runs original assertions in both modes; native complete, covered behavioral failure proven. GREEN pending.
+AC2: frozen raw-stream and actual production checks prove contamination only in covered fixture. GREEN pending.
+AC3: four frozen real controls; native diagnoses reached, covered wrong identity/platform masked and not credited. GREEN pending.
+AC4: bounded Darwin execution and owned temporary cleanup complete; native Linux execution remains mandatory for final acceptance. No Windows/Docker assurance claimed. All tracked tool sessions terminated, and process inventory showed only the diagnostic shell/rg itself, no live owned checker/build process. Test binaries/profile temp trees are t.TempDir-owned; unchanged TestMain owns golden and child scratch roots. Only evidence logs/profiles remain intentionally in this private report directory.
+AC5: RED frozen at above hash and behavior reproduced on same revision; independent PM RED approval and exact existing-helper amendment review pending. See HELPER-AMENDMENT-PROPOSAL.md. Full suite/preflight deferred per explicit user scope.
+
+## Learnings and tool-use notes
+
+- A coverage warning is fatal protocol contamination when strict stdout-plus-stderr decoding correctly requires EOF. Negative tests must prove their intended diagnosis, not merely nonzero exit.
+- A real statement profile and positive production execution protect against accidentally proving a helper-only uninstrumented path.
+- Existing TestMain owns a per-process temporary root; a future cached helper must use its lifetime, not the first test's temporary directory.
+- Tool discovery mistakes were not behavioral evidence: a guessed wrong epic name returned unknown revision before the correct epic/MAC-ui8a history was read; `pvg issues show --help` returned usage/error before canonical JSON was read; pvg rejected documented `--format=text`, then supported separate `--format text` passed. `pvg story deliver --help` returned `OK: deliver --help ...` rather than help; reported to root for read-only investigation. No source adjustment resulted.
+
+Codebase-memory Verify tier used supplied exact-symbol traces and refreshed status/coverage at generation2026-09-06T02:42:16Z. Existing relevant files metadata_match/no recorded gap; new file missing from main graph and read directly. Graph coverage is best-effort, not exhaustive.
+
 ## nd_contract
 status: new
 
