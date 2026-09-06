@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:29:02Z
-content_hash: "sha256:19a277d1c06a9783a4f18d199f8e9c5497a9757f9b3c03249cc9be4ef8d7fca2"
+updated_at: 2026-09-06T09:43:36Z
+content_hash: "sha256:215057b5e72750cc96f6c1d0f0e860f0ec2eb9630c2715f013c99d67a95c9c73"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
@@ -651,3 +651,55 @@ status: in_progress
 - [ ] AC3-AC5: subsequently authorized exact helper+44 amendment, frozen147/246 and all reviewed negative controls.
 - [ ] AC6-AC7: actual same-revision native Darwin/Linux GREEN, truthful evidence and independent final acceptance.
 
+
+### 2026-09-06T09:43:36Z ramirosalas
+## SUPPLEMENTAL-RED PROOF (2026-09-06)
+
+Phase: supplemental RED only. This comment records the newly committed baseline-callable 147-line test. It is not GREEN, not supplemental PM freeze/approval, not delivery, and not acceptance/rejection. No helper implementation or prospective 44-line test was written.
+
+### Commit and byte identity
+- Worktree: /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-yig6 on story/MAC-yig6.
+- Frozen base: c59c89de31c7f1268a220caf0fa0d67a8e166d0f.
+- Supplemental RED commit: ac439c517de169addb68637c50040a9434bc8cca (`test(MAC-yig6): tdd-red supplemental helper coverage controls`).
+- Only changed path from base: cmd/machinery/checker_fixture_helper_red_test.go, +147/-0.
+- New file SHA256: ea67a87453e92d0f3e056ffa15367a0ad85cb6592cb6ce826bfd83ff84e93fcd; exact byte comparison with /tmp/machinery-yig6-revised-proposal.4O8e2O/checker_fixture_helper_red_test.go passed before commit.
+- Frozen original RED SHA256: cmd/machinery/checker_fixture_coverage_test.go = 80b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677 (unchanged).
+- Frozen helper source/test SHA256: cmd/machinery/verify_checkers_test.go = ce795eb21f6598df29d9cfa327e8b4019bcb0130e37332f2e646a374faf6c4fe (unchanged).
+- Before-write review remains method-only: /tmp/machinery-yig6-pm-final.rirEOm/REPORT.md SHA256 fa958a74440d41058b53b9d112cd1eebe40fbf7658a13f10e758b4fb988c8f3b.
+
+### Actual bounded execution
+- Expected RED command: `env GOWORK=off GOPROXY=off GOTOOLCHAIN=local perl -e 'alarm 180; exec @ARGV' go test -count=1 -timeout=120s ./cmd/machinery -run '^TestCheckerFixtureHelper(AmbientCoverageProtocol|CachedCompilerFailure)$' -v`.
+  - Actual terminal exit: 1 (expected behavioral RED). Raw stdout: /tmp/machinery-yig6-supplemental-red.N5Cinq/supplemental-red-rerun.stdout SHA256 24a1649c34ffb39c22cf25b7e2a718828d7460536038f3b19ce52ff962295978; stderr: /tmp/machinery-yig6-supplemental-red.N5Cinq/supplemental-red-rerun.stderr SHA256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855; exit file: /tmp/machinery-yig6-supplemental-red.N5Cinq/supplemental-red-rerun.exit SHA256 4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865.
+  - Exactly two top-level intended FAILs: TestCheckerFixtureHelperAmbientCoverageProtocol (both ambient/persisted subtests expose the 54-byte `warning: GOCOVERDIR not set, no coverage data emitted`) and TestCheckerFixtureHelperCachedCompilerFailure (frozen selector child exited 0; test rejects it). No timeout, panic, skip, or compiler/setup failure.
+  - Covered wrong-digest/platform intended diagnoses remain UNREACHED behind the existing strict trailing-data error; this is baseline RED evidence and is not credited as negative proof.
+- Unchanged native control: `env GOWORK=off GOPROXY=off GOTOOLCHAIN=local perl -e 'alarm 90; exec @ARGV' go test -json -count=1 -timeout=60s ./cmd/machinery -run '^TestVerifyCheckersReproducible$'`.
+  - Actual terminal exit: 0; exact one selected test PASS (0.75s; package 1.055s). Raw JSONL: /tmp/machinery-yig6-supplemental-red.N5Cinq/original-native.jsonl SHA256 10cdad4c9eef2714fe24c37a899b5e43c226116aadaba1b6a712ed56ee849efa; stderr empty SHA256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855; exit file SHA256 9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa.
+
+### Static/TDD checks
+- `gofmt -d cmd/machinery/checker_fixture_helper_red_test.go`: no output.
+- `pvg verify cmd/machinery/checker_fixture_helper_red_test.go --include-tests --format text`: `VERIFY: PASSED (1 files scanned, 0 issues)`.
+- `pvg story verify-tdd --range c59c89de31c7f1268a220caf0fa0d67a8e166d0f..ac439c517de169addb68637c50040a9434bc8cca --json`: commits_checked=1, red_marker=tdd-red, violations=null.
+- Initial `pvg verify ... --format=text` was rejected by this installed CLI; `pvg verify --help` confirmed the supported spelling is `--format text`, which passed above. No source/test change resulted.
+
+### AC map (this phase only)
+- [x] Supplemental RED gate: exact 147 bytes committed on frozen helper baseline; expected two behavioral baseline failures reproduced with raw streams/exit.
+- [x] Original native unchanged control: selected TestVerifyCheckersReproducible passes.
+- [ ] AC1-AC5 GREEN/final: helper patch, prospective44, covered-success/profile proof, Darwin/Linux final execution, and independent acceptance remain pending and were not attempted.
+
+LEARNINGS:
+- The baseline RED isolates both ambient and persisted Go coverage configuration contamination without an implementation seam.
+- `processcontrol.Run`-derived child failure classification is deliberately strict: a frozen child exit 0 is rejected, rather than treated as a substitute for the expected compiler failure.
+- This phase preserves the immutable 246-line original RED and the existing helper byte-for-byte; no Docker, installed binary, remote, service, preflight, or coverage-policy action occurred.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Supplemental RED commit ac439c517de169addb68637c50040a9434bc8cca contains only the exact approved 147-line test; protected frozen hashes verified.
+- Required native bounded RED exit=1 and unchanged control exit=0 are recorded above with raw paths/hashes.
+- TDD verifier and supported static verification pass; no GREEN or PM transition performed.
+
+### proof
+- [x] Supplemental RED: baseline behavioral defect and missing-helper behavior are expressed in committed exact tests.
+- [x] Frozen original test/helper identity preserved.
+- [ ] GREEN/final requirements: explicitly pending independent supplemental freeze and later authorized phase.
