@@ -1,19 +1,20 @@
 ---
 id: MAC-wi5z
 title: "Require active oracle discovery evidence — compliant successor to MAC-sh60"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 parent: MAC-ui8a
 created_at: 2026-09-06T16:33:51Z
 created_by: ramirosalas
 updated_at: 2026-09-06T23:26:04Z
-content_hash: "sha256:91a2a677e3c97d7d07fb123cb1ae5907dcf533c964771e65586532af4fa97693"
+content_hash: "sha256:ffa328198f5684add3af0ce0f0d445a196164e8ed80fc2e36d18c02676192672"
 labels: [hard-tdd, accepted]
 follows: [MAC-sh60, MAC-hgz1]
-blocks: [MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-hgz1]
 assignee: dev-MAC-wi5z
+closed_at: 2026-09-06T23:26:04Z
+close_reason: "Accepted: active oracle discovery evidence enforced; compliant successor to MAC-sh60 complete; merged to local epic"
 ---
 
 ## Description
@@ -131,10 +132,12 @@ status: new
 - 2026-09-06T20:22:41Z dep_removed: was_blocked_by MAC-hgz1
 - 2026-09-06T20:23:32Z status: open -> in_progress
 - 2026-09-06T20:23:32Z auto-follows: linked to predecessor MAC-hgz1
+- 2026-09-06T23:26:04Z status: in_progress -> closed
+- 2026-09-06T23:26:04Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-06T23:26:04Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-hgz1]]
 - Follows: [[MAC-sh60]], [[MAC-hgz1]]
 
