@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:44:51Z
-content_hash: "sha256:9112d023322b6a6a898b337c1cbed4abf2d24f18cca72b514a023fb7eb906cd4"
+updated_at: 2026-09-06T05:46:06Z
+content_hash: "sha256:f0a5857414b45d071119aa5474792756b9f3da010ff686450e50c364149ce1cc"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -2258,3 +2258,19 @@ status: in_progress
 - [ ] AC #3: four existing fixture conflicts have an externally demonstrated construction; PM must adjudicate exact patch and forward hgz1 boundary.
 - [ ] AC #4: prior held-root/hook/race proof retained; existing unrelated platform skip remains unresolved.
 - [ ] AC #5: prior composed renderer/CLI observations retained; final same-SHA verification and independent source closure remain mandatory.
+
+### 2026-09-06T05:46:06Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Sr PM source-supported CONDITIONAL scope/cost update, coordinated with sole independent PM who confirmed technical replay but held exact application until serialization. Current51454e0 remains14paths/3397changed. Exact UNAPPLIED patch ae6e9241ea5d7b0c4556b2ee02c6e2910b2663c2452761e7984f1c6663252971 adds65/0 solely in copyTree36 and obligationParentFixture29; conditional total16paths/3462changed. Two exact conditional PRODUCES now match later hgz1 CONSUMES. Five AC unchanged. Separate explicit PM TEST-EDIT AUTHORIZED disposition is still required; no authoring/application/delivery/approval by SrPM. Accepted initial construction/full13-caller blast/input/acceptance evidence passes forward to hgz1, never a reverse dependency.
+- Proven guarded pvg nd edit used exclusive-lock editor and apply_patch only, fullraw expected header/body + external exacttext trial + exactpostreadback; all prior Notes/History/Links/Comments and metadata retained except normal hash/time. Original story AC compared byte-exact. Source/proposal read complete; no product/test/example mutation or Paivot runtime/build/test dependency.
+- Scoped lint37issues/0errors/0review; cyclesnone; globalRTM37stories19closed0extracted requirements. Structural results only, not epic completion or AC proof. Claims/status/labels/dependencies unchanged. External preservation manifests /tmp/machinery-private-fixture-serialization.clhWCS.
+
+### proof
+- [ ] AC #1: Scoped v2/current/plan/history observations supplied; final review/replay pending.
+- [ ] AC #2: Full scope/hash inventory observations supplied; final same-SHA proof pending.
+- [ ] AC #3: No-grandfathering remains fixed; exact conditional two-helper amendment awaits separate PM disposition.
+- [ ] AC #4: Real capability/race history retained;13-caller proof and all broader obligations require final candidate review.
+- [ ] AC #5: CLI/Render/history distinction observations retained; no delivery or acceptance granted.
