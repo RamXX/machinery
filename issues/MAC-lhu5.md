@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:56:54Z
-content_hash: "sha256:c9e8e22f7bd55389e4e941fde2368cf6eed510a741a4e65d3282e3eadb739343"
+updated_at: 2026-09-06T05:57:12Z
+content_hash: "sha256:0b64a32c9ce9e58cf5e3337d0a905a27d6f8f94e9b4051d65a164df9c2aeb3f4"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
@@ -176,4 +176,21 @@ status: new
 - [ ] AC #3: complete prospective FSM obligations without invented M3 machine.
 - [ ] AC #4: real positive/negative semantic handoff proof.
 - [ ] AC #5: honest design checks and exact packet hash handoff.
+
+
+### 2026-09-06T05:57:12Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Pre-RED checkpoint only: /tmp/MAC-lhu5-method.A1so4U/PROPOSAL.md,299lines,SHA2561dd258d9b228e68e5b6bf8763653a591469c07264d56852a5d9b187f89668886. Exact source-backed gap inventory and proposed semantic witnesses await independent method/technical review.
+- No tests,packets,source,goldens,evidence,installed assets or remote changed. Clean story/MAC-lhu5 HEAD70652b948bf090008b1965c85daf36ea374daea4. No tests/builds or gates run; no RED/delivery/acceptance claim.
+- Append-notes readback placed new checkpoint before an older status:new Notes block. This final append-only comment makes authoritative latest contract in_progress without canonical body repair. Root routes independent review; developer stops and retains claim.
+
+### proof
+- [ ] AC #1: Complete source-consistent local packet contracts pending.
+- [ ] AC #2: Numerical decisions and optimizer obligation proof pending.
+- [ ] AC #3: Full prospective FSM next-state/action obligations pending.
+- [ ] AC #4: Approved packet-input controls and independent handoff review pending.
+- [ ] AC #5: Real isolated checks,golden accounting and old/new hash handoff pending.
 
