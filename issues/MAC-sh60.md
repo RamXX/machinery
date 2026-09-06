@@ -1,19 +1,20 @@
 ---
 id: MAC-sh60
 title: "Require executable oracle coverage evidence"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:13:22Z
-content_hash: "sha256:2fc50847573230076bdd8236ea52325a6ebd69016713e157728f58da50bcb8ba"
-blocks: [MAC-vx24, MAC-ou97]
+updated_at: 2026-09-06T19:21:16Z
+content_hash: "sha256:1f45a591fc4bbda761c2009ea5b37f606162ba78d25c6ed87d788dba53403f99"
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
 led_to: [MAC-wi5z]
+closed_at: 2026-09-06T19:21:16Z
+close_reason: "Superseded by MAC-wi5z (compliant successor): mechanical hard-TDD audit failed — later commits modified existing test files without required authorization markers; behavioral passes did not cure the audit failure. History/branch preserved; not accepted. Successor owns internal/gates/oraclecov.go + tests after accepted MAC-hgz1."
 ---
 
 ## Description
@@ -942,10 +943,12 @@ status: in_progress
 - 2026-09-06T00:42:45Z status: in_progress -> open
 - 2026-09-06T00:50:04Z status: open -> in_progress
 - 2026-09-06T00:50:04Z claimed by dev-MAC-sh60
+- 2026-09-06T19:21:16Z status: in_progress -> closed
+- 2026-09-06T19:21:17Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-06T19:21:17Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-vx24]], [[MAC-ou97]]
 - Follows: [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]]
 - Led to: [[MAC-wi5z]]
 
