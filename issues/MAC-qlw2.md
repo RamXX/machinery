@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:45:29Z
-content_hash: "sha256:000513b67cd8740d37d9b2692d2774b99907e1d71ccfe17ff2f3e88f52960b4c"
+updated_at: 2026-09-06T12:05:48Z
+content_hash: "sha256:8de87b773eb1cd60d63b289cc6f5d6c81cd524df91035f9853547ae5cc41dfaa"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0]
 assignee: dev-MAC-qlw2
@@ -216,4 +216,29 @@ status: in_progress
 ### proof
 - [ ] AC #1–5: exact method approval, implementation, adversarial calibration and required native proof remain pending.
 - [ ] AC #6: producer same-binary helper plus real scope API consumer conformance remains required; downstream normal CLI wiring is not this producer's acceptance claim.
+
+
+### 2026-09-06T12:05:48Z ramirosalas
+APPROVED ARCHITECTURE / PUBLICATION HOLD
+
+Terminal V4 architecture is approved with BLOCKING none: proposal SHA256 `d56d0104e965cace70e89b3be383ff3f51377c33ea8227c86833ef731be331be`; independent review SHA256 `dfa09b70d599a83d8cde10ab31d19fe5debd1eadf4c19f86c3aea79c0a9ac1e3`. No fourth architecture review is requested. MAC-p9wm is the new docs-only P0 owner for the standalone public native-custody contract and minimum accepted-contract companion notice; MAC-qlw2 now depends on its accepted publication before source or RED work.
+
+CONSUMES:
+- MAC-p9wm: docs/native-custody-contract.md
+  schema: accepted public constructors/types, acquisition-versus-work lifetime, opaque handle/sanitation/cumulative-budget rules, Docker runtime descriptor/private client, finite contributor/checker profiles, conservative unresolved-create cleanup, and live-first proof/trust contract.
+- MAC-p9wm: docs/test-assurance-contract.md
+  source: accepted companion/refinement link preserving the original 575-line body outside its minimum insertion.
+
+This checkpoint does not name future authors, freeze an exact RED inventory, authorize source/tests/calibration variants, claim native proof, or alter the existing claim. Required native Linux amd64 and Darwin arm64 delivery evidence remains unproved. All qlw2 source/test authority stays held until publication acceptance and the separately required exact before-RED inventory/actor review.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- MAC-p9wm added as an explicit blocker while the existing `dev-MAC-qlw2` claim remains intact.
+- V4 approval and publication prerequisite recorded without source/test/runtime/ref mutation.
+
+### proof
+- [x] Approved architecture is identified without requesting another architecture loop.
+- [ ] Public contract acceptance, exact author/inventory gate, implementation, and native proof remain pending.
 
