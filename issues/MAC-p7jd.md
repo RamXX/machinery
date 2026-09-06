@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:27:48Z
-content_hash: "sha256:984902e559a9e7ef213ccf72536e89d48cf897d058599964875fb6b693a36715"
+updated_at: 2026-09-06T03:28:54Z
+content_hash: "sha256:7c0f4f550a58195229fe55b0c990e770dd73b6ff07905e997b228e40601c8395"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36]
@@ -1815,3 +1815,23 @@ status: delivered
 - [x] RED AC #4: negative/positive scope and custody contracts frozen; C fault execution and approved new API supplements remain mandatory in GREEN.
 - [x] RED AC #5: actual baseline CLI integration and explicit same-revision AC5 composition limits recorded; renderer late faults, new CLI behavior and final wiring review remain mandatory in GREEN.
 
+
+### 2026-09-06T03:28:54Z ramirosalas
+## nd_contract
+status: new
+
+### evidence
+- Independent PM RED APPROVED at 2026-09-06T03:27Z. Proper `pvg story approve-red MAC-p7jd` succeeded; readback is open with hard-tdd, red-approved, no delivered/accepted label; assignee dev-MAC-p7jd retained. This returns the story for GREEN, never accepts/closes it.
+- Full independent PM report appended to Notes and retained at /tmp/machinery-p7jd-pm-red.fnQSrl/PM-RED-REPORT.md SHA25629d563f703679534f25cdd68cbb122e02918d826deb0f4ecfdaaec515d5a7590. It contains exact source review, author/independent hashes, all AC mapping, native leaf inventory paths, cause matrix, actual timings and mandatory supplements. Candidate47ba44906a09bc2fa010092a86b133d0d749c52c is tests-only against a82277af5650b487cea1260c24ffcc1c86d69d8d; exact repair-only authorization audited; original7ec5d609 retained.
+- Independently replayed complete scoped RED:189 leaves,47 pass,142 fail,0 skips; starts/terminals201/201. Gates133/31pass/102fail(7.929s); CLI28/11/17(4.390s); hook28/5/23(4.380s); designlock0(0.667s, no-tests warning, NO capability proof). Exactly24 A real false-acceptance failures,8 D compatibility controls,26 B interface/diagnostic failures,92 C-family control-unavailable cases. No v2/late fault execution credited;16 B schema mutations also unreached. No setup/compiler/import/runtime/timeout failure. Coverage percentage NOT MEASURED.
+- Independent verify-tdd PASS2commits/0skipped merges, no unauthorized edits. verify-delivery9/9shape only; full source/assertion review done independently. All native names/outcomes match author inventory. Five frozen SHA256: internal/gates/attest_implementation_test.go=fcae6e3a9dc66d8fb9abb1d151129604f59a3e38d9ac221d4f16ce91a8086260; internal/gates/attest_test.go=f0eef53c28fdf940654700832887f2c326a478c5df1d741ae9f538a3d24db253; cmd/machinery/attest_test.go=beb2d58af4d3144316f3789c3b7cbb726a4761af57ea85f0017297b9c24cd6cd; cmd/machinery/attest_implementation_test.go=e02ad18fe2745d23f05e69ce1e01dd2b1be358f94d99cb3a215b14f6e2cee3b8; internal/hook/attestation_snapshot_test.go=a3c088c095e2dba4379f548903a058eedbd5338ef872e507ab12edaa1ca06e49.
+- Required GREEN: all frozen bytes unchanged/all tests pass; actual C valid controls and challenge reachability; new designlock held-root/topology/identity/copy/budget/overlay/per-file proof and suite wrapper/renderer supplements via only previously authorized seams/new files. Complete fixture has reached first unknown --design only: later full --complete success/sole-warning isolation must be demonstrated, not assumed. No further frozen or example/golden repair authorization.
+- Same final GREEN revision must supply OBSERVED RenderAttestation actual late original mutation/real owned-cleanup failures returning nil bytes with fired/no-fault controls and concrete causes; OBSERVED built CLI full generation success and actual ordinary renderer-input/alias error exit1/empty stdout; REVIEWED exact delivered CLI->renderer->Release/errorjoin->output/defer/exit closure. Late CLI result COMPOSED; independent standalone late injection UNOBSERVED; individual OS Close errors UNFORCED; output-sink partial-write limit separate. All five AC/R2/AC5 and13required/optional14path ownership preserved; forecast2710–3310 is not permission to trim proof.
+- Own detached checkout is clean at47ba449; all review test/child/build processes terminated. Main clean and installed binary remains SHA2565205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849. No production/test/docs edits by PM; no developer worktree action, remote, preflight, service/container or installed asset change.
+
+### proof
+- [x] RED AC #1: complete-scope independent digest/topology/forgery/mutation bar frozen; actual implementation and new capability supplements owed in GREEN.
+- [x] RED AC #2: closed plan/current/history and warning/complete proof contracts reviewed; future v2/history/complete controls and docs owed.
+- [x] RED AC #3:24 real existing-interface false-acceptance failures independently observed with8 passing D controls and explicit migration assertions.
+- [x] RED AC #4: real lifecycle/filesystem/hook challenge assertions reviewed with exact control/firing/safety requirements; unexecuted mutations explicitly not credited.
+- [x] RED AC #5: real baseline CLI A/D observed; full same-GREEN renderer/process/source-closure conjunctive bar preserved. Product acceptance remains pending.
