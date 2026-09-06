@@ -1,10 +1,7 @@
-// tokens-equal: the token-identity proof as an artifact. The hard-TDD
-// protocol allows an owner-sanctioned formatting-only amendment to a locked
-// file only when it carries a token-identity proof; until now no tool could
-// produce or verify one, so the proof was a claim. Two files are
-// token-identical exactly when their whitespace-delimited token streams are
-// equal: reflow, indentation, and blank lines are formatting; any other
-// change is content and refuses the proof.
+// tokens-equal compares whitespace-delimited token streams using strings.Fields.
+// Equal streams can have different program meaning: whitespace inside quoted
+// literals and indentation can matter. Equality does not establish a
+// formatting-only change or authorize edits to frozen tests.
 package main
 
 import (
@@ -19,7 +16,12 @@ import (
 func newTokensEqualCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "tokens-equal <old-file> <new-file>",
-		Short: "Prove two files are formatting-only variants (equal whitespace-delimited token streams)",
+		Short: "Compare two files' whitespace-delimited token streams",
+		Long: "Compare two files' whitespace-delimited token streams.\n\n" +
+			"Whitespace inside quoted literals and indentation can change program meaning\n" +
+			"even when these token streams are equal. Equality does not prove a formatting-only\n" +
+			"change or authorize edits to frozen tests.\n\n" +
+			"Exit status: 0 for equal token streams; 1 for different streams or a file read error.",
 		Args:  cobra.ExactArgs(2),
 	}
 	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
@@ -77,7 +79,7 @@ func tokensEqualRunTo(oldPath, newPath string, stdoutW, stderrW io.Writer) error
 			which, len(longer)-limit, at+1, tokenContext(longer, at))
 		return commandExitBecause(1, fmt.Errorf("token counts differ: %d vs %d", len(oldToks), len(newToks)))
 	}
-	fmt.Fprintf(stdoutW, "token-identical: %d tokens; the change is formatting-only\n", len(oldToks))
+	fmt.Fprintf(stdoutW, "token-identical: %d tokens; equal whitespace-delimited token streams only; no semantic equivalence or frozen-test edit authorization\n", len(oldToks))
 	return nil
 }
 
