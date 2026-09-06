@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:19:43Z
-content_hash: "sha256:40f5ede4e88d1b99bf6d7b79e73bbdb99792df892e16a761267351a35a82a3ec"
+content_hash: "sha256:b059cf744c1343ecc24075dba62f2ca2ab744af5af5672f1d8fba01166df6284"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36]
@@ -861,6 +861,18 @@ Review evidence/limits:
 - Graph index_status/search_graph identified Config/Load and copyDirInto; coverage generation 2026-09-06T02:42:16Z reports best-effort metadata_match/no_recorded_issue for internal/hook/hook.go and cmd/machinery/golden_test.go. No claim of exhaustive graph proof.
 - Exact git show 7ec5d609 of both frozen test files and their readonly Config/decodeConfig/Load/copyDirInto dependencies; exact file hashing and raw JSONL hashing/leaf extraction above. Source inspection of the tests supplies cost evidence, not acceptance.
 - Main remained clean at 497419ab4512fcff765cd5feb27aed4c67b5608d; observed epic 70652b948bf090008b1965c85daf36ea374daea4. PM used committed refs, not the developer worktree. No PM source/test/docs edits, execution replay, installed asset change, remote mutation, full preflight or status transition.
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-05.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
+
 ## Implementation Evidence
 
 PROOF: RED-only delivery for MAC-p7jd. Product implementation and AC acceptance are NOT complete. Independent PM replay/approval and all GREEN proof remain pending.
