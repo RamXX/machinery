@@ -1,17 +1,19 @@
 ---
 id: MAC-p9wm
 title: "Publish standalone native custody contract"
-status: open
+status: in_progress
 priority: 0
 type: task
 labels: [docs]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:10:20Z
-content_hash: "sha256:982b8bb1691a48dffaa6ef68122aafa87b1c566b3452c0b4346014efbc18820e"
+updated_at: 2026-09-06T12:12:01Z
+content_hash: "sha256:3680bda1d330ac984e2b795b554b761e6fcff5d6ac0d90d05e603f00388a237a"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
+assignee: dev-MAC-p9wm
+follows: [MAC-l7m0]
 ---
 
 ## Description
@@ -329,11 +331,15 @@ status: new
 - 2026-09-06T12:04:53Z dep_added: blocks MAC-qlw2
 - 2026-09-06T12:04:53Z dep_added: blocks MAC-vx24
 - 2026-09-06T12:04:53Z dep_added: blocks MAC-ou97
+- 2026-09-06T12:12:01Z status: open -> in_progress
+- 2026-09-06T12:12:01Z auto-follows: linked to predecessor MAC-l7m0
+- 2026-09-06T12:12:01Z claimed by dev-MAC-p9wm
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-qlw2]], [[MAC-vx24]], [[MAC-ou97]]
 - Related: [[MAC-l7m0]]
+- Follows: [[MAC-l7m0]]
 
 ## Comments
 
