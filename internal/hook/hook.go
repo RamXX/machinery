@@ -1318,7 +1318,12 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		selWarn += mix
 	}
 	if len(sel.Run) == 0 {
-		if err := snapshot.CheckUnchanged(); err != nil {
+		if observer, ok := w.(interface {
+			beforeAttestationFinalization(*gates.Snapshot, []*gates.Gate)
+		}); ok {
+			observer.beforeAttestationFinalization(snapshot, nil)
+		}
+		if err := errors.Join(snapshot.CheckUnchanged(), snapshot.Release()); err != nil {
 			return emitJSON(w, stopOut{Decision: "block", Reason: "machinery design changed while the empty gate decision was being derived; retry the stop: " + err.Error()})
 		}
 		if err := clearCheckedState(root, in.SessionID, state.revision); err != nil {
@@ -1340,7 +1345,18 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 	// A stop-time run binds no commit: the working tree is mid-change and the
 	// commit under review does not exist yet, so Ga states that non-check
 	// rather than guessing. CI passes --commit and stays the outer wall.
-	for _, g := range snapshot.RunSelected(implDir, sel, gates.RunOptions{}) {
+	run := snapshot.RunSelected(implDir, sel, gates.RunOptions{})
+	armed := fileExists(filepath.Join(sourceDesignDir, "ratchet.json"))
+	left, waveStale, waveActive := waveSentinel(sourceDesignDir)
+	if observer, ok := w.(interface {
+		beforeAttestationFinalization(*gates.Snapshot, []*gates.Gate)
+	}); ok {
+		observer.beforeAttestationFinalization(snapshot, run)
+	}
+	if err := errors.Join(snapshot.CheckUnchanged(), snapshot.Release()); err != nil {
+		return emitJSON(w, stopOut{Decision: "block", Reason: "machinery current review not established; snapshot custody finalization failed: " + snapshot.LogicalError(err).Error()})
+	}
+	for _, g := range run {
 		n := g.Emit(&buf)
 		blocking += n
 		drift += len(g.Drift)
@@ -1355,15 +1371,10 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 	// Before that they warn: blocking a session on pre-existing boundary
 	// debt it did not create invites the model to "fix" the debt by adding
 	// allow rules, which is silent amnesty. Strict mode overrides.
-	armed := fileExists(filepath.Join(sourceDesignDir, "ratchet.json"))
 	shouldBlock := drift > 0 || (g4Blocking > 0 && armed) || (cfg.Strict && blocking > 0)
 	// S10 (wave sentinel): canonical content "open" is the explicit operator
 	// state that defers red gates during a multi-agent wave. Deleting it closes
 	// the wave. No mtime or wall clock participates in the decision.
-	left, waveStale, waveActive := waveSentinel(sourceDesignDir)
-	if err := snapshot.CheckUnchanged(); err != nil {
-		return emitJSON(w, stopOut{Decision: "block", Reason: "machinery design changed while the stop decision was being derived; retry the stop: " + err.Error()})
-	}
 	if shouldBlock {
 		if stale, active := waveStale, waveActive; active {
 			if stale {

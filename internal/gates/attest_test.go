@@ -173,8 +173,8 @@ func TestAttestationMutations(t *testing.T) {
 		},
 		{
 			"wrong version",
-			"attestation_version: 2\nattestations: []\n",
-			"attestation_version must be the integer 1",
+			"attestation_version: 3\nattestations: []\n",
+			"attestation_version must be the integer 1 or 2",
 		},
 		{
 			"empty list",
@@ -382,5 +382,51 @@ func TestAttestationSurvivesDecomposedParentNarrowing(t *testing.T) {
 	}
 	if !strings.Contains(sel.Note, "gv") {
 		t.Fatalf("the narrowing note must list gv: %q", sel.Note)
+	}
+}
+
+// B: these closed-v2 tests compile on the v1 base; its unsupported-version
+// finding is interface absence, not evidence that a schema challenge ran.
+func TestAttestationBV2PlanAndMalformedSchema(t *testing.T) {
+	good := strings.Replace(attestEvidence(attestRowFor("g2.nfr-content")), "attestation_version: 1", "attestation_version: 2", 1)
+	good = strings.Replace(good, "    attestor:", "    kind: plan\n    attestor:", 1)
+	t.Run("accepted-plan", func(t *testing.T) {
+		design, _ := attestFixture(t, good)
+		g := CheckAttestations(design)
+		if len(g.Errs) != 0 || len(g.Warns) != 5 || g.Counts["current implementation reviews"] != 0 {
+			t.Fatalf("B valid v2 plan must be accepted with ordinary partial coverage: errors=%v warnings=%v counts=%v", g.Errs, g.Warns, g.Counts)
+		}
+	})
+	for _, tc := range []struct{ name, from, to, category string }{
+		{"unknown-kind", "kind: plan", "kind: accepted", "GV_KIND"},
+		{"wrong-kind", "kind: plan", "kind: historical", "GV_KIND"},
+		{"unknown-row-key", "kind: plan", "kind: plan\n    verdict: ACCEPTED", "GV_SCHEMA"},
+		{"duplicate-row-key", "kind: plan", "kind: plan\n    kind: plan", "GV_SCHEMA"},
+		{"wrong-version-type", "attestation_version: 2", "attestation_version: '2'", "GV_SCHEMA"},
+		{"wrong-attestor-type", "attestor: Ramiro Salas", "attestor: [R]", "GV_SCHEMA"},
+		{"null-kind", "kind: plan", "kind: null", "GV_SCHEMA"},
+		{"structured-note", "kind: plan", "kind: plan\n    note: {signed: true}", "GV_SCHEMA"},
+		{"structured-comment", "kind: plan", "kind: plan\n    _comment: []", "GV_SCHEMA"},
+		{"implementation-on-plan", "kind: plan", "kind: plan\n    implementation: {}", "GV_SCHEMA"},
+		{"invalid-date", "2026-08-30", "2026-02-30", "GV_SCHEMA"},
+		{"duplicate-root-key", "attestation_version: 2", "attestation_version: 2\nattestation_version: 2", "GV_SCHEMA"},
+		{"cover-path-alias", "path: ARCHITECTURE.md", "path: ./ARCHITECTURE.md", "GV_SCOPE_PATH"},
+		{"cover-duplicate-key", "path: ARCHITECTURE.md", "path: ARCHITECTURE.md, path: ARCHITECTURE.md", "GV_SCHEMA"},
+		{"yaml-alias", "attestor: Ramiro Salas", "attestor: &reviewer R\n    note: *reviewer", "GV_SCHEMA"},
+		{"yaml-merge", "kind: plan", "kind: plan\n    <<: {note: merged}", "GV_SCHEMA"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			design, _ := attestFixture(t, good)
+			if g := CheckAttestations(design); len(g.Errs) != 0 {
+				t.Fatalf("B valid v2 control is INTERFACE_ABSENT; schema challenge not reached: %v", g.Errs)
+			}
+			bad := strings.Replace(good, tc.from, tc.to, 1)
+			_, hash := attestFixture(t, "")
+			mustWrite(t, filepath.Join(design, AttestationsFileName), strings.ReplaceAll(bad, "<ARCH_HASH>", hash))
+			g := CheckAttestations(design)
+			if !hasErr(g, tc.category) || g.Counts["current implementation reviews"] != 0 {
+				t.Fatalf("want %s with no current assurance: errors=%v counts=%v", tc.category, g.Errs, g.Counts)
+			}
+		})
 	}
 }

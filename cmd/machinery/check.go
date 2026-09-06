@@ -20,7 +20,7 @@ func newCheckCmd() *cobra.Command {
 	var commit string
 	var warningsAsErrors bool
 	var complete bool
-	c.Flags().StringVar(&implDir, "impl", "", "implementation directory for G4-import and Gt-tests")
+	c.Flags().StringVar(&implDir, "impl", "", "implementation directory for G4-import, Gt-tests, and Gv current implementation reviews")
 	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,gv,g4,gt,g5")
 	c.Flags().StringVar(&commit, "commit", "", "repository-history anchor for Ga-accept evidence (env MACHINERY_COMMIT; the flag wins)")
 	c.Flags().BoolVar(&warningsAsErrors, "warnings-as-errors", false, "treat every gate warning as a blocking finding")
@@ -39,7 +39,7 @@ func newCheckCmd() *cobra.Command {
 			return commandExit(1)
 		}
 		if complete && implDir == "" {
-			fmt.Fprintln(stderr, "machinery_check: --complete requires --impl so final handoff includes G4-import and Gt-tests")
+			fmt.Fprintln(stderr, "machinery_check: --complete requires --impl so final handoff includes G4-import, Gt-tests, and Gv current implementation reviews")
 			return commandExit(1)
 		}
 		warningsAsErrors = warningsAsErrors || complete
