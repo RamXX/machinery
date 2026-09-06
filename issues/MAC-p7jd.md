@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-05T23:51:29Z
-content_hash: "sha256:6cf035ff038f33c7f007407907687f2142a64895f2ccf8d1c8a94fb90b1eef13"
+updated_at: 2026-09-06T00:05:54Z
+content_hash: "sha256:bb42995fb456a53c04a847da19bb248a79072969f11d24f8b1b5fc43c2ad9a81"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce]
@@ -395,6 +395,74 @@ Supported single-executable EDITOR guarded the exact old canonical Description. 
 Prior canonical Description retained verbatim for append-only decision history:
 <previous_canonical_description>
 SR PM terminal canonical-scope checks: pvg lint --backlog --epic MAC-ui8a PASSED (33 issues; 0 errors, 0 review findings); pvg nd dep cycles reported no cycles; pvg rtm check --epic MAC-ui8a PASSED (18 stories, 2 closed; 0 tagged requirements extracted/0 uncovered, so this is structural coverage only, not product AC proof). Canonical readback matched approved embedded contract and all five original AC byte-for-byte; original Description retained in append-only notes. Pending independent PM test-edit/seam authorization; no approve-red or queue advance performed.
+PRE-RED PM EXACT TEST-EDIT / SEAM AUTHORIZATION — MAC-p7jd — 2026-09-05
+
+Verdict: AUTHORIZED ONLY FOR THE BOUNDED USES BELOW. This is independent pre-RED authoring authorization, not approve-red, GREEN dispatch authorization, delivery, acceptance, architecture replacement, or a waiver of proof. Keep in_progress, hard-tdd, assignee dev-MAC-p7jd and the healthy retained worktree/claim. Architecture revision 2 SHA256 8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179 and its five AC remain authoritative.
+
+TEST-EDIT AUTHORIZED: internal/gates/attest_test.go — only TestAttestationMutations case "wrong version": change the evidence version from integer 2 to integer 3, and replace expected diagnostic "attestation_version must be the integer 1" with "attestation_version must be the integer 1 or 2". This preserves rejection of unsupported versions while permitting the approved closed v2 schema. Add separate new accepted-v2 plan and malformed-v2 schema tests in this owned file, scoped to the canonical closed v2 contract (real existing attestFixture/design files and CheckAttestations; no new API references). The valid control must actually accept a well-formed v2 plan row; malformed fixtures must assert their particular schema/kind failure and no current success, not any-error. Record/freeze their exact discovered leaf names. All other cases, helper definitions, existing assertions and existing tests in this file remain unchanged.
+
+TEST-EDIT AUTHORIZED: cmd/machinery/attest_test.go — only TestAttestRejectsIdentityAliases: replace the os.Link setup failure t.Skipf("hard links unavailable: %v", err) with t.Fatalf("create required hard-link alias fixture: %v", err). Keep actual os.Link, real CLI invocation, exit 1, empty stdout and "alias the same file identity" assertions unchanged. This selects the mandatory existing-case amendment, not an alternative new alias case. Setup failure is an infrastructure/setup failure, never passing, skipped, or behavioral RED.
+
+Carry [test-edit-authorized] in each commit subject containing either existing-test amendment; the frozen RED commit also needs the normal tdd-red marker. This authorizes no later GREEN edits to frozen files. Other existing tests, including six-g2/count/coverage controls, explicit-file custody, determinism_hardening tests, failclosed_io tests, accept.go/accept_test.go and predecessor tests remain unchanged absent a further named review.
+
+SEAM 1 — AUTHORIZED EXISTING-API FROZEN TESTS:
+In new internal/gates/attest_implementation_test.go, use AcquireSnapshot, RunSelected, TrackExternal, CheckUnchanged, DesignPath and Release directly. No new seam is required for these tests. Pair valid unchanged v2 current scope with each actual owned filesystem operation after RunSelected and before Release: original subject content mutation; original root rename/replacement; separately tracked external-file mutation while held strict design/impl inputs remain unchanged; observed CheckUnchanged failure followed by exact byte restoration. Assert zero public current-review/file/scope success counts while provisional, publish only after successful Release, suppression after each failure, latched error despite restoration, logical paths, same final disposition on repeated Release, no resurrection, repeated pre-release runs retaining all pending results, and fail-closed use after release. No mutation may be silently credited if the v2 unchanged control fails first. These are B/C on base as applicable, not additional A proof. Real original/root mutations must remain confined to test-owned fixtures with matched no-mutation controls.
+
+SEAM 2 — AUTHORIZED EXACT HOOK WRITER INTERFACE:
+In owned internal/hook/hook.go, an unexported optional interface on the existing io.Writer may have exactly:
+    interface { beforeAttestationFinalization(*gates.Snapshot, []*gates.Gate) }
+Invoke it exactly once on each successful acquisition/selection path reaching stop finalization, after collecting gate/ratchet/wave facts, immediately before the final CheckUnchanged plus explicit Release, before rendering/tallying/policy/wave deferral/clearCheckedState/non-blocking output. On the empty-selection path pass nil gates and invoke before that branch's finalization and state clear. Early already-blocking error exits need not invoke it. Ordinary writers do nothing; no public config, flag, environment fault switch or production fault verdict is added.
+
+New internal/hook/attestation_snapshot_test.go may implement this method in a recording writer in package hook, so frozen tests compile before the interface exists. The method may record firing, inspect provisional gate values and mutate a precisely identified actual fixture file or owned private-copy file; it cannot alter Gate fields, return an error/verdict, call Release recursively, skip normal checks, replace the snapshot, or manufacture success/failure. Require a B mandatory-fired test (base absent callback = INTERFACE_ABSENT) and C tests that first establish a valid unchanged finalized v2 control, then challenge the same setup. Original-file mutation and private-copy regular entry replaced with a symlink are approved operations. Private-copy paths must be obtained from the actual snapshot DesignPath and validated as below, not discovered by broad temp globs. Assert exactly one block JSON, no preceding allow/non-block JSON or output, retained touched ledger, zero published current counters/positive current notes and logical-path diagnostics. Cover actual Stop and SubagentStop, strict=false, strict=true and open-wave policy, plus empty-selected-gate finalization. Preserve semantic warning/wave no-fault outcomes. For a successful no-fault fixture the existing configured behavior and ledger-clear expectation must be demonstrated; a wave-deferred semantic-error control follows the existing ledger retention policy instead of inventing a clear requirement.
+
+SEAM 3 — AUTHORIZED GREEN-SUPPLEMENTAL FIRST RELEASE CALLBACK:
+Only internal/gates/suite.go may add:
+    var attestationBeforeFinalRelease = func(*Snapshot) {}
+Invoke only on the first Release before its final validation/cleanup; repeated Release must return its already-latched disposition without callback, revalidation or refinalization. This callback cannot return or directly inject an error/verdict, mutate Gate/pending/custody fields, replace handles or call Release recursively. Tests may inspect state and perform actual original-file mutation or the reviewed private-copy symlink cleanup fault. Install, count firing and restore the prior callback with cleanup; no parallel tests or goroutines may race the package global.
+Tests referencing this new variable belong only in optional new internal/gates/attest_green_test.go, reported as supplemental GREEN proof and its file/LOC cost. Exercise SelectRunAndNote, package RunSelected, CheckAttestationsWithImplementation and RenderAttestation with matched fired no-fault controls. Require correct joined error propagation, suppression/finalized counts, logical paths and RenderAttestation nil bytes. For the cleanup case require the concrete private-snapshot cleanup cause from the actual operation, not merely an earlier generic validation error. New-variable compilation failure is never baseline RED.
+
+SEAM 4 — AUTHORIZED NEW CAPABILITY COPY/BOUND TESTS:
+Reuse, without editing designlock.go or its existing tests, existing testAfterSnapshotCopyReadChunk func(string) from new internal/designlock/attestation_snapshot_test.go. Arm only after unrelated AcquireReader preparation; match the exact owned target label/path passed into copySnapshotFile; count the first real chunk and mutate actual original file bytes or rename/replace the original fixture root. Use a nonempty file large enough to witness the intended read, explicit fired assertions, deterministic operations and a same-callback no-fault control. No timing lottery, fake reader/FileInfo/verdict, or success conditional on hook absence. Tests referencing new MaterializeAttestationTree/types are GREEN supplemental. Existing-symbol frozen cases may be authored only when they prove the stated old interface behavior and compile on base; they cannot be relabeled strict new-capability proof.
+
+Only NEW internal/designlock/attestation_snapshot.go may additionally declare:
+    var newAttestationSnapshotBudget = func() snapshotBudget {
+        return snapshotBudget{maxEntries: snapshotInventoryMaxEntries, maxBytes: snapshotAggregateMaxBytes, maxDepth: snapshotInventoryMaxDepth}
+    }
+The exact production defaults remain 100000 entries, depth 64, 1 GiB regular-file cap and 8 GiB aggregate. Tests may temporarily lower only returned maxEntries/maxBytes/maxDepth, restoring the factory and using no parallelism; production exposes no user override. One budget spans each complete logical inventory pass including overlays, never reset per directory/row/overlay. Real small trees must exercise entry, aggregate and depth at-limit and limit-plus-one, including a combined overlay case that would incorrectly pass if budgets were reset. Use actual filesystem FileInfo and byte reads. The fixed per-file cap remains tested with an actual oversized sparse file; never fake size metadata. Boundary tests are supplemental GREEN and report the actual limits exercised: lower-budget boundary tests do not mean an actual 8 GiB tree was hashed. Generic designlock.go, external_snapshot.go, source_snapshot.go, snapshot_inventory.go and helpers remain read-only.
+
+PRIVATE-COPY FAULT SAFETY FOR SEAMS 2/3:
+Run destructive owned-copy cases in a helper test process with TMPDIR set to one unique parent-owned test directory before any acquisition. This is test-process temp isolation, not a production fault env switch. Validate the candidate copy belongs strictly beneath that directory, differs from original fixtures, and is the actual returned copy; modify only a known regular entry into a symlink targeting another owned sentinel fixture. Do not follow the symlink or touch arbitrary temp trees. Capture/verify the real cleanup error, preserved external sentinel and output/count/ledger outcome. Child exit closes retained handles; parent cleans only its unique owned tree. Matched helper-process no-fault control is mandatory. No tests run against the retained dev worktree, installed assets, shared vault or user files.
+
+EVIDENCE STAGING AND LIMITS:
+A remains mandatory existing-interface behavioral assertion failure: each of the three legacy behavioral claims falsely accepted by base, with independent unchanged/mutated cases requiring the final GV_MISSING_IMPLEMENTATION_SUBJECT contract. D remains mandatory passing base compatibility controls. B unsupported version/flags/missing callback and C mutation stages not reached after failing valid-v2 controls must be reported as INTERFACE_ABSENT / NOT YET EXERCISED, not staleness/custody proof. Final replay must reach both C legs and keep all frozen bytes unchanged. No skip-if-missing or accept-any-error.
+
+These seams do not force an OS root-handle/filelock Close error; the canonical allows actual owned cleanup failure as the alternative lifecycle fault. Report the unforced OS close boundary honestly; do not invent a need to force every close primitive.
+They also do not independently inject a late-release fault into the standalone CLI executable. Actual CLI generation/check changed-implementation/history/alias/ordinary-error and empty-stdout tests remain mandatory. RenderAttestation nil-bytes fault proof, CLI adapter source inspection and actual CLI other-error proof are compositional evidence, not a directly observed CLI late-release exit.
+Before approve-red, resolve the exact canonical AC5 matrix wording "final check/close failure -> exit 1 and empty stdout": if it intends composed shared-renderer fault plus CLI wiring/process proof, record that bounded clarification; if it intends independent CLI late-release injection, the author must propose the exact additional seam for review. This authorization neither silently waives that wording nor invents a production environment switch or wider ownership. It does not block the now-authorized bounded RED authoring.
+
+Evidence reviewed (read-only):
+- pm_acceptor and codebase-memory skills read fully. pvg nd show MAC-p7jd --json read all 485 Body lines in pages; shared tracker status in_progress, hard-tdd, assignee dev-MAC-p7jd, parent MAC-ui8a.
+- shasum -a 256 /tmp/machinery-attestation-contract.jODZpc/PROPOSAL.md matched approved SHA above.
+- Graph list_projects/index_status/schema/search_graph (74 results, has_more false), trace_path AcquireSnapshot both directions depth 1, exact get_code_snippet, and check_index_coverage. Generation 2026-09-05T23:58:53Z, best-effort metadata_match/no_recorded_issue for eight main paths; guessed internal/designlock/scale.go reported missing and exact git tree confirmed it does not exist. Relevant bounds are in snapshot_inventory.go/designlock.go; no nonexistent source relied upon.
+- Exact git show epic/MAC-ui8a for suite.go, hook.go, attest tests, CLI attest.go, private_snapshot.go, snapshot_inventory.go, source_snapshot.go, external_snapshot.go, designlock.go and snapshot_bounds_test.go. git rev-parse HEAD epic/MAC-ui8a: main 497419ab4512fcff765cd5feb27aed4c67b5608d, epic 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff --name-only a82277a..epic/MAC-ui8a showed only subsequent unrelated baseline/docs/gates/regeneration files; exact proposed seam/test files unchanged from RED base. Main-vs-epic suite differences are accepted parent-owned Gt selection, preserved.
+- Source confirms existing callback is after first actual chunk write; actual private cleanup rejects symlinks; current hook renders/checks and clears/emits before deferred Release; cargo callback is before gate evaluation and ledger callbacks are other boundaries.
+- pvg notes search machinery attestation returned no additional context. No test/build run, source/test/docs edit, retained worktree change, installation, network mutation or workflow transition performed. This review authorizes future testing; it supplies no executed behavioral AC proof.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent PRE-RED PM exact two-test amendments and four bounded seam/use decisions recorded above after canonical and exact source review.
+- Claim, hard-tdd, parent and status intentionally retained; A/B/C/D execution, frozen RED review and all GREEN implementation proof remain pending.
+- Standalone CLI late-release proof wording requires explicit interpretation before approve-red; OS close unforced boundary disclosed, actual cleanup alternative authorized.
+
+### proof
+- [ ] AC #1: complete scope/inventory binding requires frozen RED and GREEN proof
+- [ ] AC #2: closed plan/current/history semantics require behavioral replay
+- [ ] AC #3: legacy migration requires A failures on base and D compatibility controls
+- [ ] AC #4: approved real mutation/custody/lifecycle cases require reached final proof
+- [ ] AC #5: actual CLI/history/hook behavior and accurate limits require final replay
+
 
 ## USER INTENT
 Strengthen Machinery mission-critical assurance with observable fail-closed behavior and precise limits.
