@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T05:37:21Z
-content_hash: "sha256:c045ea6544365153b2449c30738b3fdff72746adeca038f875912bff620616e7"
+content_hash: "sha256:17236940b63fd5a10e94391015e00d1387b38530b75a0555b6858a063871bd0e"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -2233,3 +2233,22 @@ status: in_progress
 - [ ] AC #3: No-grandfathering retained; four broader fixture leaves require exact independently reviewed repair.
 - [ ] AC #4: Capability/race observations supplied; broader fixture/platform-skip resolution pending.
 - [ ] AC #5: Render/CLI observations and composed source closure preserved; independent review/final replay pending.
+
+### 2026-09-06T05:37:21Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- PROPOSAL ONLY, UNAPPLIED, NOT TEST-EDIT AUTHORIZATION: exact test-local fixture amendment against clean51454e069ebe4039f02d6d9108acf9354c7ad6c8. Shared source/tests/examples unchanged; no delivery or RED approval. Independent PM review required before any [test-edit-authorized] commit.
+- Index /tmp/machinery-p7jd-fixture-proposal.geNVdA/PROPOSAL-INDEX.md SHA2561049ea7adf1eaa142948f2f6cd3d4d8327ae20a9b3326222f57041f7f19c9169. Exact fixture-amendment.patch SHA256ae6e9241ea5d7b0c4556b2ee02c6e2910b2663c2452761e7984f1c6663252971,65 additions0 deletions in only internal/hook/hook_test.go copyTree and internal/gates/obligation_ownership_test.go obligationParentFixture. Proposed total16 paths3462 changed lines, not approved scope.
+- External archive diagnostic only: all13 original affected-helper leaves PASS0FAIL0SKIP (6hook4.704s,7parent9.320s). Exact original assertions/outside-helper bytes unchanged; zero deleted original lines. Raw Gv explicitly retains missing-current warning and current_reviews0. Actual Stop stdout empty/ledger cleared. Actual parent default+explicit positive controls exit0 and removed-ID challenges exit1 with original assertions. These are NONQUALIFYING external observations, not same-SHA shared story proof.
+- Full before/after evidence YAML, all6 acceptance-byte hashes, full62-file GoCRM design inventory (implementation absent),73-file complete parent control and75-file Policy/Isolation control/missing-ID inventories, raw CLI/Stop outputs, exact native names, audit scripts and provenance in that directory. Only copied evidence changes; cover hashes/attestor/date unchanged; ga historical and all acceptance anchors unchanged. No GoCRM runtime/parser or parent decision-ID synthetic code is claimed as current substantive conformance.
+- Precise forward consequence: hgz1 planned source v2 migration WILL fail both exactv1 fixture guards. Its later GoCRM current row is not this fixture's current evidence. PM/Sr PM must explicitly route future exact amendment/decoupling authority for these2 constructors before hgz1 regression completion; its present scope does not own these files. No automatic broadening or reverse dependency proposed. This65-line proposal is intentionally unchanged pending judgment.
+- Earlier4 broader failures,1 filesystem skip,229 scoped+45race passes at4b246ba remain preserved and unresolved shared-state evidence. Clean shared51454e0; all finite diagnostics complete; no background process, install, asset/service operation, remote, preflight, merge or production dependency added.
+
+### proof
+- [ ] AC #1: prior observations retained; final independent review and same-SHA replay pending.
+- [ ] AC #2: exact proposal preserves honest plan/current/history distinction; no shared repair authorized yet.
+- [ ] AC #3: four existing fixture conflicts have an externally demonstrated construction; PM must adjudicate exact patch and forward hgz1 boundary.
+- [ ] AC #4: prior held-root/hook/race proof retained; existing unrelated platform skip remains unresolved.
+- [ ] AC #5: prior composed renderer/CLI observations retained; final same-SHA verification and independent source closure remain mandatory.
