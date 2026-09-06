@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:49:13Z
-content_hash: "sha256:c81e29b6003f75c88aca24c4006348dd557819b9642aab75d512a2b5a80097e1"
+updated_at: 2026-09-06T00:50:40Z
+content_hash: "sha256:41bc7c6887a11a07ab9b4f73337d6f0496ef4b7c34df6291e4f8d2587c931ddc"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -381,6 +381,32 @@ Independent evidence and limits:
 - Graph Verify project Users-ramirosalas-workspace-machinery, generation2026-09-05T23:58:53Z. Main indexed paths report metadata_match/no_recorded_issue, but .claude is excluded and bootstrap is absent in main. Exact retained-commit/source reads supplied the evidence for all relevant changed/frozen seams; no graph completeness claim.
 - PM ran no runtime tests, full preflight, source/test edits, worktree switch, install/dev-link/upgrade, binary/skill/plugin/agent change, remote sync/fetch/pull/push or GitHub action. Main497419ab4512fcff765cd5feb27aed4c67b5608d and epic6cb2d974ea8aea211a5974f453cef2b5802bb11e unchanged at inspection. NIL installed product and user Dagger remain outside this task.
 Joint RED repair checkpoint (not delivery): separate author committed authorized tests-only 65b7d13539dad9117ddff7cbadc84db021e789ea after unchanged GREEN0ad71eb. Owned detached baseline76eefa1ed8b2ded8e673fc9faf97e422f21a8448 is original496963f plus only this repair; identical revised test bytes. Exact authorized 2m descriptor/three-legacy selection captured to /tmp/machinery-MAC-2u36-joint-proof.623afI/baseline-controls.jsonl (SHA256d9a4d823ef5fc33787e98ce783830fb19ffa9f7bfa024f625d2a845a98df9bc1) then candidate-controls.jsonl (SHA256f06542bfb831e130101efb676a603c6ccee404bac431c4d490e254092d28e300). Each9leaves5PASS4FAIL0SKIP,10runs10terminals; baseline15.355s/candidate15.469s. All3legacy real-placement/execution controls PASS on both; nil-invalid and real EBADF syscall controls PASS. Four descriptor failures are a newly committed assertion error: SyscallConn.Control returns actual internal poll use-of-closed-file error, not errors.Is(os.ErrClosed). Classifier correctly propagates it; no product RED or rollback claim. Reported before any predicate amendment; proposed compare against actual no-op Control error from same closed handle. Paused edits for independent authorization; no parent/full matrix started. Combined exact basef24b2df-toHEAD1839 changedLOC9files; repair incremental+418/-8. Production3files and receipt_test/install_test hashes unchanged; claim/status/labels retained. No live installs, remote operations, Dagger changes or other test edits.
+TEST-EDIT AUTHORIZED: MAC-2u36 — bounded independent closed-descriptor assertion follow-up, 2026-09-06 UTC.
+
+Authorize ONLY the newly authored closed-handle assertion in TestBootstrapReceiptWriterDescriptors, internal/install/bootstrap_receipt_writer_unix_test.go, currently committed at candidate65b7d13539dad9117ddff7cbadc84db021e789ea and identical tests-only baseline76eefa1ed8b2ded8e673fc9faf97e422f21a8448. This supplements the exact joint authorization; it does not authorize another classifier/fixture/oracle change, acceptance, approve-red, delivery, rejection or state/label/claim transition.
+
+EXPECTED: closed/invalid descriptor errors remain actual propagated failures, never success. The contract does not require File.SyscallConn().Control to normalize its closing error to os.ErrClosed. The separate actual double-Close publication injection DOES still require real os.ErrClosed and is unchanged.
+
+DELIVERED: current closed query assertion requires errors.Is(err,os.ErrClosed), but the actual Control returns "use of closed file". Classifier retains the Control error through errors.Join. Local Go1.27.1 source os/rawconn.go18-25 delegates to pfd.RawControl and returns that error; internal/poll/fd.go33-44 defines the distinct ErrFileClosing sentinel. Existing matching descriptor/offset/mode/bytes/usability and normal-close checks run before this failure. Both raw runs report only these four new assertion failures; nil-invalid and real F_GETFL EBADF controls pass.
+
+EXACT REPAIR: after the successful real normal close of the SAME file, obtain its SyscallConn, require that acquisition succeeds, and call Control with a no-op callback on that same already-closed handle. Require the actual Control error to be nonnil. Call bootstrapReceiptWritable on the same closed file and require writable==false, classifierErr!=nil and errors.Is(classifierErr,actualControlErr). Do not compare error strings, fabricate/normalize errors, accept nil, reopen or substitute another descriptor, or change classifier implementation. Preserve every existing open-handle classification, distinct-writer, unchanged bytes/mode/offset/usability/normal-close assertion, nil-invalid and real-invalid-fd EBADF controls. No changes to bootstrapFinalizationCase, its real os.ErrClosed injection/error assertions or any product file are authorized.
+
+Record a separate amendment commit with BOTH tdd-red and [test-edit-authorized], preserve65b7d13/76eefa1 and their raw history, and apply identical revised test bytes to source496963f baseline and retained source0ad71eb candidate. Replay the same focused2m selection on both before any parent focus. Report every named leaf/terminal/count, SHA/hash and elapsed cost; these controls should pass both sources and are not product RED. The earlier authorized parent focus, independent freeze/re-RED review and later full matrix requirements remain intact; no broad replay or deadline increase is granted here.
+
+Independent evidence: read exact committed file and empty baseline..candidate descriptor-file diff. Independently verified raw baseline-controls.jsonl SHA256d9a4d823ef5fc33787e98ce783830fb19ffa9f7bfa024f625d2a845a98df9bc1 and candidate-controls.jsonl SHA256f06542bfb831e130101efb676a603c6ccee404bac431c4d490e254092d28e300 under /tmp/machinery-MAC-2u36-joint-proof.623afI. Both author runs:9leaves5PASS4assertionFAIL0SKIP,10runs10terminals;15.355s baseline/15.469s candidate. All3legacy placements/execution controls pass both. These are audited author results, not fresh PM runtime replay or clean parent-fault rollback proof. PM made no source/test/worktree changes or product/remote operations.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent exact-source/raw-error review confirms wrong sentinel expectation in one newly authored assertion, with explicit narrow repair above.
+- Preserve assignee dev-MAC-2u36, hard-tdd/red-approved, parent MAC-ui8a, downstream MAC-gcrr/MAC-ou97, dependencies and current claim.
+
+### proof
+- [x] AC #6: actual closed-query error preservation requirement maintained; separate final publication os.ErrClosed fault remains exact.
+- [ ] Revised focused controls on both sources and independent corrected freeze/re-RED review.
+- [ ] Actual clean parent-fault rollback, complete GREEN verification and product acceptance.
+
 
 ## nd_contract
 status: in_progress
