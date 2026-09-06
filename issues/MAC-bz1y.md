@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:22:36Z
-content_hash: "sha256:3d0854c95b00e6ae52cc294b287bdf2e48c69e307e8a6dc85a98a6a543992d24"
+updated_at: 2026-09-06T09:23:51Z
+content_hash: "sha256:1501ce46f3a25d4b9b5d0c5d0e713161ea214d787a55ec29a30d30999b0895a7"
 blocked_by: [MAC-hpqp, MAC-6h0s, MAC-hy71]
 blocks: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-al5u, MAC-vx24, MAC-ou97]
 ---
@@ -168,3 +168,21 @@ status: new
 
 ### proof
 - [ ] All current story ACs remain pending without weakening.
+
+### 2026-09-06T09:23:51Z ramirosalas
+CI PRODUCER/CONSUMER SERIALIZATION 2026-09-06
+The required assurance lane follows the existing exact-commit CI/release verification contract; the dependency MAC-bz1y -> MAC-hy71 is now explicit. This is necessary sequential ownership of .github/workflows/ci.yml, not a new release feature or a dropped edge. MAC-al5u follows this lane transitively. Preserve existing required checks and publication policy while adding the approved persistent native test inventory.
+
+CONSUMES:
+- MAC-hy71: .github/workflows/ci.yml
+  source: accepted exact-commit CI verification/gate wiring; preserve its required-check semantics and integrate the native assurance lanes without bypass.
+  
+## nd_contract
+status: new
+
+### evidence
+- Root-authorized CI serialization edge added; original edges/claims preserved.
+- No code, preflight or remote mutation.
+
+### proof
+- [ ] All six current lane ACs plus preserved upstream exact-commit CI gate semantics remain required.
