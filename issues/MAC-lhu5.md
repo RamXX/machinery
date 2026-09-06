@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:05:28Z
-content_hash: "sha256:24154e49ba5e0acf252690d986cd2fb2007e8ccc7bc6442e00ede7073d6e41d7"
+content_hash: "sha256:1e193f5ea14ccadc89f896d12de5b6d27f27dff34eff36065df3e2e226e00c94"
 blocks: [MAC-ou97]
 ---
 
@@ -126,3 +126,23 @@ status: new
 - Blocks: [[MAC-ou97]]
 
 ## Comments
+
+### 2026-09-06T03:05:28Z ramirosalas
+## nd_contract
+status: new
+
+### evidence
+- Created P0 under MAC-ui8a; open/unclaimed/hard-tdd. MAC-ou97 explicitly depends on this repair. No existing state/claim/test/source changes.
+- Actual canonical readback confirms five AC, explicit nonoverlapping ownership and intact quoted command. Scoped lint PASS36issues/0errors/0review; dependency cycles none; RTM0extracted requirements/21stories/4closed is structural only, not AC proof.
+- Independent test/handoff review and exact existing-test amendment authorization remain pending; no RED approval or implementation permission granted by triage.
+- Confirmed source-established packet-alone handoff omissions; all six packets/root/model/architecture inspected. No optimizer runtime or mutation was executed in triage.
+- Existing integer-bps representation supplies concrete authority; any still-unstated numerical precision/comparison or port detail requires bounded technical review.
+- Packet-only ownership avoids concurrent writes to MAC-lnu6's root BUILD/evidence; consumer sequencing remains explicit downstream.
+
+### proof
+- [ ] AC #1: complete packet-alone local contract with source consistency.
+- [ ] AC #2: concrete optimizer obligation/units/sum and reviewed numeric semantics.
+- [ ] AC #3: complete prospective FSM obligations without invented M3 machine.
+- [ ] AC #4: real positive/negative semantic handoff proof.
+- [ ] AC #5: honest design checks and exact packet hash handoff.
+
