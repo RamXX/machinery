@@ -307,8 +307,9 @@ func objectFields(value any, allowed string) (map[string]any, error) {
 	if !ok {
 		return nil, parseError("expected object")
 	}
+	allowedFields := strings.Split(allowed, " ")
 	for key := range obj {
-		if !strings.Contains(" "+allowed+" ", " "+key+" ") {
+		if !slices.Contains(allowedFields, key) {
 			return nil, parseError("unknown field " + key)
 		}
 	}
