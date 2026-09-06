@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:00:51Z
-content_hash: "sha256:41635a3b580376f66782734900e54cf0ef7c01360e7ebd8ed409804260f39d43"
+updated_at: 2026-09-06T09:16:30Z
+content_hash: "sha256:24df6b74dfb384fe489262610f2d8664e137cd9da5c2fb228a8d4339ef907a1f"
 blocked_by: [MAC-p9z1]
 blocks: [MAC-sqpt, MAC-u4oo, MAC-vx24, MAC-ou97]
 ---
@@ -99,3 +99,38 @@ status: new
 - Blocked by: [[MAC-p9z1]]
 
 ## Comments
+
+### 2026-09-06T09:16:30Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- internal/assuranceflow/register.go -> internal/assuranceflow -> Register(ctx context.Context, req RegisterRequest, output io.Writer) (Registration, error), RegisterRequest{Design,Implementation,Store,ExpectedHead string;Milestones []string}; private-constructed Registration with ProjectID, StoreID, PreviousHead, HeadDigest, Generation, sorted MilestoneKeys and State accessors. Exact section 7 API and section 3 registration transaction; no public constructor or execution success.
+- internal/assuranceflow/register_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/tdd/registration_store.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/tdd/registration_store_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-p9z1: internal/tdd/store.go
+  MAC-6h0s: machinery.tdd.store/v1, machinery.tdd.head/v1, immutable object/head archive and external 0700 store; Capture(ctx context.Context, req CaptureRequest) (BundleRef, error), Status(ctx context.Context, req StatusRequest) (StatusReport, error).
+- MAC-6h0s: internal/gates/assurance_inventory.go
+  spec: AssuranceInventory(design string) (tdd.Inventory, error); tdd.Validate(plan Plan, manifests []Manifest, inventory Inventory) error.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: A user can explicitly register a reviewed revision once and receive its durable head; stale writers return HEAD_CONFLICT without silent rebase.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
