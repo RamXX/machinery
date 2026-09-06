@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:29:40Z
-content_hash: "sha256:29e8bd2e5ee51b40cd82ede6efc8bfc86e9ed1b39ba5a75e77c0180f4b409154"
+updated_at: 2026-09-06T07:37:42Z
+content_hash: "sha256:97a815a6ab4615477e425a35e3ea6b2bca93fd0272ea597c0a402a3a45a0b063"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 assignee: dev-MAC-p7jd
@@ -941,7 +941,54 @@ Observed evidence and limits:
 - Measured production6files1125add/43del =1168 changed lines; combined11files2609add/46del =2655. Remaining tests/docs and actual final cost still owed; the canonical forecast is not completion proof.
 - Main497419ab4512fcff765cd5feb27aed4c67b5608d clean and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged. PM inspected committed refs and proof files only, not developer worktree internals. No source/test/docs, installed binary/assets, remote, services, Docker or preflight changes; private pvg tracker writes only. Machinery standalone constraint unchanged.
 SR PM LEGACY FIXTURE OWNERSHIP / PROPOSAL-PREPARATION HOLD. Read complete PAUSED-BLAST-DISPUTE.md SHA256d2837c4fbd4205ba151b856e96a7747d3cc32b58b1a69b4c49fe1d6fedb6bc1f and terminal report.229scoped+45race PASS belong to4b246ba; paused51454e069ebe4039f02d6d9108acf9354c7ad6c8 is docs-only later and still owes finalsameSHA proof. Four old-fixture leaves remain held: hook_test.go TestStopGreenDesignClearsStateSilently and obligation_ownership_test.go TestObligationParentRealCLI obligation-free/Policy/Isolation default-gate legs. Legacy v1 gt correctly fails GV_MISSING_IMPLEMENTATION_SUBJECT; silence/ledger, default-vs-explicit Gt, real controls/negatives, Ga ancestry/selection and no-grandfathering are fixed. hgz1 now owns all8bundled evidence migrations AFTER p7/uzxr/lhu5; no p7 reverse dependency or bundled writes to unblock this story. Root may resume the healthy retained GREEN author for an UNAPPLIED EXTERNAL exact test-local fixture proposal against51454e0 limited to those2existingtest paths, with full old/new hunks, original-assertion byte equality, helper callers, real input/evidence inventory, warning/silence semantics and per-file cost. This is proposal preparation only, not oldtest editing or TEST-EDIT AUTHORIZED. Separate independent PM must approve exacttext before any subsequent sanctioned amendment. Verified existing APIs: gates.AttestationReview{Claim,Kind,Attestor,Date,Note string}; RenderAttestation(design,impl string,review AttestationReview)([]byte,error); CheckAttestationsWithImplementation(design,impl string)*Gate. No missing core schema/API identified. Exact valid fixture construction remains unresolved: plan warnings cannot be assumed silent; real/synthetic impl hashes do not establish substantive current conformance, especially before uzxr repair. If no fixture preserves all constraints, report exact technical conflict for independent specialist review; do not weaken assertions, invent review or change product semantics. Existing filesystem skip remains uncredited. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
+## Implementation Evidence (GREEN literal-none repair)
 
+### Summary
+- Corrected only `internal/gates/attest.go`: digest descriptor `none` no longer authorizes omission of a genuine literal `none` entry. Actual in-root evidence remains the only entry exclusion; digest grammar/schema/full-root-v1 unchanged.
+- External raw proof: `/tmp/machinery-p7jd-none-green.eMIDLD/GREEN-REPORT.md`; raw JSON/test identities/control and negative logs are hash-bound by evidence-sha256 `30867e546b29a2b691215409f41ed97b196bbdaa42d4213f74cc883b0b6d516a`.
+
+### Commit SHA
+- `39a498164fc6e09169ea5b33d470890d315f6a50` on `story/MAC-p7jd`; production delta 3 additions/1 deletion.
+
+### CI Results
+- New frozen literal-none CLI matrix: 120 PASS / 0 FAIL / 0 SKIP leaves (four topologies x file/empty-directory, controls and reached negatives).
+- Existing targeted scopes: gates Attest 151 PASS; original CLI Attest 28 PASS (plus new matrix); hook 28 PASS; designlock 22 PASS.
+- Race: gates 23 PASS; designlock 22 PASS. Exact six hook callers 6 PASS; parent callers 7 PASS. Broader replay 149 PASS / 0 FAIL / 1 existing Darwin casefold SKIP.
+- `pvg verify internal/gates/attest.go --format text`: PASS (1 file, 0 issues). `git diff --check`, gofmt: clean. Whole changed-set scanner retains 11 existing hook return-empty heuristic findings, explicitly not clean.
+
+### Commands run
+- `GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=5m -json ./cmd/machinery -run ^TestAttestationScopeNone$`
+- Same bounded native JSON command for required gates/CLI/hook/designlock Attest selectors, both required race selectors, six hook + seven parent callers, and four broader selectors; complete exact commands/results are in the external report.
+- `pvg story verify-tdd --range a82277af5650b487cea1260c24ffcc1c86d69d8d..HEAD --json`: 13 commits, 0 merge skips, 0 violations.
+
+### Frozen hashes
+- `cmd/machinery/attest_scope_none_test.go`: `3d9d8250f759807795251685e1cb924ba8eceb4c819b3fa0376bd15b254f9fc0`.
+- Approved helpers unchanged: hook `2b185970a3f69a140338cee97e14db0da82ef0aaf01250364357b104c1458b33`; obligation parent `cc5f5e12a0d41a6eeda60895fece31713c5f068817bb2d3f08b7f1c6ff4d4b04`.
+
+### AC proof
+- [x] AC1: Complete full-root inventory retains real top-level literal `none` when the evidence descriptor is absent; later content/mode/add/remove/rename changes now invalidate.
+- [x] AC2: Existing closed current/plan/history schema and diagnostics remain covered by the unchanged targeted suites.
+- [x] AC3: Existing migration/current-review proof remains passing and unchanged.
+- [x] AC4: New real built-CLI controls and independently reached negatives cover all four topologies and both literal entry kinds; actual evidence/.git exclusions remain.
+- [x] AC5: Existing bounded CLI/custody/race/caller proof replayed; approved observation/composition limits retained.
+
+LEARNINGS:
+- A sentinel digest descriptor is metadata, not filesystem exclusion authority; retain a separate boolean for an actual resolved exclusion.
+- The Darwin casefold skip is still a Linux final-gate obligation, not a passing result.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Commit 39a498164fc6e09169ea5b33d470890d315f6a50; raw same-SHA proof at /tmp/machinery-p7jd-none-green.eMIDLD.
+- Targeted/race/caller/broader native replays completed with the stated counts; frozen TDD range has zero violations.
+
+### proof
+- [x] AC #1: literal `none` is retained absent a real in-root evidence exclusion.
+- [x] AC #2: existing closed classification behavior remains passing.
+- [x] AC #3: existing migration behavior remains passing.
+- [x] AC #4: four-topology literal file/empty-directory controls and negatives pass.
+- [x] AC #5: required bounded CLI/custody/caller evidence replays; disclosed limits retained.
 
 ## nd_contract
 status: delivered
