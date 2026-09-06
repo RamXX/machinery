@@ -1,7 +1,7 @@
 ---
 id: MAC-2u36
 title: "Converge installer reruns on recorded targets"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, delivered]
@@ -9,10 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-06T02:37:14Z
-content_hash: "sha256:bfb42f6a5794977c0e6ccf5d4da17d0e9298905871ccb39d85456660b74af214"
-blocks: [MAC-gcrr, MAC-ou97]
+content_hash: "sha256:0f4b0a55e4da6645013c70470a62545d139c79c23c7e2ab078ca087280fbe921"
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
+closed_at: 2026-09-06T02:37:14Z
+close_reason: "Independent seven-AC GREEN review: exact frozen tests and composed 85 required passes, actual writer-close rollback, native coverage reconciled; documentation explicitly bound to MAC-gcrr before final gate."
 ---
 
 ## Description
@@ -2588,10 +2589,12 @@ Preserved as quoted history; current Description is authoritative.
 - 2026-09-06T00:09:30Z auto-follows: linked to predecessor MAC-a89e
 - 2026-09-06T00:09:30Z claimed by dev-MAC-2u36
 - 2026-09-06T02:25:28Z status: in_progress -> in_progress
+- 2026-09-06T02:37:14Z status: in_progress -> closed
+- 2026-09-06T02:37:14Z dep_removed: no_longer_blocks MAC-gcrr
+- 2026-09-06T02:37:14Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 - Follows: [[MAC-olrx]], [[MAC-p8ce]], [[MAC-a89e]]
 
 ## Comments
