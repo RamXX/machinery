@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T05:31:32Z
-content_hash: "sha256:36ce9d3ab92014a589860e729af2e7c470eeaad392e4e2374c5ab7090cd2ebca"
+content_hash: "sha256:74903a487ccb32d9df0e235db2a72b2644ecb7b268163dbd710509050561b0d7"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -627,3 +627,21 @@ status: in_progress
 - [ ] AC #3: Original native unsafe-variant sensitivity AC remains pending complete frozen candidate replay.
 - [ ] AC #4: Original dynamic executed-row inventory AC remains pending final proof.
 - [ ] AC #5: Original candidate conformance/consumer handoff AC remains pending; no current claim renewal.
+
+### 2026-09-06T05:31:32Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- TERMINAL PM EXACT AMENDMENT ADJUDICATION: TEST-EDIT AUTHORIZED only for complete-later-amendment.patch SHA2562f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249 against retained4ef6baffc4de72f2a3e935348f180283fe53c20b. Full exact disposition/report is preserved in preceding PM EXACT AMENDMENT ADJUDICATION Notes and /tmp/MAC-uzxr-PM-amendment.DFEjTI/REVIEW.md SHA256296a026c28fcaf4b3b25bfdcaccf7edc423d5801b7c93d6dac89a253350b14d2. Root explicit routing remains required before author applies it.
+- Exact five-suite result hashes and1174-line additive frozen-file expansion are byte-bound by that report; frozen-file-additive.patch SHA2569b3129d5095717e25c46b940e6d1918c0d4a88c7047aac4137fefe23467c0f43. Preserve entire495-line prefix SHA256326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba; expanded1669-line result4578841816e77712ed249a349e1f63c13c7eac233f15eccacb2d0ee916527b25. Only separate48-line compile scaffold fsm.go resultde548b5201129f51d1653800908035ef09333866ca801836db1d48ed858eb27c may accompany the freeze; ErrScaffold, compile-only, empty/setup/timeout failures remain NONQUALIFYING. No whole-parser implementation or production Task edit now.
+- Independent exact git-object/tuple/MD/JSON/guard-fact/AST/patch audit PASS:218 original witnesses,197rows,47states,118orderedgroups,17exactmutations; all original setup/event/order and two terminal supplement bodies preserved. Raw /tmp/MAC-uzxr-PM-amendment.DFEjTI/audit.jsonl SHA256f73311bbd9611e33b4d56c17e46fa965b932d0ec814ced7ccab754cc47f3571c. Candidate runtime conformance and unsafe-variant rejection are not yet established.
+- Original998a5a3 genuine semantic RED (3 intended outerFAIL/200childPASS) and storage4ef6baf verification plus historical225baseline remain preserved. A separate [test-edit-authorized] and tdd-red marked amendment commit, fresh full per-file/prefix hash inventory and finite genuine RED evidence must return to an independent PM checkpoint before any approve-red or GREEN dispatch. This disposition does not bypass the author's RED pause, authorize further test bytes, renew consumer claims, or credit missing future Task anchors/scaffold control failures.
+- Durable record is append-only. Canonical eight paths/five AC, statusin_progress/hard-tdd/dev-MAC-uzxr claim, dependencies and all prior Notes/history preserved; no description rewrite, source/test/example/service/remote/preflight/toolchain change, product Paivot dependency, delivery/acceptance/rejection/RED-approval transition.
+
+### proof
+- [ ] AC #1: implemented current parser and complete binding execution pending.
+- [ ] AC #2: complete candidate effects/context and narrow Task repair pending.
+- [ ] AC #3: preserved initial genuine RED; final candidate unsafe-variant rejection pending.
+- [ ] AC #4: full successful candidate row/witness/native inventory pending.
+- [ ] AC #5: focused passing candidate proof and consumer handoff pending.
