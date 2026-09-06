@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:05:27Z
-content_hash: "sha256:9efec3be3c62e380635db383729465a7daead2b5e29667a3256f5a99f5bf9b88"
+content_hash: "sha256:1acb9bdeb46782de69b190b934e1d9bb707ec0dbd3e4591a971f65c4ad09b29c"
 blocks: [MAC-ou97]
 ---
 
@@ -124,3 +124,22 @@ status: new
 - Blocks: [[MAC-ou97]]
 
 ## Comments
+
+### 2026-09-06T03:05:27Z ramirosalas
+## nd_contract
+status: new
+
+### evidence
+- Created P0 under MAC-ui8a; open/unclaimed/hard-tdd. MAC-ou97 explicitly depends on this repair. No existing state/claim/test/source changes.
+- Actual canonical readback confirms five AC, explicit nonoverlapping ownership and intact quoted command. Scoped lint PASS36issues/0errors/0review; dependency cycles none; RTM0extracted requirements/21stories/4closed is structural only, not AC proof.
+- Independent test/handoff review and exact existing-test amendment authorization remain pending; no RED approval or implementation permission granted by triage.
+- P0 source-established conformance parser defect plus separately identified action-adequacy gap; parent supplied independently verified native218-pass control. No new mutation run or repair performed.
+- Existing claims/tests/ownership remain held until independent exact test amendment review; no core schema duplication.
+
+### proof
+- [ ] AC #1: actual committed-row parser and closed input/guard reconciliation.
+- [ ] AC #2: correct entry/exit-aware complete effects and adversarial sensitivity.
+- [ ] AC #3: real expected-state/action and extra-effect unsafe variants fail for intended causes.
+- [ ] AC #4: complete executed-row inventory and preserved controls.
+- [ ] AC #5: native candidate proof without automatic claim renewal.
+
