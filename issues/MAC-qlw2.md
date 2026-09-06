@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:29Z
-content_hash: "sha256:f50313562910475bb9c4e33ec34284f84f1a2f11906a575e2998d2dcbb9eabeb"
+updated_at: 2026-09-06T09:21:58Z
+content_hash: "sha256:1eaa76f0738bdf9fffb11e3efb985df42fa194d321c66c7859a3e04cba717f7c"
 blocked_by: [MAC-l7m0]
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 ---
@@ -115,6 +115,7 @@ PRODUCES:
 CONSUMES:
 - MAC-l7m0: docs/test-assurance-contract.md
   MAC-6h0s: Section 8 complete native scope/broker/guardian contract; section 3 cumulative cleanup budgets.
+  schema: Section 8 complete native scope/broker/guardian contract; section 3 cumulative cleanup budgets.
 - MAC-l7m0: docs/test-assurance-contract.md
   schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
 
