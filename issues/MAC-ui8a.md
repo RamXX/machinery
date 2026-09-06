@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:35:03Z
-content_hash: "sha256:e6d1d5bbd6e5f4a55d822aa5074e12234dadda9bc6fc1b2d51e99294c24d5574"
+updated_at: 2026-09-06T11:03:02Z
+content_hash: "sha256:6df7446595a48de9fa605569ce29cc8aae0c7ab584b0e15ae515ea08d081d4fc"
 ---
 
 ## Description
@@ -716,4 +716,27 @@ status: in_progress
 ### proof
 - [x] Accepted standalone contract has exact local canonical landing and independent positive/negative review.
 - [ ] Remaining implementation, actual native Linux proof, independent acceptance and final integrated preflight/local release remain pending.
+
+
+### 2026-09-06T11:03:02Z ramirosalas
+REVIEW CHECKPOINT 2026-09-06 — no additional source acceptance
+Accepted/merged remains 7 of 40 children. Main497419ab4512fcff765cd5feb27aed4c67b5608d and epic a94e768adf461178e0562ad135c7c06d8163a3a4 unchanged. Installed Machinery SHA2565205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849 and user Dagger18576903a871d895c8b414ee0a41897313ce31d7b5b6284c29b489553e4fae99 preserved; pushurl remains /dev/null. No preflight, runtime install, remote operation, binary replacement or new repository source/test edit.
+
+Portfolio: initial external whole-package drafts were substantively inadequate (mostly keyword/count checks, missing policy outcomes and incomplete source projection), so not approved for source/RED. Bounded D1 method now frozen at /tmp/MAC-lhu5-D1-method-repair-v3.xQUt1b: test5577ad3334146482c0e1ffdc318ee518eac1b91f8f8c97b80bd6ebe681f1cc10; report6499222e7da0a95706463eff76b516172f1c2ce118f7b372316a7a0f070aaa99; raw9cb13953789c5ce446b2eacf0f5707a4dfb468615c68cf322ecc98501610c199. Root checked48 test/subtestPASS +1packagePASS,0FAIL/SKIP. This is a finite external method experiment, not repository RED or a portfolio runtime. /root/portfolio_d1_method_pm is independently reviewing it. Whole packet/source integration, D2–D6, full FSM target/effect obligations and actual policy source repair still pending. Prior external draft preservation violations and corrected hashes are disclosed in v3 report, not misrepresented as immutable or repository RED.
+
+Custody: /tmp/MAC-qlw2-boundary-adjudication.onIV3H/REVIEW.md9f85645d893ffcdb6888480a85d8030668fe65c382cbb8866faa708f0339221a found missing callable producers for opaque Capability/InternalIO, unexpressible ExtraFiles/SysProcAttr producer tests, incomplete native observation/calibration and contributor-container handoff. Normal Limits/private framing choices are not architecture blockers. Proposed narrow supplement /tmp/MAC-qlw2-supplement-v2.63aaBU/PROPOSAL.md169f81b34f78eb928cf76994105c7361b4e39642f9da50925e4a42026e86525a and NATIVE-OBSERVATION.md5a0b0e5b80920d4fcf2d4344f219b4925778f87467ff8807b41a901d523775bb are under /root/custody_supplement_anchor review. New constructors/auth cap/calibration staging are NOT yet approved/applied. Root flagged root-owner→first-broker bootstrap contradiction for independent review. q remains claimed, source-free preRED hold with corrected authoritative EOF in_progress checkpoint.
+
+Pending user resource/authority unchanged: required native Linux amd64 executor (current Mac/Docker arm64 not substitute); approval of proposed fresh MAC-sh60 compliant successor/disposition. Existing failed sh60 branch/audit remain intact; no exception, cancellation or blocker transfer. No false completion.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Current source/protected-resource identities checked read-only.
+- Actual D1 draft model execution counts separated from independent acceptance and native implementation proof.
+- Two bounded independent reviewers active; no global recovery/setup/sync.
+
+### proof
+- [x] Unsupported/tautological preliminary test claims were rejected before source authoring.
+- [ ] Remaining implementation, source/method approval, two-platform native proof and final integrated preflight/local release remain pending.
 
