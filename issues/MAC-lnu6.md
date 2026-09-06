@@ -4,7 +4,7 @@ title: "Remove unsafe frozen-test formatting exemptions"
 status: open
 priority: 0
 type: bug
-labels: [hard-tdd, delivered]
+labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
