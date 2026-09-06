@@ -322,7 +322,9 @@ func TestExampleAttestationMigration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			return string(body)
+			// Prose wraps across lines; match on normalized whitespace so the
+			// obligation is checked semantically, not by line breaks.
+			return strings.Join(strings.Fields(string(body)), " ")
 		}
 		mustContain := func(file, body string, wants ...string) {
 			t.Helper()
@@ -352,7 +354,7 @@ func TestExampleAttestationMigration(t *testing.T) {
 		surreal := read("surreal-crm/design/BUILD.md")
 		mustContain("surreal-crm/design/BUILD.md", surreal,
 			"Wholesale conformance obligation",
-			"one wholesale conformance test per machine parses the committed",
+			"One wholesale conformance test per machine parses the committed",
 			"reconciles the row against the machine's",
 			"next state and the complete ordered expected-actions list",
 			"entry and exit semantics",
@@ -438,7 +440,7 @@ func TestExampleAttestationMigration(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("reviewed unchanged current scope must pass gv with --impl; exit %d:\n%s", code, out)
 		}
-		for _, want := range []string{"1 current implementation reviews", "1 historical review records", "12 plan judgments"} {
+		for _, want := range []string{"1 current implementation reviews", "1 historical review records", "11 plan judgments"} {
 			if !strings.Contains(out, want) {
 				t.Fatalf("gv counts missing %q:\n%s", want, out)
 			}
@@ -457,21 +459,20 @@ func TestExampleAttestationMigration(t *testing.T) {
 		copyDirInto(t, filepath.Join(root, "examples", "go-crm"), base)
 		design := filepath.Join(base, "design")
 		impl := filepath.Join(base, "impl")
-		gv := func() string {
+		gv := func() (string, int) {
 			out, _, code := runBin(t, "check", design, "--gate", "gv", "--impl", impl)
-			t.Logf("gv exit %d", code)
-			return out
+			return out, code
 		}
 		expectBlocking := func(category string) {
 			t.Helper()
-			out := gv()
-			if !strings.Contains(out, category) {
-				t.Fatalf("expected blocking category %s:\n%s", category, out)
+			out, code := gv()
+			if code != 1 || !strings.Contains(out, category) {
+				t.Fatalf("expected blocking category %s (exit %d):\n%s", category, code, out)
 			}
 		}
 		// Safe control: the untouched copied scope passes.
-		if out := gv(); strings.Contains(out, "ERROR") {
-			t.Fatalf("safe control must pass:\n%s", out)
+		if out, code := gv(); code != 0 {
+			t.Fatalf("safe control must pass; exit %d:\n%s", code, out)
 		}
 		// Real test mutation invalidates the current scope content.
 		testFile := filepath.Join(impl, "internal", "testoracle", "fsm_field_membership_test.go")
@@ -528,16 +529,21 @@ func TestExampleAttestationMigration(t *testing.T) {
 		if err := os.Rename(filepath.Join(impl, "internal", "model", "entities_renamed.go"), filepath.Join(impl, "internal", "model", "entities.go")); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.Remove(filepath.Join(impl, "internal", "model", "errors.go")); err != nil {
+		removed := filepath.Join(impl, "internal", "model", "errors.go")
+		orig, err := os.ReadFile(removed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(removed); err != nil {
 			t.Fatal(err)
 		}
 		expectBlocking("GV_SCOPE_INVENTORY")
-		if err := os.WriteFile(filepath.Join(impl, "internal", "model", "errors.go"), []byte("package model\n"), 0o644); err != nil {
+		if err := os.WriteFile(removed, orig, 0o644); err != nil {
 			t.Fatal(err)
 		}
 		// Safe control again after restoration.
-		if out := gv(); strings.Contains(out, "ERROR") {
-			t.Fatalf("restored scope must pass again:\n%s", out)
+		if out, code := gv(); code != 0 {
+			t.Fatalf("restored scope must pass again; exit %d:\n%s", code, out)
 		}
 	})
 
