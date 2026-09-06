@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:48:08Z
-content_hash: "sha256:b898683b820ac1d2c917b26d4b1871eb71d2cf1fdcbf60341948c56b06b0e5a0"
+updated_at: 2026-09-06T07:55:20Z
+content_hash: "sha256:16a7e4f909fe0d7a912300de64981d5056a34204c636ad1b9ed64d14a926fd9f"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx, MAC-p7jd]
 assignee: dev-MAC-uzxr
@@ -168,6 +168,38 @@ Read complete author checkpoint/audit.cjs/audit.jsonl and verified all suppliedh
 No further storage repair required. Author may prepare complete EXTERNAL later patch and measured per-file decomposition for separate exact PM/SrPM review. Applying all5suite/helper/parser/additive amendments stays HELD. No fullapprove-red/deliver/accept/reject transition; no new test-edit permission, AC/path/scope change, candidate parser/Taskfix proof or consumerclaimrenewal.
 SR PM MEASURED FORECAST / PRESERVATION REPAIR. Canonical eight paths and five AC unchanged; actual external proposal2450changed plus503historical=2953 cumulative beforeGREEN, aggregate2945changed. Conditional3300-3500 cumulative/3200-3400 aggregate forecast assumes prior300-450-line parser estimate and separately charges48-line scaffold replacement plus narrowTask correction. Old750-1150/provisional1500-2200 obsolete; no proof trimmed or test permission granted. First --description command succeeded but verification failed because nd treats same-level nested headings as section boundaries and retained an old canonical suffix. Original failed readback preserved in /tmp/machinery-private-triage.JF2BDG/READONLY-HANDOFF.md. Installed --body-file has the same Description semantics. Root-authorized guarded pvg nd edit bound full live raw header/body to journal export and checked an external apply_patch trial, removed ONLY duplicate canonical block under nd exclusive lock, then verified exact full body90c15690a83bd2200723fdaa8bdd27e3871e189959b4936083afe06336d35590 and identical tail/metadata except normal hash/time. Exact expected/proposed manifests and editor remain external. First hgz1 preparation-only cross-realm assertion failed before any tracker write, then root explicitly authorized scalar-array comparison correction; historical failure is not proof. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
 EXPANDED RED FREEZE CHECKPOINT: exact authorized seven-path patch2f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249 committed acf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f over4ef6baf with literal [test-edit-authorized] and tdd-red. Full report /tmp/MAC-uzxr-final-red.nOXYuf/REVIEW.md SHA2565cb98377240aa8be22f0b9d88b74a7a6bd959fbfd8f1efb2907d08b02f68ad5c. Exact seven result hashes/frozen495prefix/99committedexamplefiles/218originaltuples/twoterminalbodies verified; Task unchanged. Measured2120add330del2450changed/net1790; historical503changed separate. Actual all10 contractroots and focusednative plus3meta families ran15.526s: contracts0PASS28FAIL0SKIP, focused10supplementPASS5transitionrootFAIL0SKIP, original/candidate/remainingmeta3/3/17outerFAIL. All current parser/control failures NONQUALIFYING ErrScaffold; all intended later mutants/most nestedcontractbranches unreached. Actual23children10supplementPASS25transitionrootFAIL0SKIP,0transitionrowleaves/0mutants; all23fixturecwdsremoved. Export52files=46receipts/rawlogs+6manifests47committedinputhasheseach;17latercontrols fail before manifest export, no nonexistent manifest credited. Raw and complete native identity receipts in report. Normal verify-tdd3commits0violations/no waiver; scoped static7files0issues; gofmt/diffcheckclean. Original genuine998a5a3 threeunsafeacceptedouterFAIL200childPASS, validatedstorage4ef6baf bothmodes, historical225baseline and separate actualTaskentrydefect preserved as distinct evidence. No parserimplementation, productionedit, source/testcorrection, delivery, approve-red, GREEN, consumerclaimrenewal, remote/toolchain/service changes or background process. STOP clean for independent combined-evidence RED adjudication.
+## Implementation Evidence Completion — final candidate export and cleanup
+
+PROOF:
+
+### CI/Test Results
+
+Commands run:
+- `cd examples/go-crm/impl && GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=300s ./internal/testoracle -run '^(TestFSMNativeOracleSensitivity|TestFSMCandidateExecutedInventory|TestFSMRemainingNativeSensitivity)$' -args -fsm-native-proof-dir /tmp/MAC-uzxr-final-proof.Pjb6M2` — PASS, 23.113s.
+- `cd examples/go-crm/impl && GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -v -timeout=300s ./internal/testoracle -run '^(TestFSMNativeOracleSensitivity|TestFSMCandidateExecutedInventory|TestFSMRemainingNativeSensitivity)$'` — PASS, 22.831s; default cleanup audit recorded.
+
+Summary: final candidate export has 43 child executions: 28 exit 0 and 15 intended exit 1. It retains 149 JSON/JSONL export artifacts, with 1,398 native leaf PASS, 6 semantic intended leaf FAIL, 9 structural intended pre-Fire root FAIL, and zero skips. All 20 mutations ran with matched controls; five inventory mutations keep native assertions green but are rejected by the actual-output inventory verifier. Dynamic copy manifests contain 48 inputs; separate Git custody manifest contains 100 tracked Go CRM paths. Default lifecycle recorded three owned proof roots and 69 observed paths, all removed. Statement/branch coverage not measured.
+
+### Commit
+
+- Candidate SHA: `bb5205c32e7b17ebefc5b050b7bf7417b0720e72`
+- External raw proof and report: `/tmp/MAC-uzxr-final-proof.Pjb6M2/FINAL-PROOF.md`
+- Raw JSON/hash index, manifest, per-child receipts, and cleanup audit are retained in that directory.
+
+### AC Verification
+
+| AC | Final evidence completion | Status |
+|---|---|---|
+| 1 | Exact membership regression plus exported parser/native proof retain closed structural dialect behavior | PASS |
+| 2 | Matched controls and exported actions/inventory retain existing reconciliation; Task unchanged | PASS |
+| 3 | All 20 actual variants have retained child receipts and intended classifications | PASS |
+| 4 | Exported actual-output inventory confirms 197 rows, 218 witnesses, 10 supplements and dynamic 48 input custody | PASS |
+| 5 | Same-SHA export, cleanup, source/freeze custody and raw-hash index are complete for independent PM | PASS |
+
+LEARNINGS:
+- Final child receipts and cleanup audit close evidence gaps that aggregate Go PASS output cannot establish.
+- Dynamic native inputs (48) and complete Git source custody (100) are distinct counts and both are retained.
+
 ## nd_contract
 status: delivered
 
