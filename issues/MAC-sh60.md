@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-06T00:12:56Z
-content_hash: "sha256:0905c749a995507edc4cf76a91afc8c433934baad464ad1345ea5101d1a72fe9"
+content_hash: "sha256:fb8d39516d3891b27cabebd6ea29a3f560d28d05aa2f69bebde3c46065dd337d"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-sh60
 follows: [MAC-a89e, MAC-p8ce]
@@ -115,6 +115,18 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-05.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
+
 ## RED Delivery — MAC-sh60
 PROOF:
 - Phase: RED tests only. Commit b5d3b8c67f487195215860f3d361432f5b2b6b27 on story/MAC-sh60; exact unchanged production base 6cb2d974ea8aea211a5974f453cef2b5802bb11e. GREEN SHA: pending separate agent.
