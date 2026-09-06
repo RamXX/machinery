@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:16:50Z
 created_by: ramirosalas
 updated_at: 2026-09-06T05:26:05Z
-content_hash: "sha256:8c9dab5785c3c61787c8cd52eb5318accb22122ed2762988541d640ffeae2933"
+content_hash: "sha256:c4f5a86143e5e0a7871f61b36bb17dd8498b7c38a93ac2a494eb3544adaca96f"
 blocked_by: [MAC-uzxr, MAC-lhu5, MAC-p7jd]
 blocks: [MAC-lnu6, MAC-ou97]
 ---
@@ -207,3 +207,18 @@ status: new
 - [ ] AC #4: substantive independent review, real generated scope and exact provenance/hash changes.
 - [ ] AC #5: six real CLI positive/negative outcomes without overclaim.
 - [ ] AC #6: exact reviewed golden updates and accepted downstream baseline handoff.
+
+### 2026-09-06T05:26:05Z ramirosalas
+## nd_contract
+status: new
+
+### evidence
+- SR PM COMPLETE BUNDLED INVENTORY CORRECTION. Canonical39 possible paths now comprise sixBUILD/eightattestations/24conditionalstandardgoldens/one new test;97 total rows across8documents,12 behavioral rows. Added checkout-split/parent and pii-flow evidence plus their6standard golden outputs. Their BUILD files and check-pii-flow-gk remain read-only. Six AC retained with migration proof expanded to8examples; exact evidence/golden amendments still require prior independent substantive/PM review, true reviewer/date/note, complete covers/scope and old provenance. No hash-only review renewal. Serial accepted p7+uzxr+lhu5 -> hgz1 -> lnu6 unchanged; lnu6 still exactly17paths/6examples/14conditionalrows/9policyblocks. Guarded ndedit external trial and exact live full-byte comparison passed; bodyb5160c7cdec3320cce415261f01a5eef963eadb0db2887e3fd59c4848046e900 verified, all prior Notes/History/Links/Comments and metadata preserved except expected hash/time. Approx1100-1900 changedLOC is a forecast, not evidence/test-edit permission. No reverse p7 dependency. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
+
+### proof
+- [ ] AC #1: Six owned BUILD conformance/context corrections pending with lnu policy blocks preserved.
+- [ ] AC #2: Go CRM local-authority migration/toolchain wording correction pending.
+- [ ] AC #3: All8 YAML documents require complete closed v2 classification; no migration performed.
+- [ ] AC #4: Substantive independent review, actual generated scope and exact provenance/hash edits pending.
+- [ ] AC #5: Eight real example positive/negative CLI matrices pending; design-only plans never current proof.
+- [ ] AC #6: Exact reviewed golden amendments and downstream six-example lnu handoff pending.
