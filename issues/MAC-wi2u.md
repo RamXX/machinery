@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:22:36Z
-content_hash: "sha256:7977496499bf75745a605c4578dfbf6fe41e7b58b06cd68d0e34c67b5f59972b"
+updated_at: 2026-09-06T09:22:37Z
+content_hash: "sha256:aa6e3d4c52c06ee2c829de8a7a9bd21325d85ab40070074f4353204188b1c7e4"
 blocked_by: [MAC-bz1y, MAC-6h0s]
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 ---
@@ -148,3 +148,22 @@ status: new
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
 - [ ] AC #7: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:22:37Z ramirosalas
+SCHEMA MARKER INSERTION AUDIT 2026-09-06
+Root-authorized supported nd edit inserted ONLY 1 valid indented schema signature line(s) into the newly authored canonical CONSUMES block. Every original byte/contract/status/evidence/history was preserved; no deletion/replacement. This repairs the mechanical label substitution, not the contract values.
+Before raw Body SHA256: 76a9499fbd7153ed2662fb8617540734366a630f16080d8f31d137d6f13019ca
+After insertion-only raw Body SHA256 (before this audit comment): 7977496499bf75745a605c4578dfbf6fe41e7b58b06cd68d0e34c67b5f59972b
+Exact inserted lines (zero-based original Body line positions shown):
+- after Body line 111: "  schema: closed required fragment union with exact Go 1.27.1 native closure and Linux amd64/Darwin arm64 execution accounting."
+Read-back pvg nd show Body exactly equals prior Body plus these insertions. Editor required expected hash, count, exact target and 13-entry total; installed pvg source revision c0957106a81346033d7b1d82fde5f434a9db6bab confirms scanner checks every historical entry.
+
+## nd_contract
+status: new
+
+### evidence
+- Signature syntax corrected via supported guarded editor; exact before/after evidence above.
+- No implementation/native proof; independent Anchor and canonical document holds remain.
+
+### proof
+- [ ] All current story ACs remain pending without weakening.
