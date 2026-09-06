@@ -805,6 +805,15 @@ actions of the five terminal states live in the oracle's state entry/exit table.
 change in this rebuild, which is exactly why the reused oracle and characterization suites are valid
 migration evidence (migration.yaml asset: oracle and characterization test suites).
 
+**Wholesale conformance obligation.** One wholesale conformance test per machine parses the committed
+`machines/<M>.oracle.md` table and `machines/<M>.machine.json` directly, never a transcription. For
+every oracle row it reconstructs the declared source state and trigger, reconciles the row against the
+machine's declared guard inputs, fires the transition, and asserts both the next state and the complete
+ordered expected-actions list, including the legitimate entry and exit semantics recorded in the
+oracle's state entry/exit table. A conformance parser that checks only row ids or next states is
+incomplete. This is a planned obligation for the rebuild's future implementation suite, not evidence
+that any suite currently runs.
+
 ### 7.2 Contract tests (per boundary, from section 4.6)
 
 One test per interface method x outcome. Repo tests run against a real disposable SurrealDB container

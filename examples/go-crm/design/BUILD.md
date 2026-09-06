@@ -788,6 +788,18 @@ actions of the five terminal states live in the oracle's state entry/exit table.
 as a literal. Compound-guard tests append the stable clause suffix (`a`, `b`, and so on) to prove each
 declared clause has an independent falsifying case.
 
+**Wholesale conformance suite (accepted implementation).** The accepted `impl` realizes this section's
+obligation as a parser-backed suite in `impl/internal/testoracle`: its parser loads each committed
+`machines/<M>.oracle.md` + `<M>.machine.json` pair and requires the parsed row and state inventories
+to equal an independent re-parse of all 197 committed transition rows across the five machines,
+reconciles fired effects including exit/transition/entry ordering and internal transitions, binds the
+closed inventory, priority, and invoke identities, requires exact structural field membership, and
+rejects malformed or incomplete tables. Native sensitivity controls fail on unsafe oracle edits and
+unexpected extra effects, and the whole `impl` suite - including the real-boundary repo and session
+tests against a temporary LadybugDB - passes green. This is bounded evidence: a Gv current row binds
+that reviewed scope by full-root content hash and does not authenticate test execution, reviewer
+identity, or full-system acceptance.
+
 ### 7.2 Contract tests (per boundary, from section 4.6)
 
 One test per interface method x outcome. Repo tests run against a real temporary LadybugDB directory
@@ -908,8 +920,11 @@ The reference shape is `impl/internal/authz/tenant_oracle_test.go`; regenerate t
 
 Four placement rows persist machine state (ARCHITECTURE.md section 7): `Deal` persists `stage`,
 `Task` and `User` persist `status` as graph node attributes, and `Session` persists its token
-(`userId` plus `expiresAt`, HMAC-signed) in `~/.crm/session`. This is a greenfield design and no
-production data exists; the protocol below binds from the first deployment onward, per machine.
+(`userId` plus `expiresAt`, HMAC-signed) in `~/.crm/session`. This target is a declared rebuild of
+the existing prototype CRM under `design/migration.yaml`: its migration phases run against the
+classified prototype exporter, schema, test suite, and disposable seed data, all nonproduction, and
+no production migration has run. The target store has no persisted instances yet; the protocol below
+binds from the first deployment onward, per machine.
 
 - **Deal.** When a `DealStage` value is renamed, split, or removed, the revision MUST ship a
   mapping table from every old persisted `stage` value to its new stage, applied once over all Deal
@@ -1057,7 +1072,8 @@ Pin the environment so two implementing agents cannot diverge. The source of tru
 
 - Go 1.26 (`go 1.26` in `impl/go.mod`); one statically linked binary.
 - `github.com/LadybugDB/go-ladybug` v0.17.0, imported only by `internal/repo/**` (C-ARCH-01).
-- `golang.org/x/crypto` v0.53.0 for argon2id (`golang.org/x/crypto/argon2`).
+- `golang.org/x/crypto` v0.55.0 for argon2id (`golang.org/x/crypto/argon2`), matching the
+  authoritative `impl/go.mod` pin.
 - Tests: the Go stdlib `testing` package only (no assertion or mocking libraries); integration
   tests run against a real temporary LadybugDB directory, no mocks.
 - The two design-gate commands an implementer runs, from the example root:
