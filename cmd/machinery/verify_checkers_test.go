@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -53,6 +54,93 @@ const (
 	checkerScratchCrashDesignEnv = "MACHINERY_CHECKER_SCRATCH_CRASH_DESIGN"
 	checkerScratchCrashRegistry  = "MACHINERY_CHECKER_SCRATCH_CRASH_REGISTRY"
 )
+
+var (
+	checkerFixtureExecutableOnce sync.Once
+	checkerFixtureExecutablePath string
+	checkerFixtureExecutableErr  error
+)
+
+func checkerFixtureExecutable(t *testing.T) string {
+	t.Helper()
+	if testing.CoverMode() == "" {
+		executable, err := os.Executable()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return executable
+	}
+	checkerFixtureExecutableOnce.Do(func() {
+		ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+		defer cancel()
+		source, err := checkerFixtureExecutableSource()
+		if err != nil {
+			checkerFixtureExecutableErr = err
+			return
+		}
+		checkerFixtureExecutablePath, checkerFixtureExecutableErr = checkerFixtureExecutableBuild(ctx, source)
+	})
+	if checkerFixtureExecutableErr != nil {
+		t.Fatal(checkerFixtureExecutableErr)
+	}
+	return checkerFixtureExecutablePath
+}
+
+func checkerFixtureExecutableSource() (string, error) {
+	_, source, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", errors.New("locate checker fixture test source")
+	}
+	if !filepath.IsAbs(source) {
+		return "", fmt.Errorf("checker fixture test source is not absolute: %q", source)
+	}
+	info, err := os.Stat(source)
+	if err != nil {
+		return "", fmt.Errorf("inspect checker fixture test source %q: %w", source, err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("checker fixture test source is not a regular file: %q", source)
+	}
+	return source, nil
+}
+
+func checkerFixtureExecutableBuild(ctx context.Context, source string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", fmt.Errorf("compile checker fixture executable: %w", err)
+	}
+	if !filepath.IsAbs(source) {
+		return "", fmt.Errorf("checker fixture test source is not absolute: %q", source)
+	}
+	info, err := os.Stat(source)
+	if err != nil {
+		return "", fmt.Errorf("inspect checker fixture test source %q: %w", source, err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("checker fixture test source is not a regular file: %q", source)
+	}
+	if cmdTestControlRoot == "" {
+		return "", errors.New("create checker fixture executable without test control root")
+	}
+	dir, err := os.MkdirTemp(cmdTestControlRoot, "checker-fixture-")
+	if err != nil {
+		return "", fmt.Errorf("create checker fixture executable directory: %w", err)
+	}
+	executable := filepath.Join(dir, "checker-fixture.test")
+	cmd := exec.CommandContext(ctx, "go", "test", "-c", "-cover=false", "-o", executable, ".")
+	cmd.Dir = filepath.Dir(source)
+	cmd.Env = environmentWithOverrides(os.Environ(), []string{"GOFLAGS=-cover=false"})
+	cmd.WaitDelay = time.Second
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := processcontrol.Run(ctx, cmd); err != nil {
+		return "", fmt.Errorf("compile checker fixture executable: %w; stdout=%q stderr=%q", err, stdout.String(), stderr.String())
+	}
+	if stdout.Len() != 0 || stderr.Len() != 0 {
+		return "", fmt.Errorf("compile checker fixture executable emitted unexpected output: stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	return executable, nil
+}
 
 func TestCheckerToolInventoryRejectsEntryBeyondFixedCeiling(t *testing.T) {
 	dir := t.TempDir()
@@ -337,10 +425,7 @@ func writeScript(t *testing.T, body string) string {
 // writeRegistryFile writes a registry YAML file and returns its path.
 func writeRegistryFile(t *testing.T, body string) string {
 	t.Helper()
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
+	executable := checkerFixtureExecutable(t)
 	engineJSON, err := json.Marshal([]string{executable, "-test.run=^TestCheckerProcessFixture$", "--", checkerProcessFixtureMarker, "oci-engine"})
 	if err != nil {
 		t.Fatal(err)
@@ -368,10 +453,7 @@ func writeRegistryFile(t *testing.T, body string) string {
 
 func checkerFixtureEngineArgs(t *testing.T, mode string) string {
 	t.Helper()
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
+	executable := checkerFixtureExecutable(t)
 	encoded, err := json.Marshal([]string{executable, "-test.run=^TestCheckerProcessFixture$", "--", checkerProcessFixtureMarker, mode})
 	if err != nil {
 		t.Fatal(err)
@@ -1625,10 +1707,7 @@ func mustReadProcessFile(path string) []byte {
 
 func checkerProcessFixtureCommand(t *testing.T, mode string) []string {
 	t.Helper()
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
+	executable := checkerFixtureExecutable(t)
 	return []string{executable, "-test.run=^TestCheckerProcessFixture$", "--", checkerProcessFixtureMarker, mode}
 }
 
