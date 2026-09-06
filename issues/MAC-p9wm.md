@@ -8,8 +8,8 @@ labels: [docs, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:22:50Z
-content_hash: "sha256:d1e55b566026a6a5656bd7010552853776042d05c6323e23b8a960cf0cbc03f0"
+updated_at: 2026-09-06T12:23:20Z
+content_hash: "sha256:e493db202a47359fc1cbbf67241528bc39f0151132007e709e4495bf847ebaf4"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 assignee: dev-MAC-p9wm
@@ -325,6 +325,35 @@ status: new
 
 
 ## Notes
+## Implementation Evidence
+
+PROOF:
+
+### CI/Test Results
+Commands run:
+- `git diff --check a94e768adf461178e0562ad135c7c06d8163a3a4 2a63e4bb0d7b57c42dfd6f45fecfdc4f8a18cfbf -- docs/native-custody-contract.md docs/test-assurance-contract.md`
+- exact two-path identity, mode, byte reconstruction, relative-link, heading/fence, candidate-object, conflict, and contamination checks recorded in the prior evidence block and immutable report
+- `pvg verify docs/native-custody-contract.md docs/test-assurance-contract.md --format text`
+Summary: bounded documentation checks PASS with 0 final failures; 0 product/native tests run and 0 applicable; independent complete-prose PM review pending.
+Coverage: N/A (docs-only publication).
+
+### Commit
+Commit SHA: 2a63e4bb0d7b57c42dfd6f45fecfdc4f8a18cfbf
+Base SHA: a94e768adf461178e0562ad135c7c06d8163a3a4
+
+### AC Verification
+- [x] AC #1: status/trust/standalone/unproved contract published.
+- [x] AC #2: exact API/lifetime/ownership/budget contract published.
+- [x] AC #3: exact runtime/service/profile/cleanup contract published.
+- [x] AC #4: live-first/migration/native-matrix contract published.
+- [x] AC #5: one-line companion and exact accepted-byte reconstruction.
+- [ ] AC #6: developer artifacts delivered for independent PM review.
+- [ ] AC #7: developer bounded checks pass; independent prose/render review pending.
+- [x] AC #8: exact developer evidence and true-EOF contract recorded.
+
+LEARNINGS:
+- Parser-required evidence labels must begin at column zero in Notes; the final authoritative contract remains a true-EOF Comment.
+
 ## Implementation Evidence
 
 PROOF:
