@@ -394,6 +394,11 @@ func TestAttestImplementationCLI(t *testing.T) {
 	t.Run("C-complete-sole-current-warning", func(t *testing.T) {
 		root := t.TempDir()
 		f := &cliReviewFixture{root, filepath.Join(root, "design"), filepath.Join(root, "src")}
+		for _, path := range []string{f.design, f.impl} {
+			if err := os.MkdirAll(path, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
 		copyDirInto(t, "../../examples/go-crm/design", f.design)
 		copyDirInto(t, "../../examples/go-crm/impl", f.impl)
 		cliReviewGit(t, f.root, "init", "-q")

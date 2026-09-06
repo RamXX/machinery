@@ -102,7 +102,8 @@ func hookReviewNoCurrent(t *testing.T, g *gates.Gate) {
 func hookReviewFixture(t *testing.T, scenario hookReviewScenario) string {
 	t.Helper()
 	root := t.TempDir()
-	cfg := Config{Design: "design", Impl: "src", Gates: "gv", Strict: scenario.Strict}
+	enabled := true
+	cfg := Config{Design: "design", Impl: "src", Gates: "gv", Hooks: &enabled, Strict: scenario.Strict}
 	if scenario.Empty {
 		cfg.Gates = ""
 		cfg.Impl = ""
@@ -112,6 +113,9 @@ func hookReviewFixture(t *testing.T, scenario hookReviewScenario) string {
 		t.Fatal(err)
 	}
 	writeFile(t, filepath.Join(root, ConfigName), string(config))
+	if _, ok, warning := Load(root); !ok || warning != "" {
+		t.Fatalf("hook fixture configuration invalid: ok=%t warning=%s", ok, warning)
+	}
 	writeFile(t, filepath.Join(root, "src", "handler.go"), hookReviewSource)
 	writeFile(t, filepath.Join(root, "design", "receipt-cleanup.txt"), "owned cleanup witness\n")
 	if scenario.Wave {
