@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:13:52Z
-content_hash: "sha256:e48e60d55dc1597833c7aba1e728f01b1e18e6553b995579152ce6a582a2a13a"
+updated_at: 2026-09-06T01:14:09Z
+content_hash: "sha256:e330aceb0262a645b5c10a76b1d3821306a071c94071e2568f41994d906c6d87"
 blocks: [MAC-vx24, MAC-ou97]
 ---
 
@@ -99,6 +99,24 @@ Runtime classification: service-free Go/native filesystem/local CLI only; no Doc
 ## Notes
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 SCOPE REPAIR / SOURCE-VERIFIED COMPLETE SHIPPED GUIDANCE
+## nd_contract
+status: new
+
+### evidence
+- Bounded Sr PM scope repair; all five user AC preserved; status open, hard-tdd, unclaimed and existing downstream dependencies unchanged.
+- Exact epic 6cb2d974 source scan found nine active shipped exemptions and six adjacent BUILD subject hash records. Root approved 17-path/~500-LOC forecast. MAC-vx24 already depends on this story; no deferral or new feature.
+- Inspected cmd/machinery/tokensequal.go, oracle_test.go:757-813, golden_test.go and check.go; existing oracle tests/helper bytes remain unchanged. Codebase graph lookup/coverage was best effort, exact committed source used for findings.
+- Canonical scope is not PM frozen-fixture/evidence amendment authorization. Independent reviewer approval of exact prose/evidence deltas is required before writes; only exact reviewed BUILD subject hashes may refresh afterward, never other claims, schemas, acceptance or history.
+- Scoped backlog lint PASS (33 issues, 0 errors/review findings), dependency cycles none; RTM PASS with 0 extracted requirements/18 stories is structural only, not AC verification. Initial CONSUMES formatting lint errors corrected; all five AC preserved.
+- No source/test/docs/installed assets or worktree edits; no runtime proof performed during backlog repair. Required real CLI/guidance RED controls and post-refresh gate checks remain pending.
+
+### proof
+- [ ] AC #1: all nine shipped guidance surfaces remove frozen-edit exemptions; exact bytes/inventory and evidence revision/replay required.
+- [ ] AC #2: honest CLI help/output/docs without semantic or formatting-only proof claims.
+- [ ] AC #3: executable quoted-literal and indentation-sensitive semantic counterexamples plus real CLI negatives.
+- [ ] AC #4: genuine whitespace utility controls and prior custody/exit behavior preserved.
+- [ ] AC #5: actual built CLI, all-nine-surface tests and six post-refresh Gv checks, service-free and standalone.
+
 
 ## nd_contract
 status: new
