@@ -11,7 +11,7 @@ updated_at: 2026-09-06T10:30:30Z
 content_hash: "sha256:89bbcf98abc5131e1198e8841aa28b3fa3c570862ef2be898b85b1352dfdafdc"
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36, MAC-a89e]
 assignee: dev-MAC-l7m0
-labels: [delivered]
+labels: [delivered, accepted]
 closed_at: 2026-09-06T10:30:30Z
 close_reason: "Independent PM approved exact standalone documentation projection and all A1-A6; full review SHA256 b7c57fcb51d64b332c1baef0b8d9d2f986968042b58e9dc233de1f9865a1cc8d; no native implementation proof claimed."
 ---
