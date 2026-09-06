@@ -1,19 +1,20 @@
 ---
 id: MAC-p9wm
 title: "Publish standalone native custody contract"
-status: in_progress
+status: closed
 priority: 0
 type: task
 labels: [docs, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:24:03Z
-content_hash: "sha256:3fd5b939a9415988877fb4fe0e6a09e860e7dda5e1f7c0632843aac26b20df61"
+updated_at: 2026-09-06T12:31:38Z
+content_hash: "sha256:e3e7436904c211526cb43067b88718713a055c3e4d9bdab6c1d624a06f80f8d5"
 related: [MAC-l7m0]
-blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 assignee: dev-MAC-p9wm
 follows: [MAC-l7m0, MAC-uzxr]
+closed_at: 2026-09-06T12:31:38Z
+close_reason: "Accepted: independent whole-prose review verified AC1-AC8, original plus all 19 negative mutants, exact two-path Git object/byte preservation, Pandoc structure/link rendering, and honest docs-only proof limits; frozen PM report /tmp/MAC-p9wm-pm-review.Hf8lA2/REPORT.md SHA256 19c0c4be6b4eb4b7035db3e9e576352ad1cfd3b24f414e287be7d8dfded38f8e"
 ---
 
 ## Description
@@ -412,10 +413,13 @@ status: delivered
 - 2026-09-06T12:12:01Z claimed by dev-MAC-p9wm
 - 2026-09-06T12:21:36Z status: in_progress -> in_progress
 - 2026-09-06T12:21:36Z auto-follows: linked to predecessor MAC-uzxr
+- 2026-09-06T12:31:38Z status: in_progress -> closed
+- 2026-09-06T12:31:39Z dep_removed: no_longer_blocks MAC-qlw2
+- 2026-09-06T12:31:39Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-06T12:31:39Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-qlw2]], [[MAC-vx24]], [[MAC-ou97]]
 - Related: [[MAC-l7m0]]
 - Follows: [[MAC-l7m0]], [[MAC-uzxr]]
 

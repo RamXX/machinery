@@ -9,12 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
 updated_at: 2026-09-06T12:05:48Z
-content_hash: "sha256:8de87b773eb1cd60d63b289cc6f5d6c81cd524df91035f9853547ae5cc41dfaa"
+content_hash: "sha256:85055f293ff91ad624c3c94d719b62ee2381f024fb36a7eaf5b20b51fd58943b"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
-was_blocked_by: [MAC-l7m0]
+was_blocked_by: [MAC-l7m0, MAC-p9wm]
 assignee: dev-MAC-qlw2
 follows: [MAC-l7m0]
-blocked_by: [MAC-p9wm]
 ---
 
 ## Description
@@ -120,12 +119,12 @@ status: in_progress
 - 2026-09-06T10:33:11Z auto-follows: linked to predecessor MAC-l7m0
 - 2026-09-06T10:33:11Z claimed by dev-MAC-qlw2
 - 2026-09-06T12:04:53Z dep_added: blocked_by MAC-p9wm
+- 2026-09-06T12:31:39Z dep_removed: was_blocked_by MAC-p9wm
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-cn7q]], [[MAC-6h0s]], [[MAC-vx24]], [[MAC-ou97]]
-- Blocked by: [[MAC-p9wm]]
-- Was blocked by: [[MAC-l7m0]]
+- Was blocked by: [[MAC-l7m0]], [[MAC-p9wm]]
 - Follows: [[MAC-l7m0]]
 
 ## Comments
