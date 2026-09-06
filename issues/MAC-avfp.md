@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:31Z
-content_hash: "sha256:8ef8b342d4606020379116dce60d97a755229942285c40f7c78acdcc612ced72"
+updated_at: 2026-09-06T09:22:37Z
+content_hash: "sha256:2f5c4fbb44998fe45b43c5ca955a87a1cacc19cc5fcb33e99b2ca1601f333487"
 blocked_by: [MAC-bz1y, MAC-6h0s]
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 ---
@@ -125,6 +125,7 @@ CONSUMES:
   spec: Adapter, SuiteRequest{Inputs InputView;Suite Suite;Source BundleRef;Scratch string;Runtime RuntimeHandle;Scope processscope.Scope;Limits Limits}, EventSink func(Event) error and machinery.tdd.event/v1 normalized identities; PreparedSuite is opaque and cannot be deserialized.
 - MAC-bz1y: scripts/integration-lane/assurance_catalog.go
   MAC-6h0s: closed required fragment union with exact Node 26.8.1 and TypeScript 7.0.2 native closure and Linux amd64/Darwin arm64 execution accounting.
+  schema: closed required fragment union with exact Node 26.8.1 and TypeScript 7.0.2 native closure and Linux amd64/Darwin arm64 execution accounting.
 - MAC-qlw2: internal/processscope/scope.go
   spec: Scope.Run(context.Context, Command, Streams) (Result, error); use remaining absolute budget and owned child scope, never direct unowned subprocess.
 - MAC-l7m0: docs/test-assurance-contract.md
