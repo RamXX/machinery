@@ -2,9 +2,9 @@
   "id": "referenceDataCommand",
   "initial": "idle",
   "_role": "operational",
-  "_comment": "One short-lived operational envelope per analyst reference-data command. The actor performs the deterministic invariant-carrying transform or versioned upsert; success and failure are terminal command outcomes, and no reference-data entity is given a synthetic lifecycle.",
+  "_comment": "One short-lived operational envelope per analyst reference-data command. The actor performs the deterministic invariant-carrying transform or versioned upsert; success and failure are terminal command outcomes, and no reference-data entity is given a synthetic lifecycle. The envelope carries RESOLVED outcomes only: a publication that remains unresolved after drain has no failed-row delivery and is reported as an unknown-outcome residual outside this machine.",
   "_delays": {
-    "COMMAND_TIMEOUT": "20000 ms - upper bound for one provider-backed refresh, versioned upsert, or candidate-set build"
+    "COMMAND_TIMEOUT": "20000 ms - publication-admission deadline shared by preparation and publication for one provider-backed refresh, versioned upsert, or candidate-set build; preparation never resets it; not a total command return bound"
   },
   "context": {
     "commandId": null,
