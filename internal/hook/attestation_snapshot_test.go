@@ -105,7 +105,7 @@ func hookReviewFixture(t *testing.T, scenario hookReviewScenario) string {
 	enabled := true
 	cfg := Config{Design: "design", Impl: "src", Gates: "gv", Hooks: &enabled, Strict: scenario.Strict}
 	if scenario.Empty {
-		cfg.Gates = ""
+		cfg.Gates = "g4,gt"
 		cfg.Impl = ""
 	}
 	config, err := json.Marshal(cfg)

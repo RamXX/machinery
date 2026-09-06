@@ -410,16 +410,18 @@ func TestAttestImplementationCLI(t *testing.T) {
 			t.Fatalf("acceptance fixture: %v %v", files, err)
 		}
 		for _, path := range files {
-			var row map[string]any
-			if err := yaml.Unmarshal(cliReviewRead(t, path), &row); err != nil {
-				t.Fatal(err)
+			lines := strings.Split(string(cliReviewRead(t, path)), "\n")
+			commits := 0
+			for i, line := range lines {
+				if strings.HasPrefix(line, "commit: ") {
+					lines[i] = fmt.Sprintf("commit: %q", anchor)
+					commits++
+				}
 			}
-			row["commit"] = anchor
-			b, err := yaml.Marshal(row)
-			if err != nil {
-				t.Fatal(err)
+			if commits != 1 {
+				t.Fatalf("acceptance fixture %s: want exactly one root commit line, got %d", path, commits)
 			}
-			cliReviewWrite(t, path, string(b))
+			cliReviewWrite(t, path, strings.Join(lines, "\n"))
 		}
 		var old map[string]any
 		if err := yaml.Unmarshal(cliReviewRead(t, filepath.Join(f.design, gates.AttestationsFileName)), &old); err != nil {
