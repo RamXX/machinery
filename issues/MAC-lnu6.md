@@ -9,10 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:05:28Z
-content_hash: "sha256:35bcc2c4be5e052b14af6bb4092ad995a8b7783d5a7133951f5290a154dcac3a"
+content_hash: "sha256:23b32c4badaaf2325280bc25beea6d4179502cba8d3ead17c9ec2b34511c78ad"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
+blocked_by: [MAC-hgz1]
 ---
 
 ## Description
@@ -468,10 +469,12 @@ Historical original canonical Description (superseded only as active scope; pres
 - 2026-09-06T02:22:34Z status: open -> in_progress
 - 2026-09-06T02:22:34Z auto-follows: linked to predecessor MAC-olrx
 - 2026-09-06T02:22:34Z claimed by dev-MAC-lnu6
+- 2026-09-06T03:17:09Z dep_added: blocked_by MAC-hgz1
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]]
+- Blocked by: [[MAC-hgz1]]
 - Follows: [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]]
 
 ## Comments
