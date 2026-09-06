@@ -9,12 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
 updated_at: 2026-09-06T13:11:01Z
-content_hash: "sha256:b214fc59af59083395235ec1b06832456e65834ee197e5959131b903757e44f3"
+content_hash: "sha256:63d7e3b4c406dbd281052df9af371b9c3c46d0ee7430ab1042ebfc16b20a72fd"
 related: [MAC-l7m0]
 assignee: dev-MAC-p9wm
 follows: [MAC-l7m0, MAC-uzxr]
 closed_at: 2026-09-06T12:31:38Z
 close_reason: "Accepted: independent whole-prose review verified AC1-AC8, original plus all 19 negative mutants, exact two-path Git object/byte preservation, Pandoc structure/link rendering, and honest docs-only proof limits; frozen PM report /tmp/MAC-p9wm-pm-review.Hf8lA2/REPORT.md SHA256 19c0c4be6b4eb4b7035db3e9e576352ad1cfd3b24f414e287be7d8dfded38f8e"
+led_to: [MAC-yig6]
 ---
 
 ## Description
@@ -434,6 +435,7 @@ status: delivered
 - Parent: [[MAC-ui8a]]
 - Related: [[MAC-l7m0]]
 - Follows: [[MAC-l7m0]], [[MAC-uzxr]]
+- Led to: [[MAC-yig6]]
 
 ## Comments
 
