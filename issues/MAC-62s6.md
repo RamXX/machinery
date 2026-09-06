@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:30Z
-content_hash: "sha256:24df6b74dfb384fe489262610f2d8664e137cd9da5c2fb228a8d4339ef907a1f"
+updated_at: 2026-09-06T09:22:35Z
+content_hash: "sha256:4b99a8c06faaa14c6fd26108fa092c6cd54263e2b73fd81b408630eda02ce039"
 blocked_by: [MAC-p9z1]
 blocks: [MAC-sqpt, MAC-u4oo, MAC-vx24, MAC-ou97]
 ---
@@ -113,6 +113,7 @@ PRODUCES:
 CONSUMES:
 - MAC-p9z1: internal/tdd/store.go
   MAC-6h0s: machinery.tdd.store/v1, machinery.tdd.head/v1, immutable object/head archive and external 0700 store; Capture(ctx context.Context, req CaptureRequest) (BundleRef, error), Status(ctx context.Context, req StatusRequest) (StatusReport, error).
+  schema: machinery.tdd.store/v1, machinery.tdd.head/v1, immutable object/head archive and external 0700 store; Capture(ctx context.Context, req CaptureRequest) (BundleRef, error), Status(ctx context.Context, req StatusRequest) (StatusReport, error).
 - MAC-6h0s: internal/gates/assurance_inventory.go
   spec: AssuranceInventory(design string) (tdd.Inventory, error); tdd.Validate(plan Plan, manifests []Manifest, inventory Inventory) error.
 - MAC-l7m0: docs/test-assurance-contract.md
