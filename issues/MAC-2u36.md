@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:35:50Z
-content_hash: "sha256:c70b783cabd904cb4d2246310c92aacabed990c05cbcaea46409c30884d69ccc"
+updated_at: 2026-09-06T02:37:14Z
+content_hash: "sha256:bfb42f6a5794977c0e6ccf5d4da17d0e9298905871ccb39d85456660b74af214"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -546,6 +546,113 @@ Delivery and final-gate obligations:
 - The final epic/held contributor gate still owns complete required platform and external runtime verification. Case-alias negative needs a filesystem able to materialize both names; official Structurizr cache proof needs its official-archive lane; OCI golden needs its explicitly provisioned engine lane (held221525d CI already sets MACHINERY_REQUIRE_OCI_GOLDEN in that lane). This decision neither proves those outcomes nor asserts all their enabling policy is already wired. Their final required proof stays pending with its existing owner; no new policy choice or automatic duplicate bug is inferred solely from these known prerequisites/skips.
 - If later review finds overlap, an unexpected failed assertion or a missing required MAC-2u36 outcome, this bounded confirmation does not waive it. Normal full GREEN delivery review remains independent and may reject inadequate proof. No source/test/runtime/installed asset/remote action is requested now; only the narrow scope decision is recorded.
 CANONICAL DOCUMENTATION DIVISION — root-authorized independent PM split. No implementation or test waiver.
+# Independent GREEN review — MAC-2u36
+
+Candidate: 15252d255fa12a131fbc2cdb13f593a212fd4ccb; production: 0ad71eba545083e0836792f6f2e307604182e2dd. Review date: 2026-09-06 UTC. Decision: ACCEPTED. Implementation and required proof meet all seven ACs; documentation is explicitly bound to the downstream consumer story before final release.
+
+## Current independent work
+
+Read the current canonical seven ACs, scope, actual delivered terminal contract and relevant complete authorization history through shared pvg issues show. Read the complete composed GREEN report, complete repaired-RED freeze, finite composed-budget decision and three-skip delivery-scope decision. The report's earlier healthy hold is superseded only by the later actual delivered contract; its historical runtime results remain unchanged.
+
+Created only a PM-owned detached checkout at the exact candidate for fresh source/static verification. No runtime replay was necessary: primary current-SHA runtime evidence is complete, trustworthy and independently reconciled below. This is an independent complete evidence/source review, not fresh PM execution of the native or CLI matrix. No -cover, race, monolithic native pass or full-preflight result is claimed.
+
+Fresh git diff --check f24b2df HEAD passed. Fresh pvg story verify-tdd --base f24b2df passed 13 commits, zero unauthorized edits/merge skips. Exact baseline53572ef..candidate15252d2 diff contains ONLY install.go, receipt.go and update.go: all repaired frozen tests are byte-identical. Candidate production equals retained0ad71eb and baseline production equals original496963f. Authoring history is honest: the separately authorized oracle repairs followed the retained GREEN commit and were independently re-RED against unchanged old production; they were not silently authored before GREEN or weakened by its author.
+
+All seven frozen SHA256 values match the complete re-freeze:
+- bootstrap_receipt_test.go a49618fbbfb5eb7d683beed8111677ea718fe16097c962c1c9ee18690614af80
+- bootstrap_receipt_writer_unix_test.go 18bfe7e3834089b9b09b6bbdd83a064f61fefcaeb50494bc0d976b7e2624b77f
+- bootstrap_receipt_writer_other_test.go c956a651cb194a71807de2a19f6389be70c169ec41c2147f16458ec65e440391
+- update_receipt_fixture_test.go 5c239c670a26fbed20a709d585ce606dc49de159cd80daf136d9c3c421a99157
+- update_test.go a9c46ba692fd28d5fccc10dae801c13542c240d79be80819f60e4e7e2657715c
+- receipt_test.go a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48
+- install_test.go d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba
+
+Fresh pvg verify on the exact nine changed files returns exit1, six heuristics; it is NOT clean PASS. All six were independently read and semantically resolved: pluginStderrDiagnostic returns empty only for empty stderr; installFileChangeID returns empty when extra platform change identity is unavailable while callers retain identity/mode/size/modtime checks. These five branches are unchanged by GREEN. The nine-code-line complementary-platform classifier explicitly returns unsupported error; it is a complete required function, not a stub or absent implementation. No suppression/padding or test mutation is needed. Go signatures type all new functions; no new config registration, production dependency or public bypass. No actual incomplete implementation was found.
+
+Graph Verify discovery/trace used the existing main graph, generation2026-09-05T23:58:53Z, with full requested pages and coverage lookup. Main metadata_match/no_recorded_issue is best-effort only and does not describe this detached candidate. New bootstrap/helper files are absent from main graph. Exact committed source/diffs supplied candidate truth, including new finalization methods and every authorization-sensitive helper. No graph completeness/absence claim substitutes for source reading.
+
+## Runtime provenance and reconciliation
+
+Independently hashed and parsed every native raw artifact, reconciled all starts/terminals and exact native top-level names against the previously compiled exact-candidate inventory, and compared the composed named JSON inventory with raw outcomes/durations.
+
+All artifacts below are under /tmp/machinery-MAC-2u36-green.G05gWz:
+- 15252d2-COMPOSED_GREEN_REPORT.md SHA2566b5d9ac79fab9bdd16c8502a2d08245458e3c2cb4a726f3eab4101d860b4ab6d
+- 15252d2-composed-inventory.json SHA2562822be70f16dfefd6ac9d74ee73b4c91f9493b916ab55c0e71a4eefbb82d8a75
+- 15252d2-delivered-readback.json SHA256035ffca2d09812ab8f7a20fe50200e24fc0da73e0bdaa87c6ba4c7ccf048c75e
+- 15252d2-full-green.jsonl SHA2562d5eb852990952e57e6bcf2c5aff3618821da4c2e16744240b25eab6f25348da
+- 15252d2-A-cli-remainder.jsonl SHA2566160539baab5d35556e585eedebb4261ddef556a53a21780fb596aecb67cd497
+- 15252d2-B-install-complement.jsonl SHA2568178d0ee0f984fc07638b6056c79fb30dfdb043a510b38eef4aa9f62cb276724
+- 15252d2-C-cmd.jsonl SHA256bdd17c7579cfd52a54d8002350de4f2d89ce8619fc3096574ffd632f827ec0c2
+
+Exact commands and outcomes:
+1. go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json: historical package TIMEOUT900.473s/exit1, 35 terminal PASS leaves/0 assertion FAIL/0 SKIP.42 starts40 terminals; original CLI parent and its one just-started leaf were interrupted. No full-package PASS credit.
+2. A: go test -count=1 -timeout=7m ./internal/install -run '^TestBootstrapReceiptCLI$/(missing_prestate_later_target_failure_rolls_back_bootstrap_true|corrupt_receipt|unsafe_receipt|stale_schema|plugin_discovery_failure|symlink_native_artifact|non-directory_native_parent|interrupted_download_recovers_real_transaction)$' -json:8PASS0FAIL0SKIP184.383s,9starts9terminals.
+3. B: go test -count=1 -timeout=15m ./internal/install -skip '^TestBootstrapReceiptCLI$' -json:412PASS0FAIL0SKIP145.642s,463starts463terminals, exact189/189native top names.
+4. C: go test -count=1 -timeout=15m ./cmd/machinery -json:399PASS0FAIL3SKIP200.934s,437starts437terminals, exact263/263native top names.
+
+Independently rebuilt the 85-leaf story union from baseline names and actual terminal results:32 actual CLI leaves (24 completed prior +8 A) and53 nonCLI from B;85/85PASS0SKIP, no missing or unexpected. Prior11nonCLI results are duplicates and not extra credit. B includes the three repaired legacy controls outside the story regex. The original TestBootstrapReceiptCLI parent remains explicitly composed, not a fabricated whole-parent terminal result. Original timeout remains a failed package invocation; the independently authorized finite complement repairs missing verification, not history.
+
+B412raw passing leaves are402behavioral +10dormant helpers; C399raw passing leaves are394behavioral +5dormant helpers. All fifteen helper identities match the report/inventory and are not additional behavioral proof. Actual helper subprocess behavior is established by parent assertions. Native install union is434behavioral PASS +10scaffolding records,0skip. Exact inventory/raw differences:0 for both native packages, including durations and action classifications. No new assertion/panic/build/race-warning failure in terminal A/B/C.
+
+The only C skips are TestValidateC4ExportInventoryIsPortableClosedAndStable (case-alias fixture unavailable on this filesystem), TestProvisionOfficialStructurizrArchiveAndReuseCache (official archive lane not selected), and TestVerifyCheckersPiiFlowEngineGolden (provisioned OCI lane not selected). None earns full behavioral PASS. Read and independently considered DELIVERY_SCOPE.md: these flow through unchanged C4/export/provision/checker modules, not the three changed installer bodies; shared libraries are unchanged. The explicit user targeted-testing scope and downstream final gate apply. All required installer/receipt/lock integrations executed. No infrastructure absence, external-lane success, race runtime fit or final-gate waiver is inferred.
+
+Authority artifacts independently hash-verified:
+- /tmp/machinery-pm-MAC-2u36-joint.J3jcK7/COMPLETE_RERED_FREEZE.md SHA25697d7437738d815b81f411d90382a23708303f9bf6d4d802bd33e52c85cdab2c3
+- /tmp/machinery-pm-MAC-2u36-budget.FBiyzE/BUDGET_DECISION.md SHA2562f87aa9e02e81028f3e2ad1a699b63ec1e038cff429d4bc2951b2b62924325cf
+- /tmp/machinery-pm-MAC-2u36-budget.FBiyzE/DELIVERY_SCOPE.md SHA25686f22b8eef256784a992053bbcf6a7933e89ac9fefe85311bf4722b1fd284a41
+
+## Seven-AC implementation assessment
+
+AC1 PASS: updatePlan still rejects bootstrap with explicit selectors first; it loads the receipt fail-closed and delegates to ordinary buildRefreshPlan when one exists. That preserves recorded home groups/native copy modes/plugin obligations and ordinary relevant discovery. Absent receipts retain the existing plugin-aware default path. Exact plan/default/schema1/selectors and actual ordinary/bootstrap convergence cases pass. Existing UpdateOptions comment was corrected.
+
+AC2 PASS: no receipt parser/schema/topology/inventory/digest/permission/ownership validation is removed or relaxed. The original private receipt proof remains byte-identical and passes in B: matched valid schema1/schema2, actual0700config/0600regular receipt, typed malformed/wrong-type errors, exact wrapper removal and intended detail. Schema2 has independent six-root content-digest fixtures and single-category inventory/digest mutations, including normalized valid reversed order. Actual CLI malformed/permissions/schema/plugin/symlink/parent cases all pass in A. Safely edited/missing regular owned artifacts pass repaired success cases; early receipt inventory is no longer demanded by children. Unsafe ownership remains rejected, including skip-plugins.
+
+AC3 PASS: all eight real intact/edited/singlemissing/multimissing ordinary/bootstrap leaves pass. The exact Codex missing file and simultaneous OpenCode missing adapter are restored from current release while both home/native mode groups, binary version/bytes, independently referenced complete content, receipt membership/digests/plugin obligations, unrelated sentinels and same-release idempotence are asserted. This is outcome proof, not success exit or metadata-only evidence.
+
+AC4 PASS: all four actual later-source rollback leaves pass, including missing-prestate ordinary/bootstrap. The real release archive lacks only the intended OpenCode adapter; tests require binary/home/Codex mutation witnesses and exact source diagnostic before full prior-state equality. Prior absence is asserted as absence. Final missing-bootstrap leaf passed in A44.64s; earlier three passed in prior invocation. Interrupted download recovery passed20.90s separately and proves PRE-mutation startup recovery only. B passes foreign-postimage/commit/rollback safety cases, including six concurrent post-image mutations and immediate pre-removal revalidation. Transaction source is unchanged.
+
+AC5 PASS: frozen matrix builds actual old/next Machinery Cobra CLIs and checksummed source archives, uses loopback releases/default runners/real child processes and temp HOME/config/bin/targets. No required integration skip or fake release CLI. Repaired legacy first/third cases remain component observers with actual downloaded-source lower-level placements, and second remains real downloaded-shell execution-wiring to an authenticated test child; these are honestly supplemental and not substituted for released-CLI integration. Parser rejects unexpected/malformed helper argv and verifies/cleans actual source snapshots. Paivot remains private tracker use with no product dependency.
+
+AC6 PASS: Update owns the operation lock and prepared journal covering binary/direct artifacts/receipt. Default children receive existing validated parent capability. beginArtifactTransaction authenticates delegated capability, prepared phase and exact covered paths before tx.delegated; Install now suppresses ONLY persisted recording for these authenticated participants. Standalone Record behavior remains. Children complete placement and held-source verification before returning; parent calls recordRefreshPlanLocked after all returned children, before tx.commit. That reloads preserved receipt ownership, accumulates selected plan without deleting unselected groups, and saves normalized fresh full inventory with validateReceipt before publication. On failure parent rolls back; existing foreign-postimage refusal is intact. Host-plugin refresh/obligations remain after direct commit.
+
+Actual current raw logs show both genuine second-Close os.ErrClosed errors at exact parent journal receipt scratch files; all four parent leaves pass. The repaired hook first checks exact canonical scratch path then F_GETFL/O_ACCMODE on the open descriptor under SyscallConn.Control. All matching writable closes count; read handles close normally. publications==1 and fault injections==1 are mandatory, with actual close error retained by Update. Unchanged persisted receipt through completed children, complete independent content/prepared coverage/current scratch payload, absence/present controls, no commit on fault, exact binary/home/native/receipt rollback, sentinels, journal cleanup and real lock reacquisition all remain frozen and passed. Earlier pathname-only reader contamination receives no fault credit. Six descriptor controls and all four authority controls pass; complementary unsupported-platform function cannot return false success.
+
+AC7 PASS: setHomeInstall retains same-canonical replacement semantics while checking every other recorded group's paths for repeated/nested overlaps before changing candidate topology. Error names conflicting paths and actionable nonconflicting retry/reconfiguration. saveReceipt refreshes real inventory then validates normalized candidate before publication; normalization alone cannot legalize bad ownership. Recording errors route through existing rollback, preserving exact receipt and placement state. Both real cross-group conflict flows pass followed by actual native install without receipt repair. Three fresh/disjoint/same-ordered-group-copy-change controls pass. No automatic regrouping, ownership deletion, selected hardcoded-target ordering or invented atomic host-plugin promise.
+
+## Documentation finding and scope disposition
+
+Mandatory freshness review found exact contradictions: README.md620-622 and docs/agent-portability.md122-124 state bootstrap updates default homes only and ignores the receipt. Candidate fixes that behavior, so these passages require correction. MAC-gcrr initially owned README but did not explicitly name this bootstrap correction or own agent-portability. Reported to dispatcher before acceptance.
+
+Resolved by independently reviewing the scope owner's canonical readback: MAC-2u36 now explicitly delegates only these documentation outputs in its Downstream documentation division; all seven implementation AC remain byte-for-byte unchanged. MAC-gcrr now explicitly owns BOTH files, precise parity/copy-mode/safe-repair/fail-closed inspection/direct-rollback/foreign-change/post-commit-host-plugin-failure guidance, regression checks rejecting both obsolete bootstrap and warning-only claims, and release guidance. It must consume accepted actual CLI evidence, not substitute text for integration. Its existing dependency on MAC-2u36 and its blocking MAC-ou97 remain intact. This satisfies the PM freshness rule's explicit scope division: no docs correctness claim is made at this commit and no stale-doc release is authorized. Actual docs edits and consumer acceptance remain required in MAC-gcrr before the final gate. No code/test alteration or rerun is needed for this tracker-only binding.
+
+## Budget and containment
+
+Measured1847changedLOC across9files:1752tests +95production(+74/-21), within the independently reviewed approximately1850 forecast. All production changes are three owned source files; no lock/transaction/target/CLI/shared helper/config changes. Extra test cost comes from mandatory real placement and actual writer-descriptor attribution, not unrelated implementation. No numeric code-coverage claim; instrumentation specifically excluded for known separately tracked MAC-yig6.
+
+No source/test/fixture edits or runtime changes during PM review. Root remained clean main497419ab4512fcff765cd5feb27aed4c67b5608d. Installed machinery SHA2565205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849 unchanged. User Dagger, live NIL installation, healthy developer worktrees, remotes and final-preflight lanes untouched.
+
+LEARNINGS: distinguish writable receipt publication from read handles sharing its path; retain current-SHA terminal leaves after aggregate timeout with finite exact complements; count helper returns as scaffolding; documentation ownership must explicitly cover new behavior before a code story is accepted.
+
+## nd_contract
+status: accepted
+
+### evidence
+- Independent complete seven-AC implementation/source/evidence review at15252d2; all85required story leaves PASS0SKIP with genuine two writer-close faults/full rollback in exact-SHA composed evidence.
+- Fresh13commit TDD audit, exact repaired-baseline test equality, seven frozen hashes, complete raw/native inventory reconciliation and semantic six-heuristic scanner review.
+- Documentation stale findings explicitly assigned in canonical MAC-2u36/MAC-gcrr contracts, with both-file regression/release obligations and existing final-gate dependencies; no implementation AC or proof weakened.
+- No runtime rerun claimed; primary proof is trustworthy current author execution independently audited. Historical timeout, unrelated3skips and15dormant helper records retain honest classifications.
+
+### proof
+- [x] AC #1: receipt-aware complete bootstrap/ordinary plan, modes/defaults/selectors verified.
+- [x] AC #2: private attributed metadata validation, unsafe ownership fail-closed and safe content repair verified.
+- [x] AC #3: all8actual convergence/repair cases with complete current content/topology/digests/idempotence pass.
+- [x] AC #4: all4actual later-source rollbacks including absent prestate and distinct interrupted recovery pass.
+- [x] AC #5: complete required built-release CLI/temp-root integration executes with no required skip.
+- [x] AC #6: authenticated child deferral, parent normalized validated publication, two actual writer faults/full rollback and authority/foreign-change preservation verified.
+- [x] AC #7: actual overlap rejection/restoration/follow-on native and supported recording controls pass.
+- [x] Product story accepted; canonical transition/readback follows.
+- [ ] Downstream MAC-gcrr docs and MAC-ou97 final platform/archive/OCI/race/preflight/release gate remain pending; epic must remain open.
+
 
 ## nd_contract
 status: delivered
