@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:22:34Z
-content_hash: "sha256:c68096aa21ab8e18a1e2d14afd8cf591c3ef27232d6c1557a0232d6e29238ac4"
+updated_at: 2026-09-06T02:30:55Z
+content_hash: "sha256:f34b0ac4e48a1d33c71ced52f9c1701a69602336c0ce9144a26ae9ae88b20fda"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
@@ -638,3 +638,43 @@ status: new
 - [x] AC #5 RED bar: standalone actual CLI and all nine real guidance paths executed, no skips.
 - [ ] GREEN implementation, exact amendment/historical truth authorization, six baseline/stale/final Gv outcomes, unchanged-golden compatibility and final PM acceptance remain outstanding.
 
+
+### 2026-09-06T02:30:55Z ramirosalas
+## MAC-lnu6 bounded GREEN stage — healthy amendment-review hold
+
+PROOF:
+- Canonical Description and last independent PM RED decision read in full. Fresh GREEN author; retained story/MAC-lnu6 worktree /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-lnu6, frozen RED0ea1fdc730aadac15cecc8de33bb95898ad91d60 on epic6cb2d974ea8aea211a5974f453cef2b5802bb11e.
+- CLI-only commit713184db16a12b8c3763b4aa8f5bf025721abf22: cmd/machinery/tokensequal.go +11/-9. Honest comments, Short/Long help and equality-output wording only; token comparison/count prefix/exit and rooted stable open/read/revalidate/close behavior unchanged. All other tracked bytes unchanged after RED; clean worktree. Overall epic diff currently2files +240/-9 including immutable RED229additions.
+- Focused actual CLI command: timeout150s go test -count=1 -timeout=120s ./cmd/machinery -run 'TokensEqual|Frozen' -json. Terminal exit1, partial GREEN26leaves17PASS/9expected guidanceFAIL/0SKIP, package1.614s, terminal2026-09-05T19:25:14.840016-07:00. Raw /tmp/MAC-lnu6-cli-713184d.jsonl SHA256ca09b37821c5217b498c5f9403823a1cd3ae8e8fcddf3a5c149dba3bc129a2b6.
+- PASS: TestTokensEqual; TestTokensEqualRejectsMutationDuringComparison; both semantic cases' executable_semantic_control, whitespace_token_utility and no_semantic_or_frozen_edit_assurance leaves; both command/root HelpDescribesOnlyWhitespaceTokens leaves; all6RealCLIUtilityControls (whitespace_reflow, empty_whitespace, token_value_changed, token_added, token_removed, missing_input); WhitespaceSuccessDoesNotAuthorizeFrozenEdits.
+- Expected FAIL: each of the9canonical paths in TestFrozenGuidanceRequiresExactIdentityAndEvidenceReplay. Each actual old owner-sanctioned formatting/token-identity exemption fails at test176 before replacement-policy assertions. Complete exact leaf inventory is in review artifact. These failures remain held by explicit independent amendment requirement; no GREEN delivery is claimed.
+- Frozen new test SHA2561138fc41a835abf3769210bdbc2dbdb1d9d2ad6db9752b14c90bf41b9945c51f; git diff frozenRED HEAD -- '*_test.go' '**/testdata/**' empty. Existing tests/helpers/goldens immutable. pvg verify cmd/machinery/tokensequal.go --format text PASS1file0issues; git diff --check clean.
+- Exact9prose old/new blocks, prospective whole-file hashes, sixattestation/14record handling proposal: /tmp/MAC-lnu6-proposal.NZsERt/REVIEW.md SHA25648889c0b61afae030244dcd90f394515a183f9e90d9126dffe0602ffbe31b21f. Proposal only; none applied.
+- Machine-readable exact deltas: /tmp/MAC-lnu6-proposal.NZsERt/guidance-deltas.json SHA256d21d80e66e18356110be1a4c1753adebf6a3440846c8286b3664da945deac011. Complete old affected records and old/proposed hashes: /tmp/MAC-lnu6-proposal.NZsERt/subject-inventory.json SHA256e08121e72aa07e230276a1e1227f761a4d7b193c52af1f5be22e5f43dfc9c0e5.
+- Proposed9prose changes+57/-31; combinedCLI+RED+prose337changedLOC before evidence. No guidance/evidence/test write authorization inferred. For all6files recommend NO mechanical hash-only historical rebinding. Proposed current re-attestation requires canonical scope extension for exactly14affected records' attestor/date/note plus BUILDhash, actual independent claim verification, and exact original provenance retention; all claimIDs/schema/otherrecords/nonBUILDcovers/hash/acceptance/history unchanged. This is an explicitly UNAUTHORIZED proposal, forecast60–100 evidencechangedLOC rather than20–40, still17paths/about500total; canonical review is required before these broader changes. Actual reviewer/date/verified findings must come from independent review, not fabricated placeholders.
+- Portfolio's2affected records each coverBUILD plus6milestonepackets: a current attestor would need full7subject review. GoCRM gt note asserts executable Go test behavior; narrow prose review/Gv cannot renew it. Historical Sept2/3reviews cannot silently claim to have examined newly amended BUILD bytes.
+- Local CLI built with timeout120s go build -o /tmp/MAC-lnu6-proposal.NZsERt/machinery ./cmd/machinery. BinarySHA2563c519c5e609f694527a40255cae932a2bd683dba17ca6826c3234ea897845e96. Each actual baseline used MACHINERY_CONFIG_DIR=/tmp/MAC-lnu6-proposal.NZsERt/config timeout30s <local-binary> check <design-dir> --gate gv. All6baselineexit0, stderr empty,0blocking. Currentartifacts/attested/owed: orders23/14/14, payments23/14/14, fulfillment56/12/12, goCRM54/13/13, portfolio52/12/12, surrealCRM48/12/12. Durations0.217831/0.208802/0.091902/0.106182/0.086750/0.099941s. Initial exploratory6passed, repeated once for individual raw exit/duration records.
+- Raw6baseline log /tmp/MAC-lnu6-proposal.NZsERt/gv-baseline.jsonl SHA2569400c61ce661483cc5019394f788dcca7098a22a5002ed820048308da1c5769e. This only proves current structural validity. Six changedBUILD stale-before-refresh and sixfinalGvchecks remain pending actualauthorizededits.
+- TestGoldenCheck/fullsuite notrun in boundedCLI stage; mandatory unchanged-golden compatibility remains after authorization. Go statementcoverage notmeasured. All5AC accounted below; no coveragepercentage falselyclaimed.
+- Bounded tracked scan git grep -n -E 'tokens-equal|token-identity proof|formatting-only amendment' -- ':!go.sum': allreturnedhits reviewed. Nineguidanceexemptionsawaitproposal, READMEcommandinventory, oldcustody/snapshotdiagnostics, frozenREDtestpatterns and currentCLIhonestwording. No natural-language completenessclaim; finalscan+directprose reviewmandatory.
+- Codebase-memory Verify graphgeneration2026-09-05T23:58:53Z,7tokensEqualresults/noextra pages,19evidencepaths+worktreescopecoveragechecked; worktreeexcluded/newtestmissing, exactsourcefallbackused. Vaultsearch no relevantreturnednotes. No remote/main/epic/history/installedasset/service/otherworktreemutation and no Paivot productdependency.
+
+LEARNINGS:
+- All six evidence files, not only GoCRM, attribute BUILD claims to historical reviewers/dates; policy changes cannot be safely represented by silent old-record hash substitution.
+- Separating CLI implementation from held fixture/evidence changes gives honest partialGREEN: fivepreviousCLIassurancefailures nowPASS while nineactualguidancefailures remain visible.
+- Full covers sets matter for re-attestation: portfolio's unchanged packets and GoCRM's execution claim need substantive independent review, not mechanical hash refresh.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Claimed retained story/MAC-lnu6; CLI713184db16a12b8c3763b4aa8f5bf025721abf22 committed; cleanworktree;26leaves17PASS/9expectedguidanceFAIL/0SKIP,1.614s; frozenRED/newandoldtestsuntouched.
+- Exactreviewartifact/hashand6baselineGvlogsabove. Nineguidance/sixevidencefilesuntouched. Independentprose/evidencedecisionpending; no implicitapproval, delivery, release or closure.
+- Healthy hold preservesclaim/worktree; broaderre-attestationmetadataextensionrequirescanonicalreview beforewrites. FrozenREDapprovaldoesnotauthorizeit.
+
+### proof
+- [ ] AC #1: exactnineguidanceamendmentsproposed; apply/replayawaitindependentauthorization.
+- [ ] AC #2: actualCLIhelp/outputhonestyPASS; docschangespending.
+- [ ] AC #3: executableGoquotedspace8to7andvalidYAMLpermissionownership1to0plusrealCLIequalandhonestyPASS; guidanceconditionpending.
+- [x] AC #4: genuinewhitespaceutility/empty/countprefix/exit/readerrorandoriginalmutationcustodyPASSunchanged.
+- [ ] AC #5: actualstandaloneCLIandallnineguidancecasesexecuted0skip; fullshippedcontractandpostamendmentGv/unchangedgoldencompatibilitypending.
