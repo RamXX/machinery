@@ -9,8 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:05:28Z
-content_hash: "sha256:1e193f5ea14ccadc89f896d12de5b6d27f27dff34eff36065df3e2e226e00c94"
-blocks: [MAC-ou97]
+content_hash: "sha256:1556a891ef232f15775a72acbabc04dc7767c810352fd799836806bdd5a5a74f"
+blocks: [MAC-ou97, MAC-hgz1]
 ---
 
 ## Description
@@ -120,10 +120,11 @@ status: new
 
 ## History
 - 2026-09-06T03:03:20Z dep_added: blocks MAC-ou97
+- 2026-09-06T03:17:08Z dep_added: blocks MAC-hgz1
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-ou97]]
+- Blocks: [[MAC-ou97]], [[MAC-hgz1]]
 
 ## Comments
 
