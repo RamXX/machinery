@@ -1,7 +1,7 @@
 ---
 id: MAC-uzxr
 title: "Bind Go CRM FSM conformance to committed oracle expectations"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, delivered]
@@ -9,10 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T08:07:54Z
-content_hash: "sha256:8c213fad1d2cbc4172500838a5c117fe319bcd16d3abbf37a13dfd8494c39316"
-blocks: [MAC-ou97, MAC-hgz1]
+content_hash: "sha256:7333d1f92e40e2c6b121dbae2c66cad8bf7baf886a7382e5db6aed8f603ae6b4"
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx, MAC-p7jd]
 assignee: dev-MAC-uzxr
+closed_at: 2026-09-06T08:07:54Z
+close_reason: "Accepted: five AC verified independently at bb5205c; 24 regression, 68 parser, 228 native and 23 meta leaves PASS, exact 43-child custody audited; canonical command and stale self-index corrections recorded."
 ---
 
 ## Description
@@ -1271,10 +1272,12 @@ status: new
 - 2026-09-06T07:43:22Z claimed by dev-MAC-uzxr
 - 2026-09-06T07:47:16Z status: in_progress -> in_progress
 - 2026-09-06T07:47:16Z auto-follows: linked to predecessor MAC-p7jd
+- 2026-09-06T08:07:54Z status: in_progress -> closed
+- 2026-09-06T08:07:54Z dep_removed: no_longer_blocks MAC-ou97
+- 2026-09-06T08:07:54Z dep_removed: no_longer_blocks MAC-hgz1
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-ou97]], [[MAC-hgz1]]
 - Follows: [[MAC-2u36]], [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]], [[MAC-p7jd]]
 
 ## Comments
