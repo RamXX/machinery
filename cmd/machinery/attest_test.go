@@ -162,7 +162,7 @@ func TestAttestRejectsIdentityAliases(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Link(first, alias); err != nil {
-		t.Skipf("hard links unavailable: %v", err)
+		t.Fatalf("create required hard-link alias fixture: %v", err)
 	}
 	out, errOut, code := runAttest(t, first, alias)
 	if code != 1 || out != "" || !strings.Contains(errOut, "alias the same file identity") {
