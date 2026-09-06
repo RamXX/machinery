@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:47:59Z
-content_hash: "sha256:cbb959ca1a5a75f0d13b30272568c66f102d752fa748d80bf8741760cc0bd0ca"
+updated_at: 2026-09-06T12:45:47Z
+content_hash: "sha256:6d0461ea87e2f9ae718e5182029589833577a628714287b2c037162dfb9e5eda"
 blocked_by: [MAC-qlw2]
 blocks: [MAC-pe9v, MAC-hpqp, MAC-vx24, MAC-ou97]
 ---
@@ -192,3 +192,61 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-06T12:45:47Z ramirosalas
+ACCEPTED PUBLIC CUSTODY CONTRACT / AUTHORITATIVE CURRENT ATTACHMENT SCOPE — 2026-09-06
+
+This true-EOF amendment consumes the accepted public custody refinement and supersedes only obsolete publication-hold references. It preserves the existing complete ELEVEN-path scope, all NINE current acceptance criteria, prior evidence/history, hard-TDD requirements and the dependency chain. It grants no source/test edit, RED, implementation, native proof, delivery or acceptance.
+
+ACCEPTED PRODUCER GROUNDING
+- MAC-p9wm is closed/accepted. Epic `2a73454d5f133a7b5fb4db0346232fd389810d28` contains `docs/native-custody-contract.md` blob `1c1581d1aec324d979593613b44976ed0007c45b` / SHA256 `bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a` and companion `docs/test-assurance-contract.md` blob `acce64fee8db5a7565e8fa33422334de125e913f` / SHA256 `171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d`.
+- Independent acceptance report SHA256: `19c0c4be6b4eb4b7035db3e9e576352ad1cfd3b24f414e287be7d8dfded38f8e`. Approved V4 architecture/review SHA256: `d56d0104e965cace70e89b3be383ff3f51377c33ea8227c86833ef731be331be` / `dfa09b70d599a83d8cde10ab31d19fe5debd1eadf4c19f86c3aea79c0a9ac1e3`.
+
+PRODUCES:
+- internal/processcontrol/scope.go -> WithScope(ctx, scope), AttachScope(cmd, scope), ExitStatus(err), preserving Run(context.Context, *exec.Cmd) error compatibility and fail-closed scoped error semantics.
+- internal/processcontrol/scope_test.go -> scoped compatibility, attachment, exit classification and malformed-input tests.
+- internal/processcontrol/run.go -> existing compatible execution entry with explicit verified custody selection and no required-path unscoped fallback.
+- internal/formal/formal.go -> actual VerifyFormalTo/runTLC chain carries inherited owner context/scope and preserves existing engine/JAR behavior.
+- internal/formal/process.go -> openFormalJava identity probe and runBoundedProcess use the same bounded owner and attach only after runtime environment sanitation.
+- internal/formal/alloy.go -> runAlloy probe and the separate real Alloy JVM use that same bounded owner/scope after sanitation.
+- internal/formal/custody_integration_test.go -> separately reviewed real TLC, Alloy, probe and normal-command custody cases.
+- internal/runtimeclosure/java.go -> explicit scoped attachment while preserving opened Java closure identity and validation.
+- internal/runtimeclosure/custody_integration_test.go -> real runtime probe/cancellation/identity evidence.
+- cmd/machinery/main.go -> error-first InheritedInternalIO acquisition and authenticated ServeInternal interception before ordinary Cobra parsing.
+- cmd/machinery/stubs.go -> ONLY newVerifyFormalCmd real context/scope handoff; every unrelated command remains unchanged.
+
+CONSUMES:
+- MAC-qlw2: internal/processscope/scope.go
+  spec: InheritedInternalIO(context.Context) (InternalIO, bool, error); (InternalIO).Close() error; Open(context.Context, Options) (Scope, error); Scope.Run/Child/Attach/Close; ServeInternal([]string, InternalIO) (bool, int), using the accepted acquisition-versus-work lifetime and error-before-bool rules.
+- MAC-p9wm: docs/native-custody-contract.md
+  schema: exact accepted constructors, validation precedence, opaque-handle ownership, attachment-after-sanitation, real owner propagation, cumulative deadline/one-cleanup-grace and fail-closed internal-service rules at SHA256 bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a.
+- MAC-p9wm: docs/test-assurance-contract.md
+  source: exact accepted formal/processcontrol/runtimeclosure and contributor attachment obligations, preserved by companion SHA256 171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d.
+- Existing exact epic source.
+  source: Run(context.Context,*exec.Cmd) error; VerifyFormalTo(string,bool,io.Writer,io.Writer) int; openFormalJava(string) (*runtimeclosure.Java,error); runBoundedProcess(context.Context,*exec.Cmd,time.Duration) (string,error); runAlloy(string,[]alloy.Command) ([]AlloyVerdict,[]string,error); newVerifyFormalCmd() *cobra.Command; OpenJava() (*Java,error); Environment(string,string,string) []string.
+
+CURRENT NINE ACCEPTANCE CRITERIA — PRESERVED AND REFINED
+1. Preserve ordinary Run and every existing callable formal/test API. Required scoped paths use explicit context/scope-bearing calls and cannot select a compatibility wrapper, `context.Background`, ambient attachment or root fallback.
+2. Constructor use is error-first. Nil/no-deadline acquisition context, prior cancellation/expiry and present-invalid intent follow the accepted precedence; only successful absence proceeds to ordinary CLI parsing. A valid internal request owns its handle through ServeInternal; malformed/untrusted activation never reaches product execution.
+3. Wire the actual command -> VerifyFormalTo -> runTLC AND runAlloy -> openFormalJava -> runBoundedProcess/processcontrol chains. Apply custody AFTER each runtimeclosure.Environment sanitation so reconstruction cannot strip or mutate it. The SAME real owner reaches probes and actual JVMs.
+4. Retain Java/JAR opened identity, snapshot/checksum/revalidation, strict output/receipt checks, existing runtime limits, cleanup and publication guarantees. Audit dependent *exec.ExitError use and preserve target-versus-custody classification through ExitStatus.
+5. Malformed ExtraFiles, conflicting SysProcAttr, stale/forged/closed/cross-scope attachment, rebuilt-environment loss or missing registration fails before Cmd.Start. No required scoped path silently falls back to unscoped execution.
+6. On native Linux amd64 AND Darwin arm64, observe active pinned JVMs before cancellation in actual provisioning/probe and suite/meta verification, across BOTH TLC and Alloy. Owned descendants terminate/reap before return while unrelated process/container controls survive; fake Java, source-only inspection and a provisioning-only wrapper do not qualify.
+7. Supplemental tests cover normal output, intended assertion failure, early parent exit, cancellation, timeout, stream overflow, attachment loss, malformed/forged/closed scope, probe/engine cleanup failure and one cumulative owner/wall budget plus shared cleanup grace. Preserve all existing formal/runtimeclosure frozen tests byte-for-byte.
+8. Before RED, publish the exact source/test/helper/fixture/config/dependency-lock and process-producing call-site inventory. MAC-hpqp consumes every required formal/TLC/Alloy/probe/command-chain leaf in its current custody fragment; an unused helper or omitted branch cannot pass.
+9. Deliver attachment implementation only. Do not own or edit `cmd/machinery/verify_checkers.go`; checker dispatch/profile belongs to MAC-yhg5. Do not rewrite MAC-hpqp’s historical frozen inputs or claim its current 96-obligation replay. Developer delivers; independent PM verifies actual native evidence.
+
+DIFF BUDGET: exactly 11 existing owned paths, forecast under 2,300 changed LOC including supplemental tests. Overrun requires explicit investigation, not invented outputs or weakened AC. qlw2 remains this story’s producer and MAC-hpqp remains its consumer; `MAC-qlw2 -> MAC-cn7q -> MAC-hpqp` is unchanged. Accepted MAC-p9wm is satisfied context, not a new blocker. All standalone/no-install/no-remote/no-preflight/no-unrelated-cleanup constraints remain.
+
+## nd_contract
+status: new
+
+### evidence
+- Accepted producer hashes and complete current eleven-path/nine-AC map are fixed above.
+- Status remains open/new and dependency direction remains qlw2 -> cn7q -> hpqp. No source/test/ref/worktree/runtime/native/preflight/remote/install action occurred.
+
+### proof
+- [x] Accepted constructor/acquisition/work-lifetime and real-owner/post-sanitation refinements are canonically consumed.
+- [x] Eleven paths, nine ACs and the checker ownership exclusion are explicit.
+- [ ] Exact before-RED inventory, implementation and both required native-host matrices remain pending.
+
