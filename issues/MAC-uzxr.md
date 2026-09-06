@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:10:06Z
-content_hash: "sha256:9cd0ae7d878d39a4025662a488e76d01d31052941e6f39fe4d1e6f712b489ce9"
+updated_at: 2026-09-06T07:11:02Z
+content_hash: "sha256:71d6bc499e7719e9467d44cb65e8e7653152abde1c56b323e64b2c6fc19a572a"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-uzxr
@@ -1317,3 +1317,18 @@ status: rejected
 - [x] AC #3: Prior specified20 real unsafe variants and matched controls retained; repaired candidate must replay them.
 - [x] AC #4: Prior exact197rows/218successfulwitnesses+10supplements/native bidirectional inventory retained; fresh candidate proof remains required.
 - [ ] AC #5: R1 repair and R2 recognized delivery9/9 plus authoritative delivered EOF contract and independent reviewed handoff remain pending.
+
+### 2026-09-06T07:11:02Z ramirosalas
+## nd_contract
+status: delivered
+
+### evidence
+- Supplemental RED candidate d3d257bd199801d88bdcce8ac8f89fdb8f6bd64c: actual14PASS10intendedFAIL0SKIP; original68contractsPASS; one added test, no source correction. Awaiting independent RED PM checkpoint; historical red-approved label does not approve this file.
+
+### proof
+- [x] Supplemental AC #1 regression: all10 specified composite-field failures and14 passing controls executed against unchanged rejected source.
+- [x] Supplemental custody: six frozen hashes/original prefix/99existingexamplefiles unchanged; committed tdd-red before replay.
+- [ ] AC #1 full contract repair requires separate GREEN after independent RED approval.
+- [ ] AC #2/#3/#4 complete final native/context/mutation/inventory evidence must be replayed on repaired candidate.
+- [ ] AC #5 whole-story acceptance and consumer handoff remain pending; this delivery is supplemental RED only.
+
