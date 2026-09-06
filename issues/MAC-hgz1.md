@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:16:50Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:24:58Z
-content_hash: "sha256:14e16f2e29ac68271527b297dd1f5cea9c19bd7c64a2180c68ce7e6eaceb4360"
+content_hash: "sha256:b65b9b76de10221343bf5cc69d5d34fb74377b5cc1e645e6ba5022aa7a17d645"
 blocked_by: [MAC-uzxr, MAC-lhu5, MAC-p7jd]
 blocks: [MAC-lnu6, MAC-ou97]
 ---
@@ -171,3 +171,23 @@ status: new
 - Blocked by: [[MAC-uzxr]], [[MAC-lhu5]], [[MAC-p7jd]]
 
 ## Comments
+
+### 2026-09-06T03:24:58Z ramirosalas
+## nd_contract
+status: new
+
+### evidence
+- Terminal tracker readback verified P0 open/unclaimed consumer,31 explicit forecast paths and six pending AC; depends on MAC-uzxr,MAC-lhu5,MAC-p7jd and blocks MAC-lnu6 plus final MAC-ou97. MAC-lnu6 keeps its original five AC,17 paths,healthy claim and frozen RED/CLI. Existing story claims/status/labels preserved.
+- Scoped backlog lint:37 issues,0 errors,0 review findings; dependency cycles:none. RTM:22 stories checked,4 closed,0 extracted requirements; structural result only, NOT acceptance-criterion proof.
+- Actual canonical headings, commands and AC read back semantically; original MAC-lnu6 AC compared exact. Root remains clean main497419ab4512fcff765cd5feb27aed4c67b5608d. No runtime/source/test/docs/evidence/golden changes occurred. All14 evidence amendments remain held for substantive review; current observed historical execution is not future parser/migration proof.
+- Created P0 consumer migration under MAC-ui8a by explicit dispatcher serialization direction; core p7 contract unchanged and not yet implemented proof.
+- PM identified unsupported14 current claims; all current evidence writes remain held. Existing reports/old prose authorization remain historical; source/claim/provenance decisions require fresh exact independent approval.
+- No source/test/docs/evidence/golden/claim/status mutation by this triage; only new tracker story/dependencies and scoped downstream contract reconciliation.
+
+### proof
+- [ ] AC #1: truthful complete conformance/context BUILD contracts with policy blocks preserved.
+- [ ] AC #2: local-authority Go CRM migration/toolchain wording resolved.
+- [ ] AC #3: complete closed v2 row classification and actual current versus planned distinction.
+- [ ] AC #4: substantive independent review, real generated scope and exact provenance/hash changes.
+- [ ] AC #5: six real CLI positive/negative outcomes without overclaim.
+- [ ] AC #6: exact reviewed golden updates and accepted downstream baseline handoff.
