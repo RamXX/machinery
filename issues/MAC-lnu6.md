@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:30:55Z
-content_hash: "sha256:f34b0ac4e48a1d33c71ced52f9c1701a69602336c0ce9144a26ae9ae88b20fda"
+updated_at: 2026-09-06T02:31:41Z
+content_hash: "sha256:561712ee3a493d15813ead3351ce9e87bd92ecfd57db9f986c947ff4786a9198"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
@@ -678,3 +678,39 @@ status: in_progress
 - [ ] AC #3: executableGoquotedspace8to7andvalidYAMLpermissionownership1to0plusrealCLIequalandhonestyPASS; guidanceconditionpending.
 - [x] AC #4: genuinewhitespaceutility/empty/countprefix/exit/readerrorandoriginalmutationcustodyPASSunchanged.
 - [ ] AC #5: actualstandaloneCLIandallnineguidancecasesexecuted0skip; fullshippedcontractandpostamendmentGv/unchangedgoldencompatibilitypending.
+
+### 2026-09-06T02:31:41Z ramirosalas
+## MAC-lnu6 current bounded-stage contract (readable terminal summary)
+
+The preceding detailed evidence and its immutable raw logs remain applicable. This is a healthy in_progress hold for independent amendment review, not a delivery.
+
+PROOF:
+- Retained branch story/MAC-lnu6 at 713184db16a12b8c3763b4aa8f5bf025721abf22. Only cmd/machinery/tokensequal.go changed after frozen RED 0ea1fdc730aadac15cecc8de33bb95898ad91d60: +11/-9, limited to comments/help/equal-output wording. Comparison, count prefix, exit codes and stable read/revalidate/close custody remain unchanged.
+- Focused command: timeout 150s go test -count=1 -timeout=120s ./cmd/machinery -run 'TokensEqual|Frozen' -json. Result: exit 1, 26 leaves, 17 PASS / 9 expected guidance FAIL / 0 SKIP, package elapsed 1.614s. All five earlier CLI assurance failures now pass. All nine guidance cases still fail on their actual old formatting/token-identity exemption, as expected while amendment authorization is held. Raw log and exact leaf inventory are in the review artifact.
+- Review artifact: /tmp/MAC-lnu6-proposal.NZsERt/REVIEW.md, SHA256 48889c0b61afae030244dcd90f394515a183f9e90d9126dffe0602ffbe31b21f. Includes exact nine old/new prose blocks, prospective BUILD hashes, complete six-file / 14-record evidence inventory, exact runtime logs and decisions needed. Companion guidance-deltas.json and subject-inventory.json in the same directory are immutable proposals.
+- All six actual baseline Gv commands passed with exit 0, empty stderr and zero blocking findings. Binary built locally from the CLI commit; private MACHINERY_CONFIG_DIR, finite timeouts, no installed binary used. Baseline raw log: /tmp/MAC-lnu6-proposal.NZsERt/gv-baseline.jsonl, SHA256 9400c61ce661483cc5019394f788dcca7098a22a5002ed820048308da1c5769e.
+- Frozen test SHA256 remains 1138fc41a835abf3769210bdbc2dbdb1d9d2ad6db9752b14c90bf41b9945c51f. All existing tests/helpers/goldens and all guidance/evidence files are untouched. Worktree clean; diff --check clean; pvg verify passed (1 file, 0 issues). No skips, mocks, Paivot product dependency, remote mutation or user-service/installed-asset changes.
+- Exact proposed guidance: +57/-31. Combined CLI, frozen RED and proposed prose: 337 changed lines before evidence. Recommendation: reject silent hash-only historical rebinding for all six evidence files. A current re-attestation requires explicit canonical extension of the 14 affected records' attestor/date/note plus BUILD hash, actual independent verification of each complete claim/coverage set, and preserved original provenance. No broader write is authorized or performed. Estimate 60–100 evidence changed lines instead of 20–40, retaining 17 paths and approximately 500 total; this is a scope-review request, not inferred permission.
+- All other claims, covers membership/order, non-BUILD subjects/hashes, schemas, acceptance and git history must remain unchanged. Portfolio's two records each cover seven subjects. Go CRM's gt note asserts executable Go test behavior. Neither the narrow CLI test run nor Gv establishes those full current review claims.
+- Pending: independent exact-prose and truthful evidence decision; any necessary canonical scope authorization; approved guidance/evidence writes; six stale-before-refresh and six final Gv checks; unchanged-golden TestGoldenCheck; final focused GREEN, source scan and PM acceptance. Statement coverage was not measured; full suite and compatibility were not run in this bounded stage.
+
+LEARNINGS:
+- Historical reviewer/date binding affects all six examples; mechanically matching hashes does not establish a new substantive review.
+- Unchanged utility/custody checks and separately failing guidance cases provide honest evidence for the bounded CLI stage.
+- Re-attestation must address the full covers set and the actual claim, including unchanged portfolio packets and Go CRM's execution statement.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- CLI commit 713184db16a12b8c3763b4aa8f5bf025721abf22; frozen RED unchanged; focused 26 leaves: 17 PASS / 9 expected guidance FAIL / 0 SKIP; six actual Gv baselines PASS.
+- Exact review artifact and SHA256 above. Nine guidance files and six evidence files remain untouched; independent amendment/historical-truth authorization pending.
+- Healthy hold retains the atomic claim and clean worktree. No delivery, release, closure, renewed acceptance or current re-attestation claimed.
+
+### proof
+- [ ] AC #1: exact nine guidance amendments proposed; application and replay await authorization.
+- [ ] AC #2: actual CLI help/output honesty passes; documentation changes pending.
+- [ ] AC #3: executable quoted-space and valid indentation semantic controls, real equal-token calls and CLI honesty pass; guidance condition pending.
+- [x] AC #4: genuine whitespace/empty utility, count prefix, exit/read-error and original mutation/custody controls pass unchanged.
+- [ ] AC #5: actual standalone CLI and all nine real guidance cases execute without skips; full shipped contract, post-amendment Gv and unchanged-golden compatibility remain pending.
+
