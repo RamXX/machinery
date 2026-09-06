@@ -1,18 +1,18 @@
 ---
 id: MAC-p7jd
 title: "Invalidate reviews when implementation subjects change"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:28:54Z
-content_hash: "sha256:7c0f4f550a58195229fe55b0c990e770dd73b6ff07905e997b228e40601c8395"
+updated_at: 2026-09-06T04:10:43Z
+content_hash: "sha256:26b9f85749a2d6e2b66e0dae5ebc92f07d1e211bf37e79294d9a996972448ff1"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
-follows: [MAC-p8ce, MAC-2u36]
+follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
 ---
 
 ## Description
@@ -1617,11 +1617,14 @@ status: in_progress
 - 2026-09-06T03:19:43Z status: in_progress -> in_progress
 - 2026-09-06T03:19:43Z auto-follows: linked to predecessor MAC-2u36
 - 2026-09-06T03:27:48Z status: in_progress -> open
+- 2026-09-06T04:10:43Z status: open -> in_progress
+- 2026-09-06T04:10:43Z auto-follows: linked to predecessor MAC-a89e
+- 2026-09-06T04:10:43Z claimed by dev-MAC-p7jd
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]], [[MAC-hgz1]]
-- Follows: [[MAC-p8ce]], [[MAC-2u36]]
+- Follows: [[MAC-p8ce]], [[MAC-2u36]], [[MAC-a89e]]
 
 ## Comments
 
