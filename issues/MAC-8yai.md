@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:52Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:01:52Z
-content_hash: "sha256:db74e1574c43e8c2cc9210b5f2be42423bdba19a0f270f45f5c7c8181d7c8497"
+updated_at: 2026-09-06T09:16:32Z
+content_hash: "sha256:ca13eb725820a0c868cb87c0937e09b588eedbd5bd18b7aba9c25ea5bcfcd1b8"
 blocked_by: [MAC-bz1y, MAC-6h0s]
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 ---
@@ -106,3 +106,44 @@ status: new
 - Blocked by: [[MAC-bz1y]], [[MAC-6h0s]]
 
 ## Comments
+
+### 2026-09-06T09:16:32Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- internal/tdd/adapters/elixir.go -> internal/tdd/adapters/elixir.go -> the closed elixir-exunit/v1 implementation of Adapter { ID() string; Prepare(context.Context, SuiteRequest) (PreparedSuite, error); Run(context.Context, PreparedSuite, EventSink) (Execution, error) }; embedded elixir assertion/harness assets under the owned assets directory; internal/runtimeclosure/elixir.go -> exact approved RuntimeHandle implementation for Elixir/ExUnit/Mix 1.20.4, OTP 29.0.6, ERTS 17.0.6, no new user-selectable adapter API; named required contributor fragment.
+- internal/tdd/adapters/elixir_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/tdd/adapters/elixir_integration_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/tdd/adapters/assets/elixir/README.md -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/runtimeclosure/elixir.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/runtimeclosure/elixir_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- testdata/integration-lanes/assurance-elixir.json -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-6h0s: internal/tdd/types.go
+  spec: Adapter, SuiteRequest{Inputs InputView;Suite Suite;Source BundleRef;Scratch string;Runtime RuntimeHandle;Scope processscope.Scope;Limits Limits}, EventSink func(Event) error and machinery.tdd.event/v1 normalized identities; PreparedSuite is opaque and cannot be deserialized.
+- MAC-bz1y: scripts/integration-lane/assurance_catalog.go
+  MAC-6h0s: closed required fragment union with exact Elixir/ExUnit/Mix 1.20.4, OTP 29.0.6, ERTS 17.0.6 native closure and Linux amd64/Darwin arm64 execution accounting.
+- MAC-qlw2: internal/processscope/scope.go
+  spec: Scope.Run(context.Context, Command, Streams) (Result, error); use remaining absolute budget and owned child scope, never direct unowned subprocess.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: An Elixir consumer receives real ExUnit assertion proof with exact effective settings; filters or setup errors return failure.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
+- [ ] AC #7: current story acceptance requirement remains pending.
