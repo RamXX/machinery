@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:00:52Z
-content_hash: "sha256:9cd35106aaa622b6d88732e54134bfb224da357c409e1f5e39ca7d4ff8e4abba"
+updated_at: 2026-09-06T07:01:43Z
+content_hash: "sha256:637552bee833225207fc94724b006550575eb686cb817d5ce52d8346f31ffee1"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 assignee: dev-MAC-p7jd
@@ -3014,3 +3014,27 @@ status: rejected
 - [x] AC #3: Prior independent no-grandfathering/migration and exact13-helper-caller proof retained; future hgz1 hold unchanged.
 - [ ] AC #4: Pending newly owned real four-topology RED-first regression, independent review, frozen GREEN replay and full original proof.
 - [x] AC #5: Prior bounded observed/reviewed/composed CLI/error/output evidence and explicit unobserved limitations retained; not whole-story acceptance or cure for AC1.
+
+### 2026-09-06T07:01:43Z ramirosalas
+## Supplemental RED delivery held for independent review
+
+The one complete Implementation Evidence/PROOF/LEARNINGS report is appended in Notes and retained at /tmp/machinery-p7jd-none-red.kVs2en/RED-REPORT.md. No historical report is duplicated here. Supported pvg story deliver succeeded, retaining the existing historical red-approved label and adding delivered. Its generated contract was inserted before old comments: first verify-delivery was 8/9 because the last old contract still read rejected. This supported EOF comment records the actual supplemental RED terminal state; no manual label or phase changes are made.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Supplemental RED ONLY, commit c71faeab997d176224ed6f38437de4604cda0b98 on story/MAC-p7jd; new cmd/machinery/attest_scope_none_test.go SHA256 3d9d8250f759807795251685e1cb924ba8eceb4c819b3fa0376bd15b254f9fc0. Production is unchanged from rejected 412d01b57ae4770a6cf4fb4f48442fb7e632cdd7. One new file, 364 additions; aggregate 17 paths / 3826 changed lines.
+- Final exact-source native new matrix 80 PASS / 40 expected behavioral FAIL / 0 SKIP, 37.147 seconds; all 120 leaves and all 72 negative challenges reached. Broader CLI selector 108 PASS / 40 expected FAIL / 0 SKIP, including the same 120 leaves plus 28 existing passing CLI leaves. No compile/setup/timeout/missing-input failure. Complete raw names/results, actual CLI output, generated/submitted rows, original input metadata/hashes, commands and source inventory are in /tmp/machinery-p7jd-none-red.kVs2en/audit.json, SHA256 d5ed8b75aac5187a15ddcb9b96b713144007f23f6b0fcaf1f9a3914f3dcb197d.
+- Failure attribution: 16 inventory mismatches, 4 independently complete manifests rejected, 16 unsafe exit0/current1 mutation or narrowing results, 4 rename diagnostic/path-set failures. Rename did reject; it omitted the removed none path and reported only none-renamed. All passing exclusion/freshness legs are recorded even where a subsequent independent inventory assertion fails.
+- Seven existing frozen hashes and both exact authorized fixture helper constructions unchanged. pvg verify new file: 1 file / 0 issues. TDD lineage: 12 commits / 0 violations. No production fix, existing-test edit, approval, acceptance, close, merge, remote operation, installed-asset replacement, service/container mutation or preflight. Main and epic remain untouched; retained story worktree is clean and healthy.
+- RED-HELD: independent supplemental exact-test-text review/replay is required before separately routed GREEN. Existing red-approved label is historical for the earlier suite and does NOT approve this new file. The product AC1/4 rejection remains unresolved; delivered here means only a committed, reviewable RED candidate. Prior R2, AC5 bounded composition and final case-sensitive Linux/preflight obligations remain unchanged.
+
+### proof
+- [x] RED AC #1: Four topologies x regular none file/empty none directory; independent exact inventory/digest and separate actual mutation/narrowing challenges authored and reached. Product repair pending.
+- [x] RED AC #2: Existing kind/history boundaries and previous positive proof retained; no schema or classification changes. Additional existing CLI controls pass.
+- [x] RED AC #3: Existing migration/no-grandfathering and exact fixture helper bytes retained; no evidence renewal or weakened assertion.
+- [x] RED AC #4: All 72 intended negatives reached, matched actual unchanged controls, real evidence-only commits, exact evidence/.git exclusions and same-basename sibling inputs. Forty intentional RED failures remain.
+- [x] RED AC #5: Real ordinary locally built CLI and filesystem/Git, precise exit/count/category/path and limits; previous OBSERVED/REVIEWED/COMPOSED/UNOBSERVED limits preserved.
+- [ ] Supplemental RED approval: independent PM exact-text replay/review pending.
+- [ ] GREEN completion and whole-story acceptance: not delivered; separately routed production correction and all required final proof pending.
