@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:01:52Z
 created_by: ramirosalas
 updated_at: 2026-09-06T09:22:39Z
-content_hash: "sha256:558a3de229bb2d8948cdfe36f8575a855ba598331594b7d9e7013f093c8418a3"
+content_hash: "sha256:410f643e0491f4732eb6a847de7697e6023d332c01cd2bbfd73ddac4bcfe6fdc"
 blocked_by: [MAC-bz1y, MAC-6h0s]
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 ---
@@ -148,3 +148,22 @@ status: new
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
 - [ ] AC #7: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:22:39Z ramirosalas
+SCHEMA MARKER INSERTION AUDIT 2026-09-06
+Root-authorized supported nd edit inserted ONLY 1 valid indented schema signature line(s) into the newly authored canonical CONSUMES block. Every original byte/contract/status/evidence/history was preserved; no deletion/replacement. This repairs the mechanical label substitution, not the contract values.
+Before raw Body SHA256: ca13eb725820a0c868cb87c0937e09b588eedbd5bd18b7aba9c25ea5bcfcd1b8
+After insertion-only raw Body SHA256 (before this audit comment): 558a3de229bb2d8948cdfe36f8575a855ba598331594b7d9e7013f093c8418a3
+Exact inserted lines (zero-based original Body line positions shown):
+- after Body line 111: "  schema: closed required fragment union with exact Elixir/ExUnit/Mix 1.20.4, OTP 29.0.6, ERTS 17.0.6 native closure and Linux amd64/Darwin arm64 execution accounting."
+Read-back pvg nd show Body exactly equals prior Body plus these insertions. Editor required expected hash, count, exact target and 13-entry total; installed pvg source revision c0957106a81346033d7b1d82fde5f434a9db6bab confirms scanner checks every historical entry.
+
+## nd_contract
+status: new
+
+### evidence
+- Signature syntax corrected via supported guarded editor; exact before/after evidence above.
+- No implementation/native proof; independent Anchor and canonical document holds remain.
+
+### proof
+- [ ] All current story ACs remain pending without weakening.
