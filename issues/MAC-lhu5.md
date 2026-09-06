@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
-updated_at: 2026-09-06T11:16:45Z
-content_hash: "sha256:11db507b7cb07d76998e27d87557675ed993a4311fd88f0c324b5186bad0f32e"
+updated_at: 2026-09-06T11:50:40Z
+content_hash: "sha256:070bed22fc00039ad0496facee1800a9d754bf629a2d533d8ba8f0162a220aad"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
@@ -576,3 +576,6 @@ status: in_progress
 - [x] Bounded D1 arithmetic and negative-model survivor semantics independently exercised.
 - [ ] All story ACs still require their complete integrated source/test/evidence proof.
 
+
+### 2026-09-06T11:50:40Z ramirosalas
+BOUNDED METHOD REVIEW 2026-09-06: D5/D6 external candidate /tmp/MAC-lhu5-D5D6-method.ORvrzx independently reproduced 37 test passes (32 leaves+5 parents), package pass, 0 failures/skips. PM /tmp/MAC-lhu5-D5D6-review.GRFAl4/REVIEW.md SHA256 4ff1dbd8ade6d43331142542737528f013d09e11da7189ed0a1d53a7a20bb27c reports GAPS_FOUND in frozen-intent reconciliation, opaque session collision, exact Ready/Failed projection predicates, and confirmed-Unpublished generic IOError retry classification. Root read full source/report/probes and verified hashes; agrees these four bounded defects. Final PM probes 49run42pass7fail0skip: six blocking probe failures plus one disclosed version-overflow policy/range advisory; no failure discarded. Fresh external-only correction assigned root/portfolio_d5d6_repair_v2, smaller Sol high agent, preserving original artifacts and all D1 bounded approval. This is not repository RED/story rejection/source permission. All whole-source, decoder, FSM, remaining policy-method and before-edit inventory obligations remain; current 21-path repository scope unchanged.
