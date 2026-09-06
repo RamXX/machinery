@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
 updated_at: 2026-09-06T09:22:35Z
-content_hash: "sha256:4b99a8c06faaa14c6fd26108fa092c6cd54263e2b73fd81b408630eda02ce039"
+content_hash: "sha256:116169252a0219056e6141ba9e5843799000825b666a1172d2b50997defd1140"
 blocked_by: [MAC-p9z1]
 blocks: [MAC-sqpt, MAC-u4oo, MAC-vx24, MAC-ou97]
 ---
@@ -135,3 +135,22 @@ status: new
 - [ ] AC #4: current story acceptance requirement remains pending.
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:22:35Z ramirosalas
+SCHEMA MARKER INSERTION AUDIT 2026-09-06
+Root-authorized supported nd edit inserted ONLY 1 valid indented schema signature line(s) into the newly authored canonical CONSUMES block. Every original byte/contract/status/evidence/history was preserved; no deletion/replacement. This repairs the mechanical label substitution, not the contract values.
+Before raw Body SHA256: 24df6b74dfb384fe489262610f2d8664e137cd9da5c2fb228a8d4339ef907a1f
+After insertion-only raw Body SHA256 (before this audit comment): 4b99a8c06faaa14c6fd26108fa092c6cd54263e2b73fd81b408630eda02ce039
+Exact inserted lines (zero-based original Body line positions shown):
+- after Body line 99: "  schema: machinery.tdd.store/v1, machinery.tdd.head/v1, immutable object/head archive and external 0700 store; Capture(ctx context.Context, req CaptureRequest) (BundleRef, error), Status(ctx context.Context, req StatusRequest) (StatusReport, error)."
+Read-back pvg nd show Body exactly equals prior Body plus these insertions. Editor required expected hash, count, exact target and 13-entry total; installed pvg source revision c0957106a81346033d7b1d82fde5f434a9db6bab confirms scanner checks every historical entry.
+
+## nd_contract
+status: new
+
+### evidence
+- Signature syntax corrected via supported guarded editor; exact before/after evidence above.
+- No implementation/native proof; independent Anchor and canonical document holds remain.
+
+### proof
+- [ ] All current story ACs remain pending without weakening.
