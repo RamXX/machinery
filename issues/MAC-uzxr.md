@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:04:27Z
-content_hash: "sha256:c22cd3b9897f011f1a5af9d68879367d4b899684584347501efaed87122706ca"
+updated_at: 2026-09-06T05:05:14Z
+content_hash: "sha256:7e9a76ec47e563043b6da60d1f8849cbbba5feb59e90e1dd359230a65d62d689"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -508,3 +508,21 @@ status: in_progress
 - [ ] AC #3: initialRED/storagevalidated, candidate rejectionproofpending.
 - [ ] AC #4: dynamic candidate executedinventorypending.
 - [ ] AC #5: fullpassingcandidate/consumerhandoffpending.
+
+### 2026-09-06T05:05:14Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- TERMINAL EXTERNAL AMENDMENT CHECKPOINT: complete unapplied package /tmp/MAC-uzxr-amendment.QYZfzX/REVIEW.md SHA2567105508cf12fa8ea73bfd9db81d97dc5a068ad08db1cae39166a13a7dca8fdc6. Preceding External complete amendment proposal checkpoint contains detailed current evidence. Supported append-notes insertion precedes older chronological comments; this final comment disambiguates latest contract without rewriting history.
+- Complete seven-path patch SHA2562f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249, exact additive frozen-file patch9b3129d5095717e25c46b940e6d1918c0d4a88c7047aac4137fefe23467c0f43. All initial495semantic/storage lines unchanged. Retained story clean4ef6baffc4de72f2a3e935348f180283fe53c20b; Task production unchanged. No shared writes/commits, delivery or approve-red.
+- Measured later stage2120add330del=2450changed/net1790 across seven proposedpaths; priorhistory503changed separate. Root/SrPM owns forecast canonicalization; five AC/eight paths unchanged.
+- Scratch apply-check exit0; author audit218preservedtuple/actualpre-Firefacts to197rows/47states/118groups and frozen/terminal/source integrity PASS. Builder diagnostic5top-levelPASS0SKIP and compile-only4packages exit0/ZERO behavioral tests explicitly NONQUALIFYING. No whole parser or fabricated fixed Task baseline. Original validated genuine RED998a5a3/storage4ef6baf remain actual initial proof.
+- Complete concrete builders/dialect/assertions/actual candidateinventory/17exactmutations proposed. Separate exact TEST-EDIT AUTHORIZED independent review required before shared application; all final candidate execution/GREEN pending. No subagents/background/remote/toolchain/service/product-Paivot changes; claim retained.
+
+### proof
+- [ ] AC #1: approved parser and closed binding implementation/replay pending.
+- [ ] AC #2: complete effects/context and narrowly authorized Task repair pending.
+- [ ] AC #3: initial genuine RED/storage validated; final candidate unsafe-variant rejection pending.
+- [ ] AC #4: successful actual candidate row/witness/native inventory pending.
+- [ ] AC #5: complete passing candidate proof and consumer handoff pending.
