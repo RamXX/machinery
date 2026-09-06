@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:49:00Z
-content_hash: "sha256:653007c44f7722dc09a505148c14224ef1d99c7de7c7da6e17c65c24d2afe09c"
+updated_at: 2026-09-06T03:49:41Z
+content_hash: "sha256:f93362167cd4314cf496bdeb54a40f10dcc1478e679bea70429cd7f890127a77"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -328,3 +328,23 @@ status: in_progress
 - [ ] AC #4: complete executed-row inventory with terminal supplements and honest failure attribution.
 - [ ] AC #5: full focused native candidate proof and reviewed consumer scope handoff, without automatic claim renewal.
 
+
+### 2026-09-06T03:49:41Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- TERMINAL PRE-RED PM SCOPE DISPOSITION: supported append-notes readback places the new review before older historical contracts; this supported chronological comment makes the current contract unambiguous without rewriting history.
+- Full independent review /tmp/MAC-uzxr-PM-scope-review.md SHA256a90e7be8958cbb692f4d7595889d67023733b4eb3c58878012bb2a9e41930202 and preceding PRE-RED PM SCOPE DISPOSITION note are authoritative scope detail. Verified unchanged status in_progress,hard-tdd,dev-MAC-uzxr.
+- Authorize ONLY initial new fsm_test.go stdlib real-process stage: paired USER-e20d04 target/action and pinned Session Anonymous-resume extra-effect variants, complete unaffected per-machine User/Session controls, actual unsafe-variant-accepted RED on unchanged old suites, separate all5+2supplement baseline, bounded contexts, SHA/manifests/native outcomes. Commit tdd-red then independent replay checkpoint. No fsm.go, old-test or production writes now; no story delivery/approve-red/acceptance.
+- HOLD complete later five-suite/helper amendments until exact guard/event expressions, parser/reconciliation assertions, execution-inventory verifier and all remaining mutation hunks/per-file costs reviewed. First fsm_test assertions freeze; future additive same-file patch needs separate exact PM authorization and machine-readable audit markers, none implied now. Final combined RED must be independently frozen/replayed before GREEN task.go fallback repair.
+- Independent exact70652b948 source comparison:218 original ordered tuples,197 MD/JSON identities and stable stimulus hashes,47 states,118 priority groups. USER generated stable ID excludes target/actions and remains valid in proposed coherent semantic variants. Diagnostic logs independently hash/count matched1PASS1FAIL and224PASS1FAIL/0SKIP; no new runtime tests or mutations by PM. Graph generation02:42:16Z best effort, source fallback used.
+- SrPM recommendation only: revise same8-path forecast provisionally1500-2200 additions+deletions or justify1250-1750 with measured decomposition;218 tuple replacements alone436 changed lines. Canonical scope/AC unchanged; no proof trimming or extra architecture.
+- Only external review/coordination writes. Claim/worktree preserved; no developer-worktree internals, source/test/docs/evidence/service/remote/toolchain/consumer writes.
+
+### proof
+- [ ] AC #1: exact parser and closed actual event/guard binding pending.
+- [ ] AC #2: concrete effects/context assertions and Task repair pending RED/GREEN.
+- [ ] AC #3: independent native semantic/extra-effect/missing-call proof pending.
+- [ ] AC #4: full actual successful execution inventory and supplements pending.
+- [ ] AC #5: full focused candidate proof pending; no claim renewal.
