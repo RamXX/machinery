@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:37:43Z
-content_hash: "sha256:b5e5181889a0378f4e04736a27c324020824e2b979383079259e4a44242a6290"
+updated_at: 2026-09-06T00:49:13Z
+content_hash: "sha256:c81e29b6003f75c88aca24c4006348dd557819b9642aab75d512a2b5a80097e1"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -380,6 +380,7 @@ Independent evidence and limits:
 - Five scanner findings independently disposed as unchanged legitimate fallbacks, not stubs: pluginStderrDiagnostic returns empty only when stderr is empty; installFileChangeID returns empty for unavailable/nil/nonstruct/unsupported platform stat identity and otherwise extracts real ctime fields. Callers retain identity/mode/size/modtime checks and treat this as unavailable extra metadata. No suppression/edit needed, and no complete security audit is claimed.
 - Graph Verify project Users-ramirosalas-workspace-machinery, generation2026-09-05T23:58:53Z. Main indexed paths report metadata_match/no_recorded_issue, but .claude is excluded and bootstrap is absent in main. Exact retained-commit/source reads supplied the evidence for all relevant changed/frozen seams; no graph completeness claim.
 - PM ran no runtime tests, full preflight, source/test edits, worktree switch, install/dev-link/upgrade, binary/skill/plugin/agent change, remote sync/fetch/pull/push or GitHub action. Main497419ab4512fcff765cd5feb27aed4c67b5608d and epic6cb2d974ea8aea211a5974f453cef2b5802bb11e unchanged at inspection. NIL installed product and user Dagger remain outside this task.
+Joint RED repair checkpoint (not delivery): separate author committed authorized tests-only 65b7d13539dad9117ddff7cbadc84db021e789ea after unchanged GREEN0ad71eb. Owned detached baseline76eefa1ed8b2ded8e673fc9faf97e422f21a8448 is original496963f plus only this repair; identical revised test bytes. Exact authorized 2m descriptor/three-legacy selection captured to /tmp/machinery-MAC-2u36-joint-proof.623afI/baseline-controls.jsonl (SHA256d9a4d823ef5fc33787e98ce783830fb19ffa9f7bfa024f625d2a845a98df9bc1) then candidate-controls.jsonl (SHA256f06542bfb831e130101efb676a603c6ccee404bac431c4d490e254092d28e300). Each9leaves5PASS4FAIL0SKIP,10runs10terminals; baseline15.355s/candidate15.469s. All3legacy real-placement/execution controls PASS on both; nil-invalid and real EBADF syscall controls PASS. Four descriptor failures are a newly committed assertion error: SyscallConn.Control returns actual internal poll use-of-closed-file error, not errors.Is(os.ErrClosed). Classifier correctly propagates it; no product RED or rollback claim. Reported before any predicate amendment; proposed compare against actual no-op Control error from same closed handle. Paused edits for independent authorization; no parent/full matrix started. Combined exact basef24b2df-toHEAD1839 changedLOC9files; repair incremental+418/-8. Production3files and receipt_test/install_test hashes unchanged; claim/status/labels retained. No live installs, remote operations, Dagger changes or other test edits.
 
 ## nd_contract
 status: in_progress
