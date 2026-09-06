@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:17:06Z
-content_hash: "sha256:249d52176c918d7526792a22a929a9823122a85e7a0ab1cc8017fc5015c47c8d"
+updated_at: 2026-09-06T01:18:00Z
+content_hash: "sha256:ebfb0a36691bf0cf3ba2b3dc5e92b81e3311ff2058c9402df990b8d82e4a80d2"
 blocks: [MAC-ou97]
 ---
 
@@ -100,6 +100,22 @@ status: new
 
 
 ## Notes
+## nd_contract
+status: new
+
+### evidence
+- Sr PM created MAC-yig6, P0 bug, parent MAC-ui8a, open/hard-tdd/unclaimed; MAC-ou97 now explicitly depends on it. No other story state/claim/scope changed.
+- Source and exact diagnostic report/raw SHA256 values verified against unchanged main 497419a. Observed native PASS 1.203s versus covered FAIL 0.747s for one identical leaf; real child stdout 131 bytes plus instrumentation stderr 54 bytes explains strict trailing-data failure. Current noncoverage CI/preflight failure is NOT claimed.
+- Two test-support paths, 250-400 LOC forecast; no production parser/environment/output-policy changes. Existing-helper amendment requires independent PM authorization; this creation is not RED approval.
+- Scoped backlog lint PASS: 34 issues, 0 errors/review findings. No dependency cycles. RTM PASS: 0 extracted requirements, 19 stories/3 closed; structural only, not implementation AC proof.
+- No tests/source/docs edits or runtime reruns by this triage. Root clean main retained.
+
+### proof
+- [ ] AC #1: actual native/covered existing success control and valid coverage profile.
+- [ ] AC #2: clean fixture protocol at the real instrumented boundary without production bypass.
+- [ ] AC #3: intended strict negative controls in both modes.
+- [ ] AC #4: bounded native Darwin/Linux execution and owned-resource cleanup.
+- [ ] AC #5: independently frozen RED/GREEN and truthful scoped evidence.
 
 
 ## History
