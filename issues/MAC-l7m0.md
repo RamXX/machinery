@@ -8,7 +8,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T10:30:30Z
-content_hash: "sha256:89bbcf98abc5131e1198e8841aa28b3fa3c570862ef2be898b85b1352dfdafdc"
+content_hash: "sha256:8219b97b7d125c9d763506b424e1f271be79b5ba5b59d8ab44c734ed1bb70d1e"
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36, MAC-a89e]
 assignee: dev-MAC-l7m0
 labels: [accepted]
@@ -81,6 +81,18 @@ Observable outcome: the maintainer can review a closed standalone contract that 
 ## Notes
 BLOCKED — USER CHOICE / ARCHITECTURE REVIEW. Do not dispatch a generic developer. Pending user decisions: supported initial native runner languages and trusted-host versus adversarial-code execution boundary. Independent architect owns exact contract. Only after answers plus reviewed contract may Sr PM repair implementation interfaces and release this blocker.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: Architecture is read-only contract work, not an executable runtime suite. Its accepted contract must explicitly identify any native adapter runtimes consumed by implementation; MAC-vx24 must register/provision those using the required closed integration lane. No execution assurance may be claimed from schema or architectural review alone.
+
+
+## nd_contract
+status: accepted
+
+### evidence
+- PM closeout applied via pvg story accept on 2026-09-06.
+
+### proof
+- [x] Story closed after accepted label was applied.
+
+
 ## PM Decision
 APPROVED [2026-09-06]: Independent review of candidate 0feaebf725267f9d0045d653ef57a90af0c9d946 against base 7e36f3e7ddcf25565d5d4fe60b328df254eee91d fulfills the complete one-document A1-A6 map. Documentation acceptance only; no implementation/native proof is claimed.
 
