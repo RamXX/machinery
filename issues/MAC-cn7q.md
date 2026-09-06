@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:29Z
-content_hash: "sha256:228426f8b40e4a6c86f5b6a8a50f9c629e6b3b204d24f079e7b7b995f1ee401c"
+updated_at: 2026-09-06T09:47:59Z
+content_hash: "sha256:cbb959ca1a5a75f0d13b30272568c66f102d752fa748d80bf8741760cc0bd0ca"
 blocked_by: [MAC-qlw2]
 blocks: [MAC-pe9v, MAC-hpqp, MAC-vx24, MAC-ou97]
 ---
@@ -140,3 +140,55 @@ status: new
 - [ ] AC #4: current story acceptance requirement remains pending.
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:47:59Z ramirosalas
+ROUND-1 RULE 1 REPAIR: COMPLETE FORMAL CUSTODY OWNERSHIP
+This is the complete CURRENT ownership/acceptance map for this bounded attachment story. It supersedes the earlier incomplete exclusive path list, preserving all prior guarantees, frozen evidence and the approved architecture. No source edit or implementation approval is made by this note.
+
+PRODUCES:
+- internal/processcontrol/scope.go -> approved WithScope/AttachScope/ExitStatus integration.
+- internal/processcontrol/scope_test.go -> supplemental compatibility and fail-closed tests.
+- internal/processcontrol/run.go -> preserve Run(ctx context.Context,cmd *exec.Cmd) error, attach explicit verified custody.
+- internal/formal/formal.go -> actual VerifyFormalTo/runTLC caller chain carries the approved execution context/scope.
+- internal/formal/process.go -> actual openFormalJava identity probe and runBoundedProcess use inherited execution context and verified scope after environment sanitation.
+- internal/formal/alloy.go -> actual runAlloy probe and separate JVM launch use that SAME execution context/scope after sanitation.
+- internal/formal/custody_integration_test.go -> separately reviewed real TLC/Alloy/probe/command-chain native supplemental tests.
+- internal/runtimeclosure/java.go -> explicit custody attachment while preserving opened Java closure identity.
+- internal/runtimeclosure/custody_integration_test.go -> supplemental runtime probe/cancellation evidence.
+- cmd/machinery/main.go -> authenticated same-binary ServeInternal before command parsing.
+- cmd/machinery/stubs.go -> ONLY newVerifyFormalCmd context/scope handoff to the existing formal command chain; preserve other commands.
+
+CONSUMES:
+- MAC-qlw2: internal/processscope/scope.go
+  spec: Open(context.Context,Options)(Scope,error); Scope.Run/Child/Attach/Close; ServeInternal(args []string,io InternalIO)(handled bool,exitCode int), exact approved section8.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: exact approved public contract; section4 cumulative budgets, section8 custody, section7 normal API/owner boundary.
+- Existing exact epic source.
+  source: openFormalJava(workdir string)(*runtimeclosure.Java,error); runBoundedProcess(ctx context.Context,cmd *exec.Cmd,timeout time.Duration)(string,error); runAlloy(alsPath string,commands []alloy.Command)(result []AlloyVerdict,notes []string,retErr error); VerifyFormalTo(design string,genOnly bool,stdoutW,stderrW io.Writer)(exitCode int); newVerifyFormalCmd() *cobra.Command.
+
+CURRENT ACCEPTANCE CRITERIA
+1. Preserve ordinary Run and existing callable formal/test APIs. Scoped execution uses explicit verified context/scope-bearing internal call paths (compatibility wrappers may retain old signatures), with the exact private signature/caller inventory reviewed before supplemental RED. Required scoped calls cannot select an unscoped wrapper or context.Background fallback. No new public product command, ambient-global scope substitute or copied parallel probe.
+2. Wire actual command -> VerifyFormalTo -> both runTLC and runAlloy -> openFormalJava -> runBoundedProcess/processcontrol paths. The source-verified openFormalJava probe and separate Alloy JVM currently create background contexts; replace those scoped-path contexts with bounded children of the SAME owner. Apply WithScope and AttachScope AFTER each runtimeclosure.Environment sanitation. Do not omit Alloy or duplicate the probe to avoid its real source file.
+3. Retain opened Java/JAR identity, checksum/revalidation, strict output/receipt checks, existing runtime limits and cleanup/publication guarantees. Audit affected *exec.ExitError inspection and preserve classification with the approved accessor; malformed ExtraFiles/SysProcAttr or custody mismatch fails closed, no fallback.
+4. Authenticate ServeInternal before ordinary parsing; untrusted/malformed internal activation cannot become a normal launch. Preserve ordinary Cobra activation/recovery and all unrelated stubs.go commands.
+5. On Linux amd64 AND Darwin arm64, real native tests observe active pinned nested JVMs before cancellation in actual provisioning/probe and suite/meta verification paths, exercising BOTH TLC and Alloy branches. Assert owned descendants terminate/reap and unrelated processes/containers survive. No fake Java, source-only proof or outer provisioning wrapper substitute.
+6. Supplemental positive/negative tests cover normal output, intended assertion failure, nested early-parent exit, cancellation, timeout, stream overflow, malformed/forged/closed scope, probe/engine cleanup failure, and lost attachment after environment rebuilding. All preparation/probes/engines consume inherited cumulative deadlines and one shared cleanup grace; no per-step reset.
+7. Produce the exact source/test/fixture/config inventory BEFORE RED review; preserve existing formal/runtimeclosure frozen tests byte-for-byte. The new formal/runtimeclosure supplemental cases are explicitly consumed by MAC-hpqp's testdata/integration-lanes/custody.json alongside its original96+new lane cases, never silently left out of required CI/preflight execution.
+8. Demonstrate actual normal command and library producer/consumer call paths, including the stubs.go handoff. Publish the actual process-producing call-graph inventory; every required launch is attached or rejected before dispatch. No acceptance on an unused new helper.
+9. Existing MAC-hpqp claim/pilot bytes and its pending same-source proof remain intact. This delivery supplies attachment implementation only; hpqp supplies lane execution integration. Developer delivers, independent PM verifies native proof. No preflight until final epic, installed replacement, remote action or unrelated teardown.
+
+DIFF BUDGET: complete current scope11 files, under2300 changed LOC including supplemental tests (earlier ~9/1700 forecast repaired to include the three missing real call surfaces); investigate overrun before broadening.
+MANDATORY SKILLS: developer, codebase-memory for exact call-site inventory, pm_acceptor.
+OUT OF SCOPE: hpqp frozen96pilot edits; new formal engines or architecture; final Git/Ga implementation owned by MAC-pe9v. All old stronger constraints remain required.
+
+## nd_contract
+status: new
+
+### evidence
+- Independent round1 findings repaired through supported append-only scope/consumer notes; no architecture/source/test/ref/runtime mutation.
+- Exact source surfaces verified against accepted epic7e36f3e7ddcf25565d5d4fe60b328df254eee91d; prior Body/status/labels/history preserved.
+- Independent Anchor ROUND2 and canonical-document acceptance remain prerequisites, not implementation evidence.
+
+### proof
+- [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
+- [ ] Independent review/native execution/final acceptance pending.
