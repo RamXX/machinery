@@ -1,18 +1,18 @@
 ---
 id: MAC-lnu6
 title: "Remove unsafe frozen-test formatting exemptions"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:18:00Z
-content_hash: "sha256:2ef19fb4634cec9ef1344bfb519bcc2fc3f63456000a0d88a4dcf47777dae25e"
+updated_at: 2026-09-06T02:22:34Z
+content_hash: "sha256:c68096aa21ab8e18a1e2d14afd8cf591c3ef27232d6c1557a0232d6e29238ac4"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
-follows: [MAC-a89e, MAC-p8ce]
+follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 ---
 
 ## Description
@@ -323,11 +323,14 @@ Historical original canonical Description (superseded only as active scope; pres
 - 2026-09-06T02:07:57Z status: in_progress -> in_progress
 - 2026-09-06T02:07:57Z auto-follows: linked to predecessor MAC-p8ce
 - 2026-09-06T02:16:36Z status: in_progress -> open
+- 2026-09-06T02:22:34Z status: open -> in_progress
+- 2026-09-06T02:22:34Z auto-follows: linked to predecessor MAC-olrx
+- 2026-09-06T02:22:34Z claimed by dev-MAC-lnu6
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]]
-- Follows: [[MAC-a89e]], [[MAC-p8ce]]
+- Follows: [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]]
 
 ## Comments
 
