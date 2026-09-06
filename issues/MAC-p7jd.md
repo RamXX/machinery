@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:27:48Z
-content_hash: "sha256:d2926b8248eaab4e73118ecd9fe963e00213107a936afbbeef79bb6e94d1b31a"
+content_hash: "sha256:984902e559a9e7ef213ccf72536e89d48cf897d058599964875fb6b693a36715"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36]
@@ -862,6 +862,18 @@ Review evidence/limits:
 - Exact git show 7ec5d609 of both frozen test files and their readonly Config/decodeConfig/Load/copyDirInto dependencies; exact file hashing and raw JSONL hashing/leaf extraction above. Source inspection of the tests supplies cost evidence, not acceptance.
 - Main remained clean at 497419ab4512fcff765cd5feb27aed4c67b5608d; observed epic 70652b948bf090008b1965c85daf36ea374daea4. PM used committed refs, not the developer worktree. No PM source/test/docs edits, execution replay, installed asset change, remote mutation, full preflight or status transition.
 SAME-STORY COST CANONICALIZATION ONLY
+
+
+## nd_contract
+status: red-approved
+
+### evidence
+- RED tests approved via pvg story approve-red on 2026-09-05.
+
+### proof
+- [ ] GREEN developer must implement against the approved RED tests without modifying them.
+
+
 # Independent PM RED review — MAC-p7jd
 
 Decision: APPROVED for RED transition only. The frozen suite together with the explicit mandatory GREEN supplements and same-revision source/proof bars can prove the approved story. This is not product acceptance, implemented custody proof, or permission to modify frozen tests.
