@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:22:41Z
-content_hash: "sha256:e37d285c0bb763ac999343055b2e8f37637698390aee309c2d555022502cfc64"
+updated_at: 2026-09-06T09:48:00Z
+content_hash: "sha256:f5581cc389f1660f1a31770d13c18aac3feb973f3a67ee5dbc4d070ec252679c"
 blocked_by: [MAC-5ft8, MAC-bz1y]
 blocks: [MAC-1u2v, MAC-vx24, MAC-ou97]
 ---
@@ -170,3 +170,55 @@ status: new
 
 ### proof
 - [ ] All current story ACs remain pending without weakening.
+
+### 2026-09-06T09:48:00Z ramirosalas
+ROUND-1 RULES 1/2 REPAIR: COMPLETE EXAMPLE INVOCATION OWNERSHIP
+Complete CURRENT ownership and acceptance map replaces the incomplete earlier script/inventory list. Existing behavior and all historical evidence remain required.
+
+PRODUCES:
+- scripts/assurance-examples.sh -> real complete-example strict workflow.
+- scripts/assurance-examples-test.sh -> real entrypoint positive/negative controls.
+- scripts/shellcheck-files.txt -> exact sorted unique current shell corpus including BOTH new scripts, preserving every existing entry.
+- scripts/example-inventory.sh -> truthful classification, no implemented-example downgrade.
+- Makefile -> normal check invocation uses current strict evidence.
+- .github/workflows/ci.yml -> sequential strict complete-example native lane.
+- scripts/preflight.sh -> final-only complete-example invocation.
+- testdata/integration-lanes/assurance-examples.json -> required closed exact-case fragment.
+
+CONSUMES:
+- MAC-5ft8: examples/go-crm/design/attestations.yaml
+  schema: post-strict-test substantive independent current judgment and exact generated full-root-v1 evidence; authored controls finalized first; not an upstream historical/hash-only refresh.
+- MAC-5ft8: examples/go-crm/design/assurance/plan.json
+  schema: prospective complete strict plan plus unchanged independently required legacy regression inventory.
+- MAC-u4oo: cmd/machinery/tdd.go
+  endpoint: exact standalone store/capture/register/red/green/verify and check --impl <path> --store <path> --complete commands.
+- MAC-bz1y: scripts/integration-lane/assurance_catalog.go
+  schema: complete native fragment union; CI ownership follows MAC-hy71 -> MAC-bz1y -> this story.
+- MAC-hpqp: scripts/shellcheck-files.txt
+  source: preserved earlier complete shell corpus; amend later when this story actually adds its two scripts.
+- Existing scripts/shellcheck-inventory.sh
+  source: discovers all scripts/*.sh and compares byte-exact sorted unique corpus with scripts/shellcheck-files.txt; no source change required.
+
+CURRENT ACCEPTANCE CRITERIA
+1. Preserve authoritative inventory of one currently implemented-complete Go CRM row and seven explicitly design-only rows. Do not implement or reclassify those seven, downgrade Go CRM, hand-pick a smaller list or alter any legacy regression obligation.
+2. Wire actual make check, CI and final preflight to isolated explicit external stores and actual current complete verification. Consume the completed MAC-5ft8 substantive post-change judgment/evidence, not old hgz1/lnu6 approval or imported PASS. Transport integrity alone is not replay.
+3. Add both new shell scripts to scripts/shellcheck-files.txt at this story's implementation step. Preserve the entire prior corpus and exact byte-sort/uniqueness. Real inventory positive control must pass with both files; omit either entry, omit an existing entry, add duplicate/unsorted/phantom entry or missing script and the inventory must fail for its intended diagnostic. No future placeholder registration in hpqp.
+4. Run legacy required regressions and new strict tests as separately accountable complete sets. No missing/skip/empty branch, selector hiding, runtime absence fallback or test-name keyword evidence.
+5. Real candidate-binary entrypoint tests cover fresh environment/no PASS, current completed row, design-only rows, stale pre-refresh versus current independently reviewed evidence, deleted head/object/control, code/helper mutation, missing runtime, invalid plan and removal of the required complete row. No mocked CLI.
+6. Persist the exact required fragment in both native CI lanes and final preflight; retain original frozen pilot. Run targeted script/lane validation only during this story, not full preflight.
+7. Report exact classification/migration/current-evidence mapping and blocking unsupported requirements truthfully. This invocation owner cannot silently refresh judgments, rewrite fixture/golden bytes or change Gv exclusions; any later subject/golden change needs its own exact reviewed ownership and renewed substantive judgment.
+DIFF BUDGET: current9 files, under1300 changed LOC including exact corpus update and controls; investigate overrun.
+MANDATORY SKILLS: developer and pm_acceptor.
+OUT OF SCOPE: new CRM implementation/strict test edits, automatic attestations refresh, fixture/golden amendments not explicitly reviewed, private tooling/product dependencies, installation or release operations.
+
+## nd_contract
+status: new
+
+### evidence
+- Independent round1 findings repaired through supported append-only scope/consumer notes; no architecture/source/test/ref/runtime mutation.
+- Exact source surfaces verified against accepted epic7e36f3e7ddcf25565d5d4fe60b328df254eee91d; prior Body/status/labels/history preserved.
+- Independent Anchor ROUND2 and canonical-document acceptance remain prerequisites, not implementation evidence.
+
+### proof
+- [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
+- [ ] Independent review/native execution/final acceptance pending.
