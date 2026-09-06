@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:53:50Z
-content_hash: "sha256:79d713154ad255a7e5570cd9c871a4d49f3a5d0c43a98564ea589921e12d0f75"
+updated_at: 2026-09-06T03:05:28Z
+content_hash: "sha256:a17ce9eceb1861be6e9e7922d9907c35d27d0d32d51ab69e4431158ed2bd8b7a"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-lnu6
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
@@ -121,6 +121,32 @@ EVIDENCE-TRUTH HOLD FOR INDEPENDENT PM (does not block new RED authoring)
 Source at epic 6cb2d974, examples/go-crm/design/attestations.yaml:99-110, records gt.conformance-test-shape and g4.zero-context under attestor Codex CRM design review, date 2026-09-03, both covering BUILD.md. Rebinding changed BUILD bytes while mechanically preserving that identity/date/note may misrepresent historical review. The canonical conditional hash-only allowance is NOT authorization where it would imply those historical reviewers covered new bytes.
 Unresolved reviewer question before ANY evidence write: is the exact prose delta a truthful mechanical no-new-claim refresh, or does it require an explicitly scoped new re-attestation with truthful reviewer/date/context? PM must decide from the actual delta and preserve historical evidence; if re-attestation requires field/schema/ownership changes beyond the current hash-only boundary, return the exact amendment for canonical review first. No blanket identity renewal, forged review or automatic rehash. No product protocol change is implied. New RED tests and unchanged existing tests may proceed through normal independent authorization while this evidence decision remains held.
 BOUNDED CURRENT-REVIEW SCOPE — CONDITIONAL ONLY, NOT GUIDANCE/EVIDENCE WRITE AUTHORIZATION
+SCOPE-OWNER TRIAGE OF INDEPENDENT SUBSTANTIVE CLAIM FAILURES
+Created P0 MAC-uzxr for actual Go CRM FSM parser/action-adequacy repair (five transition tests plus bounded test support; no BUILD/evidence writes). Created P0 MAC-lhu5 for source-established portfolio packet-alone omissions (six packets plus semantic/handoff test; root BUILD/evidence read-only). Both are contained in MAC-ui8a and explicitly block final MAC-ou97. Neither establishes repaired behavior today.
+Core plan/current/historical distinction and exact v2 schema/CLI remain owned by active MAC-p7jd; no edits to its scope/frozen bar. MAC-l7m0/MAC-vx24 own future execution-authentication/replay, not proof of current examples.
+All fourteen MAC-lnu6 evidence records remain held. The PM authorized only the nine exact prose deltas d21d80e66e18356110be1a4c1753adebf6a3440846c8286b3664da945deac011; no broader claims/metadata/hashes or tests are authorized. New packet changes would alter currently protected non-BUILD hashes, so they require a serialized consumer migration/proposal revalidation, not an automatic hash refresh.
+Pending dispatcher ownership decision: a consumer migration after MAC-p7jd/MAC-uzxr/MAC-lhu5 must reconcile six BUILD/YAML files, truthful design-only plan versus reviewed actual Go CRM current scope, exact historical provenance and affected golden expectations. V2 requires kind on every row, so this cannot be smuggled through the current fourteen-record metadata-only boundary. Explicit ownership/dependency/verification reconciliation is required before shared-file writers dispatch; no lnu dependency or ownership transfer added in this note.
+Exact Go CRM BUILD concerns also need that bounded consumer clarification: migration.yaml declares mode rebuild/prototype phases but section8 calls the whole design greenfield; BUILD declares impl/go.mod authoritative yet lists x/crypto v0.53.0 versus actual v0.55.0. Correct wording against local authoritative files, not a library upgrade, migration implementation or external factual claim. Existing review cannot certify these away.
+
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Sr PM triage created MAC-uzxr and MAC-lhu5 as separate P0 capstone prerequisites; source-established defects are not current repairs. Six BUILD/evidence consumer migration, serial ownership and future v2/golden contract reconciliation remain a dispatcher decision. No change to this story's claim/status/AC/frozen tests/dependencies and no evidence-write authorization.
+- Independent bounded amendment review completed at 713184db16a12b8c3763b4aa8f5bf025721abf22, immutable RED 0ea1fdc730aadac15cecc8de33bb95898ad91d60 unchanged.
+- Exactly nine prose replacements authorized by guidance-deltas SHA256 d21d80e66e18356110be1a4c1753adebf6a3440846c8286b3664da945deac011 and full-file hashes above; none applied during PM review.
+- All fourteen records reviewed against full covers, including all seven portfolio subjects. All six evidence files remain held; no attestor/date/note/BUILD-hash write authorization. Missing current wholesale FSM parsing and action-completeness proof, design-only/current-claim mismatch, and packet/context concerns recorded explicitly above.
+- Independent native Go CRM transition replay: 218 PASS, 0 FAIL, 0 SKIP; all 197 committed FSM IDs present in executed names; three package durations 0.590/0.361/0.917s, command wall1.503486s; raw log and SHA256 above. This is bounded transition proof, not wholesale parser or full implementation acceptance.
+- Detached PM checkout retained clean; source/tests/goldens/evidence/main/epic/installed assets/user services unchanged. No state transition, release, new dependency or backlog expansion; existing in_progress/hard-tdd/red-approved/dev-MAC-lnu6 claim preserved.
+
+### proof
+- [ ] AC #1: nine exact policy changes authorized; actual application and immutable-suite replay pending, evidence amendments held.
+- [ ] AC #2: CLI-only wording reviewed; authorized documentation still unapplied.
+- [ ] AC #3: existing executable semantic counterexamples remain frozen; actual shipped guidance replay pending.
+- [x] AC #4: prior recorded CLI utility/exit/custody controls remain unchanged; no comparison implementation change found.
+- [ ] AC #5: final all-nine contract, six stale and six final Gv outcomes, unchanged-golden TestGoldenCheck and GREEN PM acceptance remain owed.
+
 
 ## nd_contract
 status: in_progress
