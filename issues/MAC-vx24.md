@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:15:16Z
-content_hash: "sha256:295be7fb68e8a23d2e243c5adc828399a9a5d6f190f00e61cc8039b062b514bc"
+updated_at: 2026-09-06T09:16:35Z
+content_hash: "sha256:ffdfc505e82a4538cf7d7f3db9f4636b2793dfcf67b603b0f8e96eb371072d45"
 blocked_by: [MAC-l7m0, MAC-sh60, MAC-2n83, MAC-lnu6, MAC-hpqp, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-olrx, MAC-p7jd]
@@ -248,3 +248,21 @@ status: new
 - [ ] AC1-AC8: original behavioral obligations and actual normal integration verified after all producers accepted.
 - [ ] AC9: standalone guidance, frozen negative doc tests and truthful public matrix delivered/independently accepted.
 
+
+### 2026-09-06T09:16:35Z ramirosalas
+CANONICAL SUPPLEMENTAL OUTPUT MAP 2026-09-06
+PRODUCES:
+- agents/machinery-build-writer.md -> exact bounded current ownership in preceding approved scope revision; no additional implementation authority
+- skills/machinery/SKILL.md -> exact bounded current ownership in preceding approved scope revision; no additional implementation authority
+- skills/machinery/references/build-md-template.md -> exact bounded current ownership in preceding approved scope revision; no additional implementation authority
+- repository_contract_test.go -> exact bounded current ownership in preceding approved scope revision; no additional implementation authority
+- docs/test-assurance-integration.md -> exact bounded current ownership in preceding approved scope revision; no additional implementation authority
+
+## nd_contract
+status: new
+
+### evidence
+- Parser-supported output declaration only; earlier current AC/proof map and healthy claim preserved.
+
+### proof
+- [ ] Every existing and supplemental current AC remains required; no execution proof claimed.
