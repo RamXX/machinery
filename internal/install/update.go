@@ -41,8 +41,8 @@ type UpdateOptions struct {
 	Targets     []string
 	Copy        bool
 	SkipPlugins bool
-	// BootstrapDefaults asks a fresh installer to use Install's plugin-aware
-	// default direct homes instead of receipt/discovery planning.
+	// BootstrapDefaults uses the recorded refresh plan when a receipt exists,
+	// or Install's plugin-aware default direct homes for a fresh installer.
 	BootstrapDefaults bool
 	Out               io.Writer
 
@@ -215,6 +215,12 @@ func updateLocked(opts UpdateOptions) (result UpdateResult, retErr error) {
 		if err := refreshDirectInstalls(destination, source, plan, run, out); err != nil {
 			return result, rollbackUpdateTransaction(tx, fmt.Errorf("binary updated to %s, but direct harness refresh failed: %w", tag, err))
 		}
+		// Authenticated placement children leave the persisted receipt untouched.
+		// Only this parent can inventory the complete plan after every selected
+		// child has returned, including repairs of previously missing artifacts.
+		if err := recordRefreshPlanLocked(plan); err != nil {
+			return result, rollbackUpdateTransaction(tx, fmt.Errorf("finalize direct refresh receipt: %w", err))
+		}
 	}
 	if err := tx.commit(); err != nil {
 		return result, fmt.Errorf("commit update transaction: %w", err)
@@ -249,6 +255,11 @@ func updatePlan(opts UpdateOptions) (refreshPlan, error) {
 	if opts.BootstrapDefaults {
 		if len(opts.Homes) != 0 || len(opts.Targets) != 0 {
 			return refreshPlan{}, fmt.Errorf("bootstrap defaults cannot be combined with explicit homes or targets")
+		}
+		if _, exists, err := loadReceipt(); err != nil {
+			return refreshPlan{}, err
+		} else if exists {
+			return buildRefreshPlan()
 		}
 		defaults, err := DefaultHomes()
 		if err != nil {

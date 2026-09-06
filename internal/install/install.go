@@ -153,7 +153,7 @@ func installLocked(opts Options) (retErr error) {
 		if err := installTargets(opts.Targets, source.path, opts.Copy, out, opts.beforeCommit); err != nil {
 			return rollbackInstallTransaction(tx, err)
 		}
-		if opts.Record {
+		if opts.Record && !tx.delegated {
 			if err := recordTargetInstallLocked(opts.Targets, opts.Copy); err != nil {
 				return rollbackInstallTransaction(tx, err)
 			}
@@ -243,7 +243,10 @@ func installLocked(opts Options) (retErr error) {
 			return rollbackInstallTransaction(tx, err)
 		}
 	}
-	if opts.Record {
+	// Delegation is established by beginArtifactTransaction only after the
+	// parent lock capability, prepared journal and exact paths authenticate.
+	// That parent publishes once all selected placement children have returned.
+	if opts.Record && !tx.delegated {
 		if err := recordHomeInstallLocked(homes, opts.Copy); err != nil {
 			return rollbackInstallTransaction(tx, err)
 		}
