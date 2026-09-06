@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:46:40Z
-content_hash: "sha256:83e411649bc7198984114d691dd1940c0dd53e17157b89cce2e7ff1139daef9d"
+updated_at: 2026-09-06T03:47:58Z
+content_hash: "sha256:2d983b8263d3f228749a73d622f241e9526fd7c0d14e7228a46d505bc1d0d2fc"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e]
@@ -261,3 +261,63 @@ status: new
 - [ ] AC #4: bounded native Darwin/Linux execution and owned-resource cleanup.
 - [ ] AC #5: independently frozen RED/GREEN and truthful scoped evidence.
 
+
+### 2026-09-06T03:47:58Z ramirosalas
+## Implementation Evidence (RED DELIVERED)
+
+PROOF:
+
+### CI/Test Results
+
+Commands run:
+- From /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-yig6: `go test -json -count=1 -timeout=180s ./cmd/machinery -run '^TestCheckerFixtureCoverageRegression$'`.
+- `go test -json -count=1 -timeout=60s ./cmd/machinery -run '^TestVerifyCheckersReproducible$'`.
+- `go test -json -count=1 -timeout=60s -coverprofile=/tmp/machinery-yig6-red.09ui51/original-coverage.out ./cmd/machinery -run '^TestVerifyCheckersReproducible$'`.
+- Native targeted selection of TestCheckerFixtureProtocolControls, original, and five existing stream/bounds/timeout leaves; covered equivalent additionally includes outer meta. Full exact selectors and command timings are in /tmp/machinery-yig6-red.09ui51/REPORT.md SHA256648c4d87d5facac1d46110ab796436a8a7a19ebeceadb15b8e8a53edbc4e6eb8, already appended as evidence.
+- `go tool cover -func=/tmp/machinery-yig6-red.09ui51/original-coverage.out` and `go tool cover -func=/tmp/machinery-yig6-red.09ui51/selection-coverage.out`.
+- `pvg verify cmd/machinery/checker_fixture_coverage_test.go --include-tests --format text`; `pvg story verify-tdd --base 70652b948bf090008b1965c85daf36ea374daea4 --json`.
+
+Summary: RED behavior proven. Original native1 PASS/0 FAIL; original covered0 PASS/1 FAIL at real trailing-data assertion. Matched compiled native10 terminal leaves PASS/0 FAIL; covered5 PASS/5 FAIL. Zero skips/setup/deadline failures. Existing stream/bounds/timeout five leaves PASS in both modes. pvg verify PASS1file0issues; verify-tdd PASS1commit0violations. Native direct selection10 PASS/0 FAIL. Covered full selection terminal test events6 PASS/8 FAIL including two failed parent suites; direct covered leaves5 PASS/5 FAIL plus outer meta native PASS/covered FAIL.
+
+Coverage: actual Go profile parsed successfully,2541 blocks/4015 statements/402 executed including366 verify_checkers.go statements,10.0%; original397 executed including361 production,9.9%. Real Go1.27.1 darwin/arm64 only. Outer meta6.46s; covered outer5.24s; original native package0.998s/covered0.800s. All compiler/process calls bounded and terminated. Linux native proof remains required at GREEN/final; no Docker/Windows claim.
+
+### Commit
+- Branch: story/MAC-yig6
+- SHA: c59c89de31c7f1268a220caf0fa0d67a8e166d0f
+- Frozen new test SHA25680b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677,246 additions/0 deletions. Existing helpers and production unchanged.
+
+### pvg verify
+- VERIFY: PASSED (1 files scanned, 0 issues).
+- verify-tdd:1commit, violations:null.
+
+### AC Verification
+| AC # | Requirement | Test Location | RED status |
+|------|-------------|---------------|------------|
+| 1 | Original actual native/covered assertions | TestCheckerFixtureCoverageRegression and unchanged TestVerifyCheckersReproducible | Native pass; covered behavioral fail; GREEN pending |
+| 2 | Actual separate streams and closed production env | TestCheckerFixtureProtocolControls | Native stderr0B; covered warning54B, valid stdout131B; contamination frozen |
+| 3 | Correct/wrong digest/wrong platform/extra data distinct diagnoses | Four TestCheckerFixtureProtocolControls children | Native intended diagnoses reached; covered digest/platform UNREACHED, never credited |
+| 4 | Bounded host execution and cleanup | Meta180s, children60s, existing bounded leaves | Darwin complete, Linux native pending; zero skips/live owned processes |
+| 5 | Independent RED and unchanged GREEN proof | tdd-red commit and evidence report | Frozen RED ready for independent review; GREEN pending |
+
+LEARNINGS:
+- Coverage stderr corrupts strict protocol although stdout remains valid; a negative must prove its distinct diagnosis.
+- Real parsed coverage must include executed production statements; helper-only instrumentation is insufficient.
+- Future cached helper lifetime belongs to unchanged TestMain root, not first test temporary directory.
+
+Helper amendment proposal (not applied): /tmp/machinery-yig6-red.09ui51/HELPER-AMENDMENT-PROPOSAL.md SHA256555a3ac33a1a1b5023d3f378e56719f4dee7707c3cb7b0657dab5471ddc53497. Independent PM review required before the three exact executable-selector changes and associated real uninstrumented helper-build/cache support. No frozen test edits authorized by this delivery.
+
+Raw files under /tmp/machinery-yig6-red.09ui51: meta-native.jsonl SHA256836213a078c83cbd1142df1859b7e7f38e28f3e2b98bf2d2fd4246f8a511526b; original-native.jsonl a8b4bc7717e17cf293178b76422d64cc2995cd3a27b5239b6aac9ad280f7578a; original-covered.jsonl fb085049e5ed5bd7e22191e96917c0d371d1bfbd990e59e1814e6b85c89cd04d; selection-native.jsonl7ddc99ad818c53ac80e68a354459df4b8837b6ee4356d99cbc7c665f02c01bdf; selection-covered.jsonl5c3ed8845d3055db8a21bdab0b81303f246684a968c8d9699a6b89be7a57cae8. Profile hashes and all exact timings are in full report. Documentation syntax discovery errors and first verify-delivery shape failure were coordination-only, not compiler or behavioral evidence; this terminal comment repairs evidence layout only.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED only, SHA c59c89de31c7f1268a220caf0fa0d67a8e166d0f. Full commands/counts/coverage/raw hashes above. Native matching control passes; covered real protocol fails for observed54-byte Go warning. No test amendments, skips, deadline/setup failures, installed modifications, remotes, Docker or full preflight.
+- Clean worktree and no live owned process. Independent RED and helper-amendment review pending. GREEN implementation and Linux native execution remain required.
+
+### proof
+- [x] AC #1 RED: unchanged original native PASS/covered behavioral FAIL on frozen SHA; GREEN pending.
+- [x] AC #2 RED: real raw streams expose coverage contamination with unchanged production environment/parser.
+- [x] AC #3 RED: native distinct diagnoses observed; covered wrong-digest/platform UNREACHED and not credited.
+- [ ] AC #4 FINAL: Darwin bounded execution complete; native Linux execution pending.
+- [ ] AC #5 FINAL: frozen RED proved; independent approval and GREEN evidence pending.
