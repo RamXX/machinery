@@ -8,8 +8,8 @@ labels: [docs]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:06:45Z
-content_hash: "sha256:ea2115feee79538c387c4480e43fa9e271a6bd241d13d540805cf7d92f2fc074"
+updated_at: 2026-09-06T12:10:20Z
+content_hash: "sha256:982b8bb1691a48dffaa6ef68122aafa87b1c566b3452c0b4346014efbc18820e"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 ---
@@ -379,4 +379,48 @@ status: new
 ### proof
 - [x] Story is self-contained, ≤8 AC, docs-only, exactly scoped, dependency-correct, and structurally clean.
 - [ ] AC #1-#8 remain pending developer delivery and independent PM acceptance.
+
+
+### 2026-09-06T12:10:20Z ramirosalas
+AUTHORITATIVE PUBLIC PROJECTION CLARIFICATION — ENDPOINT PREPARATION AND CHECKER EXECUTION
+
+This append-only clarification supplements APPROVED PUBLIC PROJECTION sections 5–8 and Acceptance Criteria 2–4. It preserves every earlier byte, clause, path, dependency, status, hold, and evidence record. It is exact projection of the already approved V4 architecture, not a new design decision, implemented flag, source/test grant, runtime action, or native proof.
+
+### Explicit once-only Docker endpoint preparation and transport
+
+The public contract must state that “no ambient daemon discovery” prohibits ambient authority during capture inheritance, mutation, run, replay, and cleanup; it does not prohibit the following single owned bounded preparation step:
+
+- The contributor/integration lane exposes `--docker-endpoint <absolute local socket>` and passes that concrete endpoint to `CaptureDockerRuntime`. An explicitly supplied endpoint wins. Otherwise, preflight performs its existing Docker-context inspection exactly once during owned bounded provisioning, resolves one concrete local Unix socket endpoint, records/freezes that selection, and passes the same explicit value to both the lane and the checker command.
+- The standalone checker command exposes the corresponding `--docker-endpoint <absolute local socket>`. When no explicit endpoint is supplied, that command may perform its existing context resolution exactly once during owned bounded preparation, freeze the resulting concrete descriptor, and must never consult ambient Docker context again during run or replay.
+- Unsupported remote endpoints fail before replay. A context name, environment variable, caller string, old descriptor file, or later re-resolution is never runtime authority. Run and replay use the same captured live runtime/daemon binding and private client configuration.
+- `CaptureDockerRuntime` is identity capture, not image provisioning or pulling. The separately owned provisioning step pulls only the exact authorized pinned image through registered custody, then capture freezes the runtime descriptor before native selection/replay. Checker execution never pulls during run or replay.
+- The public document describes these flags and steps as required future behavior. It must not imply that the current binary already implements the flags or that documentation performed provisioning/capture.
+
+### Actual checker command context, scope, runtime, run, and replay binding
+
+The public contract must state that the normal checker command propagates its real command cancellation/deadline context, authenticated scope, and captured Docker runtime through checker orchestration, per-checker validation, and BOTH the primary run and committed-evidence replay. Required scoped execution:
+
+- uses the real command context, never `context.Background` or a replacement owner context;
+- retains the same authenticated owner/root and captured runtime across run and replay, with any phase child bounded by that SAME owner and the already cumulative deadlines;
+- performs deterministic checker environment/sandbox sanitation first and applies the scoped attachment AFTER that sanitation, so sanitation cannot discard or rewrite custody and no ambient attachment is trusted;
+- refuses a nil, stale, foreign, cancelled, closed, mismatched, or unscoped capability/runtime before target start;
+- may retain service-free compatibility wrappers for separately bounded tests, but a required scoped command path cannot call or fall back to an unscoped compatibility wrapper for either run or replay;
+- routes both real checker phases through the closed `RunCheckerDocker` profile and its accepted registry/image/platform/input/argv/work-root bindings rather than a direct generic `docker run --rm` client; and
+- completes exact container/helper cleanup and validates absence before successful checker output, evidence publication, work-root release, or runtime release. Target result and cleanup result remain distinct, and cleanup failure prevents success.
+
+The coverage matrix and independent whole-prose review required by AC6–AC7 must include these clarification rows. Add semantic negative mutants for: lane and checker receiving different endpoints; ambient context re-read between run and replay; remote endpoint admitted; image pulled during replay; `context.Background` substituted; replay left unscoped; attachment applied before sanitation and lost/mutated; service-free wrapper used by required execution; or success/output/release occurring before cleanup. Each mutant must be rejected for the intended contract reason; keyword presence remains insufficient.
+
+No private tracker identifiers or workflow chronology are needed in shipped prose. The public wording may use generic consumer roles, but must preserve the exact `--docker-endpoint` spelling, absolute-local-socket constraint, once-only owned preparation exception, same-endpoint freeze/transport, no-pull replay rule, and real run-plus-replay context/scope/runtime lifecycle above.
+
+## nd_contract
+status: new
+
+### evidence
+- Exact approved endpoint-preparation/transport and real checker run/replay binding added at true EOF without replacing prior Body/history.
+- Ownership remains exactly two documentation paths; dependencies, labels, claim/status, implementation/native holds, and no-fourth-review decision are unchanged.
+
+### proof
+- [x] Self-contained projection now includes the once-only owned endpoint-resolution exception and exact `--docker-endpoint` transport.
+- [x] Self-contained projection now includes actual command context/authenticated scope/captured runtime across both checker run and replay, post-sanitation attachment, and cleanup-before-success.
+- [ ] AC #1–#8 remain pending developer delivery and independent PM acceptance, including the expanded coverage/negative-mutant review under existing AC2–AC4 and AC6–AC7.
 
