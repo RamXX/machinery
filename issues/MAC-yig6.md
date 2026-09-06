@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T08:47:53Z
-content_hash: "sha256:f87379f6b3e6c8f8336a58707f094f2497ccfb357c09f99c302075b514ffe44f"
+updated_at: 2026-09-06T09:29:02Z
+content_hash: "sha256:19a277d1c06a9783a4f18d199f8e9c5497a9757f9b3c03249cc9be4ef8d7fca2"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
@@ -598,3 +598,56 @@ status: in_progress
 - [ ] AC #1-3 GREEN: exact revised helper/supplemental-test readiness and actual protocol/coverage proofs pending.
 - [ ] AC #4 FINAL: actual same-SHA Darwin/Linux execution and cleanup pending.
 - [ ] AC #5 FINAL: independent GREEN acceptance pending.
+
+### 2026-09-06T09:29:02Z ramirosalas
+CURRENT COMPLETE FOUR-PATH SCOPE / STAGED AMENDMENT 2026-09-06
+
+This is a SEPARATE bounded scope repair after the sealed assurance-decomposition handoff (immutable nd/backlog f9d3612bfc3feac8df59ad65cb0d623268700a99). It does not alter that report/snapshot or invent a new architecture. Existing healthy in_progress/red-approved claim, original RED and all evidence/history remain intact. No delivery/rejection/acceptance, label, claim, ref or source transition is made.
+
+Independent exact BEFORE-WRITE review: /tmp/machinery-yig6-pm-final.rirEOm/REPORT.md, 80 lines, SHA256 fa958a74440d41058b53b9d112cd1eebe40fbf7658a13f10e758b4fb988c8f3b, fully read and hash-verified by Sr PM. Its APPROVED decision is exact proposal/method readiness CONDITIONAL on the staged gates below, NOT supplemental RED approval, GREEN acceptance, Linux proof or blanket existing-test amendment authority. The previous proposed three-path/two-path budgets and unapproved 94/33/189-line drafts are historical only.
+
+CURRENT EXCLUSIVE OWNERSHIP
+PRODUCES:
+- cmd/machinery/checker_fixture_coverage_test.go -> original 246-line frozen RED, UNCHANGED; SHA256 80b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677 at c59c89de31c7f1268a220caf0fa0d67a8e166d0f.
+- cmd/machinery/verify_checkers_test.go -> ONLY exact independently reviewed helper patch, +91/-12, conditional on supplemental committed RED freeze and subsequent exact amendment authorization.
+- cmd/machinery/checker_fixture_helper_red_test.go -> NEW baseline-callable 147-line supplemental RED; SHA256 ea67a87453e92d0f3e056ffa15367a0ad85cb6592cb6ce826bfd83ff84e93fcd.
+- cmd/machinery/checker_fixture_helper_build_test.go -> NEW prospective-only 44-line tests; SHA256 6274d5685e6804912780761cafbbfb8f370d8f2863430f65f399720a960575ef; may accompany ONLY the later authorized exact helper amendment, never the baseline RED commit.
+
+CONSUMES:
+- Existing frozen checker fixture and production protocol.
+  source: exact c59c89de31c7f1268a220caf0fa0d67a8e166d0f baseline and unchanged original 246-line test; actual writeRegistryFile, checkerFixtureEngineArgs and checkerProcessFixtureCommand selectors, existing TestMain/fixture dispatcher/protocol behavior.
+- Exact reviewed external helper patch.
+  source: /tmp/machinery-yig6-revised-proposal.4O8e2O/MAC-yig6-revised-helper.patch SHA256 f6c4ea4e5d0ea57300cecf4857c582e732ca72a2eb8ecc393b43856d8e1e8d13; immutable index /tmp/machinery-yig6-final-index.9Fh2wK.md SHA256 30ee81af8373caed3b6bee6908da026ceeb62d7adccd6b9931a023a7f42dc95b.
+- Existing process ownership.
+  spec: processcontrol.Run(ctx context.Context, cmd *exec.Cmd) error is used unchanged; joined context/wait/cleanup/reap errors must not be mistaken for expected native exit1.
+
+COMPLETE CURRENT ACCEPTANCE / PHASE MAP
+1. Preserve the original story AC1-AC5 in full: actual unchanged TestVerifyCheckersReproducible native/covered success, clean real protocol streams, distinct correct/wrong-digest/wrong-platform/extra-data sensitivity, valid production-executed coverage, bounded native Darwin/Linux cleanup and independent frozen RED/GREEN evidence. Current total ownership is the FOUR paths above; no other source/test edit is authorized.
+2. NEXT SOURCE PHASE is ONLY the exact 147-line baseline-callable supplemental RED on unchanged c59c89de helper/source plus original246. Actual developer commit is required; independent PM must verify committed SHA/bytes and intended behavioral baseline failures, then freeze through the supported workflow BEFORE helper or44-line writes. External archive calibration is not that commit/approval. No undefined prospective seam, compile/setup/infrastructure failure or unchanged covered wrong-diagnosis masking is credited as behavioral RED.
+3. Only AFTER that committed supplemental RED freeze may the exact reviewed helper patch and exact prospective44-line file receive the required explicit amendment authorization record and [test-edit-authorized] commit marker. This scope note does not itself grant that later write permission. Any byte change requires fresh independent exact review; no blanket test rewrite. Original246 and newly frozen147 stay byte-for-byte unchanged throughout GREEN.
+4. The helper amendment changes only the three original os.Executable selector blocks plus exact reviewed support. Preserve original assertions/modes/argv/markers/exits, TestMain, fixture dispatcher/OCI helper, golden helpers, production parser/env, processcontrol, workflows and coverage settings. Normal noncovered os.Executable behavior stays. Covered helper uses real go test -c -cover=false -o <owned> ., child-only nonempty GOFLAGS=-cover=false, NO coverpkg reset; parent remains instrumented. Absolute regular source, t.Context-derived60s bound, sync.Once cached success/error, no retry/fallback/published path on failure, bounded process ownership/output and unchanged TestMain-owned root remain exact reviewed semantics.
+5. Supplemental147 proves actual ambient and persisted coverage protocol controls, covered caller execution and persistent compiler failure/no retry after PATH repair. Prospective44 separately proves valid-control, already-canceled, relative-source, missing-source and nonregular-source preconditions. Real compiler/process/output only, no fake outcomes or arbitrary warning filtering. Error classification must reject nil, canceled/deadline, wrong native exit/signal, unknown/wait/cleanup/reap leaves and every mixed joined-error tree; accepted expected-exit evidence must not hide cleanup failure. Source verification of error-tree policy is not fabricated runtime proof.
+6. Final GREEN requires actual SAME-revision native Darwin AND Linux execution of both frozen files plus prospective44, paired original native/covered test and existing checker stream/bounds/timeout controls, separate raw streams, real parsed profiles with executed production statements, exact selected inventory/zero skips and owned cleanup. Independent reviewed Darwin archive calibration (147 baseline2FAIL versus candidate3PASS; originalcovered1PASS and valid14.0% profile) is scoped before-write evidence only; no full-suite/Linux/Windows/Docker lifecycle claim. The intentionally uninstrumented helper supplies no claimed helper coverage.
+7. Developer provides exact phase SHAs, before/after hashes, actual commands/counts/profile validity and AC table. Independent PM accepts only after all phase/native gates; no self-acceptance. No installed binary/plugin changes, NIL/Dagger/service mutations, remotes/push, or full scripts/preflight.sh during this repair. Any other path/byte/scope change returns for review before writes.
+
+DIFF BUDGET (CURRENT, EXPLICITLY REPAIRED)
+Four paths aggregate +528/-12 against the story base: original246 frozen + helper91/-12 + supplemental147 + prospective44. The current increment against c59c89de is three paths +282/-12. This replaces the original ~250-400-line/two-path forecast; expansion is the reviewed negative coverage and baseline/prospective phase separation, not permission for broader refactoring.
+
+MANDATORY SKILLS: developer and pm_acceptor; codebase-memory for implementation source verification. Sr PM performed tracker scope repair only.
+OUT OF SCOPE: production/runtime architecture, assertion weakening, original246 rewrite, helper edit before supplemental freeze, prospective44 in the RED commit, broad error-classifier/processcontrol refactor, installed assets and release operations.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent exact before-write report fully read and SHA256 verified; complete current four-path scope and staged gates recorded here.
+- Original approved246 RED and healthy claim preserved; no source/ref/label/status/claim or runtime changes by Sr PM.
+- This scope repair is not supplemental RED approval, test-edit authorization, GREEN acceptance or native Linux proof.
+
+### proof
+- [x] Original RED history and exact frozen246 identity preserved as existing approved evidence.
+- [ ] AC1: original full behavior/protocol/coverage/cleanup requirements remain.
+- [ ] AC2: exact147 committed on unchanged helper baseline and independently frozen.
+- [ ] AC3-AC5: subsequently authorized exact helper+44 amendment, frozen147/246 and all reviewed negative controls.
+- [ ] AC6-AC7: actual same-revision native Darwin/Linux GREEN, truthful evidence and independent final acceptance.
+
