@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:12:26Z
-content_hash: "sha256:0cba80cf3cae3e3de65b730a25c57c09b625e11e0e4aa7a48cc5412d554826c0"
+content_hash: "sha256:9dd94148141b8a2371773874ee33fa05d338baeedb0e331d868b4b131120e433"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce]
@@ -1023,3 +1023,22 @@ status: in_progress
 - [ ] AC #5: same delivered GREEN revision must supply OBSERVED real renderer late validation/cleanup failure with nil bytes; OBSERVED built CLI success and ordinary real renderer-error/alias failures with exact output/exit; REVIEWED final renderer-to-CLI output/error/defer closure. Late CLI guarantee is COMPOSED, not independently observed injection; standalone late injection remains UNOBSERVED and individual OS Close errors UNFORCED. Actual cleanup cause, existing real CLI freshness/history/migration cases and output-sink partial-write limit remain mandatory.
 
 Structural checks: scoped backlog lint PASSED (33 issues, 0 errors, 0 review findings); no dependency cycles; scoped RTM PASSED (18 stories/3 closed; 0 tagged requirements extracted/0 uncovered). These checks are structural, not product AC proof. This terminal full contract supersedes older trailing architecture-pending blocks without deleting history.
+
+### 2026-09-06T03:12:26Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent PM POST-FREEZE exact setup-repair authorization is recorded in Notes for internal/hook/attestation_snapshot_test.go hookReviewFixture and cmd/machinery/attest_implementation_test.go C-complete-sole-current-warning, against frozen RED 7ec5d609acc1597ee2c0ddbf5401b92f834d5ab3. Only those setup hunks are authorized; repair commit requires tdd-red and [test-edit-authorized].
+- Original logs and hashes retained. Original 27 new hook failures and the one CLI complete fixture failure are SETUP, not behavioral RED. Complete repaired replay and independent RED review/freeze remain mandatory; no red-approved, delivery, rejection, GREEN dispatch or acceptance granted.
+- PM investigated the test overrun and supports same-story ~2710–3310 forecast within unchanged 13 required/optional14 paths; SrPM canonical estimate update pending, with no proof trimming or scope expansion.
+- R2 authority 8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179 and approved AC5 composition 5fc3193106a803b7760020b646ed4db7b3d417f5e196b2266d10cf8227733937 remain authoritative. Exact prior seam restrictions and five product AC unchanged.
+- Status in_progress, hard-tdd, assignee dev-MAC-p7jd and healthy retained claim/worktree preserved. PM reviewed source/logs only and made tracker notes only.
+
+### proof
+- [ ] AC #1: complete scope/inventory binding requires frozen corrected RED and final GREEN proof
+- [ ] AC #2: closed plan/current/history semantics require behavioral replay
+- [ ] AC #3: A legacy false acceptance and D passing compatibility controls require complete independent repaired replay
+- [ ] AC #4: real mutation/custody/lifecycle tests must reach intended boundaries; SETUP is not proof
+- [ ] AC #5: unchanged conjunctive same-GREEN-revision bar: OBSERVED renderer real late validation/cleanup failure -> nil bytes, OBSERVED built CLI success/ordinary renderer-error/alias output/exit, REVIEWED delivered renderer-to-CLI error/output closure; late CLI guarantee COMPOSED, independent standalone late injection UNOBSERVED, individual OS Close errors UNFORCED. Real cleanup cause, freshness/history/migration and output-sink limit remain required.
+
