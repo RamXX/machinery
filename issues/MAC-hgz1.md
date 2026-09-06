@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:16:50Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:26:05Z
-content_hash: "sha256:c4f5a86143e5e0a7871f61b36bb17dd8498b7c38a93ac2a494eb3544adaca96f"
+updated_at: 2026-09-06T05:28:14Z
+content_hash: "sha256:9ae7d694f2a8b69c255ac6841ddee3401880aa88fc4779bc7baa24500aff7c37"
 blocked_by: [MAC-uzxr, MAC-lhu5, MAC-p7jd]
 blocks: [MAC-lnu6, MAC-ou97]
 ---
@@ -141,7 +141,7 @@ status: new
 - [ ] AC #2: local-authority Go CRM migration/toolchain wording resolved.
 - [ ] AC #3: complete closed v2 row classification and actual current versus planned distinction.
 - [ ] AC #4: substantive independent review, real generated scope and exact provenance/hash changes.
-- [ ] AC #5: six real CLI positive/negative outcomes without overclaim.
+- [ ] AC #5: eight real CLI positive/negative outcomes without overclaim.
 - [ ] AC #6: exact reviewed golden updates and accepted downstream baseline handoff.
 
 
