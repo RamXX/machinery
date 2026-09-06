@@ -8,8 +8,8 @@ labels: [docs, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:32:51Z
-content_hash: "sha256:5fb3cfc1dc542c0e2b706bb3251a32b45339d7e6e5199ca9e3a00f15ef9b35b1"
+updated_at: 2026-09-06T13:11:01Z
+content_hash: "sha256:b214fc59af59083395235ec1b06832456e65834ee197e5959131b903757e44f3"
 related: [MAC-l7m0]
 assignee: dev-MAC-p9wm
 follows: [MAC-l7m0, MAC-uzxr]
@@ -679,3 +679,6 @@ status: accepted
 - [x] AC #6: independent whole-prose coverage and written original plus 19-mutant semantic verdicts are frozen in the PM report.
 - [x] AC #7: bounded two-path Git, byte, render, link, contamination, and semantic checks passed; zero product/native tests are correctly reported as not applicable.
 - [x] AC #8: exact hashes/counts/modes/hunk/reports/limitations/failures are recorded and this final Comment is the authoritative true-EOF accepted contract.
+
+### 2026-09-06T13:11:01Z ramirosalas
+LOCAL EPIC INTEGRATION CHECKPOINT: Following independent accepted contract above, root merged the exact candidate 2a63e4bb0d7b57c42dfd6f45fecfdc4f8a18cfbf to epic/MAC-ui8a as 2a73454d5f133a7b5fb4db0346232fd389810d28. Both document blobs remain exactly 1c1581d1aec324d979593613b44976ed0007c45b and acce64fee8db5a7565e8fa33422334de125e913f; integration checkout clean. Main remains 497419ab4512fcff765cd5feb27aed4c67b5608d. No installed binary replacement, remote operation or final preflight. Existing accepted status, all eight AC proofs and limitations above remain authoritative; this adds merge evidence only.
