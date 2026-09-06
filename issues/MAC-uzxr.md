@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T04:16:55Z
-content_hash: "sha256:0e0a98eaff2afce1a1ce0dccf0fcdfb3dc8e9b2c7ab4973998b56ce1b0b25f4b"
+updated_at: 2026-09-06T04:20:48Z
+content_hash: "sha256:6b3dbe5d7a69b8c1fb8ec03e4f16331c43a97173944c04d5b28f75b392f8603b"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -151,6 +151,22 @@ Flag owned solely by this test file controls evidence storage, NEVER execution g
 All mutation bytes, nativeUserLeaves/nativeSessionLeaves, cases/diagnostics/assertions, nativeRun/nativeCheckRun/nativeManifest/nativeCopy, command/timeouts and result logic byte-identical. No unrelated later parser/helper/additive amendment in this repair.
 
 Required finite actual verification after repair: run same meta command once default, once with -args -fsm-native-proof-dir=<existing-absolute-review-directory>; both actualexit1/3 intended outerFAIL/200 childPASS0SKIP. Default emitted proof path must disappear after process ends; explicit mode21 evidence files remain and six receipts/logs/46input manifests/exact2/2/1 mutation-only files are checked. All fixtures clean in both. Same env/pipefail; logs and repairedfile hashes, actual runtime/exits, only-authorized-diff, gofmt/diff/scoped pvg verify. Cleanup errors are real failures. Commit separate [test-edit-authorized] repair, then independent verification checkpoint; full RED still held.
+## nd_contract
+status: in_progress
+
+### evidence
+- Storage-only TEST-EDIT AUTHORIZED repair committed4ef6baffc4de72f2a3e935348f180283fe53c20b with [test-edit-authorized]; original semantic tdd-red998a5a3 preserved. Exact independent review /tmp/MAC-uzxr-PM-initial-red-replay.md09291b1d33e9a7c77981c76f2cba2b01415eed3695de5d44f5c650fd31d119b6 fully read. Only flag import/declaration/proof allocation-log changed; fsm_test.go14add4delete,18changedLOC/net+10,SHA256326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba.
+- Actual default and explicit export go test -count=1 -timeout=300s ./internal/testoracle -run ^TestFSMNativeOracleSensitivity$ -json commands from impl,offline local environment and pipefail:both exit1 with3 intended outerFAIL,200 childPASS0FAIL0SKIP. Default wall3.205103916s/package3.115s;export wall2.972808833s/package2.930s. Default emitted proof path absent after run; export retained21files; all owned fixture cwd paths removed.
+- Full external proof /tmp/MAC-uzxr-storage-review.dGuJPh/checkpoint.md. Default log SHA2562954c70326cfacc4a769877492f9c6e371411ab5247c3e2ddb91e4497906a31b;exporta530a99f92b9f4509207d93c028051886993d826d1393772c9877cd622ada954. Export proof crm-fsm-native-proof-2940413560 under review dir retains6receipts/raw logs,46control hashes each,exact2/2/1mutation files. Default child raw evidence intentionally cleaned; outer actual summaries retained.
+- Read-only exact reconstruction audit PASS:only3authorized edits over998a5a3; all semantic assertions/mutations/inventories/helpers/commands/deadlines byte-identical. Verified export command/package/run-terminal inventories/raw hashes/source hashes/reconstructed mutations and cleanup. audit.cjs4068acff248b538ef2fc100bd9404dc1535be6b80f03979904f46363ac55241d; audit.jsonlf2bc73a52785197faa5db00c79a7839dd37403de9de415b93e6db76d96b5dc2d.
+- gofmt/diff-check/scoped pvg verify PASS1file0issues; worktree clean. Original logs preserved, no other shared edits or source/product/remote/service/toolchain/consumer changes. STOP for independent storage-repair verification. Complete external later amendment outstanding; no full story delivery/approve-red/acceptance.
+
+### proof
+- [ ] AC #1: parsed current rows and closed actual guard/event bindings pending.
+- [ ] AC #2: complete effects/context assertions and Task GREEN repair pending.
+- [ ] AC #3: initial semantic RED validated; storage repair committed awaiting verification; full sensitivity pending.
+- [ ] AC #4: full candidate successful execution inventory pending.
+- [ ] AC #5: focused corrected candidate proof and consumer handoff pending.
 
 ## nd_contract
 status: in_progress
