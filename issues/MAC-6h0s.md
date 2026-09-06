@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:29Z
-content_hash: "sha256:b61715f8ebcbee272556e72c66382a2bfbc15531e5c564c6d23fe774fd02a0ef"
+updated_at: 2026-09-06T09:22:34Z
+content_hash: "sha256:07f9ce56105313f1c653055271f675432c7b7234954ac2475f2331a73e6ddf02"
 blocked_by: [MAC-qlw2]
 blocks: [MAC-p9z1, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-vx24, MAC-ou97]
 ---
@@ -127,6 +127,7 @@ CONSUMES:
   spec: Scope interface in typed requests; no process is launched by declaration validation.
 - MAC-l7m0: docs/test-assurance-contract.md
   MAC-6h0s: Sections 2-3 exact closed plan/milestone JSON, qualified obligation/test identity, limits, review-digest projection; section 7 Go signatures.
+  schema: Sections 2-3 exact closed plan/milestone JSON, qualified obligation/test identity, limits, review-digest projection; section 7 Go signatures.
 - MAC-l7m0: docs/test-assurance-contract.md
   schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
 
