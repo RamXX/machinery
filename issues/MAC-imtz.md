@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:52Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:22:38Z
-content_hash: "sha256:4d3a1221d7d221b36b6ef617aff40bac813568b91f6e9f6ba8c01f8aee56d952"
+updated_at: 2026-09-06T09:48:02Z
+content_hash: "sha256:2612ac65099577d73467d9a59c9440e56c235f687449d0bed288fcd661830b75"
 blocked_by: [MAC-bz1y, MAC-6h0s]
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 ---
@@ -167,3 +167,47 @@ status: new
 
 ### proof
 - [ ] All current story ACs remain pending without weakening.
+
+### 2026-09-06T09:48:02Z ramirosalas
+ROUND-1 RULE 1 REPAIR: COMPLETE python-unittest/v1 EXECUTABLE ASSET OWNERSHIP
+This is the unambiguous complete CURRENT ownership for the already approved adapter, replacing README-only/ambiguous directory wording. No new adapter/framework/runtime semantics.
+
+PRODUCES:
+- internal/tdd/adapters/python.go -> exact approved Adapter implementation AND its executable-asset embedding/materialization/byte-verification/transport wiring (including Go embed declarations); no unowned common embedding file is assumed.
+- internal/tdd/adapters/python_test.go -> focused parser/helper/transport and immutable-asset negative tests.
+- internal/tdd/adapters/python_integration_test.go -> real native assertion/lifecycle/custody conformance.
+- internal/tdd/adapters/assets/python -> EXCLUSIVELY owned bounded executable asset directory: all language helper/assertion transport, bootstrap/reporter/formatter needed by THIS closed adapter, plus its README. At most8 executable/configuration asset files plus README; exact paths reviewed before RED, no undeclared file or vendored runtime.
+- internal/runtimeclosure/python.go -> exact pinned language runtime closure.
+- internal/runtimeclosure/python_test.go -> real closure validation and mutation controls.
+- testdata/integration-lanes/assurance-python.json -> exact required native conformance fragment.
+
+CONSUMES:
+- MAC-6h0s: internal/tdd/types.go
+  spec: Adapter { ID() string; Prepare(context.Context,SuiteRequest)(PreparedSuite,error); Run(context.Context,PreparedSuite,EventSink)(Execution,error) }; exact machinery.tdd.event/v1 and closed requests.
+- MAC-qlw2: internal/processscope/scope.go
+  spec: Scope.Run(context.Context,Command,Streams)(Result,error), remaining deadline and owned cleanup.
+- MAC-bz1y: scripts/integration-lane/assurance_catalog.go
+  schema: exact native runtime versions and closed required-fragment union on Linux amd64/Darwin arm64.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: unchanged section4 closed identities/budgets, section5 assertion causality, section6 python-unittest/v1 semantics, section7 API, section8 custody.
+
+CURRENT ACCEPTANCE / INVENTORY MAP
+All seven existing adapter ACs remain required unchanged: exact native profile/runtime, approved fixed invocation, real source-bound assertion cause, full positive+negative two-platform conformance, exact normalized lifecycle, cumulative scoped custody and persistent required-lane integration.
+Before ANY RED authoring, provide an exact bounded executable asset inventory (paths, roles, entrypoints, imports/dependencies, embedding owner, byte-source/materialization relation and planned test identities) for independent review. No future test IDs need be invented now; the exact inventory must be approved and frozen before RED execution/implementation authorization. A README alone cannot satisfy helper delivery.
+All executable helper/transport/bootstrap/reporter assets for this adapter live in the owned bounded directory and are embedded/wired by the owned python.go production adapter. Their exact complete bytes/config/dependency closure become frozen protocol inputs, materialized with approved topology/modes and checked before use. No unreviewed project reporter/helper, alternate filesystem copy, ambient fallback or unowned central asset registrar.
+Real native positive/negative conformance must execute the EMBEDDED production assets through this Adapter and normal downstream replay/complete. Missing, substituted, unembedded, extra undeclared, mutated or not-actually-invoked asset must fail; printed fabricated events or tests aimed only at README cannot pass.
+Preserve all existing tests/helper semantics and other adapters' directories; no frozen pilot edits. If the exact inventory cannot fit the bound, stop for separately reviewed decomposition, never hide files in a generic directory.
+DIFF BUDGET: at most15 actual files including bounded assets, under2100 changed LOC as originally budgeted; investigate overrun before expanding.
+MANDATORY SKILLS: developer and pm_acceptor. Product independence, native no-mock/no-skip proof and final-only preflight hold remain.
+
+## nd_contract
+status: new
+
+### evidence
+- Independent round1 findings repaired through supported append-only scope/consumer notes; no architecture/source/test/ref/runtime mutation.
+- Exact source surfaces verified against accepted epic7e36f3e7ddcf25565d5d4fe60b328df254eee91d; prior Body/status/labels/history preserved.
+- Independent Anchor ROUND2 and canonical-document acceptance remain prerequisites, not implementation evidence.
+
+### proof
+- [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
+- [ ] Independent review/native execution/final acceptance pending.
