@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:54:54Z
-content_hash: "sha256:61d06e726ba34551a0d957bde4ca3c686d7bc4137d5bba342cebda03e7cf948f"
+updated_at: 2026-09-06T09:57:10Z
+content_hash: "sha256:fa2fa5f2b4a5e90c66b7de5b5a982032523661b4ba6b0cfeef6f73e871e0bfdf"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
@@ -738,4 +738,48 @@ status: new
 - [ ] Remaining workflow completion: actual zero-finding doctor precheck/fix and allissue invariance.
 - [ ] Current phase3: narrow exacthelper+44 authorization remains held until completion.
 - [ ] Original AC1-5 GREEN/current phase6-7: same-revision nativeDarwin/Linux, real profile/protocol/control/cleanup proof and independent final acceptance pending.
+
+
+### 2026-09-06T09:57:10Z ramirosalas
+## PM SUPPLEMENTAL FREEZE COMPLETION AND EXACT HELPER AMENDMENT AUTHORIZATION — 2026-09-06
+
+The genuine independent supplemental RED approval at ac439c517de169addb68637c50040a9434bc8cca is now recorded at true EOF and the remaining supported doctor operation has completed. The failed pvg story approve-red invocation remains a FAILED partial transition; this note does not relabel it as successful. Its existing-label failure, prior status change to open, retained assignee/labels and unperformed note/doctor operations remain visible in the immediately preceding PM approval and independent report.
+
+Supported completion evidence:
+- After dispatcher clearance and the other writer's completion, captured all 56 issues using pvg nd list --all --limit 0 --json. Each snapshot retains every metadata field and replaces Body with a SHA256 hash; IDs are unique and the count is enforced.
+- Fresh pvg nd doctor --json: exit 0, All 56 issues passed validation, empty stderr.
+- Actual pvg nd doctor --fix: exit 0, All 56 issues passed validation, empty stderr.
+- Before/after snapshots are byte-identical: SHA256 753671d79aa8e7f92290515a3a659bfbbd46b9b94d403cff332b5c081014b0db. No body, status, label, claim/assignee, dependency, timestamp or other captured issue metadata changed by doctor.
+- Snapshot/log/script artifacts are under /tmp/machinery-yig6-pm-supplemental.gOsP36: issues-before-doctor.json, issues-after-doctor.json, issue-snapshot.cjs, doctor-precheck.stdout/stderr and doctor-fix.stdout/stderr.
+- This explicitly completes only the supported NOTE plus DOCTOR operations remaining from the attempted workflow. No duplicate-label removal, retry, acceptance, claim, private-code fix, tool replacement or audit waiver occurred. Actual documented doctor behavior and observed outputs are the evidence; no installed nd source parity is asserted.
+
+TEST-EDIT AUTHORIZED: cmd/machinery/verify_checkers_test.go -- ONLY the exact independently reviewed helper patch /tmp/machinery-yig6-revised-proposal.4O8e2O/MAC-yig6-revised-helper.patch SHA256 f6c4ea4e5d0ea57300cecf4857c582e732ca72a2eb8ecc393b43856d8e1e8d13 (+91/-12), against the unchanged helper SHA256 ce795eb21f6598df29d9cfa327e8b4019bcb0130e37332f2e646a374faf6c4fe at committed supplemental RED ac439c517de169addb68637c50040a9434bc8cca. Required commit subject marker: [test-edit-authorized].
+
+The associated NEW prospective-only cmd/machinery/checker_fixture_helper_build_test.go may now be added ONLY with exact SHA256 6274d5685e6804912780761cafbbfb8f370d8f2863430f65f399720a960575ef (44 lines) alongside that authorized helper amendment. It is not RED and was not present in the frozen RED commit. This is precise amendment authority after actual committed supplemental freeze and supported remaining-work completion, not permission to rewrite existing assertions or bypass a gate.
+
+Immutable RED identities throughout GREEN:
+- Original 246-line cmd/machinery/checker_fixture_coverage_test.go: SHA256 80b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677.
+- Supplemental 147-line cmd/machinery/checker_fixture_helper_red_test.go: SHA256 ea67a87453e92d0f3e056ffa15367a0ad85cb6592cb6ce826bfd83ff84e93fcd at ac439c517de169addb68637c50040a9434bc8cca.
+- Full story TDD range 70652b948bf090008b1965c85daf36ea374daea4..ac439c517de169addb68637c50040a9434bc8cca: both tdd-red commits, zero violations, only the two added RED files. No production/helper delta before this authorization.
+
+Exact boundary remains three original os.Executable selectors plus reviewed source-local, 60-second t.Context, sync.Once cache, child-only nonempty GOFLAGS=-cover=false, real compiler/processcontrol.Run, bounded WaitDelay and TestMain-owned support. Preserve every original assertion, mode, argument, marker and exit; fixture dispatcher, OCI helper, TestMain, shared golden helpers, production parser/environment, processcontrol, workflows and parent coverage settings stay unchanged. Any byte or scope change requires fresh independent review. Repaired aggregate scope remains four paths, +528/-12.
+
+Independent committed RED report: /tmp/machinery-yig6-pm-supplemental.gOsP36/REPORT.md SHA256 855fc6566c7ced40ee3c5133bb3b3fd373a92e6f4ec555b475464a3d26013b4c, supplemented by these explicit remaining-work records. Exact before-write review: /tmp/machinery-yig6-pm-final.rirEOm/REPORT.md SHA256 fa958a74440d41058b53b9d112cd1eebe40fbf7658a13f10e758b4fb988c8f3b. Actual RED: two intended top-level failures, native original one pass; full commands/raw hashes/AC mapping remain in those records. No fresh behavioral rerun is claimed here.
+
+Actual SAME-revision native Darwin AND Linux GREEN remains mandatory: both frozen files plus prospective 44-line tests, paired original native/covered success, existing checker stream/bounds/timeout controls, separate raw streams, real parsed production-executed profiles, exact inventory with zero skips, owned cleanup and independent final PM acceptance. No Linux or final GREEN assurance is supplied by this authorization. This PM performed no helper/source/ref write, automatic GREEN claim, installed Machinery/NIL/Dagger/service action, remote operation or preflight.
+
+## nd_contract
+status: new
+
+### evidence
+- Exact committed supplemental RED independently approved/frozen; full TDD audit and semantic RED/native control recorded.
+- Failed approve-red provenance preserved; supported note plus actual doctor completion verified with all 56 issue records invariant.
+- Narrow exact helper patch and new prospective44 authorization recorded above with required [test-edit-authorized] commit marker.
+
+### proof
+- [x] Current scope phase2: original246 and supplemental147 are exact immutable committed RED.
+- [x] Remaining workflow completion: fresh zero-finding doctor precheck, actual doctor --fix and all-issue invariance verified.
+- [x] Current phase3 authorization: exact helper patch plus exact prospective44 may proceed within the recorded boundary.
+- [ ] Current phase3-5 implementation: authorized bytes must be applied/committed and both frozen files preserved.
+- [ ] Original AC1-5 GREEN/current phase6-7: actual same-revision native Darwin/Linux protocol, profiles, controls, cleanup and final independent acceptance remain pending.
 
