@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T22:23:28Z
-content_hash: "sha256:890daded73584af134c1b0c8c3c3b6f7ca8faed2053f2de14eebefe733344516"
+updated_at: 2026-09-06T09:12:48Z
+content_hash: "sha256:fd46c93ddd93f6ab54f08862ceee01b70c7a13d65de4a157efee882e017478a5"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -777,4 +777,47 @@ Revised scope options for Sr PM:
 Formal execution guarantees to preserve: runTLC snapshots the verified JAR into its private meta root and revalidates the Java identity after execution. A new exported provisioning pathname is only a checked provisioning result; it must not replace actual engine execution evidence or weaken those snapshot/revalidation guarantees. Any direct parent Java/TLC validation must retain the relevant immutable executable/JAR closure guarantees and bounded private scratch, with a new cancellation control/negative proving that the actual nested JVM disappears before lane return.
 
 No additional source/API/test/fragment changes were made for these options. Current221525d checkpoint remains undelivered with claim retained for scope review.
+
+
+### 2026-09-06T09:12:48Z ramirosalas
+APPROVED CUSTODY INTEGRATION SCOPE REVISION 2026-09-06
+
+This append-only revision is narrowly limited to the architecture-dependent AC8 custody integration. Preserve all earlier ACs, failed records, healthy GREEN claim/status and the 96-case frozen pilot. Architecture approval is not native evidence, and this story remains undelivered.
+
+The reviewed contract is delivered by MAC-l7m0 as docs/test-assurance-contract.md (575-line public projection SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8). Required new producer chain: MAC-qlw2 broker/guardians -> MAC-cn7q processcontrol/formal/runtimeclosure attachment -> this lane integration. This story now depends on MAC-cn7q; no cycle runs back from either custody producer to this lane.
+
+CURRENT SUPPLEMENTAL OWNERSHIP / PRODUCES:
+- scripts/integration-lane/main.go -> integrate approved processscope.Open/Child/Close and verified ServeInternal before lane parsing; use actual authenticated custody throughout provisioning and suite execution.
+- scripts/integration-lane/custody_integration_test.go -> NEW separately reviewed supplemental native custody cases, not edits to frozen main_test.go.
+- testdata/integration-lanes/custody.json -> NEW supplemental exact-case fragment, preserving original union and source/fixture/config identities.
+Original remaining CI/preflight/lane ownership stays intact. Do not edit the seven frozen v2 files at e55238223961fec922896c361d8af6cafc454a8e: scripts/integration-lane/main_test.go, testdata/integration-lanes/schema.json, pilot.json, runtime-pins.json, pilot.integration.test.mjs, CONTRACT.md, cmd/machinery/integration_lane_test.go (directory prefixes as recorded in the original inventory). Preserve prior v1 history and all 96 named leaves, originally 39 PASS / 57 intended FAIL / 0 SKIP. No prior test rewrite is authorized by new supplemental RED.
+
+CONSUMES:
+- MAC-cn7q: internal/processcontrol/scope.go
+  spec: Run(ctx context.Context,cmd *exec.Cmd) error compatibility; WithScope(ctx,scope), AttachScope(cmd,scope), ExitStatus(err), actual formal/runtimeclosure attachments AFTER environment sanitization.
+- MAC-qlw2: internal/processscope/scope.go
+  spec: Open(context.Context,Options)(Scope,error); Scope.Run(context.Context,Command,Streams)(Result,error), Child(context.Context)(Scope,error), Close(context.Context)(CleanupReport,error); ServeInternal(args []string,io InternalIO)(handled bool,exitCode int).
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Section8 exact custody protocol and aggregate deadline/cleanup contract.
+
+ADDITIONAL AC8 PROOF OBLIGATIONS:
+A8a. Authenticate native broker/guardian custody through the actual lane -> provisioning/helper -> formal -> pinned Java/TLC path and lane -> real suite/meta test -> nested pinned JVM path. Observe an actually active nested JVM BEFORE cancellation in both paths on Linux amd64 and Darwin arm64; source analysis, fake Java or an outer wrapper alone is insufficient.
+A8b. New supplemental RED inventories/fixtures/config are reviewed and frozen separately. Show expected assertion failures and passing safe controls for early intermediate exit, interruption, timeout, overflow, closed/forged/stale scope and cleanup failure. Demonstrate terminal group kill before identity guardian reaping; exact ownership/capability lifecycle, no foreign PID/container cleanup and no residual owned process.
+A8c. All preparation/probes/suite launch/parse/cleanup calls use remaining aggregate deadlines and one shared cleanup grace; enumerate actual process-producing call sites. Missing/malformed attachment is fail-closed, never background fallback. Runtime validation is preserved after environment sanitation.
+A8d. Final same-source native lane proof includes unchanged original 96 leaves PLUS separately named supplemental custody leaves, no skip/empty/lost/duplicate cases and no runtime leaks. Existing cold-cache residual and standalone Node/full-lane pending evidence remain pending until actually rerun; do not treat the approved architecture as satisfying them.
+A8e. Four-language runtime catalog/fragments and compatible contributor schema evolution are owned by MAC-bz1y after this delivery; language adapters and their conformance are separate producers. Final-Ga GateExecution/runtimeclosure.Git/accept.go is owned by MAC-pe9v, NOT quietly added to this story's frozen pilot or source scope.
+
+DIFF BUDGET ADDENDUM: this lane consumer adds at most ~3 owned supplemental files / 650 changed LOC beyond its existing measured scope; investigate overruns. Broker/attachment implementation is budgeted in its own upstream stories. No heavy preflight here, no installed replacement, no remote mutation or unrelated user process/container cleanup.
+HOLD: independent Anchor backlog review and accepted upstream contract/custody delivery required before the root resumes this architecture-dependent GREEN work.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Approved architecture backlog integration only; original GREEN checkpoint 221525d7baf7a565ece9972d09bf916132e68050 remains undelivered.
+- Original frozen pilot and prior failed histories preserved; no source/test edit or native execution by Sr PM.
+
+### proof
+- [ ] Existing AC1-AC8 and pending same-source 96-case lane evidence remain required.
+- [ ] A8a-A8e: actual new supplemental custody proof pending.
 
