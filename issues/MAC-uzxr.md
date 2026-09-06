@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T04:16:29Z
-content_hash: "sha256:fbacf13bd4afae6342ce28db18327e30578d2fe904513a13b086d457c37a15dd"
+updated_at: 2026-09-06T04:16:55Z
+content_hash: "sha256:0e0a98eaff2afce1a1ce0dccf0fcdfb3dc8e9b2c7ab4973998b56ce1b0b25f4b"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -409,3 +409,20 @@ status: in_progress
 - [ ] AC #3: independent native semantic/extra-effect/missing-call proof pending.
 - [ ] AC #4: full actual successful execution inventory and supplements pending.
 - [ ] AC #5: full focused candidate proof pending; no claim renewal.
+
+### 2026-09-06T04:16:55Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- TERMINAL INITIAL RED CHECKPOINT: INITIAL_RED_REPLAY VALIDATED at998a5a3b3107292365c7c3e6ddb85c072c534145, not full RED approval/delivery/acceptance/rejection. The preceding INITIAL_RED_REPLAY note contains exact durable storage-only TEST-EDIT AUTHORIZED statements; read them before the separate repair. Report /tmp/MAC-uzxr-PM-initial-red-replay.md SHA25609291b1d33e9a7c77981c76f2cba2b01415eed3695de5d44f5c650fd31d119b6.
+- Detached real replay actualexit1/3 intended outerFAIL/200 childPASS0SKIP; rawf8e10d43309778babbe609643c2adde672ad09c87305470745b706b5200dc67b. Separate225PASS baseline exact218+7identities, raw ee99c3aa35061bfc763ad6566a616920e98327b79f06e1637898fde8874f4ea1. Author and PM46-input manifests/exact2/2/1 mutations/six receipts and native terminal identities verified. Fixture cwds cleaned;197672bytes/21proof files retained unconditionally on ordinary run.
+- TEST-EDIT AUTHORIZED is ONLY stdlib flag import, nativeProofParent flag and exact3rd storage block supplied in preceding note: default t.TempDir built-in cleanup/error reporting; explicit existing absolute export parent via -fsm-native-proof-dir, no execution gates or expected-outcome changes. Preserve all semantic assertions/mutations/native inventories byte-for-byte; separate [test-edit-authorized] commit, original998a5a3 and RED logs preserved. Both modes need actual3FAIL/200PASS replay plus default cleanup/export retention checks before next independent verification.
+- All later five-suite/helper/parser/additive patches and fullRED/GREEN decisions remain HELD. No AC/path/architecture/canonical forecast changes. Claim and healthy developer worktree retained, statusin_progress/hard-tdd/dev-MAC-uzxr. No product/source edits by PM, remote/toolchain/service changes, subagents or running jobs.
+
+### proof
+- [ ] AC #1: parser and closed actual witness binding pending.
+- [ ] AC #2: complete effects/context and Task repair pending.
+- [ ] AC #3: valid initial missing-sensitivity RED; candidate rejection proof pending.
+- [ ] AC #4: historical225 baseline verified; dynamic candidate inventory pending.
+- [ ] AC #5: complete passing candidate proof and consumer handoff pending.
