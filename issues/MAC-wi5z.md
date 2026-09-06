@@ -8,8 +8,9 @@ parent: MAC-ui8a
 created_at: 2026-09-06T16:33:51Z
 created_by: ramirosalas
 updated_at: 2026-09-06T16:33:54Z
-content_hash: "sha256:c9bd25e0111c11cf750df427d7261bb442fa73e3f94aefd6617061e94b76f38f"
+content_hash: "sha256:ccea4151354bcafec7df9638a1a30ef703082659c14d6a216b18b0f4b5a1684d"
 labels: [hard-tdd]
+follows: [MAC-sh60]
 ---
 
 ## Description
@@ -125,5 +126,6 @@ status: new
 
 ## Links
 - Parent: [[MAC-ui8a]]
+- Follows: [[MAC-sh60]]
 
 ## Comments

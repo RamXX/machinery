@@ -9,10 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-06T02:13:22Z
-content_hash: "sha256:4f57c52a5dc467e65fa448c8ea07537cdb3f025821aa74a430014d1191559362"
+content_hash: "sha256:2fc50847573230076bdd8236ea52325a6ebd69016713e157728f58da50bcb8ba"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
+led_to: [MAC-wi5z]
 ---
 
 ## Description
@@ -946,6 +947,7 @@ status: in_progress
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]]
 - Follows: [[MAC-a89e]], [[MAC-p8ce]], [[MAC-olrx]]
+- Led to: [[MAC-wi5z]]
 
 ## Comments
 
