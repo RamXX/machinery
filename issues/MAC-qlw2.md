@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:45:35Z
-content_hash: "sha256:32aee8704eca81ad5d852101e3d97b43d45877124842f477d91e81581d4d5a6e"
+updated_at: 2026-09-06T14:59:08Z
+content_hash: "sha256:823d687235dd457e6b603bda4e67315b73b42caf8289307c692048c310c28bad"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0, MAC-p9wm]
 assignee: dev-MAC-qlw2
@@ -300,3 +300,6 @@ status: in_progress
 - [ ] Exact prospective RED inventory plus actual distinct RED/calibration handles must be recorded before first RED/test authoring; independent PM and separate production GREEN handles are selected only at their later applicable gates.
 - [ ] Implementation, actual RED/GREEN and same-candidate Darwin arm64 plus Linux amd64 native proof remain pending.
 
+
+### 2026-09-06T14:59:08Z ramirosalas
+PRE-EDIT METHOD CHECKPOINT ONLY. Frozen V2 inventory remains unapproved. Independent report /tmp/MAC-qlw2-inventory-v2-review.e5Dw60/REPORT.md SHA256 a392e384a104ed3502a13f8ee095cf1de6fdc05a68a7c792f5984314bea2a385 and immutable ADDENDUM.md SHA256 4a2f5b12ecab3c329f475732eae0b0dca8249ddd90b9d42caa8dd8246f392c51 are GAPS_FOUND, fully read and verified by root. Eight finite method corrections plus disjoint internal-service versus capability-attachment dispatch are assigned to existing /root/custody_red_inventory in a new external V3 package. No source/test authoring or RED authority. H01 external-copy calibration requires prospective actual distinct actor/chronology amendment; forecast 4900–8100 LOC is investigated but not yet canonically substituted. Exact future eight-path ownership and existing claim/status/DAG remain unchanged. No fourth architecture loop, audit exception, native acceptance, preflight, installed replacement or remote action.
