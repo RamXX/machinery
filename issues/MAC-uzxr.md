@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:39:42Z
-content_hash: "sha256:2e636e57c755a2095897bb6e7fabb7bbdaa06163e9c898e395173e845ca4bc88"
+updated_at: 2026-09-06T06:07:56Z
+content_hash: "sha256:423a0ce838a18f5f4c78a68ddc2d8f2a0d21c6bbebc9dd12f4bfcee6efad81fb"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -168,6 +168,96 @@ Read complete author checkpoint/audit.cjs/audit.jsonl and verified all suppliedh
 No further storage repair required. Author may prepare complete EXTERNAL later patch and measured per-file decomposition for separate exact PM/SrPM review. Applying all5suite/helper/parser/additive amendments stays HELD. No fullapprove-red/deliver/accept/reject transition; no new test-edit permission, AC/path/scope change, candidate parser/Taskfix proof or consumerclaimrenewal.
 SR PM MEASURED FORECAST / PRESERVATION REPAIR. Canonical eight paths and five AC unchanged; actual external proposal2450changed plus503historical=2953 cumulative beforeGREEN, aggregate2945changed. Conditional3300-3500 cumulative/3200-3400 aggregate forecast assumes prior300-450-line parser estimate and separately charges48-line scaffold replacement plus narrowTask correction. Old750-1150/provisional1500-2200 obsolete; no proof trimmed or test permission granted. First --description command succeeded but verification failed because nd treats same-level nested headings as section boundaries and retained an old canonical suffix. Original failed readback preserved in /tmp/machinery-private-triage.JF2BDG/READONLY-HANDOFF.md. Installed --body-file has the same Description semantics. Root-authorized guarded pvg nd edit bound full live raw header/body to journal export and checked an external apply_patch trial, removed ONLY duplicate canonical block under nd exclusive lock, then verified exact full body90c15690a83bd2200723fdaa8bdd27e3871e189959b4936083afe06336d35590 and identical tail/metadata except normal hash/time. Exact expected/proposed manifests and editor remain external. First hgz1 preparation-only cross-realm assertion failed before any tracker write, then root explicitly authorized scalar-array comparison correction; historical failure is not proof. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
 EXPANDED RED FREEZE CHECKPOINT: exact authorized seven-path patch2f722fa783fa4a27cbbd7ec92ad706e7bf86079801b0d80d3fe0a8c03f07e249 committed acf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f over4ef6baf with literal [test-edit-authorized] and tdd-red. Full report /tmp/MAC-uzxr-final-red.nOXYuf/REVIEW.md SHA2565cb98377240aa8be22f0b9d88b74a7a6bd959fbfd8f1efb2907d08b02f68ad5c. Exact seven result hashes/frozen495prefix/99committedexamplefiles/218originaltuples/twoterminalbodies verified; Task unchanged. Measured2120add330del2450changed/net1790; historical503changed separate. Actual all10 contractroots and focusednative plus3meta families ran15.526s: contracts0PASS28FAIL0SKIP, focused10supplementPASS5transitionrootFAIL0SKIP, original/candidate/remainingmeta3/3/17outerFAIL. All current parser/control failures NONQUALIFYING ErrScaffold; all intended later mutants/most nestedcontractbranches unreached. Actual23children10supplementPASS25transitionrootFAIL0SKIP,0transitionrowleaves/0mutants; all23fixturecwdsremoved. Export52files=46receipts/rawlogs+6manifests47committedinputhasheseach;17latercontrols fail before manifest export, no nonexistent manifest credited. Raw and complete native identity receipts in report. Normal verify-tdd3commits0violations/no waiver; scoped static7files0issues; gofmt/diffcheckclean. Original genuine998a5a3 threeunsafeacceptedouterFAIL200childPASS, validatedstorage4ef6baf bothmodes, historical225baseline and separate actualTaskentrydefect preserved as distinct evidence. No parserimplementation, productionedit, source/testcorrection, delivery, approve-red, GREEN, consumerclaimrenewal, remote/toolchain/service changes or background process. STOP clean for independent combined-evidence RED adjudication.
+## INDEPENDENT COMBINED-EVIDENCE RED DECISION — MAC-uzxr
+
+Full PM report /tmp/MAC-uzxr-PM-combined.au6aPZ/REVIEW.md SHA256072af4cda455158288e635968040fa0930e1f40a0fd0fead10314497341d670c. This records the evidence-based decision; the supported approve-red transition and terminal readback follow separately, without waiver.
+
+# MAC-uzxr independent combined-evidence RED adjudication
+
+PM decision: **APPROVE RED** for frozen commit `acf1bba2d37784fa175b5ee2cdd0f9b5ac0d5c3f`, subject to the supported approve-red command succeeding without waiver. This approves the test bar for a fresh GREEN developer; it does not accept implementation, claim completed conformance, mark any full AC proved, or authorize broader ownership. The current scaffold failures earn no behavioral RED credit.
+
+## Why the combined evidence is sufficient
+
+The canonical Testing Requirements expressly permit test-support scaffolding to support a qualifying RED when unchanged old suites demonstrate the specific missing parser/sensitivity behavior. That condition is independently met here, without depending on ErrScaffold:
+
+1. The original immutable998a5a3 semantic tests, preserved byte-for-byte through storage4ef6baf and as the entire495-line prefix in acf1bba, actually run complete unchanged User/Session controls and exact unsafe variants. A fresh PM replay of4ef6baf again produced three intended outer `unsafe native variant was accepted` failures, with all200 child leaves passing. Coherent expected-state/action mutations retained valid stable stimulus identities; the Session mutation introduced an observable extra effect on an empty-effect row. There was no parser/setup/control failure in that replay. This is genuine evidence of the missing sensitivity the story repairs.
+2. The Task missing entry action is independently established on unchanged production by the preserved real probe: normal TASK-67b0ff PASS, fallback TASK-754183 FAIL for missing recordTaskClosed. The wider strict-effects diagnostic has224PASS/1FAIL and the same sole fallback. These prove a separate application discrepancy and are not relabeled as parser RED. The frozen new Task assertions additionally require actual Rejection clearing, retaining normal Cancelled/Done, valid-prior, non-always and terminal controls. A forged action name will not satisfy the context assertion.
+3. Exact independent amendment review296a026c28fcaf4b3b25bfdcaccf7edc423d5801b7c93d6dac89a253350b14d2 established the complete prospective test bar: all218 original actual input/guard witnesses, closed MD/JSON parsing and identity/order reconciliation, exact one-Fire effects, real successful execution inventory, and all17 additional exact structural/semantic/inventory variants. The candidate is exactly that authorized byte sequence, now committed with both audit markers. The tests and minimum interface compile, and finite replay confirms which code is reached at the boundary. No observed failure establishes a concrete defect in the assertions themselves.
+
+RED does not require implementing the GREEN parser merely to run every future passing control. Requiring that would defeat the explicit canonical staging allowance. Conversely, the new scaffold-bound outcomes do not prove parser sensitivity, effects, guard binding or native inventory; approval relies on the preserved genuine behavior plus the reviewed frozen contracts, not on counting those failures. The GREEN review must establish all presently unreachable success and negative paths on the exact candidate. This is a RED approval judgment, not a preapproval of those future results.
+
+## Independent scope/static audit
+
+Main-agent skills read in this review conversation: pm_acceptor, developer, nd, codebase-memory, vault-knowledge; pvg skill additionally read for the supported RED transition. Canonical current description/five AC, latest Notes and author checkpoint were read; no final-delivery or acceptance procedure was substituted for the requested RED phase. Author report `/tmp/MAC-uzxr-final-red.nOXYuf/REVIEW.md` SHA256 `5cb98377240aa8be22f0b9d88b74a7a6bd959fbfd8f1efb2907d08b02f68ad5c` was read completely.
+
+Graph-first index remained ready, generation2026-09-06T02:42:16Z; seven test/support paths plus Task were coverage-checked. Existing files report metadata_match/no recorded gap; the new testoracle paths are missing from the main index. Exact committed git objects supply authoritative branch content; graph completeness is not assumed.
+
+Owned detached checkout `/tmp/MAC-uzxr-PM-combined.au6aPZ/current` is pinned to acf1bba. A separate owned archive contains exact historical4ef6baf example source. No developer-worktree internals were inspected. Every one of99 current example files was checked against the commit, all seven allowed resulting hashes matched the previous authorization, and every other file matched4ef6baf. Exactly seven paths differ. The495-line prefix remains SHA256 `326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba`; expanded fsm_test.go `4578841816e77712ed249a349e1f63c13c7eac233f15eccacb2d0ee916527b25`. Production Task remains `39af26a093f855acf269da153915fbecf6e78c0f3dbba85b087bf4b83586e35b`. The bounded source/tuple/model/AST reconstruction from the prior exact review remains applicable to identical bytes:218 witnesses/197rows/47states/118orderedgroups, preserved ordering and both original terminal bodies,17 exact mutations, closed current dialect and real pre-Fire guard facts.
+
+`pvg story verify-tdd --base 70652b948bf090008b1965c85daf36ea374daea4 --json` from the detached candidate checked three commits with zero violations and no waiver. Scoped `pvg verify` all seven exact paths with --include-tests passed7files/0issues. Diff whitespace check and final detached status were clean. Those checks do not prove a parser exists. The exact48-line fsm.go is still ErrScaffold. Three audit commits are998a5a3 (tdd-red),4ef6baf ([test-edit-authorized] storage), acf1bba ([test-edit-authorized] and tdd-red full freeze). Canonical eight paths/five AC and measured2450 later changed LOC are unchanged.
+
+## Current independent actual replay
+
+Host go1.27.1 darwin/arm64. Every command used GOWORK=off, GOPROXY=off, GOTOOLCHAIN=local and -count=1. Exact argv/environment/cwd/duration/outcomes are in each `*-receipt.json`; commands run synchronously with explicit130s/310s external bounds, Go120s/300s and existing child120s/context125s/WaitDelay5s and meta270s limits.
+
+| Group | Actual exit | Terminal leaves | Wall |
+|---|---:|---|---:|
+| Ten parser/contract roots |1|0PASS/28FAIL/0SKIP|0.629s|
+| Five transition suites and three supplement roots |1|10 supplementPASS/5 transition-rootFAIL/0SKIP|1.083s|
+| TestFSMNativeOracleSensitivity |1|3 outerFAIL/0PASS/0SKIP|2.154s|
+| TestFSMCandidateExecutedInventory |1|3 outerFAIL/0PASS/0SKIP|2.154s|
+| TestFSMRemainingNativeSensitivity |1|17 outerFAIL/0PASS/0SKIP|10.376s|
+
+Five-group total16.396s. All current parser/control failures are NONQUALIFYING ErrScaffold; required positive Parse failure makes many nested malformed-input and effect checks unreachable. No skip, compile error, panic, process timeout or nonempty stderr occurred. The ten passing leaves are exclusively the seven original terminal supplements plus three new Task non-always cases.
+
+Current23 actual children contain10 supplementPASS,25 transition-rootFAIL, zero transition-row leaves, zero registration/observation records, zero mutants, zero skips. The full candidate checker sees process exit1; neither its successful reconciliation nor any negative inventory corruption case is proved. All17 later variants stop at failed controls, so future Task anchors are not reached. An independent audit also read the author's corresponding raw children and corroborated exactly those same counts and limits.
+
+Each current export set has52 files:23 raw logs,23 execution receipts and6 manifests of47 committed input hashes. All receipts have correct package/command/actual once-run and terminal inventories, raw SHA256, exit and removed fixture cwd. No mutant artifacts exist. The17 failed remaining controls export no manifests because manifest creation follows successful controls; none is invented. New candidate default storage was independently replayed once (2.153s,3 outerFAIL at scaffold); the emitted proof directory and all3 child cwds were absent afterward. Historical cleanup/export proof remains preserved, and passing GREEN lifecycle verification is still required.
+
+Current raw SHA256 values under `/tmp/MAC-uzxr-PM-combined.au6aPZ/`:
+
+- contracts.jsonl: `a6e45c397b29d1bc220a37544156bfb73dca352cab65e0e3548a6b0bb9ef56bb`
+- focused.jsonl: `c298b6b6c30c7db68df012fed4005d5d1eb10f2a199f61f957919caa8e00f491`
+- TestFSMNativeOracleSensitivity.jsonl: `857006cf7e89cb76c79557a714a02836a9348401b3f04951841845006f57e1a6`
+- TestFSMCandidateExecutedInventory.jsonl: `3bc0d8fa3d1392a5289db7efc16505bf8fd69fe5c2b47242a88b2376e90f52b5`
+- TestFSMRemainingNativeSensitivity.jsonl: `b61fcd8cc67d255cb5248188ebfa1e466e8cf56dac8c0990f24f6c9bcb40bb00`
+- current-default.jsonl: `f5b0d1773a9024782d970850463e11af64160fd6cad4543eb2d2faa5226e8efd`
+
+## Genuine historical replay and independent raw audit
+
+From the exact4ef6baf archive, ran `go test -count=1 -timeout=300s ./internal/testoracle -run '^TestFSMNativeOracleSensitivity$' -json -args -fsm-native-proof-dir=/tmp/MAC-uzxr-PM-combined.au6aPZ` under the same offline/local environment. Actual exit1,3 intended outerFAIL,3.398s. All six children exited0 with200 native leaves PASS/0FAIL/0SKIP; each User pair exercised all20 leaves and the Session pair all60. Raw historical-genuine.jsonl SHA256 `a8f978b85b1031dac050b1f5cd49a0c7b45e816c2b67c25deb72d63622f2e968`.
+
+Independently reconstructed46 control input hashes from historical git objects, exact once-only2/2/1 mutation files from recorded old/new bytes and all resulting hashes. Verified all6 receipts, commands/package identities, exact native names and once-run/once-PASS termination; all fixture cwds removed. Explicit export retains21 proof files. The outer diagnostics are actual unsafe acceptance, not scaffold failure. These historical tests are unchanged and no fixed Task baseline was fabricated.
+
+Previously independent225PASS baseline raw `/tmp/MAC-uzxr-pm-initial-red.csxQrh/baseline.jsonl`, SHA256 `ee99c3aa35061bfc763ad6566a616920e98327b79f06e1637898fde8874f4ea1`, was re-audited for exact218 transition plus7 supplement identities, including slash labels. It was not unnecessarily rerun. Original semantic report09291b1d33e9a7c77981c76f2cba2b01415eed3695de5d44f5c650fd31d119b6 and storage reportb52cda2189988e9516cc10c59cda850e39f82502405eaec75ba0fdcc15bbd184 remain intact.
+
+Read the exact Task probe source/raw, verified its production source equals the current unchanged Task hash and its exact1PASS normal/1FAIL fallback outcomes. Probe raw SHA256 `90e3d11c3df38725d77637bc187d7e27dcf0a2b65f0934e6b71c785b177e783c`; strict-effects raw `c6ce626ee381f97d020a2bea090d1a626e9b9adfa421c75ffd877cdfb8ee42a4` independently has224PASS/1FAIL/0SKIP with exactly the historical225 identity set and sole TASK-754183 failure. These are application-effect diagnostics, not proof of parsed expectations or fake-name rejection on a corrected candidate.
+
+Independent audit script `audit.cjs` SHA256 `7097b7571fead561adacde188933bea3ff2e04edafc3fc60d1d0cda66dca6dfa`; raw `audit.jsonl` SHA256 `abaa51f3f769410907eb17e283f17ce7effd916b088d8523a3919d72c9d175a8`. Synchronous runner `run.cjs` SHA256 `542381f49ab05efcb3f73c5fd06cdf559401105a71b8e38ca43b776c324d8507`. Audit exited0 in4.220670875s. An initial pvg approve-red --help lookup was unsupported and exited1 without mutation; documented skill syntax is used for the actual transition, not an inferred flag. No product error was concealed.
+
+## Frozen GREEN obligations and phase boundary
+
+Root must dispatch a **fresh GREEN developer**, separate from the RED author's context. Six Go test files (five original suites plus fsm_test.go) at acf1bba are frozen; no edit, deletion, weakening, skip or helper bypass is authorized. The seven-file freeze includes the exact minimum fsm.go API, whose non-test implementation body is the explicitly owned GREEN work. Implement its reviewed closed contract without a broader parser API/product dependency. Preserve current source/oracle/module/config closure: do not change the ten committed design inputs, module files, generated evidence, BUILD/attestations or unrelated production. Private implementation helpers within the owned parser are ordinary GREEN work; changing frozen assertions or widening the interface is not.
+
+Only the already-scoped Task.fireRolledBack fallback may change in application production: recordRoutingError, Cancelled routing, actual existing recordTaskClosed call and ordered [recordRoutingError,recordTaskClosed]. No other guard/routing/event/final-state/action behavior is authorized. Future fake-name and missing-call anchors must then match exactly once; failed controls or missing anchors never count as successful regressions. A new concrete mismatch returns through the existing scope/test-dispute process.
+
+GREEN must pass the complete focused native suite with actual parsed row/guard execution and all terminal/non-always supplements; every parser contract and nested rejection table; full bidirectional parsed-row/successful-observation/native-leaf inventory; all20 actual mutation cases (original3 plus later17) with valid complete unchanged controls and exact intended diagnostics. The full meta families contain43 sequential children when controls succeed. Prove source/input/manifests/raw output custody, unchanged unrelated bytes, all actual native identities/outcomes, zero skips, default cleanup and intentional export. Report measured full runtime and actual implementation/diff cost;16.396s scaffold replay is not full candidate timing. Run normal TDD audit without waiver, then independent GREEN PM review. No full AC, current consumer claim, acceptance or authenticated-execution assertion is granted now.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- PM combined-evidence decision APPROVE RED for acf1bba; supported transition/readback still to be recorded after this report.
+- Genuine historical sensitivity replay and separate Task defect support the explicit canonical staging allowance; current scaffold outcomes remain NONQUALIFYING.
+- No source/test edits, implementation, remote/install/assets/service/preflight operations, child agents or acceptance/close performed by PM. Detached review and historical archives retained; no worktree cleanup.
+
+### proof
+- [ ] AC #1: current parser implementation and complete actual input/guard binding pending GREEN.
+- [ ] AC #2: complete effects/context and narrow Task correction pending GREEN.
+- [ ] AC #3: full candidate20 unsafe-variant rejections with valid controls pending GREEN.
+- [ ] AC #4: successful complete bidirectional candidate inventory pending GREEN.
+- [ ] AC #5: passing candidate proof and reviewed consumer handoff pending GREEN/PM.
+
 
 ## PM EXACT AMENDMENT ADJUDICATION — MAC-uzxr
 
