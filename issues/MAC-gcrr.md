@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
 updated_at: 2026-09-06T02:35:49Z
-content_hash: "sha256:25fc96bbc3585e5d968f938feda2485e6b0e670cc5c6f64e0ae952dff1f57763"
+content_hash: "sha256:ab5cde72f42acd5125640b2b84a7765cd69d1fd731145bda013ad69c118cc380"
 blocked_by: [MAC-vx24, MAC-hy71, MAC-p7jd, MAC-2u36, MAC-yhg5, MAC-hwdb, MAC-hpqp]
 blocks: [MAC-ou97]
 was_blocked_by: [MAC-p8ce, MAC-a89e]
@@ -219,3 +219,20 @@ Prior canonical Description (historical, superseded only by bounded documentatio
 - Was blocked by: [[MAC-p8ce]], [[MAC-a89e]]
 
 ## Comments
+
+### 2026-09-06T02:35:49Z ramirosalas
+## nd_contract
+status: new
+
+### evidence
+- Sr PM canonical documentation division only: MAC-gcrr owns README.md + docs/agent-portability.md and safety regression/release guidance; installer seven AC/frozen proof unchanged, independent PM acceptance pending. Source 15252d2 confirms receipt-aware parity, safe repair, strict inspection, direct rollback/foreign-change protection and post-direct-commit host-plugin error boundary. Existing dependencies retained; no docs/source/test writes or status/claim change.
+- Created 2026-09-05 from assessment and source-verified interfaces.
+
+### proof
+- [ ] AC #1: independently verified
+- [ ] AC #2: independently verified
+- [ ] AC #3: independently verified
+- [ ] AC #4: independently verified
+- [ ] AC #5: independently verified
+- [ ] AC #6: independently verified
+
