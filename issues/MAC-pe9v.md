@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:32Z
-content_hash: "sha256:67f964284807dc1352354b61e115d04dbff076f3083a7ad6a2ce0543303e4ef0"
+updated_at: 2026-09-06T09:22:39Z
+content_hash: "sha256:e7550e0a048565d5290c7d4b339e3f0a813a873e063edef752da5736b2bb122c"
 blocked_by: [MAC-cn7q, MAC-bz1y]
 blocks: [MAC-sd7g, MAC-wbxq, MAC-vx24, MAC-ou97]
 ---
@@ -122,6 +122,7 @@ CONSUMES:
   spec: WithScope(ctx, scope), AttachScope(cmd, scope), ExitStatus(err); attach AFTER gitcontrol.Environment sanitization.
 - MAC-bz1y: testdata/integration-lanes/assurance-runtime-pins.json
   MAC-6h0s: real native Git 2.55.0 exact closure plus Linux amd64/Darwin arm64 required accounting.
+  schema: real native Git 2.55.0 exact closure plus Linux amd64/Darwin arm64 required accounting.
 Existing internal/gates/suite.go
   spec: (s *Snapshot) RunSelected(impl string, sel Selection, opt RunOptions) []*Gate; (s *Snapshot) Release() error. Existing accepted snapshot/finalization guarantees are preserved.
 - MAC-l7m0: docs/test-assurance-contract.md
