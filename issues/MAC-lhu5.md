@@ -1,7 +1,7 @@
 ---
 id: MAC-lhu5
 title: "Make portfolio milestone packets satisfy their standalone handoff contract"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, accepted]
@@ -9,10 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
 updated_at: 2026-09-06T19:21:06Z
-content_hash: "sha256:d92a67361417658f833fc127d320066848dfb49554125bdb7f6c7c3a70fa0578"
-blocks: [MAC-ou97, MAC-hgz1]
+content_hash: "sha256:3c9660433b21e0cfaf168192a7a33cfce5765a6ad541ceae0806ec503bdf5147"
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
+closed_at: 2026-09-06T19:21:06Z
+close_reason: "Accepted: portfolio packets satisfy standalone handoff contract; RED/GREEN proven; merged to local epic"
 ---
 
 ## Description
@@ -150,10 +151,12 @@ status: new
 - 2026-09-06T05:48:13Z status: open -> in_progress
 - 2026-09-06T05:48:14Z auto-follows: linked to predecessor MAC-2u36
 - 2026-09-06T05:48:14Z claimed by dev-MAC-lhu5
+- 2026-09-06T19:21:06Z status: in_progress -> closed
+- 2026-09-06T19:21:07Z dep_removed: no_longer_blocks MAC-ou97
+- 2026-09-06T19:21:07Z dep_removed: no_longer_blocks MAC-hgz1
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-ou97]], [[MAC-hgz1]]
 - Follows: [[MAC-2u36]]
 
 ## Comments
