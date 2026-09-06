@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T07:47:13Z
-content_hash: "sha256:f8822d90d21f37a1e0f8eec7304c5015956810958a76f34e5ff3642b52843c31"
+content_hash: "sha256:ce19707b54c3c471925a36fb43b2779a02e53c3d46e826ccaa2b1154afd1ad02"
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 assignee: dev-MAC-p7jd
 closed_at: 2026-09-06T07:47:13Z
@@ -3311,3 +3311,24 @@ status: delivered
 - [x] AC #3: migration replayed.
 - [x] AC #4: approved new matrix passes.
 - [x] AC #5: bounded evidence and limitations preserved.
+
+### 2026-09-06T07:47:13Z ramirosalas
+## Independent final GREEN acceptance (authoritative EOF)
+
+ACCEPTED [2026-09-06], exact candidate 39a498164fc6e09169ea5b33d470890d315f6a50. Full review /private/tmp/machinery-p7jd-none-green-pm.RE7VYT/PM-FINAL-REVIEW.md SHA256 6c5a528e2fb64b908c9ca51be7213af32305d71fa9db32054b210d918612f412; the complete review was appended once through supported nd notes. Supported pvg story accept succeeded. No merge or epic completion is claimed.
+
+## nd_contract
+status: accepted
+
+### evidence
+- Fresh independent four-package replay:349 PASS/0 FAIL/0 SKIP (gates151, CLI148, hook28, designlock22), including all120 supplemental leaves,112 controls,104 subsequent challenges and72 negative mutations. Raw JSONL SHA256 d7cbd1036812c2e907302197a66b270bf22d9eec5dcf4d36a00c9a9caed6876e.
+- All8 frozen files and2 exact authorized fixture helpers unchanged. Same-candidate author race45/helper13/broader149PASS plus1 explicitly unpaid Darwin casefold SKIP verified from all13 raw JSONL streams. Independent13-commit TDD guard:0 violations. Full source closure and all five AC reviewed; the prior literal-none blocker is repaired.
+- AC5 remains OBSERVED real late renderer faults and ordinary CLI, REVIEWED exact closure, COMPOSED late CLI; independently injected standalone late CLI UNOBSERVED, OS Close UNFORCED, sink partial writes separate. Eleven unchanged hook return-empty heuristics are inspected documented branches, not silently declared clean. Case-sensitive Linux collision leaf and full preflight remain final-epic obligations, neither passed nor waived.
+- Prior review/rejection/RED evidence remains historical record. No source/test edits, remote/installed-assets/service/engine mutation, preflight or merge by PM; all finite verification processes completed. Root owns local integration and final epic work.
+
+### proof
+- [x] AC #1: Complete implementation/test root and exact digest; legitimate none included and actual subject/scope changes invalidate.
+- [x] AC #2: Plan/current/historical classification and current/history diagnostics remain distinct.
+- [x] AC #3: Explicit migration/no-grandfathering and preserved compatibility pass.
+- [x] AC #4: Real mutation/scope/alias/custody/replay negatives and unchanged/evidence-only controls pass with frozen bytes.
+- [x] AC #5: Real CLI generation/check and approved bounded renderer/output proof pass with honest execution/judgment limits.
