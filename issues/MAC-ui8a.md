@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:26:01Z
-content_hash: "sha256:e83cff18d1901f57e104c874d83eb4152f1254d22b7849612a2194bb72b3e0c5"
+updated_at: 2026-09-06T09:36:56Z
+content_hash: "sha256:3d3cb362bf1c5281045f4a8ed83ca9df7d96bb3c8d474372052230fbf5dac9aa"
 ---
 
 ## Description
@@ -353,4 +353,67 @@ status: in_progress
 - [x] No lint errors; RTM/cycle checks passed; original claims/frozen histories preserved.
 - [ ] Independent Anchor backlog approval.
 - [ ] All implementation/native proof/final preflight/isolated candidate closure remain pending.
+
+
+### 2026-09-06T09:36:56Z ramirosalas
+# Independent assurance backlog review — round 1 of 3
+
+REVIEW_RESULT: REJECTED
+
+Scope: the nineteen new assurance stories under MAC-ui8a, canonical documentation producer MAC-l7m0, and their impacts on MAC-hpqp/MAC-hy71/MAC-hgz1/MAC-lnu6/MAC-vx24/MAC-ou97. This does not reopen the accepted original backlog review or the approved architecture. No conditional pass.
+
+## Blocking findings
+
+### 1. CRITICAL — executable integration ownership must include the actual required edit surfaces
+
+RULE: A bounded story must own every required production, executable asset, and maintained inventory surface at its real path, or consume an explicitly owned and correctly ordered producer. Naming behavior while excluding the files that implement or register it is not executable decomposition.
+
+ISSUE / all identified instances:
+
+- MAC-cn7q promises scoped formal provisioning/probes/verification and an audit of every reachable process producer, but its exclusive PRODUCES list omits `internal/formal/process.go`. At accepted epic 7e36f3e7ddcf25565d5d4fe60b328df254eee91d, `openFormalJava` in that file constructs `context.Background()`, sanitizes `cmd.Env`, and calls `runBoundedProcess` for the actual JVM identity probe. Its existing API has no scope/context input. Editing only formal.go, runtimeclosure/java.go and processcontrol cannot satisfy the required explicit attachment after this sanitation without an unapproved alternate mechanism or bypass. The same sweep finds `internal/formal/alloy.go`: `runAlloy` calls this probe and separately creates a background-context JVM after environment sanitation. These are existing paths in normal VerifyFormalTo, not hypothetical future gates. Assign the exact scoped call-chain changes and supplemental test/fragment mapping while preserving Java/JAR and original frozen tests; do not silently exclude the existing Alloy branch or duplicate the probe to avoid ownership.
+- MAC-al5u adds `scripts/assurance-examples.sh` and `scripts/assurance-examples-test.sh` but does not own `scripts/shellcheck-files.txt`. The existing `scripts/shellcheck-inventory.sh` discovers all `.sh` files under scripts and requires byte-exact equality with that closed file. Both additions necessarily require its update. MAC-hpqp owns the inventory earlier in the dependency chain and cannot register nonexistent future scripts as its completed corpus. Assign the later inventory amendment to the script producer and preserve the existing corpus.
+- MAC-vx24's current bounded map says it modifies the existing `repository_contract_test.go`, but that repository-root path does not exist. The actual existing file is `cmd/machinery/repository_contract_test.go`, confirmed by graph discovery and the accepted epic tree. Correct ownership to the real test surface and preserve its existing regression bytes except independently approved RED changes; do not create a replacement root file and call that integration with the existing contract tests.
+- MAC-wi2u, MAC-avfp, MAC-imtz and MAC-8yai require embedded executable helpers/transports/reporters/bootstraps, while their exclusive file lists name only `internal/tdd/adapters/assets/{go,typescript,python,elixir}/README.md` and refer generically to an "owned assets directory." This leaves conflicting file-versus-directory scope for the actual executable assets. Explicitly own the concrete helper/transport/embedding surfaces, or unambiguously own each bounded asset directory and require its exact file inventory to receive review before RED. A README is not the helper producer. This is an ownership correction, not a demand to invent future test IDs.
+
+SCOPE: Swept all nineteen new current Bodies and the six named existing integration/serialization consumers. Repair this rule across their production paths, embedded assets and mandatory inventories, preserving serial shared-file ownership. The standalone four-adapter architecture and old frozen pilot remain unchanged.
+
+### 2. CRITICAL — prospective strict migration must own the current judgment refresh it necessarily invalidates
+
+RULE: A migration that changes the complete implementation/test subject and requires current full-root Gv success must assign a downstream, substantive independent judgment and exact evidence refresh after those changes. Earlier accepted evidence, hash-only renewal, or making Gv weaker cannot satisfy the migration.
+
+ISSUE: MAC-5ft8 requires new strict tests/helpers under `examples/go-crm/impl/internal/...` and actual current `check --complete`, but owns no `examples/go-crm/design/attestations.yaml` refresh. The accepted Gv implementation compares the entire recorded versus current entry set and returns `GV_SCOPE_INVENTORY` for added paths (`internal/gates/attest.go`, accepted epic lines 812–847); the new strict tests/helper directories therefore invalidate the current implementation subject established upstream. MAC-hgz1 and MAC-lnu6 both precede this migration. MAC-lnu6 explicitly preserves implementation entries/hash and permits only its narrow policy-related metadata/BUILD-hash changes. MAC-al5u is an invocation owner, MAC-vx24 is guidance/integration, and MAC-ou97 is tests-only; none owns the necessary later subject review/evidence amendment. Thus the migration's required full current complete success has no authorized producer.
+
+FIX: Assign a bounded post-strict-test current-judgment/evidence owner, normally as an explicit MAC-5ft8 scope addition or an ordered consumer. Require actual independent review of the new complete test/implementation inventory, exact generated evidence, preserved prior attribution/history and all legacy regression proof. Include the new subject's stale-before-refresh and current-after-review controls. Keep authored assurance controls finished before judgment and execution, preserve full-root Gv without new exclusions, and do not imply automatic reviewer/date or hash refresh authority. Any resulting example fixture/golden changes need their own exact reviewed ownership; this finding does not authorize altering them.
+
+SCOPE: Swept MAC-5ft8/MAC-al5u/MAC-vx24/MAC-ou97 against the complete current ownership constraints of MAC-hgz1/MAC-lnu6 and architecture sections 4, 7 and 10. The current closed example inventory has one implemented-complete row, Go CRM, and seven explicitly design-only rows; no request to implement or downgrade those seven is made.
+
+## Advisory observations and preserved strengths
+
+- The ten lint review findings are observable-verb heuristics, not additional blockers. The stories have concrete native/API outcomes and a continuous downstream normal CLI/complete path; the missing ownership above is substantive.
+- Several cross-references call the schema/store/budget section "section 3" or "sections 2–3", while the normative document places the closed schema/store/budget contract in section 4. The exact document hash still identifies the authority. Correct references during the global ownership repair; do not rewrite normative content.
+- Deferred exact native test names are acceptable where separately proposed, independently reviewed and frozen before RED authoring. Do not invent names only to satisfy lint. The runtime/conformance matrices must still become complete exact inventories before execution authorization.
+- The decomposition correctly preserves explicit empty-head registration/CAS and failed history, same-assertion red_controls, retained-state replay, four closed native adapters, full current Ga/Gv/Gtd, no-launch/release/publication/output ordering, cumulative milestone and four-hour owner budgets, shared terminal cleanup, fresh first-use without prior PASS, and native-cooperative/unauthenticated-host limits. No architectural redesign is requested.
+- hpqp's original seven frozen files/96-leaf union and failed history remain protected; the new custody work is supplemental. hy71 -> bz1y -> al5u serializes shared CI ownership. hgz1 -> lnu6 remains before prospective assurance migration. The existing sh60 FAIL/hold and original vx24/ou97 dependencies are untouched; no successor/cancellation/transfer authority follows from this review.
+
+## Evidence and limits
+
+- FIRST command: `pvg lint --backlog --epic MAC-ui8a --json`, exit 0, JSON array with 0 errors and 10 review-only vertical-slice findings. `pvg rtm check`: exit 0, 0 extracted requirements (56 stories, 21 closed); empty tags are not semantic coverage. `pvg nd dep cycles`: no cycles. `pvg settings design.machinery`: off; no enabled-design gate was bypassed.
+- Read all nineteen complete current story Bodies, complete canonical epic Body, complete MAC-l7m0, complete vx24/hy71/ou97, and relevant original/current hpqp/hgz1/lnu6 ownership and history through `pvg nd`; no raw vault reads. Independently recomputed the nineteen plus six reviewed child Body hashes against the canonical handoff table: all match.
+- Canonical epic Body before this review: 41223 UTF-8 bytes, SHA256 e83cff18d1901f57e104c874d83eb4152f1254d22b7849612a2194bb72b3e0c5; handoff seal f9d3612bfc3feac8df59ad65cb0d623268700a99. Current nd/backlog d176745699de0277a70bdb660cd7245005165a9a also includes the separate Y amendment; reviewed child hashes remain unchanged.
+- Read the full 589-line approved private architecture and complete CHALLENGE-3. Hashes match e467a3b6c6f657e7a4cb28e85c688be0df24c56a7e3c76fdcfa224f7ff5d2624 and 0205b50a8eb2e135230173bbf4a7b7eccdde5934fabab5aa4b2dde95d474ac66. MAC-l7m0 retains exact one-document public projection SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; it remains blocked and unlanded.
+- Graph-first Verify-tier source discovery used project Users-ramirosalas-workspace-machinery, generation 2026-09-06T08:09:26Z; relevant paths reported metadata_match. Non-indexed TSV/text inventories were read directly. Material formal/Gv/path claims were independently checked in the exact accepted epic Git object. Graph coverage is best-effort, not a completeness theorem. Tool-guided missing-project argument was corrected; absent optional local AGENTS was confirmed by root, using supplied global instructions.
+- Working tree clean; main remains 497419ab4512fcff765cd5feb27aed4c67b5608d and epic remains 7e36f3e7ddcf25565d5d4fe60b328df254eee91d. No source/test/worktree/installed/runtime/service/remote changes, no child agents, no native tests or heavy preflight run. This is backlog judgment, not architecture feasibility or native delivery evidence.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent round-1 assurance backlog review completed; two blocking general rules with full identified instances and sweep scopes above.
+- Report is reviewer-owned and immutable after creation. Only this review may be appended to the epic; no child status/scope/dependency changes.
+
+### proof
+- [x] New decomposition reviewed against the exact accepted architecture and relevant existing ownership/frozen-history constraints.
+- [x] Mechanical lint/RTM/cycle results and exact source-backed integration gaps recorded honestly.
+- [ ] Independent assurance backlog approval: REJECTED pending the two bounded general-rule repairs.
+- [ ] Implementation/native two-platform proof/final preflight/isolated candidate remain pending.
 
