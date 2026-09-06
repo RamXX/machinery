@@ -9,8 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:36:14Z
 created_by: ramirosalas
 updated_at: 2026-09-05T19:45:33Z
-content_hash: "sha256:58f56df4910995187087380d6653b22b8da31882f3964bdaf2c4bf8da37eb826"
-blocked_by: [MAC-hlae, MAC-sh60, MAC-yhg5, MAC-hwdb, MAC-2n83, MAC-hy71, MAC-gcrr, MAC-l7m0, MAC-vx24, MAC-lnu6, MAC-hpqp, MAC-yig6, MAC-lhu5, MAC-hgz1, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6]
+content_hash: "sha256:092250bc33efaa25d35677af9634e601b78469c122725f63951be47688c02985"
+blocked_by: [MAC-hlae, MAC-sh60, MAC-yhg5, MAC-hwdb, MAC-2n83, MAC-hy71, MAC-gcrr, MAC-l7m0, MAC-vx24, MAC-lnu6, MAC-hpqp, MAC-yig6, MAC-lhu5, MAC-hgz1, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y]
 was_blocked_by: [MAC-olrx, MAC-p8ce, MAC-a89e, MAC-2u36, MAC-p7jd, MAC-uzxr]
 ---
 
@@ -157,10 +157,11 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-06T09:10:17Z dep_added: blocked_by MAC-6h0s
 - 2026-09-06T09:10:18Z dep_added: blocked_by MAC-p9z1
 - 2026-09-06T09:10:19Z dep_added: blocked_by MAC-62s6
+- 2026-09-06T09:10:20Z dep_added: blocked_by MAC-bz1y
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocked by: [[MAC-hlae]], [[MAC-sh60]], [[MAC-yhg5]], [[MAC-hwdb]], [[MAC-2n83]], [[MAC-hy71]], [[MAC-gcrr]], [[MAC-l7m0]], [[MAC-vx24]], [[MAC-lnu6]], [[MAC-hpqp]], [[MAC-yig6]], [[MAC-lhu5]], [[MAC-hgz1]], [[MAC-qlw2]], [[MAC-cn7q]], [[MAC-6h0s]], [[MAC-p9z1]], [[MAC-62s6]]
+- Blocked by: [[MAC-hlae]], [[MAC-sh60]], [[MAC-yhg5]], [[MAC-hwdb]], [[MAC-2n83]], [[MAC-hy71]], [[MAC-gcrr]], [[MAC-l7m0]], [[MAC-vx24]], [[MAC-lnu6]], [[MAC-hpqp]], [[MAC-yig6]], [[MAC-lhu5]], [[MAC-hgz1]], [[MAC-qlw2]], [[MAC-cn7q]], [[MAC-6h0s]], [[MAC-p9z1]], [[MAC-62s6]], [[MAC-bz1y]]
 - Was blocked by: [[MAC-olrx]], [[MAC-p8ce]], [[MAC-a89e]], [[MAC-2u36]], [[MAC-p7jd]], [[MAC-uzxr]]
 
 ## Comments
