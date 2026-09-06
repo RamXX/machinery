@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
 updated_at: 2026-09-06T01:18:00Z
-content_hash: "sha256:fbd4372aefa1a462429a28c25431e54e3d87dc7fd5b6343ac85844414a984cce"
+content_hash: "sha256:b3ea5182eeec19d049e0ff1095fea2e12ca9f791cd9e6ae250409bcb9f060ee4"
 blocks: [MAC-vx24, MAC-ou97]
 ---
 
@@ -252,6 +252,31 @@ status: new
 - Inspected cmd/machinery/tokensequal.go, oracle_test.go:757-813, golden_test.go and check.go; existing oracle tests/helper bytes remain unchanged. Codebase graph lookup/coverage was best effort, exact committed source used for findings.
 - Canonical scope is not PM frozen-fixture/evidence amendment authorization. Independent reviewer approval of exact prose/evidence deltas is required before writes; only exact reviewed BUILD subject hashes may refresh afterward, never other claims, schemas, acceptance or history.
 - Scoped backlog lint PASS (33 issues, 0 errors/review findings), dependency cycles none; RTM PASS with 0 extracted requirements/18 stories is structural only, not AC verification. Initial CONSUMES formatting lint errors corrected; all five AC preserved.
+- No source/test/docs/installed assets or worktree edits; no runtime proof performed during backlog repair. Required real CLI/guidance RED controls and post-refresh gate checks remain pending.
+
+### proof
+- [ ] AC #1: all nine shipped guidance surfaces remove frozen-edit exemptions; exact bytes/inventory and evidence revision/replay required.
+- [ ] AC #2: honest CLI help/output/docs without semantic or formatting-only proof claims.
+- [ ] AC #3: executable quoted-literal and indentation-sensitive semantic counterexamples plus real CLI negatives.
+- [ ] AC #4: genuine whitespace utility controls and prior custody/exit behavior preserved.
+- [ ] AC #5: actual built CLI, all-nine-surface tests and six post-refresh Gv checks, service-free and standalone.
+
+
+### 2026-09-06T01:18:00Z ramirosalas
+EVIDENCE-TRUTH HOLD FOR INDEPENDENT PM (does not block new RED authoring)
+Source at epic 6cb2d974, examples/go-crm/design/attestations.yaml:99-110, records gt.conformance-test-shape and g4.zero-context under attestor Codex CRM design review, date 2026-09-03, both covering BUILD.md. Rebinding changed BUILD bytes while mechanically preserving that identity/date/note may misrepresent historical review. The canonical conditional hash-only allowance is NOT authorization where it would imply those historical reviewers covered new bytes.
+Unresolved reviewer question before ANY evidence write: is the exact prose delta a truthful mechanical no-new-claim refresh, or does it require an explicitly scoped new re-attestation with truthful reviewer/date/context? PM must decide from the actual delta and preserve historical evidence; if re-attestation requires field/schema/ownership changes beyond the current hash-only boundary, return the exact amendment for canonical review first. No blanket identity renewal, forged review or automatic rehash. No product protocol change is implied. New RED tests and unchanged existing tests may proceed through normal independent authorization while this evidence decision remains held.
+
+## nd_contract
+status: new
+
+### evidence
+- Bounded Sr PM scope repair; all five user AC preserved; status open, hard-tdd, unclaimed and existing downstream dependencies unchanged.
+- Exact epic 6cb2d974 source scan found nine active shipped exemptions and six adjacent BUILD subject hash records. Root approved 17-path/~500-LOC forecast. MAC-vx24 already depends on this story; no deferral or new feature.
+- Inspected cmd/machinery/tokensequal.go, oracle_test.go:757-813, golden_test.go and check.go; existing oracle tests/helper bytes remain unchanged. Codebase graph lookup/coverage was best effort, exact committed source used for findings.
+- Canonical scope is not PM frozen-fixture/evidence amendment authorization. Independent reviewer approval of exact prose/evidence deltas is required before writes; only exact reviewed BUILD subject hashes may refresh afterward, never other claims, schemas, acceptance or history.
+- Additional source-verified evidence-truth hold: no hash-only rebinding if it misstates historical review; independent PM must decide truthful scoped re-attestation versus mechanical no-new-claim refresh before evidence writes. This does not block new RED authoring. Canonical broader identity/schema changes remain unauthorized.
+- Scoped lint PASS; cycles none; RTM 0 extracted requirements is structural only, not AC proof.
 - No source/test/docs/installed assets or worktree edits; no runtime proof performed during backlog repair. Required real CLI/guidance RED controls and post-refresh gate checks remain pending.
 
 ### proof
