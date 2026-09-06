@@ -7,8 +7,8 @@ type: bug
 parent: MAC-ui8a
 created_at: 2026-09-06T16:33:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T20:23:32Z
-content_hash: "sha256:7ac2ddeccab531c81a02344e4d8743a24bf2ae0fcc5ded1ebe2e76b02384f61c"
+updated_at: 2026-09-06T23:26:04Z
+content_hash: "sha256:91a2a677e3c97d7d07fb123cb1ae5907dcf533c964771e65586532af4fa97693"
 labels: [hard-tdd]
 follows: [MAC-sh60, MAC-hgz1]
 blocks: [MAC-vx24, MAC-ou97]
@@ -145,3 +145,6 @@ SUCCESSOR BOOKKEEPING 2026-09-06: User-approved compliant successor created from
 
 ### 2026-09-06T16:35:05Z ramirosalas
 STRUCTURAL CHECKPOINT 2026-09-06: pvg nd dep cycles PASS (none); scoped RTM PASS (43 stories, 0 extracted/covered/uncovered). Scoped backlog lint scanned 58 issues and returned exit 1 with exactly two errors: produces-collision for internal/gates/oraclecov.go and internal/gates/oraclecov_negative_test.go, each simultaneously claimed by retained MAC-sh60 and successor MAC-wi5z without a dependency chain. Nine unrelated pre-existing vertical-slice review findings were also reported. The two errors are the expected consequence of unavailable canonical cancellation/supersession bookkeeping. No artificial successor-to-old completion dependency, old scope edit, terminal close, label/status change, edge removal, or queue bypass is authorized; MAC-wi5z remains open and blocked by MAC-hgz1, and must remain held/not dispatched pending root review plus a supported disposition policy. This lint result is structural evidence only, not AC/test/native proof.
+
+### 2026-09-06T23:26:04Z ramirosalas
+ACCEPTED 2026-09-06 (user decision 1a — production LOC overage accepted, proof not trimmed) — 6 commits 7dc13a4..0e0ea3d over baseline B df8dce0. Successor contract honored: no old GREEN production imported (verified not ancestors of B); tests-only delta 6cb2d97..8f84325 + disclosed 122-line spec from a6ac10e; audit markers correct at creation (3 tdd-red, 1 tdd-red [test-edit-authorized], fix, refactor, [test-edit-authorized] golden capture). RED: intended semantic failures incl. 26 bypass subtests; GREEN all targeted suites ok; golden one-line truthful reclassification (177->137 literal-covered) with same-SHA capture; G4 ERROR retained unmasked. 1,800 changed LOC total. Coordinator merged + targeted suites ok on epic. Record: .git/machinery-evidence-20260906.TEFZ7D/wi5z-record.md
