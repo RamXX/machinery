@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
-updated_at: 2026-09-06T03:34:05Z
-content_hash: "sha256:55a3a5f31fc8d6866b5a04e7a4252aaaf4d1b3709d92968cb1610e6b242c8545"
+updated_at: 2026-09-06T03:35:09Z
+content_hash: "sha256:95bba33a8a81b6a60aa9f1ddef51b665b19166861d28bf0fb087965c858f1c56"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -111,6 +111,107 @@ status: new
 
 
 ## Notes
+TASK ENTRY-ACTION SAME-P0 CANONICAL EXTENSION
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Sr PM bug_triage: confirmed TASK-754183 missing Cancelled entry action is folded into existing P0 MAC-uzxr by explicit root authorization; no new issue or dependency. Eight owned paths/~750-1150 LOC, only added production path task.go and only fireRolledBack fallback repair after independent RED approval.
+- Exact70652b948 source read; Task.Fire(evt TaskEvent) Effect, fireRolledBack(evt TaskEvent) Effect and recordTaskClosed() verified. Existing action clears Rejection; canonical AC2 proof must assert actual context mutation, Cancelled and ordered actions, not merely a returned name.
+- Isolated probe read/hash matched: task_entry_probe_test.go f6809da70ce0130f79020f8d032194c878e3b17acdeebfaa12f22ca54bc97e84; task.go copied/committed39af26a093f855acf269da153915fbecf6e78c0f3dbba85b087bf4b83586e35b; probe-pipefail.jsonl90e3d11c3df38725d77637bc187d7e27dcf0a2b65f0934e6b71c785b177e783c. Actual corrected exit1:1PASS normal TASK-67b0ff,1FAIL fallback TASK-754183,0SKIP,package0.286s; initial tee status0 is not success.
+- Additional copied-test exact-effects.jsonl hashc6ce626ee381f97d020a2bea090d1a626e9b9adfa421c75ffd877cdfb8ee42a4 and four copy-only diffs read:225 leaves224PASS/1FAIL samefallback/0SKIP,author-reported0.917s wall,actual exit1. These hand-reconciled diagnostics do not prove the missing parser is detected and are NOT approved/frozen RED.
+- Original five AC compared byte-exact after edit; unique canonical headings and intact quoted commands read back. Claims/status/labels preserved: in_progress,hard-tdd,dev-MAC-uzxr. No source/test/docs/evidence/golden edits, no production fix, no review approval or delivery by Sr PM.
+- All five existing-test amendments and concrete parser/reconciliation/sensitivity design still require exact independent PM authorization before edits. No production changes until RED approved; no blanket repair permission. MAC-hgz1 consumes accepted parser/test AND corrected Task source, MAC-ou97 remains blocked, MAC-lnu6 evidence hold unchanged.
+- Scoped lint37 issues PASS0 errors/0 findings; no dependency cycles. RTM22 stories,4 closed,0 extracted requirements: structural result only, NOT five-AC proof. Root main497419a remains clean.
+- Self-review fixed scope-honesty defect by including directly related tiny production correction; no new API, generated-oracle changes, broad rewrite or unsupported additional bug claimed.
+
+### proof
+- [ ] AC #1: actual committed-row parser and closed input/guard reconciliation.
+- [ ] AC #2: entry/exit-aware complete effects plus TASK-754183 actual context-effect repair and safe controls.
+- [ ] AC #3: real next-state/action/extra-effect and missing-call sensitivity, independently frozen before GREEN.
+- [ ] AC #4: complete executed-row inventory with terminal supplements and honest failure attribution.
+- [ ] AC #5: full focused native candidate proof and reviewed consumer scope handoff, without automatic claim renewal.
+
+
+Prior canonical retained verbatim as historical quoted context:
+> ## USER INTENT
+> A current example conformance claim must describe real tests bound to committed FSM expectations, not handwritten expectations that merely reuse stable row names.
+> 
+> ## Context (Embedded)
+> Confirmed absent wholesale FSM parser in Go CRM's five transition suites. PM's actual replay passed 218 leaves (domain130/session60/cli28), zero failures/skips, with all197 committed IDs present in executed names. This proves bounded existing transition execution, not linkage to parsed current oracle expectations. Raw /tmp/MAC-lnu6-pm-go-crm-transitions-713184d.jsonl SHA256 8a88436b9d6212a45eb422c4f4d609902679a15343ba796b1c72174aff03a662; wall1.503486s.
+> internal/gates/attest.go:151 requires wholesale committed oracle parsing plus per-row next state AND expected actions. Five handwritten test tables call real Fire/State but do not parse the committed FSM oracle tables. Existing firedInOrder loops accept expected actions as a subsequence and any actual list for an empty expectation. Source establishes that adequacy gap; no extra-effect mutant was executed by the discovery review. Registry wording does not expressly require exact-list equality. Entry/exit effects are legitimate and MUST be reconciled from committed semantics rather than blindly replacing containment with transition-column equality.
+> 
+> ## Ownership
+> Seven forecast paths:
+> - examples/go-crm/impl/internal/domain/deal_test.go
+> - examples/go-crm/impl/internal/domain/task_test.go
+> - examples/go-crm/impl/internal/domain/user_test.go
+> - examples/go-crm/impl/internal/session/machine_test.go
+> - examples/go-crm/impl/internal/cli/command_test.go
+> - examples/go-crm/impl/internal/testoracle/fsm.go (new test-support parser/reconciliation only)
+> - examples/go-crm/impl/internal/testoracle/fsm_test.go (new parser and real subprocess sensitivity proof)
+> Only exact independently PM-authorized existing test/helper amendments may change the five old files. Preserve their real inputs/guard branch cases, terminal supplements and safety intentions. New test-support paths are reviewed outputs, not assumed existing APIs; concrete helper shape/use must be reviewed before authoring if it affects frozen assertions.
+> Read-only: five committed design/machines/{Deal,Task,User,Session,CommandExecution}.oracle.md and .machine.json files; production Fire implementations; root Machinery parser/gate/attestation code; all BUILD/attestations/acceptance/go.mod/go.sum. No generated-oracle edits or fixture weakening to make tests pass. Unexpected production mismatch returns to Sr PM; no blanket implementation-fix ownership. You are not alone; preserve other work.
+> 
+> ## Boundary Map
+> PRODUCES:
+> - Five exact transition test files -> actual Fire/State conformance driven by parsed committed row expectations with complete row/guard input reconciliation.
+> - internal/testoracle/fsm.go under the Go CRM impl -> bounded test-support parser and expectation reconciliation, not a new Machinery production API.
+> - internal/testoracle/fsm_test.go under the Go CRM impl -> matched real native controls and adversarial parser/assertion sensitivity.
+> CONSUMES:
+> - Existing Go CRM transition interfaces.
+>   source: TestDealTransitions/TestTaskTransitions/TestUserTransitions/TestSessionTransitions/TestCommandExecutionTransitions instantiate real domain/session/CLI machines, call Fire on concrete events and inspect State and Effect.Actions.
+> - Existing committed oracle grammar and semantics.
+>   source: each .oracle.md contains State entry / exit actions plus Transitions columns test id, stable id, source, trigger, guard, target, actions; corresponding .machine.json defines ordered guarded alternatives, internal/external transitions and entry/exit actions. Parse these actual committed sources, not matrix citations only.
+> - Existing claim vocabulary.
+>   source: internal/gates/attest.go gt.conformance-test-shape requires wholesale parser, next state and expected actions; no core claim-model edit here.
+> 
+> ### Story Acceptance Criteria
+> 1. All five FSM conformance suites parse the committed oracle tables during real execution and derive expected next state/actions from them, with an explicit closed mapping from each current row/guard branch to actual setup/event inputs. Check source/trigger/guard/target identity, not only stable-ID string membership. Missing, duplicate, malformed, newly added unmapped or unused rows fail with named diagnostics; preserve complete existing guard-clause coverage and additional legitimate supplement cases.
+> 2. Reconcile full observable action expectations using the actual committed transition AND entry/exit semantics, including internal transitions and fallback/guard priority. Independently review the concrete reconciliation before freezing revised assertions. Correct legitimate entry/exit actions pass; missing, reordered, duplicated or unrelated extra effects fail, including an empty-transition-action row. Do not claim this exactness was an explicit old registry quotation; it is required adequacy proof for this repaired current claim.
+> 3. Real native subprocess sensitivity on isolated copied source/oracle fixtures demonstrates that changing committed expected next state or actions without changing implementation causes the intended conformance failure, not parse/setup failure. Separately inject a reviewed extra-effect implementation variant and require the same frozen assertions to reject it, with unchanged implementation/oracle controls passing. No returned fake process result, warning-only negative, modified shared oracle or production fault API.
+> 4. Report bidirectional committed-row versus actual executed-row inventory for all five machines; current baseline197 IDs/218 leaves is historical, not a hardcoded ceiling. All selected rows/guard witnesses terminate with expected real outcomes and zero skips; inspect real next-state/action diagnostics and preserve terminal supplements. A passing parser unit test or named-ID count alone is insufficient.
+> 5. The actual focused native Go CRM suite and parser/sensitivity proof pass on the delivered candidate, old unrelated tests remain unchanged, and the consumer migration can use the exact reviewed source/test scope and logs to assess a current claim. No automatic attestation, implementation acceptance renewal, full-suite or authenticated-execution assertion is made by this story.
+> 
+> ## Testing Requirements
+> Unit tests plus Integration tests: MANDATORY (no mocks of Fire, compiler, filesystem, process output or assertion result). Service-free native Go and real temporary copies/subprocesses; no Docker or Paivot dependency. Review exact old-test amendments before RED writes; test-support scaffolding may support a qualifying RED only when the unchanged old suites demonstrate the specific missing parser/sensitivity behavior. Compile/API/fixture/timeout failures are not RED.
+> Focused existing control from examples/go-crm/impl: go test -count=1 -timeout=120s ./internal/domain ./internal/session ./internal/cli -run '^(TestDealTransitions|TestTaskTransitions|TestUserTransitions|TestSessionTransitions|TestCommandExecutionTransitions)$' -json
+> Run new internal/testoracle tests explicitly plus relevant existing terminal supplements. Bound outer meta-tests and avoid recursive selection of themselves. Propose exact new names/commands and mutation hunks for independent RED review; freeze unchanged-control and unsafe variants separately with SHA/input hashes. No hidden skip, generated expected-output replacement, or acceptance based on one error. Record host/toolchain, exact source/reference/mutant SHAs, commands, leaf/row inventories, logs and durations.
+> 
+> ## OUT OF SCOPE
+> - Core plan/current/historical schema and freshness custody belong to MAC-p7jd; future authenticated runner/replay enforcement belongs to MAC-l7m0/MAC-vx24.
+> - BUILD/attestation consumer migration is a separately sequenced repair; no simultaneous ownership of MAC-lnu6 files.
+> - New application behavior, root parser/generator edits, external services and global preflight.
+> 
+> ## DIFF BUDGET
+> - Seven paths, forecast700-1100 changed LOC, largely explicit row/guard reconciliation and paired subprocess tests. Report actual per-file cost; independent review required for material growth, never trim safety witnesses.
+> - Existing focused baseline1.503486s; new real copied-tree builds/mutations cost more. Initial outer proof budget5m with bounded individual120s child suites; report measured runtime rather than assuming this fit.
+> 
+> ## Discovered During
+> MAC-lnu6 independent substantive amendment review at 713184db16a12b8c3763b4aa8f5bf025721abf22. Full report /tmp/MAC-lnu6-PM-AMENDMENT-713184d.md SHA256 6fc5223d3e5d48170f89ff9e29b634b256bfe2454b710378f08cb60d875aadf1 was read completely (227 newline-terminated lines; final content included). No runtime mutation proof beyond the explicitly reported native replay is claimed. Exact epic 70652b948 source inspected; graph generation 2026-09-06T02:42:16Z is best effort, not completeness proof.
+> 
+> ## MANDATORY SKILLS
+> - developer; codebase-memory; pm_acceptor.
+> 
+> ## Delivery Requirements
+> Hard TDD with independent RED and exact existing-test amendment review before edits. Preserve all unrelated tests, goldens, generated evidence and existing claims. Shared tracker is development coordination only; product remains standalone. No remote, full preflight, installed assets, user services or healthy-worktree cleanup. No source/docs/tests changed during triage. Use supported delivery; independent PM accepts.
+> 
+> ## nd_contract
+> status: new
+> 
+> ### evidence
+> - P0 source-established conformance parser defect plus separately identified action-adequacy gap; parent supplied independently verified native218-pass control. No new mutation run or repair performed.
+> - Existing claims/tests/ownership remain held until independent exact test amendment review; no core schema duplication.
+> 
+> ### proof
+> - [ ] AC #1: actual committed-row parser and closed input/guard reconciliation.
+> - [ ] AC #2: correct entry/exit-aware complete effects and adversarial sensitivity.
+> - [ ] AC #3: real expected-state/action and extra-effect unsafe variants fail for intended causes.
+> - [ ] AC #4: complete executed-row inventory and preserved controls.
+> - [ ] AC #5: native candidate proof without automatic claim renewal.
+> 
+
 ## nd_contract
 status: new
 
