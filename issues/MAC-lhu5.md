@@ -4,7 +4,7 @@ title: "Make portfolio milestone packets satisfy their standalone handoff contra
 status: in_progress
 priority: 0
 type: bug
-labels: [hard-tdd]
+labels: [hard-tdd, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
