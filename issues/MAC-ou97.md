@@ -8,8 +8,8 @@ labels: [capstone]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:14Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:05Z
-content_hash: "sha256:d918e938b1bde1c3af4aa89fea88eb0157cc16ad5a479ecda386fb95885b179a"
+updated_at: 2026-09-06T12:05:48Z
+content_hash: "sha256:0e36bc44e9aa6d2003280f1145f077d5cae1566b7d47ad46cf938a53e346b98c"
 blocked_by: [MAC-hlae, MAC-sh60, MAC-yhg5, MAC-hwdb, MAC-2n83, MAC-hy71, MAC-gcrr, MAC-vx24, MAC-lnu6, MAC-hpqp, MAC-yig6, MAC-lhu5, MAC-hgz1, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v, MAC-p9wm]
 was_blocked_by: [MAC-olrx, MAC-p8ce, MAC-a89e, MAC-2u36, MAC-p7jd, MAC-uzxr, MAC-l7m0]
 ---
@@ -242,3 +242,28 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-06T12:05:48Z ramirosalas
+FINAL CAPSTONE PUBLICATION DEPENDENCY
+
+MAC-ou97 now directly depends on MAC-p9wm, preserving the capstone rule that every epic child is accepted first. Its user-facing final scenarios must find the native-custody supplement through the accepted test-assurance companion link and must distinguish published architecture from implementation/native execution proof.
+
+CONSUMES:
+- MAC-p9wm: docs/native-custody-contract.md
+  source: accepted standalone public native-custody contract, including exact trust/residual and remaining-proof boundaries.
+- MAC-p9wm: docs/test-assurance-contract.md
+  source: accepted discoverability/refinement notice with the original contract otherwise preserved.
+
+No production or test ownership is transferred to MAC-p9wm or this capstone. MAC-ou97 remains open/new with all previous blockers and outcomes intact.
+
+## nd_contract
+status: new
+
+### evidence
+- MAC-p9wm added as a direct final-capstone blocker/consumer.
+- No existing dependency removed and no status/label/claim altered.
+
+### proof
+- [ ] Final capstone validates public discoverability and truthful architecture-versus-proof claims after all implementations are accepted.
+- [ ] All pre-existing MAC-ou97 ACs remain pending.
+
