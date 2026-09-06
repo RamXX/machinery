@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:50:04Z
-content_hash: "sha256:5c151129bee4b9dd5f28dd79d22a0fccad205c63cf6a571a50036291ce965f49"
+updated_at: 2026-09-06T01:04:19Z
+content_hash: "sha256:7161d4e0f468b0c9bf7d6cec83b746fbe47755b9f91dddbe4d52728d631bf279"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
@@ -1111,3 +1111,17 @@ phase: red-approved
 - [x] AC #4 RED bar: unit and CLI discovery-versus-execution assertions reach intended failures; static discovery never claims assertions ran.
 - [x] AC #5 RED bar: stable-ID/file boundaries, orphan/missing-oracle, parent/clause and Rust/MJS preservation controls pass; actual CLI proof remains valid.
 - [ ] GREEN: implement all five ACs with approved RED bytes unchanged, then deliver independent production proof for PM acceptance.
+
+### 2026-09-06T01:04:19Z ramirosalas
+GREEN HEALTHY HOLD: root requested independent PM scope review before helper-call expansion/golden changes. Clean committed 3d47b80ce59af1f521539e0b48e67be9ee4e9a71, frozen hashes unchanged, cumulative709changedLOC/5files. Full checkpoint/evidence/proposed bounded helper repair: /tmp/MAC-sh60-green.GtkNbt/healthy-hold.md. Frozen gate96 and actual CLI10 pass; new scope18pass on committed correction. Broader package run terminal81763 completed: gates1171pass/0fail/1skip; cmd381pass/23fail/3skip terminal leaves plus180s package timeout, not full passing assurance. Genuine go-crm helper recognition remains required; separate OCI fixture failures retained for diagnosis. No story delivery or release; claim retained at dispatcher request.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- HEAD3d47b80ce59af1f521539e0b48e67be9ee4e9a71; raw logs and exact inventories in /tmp/MAC-sh60-green.GtkNbt; no running sessions.
+
+### proof
+- [x] Frozen RED bytes preserved; required direct-parser/literal/discovery controls pass.
+- [ ] AC #2: retain existing go-crm helper parser discovery after PM scope review.
+- [ ] Full delivery: resolve scoped regression and review output golden before delivery.
