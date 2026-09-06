@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:46:40Z
-content_hash: "sha256:bc2df5383b493916436267c73f625af1317859e0798f0319e118d72fad689038"
+content_hash: "sha256:3ac8018e2dfde04679d0d27ed7e069fbf789241da3f3c4b41e37464fb83c3e32"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36]
@@ -102,6 +102,38 @@ status: new
 
 
 ## Notes
+## RED delivery evidence
+
+PROOF:
+- RED commit c59c89de31c7f1268a220caf0fa0d67a8e166d0f on story/MAC-yig6; new frozen file SHA25680b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677, 246 additions/0 deletions, no existing helper/source edits.
+- Full exact commands, selected inventory, raw paths, classifications, timings and AC mapping are in the appended REPORT.md and /tmp/machinery-yig6-red.09ui51/REPORT.md SHA256648c4d87d5facac1d46110ab796436a8a7a19ebeceadb15b8e8a53edbc4e6eb8.
+- Actual Go1.27.1 darwin/arm64: unchanged original native1 PASS (package0.998s) / covered1 FAIL (package0.800s) due strict OCI trailing-data failure. Paired compiled native10 terminal leaves PASS / covered5 PASS5 FAIL. Covered identity/platform negative diagnoses explicitly UNREACHED; no credit for masked negatives. Zero skips/setup failures/deadline failures. Five unchanged stream/bounds/timeout leaves pass in both modes.
+- Frozen outer meta native child PASS2.99s and covered child FAIL3.47s, total6.46s; under covered parent native child PASS2.69s/covered FAIL2.55s, total5.24s. Real profile2541 blocks/4015 statements/402 executed (366 verify_checkers.go),10.0%; direct original profile397 executed (361 production),9.9%. Go cover parser accepted both.
+- Raw SHA256: meta-native.jsonl836213a078c83cbd1142df1859b7e7f38e28f3e2b98bf2d2fd4246f8a511526b; original-native.jsonl a8b4bc7717e17cf293178b76422d64cc2995cd3a27b5239b6aac9ad280f7578a; original-covered.jsonl fb085049e5ed5bd7e22191e96917c0d371d1bfbd990e59e1814e6b85c89cd04d; selection-native.jsonl7ddc99ad818c53ac80e68a354459df4b8837b6ee4356d99cbc7c665f02c01bdf; selection-covered.jsonl5c3ed8845d3055db8a21bdab0b81303f246684a968c8d9699a6b89be7a57cae8. All reside beside REPORT.md.
+- Original coverage profile SHA256b6c192eddd83c4aec6a1d01a8d558bb4f4521c79e057265b71d7e454af67fa4a; selection profile d2b22bcd3ca5745eea84b2ac88d720e1a97c530f7b09c31c0d896fc9b33997e5.
+- pvg verify explicit new path --include-tests --format text PASS1file0issues; verify-tdd base70652b9 PASS1commit0violations. Clean worktree, all test/compiler sessions terminated, no owned live checker process. Installed binary hash unchanged. No remote/install/Docker/full-preflight operations.
+- Pending helper review document /tmp/machinery-yig6-red.09ui51/HELPER-AMENDMENT-PROPOSAL.md SHA256555a3ac33a1a1b5023d3f378e56719f4dee7707c3cb7b0657dab5471ddc53497 specifies only three existing executable selectors plus directly associated private compiler/cache helper. No amendment applied. Independent PM must approve exact amendment before GREEN writes.
+
+LEARNINGS:
+- Coverage stderr crosses strict OCI EOF verification even when stdout remains valid; merely asserting rejection would falsely credit masked identity/platform negatives.
+- Validate executed production statement blocks as well as profile syntax; actual instrumentation must remain on the caller.
+- Any future once-built helper must live in the TestMain-owned root, not an individual test's temporary directory; its intentionally uninstrumented coverage boundary must be reported.
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED phase only, frozen SHA c59c89de31c7f1268a220caf0fa0d67a8e166d0f; report and raw artifacts above; no implementation or acceptance claimed.
+- Native real controls pass; covered real controls fail for observed54-byte Go coverage stderr contamination, with real nonempty coverage profile and zero skipped/deadline/setup failures.
+- pvg verify PASS and verify-tdd PASS; no existing test/production change; exact helper proposal awaits independent review.
+
+### proof
+- [x] AC #1 RED: unchanged original success assertions pass natively and fail behaviorally under actual coverage on same revision; GREEN success pending.
+- [x] AC #2 RED: separate actual stdout/stderr under closed production environment proves instrumentation contamination; GREEN cleanliness pending.
+- [x] AC #3 RED: native four-control sensitivity observed; covered wrong-digest/platform marked UNREACHED rather than credited; frozen outcome tests demand intended diagnoses.
+- [ ] AC #4 FINAL: Darwin bounded execution complete, native Linux execution remains required; no Docker/Windows assurance claimed.
+- [ ] AC #5 FINAL: RED frozen and paired proof complete; independent RED/helper amendment approval and GREEN evidence pending.
+
 # MAC-yig6 exact GREEN helper amendment proposal — not applied
 
 Frozen RED: c59c89de31c7f1268a220caf0fa0d67a8e166d0f. Independent PM authorization is required before any existing helper edit. The RED file remains byte-for-byte frozen.
