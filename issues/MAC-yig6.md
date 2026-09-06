@@ -1,16 +1,18 @@
 ---
 id: MAC-yig6
 title: "Keep checker test fixtures protocol-correct under Go coverage"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:18:00Z
-content_hash: "sha256:25b5b1025f90a30b135b49d9c7cfb74a4993372697f5ad3b2b4318c2b0772be4"
+updated_at: 2026-09-06T03:36:07Z
+content_hash: "sha256:8c75cf730a938a8e18e1e828de0ce297cb8517cabe6903f2a9126a37cb606203"
 blocks: [MAC-ou97]
+assignee: dev-MAC-yig6
+follows: [MAC-2u36]
 ---
 
 ## Description
@@ -120,10 +122,14 @@ status: new
 
 ## History
 - 2026-09-06T01:17:22Z dep_added: blocks MAC-ou97
+- 2026-09-06T03:36:07Z status: open -> in_progress
+- 2026-09-06T03:36:07Z auto-follows: linked to predecessor MAC-2u36
+- 2026-09-06T03:36:07Z claimed by dev-MAC-yig6
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-ou97]]
+- Follows: [[MAC-2u36]]
 
 ## Comments
 
