@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T05:50:12Z
-content_hash: "sha256:fa7c49801edb592257fdb138e6f3cb7ffa0a775989e1f22dda5dea5170b9901c"
+content_hash: "sha256:19a64c1fc64129b941dd1af9148caedff7f6295e03c839685f7a1ff40f01683b"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -2406,3 +2406,21 @@ status: in_progress
 - [ ] AC #3: No-grandfathering remains fixed; exact conditional two-helper amendment awaits separate PM disposition.
 - [ ] AC #4: Real capability/race history retained;13-caller proof and all broader obligations require final candidate review.
 - [ ] AC #5: CLI/Render/history distinction observations retained; no delivery or acceptance granted.
+
+### 2026-09-06T05:50:12Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent PM EXACT LEGACY-FIXTURE AMENDMENT ADJUDICATION authorizes only patch ae6e9241ea5d7b0c4556b2ee02c6e2910b2663c2452761e7984f1c6663252971 against51454e069ebe4039f02d6d9108acf9354c7ad6c8:36 additions in copyTree and29 in obligationParentFixture, no deletions/other-file authority. Separate [test-edit-authorized] commit and all frozen hashes required. Original assertions/Ga/source examples/no-grandfathering retained.
+- Independent external archive replay13 caller leaves PASS0FAIL0SKIP; four external observer leaves reproduce exact real Gv/Stop/CLI and full inventories. Audit /tmp/machinery-p7jd-pm-fixture.Mm3FM4/pm-audit.json SHA25643773cab089ffd3ec3cc48411c32c5b39c0a3f277632f6e09e377555f2c091f0. External evidence is diagnostic only, not delivered same-SHA proof.
+- Independently read-back SrPM p7 conditional16paths/3462changed and hgz1 future41paths with exact two-helper accepted-baseline CONSUMES resolves earlier missing-owner hold. Future v2/current fixture handling still requires separate exact BEFORE-EDIT PM approval; no automatic downgrade, provenance renewal or reverse dependency. Root verifies durable authorization before application.
+- Status in_progress, hard-tdd/red-approved labels and dev-MAC-p7jd claim preserved. No delivery/accept/reject/approve-red transition, product source/test write, developer worktree access, install/remote/main/epic/preflight mutation. All original failed/setup/skip history retained.
+
+### proof
+- [ ] AC #1: Complete implementation scope binding still requires final same-revision proof and independent acceptance review.
+- [ ] AC #2: Plan/current/history distinction retained by exact fixture amendment; whole-story review remains pending.
+- [ ] AC #3: Legacy no-grandfathering remains enforced; exact two-helper repair authorized but shared application/replay not certified here.
+- [ ] AC #4: Frozen tests and all13 affected callers preserved; fresh scoped/race/broader regression and TDD audit owed.
+- [ ] AC #5: Real CLI/history and composed renderer closure require final same-SHA review; no execution/reviewer-honesty or separately injected CLI/OS-close proof claimed.
+
