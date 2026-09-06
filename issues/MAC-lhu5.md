@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
-updated_at: 2026-09-06T11:50:40Z
-content_hash: "sha256:070bed22fc00039ad0496facee1800a9d754bf629a2d533d8ba8f0162a220aad"
+updated_at: 2026-09-06T13:11:02Z
+content_hash: "sha256:11fa7c16e291f528957574fd07670d553fa9bdfdb5b3f98a341dfd1667d5fb72"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
@@ -579,3 +579,8 @@ status: in_progress
 
 ### 2026-09-06T11:50:40Z ramirosalas
 BOUNDED METHOD REVIEW 2026-09-06: D5/D6 external candidate /tmp/MAC-lhu5-D5D6-method.ORvrzx independently reproduced 37 test passes (32 leaves+5 parents), package pass, 0 failures/skips. PM /tmp/MAC-lhu5-D5D6-review.GRFAl4/REVIEW.md SHA256 4ff1dbd8ade6d43331142542737528f013d09e11da7189ed0a1d53a7a20bb27c reports GAPS_FOUND in frozen-intent reconciliation, opaque session collision, exact Ready/Failed projection predicates, and confirmed-Unpublished generic IOError retry classification. Root read full source/report/probes and verified hashes; agrees these four bounded defects. Final PM probes 49run42pass7fail0skip: six blocking probe failures plus one disclosed version-overflow policy/range advisory; no failure discarded. Fresh external-only correction assigned root/portfolio_d5d6_repair_v2, smaller Sol high agent, preserving original artifacts and all D1 bounded approval. This is not repository RED/story rejection/source permission. All whole-source, decoder, FSM, remaining policy-method and before-edit inventory obligations remain; current 21-path repository scope unchanged.
+
+### 2026-09-06T13:11:02Z ramirosalas
+BOUNDED METHOD CHECKPOINT — NO SOURCE/RED/STORY ACCEPTANCE. D5/D6 V3 independent review /tmp/MAC-lhu5-D5D6-rereview-v3.tPiHxA/REVIEW.md SHA256 ec9a46979dbcd5bd8d63fa944bf0b1c5215649987c74b904f7d853954f2efaf8 APPROVED the finite exact-operation correlation repair. V3 source SHA256 a5bb0db2bacc0096621026b9fd8ee2c4120053b23bab7b13c443d76a7301e311. Fresh own59 passes (51 leaves/8 parents), original blockers6 passes, independent24 passes (23 leaves/1 parent), focused2 passes; each package passes, no failures/skips. Full old PM run deliberately retained11 test passes/1 disclosed unsupported version-successor advisory failure plus package failure. All previous failed revisions/probes preserved; no universal version policy inferred. Root fully read review/delta/probes and verified raw counts/hashes. D1 bounded approval unchanged.
+
+Separate D4/D6 admission/reference V1 /tmp/MAC-lhu5-admission-reference-method.lAP9oj source SHA25663429f8f933e1dd7c35082f25a03f81fc5591e58addd99805382a764346b2026 had baseline78 passes (69 leaves/9 parents), package pass. Independent /tmp/MAC-lhu5-admission-reference-review.knVgJ0/REPORT.md SHA256cf3375a412290abadbabaa866987562f24e19ede939175177ff4ef83c333e7e5 is GAPS_FOUND:13 probes6 passes/7 substantive failures. Closed-shape empty-name field, explicit command-bound attempt lifecycle/unique completion, operative same-input policy mutants, and actual app-domain-to-canonical-store ownership need correction. Root fully read all1472 source lines,188 independent probe lines, support ledgers and reports; evidence manifest verified. Fresh external-only V2 assigned /root/portfolio_admission_reference_v2, no repository/tracker/source authority; originals frozen. Current21-path future ownership and all source-before-edit, full policy/FSM/packet/extraction/native obligations remain unchanged. Existing in_progress contract and five pending AC remain authoritative.
