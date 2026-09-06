@@ -1,16 +1,18 @@
 ---
 id: MAC-lnu6
 title: "Remove unsafe frozen-test formatting exemptions"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:13Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:18:00Z
-content_hash: "sha256:b3ea5182eeec19d049e0ff1095fea2e12ca9f791cd9e6ae250409bcb9f060ee4"
+updated_at: 2026-09-06T02:01:23Z
+content_hash: "sha256:78170fe6f63ecb8fce860214484928d537166d2c336b8f029efd0e719240accd"
 blocks: [MAC-vx24, MAC-ou97]
+assignee: dev-MAC-lnu6
+follows: [MAC-a89e]
 ---
 
 ## Description
@@ -216,10 +218,14 @@ Historical original canonical Description (superseded only as active scope; pres
 ## History
 - 2026-09-05T19:36:14Z dep_added: blocks MAC-vx24
 - 2026-09-05T19:36:17Z dep_added: blocks MAC-ou97
+- 2026-09-06T02:01:23Z status: open -> in_progress
+- 2026-09-06T02:01:23Z auto-follows: linked to predecessor MAC-a89e
+- 2026-09-06T02:01:23Z claimed by dev-MAC-lnu6
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]]
+- Follows: [[MAC-a89e]]
 
 ## Comments
 
