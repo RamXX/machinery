@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:21:31Z
-content_hash: "sha256:6ce34dec3882d3cef2ab9c619fc31a9313193e3cb1afc7fa8565784fded10d8e"
+updated_at: 2026-09-06T02:23:13Z
+content_hash: "sha256:582694266394a66ba9bdeeabdb4bad89ab7fdb3db113511bde65b115a6e42022"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -511,6 +511,51 @@ Held CI/preflight gate reconciliation and limits:
 - MAC-2u36 composed native verification is NOT a substitute for hpqp/epic full gate and does not change its20m policy. There is currently no measured complete same-SHA native install or race package result proving fit or non-fit to that gate. Report per-stage elapsed plus deduplicated leaf timings as measurements, while distinguishing repeated setup and parallelism; do not sum shard wall times and call it a monolithic runtime. If subsequent native measurements demonstrate incompatibility, identify exact command/SHA/host/race mode, elapsed/unfinished inventory and attributable cost to root/epic gate owner before that gate; do not edit hpqp/CI/preflight, increase its bound, waive it or invent a policy choice.
 
 Preservation: candidate source0ad71eb and freeze15252d2/test hashes from COMPLETE_RERED_FREEZE.md remain authoritative; no test edit or new test authorization. Current in_progress/assignee dev-MAC-2u36/hard-tdd+red-approved/parent MAC-ui8a/blocks MAC-gcrr+MAC-ou97 and dependencies/claim stay unchanged. Main/epic, installed Machinery/NIL use, Dagger, remote/sync and product independence remain untouched. PM ran only the nonexecuting inventory command, no runtime retry/native suite/preflight, and no author-worktree mutation or cleanup.
+INDEPENDENT DELIVERY-SCOPE CONFIRMATION: THREE UNRELATED NATIVE SKIPS DO NOT BLOCK TARGETED MAC-2u36 DELIVERY — 2026-09-06 UTC.
+
+The healthy GREEN author may prepare/deliver the completed targeted MAC-2u36 proof once root reviews this decision. This decision resolves ONLY the three C-command skips relative to the user's explicit targeted-now/final-full-gate-later scope. It is not GREEN acceptance, a claim that the complete delivery report has passed final review, a canonical delivery/status/label/claim transition, or authorization to edit source/tests/config, enable external lanes, rerun tests, create a new bug or waive the final epic gate. Preserve in_progress/dev-MAC-2u36/hard-tdd+red-approved and the exact15252d2 freeze until the normal separately authorized delivery operation.
+
+Skill interpretation and controlling scope:
+- Read the full /Users/ramirosalas/.codex/skills/developer/SKILL.md. Section7 says "No skipped tests" and rejects collected-but-unexecuted integration proof; that remains enforced for all required MAC-2u36 tests/integrations. No skipped outcome becomes PASS and no uninvoked helper becomes behavioral evidence.
+- The same skill's Section9 explicitly says: "If the user has explicitly constrained to targeted tests ... run tests covering the blast radius of your changes" and requires delivery to "declare what you ran and what you skipped," with its example declaring unrelated no-code-path-overlap omissions. It also states: "The epic completion gate runs the full suite regardless".
+- Apply that explicit targeted-testing rule and the user's targeted-now/final-gate-later direction here. The approved budget plan deliberately runs the broader native CLI package while requiring honest prerequisite/skip classification. Running extra unrelated tests does not turn their separate external prerequisites into installer AC dependencies. This is the skill's specific scope allowance under explicit user direction, not a root-invented exception to required integration proof. Section7 still blocks a skipped required installer/receipt/lock integration, but none is skipped in current evidence.
+
+Exact skipped cases and independent boundary findings at15252d255fa12a131fbc2cdb13f593a212fd4ccb:
+1. TestValidateC4ExportInventoryIsPortableClosedAndStable, cmd/machinery/c4_closure_test.go310-326. Actual skip: "host filesystem cannot materialize case-aliased filenames". The valid initial inventory executes, but the case-alias rejection cannot be exercised on this filesystem; whole-test result remains SKIP. It directly calls validateC4ExportInventory (verify_c4.go128), using os.OpenRoot, portablepath.ValidateBase and C4 export identity/content inventory. It does not call the changed installer plan/recording/publication functions.
+2. TestProvisionOfficialStructurizrArchiveAndReuseCache, cmd/machinery/check_test.go1002-1025. Actual skip: "set MACHINERY_TEST_OFFICIAL_STRUCTURIZR=1 for the official archive/cache contract". This gated official archive/cache proof did not execute. It calls provisionStructurizr (structurizr_provision.go31) and fingerprintStructurizrTree: distinct cache/machinery/structurizr, filelock/cachestage/safefile and .machinery-structurizr-receipt flow. That receipt is not install.json/saveReceipt. No claim that external infrastructure is absent rather than simply not selected; the raw evidence only proves the existing gate was not enabled.
+3. TestVerifyCheckersPiiFlowEngineGolden, cmd/machinery/verify_checkers_test.go1089-1175. Actual skip: "real OCI golden runs only in the explicitly provisioned engine lane". This required-when-selected lane was not enabled here. runVC/runVCRaw constructs newVerifyCheckersCmd directly; executeCapturedCommand executes that command, not newRootCmd installer dispatch. verifyCheckersTo, checker/designlock snapshots and runCheckerOCI reproduce the pinned external checker and userspace isolation. It does not traverse the changed install/update/receipt bodies. No Docker availability/absence claim is inferred.
+
+Only production update.go/install.go/receipt.go changed (+74/-21). Exact committed diff confirms the above tests/modules and shared filelock/cachestage/safefile/designlock/checker modules unchanged. The changed functions updatePlan/updateLocked/installLocked/saveReceipt/setHomeInstall/setTargetInstall/recordRefreshPlanLocked are not reached by these three test flows. Shared generic filesystem or lock vocabulary is not shared changed behavior. Direct committed source corroborates graph discovery; no complete transitive-graph absence claim is made.
+
+Graph Verify discovery and both-direction depth2 traces for validateC4ExportInventory, provisionStructurizr and verifyCheckersTo were fully returned without pagination gaps (18/28/65callees). Main graph generation2026-09-05T23:58:53Z, cited paths metadata_match/no_recorded_issue, best-effort only. Generic names such as Open/Name/Close generated unrelated graph matches; exact committed source/imports/call sites resolve the material boundary. This is bounded blast-radius analysis, not a whole-repository security audit.
+
+Independent current coverage/raw verification:
+- A15252d2-A-cli-remainder.jsonl SHA2566160539baab5d35556e585eedebb4261ddef556a53a21780fb596aecb67cd497:8PASS0FAIL0SKIP,9runs9terminals,184.383s.
+- B15252d2-B-install-complement.jsonl SHA2568178d0ee0f984fc07638b6056c79fb30dfdb043a510b38eef4aa9f62cb276724:189/189expected top-level items,412PASS0FAIL0SKIP leaves,463runs463terminals,145.642s.
+- C15252d2-C-cmd.jsonl SHA256bdd17c7579cfd52a54d8002350de4f2d89ce8619fc3096574ffd632f827ec0c2:263/263expected top-level items,399PASS3SKIP0FAIL leaves,437runs437terminals,200.934s. The only skipped leaves are the three above. All paths are under /tmp/machinery-MAC-2u36-green.G05gWz.
+- Independently hashed/parsed all three raw logs and compared actual top-level name sets with prior exact compiled native inventory: no omitted/unexpected top-level item in B or C. Independently reconciled completed earlier current-SHA leaves plus A/B against the frozen85-leaf story inventory: no required leaf missing PASS, no required story skip. Existing TestCmdTestControlStateIsPrivate, TestConcurrentCmdTestBinariesUseDisjointControlState and TestInstallAndUninstallMaintainUpdateReceipt pass in C; required install/receipt/authority/native controls pass in B and the actual CLI matrix.
+- Preserve raw native counts: the412/399reported native leaf counts include any dormant helper entries. Delivery must list those as scaffolding, not behavioral integrations. Do not inflate required coverage with helper returns or repeated descriptor/plan leaves.
+
+Delivery and final-gate obligations:
+- Delivery must explicitly state composed exact-SHA coverage,85required story leavesPASS0SKIP, A/B/C raw counts, exact three skips/reasons/no-overlap classification and uninvoked helper classification. The original900.473s package timeout remains historical FAIL with35valid completed leaves, not a rewritten full-suitePASS. Do not claim monolithic native/race/full-preflight success or measured race20m fit.
+- The final epic/held contributor gate still owns complete required platform and external runtime verification. Case-alias negative needs a filesystem able to materialize both names; official Structurizr cache proof needs its official-archive lane; OCI golden needs its explicitly provisioned engine lane (held221525d CI already sets MACHINERY_REQUIRE_OCI_GOLDEN in that lane). This decision neither proves those outcomes nor asserts all their enabling policy is already wired. Their final required proof stays pending with its existing owner; no new policy choice or automatic duplicate bug is inferred solely from these known prerequisites/skips.
+- If later review finds overlap, an unexpected failed assertion or a missing required MAC-2u36 outcome, this bounded confirmation does not waive it. Normal full GREEN delivery review remains independent and may reject inadequate proof. No source/test/runtime/installed asset/remote action is requested now; only the narrow scope decision is recorded.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent exact-source and actual raw skip review applies explicit user-targeted testing allowance while preserving all required integration/no-skip rules.
+- All85required story leavesPASS0SKIP; Binstall412PASS0SKIP; Ccmd399PASS3honestly classified unrelatedSKIP0FAIL; exact native top-level inventory reconciled.
+- No acceptance/delivery/phase/label/claim/dependency transition or external lane enablement; root reviews this confirmation before author delivery resumes.
+
+### proof
+- [x] Three native C skips are outside changed installer call paths and do not block this user-authorized targeted delivery.
+- [x] Their actual SKIP results, prerequisites, dormant helper classification and composed-coverage limits remain explicit.
+- [ ] Complete GREEN delivery proof and independent acceptance review.
+- [ ] Separate final epic/platform/official-engine/OCI/race gate verification, unchanged and not waived.
+
+
 ## GREEN composed verification complete — independent scope hold
 
 Candidate15252d255fa12a131fbc2cdb13f593a212fd4ccb remains clean on story/MAC-2u36 in retained dev-MAC-2u36; production0ad71eba545083e0836792f6f2e307604182e2dd unchanged. No test/source/config edits or live processes remain.
