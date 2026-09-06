@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:34Z
-content_hash: "sha256:8a69f7c31d614e4de24e4e892794c6c3ad57097d7d7cc2deb27789879fff4dcb"
+updated_at: 2026-09-06T09:48:03Z
+content_hash: "sha256:86d60c6279716347f7c022a7353108aceedcd8ef90cec0c0e16749f13b66fa16"
 blocked_by: [MAC-u4oo]
 blocks: [MAC-al5u, MAC-vx24, MAC-ou97]
 ---
@@ -174,3 +174,62 @@ status: new
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
 - [ ] AC #7: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:48:03Z ramirosalas
+ROUND-1 RULE 2 REPAIR: COMPLETE PROSPECTIVE CRM SUBJECT / CURRENT JUDGMENT OWNERSHIP
+This is the complete CURRENT bounded ownership/acceptance map. It preserves all prior migration obligations and expressly assigns the post-change substantive judgment/evidence which new strict tests invalidate. No earlier hgz1/lnu6 approval or hash-only refresh is authority for these later subject changes.
+
+PRODUCES:
+- examples/go-crm/design/assurance/plan.json -> prospective complete strict plan.
+- examples/go-crm/design/assurance/milestones -> bounded current milestone manifests and exact reviewed controls.
+- examples/go-crm/impl/internal/assurancetest -> new strict helper assets with exact pre-RED inventory.
+- examples/go-crm/impl/internal/authz/strict_assurance_test.go -> new calibrated strict public-boundary assertions.
+- examples/go-crm/impl/internal/domain/strict_assurance_test.go -> new calibrated strict domain assertions.
+- examples/go-crm/impl/internal/session/strict_assurance_test.go -> new calibrated strict session assertions.
+- examples/go-crm/impl/internal/cli/strict_assurance_test.go -> new calibrated strict CLI assertions.
+- examples/go-crm/impl/internal/repo/strict_assurance_test.go -> new calibrated strict real supported persistence assertions, no mocked persistence claim.
+- examples/go-crm/design/attestations.yaml -> exact generated current evidence ONLY after substantive independent judgment of the FINAL new complete implementation/test subject and authored controls.
+- cmd/machinery/go_crm_assurance_migration_test.go -> new real candidate-CLI stale-before-refresh/current-after-review and inventory/history preservation controls; exact test inventory independently reviewed before RED.
+- testdata/integration-lanes/assurance-go-crm.json -> required legacy PLUS new strict/migration control leaf inventory.
+
+CONSUMES:
+- MAC-u4oo: cmd/machinery/tdd.go
+  endpoint: exact standalone store/scaffold/capture/register/red/green/verify/check --complete workflow.
+- MAC-wi2u: internal/tdd/adapters/go.go
+  spec: closed go-testing/v1 Adapter and bound assertion helper; legacy direct t.Fatal tests are not relabeled as strict.
+- MAC-hgz1: examples/go-crm/design/attestations.yaml
+  schema: upstream accepted v2 evidence/history; preserve attribution/history, then independently review the new subject rather than copying prior PASS.
+- MAC-lnu6: examples/go-crm/design/attestations.yaml
+  source: earlier narrow metadata/BUILD-hash policy repair, already ordered transitively; it does not refresh later implementation entries.
+- Existing accepted current evidence generator.
+  endpoint: machinery attest --design <design> --claim <claim> --kind current --impl <complete-implementation-root> --attestor <actual-reviewer-attribution> --date <actual-review-date> [--note <verified-note>]; generation PRINTS a complete v2 row and does not write attestations.yaml.
+- Existing internal/gates/attest.go.
+  source: full-root-v1 compares entire current/recorded entry sets (GV_SCOPE_INVENTORY), then exact types/modes/bytes/hash (GV_STALE_CONTENT); no new exclusions.
+
+CURRENT ACCEPTANCE CRITERIA
+1. Inventory EVERY current CRM milestone, oracle/guard/invariant/runtime obligation and existing required regression. Create only prospective reviewed strict tests/controls; retain all original approved/failing RED, accepted history and legacy required files byte-for-byte. Legacy native tests continue independently in the required lane, never selector-hidden or silently converted to strict.
+2. Use real public CRM behavior and supported native fixture paths, no fake persistence as complete proof. Missing storage/CGO/service/credential/runtime contract is an explicit blocker requiring review, not permission to downgrade the implemented-complete example or infer support from an old PASS.
+3. Finish all authored assurance plan/milestone/helper/test/config/lock/control bytes and retained variant references first, with the new tests' own reviewed RED freeze, same-assertion red_controls and safe/unsafe calibration. Review the exact complete final subject inventory BEFORE substantive judgment/current-evidence generation and assurance execution. Any subsequent governed byte/path/mode/topology/control change invalidates that judgment/evidence and requires renewed substantive review; do not insert tests after refreshing the hash.
+4. Demonstrate stale-before-refresh through actual current Gv on the newly added strict subject with the preserved earlier record: added paths must cause GV_SCOPE_INVENTORY, not pass from old hgz1/lnu6 evidence. Also preserve required legacy regression counts/hashes and prove deleting/hiding an old test cannot evade the current complete inventory. These are real candidate CLI controls, not hand-built gate verdicts.
+5. Obtain substantive INDEPENDENT review of the final new complete implementation/test inventory, assertion adequacy/negative controls, authored assurance controls, required runtime residual dispositions and all legacy regression evidence. Record actual findings, scope and reviewer attribution/date; never automatically copy a reviewer/date or imply authenticated identity. Reviewer may refuse approval; such refusal blocks current assurance rather than triggering mechanical hash renewal.
+6. Only after that independent judgment, generate exact current v2 rows with the actual Machinery attest command against the final complete root, retain generated bytes and merge ONLY reviewed row amendments into the owned attestations.yaml. Preserve prior attribution/history and all unchanged rows/legacy acceptance. No manually invented digest, hash-only refresh, new Gv exclusion, scope narrowing, plan/history relabeling or hidden deletion. Each current claim affected by the complete subject change must be reviewed/refreshed, not one convenient claim.
+7. Current-after-review control uses that exact independently judged/generated evidence on unchanged finalized source/control bytes and must pass current Gv and the strict normal replay/complete workflow. Reinsert the old record, alter a strict test/helper/mode/empty directory/control or omit a required judgment and it must block with the intended diagnosis. Hash generation alone is not review or proof tests ran.
+8. Execute actual store-init/capture/explicit-register/RED/GREEN/retained replay/complete with native Go on both supported platforms, all matching controls, exact frozen closure and every required check. Preserve actual failure history and distinguish historical ancestor acceptance from current implementation assurance. Any calibration already gathered before final judgment remains evidence of its exact state only; final claimed assurance must use finalized authored controls/judgment and current execution.
+9. Required native fragment runs ALL legacy regressions and new strict/migration controls with exact identities/zero missing or skipped leaves, actual profiles/runtime identities and clean owned resources. New manifests/evidence contain no secrets, private tracker prerequisites, absolute store paths or imported fabricated PASS.
+10. Deliver exact subject/evidence/legacy-inventory before/after hashes, full independent substantive review, exact generated rows and real stale/current native output. No later fixture or golden change is authorized here: if outputs require golden/fixture edits, obtain separately reviewed exact file/byte ownership and renewed affected judgment before that work. No changes to protected hgz1/lnu6/Y/hpqp/p7/U source, claim or frozen proof; MAC-sh60 original final obligations remain unchanged.
+
+DIFF BUDGET: bounded current scope approximately18 files (including exact pre-reviewed manifest/helper inventory), under2500 changed LOC; additions versus earlier forecast are one evidence file and one focused real migration-control test file. Investigate overrun, never trim controls.
+MANDATORY SKILLS: developer, independent pm_acceptor for substantive judgment and acceptance; codebase-memory for actual evidence/gate interfaces.
+OUT OF SCOPE: rewriting legacy frozen tests, automatic or hash-only judgment refresh, new Gv exclusions, fixture/golden changes without exact separate review, incomplete example downgrade, remote/install/preflight operations. All original user guarantees remain required.
+
+## nd_contract
+status: new
+
+### evidence
+- Independent round1 findings repaired through supported append-only scope/consumer notes; no architecture/source/test/ref/runtime mutation.
+- Exact source surfaces verified against accepted epic7e36f3e7ddcf25565d5d4fe60b328df254eee91d; prior Body/status/labels/history preserved.
+- Independent Anchor ROUND2 and canonical-document acceptance remain prerequisites, not implementation evidence.
+
+### proof
+- [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
+- [ ] Independent review/native execution/final acceptance pending.
