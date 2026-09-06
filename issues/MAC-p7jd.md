@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T07:38:21Z
-content_hash: "sha256:1f5212ee309938c30c321c0748c53b29a3f0e8b0e09bb29ff1d43869dd9576dc"
+updated_at: 2026-09-06T07:39:34Z
+content_hash: "sha256:ca77a2d02b139e06fc1eddff2c6660d200f278fa010762803d7e0ec4bda72257"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 assignee: dev-MAC-p7jd
@@ -3199,3 +3199,27 @@ status: delivered
 - [x] AC #3: existing migration proof replayed.
 - [x] AC #4: all approved topology/type controls and negatives pass.
 - [x] AC #5: required bounded CLI/custody/caller proof replayed; approved limits retained.
+
+### 2026-09-06T07:39:34Z ramirosalas
+## GREEN evidence index update (EOF)
+
+Summary: exact argv for every targeted, race, caller, and broader selector; full terminal identities; empty stderr evidence; seven original frozen hashes, eighth supplemental hash, both helpers; raw `verify-tdd` and whole changed-set `pvg verify` output are now retained beside the report.
+
+Implementation Evidence: `/tmp/machinery-p7jd-none-green.eMIDLD/GREEN-REPORT.md` SHA256 `8b40fc507a97546fef8f33111a51ed67979fc145ea2a73399e4dbb752d2ee25a`; evidence index SHA256 `f294fab3623903146b5a72109881e7a51773fdc4ebd4da4c38c34467c0f69af3`; candidate `39a498164fc6e09169ea5b33d470890d315f6a50`.
+
+CI Results / Commands run: unchanged from prior EOF delivery: new120 PASS/0 FAIL/0 SKIP; gates151, original CLI28, hook28, designlock22; races23/22; six/seven callers; broader149 PASS/0 FAIL/1 Darwin casefold skip. AC5 remains OBSERVED late Render + ordinary CLI, REVIEWED unchanged closure, COMPOSED late CLI; injected late CLI UNOBSERVED, OS Close UNFORCED, sink writes separate.
+
+Commit SHA: `39a498164fc6e09169ea5b33d470890d315f6a50`.
+
+## nd_contract
+status: delivered
+
+### evidence
+- Exact raw evidence index and report hashes above; all final requested provenance retained.
+
+### proof
+- [x] AC #1: literal none retained unless actual in-root exclusion exists.
+- [x] AC #2: classification replayed.
+- [x] AC #3: migration replayed.
+- [x] AC #4: approved new matrix passes.
+- [x] AC #5: bounded evidence and limitations preserved.
