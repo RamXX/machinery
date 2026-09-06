@@ -9,10 +9,10 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-06T00:12:56Z
-content_hash: "sha256:6b48940f008cc8b7b7d9318408d4c3abe7d0dfd3a60a834ed30a4a983772907b"
+content_hash: "sha256:0905c749a995507edc4cf76a91afc8c433934baad464ad1345ea5101d1a72fe9"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-sh60
-follows: [MAC-a89e]
+follows: [MAC-a89e, MAC-p8ce]
 ---
 
 ## Description
@@ -301,10 +301,12 @@ status: in_progress
 - 2026-09-06T00:01:08Z status: open -> in_progress
 - 2026-09-06T00:01:08Z auto-follows: linked to predecessor MAC-a89e
 - 2026-09-06T00:01:08Z claimed by dev-MAC-sh60
+- 2026-09-06T00:12:56Z status: in_progress -> in_progress
+- 2026-09-06T00:12:56Z auto-follows: linked to predecessor MAC-p8ce
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]]
-- Follows: [[MAC-a89e]]
+- Follows: [[MAC-a89e]], [[MAC-p8ce]]
 
 ## Comments
