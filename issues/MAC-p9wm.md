@@ -8,8 +8,8 @@ labels: [docs]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:04:37Z
-content_hash: "sha256:264a6075e5ebeea0e38985a00b02aa4d5a094bb6dcd019bf3476b82bafe9e851"
+updated_at: 2026-09-06T12:05:48Z
+content_hash: "sha256:8dcf1c1d271b76d479e2f65f400c295db2e2df79309af74fd27ad9c89b7387fa"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 ---
@@ -336,3 +336,22 @@ status: new
 - Related: [[MAC-l7m0]]
 
 ## Comments
+
+### 2026-09-06T12:05:48Z ramirosalas
+PUBLICATION PREREQUISITE CREATION CHECKPOINT
+
+MAC-p9wm is the sole public-document owner for `docs/native-custody-contract.md` plus the minimum companion notice in `docs/test-assurance-contract.md`. Accepted MAC-l7m0 is the satisfied normative source and is recorded as a related producer. Direct blockers added: MAC-qlw2, MAC-vx24, and final capstone MAC-ou97 each depend on MAC-p9wm. No implementation, test, source, native, runtime, ref, installation, preflight, remote, or protected-audit authority is conferred.
+
+The terminal architecture remains approved with no fourth review loop. Exact inventories, author identities, actual RED/GREEN, and native Darwin arm64/Linux amd64 proof remain separate later gates. Public prose must strip private IDs/workflow/local chronology and must not claim those outcomes completed.
+
+## nd_contract
+status: new
+
+### evidence
+- Created as task/P0 under MAC-ui8a with label `docs`; accepted producer MAC-l7m0 related.
+- Dependency edges verified at creation time: MAC-qlw2, MAC-vx24, and MAC-ou97 are blocked by MAC-p9wm.
+- Scope is exactly two documentation paths and no `hard-tdd` label.
+
+### proof
+- [ ] AC #1-#8: docs-only delivery and independent semantic review pending.
+
