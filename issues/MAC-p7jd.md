@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, rejected]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:45:46Z
-content_hash: "sha256:5e9619c9809df0cdd6250e762ea85cac7088ba5824474c7e260dbc326e6c24a3"
+updated_at: 2026-09-06T07:00:46Z
+content_hash: "sha256:51c81b6a560665feb7166a7faf08d65838ea0a9ca9a17913d54ccd491c3b6d49"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 assignee: dev-MAC-p7jd
@@ -941,6 +941,98 @@ Observed evidence and limits:
 - Measured production6files1125add/43del =1168 changed lines; combined11files2609add/46del =2655. Remaining tests/docs and actual final cost still owed; the canonical forecast is not completion proof.
 - Main497419ab4512fcff765cd5feb27aed4c67b5608d clean and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged. PM inspected committed refs and proof files only, not developer worktree internals. No source/test/docs, installed binary/assets, remote, services, Docker or preflight changes; private pvg tracker writes only. Machinery standalone constraint unchanged.
 SR PM LEGACY FIXTURE OWNERSHIP / PROPOSAL-PREPARATION HOLD. Read complete PAUSED-BLAST-DISPUTE.md SHA256d2837c4fbd4205ba151b856e96a7747d3cc32b58b1a69b4c49fe1d6fedb6bc1f and terminal report.229scoped+45race PASS belong to4b246ba; paused51454e069ebe4039f02d6d9108acf9354c7ad6c8 is docs-only later and still owes finalsameSHA proof. Four old-fixture leaves remain held: hook_test.go TestStopGreenDesignClearsStateSilently and obligation_ownership_test.go TestObligationParentRealCLI obligation-free/Policy/Isolation default-gate legs. Legacy v1 gt correctly fails GV_MISSING_IMPLEMENTATION_SUBJECT; silence/ledger, default-vs-explicit Gt, real controls/negatives, Ga ancestry/selection and no-grandfathering are fixed. hgz1 now owns all8bundled evidence migrations AFTER p7/uzxr/lhu5; no p7 reverse dependency or bundled writes to unblock this story. Root may resume the healthy retained GREEN author for an UNAPPLIED EXTERNAL exact test-local fixture proposal against51454e0 limited to those2existingtest paths, with full old/new hunks, original-assertion byte equality, helper callers, real input/evidence inventory, warning/silence semantics and per-file cost. This is proposal preparation only, not oldtest editing or TEST-EDIT AUTHORIZED. Separate independent PM must approve exacttext before any subsequent sanctioned amendment. Verified existing APIs: gates.AttestationReview{Claim,Kind,Attestor,Date,Note string}; RenderAttestation(design,impl string,review AttestationReview)([]byte,error); CheckAttestationsWithImplementation(design,impl string)*Gate. No missing core schema/API identified. Exact valid fixture construction remains unresolved: plan warnings cannot be assumed silent; real/synthetic impl hashes do not establish substantive current conformance, especially before uzxr repair. If no fixture preserves all constraints, report exact technical conflict for independent specialist review; do not weaken assertions, invent review or change product semantics. Existing filesystem skip remains uncredited. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
+# MAC-p7jd supplemental literal-none RED candidate
+
+## Implementation Evidence (DELIVERED — supplemental RED only)
+
+PROOF:
+
+Candidate commit `c71faeab997d176224ed6f38437de4604cda0b98`, branch `story/MAC-p7jd`, adds ONLY `cmd/machinery/attest_scope_none_test.go` (364 lines). File SHA256 `3d9d8250f759807795251685e1cb924ba8eceb4c819b3fa0376bd15b254f9fc0`. The commit subject carries `tdd-red`; it precedes both final replays. Production is byte-identical to rejected `412d01b57ae4770a6cf4fb4f48442fb7e632cdd7`. No existing test, fixture helper, production, document, example, schema, dependency, API or seam changed. This delivers a reviewable regression candidate, not GREEN completion or independent RED approval.
+
+### Authority and source review
+
+Read developer, nd plus CLI reference, pvg, vault-knowledge and codebase-memory skills. PM acceptance belongs to the separate independent reviewer, not this author. Read live canonical AC1–5, R2 and current authoring boundaries, exact 2026-09-06T06:44:43Z AUTHORITATIVE SAME-STORY SCOPE AMENDMENT and rejection report. R2 `/tmp/machinery-attestation-contract.jODZpc/PROPOSAL.md` SHA256 `8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179`; full AC5 clarification SHA256 `5fc3193106a803b7760020b646ed4db7b3d417f5e196b2266d10cf8227733937`; full PM rejection `/tmp/machinery-p7jd-pm-final.pT2Q0q/PM-FINAL-REVIEW.md` SHA256 `c3950515759f8cf148b4e2469102bbe1a7b7dabfc4c9b22bdb14297ec07071d6`.
+
+Graph project `Users-ramirosalas-workspace-machinery`, generation `2026-09-06T02:42:16Z`, list pagination complete. Parent supplied goldenBin discovery; own coverage checked all five used source paths. Story helper/new test files are missing from the main index; exact worktree source at rejected412d01b supplies authority. This is best-effort graph coverage, not completeness. Read actual goldenBin/cliReview helpers and hermetic testgit implementation. Vault search/read reinforced independent inventories and reached validation layers. Epic log shows no landed p7 implementation.
+
+### CI/Test Results
+
+All shell commands used explicit worktree cd. Every test used `GOWORK=off GOPROXY=off GOTOOLCHAIN=local`; Go1.27.1 darwin/arm64, offline existing cache, actual ordinary CLI built by goldenBin and real bounded Git/CLI subprocesses. TestMain's existing isolated control directory and cleanup remained unchanged. No mocks, skip gates, verdict injection, product dependency on Paivot, background jobs, services/containers, installation, remote operations or preflight.
+
+Commands run:
+
+- `env GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=5m -json ./cmd/machinery -run '^TestAttestationScopeNone$'` — first precommit author inventory: 80 PASS / 40 FAIL / 0 SKIP, package27.383s; raw `author-first.jsonl` SHA256 `2c2a7f25e33a3adc2acaf65ff896beca9e7ad6bd2eed0128e18efe0b0716a3ff`.
+- `env GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=2m -json ./cmd/machinery -run '^TestAttestationScopeNone$/././^evidence-only$'` — precommit actual evidence-commit check after adding diagnostic logging and stricter exact-count assertions: 4 PASS / 4 inventory FAIL / 0 SKIP, package3.641s; raw `author-evidence-precommit.jsonl` SHA256 `0c7994025b028d61ad0712dda07959d74ee9b05abfc9f3df6711344f4428f68a`.
+- `env GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=5m -coverprofile=/tmp/machinery-p7jd-none-red.kVs2en/final-new.cover -json ./cmd/machinery -run '^TestAttestationScopeNone$'` — committed complete new matrix: 80 PASS / 40 FAIL / 0 SKIP; package37.147s, suite36.72s; raw `final-new.jsonl` SHA256 `7b7e9f791d9e47a7b21910e855d31c6ec042ddfa18ad61b175e7ad84650c8943`.
+- `env GOWORK=off GOPROXY=off GOTOOLCHAIN=local go test -count=1 -timeout=5m -json ./cmd/machinery -run '^TestAttest'` — committed containing CLI selector: 108 PASS / 40 FAIL / 0 SKIP, package45.028s; raw `final-cmd-attest.jsonl` SHA256 `a062950581b1e3f884ac6ab66950c63fef58356290afd66b07543f5832612738`. This overlaps all120 new leaves; the additional28 existing CLI leaves all PASS. Do not sum overlapping selectors as unique coverage.
+- `pvg verify cmd/machinery/attest_scope_none_test.go --format text` — `VERIFY: PASSED (1 files scanned, 0 issues)`.
+- `pvg story verify-tdd --range a82277af5650b487cea1260c24ffcc1c86d69d8d..HEAD --json` —12 commits checked,0 merges skipped,0 violations.
+- `shasum -a 256 -c /tmp/machinery-p7jd-final-proof.O4NxfV/frozen-test-sha256.txt` — all seven OK.
+- `git diff --check a82277a HEAD` — empty; `git status --short` — empty after commit.
+- `node /tmp/machinery-p7jd-none-red.kVs2en/audit.cjs` — emits `audit.json` with complete leaf names/outcomes/timings/reachability, every changed source hash, all seven expected/actual frozen hashes, source/branch/protected refs and exact17-path cost inventory. Script SHA256 `c5811b50666a98f1cef5920d344647e0a2c5f3d81229e766dac10f7a8f5aac32`; audit SHA256 `d5ed8b75aac5187a15ddcb9b96b713144007f23f6b0fcaf1f9a3914f3dcb197d`.
+
+Summary: new RED80PASS/40 expected behavioral FAIL/0SKIP; existing CLI28PASS/0FAIL/0SKIP. Zero compile/import/setup/timeout/missing-input failures and zero unclassified new failures. All four raw stderr files are empty. The four commands exited1 because they contain intentional RED assertions. Coverage: instrumented parent command package0.0%; actual spawned ordinary CLI is uninstrumented, so this is not a product/whole-project coverage percentage or a threshold assertion. No missing-execution claim is disguised as coverage. Full original four-package/custody/hook/13-caller/broader/race proof and final-epic preflight remain owed on the eventual GREEN candidate, not waived or re-claimed from this RED-only run.
+
+### Reached matrix and precise failure attribution
+
+The120 independent leaves are the Cartesian product of disjoint / inside-design / equal / ancestor, file / empty-directory, and15 named cases. Eight independent absent-evidence inventory leaves compare every generated entry/key/type/mode/file-size/hash plus root/policy/exact grammar digest with a standard-filesystem oracle. Another112 leaves first reach actual unchanged generated-receipt CLI exit0/current1. Separate inventory failure never prevents another leaf's mutation. Every literal input is Lstat-verified; files are regular with recorded byte hashes; directories remain empty and mode0755 changes to0700. Reports retain actual CLI argv, elapsed time, output, generated rows and submitted forgery rows.
+
+All72 intended negative challenges execute:8 each of content-or-mode, addition, removal, rename, omission-old-digest, omission-rehashed, sibling-evidence, nested-evidence and nested-git. Another8 independent-full-manifest checks and24 evidence/Git controls also reach their operations, giving104 post-control challenges total. No mutation is unreached. Exact negative diagnostics are joined category-and-message assertions, preventing the word `none` in a temporary test directory from satisfying the named-path requirement.
+
+Equal and ancestor cells: all60 leaves PASS. Disjoint and inside-design cells:20PASS/40FAIL. The40 failures comprise:
+
+-16 independent manifest mismatches: absent evidence plus after evidence-only / Git-directory / regular-gitfile controls, each in the four affected layout/type cells. Actual manifests omit only literal `none`; the filesystem oracle includes it. Those12 post-control exclusion failures occur AFTER actual unchanged/evidence/Git freshness succeeds and digest stability is checked, not before those operations.
+-4 rejected independently constructed complete manifests: actual valid complete receipt includes `none`, but the checker rejects it against its narrowed fresh projection. These controls have their own leaves and cannot prevent omission challenges.
+-16 unsafe exit0/current1 results: actual content or mode change, addition, removal and independently rehashed omission, each in four affected cells. Example: `content-or-mode` wants `GV_STALE_CONTENT: scope path none changed`, but actual output reports `1 current implementation reviews` and `0 blocking`.
+-4 rename diagnostic/set failures: actual rename DOES fail closed with exit1 and no current success, but reports only `none-renamed` as added. Required raw-ASCII-first path `none` was removed too and should be reported first. These are incomplete inventory diagnostics, NOT falsely current rename results.
+
+All8 old-digest omission tests PASS with `GV_SCOPE_HASH: submitted inventory does not match its recorded hash`. Both forged manifests originate from an independently enumerated complete inventory, removing exactly one `none` entry; rehashed variants calculate the exact R2 digest independently. The full independently generated manifest's separate control fails on the four affected cells as disclosed; generated-receipt baseline controls do pass before every forge is submitted. No generator omission is adopted as an expected oracle.
+
+All16 unrelated sibling/nested `attestations.yaml` content changes reject with exact `GV_STALE_CONTENT` paths. All8 nested `.git` additions reject with `GV_SCOPE_UNSUPPORTED_METADATA` naming the actual logical nested path. Top-level real Git directories and `--separate-git-dir` regular gitfiles are checked through real local commits; ordinary evidence-only changes include presence/content/mode and a real commit. Fixed evidence descriptors are independently checked both before the logical receipt exists and after it exists. No valid `none` name is reserved/rejected, no digest/schema change is introduced, and the original frozen alias/custody/root-narrowing proof is unchanged.
+
+Minimal BUILD fixtures have the same ordinary nonblocking missing-g4.zero-context warning before and after. This is not a complete/zero-warning fixture; warnings cannot satisfy exact exit1/category/path/no-current assertions. Existing reported quality heuristics and case-sensitive Linux final-epic obligation are retained history, not waived by this clean single-new-file scan.
+
+### Ownership, cost and immutable preservation
+
+Increment:1 new file/364 additions/0 deletions; eventual production repair0 lines authored. Aggregate againsta82277a:17 files,3760 additions+66 deletions=3826 changed lines, within the current3770–4000 forecast. Four verification runs cost113.199 cumulative package-seconds; final two overlap in wall time. Authoring involved one complete initial matrix, a bounded eight-leaf evidence-commit refinement check, then the two committed replays. No requirements were trimmed for cost.
+
+All seven frozen hashes match the prior reviewed manifest. Both helper files are byte-identical to412d01b, retaining the exact authorized36+29=65 additions and zero deletions; no additional fixture authority is assumed. Main stays497419ab4512fcff765cd5feb27aed4c67b5608d; epic stays70652b948bf090008b1965c85daf36ea374daea4. Worktree is healthy/clean and retained. No running verification subprocess remains.
+
+### AC Verification
+
+| AC | Supplemental test evidence | Disposition |
+|---|---|---|
+|1|All eight actual none input cells; independent complete inventory/digest; real content/mode/add/remove/rename and independent omission forgery|RED bar authored/reached; production remains rejected, GREEN pending|
+|2|No schema/kind/history changes;28 existing CLI leaves pass including preserved historical/current controls|Prior positive proof retained, not whole-story reacceptance|
+|3|No grandfathering or fixture renewal; existing migration/compatibility CLI proof passes unchanged|Prior positive proof retained|
+|4|All72 negatives reached; all topologies, exact evidence and VCS exclusions and actual evidence-only commits|RED regression proof complete for independent review;40 failures remain|
+|5|Ordinary built CLI generation/check and real filesystem/Git; exact current counts, categories and honest limits|Supplemental actual process proof; prior AC5 OBSERVED/REVIEWED/COMPOSED/UNOBSERVED limits retained|
+
+LEARNINGS:
+
+- A complete-manifest assertion and a mutation challenge need independent leaves: shared generator/checker omissions can pass unchanged controls while excluding real inputs.
+- Independently constructed forged inventories test self-hash and actual-root comparison separately; correct old-digest rejection does not establish complete observed scope.
+- A rename can reject for its new name while silently missing the removed original; report that path-set defect separately from unsafe current acceptance.
+- The literal absence descriptor is grammar, never an additional reserved filename. Real evidence-only commits and same-basename sibling inputs expose this boundary precisely.
+
+DISCOVERED_BUG:
+  title: Existing MAC-p7jd literal-none inventory projection rejection reproduced
+  context: Production412d01b drops legitimate none entries in disjoint and inside-design scopes; actual changed bytes/mode/add/remove/rehashed narrowed scope falsely retain current approval. Rename rejects only its added name and complete independent manifests are falsely rejected. This is the already canonical same-story blocker, not a new bug request.
+  affected_files: internal/gates/attest.go captureAttestationSubject
+  discovered_during: MAC-p7jd supplemental RED against412d01b
+
+## nd_contract
+status: delivered
+
+### evidence
+- Supplemental RED candidatec71faeab997d176224ed6f38437de4604cda0b98, new-file hash3d9d8250f759807795251685e1cb924ba8eceb4c819b3fa0376bd15b254f9fc0; complete raw native matrix and report above. Existing production unchanged/rejected.
+- Independent supplemental RED exact-text replay/review is still pending. No approve-red, GREEN repair, acceptance, close or merge occurred or is authorized by this delivery. Prior red-approved label refers to the earlier test set, not this supplemental candidate.
+
+### proof
+- [x] Supplemental RED AC1/4 matrix authored and all120 leaves executed;80PASS/40behavioralFAIL/0SKIP, all72 negative challenges reached with separate controls.
+- [x] Existing seven frozen tests and exact two fixture helper constructions preserved;28 additional existing CLI leaves PASS.
+- [ ] AC1/4 product correctness: same-story failure remains; separately routed GREEN and independent final review required.
+- [ ] Independent supplemental RED approval: pending exact-text replay and review.
 
 
 ## nd_contract
