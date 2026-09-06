@@ -1,7 +1,7 @@
 ---
 id: MAC-yig6
 title: "Keep checker test fixtures protocol-correct under Go coverage"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, delivered, accepted]
@@ -9,10 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T18:35:57Z
-content_hash: "sha256:2ef025352e14120cb1dcc2bf0e9704b422c474ebe1ead0c794430173ed4a6de1"
-blocks: [MAC-ou97]
+content_hash: "sha256:a88b9b3dda439434441af7103ba7e54eae2f04b99a417993ebbadd64407586f3"
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce, MAC-uzxr, MAC-p9wm]
 assignee: dev-MAC-yig6
+closed_at: 2026-09-06T18:35:57Z
+close_reason: "Accepted: checker fixtures protocol-correct under Go coverage; proven native Darwin+Linux, covered and uncovered; merged to local epic"
 ---
 
 ## Description
@@ -343,10 +344,11 @@ status: new
 - 2026-09-06T17:02:09Z status: open -> in_progress
 - 2026-09-06T17:02:09Z auto-follows: linked to predecessor MAC-p9wm
 - 2026-09-06T17:02:09Z claimed by dev-MAC-yig6
+- 2026-09-06T18:35:57Z status: in_progress -> closed
+- 2026-09-06T18:35:58Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-ou97]]
 - Follows: [[MAC-2u36]], [[MAC-a89e]], [[MAC-p8ce]], [[MAC-uzxr]], [[MAC-p9wm]]
 
 ## Comments
