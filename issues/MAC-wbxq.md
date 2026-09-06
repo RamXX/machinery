@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:05:11Z
-content_hash: "sha256:a5594569b56cc2c08eb4aeb7802d39b41c4ff5651e485256dd5d6a300842e41d"
+updated_at: 2026-09-06T09:16:33Z
+content_hash: "sha256:c00ffb101f70bd3d90026a301f9e1f637bf11bec81c4a68cc9af8f47f45d53f7"
 blocked_by: [MAC-p9z1, MAC-pe9v, MAC-lnu6]
 blocks: [MAC-rau8, MAC-vx24, MAC-ou97]
 ---
@@ -102,3 +102,41 @@ status: new
 - Blocked by: [[MAC-p9z1]], [[MAC-pe9v]], [[MAC-lnu6]]
 
 ## Comments
+
+### 2026-09-06T09:16:33Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- internal/gates/tdd.go -> internal/gates/tdd.go -> CheckTDDAssurance(design, impl string, inventory tdd.Inventory, status tdd.StatusReport) *Gate; RunOptions.TDDStatus *tdd.StatusReport, TDDRequired bool; Gtd suite registration/selection and required-status validation. Normal gate output always says replay not performed for this cheap path.
+- internal/gates/tdd_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/gates/suite.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/gates/tdd_suite_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-p9z1: internal/tdd/status.go
+  spec: Status(ctx context.Context,req StatusRequest)(StatusReport,error); independent source/control/judgment/store-head state dimensions.
+- MAC-6h0s: internal/gates/assurance_inventory.go
+  spec: AssuranceInventory(design string)(tdd.Inventory,error).
+- MAC-pe9v: internal/gates/suite.go
+  spec: RunOptions.Execution *GateExecution and ExecutionRequired bool; preserve these fields while adding TDDStatus/TDDRequired.
+- MAC-lnu6: cmd/machinery/tokensequal.go
+  source: existing frozen-byte policy repair; no tokens-equal permission to mutate tests.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: A user receives explicit current freshness diagnostics saying replay not performed; missing required status returns a blocking gate.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
