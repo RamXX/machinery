@@ -6,8 +6,8 @@ priority: 0
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-06T11:42:35Z
-content_hash: "sha256:52d8fe43e579713191f6841c742802519138fda6442a766e85c4f51901b924d8"
+updated_at: 2026-09-06T16:31:15Z
+content_hash: "sha256:9e33b32d2a08a33b98cc40f35363852f8890593eb6c7d8dd80eca1bbc20fc046"
 ---
 
 ## Description
@@ -743,3 +743,6 @@ status: in_progress
 
 ### 2026-09-06T11:42:35Z ramirosalas
 LOCAL EVIDENCE CHECKPOINT 2026-09-06: bounded completed external artifacts archived under git common dir at .git/machinery-evidence-20260906.TEFZ7D/bounded-methods-checkpoint.tar.gz, SHA256 8cfaff4bcd0775813b5bebe4080a6c8de34bad9cdcddcb6585feca8ad5ac5c16; adjacent README states contents and limits. Original artifacts retained. Includes approved policy V3, D1 V3/V4 and both failed/successful independent probe history, unapproved D5/D6 candidate, custody V2/V3 rejection history, pending sh60 successor proposal. Listing and two extracted frozen-source hashes verified. Not an archive of all earlier proof. No source/ref/install/remote/preflight change. main497419a and epica94e768 unchanged; 7/40 children accepted. D5/D6 independent method review and custody V4 authoring remain active, not repository RED approval.
+
+### 2026-09-06T16:31:15Z ramirosalas
+USER AUTHORIZATION UPDATE 2026-09-06: user confirmed the supplied remote executor is amd64 and authorized Machinery verification there as needed, with no disturbance to existing containers and cleanup only of our resources. Root read-only SSH readiness check confirmed Linux x86_64, Docker29.7.2 linux/amd64, four CPUs; no remote resources or tests created. Host availability is no longer a permission blocker; actual same-candidate native proof remains owed. User explicitly approved the previously proposed compliant fresh successor to MAC-sh60: retain failed history, new independently reviewed RED and fresh GREEN, no exception. Bounded Sr PM bookkeeping assigned; no successor completion or cancellation asserted yet. User requested a narrow handoff for the platform restriction; root instead prepared an official-feedback diagnostic packet and will not route blocked custody execution through an unrestricted agent or the remote host. Platform restriction remains unresolved. Independent pure portfolio finite-method correction continues separately; no product integration/RED/native acceptance from that work. Main and installed binary remain unchanged; preflight held until final integration and no remote Git publication.
