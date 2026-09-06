@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T05:26:12Z
-content_hash: "sha256:f3d977c38d19ddc3274c54bdd88a930d23e895bff07faa449098df5af8f3f109"
+content_hash: "sha256:95eac63fa10b35be06ef596db091fff060aa301be8d05157e8b371b92f1c2154"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -2202,3 +2202,17 @@ status: in_progress
 - [ ] AC #3: required scope migration passes;4 broader legacy fixture conflicts need exact ownership/repair authority.
 - [ ] AC #4: real capability/limits/hook and45 race observations pass; broader fixture/platform-skip resolution pending.
 - [ ] AC #5: observed Render late faults return nil bytes; built CLI ordinary success/failure observed; composed source closure recorded; independent review and final same-SHA replay pending. Standalone CLI late injection UNOBSERVED, individual OS Close errors UNFORCED, sink partialwrites separate.
+
+### 2026-09-06T05:26:12Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- SR PM LEGACY FIXTURE OWNERSHIP / PROPOSAL-PREPARATION HOLD. Read complete PAUSED-BLAST-DISPUTE.md SHA256d2837c4fbd4205ba151b856e96a7747d3cc32b58b1a69b4c49fe1d6fedb6bc1f and terminal report.229scoped+45race PASS belong to4b246ba; paused51454e069ebe4039f02d6d9108acf9354c7ad6c8 is docs-only later and still owes finalsameSHA proof. Four old-fixture leaves remain held: hook_test.go TestStopGreenDesignClearsStateSilently and obligation_ownership_test.go TestObligationParentRealCLI obligation-free/Policy/Isolation default-gate legs. Legacy v1 gt correctly fails GV_MISSING_IMPLEMENTATION_SUBJECT; silence/ledger, default-vs-explicit Gt, real controls/negatives, Ga ancestry/selection and no-grandfathering are fixed. hgz1 now owns all8bundled evidence migrations AFTER p7/uzxr/lhu5; no p7 reverse dependency or bundled writes to unblock this story. Root may resume the healthy retained GREEN author for an UNAPPLIED EXTERNAL exact test-local fixture proposal against51454e0 limited to those2existingtest paths, with full old/new hunks, original-assertion byte equality, helper callers, real input/evidence inventory, warning/silence semantics and per-file cost. This is proposal preparation only, not oldtest editing or TEST-EDIT AUTHORIZED. Separate independent PM must approve exacttext before any subsequent sanctioned amendment. Verified existing APIs: gates.AttestationReview{Claim,Kind,Attestor,Date,Note string}; RenderAttestation(design,impl string,review AttestationReview)([]byte,error); CheckAttestationsWithImplementation(design,impl string)*Gate. No missing core schema/API identified. Exact valid fixture construction remains unresolved: plan warnings cannot be assumed silent; real/synthetic impl hashes do not establish substantive current conformance, especially before uzxr repair. If no fixture preserves all constraints, report exact technical conflict for independent specialist review; do not weaken assertions, invent review or change product semantics. Existing filesystem skip remains uncredited. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
+
+### proof
+- [ ] AC #1: Scoped v2/current/plan/history observations supplied; independent final review pending.
+- [ ] AC #2: Full-root inventory/digest/docs observations supplied; final sameSHA proof pending.
+- [ ] AC #3: No-grandfathering retained; four broader fixture leaves require exact independently reviewed repair.
+- [ ] AC #4: Capability/race observations supplied; broader fixture/platform-skip resolution pending.
+- [ ] AC #5: Render/CLI observations and composed source closure preserved; independent review/final replay pending.
