@@ -138,9 +138,9 @@ attestations:
         hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: gt.conformance-test-shape
     kind: plan
-    attestor: coordinator-review-pending
+    attestor: coordinator
     date: 2026-09-06
-    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
+    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised root BUILD and M0-M5 packets: the packet-derived conformance obligations (per committed row: next state and expected actions, incl. M4''s ordered entry/exit obligations) remain future implementation work; prospective plan only, no portfolio implementation exists.'
     covers:
       - path: BUILD.md
         hash: sha256:0746b512e82e7f2a004b88347a874cf8af7a6f6f84fe4d96956a2a0190750e47
@@ -152,9 +152,9 @@ attestations:
       - {path: BUILD/M5-reference-operations.md, hash: sha256:66dc1e1d762c89a14eb2f4b4001486a0aaa112137194f2fe474aec720ad3470b}
   - claim: g4.zero-context
     kind: plan
-    attestor: coordinator-review-pending
+    attestor: coordinator
     date: 2026-09-06
-    note: 'Amended 2026-09-06 under MAC-lnu6: BUILD.md frozen-test policy block replaced (owner-sanctioned formatting-only and token-identity exemption removed; frozen identity is exact bytes plus inventory, amendments require a new evidence revision and gate replay). Prior attestor/date/note covered the pre-amendment BUILD bytes preserved in git history; independent review over the amended BUILD bytes is pending.'
+    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised packets: each milestone packet remains independently zero-context executable; the repair changed contract prose, not the packet-alone handoff.'
     covers:
       - path: BUILD.md
         hash: sha256:0746b512e82e7f2a004b88347a874cf8af7a6f6f84fe4d96956a2a0190750e47
