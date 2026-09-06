@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:05:11Z
-content_hash: "sha256:0604dc3c9abb0819b968d07fab229a133612567dc4fc4a80126624397817ac6c"
+updated_at: 2026-09-06T09:16:33Z
+content_hash: "sha256:3bfe4c020a91e20ea912d80a677403b1610fd9a34cba3e0fc4e8bb972c93df1f"
 blocked_by: [MAC-rau8, MAC-62s6, MAC-2n83]
 blocks: [MAC-5ft8, MAC-1u2v, MAC-vx24, MAC-ou97]
 ---
@@ -111,3 +111,47 @@ status: new
 - Blocked by: [[MAC-rau8]], [[MAC-62s6]], [[MAC-2n83]]
 
 ## Comments
+
+### 2026-09-06T09:16:33Z ramirosalas
+CANONICAL MACHINE-READABLE BOUNDARY MAP 2026-09-06
+This repeats the existing ownership/signatures in the parser-supported form; it does not create additional scope or weaken any AC. All prior exact acceptance/testing requirements and holds remain current.
+
+PRODUCES:
+- cmd/machinery/tdd.go -> cmd/machinery/tdd.go -> exact section 7 tdd store init/export/import, scaffold, capture, register, red, green, status, verify commands; normal check --assurance strict and --complete route through assuranceflow.Run; hook assurance_store and assurance_required fields with cheap freshness enforcement and exact-byte frozen pre-write protection.
+- cmd/machinery/tdd_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- cmd/machinery/tdd_integration_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- cmd/machinery/main.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- cmd/machinery/check.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/hook/hook.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- internal/hook/assurance_test.go -> owned bounded artifact; behavior and tests specified in the current story AC
+- testdata/integration-lanes/assurance-cli.json -> owned bounded artifact; behavior and tests specified in the current story AC
+
+CONSUMES:
+- MAC-rau8: internal/assuranceflow/run.go
+  spec: Run(ctx context.Context,req Request,output io.Writer)(Verification,error); modes red|green|verify|strict-check|complete-check.
+- MAC-62s6: internal/assuranceflow/register.go
+  spec: Register(ctx context.Context,req RegisterRequest,output io.Writer)(Registration,error); explicit ExpectedHead and selected Milestones.
+- MAC-p9z1: internal/tdd/store.go
+  spec: Capture(ctx context.Context,req CaptureRequest)(BundleRef,error); Status(ctx context.Context,req StatusRequest)(StatusReport,error); exact store init/export/import schemas.
+- MAC-2n83: cmd/machinery/main.go
+  source: normal activation/recovery command registration retained; newRootCmd() *cobra.Command.
+- MAC-l7m0: docs/test-assurance-contract.md
+  schema: Exact approved public contract SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8; accepted delivery required, never an uncommitted external proposal.
+
+Observable outcome: A user can complete a standalone first-use assurance workflow through normal Machinery commands and receives fail-closed diagnostics for stale or unsupported inputs.
+
+## nd_contract
+status: new
+
+### evidence
+- Canonical boundary syntax reconciled without code or test changes.
+- HOLD: independent Anchor backlog approval and accepted canonical contract required.
+
+### proof
+- [ ] AC #1: current story acceptance requirement remains pending.
+- [ ] AC #2: current story acceptance requirement remains pending.
+- [ ] AC #3: current story acceptance requirement remains pending.
+- [ ] AC #4: current story acceptance requirement remains pending.
+- [ ] AC #5: current story acceptance requirement remains pending.
+- [ ] AC #6: current story acceptance requirement remains pending.
+- [ ] AC #7: current story acceptance requirement remains pending.
