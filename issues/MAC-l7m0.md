@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:35Z
-content_hash: "sha256:0865148252909fb24cc62bed41b5482236ec4ab636b4740902dee287d17528b3"
+updated_at: 2026-09-06T08:47:43Z
+content_hash: "sha256:d4244516b254d7a05ce468e6add52130548f9be48732c6aca52da14161096c9c"
 blocks: [MAC-vx24, MAC-ou97]
 ---
 
@@ -88,3 +88,38 @@ ANCHOR ROUND-1 RUNTIME CLASSIFICATION: Architecture is read-only contract work, 
 - Blocks: [[MAC-vx24]], [[MAC-ou97]]
 
 ## Comments
+
+### 2026-09-06T08:47:43Z ramirosalas
+AUTHORITATIVE SCOPE REVISION 2026-09-06 — approved architecture landing only
+This append-only revision supersedes earlier unresolved-user-choice wording for this story without erasing it. Root confirms user choices and independent CHALLENGE-3 approval (zero blocking findings). Architecture approval is NOT implementation, native feasibility proof or permission to dispatch unreviewed successor stories. Root's backlog-review hold remains until independent Anchor approval.
+
+USER INTENT: land one permanent exact standalone Machinery contract so bounded implementation stories consume reviewed schemas/APIs rather than a temporary proposed report.
+
+PRODUCES:
+- docs/test-assurance-contract.md -> exact 589-line v3-final architecture bytes, SHA256 e467a3b6c6f657e7a4cb28e85c688be0df24c56a7e3c76fdcfa224f7ff5d2624
+- docs/test-assurance-review.md -> exact 32-line independent CHALLENGE-3 bytes, SHA256 0205b50a8eb2e135230173bbf4a7b7eccdde5934fabab5aa4b2dde95d474ac66
+- docs/test-assurance-status.md -> short canonical approval/status index: approved architecture pair above, no implementation/native proof yet; its index explicitly resolves historical PROPOSED wording in the immutable source without rewriting that source
+CONSUMES:
+- Approved immutable architecture and independent review provided by root.
+  source: /tmp/machinery-assurance-architecture.fXW3vg/test-assurance-contract-v3-final.md and CHALLENGE-3.md; verified hashes above.
+
+AC A1: copy the complete architecture/review to owned canonical paths unchanged; exact hashes and line counts match. Status index links both and says review-approved contract, not software acceptance or execution evidence.
+AC A2: preserve four first-release closed native adapters and exact catalogs: Go1.27.1; Node26.8.1+TypeScript7.0.2; CPython3.14.7; Elixir/Mix/ExUnit1.20.4+OTP29.0.6/ERTS17.0.6, plus scoped gate Git2.55.0; supported native Linuxamd64/Darwinarm64. No arbitrary shell adapters, Paivot dependency, audit exception or installed replacement.
+AC A3: validate retained exact CLI/API/schema/root topology/external-store/explicit-register/expected-head CAS/empty-head/history/failed-RED contracts and entire lifecycle/budget text; no omission or semantic paraphrase.
+AC A4: status index carries all three review advisories as unfulfilled implementation obligations: actual two-platform custody/assertion proof; real first-use init/scaffold/capture/register/RED/GREEN/verify/complete without prior PASS receipt; actual process-producing call-graph audit plus cumulative deadlines.
+AC A5: no source/test/runtime/CI/installed edits under this documentation-only story. Preserve accepted p7 full-root/Gv custody and legacy frozen tests/96-case hpqp union; new implementation requires separately reviewed stories. No heavy preflight; hash/link/doc checks only.
+AC A6: independent PM verifies hashes and canonical references, then delivers/accepts documentation through normal local workflow. No contract imported as a pass result.
+
+DIFF BUDGET: 3 documentation files, ~650 lines. MANDATORY SKILLS: developer for literal landing, pm_acceptor for independent hash/link review. No hard-TDD label is required for immutable documentation landing.
+
+## nd_contract
+status: new
+
+### evidence
+- Sr PM fully read all589architecture lines and all32review lines; SHA256 and line counts independently matched on2026-09-06.
+- Canonical tracker body read completely before this true-EOF scope revision; no old contract overwritten.
+
+### proof
+- [x] Approved immutable sources and exact landing scope identified.
+- [ ] AC A1-A6: canonical docs landed and independently accepted.
+
