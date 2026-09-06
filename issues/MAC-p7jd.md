@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T05:05:18Z
-content_hash: "sha256:5f626641e91b529bff81960d4c7490169f3d8933cb400a00f6dea2b2f6fc7b16"
+content_hash: "sha256:ea0bbc6c8353c811f73e4f7501cbbaa1d5ef6eac997a63373ad5fb21867d990c"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -2164,3 +2164,6 @@ status: in_progress
 - [ ] AC #4: repaired empty fixture must reach real cleanup; mandatory supplemental proof and all preserved assertions remain required
 - [ ] AC #5: complete-mode sole-current-warning and same-delivered-revision OBSERVED renderer faults/nil bytes plus OBSERVED built CLI outcomes and REVIEWED renderer-to-CLI closure remain mandatory; CLI late guarantee COMPOSED, independent standalone late injection UNOBSERVED, individual OS Close errors UNFORCED
 
+
+### 2026-09-06T05:05:18Z ramirosalas
+RED-DISPUTE: GREEN paused at clean4b246baf7f9384f373d4935f01bbe07c7fcf7076. Full PAUSED-BLAST-DISPUTE.md appended in Notes:229 scoped leaves+45 targeted race leaves PASS/no skips; broader replay4 legacy v1 fixture conflicts and1 existing filesystem skip unresolved. No fixture/helper/example changes, no delivery. Latest nd_contract status: in_progress; proof pending exact repair authority, docs-only positional check command correction and final review. No active/background process.
