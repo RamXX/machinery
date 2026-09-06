@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-06T06:30:50Z
-content_hash: "sha256:49e25d3447ef36702b1b9ca517c1eb0bda1776f3a4c4eab77da64bfc6733a0b0"
+content_hash: "sha256:077bccdbf305e611c4b03eb46a64709e84aad1b0ebde0353ff80606f2ff79e56"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 ---
@@ -2826,3 +2826,32 @@ status: delivered
 - [x] AC #3: Legacy behavioral evidence is never grandfathered as current; migration diagnostics and all 13 exact amended fixture callers preserve plan warnings/current zero and historical Ga semantics.
 - [x] AC #4: Required real positive/negative filesystem, code/test mutation, alias, stale replay and evidence-only cases pass without skips; the distinct pre-existing case-insensitive-filesystem skip remains uncredited and owed on Linux.
 - [x] AC #5: Same-SHA actual CLI and renderer observations plus explicit source composition support the approved guarantee and honest binding limits; independent PM final source review remains required, with UNOBSERVED/UNFORCED boundaries retained.
+
+### 2026-09-06T06:30:50Z ramirosalas
+## PM Decision
+REJECTED [2026-09-06]: whole-story GREEN candidate 412d01b57ae4770a6cf4fb4f48442fb7e632cdd7.
+EXPECTED: AC1 requires a complete implementation/test scope and invalidation after code/test/config change or scope narrowing; AC4 requires meaningful negative and matched positive proof. R2 permits only the exact attestation record and top-level .git exclusions.
+DELIVERED: internal/gates/attest.go:874 initializes exclusion to the digest sentinel "none"; lines 882-885 use it as a real entry filter. Independently built ordinary CLI omits actual top-level none file/empty directory in disjoint and implementation-inside-design roots. Four real file-content/directory-mode mutants remain current 1 with exit 0 and stdout identical to the unchanged controls. Equal-root and implementation-ancestor file controls correctly stale and exit 1.
+GAP: unauthorized third scope exclusion. Same-generation custody and existing 229 scoped / 45 race / 13 caller PASS do not establish freshness for an input omitted from both generation and checking. Existing test history is preserved, not invalidated.
+FIX: root/Sr PM route exact same-story new regression ownership first. Add independently reviewed positive+negative RED against 412d01b for real none file/empty directory, both affected topologies, exact inventory and change invalidation; retain actual evidence/.git exclusions and other topology controls. Only then repair production, freeze and rerun same-final-SHA scoped/custody/CLI/hook/caller/relevant broader/race and TDD proof. No production-first repair, new seam, invented test filename authority or existing frozen test amendment is granted.
+Full review appended to Notes: /tmp/machinery-p7jd-pm-final.pT2Q0q/PM-FINAL-REVIEW.md SHA256 c3950515759f8cf148b4e2469102bbe1a7b7dabfc4c9b22bdb14297ec07071d6.
+
+## nd_contract
+status: rejected
+
+### evidence
+- Independent exact Git archive review of 412d01b57ae4770a6cf4fb4f48442fb7e632cdd7 against a82277af5650b487cea1260c24ffcc1c86d69d8d; full R2/AC5 and changed source/tests/docs plus relevant provider/caller closure reviewed. No production/test/developer-worktree or installed artifact mutation.
+- Same-SHA independent native proof: 229 scoped PASS, 45 race PASS, all 13 helper callers PASS; broader selectors 149 PASS and 1 unchanged casefold SKIP, all zero FAIL. Overlaps not summed. Seven frozen hashes and exact authorized 65-addition patch retained. TDD 11 commits / 0 violations. Final 16 paths / 3462 changed lines.
+- Own audit /tmp/machinery-p7jd-pm-final.pT2Q0q/pm-review-audit.json SHA256 d5ef7a3f84b733c7293d35f68761cd4e90c3d49894ca727b92f8affd4799d8a2 preserves exact raw names/hashes/counts/source/lineage/quality. Original frozen RED and SETUP histories remain unchanged.
+- Actual defect repeat /tmp/machinery-p7jd-pm-final.pT2Q0q/pm-none-replay.json SHA256 0fd1686fc37b983c35d569d3ece449056d7f37ea3b25d589b4036a5b87d1d78a records six exact cwd/argv/status/input/mode/receipt/stdout cases. Built binary SHA256 534f53900fc9457d0950bcc6ed1d72aeac1d397d030a8017532cc7911e53f0ad.
+- AC5 OBSERVED real renderer late original/owned-cleanup faults -> nil bytes/actual causes and real CLI ordinary error -> exit1/empty output; REVIEWED exact Render -> final Release/error join -> first output closure; COMPOSED late CLI guarantee. Standalone injected late CLI UNOBSERVED, individual OS Close UNFORCED, sink partial writes separate; no execution/reviewer authentication claim.
+- Quality scan remains FAILED with 11 existing heuristic findings in four byte-identical base hook functions. Case-sensitive Linux case_folded_collision leaf remains owed at final epic gate, not passed/waived; required attestation/caller scopes have zero skips. No full preflight/runtime/install/service/remote operation.
+- Root must route same-story RED-first repair and exact scope authority before authoring. No blanket test amendment or new path/seam authorized. hgz1 future two-helper fresh actual-baseline amendment hold remains exact. All finite PM processes complete; no acceptance or merge.
+
+### proof
+- [ ] AC #1: BLOCKED: actual implementation path none is omitted in two supported topologies and its change is falsely current.
+- [x] AC #2: Closed kind/schema/current/history distinctions independently source-reviewed and exercised on covered fixtures.
+- [x] AC #3: Legacy no-grandfathering/migration and exact 13 authorized helper callers independently verified; future hgz1 migration remains separately owned.
+- [ ] AC #4: BLOCKED: existing negative/positive proof misses the demonstrated real-file/empty-directory sentinel collision; new exact regression-first proof and repair required.
+- [x] AC #5: Real current/history/changed-code CLI observations and approved bounded error/output composition independently verified, with limitations above; this is not whole-story acceptance or cure for AC1.
+
