@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:28:34Z
-content_hash: "sha256:77ceca2d7cc571327bd4bf17a23232890f706b3985cc49e3f9fed047bc34059c"
+updated_at: 2026-09-06T01:28:43Z
+content_hash: "sha256:035194458635770a8ddac2d20a561ac713818731488c833c5aa7e9af83015ca2"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -2518,3 +2518,70 @@ status: in_progress
 - [x] Existing privateparser, safecontrols, realrollback/recovery and supplementallegacy proof preserved.
 - [x] Identical revised tests and original source/history retained for independent review.
 - [ ] Independent complete repaired-RED re-freeze, candidate full/native verification and final acceptance.
+
+### 2026-09-06T01:28:43Z ramirosalas
+INDEPENDENT COMPLETE REPAIRED-RED REVIEW: APPROVED RE-FREEZE; RELEASE GREEN VERIFICATION HOLD — MAC-2u36, 2026-09-06 UTC.
+
+The complete repaired RED acceptance bar is sound. Freeze the exact test revisions/hashes below and release the healthy retained GREEN agent to complete verification against them. This is the explicit independent repair/re-freeze decision within an already claimed GREEN story. It does NOT call approve-red or change status/labels/claim/dependencies; those remain in_progress, dev-MAC-2u36, hard-tdd/red-approved, parent MAC-ui8a, blocking MAC-gcrr/MAC-ou97. It is not product acceptance, closure, delivery or rejection. The earlier RED declaration remains historical evidence, supplemented by this exact authorized repaired freeze. No further test/fixture/config edit is authorized.
+
+Permitted next verification on candidate15252d255fa12a131fbc2cdb13f593a212fd4ccb (or subsequent separately scoped production-only GREEN changes preserving this freeze):
+1. go test -count=1 -timeout=15m ./internal/install -run 'Bootstrap|Receipt|UpdatePlan' -json
+2. go test -count=1 -timeout=15m ./internal/install ./cmd/machinery
+Capture complete raw stdout/stderr before display, exact SHA/hash and every required named execution/terminal/failure/skip, elapsed costs and AC1-7 mapping. The three explicitly selected legacy controls have current candidate passing evidence outside the first regex; keep their separate accounting and execute them in native regression. Do not count an uninvoked TestUpdatePlacementChildHelper as extra behavioral proof. Existing90s parent/child and all other individual operation limits remain exact. No deadline increase, skipping required cases, broad retry masking or test weakening. Investigate any new failure without assuming a remaining oracle defect; locked tests require new explicit independent authorization before edits. Full preflight remains the final epic gate. Final product acceptance still requires complete trustworthy GREEN matrix/native evidence, implementation review and normal delivery/independent acceptance.
+
+Authoritative repaired freeze/provenance:
+- Tests-only RED baseline53572efc7adfde1649c4ca305280324aa050c6e5 retains original496963fb7f4842d706d308dafcbd145908a6e395 production and applies76eefa1ed8b2ded8e673fc9faf97e422f21a8448 then53572ef.
+- Candidate15252d255fa12a131fbc2cdb13f593a212fd4ccb retains GREEN0ad71eba545083e0836792f6f2e307604182e2dd production and applies65b7d13539dad9117ddff7cbadc84db021e789ea then15252d2. The paired test trees are identical.
+- Repair subjects are exactly: `test(MAC-2u36): tdd-red [test-edit-authorized] repair real placement and writer-close fixtures` and `test(MAC-2u36): tdd-red [test-edit-authorized] retain actual closed Control error`. Preserve all original/repair commits and raw histories. These tests were repaired AFTER retained GREEN under reviewed disputes; do not represent authoring order otherwise. Independent unchanged-production replay and this explicit repaired freeze make the current tests authoritative for further GREEN verification.
+
+Frozen SHA256 (paths under internal/install):
+| File | SHA256 |
+|---|---|
+| bootstrap_receipt_test.go | a49618fbbfb5eb7d683beed8111677ea718fe16097c962c1c9ee18690614af80 |
+| bootstrap_receipt_writer_unix_test.go | 18bfe7e3834089b9b09b6bbdd83a064f61fefcaeb50494bc0d976b7e2624b77f |
+| bootstrap_receipt_writer_other_test.go | c956a651cb194a71807de2a19f6389be70c169ec41c2147f16458ec65e440391 |
+| update_receipt_fixture_test.go | 5c239c670a26fbed20a709d585ce606dc49de159cd80daf136d9c3c421a99157 |
+| update_test.go | a9c46ba692fd28d5fccc10dae801c13542c240d79be80819f60e4e7e2657715c |
+| receipt_test.go | a56a3dc07bd447a0e4d4469f0d027509e5149eb26b494d118d394089cbfb5c48 |
+| install_test.go | d5039079dd032f8b86f86ad6bd0ac411b192983b10ee194e599d6e59bcba97ba |
+All other frozen test/fixture/config bytes remain unchanged. Original shared write/fakeSource/sourceTarball/updateReleaseServer and all old safety assertions retain exact bytes except the independently authorized named amendments.
+
+Complete evidence audit:
+- Author FULL_RERED_REPORT.md at /tmp/machinery-MAC-2u36-joint-proof.623afI/FULL_RERED_REPORT.md SHA2567026b3751d08b61a441e006464a7ad2df5c8394d55af7a649a48a4a2991737df independently verified/read completely, including full85-leaf inventory, named failure causes, AC1-7 mapping and LEARNINGS.
+- Independently hashed/parsed baseline-full-rered.jsonl in that directory:9898464034c6be714a48dcc7b07241e2c56ec9b2c83aa1b6adff74dc32441915. Exact current53572ef command completed in769.988s with85unique leaves68PASS17intendedFAIL0SKIP;96unique run events96terminal events, zero missing. No timeout/panic/build/fixture error found. This is one current author runtime replay following the focused release, not fresh PM runtime execution.
+- Independently compared complete terminal failure identities with original496963f raw /tmp/machinery-MAC-2u36-red.qRk5DC/496963f-final-matrix.jsonl: exact match, including parent containers. The only additional leaves are6descriptor controls, allPASS. Three separately selected current baseline legacy controls alsoPASS, yielding88unique selected/supplemental behavioral leaves71PASS17intendedFAIL0SKIP without double-counting the descriptor repeats or helper scaffolding. This is not the entire native package suite, which remains pending GREEN.
+- Current baseline controls rawd2158e6647bac2deeefe01fa8fd256dc595b8cc8b1751919176eb62d08c3272a and candidate controls04b38499c12d883572735dd38f442d5f1f779f405d1a78471d832929404385b1 were independently verified in focused review:9PASS each,15.139/16.055s. Focused current candidate parent rawc22b27ade0b4de667a1e5094957c9f8f047cd7ae2b76b9631d0b003fd84c22c2 remains separately audited evidence:4PASS201.231s, one actual writer each and one real double-close fault in each of two fault cases, with unchanged exact rollback/absence/sentinels/journal/lock assertions. This is candidate focused proof, not full candidate verification.
+- Fresh independent post-full-run checks confirm candidate/baseline clean, empty test-tree difference, unchanged baseline production from496963f and candidate production from0ad71eb, and every frozen hash above. Fresh `pvg story verify-tdd --base f24b2df3cb1e1521f97b406a7516f72bb7bc7890` in retained candidate: PASS13commits0unauthorized test edits,0skipped merges. No state mutation.
+- Full1847changedLOC/9files remains justified and within reviewed approximately1850 budget:1752tests+95unchanged retained production. Prior exact scoped diff/source audit remains current by byte identity. Scanner thin_file for9-code-line complementary-platform function is complete required explicit unsupported error, not incomplete implementation; no padding/suppression needed. Five old production return-empty findings remain legitimate unchanged fallback branches, not stubs.
+
+AC-by-AC complete repaired-RED judgment:
+1. Complete recorded mixed plan is independently asserted and remains RED on old bootstrap default selection. No-receipt defaults, supported schema1 and plugin-aware controls pass. Explicit selector incompatibility and mixed mode expectations remain exact.
+2. Current23private parser/topology/inventory/digest/order controls pass with0700config/0600regular receipt checks, matched valid controls, intended wrapper-stripped/typed diagnostic attribution; unchanged code/source confirms old permission masking is not reused as proof. Real mode-only unsafe receipt, corrupt/schema/plugin and parent-path controls pass; unsafe native symlink bootstrap remains intendedRED. Safely edited/missing owned content remains repairable, never reclassified as unsafe ownership.
+3. Actual built-release ordinary intact45.20s and edited44.11s convergence pass with exact binary/version, complete independent content/modes/links, full receipt topology/inventory/digests/plugin obligations, sentinels and same-release idempotence. Bootstrap parity and all4single/multi-missing ordinary/bootstrap leaves remain desired repairRED. Raw missing-file diagnostics show early child complete-inventory failure before later native repair, not invalid fixture/source setup.
+4. Actual ordinary later-target failure passes31.50s; frozen witnesses require binary/home/earlier Codex mutation, precise missing later OpenCode adapter cause and full previous-state restoration. Bootstrap/missing-prestate variants fail their required reached-boundary assertions; they receive no later-fault rollback credit. Interrupted journal recovery passes14.95s and remains explicitly pre-mutation interruption evidence.
+5. Release fixture uses actual source archive builder, real old/next CLI builds, local checksummed downloads, default real child processes and isolated roots. Full current matrix executes with no required skips. Repaired first/third legacy observers remain COMPONENT real downloaded-source placements; second is actual downloaded-shell execution-wiring under inherited authority, not a released CLI substitute. No product Paivot dependency or live install mutation is introduced.
+6. Descriptor controls pass with real open access modes, unchanged bytes/mode/offset/handle checks and actual closed-Control/EBADF errors. All4baseline parent leaves still complete actual children but see premature persisted child receipts and0parent publications. Fault leaves explicitly0injections and nil close error: missing-boundary RED only, not late-fault rollback. Separate candidate actual one-writer/twofault focused proof closes the earlier oracle reachability question while preserving exact prepared scope, child receipt immutability, independent current payload/digests, real os.ErrClosed, no commit, full rollback/absence/sentinels, cleanup and lock reuse. Four absent/forged/unprepared/out-of-scope authority controls pass in full baseline; no bypass introduced. Concurrent foreign-postimage protection remains unchanged and must pass native GREEN regression.
+7. Both real cross-group conflict/follow-on-native tests remain intendedRED: old source reports success and emits overlapping receipt; exact state preservation/conflict diagnosis/next-native success are enforced. Fresh/disjoint/same-ordered-group copy-change controls pass. Full expected topology/current inventory/digests and link/copy assertions remain intact; no automatic cross-group ownership migration is invented.
+
+Evidence limits and containment:
+Current author complete proof is consistent with independently audited exact source, repaired paired focus and unchanged prior evidence; no concrete inconsistency warrants redundant full PM runtime. This decision is an independent complete evidence review, not a claim of fresh PM85-leaf runtime or statement/branch coverage percentage. Earlier false sentinel, path-only reader fault contamination and ten permission-masked parser passes remain honestly qualified historical evidence. No new unresolved product defect, scope gap or authorization need found at this re-freeze gate. PM performed no source/test edit, worktree cleanup, installed binary/skill/plugin/agent or Dagger mutation, remote operation, main/epic change or full preflight.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Independent complete repaired-RED review approves exact freeze above and releases healthy GREEN verification hold without approve-red or workflow transition.
+- Current author baseline85leaves68PASS17intendedFAIL0SKIP769.988s independently hashed/parsed; failure identity matches original RED. Three separate current controls bring88unique selected/supplemental leaves.
+- Fresh hard-TDD audit PASS13commits; exact immutable source/test checks and prior focused candidate actual fault proof remain sound.
+
+### proof
+- [x] AC #1: complete recorded-plan/default/plugin/schema1 acceptance bar reviewed.
+- [x] AC #2: attributable private parser/topology/inventory/digest and ownership safety bar reviewed.
+- [x] AC #3: real full convergence/repair/content/digest/idempotence bar reviewed.
+- [x] AC #4: actual postmutation rollback versus unreached/pre-mutation boundaries accurately distinguished.
+- [x] AC #5: actual release/CLI/child proof and supplemental component/execution boundaries reviewed.
+- [x] AC #6: exact corrected parent writer/authority/finalization/rollback bar re-frozen; actual candidate focused fault proof independently audited.
+- [x] AC #7: actual conflict/restoration/follow-on and valid-recording controls reviewed.
+- [x] Independent repaired test freeze approved; healthy retained GREEN may resume verification with no test edits.
+- [ ] Full current GREEN matrix/native regression, complete implementation acceptance review and final product acceptance.
+
