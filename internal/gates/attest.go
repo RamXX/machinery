@@ -1001,7 +1001,7 @@ func renderAttestationInSnapshot(design string, subject *attestationSubject, rev
 	if err != nil {
 		return nil, err
 	}
-	if len(body) > designArtifactMaxBytes {
+	if int64(len(body)) > designArtifactMaxBytes {
 		return nil, fmt.Errorf("GV_EVIDENCE_LIMIT: generated document has %d bytes, maximum %d; merged rows must also fit this document limit", len(body), designArtifactMaxBytes)
 	}
 	return body, nil
