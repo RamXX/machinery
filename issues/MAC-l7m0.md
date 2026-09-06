@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:30:30Z
-content_hash: "sha256:8219b97b7d125c9d763506b424e1f271be79b5ba5b59d8ab44c734ed1bb70d1e"
+updated_at: 2026-09-06T10:31:16Z
+content_hash: "sha256:704436045d6c1235ddd7b1d3e935f7afb0e7748d6baa724f8c8d520f49ea9755"
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36, MAC-a89e]
 assignee: dev-MAC-l7m0
 labels: [accepted]
@@ -457,4 +457,29 @@ status: accepted
 - [x] A4: Architecture approval remains distinct from actual four-language/two-platform, first-use, custody/assertion, process-producer and cumulative-budget implementation proof.
 - [x] A5: Exact-byte/static/privacy checks and actual canonical-positive plus five intended negative document controls verified; no source/runtime/preflight/install/remote changes.
 - [x] A6: Genuine independent PM review APPROVED; canonical acceptance transition is the next supported action.
+
+
+### 2026-09-06T10:31:16Z ramirosalas
+## PM Acceptance Completion
+The supported explicit command pvg story accept MAC-l7m0 --reason <independent A1-A6 approval> completed. Fresh canonical pvg nd show verified status closed, label accepted, ClosedAt 2026-09-06T10:30:30Z; post-transition Body hash before this completion comment was sha256:8219b97b7d125c9d763506b424e1f271be79b5ba5b59d8ab44c734ed1bb70d1e. nd/backlog transition tip was be2e398 (nd: update). This is actual documentation acceptance, not a proposed transition or native implementation proof.
+
+Immutable independent review remains /tmp/machinery-assurance-pm.pYsE8w/REVIEW.md SHA256 b7c57fcb51d64b332c1baef0b8d9d2f986968042b58e9dc233de1f9865a1cc8d. Separate transition/help note SHA256 957e00ced52bf12e3bebaaf9318977b55ee9765a06b368b8d93e749f5c0a5264 records the misleading help response and verified absence of mutation; it was never counted as acceptance.
+
+Fresh doctor: all 56 issues passed. Epic sibling check: MAC-ui8a has 40 children, 33 still not closed, so epic auto-close does not apply. Native dependency handling moved MAC-l7m0 from BlockedBy to WasBlockedBy on MAC-vx24, MAC-ou97 and MAC-qlw2; qlw2 now has no remaining BlockedBy, while vx24/ou97 retain their other blockers. No successor claim/dispatch/merge performed. Only these three dependency links and MAC-l7m0 changed in the acceptance snapshot range; no source/main/epic/remote mutation.
+
+## nd_contract
+status: accepted
+
+### evidence
+- Exact candidate 0feaebf725267f9d0045d653ef57a90af0c9d946 documentation independently APPROVED and canonical supported acceptance verified closed+accepted.
+- Exact projection, all normative sections and actual one-positive/five-negative document controls verified; full immutable review above.
+- All historical failures preserved; no native implementation or runtime proof supplied by this documentation acceptance.
+
+### proof
+- [x] A1: Exact one-document public projection.
+- [x] A2: Complete normative semantic preservation.
+- [x] A3: Standalone public provenance/dependency boundary.
+- [x] A4: Honest architecture versus implementation/evidence distinction.
+- [x] A5: Actual bounded positive and negative document validation.
+- [x] A6: Independent PM review followed by verified canonical closed+accepted transition.
 
