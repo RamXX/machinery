@@ -9,8 +9,8 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
 updated_at: 2026-09-05T22:23:28Z
-content_hash: "sha256:748b4078aa32a147d87e0ababbcaf613206ada3e08194b946efd793231344bc7"
-blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71]
+content_hash: "sha256:acd530249bd3821db42a082064d09398e0fd8bfdb8e93f156fdd1da42fc03f29"
+blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
 ---
@@ -473,10 +473,11 @@ status: new
 - 2026-09-05T21:01:13Z status: in_progress -> open
 - 2026-09-05T21:43:52Z status: open -> in_progress
 - 2026-09-05T21:43:52Z claimed by dev-MAC-hpqp
+- 2026-09-06T09:09:59Z dep_added: blocks MAC-bz1y
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-hlae]], [[MAC-yhg5]], [[MAC-2n83]], [[MAC-hwdb]], [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]], [[MAC-hy71]]
+- Blocks: [[MAC-hlae]], [[MAC-yhg5]], [[MAC-2n83]], [[MAC-hwdb]], [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]], [[MAC-hy71]], [[MAC-bz1y]]
 - Follows: [[MAC-olrx]]
 
 ## Comments
