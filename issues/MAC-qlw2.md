@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:05:48Z
-content_hash: "sha256:85055f293ff91ad624c3c94d719b62ee2381f024fb36a7eaf5b20b51fd58943b"
+updated_at: 2026-09-06T12:45:35Z
+content_hash: "sha256:32aee8704eca81ad5d852101e3d97b43d45877124842f477d91e81581d4d5a6e"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0, MAC-p9wm]
 assignee: dev-MAC-qlw2
@@ -240,4 +240,63 @@ status: in_progress
 ### proof
 - [x] Approved architecture is identified without requesting another architecture loop.
 - [ ] Public contract acceptance, exact author/inventory gate, implementation, and native proof remain pending.
+
+
+### 2026-09-06T12:45:35Z ramirosalas
+ACCEPTED PUBLIC CUSTODY CONTRACT / AUTHORITATIVE CURRENT PROSPECTIVE SCOPE — 2026-09-06
+
+This true-EOF amendment supersedes only the earlier six-path/2600-LOC scope forecast and the now-satisfied publication blocker. Every earlier stronger acceptance/testing constraint, failed record, frozen evidence item, claim, dependency history and native-proof obligation remains intact. This is prospective story scope and workflow authority only: it is not test implementation approval, RED approval, source authorization, native execution evidence, delivery or acceptance. Terminal V4 architecture remains approved with BLOCKING none; no fourth architecture review is requested.
+
+ACCEPTED PRODUCER GROUNDING
+- MAC-p9wm is closed/accepted. Accepted docs candidate `2a63e4bb0d7b57c42dfd6f45fecfdc4f8a18cfbf` is present in epic `2a73454d5f133a7b5fb4db0346232fd389810d28`.
+- `docs/native-custody-contract.md`: Git blob `1c1581d1aec324d979593613b44976ed0007c45b`, 328 lines / 27,783 bytes, SHA256 `bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a`.
+- `docs/test-assurance-contract.md`: Git blob `acce64fee8db5a7565e8fa33422334de125e913f`, 576 lines / 109,579 bytes, SHA256 `171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d`; its accepted 575-line body remains byte-identical outside the one companion link.
+- Independent acceptance report: `/tmp/MAC-p9wm-pm-review.Hf8lA2/REPORT.md`, SHA256 `19c0c4be6b4eb4b7035db3e9e576352ad1cfd3b24f414e287be7d8dfded38f8e`.
+- Approved architecture proposal/review: `/tmp/MAC-qlw2-supplement-v4.HaJAeo/PROPOSAL.md` SHA256 `d56d0104e965cace70e89b3be383ff3f51377c33ea8227c86833ef731be331be`; `/tmp/MAC-qlw2-anchor-v4.fH9ocw/REVIEW.md` SHA256 `dfa09b70d599a83d8cde10ab31d19fe5debd1eadf4c19f86c3aea79c0a9ac1e3`.
+
+PRODUCES:
+- internal/processscope/scope.go -> exact public custody records and APIs: InheritedInternalIO(context.Context) (InternalIO, bool, error); (InternalIO).Close() error; InheritedCapability(context.Context) (Capability, error); (Capability).Close() error; Open(context.Context, Options) (Scope, error); Join(context.Context, Capability) (Scope, error); ServeInternal([]string, InternalIO) (bool, int); Scope.Run/Child/Attach/Close; exact Limits, Diagnostic, Command, Streams, Result, Options, CleanupReport and ResourceState records.
+- internal/processscope/broker.go -> live authenticated broker, root/child guardian registration and base finite dispatch required by the accepted contract; the later checker-only dispatch arm is MAC-yhg5 and may modify this file only sequentially after qlw2.
+- internal/processscope/guardian_unix.go -> Unix guardian implementation with explicit build constraints for supported Darwin/Linux behavior, direct-child live identity and terminal group-kill-before-Wait/reap ordering.
+- internal/processscope/internal.go -> existing untagged portable internal surface, including the unsupported-platform definition used when the Unix guardian implementation is unavailable; no false native fallback.
+- internal/processscope/contributor_docker.go -> DockerRuntime request/capture/inherit/descriptor/Validate/Close API; closed ContributorDocker service, five-program registry, bounded observation protocol and read-only exact-ID InspectDockerContainer API.
+- internal/processscope/scope_test.go -> exact separately frozen constructor, handle, broker, limits, guardian and portable-unsupported tests.
+- internal/processscope/custody_integration_test.go -> real same-binary exported-API custody, nested scope, live-first process/container and independent foreign-survival tests.
+- internal/processscope/contributor_docker_test.go -> closed Docker runtime/descriptor/service/observation/create-start-cleanup tests and calibration controls.
+
+CONSUMES:
+- MAC-p9wm: docs/native-custody-contract.md
+  schema: exact accepted public constructors/Close semantics; acquisition-versus-work lifetime and error precedence; scope records/Limits/Diagnostic; authenticated broker/guardian; cumulative wall/owner/cleanup rules; DockerRuntime descriptor/private client; closed contributor profile; conservative unresolved-create lifecycle; live-first calibration and native host matrices, at SHA256 bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a.
+- MAC-p9wm: docs/test-assurance-contract.md
+  source: accepted companion contract preserving every non-custody obligation and linking the refinement at SHA256 171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d.
+
+CURRENT PROSPECTIVE ACCEPTANCE / TEST WORKFLOW
+1. Exactly EIGHT owned paths apply: five implementation paths (`scope.go`, `broker.go`, `guardian_unix.go`, `internal.go`, `contributor_docker.go`) and three test paths (`scope_test.go`, `custody_integration_test.go`, `contributor_docker_test.go`). Checker-specific profile implementation belongs to MAC-yhg5, not this story. All public records, defaults, absolute caps, opaque live authorities and Close/error semantics match the accepted producer exactly.
+2. Root bootstrap, descendant Join, command attachment and Docker runtime/service work retain one authenticated owner. Constructors validate nil/deadline/cancellation before absence or intent, use the bounded acquisition-only lifetime, and transfer one usable handle atomically; post-handoff probe cancellation does not revoke work, while authenticated owner/operation expiry, Join cancellation and liveness loss do. No marker, path, descriptor text, PID, label or historical record creates authority.
+3. The contributor service remains synchronous and closed: exact five programs only; fixed profile; observations are bounded read-only data; inspection is exact-ID/same-daemon/read-only. Actual guardian and container ownership is registered before start admission. Unresolved create/start is never retried or reported clean; cleanup failure stays distinct from target result. No checker-specific arbitrary argv/resource path is added here.
+4. One cumulative milestone wall deadline and fixed owner ceiling cover queueing, nested work and retries; terminal failure enters one shared cleanup grace. Cleanup-only helpers are registered under that original grace and may perform only fixed terminal-response/identity/exact-owned inspect/remove operations. They never provision, create/start targets, replay, run tests, use Background/unscoped fallback or renew grace. CLOSING rejects new public work, and unresolved create/start can never become false-clean.
+5. Required live-first proof uses the real same-binary exported API and independent same-daemon observer before the trigger. Per-invariant unsafe/safe pairs prove normal completion, intended assertion failure, host output overflow, timeout, SIGINT/SIGTERM, owner loss, registration/admission races, early parent exit, nested Join, malformed/stale/forged/cross-scope/closed/reused handles and conservative daemon ambiguity. Exact owned absence and helper/guardian reaping precede success; independently owned foreign process/container controls survive. Historic PID/name/labels never authorize cleanup.
+6. Native Linux amd64 and Darwin arm64 must run the same production candidate and frozen inventory before acceptance. Linux amd64 remains pending and is not waived by an amd64 image, arm64 daemon, cross-build or architecture approval; its absence is not a barrier to permitted Darwin planning and authoring under the gates below.
+7. DIFF BUDGET: exactly 8 files, forecast 3,800–6,200 changed LOC. This is an investigated forecast, not a trim target. Any overrun triggers explicit PM investigation; required tests/contracts are not weakened or deleted to fit it.
+8. All original stronger constraints remain: standalone Machinery with private pvg/nd used only for development coordination; no product dependency; no remote/install/preflight/unrelated cleanup; no audit exception, disposition, successor waiver or edge change; developer delivers and an independent PM accepts.
+
+BEFORE-FIRST-EDIT HARD-TDD HOLD / ACTIONABLE NEXT
+- Current owner remains the existing `dev-MAC-qlw2` claim. The accepted publication removes only the former MAC-p9wm blocker; it does not release this before-edit hold. Root-reported branch base remains old epic `a94e768adf461178e0562ad135c7c06d8163a3a4` with no source/test work yet.
+- NEXT: the current developer must return a separate prospective RED-author package BEFORE touching source/test bytes: exact leaf/helper/fixture/config/dependency-lock inventory; expected-failure plus passing-control matrix; same-binary real helper and independent-live-first method; exact source base; and the actual selected RED author handle. Do not invent or freeze test names in this PM amendment.
+- Before the first RED/test authoring dispatch, record the actual RED-author handle and a DIFFERENT actual calibration-implementation-author handle. Select the independent PM handle before that independent review. Select the separate actual production GREEN-author handle only after independent RED approval and before GREEN dispatch; a future GREEN handle is not an artificial prerequisite for initial RED authoring. The four role semantics remain distinct and no speculative handle is approved here. Tests/helpers/fixtures/config freeze first; only then may the calibration author modify copies of the five implementation paths. Pre-inventory planning may occur before the later reviewer/GREEN roles are selected, but no source/test bytes may be written before the applicable before-edit gate.
+- State roles are fixed prospectively: S0 is the absent-API/setup state and is retained honestly but is NOT custody RED; S1 is a new operative unsafe implementation-only reference; S2 is its safe counterpart; additional S1-x/S2-x pairs cover distinct invariants; G is later production authored only after independent actual RED approval. Variant implementation bytes freeze before replay. Tests/config/dependency bytes are identical across calibration states. A safe reference never substitutes for G and production G cannot be transplanted from it.
+- If the canonical workflow truly cannot admit prospective S1/S2 calibration, stop and escalate or create a legitimate independently reviewed construction foundation/current revision. Never launder S0 setup failure, historical evidence or a later safe implementation into RED.
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Accepted public producer and terminal V4 architecture hashes are fixed above; all named artifacts were read completely and hash-checked.
+- Canonical repair is tracker-only and preserves the existing claim/status/dependency history. No source/test/ref/worktree/runtime/native/preflight/remote/install action occurred.
+
+### proof
+- [x] Publication prerequisite is satisfied by accepted MAC-p9wm without claiming implementation.
+- [x] Prospective eight-path ownership, budget, producer/consumer map and calibration roles are bounded.
+- [ ] Exact prospective RED inventory plus actual distinct RED/calibration handles must be recorded before first RED/test authoring; independent PM and separate production GREEN handles are selected only at their later applicable gates.
+- [ ] Implementation, actual RED/GREEN and same-candidate Darwin arm64 plus Linux amd64 native proof remain pending.
 
