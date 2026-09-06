@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T06:51:33Z
-content_hash: "sha256:2bb4744ca0a20daf04f73f9c6a056cee5a513ed41a3ab4df20689ae5989a7abd"
+content_hash: "sha256:125254215a0e4987dff88151046fd2924836b0e99e4b1e1f33a4350ca5583b4b"
 blocks: [MAC-ou97, MAC-hgz1]
 follows: [MAC-2u36, MAC-a89e, MAC-p8ce]
 ---
@@ -1086,3 +1086,23 @@ status: delivered
 
 ### 2026-09-06T06:51:32Z ramirosalas
 REJECTED: R1 AC1/closed contract: public Parse at exact dc3a8a accepts ten unknown composite JSON keys across root/state/transition/invoke because fsm.go objectFields uses substring membership. Matched committed Session60-row control and four ordinary unknown-key rejections prove the gap. FIX: regression-first separate new test ownership via root/SrPM, exact-key implementation repair only in owned fsm.go, retain all six frozen tests; no test edit/grammar waiver or new RED approval. R2: actual verify-delivery3OK/6FAIL requires recognized canonical Implementation Evidence, CI/Test Results, Commands run, Summary, producing SHA and AC verification plus authoritative EOF contract; correct append-only on re-delivery and require9/9. Full independent report /tmp/MAC-uzxr-PM-green.7BaxI6/REVIEW.md SHA256dec4dd53d5f57dac813c9290fced9c4b366484fd8fc027da6ed8d695a3d2b74a. Frozen68/228/3/3/17 and default3/3/17 allPASS, no tampering; current raw proof preserved. No acceptance or source edits.
+
+### 2026-09-06T06:51:33Z ramirosalas
+## nd_contract
+status: rejected
+
+### evidence
+- TERMINAL INDEPENDENT GREEN REJECTION MAC-uzxr at dc3a8a365c21d5370c0825de992e2461ea0785a9. Supported pvg story reject exited0; actual readback open/rejected, not accepted/closed/delivered. Full detailed EXPECTED/DELIVERED/GAP/FIX and all evidence in appended PM report /tmp/MAC-uzxr-PM-green.7BaxI6/REVIEW.md SHA256dec4dd53d5f57dac813c9290fced9c4b366484fd8fc027da6ed8d695a3d2b74a.
+- R1 confirmed public Parse implementation defect in fsm.go objectFields: substring allowlist admits ten unknown composite field names across root/state/transition/invoke (including id initial,_comment _role,on after,target guard,src input,onDone onError). Exact committed Session control60rows,nil and four ordinary unknown-field oracle-parse controls; ten unsafe composite inputs wrongly60rows,nil. Separate external module imports unmodified exact Git archive; raw probe.stdout SHA2566158b871c33f6ced2ce1e9dc2a442247dae0b81a66c9e4c73032a73cfa80b2e2. Diagnostic exit0 is not contract success. Require genuine regression-first same-story rework via root/SrPM new-path ownership and independent checkpoint, then exact-key membership fix only; no change to declared grammar/API/Task or any of six frozen tests. No test-edit authorization or new RED approval here.
+- R2 observed supported verify-delivery exit1:3OK/6FAIL for recognized Implementation Evidence, CI/Test Results, Commands run, Summary, commit SHA and AC verification shape. Substantive report/results exist; this is shape/placement failure, not missing executions. Raw SHA256f71c17f110481fd8250dd75e25e278ed5e3a03a0aeb2560a270250a7f61904be. Re-delivery must use canonical supported append-only evidence, actual final delivered contract at EOF and9OK/0FAIL; never --description/--body-file or waiver.
+- Independent exact-archive frozen proof allPASS:68 parser,218 transitions+10supplements,3original/3candidate/17remaining meta; default3/3/17PASS0SKIP. Actual five-group25.799s/default24.093s, finite unchanged deadlines, Go1.27.1 darwin/arm64 GOWORK/GOPROXYoff GOTOOLCHAINlocal -count=1. Both PM and author raw audit:197rows47states118groups,218registrations/218successfulobservations; all20 exact variants43realchildren28exit0/15intendedexit1,1398nativePASS15intendedFAIL0SKIP,43x47input manifests149exports. Exact full child/native outcomes and actual inventory corruption checked. All23distinct exported fixture dirs removed; default adds43children with3proofdirs+23fixture dirs removed. Raw audit.json SHA256f5e3902319197e3394b6ac19f3b6ad2a6be71286c32bdc2e6994db5f8a203926. Ordinary artifacts, no authenticated claim.
+- All99 committed example files match own archive; six frozen hashes and original495prefix326a632d89f522c7b40efc1e4d6a95bf81b0508db0cfc5c12459f9feec2132ba unchanged. GREEN only parser607add12delete and exactTask2add1delete=622changed;3575cumulative3543aggregate across8paths, justified conditional forecast excess not a cap failure. TDD4commits0violations, scopedstatic8files0issues, diffcheck clean. Real Task fallback context/call/actions and both regression mutants verified. No other established source blocker in full bounded review.
+- Historical initial genuine RED3unsafe-accepted outerFAIL/200childPASS, storage proof and separate Task defect remain intact. Expanded scaffold ErrScaffold outcomes remain NONQUALIFYING; no retrospective RED credit. No PM source/test/example edit, claim renewal, install/assets/remote/preflight/service/Dagger action, developer-worktree access, merge/accept/close or child agents. Root owns new regression routing; main497419ab4512fcff765cd5feb27aed4c67b5608d and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged.
+
+### proof
+- [ ] AC #1: NOT MET; exact structural-field closure fails for composite unknown keys. Regression-first repair and independent review required.
+- [x] AC #2: Current exact one-Fire effects, Task real entry/context correction and missing/name-only variants independently verified; no whole-story acceptance.
+- [x] AC #3: Current specified20 real unsafe variants and complete matched controls independently verified, correctly classified semantic/structural/inventory.
+- [x] AC #4: Current197rows/218successfulwitnesses+10supplements bidirectionally reconciled to exact native identities with0SKIP.
+- [ ] AC #5: Story not accepted; R1 implementation repair plus R2 canonical delivery shape and fresh reviewed candidate handoff remain pending.
+
