@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T04:25:57Z
-content_hash: "sha256:57242299aa00098c68cba61418db600aabea6172c99673c247190fcd9af9cb3a"
+content_hash: "sha256:5dcd4a92ed15f1579abdf52e46169a630a6dfe71dd696aced9986e06f1682d9f"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -469,3 +469,20 @@ status: in_progress
 - [ ] AC #3: valid initial missing-sensitivity RED; candidate rejection proof pending.
 - [ ] AC #4: historical225 baseline verified; dynamic candidate inventory pending.
 - [ ] AC #5: complete passing candidate proof and consumer handoff pending.
+
+### 2026-09-06T04:25:57Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- TERMINAL STORAGE CHECKPOINT: STORAGE_REPAIR VALIDATED at4ef6baffc4de72f2a3e935348f180283fe53c20b; original998a5a3 preserved. Complete independent report /tmp/MAC-uzxr-PM-storage-verification.md SHA256b52cda2189988e9516cc10c59cda850e39f82502405eaec75ba0fdcc15bbd184 and preceding STORAGE_REPAIR note are authoritative detail.
+- Exactly3 authorized transformations/18changedLOC, fullcandidatebytecomparison; semantic assertions/nativeinventoryunchanged. [test-edit-authorized] marker and normal verify-tdd original70652b948 base PASS2commits/no violations/no waiver.
+- Independent default/export both actualexit1,3 intendedREDleafFAIL/200checkedchildPASS0SKIP. Defaultproof+6fixturecwdsabsent, rawdefaultchildfilesintentionallycleaned. Export21filesretained;6actualreceipts/rawhashes/exactnativeidentities/46inputmanifests/exact2/2/1mutations verified. PMdefault9ac83cb0f357a4aa7d529872b3ba85cd60e38a5ab19178180bf036dcca6a6b8e, PMexportbc7148f9887ef4429231d484cd565e622c299cef4496a44b00b17ff260cb6076. Author evidence separately corroborated via gitobjects, no developerworktree read.
+- No further storage repair needed. Author may prepare full external laterpatch and measureddecomposition. ALL shared5suite/helper/parser/additive edits HELD for separateexactreview; fullREDapproval/GREEN/delivery/acceptance/rejection not performed. AllACpending, claim/worktreeretained, no product/remote/service/toolchainwrites.
+
+### proof
+- [ ] AC #1: parser/closed binding pending.
+- [ ] AC #2: complete effects/context/Taskrepair pending.
+- [ ] AC #3: initialRED/storagevalidated, candidate rejectionproofpending.
+- [ ] AC #4: dynamic candidate executedinventorypending.
+- [ ] AC #5: fullpassingcandidate/consumerhandoffpending.
