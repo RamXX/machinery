@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T03:03:05Z
 created_by: ramirosalas
-updated_at: 2026-09-06T15:26:16Z
-content_hash: "sha256:f1ee4f30c3fb383d086728a1cb4a8a48d7dfbc6b2aaf55fd76c051b435405cdf"
+updated_at: 2026-09-06T15:37:02Z
+content_hash: "sha256:7515a0bee1ee3852da26d06529f1bece857beff9d19fa617f6f52258ca368b38"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-lhu5
 follows: [MAC-2u36]
@@ -596,3 +596,6 @@ FINITE FSM V2 REVIEW CHECKPOINT ONLY. External V2 original and full suites pass 
 
 ### 2026-09-06T15:26:15Z ramirosalas
 FINITE FSM V3 CHECKPOINT ONLY. Independent /tmp/MAC-lhu5-FSM-review-v3.5NxDTt/REVIEW.md SHA256 f627bcb1e57eaf0f92a22f5215dd2131ad868c514884e697be4d61c36d9f9aaa closes exact JSON/key/null and effect controls. One narrow section-boundary gap remains: tab-separated or empty H1/H2 ATX headings fail to close the normative section. Actual eight failing leaves/three failing parents retained; candidate310passes(281leaves29parents) does not override them. Root fully read151-line report/new40-line probe and verified both manifests. External V4 assigned original author for minimal finite heading-boundary correction, all prior tests/probes/Step/ledger/14fixtures unchanged. No source/RED/story/native/full21-path authority; earlier bounded approvals and current in_progress contract/five pending AC unchanged.
+
+### 2026-09-06T15:37:02Z ramirosalas
+FINITE FSM METHOD APPROVED ONLY. External V4 /tmp/MAC-lhu5-FSM-method-v4.OfMOnm REPORT-V4.md SHA256 fbe1f7594fb724eee1a7d2a859efb56d6277171cc4bf5e041ea7659bf851e87a and independent /tmp/MAC-lhu5-FSM-review-v4.Jd9YjS/REVIEW.md SHA256 418e1010a642fa4fba0909d3fc0d851a0e43b0115e6c7b7810e3bf944f513d75 are approved only for bounded FSM extraction/routing/effects. Root fully read report/minimal92-line delta/new26-line controls and96-line PM report/runledger; candidate62-entry and PM27-entry/final manifests verified. Fresh full330passes(297leaves33parents), newest unchanged reviewer8leaves3parents pass, allselectors exit0/pkgpass/zeroF/S/empty stderr; overlaps not summed. Entire46-row literal basis, Step, JSON/effects/production/spans/14fixtures/priorprobes unchanged; all old failures retained. Remaining typed-value/timestamp/backup external method assigned /root/portfolio_values_backup_method; no product/source/RED authority. Whole21-path packet/hunks/cost integration and actualTDD/native acceptance remain pending; in_progress contract/five pending AC unchanged. Metadata correction: previous checkpoint newest probe was39physical lines, not40; exact reviewed hash unchanged.
