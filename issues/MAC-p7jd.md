@@ -1,17 +1,16 @@
 ---
 id: MAC-p7jd
 title: "Invalidate reviews when implementation subjects change"
-status: in_progress
+status: open
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:30:08Z
-content_hash: "sha256:5d47a68b7d944e28e18606c5695ac49218d672aa0ee508148dffa3f96bdfb7c3"
+updated_at: 2026-09-06T06:30:50Z
+content_hash: "sha256:49e25d3447ef36702b1b9ca517c1eb0bda1776f3a4c4eab77da64bfc6733a0b0"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
-assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
 ---
 
@@ -2450,6 +2449,8 @@ status: in_progress
 - 2026-09-06T04:10:43Z claimed by dev-MAC-p7jd
 - 2026-09-06T06:03:26Z status: in_progress -> in_progress
 - 2026-09-06T06:03:26Z auto-follows: linked to predecessor MAC-olrx
+- 2026-09-06T06:30:50Z status: in_progress -> open
+- 2026-09-06T06:30:50Z released by ramirosalas
 
 ## Links
 - Parent: [[MAC-ui8a]]
