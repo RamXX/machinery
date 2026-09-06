@@ -8,8 +8,8 @@ labels: [docs]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:05:48Z
-content_hash: "sha256:8dcf1c1d271b76d479e2f65f400c295db2e2df79309af74fd27ad9c89b7387fa"
+updated_at: 2026-09-06T12:06:45Z
+content_hash: "sha256:ea2115feee79538c387c4480e43fa9e271a6bd241d13d540805cf7d92f2fc074"
 related: [MAC-l7m0]
 blocks: [MAC-qlw2, MAC-vx24, MAC-ou97]
 ---
@@ -354,4 +354,29 @@ status: new
 
 ### proof
 - [ ] AC #1-#8: docs-only delivery and independent semantic review pending.
+
+
+### 2026-09-06T12:06:45Z ramirosalas
+FINAL SR-PM VALIDATION CHECKPOINT
+
+Terminology and source calibration: the accepted source document was read completely from exact epic object `a94e768adf461178e0562ad135c7c06d8163a3a4`, verified at 575 lines / 109367 bytes / SHA256 `22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8`. The approved V4 proposal and terminal Anchor were read completely at their recorded SHA256 identities. `docs/native-custody-contract.md` is absent at that object and is explicitly PRODUCED here. Every prospective API/schema string comes from the approved architecture and is labeled required future behavior, never existing Go implementation.
+
+Structural results:
+- `pvg nd dep cycles`: no dependency cycles.
+- `pvg lint --backlog --epic MAC-ui8a --json`: zero errors; ten inherited `vertical-slice` review heuristics on other existing stories, none on MAC-p9wm. No repair is authorized or required here.
+- `pvg rtm check --epic MAC-ui8a --json`: passed; 0 tagged requirements / 0 uncovered / 42 stories checked at command time.
+- Read-back confirms MAC-p9wm is open/new, P0 task, parent MAC-ui8a, label `docs` only, related accepted producer MAC-l7m0, and directly blocks MAC-qlw2/MAC-vx24/MAC-ou97. MAC-qlw2 remains claimed/in_progress; MAC-vx24 and MAC-ou97 remain open/new; no accepted status changed.
+
+Adversarial self-review verdict: MAC-p9wm = clean. Reality: both owned paths are grounded in the exact accepted Git object or this story's PRODUCES. Depth: the complete approved public projection is embedded, including precise APIs, schema, budgets, profiles, cleanup and proof limits. Scope: two docs paths only; adjacent implementation/RED/native/integration work has genuine separate owners. Coverage: positive source preservation and ten semantic negative mutants are enumerated. Hard rules: no hard-tdd, no fake product/native tests, no Paivot product dependency, no fourth architecture review, and no protected-audit disposition.
+
+## nd_contract
+status: new
+
+### evidence
+- Exact immutable inputs, canonical ownership/dependencies, cycle check, scoped lint, scoped RTM, terminology audit, and self-review recorded above.
+- This is publication planning only; no document/source/test/native/runtime/ref/remote/install/preflight mutation or completion claim.
+
+### proof
+- [x] Story is self-contained, ≤8 AC, docs-only, exactly scoped, dependency-correct, and structurally clean.
+- [ ] AC #1-#8 remain pending developer delivery and independent PM acceptance.
 
