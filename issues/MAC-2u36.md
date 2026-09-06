@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:26:16Z
-content_hash: "sha256:e5144ff2ad1f91e2f5efbd41f9bb6feced30350ebf616321b8f8830edb957c7c"
+updated_at: 2026-09-06T00:27:05Z
+content_hash: "sha256:5a6466c827306866ba8a0e3dcfa7333c3a622aa84e1c38cd18b708d65cfd89e8"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -185,6 +185,37 @@ AUTHORITATIVE USER CONSTRAINTS 2026-09-05: Machinery product must be standalone,
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: This story's required current cases are service-free Go/native filesystem/local-process tests and real local CLI paths; no Docker/Java/Node dependency is implicit in ordinary native suites. Preserve actual non-mocked path tests. If implementation introduces any external runtime-backed case, it MUST add a dedicated closed fragment under testdata/integration-lanes via the shared required lane and declare ownership/dependency before delivery; no skip-if-missing, env-gated omission or reliance on later incidental execution. Missing service cannot silently convert required coverage to success.
 RED-DISPUTE ADDENDUM — disappeared_target classification:
 The frozen disappeared_target fixture removes only the regular owned file <temporary HOME>/.codex/agents/machinery-fsm-author.toml after a valid receipt was recorded. It does not substitute a symlink, change a parent path/type, or introduce unrelated ownership. The current bootstrap run rejects and preserves pre-run state (PASS, 18.65s), but no ordinary-update control for this exact missing-file input was run. Its acceptance assertion therefore needs the same AC1/AC2 contract review: supported ordinary forced repair may recreate a missing owned artifact. Do not infer unsafe ownership from absence alone. The passing negative demonstrates current bootstrap behavior, not proof that this is the intended permanent contract. Root requested no additional expensive CLI runs before Sr PM clarification.
+SR PM VERIFICATION-CONTRACT REPAIR — scope canonicalized; independent PM TEST-EDIT AUTHORIZATION pending.
+Same existing MAC-2u36/P0 under MAC-ui8a, no new product bug or prerequisite. Canonical readback verified exact scoped repair and all seven AC byte-for-byte; all previous notes/history/comments and claim/status/labels/dependencies preserved. GREEN0ad71eb retained, approved RED496963f retained; no source/tests/docs/worktree edits or state transition.
+Required independent PM decision is the exact joint test scope: three named update_test.go legacy fixtures with local update_receipt_fixture_test.go real placements/downloaded native source/actual authenticated helper; bootstrapFinalizationCase only writable-descriptor matching and one real writer fault, plus two platform-separated writer query/control test files. No global helper rewrite. First/third remain component command observers, second execution-wiring fixture; frozen actual released CLI matrix still owns end-to-end AC5. opts.run must not gain/spoof parent authority or reenter Install under parent lock.
+Descriptor proposal verified in local pinned x/sys/unix v0.47.0 source: FcntlInt(fd uintptr, cmd,arg int)(int,error), F_GETFL and O_ACCMODE for Darwin/Linux; query via SyscallConn.Control. Count every real writable receipt close, exclude read-only closes, real first-writer double-close error only once; retain every child sequencing/complete payload/final inventory/rollback/foreign-change/lock assertion. Complementary unsupported test-platform file returns explicit error, not passing/skip. New helper/control runtime proof remains pending PM authorization and RED author.
+Corrected legacy/descriptor controls must pass both unchanged-production496963f and candidate0ad71eb; corrected parent cases must retain intended missing-finalization RED on unchanged production and then execute one actual writer fault/full rollback on candidate. A GREEN-only run is not re-RED evidence. No fabricated receipt/digest, durability bypass, source changes to stop reader closes, retry or timeout relaxation.
+Verified raw SHA256s: legacy-runner-focused.jsonl da0548ffac4b9cce7dd51a7ac9d75958c88484662b97f4e26c793c78a3129cf9 (3 failures,5.684s); parent-standalone-focused.jsonl e05ffbcc615cb5c9dee66e731607da43adf1e70cdec81c7a924c7268a67bcf5d (9leaves5PASS4FAIL0SKIP269.131s/all13runterminal). The newly reached path-only matcher observes7closes in no-fault and injects3times in fault, including real read handles; full clean fault rollback not proven, no new production rollback defect claimed.
+Budget revised to9files/~1850combined LOC: measured1322test+95source=1417, plus190–280legacy fixture amendments and~75–120writer/platform controls =>1682–1817projected; actual reporting required. Four parent focus160.19s measured (~180forecast); legacy repaired10–25s forecast per run. Preserve existing90s operation/7mfocus/15mbroad bounds. Full preflight remains epic-final.
+Five scanner returns source-attributed to unchanged empty-stderr/unavailable-stat fallback branches; no suppressions or final acceptance claim. Parent/PM disposition remains independent.
+Initial instruction/context/source checks only, not scripts/preflight.sh. Graph source discovery and exact candidate/base diff used; graph generation2026-09-05T23:58:53Z best-effort metadata_match for existing installer paths; new bootstrap file absent from main index was read directly at retained story checkpoint. An earlier guessed log filename was a reported lookup error, parent authorized exact supplied path continuation; not a product finding.
+
+Prior canonical budget preserved verbatim:
+## DIFF BUDGET
+Expected 4-6 files, approximately1700 combined changed LOC: roughly1350 tests and350 production across the same three owned source files. Measured98d3b57 bootstrap suite is1111 lines, already above the earlier1050 test forecast; bounded AC2 private-fixture/precise-diagnostic repair and schema2 cases are estimated at another150-200 changed test lines, retaining the prior350 production allowance and modest rounding headroom. This supersedes the under1400 forecast transparently, not an automatic acceptance cap or permission to compress away proof. Keep shared write unchanged and reuse the existing real CLI permission negative; no duplicate costly CLI fixtures for loader cases. Report actual per-file additions/deletions, helper reuse and elapsed focused/full replay costs; independent PM investigates material overrun or any new file/scope before authorization. Preserve required safety tests, individual operation bounds and the15m package command. Earlier budget measurements and authorizations remain historical.
+
+
+## nd_contract
+status: in_progress
+
+### evidence
+- Guarded supported single-executable EDITOR canonical edit plus full shared readback preserved seven AC, prior history and live metadata.
+- Exact same-story verification repair ready for independent PM test-edit and separate RED rework authorization; GREEN production retained undelivered.
+- No authorizations, delivery/approval/rejection/status/claim changes or source/test/installed-asset mutations performed by triage.
+
+### proof
+- [ ] AC #1-3: retained frozen proof and complete updated regression replay pending
+- [ ] AC #4: corrected uncontaminated late-writer-fault rollback and complete regression pending
+- [ ] AC #5: retained actual released-CLI integration; component fixtures are not substitutes
+- [ ] AC #6: scoped descriptor-specific oracle repair and real fault/normal control pending independent PM authorization
+- [ ] AC #7: retained standalone actual5PASS checkpoint; final full acceptance pending
+
+
 ## MAC-2u36 GREEN checkpoint — intentional verification-review hold
 
 Implementation committed 0ad71eb on retained story/MAC-2u36 at /Users/ramirosalas/workspace/machinery/.claude/worktrees/dev-MAC-2u36. Only update.go, receipt.go, install.go changed (+74/-21,95 changed production LOC). Bootstrap uses full recorded/discovered plan when receipt exists; authenticated delegated tx children defer receipt writes; parent merges completed selections into prior ownership and publishes complete normalized real inventory before commit; standalone conflicting home groups reject with actionable paths and validated receipts remain required. No frozen tests, journal/lock/target/CLI implementation, public bypass or installed assets changed.
