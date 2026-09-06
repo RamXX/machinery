@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T01:17:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T03:46:40Z
-content_hash: "sha256:19a1a754123bf115efa8421b338eb1b1337f1261e7221a82d5e52fa02b7f3bd4"
+content_hash: "sha256:bc2df5383b493916436267c73f625af1317859e0798f0319e118d72fad689038"
 blocks: [MAC-ou97]
 assignee: dev-MAC-yig6
 follows: [MAC-2u36]
@@ -102,6 +102,23 @@ status: new
 
 
 ## Notes
+# MAC-yig6 exact GREEN helper amendment proposal — not applied
+
+Frozen RED: c59c89de31c7f1268a220caf0fa0d67a8e166d0f. Independent PM authorization is required before any existing helper edit. The RED file remains byte-for-byte frozen.
+
+Proposed existing-file scope: cmd/machinery/verify_checkers_test.go only.
+
+1. In writeRegistryFile, checkerFixtureEngineArgs, and checkerProcessFixtureCommand, replace only the initial os.Executable/error block with `executable := checkerFixtureExecutable(t)`. Retain every argument, marker, mode, JSON encoding, registry augmentation, assertion, exit and error behavior after those initial blocks.
+2. Add the `sync` standard-library import and directly associated private support: a sync.Once-protected cached helper executable path/build error and `checkerFixtureExecutable(t *testing.T) string` beside the existing fixture helpers.
+3. The private helper returns os.Executable normally when testing.CoverMode() is empty. Under coverage it uses the real Go compiler to build this same package's test executable with `go test -c -cover=false -coverpkg= -o <owned-private-directory>/checker-fixture.test .`. Resolve package source directory from runtime.Caller. Use a directory beneath the existing cmdTestControlRoot so unchanged TestMain owns cleanup after all tests; do not cache a path under the first test's t.TempDir. Compile synchronously with a 60-second context derived from the calling test, capture real stdout/stderr, and fail the requesting test on compiler failure or deadline. Never return an installed binary, fall back to contaminated self-execution, or ignore build failure. The cache avoids repeated compilation in a covered package run.
+4. Do not change TestCheckerProcessFixture or runCheckerOCIEngineFixture: the uninstrumented helper executes their existing source and all existing modes. Do not change TestMain, golden helpers, production, deterministic environment, parser, workflows, coverage settings, or RED assertions.
+
+Coverage boundary: only the protocol fixture executable is intentionally uninstrumented. The requesting test binary and production functions it directly calls remain actually instrumented, and requested package coverage is still emitted and validated. Ordinary goldenBin already builds an ordinary CLI; this proposal neither changes that existing infrastructure nor claims helper-executable coverage. The compiled helper remains a protocol fixture, with no Docker claim.
+
+Forecast: approximately 50–70 additions and 12 deletions in the existing test support file, total story approximately 310–330 changed LOC. GREEN must measure actual cost and pass the frozen RED plus unchanged checker-focused controls in native Darwin and native Linux execution. Cross-compilation alone does not meet Linux proof.
+
+This is a reviewable proposed implementation boundary, not authorization or an implementation commit. If PM requires exact textual patch approval rather than the specified statements/behavior, the GREEN agent must prepare that patch for independent review before applying it.
+
 # MAC-yig6 frozen RED evidence
 
 Revision c59c89de31c7f1268a220caf0fa0d67a8e166d0f, story/MAC-yig6, base 70652b948bf090008b1965c85daf36ea374daea4. One new file, 246 additions/0 deletions. Frozen file cmd/machinery/checker_fixture_coverage_test.go SHA256 80b590315a79f4faa3c9741eb1347e6070d3b01046338c76ce6e7000d6e92677. No existing test/helper/production changes.
