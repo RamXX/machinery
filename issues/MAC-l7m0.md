@@ -7,8 +7,8 @@ type: task
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T10:17:35Z
-content_hash: "sha256:9503d0c82228204f8eaae79cbcd222fd906cffd2b3a4c2414c713df2d9af8668"
+updated_at: 2026-09-06T10:18:01Z
+content_hash: "sha256:a2552a5d107f63a4ae61b5ad57f95b40c30ecd1f734c24331ef5fbc160f04e39"
 blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36]
 assignee: dev-MAC-l7m0
@@ -80,7 +80,37 @@ Observable outcome: the maintainer can review a closed standalone contract that 
 ## Notes
 BLOCKED — USER CHOICE / ARCHITECTURE REVIEW. Do not dispatch a generic developer. Pending user decisions: supported initial native runner languages and trusted-host versus adversarial-code execution boundary. Independent architect owns exact contract. Only after answers plus reviewed contract may Sr PM repair implementation interfaces and release this blocker.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: Architecture is read-only contract work, not an executable runtime suite. Its accepted contract must explicitly identify any native adapter runtimes consumed by implementation; MAC-vx24 must register/provision those using the required closed integration lane. No execution assurance may be claimed from schema or architectural review alone.
+## Implementation Evidence
 
+### CI/Test Results
+- Commands run:
+  - `wc -l -c docs/test-assurance-contract.md`
+  - `shasum -a 256 docs/test-assurance-contract.md`
+  - `stat -f %Lp docs/test-assurance-contract.md`
+  - `rg` standalone/private-reference and required-contract-key negative/positive checks
+  - `git diff --check`
+  - `pvg verify docs/test-assurance-contract.md --format text`
+- Summary: document projection PASS (575 lines, 109367 bytes, SHA256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8); mode PASS (0644); private-reference/key/diff checks PASS; no executable tests applicable to documentation-only scope.
+- Coverage: N/A — no production/runtime/test code changed.
+
+### Commit
+- Branch: story/MAC-l7m0
+- SHA: 0feaebf725267f9d0045d653ef57a90af0c9d946
+
+## nd_contract
+status: delivered
+
+### evidence
+- Documentation validation commands completed; all bounded checks passed.
+- Commit 0feaebf725267f9d0045d653ef57a90af0c9d946.
+
+### proof
+- [x] A1: Exact public projection landed.
+- [x] A2: Normative contract preserved.
+- [x] A3: Standalone public boundary checked.
+- [x] A4: No implementation/native-proof claim made.
+- [x] A5: Targeted validation completed.
+- [x] A6: Ready for independent PM acceptance.
 
 ## nd_contract
 status: delivered
