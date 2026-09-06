@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
 updated_at: 2026-09-06T09:22:34Z
-content_hash: "sha256:07f9ce56105313f1c653055271f675432c7b7234954ac2475f2331a73e6ddf02"
+content_hash: "sha256:78d3a80fb1b0c3378883ec7daf3e02d1a8e186116374e42f603100b89a993d27"
 blocked_by: [MAC-qlw2]
 blocks: [MAC-p9z1, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-vx24, MAC-ou97]
 ---
@@ -148,3 +148,22 @@ status: new
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
 - [ ] AC #7: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:22:34Z ramirosalas
+SCHEMA MARKER INSERTION AUDIT 2026-09-06
+Root-authorized supported nd edit inserted ONLY 1 valid indented schema signature line(s) into the newly authored canonical CONSUMES block. Every original byte/contract/status/evidence/history was preserved; no deletion/replacement. This repairs the mechanical label substitution, not the contract values.
+Before raw Body SHA256: b61715f8ebcbee272556e72c66382a2bfbc15531e5c564c6d23fe774fd02a0ef
+After insertion-only raw Body SHA256 (before this audit comment): 07f9ce56105313f1c653055271f675432c7b7234954ac2475f2331a73e6ddf02
+Exact inserted lines (zero-based original Body line positions shown):
+- after Body line 113: "  schema: Sections 2-3 exact closed plan/milestone JSON, qualified obligation/test identity, limits, review-digest projection; section 7 Go signatures."
+Read-back pvg nd show Body exactly equals prior Body plus these insertions. Editor required expected hash, count, exact target and 13-entry total; installed pvg source revision c0957106a81346033d7b1d82fde5f434a9db6bab confirms scanner checks every historical entry.
+
+## nd_contract
+status: new
+
+### evidence
+- Signature syntax corrected via supported guarded editor; exact before/after evidence above.
+- No implementation/native proof; independent Anchor and canonical document holds remain.
+
+### proof
+- [ ] All current story ACs remain pending without weakening.
