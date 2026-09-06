@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T01:27:41Z
-content_hash: "sha256:dcac92fcd64d482eb4c5d49b8cac6f7ab9ac93713cbb13fb707dbcfdccac3469"
+updated_at: 2026-09-06T01:32:02Z
+content_hash: "sha256:8e7985997df8fabcaccf5572a8b3b117e845e20dce8f4153d5fe3f514a4c822d"
 blocks: [MAC-vx24, MAC-ou97]
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
@@ -115,6 +115,47 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+## Independent PM golden RED re-freeze — MAC-sh60
+APPROVED [2026-09-05]: exact golden amendment 8f843256d30068816234d008a85239d662e8bb15 is reviewed and re-frozen. The golden-amendment hold on healthy GREEN is released. The dispatcher may integrate ONLY this approved tests-only commit into retained healthy GREEN 3d47b80ce59af1f521539e0b48e67be9ee4e9a71, then resume the already authorized bounded helper compatibility work. This is not story acceptance, production approval or a workflow transition; no approve-red/deliver/accept/reject/claim/release command was invoked.
+
+### Independent review evidence
+- Read complete /tmp/MAC-sh60-golden-red.E4Jh4K/proof.md, exact commit metadata/diff, native golden/control JSON terminal events, full actual CLI stdout/stderr hashes and stdout.diff. Compared with my exact scope/golden authorization at /tmp/MAC-sh60-pm-scope.mXj9lU/scope-golden-authorization.md and current shared canonical status/terminal proof.
+- git rev-parse 8f843256^ is fa842ed374ad5c82d8c8f4f9e0c3aead56c9cfa3. Entire delta is one insertion/one deletion at testdata/golden/check-go-crm/stdout.txt:55. No other file changed; git diff --check passes. Commit subject contains tdd-red and [test-edit-authorized]. Production and the three previously approved frozen tests remain identical to pure RED.
+- Exact appended suffix: `, static discovery; tests not executed; unsupported parser structures remain uncovered`. All preexisting counts, notably `2 formal oracles covered`, other stdout bytes, empty stderr and zero exit expectation remain unchanged.
+- Native author command: go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestGoldenCheck$/^go-crm$'. Raw golden.jsonl confirms exactly one leaf TestGoldenCheck/go-crm FAIL at golden_test.go:246 stdout mismatch; parent TestGoldenCheck/package records are not additional leaves. No skip, stderr/exitcode assertion, setup/import/compile/path/timeout failure. Package terminal 2.083s; intended leaf 1.30s.
+- Native author positive command: go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestCheckGreenSummaryLines$'. Raw control.jsonl confirms one PASS, zero fail/skip, test 0.65s.
+- The separately built actual native CLI command in proof.md exits 0. Full actual-stdout.txt SHA256 independently equals the original RED golden: 2abeaf18bcc08300ffcf6083f0715c4790e12d26e017f59df0c71d8c89f0e12f. Actual-stderr.txt SHA256 is the empty-file hash e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855. Full stdout.diff independently contains only the precise suffix-only line difference, resolving the golden harness's clipped diagnostic. All prior counts and platform-green output therefore remain intact.
+- New frozen stdout.txt SHA256 independently matches d14ccc0e945d7bd21bbb681894682aa64240a8eb9c995a815f3bf4068b77b184. Unchanged exitcode.txt SHA256 remains 9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa; unchanged stderr.txt remains empty.
+- Proof is complete, consistent and attributable to this exact candidate. Per pm_acceptor evidence rules, no redundant native rerun was needed. The author's pvg verify result scanned zero text-golden files and is not treated as behavioral evidence; exact diff/hashes plus real native assertions provide the proof.
+- Read-only status checks show the author's detached proof checkout remains clean and healthy GREEN remains clean at 3d47b80ce59af1f521539e0b48e67be9ee4e9a71. Neither was edited or removed by PM. All source/test/fixture bytes remain untouched by this review.
+
+### Re-freeze and continuation boundary
+The original RED author's exact one-line authorization is fulfilled and exhausted; it grants no continuing test-edit permission. The golden file is now frozen at the hash above alongside the original three frozen tests:
+- internal/gates/oraclecov_negative_test.go: 42f1237819cfecc4a265fd5dfa4a90050d8f0f77f9aa0baf27b42995d8834e45
+- internal/gates/oraclecov_test.go: dd68d778605397184630447bc09b712072fe604be77c496177d121690414b994
+- cmd/machinery/oraclecov_negative_test.go: 6ea06399d8271691f7f40f30f067e0d3270184eaca4fc2548cc7a562c7775d08
+
+Root owns integration; GREEN may not edit any of these frozen bytes. Any future fixture repair requires a separately named authorization and genuine tests-only RED proof. This later amendment is explicitly subsequent to the healthy GREEN checkpoint; it is not claimed as original pre-GREEN evidence.
+
+The previously approved <=1000 cumulative changed LOC / six named paths and same-file helper/Scanner/typed-row/t.Run boundaries remain authoritative. Implement connected target-oracle-to-row-to-active-failing-comparison provenance and required negative controls, preserve existing example semantics and formal counts, then run native example/targeted/full-cmd verification exactly as scoped. New helper tests in the GREEN supplemental file remain supplemental, not historical RED.
+
+The finite full native cmd timeout allowance remains 10m without coverage instrumentation; timeout or skipped tests cannot count as completed assurance. Prior raw-log correction stands: TestInstallCommand passed; TestInstallAndDoctorTargetAll, TestInstallScript and TestInstallScriptHostTargets were active at the broad 180s timeout. Separate MAC-yig6 owns the proved coverage-instrumented fixture protocol defect; no claim attributes all 23 broad failures to it. No full preflight, external runtime lane, installed asset/binary changes, remote action, main/epic mutation or unrelated installer/OCI fix is authorized by this re-freeze.
+
+## nd_contract
+status: in_progress
+phase: green-ready-after-golden-refreeze
+
+### evidence
+- Golden RED amendment 8f843256d30068816234d008a85239d662e8bb15 independently reviewed and frozen; exact native one-leaf disclosure FAIL and one positive PASS, zero skips, full CLI suffix-only difference proven.
+- Healthy GREEN hold released for dispatcher-owned integration of only this approved tests commit and already-scoped helper implementation; current labels/status/claim unchanged.
+
+### proof
+- [x] AC4 golden amendment reviewed/re-frozen; complete prior counts, zero exit and empty stderr retained.
+- [x] Original three frozen tests and pure RED production unchanged by amendment.
+- [ ] Dispatcher integration and AC2 bounded helper compatibility/negative tests pending.
+- [ ] Native examples, required targeted checks and complete full-cmd correctness verification pending.
+- [ ] Five-AC GREEN delivery and independent acceptance pending; no production completion claimed.
+
 ## MAC-sh60 golden RED amendment proof
 
 This amendment was authorized AFTER the healthy GREEN checkpoint 3d47b80ce59af1f521539e0b48e67be9ee4e9a71. It is an honest later tests-only amendment, not evidence claimed to predate GREEN implementation. The independent scope/golden authorization in /tmp/MAC-sh60-pm-scope.mXj9lU/scope-golden-authorization.md was read completely. No GREEN checkout/source/branch was modified.
