@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:01:52Z
 created_by: ramirosalas
 updated_at: 2026-09-06T09:22:38Z
-content_hash: "sha256:2b1f60dfe2abab6cd592b10022657b40d404fff3417bf75a4d174abb1dea0b62"
+content_hash: "sha256:4d3a1221d7d221b36b6ef617aff40bac813568b91f6e9f6ba8c01f8aee56d952"
 blocked_by: [MAC-bz1y, MAC-6h0s]
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 ---
@@ -148,3 +148,22 @@ status: new
 - [ ] AC #5: current story acceptance requirement remains pending.
 - [ ] AC #6: current story acceptance requirement remains pending.
 - [ ] AC #7: current story acceptance requirement remains pending.
+
+### 2026-09-06T09:22:38Z ramirosalas
+SCHEMA MARKER INSERTION AUDIT 2026-09-06
+Root-authorized supported nd edit inserted ONLY 1 valid indented schema signature line(s) into the newly authored canonical CONSUMES block. Every original byte/contract/status/evidence/history was preserved; no deletion/replacement. This repairs the mechanical label substitution, not the contract values.
+Before raw Body SHA256: 36a9055aadcb5dd2bbc40fe2e7bba4302d73bddb105d57cbeebd20ebf4a2471f
+After insertion-only raw Body SHA256 (before this audit comment): 2b1f60dfe2abab6cd592b10022657b40d404fff3417bf75a4d174abb1dea0b62
+Exact inserted lines (zero-based original Body line positions shown):
+- after Body line 111: "  schema: closed required fragment union with exact CPython 3.14.7 native closure and Linux amd64/Darwin arm64 execution accounting."
+Read-back pvg nd show Body exactly equals prior Body plus these insertions. Editor required expected hash, count, exact target and 13-entry total; installed pvg source revision c0957106a81346033d7b1d82fde5f434a9db6bab confirms scanner checks every historical entry.
+
+## nd_contract
+status: new
+
+### evidence
+- Signature syntax corrected via supported guarded editor; exact before/after evidence above.
+- No implementation/native proof; independent Anchor and canonical document holds remain.
+
+### proof
+- [ ] All current story ACs remain pending without weakening.
