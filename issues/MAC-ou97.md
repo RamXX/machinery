@@ -8,8 +8,8 @@ labels: [capstone]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:14Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:15:16Z
-content_hash: "sha256:72c7746412e413506afa5755c785825a98b0da5961fee99366f31bf228147994"
+updated_at: 2026-09-06T09:48:05Z
+content_hash: "sha256:a946be6cc705da9843c8060965ce9a6708114d29c6930ea15b639d5bdd713274"
 blocked_by: [MAC-hlae, MAC-sh60, MAC-yhg5, MAC-hwdb, MAC-2n83, MAC-hy71, MAC-gcrr, MAC-l7m0, MAC-vx24, MAC-lnu6, MAC-hpqp, MAC-yig6, MAC-lhu5, MAC-hgz1, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
 was_blocked_by: [MAC-olrx, MAC-p8ce, MAC-a89e, MAC-2u36, MAC-p7jd, MAC-uzxr]
 ---
@@ -216,3 +216,27 @@ status: new
 - [ ] A9-A12: complete four-language/two-platform real E2E and adversarial/custody/deadline proof.
 - [ ] A13-A14: final full preflight and isolated local candidate closure after independent acceptance.
 
+
+### 2026-09-06T09:48:05Z ramirosalas
+ROUND-1 RULES 1/2 FINAL CONSUMER CLOSURE
+Every original and expanded final capstone AC remains required; tests-only ownership/status/label and dependency DAG unchanged.
+CONSUMES:
+- MAC-5ft8: examples/go-crm/design/attestations.yaml
+  schema: substantive independent post-strict-test current judgment and exact generated full-root-v1 evidence, with authored controls finalized first and real stale-before/current-after controls.
+- MAC-al5u: scripts/shellcheck-files.txt
+  source: both new scripts included in the preserved byte-exact sorted unique corpus.
+- MAC-vx24: cmd/machinery/repository_contract_test.go
+  source: actual existing contract regression path; historical root-path typo is not an output.
+Final user-perspective proof must exercise TLC AND Alloy actual scoped paths, embedded executable assets for each native adapter, complete script inventory, and current CRM judgment after all added tests/controls. An older accepted subject, hash-only refresh, new exclusion, missing legacy regression, unreviewed fixture/golden amendment or design-only downgrade cannot satisfy complete. No implementation/source/judgment refresh authority is added to this tests-only capstone.
+
+## nd_contract
+status: new
+
+### evidence
+- Independent round1 findings repaired through supported append-only scope/consumer notes; no architecture/source/test/ref/runtime mutation.
+- Exact source surfaces verified against accepted epic7e36f3e7ddcf25565d5d4fe60b328df254eee91d; prior Body/status/labels/history preserved.
+- Independent Anchor ROUND2 and canonical-document acceptance remain prerequisites, not implementation evidence.
+
+### proof
+- [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
+- [ ] Independent review/native execution/final acceptance pending.
