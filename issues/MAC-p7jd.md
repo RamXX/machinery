@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T05:46:06Z
-content_hash: "sha256:f0a5857414b45d071119aa5474792756b9f3da010ff686450e50c364149ce1cc"
+updated_at: 2026-09-06T05:50:12Z
+content_hash: "sha256:fa7c49801edb592257fdb138e6f3cb7ffa0a775989e1f22dda5dea5170b9901c"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e]
@@ -941,6 +941,138 @@ Observed evidence and limits:
 - Measured production6files1125add/43del =1168 changed lines; combined11files2609add/46del =2655. Remaining tests/docs and actual final cost still owed; the canonical forecast is not completion proof.
 - Main497419ab4512fcff765cd5feb27aed4c67b5608d clean and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged. PM inspected committed refs and proof files only, not developer worktree internals. No source/test/docs, installed binary/assets, remote, services, Docker or preflight changes; private pvg tracker writes only. Machinery standalone constraint unchanged.
 SR PM LEGACY FIXTURE OWNERSHIP / PROPOSAL-PREPARATION HOLD. Read complete PAUSED-BLAST-DISPUTE.md SHA256d2837c4fbd4205ba151b856e96a7747d3cc32b58b1a69b4c49fe1d6fedb6bc1f and terminal report.229scoped+45race PASS belong to4b246ba; paused51454e069ebe4039f02d6d9108acf9354c7ad6c8 is docs-only later and still owes finalsameSHA proof. Four old-fixture leaves remain held: hook_test.go TestStopGreenDesignClearsStateSilently and obligation_ownership_test.go TestObligationParentRealCLI obligation-free/Policy/Isolation default-gate legs. Legacy v1 gt correctly fails GV_MISSING_IMPLEMENTATION_SUBJECT; silence/ledger, default-vs-explicit Gt, real controls/negatives, Ga ancestry/selection and no-grandfathering are fixed. hgz1 now owns all8bundled evidence migrations AFTER p7/uzxr/lhu5; no p7 reverse dependency or bundled writes to unblock this story. Root may resume the healthy retained GREEN author for an UNAPPLIED EXTERNAL exact test-local fixture proposal against51454e0 limited to those2existingtest paths, with full old/new hunks, original-assertion byte equality, helper callers, real input/evidence inventory, warning/silence semantics and per-file cost. This is proposal preparation only, not oldtest editing or TEST-EDIT AUTHORIZED. Separate independent PM must approve exacttext before any subsequent sanctioned amendment. Verified existing APIs: gates.AttestationReview{Claim,Kind,Attestor,Date,Note string}; RenderAttestation(design,impl string,review AttestationReview)([]byte,error); CheckAttestationsWithImplementation(design,impl string)*Gate. No missing core schema/API identified. Exact valid fixture construction remains unresolved: plan warnings cannot be assumed silent; real/synthetic impl hashes do not establish substantive current conformance, especially before uzxr repair. If no fixture preserves all constraints, report exact technical conflict for independent specialist review; do not weaken assertions, invent review or change product semantics. Existing filesystem skip remains uncredited. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
+## PM EXACT LEGACY-FIXTURE AMENDMENT ADJUDICATION — 2026-09-06 — 51454e0
+
+TEST-EDIT AUTHORIZED: only the exact unapplied 65-addition/0-deletion patch below, SHA256 ae6e9241ea5d7b0c4556b2ee02c6e2910b2663c2452761e7984f1c6663252971, against committed 51454e069ebe4039f02d6d9108acf9354c7ad6c8. This is bounded GREEN-phase fixture-dispute adjudication, NOT delivery, final acceptance, rejection, RED reapproval, a status transition, or permission for other edits. Root must verify this durable disposition before resuming application. The earlier effective-application hold for unowned future incompatibility is resolved by the independently read-back SrPM canonical scope below; no implementation prerequisite or reverse dependency is invented.
+
+WHY THESE EXACT REPAIRS:
+Approved R2 (SHA256 8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179) and AC5 clarification (SHA256 5fc3193106a803b7760020b646ed4db7b3d417f5e196b2266d10cf8227733937) remain unchanged, as do all five AC. Legacy v1 implementation claims MUST receive GV_MISSING_IMPLEMENTATION_SUBJECT. The original four broader failures are truthful old-fixture incompatibility, not a reason for production grandfathering: silent Stop's ledger assertion and obligation-free parent's explicit Gt control were initially unreached; the Policy/Isolation default positives failed solely on Gv while explicit positives and later negatives executed. Preserve all original logs at /tmp/machinery-p7jd-green-proof.eHzGMx, including PAUSED-BLAST-DISPUTE.md SHA256 d2837c4fbd4205ba151b856e96a7747d3cc32b58b1a69b4c49fe1d6fedb6bc1f and PAUSED-BLAST-TERMINAL.md. Earlier 2e897a4 date/empty-selection repairs and their setup history are separate authority, not permission inferred here.
+
+EXACT FILE/BYTE BOUNDARIES:
+1. internal/hook/hook_test.go, only the 36 added lines inside existing copyTree after unchanged copyDesignTree: before SHA256 ab6986f14b95c942f4f627579b6f5ac0e34b475e4addcc64e293d9a66c292a92; after SHA256 2b185970a3f69a140338cee97e14db0da82ef0aaf01250364357b104c1458b33. The original helper lines and all bytes outside this helper remain identical (outside-helper SHA256 af77e952bcaaf42801810c3e2c3be7a2b4a6a0970752118fac4b0eff666e64fc).
+2. internal/gates/obligation_ownership_test.go, only the 29 added lines inside obligationParentFixture after unchanged CheckPack and before return: before SHA256 326e63f9bb4bbe12ecb5979cd3ad13fa6d83bbdd3924e835d96b929809d66e97; after SHA256 cc5f5e12a0d41a6eeda60895fece31713c5f068817bb2d3f08b7f1c6ff4d4b04. Original helper lines and outside bytes remain identical (outside-helper SHA256 6a3b9fe71dcb40c85c8c1ba4bd47a6ca6ef6ca3bdff161105552d87804cbf145).
+No imports, assertions, skips, sibling tests, generic helper factoring, selectors, production/Ga/CLI policy, source examples, generated artifacts, acceptance records or other shared files may change under this authority. All seven frozen attestation test hashes remain unchanged; PM independently matched them to final-test-sha256.txt in its archive. New external observer/audit files are diagnostic-only and must NOT enter the story.
+
+SUBSTANTIVE EVIDENCE HONESTY:
+The helpers copy all original inputs first. Their exact count-one v1/header/claim/note guards fail closed on an unexpected source. Go CRM's copied evidence becomes 12 design/prospective-plan rows plus one ga.review-quality historical row; parent becomes eight plan rows. No current row or implementation subject is invented. The Go CRM gt note explicitly disclaims current implementation review and test execution; parent gt's existing prospective delegated-conformance note remains unchanged. Retained old dates/attestors/notes are copied fixture provenance, not a new review or refreshed endorsement. Explicit kind/note construction is justified for these temporary test meanings only; it does not validate the source example's old conformance claim or authenticate reviewer honesty. No cover hash/membership, date, attestor, acceptance anchor, source input or unrelated note is renewed. Ga's historical covers remain fully valid against the same six exact acceptance files.
+Both helpers now require no Gv errors/drift, exactly one gt.conformance-test-shape plan-only/current-missing warning, and zero current-review count; Go CRM also requires historical count one. These checks strengthen fixture setup while preserving all original semantics. Ordinary default CLI nonblocking-warning success/platform-green and silent Stop are not current implementation approval or --complete success. Existing CLI warning promotion remains unchanged. Go CRM implementation is NOT copied or executed; MAC-uzxr's conformance defect is not hidden by manufactured current credit. Parent runtime tests still execute real Go tests for intended decision-ID coverage, not a substantive FSM review.
+
+FULL CALLER BOUNDARY:
+copyTree currently has six callers, each with crmDesign: TestStopGreenDesignClearsStateSilently; TestPreEditObligationSurvivesLostPostAndReplacementSession; TestWaveDeferralSurvivesCrashAndOutOfBandClose; TestStopDriftBlocks; TestStopWarnsWhenStagedImplGatesLackImpl; TestReapedStopStillGatesTheTree. The seven parent leaves are TestObligationParentSelectionRetainsRelationalCoverage/{Policy.oracle.md,Isolation.oracle.md}; TestObligationParentRealCLI/{obligation-free-parent-control,Policy.oracle.md,Isolation.oracle.md}; and unchanged GREEN consumer TestObligationParentDeletedRelationalOracleRemainsRequired/{gp,gn}. The latter existing green test file stays read-only. Review/replay must cover all 13 leaves, not just four old failing ones. The generic-looking name copyTree creates a real future coupling, addressed explicitly below; it is not broad authorization for additional fixture shapes.
+
+INDEPENDENT PM PROOF:
+Graph-first Verify review used ready main project Users-ramirosalas-workspace-machinery; previously observed generation 2026-09-06T02:42:16Z, main coverage missing both obligation story paths. Exact git-object source/caller search and complete input enumeration supplied missing/stale story coverage; graph absence was not treated as exhaustive proof.
+PM exported exact git archive 51454e069ebe4039f02d6d9108acf9354c7ad6c8 into unique external /tmp/machinery-p7jd-pm-fixture.Mm3FM4; applied the reviewed patch ONLY there with apply_patch. No retained developer-worktree internals were inspected or written.
+Commands from that archive:
+- go test -count=1 -timeout=5m -json ./internal/hook -run 'TestStopGreenDesignClearsStateSilently|TestPreEditObligationSurvivesLostPostAndReplacementSession|TestWaveDeferralSurvivesCrashAndOutOfBandClose|TestStopDriftBlocks|TestStopWarnsWhenStagedImplGatesLackImpl|TestReapedStopStillGatesTheTree' -> 6 native leaves PASS, 0 FAIL/SKIP, 4.611s; pm-hook.jsonl SHA256 05ab2fce54a6b1c56fb480929d1a4bbfe631ba394d38f8486a027310b9d8e4c3.
+- go test -count=1 -timeout=5m -json ./internal/gates -run TestObligationParent -> 7 native leaves PASS (10 test/pass events including parents), 0 FAIL/SKIP, 9.228s; pm-parent.jsonl SHA256 399b0c04b43d3f4901cbcf45b7473c65456df0e5c456d22d48493184d397cdaf.
+- go build -o /tmp/machinery-p7jd-pm-fixture.Mm3FM4/machinery-diagnostic ./cmd/machinery -> exit0; isolated binary SHA256 953bcb3656ce2fae546bc129cea7e019bca70096b3ee9a2c309e535f24d15281.
+- Separate external-only observer tests copied the fully inspected proposal observers with ONLY the output/binary-directory constant changed to this PM archive. go test -count=1 -timeout=5m -json ./internal/hook -run '^TestFixtureProposalHookInventory$' -> 1 PASS,0 FAIL/SKIP,0.962s; pm-observer-hook.jsonl SHA256 dfc4b26db854c95e932578ee739e4593d5530673f5a4987c38d8dbcbd1e7dc1b. Same command ./internal/gates -run '^TestFixtureProposalParentInventory$' -> 3 leaves PASS,0 FAIL/SKIP,3.850s; pm-observer-parent.jsonl SHA256 9cc39b942fe05ea35671665b2f4004b4b38e757d7a5390a3294d7ae9ce2a30f1. All four native stderr files empty.
+Actual raw Gv reports current0, GoCRM historical1/parent historical0, and the exact sole warning. Actual Stop stdout is empty and both ledger flags false. All default/explicit parent controls exit0; missing Policy AUTHZ-21866c and Isolation TENANT-97e9c6 both exit1 with real Gt/oracle/ID diagnostics and no platform-green. Positive parent fixture Go execution also remains in the unchanged native tests.
+- node /tmp/machinery-p7jd-pm-fixture.Mm3FM4/pm-audit.cjs -> exit0; independent report pm-audit.json SHA256 43773cab089ffd3ec3cc48411c32c5b39c0a3f277632f6e09e377555f2c091f0; script SHA256 c4ede818c39c558185ccc3528d31b758ef825db5a52c85c901069c13245c2db6. The first diagnostic audit used an incorrect expected path parent/impl/orders/coverage_test.go; actual unchanged helper writes parent/impl/coverage_test.go. That PM audit-only path typo was corrected and rerun, not a product/test failure.
+The six independently generated input inventories reproduce the proposal inventories exactly. GoCRM68 entries/62 regular files, no implementation, no added/missing files; only attestations.yaml differs. Parent none93 entries/73 files, four original local module/code additions; Policy/Isolation96 entries/75 files, six original module/code/oracle/test additions. No baseline input is missing; only parent/design/attestations.yaml differs from copied baseline. Control-to-missing-ID input delta is solely parent/impl/coverage_test.go.
+Reverse ONLY v2 header/kind insertions and the exact GoCRM gt note substitution and both generated attestation documents match the original git bytes completely. GoCRM YAML before503ede9141ba48ca7a1309a9054ec6e322357e8adcf260f67847c812f23ee90a/after0f75b667ce7107b39dabbbff138c496336a33839cb2e9877b97e5c8732aa3bf4; parent beforec30843d1fed9bab3691cb311acecfd452e8808f36fa8756aac0e1dfc90aa14e8/after5eaada36a4b494ef6ac414935504d52be8d93c3f82db42761941229cc8352c51.
+All six Ga acceptance files are byte-identical to exact514 git: M0=1cce160669cd04f77bff60f1ae74e6760bdf358c08adeeddd6f03260ecc01339; M1=b0d518e198e5197de8e4ed132b3e58431a353a591670af867bc9590af6b11f63; M2=f4490e4d8d34a565985f98138a81b165e861bb75e02e2f4852cc868f030bdd2a; M3=11f6d1ee99d95e51f09d14457604f0b1c56ec91484d05ae6c72e5e7d649147df; M4=66593a6aca928f948dd22b9f46b249adadf8155dfa457984d31c07f03039704d; M5=64c90b5ccbe557ae0c04ed1cb619f5bc2c44e7258bb4a4c358107fbd1bf481c9.
+
+SCOPE / KNOWN FUTURE INCOMPATIBILITY DECISION:
+Independent source verification agrees with SrPM FINAL.md SHA256 4282fb85ed5ad07ebf1537cc7bdc455a5401459783a3aea86f802a349c709407: hgz1 will migrate BOTH copied sources to v2 and GoCRM gt to a substantively reviewed current record, invalidating these v1 guards. Narrow fail-closed guards are acceptable NOW only because the missing future ownership was explicitly repaired before this authorization. Independently read back p7 PRODUCES exactly16 conditional/current paths with measured conditional3462changedLOC and hgz1 exactly41possible paths, including only these same two helper bodies, accepted p7 construction/hash/full13-caller inventory CONSUMES and mandatory new exact BEFORE-EDIT PM authorization at the actual hgz1 baseline. SrPM scope-only terminal contracts remain independently distinguishable. There is no authorization today for a future v2/current downgrade, automatic stripping of an implementation manifest, refreshed attestor/date/hash, new fixture framework, or selected future construction. hgz1 must resolve any provenance/representation conflict explicitly and preserve all13 tests and current0/plan-warning semantics; accepted p7+uzxr+lhu5 precede hgz1, then lnu6. p7 has no reverse dependency or source-example obligation.
+Cost independently verified by git diff --numstat a82277af5650b487cea1260c24ffcc1c86d69d8d 51454e0:14paths3331add66delete=3397changed. Exact patch adds2paths65add0delete ->16paths3396add66delete=3462changed. Bounded increase is direct no-grandfathering fixture compatibility plus mandatory paired proof, not permission to trim proof or expand more files. Updated scope is not final implementation acceptance.
+
+APPLICATION AND NEXT PROOF:
+Author must apply ONLY the exact patch in a separate commit whose subject contains literal [test-edit-authorized], verify the two before/after hashes, preserve all seven frozen hashes and original logs, and record the resulting full source/test hash inventory plus exact commit SHA. No unstated follow-up repairs. If guards unexpectedly fail, source differs, any new semantic failure occurs, or desired hunk differs: pause for a new exact review.
+Mandatory fresh same-revision scoped tests, targeted race proof, all13 caller replays and relevant broader regression commands are owed after repair. Repeat the recorded Attest/Attestation four-package scopes and broader selectors in PAUSED-BLAST-DISPUTE, with raw exact native names, pass/fail/skip/cause counts and bounded runtimes; rerun normal TDD range audit with all marked repairs. Reconcile every skip/failure explicitly. Existing macOS case-fold skip is not waived or passing proof here. Prior229scoped/45race PASS at4b246ba, docs-only51454e0, and this external patched diagnostic are distinct revisions/artifacts: do not combine them as a delivered same-SHA run. No full preflight now. AC5 composed renderer/real CLI/source closure still requires independent final review; injected standalone late CLI remains UNOBSERVED and OS close failures UNFORCED, not silently proven. No acceptance of product behavior, docs, current review, or whole-story completion is issued.
+
+EXACT AUTHORIZED PATCH:
+```diff
+diff --git a/internal/hook/hook_test.go b/internal/hook/hook_test.go
+index faf0172..cb4cf1b 100644
+--- a/internal/hook/hook_test.go
++++ b/internal/hook/hook_test.go
+@@ -167,6 +167,42 @@ func copyTree(t *testing.T, src, dst string) {
+ 	if err := copyDesignTree(src, dst); err != nil {
+ 		t.Fatal(err)
+ 	}
++	// These Stop fixtures review design/ledger behavior, not the CRM runtime.
++	// Preserve cover bytes and historical acceptance anchors; explicitly recast
++	// the legacy implementation claim as unfulfilled test-plan intent.
++	path := filepath.Join(dst, gates.AttestationsFileName)
++	raw, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	text := string(raw)
++	replace := func(old, next string) {
++		if strings.Count(text, old) != 1 {
++			t.Fatalf("fixture migration needs exactly one %q", old)
++		}
++		text = strings.Replace(text, old, next, 1)
++	}
++	replace("attestation_version: 1\n", "attestation_version: 2\n")
++	for _, claim := range []string{
++		"g2.action-ownership", "g2.interface-contract-rightness", "g2.placement-rightness",
++		"g2.adoption-closure-discovery", "g2.event-contract-completeness", "g2.nfr-content",
++		"g3.guard-semantics", "g3.invariant-enforcement", "g3.residual-transitions", "g3.event-redelivery",
++		"gt.conformance-test-shape", "g4.zero-context", "ga.review-quality",
++	} {
++		kind := "plan"
++		if claim == "ga.review-quality" {
++			kind = "historical"
++		}
++		line := "  - claim: " + claim + "\n"
++		replace(line, line+"    kind: "+kind+"\n")
++	}
++	replace("    note: The Go tests key executable table cases on every stable oracle id and assert next state plus ordered actions.\n",
++		"    note: Fixture plan only; conformance tests are intended to cover every committed oracle row and assert next state plus ordered actions. No current implementation review or test execution is claimed.\n")
++	writeFile(t, path, text)
++	g := gates.CheckAttestations(dst)
++	if len(g.Errs) != 0 || len(g.Drift) != 0 || len(g.Warns) != 1 || !strings.Contains(g.Warns[0], "gt.conformance-test-shape: plan only; current implementation review missing") || g.Counts["current implementation reviews"] != 0 || g.Counts["historical review records"] != 1 {
++		t.Fatalf("fixture must retain missing-current warning and historical evidence: %+v", g)
++	}
+ }
+ 
+ // copyDesignTree takes a governed reader snapshot before copying a shared
+diff --git a/internal/gates/obligation_ownership_test.go b/internal/gates/obligation_ownership_test.go
+index f4ca7f7..b5c4eed 100644
+--- a/internal/gates/obligation_ownership_test.go
++++ b/internal/gates/obligation_ownership_test.go
+@@ -350,6 +350,35 @@ func obligationParentFixture(t *testing.T) (string, string) {
+ 		t.Fatalf("complete decomposition fixture invalid: %v", err)
+ 	}
+ 	requireObligationClean(t, CheckPack(design))
++	// The parent manifest delegates runtime conformance to its children. These
++	// local tests prove decision-ID ownership, not substantive FSM conformance.
++	// Keep that claim plan-only, without changing any required design covers.
++	path := filepath.Join(design, AttestationsFileName)
++	raw, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	text := string(raw)
++	replace := func(old, next string) {
++		if strings.Count(text, old) != 1 {
++			t.Fatalf("fixture migration needs exactly one %q", old)
++		}
++		text = strings.Replace(text, old, next, 1)
++	}
++	replace("attestation_version: 1\n", "attestation_version: 2\n")
++	for _, claim := range []string{
++		"g2.action-ownership", "g2.interface-contract-rightness", "g2.placement-rightness",
++		"g2.adoption-closure-discovery", "g2.event-contract-completeness", "g2.nfr-content",
++		"gt.conformance-test-shape", "g4.zero-context",
++	} {
++		line := "  - claim: " + claim + "\n"
++		replace(line, line+"    kind: plan\n")
++	}
++	writeSuiteFile(t, path, text)
++	g := CheckAttestations(design)
++	if len(g.Errs) != 0 || len(g.Drift) != 0 || len(g.Warns) != 1 || !strings.Contains(g.Warns[0], "gt.conformance-test-shape: plan only; current implementation review missing") || g.Counts["current implementation reviews"] != 0 {
++		t.Fatalf("parent fixture must remain an unfulfilled conformance plan: %+v", g)
++	}
+ 	return design, impl
+ }
+```
+
+
 ## nd_contract
 status: in_progress
 
