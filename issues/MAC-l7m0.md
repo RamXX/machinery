@@ -8,7 +8,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T10:17:35Z
-content_hash: "sha256:548433337578e30bd2e0c3db26fb1774ffc09b411bed38ad062b1c0111545ab6"
+content_hash: "sha256:9503d0c82228204f8eaae79cbcd222fd906cffd2b3a4c2414c713df2d9af8668"
 blocks: [MAC-vx24, MAC-ou97, MAC-qlw2]
 follows: [MAC-uzxr, MAC-p7jd, MAC-2u36]
 assignee: dev-MAC-l7m0
@@ -80,6 +80,17 @@ Observable outcome: the maintainer can review a closed standalone contract that 
 ## Notes
 BLOCKED — USER CHOICE / ARCHITECTURE REVIEW. Do not dispatch a generic developer. Pending user decisions: supported initial native runner languages and trusted-host versus adversarial-code execution boundary. Independent architect owns exact contract. Only after answers plus reviewed contract may Sr PM repair implementation interfaces and release this blocker.
 ANCHOR ROUND-1 RUNTIME CLASSIFICATION: Architecture is read-only contract work, not an executable runtime suite. Its accepted contract must explicitly identify any native adapter runtimes consumed by implementation; MAC-vx24 must register/provision those using the required closed integration lane. No execution assurance may be claimed from schema or architectural review alone.
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-06.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
 
 ## History
 - 2026-09-05T19:35:06Z dep_added: blocks MAC-vx24
