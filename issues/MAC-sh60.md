@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T00:08:54Z
-content_hash: "sha256:8727b4496bffc19a10ed575d078253fbd1eed66623f3f379b6cd6acd97bfa44c"
+updated_at: 2026-09-06T00:12:56Z
+content_hash: "sha256:6b48940f008cc8b7b7d9318408d4c3abe7d0dfd3a60a834ed30a4a983772907b"
 blocks: [MAC-vx24, MAC-ou97]
 assignee: dev-MAC-sh60
 follows: [MAC-a89e]
@@ -115,6 +115,170 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+## RED Delivery — MAC-sh60
+PROOF:
+- Phase: RED tests only. Commit b5d3b8c67f487195215860f3d361432f5b2b6b27 on story/MAC-sh60; exact unchanged production base 6cb2d974ea8aea211a5974f453cef2b5802bb11e. GREEN SHA: pending separate agent.
+- Commit subject: test(MAC-sh60): tdd-red [test-edit-authorized] require active oracle coverage evidence.
+- Diff: 3 files, 285 insertions / 8 deletions (293 changed LOC): new internal/gates/oraclecov_negative_test.go 199 lines; new directly associated cmd/machinery/oraclecov_negative_test.go 82 lines; existing internal/gates/oraclecov_test.go exactly four PM-authorized fixture expression replacements, 4 added/8 deleted. All assertions, names, sibling paths, parseEvidence, other production/tests preserved. Production oraclecov.go diff from base empty; worktree clean.
+- Exact commands from committed SHA:
+  1. go test -json -count=1 -timeout=120s ./internal/gates -run 'Oracle|Conformance|Coverage|GtCitationBoundaries' > /tmp/MAC-sh60-red-proof.D3QqXS/gates.jsonl
+     Exit 1 EXPECTED RED; 90 native leaves: 68 pass, 22 fail, 0 skip.
+  2. go test -json -count=1 -timeout=120s ./cmd/machinery -run '^TestOracleCoverageCLI' > /tmp/MAC-sh60-red-proof.D3QqXS/cli.jsonl
+     Exit 1 EXPECTED RED; 10 native leaves: 4 pass, 6 fail, 0 skip.
+  3. go test -json -count=1 -timeout=90s ./internal/gates -run '^TestGt' > /tmp/MAC-sh60-red-proof.D3QqXS/gt-controls.jsonl
+     Exit 0; 7 native leaves pass, 0 fail, 0 skip. Includes unreadable-directory, comment, filename and Rust controls. Two filename-boundary leaves repeat command 1; counts are per run, not summed unique.
+- Raw JSON and exact leaf inventory files: /tmp/MAC-sh60-red-proof.D3QqXS/{gates,cli,gt-controls}.jsonl and corresponding {gates,cli,gt-controls}-inventory.json. Inventories computed from terminal pass/fail/skip records after excluding parents with child names.
+- 20/20 new non-executable unit negatives reached intended behavioral assertion: Gt returned errs=[] and credited either 2 literal IDs or 1 machine by conformance parse. Includes quoted/block Go comments, unused constants, uncalled parser, lowercase Testhelper and wrong-signature TestRows helper, modern/legacy disabled literals, disabled parser, Elixir hash IDs/parser, Python module/test/parser docstrings, JS/Python/Ruby/Elixir unused declarations, unrelated Go split and read without row checks. The invalid-signature SOURCE fixture is never compiled as execution proof; the valid outer native test fails on false Gt coverage.
+- Mixed active/disabled unit result: errs=[] counts ids covered by literal:2, machines:1, oracle rows:2, test files scanned:2; intended one uncovered ID assertion fails.
+- Five actual CLI bypass leaves reach real Gt with empty stderr then fail exit assertion: exit=0 want=1 for quoted_comment, unused_constants, disabled_go, elixir_comment, mixed_disabled. This is a built worktree CLI process via unchanged goldenBin/runBinWithEnv, real temp design/impl trees and private HOME/config; no fake result or mock.
+- Unit and CLI reporting leaves fail because real emitted output lacks explicit discovery/not-execution labeling. CLI includes a fatal literal-ID test source; scanner discovers its literal without running it.
+- Passing controls: 11 literal extension fixtures; 7 active parser language fixtures; 3 malformed reference controls; 2 native parser runtime leaves; 4 actual CLI controls (literal, parser, zero tests, malformed reference); all selected legacy tests. Genuine native Go parser reads an actual path, parses 2 rows and compares computed fixture transition to oracle expected target. Raw output contains two 'checked oracle row' logs with successful native exit. Mutating ONLY first expected target B -> A causes native exit status 1 with reached 'oracle transition mismatch: got B want A'; outer corrupt_true control PASSES. No compile/import/read-path/timeout failure counted as RED.
+- Other-language fixtures are static discovery examples only: Python, Ruby, Elixir, Rust and JS/TS compare fixture transition results to parsed expected targets; no claim their runtimes/assertions executed. No Docker/Java/Node runtime introduced, required external service lane not applicable. Go local filesystem/process prerequisites ran unconditionally.
+- pvg verify internal/gates/oraclecov_negative_test.go internal/gates/oraclecov_test.go cmd/machinery/oraclecov_negative_test.go --include-tests --format text => 'VERIFY: FAILED (3 files scanned, 1 issues)', sole finding intentional existing quoted TODO at oraclecov_test.go:158 inside comment-rejection fixture. No stub/thin-file finding. PM frozen boundary explicitly preserves this fixture; it is test input, not unfinished implementation. The skill's initial --format=text spelling was rejected; help established supported --format text and scan completed.
+- git diff --check passed before commit. Test coverage percentage not measured: RED authors no production and intentionally failing suite; behavioral matrix and exact leaf inventory supplied instead. Full preflight and unrelated package suites not run by explicit story constraint; targeted clause/parent/orphan/missing/boundary regressions above passed.
+- Frozen SHA256:
+  internal/gates/oraclecov_negative_test.go 77940442bc579b2ec64715c79555d89c44dd27e498e49d296899e2d8f90ff042
+  internal/gates/oraclecov_test.go dd68d778605397184630447bc09b712072fe604be77c496177d121690414b994
+  cmd/machinery/oraclecov_negative_test.go 6ea06399d8271691f7f40f30f067e0d3270184eaca4fc2548cc7a562c7775d08
+  unchanged production oraclecov.go 9f4bfabcfe43362b62068e59a59f313cd6d27a3490392f66c5fcf71be70684ad
+- No install/dev-link/toolchain/remote/main mutation. Installed Machinery/NIL binary untouched. Parent owns dispatch, independent RED approval, fresh GREEN and merges.
+
+### AC-to-test proof (RED, not production completion)
+1. RejectsNonExecutableEvidence 20 intended failures plus MixedActiveAndDisabled: uncovered safety bar frozen.
+2. LiteralLanguageControls 11 pass; ActiveParserLanguageControls 7 pass; ParserRuntimeControl 2 pass; malformed/ambiguous negatives; exact four repaired existing positive fixtures pass with old assertions preserved.
+3. Full CheckOracleCoverage bypass/zero/mixed/malformed/positive fixtures exercised; actual CLI matrix 9 leaves reached.
+4. OutputLabelsDiscoveryOnly and CLILabelsDiscoveryOnly both intended failures; no static execution claim.
+5. Existing stable boundaries, orphan/missing diagnostics, clause obligations, parent selection, Rust/MJS controls pass; actual CLI temp-tree execution proven.
+
+LEARNINGS:
+- Raw file-level filename/delimiter matching credits entirely uncalled/commented evidence even when row-ID extraction strips Go comments.
+- Go name-prefix-only scanning also credits native non-test helper names and invalid signatures; these are discovery failures, not native compile proof.
+- Fixture parser success needs row-behavior assertions plus altered expected-result control to avoid replacing an unsafe positive fixture with mere shape checking.
+- Existing literal TODO in a negative input triggers pvg quality heuristics and must remain explicitly documented under the exact PM edit boundary.
+
+### Exact native leaf inventory (three runs in command order; repeated boundary controls shown)
+pass	TestCheckAcceptanceDoDIDCoverage
+pass	TestCheckAcceptanceOracleSetExpandsToExactStableIDInventory
+pass	TestCheckAcceptanceRejectsMalformedOracleSet
+pass	TestAdjudicationMissingOracleFails
+pass	TestAttestationCoverageWarnsRatherThanBlocks
+pass	TestCheckBuildPlanNoCommittedOracles
+pass	TestGkRejectsFailedCoverageRowUnderPassVerdict
+pass	TestGkCoverageGapIsError
+pass	TestGkResidualWaivesCoverage
+pass	TestClauseCoverageEmptyDeclarationErrors
+pass	TestClauseCoverageComplete
+pass	TestClauseCoverageMissingSuffixErrors
+pass	TestClauseCoverageWholesaleParseDoesNotDischarge
+pass	TestClauseCoverageUndeclaredGuardCarriesNoObligation
+pass	TestClauseCoverageUnguardedRowsExempt
+pass	TestOracleIDsInCommentsDoNotCover
+pass	TestOracleVersionOnlySkewIsNotDrift
+pass	TestOracleContentDriftStillDrift
+pass	TestOracleMissingStampIsFreshAndSilent
+pass	TestOracleCurrentStampIsSilent
+pass	TestIDCiteRemovedOracleTagStillErrors
+pass	TestIDCiteNoOraclesWarns
+pass	TestCheckIsolationStaleOracleIsDrift
+pass	TestObligationParentDeletedRelationalOracleRemainsRequired/gp
+pass	TestObligationParentDeletedRelationalOracleRemainsRequired/gn
+pass	TestObligationParentSelectionRetainsRelationalCoverage/Policy.oracle.md
+pass	TestObligationParentSelectionRetainsRelationalCoverage/Isolation.oracle.md
+fail	TestOracleCoverageRejectsNonExecutableEvidence/quoted_go_comment
+fail	TestOracleCoverageRejectsNonExecutableEvidence/go_block_comment
+fail	TestOracleCoverageRejectsNonExecutableEvidence/unused_go_constants
+fail	TestOracleCoverageRejectsNonExecutableEvidence/uncalled_go_parser
+fail	TestOracleCoverageRejectsNonExecutableEvidence/go_lowercase_test_helper
+fail	TestOracleCoverageRejectsNonExecutableEvidence/go_invalid_test_signature
+fail	TestOracleCoverageRejectsNonExecutableEvidence/disabled_go_literal
+fail	TestOracleCoverageRejectsNonExecutableEvidence/disabled_go_parser
+fail	TestOracleCoverageRejectsNonExecutableEvidence/legacy_disabled_go_literal
+fail	TestOracleCoverageRejectsNonExecutableEvidence/elixir_hash_ids
+fail	TestOracleCoverageRejectsNonExecutableEvidence/elixir_hash_parser
+fail	TestOracleCoverageRejectsNonExecutableEvidence/python_module_docstring
+fail	TestOracleCoverageRejectsNonExecutableEvidence/python_test_docstring
+fail	TestOracleCoverageRejectsNonExecutableEvidence/python_parser_docstring
+fail	TestOracleCoverageRejectsNonExecutableEvidence/js_unused_declarations
+fail	TestOracleCoverageRejectsNonExecutableEvidence/python_unused_declarations
+fail	TestOracleCoverageRejectsNonExecutableEvidence/ruby_unused_declarations
+fail	TestOracleCoverageRejectsNonExecutableEvidence/elixir_unused_declarations
+fail	TestOracleCoverageRejectsNonExecutableEvidence/go_unrelated_split
+fail	TestOracleCoverageRejectsNonExecutableEvidence/go_read_without_row_checks
+fail	TestOracleCoverageMixedActiveAndDisabled
+pass	TestOracleCoverageLiteralLanguageControls/test_rows.py
+pass	TestOracleCoverageLiteralLanguageControls/rows_spec.rb
+pass	TestOracleCoverageLiteralLanguageControls/rows_test.exs
+pass	TestOracleCoverageLiteralLanguageControls/tests/rows.rs
+pass	TestOracleCoverageLiteralLanguageControls/rows.test.tsx
+pass	TestOracleCoverageLiteralLanguageControls/rows.test.js
+pass	TestOracleCoverageLiteralLanguageControls/rows.test.jsx
+pass	TestOracleCoverageLiteralLanguageControls/rows.test.mjs
+pass	TestOracleCoverageLiteralLanguageControls/rows_test.go
+pass	TestOracleCoverageLiteralLanguageControls/rows.test.ts
+pass	TestOracleCoverageLiteralLanguageControls/rows.test.cjs
+pass	TestOracleCoverageActiveParserLanguageControls/test_rows.py
+pass	TestOracleCoverageActiveParserLanguageControls/rows_spec.rb
+pass	TestOracleCoverageActiveParserLanguageControls/rows_test.exs
+pass	TestOracleCoverageActiveParserLanguageControls/tests/rows.rs
+pass	TestOracleCoverageActiveParserLanguageControls/rows_test.go
+pass	TestOracleCoverageActiveParserLanguageControls/rows.test.js
+pass	TestOracleCoverageActiveParserLanguageControls/rows.test.ts
+pass	TestOracleCoverageParserRuntimeControl/corrupt_false
+pass	TestOracleCoverageParserRuntimeControl/corrupt_true
+pass	TestOracleCoverageMalformedReferencesStayUncovered/Thing.oracle.md.bak
+pass	TestOracleCoverageMalformedReferencesStayUncovered/NotThing.oracle.md
+pass	TestOracleCoverageMalformedReferencesStayUncovered/purchase-Thing.oracle.md
+fail	TestOracleCoverageOutputLabelsDiscoveryOnly
+pass	TestCheckOracleCoverageClean
+pass	TestCheckOracleCoverageRejectsAndIgnoresOrphanOracle
+pass	TestCheckOracleCoverageMissingIDs
+pass	TestCheckOracleCoverageIgnoresProductionSources
+pass	TestCheckOracleCoverageNoTestFilesFailsLoudly
+pass	TestGtCitationBoundaries/hyphenated_sibling_does_not_cover
+pass	TestGtCitationBoundaries/a_suffixed_artifact_is_not_the_oracle
+pass	TestCheckOracleCoverageRustTestShapes
+pass	TestCheckOracleCoverageConformanceParse
+pass	TestCheckOracleCoverageConformanceParseIsNotSubstring
+pass	TestCheckOracleCoverageMachinesWithoutOracles
+pass	TestCheckOracleCoverageMachineMissingItsOracle
+pass	TestCheckOracleCoverageNoMachines
+pass	TestCheckOracleCoverageFormalOracles/covered_by_file-name_literal
+pass	TestCheckOracleCoverageFormalOracles/uncovered
+pass	TestCheckOracleCoverageCapsOffenderList
+pass	TestCheckOracleCoverageHonorsContractIgnore
+pass	TestCheckOracleCoverageScansMjsTestFiles
+pass	TestOracleCoverageCLIRealTrees/literal_control
+pass	TestOracleCoverageCLIRealTrees/parser_control
+fail	TestOracleCoverageCLIRealTrees/quoted_comment
+fail	TestOracleCoverageCLIRealTrees/unused_constants
+fail	TestOracleCoverageCLIRealTrees/disabled_go
+fail	TestOracleCoverageCLIRealTrees/elixir_comment
+pass	TestOracleCoverageCLIRealTrees/zero_tests
+fail	TestOracleCoverageCLIRealTrees/mixed_disabled
+pass	TestOracleCoverageCLIRealTrees/malformed_reference
+fail	TestOracleCoverageCLILabelsDiscoveryOnly
+pass	TestGtWholesaleNeedsStringLiteralAndParseEvidence/comment_mention_covers_nothing
+pass	TestGtWholesaleNeedsStringLiteralAndParseEvidence/quoted_mention_without_parse_evidence_covers_nothing
+pass	TestGtWholesaleNeedsStringLiteralAndParseEvidence/parse_evidence_must_live_in_the_citing_file
+pass	TestGtCitationBoundaries/hyphenated_sibling_does_not_cover
+pass	TestGtCitationBoundaries/a_suffixed_artifact_is_not_the_oracle
+pass	TestGtRustProductionTextIsNotTestCorpus
+pass	TestGtCorpusSurvivesUnreadableDir
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- RED b5d3b8c67f487195215860f3d361432f5b2b6b27, 28 intended failing leaves across main gate/CLI runs, passing controls and exact raw JSON recorded above. GREEN pending.
+
+### proof
+- [x] AC #1: RED safety failures reproduced, implementation pending.
+- [x] AC #2: native/source positive controls and ambiguous-evidence negative bar established.
+- [x] AC #3: real CheckOracleCoverage and real CLI regression fixtures executed.
+- [x] AC #4: RED output distinction assertions fail as intended.
+- [x] AC #5: selected preservation controls pass and CLI/process path is real.
+
 
 ## nd_contract
 status: in_progress
