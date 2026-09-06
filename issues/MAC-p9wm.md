@@ -8,8 +8,8 @@ labels: [docs, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T12:04:37Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:31:39Z
-content_hash: "sha256:6dc2465b87e9cb6d4d6d9aa951ad0b82bd15aa3f83794e0c8015f802cc99b9ee"
+updated_at: 2026-09-06T12:32:51Z
+content_hash: "sha256:5fb3cfc1dc542c0e2b706bb3251a32b45339d7e6e5199ca9e3a00f15ef9b35b1"
 related: [MAC-l7m0]
 assignee: dev-MAC-p9wm
 follows: [MAC-l7m0, MAC-uzxr]
@@ -650,3 +650,32 @@ status: delivered
 - [ ] AC #6: complete developer mapping and 19-mutant self-review delivered for independent whole-prose PM review; no PM verdict claimed.
 - [ ] AC #7: bounded developer validation complete; independent prose/render review pending.
 - [x] AC #8: exact evidence and authoritative true-EOF delivered contract recorded; acceptance remains separate.
+
+### 2026-09-06T12:32:51Z ramirosalas
+## PM Decision
+ACCEPTED [2026-09-06]: Independent complete-prose review found no architecture ambiguity. The immutable two-document candidate satisfies AC1-AC8 and rejects the original plus all 19 required negative mutants for contract-specific reasons. This docs-only decision does not claim implementation, RED/GREEN, runtime, cleanup, native-host, merge, or release proof.
+
+## nd_contract
+status: accepted
+
+### evidence
+- Dispatcher-selected normal-phase PM review; delivered state and absence of hard-tdd verified before decision.
+- Read the canonical 620-line story Body through true EOF, the complete 328-line supplement, the complete accepted 575-line baseline, the exact companion hunk, and both immutable developer reports.
+- Base a94e768adf461178e0562ad135c7c06d8163a3a4; candidate 2a63e4bb0d7b57c42dfd6f45fecfdc4f8a18cfbf; candidate parent equals base.
+- Exact scope: two owned docs, 329 insertions, 0 deletions, 27,995 net added bytes, both mode 0644; diff check passed.
+- New contract SHA-256 bee289e553809b550b1f5cedf73415f600379ab54830a11733ba0dc7caaaba2a; candidate companion SHA-256 171ebaa3e992b60bd90f1fc280818a125689390f8440b3a9a7b2c97e7f8b747d.
+- Removing only the 212-byte companion line 5 reconstructs the accepted 109,367-byte source at SHA-256 22b74bc01afec68c67a9c2a4ec13b12eef910caddd4dd5e0f82464ca92bec3c8 with cmp exit 0.
+- Pandoc 3.11 parsed the supplement as 1 H1, 8 H2, 16 H3, 7 code blocks, and 2 tables; the companion parses one link to the existing relative target. Bounded private-contamination, stub, and conflict scans found no matches.
+- Independent original and all 19 mutant verdicts, full AC coverage, exact Git evidence, limitations, and preserved check corrections are frozen at /tmp/MAC-p9wm-pm-review.Hf8lA2/REPORT.md, mode 0444, SHA-256 19c0c4be6b4eb4b7035db3e9e576352ad1cfd3b24f414e287be7d8dfded38f8e.
+- Product/native tests: 0 run and 0 applicable; coverage N/A. No runtime or native proof was inferred from documentation or delivery shape.
+- Transition applied only through pvg story accept; read-back verified status closed and label accepted. Parent epic has 41 children, 33 nonclosed, and is not close-eligible.
+
+### proof
+- [x] AC #1: approved standalone refinement, trust residuals, separate claim dimensions, and honest unproved state are exact and free of private dependency.
+- [x] AC #2: every API/type/record/default/cap/acquisition/handoff/Join/Close/Attach/owner/cumulative-budget clause is published without weakened authority.
+- [x] AC #3: Docker codec/private client, once-only endpoint preparation, contributor/checker profiles, exact ordering, unresolved-create handling, and run/replay lifecycle are complete.
+- [x] AC #4: live-first positive/adversarial method, distinct implementation roles, historical mapping, native matrices, and proof limits are explicit.
+- [x] AC #5: one minimal companion insertion preserves every accepted baseline byte otherwise and limits precedence to native custody.
+- [x] AC #6: independent whole-prose coverage and written original plus 19-mutant semantic verdicts are frozen in the PM report.
+- [x] AC #7: bounded two-path Git, byte, render, link, contamination, and semantic checks passed; zero product/native tests are correctly reported as not applicable.
+- [x] AC #8: exact hashes/counts/modes/hunk/reports/limitations/failures are recorded and this final Comment is the authoritative true-EOF accepted contract.
