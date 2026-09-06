@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-06T06:04:04Z
-content_hash: "sha256:f2873ddc5393d1feb67b7c9aeb05878b48dec87bf9a47349f2b69cc0d7182a52"
+updated_at: 2026-09-06T06:30:08Z
+content_hash: "sha256:5d47a68b7d944e28e18606c5695ac49218d672aa0ee508148dffa3f96bdfb7c3"
 blocks: [MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-p7jd
 follows: [MAC-p8ce, MAC-2u36, MAC-a89e, MAC-olrx]
@@ -941,6 +941,104 @@ Observed evidence and limits:
 - Measured production6files1125add/43del =1168 changed lines; combined11files2609add/46del =2655. Remaining tests/docs and actual final cost still owed; the canonical forecast is not completion proof.
 - Main497419ab4512fcff765cd5feb27aed4c67b5608d clean and epic70652b948bf090008b1965c85daf36ea374daea4 unchanged. PM inspected committed refs and proof files only, not developer worktree internals. No source/test/docs, installed binary/assets, remote, services, Docker or preflight changes; private pvg tracker writes only. Machinery standalone constraint unchanged.
 SR PM LEGACY FIXTURE OWNERSHIP / PROPOSAL-PREPARATION HOLD. Read complete PAUSED-BLAST-DISPUTE.md SHA256d2837c4fbd4205ba151b856e96a7747d3cc32b58b1a69b4c49fe1d6fedb6bc1f and terminal report.229scoped+45race PASS belong to4b246ba; paused51454e069ebe4039f02d6d9108acf9354c7ad6c8 is docs-only later and still owes finalsameSHA proof. Four old-fixture leaves remain held: hook_test.go TestStopGreenDesignClearsStateSilently and obligation_ownership_test.go TestObligationParentRealCLI obligation-free/Policy/Isolation default-gate legs. Legacy v1 gt correctly fails GV_MISSING_IMPLEMENTATION_SUBJECT; silence/ledger, default-vs-explicit Gt, real controls/negatives, Ga ancestry/selection and no-grandfathering are fixed. hgz1 now owns all8bundled evidence migrations AFTER p7/uzxr/lhu5; no p7 reverse dependency or bundled writes to unblock this story. Root may resume the healthy retained GREEN author for an UNAPPLIED EXTERNAL exact test-local fixture proposal against51454e0 limited to those2existingtest paths, with full old/new hunks, original-assertion byte equality, helper callers, real input/evidence inventory, warning/silence semantics and per-file cost. This is proposal preparation only, not oldtest editing or TEST-EDIT AUTHORIZED. Separate independent PM must approve exacttext before any subsequent sanctioned amendment. Verified existing APIs: gates.AttestationReview{Claim,Kind,Attestor,Date,Note string}; RenderAttestation(design,impl string,review AttestationReview)([]byte,error); CheckAttestationsWithImplementation(design,impl string)*Gate. No missing core schema/API identified. Exact valid fixture construction remains unresolved: plan warnings cannot be assumed silent; real/synthetic impl hashes do not establish substantive current conformance, especially before uzxr repair. If no fixture preserves all constraints, report exact technical conflict for independent specialist review; do not weaken assertions, invent review or change product semantics. Existing filesystem skip remains uncredited. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
+# MAC-p7jd independent whole-story GREEN review
+
+REJECTED [2026-09-06]. One established blocking implementation defect; no acceptance or merge authority.
+
+Candidate: `412d01b57ae4770a6cf4fb4f48442fb7e632cdd7`; production base: `a82277af5650b487cea1260c24ffcc1c86d69d8d`. PM reviewed an external exact Git archive in `/tmp/machinery-p7jd-pm-final.pT2Q0q`, not developer-worktree internals. Every changed exported source/test/doc byte matches the candidate Git object. All finite processes completed. Machinery remains standalone; private pvg is coordination only.
+
+## Decision: complete scope silently excludes a real entry named none
+
+EXPECTED — AC1: “Implementation/test behavior claims bind a complete explicit implementation/test scope under rooted inventory and content hashes, not only BUILD or pack. Any code/test/config addition, removal, rename, content change or scope narrowing affecting the claim invalidates freshness.” AC4 requires meaningful changed-implementation/scope negatives and matched unchanged positives. Approved R2 allows only top-level `.git` and the exact logical `<design>/attestations.yaml` record as scope exclusions. There are no arbitrary path selectors.
+
+DELIVERED — `internal/gates/attest.go:874` initializes `attestationSubject.exclusion` to the digest sentinel `"none"`. Lines 878–881 replace it with an actual evidence-relative path only when that path lies inside implementation. Lines 882–885 then compare every real entry's path with this field and skip equality. A real top-level implementation file or empty directory named `none` is therefore removed from the manifest in disjoint and implementation-inside-design topologies. Both generation and checking make the same omission.
+
+GAP — ordinary CLI generation produces a valid current receipt missing this real entry; subsequent real file-content change or empty-directory mode change remains current with exit 0 and byte-identical output. This is an unauthorized third exclusion, not a reviewer-honesty limitation, allowed evidence-only change, unsupported filesystem, missing fixture setup, or forced late-failure boundary. The lower retained-root snapshot inventories the entry; projection into the attestation manifest drops it. Same-invocation custody protection does not fix freshness across separate invocations, each of which captures the now-changed bytes afresh.
+
+FIX — same-story hard-TDD repair, new positive and negative regression FIRST against this exact candidate, independently reviewed before production repair. Cover real `none` regular files and empty directories, including disjoint and implementation-inside-design; assert the exact inventory includes them, unchanged current review succeeds, and meaningful content/mode or scope change invalidates it. Preserve the intended actual evidence-record and top-level `.git` exclusions, all four topology semantics, and full-root inventory/custody behavior. Distinguish the digest's absence descriptor from actual path-filter authority; do not reserve or reject an otherwise valid name as an improvised workaround. Root/Sr PM must route exact test ownership and any cost/path adjustment before authoring; this review does not invent a filename, authorize editing seven frozen files, or grant any new seam. No production-first one-line fix or blanket test amendment is authorized. After repair, freeze new proof and replay scoped, custody, CLI, hook, caller, relevant broader/race and TDD proof on one final revision for independent re-review.
+
+No additional blocker was established in the complete changed-source sweep. Search of other `none`, `exclusion` and `copySkip` comparisons found the above collision only; private-copy skipping has an explicit nonempty-path guard. Equal-root and implementation-ancestor controls include `none` and correctly reject its changed bytes. This bounds the finding without claiming arbitrary inputs have been exhaustively proved.
+
+## Real CLI reproductions and immutable evidence
+
+Built from the exact archive with `go build -o /tmp/machinery-p7jd-pm-final.pT2Q0q/machinery-pm ./cmd/machinery`. Binary SHA256 `534f53900fc9457d0950bcc6ed1d72aeac1d397d030a8017532cc7911e53f0ad`.
+
+For each fixture below, from its own directory, ran:
+
+```text
+<binary> attest --design <design> --impl <impl> --claim gt.conformance-test-shape --kind current --attestor 'PM diagnostic fixture only' --date 2026-09-06
+<binary> check <design> --impl <impl> --gate gv
+```
+
+The generated document was saved unchanged as that design's `attestations.yaml`, followed by a check before and after mutation. All six generation and unchanged controls returned 0. Attribution is explicitly diagnostic, not an assertion that a real reviewer or test execution was authenticated. These intentionally minimal fixtures have one unchanged ordinary missing-`g4.zero-context` warning; that warning is nonblocking and does not explain acceptance of changed `none`. This is not a `--complete` or zero-warning claim.
+
+| Fixture directory | Design / implementation | Mutation | Check after mutation |
+| --- | --- | --- | --- |
+| `none-proof` | `design` / `impl` | real `none` file bytes | BUG: exit 0, current 1 |
+| `none-inside` | `design` / `design/impl` | real `none` file bytes | BUG: exit 0, current 1 |
+| `none-dir-disjoint` | `design` / `impl` | real empty `none` directory mode 0755 to 0700 | BUG: exit 0, current 1 |
+| `none-dir-inside` | `design` / `design/impl` | real empty `none` directory mode 0755 to 0700 | BUG: exit 0, current 1 |
+| `none-equal` | `.` / `.` | same real file-byte mutation | expected exit 1, `GV_STALE_CONTENT: scope path none changed` |
+| `none-ancestor` | `design` / `.` | same real file-byte mutation | expected exit 1, `GV_STALE_CONTENT: scope path none changed` |
+
+All paths are beneath the PM directory above (`/tmp` resolves to `/private/tmp` on this host). Files changed from `assert actual behavior\n` to `return unchecked behavior\n`; other implementation file `handler.go` stayed `package example\n`. Original input copies `none-input-before.txt` and `none-input-after.txt` have SHAs `02f5fd2d7d6e18dc8c09b2062ce84cfe680107baaeed2d3ff9e0c1a505815c0c` and `0738305e11fd26f62bf4b8adea38aa2921ca8836089708c277b2c77f338408b8`. Empty-directory children remain `[]`, with actual 0700 mode recorded.
+
+Raw documents and before/after stdout/stderr use prefixes `none`, `none-inside`, `none-dir-disjoint`, `none-dir-inside`, `none-equal`, `none-ancestor`: suffixes `-generated.yaml`, `-generate.stderr`, `-control.stdout`, `-control.stderr`, `-mutated.stdout`, `-mutated.stderr`. Bad-case receipts contain only `.` and `handler.go`; no `none` entry. All four bad-case unchanged and changed stdout hashes are identical: `dcf9098147973c7d631978167fc25f20c90e9c7071770dd775b69164bc75c86d`. Check stderr is empty. Receipt SHAs:
+
+- `none-generated.yaml`: `ec6f0b05ee7b4d58381e060e6181d5464e0070ab9f582a6dc53007aa0ff237d7`.
+- `none-inside-generated.yaml` and `none-dir-inside-generated.yaml`: `14178ac6b5966b8fc4bcb3c3c490a65f6739915b41553bc264e30d417fa0a04e`.
+- `none-dir-disjoint-generated.yaml`: `4021d38cd6ab39388e6c5162f28642fb3ed89fda18bdba164728ed5633ed3f06`.
+- Equal/ancestor: `603c620a9074167233c9ce833c14654b2635531b4da37ee0e121045367d93849` / `516906b467e493171972e3414b3c434c439b63484d29f477975b32fff6ed9e67`.
+
+Final finite repeat command `node pm-none-replay.cjs > pm-none-replay.json` independently rechecks all six preserved mutants, records executable/actual-receipt hashes, exact cwd/argv/status/stdout/stderr and target type/mode/content/children. Script SHA `04a4bff364fb659383eea5f1b54884288dc522f458a7f0f44dbe83c8854f7c35`; JSON SHA `0fd1686fc37b983c35d569d3ece449056d7f37ea3b25d589b4036a5b87d1d78a`. It expects the observed defective outcomes, so its exit 0 is diagnostic reproducibility, NOT a passing product regression.
+
+## Independent same-revision tests and provenance
+
+All native commands use `go test -count=1 -timeout=5m -json`; race runs additionally `-race`. Output files below live in the PM archive; corresponding `.stderr` files are empty. Exact names, package durations and outcomes are retained in `pm-review-audit.json`. Scopes overlap and are not summed into unique coverage.
+
+| Raw JSONL | Packages / selector | PASS / FAIL / SKIP |
+| --- | --- | --- |
+| `pm-scoped.jsonl` | `./internal/gates ./cmd/machinery ./internal/hook ./internal/designlock`, `Attest|Attestation` | 229 / 0 / 0 |
+| `pm-race-designlock.jsonl` | designlock, `Attestation`, race | 22 / 0 / 0 |
+| `pm-race-gates.jsonl` | gates, `TestAttestGreen|TestAttestationCRelease`, race | 23 / 0 / 0 |
+| `pm-callers-hook.jsonl` | hook, six exact helper callers listed below | 6 / 0 / 0 |
+| `pm-callers-parent.jsonl` | gates, `TestObligationParent` | 7 / 0 / 0 |
+| `pm-blast-gates.jsonl` | gates, `TestSelect|TestRunSelected|TestCargoWorkspacePointerMutation|TestGateSnapshot` | 33 / 0 / 1 |
+| `pm-blast-hook.jsonl` | hook, `TestStop|TestSelectGates|TestGreenStop` | 24 / 0 / 0 |
+| `pm-blast-accepted.jsonl` | gates, `TestObligation|TestReadsConsumer` | 79 / 0 / 0 |
+| `pm-blast-designlock.jsonl` | designlock, `TestMaterializeDesignWorkspace|TestExternalTreeSnapshotCleanup|TestRegularFileSnapshotCleanup|TestExternalSnapshotRejects|TestUniversalSnapshotBoundary` | 13 / 0 / 0 |
+
+Hook caller selector: `TestStopGreenDesignClearsStateSilently|TestPreEditObligationSurvivesLostPostAndReplacementSession|TestWaveDeferralSurvivesCrashAndOutOfBandClose|TestStopDriftBlocks|TestStopWarnsWhenStagedImplGatesLackImpl|TestReapedStopStillGatesTheTree`.
+
+Audit script `pm-review-audit.cjs` SHA `505ca6beae19b27505790254decaa4efa58a569b623043a9476d19e29e9abf14`; result `pm-review-audit.json` SHA `d5ef7a3f84b733c7293d35f68761cd4e90c3d49894ca727b92f8affd4799d8a2`. It includes SHA256 for every raw run, all leaf identities, changed-source hashes, original 189 frozen leaf lineage, fixture diagnostics and quality provenance. Author's full evidence manifest independently matched actual files. Original 47 PASS / 142 FAIL frozen RED and earlier explicitly classified SETUP failures remain valid retained history; current omission is a coverage gap, not retroactive falsification.
+
+`pvg story verify-tdd --range a82277a..412d01b --json`: 11 commits, zero merges/violations. `git diff --check a82277a 412d01b`: empty. Final diff: 16 paths, 3396 additions + 66 deletions = 3462 changed lines. All seven frozen test hashes match their exact authorities; only the separate approved 65-addition fixture patch affects the additional two old helper files. Read-only generic designlock/source/external/inventory/portablepath, shared Ga, command hook and module/dependency boundaries are unchanged. hgz1's explicit future two-helper ownership and fresh actual-baseline PM amendment hold remain untouched; no future current-to-plan downgrade is authorized.
+
+## Whole-contract source review and AC5 closure
+
+Read full live canonical AC/R2/AC5/current authority and delivery notes, full 277-line R2 proposal SHA `8e20b8d4e1707a2b381f9e8e4f359ca641222f0deec896407f2cdbefe5c0f179`, full AC5 clarification SHA `5fc3193106a803b7760020b646ed4db7b3d417f5e196b2266d10cf8227733937`, and full author GREEN report SHA `815e8dd3c79f0b28dba51b8f7354b9cb9fe29f862327839de14d3163645bf033`. Graph-first main index coverage supplied existing wrapper/caller relationships; new story paths absent from the main index were reviewed from exact committed Git objects, not assumed indexed.
+
+Reviewed complete new attestation capability, attestation checker/renderer, changed suite/hook/CLI source and docs; complete five new RED/GREEN test files, exact existing-test patches and relevant old helper callers. Inspected unchanged YAML parser, logical error mapping, generic file-copy/inventory providers, command output/error/root-exit machinery and old skipped test where they affect the proof. This does not claim every unrelated line of the repository was reviewed.
+
+Source sweep covered closed v2 kinds/required covers/legacy errors; inventory grammar/digest/self-check/both-direction set comparison; alias, hardlink, bounds and all four topologies; original held-root generation and private-copy ownership; before/after reads and final revalidation; full Release joining/latching/repeat behavior and provisional public counters; all wrappers, strict-false/wave/empty Stop paths and ledger/output ordering; CLI flags/dates/missing BUILD diagnostics; complete output/Ga history; exact 16 MiB and per-pass overlay budget documentation. No additional source defect is established beyond the sentinel collision. Positive inspected properties do not establish the contradicted full-inventory AC.
+
+AC5 evidence tiers at the same candidate:
+
+- OBSERVED: actual Render late original mutation and real owned-copy cleanup fault return nil bytes and actual causes, paired with fired no-fault controls; owned sentinel/logical-path protection passes.
+- OBSERVED: built ordinary CLI success and ordinary renderer-input/alias failures exercise the real branch, with required failure exit 1 and empty stdout; real current/history/changed-code cases pass their covered fixtures.
+- REVIEWED: `cmd/machinery/attest.go:120` invokes Render; `internal/gates/attest.go:949–965` joins check and final Release before returning bytes; `internal/gates/suite.go:82–106` completes retained-capability/workspace/lock finalization. Any renderer error reaches CLI error branch before its first generation stdout write at line 128. `cmd/machinery/io.go` and main error/exit handling preserve failure and do not defer, retry or provide an alternate stdout emission. Render itself emits no stdout.
+- COMPOSED: a late renderer failure traverses this same CLI closure to exit 1/empty stdout. This bounded guarantee does not cure the manifest's missing real input.
+- UNOBSERVED: independently injected standalone CLI late-release fault. UNFORCED: individual OS root-handle/filelock Close primitive errors. Actual owned-copy cleanup supplies the approved lifecycle-fault alternative. Sink partial writes are separate; no execution or reviewer-identity authentication is claimed.
+
+The full-story acceptance proof remains false for AC1 and incomplete for AC4; AC2/3 and the bounded AC5 closure have positive independent evidence, not blanket story acceptance.
+
+## Honest remaining limits and disposition
+
+Author targeted four-package coverage 16.1% is not whole-project coverage or a threshold claim. Scoped quality scan is NOT clean: 11 existing return-empty heuristics. Full containing functions `logicalSnapshotError`, `generatedReason`, `hookFileChangeID`, `relToRoot` were independently byte-compared to base and are unchanged; audit contains hashes. No source was altered to silence them.
+
+One unchanged broader skip, `TestSelectRejectsNonportableAndAliasedDesignPaths/case_folded_collision`, skips before its assertion on this case-insensitive filesystem. It is neither PASS nor waived; all required attestation and helper scopes have zero skips. Exact case-sensitive Linux/final-epic leaf remains owed: `go test -count=1 -timeout=5m -json ./internal/gates -run '^TestSelectRejectsNonportableAndAliasedDesignPaths$/^case_folded_collision$'`. No full preflight, Linux/container setup, service or installed artifact operation was performed or authorized. This disclosed final-gate obligation is separate from the concrete blocking defect.
+
+Root/Sr PM handoff: same-story AC1/4 regression RED and repair, preserve all prior proof and frozen bytes, route exact new test scope before edits. No broader product compatibility amnesty, fixture renewal, test filename authority or new seam follows from this rejection. Main was clean at final read-only check. All external PM evidence remains available; nothing material was removed.
 
 
 ## nd_contract
