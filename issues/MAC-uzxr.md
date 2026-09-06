@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-06T03:01:38Z
 created_by: ramirosalas
 updated_at: 2026-09-06T05:26:01Z
-content_hash: "sha256:dbdce66e901965861317c5cd5a30e95e27117afa0ab93a44199803482fd9a9e5"
+content_hash: "sha256:b22806c50dfb4abe3b1e5b10a9aeca4ecc57e341cc3bdff82635c513ec038107"
 blocks: [MAC-ou97, MAC-hgz1]
 assignee: dev-MAC-uzxr
 follows: [MAC-2u36]
@@ -532,3 +532,17 @@ status: in_progress
 - [ ] AC #3: initial genuine RED/storage validated; final candidate unsafe-variant rejection pending.
 - [ ] AC #4: successful actual candidate row/witness/native inventory pending.
 - [ ] AC #5: complete passing candidate proof and consumer handoff pending.
+
+### 2026-09-06T05:26:01Z ramirosalas
+## nd_contract
+status: in_progress
+
+### evidence
+- SR PM MEASURED FORECAST / PRESERVATION REPAIR. Canonical eight paths and five AC unchanged; actual external proposal2450changed plus503historical=2953 cumulative beforeGREEN, aggregate2945changed. Conditional3300-3500 cumulative/3200-3400 aggregate forecast assumes prior300-450-line parser estimate and separately charges48-line scaffold replacement plus narrowTask correction. Old750-1150/provisional1500-2200 obsolete; no proof trimmed or test permission granted. First --description command succeeded but verification failed because nd treats same-level nested headings as section boundaries and retained an old canonical suffix. Original failed readback preserved in /tmp/machinery-private-triage.JF2BDG/READONLY-HANDOFF.md. Installed --body-file has the same Description semantics. Root-authorized guarded pvg nd edit bound full live raw header/body to journal export and checked an external apply_patch trial, removed ONLY duplicate canonical block under nd exclusive lock, then verified exact full body90c15690a83bd2200723fdaa8bdd27e3871e189959b4936083afe06336d35590 and identical tail/metadata except normal hash/time. Exact expected/proposed manifests and editor remain external. First hgz1 preparation-only cross-realm assertion failed before any tracker write, then root explicitly authorized scalar-array comparison correction; historical failure is not proof. Scoped structural verification after exact canonical repair: pvg lint --backlog --epic MAC-ui8a scanned37 issues,0 errors/0 review findings; pvg rtm check37 stories/19closed/0 extracted requirements; pvg nd dep cycles found none. These are structure checks, not AC proof. Claims/status/labels/dependencies retained; no source/test/example/toolchain/remote/preflight mutation or Paivot product dependency.
+
+### proof
+- [ ] AC #1: Original parsed-row/closed-witness AC remains pending independent final amendment/freeze and implementation.
+- [ ] AC #2: Original complete-effect/context AC remains pending actual Task repair and candidate proof.
+- [ ] AC #3: Original native unsafe-variant sensitivity AC remains pending complete frozen candidate replay.
+- [ ] AC #4: Original dynamic executed-row inventory AC remains pending final proof.
+- [ ] AC #5: Original candidate conformance/consumer handoff AC remains pending; no current claim renewal.
