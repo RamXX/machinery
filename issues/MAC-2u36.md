@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T02:26:33Z
-content_hash: "sha256:a9e0a0556c2bc87df894b9d318057cc8295e40560ef5df3b62581f3dce950891"
+updated_at: 2026-09-06T02:35:20Z
+content_hash: "sha256:aba03bc536e9f2ed557b9c3cc925f6341f3ab3e3a66d74c3519b94937244479b"
 blocks: [MAC-gcrr, MAC-ou97]
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
@@ -145,6 +145,11 @@ Scanner attribution (independent final PM disposition pending): five reported re
 
 ## DIFF BUDGET
 Revised verification forecast: 9 changed files (3 owned production files; existing bootstrap/receipt tests; the three-function update_test amendment; new update_receipt_fixture_test.go and two platform-separated writer-query test files), approximately1,850 combined changed LOC. Measured approved test delta was1322 and retained production is95 changed lines (+74/-21), totaling1417. Author forecasts160–220 new legacy helper lines plus15–30 replacements (~190–280 additions+deletions), and65–105 writer-query/hook/sensitivity lines plus modest complementary-platform/error-control overhead (~75–120). Projected combined: 1417+190–280+75–120 = approximately1682–1817;1850 allows modest honest rounding, not padding or an automatic acceptance cap. This supersedes the4–6-file/~1700 estimate because actual downloaded-native fixtures and a descriptor-specific oracle require explicit local support. Report actual per-file additions/deletions, helper reuse and focused/full elapsed costs; PM investigates material overrun, new files or changed ownership rather than trimming safety proof. Shared write/fakeSource/sourceTarball/updateReleaseServer remain unchanged. Preserve all operation bounds and existing15m package command; prior measurements/authorizations remain historical.
+
+## Downstream documentation division
+MAC-gcrr explicitly owns README.md and docs/agent-portability.md updates for this delivered installer behavior, its safety-critical native documentation checks, and the existing release-note outputs. At delivered source 15252d255fa12a131fbc2cdb13f593a212fd4ccb those files still contain obsolete defaults-only/not-from-receipt bootstrap statements; README also incorrectly describes host plugin failure as warning-only. These outputs are explicitly required in MAC-gcrr before its acceptance and the downstream MAC-ou97/final release, not deferred indefinitely.
+The binding is complete receipt-aware bootstrap/ordinary parity and copy/link modes; safe edited/missing owned-file repair; fail-closed corrupt/unsafe/plugin inspection; direct pre-commit transaction rollback with foreign-change protection; and honest post-direct-commit host-plugin failure/side-effect/obligation limits. Host-owned plugin caches are not atomically rolled back. MAC-gcrr consumes the accepted frozen real CLI/native contract and exact delivered source, with checks rejecting the old unsafe wording in both files.
+All seven implementation AC, every frozen test, production ownership and pending independent acceptance proof remain unchanged. This is an independently reviewed division of documentation deliverables, not an outcome/test waiver or permission to ship stale docs on main. Existing MAC-2u36 -> MAC-gcrr and MAC-2u36 -> MAC-ou97 dependencies remain; MAC-gcrr also blocks MAC-ou97. No new dependency or implementation/test authorization.
 
 ## Dependencies
 Parent MAC-ui8a; remains blocking MAC-gcrr and MAC-ou97. No new inter-story dependency: one developer owns all three coupled installer defects and one independent PM reviews the full outcome. No other sibling implementation declares the three owned installer source seams. Consumer guidance and epic acceptance remain blocked until this story is accepted.
