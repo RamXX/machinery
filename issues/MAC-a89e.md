@@ -9,12 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-06T00:02:54Z
-content_hash: "sha256:c1614ae3f5948243c7637a0188689e434e03bd11d38156b6e4310cbf573b721a"
+content_hash: "sha256:8707daffc76b0e338145619a5aee9f3f3f03f12e66e11f460add0576872d8a26"
 follows: [MAC-olrx, MAC-p8ce]
 assignee: dev-MAC-a89e
 closed_at: 2026-09-05T23:57:31Z
 close_reason: "Accepted: independent 40/40 GREEN pass, frozen RED intact, exact authorized documentation correction closes sole prior gap; all four ACs verified."
-led_to: [MAC-sh60, MAC-2u36, MAC-lnu6, MAC-yig6, MAC-p7jd, MAC-uzxr]
+led_to: [MAC-sh60, MAC-2u36, MAC-lnu6, MAC-yig6, MAC-p7jd, MAC-uzxr, MAC-l7m0]
 ---
 
 ## Description
@@ -671,7 +671,7 @@ Preserved verbatim as quoted history; current Description is authoritative.
 ## Links
 - Parent: [[MAC-ui8a]]
 - Follows: [[MAC-olrx]], [[MAC-p8ce]]
-- Led to: [[MAC-sh60]], [[MAC-2u36]], [[MAC-lnu6]], [[MAC-yig6]], [[MAC-p7jd]], [[MAC-uzxr]]
+- Led to: [[MAC-sh60]], [[MAC-2u36]], [[MAC-lnu6]], [[MAC-yig6]], [[MAC-p7jd]], [[MAC-uzxr]], [[MAC-l7m0]]
 
 ## Comments
 
