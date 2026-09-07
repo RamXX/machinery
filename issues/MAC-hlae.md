@@ -1,17 +1,19 @@
 ---
 id: MAC-hlae
 title: "Reject unmodeled saga compensation paths"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd, walking-skeleton]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:31Z
-content_hash: "sha256:3f18a2a1a09678cd475a29df9d47fb3e3085e1aee04c292e5ca943cf7692ab10"
+updated_at: 2026-09-07T07:22:57Z
+content_hash: "sha256:9de603ed8513af0f4f1a37e4c3500cb511d037fcf9b3ea7ffbbde904ab88d0db"
 blocks: [MAC-ou97]
 was_blocked_by: [MAC-hpqp]
+follows: [MAC-hpqp]
+assignee: dev-MAC-hlae
 ---
 
 ## Description
@@ -101,10 +103,13 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-05T19:36:14Z dep_added: blocks MAC-ou97
 - 2026-09-05T19:45:31Z dep_added: blocked_by MAC-hpqp
 - 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
+- 2026-09-07T07:22:57Z status: open -> in_progress
+- 2026-09-07T07:22:57Z auto-follows: linked to predecessor MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-ou97]]
 - Was blocked by: [[MAC-hpqp]]
+- Follows: [[MAC-hpqp]]
 
 ## Comments
