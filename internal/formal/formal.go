@@ -29,6 +29,7 @@ import (
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/pack"
 	"github.com/RamXX/machinery/internal/portablepath"
+	"github.com/RamXX/machinery/internal/processcontrol"
 	"github.com/RamXX/machinery/internal/refine"
 	"github.com/RamXX/machinery/internal/runtimeclosure"
 	"github.com/RamXX/machinery/internal/tla"
@@ -542,8 +543,14 @@ func tlcArgs(jar, metaDir, cfgPath, tlaPath string) []string {
 		"-config", filepath.Base(cfgPath), filepath.Base(tlaPath)}
 }
 
-// runTLC mirrors tlc.sh: java -cp jar tlc2.TLC on a .tla/.cfg pair.
+// runTLC mirrors tlc.sh: java -cp jar tlc2.TLC on a .tla/.cfg pair. It is the
+// ordinary compatibility entry; the scoped verification chain uses
+// runTLCScoped with the inherited owner context.
 func runTLC(tlaPath, cfgPath string) (output string, retErr error) {
+	return runTLCScoped(context.Background(), tlaPath, cfgPath)
+}
+
+func runTLCScoped(ctx context.Context, tlaPath, cfgPath string) (output string, retErr error) {
 	jar, err := ensureJar()
 	if err != nil {
 		return "", err
@@ -566,7 +573,7 @@ func runTLC(tlaPath, cfgPath string) (output string, retErr error) {
 	if err != nil {
 		return "", err
 	}
-	java, err := openFormalJava(metaDir)
+	java, err := openFormalJavaScoped(ctx, metaDir)
 	if err != nil {
 		return "", err
 	}
@@ -577,12 +584,16 @@ func runTLC(tlaPath, cfgPath string) (output string, retErr error) {
 		retErr = errors.Join(retErr, java.Close())
 	}()
 	dir := filepath.Dir(tlaPath)
-	// TLC is exhaustive model-checking; give it a generous but bounded budget.
-	ctx, cancel := context.WithTimeout(context.Background(), formalProcessTimeout)
+	// TLC is exhaustive model-checking; give it a generous but bounded budget
+	// as a child of the inherited owner context.
+	ctx, cancel := context.WithTimeout(ctx, formalProcessTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, java.Path(), tlcArgs(jar, metaDir, cfgPath, tlaPath)...)
 	cmd.Dir = dir
 	cmd.Env = runtimeclosure.Environment(metaDir, metaDir, java.Path())
+	if err := runtimeclosure.AttachCustody(ctx, cmd); err != nil {
+		return "", err
+	}
 	output, runErr := runBoundedProcess(ctx, cmd, formalProcessTimeout)
 	if runErr == nil {
 		runErr = validateTLCSuccessOutput(output)
@@ -1053,6 +1064,22 @@ func VerifyFormal(design string, genOnly bool) (exitCode int) {
 
 // VerifyFormalTo is VerifyFormal with explicit deterministic output sinks.
 func VerifyFormalTo(design string, genOnly bool, stdoutW, stderrW io.Writer) (exitCode int) {
+	return verifyFormal(context.Background(), design, genOnly, stdoutW, stderrW)
+}
+
+// VerifyFormalInScope is the scoped execution entry: engine subprocesses
+// (Java probes, TLC, Alloy) launched for a full verification MUST inherit the
+// verified custody scope carried by ctx. Generation-only mode launches no
+// engine subprocess and therefore requires no scope.
+func VerifyFormalInScope(ctx context.Context, design string, genOnly bool, stdoutW, stderrW io.Writer) (exitCode int) {
+	if !genOnly && processcontrol.ScopeFromContext(ctx) == nil {
+		fmt.Fprintln(stderrW, "verify-formal: full formal verification requires native process custody; the caller must pass a scope-bearing execution context")
+		return 1
+	}
+	return verifyFormal(ctx, design, genOnly, stdoutW, stderrW)
+}
+
+func verifyFormal(ctx context.Context, design string, genOnly bool, stdoutW, stderrW io.Writer) (exitCode int) {
 	fdir := filepath.Join(design, "formal")
 	snapshot, err := designlock.Acquire(design)
 	if err != nil {
@@ -1518,7 +1545,7 @@ formalPublicationDone:
 	for _, name := range runPairs {
 		tlaF := filepath.Join(verificationDir, name+".tla")
 		cfgF := filepath.Join(verificationDir, name+".cfg")
-		out, err := runTLC(tlaF, cfgF)
+		out, err := runTLCScoped(ctx, tlaF, cfgF)
 		if err == nil && strings.Contains(out, "No error has been found") {
 			fmt.Fprintf(stdoutW, "  PASS  %s\n", name)
 			pass++
@@ -1540,7 +1567,7 @@ formalPublicationDone:
 		if !present {
 			return
 		}
-		vs, notes, aerr := runAlloy(filepath.Join(verificationDir, alsName), commands)
+		vs, notes, aerr := runAlloyScoped(ctx, filepath.Join(verificationDir, alsName), commands)
 		if aerr != nil {
 			fmt.Fprintln(stderrW, aerr)
 			fail++

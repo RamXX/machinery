@@ -4,17 +4,21 @@ package runtimeclosure
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/RamXX/machinery/internal/processcontrol"
 )
 
 const (
@@ -624,4 +628,24 @@ func Environment(home, temp, javaPath string) []string {
 		}
 	}
 	return env
+}
+
+// AttachCustody binds cmd to the verified custody scope carried by ctx.
+// Environment intentionally discards ambient values, so custody must be
+// handed to the command explicitly AFTER that sanitation: reconstruction
+// must never silently strip it. When ctx carries no scope, AttachCustody is
+// an explicit no-op for ordinary (unscoped) compatibility execution; the
+// scoped execution path itself fails closed inside processcontrol.
+func AttachCustody(ctx context.Context, cmd *exec.Cmd) error {
+	if cmd == nil {
+		return errors.New("runtimeclosure.AttachCustody: nil command")
+	}
+	if ctx == nil {
+		return errors.New("runtimeclosure.AttachCustody: nil context")
+	}
+	scope := processcontrol.ScopeFromContext(ctx)
+	if scope == nil {
+		return nil // RED: no custody scope is ever carried by a context.
+	}
+	return processcontrol.AttachScope(cmd, scope)
 }

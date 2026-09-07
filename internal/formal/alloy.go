@@ -327,7 +327,13 @@ type AlloyVerdict struct {
 // while the text form carries every relation in full.
 // runAlloy's second result carries the tolerated engine notes (today only
 // the kodkod native-library fallback); verify-formal prints each as a NOTE.
+// runAlloy is the ordinary compatibility entry; the scoped verification chain
+// uses runAlloyScoped with the inherited owner context.
 func runAlloy(alsPath string, commands []alloy.Command) (result []AlloyVerdict, notes []string, retErr error) {
+	return runAlloyScoped(context.Background(), alsPath, commands)
+}
+
+func runAlloyScoped(ctx context.Context, alsPath string, commands []alloy.Command) (result []AlloyVerdict, notes []string, retErr error) {
 	jar, err := ensureAlloyJar()
 	if err != nil {
 		return nil, nil, err
@@ -357,7 +363,7 @@ func runAlloy(alsPath string, commands []alloy.Command) (result []AlloyVerdict, 
 	if err != nil {
 		return nil, nil, err
 	}
-	java, err := openFormalJava(outDir)
+	java, err := openFormalJavaScoped(ctx, outDir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -367,11 +373,15 @@ func runAlloy(alsPath string, commands []alloy.Command) (result []AlloyVerdict, 
 		}
 		retErr = errors.Join(retErr, java.Close())
 	}()
-	ctx, cancel := context.WithTimeout(context.Background(), formalProcessTimeout)
+	// The Alloy engine runs as a bounded child of the inherited owner context.
+	ctx, cancel := context.WithTimeout(ctx, formalProcessTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, java.Path(), "-jar", jar, "exec", "-f", "-t", "text", "-c", "*", "-o", outDir, filepath.Base(alsPath))
 	cmd.Dir = filepath.Dir(alsPath)
 	cmd.Env = runtimeclosure.Environment(outDir, outDir, java.Path())
+	if err := runtimeclosure.AttachCustody(ctx, cmd); err != nil {
+		return nil, nil, err
+	}
 	processOut, runErr := runBoundedProcess(ctx, cmd, formalProcessTimeout)
 	gotJarSHA, jarErr := fileSHA256(jar)
 	if jarErr != nil || gotJarSHA != want {
