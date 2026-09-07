@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:51Z
 created_by: ramirosalas
-updated_at: 2026-09-07T10:08:47Z
-content_hash: "sha256:e7ee4c476232d95951e5e7710003bb815528031d63072e79b73902f65423745f"
+updated_at: 2026-09-07T18:47:01Z
+content_hash: "sha256:5deae72b66295236c7f7ca199c60e6e750854081d4dba28d970ff1ddccdfd7b7"
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
 follows: [MAC-6h0s, MAC-bz1y]
@@ -219,3 +219,6 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-07T18:47:01Z ramirosalas
+ACCEPTED 2026-09-07 — RED 4b07b6c (30 intended failures + 3 controls, frozen byte-pinned assets natively verified) -> GREEN 9ef085e. node-test-typescript/v1 Adapter: TS7 native compiler closure binds node + libnode + TypeScript package tree + platform binary; frozen tsconfig on closed argv (TS5112 documented); adversarial shapes pinned empirically (skip reports success+exit 0; process.exit(0) root-only stream — both rejected by inventory reconciliation); per-command child scopes mirroring wi2u. All owned suites ok; -race clean; vet clean; lane green (assurance-node-conformance 4/4/4/0/0). Merge union 96b3e4e (see wi2u comment). Overrun 4458 vs 2100 — same mandated-negative cause; 13 new files within bound; RED-byte amendments inside GREEN disclosed (ambient .d.ts re-freeze + fixture repairs) — reviewed here: infrastructure only, no assertion weakened. RESIDUALS: Design/Milestone fields empty on adapter events (downstream stories own completion); Linux proof rides hosted CI. Record: .git/machinery-evidence-20260906.TEFZ7D/avfp-record.md
