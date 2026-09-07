@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-07T21:01:14Z
-content_hash: "sha256:26919906fe562e2bbc5940d0c22f5d4610b0344c521b1113a92c9d766154bfbc"
+updated_at: 2026-09-07T21:43:47Z
+content_hash: "sha256:88bd12aa1df5b159e12c6f596d0ce8b7c0b99d01e15190b7499edd3138be4f8b"
 blocks: [MAC-sqpt, MAC-u4oo, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-p9z1]
 follows: [MAC-p9z1]
@@ -176,3 +176,6 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-07T21:43:47Z ramirosalas
+ACCEPTED 2026-09-07 — RED f3b172c (21 intended failures over fail-closed stubs; prior frozen suites as controls) -> GREEN 29d43d2. Section 4 registration transaction: registration_store.go lineage validation + canonical successor + graph reconciliation + CommitRegistration (reservation release -> staging -> expected-head compare with idempotent exception -> archiving -> revalidation -> durable compare-and-advance -> post-advance verify -> quiescent release, 600000ms+10000ms bounds); assuranceflow Register API with private Registration, control snapshot revalidation, AssuranceInventory integration, postcommit fail-closed. 16/16 targeted identities; vet/build/-race green; all prior frozen suites pass. Overrun 2633 vs ~1500 guideline (1206 production) — flagged, established pattern; six disclosed [test-edit-authorized] RED-fixture corrections. RESIDUALS: Linux lane at completion gate; cooperative-writer expired-takeover micro-race converts to detected CUSTODY_ERROR (never silent); fsync injection nondeterministic. Coordinator merged; assuranceflow+tdd suites green on epic. Record: .git/machinery-evidence-20260906.TEFZ7D/62s6-record.md
