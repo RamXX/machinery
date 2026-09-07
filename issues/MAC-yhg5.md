@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-07T04:45:47Z
-content_hash: "sha256:8f7ee01f9796b49d403e78af4e8833c3baaf502eb42baf7c933d73e577921ee7"
+updated_at: 2026-09-07T07:22:44Z
+content_hash: "sha256:6f470326a780f6ff7b7a80b4a32ffa3190d5fa18628fd98e5f2d552d417ee935"
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp]
@@ -168,3 +168,6 @@ status: new
 - [x] Existing qlw2/MAC-yig6 tests, hpqp chain and public custody invariants are preserved.
 - [ ] Exact before-RED inventory, staged actual-role selection, implementation and both native-host matrices remain pending.
 
+
+### 2026-09-07T07:22:44Z ramirosalas
+ACCEPTED 2026-09-06 — RED 302c083 (14 real-daemon cases, 11 intended failures incl. headline timeout leak) -> GREEN 4e134b5 + isolation amendments 7340d33 (leak witness scoped to test-lifetime RUNNING containers; cross-story pollution with 2n83 fixtures fixed) + cba8bb8 (foreign-container cleanup uses live context; busybox leak eliminated; 7 accumulated fixtures removed). runCheckerOCI now captures exact container ID via --cidfile (no fire-and-forget --rm), force-removes that exact ID on every return path, closed finite budgets --memory 134217728 --cpus 0.5 --pids-limit 32 (fail-closed validation), output-flood abort at capture bound; sandbox/digest/platform closure byte-preserved. 14/14 lifecycle ok 40.5s; frozen VerifyCheckers ok; timeout-case docker inspect transcript captured; full required lane 5 suites green on epic. 3 files ~800 lines < 900 budget. RESIDUALS (documented): lane label witness unwired; OOM accounting nondeterministic under daemon swap (pids exhaustion anchors proof); microsecond create<->cidfile race theoretical. Coordinator verified + merged. Record: .git/machinery-evidence-20260906.TEFZ7D/yhg5-record.md
