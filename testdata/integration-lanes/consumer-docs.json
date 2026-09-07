@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "suites": [
+    {
+      "id": "consumer-docs",
+      "lane": "required",
+      "adapter": "go-json",
+      "package": "./cmd/machinery",
+      "source_files": ["cmd/machinery/assurance_docs_integration_test.go"],
+      "tests": [
+        "TestAssuranceDocsRegistryBindPathExampleFlow",
+        "TestAssuranceDocsRuntimeInputsMountReadOnly"
+      ],
+      "runtimes": ["go", "docker"],
+      "timeout": "10m",
+      "stdout_limit": 4194304,
+      "stderr_limit": 1048576
+    }
+  ]
+}
