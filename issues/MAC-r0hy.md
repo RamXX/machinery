@@ -8,8 +8,8 @@ assignee: dev-win
 parent: MAC-ui8a
 created_at: 2026-09-07T21:43:48Z
 created_by: ramirosalas
-updated_at: 2026-09-07T21:43:48Z
-content_hash: "sha256:341b7aab34736ac1c5b1cc3d8a802122c9b41f17c620d6143a9513e22e2caa0c"
+updated_at: 2026-09-07T21:57:52Z
+content_hash: "sha256:db2c64ab5f438bac2c170c2a7bc62917e6c919eb06ddf88949a7841b0588d719"
 ---
 
 ## Description
@@ -31,3 +31,6 @@ User requirement: release targets are exactly darwin (amd64/arm64), linux (amd64
 - Parent: [[MAC-ui8a]]
 
 ## Comments
+
+### 2026-09-07T21:57:52Z ramirosalas
+ACCEPTED 2026-09-07 — a8ff27d. Pure-Go helpers (frameReader/newFrameReader/selfDigest/mustMarshal) moved verbatim to unguarded frame.go; guardian_other.go gains 4-line honest UNSUPPORTED_PLATFORM frameReader.read stub; unix paths byte-identical (29/29 processscope, zero skips). windows amd64+arm64 full-repo builds; Open/Join/ServeInternal honestly refuse on windows; release.yml gains windows/amd64 (manifest 8->10 artifacts, checksums glob-based pick-up, actionlint clean); release-archive proven on a real windows binary; lane 8+8 green. WATCH (documented, not blocking): windows TEST-compile gaps in tdd/special_windows_test.go + gates attest_implementation_test.go (CI windows is build-only); install.sh refuses Windows (installer change out of scope — noted for future).
