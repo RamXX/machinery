@@ -9,12 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
 updated_at: 2026-09-05T23:07:17Z
-content_hash: "sha256:ddb0dd29a807e99e850a56b4b22c5f6e092196e59469518fdafd34284121c72b"
+content_hash: "sha256:8c2f8aefa1c11f81dba4f0abe26614e8c4e807b143a2c69a871b676e03a2dd88"
 assignee: dev-MAC-p8ce
 follows: [MAC-olrx]
 closed_at: 2026-09-05T23:07:17Z
 close_reason: "Independent GREEN review: frozen RED unchanged, all 78 targeted leaves and 9 native CLI cases pass; all five ACs verified."
-led_to: [MAC-p7jd, MAC-2u36, MAC-a89e, MAC-sh60, MAC-lnu6, MAC-uzxr, MAC-yig6]
+led_to: [MAC-p7jd, MAC-2u36, MAC-a89e, MAC-sh60, MAC-lnu6, MAC-uzxr, MAC-yig6, MAC-gcrr]
 ---
 
 ## Description
@@ -473,7 +473,7 @@ status: delivered
 ## Links
 - Parent: [[MAC-ui8a]]
 - Follows: [[MAC-olrx]]
-- Led to: [[MAC-p7jd]], [[MAC-2u36]], [[MAC-a89e]], [[MAC-sh60]], [[MAC-lnu6]], [[MAC-uzxr]], [[MAC-yig6]]
+- Led to: [[MAC-p7jd]], [[MAC-2u36]], [[MAC-a89e]], [[MAC-sh60]], [[MAC-lnu6]], [[MAC-uzxr]], [[MAC-yig6]], [[MAC-gcrr]]
 
 ## Comments
 

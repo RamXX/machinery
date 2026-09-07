@@ -9,13 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-07T07:22:44Z
-content_hash: "sha256:b8126e194ded4a191d76195d5fd6f6c4d6c8275cb3165fb203884110fa170c33"
+content_hash: "sha256:e10b30b4ec5bff405418779033a3d4215739746b630eec606d132d2b811d7c75"
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp]
 assignee: dev-MAC-yhg5
 closed_at: 2026-09-07T07:22:44Z
 close_reason: "Accepted: checker container lifetime owned deterministically; merged to local epic"
-led_to: [MAC-hwdb]
+led_to: [MAC-hwdb, MAC-gcrr]
 ---
 
 ## Description
@@ -113,7 +113,7 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-hpqp]]
 - Follows: [[MAC-hpqp]]
-- Led to: [[MAC-hwdb]]
+- Led to: [[MAC-hwdb]], [[MAC-gcrr]]
 
 ## Comments
 

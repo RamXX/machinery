@@ -9,12 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-07T08:24:55Z
-content_hash: "sha256:b805a6d5025eef9cd81e8f0ffc7a175624d6352cd98178281508a8b287d71387"
+content_hash: "sha256:34ff52f948ddb38f7eb3e73b2b745d725f5f22f5109f56269286210e72ff08fa"
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp, MAC-yhg5]
 assignee: dev-MAC-hwdb
 closed_at: 2026-09-07T08:24:55Z
 close_reason: "Accepted: opencode governance subprocesses bounded; merged to local epic"
+led_to: [MAC-gcrr]
 ---
 
 ## Description
@@ -125,6 +126,7 @@ status: delivered
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-hpqp]]
 - Follows: [[MAC-hpqp]], [[MAC-yhg5]]
+- Led to: [[MAC-gcrr]]
 
 ## Comments
 

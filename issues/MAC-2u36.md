@@ -9,12 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-06T02:42:36Z
-content_hash: "sha256:8d092ebdc6a6c0f4d8c268c9f05678c9ee171fe66a0b6630ee63d22139bbac96"
+content_hash: "sha256:4d3f5cf423e672777dcef203a5c839270d383adfc458400bf13fde871967028d"
 follows: [MAC-olrx, MAC-p8ce, MAC-a89e]
 assignee: dev-MAC-2u36
 closed_at: 2026-09-06T02:37:14Z
 close_reason: "Independent seven-AC GREEN review: exact frozen tests and composed 85 required passes, actual writer-close rollback, native coverage reconciled; documentation explicitly bound to MAC-gcrr before final gate."
-led_to: [MAC-p7jd, MAC-uzxr, MAC-yig6, MAC-lhu5, MAC-l7m0]
+led_to: [MAC-p7jd, MAC-uzxr, MAC-yig6, MAC-lhu5, MAC-l7m0, MAC-gcrr]
 ---
 
 ## Description
@@ -2609,7 +2609,7 @@ Preserved as quoted history; current Description is authoritative.
 ## Links
 - Parent: [[MAC-ui8a]]
 - Follows: [[MAC-olrx]], [[MAC-p8ce]], [[MAC-a89e]]
-- Led to: [[MAC-p7jd]], [[MAC-uzxr]], [[MAC-yig6]], [[MAC-lhu5]], [[MAC-l7m0]]
+- Led to: [[MAC-p7jd]], [[MAC-uzxr]], [[MAC-yig6]], [[MAC-lhu5]], [[MAC-l7m0]], [[MAC-gcrr]]
 
 ## Comments
 
