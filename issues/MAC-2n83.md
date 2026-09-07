@@ -1,7 +1,7 @@
 ---
 id: MAC-2n83
 title: "Recover interrupted publication without losing ownership"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
 updated_at: 2026-09-07T07:22:43Z
-content_hash: "sha256:5f933a56b8c6422d0f73b4532a5ca7eedfb30721f9d62ce14e16d3d259a5668c"
-blocks: [MAC-vx24, MAC-ou97, MAC-u4oo]
+content_hash: "sha256:23c882dc2a62b7678afbd66c203789368db36cb59ec28d8ff75622218bc6c7c0"
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp]
 assignee: dev-MAC-2n83
+closed_at: 2026-09-07T07:22:43Z
+close_reason: "Accepted: interrupted publication recoverable without losing ownership; merged to local epic"
 ---
 
 ## Description
@@ -106,10 +107,13 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
 - 2026-09-07T04:45:47Z status: open -> in_progress
 - 2026-09-07T04:45:47Z auto-follows: linked to predecessor MAC-hpqp
+- 2026-09-07T07:22:43Z status: in_progress -> closed
+- 2026-09-07T07:22:44Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T07:22:44Z dep_removed: no_longer_blocks MAC-ou97
+- 2026-09-07T07:22:44Z dep_removed: no_longer_blocks MAC-u4oo
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-vx24]], [[MAC-ou97]], [[MAC-u4oo]]
 - Was blocked by: [[MAC-hpqp]]
 - Follows: [[MAC-hpqp]]
 
