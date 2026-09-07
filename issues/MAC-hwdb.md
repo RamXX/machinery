@@ -1,17 +1,19 @@
 ---
 id: MAC-hwdb
 title: "Bound OpenCode governance subprocesses"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:32Z
-content_hash: "sha256:d07d97002810341b8983976eb9a8b3bf1d023929427a616dab981eb430023240"
+updated_at: 2026-09-07T07:22:57Z
+content_hash: "sha256:3405e17cb202e459ae4d7d606aef2e31170dc64de1d40850e6e1c4d5a0a81426"
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-hpqp]
+follows: [MAC-hpqp]
+assignee: dev-MAC-hwdb
 ---
 
 ## Description
@@ -99,10 +101,13 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-05T19:36:15Z dep_added: blocks MAC-ou97
 - 2026-09-05T19:45:32Z dep_added: blocked_by MAC-hpqp
 - 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
+- 2026-09-07T07:22:57Z status: open -> in_progress
+- 2026-09-07T07:22:57Z auto-follows: linked to predecessor MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 - Was blocked by: [[MAC-hpqp]]
+- Follows: [[MAC-hpqp]]
 
 ## Comments
