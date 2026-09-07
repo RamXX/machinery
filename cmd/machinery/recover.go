@@ -67,7 +67,11 @@ interrupted. Never manually delete publication sentinels or journals.`,
 			return commandExitBecause(1, failure)
 		}
 		renderRecoveryReport(stdoutW, report)
-		fmt.Fprintln(stdoutW, "completed: interrupted publication finalized; the design is consistent")
+		if report.Finalized {
+			fmt.Fprintln(stdoutW, "completed: interrupted publication finalized; the design is consistent")
+		} else {
+			fmt.Fprintln(stdoutW, "nothing to recover: no interrupted publication found")
+		}
 		return nil
 	}
 	return c

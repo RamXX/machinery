@@ -2461,6 +2461,7 @@ type RecoveryReport struct {
 	Outputs           []RecoveryOutput
 	Journals          []RecoveryJournal
 	LiveWriter        bool
+	Finalized         bool
 	Reasons           []string
 }
 
@@ -2551,6 +2552,7 @@ func RecoverInterrupted(designRoot string) (*RecoveryReport, error) {
 	if err != nil {
 		return current, errors.Join(err, releaseErr)
 	}
+	final.Finalized = true
 	return final, releaseErr
 }
 
