@@ -8,8 +8,8 @@ assignee: dev-jrn
 parent: MAC-ui8a
 created_at: 2026-09-07T21:57:39Z
 created_by: ramirosalas
-updated_at: 2026-09-07T21:57:40Z
-content_hash: "sha256:e5c7bbda668db67311b6b26418d11742896937e2603392e85afd2821c3de5de5"
+updated_at: 2026-09-07T22:29:14Z
+content_hash: "sha256:ead0d6307e03ec01cd1fa660d6fe959537eb35c627e6ee465314372227d6f5ec"
 follows: [MAC-62s6]
 ---
 
@@ -34,3 +34,6 @@ Found during MAC-o82q Linux confirmation (REPORT f3c2d8f4907283b63f7286fc905e5f4
 - Follows: [[MAC-62s6]]
 
 ## Comments
+
+### 2026-09-07T22:29:14Z ramirosalas
+ACCEPTED 2026-09-07 — RED b8e4c91 (coarse-tick journal blindness 5/5 deterministic; benign control green) -> GREEN 4eee40c. Sticky-latched inode-bound mutation sentinel on the journal fd (inotify /proc/self/fd/N Linux; kqueue NOTE_WRITE|EXTEND|REVOKE BSD; no-channel fallback elsewhere) drained as final conjunct in requireHeld/requireHeldAfterUnlink/refreshAfterRename; formalJournalChangeID routed through the o82q coarsener seam; all stat conjuncts kept; no frozen tests amended. Linux confirmation on original flake host: full formal suite rc=0 114/0/0; retained-handle ABA in-suite PASS + 5/5 isolated; coarse tests deterministic; JDK provisioned pin-verified. Race pass environment-blocked (no gcc on ad-hoc host; Linux -race rides hosted CI). 333+/4- in 5 files. Coordinator merged. Record: .git/machinery-evidence-20260906.TEFZ7D/3hzt-record.md; Linux REPORT 965b82e4.
