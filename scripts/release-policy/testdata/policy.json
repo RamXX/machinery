@@ -1,0 +1,22 @@
+{
+  "policy_version": 1,
+  "description": "Hermetic test policy for scripts/release-policy. Mirrors the committed docs/release-policy.json schema against a disposable fixture repository and fixture API responses.",
+  "application_status": "test fixture; never applied to any remote",
+  "target": {"repository": "example/machinery", "branch": "main"},
+  "required_workflows": [
+    {"path": ".github/workflows/ci.yml", "name": "ci", "events": ["push", "pull_request"], "required_jobs": ["integration-required", "lint", "test"]},
+    {"path": ".github/workflows/formal.yml", "name": "formal", "events": ["push", "pull_request", "workflow_dispatch"], "required_jobs": ["integration-required", "verify-formal"]},
+    {"path": ".github/workflows/security.yml", "name": "security", "events": ["push", "pull_request"], "required_jobs": ["govulncheck", "gitleaks"]}
+  ],
+  "tag_pattern": "^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+  "main_ref": "refs/heads/main",
+  "artifact_inventory": {"names": ["machinery-darwin-amd64", "machinery-darwin-arm64", "machinery-linux-amd64", "machinery-linux-arm64", "machinery_{version}_darwin_amd64.tar.gz", "machinery_{version}_darwin_arm64.tar.gz", "machinery_{version}_linux_amd64.tar.gz", "machinery_{version}_linux_arm64.tar.gz"]},
+  "github_required_status_checks": {
+    "endpoint": "/repos/example/machinery/branches/main/protection/required_status_checks",
+    "method": "PUT",
+    "payload": {"strict": true, "contexts": ["integration-required", "lint", "test", "verify-formal", "govulncheck", "gitleaks"]},
+    "apply_command": "gh api -X PUT /repos/example/machinery/branches/main/protection/required_status_checks --input -",
+    "verify_command": "gh api /repos/example/machinery/branches/main/protection/required_status_checks",
+    "pre_apply_name_confirmation": "confirm check-run names read-only before applying"
+  }
+}
