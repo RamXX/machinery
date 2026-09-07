@@ -4,7 +4,7 @@ title: "Retain native child ownership until cleanup completes"
 status: open
 priority: 0
 type: feature
-labels: [hard-tdd]
+labels: [hard-tdd, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
