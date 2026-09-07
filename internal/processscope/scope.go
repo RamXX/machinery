@@ -1,3 +1,7 @@
+// Package processscope owns native process custody: the broker and guardian
+// supervision protocol, wall-deadline enforcement, and the scoped execution
+// surface consumed by processcontrol. Lifecycle authority lives here, never
+// in incidental caller contexts.
 package processscope
 
 import (

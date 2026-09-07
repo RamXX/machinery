@@ -4,6 +4,7 @@
 // payload tree digest, and finalized Validate reconciliation. No process is
 // launched and no evidence is issued here; capture/register/replay and the
 // normal gates consume this producer.
+
 package tdd
 
 import (
@@ -2597,9 +2598,7 @@ func Validate(plan Plan, manifests []Manifest, inventory Inventory) error {
 		return nil
 	}
 	msgs := make([]string, len(errs))
-	for i, e := range errs {
-		msgs[i] = e
-	}
+	copy(msgs, errs)
 	return errors.New(strings.Join(msgs, "\n"))
 }
 

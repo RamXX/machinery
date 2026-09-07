@@ -1,4 +1,4 @@
-// External store custody for the closed v1 executable-assurance contract
+// Package tdd: external store custody for the closed v1 executable-assurance contract
 // (docs/test-assurance-contract.md section 4): durable generation-zero
 // initialization of a new 0700 root, rooted-identity validation, the
 // canonical head chain with fail-closed rollback detection, placement rules
@@ -1273,8 +1273,8 @@ func validateArchivePath(p, kind string) error {
 	if err := validatePath(p); err != nil {
 		return err
 	}
-	dir := path_Dir(p)
-	base := path_Base(p)
+	dir := pathDir(p)
+	base := pathBase(p)
 	switch kind {
 	case "store":
 		if p != "store.json" {
@@ -1311,8 +1311,8 @@ func validateArchivePath(p, kind string) error {
 	return nil
 }
 
-// path_Dir/path_Base are slash-path helpers independent of filepath.
-func path_Dir(p string) string {
+// pathDir/pathBase are slash-path helpers independent of filepath.
+func pathDir(p string) string {
 	i := strings.LastIndexByte(p, '/')
 	if i < 0 {
 		return ""
@@ -1320,7 +1320,7 @@ func path_Dir(p string) string {
 	return p[:i]
 }
 
-func path_Base(p string) string {
+func pathBase(p string) string {
 	if i := strings.LastIndexByte(p, '/'); i >= 0 {
 		return p[i+1:]
 	}
@@ -1356,7 +1356,7 @@ func buildStagedStore(staging string, id StoreIdentity, entries []importIndexEnt
 		if err := publishImmutableFile(target, perm, payload); err != nil {
 			return err
 		}
-		if e.kind == "blob" && digestHexBytes(payload) != path_Base(e.path) {
+		if e.kind == "blob" && digestHexBytes(payload) != pathBase(e.path) {
 			return fmt.Errorf("INVALID_SCHEMA: blob %s content does not hash to its content-addressed name", e.path)
 		}
 	}

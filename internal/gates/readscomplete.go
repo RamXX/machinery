@@ -187,7 +187,7 @@ func collectConsumerReads(g *Gate, design string) []consumerReadsLine {
 }
 
 var readsWord = regexp.MustCompile(`\bREADS\b`)
-var readFieldName = regexp.MustCompile("^[A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*$")
+var readFieldName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$`)
 
 // parseConsumerReadSet rejects empty, duplicate or malformed members instead of
 // silently discarding them. One row declares exactly one complete set.

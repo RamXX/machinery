@@ -199,7 +199,7 @@ func TestOracleCoverageOutputLabelsDiscoveryOnly(t *testing.T) {
 		t.Fatalf("positive discovery failed: %s", &output)
 	}
 	text := strings.ToLower(output.String())
-	if !strings.Contains(text, "discovery") || !(strings.Contains(text, "not executed") || strings.Contains(text, "does not execute") || strings.Contains(text, "not execution")) {
+	if !strings.Contains(text, "discovery") || !strings.Contains(text, "not executed") && !strings.Contains(text, "does not execute") && !strings.Contains(text, "not execution") {
 		t.Fatalf("static gate output does not distinguish discovery from execution: %s", &output)
 	}
 }

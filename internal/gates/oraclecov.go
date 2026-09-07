@@ -367,7 +367,7 @@ func wholeTokenIn(base, text string) bool {
 // wholeTokenAt reports whether text[pos:pos+n] has no gluing [A-Za-z0-9_.-]
 // byte on either side.
 func wholeTokenAt(text string, pos, n int) bool {
-	return !((pos > 0 && isFileNameChar(text[pos-1])) || (pos+n < len(text) && isFileNameChar(text[pos+n])))
+	return (pos <= 0 || !isFileNameChar(text[pos-1])) && (pos+n >= len(text) || !isFileNameChar(text[pos+n]))
 }
 
 // mentionInsideQuotes reports whether text[start:end] lies inside a
@@ -1360,8 +1360,8 @@ func (a *goAnalysis) isOracleRead(call *ast.CallExpr, env *goEnv) bool {
 		return false
 	}
 	fn := sel.Sel.Name
-	if !((pkg.Name == "os" && (fn == "ReadFile" || fn == "Open" || fn == "OpenFile")) ||
-		(pkg.Name == "ioutil" && fn == "ReadFile")) {
+	if (pkg.Name != "os" || fn != "ReadFile" && fn != "Open" && fn != "OpenFile") &&
+		(pkg.Name != "ioutil" || fn != "ReadFile") {
 		return false
 	}
 	path := a.resolvePath(call.Args[0], env)

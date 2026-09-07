@@ -1,4 +1,4 @@
-// AssuranceInventory: the authoritative obligation inventory of
+// Package gates: the authoritative obligation inventory of
 // docs/test-assurance-contract.md section 3, derived from a held immutable
 // design snapshot. The inventory includes every root BUILD milestone, every
 // committed oracle row in scope (machines/*.oracle.md plus the relational

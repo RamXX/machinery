@@ -342,7 +342,7 @@ func captureAttestationRoot(root *os.Root, logical string, policy attestationInv
 			policy.witnesses[name] = before
 		}
 		entry := AttestationTreeEntry{Path: filepath.ToSlash(name), Directory: before.IsDir(), Mode: uint32(before.Mode().Perm())}
-		copyEntry := copyTo != "" && !(policy.copySkip != "" && (name == policy.copySkip || strings.HasPrefix(name, policy.copySkip+string(filepath.Separator))))
+		copyEntry := copyTo != "" && (policy.copySkip == "" || name != policy.copySkip && !strings.HasPrefix(name, policy.copySkip+string(filepath.Separator)))
 		if before.IsDir() {
 			if err := budget.enterDirectory(label, depth); err != nil {
 				return err
@@ -430,7 +430,7 @@ func captureAttestationRoot(root *os.Root, logical string, policy attestationInv
 		if statErr != nil || !sameFingerprintFile(before, opened) {
 			return errors.Join(fmt.Errorf("%s changed while opening file", label), statErr, file.Close())
 		}
-		var writer io.Writer = io.Discard
+		var writer = io.Discard
 		var dest *os.File
 		if copyEntry {
 			dest, err = os.OpenFile(filepath.Join(copyTo, name), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)

@@ -6,6 +6,7 @@
 // non-execution owner deadline with one 10000 ms cleanup grace, launches no
 // subprocesses, never retries automatically and NEVER advances the head for
 // any execution/status operation — only Register commits authored revisions.
+
 package tdd
 
 import (
@@ -101,7 +102,7 @@ func DecodeExpectedHead(raw []byte) (ExpectedHead, error) {
 	}
 	eh := ExpectedHead{ProjectID: h.ProjectID, Generation: h.Generation, Digest: digestOfBytes(raw), Previous: h.Previous}
 	for _, p := range h.Plans {
-		eh.Plans = append(eh.Plans, HeadPlanEntry{Design: p.Design, PlanDigest: p.PlanDigest})
+		eh.Plans = append(eh.Plans, HeadPlanEntry(p))
 	}
 	for _, m := range h.Milestones {
 		eh.Milestones = append(eh.Milestones, HeadMilestoneEntry{

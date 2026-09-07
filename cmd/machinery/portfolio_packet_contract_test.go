@@ -1126,9 +1126,7 @@ func TestPortfolioPacketD1ValueRuleWitness(t *testing.T) {
 	// One universe contains both flavors: A rows are heterogeneous, B rows [100,80,100].
 	full := ppMatrix{dates: m.dates, basis: m.basis}
 	full.candidates = append(full.candidates, m.candidates...)
-	for _, c := range universeMatrix("B", []string{"100", "80", "100"}).candidates {
-		full.candidates = append(full.candidates, c)
-	}
+	full.candidates = append(full.candidates, universeMatrix("B", []string{"100", "80", "100"}).candidates...)
 	lim := ppLimits{maxCandidates: 64, maxLookbackDays: 3, maxScalarBytes: 10}
 	t.Run("normalized-per-asset-initial-price", func(t *testing.T) {
 		d, err := drawdown(hetero, full, valueBuyHold)
@@ -2285,7 +2283,7 @@ func TestPortfolioPacketFSMImmediateEffectOrder(t *testing.T) {
 					t.Fatalf("stable id %s missing from the literal effect ledger", or.Stable)
 				}
 				got := immediateEffects(d.machine, or)
-				if !reflect.DeepEqual(got, want) && !(len(got) == 0 && len(want) == 0) {
+				if !reflect.DeepEqual(got, want) && (len(got) != 0 || len(want) != 0) {
 					t.Errorf("%s effects=%v want literal %v (exit/transition/entry order)", or.Stable, got, want)
 				}
 			}
@@ -4279,7 +4277,8 @@ func TestPortfolioPacketPUBConfirmedVsUnresolvedMatrix(t *testing.T) {
 			}
 			return ""
 		}
-		if keywordDispatch("IOError") == keywordDispatch("IOError") {
+		unpublishedKeywordRow, unresolvedKeywordRow := keywordDispatch("IOError"), keywordDispatch("IOError")
+		if unpublishedKeywordRow == unresolvedKeywordRow {
 			// both members carry cause IOError; the keyword dispatcher cannot separate
 			// Unpublished from Unresolved: assert the outcome-aware mapping does.
 			if portfolioFailureRow("Unpublished", "IOError") == portfolioFailureRow("Unresolved", "IOError") {

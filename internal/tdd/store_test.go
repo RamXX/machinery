@@ -30,7 +30,7 @@ type headMs struct {
 func renderHeadCanon(projectID string, generation int64, previous string, plans [][2]string, milestones []headMs) []byte {
 	var b strings.Builder
 	b.WriteString(`{"generation":`)
-	b.WriteString(fmt.Sprint(generation))
+	fmt.Fprint(&b, generation)
 	b.WriteString(`,"milestones":[`)
 	for i, m := range milestones {
 		if i > 0 {

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -241,6 +240,6 @@ func checkerCoverageProfile(t *testing.T, ctx context.Context, path string) {
 	}
 	t.Logf("COVERAGE valid blocks=%d statements=%d executed=%d verify_checkers=%d (%.1f%%)", len(lines)-1, statements, executed, productionExecuted, 100*float64(executed)/float64(statements))
 	if !strings.Contains(stdout, "total:") {
-		t.Error(fmt.Sprintf("COVERAGE Go report missing total: %s", stdout))
+		t.Errorf("COVERAGE Go report missing total: %s", stdout)
 	}
 }

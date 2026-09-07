@@ -3,6 +3,7 @@
 // link/special/alias/race rejection, deterministic role classification,
 // immutable content-addressed blob publication and the separately bound
 // control-plane and judgment-control inventories. No subprocesses.
+
 package tdd
 
 import (

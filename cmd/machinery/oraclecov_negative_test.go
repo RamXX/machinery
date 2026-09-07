@@ -76,7 +76,7 @@ func TestOracleCoverageCLILabelsDiscoveryOnly(t *testing.T) {
 		t.Fatalf("literal discovery control failed: code=%d out=%s stderr=%s", code, out, stderr)
 	}
 	text := strings.ToLower(out)
-	if !strings.Contains(text, "discovery") || !(strings.Contains(text, "not executed") || strings.Contains(text, "does not execute") || strings.Contains(text, "not execution")) {
+	if !strings.Contains(text, "discovery") || !strings.Contains(text, "not executed") && !strings.Contains(text, "does not execute") && !strings.Contains(text, "not execution") {
 		t.Fatalf("CLI conflates discovery with assertion execution: %s", out)
 	}
 }

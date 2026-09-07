@@ -822,8 +822,8 @@ func bootstrapStandaloneReceiptCases(t *testing.T, release *bootstrapRelease) {
 			out, err := cmd.CombinedOutput()
 			diagnostic := strings.ToLower(string(out))
 			if err == nil || ctx.Err() != nil || !strings.Contains(string(out), filepath.Join(f.home, "copy-a")) ||
-				!(strings.Contains(diagnostic, "overlap") || strings.Contains(diagnostic, "conflict") || strings.Contains(diagnostic, "repeat")) ||
-				!(strings.Contains(diagnostic, "retry") || strings.Contains(diagnostic, "reconfigur") || strings.Contains(diagnostic, "nonconflicting")) {
+				!strings.Contains(diagnostic, "overlap") && !strings.Contains(diagnostic, "conflict") && !strings.Contains(diagnostic, "repeat") ||
+				!strings.Contains(diagnostic, "retry") && !strings.Contains(diagnostic, "reconfigur") && !strings.Contains(diagnostic, "nonconflicting") {
 				t.Errorf("expected actionable recorded-group conflict, got err=%v deadline=%v output=%s", err, ctx.Err(), out)
 			}
 			if !reflect.DeepEqual(before, bootstrapState(t, f)) {

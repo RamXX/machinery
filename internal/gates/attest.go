@@ -511,7 +511,7 @@ func parseAttestationRow(g *Gate, where string, item *ir.Value, version string) 
 		return attestRow{}, false
 	}
 	for _, key := range obj.Keys() {
-		if !attestRowKeys[key] && !(version == "2" && (key == "kind" || key == "implementation")) {
+		if !attestRowKeys[key] && (version != "2" || key != "kind" && key != "implementation") {
 			g.Errs = append(g.Errs, fmt.Sprintf("GV_SCHEMA: %s: unsupported key %s (a row is claim, attestor, date, covers, and an optional note)", where, ir.Repr(key)))
 		}
 	}
@@ -532,7 +532,7 @@ func parseAttestationRow(g *Gate, where string, item *ir.Value, version string) 
 		row.claim, row.date = obj.GetString("claim"), obj.GetString("date")
 		validateAttestationStrings(g, where, obj, "kind")
 		class := attestationClaimKinds[row.claim]
-		if row.kind != "plan" && row.kind != "current" && row.kind != "historical" || class != "" && row.kind != class && !(class == "current" && row.kind == "plan") {
+		if row.kind != "plan" && row.kind != "current" && row.kind != "historical" || class != "" && row.kind != class && (class != "current" || row.kind != "plan") {
 			g.Errs = append(g.Errs, "GV_KIND: "+where+" kind is incompatible with "+row.claim)
 		}
 		impl := obj.Get2("implementation")
@@ -973,7 +973,7 @@ func RenderAttestation(design, impl string, review AttestationReview) ([]byte, e
 
 func renderAttestationInSnapshot(design string, subject *attestationSubject, review AttestationReview) ([]byte, error) {
 	class, known := attestationClaimKinds[review.Claim]
-	if !known || review.Kind != class && !(class == "current" && review.Kind == "plan") {
+	if !known || review.Kind != class && (class != "current" || review.Kind != "plan") {
 		return nil, fmt.Errorf("GV_KIND: unknown claim or incompatible kind for %s", review.Claim)
 	}
 	if review.Kind == "current" && subject == nil {
