@@ -1,7 +1,7 @@
 ---
 id: MAC-wi2u
 title: "Prove Go assertions through the native test runner"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:01:51Z
 created_by: ramirosalas
 updated_at: 2026-09-07T18:47:01Z
-content_hash: "sha256:1cd58b6e3e7458e6e4e7527b36e60fcde9b7f7c80d745f2f4403ea8671d9a326"
-blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
+content_hash: "sha256:2a74c88668321884013dbbc2b6f1db41f477a968ff02872d08334250ebfe919a"
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
 follows: [MAC-6h0s, MAC-bz1y]
 assignee: dev-MAC-wi2u
+closed_at: 2026-09-07T18:47:01Z
+close_reason: "Accepted: Go assertions proven through native test runner; merged to local epic"
 ---
 
 ## Description
@@ -106,10 +107,13 @@ status: new
 - 2026-09-07T10:08:47Z status: open -> in_progress
 - 2026-09-07T10:08:47Z auto-follows: linked to predecessor MAC-6h0s
 - 2026-09-07T10:08:47Z auto-follows: linked to predecessor MAC-bz1y
+- 2026-09-07T18:47:01Z status: in_progress -> closed
+- 2026-09-07T18:47:01Z dep_removed: no_longer_blocks MAC-sd7g
+- 2026-09-07T18:47:01Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T18:47:01Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-sd7g]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-6h0s]], [[MAC-bz1y]]
 - Follows: [[MAC-6h0s]], [[MAC-bz1y]]
 
