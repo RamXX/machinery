@@ -1,19 +1,20 @@
 ---
 id: MAC-hpqp
 title: "Execute every required infrastructure test deterministically"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-07T04:45:24Z
-content_hash: "sha256:7ef1a822fe5cb235c5ed72522c66047c01dfe9a268320f0f8be9164bcc663f0b"
-blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
+updated_at: 2026-09-07T04:45:25Z
+content_hash: "sha256:18887ac5de57af1abff3048ead2cca6c8b36b24253e0bafc16551480a7ba752b"
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
 was_blocked_by: [MAC-cn7q]
+closed_at: 2026-09-07T04:45:25Z
+close_reason: "Accepted: every required infrastructure test executes deterministically under native custody; AC8 hold resolved; merged to local epic"
 ---
 
 ## Description
@@ -477,10 +478,19 @@ status: new
 - 2026-09-06T09:09:59Z dep_added: blocks MAC-bz1y
 - 2026-09-06T09:10:14Z dep_added: blocked_by MAC-cn7q
 - 2026-09-07T01:42:39Z dep_removed: was_blocked_by MAC-cn7q
+- 2026-09-07T04:45:25Z status: in_progress -> closed
+- 2026-09-07T04:45:25Z dep_removed: no_longer_blocks MAC-hlae
+- 2026-09-07T04:45:25Z dep_removed: no_longer_blocks MAC-yhg5
+- 2026-09-07T04:45:25Z dep_removed: no_longer_blocks MAC-2n83
+- 2026-09-07T04:45:25Z dep_removed: no_longer_blocks MAC-hwdb
+- 2026-09-07T04:45:25Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T04:45:25Z dep_removed: no_longer_blocks MAC-gcrr
+- 2026-09-07T04:45:25Z dep_removed: no_longer_blocks MAC-ou97
+- 2026-09-07T04:45:25Z dep_removed: no_longer_blocks MAC-hy71
+- 2026-09-07T04:45:25Z dep_removed: no_longer_blocks MAC-bz1y
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-hlae]], [[MAC-yhg5]], [[MAC-2n83]], [[MAC-hwdb]], [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]], [[MAC-hy71]], [[MAC-bz1y]]
 - Was blocked by: [[MAC-cn7q]]
 - Follows: [[MAC-olrx]]
 

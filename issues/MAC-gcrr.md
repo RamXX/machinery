@@ -9,10 +9,10 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
 updated_at: 2026-09-06T02:35:49Z
-content_hash: "sha256:80c9b6332395a2d84dc0bd071cebef42aa7d8663bf878edd4633529b7f568e56"
-blocked_by: [MAC-vx24, MAC-hy71, MAC-yhg5, MAC-hwdb, MAC-hpqp]
+content_hash: "sha256:fe1fa5a869792f1d7c3fa1c6f1c29c92c529bdf9fec335fdf907f7722ad41387"
+blocked_by: [MAC-vx24, MAC-hy71, MAC-yhg5, MAC-hwdb]
 blocks: [MAC-ou97]
-was_blocked_by: [MAC-p8ce, MAC-a89e, MAC-2u36, MAC-p7jd]
+was_blocked_by: [MAC-p8ce, MAC-a89e, MAC-2u36, MAC-p7jd, MAC-hpqp]
 ---
 
 ## Description
@@ -213,12 +213,13 @@ Prior canonical Description (historical, superseded only by bounded documentatio
 - 2026-09-05T23:57:31Z dep_removed: was_blocked_by MAC-a89e
 - 2026-09-06T02:37:14Z dep_removed: was_blocked_by MAC-2u36
 - 2026-09-06T07:47:13Z dep_removed: was_blocked_by MAC-p7jd
+- 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-ou97]]
-- Blocked by: [[MAC-vx24]], [[MAC-hy71]], [[MAC-yhg5]], [[MAC-hwdb]], [[MAC-hpqp]]
-- Was blocked by: [[MAC-p8ce]], [[MAC-a89e]], [[MAC-2u36]], [[MAC-p7jd]]
+- Blocked by: [[MAC-vx24]], [[MAC-hy71]], [[MAC-yhg5]], [[MAC-hwdb]]
+- Was blocked by: [[MAC-p8ce]], [[MAC-a89e]], [[MAC-2u36]], [[MAC-p7jd]], [[MAC-hpqp]]
 
 ## Comments
 

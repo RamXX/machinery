@@ -9,9 +9,9 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-06T12:46:06Z
-content_hash: "sha256:4ea242ed6273d5b0c09c45e330a82ee71095ab38adf168bc627326545b9b7235"
+content_hash: "sha256:d71e62df017b801eb27409b981c6459d9e610ff9f9024c2b7000e97ec8013d1f"
 blocks: [MAC-gcrr, MAC-ou97]
-blocked_by: [MAC-hpqp]
+was_blocked_by: [MAC-hpqp]
 ---
 
 ## Description
@@ -98,11 +98,12 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-05T19:35:09Z dep_added: blocks MAC-gcrr
 - 2026-09-05T19:36:15Z dep_added: blocks MAC-ou97
 - 2026-09-05T19:45:31Z dep_added: blocked_by MAC-hpqp
+- 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
-- Blocked by: [[MAC-hpqp]]
+- Was blocked by: [[MAC-hpqp]]
 
 ## Comments
 
