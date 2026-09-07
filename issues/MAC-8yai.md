@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:52Z
 created_by: ramirosalas
-updated_at: 2026-09-07T18:47:02Z
-content_hash: "sha256:d28d80a22a1b9851c54b79e0aad0f1eb89e5f29ab4bb44f1830a69670e62277e"
+updated_at: 2026-09-07T21:01:13Z
+content_hash: "sha256:d12fd389cc58cc09f7042666e1d8a2a147029636d9a27e8f10146c0bd3d029c8"
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
 follows: [MAC-6h0s, MAC-bz1y]
@@ -219,3 +219,6 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-07T21:01:13Z ramirosalas
+ACCEPTED 2026-09-07 — RED d53467f (31 subjects, 6 frozen assets natively pre-verified) -> GREEN 866a27a. Elixir/OTP closure byte-pinned tree fingerprint (2 scoped probes, pure Close); byte-pinned harness + witness-transport reconciliation; effective-option enforcement; exit concordance (0/2/1); describe-prefixed native name atoms; truncated autorun stream on compile failure handled; no flaky-retry in ExUnit 1.20.4 core (pinned); comment-registered call sites impossible (prior oracle-defect class closed). Owned packages green; -race green; lane green after union 1a25305 (assurance-elixir-conformance 3/3). Overrun ~2.2x — test-dominated, sibling precedent; one disclosed catalog supersession + six enumerated RED-audit repairs. RESIDUALS: Linux rides hosted CI; deps-free harness-only v1 surface. WATCH: one first-run flake of frozen saga-closure TLC case under load (base control + rerun green). Record: .git/machinery-evidence-20260906.TEFZ7D/8yai-record.md
