@@ -9,12 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
 updated_at: 2026-09-07T09:15:08Z
-content_hash: "sha256:0009407558f9b29f48a0770ca1cee5c3dcfecec7f3bfde651c08d43e974f8bb1"
+content_hash: "sha256:ac137be6bc33b2156fb469ba917eec9e01d20243c1d148e1d3a2f8b1f013b8af"
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp]
 assignee: dev-MAC-hy71
 closed_at: 2026-09-07T09:15:08Z
 close_reason: "Accepted: release publication gated on exact-commit verification; merged to local epic"
+led_to: [MAC-bz1y]
 ---
 
 ## Description
@@ -114,6 +115,7 @@ This story modifies these shared workflow files only after MAC-hpqp acceptance. 
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-hpqp]]
 - Follows: [[MAC-hpqp]]
+- Led to: [[MAC-bz1y]]
 
 ## Comments
 

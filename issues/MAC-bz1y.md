@@ -1,17 +1,19 @@
 ---
 id: MAC-bz1y
 title: "Require four-language native assurance conformance lanes"
-status: open
+status: in_progress
 priority: 0
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:04Z
-content_hash: "sha256:ed982c402468759901837753d72996118ef2a8b7d99d9eab65b4d04418885053"
+updated_at: 2026-09-07T09:15:42Z
+content_hash: "sha256:bfca2d1d904e4749b10d0a3149879d92315978e9718e08e74490e98d053b786d"
 blocks: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-al5u, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s, MAC-hpqp, MAC-hy71]
+follows: [MAC-6h0s, MAC-hpqp, MAC-hy71]
+assignee: dev-MAC-bz1y
 ---
 
 ## Description
@@ -104,11 +106,16 @@ status: new
 - 2026-09-07T01:42:40Z dep_removed: was_blocked_by MAC-6h0s
 - 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
 - 2026-09-07T09:15:08Z dep_removed: was_blocked_by MAC-hy71
+- 2026-09-07T09:15:42Z status: open -> in_progress
+- 2026-09-07T09:15:42Z auto-follows: linked to predecessor MAC-6h0s
+- 2026-09-07T09:15:42Z auto-follows: linked to predecessor MAC-hpqp
+- 2026-09-07T09:15:42Z auto-follows: linked to predecessor MAC-hy71
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-pe9v]], [[MAC-al5u]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-6h0s]], [[MAC-hpqp]], [[MAC-hy71]]
+- Follows: [[MAC-6h0s]], [[MAC-hpqp]], [[MAC-hy71]]
 
 ## Comments
 
