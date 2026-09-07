@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-06T23:26:32Z
-content_hash: "sha256:cf44b14d35c4a8e79e48d48cfc478080abb26223d82566faf0ffdf2b0fe0e0b3"
+updated_at: 2026-09-07T00:29:09Z
+content_hash: "sha256:9589e504c249f5a96c120ca6aa5758ca879b264ad41aab54fb8015c458a06ea6"
 blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-l7m0, MAC-p9wm]
 assignee: dev-MAC-qlw2
@@ -314,3 +314,6 @@ EXECUTION BLOCKER CHECKPOINT. The delegated external V4 inventory correction by 
 
 ### 2026-09-06T17:01:55Z ramirosalas
 USER-TABLED 2026-09-06: user explicitly asked to table this issue and continue independent areas. Supported pvg nd defer MAC-qlw2 changed only scheduling status to deferred; prior claim, hard-TDD label, dependencies, branch and failed/review history retained. This is not completion, cancellation, test approval, or waiver of the final assurance requirement. No new custody planning/source/test execution assigned. Consumers remain blocked. Resume only when the owner reopens this issue; independent work may continue without claiming full custody/final assurance.
+
+### 2026-09-07T00:29:09Z ramirosalas
+ACCEPTED 2026-09-06 — internal/processscope native custody implemented per test-assurance-contract s8+s3. RED f585213 (28/29 intended semantic failures). GREEN Darwin arm64 go1.27.1: 29/29 ok 10.759s zero skips; -race ok 32.158s zero races; vet/build/gofmt clean. Linux amd64 (authorized host, isolated owned root, GOENV/GOTELEMETRY=off): 29/29 ok 10.97s, vet pass, source invariance byte-identical; evidence bundle 33c1faf9..., REPORT 41cb172f.... RESIDUALS (honest): Linux -race not executable (host has no C compiler; race coverage stands on Darwin only); full 'go build .\/...' under GOPROXY=off needs out-of-lane modules (scoped build passed; full build at final gate); container cleanup is registration/reporting (daemon wiring downstream per contract). Diff 4,408 vs ~2,600 budget — within the V4-approved 3,800-6,200 envelope for this scope; 6 disclosed [test-edit-authorized] RED-defect repairs, all strengthening. AC map in .git/machinery-evidence-20260906.TEFZ7D/qlw2-record.md. Coordinator merged + epic suites ok.
