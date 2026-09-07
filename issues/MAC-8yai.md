@@ -4,7 +4,7 @@ title: "Prove Elixir assertions through native ExUnit"
 status: in_progress
 priority: 1
 type: feature
-labels: [hard-tdd]
+labels: [hard-tdd, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:52Z
 created_by: ramirosalas
