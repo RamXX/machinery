@@ -4,11 +4,11 @@ title: "Require four-language native assurance conformance lanes"
 status: in_progress
 priority: 0
 type: feature
-labels: [hard-tdd]
+labels: [hard-tdd, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-07T10:08:33Z
+updated_at: 2026-09-07T10:08:34Z
 content_hash: "sha256:eca80287cfb9af479adeabea104e2fa9ebb8cd684fcc7806bcb7589d6c7ff8b8"
 blocks: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-al5u, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s, MAC-hpqp, MAC-hy71]
