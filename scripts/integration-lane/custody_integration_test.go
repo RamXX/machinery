@@ -358,15 +358,19 @@ func TestLaneSuitesExecuteAsGuardedCustodyJobs(t *testing.T) {
 	}
 }
 
-// The formal provisioning helper must refuse to run without an inherited
-// custody capability: it is only ever launched by the lane under custody, and
-// a direct invocation fails closed instead of provisioning unscoped.
+// The formal provisioning helper must open its own verified custody root
+// before doing any work: it runs only as a guarded job of the lane, and a
+// direct invocation that cannot establish custody fails closed instead of
+// provisioning unscoped.
 func TestLaneProvisionFormalRequiresCustodyCapability(t *testing.T) {
 	bin := custodyLaneBinary(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	dir := t.TempDir()
-	cmd := exec.CommandContext(ctx, bin, "provision-formal", dir)
+	notADir := filepath.Join(t.TempDir(), "occupied")
+	if err := os.WriteFile(notADir, []byte("file"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(ctx, bin, "provision-formal", notADir)
 	cmd.Env = append(os.Environ(),
 		"HOME="+t.TempDir(),
 		"HTTPS_PROXY=http://127.0.0.1:1",
@@ -376,7 +380,7 @@ func TestLaneProvisionFormalRequiresCustodyCapability(t *testing.T) {
 	)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
-		t.Fatalf("helper without custody capability succeeded: %s", out)
+		t.Fatalf("helper without verifiable custody succeeded: %s", out)
 	}
 	if !strings.Contains(strings.ToLower(string(out)), "custody") {
 		t.Fatalf("helper failure was not the custody fail-closed outcome: %s", out)

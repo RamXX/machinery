@@ -1,10 +1,27 @@
 // Command integration-lane executes the closed required native test inventory.
+//
+// Every process this lane launches executes under verified native
+// processscope custody (processcontrol.WithScope): registration before
+// launch, guardian-owned process groups, terminal group kill before reap, a
+// cumulative wall budget and owner liveness. The formal provisioning helper
+// joins the inherited capability so its nested Java identity probes and TLC
+// engine executions are guarded jobs of the same root. Custody that cannot
+// be established, and cleanup that cannot be verified, fail closed.
+//
+// Residual behavior, stated honestly rather than papered over: an uncatchable
+// owner death or a descendant that deliberately escapes both registration and
+// its own process group (for example a direct setsid, or an engine launched
+// with a fresh background context inside foreign test code) is beyond
+// transitive custody. processscope reports such evidence as cleanup-failed,
+// never as false success, and this lane never uses process-name or PID
+// pattern matching as cleanup authority.
 package main
 
 import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -30,6 +47,7 @@ import (
 
 	"github.com/RamXX/machinery/internal/formal"
 	"github.com/RamXX/machinery/internal/processcontrol"
+	"github.com/RamXX/machinery/internal/processscope"
 	"github.com/RamXX/machinery/internal/runtimeclosure"
 )
 
@@ -112,9 +130,27 @@ type report struct {
 	Cleanup  struct {
 		Status string `json:"status"`
 	} `json:"cleanup"`
+	Custody custodyReceipt `json:"custody"`
+}
+
+// custodyReceipt binds verifiable native custody evidence into the report:
+// the guard mode, the number of guarded jobs, and a status that is passed
+// only when the custody close verified every job registered, terminated and
+// reaped.
+type custodyReceipt struct {
+	Status string `json:"status"`
+	Mode   string `json:"mode"`
+	Jobs   int    `json:"jobs"`
 }
 
 func main() {
+	// Authenticated internal custody activation comes before any ordinary
+	// lane execution so this binary can serve as the broker/guardian helper
+	// of its own custody root. Malformed or forged claims are refused, never
+	// silently reduced to an unscoped run.
+	if code, handled := serveInternalActivation(os.Args[1:]); handled {
+		os.Exit(code)
+	}
 	// Provisioning runs in a child so cache/HOME and engine overrides never
 	// mutate the caller process. Its output and entire lifetime are bounded.
 	if len(os.Args) == 3 && os.Args[1] == "provision-formal" {
@@ -125,6 +161,33 @@ func main() {
 		return
 	}
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+// serveInternalActivation acquires the inherited internal channel error-first
+// and serves verified broker/guardian requests with this same binary. It
+// reports handled=false only for the verified absence of any internal claim.
+func serveInternalActivation(args []string) (exitCode int, handled bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	io, present, err := processscope.InheritedInternalIO(ctx)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "integration-lane: refusing untrusted internal activation:", err)
+		return 1, true
+	}
+	if !present {
+		if len(args) > 0 && args[0] == processscope.InternalMarker {
+			fmt.Fprintln(os.Stderr, "machinery: internal marker without an authenticated internal channel; refusing normal lane execution")
+			return 1, true
+		}
+		return 0, false
+	}
+	defer io.Close()
+	wasHandled, code := processscope.ServeInternal(args, io)
+	if !wasHandled {
+		fmt.Fprintln(os.Stderr, "integration-lane: internal channel claim without the internal marker; refusing normal execution")
+		return 1, true
+	}
+	return code, true
 }
 
 func run(args []string, stdout, stderr io.Writer) (status int) {
@@ -145,6 +208,7 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 	}
 	r := report{Version: 1, Lane: *lane, Status: "failed", Suites: []suiteReceipt{}, Runtimes: []runtimeReceipt{}}
 	r.Cleanup.Status = "passed"
+	r.Custody.Status = "failed"
 	status = 1
 	var work string
 	defer func() {
@@ -234,9 +298,23 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
+	// Native custody guards every process the lane launches. A present-but-
+	// malformed inherited custody capability fails closed instead of degrading
+	// to unscoped execution; a valid one is honored for the whole run.
+	custody, err := newLaneCustody()
+	if err != nil {
+		fmt.Fprintln(stderr, "custody:", err)
+		return 1
+	}
+	defer func() {
+		if err := custody.finalize(&r.Custody); err != nil {
+			status = 1
+			fmt.Fprintln(stderr, "custody cleanup did not verify:", err)
+		}
+	}()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	runtimes, err := provision(ctx, *root, work, *cache, policy, suites)
+	runtimes, err := provision(ctx, custody, *root, work, *cache, policy, suites)
 	r.Runtimes = runtimes
 	if err != nil {
 		fmt.Fprintln(stderr, "provision:", err)
@@ -248,13 +326,13 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 			fmt.Fprintln(stderr, e)
 			return 1
 		}
-		receipt, e := execute(ctx, *root, scratch, *cache, filepath.Dir(*reportPath), s, runtimes)
+		receipt, e := execute(ctx, custody, *root, scratch, *cache, filepath.Dir(*reportPath), s, runtimes)
 		r.Suites = append(r.Suites, receipt)
 		dockerRequired := false
 		for _, id := range s.Runtimes {
 			dockerRequired = dockerRequired || id == "docker"
 		}
-		cleanupErr := cleanupContainers(scratch, filepath.Base(scratch), policy, dockerRequired)
+		cleanupErr := cleanupContainers(custody, scratch, filepath.Base(scratch), policy, dockerRequired)
 		if cleanupErr != nil {
 			r.Cleanup.Status = "failed"
 		}
@@ -603,60 +681,298 @@ func integrationTagged(body []byte) bool {
 	return false
 }
 
-func command(ctx context.Context, dir string, env []string, timeout time.Duration, outLimit, errLimit int, argv ...string) (string, string, error) {
-	bounded, cancel := context.WithTimeout(ctx, timeout)
+// laneCustody guards every process the lane launches with verified native
+// custody, shaped by the accepted custody chain's shipped budgets:
+//
+//   - A job result is awaited only within the shared cleanup grace
+//     (cleanup_ms + 10s, hard-capped), so jobs that legitimately outlive it —
+//     suite executions, engine provisioning, image pulls — follow the
+//     long-job protocol the custody suite itself uses: the guarded job writes
+//     its own bounded stdout/stderr/exit evidence, the Run call proceeds in
+//     the background, and completion is observed from that evidence.
+//   - Closing any scope arms one broker-wide final-cleanup grace and live
+//     jobs are capped per broker, so the lane opens one custody root per
+//     guarded run and verifies its terminal close before continuing. Every
+//     job is broker-registered before launch, guardian-owned, and terminally
+//     killed before reap, or cleanup is honestly reported failed.
+//
+// Nothing here invents a new process ownership interface.
+type laneCustody struct {
+	inherited processscope.Scope
+	mode      string
+	mu        sync.Mutex
+	jobs      int
+	closed    []error
+}
+
+// newLaneCustody validates any inherited custody capability error-first: a
+// present-but-malformed or stale capability fails closed instead of being
+// silently discarded in favor of unscoped execution.
+func newLaneCustody() (*laneCustody, error) {
+	if os.Getenv(processscope.EnvCapability) != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		capability, err := processscope.InheritedCapability(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("inherited custody capability is malformed or stale: %w", err)
+		}
+		scope, err := processscope.Join(ctx, capability)
+		if err != nil {
+			return nil, fmt.Errorf("join inherited custody: %w", err)
+		}
+		return &laneCustody{inherited: scope, mode: "joined"}, nil
+	}
+	return &laneCustody{mode: "root"}, nil
+}
+
+// begin returns the scope for one guarded run: the honored inherited scope
+// when the lane itself runs inside outer custody, or a fresh verified root.
+func (l *laneCustody) begin(scratch string) (processscope.Scope, error) {
+	if l.inherited != nil {
+		return l.inherited, nil
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	body, err := regularBytes(self, 256<<20)
+	if err != nil {
+		return nil, fmt.Errorf("custody helper identity: %w", err)
+	}
+	sum := sha256.Sum256(body)
+	openCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(bounded, argv[0], argv[1:]...)
-	cmd.Dir = dir
-	cmd.Env = env
-	stdout := &limitedStream{limit: outLimit, cancel: cancel}
-	stderr := &limitedStream{limit: errLimit, cancel: cancel}
-	cmd.Stdout, cmd.Stderr = stdout, stderr
-	err := processcontrol.Run(bounded, cmd)
-	out, outErr := stdout.result()
-	errout, errErr := stderr.result()
-	err = errors.Join(err, outErr, errErr)
-	if ctx.Err() != nil {
-		err = errors.Join(err, fmt.Errorf("cancellation: %w", ctx.Err()))
-	} else if bounded.Err() != nil {
-		err = errors.Join(err, fmt.Errorf("timeout: %w", bounded.Err()))
+	scope, err := processscope.Open(openCtx, processscope.Options{
+		HelperExecutable: self,
+		HelperDigest:     hex.EncodeToString(sum[:]),
+		ScratchRoot:      scratch,
+		Limits:           processscope.Limits{Jobs: 4, WallMS: 3600000, CleanupMS: 30000},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("open native custody: %w", err)
 	}
-	return out, errout, err
+	return scope, nil
 }
 
-// limitedStream cancels the complete owned process tree as soon as an output
-// budget is exceeded; merely truncating output would let a producer keep running.
-type limitedStream struct {
-	mu       sync.Mutex
-	body     bytes.Buffer
-	limit    int
-	overflow bool
-	cancel   context.CancelFunc
-}
-
-// Write implements io.Writer and bounds storage before copying any bytes.
-func (s *limitedStream) Write(p []byte) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	remaining := s.limit - s.body.Len()
-	if len(p) > remaining {
-		s.overflow = true
-		s.cancel()
+// end closes one guarded run's root with a bounded, deliberately fresh
+// deadline so terminal retirement and reaping are verified even after the
+// operating context was cancelled, and records the verified evidence.
+func (l *laneCustody) end(scope processscope.Scope) error {
+	if scope == l.inherited {
+		return nil
 	}
-	_, _ = s.body.Write(p[:min(remaining, len(p))])
-	return len(p), nil
-}
-
-func (s *limitedStream) result() (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.overflow {
-		return s.body.String(), fmt.Errorf("native output limit %d exceeded", s.limit)
+	closeCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	rep, err := scope.Close(closeCtx)
+	verified := err == nil && rep.Status == processscope.StatusCleaned
+	for _, j := range rep.Jobs {
+		if !j.Registered || !j.Terminated || !j.Reaped {
+			verified = false
+		}
 	}
-	return s.body.String(), nil
+	l.mu.Lock()
+	l.jobs += len(rep.Jobs)
+	if !verified {
+		l.closed = append(l.closed, fmt.Errorf("guarded root cleanup: err=%v report=%+v", err, rep))
+	}
+	l.mu.Unlock()
+	if !verified {
+		return fmt.Errorf("guarded root cleanup did not verify: err=%v report=%+v", err, rep)
+	}
+	return nil
 }
 
-func toolReceipt(ctx context.Context, id, arg string) (runtimeReceipt, error) {
+// finalize folds the verified custody evidence into the report: it fails the
+// lane whenever any guarded root cleanup did not verify, and closes an
+// honored inherited scope exactly once at lane end.
+func (l *laneCustody) finalize(receipt *custodyReceipt) error {
+	l.mu.Lock()
+	jobs := l.jobs
+	failures := append([]error(nil), l.closed...)
+	l.mu.Unlock()
+	if l.inherited != nil {
+		closeCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer cancel()
+		rep, err := l.inherited.Close(closeCtx)
+		verified := err == nil && rep.Status == processscope.StatusCleaned
+		for _, j := range rep.Jobs {
+			if !j.Registered || !j.Terminated || !j.Reaped {
+				verified = false
+			}
+		}
+		jobs += len(rep.Jobs)
+		if !verified {
+			failures = append(failures, fmt.Errorf("inherited custody close: err=%v report=%+v", err, rep))
+		}
+	}
+	receipt.Mode = l.mode
+	receipt.Jobs = jobs
+	if len(failures) == 0 {
+		receipt.Status = "passed"
+		return nil
+	}
+	receipt.Status = "failed"
+	return errors.Join(failures...)
+}
+
+// benignRunError reports whether err is the documented result-wait ceiling
+// that a healthy long job outlives; it is not a launch failure.
+func benignRunError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var serr *processscope.Error
+	if errors.As(err, &serr) {
+		return serr.Code == processscope.CodeCustodyError && strings.Contains(serr.Message, "broker did not deliver a terminal result")
+	}
+	return false
+}
+
+// run executes argv as one guarded custody job. stdout/stderr are captured by
+// the job itself into bounded evidence files (the scoped stream pumps do not
+// outlive the custody result-wait ceiling), the exit status lands in its own
+// evidence file, and the run's custody root is closed with verified terminal
+// retirement on completion, deadline, output overflow or cancellation.
+func (l *laneCustody) run(ctx context.Context, scratch, dir string, env []string, timeout time.Duration, outLimit, errLimit int, argv ...string) (string, string, error) {
+	if env == nil {
+		env = ambientEnv()
+	}
+	if len(argv) == 0 {
+		return "", "", fmt.Errorf("guarded job requires an executable")
+	}
+	exe := argv[0]
+	if !filepath.IsAbs(exe) {
+		resolved, err := exec.LookPath(exe)
+		if err != nil {
+			return "", "", fmt.Errorf("guarded job executable %s: %w", exe, err)
+		}
+		exe = resolved
+	}
+	digest, err := guardedDigest(exe)
+	if err != nil {
+		return "", "", err
+	}
+	scope, err := l.begin(scratch)
+	if err != nil {
+		return "", "", err
+	}
+	evidence, err := os.MkdirTemp(scratch, "guarded-")
+	if err != nil {
+		_ = l.end(scope)
+		return "", "", err
+	}
+	defer func() { _ = l.end(scope) }()
+	outPath := filepath.Join(evidence, "stdout")
+	errPath := filepath.Join(evidence, "stderr")
+	exitPath := filepath.Join(evidence, "exit")
+	envPath := filepath.Join(evidence, "env")
+	// The declared environment travels in an exactly shell-escaped file the
+	// wrapper sources, not in the custody control frame: the frame must stay
+	// far below the smallest shipped platform socket buffer so the control
+	// write can never split mid-message.
+	if err := writeShellEnv(envPath, env); err != nil {
+		return "", "", err
+	}
+	sh := "/bin/sh"
+	script := fmt.Sprintf(`. %s; "$@" >%s 2>%s; printf '%%s\n' "$?" >%s`, shellQuote(envPath), shellQuote(outPath), shellQuote(errPath), shellQuote(exitPath))
+	// With sh -c, the first parameter after the script is $0; the executable
+	// must therefore start at $1 so "$@" expands to the real command.
+	wrapperArgs := append([]string{"-c", script, "guarded-job"}, argv...)
+	attached, err := scope.Attach(processscope.Command{
+		Executable:    sh,
+		Args:          wrapperArgs,
+		Dir:           dir,
+		Env:           []string{"PATH=/usr/bin:/bin"},
+		RuntimeDigest: digest,
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("attach guarded custody: %w", err)
+	}
+	runErr := make(chan error, 1)
+	go func() {
+		bounded, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		_, rerr := scope.Run(bounded, attached, processscope.Streams{})
+		runErr <- rerr
+	}()
+	deadline := time.Now().Add(timeout)
+	tick := time.NewTimer(50 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case rerr := <-runErr:
+			// A nil or ceiling error means the guarded job is proceeding
+			// normally (short jobs deliver their natural result, long jobs
+			// outlive the result-wait ceiling); completion is observed from
+			// the evidence files instead. Any other error is a genuine launch
+			// or custody failure and aborts fail-closed.
+			if rerr != nil && !benignRunError(rerr) {
+				return "", "", fmt.Errorf("guarded job failed: %w", rerr)
+			}
+			runErr = nil
+		case <-ctx.Done():
+			return "", "", fmt.Errorf("guarded job canceled: %w", ctx.Err())
+		case <-tick.C:
+			if info, e := os.Lstat(exitPath); e == nil && info.Mode().IsRegular() {
+				out, outErr := regularBytes(outPath, int64(outLimit)+1)
+				errout, errOutErr := regularBytes(errPath, int64(errLimit)+1)
+				statusBytes, exitErr := regularBytes(exitPath, 64)
+				status := 0
+				if exitErr == nil {
+					if n, e := strconv.Atoi(strings.TrimSpace(string(statusBytes))); e == nil {
+						status = n
+					}
+				} else {
+					exitErr = nil
+				}
+				var runErrs []error
+				if len(out) > outLimit {
+					runErrs = append(runErrs, fmt.Errorf("native output limit %d exceeded", outLimit))
+				}
+				if len(errout) > errLimit {
+					runErrs = append(runErrs, fmt.Errorf("native stderr limit %d exceeded", errLimit))
+				}
+				if status != 0 {
+					runErrs = append(runErrs, fmt.Errorf("guarded job exited with status %d", status))
+				}
+				return string(out), string(errout), errors.Join(append(runErrs, outErr, errOutErr, exitErr)...)
+			}
+			for path, limit := range map[string]int{outPath: outLimit, errPath: errLimit} {
+				if info, e := os.Lstat(path); e == nil && info.Mode().IsRegular() && info.Size() > int64(limit) {
+					return "", "", fmt.Errorf("native output limit %d exceeded", limit)
+				}
+			}
+			if time.Now().After(deadline) {
+				return "", "", fmt.Errorf("timeout: guarded job exceeded %s", timeout)
+			}
+			tick.Reset(50 * time.Millisecond)
+		}
+	}
+}
+
+// guardedDigest binds the sha256 identity of the executable the job will
+// run, following launcher symlinks to the real regular file, matching the
+// custody runtime-identity convention.
+func guardedDigest(exe string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(exe)
+	if err != nil {
+		return "", fmt.Errorf("guarded job executable identity %s: %w", exe, err)
+	}
+	b, err := regularBytes(resolved, 256<<20)
+	if err != nil {
+		return "", fmt.Errorf("guarded job executable identity %s: %w", exe, err)
+	}
+	sum := sha256.Sum256(b)
+	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}
+
+// shellQuote single-quotes a literal path for the guarded wrapper script.
+// Evidence paths come from os.MkdirTemp and contain no quote characters.
+func shellQuote(path string) string {
+	return "'" + path + "'"
+}
+
+func toolReceipt(ctx context.Context, custody *laneCustody, scratch, id, arg string) (runtimeReceipt, error) {
 	r := runtimeReceipt{ID: id, Status: "failed"}
 	path, err := exec.LookPath(id)
 	if err != nil {
@@ -670,7 +986,7 @@ func toolReceipt(ctx context.Context, id, arg string) (runtimeReceipt, error) {
 	if err != nil {
 		return r, err
 	}
-	out, errout, err := command(ctx, "", nil, 15*time.Second, 1<<20, 1<<20, path, arg)
+	out, errout, err := custody.run(ctx, scratch, "", nil, 15*time.Second, 1<<20, 1<<20, path, arg)
 	if err != nil || errout != "" {
 		return r, fmt.Errorf("%s version failed: %w %s", id, err, errout)
 	}
@@ -681,7 +997,7 @@ func toolReceipt(ctx context.Context, id, arg string) (runtimeReceipt, error) {
 	return r, nil
 }
 
-func provision(ctx context.Context, root, work, cache string, p pins, suites []suite) ([]runtimeReceipt, error) {
+func provision(ctx context.Context, custody *laneCustody, root, work, cache string, p pins, suites []suite) ([]runtimeReceipt, error) {
 	needed := map[string]bool{}
 	for _, s := range suites {
 		for _, id := range s.Runtimes {
@@ -701,7 +1017,7 @@ func provision(ctx context.Context, root, work, cache string, p pins, suites []s
 			if id == "node" {
 				arg = "--version"
 			}
-			r, err := toolReceipt(ctx, id, arg)
+			r, err := toolReceipt(ctx, custody, work, id, arg)
 			if err != nil {
 				return result, err
 			}
@@ -723,11 +1039,11 @@ func provision(ctx context.Context, root, work, cache string, p pins, suites []s
 		if p.Docker.Memory != "128m" || p.Docker.CPUs != "0.5" || p.Docker.PIDs != 32 {
 			return result, fmt.Errorf("invalid docker resource pin")
 		}
-		out, errout, err := command(ctx, root, nil, 10*time.Minute, 1<<20, 1<<20, "docker", "pull", "--quiet", "--platform", p.Docker.Platform, p.Docker.Image)
+		out, errout, err := custody.run(ctx, work, root, nil, 10*time.Minute, 1<<20, 1<<20, "docker", "pull", "--quiet", "--platform", p.Docker.Platform, p.Docker.Image)
 		if err != nil {
 			return result, fmt.Errorf("docker pin provisioning: %w %s %s", err, out, errout)
 		}
-		out, errout, err = command(ctx, root, nil, 30*time.Second, 1<<20, 1<<20, "docker", "image", "inspect", "--format", "{{json .RepoDigests}} {{.Os}}/{{.Architecture}}", p.Docker.Image)
+		out, errout, err = custody.run(ctx, work, root, nil, 30*time.Second, 1<<20, 1<<20, "docker", "image", "inspect", "--format", "{{json .RepoDigests}} {{.Os}}/{{.Architecture}}", p.Docker.Image)
 		if err != nil || !strings.Contains(out, `"`+p.Docker.Image+`"`) || !strings.HasSuffix(strings.TrimSpace(out), p.Docker.Platform) {
 			return result, fmt.Errorf("docker pin/platform verification failed: %w %s %s", err, out, errout)
 		}
@@ -756,7 +1072,12 @@ func provision(ctx context.Context, root, work, cache string, p pins, suites []s
 			return result, err
 		}
 		env := environment(map[string]string{"HOME": cache, "XDG_CACHE_HOME": filepath.Join(cache, "cache"), "TMPDIR": work, "TMP": work, "TEMP": work})
-		out, errout, err := command(ctx, root, env, 12*time.Minute, 1<<20, 1<<20, self, "provision-formal", work)
+		// The helper runs as one guarded job of the lane's custody and opens
+		// its own verified custody root for the nested Java identity probes
+		// and TLC engine executions: cancelling the lane kills the helper job,
+		// and the helper's broker then self-cleans its engine jobs through
+		// owner-liveness. Both custody roots are verified before any success.
+		out, errout, err := custody.run(ctx, work, root, env, 12*time.Minute, 1<<20, 1<<20, self, "provision-formal", work)
 		if err != nil {
 			return result, fmt.Errorf("formal provision failed: %w %s %s", err, out, errout)
 		}
@@ -790,10 +1111,45 @@ func provision(ctx context.Context, root, work, cache string, p pins, suites []s
 	return result, nil
 }
 
+// custodyReservedEnv lists the custody transport variables that are never
+// inherited implicitly: they are granted only by the authenticated broker at
+// launch, or requested explicitly for the provisioning helper.
+func custodyReservedEnv() map[string]bool {
+	return map[string]bool{
+		processscope.EnvCapability:       true,
+		processscope.EnvChildRequest:     true,
+		processscope.EnvAttachment:       true,
+		processscope.EnvInternalCtl:      true,
+		processscope.EnvInternalOwner:    true,
+		processscope.EnvInternalParent:   true,
+		processscope.EnvInternalDeadline: true,
+	}
+}
+
+// ambientEnv is the explicit environment for tool invocations: the caller's
+// ambient environment minus the reserved custody transport variables, which
+// scoped execution must never inherit implicitly.
+func ambientEnv() []string {
+	reserved := custodyReservedEnv()
+	var out []string
+	for _, item := range os.Environ() {
+		key, _, _ := strings.Cut(item, "=")
+		if !reserved[key] {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
 // environment preserves runtime discovery and explicit network configuration,
-// but clears ambient test filters, loader injection, and engine overrides.
+// but clears ambient test filters, loader injection, engine overrides, and
+// the reserved custody transport variables (those are re-granted only
+// deliberately, never inherited).
 func environment(overrides map[string]string) []string {
 	drop := map[string]bool{"GOFLAGS": true, "GOWORK": true, "NODE_OPTIONS": true, "NODE_TEST_CONTEXT": true, "MACHINERY_JAVA": true, "MACHINERY_JAVA_CLOSURE_SHA256": true, "TLA_TOOLS_JAR": true, "TLA_TOOLS_JAR_SHA256": true, "JAVA_TOOL_OPTIONS": true, "JDK_JAVA_OPTIONS": true, "CLASSPATH": true}
+	for key := range custodyReservedEnv() {
+		drop[key] = true
+	}
 	var env []string
 	for _, item := range os.Environ() {
 		key, _, _ := strings.Cut(item, "=")
@@ -812,15 +1168,59 @@ func environment(overrides map[string]string) []string {
 	return append(env, "GOFLAGS=", "GOWORK=off")
 }
 
+// provisionFormal provisions the pinned Java/TLC closure under the helper's
+// own verified native custody. It runs only as a guarded job of the
+// integration lane: its Java identity probes and TLC engine executions attach
+// to the helper's custody root after environment sanitation, that root must
+// close verified before the helper reports success, and the lane's outer
+// custody guarantees the helper job's terminal cleanup.
 func provisionFormal(work string) (retErr error) {
+	self, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("provision-formal: %w", err)
+	}
+	body, err := regularBytes(self, 256<<20)
+	if err != nil {
+		return fmt.Errorf("provision-formal: custody helper identity: %w", err)
+	}
+	sum := sha256.Sum256(body)
+	scratch := filepath.Join(work, "helper-custody")
+	baseCtx, cancel := context.WithTimeout(context.Background(), 11*time.Minute)
+	defer cancel()
+	scope, err := processscope.Open(baseCtx, processscope.Options{
+		HelperExecutable: self,
+		HelperDigest:     hex.EncodeToString(sum[:]),
+		ScratchRoot:      scratch,
+		Limits:           processscope.Limits{Jobs: 4, WallMS: 660000, CleanupMS: 30000},
+	})
+	if err != nil {
+		return fmt.Errorf("provision-formal: open native custody: %w", err)
+	}
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer cancel()
+		rep, closeErr := scope.Close(closeCtx)
+		if closeErr != nil || rep.Status != processscope.StatusCleaned {
+			retErr = errors.Join(retErr, fmt.Errorf("provision-formal: custody cleanup did not verify: %v %+v", closeErr, rep))
+		}
+	}()
+	ctx := processcontrol.WithScope(baseCtx, scope)
 	java, err := runtimeclosure.OpenJava()
 	if err != nil {
 		return err
 	}
 	defer func() { retErr = errors.Join(retErr, java.Close()) }()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	out, errout, err := command(ctx, work, runtimeclosure.Environment(work, work, java.Path()), 30*time.Second, 1<<20, 1<<20, java.Path(), "-XshowSettings:properties", "-version")
+	// The identity probe uses its own guarded custody root, opened and
+	// verified before the engine verification starts, so no scope channel is
+	// closed while the pinned runtime closure is still being provisioned.
+	probeCustody, err := newLaneCustody()
+	if err != nil {
+		return fmt.Errorf("provision-formal: %w", err)
+	}
+	defer func() { _ = probeCustody.finalize(&custodyReceipt{}) }()
+	probeCtx, cancelProbe := context.WithTimeout(baseCtx, time.Minute)
+	defer cancelProbe()
+	out, errout, err := probeCustody.run(probeCtx, work, work, runtimeclosure.Environment(work, work, java.Path()), 30*time.Second, 1<<20, 1<<20, java.Path(), "-XshowSettings:properties", "-version")
 	if err != nil {
 		return err
 	}
@@ -842,7 +1242,7 @@ func provisionFormal(work string) (retErr error) {
 	if err := os.WriteFile(filepath.Join(design, "formal", "Probe.cfg"), []byte("SPECIFICATION Spec\nINVARIANT Safe\n"), 0600); err != nil {
 		return err
 	}
-	if formal.VerifyFormalTo(design, false, os.Stderr, os.Stderr) != 0 {
+	if formal.VerifyFormalInScope(ctx, design, false, os.Stderr, os.Stderr) != 0 {
 		return fmt.Errorf("pinned TLC provisioning execution failed")
 	}
 	cache, err := os.UserCacheDir()
@@ -879,7 +1279,7 @@ func provisionFormal(work string) (retErr error) {
 	})
 }
 
-func execute(ctx context.Context, root, work, cache, evidence string, s suite, runtimes []runtimeReceipt) (suiteReceipt, error) {
+func execute(ctx context.Context, custody *laneCustody, root, work, cache, evidence string, s suite, runtimes []runtimeReceipt) (suiteReceipt, error) {
 	r := suiteReceipt{ID: s.ID, Adapter: s.Adapter, Selected: len(s.Tests), Tests: []testReceipt{}}
 	for _, name := range s.Tests {
 		r.Tests = append(r.Tests, testReceipt{Name: name, Source: s.sourceByTest[name], Status: "not_started"})
@@ -905,7 +1305,7 @@ func execute(ctx context.Context, root, work, cache, evidence string, s suite, r
 	var argv []string
 	packageID := ""
 	if s.Adapter == "go-json" {
-		out, errout, err := command(ctx, root, env, time.Minute, 1<<20, 1<<20, paths["go"], "list", "-json", "-tags", "machinery_integration", s.Package)
+		out, errout, err := custody.run(ctx, work, root, env, time.Minute, 1<<20, 1<<20, paths["go"], "list", "-json", "-tags", "machinery_integration", s.Package)
 		if err != nil || errout != "" {
 			return r, fmt.Errorf("native package selection failed: %w %s", err, errout)
 		}
@@ -943,12 +1343,15 @@ func execute(ctx context.Context, root, work, cache, evidence string, s suite, r
 		return r, err
 	}
 	// Go combines the test process streams into Output events. Apply the
-	// stricter budget to that combined native stream.
+	// stricter budget to that combined native stream. The suite execution is
+	// a guarded custody job following the long-job protocol: the job writes
+	// its own native stream and exit evidence, and the child scope closes
+	// with verified terminal cleanup on every outcome.
 	limit := s.StdoutLimit
 	if s.Adapter == "go-json" {
 		limit = min(limit, s.StderrLimit)
 	}
-	out, errout, runErr := command(ctx, root, env, duration, limit, s.StderrLimit, argv...)
+	out, errout, runErr := custody.run(ctx, work, root, env, duration, limit, s.StderrLimit, argv...)
 	events, err := os.CreateTemp(evidence, s.ID+"-events-*")
 	if err != nil {
 		return r, errors.Join(runErr, err)
@@ -1142,7 +1545,13 @@ func accountNode(output string, r *suiteReceipt) error {
 	return errors.Join(failures...)
 }
 
-func cleanupContainers(work, runID string, p pins, dockerRequired bool) error {
+// cleanupContainers reconciles scoped Docker ownership. Its bounded commands
+// run under the lane's custody on fresh deadline contexts so owned containers
+// are still reclaimed when the suite context was already cancelled.
+func cleanupContainers(custody *laneCustody, work, runID string, p pins, dockerRequired bool) error {
+	custodyCtx := func(timeout time.Duration) (context.Context, context.CancelFunc) {
+		return context.WithTimeout(context.Background(), timeout)
+	}
 	dir := filepath.Join(work, "containers")
 	entries, err := os.ReadDir(dir)
 	if err != nil && !os.IsNotExist(err) {
@@ -1166,8 +1575,8 @@ func cleanupContainers(work, runID string, p pins, dockerRequired bool) error {
 	// The unique label is a second ownership witness. It finds a container
 	// whose test exited between Docker creation and writing its cidfile.
 	if dockerRequired {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		out, errout, e := command(ctx, "", nil, 15*time.Second, 1<<20, 1<<20, "docker", "ps", "-aq", "--no-trunc", "--filter", "label="+ownerLabel+"="+runID)
+		ctx, cancel := custodyCtx(15 * time.Second)
+		out, errout, e := custody.run(ctx, work, "", nil, 15*time.Second, 1<<20, 1<<20, "docker", "ps", "-aq", "--no-trunc", "--filter", "label="+ownerLabel+"="+runID)
 		cancel()
 		if e != nil {
 			failures = append(failures, fmt.Errorf("cleanup ownership inventory failed: %w %s", e, errout))
@@ -1187,8 +1596,8 @@ func cleanupContainers(work, runID string, p pins, dockerRequired bool) error {
 	}
 	sort.Strings(ordered)
 	for _, id := range ordered {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		out, errout, e := command(ctx, "", nil, 10*time.Second, 1<<20, 1<<20, "docker", "inspect", "--format", `{{index .Config.Labels "`+ownerLabel+`"}} {{.Config.Image}}`, id)
+		ctx, cancel := custodyCtx(30 * time.Second)
+		out, errout, e := custody.run(ctx, work, "", nil, 10*time.Second, 1<<20, 1<<20, "docker", "inspect", "--format", `{{index .Config.Labels "`+ownerLabel+`"}} {{.Config.Image}}`, id)
 		if e != nil && strings.Contains(strings.ToLower(out+errout), "no such object") {
 			cancel()
 			continue
@@ -1199,15 +1608,42 @@ func cleanupContainers(work, runID string, p pins, dockerRequired bool) error {
 			continue
 		}
 		failures = append(failures, fmt.Errorf("owned container leak %s", id))
-		out, errout, e = command(ctx, "", nil, 10*time.Second, 1<<20, 1<<20, "docker", "rm", "-f", id)
+		out, errout, e = custody.run(ctx, work, "", nil, 10*time.Second, 1<<20, 1<<20, "docker", "rm", "-f", id)
 		if e != nil {
 			failures = append(failures, fmt.Errorf("cleanup %s: %w %s %s", id, e, out, errout))
 		}
-		out, errout, e = command(ctx, "", nil, 10*time.Second, 1<<20, 1<<20, "docker", "inspect", id)
+		out, errout, e = custody.run(ctx, work, "", nil, 10*time.Second, 1<<20, 1<<20, "docker", "inspect", id)
 		if e == nil || !strings.Contains(strings.ToLower(out+errout), "no such object") {
 			failures = append(failures, fmt.Errorf("cleanup cannot verify removal %s", id))
 		}
 		cancel()
 	}
 	return errors.Join(failures...)
+}
+
+// writeShellEnv persists an exact environment as shell-quoted export lines.
+// Single-quote escaping preserves every byte of every value (including
+// newlines), so sourcing the file restores the declared environment exactly.
+func writeShellEnv(path string, env []string) error {
+	var b strings.Builder
+	for _, entry := range env {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok || !envKeyPattern.MatchString(key) {
+			return fmt.Errorf("guarded job environment entry %q is not exportable", entry)
+		}
+		b.WriteString("export ")
+		b.WriteString(key)
+		b.WriteByte('=')
+		b.WriteByte('\'')
+		b.WriteString(shellEscape(value))
+		b.WriteString("'\n")
+	}
+	return os.WriteFile(path, []byte(b.String()), 0600)
+}
+
+var envKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// shellEscape makes value safe inside single quotes in POSIX shell.
+func shellEscape(value string) string {
+	return strings.ReplaceAll(value, "'", `'\''`)
 }
