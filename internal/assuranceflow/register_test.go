@@ -129,15 +129,11 @@ func (p *flowProject) captureShape() tdd.Manifest {
 // ---- plan authoring (struct-first; the loader is the code under test) ----
 
 func flowPlanStruct(design string, milestones []string) tdd.Plan {
-	designDir := design
-	subject, anchor := "app/src.txt", "flow-anchor"
-	if design == "child" {
-		designDir, subject, anchor = "child", "child/src.txt", "child-anchor"
-	}
-	_ = designDir
 	srcDigest := flowSHA([]byte(flowSubject))
-	if subject == "child/src.txt" {
+	subject, anchor := "src.txt", "flow-anchor"
+	if design == "child" {
 		srcDigest = flowSHA([]byte(flowChildSub))
+		subject, anchor = "src.txt", "child-anchor"
 	}
 	ros := make([]tdd.RuntimeObligation, 0, len(protocol.RuntimeCategories))
 	for _, cat := range protocol.RuntimeCategories {
@@ -616,16 +612,34 @@ func TestRegisterSourceABA(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A -> B -> A with a genuinely NEW root generation: the original root
+	// moves away and an exact-byte copy takes its place, so content digests
+	// alone cannot detect the swap
 	swapped := filepath.Join(p.impl, "app.aba")
 	if err := os.Rename(app, swapped); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Rename(swapped, app); err != nil {
+	if err := os.Mkdir(app, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	filepath.WalkDir(swapped, func(path string, d os.DirEntry, err error) error {
+		if err != nil || path == swapped {
+			return err
+		}
+		rel, _ := filepath.Rel(swapped, path)
+		if d.IsDir() {
+			return os.MkdirAll(filepath.Join(app, rel), 0o755)
+		}
+		raw, rerr := os.ReadFile(path)
+		if rerr != nil {
+			return rerr
+		}
+		return os.WriteFile(filepath.Join(app, rel), raw, 0o644)
+	})
 	if err := snap.revalidate(); err == nil || !strings.Contains(err.Error(), "STALE_INPUT") {
 		t.Fatalf("root-generation ABA undetected: err = %v", err)
 	}
+	os.RemoveAll(swapped)
 	snap2, err := newControlSnapshot(app)
 	if err != nil {
 		t.Fatal(err)
@@ -644,13 +658,36 @@ func TestRegisterReviewMismatch(t *testing.T) {
 	bindPlan(t, p.impl, "app", []string{"M1"}, nil)
 	bindManifest(t, p.impl, "app", "M1", 1, "", true, p.refs(), nil)
 	planPath := filepath.Join(p.impl, "app", protocol.ControlDirName, protocol.PlanFileName)
-	flowWrite(t, planPath, strings.Replace(mustReadFile(t, planPath), "reviewed flow control", "reviewed flow control ", 1))
+	flowWrite(t, planPath, tamperFirstDigest(t, mustReadFile(t, planPath)))
 	if _, err := p.register(context.Background(), "app", nil, p.head0, io.Discard); err == nil || !strings.Contains(err.Error(), "STALE_INPUT") {
 		t.Fatalf("review mismatch accepted: err = %v", err)
 	}
 	if h := flowHead(t, p.store); h.Generation != 0 {
 		t.Fatal("failed registration consumed a revision")
 	}
+}
+
+// tamperFirstDigest flips the final hex digit of the first subject_digest
+// in a rendered control: the value stays grammatically valid but no longer
+// binds the projection (rationale text alone is not digest-bound).
+func tamperFirstDigest(t *testing.T, doc string) string {
+	t.Helper()
+	marker := `"subject_digest":"sha256:`
+	i := strings.Index(doc, marker)
+	if i < 0 {
+		t.Fatal("no subject digest found to tamper")
+	}
+	j := i + len(marker) + 64 - 1
+	if j >= len(doc) {
+		t.Fatal("short digest")
+	}
+	last := string(doc[j])
+	if last == "0" {
+		last = "1"
+	} else {
+		last = "0"
+	}
+	return doc[:j] + last + doc[j+1:]
 }
 
 // AC3: untargeted registered control mismatch blocks; registered milestone
@@ -662,9 +699,13 @@ func TestRegisterDraftAndDeletionMismatches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// edit the registered M2 bytes without selecting them
+	m1Path := filepath.Join(p.impl, "app", protocol.ControlDirName, protocol.MilestonesDirName, "M1.json")
+	// edit the registered M2 bytes without selecting them; advancing only
+	// M1 in the same design is blocked by the untargeted mismatch
+	m1Old := flowDigest(t, m1Path)
 	bindManifest(t, p.impl, "app", "M2", 1, "", true, []string{p.baseline, p.safeRef, p.unsafeRef, p.unsafeRef}, nil)
-	if _, err := p.register(context.Background(), "child", nil, first.HeadDigest(), io.Discard); err == nil || !strings.Contains(err.Error(), "STALE_INPUT") {
+	bindManifest(t, p.impl, "app", "M1", 2, m1Old, true, p.refs(), nil)
+	if _, err := p.register(context.Background(), "app", []string{"M1"}, first.HeadDigest(), io.Discard); err == nil || !strings.Contains(err.Error(), "STALE_INPUT") {
 		t.Fatalf("untargeted registered mismatch accepted: err = %v", err)
 	}
 	// restore M2, then delete the registered manifest file
@@ -672,13 +713,13 @@ func TestRegisterDraftAndDeletionMismatches(t *testing.T) {
 	if err := os.Remove(filepath.Join(p.impl, "app", protocol.ControlDirName, protocol.MilestonesDirName, "M2.json")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.register(context.Background(), "child", nil, first.HeadDigest(), io.Discard); err == nil || !strings.Contains(err.Error(), "MISSING_CONTRACT") {
+	if _, err := p.register(context.Background(), "app", []string{"M1"}, first.HeadDigest(), io.Discard); err == nil || !strings.Contains(err.Error(), "MISSING_CONTRACT") {
 		t.Fatalf("registered manifest deletion accepted: err = %v", err)
 	}
 	// restore the file, then remove the milestone from the plan
 	bindManifest(t, p.impl, "app", "M2", 1, "", true, p.refs(), nil)
 	bindPlan(t, p.impl, "app", []string{"M1"}, nil)
-	if _, err := p.register(context.Background(), "child", nil, first.HeadDigest(), io.Discard); err == nil || !strings.Contains(err.Error(), "MISSING_CONTRACT") {
+	if _, err := p.register(context.Background(), "app", []string{"M1"}, first.HeadDigest(), io.Discard); err == nil || !strings.Contains(err.Error(), "MISSING_CONTRACT") {
 		t.Fatalf("registered plan-entry deletion accepted: err = %v", err)
 	}
 	if h := flowHead(t, p.store); h.Generation != 1 {

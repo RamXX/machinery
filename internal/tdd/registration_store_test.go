@@ -357,7 +357,7 @@ func TestRegistrationGraphValidation(t *testing.T) {
 	}
 	// a cross-design reference resolves only through an exactly registered
 	// manifest; an unregistered child design blocks registration
-	childRef := TestRef{Design: "child", Milestone: "M1", Suite: "s1", Test: "c1"}
+	childRef := TestRef{Design: "child", Milestone: "M1", Suite: "s1", Test: "t1"}
 	parent := f.m1
 	parent.Obligations = append([]Obligation{{Key: ObligationKey{Design: ".", Kind: KindOracleRow, Owner: "machines/Alpha.oracle.md", ID: "alpha-s1"}, Positive: []TestRef{childRef}}}, f.m1.Obligations...)
 	if err := ValidateRegistrationGraph(f.plan, []Manifest{parent}, nil, inv); err == nil || !strings.Contains(err.Error(), "MISSING_TEST") {
@@ -529,8 +529,10 @@ func TestCommitRegistrationConcurrentWriters(t *testing.T) {
 					idem++
 				}
 			}
-			if wins != 1 {
-				t.Fatalf("commits = %d, want exactly 1", wins)
+			// exactly one durable commit; the identical-payload loser only
+			// confirms the already-registered exception
+			if wins-idem != 1 {
+				t.Fatalf("commits = %d, want exactly 1", wins-idem)
 			}
 			if tc.want == "idempotent" && idem != 1 {
 				t.Fatalf("idempotent confirmations = %d, want 1", idem)
