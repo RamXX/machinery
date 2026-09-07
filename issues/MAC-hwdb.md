@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-07T08:19:15Z
-content_hash: "sha256:d5b9d806fe568e14a77660198c21a53a1ab0b763dde6ea2ae713948e7df71744"
+content_hash: "sha256:b1ae182c5da3ab43b9c30279f92215e1d4fa7864b00bd6a95302fd16011322a9"
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp, MAC-yhg5]
@@ -95,7 +95,7 @@ CONSUMES:
   endpoint: go run ./scripts/integration-lane --lane required (Makefile test-integration invokes same entrypoint).
 Additional acceptance criteria: fragment matches actual test sources both directions; all registered cases actually start/terminate with expected positive/negative outcomes; no cached/skipped/empty/partial/fabricated-summary success; real provisioned positive and missing-runtime/fresh-cache failure diagnostics; no owned container/process leaks. Required local preflight and hosted CI execute the same union. Do not edit shared root inventory; own only this fragment. RED source, fixture, fragment and runner configuration are frozen together after review. Any exact test names introduced in RED must remain registered through GREEN.
 No heavy preflight until final gate; no GitHub mutation; no active installation replacement. This note supersedes any earlier command implying service-backed tests execute in unprovisioned ordinary package suites.
-
+COMPLETED: RED 7865d3f (15 intended assertion failures/15 controls green, wrapper+fragment opencode.json frozen, lane inventory acceptance proven via pins-stop) -> GREEN eb5cd68 (30/30 node --test adapters/opencode/plugins/machinery.test.mjs, 0 skips; wrapper green; go build ./... ok; TestOpenCodeAdapterContracts ok; internal/install targeted artifact tests ok; scripts/integration-lane ok). defaultRunner: 600s deadline + independent 1MiB stdout/stderr ceilings, SIGTERM->750ms->SIGKILL escalation, stream/stdin destruction, single settle flag across error/close/deadline/overflow/EPIPE; runMachinery validates response shapes (allow/deny/block/systemMessage only, ask+unknown+combined+non-object block), truncation blocks. Native adversarial children (hang, SIGTERM-ignore, floods, early-exit, garbage, wrong-shape) all bounded with ps-proven termination and zero retained children; positive real built binary deny round trip on managed root. Bun 1.0.26 run: module+validation matrix green (bun-run3.txt); Bun bare-name child_process PATH resolution is defective (stale resolution + sync throw) - documented residual, not claimed. Post-RED repair: preexisting fakeRunner now forwards result fields (...rest), re-RED proven against unchanged production (genuine assertion failure), disclosed for PM review. Diff 777 lines/4 files: 633 excl anchor-mandated lane wrapper+fragment (144) vs 650 budget - flagged for PM adjudication. Full record: /tmp/MAC-hwdb-delivery/RECORD.md. IN PROGRESS: PM acceptance. NEXT: independent PM replay.
 
 ## nd_contract
 status: delivered
