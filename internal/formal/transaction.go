@@ -451,7 +451,8 @@ func formalJournalChangeID(info os.FileInfo) string {
 		}
 		sec, nsec := field.FieldByName("Sec"), field.FieldByName("Nsec")
 		if sec.IsValid() && nsec.IsValid() && sec.CanInt() && nsec.CanInt() {
-			return fmt.Sprintf("ctime:%d:%d", sec.Int(), nsec.Int())
+			coarseSec, coarseNsec := formalCoarsenWitnessTime(sec.Int(), nsec.Int())
+			return fmt.Sprintf("ctime:%d:%d", coarseSec, coarseNsec)
 		}
 	}
 	sec, nsec := value.FieldByName("Ctime"), value.FieldByName("Ctimensec")
@@ -469,6 +470,7 @@ func formalJournalChangeID(info os.FileInfo) string {
 			nsecValue, nsecOK = int64(nsec.Uint()), true
 		}
 		if secOK && nsecOK {
+			secValue, nsecValue = formalCoarsenWitnessTime(secValue, nsecValue)
 			return fmt.Sprintf("ctime:%d:%d", secValue, nsecValue)
 		}
 	}
