@@ -8,11 +8,11 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-07T07:22:57Z
-content_hash: "sha256:3405e17cb202e459ae4d7d606aef2e31170dc64de1d40850e6e1c4d5a0a81426"
+updated_at: 2026-09-07T08:19:14Z
+content_hash: "sha256:49a05bf661ef95e12096ff00661b084bdaa67d7dcd59a7d79fe2c0cb5740119a"
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-hpqp]
-follows: [MAC-hpqp]
+follows: [MAC-hpqp, MAC-yhg5]
 assignee: dev-MAC-hwdb
 ---
 
@@ -103,11 +103,13 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
 - 2026-09-07T07:22:57Z status: open -> in_progress
 - 2026-09-07T07:22:57Z auto-follows: linked to predecessor MAC-hpqp
+- 2026-09-07T08:19:14Z status: in_progress -> in_progress
+- 2026-09-07T08:19:14Z auto-follows: linked to predecessor MAC-yhg5
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 - Was blocked by: [[MAC-hpqp]]
-- Follows: [[MAC-hpqp]]
+- Follows: [[MAC-hpqp]], [[MAC-yhg5]]
 
 ## Comments
