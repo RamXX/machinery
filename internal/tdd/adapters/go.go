@@ -81,14 +81,17 @@ var _ tdd.Adapter = (*GoAdapter)(nil)
 func Go() *GoAdapter { return &GoAdapter{} }
 
 // Lookup resolves one closed adapter identity. MAC-wi2u registered the go
-// adapter and MAC-avfp the TypeScript adapter through this same registry
-// seam; the union resolves both closed first-release identities.
+// adapter, MAC-avfp the TypeScript adapter and MAC-imtz the Python adapter
+// through this same registry seam; the union resolves the closed
+// first-release identities delivered so far.
 func Lookup(id string) (tdd.Adapter, error) {
 	switch id {
 	case AdapterGoTesting:
 		return Go(), nil
 	case AdapterNodeTestTS:
 		return TypeScript(), nil
+	case AdapterPythonUnittest:
+		return Python(), nil
 	}
 	return nil, fmt.Errorf("UNSUPPORTED_ADAPTER: %q is not a closed first-release native adapter", id)
 }

@@ -67,13 +67,17 @@ func witnessOutput(test, id, site string, line int64, value bool) string {
 }
 
 // TestLookupExposesOnlyClosedGoAdapter: the closed adapter resolves and every
-// other identity fails UNSUPPORTED_ADAPTER.
+// foreign identity fails UNSUPPORTED_ADAPTER. RED supersession (MAC-imtz,
+// justified in the RED record): the frozen entry "python-unittest/v1" became
+// a closed registered adapter through the documented Lookup seam and is
+// replaced here by the permanently-foreign "python-pytest/v1", which the
+// contract explicitly excludes from every future catalog.
 func TestLookupExposesOnlyClosedGoAdapter(t *testing.T) {
 	adapter, err := Lookup(AdapterGoTesting)
 	if err != nil || adapter.ID() != AdapterGoTesting {
 		t.Fatalf("closed go adapter must resolve: %v %+v", err, adapter)
 	}
-	for _, id := range []string{"rust-cargo/v1", "go-testing/v2", "", "python-unittest/v1"} {
+	for _, id := range []string{"rust-cargo/v1", "go-testing/v2", "", "python-pytest/v1"} {
 		if _, err := Lookup(id); err == nil || !strings.Contains(err.Error(), "UNSUPPORTED_ADAPTER") {
 			t.Fatalf("lookup %q must fail UNSUPPORTED_ADAPTER, got %v", id, err)
 		}
