@@ -168,7 +168,7 @@ func (a *GoAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.Prep
 		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s requires held input view callbacks", req.Suite.ID)
 	}
 	if err := req.Inputs.Revalidate(); err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: the held input view of suite %s failed revalidation: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: the held input view of suite %s failed revalidation: %w", req.Suite.ID, err)
 	}
 	for _, test := range req.Suite.Tests {
 		if !goImportPathPattern.MatchString(test.Native.Package) || strings.HasPrefix(test.Native.Package, "-") {
@@ -177,7 +177,7 @@ func (a *GoAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.Prep
 	}
 	limits, err := processscope.NormalizeLimits(processscope.Limits(req.Limits))
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s limits: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s limits: %w", req.Suite.ID, err)
 	}
 	for _, dir := range []string{"home", "tmp", "gocache", "gomodcache", "gopath", "build"} {
 		if err := os.MkdirAll(filepath.Join(req.Scratch, dir), 0o700); err != nil {
@@ -193,7 +193,7 @@ func (a *GoAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.Prep
 	storeRoot := filepath.Dir(filepath.Dir(objectRoot))
 	projectID, err := goStoreProjectID(storeRoot)
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: suite %s store identity: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: suite %s store identity: %w", req.Suite.ID, err)
 	}
 	moduleDir := filepath.Join(req.Scratch, "module")
 	if err := tdd.MaterializeBundle(ctx, storeRoot, projectID, req.Source.Ref(), moduleDir); err != nil {
@@ -208,21 +208,21 @@ func (a *GoAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.Prep
 		return tdd.PreparedSuite{}, fmt.Errorf("CUSTODY_ERROR: writing the helper transport: %w", err)
 	}
 	if readback, err := os.ReadFile(helperPath); err != nil || !bytes.Equal(readback, goHelperSource) {
-		return tdd.PreparedSuite{}, fmt.Errorf("CUSTODY_ERROR: the materialized helper transport does not round-trip its pinned bytes: %v", err)
+		return tdd.PreparedSuite{}, fmt.Errorf("CUSTODY_ERROR: the materialized helper transport does not round-trip its pinned bytes: %w", err)
 	}
 	if sum := fmt.Sprintf("%x", sha256.Sum256(goHelperSource)); sum != GoHelperPinnedSHA256 {
 		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: the embedded helper transport does not match its frozen pin sha256:%s", sum)
 	}
 	modulePath, err := goModulePath(moduleDir)
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s module: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s module: %w", req.Suite.ID, err)
 	}
 	if err := validateGoSuiteSources(moduleDir, modulePath, &req.Suite); err != nil {
 		return tdd.PreparedSuite{}, fmt.Errorf("suite %s frozen sources: %w", req.Suite.ID, err)
 	}
 	env, err := buildGoEnv(req.Scratch, goRootOf(handle.Binary()), req.Suite.Environment)
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s environment: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s environment: %w", req.Suite.ID, err)
 	}
 	// Build-selection proof: every declared package must exist and every
 	// declared test source must be part of the native test compilation.
@@ -371,7 +371,7 @@ func (p *goPrepared) verifyUnchanged() error {
 	for name, want := range p.fileDigests {
 		got, err := goHashFile(filepath.Join(p.moduleDir, filepath.FromSlash(name)))
 		if err != nil || got != want {
-			return fmt.Errorf("STALE_INPUT: prepared source %s changed after preparation (want sha256:%s, got %s: %v)", name, want, got, err)
+			return fmt.Errorf("STALE_INPUT: prepared source %s changed after preparation (want sha256:%s, got %s: %w)", name, want, got, err)
 		}
 	}
 	return nil
@@ -389,7 +389,7 @@ func goHashFile(path string) (string, error) {
 func goStoreProjectID(storeRoot string) (string, error) {
 	raw, err := os.ReadFile(filepath.Join(storeRoot, "store.json"))
 	if err != nil || len(raw) > 1<<20 {
-		return "", fmt.Errorf("cannot read the store identity: %v", err)
+		return "", fmt.Errorf("cannot read the store identity: %w", err)
 	}
 	var doc map[string]any
 	if err := json.Unmarshal(raw, &doc); err != nil {
@@ -409,7 +409,7 @@ func goStoreProjectID(storeRoot string) (string, error) {
 func goModulePath(moduleDir string) (string, error) {
 	raw, err := os.ReadFile(filepath.Join(moduleDir, "go.mod"))
 	if err != nil || len(raw) > 1<<20 {
-		return "", fmt.Errorf("cannot read go.mod: %v", err)
+		return "", fmt.Errorf("cannot read go.mod: %w", err)
 	}
 	for _, line := range strings.Split(string(raw), "\n") {
 		fields := strings.Fields(strings.TrimSpace(line))
@@ -441,7 +441,7 @@ func goSuitePackages(suite *tdd.Suite) []string {
 func goProveBuildSelection(ctx context.Context, scope processscope.Scope, handle *runtimeclosure.Go, moduleDir string, env []string, pkg string, suite *tdd.Suite) error {
 	listOut, err := goRunTool(ctx, scope, handle, moduleDir, env, goListTimeoutMS, "list", "-json", "-test", pkg)
 	if err != nil {
-		return fmt.Errorf("BUILD_ERROR: suite %s package %s selection failed: %v", suite.ID, pkg, err)
+		return fmt.Errorf("BUILD_ERROR: suite %s package %s selection failed: %w", suite.ID, pkg, err)
 	}
 	decoder := json.NewDecoder(bytes.NewReader(listOut))
 	found := false
@@ -452,7 +452,7 @@ func goProveBuildSelection(ctx context.Context, scope processscope.Scope, handle
 			XTestGoFiles []string
 		}
 		if err := decoder.Decode(&listed); err != nil {
-			return fmt.Errorf("BUILD_ERROR: package %s list output is malformed: %v", pkg, err)
+			return fmt.Errorf("BUILD_ERROR: package %s list output is malformed: %w", pkg, err)
 		}
 		if listed.ImportPath != pkg {
 			continue
@@ -480,7 +480,7 @@ func goProveBuildSelection(ctx context.Context, scope processscope.Scope, handle
 	}
 	binary := filepath.Join(filepath.Dir(moduleDir), "build", path.Base(pkg)+".test")
 	if _, err := goRunTool(ctx, scope, handle, moduleDir, env, goCompileTimeout, "test", "-c", "-o", binary, pkg); err != nil {
-		return fmt.Errorf("BUILD_ERROR: suite %s package %s did not compile: %v", suite.ID, pkg, err)
+		return fmt.Errorf("BUILD_ERROR: suite %s package %s did not compile: %w", suite.ID, pkg, err)
 	}
 	return nil
 }
@@ -700,7 +700,7 @@ func parseGoTestStream(raw []byte) ([]goJSONEvent, error) {
 		}
 		var doc map[string]json.RawMessage
 		if err := json.Unmarshal([]byte(line), &doc); err != nil {
-			return nil, fmt.Errorf("INVALID_SCHEMA: native stream line %d is not a JSON object: %v", lineNumber+1, err)
+			return nil, fmt.Errorf("INVALID_SCHEMA: native stream line %d is not a JSON object: %w", lineNumber+1, err)
 		}
 		for key := range doc {
 			if !goStreamKeys[key] {
@@ -1036,12 +1036,12 @@ func validateGoSuiteSources(moduleDir, modulePath string, suite *tdd.Suite) erro
 		}
 		body, err := os.ReadFile(filepath.Join(moduleDir, filepath.FromSlash(name)))
 		if err != nil {
-			return fmt.Errorf("MISSING_TEST: suite source %s is not part of the materialized module: %v", name, err)
+			return fmt.Errorf("MISSING_TEST: suite source %s is not part of the materialized module: %w", name, err)
 		}
 		fset := token.NewFileSet()
 		parsed, err := parser.ParseFile(fset, name, body, 0)
 		if err != nil {
-			return fmt.Errorf("INVALID_SCHEMA: suite source %s does not parse: %v", name, err)
+			return fmt.Errorf("INVALID_SCHEMA: suite source %s does not parse: %w", name, err)
 		}
 		info := &goSourceFile{fset: fset, file: parsed, funcs: map[string]*ast.FuncDecl{}, runCalls: map[string][]tRunCall{}}
 		for _, spec := range parsed.Imports {

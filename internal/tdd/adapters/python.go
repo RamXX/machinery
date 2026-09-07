@@ -211,7 +211,7 @@ func (a *PythonAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.
 	}
 	limits, err := processscope.NormalizeLimits(processscope.Limits(req.Limits))
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s limits: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s limits: %w", req.Suite.ID, err)
 	}
 	for _, dir := range []string{"home", "tmp"} {
 		if err := os.MkdirAll(filepath.Join(req.Scratch, dir), 0o700); err != nil {
@@ -227,7 +227,7 @@ func (a *PythonAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.
 	storeRoot := filepath.Dir(filepath.Dir(objectRoot))
 	projectID, err := goStoreProjectID(storeRoot)
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: suite %s store identity: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: suite %s store identity: %w", req.Suite.ID, err)
 	}
 	suiteDir := filepath.Join(req.Scratch, "suite")
 	if err := tdd.MaterializeBundle(ctx, storeRoot, projectID, req.Source.Ref(), suiteDir); err != nil {
@@ -251,7 +251,7 @@ func (a *PythonAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.
 		}
 		readback, err := os.ReadFile(target)
 		if err != nil || !bytes.Equal(readback, body) {
-			return tdd.PreparedSuite{}, fmt.Errorf("CUSTODY_ERROR: the materialized asset %s does not round-trip its pinned bytes: %v", name, err)
+			return tdd.PreparedSuite{}, fmt.Errorf("CUSTODY_ERROR: the materialized asset %s does not round-trip its pinned bytes: %w", name, err)
 		}
 	}
 	// No stale bytecode may exist in the prepared suite tree: CPython
@@ -265,7 +265,7 @@ func (a *PythonAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.
 	}
 	probeEnv, err := buildPythonEnv(req.Scratch, req.Suite.Environment)
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s environment: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s environment: %w", req.Suite.ID, err)
 	}
 	bootstrap := filepath.Join(suiteDir, PythonBootstrapFile)
 	// Static validation probe: every registered assertion call site, the
@@ -298,7 +298,7 @@ func (a *PythonAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.
 	}
 	env, err := buildPythonEnv(req.Scratch, req.Suite.Environment)
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s environment: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s environment: %w", req.Suite.ID, err)
 	}
 	suiteCopy := req.Suite
 	return tdd.NewPreparedSuite(&pythonPrepared{
@@ -440,7 +440,7 @@ func (p *pythonPrepared) verifyUnchanged() error {
 	for name, want := range p.fileDigests {
 		got, err := goHashFile(filepath.Join(p.suiteDir, filepath.FromSlash(name)))
 		if err != nil || got != want {
-			return fmt.Errorf("STALE_INPUT: prepared source %s changed after preparation (want sha256:%s, got %s: %v)", name, want, got, err)
+			return fmt.Errorf("STALE_INPUT: prepared source %s changed after preparation (want sha256:%s, got %s: %w)", name, want, got, err)
 		}
 	}
 	return nil
@@ -484,7 +484,7 @@ func pythonProbeVerdict(raw []byte, kind string) error {
 		Line    int64  `json:"line"`
 	}
 	if err := json.Unmarshal(bytes.TrimSpace(raw), &doc); err != nil {
-		return fmt.Errorf("INVALID_SCHEMA: the %s verdict is not a closed JSON object: %v", kind, err)
+		return fmt.Errorf("INVALID_SCHEMA: the %s verdict is not a closed JSON object: %w", kind, err)
 	}
 	if doc.Schema != PythonHarnessSchema || doc.Kind != kind {
 		return fmt.Errorf("INVALID_SCHEMA: the verdict is not the closed %s record", kind)
@@ -510,7 +510,7 @@ func pythonReconcileDiscovery(raw []byte, suite *tdd.Suite) error {
 		Tests   []string `json:"tests"`
 	}
 	if err := json.Unmarshal(bytes.TrimSpace(raw), &doc); err != nil {
-		return fmt.Errorf("INVALID_SCHEMA: the discovery verdict is not a closed JSON object: %v", err)
+		return fmt.Errorf("INVALID_SCHEMA: the discovery verdict is not a closed JSON object: %w", err)
 	}
 	if doc.Schema != PythonHarnessSchema || doc.Kind != "discover" {
 		return fmt.Errorf("INVALID_SCHEMA: the verdict is not the closed discovery record")
@@ -839,7 +839,7 @@ func parsePythonReport(raw []byte) ([]pythonReportRecord, error) {
 		}
 		var doc map[string]json.RawMessage
 		if err := json.Unmarshal([]byte(line), &doc); err != nil {
-			return nil, fmt.Errorf("INVALID_SCHEMA: harness report line %d is not a JSON object: %v", i+1, err)
+			return nil, fmt.Errorf("INVALID_SCHEMA: harness report line %d is not a JSON object: %w", i+1, err)
 		}
 		var schema, kind string
 		if err := json.Unmarshal(doc["schema"], &schema); err != nil {
@@ -923,7 +923,7 @@ func parsePythonReport(raw []byte) ([]pythonReportRecord, error) {
 			}
 		}
 		if err != nil {
-			return nil, fmt.Errorf("INVALID_SCHEMA: harness report line %d is malformed for kind %q: %v", i+1, kind, err)
+			return nil, fmt.Errorf("INVALID_SCHEMA: harness report line %d is malformed for kind %q: %w", i+1, kind, err)
 		}
 		records = append(records, record)
 	}

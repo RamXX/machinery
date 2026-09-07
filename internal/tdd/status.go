@@ -42,7 +42,7 @@ func Status(ctx context.Context, req StatusRequest) (StatusReport, error) {
 		return StatusReport{}, err
 	}
 	if err := req.Inputs.Revalidate(); err != nil {
-		return StatusReport{}, fmt.Errorf("STALE_INPUT: the held InputView failed revalidation: %v", err)
+		return StatusReport{}, fmt.Errorf("STALE_INPUT: the held InputView failed revalidation: %w", err)
 	}
 	if err := ValidateStorePlacement(req.Store, req.Inputs.SourceRoot, req.Inputs.ControlRoot); err != nil {
 		return StatusReport{}, err

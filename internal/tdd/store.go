@@ -334,7 +334,7 @@ func decodeHeadClosed(raw []byte) (headDoc, error) {
 			return headDoc{}, err
 		}
 		if err := validateRootPath(d); err != nil {
-			return headDoc{}, fmt.Errorf("INVALID_SCHEMA: %s.design: %v", where, err)
+			return headDoc{}, fmt.Errorf("INVALID_SCHEMA: %s.design: %w", where, err)
 		}
 		pd, err := reqStr(po, "plan_digest", where+".plan_digest")
 		if err != nil {
@@ -364,7 +364,7 @@ func decodeHeadClosed(raw []byte) (headDoc, error) {
 			return headDoc{}, err
 		}
 		if err := validateRootPath(d); err != nil {
-			return headDoc{}, fmt.Errorf("INVALID_SCHEMA: %s.design: %v", where, err)
+			return headDoc{}, fmt.Errorf("INVALID_SCHEMA: %s.design: %w", where, err)
 		}
 		mid, err := reqStr(mo, "milestone", where+".milestone")
 		if err != nil {
@@ -465,7 +465,7 @@ func ValidateStorePlacement(storePath string, governedRoots ...string) error {
 func resolveForPlacement(p string) (string, error) {
 	abs, err := filepath.Abs(p)
 	if err != nil {
-		return "", fmt.Errorf("INVALID_SCHEMA: cannot resolve %s: %v", p, err)
+		return "", fmt.Errorf("INVALID_SCHEMA: cannot resolve %s: %w", p, err)
 	}
 	abs = filepath.Clean(abs)
 	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
@@ -563,7 +563,7 @@ func validateHeadChain(root string, head headDoc, headDigest string) error {
 		}
 		prev, err := decodeHeadClosed(prevRaw)
 		if err != nil {
-			return fmt.Errorf("CONTROL_ROLLBACK: predecessor head %s does not decode: %v", cur.Previous, err)
+			return fmt.Errorf("CONTROL_ROLLBACK: predecessor head %s does not decode: %w", cur.Previous, err)
 		}
 		if prev.Generation != cur.Generation-1 {
 			return fmt.Errorf("CONTROL_ROLLBACK: chain discontinuity: generation %d is preceded by generation %d", cur.Generation, prev.Generation)
@@ -600,7 +600,7 @@ func validateHeadChain(root string, head headDoc, headDigest string) error {
 		}
 		arc, derr := decodeHeadClosed(rawArc)
 		if derr != nil {
-			return fmt.Errorf("CONTROL_ROLLBACK: archived head %s does not decode: %v", dig, derr)
+			return fmt.Errorf("CONTROL_ROLLBACK: archived head %s does not decode: %w", dig, derr)
 		}
 		if arc.Generation == head.Generation+1 {
 			if arc.Previous == headDigest {
@@ -794,7 +794,7 @@ func InitStore(ctx context.Context, path, projectID string) (StoreInitResult, er
 		cctx, ccancel := cleanupContext()
 		defer ccancel()
 		if rmErr := os.RemoveAll(path); rmErr != nil {
-			return StoreInitResult{}, fmt.Errorf("%w; cleanup also failed: %v", err, rmErr)
+			return StoreInitResult{}, fmt.Errorf("%w; cleanup also failed: %w", err, rmErr)
 		}
 		_ = cctx
 		return StoreInitResult{}, err
@@ -1106,7 +1106,7 @@ func ImportStore(ctx context.Context, destPath, archivePath, projectID, expected
 		defer ccancel()
 		_ = cctx
 		if rmErr := os.RemoveAll(staging); rmErr != nil {
-			return StoreImportResult{}, fmt.Errorf("%w; staging cleanup also failed: %v", err, rmErr)
+			return StoreImportResult{}, fmt.Errorf("%w; staging cleanup also failed: %w", err, rmErr)
 		}
 		return StoreImportResult{}, err
 	}
@@ -1245,7 +1245,7 @@ func decodeExportIndex(raw []byte) (entries []importIndexEntry, id StoreIdentity
 			return nil, id, "", 0, 0, fmt.Errorf("OUTPUT_LIMIT: %s declares size %d beyond the bundle bound", where, e.size)
 		}
 		if err := validateArchivePath(e.path, e.kind); err != nil {
-			return nil, id, "", 0, 0, fmt.Errorf("INVALID_SCHEMA: %s: %v", where, err)
+			return nil, id, "", 0, 0, fmt.Errorf("INVALID_SCHEMA: %s: %w", where, err)
 		}
 		if seen[e.path] {
 			return nil, id, "", 0, 0, fmt.Errorf("INVALID_SCHEMA: %s: duplicate path %q", where, e.path)

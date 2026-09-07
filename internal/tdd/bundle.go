@@ -173,7 +173,7 @@ func decodeBundleClosed(raw []byte) ([]bundleEntryData, string, error) {
 			return nil, "", err
 		}
 		if err := validateRootPath(e.Path); err != nil {
-			return nil, "", fmt.Errorf("INVALID_SCHEMA: %s.path: %v", where, err)
+			return nil, "", fmt.Errorf("INVALID_SCHEMA: %s.path: %w", where, err)
 		}
 		e.Kind, err = reqStr(eo, "kind", where+".kind")
 		if err != nil {
@@ -368,7 +368,7 @@ func MaterializeBundle(ctx context.Context, storePath, projectID, ref, dest stri
 		defer ccancel()
 		_ = cctx
 		if rmErr := os.RemoveAll(dest); rmErr != nil {
-			return fmt.Errorf("%w; cleanup also failed: %v", err, rmErr)
+			return fmt.Errorf("%w; cleanup also failed: %w", err, rmErr)
 		}
 		return err
 	}

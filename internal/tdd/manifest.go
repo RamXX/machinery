@@ -703,7 +703,7 @@ func decodeTestRef(o *ir.Object, where string) (TestRef, error) {
 		return TestRef{}, err
 	}
 	if err := validateRootPath(d); err != nil {
-		return TestRef{}, fmt.Errorf("INVALID_SCHEMA: %s.design: %v", where, err)
+		return TestRef{}, fmt.Errorf("INVALID_SCHEMA: %s.design: %w", where, err)
 	}
 	m, err := reqStr(o, "milestone", where+".milestone")
 	if err != nil {
@@ -793,7 +793,7 @@ func decodePlan(doc *ir.Value, designDir, payloadDigest string, raw []byte) (Pla
 		return Plan{}, err
 	}
 	if err := validateRootPath(design); err != nil {
-		return Plan{}, fmt.Errorf("INVALID_SCHEMA: plan.json.design: %v", err)
+		return Plan{}, fmt.Errorf("INVALID_SCHEMA: plan.json.design: %w", err)
 	}
 	if design != protocol.RepositoryRoot {
 		clean := filepath.ToSlash(filepath.Clean(designDir))
@@ -828,7 +828,7 @@ func decodePlan(doc *ir.Value, designDir, payloadDigest string, raw []byte) (Pla
 			return Plan{}, err
 		}
 		if err := validatePath(manifest); err != nil {
-			return Plan{}, fmt.Errorf("INVALID_SCHEMA: %s.manifest: %v", where, err)
+			return Plan{}, fmt.Errorf("INVALID_SCHEMA: %s.manifest: %w", where, err)
 		}
 		want := path.Join(design, protocol.ControlDirName, protocol.MilestonesDirName, id+".json")
 		if manifest != want {
@@ -902,7 +902,7 @@ func decodePlan(doc *ir.Value, designDir, payloadDigest string, raw []byte) (Pla
 				return Plan{}, err
 			}
 			if err := validatePath(sp); err != nil {
-				return Plan{}, fmt.Errorf("INVALID_SCHEMA: %s.path: %v", swhere, err)
+				return Plan{}, fmt.Errorf("INVALID_SCHEMA: %s.path: %w", swhere, err)
 			}
 			anchor, err := reqStr(so, "anchor", swhere+".anchor")
 			if err != nil {
@@ -959,7 +959,7 @@ func decodePlan(doc *ir.Value, designDir, payloadDigest string, raw []byte) (Pla
 			sp := filepath.Join(designDir, filepath.FromSlash(sr.Path))
 			data, err := readPayloadFile(sp)
 			if err != nil {
-				return Plan{}, fmt.Errorf("MISSING_CONTRACT: plan.json.runtime_obligations[%d].source_refs[%d]: %v", i, j, err)
+				return Plan{}, fmt.Errorf("MISSING_CONTRACT: plan.json.runtime_obligations[%d].source_refs[%d]: %w", i, j, err)
 			}
 			sum := "sha256:" + hex.EncodeToString(sha256Sum(data))
 			if sum != sr.Digest {
@@ -1296,7 +1296,7 @@ func decodeManifest(doc *ir.Value, msPath, designID, designDir, payloadDigest st
 		}
 		for i, v := range vals {
 			if err := validateRootPath(v); err != nil {
-				return nil, fmt.Errorf("INVALID_SCHEMA: %s.%s[%d]: %v", msPath, key, i, err)
+				return nil, fmt.Errorf("INVALID_SCHEMA: %s.%s[%d]: %w", msPath, key, i, err)
 			}
 		}
 		if err := rejectDuplicates(vals, msPath+"."+key); err != nil {
@@ -1328,7 +1328,7 @@ func decodeManifest(doc *ir.Value, msPath, designID, designDir, payloadDigest st
 			return Manifest{}, err
 		}
 		if err := validateRootPath(sp); err != nil {
-			return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.path: %v", where, err)
+			return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.path: %w", where, err)
 		}
 		kind, err := reqStr(so, "kind", where+".kind")
 		if err != nil {
@@ -1418,7 +1418,7 @@ func decodeManifest(doc *ir.Value, msPath, designID, designDir, payloadDigest st
 			return Manifest{}, err
 		}
 		if err := validateRootPath(s.Root); err != nil {
-			return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.root: %v", where, err)
+			return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.root: %w", where, err)
 		}
 		s.Files, err = reqStrArray(so, "files", where+".files")
 		if err != nil {
@@ -1426,7 +1426,7 @@ func decodeManifest(doc *ir.Value, msPath, designID, designDir, payloadDigest st
 		}
 		for j, f := range s.Files {
 			if err := validatePath(f); err != nil {
-				return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.files[%d]: %v", where, j, err)
+				return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.files[%d]: %w", where, j, err)
 			}
 		}
 		if err := rejectDuplicates(s.Files, where+".files"); err != nil {
@@ -1441,7 +1441,7 @@ func decodeManifest(doc *ir.Value, msPath, designID, designDir, payloadDigest st
 		}
 		for j, d := range deps {
 			if err := validateRootPath(d); err != nil {
-				return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.dependency_roots[%d]: %v", where, j, err)
+				return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.dependency_roots[%d]: %w", where, j, err)
 			}
 		}
 		if err := rejectDuplicates(deps, where+".dependency_roots"); err != nil {
@@ -1512,7 +1512,7 @@ func decodeManifest(doc *ir.Value, msPath, designID, designDir, payloadDigest st
 				return Manifest{}, err
 			}
 			if err := validatePath(tst.Source); err != nil {
-				return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.source: %v", twhere, err)
+				return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.source: %w", twhere, err)
 			}
 			tst.Role, err = reqStr(to, "role", twhere+".role")
 			if err != nil {
@@ -1553,7 +1553,7 @@ func decodeManifest(doc *ir.Value, msPath, designID, designDir, payloadDigest st
 					return Manifest{}, err
 				}
 				if err := validatePath(a.Source); err != nil {
-					return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.source: %v", awhere, err)
+					return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.source: %w", awhere, err)
 				}
 				a.Line, err = reqInt(ao, "line", awhere+".line")
 				if err != nil {
@@ -1598,7 +1598,7 @@ func decodeManifest(doc *ir.Value, msPath, designID, designDir, payloadDigest st
 			return Manifest{}, err
 		}
 		if err := validateRootPath(key.Design); err != nil {
-			return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.key.design: %v", where, err)
+			return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.key.design: %w", where, err)
 		}
 		key.Kind, err = reqStr(ko, "kind", where+".key.kind")
 		if err != nil {
@@ -1773,7 +1773,7 @@ func decodeManifest(doc *ir.Value, msPath, designID, designDir, payloadDigest st
 		}
 		for j, in := range c.Inputs {
 			if err := validatePath(in); err != nil {
-				return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.inputs[%d]: %v", where, j, err)
+				return Manifest{}, fmt.Errorf("INVALID_SCHEMA: %s.inputs[%d]: %w", where, j, err)
 			}
 		}
 		m.Checks = append(m.Checks, c)
@@ -2005,7 +2005,7 @@ func adjacentDesignID(msPath string) (string, string, error) {
 	}
 	d := v.AsString()
 	if err := validateRootPath(d); err != nil {
-		return "", "", fmt.Errorf("INVALID_SCHEMA: adjacent plan.json design: %v", err)
+		return "", "", fmt.Errorf("INVALID_SCHEMA: adjacent plan.json design: %w", err)
 	}
 	return d, designDir, nil
 }

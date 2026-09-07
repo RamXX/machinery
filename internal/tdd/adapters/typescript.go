@@ -245,7 +245,7 @@ func (a *TypeScriptAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (
 	storeRoot := filepath.Dir(filepath.Dir(req.Source.Materialized()))
 	projectID, err := tsStoreProjectID(storeRoot)
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: suite %s store identity: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: suite %s store identity: %w", req.Suite.ID, err)
 	}
 	bundleDir := filepath.Join(req.Scratch, "bundle")
 	if err := os.MkdirAll(req.Scratch, 0o755); err != nil {
@@ -409,7 +409,7 @@ const tsCompileOutput = 1 << 22
 func tsStoreProjectID(storeRoot string) (string, error) {
 	raw, err := os.ReadFile(filepath.Join(storeRoot, "store.json"))
 	if err != nil || len(raw) > 1<<20 {
-		return "", fmt.Errorf("cannot read the store identity: %v", err)
+		return "", fmt.Errorf("cannot read the store identity: %w", err)
 	}
 	var doc map[string]any
 	if err := json.Unmarshal(raw, &doc); err != nil {
@@ -465,7 +465,7 @@ func tsRunScoped(ctx context.Context, scope processscope.Scope, argv []string, d
 	if runErr != nil {
 		var scopeErr *processscope.Error
 		if errors.As(runErr, &scopeErr) {
-			return fmt.Errorf("%s: guarded command failed: %v", scopeErr.Code, runErr)
+			return fmt.Errorf("%s: guarded command failed: %w", scopeErr.Code, runErr)
 		}
 		return fmt.Errorf("CUSTODY_ERROR: guarded command failed: %w", runErr)
 	}

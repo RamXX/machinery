@@ -153,7 +153,7 @@ func (s *controlSnapshot) revalidate() error {
 	}
 	payload, err := tdd.DesignPayloadDigest(s.designDir)
 	if err != nil {
-		return fmt.Errorf("STALE_INPUT: the design payload failed revalidation: %v", err)
+		return fmt.Errorf("STALE_INPUT: the design payload failed revalidation: %w", err)
 	}
 	if payload != s.payloadDigest {
 		return fmt.Errorf("STALE_INPUT: the design payload digest changed during registration (%s != %s)", payload, s.payloadDigest)
@@ -190,7 +190,7 @@ func Register(ctx context.Context, req RegisterRequest, output io.Writer) (Regis
 	}
 	impl, err := filepath.Abs(req.Implementation)
 	if err != nil {
-		return Registration{}, fmt.Errorf("INVALID_SCHEMA: implementation root: %v", err)
+		return Registration{}, fmt.Errorf("INVALID_SCHEMA: implementation root: %w", err)
 	}
 	designDir := filepath.Join(impl, filepath.FromSlash(req.Design))
 	if err := tdd.ValidateStorePlacement(req.Store, impl, designDir); err != nil {

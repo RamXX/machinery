@@ -378,7 +378,7 @@ func readTypeScriptPackageIdentity(pkgRoot string) (typeScriptPkgIdentity, error
 	var identity typeScriptPkgIdentity
 	raw, err := os.ReadFile(filepath.Join(pkgRoot, "package.json"))
 	if err != nil || len(raw) > 1<<20 {
-		return identity, fmt.Errorf("package identity file must be a bounded readable package.json: %v", err)
+		return identity, fmt.Errorf("package identity file must be a bounded readable package.json: %w", err)
 	}
 	var doc struct {
 		Name    string `json:"name"`

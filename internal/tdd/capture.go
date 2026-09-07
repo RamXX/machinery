@@ -36,7 +36,7 @@ func validateCaptureRequest(req CaptureRequest) error {
 	} {
 		for i, p := range list.paths {
 			if err := validateRootPath(p); err != nil {
-				return fmt.Errorf("INVALID_SCHEMA: manifest.%s[%d]: %v", list.name, i, err)
+				return fmt.Errorf("INVALID_SCHEMA: manifest.%s[%d]: %w", list.name, i, err)
 			}
 		}
 		if err := rejectDuplicates(list.paths, "manifest."+list.name); err != nil {
@@ -50,7 +50,7 @@ func validateCaptureRequest(req CaptureRequest) error {
 	subjectFiles := map[string]bool{}
 	for i, se := range m.SubjectEntries {
 		if err := validateRootPath(se.Path); err != nil {
-			return fmt.Errorf("INVALID_SCHEMA: manifest.subject_entries[%d].path: %v", i, err)
+			return fmt.Errorf("INVALID_SCHEMA: manifest.subject_entries[%d].path: %w", i, err)
 		}
 		if se.Kind != "file" && se.Kind != "directory" {
 			return fmt.Errorf("INVALID_SCHEMA: manifest.subject_entries[%d].kind must be file or directory", i)
@@ -67,29 +67,29 @@ func validateCaptureRequest(req CaptureRequest) error {
 	}
 	for si, s := range m.Suites {
 		if err := validateRootPath(s.Root); err != nil {
-			return fmt.Errorf("INVALID_SCHEMA: manifest.suites[%d].root: %v", si, err)
+			return fmt.Errorf("INVALID_SCHEMA: manifest.suites[%d].root: %w", si, err)
 		}
 		declared = append(declared, s.Root)
 		for fi, f := range s.Files {
 			if err := validatePath(f); err != nil {
-				return fmt.Errorf("INVALID_SCHEMA: manifest.suites[%d].files[%d]: %v", si, fi, err)
+				return fmt.Errorf("INVALID_SCHEMA: manifest.suites[%d].files[%d]: %w", si, fi, err)
 			}
 			declared = append(declared, f)
 		}
 		for di, d := range s.DependencyRoots {
 			if err := validateRootPath(d); err != nil {
-				return fmt.Errorf("INVALID_SCHEMA: manifest.suites[%d].dependency_roots[%d]: %v", si, di, err)
+				return fmt.Errorf("INVALID_SCHEMA: manifest.suites[%d].dependency_roots[%d]: %w", si, di, err)
 			}
 			declared = append(declared, d)
 		}
 		for ti, tst := range s.Tests {
 			if err := validatePath(tst.Source); err != nil {
-				return fmt.Errorf("INVALID_SCHEMA: manifest.suites[%d].tests[%d].source: %v", si, ti, err)
+				return fmt.Errorf("INVALID_SCHEMA: manifest.suites[%d].tests[%d].source: %w", si, ti, err)
 			}
 			declared = append(declared, tst.Source)
 			for ai, a := range tst.Assertions {
 				if err := validatePath(a.Source); err != nil {
-					return fmt.Errorf("INVALID_SCHEMA: manifest.suites[%d].tests[%d].assertions[%d].source: %v", si, ti, ai, err)
+					return fmt.Errorf("INVALID_SCHEMA: manifest.suites[%d].tests[%d].assertions[%d].source: %w", si, ti, ai, err)
 				}
 				declared = append(declared, a.Source)
 			}
@@ -133,11 +133,11 @@ func validateHeldInputView(v InputView) error {
 		return fmt.Errorf("INVALID_SCHEMA: InputView.Release must be nonnil; a missing release callback is rejected")
 	}
 	if err := validateRootPath(v.DesignPath); err != nil {
-		return fmt.Errorf("INVALID_SCHEMA: InputView.DesignPath: %v", err)
+		return fmt.Errorf("INVALID_SCHEMA: InputView.DesignPath: %w", err)
 	}
 	for i, p := range v.ImplementationPaths {
 		if err := validateRootPath(p); err != nil {
-			return fmt.Errorf("INVALID_SCHEMA: InputView.ImplementationPaths[%d]: %v", i, err)
+			return fmt.Errorf("INVALID_SCHEMA: InputView.ImplementationPaths[%d]: %w", i, err)
 		}
 	}
 	for _, root := range []string{v.SourceRoot, v.ControlRoot} {
@@ -172,7 +172,7 @@ func newCaptureEngine(ctx context.Context, req CaptureRequest, store *storeView)
 		return nil, err
 	}
 	if err := req.Inputs.Revalidate(); err != nil {
-		return nil, fmt.Errorf("STALE_INPUT: the held InputView failed revalidation before capture: %v", err)
+		return nil, fmt.Errorf("STALE_INPUT: the held InputView failed revalidation before capture: %w", err)
 	}
 	limits := req.Limits
 	if limits.Entries <= 0 {
@@ -347,7 +347,7 @@ func (e *captureEngine) run() error {
 		return err
 	}
 	if err := e.req.Inputs.Revalidate(); err != nil {
-		return fmt.Errorf("STALE_INPUT: the held InputView changed during capture: %v", err)
+		return fmt.Errorf("STALE_INPUT: the held InputView changed during capture: %w", err)
 	}
 	return nil
 }
@@ -469,7 +469,7 @@ func (e *captureEngine) walkEntry(rel, controlNS, judgmentPath string, depth int
 	}
 	if rel != protocol.RepositoryRoot {
 		if err := validatePath(rel); err != nil {
-			return fmt.Errorf("INVALID_SCHEMA: walked path %q: %v", rel, err)
+			return fmt.Errorf("INVALID_SCHEMA: walked path %q: %w", rel, err)
 		}
 	}
 	if fi.IsDir() {
@@ -518,7 +518,7 @@ func (e *captureEngine) readFileBound(rel string, before os.FileInfo) ([]byte, e
 	}
 	data := make([]byte, st.Size())
 	if _, err := readFull(f, data); err != nil {
-		return nil, fmt.Errorf("STALE_INPUT: reading %q: %v", rel, err)
+		return nil, fmt.Errorf("STALE_INPUT: reading %q: %w", rel, err)
 	}
 	st2, err := f.Stat()
 	if err != nil || st2.Size() != st.Size() || !os.SameFile(st2, before) {
@@ -532,7 +532,7 @@ func (e *captureEngine) readFileBound(rel string, before os.FileInfo) ([]byte, e
 func (e *captureEngine) readVerifiedFile(rel string) ([]byte, error) {
 	fi, err := e.root.Lstat(rel)
 	if err != nil {
-		return nil, fmt.Errorf("STALE_INPUT: %q disappeared during capture: %v", rel, err)
+		return nil, fmt.Errorf("STALE_INPUT: %q disappeared during capture: %w", rel, err)
 	}
 	data, err := e.readFileBound(rel, fi)
 	if err != nil {

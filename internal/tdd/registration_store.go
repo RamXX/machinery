@@ -75,7 +75,7 @@ func DecodeArchivedManifest(design, milestone string, raw []byte) (Manifest, err
 		return Manifest{}, fmt.Errorf("INVALID_SCHEMA: the repository-root design resolves through its own checkout, not archived decoding without a payload")
 	}
 	if err := validateRootPath(design); err != nil {
-		return Manifest{}, fmt.Errorf("INVALID_SCHEMA: archived design root: %v", err)
+		return Manifest{}, fmt.Errorf("INVALID_SCHEMA: archived design root: %w", err)
 	}
 	msPath := filepath.Join(protocol.ControlDirName, protocol.MilestonesDirName, milestone+".json")
 	_, doc, err := readControlJSONFromBytes(msPath, raw)
@@ -456,7 +456,7 @@ func ReadArchivedHead(ctx context.Context, store, projectID, expectedHead string
 		return nil, fmt.Errorf("HISTORY_UNAVAILABLE: the archived expected head %s is not available byte-exact in store %s", expectedHead, store)
 	}
 	if _, derr := decodeHeadClosed(raw); derr != nil {
-		return nil, fmt.Errorf("HISTORY_UNAVAILABLE: the archived expected head %s does not decode: %v", expectedHead, derr)
+		return nil, fmt.Errorf("HISTORY_UNAVAILABLE: the archived expected head %s does not decode: %w", expectedHead, derr)
 	}
 	return raw, nil
 }
@@ -622,7 +622,7 @@ func CommitRegistration(ctx context.Context, req StoreRegistrationRequest) (Stor
 	}
 	if _, derr := decodeHeadClosed(expectedRaw); derr != nil {
 		v.close()
-		return StoreRegistrationResult{}, fmt.Errorf("HISTORY_UNAVAILABLE: the archived expected head %s does not decode: %v", req.ExpectedHead, derr)
+		return StoreRegistrationResult{}, fmt.Errorf("HISTORY_UNAVAILABLE: the archived expected head %s does not decode: %w", req.ExpectedHead, derr)
 	}
 	if err := v.close(); err != nil {
 		return StoreRegistrationResult{}, fmt.Errorf("CUSTODY_ERROR: releasing the store read reservation: %w", err)
@@ -724,7 +724,7 @@ func CommitRegistration(ctx context.Context, req StoreRegistrationRequest) (Stor
 		return StoreRegistrationResult{}, fmt.Errorf("CUSTODY_ERROR: post-advance verification failed; the committed head is not the derived successor (another writer may have advanced concurrently)")
 	}
 	if err := checkCtx(ctx); err != nil {
-		return StoreRegistrationResult{}, fmt.Errorf("%v; the head may already be advanced and an exact retry confirms registration", err)
+		return StoreRegistrationResult{}, fmt.Errorf("%w; the head may already be advanced and an exact retry confirms registration", err)
 	}
 	if rerr := w.release(); rerr != nil {
 		return StoreRegistrationResult{}, rerr

@@ -989,7 +989,7 @@ func executeGoConformanceSuite(ctx context.Context, custody *laneCustody, root, 
 		}
 		b, err := regularBytes(path, 4<<20)
 		if err != nil || fmt.Sprintf("%x", sha256.Sum256(b)) != want {
-			return r, fmt.Errorf("conformance source changed during execution: %s: %v", source, err)
+			return r, fmt.Errorf("conformance source changed during execution: %s: %w", source, err)
 		}
 	}
 	return r, nil
@@ -1264,7 +1264,7 @@ func executeTypeScriptConformanceSuite(ctx context.Context, custody *laneCustody
 		}
 		b, err := regularBytes(path, 4<<20)
 		if err != nil || fmt.Sprintf("%x", sha256.Sum256(b)) != want {
-			return r, fmt.Errorf("conformance source changed during execution: %s: %v", source, err)
+			return r, fmt.Errorf("conformance source changed during execution: %s: %w", source, err)
 		}
 	}
 	return r, nil
@@ -1497,7 +1497,7 @@ func executePythonConformanceSuite(ctx context.Context, custody *laneCustody, ro
 		}
 		b, err := regularBytes(path, 4<<20)
 		if err != nil || fmt.Sprintf("%x", sha256.Sum256(b)) != want {
-			return r, fmt.Errorf("conformance source changed during execution: %s: %v", source, err)
+			return r, fmt.Errorf("conformance source changed during execution: %s: %w", source, err)
 		}
 	}
 	return r, nil
@@ -1746,7 +1746,7 @@ func executeElixirConformanceSuite(ctx context.Context, custody *laneCustody, ro
 		}
 		b, err := regularBytes(path, 4<<20)
 		if err != nil || fmt.Sprintf("%x", sha256.Sum256(b)) != want {
-			return r, fmt.Errorf("conformance source changed during execution: %s: %v", source, err)
+			return r, fmt.Errorf("conformance source changed during execution: %s: %w", source, err)
 		}
 	}
 	return r, nil

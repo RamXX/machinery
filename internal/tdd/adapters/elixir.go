@@ -233,14 +233,14 @@ func (a *ElixirAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.
 		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s requires held input view callbacks", req.Suite.ID)
 	}
 	if err := req.Inputs.Revalidate(); err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: the held input view of suite %s failed revalidation: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: the held input view of suite %s failed revalidation: %w", req.Suite.ID, err)
 	}
 	if _, err := processscope.NormalizeLimits(processscope.Limits(req.Limits)); err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s limits: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s limits: %w", req.Suite.ID, err)
 	}
 	limits, err := processscope.NormalizeLimits(processscope.Limits(req.Limits))
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s limits: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s limits: %w", req.Suite.ID, err)
 	}
 	// Verified bundle materialization: only a capture-produced BundleRef
 	// carries a materialized store object root.
@@ -251,7 +251,7 @@ func (a *ElixirAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.
 	storeRoot := filepath.Dir(filepath.Dir(objectRoot))
 	projectID, err := elixirStoreProjectID(storeRoot)
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: suite %s store identity: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("STALE_INPUT: suite %s store identity: %w", req.Suite.ID, err)
 	}
 	bundleDir := filepath.Join(req.Scratch, "bundle")
 	harnessDir := filepath.Join(req.Scratch, "harness")
@@ -269,7 +269,7 @@ func (a *ElixirAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.
 	for _, file := range req.Suite.Files {
 		body, err := os.ReadFile(filepath.Join(bundleDir, filepath.FromSlash(file)))
 		if err != nil {
-			return tdd.PreparedSuite{}, fmt.Errorf("MISSING_TEST: suite file %s is absent from the captured bundle: %v", file, err)
+			return tdd.PreparedSuite{}, fmt.Errorf("MISSING_TEST: suite file %s is absent from the captured bundle: %w", file, err)
 		}
 		sources[file] = body
 	}
@@ -318,7 +318,7 @@ func (a *ElixirAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.
 	eventsPath := filepath.Join(runRoot, elixirEventsFile)
 	env, err := buildElixirRunEnv(runRoot, handle.ElixirBinDir(), handle.ErlangBinDir(), eventsPath, req.Suite.Environment)
 	if err != nil {
-		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s environment: %v", req.Suite.ID, err)
+		return tdd.PreparedSuite{}, fmt.Errorf("INVALID_SCHEMA: suite %s environment: %w", req.Suite.ID, err)
 	}
 	timeoutMS := limits.WallMS
 	if timeoutMS < 1000 {
@@ -431,7 +431,7 @@ func (a *ElixirAdapter) Run(ctx context.Context, prepared tdd.PreparedSuite, sin
 		if execution.ExitCode != nil && *execution.ExitCode != 0 {
 			return execution, fmt.Errorf("BUILD_ERROR: the native mix invocation failed without a native event stream (exit=%d stdout: %s stderr: %s)", *execution.ExitCode, boundedString(stdout.String(), 2048), boundedString(stderr.String(), 2048))
 		}
-		return execution, fmt.Errorf("INCOMPLETE_EVENTS: the native event stream is absent without a native failure status (read: %v)", readErr)
+		return execution, fmt.Errorf("INCOMPLETE_EVENTS: the native event stream is absent without a native failure status (read: %w)", readErr)
 	}
 	streamEvents, parseErr := parseElixirReporterStream(raw)
 	var rec elixirReconciliation
@@ -450,7 +450,7 @@ func (a *ElixirAdapter) Run(ctx context.Context, prepared tdd.PreparedSuite, sin
 			// or an empty selection) may leave the autorun reporter's
 			// truncated stream behind; it is a precondition failure, never
 			// RED evidence.
-			return execution, fmt.Errorf("BUILD_ERROR: suite %s aborted at the mix level (exit=%d stdout: %s stderr: %s; stream: %v)", state.suite.ID, result.ExitCode, boundedString(stdout.String(), 2048), boundedString(stderr.String(), 2048), reconcileErr)
+			return execution, fmt.Errorf("BUILD_ERROR: suite %s aborted at the mix level (exit=%d stdout: %s stderr: %s; stream: %w)", state.suite.ID, result.ExitCode, boundedString(stdout.String(), 2048), boundedString(stderr.String(), 2048), reconcileErr)
 		}
 		return execution, fmt.Errorf("suite %s native stream: %w", state.suite.ID, reconcileErr)
 	}
@@ -507,7 +507,7 @@ func elixirVerifyUnchanged(state *elixirPrepared) error {
 func elixirStoreProjectID(storeRoot string) (string, error) {
 	raw, err := os.ReadFile(filepath.Join(storeRoot, "store.json"))
 	if err != nil || len(raw) > 1<<20 {
-		return "", fmt.Errorf("cannot read the store identity: %v", err)
+		return "", fmt.Errorf("cannot read the store identity: %w", err)
 	}
 	var doc map[string]any
 	if err := json.Unmarshal(raw, &doc); err != nil {
