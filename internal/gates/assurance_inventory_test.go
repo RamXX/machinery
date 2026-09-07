@@ -31,13 +31,13 @@ const (
 )
 
 var invFixtureFiles = map[string]string{
-	"BUILD.md": "# Build\n\n## Build plan\n\n**M1 - Alpha behavior.**\nStatus: open\nDoD: alpha-s1 covered; inv-owned preserved.\n",
-	"domain.modelith.yaml": "kind: modelith\nversion: 1\nentities:\n  Widget:\n    actions:\n      - name: publish\n        preserves: [inv-owned]\n    invariants:\n      - id: inv-owned\ninvariants:\n  - id: inv-global\n",
+	"BUILD.md":                    "# Build\n\n## Build plan\n\n**M1 - Alpha behavior.**\nStatus: open\nDoD: alpha-s1 covered; inv-owned preserved.\n",
+	"domain.modelith.yaml":        "kind: modelith\nversion: 1\nentities:\n  Widget:\n    actions:\n      - name: publish\n        preserves: [inv-owned]\n    invariants:\n      - id: inv-owned\ninvariants:\n  - id: inv-global\n",
 	"machines/Alpha.machine.json": "{}",
 	"machines/Alpha.oracle.md":    "# Alpha oracle\n\n| test id | stable id | guard | behavior |\n| --- | --- | --- | --- |\n| alpha-t1 | alpha-s1 | gate-x | refuses malformed input |\n",
 	"machines/Alpha.matrix.md":    "# Alpha matrix\n\n| unit | kind | detail |\n| --- | --- | --- |\n| gate-x | guard | CLAUSES{clause-a} |\n",
-	"src.txt":             invFixtureSrc,
-	"tests/alpha_test.go": "package tests\n",
+	"src.txt":                     invFixtureSrc,
+	"tests/alpha_test.go":         "package tests\n",
 }
 
 // writeInventoryDesign materializes the fixture design tree and returns its
@@ -272,8 +272,8 @@ func inventoryRenderManifest(t *testing.T, m tdd.Manifest) []byte {
 		}
 		suites = append(suites, map[string]any{
 			"id": s.ID, "adapter": s.Adapter,
-			"runtime":      map[string]any{"profile": s.Runtime.Profile, "version": s.Runtime.Version, "platform": s.Runtime.Platform, "closure": s.Runtime.Closure},
-			"root":         s.Root, "files": strs(s.Files), "tests": tests, "environment": env,
+			"runtime": map[string]any{"profile": s.Runtime.Profile, "version": s.Runtime.Version, "platform": s.Runtime.Platform, "closure": s.Runtime.Closure},
+			"root":    s.Root, "files": strs(s.Files), "tests": tests, "environment": env,
 			"dependency_roots": strs(s.DependencyRoots),
 		})
 	}
@@ -289,7 +289,7 @@ func inventoryRenderManifest(t *testing.T, m tdd.Manifest) []byte {
 		variants = append(variants, map[string]any{
 			"id": v.ID, "kind": v.Kind, "source": v.Source, "pair": v.Pair,
 			"target_tests": refs(v.TargetTests), "expected": exps(v.Expected),
-			"review":       map[string]any{"reviewer": v.Review.Reviewer, "rationale": v.Review.Rationale, "subject_digest": v.Review.SubjectDigest},
+			"review": map[string]any{"reviewer": v.Review.Reviewer, "rationale": v.Review.Rationale, "subject_digest": v.Review.SubjectDigest},
 		})
 	}
 	checks := []any{}
@@ -313,7 +313,7 @@ func inventoryRenderManifest(t *testing.T, m tdd.Manifest) []byte {
 	}
 	b, err := jsonMarshal(map[string]any{
 		"schema": m.Schema, "id": m.ID, "revision": m.Revision, "predecessor": pred,
-		"repository":          m.Repository,
+		"repository":           m.Repository,
 		"implementation_roots": strs(m.ImplementationRoots), "frozen_roots": strs(m.FrozenRoots),
 		"subject_entries": subjects, "suites": suites, "obligations": obls,
 		"baseline": baseline, "variants": variants, "red_expectations": exps(m.RedExpectations),

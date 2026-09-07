@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -33,13 +35,13 @@ const (
 )
 
 var fixtureDesignFiles = map[string]string{
-	"BUILD.md": "# Build\n\n## Build plan\n\n**M1 - Alpha behavior.**\nStatus: open\nDoD: alpha-s1 covered; inv-owned preserved.\n",
-	"domain.modelith.yaml": "kind: modelith\nversion: 1\nentities:\n  Widget:\n    actions:\n      - name: publish\n        preserves: [inv-owned]\n    invariants:\n      - id: inv-owned\ninvariants:\n  - id: inv-global\n",
+	"BUILD.md":                    "# Build\n\n## Build plan\n\n**M1 - Alpha behavior.**\nStatus: open\nDoD: alpha-s1 covered; inv-owned preserved.\n",
+	"domain.modelith.yaml":        "kind: modelith\nversion: 1\nentities:\n  Widget:\n    actions:\n      - name: publish\n        preserves: [inv-owned]\n    invariants:\n      - id: inv-owned\ninvariants:\n  - id: inv-global\n",
 	"machines/Alpha.machine.json": "{}",
 	"machines/Alpha.oracle.md":    "# Alpha oracle\n\n| test id | stable id | guard | behavior |\n| --- | --- | --- | --- |\n| alpha-t1 | alpha-s1 | gate-x | refuses malformed input |\n",
 	"machines/Alpha.matrix.md":    "# Alpha matrix\n\n| unit | kind | detail |\n| --- | --- | --- |\n| gate-x | guard | CLAUSES{clause-a} |\n",
-	"src.txt":           fixtureSrc,
-	"tests/alpha_test.go": fixtureGoSource,
+	"src.txt":                     fixtureSrc,
+	"tests/alpha_test.go":         fixtureGoSource,
 }
 
 // writeBaseDesign materializes the frozen design tree with fixed portable
@@ -89,7 +91,7 @@ func basePlan(srcDigest, reviewDigest string) Plan {
 			SourceRefs:  []SourceRef{{Path: "src.txt", Anchor: "anchor-line", Digest: srcDigest}},
 			Disposition: disposition, Reason: reason,
 			Review: Review{Reviewer: "rev-one", Rationale: "discovery reviewed", SubjectDigest: reviewDigest},
-			Tests: tests,
+			Tests:  tests,
 		}
 	}
 	return Plan{
@@ -239,16 +241,16 @@ func renderManifest(m Manifest) []byte {
 		suites = append(suites, map[string]any{
 			"id": s.ID, "adapter": s.Adapter,
 			"runtime": map[string]any{"profile": s.Runtime.Profile, "version": s.Runtime.Version, "platform": s.Runtime.Platform, "closure": s.Runtime.Closure},
-			"root": s.Root, "files": strs(s.Files), "tests": tests, "environment": env,
+			"root":    s.Root, "files": strs(s.Files), "tests": tests, "environment": env,
 			"dependency_roots": strs(s.DependencyRoots),
 		})
 	}
 	obls := []any{}
 	for _, o := range m.Obligations {
 		obls = append(obls, map[string]any{
-			"key":       map[string]any{"design": o.Key.Design, "kind": o.Key.Kind, "owner": o.Key.Owner, "id": o.Key.ID},
-			"positive":  renderRefs(o.Positive),
-			"negative":  renderRefs(o.Negative),
+			"key":      map[string]any{"design": o.Key.Design, "kind": o.Key.Kind, "owner": o.Key.Owner, "id": o.Key.ID},
+			"positive": renderRefs(o.Positive),
+			"negative": renderRefs(o.Negative),
 		})
 	}
 	exps := func(es []Expectation) []any {
@@ -287,7 +289,7 @@ func renderManifest(m Manifest) []byte {
 	}
 	doc := map[string]any{
 		"schema": m.Schema, "id": m.ID, "revision": m.Revision, "predecessor": pred,
-		"repository": m.Repository,
+		"repository":           m.Repository,
 		"implementation_roots": strs(m.ImplementationRoots), "frozen_roots": strs(m.FrozenRoots),
 		"subject_entries": subjects, "suites": suites, "obligations": obls,
 		"baseline": baseline, "variants": variants, "red_expectations": exps(m.RedExpectations),
@@ -351,6 +353,7 @@ type corpusCase struct {
 	Expect         []string   `json:"expect"`
 	Inventory      string     `json:"inventory"`
 	LoadAll        bool       `json:"load_all"`
+	Typed          string     `json:"typed"`
 }
 
 type corpusFile struct {
@@ -409,6 +412,40 @@ func containerAt(root any, path string) (any, string, error) {
 	return cur, parts[len(parts)-1], nil
 }
 
+// parentOf drops the final path segment so insert can target the object at
+// the path itself.
+func parentOf(path string) string {
+	parts := splitJSONPath(path)
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts[:len(parts)-1], ".")
+}
+
+// valueAt walks the full path and returns the node it names.
+func valueAt(root any, path string) (any, error) {
+	cur := root
+	for _, p := range splitJSONPath(path) {
+		switch node := cur.(type) {
+		case map[string]any:
+			next, ok := node[p]
+			if !ok {
+				return nil, fmt.Errorf("missing path segment %q", p)
+			}
+			cur = next
+		case []any:
+			var idx int
+			if _, err := fmt.Sscanf(p, "%d", &idx); err != nil || idx < 0 || idx >= len(node) {
+				return nil, fmt.Errorf("bad array index %q", p)
+			}
+			cur = node[idx]
+		default:
+			return nil, fmt.Errorf("cannot descend into %T at %q", cur, p)
+		}
+	}
+	return cur, nil
+}
+
 func setPath(root any, path string, val any) error {
 	holder, key, err := containerAt(root, path)
 	if err != nil {
@@ -444,7 +481,11 @@ func applyCorpusOps(t *testing.T, doc []byte, ops []corpusOp) []byte {
 	for _, op := range ops {
 		switch op.Op {
 		case "raw":
-			return []byte(op.Raw)
+			var doc string
+			if err := json.Unmarshal(op.Value, &doc); err != nil {
+				t.Fatalf("setup: raw value: %v", err)
+			}
+			return []byte(doc)
 		case "text":
 			textAppends = append(textAppends, op.Append)
 		case "set":
@@ -464,17 +505,27 @@ func applyCorpusOps(t *testing.T, doc []byte, ops []corpusOp) []byte {
 			if err != nil {
 				t.Fatalf("setup: remove %s: %v", op.Path, err)
 			}
-			m, ok := holder.(map[string]any)
-			if !ok {
-				t.Fatalf("setup: remove %s: not an object", op.Path)
+			switch node := holder.(type) {
+			case map[string]any:
+				delete(node, key)
+			case []any:
+				var idx int
+				if _, serr := fmt.Sscanf(key, "%d", &idx); serr != nil || idx < 0 || idx >= len(node) {
+					t.Fatalf("setup: remove %s: bad array index %q", op.Path, key)
+				}
+				if err := setPath(tree, parentOf(op.Path), append(append([]any{}, node[:idx]...), node[idx+1:]...)); err != nil {
+					t.Fatalf("setup: remove %s: %v", op.Path, err)
+				}
+			default:
+				t.Fatalf("setup: remove %s: not an object or array", op.Path)
 			}
-			delete(m, key)
 		case "insert":
 			var val any
 			if err := json.Unmarshal(op.Value, &val); err != nil {
 				t.Fatalf("setup: insert value: %v", err)
 			}
-			holder, _, err := containerAt(tree, op.Path)
+			// the path names the object to insert into
+			holder, err := valueAt(tree, op.Path)
 			if err != nil {
 				t.Fatalf("setup: insert %s: %v", op.Path, err)
 			}
@@ -488,7 +539,7 @@ func applyCorpusOps(t *testing.T, doc []byte, ops []corpusOp) []byte {
 			if err := json.Unmarshal(op.Value, &val); err != nil {
 				t.Fatalf("setup: append value: %v", err)
 			}
-			holder, _, err := containerAt(tree, op.Path)
+			holder, err := valueAt(tree, op.Path)
 			if err != nil {
 				t.Fatalf("setup: append %s: %v", op.Path, err)
 			}
@@ -509,6 +560,98 @@ func applyCorpusOps(t *testing.T, doc []byte, ops []corpusOp) []byte {
 	}
 	for _, app := range textAppends {
 		out = append(out, app...)
+	}
+	return out
+}
+
+// genericProjection is an independent generic-tree implementation of
+// projection C (sorted keys, no whitespace, shortest decimals, reviews
+// nulled only at the specified schema positions). It both re-reviews
+// mutated validate-case documents and cross-checks the typed projection.
+func genericProjection(tree map[string]any) string {
+	isPlan := tree["schema"] == protocol.SchemaPlan
+	nullReview := func(path string) bool {
+		p := strings.TrimPrefix(path, ".")
+		if isPlan {
+			return strings.HasPrefix(p, "runtime_obligations.") && strings.HasSuffix(p, ".review")
+		}
+		return p == "review" || (strings.HasPrefix(p, "variants.") && strings.HasSuffix(p, ".review"))
+	}
+	var walk func(v any, path string) string
+	walk = func(v any, path string) string {
+		switch node := v.(type) {
+		case map[string]any:
+			if nullReview(path) {
+				return "null"
+			}
+			keys := make([]string, 0, len(node))
+			for k := range node {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			var b strings.Builder
+			b.WriteByte('{')
+			for i, k := range keys {
+				if i > 0 {
+					b.WriteByte(',')
+				}
+				b.WriteString(canonString(k))
+				b.WriteByte(':')
+				b.WriteString(walk(node[k], path+"."+k))
+			}
+			b.WriteByte('}')
+			return b.String()
+		case []any:
+			items := make([]string, 0, len(node))
+			for i, item := range node {
+				items = append(items, walk(item, fmt.Sprintf("%s.%d", path, i)))
+			}
+			return "[" + strings.Join(items, ",") + "]"
+		case string:
+			return canonString(node)
+		case float64:
+			return strconv.FormatFloat(node, 'f', -1, 64)
+		case bool:
+			return strconv.FormatBool(node)
+		case nil:
+			return "null"
+		default:
+			panic(fmt.Sprintf("generic projection: %T", v))
+		}
+	}
+	return walk(tree, "")
+}
+
+// rebindReviews re-reviews a mutated control: the review subject digests
+// are recomputed over the mutated projection so validate-case failures come
+// from the reconciliation logic under test, not from stale review bytes.
+func rebindReviews(t *testing.T, doc []byte, payload string) []byte {
+	t.Helper()
+	var tree map[string]any
+	if err := json.Unmarshal(doc, &tree); err != nil {
+		t.Fatalf("setup: rebind parse: %v", err)
+	}
+	digest, err := ReviewSubjectDigest([]byte(genericProjection(tree)), payload)
+	if err != nil {
+		t.Fatalf("setup: rebind digest: %v", err)
+	}
+	isPlan := tree["schema"] == protocol.SchemaPlan
+	setDigest := func(review map[string]any) {
+		review["subject_digest"] = digest
+	}
+	if isPlan {
+		for _, ro := range tree["runtime_obligations"].([]any) {
+			setDigest(ro.(map[string]any)["review"].(map[string]any))
+		}
+	} else {
+		setDigest(tree["review"].(map[string]any))
+		for _, v := range tree["variants"].([]any) {
+			setDigest(v.(map[string]any)["review"].(map[string]any))
+		}
+	}
+	out, err := json.Marshal(tree)
+	if err != nil {
+		t.Fatalf("setup: rebind marshal: %v", err)
 	}
 	return out
 }
@@ -586,6 +729,16 @@ func TestSchemaCases(t *testing.T) {
 			}
 			planDoc = applyCorpusOps(t, planDoc, planOps)
 			milestoneDoc = applyCorpusOps(t, milestoneDoc, msOps)
+			if c.Target == "validate" || c.Typed == "baseline-null" {
+				// validate cases test reconciliation, not review staleness:
+				// re-review the mutated documents first
+				payload, err := DesignPayloadDigest(design)
+				if err != nil {
+					t.Fatalf("setup: payload digest: %v", err)
+				}
+				planDoc = rebindReviews(t, planDoc, payload)
+				milestoneDoc = rebindReviews(t, milestoneDoc, payload)
+			}
 			for _, name := range []string{protocol.ControlDirName + "/" + protocol.MilestonesDirName, protocol.ControlDirName} {
 				if err := os.MkdirAll(filepath.Join(design, filepath.FromSlash(name)), 0o755); err != nil {
 					t.Fatalf("mkdir control: %v", err)
@@ -822,8 +975,6 @@ func TestDesignPayloadDigestContract(t *testing.T) {
 		dig  []byte
 	}{
 		{".", true, 0o755, 0, make([]byte, 32)},
-		{".git", true, 0o755, 0, make([]byte, 32)},
-		{".git/config", false, 0o644, 1, fileDig("g")},
 		{"BUILD.md", false, 0o644, 1, fileDig("x")},
 		{"src.txt", false, 0o644, 1, fileDig("y")},
 		{"sub", true, 0o755, 0, make([]byte, 32)},
@@ -868,6 +1019,11 @@ func TestValidateCrossDesignResolutionAndCycle(t *testing.T) {
 	childRef := TestRef{Design: "child", Milestone: "M1", Suite: "s1", Test: "t2"}
 	rewrite := func(m Manifest, design string) Manifest {
 		m.designID = design
+		// copy every slice before mutating: records share backing arrays
+		m.Obligations = append([]Obligation{}, m.Obligations...)
+		m.RedExpectations = append([]Expectation{}, m.RedExpectations...)
+		m.Variants = append([]Variant{}, m.Variants...)
+		m.RedControls = append([]RedControl{}, m.RedControls...)
 		fix := func(rs []TestRef) []TestRef {
 			out := append([]TestRef{}, rs...)
 			for i := range out {
@@ -885,6 +1041,7 @@ func TestValidateCrossDesignResolutionAndCycle(t *testing.T) {
 		}
 		for i := range m.Variants {
 			m.Variants[i].TargetTests = fix(m.Variants[i].TargetTests)
+			m.Variants[i].Expected = append([]Expectation{}, m.Variants[i].Expected...)
 			for j := range m.Variants[i].Expected {
 				m.Variants[i].Expected[j].Test.Design = design
 			}

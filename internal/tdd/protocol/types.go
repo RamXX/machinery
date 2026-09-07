@@ -146,14 +146,14 @@ const (
 // Event kinds and outcomes of the normalized event contract, plus the
 // execution-phase and provenance literals.
 const (
-	EventSuiteStart   = "suite-start"
-	EventDiscovered   = "discovered"
-	EventTestStart    = "test-start"
-	EventAssertion    = "assertion"
-	EventTestEnd      = "test-end"
-	EventSuiteEnd     = "suite-end"
-	EventDiagnostic   = "diagnostic"
-	EventError        = "error"
+	EventSuiteStart = "suite-start"
+	EventDiscovered = "discovered"
+	EventTestStart  = "test-start"
+	EventAssertion  = "assertion"
+	EventTestEnd    = "test-end"
+	EventSuiteEnd   = "suite-end"
+	EventDiagnostic = "diagnostic"
+	EventError      = "error"
 
 	OutcomeError       = "error"
 	OutcomeSkipped     = "skipped"
