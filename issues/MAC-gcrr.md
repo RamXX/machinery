@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
-updated_at: 2026-09-07T08:25:17Z
-content_hash: "sha256:de4efb1a54ca58a1c6ba8bf0c7946a4a1847103720aad7a9bf7cd987b967fd16"
+updated_at: 2026-09-07T09:15:10Z
+content_hash: "sha256:00badec680794b2b0eedf575a79412759160e50206e457c9f278aa968e96efe1"
 blocked_by: [MAC-vx24]
 blocks: [MAC-ou97]
 was_blocked_by: [MAC-p8ce, MAC-a89e, MAC-2u36, MAC-p7jd, MAC-hpqp, MAC-yhg5, MAC-hwdb, MAC-hy71]
@@ -253,3 +253,6 @@ status: new
 - [ ] AC #5: independently verified
 - [ ] AC #6: independently verified
 
+
+### 2026-09-07T09:15:10Z ramirosalas
+ACCEPTED 2026-09-07 — RED aab8218 (14 doc-contract failures, 1 control) -> GREEN 6283b42, 8 files +1000/-21 within budget. Installer delegation delivered: README/agent-portability receipt-parity bootstrap truth (complete recorded home/native/plugin plan, per-group copy/symlink modes; no-receipt plugin-aware defaults; explicit homes incompatible with bootstrap; false defaults-only/not-from-receipt/native-only-via-update claims removed); fail-closed unsafe receipts incl. skip-plugins inspection; safe repair scope honest. NEXT dispositions: 2 resolved fail-closed documented; 5 registry workaround documented (extension unapproved); 6 emulation is not native-host evidence; 7 daemon-visible paths (dind one option); 8 release discipline + hy71 pointer. CHANGELOG Unreleased section for accepted batch; release-notes discipline incl. v0.6.3 omission. Epic-accepted behaviors stated with honest residuals. NEXT.md local-only updated, never force-added. Lane 8/8 green. Coordinator merged. Record: .git/machinery-evidence-20260906.TEFZ7D/gcrr-record.md
