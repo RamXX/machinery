@@ -344,6 +344,23 @@ func runGuardian(io InternalIO, args []string) int {
 			}
 		}
 	}()
+	origPPID := os.Getppid()
+	orphaned := make(chan struct{})
+	go func() {
+		for {
+			if os.Getppid() != origPPID {
+				close(orphaned)
+				return
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+	}()
+	release := func() {
+		select {
+		case <-eof:
+		case <-orphaned:
+		}
+	}
 
 	for {
 		select {
@@ -352,13 +369,18 @@ func runGuardian(io InternalIO, args []string) int {
 				reported = true
 				report(false, err)
 			}
-			<-eof
+			release()
 			return 0
 		case <-sigCh:
 			drain(true)
-			<-eof
+			release()
 			return 0
 		case <-eof:
+			if !reported {
+				drain(true)
+			}
+			return 0
+		case <-orphaned:
 			if !reported {
 				drain(true)
 			}
