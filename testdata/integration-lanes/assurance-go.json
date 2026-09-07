@@ -1,0 +1,31 @@
+{
+  "schema": "machinery.assurance.lane/v1",
+  "fragment": "assurance-go",
+  "owner": "MAC-wi2u",
+  "suites": [
+    {
+      "id": "assurance-go-conformance",
+      "lane": "assurance",
+      "adapter": "go-testing/v1",
+      "kind": "native-conformance",
+      "package": "./conformance",
+      "source_files": [
+        "internal/tdd/adapters/assets/go/conformance/go.mod",
+        "internal/tdd/adapters/assets/go/conformance/conformance_test.go"
+      ],
+      "tests": [
+        "TestConformanceWitnessPass",
+        "TestConformanceSubtestIdentity",
+        "TestConformanceSubtestIdentity/first",
+        "TestConformanceSubtestIdentity/second",
+        "TestConformanceMultipleAssertions"
+      ],
+      "runtimes": [
+        "go"
+      ],
+      "timeout": "5m",
+      "stdout_limit": 1048576,
+      "stderr_limit": 1048576
+    }
+  ]
+}

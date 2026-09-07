@@ -206,7 +206,7 @@ func conformanceSuite(t *testing.T, files map[string][]byte) tdd.Suite {
 			leaf(t, source, "TestConformanceSubtestIdentity", ""),
 			leaf(t, source, "TestConformanceSubtestIdentity/first", "conformance/subtest-first"),
 			leaf(t, source, "TestConformanceSubtestIdentity/second", "conformance/subtest-second"),
-			leaf(t, source, "TestConformanceMultipleAssertions", "conformance/multi-a"),
+			multiAssertionLeaf(t, source),
 		},
 	}
 }
@@ -228,6 +228,13 @@ func multiAssertionLeaf(t *testing.T, source string) tdd.Test {
 // runGoSuite drives the complete production chain over a fixture module and
 // returns the execution, the collected normalized events and any error.
 func runGoSuite(t *testing.T, files map[string][]byte, suite tdd.Suite, mutateScratch func(moduleDir string)) (tdd.Execution, []tdd.Event, error) {
+	return runGoSuiteChecked(t, files, suite, mutateScratch, nil)
+}
+
+// runGoSuiteChecked additionally mutates the suite declaration after the
+// live runtime identity is bound, so subjects can prove closed rejections
+// of mismatched declared runtimes.
+func runGoSuiteChecked(t *testing.T, files map[string][]byte, suite tdd.Suite, mutateScratch func(moduleDir string), mutateSuite func(*tdd.Suite)) (tdd.Execution, []tdd.Event, error) {
 	t.Helper()
 	scope := openAdapterScope(t)
 	defer closeAdapterScope(t, scope)
@@ -250,6 +257,9 @@ func runGoSuite(t *testing.T, files map[string][]byte, suite tdd.Suite, mutateSc
 		return tdd.Execution{}, nil, fmt.Errorf("validate pinned go closure: %w", err)
 	}
 	suite.Runtime = handle.Identity()
+	if mutateSuite != nil {
+		mutateSuite(&suite)
+	}
 	suiteRoots := map[string][]byte{}
 	for name, body := range files {
 		suiteRoots[name] = body
@@ -335,16 +345,8 @@ func requireEvent(t *testing.T, events []tdd.Event, kind, test, assertion, outco
 // execution, complete normalized lifecycle, every registered assertion
 // witnessed at its frozen call site, custody verified.
 func TestGoAdapterExecutesFrozenConformanceSuiteNatively(t *testing.T) {
-	t.Parallel()
 	files := conformanceFiles(t, nil)
 	suite := conformanceSuite(t, files)
-	source := string(files["conformance_test.go"])
-	// bind both multi assertions for the full leaf coverage proof
-	for i := range suite.Tests {
-		if suite.Tests[i].ID == "TestConformanceMultipleAssertions" {
-			suite.Tests[i] = multiAssertionLeaf(t, source)
-		}
-	}
 	execution, events, err := runGoSuite(t, files, suite, nil)
 	if err != nil {
 		t.Fatalf("native conformance execution failed: %v", err)
@@ -387,17 +389,11 @@ func TestGoAdapterExecutesFrozenConformanceSuiteNatively(t *testing.T) {
 // the failure is reconciled to its exact call site, every OTHER registered
 // assertion still executes and passes.
 func TestGoAdapterProvesNativeAssertionFailureRED(t *testing.T) {
-	t.Parallel()
 	files := conformanceFiles(t, func(source string) string {
 		return strings.Replace(source, "answer == 42", "answer == 43", 1)
 	})
 	suite := conformanceSuite(t, files)
 	source := string(files["conformance_test.go"])
-	for i := range suite.Tests {
-		if suite.Tests[i].ID == "TestConformanceMultipleAssertions" {
-			suite.Tests[i] = multiAssertionLeaf(t, source)
-		}
-	}
 	execution, events, err := runGoSuite(t, files, suite, nil)
 	if err != nil {
 		t.Fatalf("expected a reconciled assertion failure, got error: %v", err)
@@ -485,10 +481,14 @@ func negativeSuite(t *testing.T, paths ...string) tdd.Suite {
 		ID: "go-negative", Adapter: "go-testing/v1", Root: ".",
 		Files: []string{"go.mod", "negative_test.go"},
 	}
+	assertionsOf := map[string]string{
+		"TestSetupFatal":          "neg/setup-after",
+		"TestExtraFailure":        "neg/extra",
+		"TestDuplicateNames/twin": "neg/twin-a",
+	}
 	for _, path := range paths {
 		test := tdd.Test{ID: path, Source: "negative_test.go", Native: tdd.NativeID{Package: negativeModule, Test: path}}
-		id := "neg/" + strings.ToLower(strings.TrimPrefix(filepath.Base(path), "Test"))
-		if strings.Contains(source, fmt.Sprintf("%q", id)) {
+		if id, ok := assertionsOf[path]; ok && strings.Contains(source, fmt.Sprintf("%q", id)) {
 			test.Assertions = []tdd.Assertion{{ID: id, Source: "negative_test.go", Line: assertionLine(t, source, id), Helper: "machinery-check/v1"}}
 		}
 		suite.Tests = append(suite.Tests, test)
@@ -499,7 +499,6 @@ func negativeSuite(t *testing.T, paths ...string) tdd.Suite {
 // TestGoAdapterRejectsNonAssertionFailureEvidence proves direct t.Fatal in a
 // test body is never eligible assertion-based RED.
 func TestGoAdapterRejectsDirectFatalAsAssertionEvidence(t *testing.T) {
-	t.Parallel()
 	_, _, err := runGoSuite(t, negativeModuleFiles(t), negativeSuite(t, "TestDirectFatal"), nil)
 	if err == nil || !strings.Contains(err.Error(), "UNEXPECTED_FAILURE") {
 		t.Fatalf("direct t.Fatal must fail UNEXPECTED_FAILURE, got %v", err)
@@ -509,7 +508,6 @@ func TestGoAdapterRejectsDirectFatalAsAssertionEvidence(t *testing.T) {
 // TestGoAdapterRejectsSetupFatalBeforeAssertion proves a setup failure
 // before the registered assertion is an error, not assertion RED.
 func TestGoAdapterRejectsSetupFatalBeforeAssertion(t *testing.T) {
-	t.Parallel()
 	_, _, err := runGoSuite(t, negativeModuleFiles(t), negativeSuite(t, "TestSetupFatal"), nil)
 	if err == nil || !strings.Contains(err.Error(), "UNEXPECTED_FAILURE") {
 		t.Fatalf("setup t.Fatal must fail UNEXPECTED_FAILURE, got %v", err)
@@ -519,7 +517,6 @@ func TestGoAdapterRejectsSetupFatalBeforeAssertion(t *testing.T) {
 // TestGoAdapterRejectsEarlyProcessExit proves an abrupt test-binary exit
 // cannot masquerade as a complete execution.
 func TestGoAdapterRejectsEarlyProcessExit(t *testing.T) {
-	t.Parallel()
 	_, _, err := runGoSuite(t, negativeModuleFiles(t), negativeSuite(t, "TestEarlyExit"), nil)
 	if err == nil {
 		t.Fatal("early os.Exit must fail closed")
@@ -529,7 +526,6 @@ func TestGoAdapterRejectsEarlyProcessExit(t *testing.T) {
 // TestGoAdapterRejectsExtraDirectFailure proves a helper-backed failure plus
 // an extra direct t.Errorf is rejected: failure accounting is exact.
 func TestGoAdapterRejectsExtraDirectFailure(t *testing.T) {
-	t.Parallel()
 	_, _, err := runGoSuite(t, negativeModuleFiles(t), negativeSuite(t, "TestExtraFailure"), nil)
 	if err == nil || !strings.Contains(err.Error(), "UNEXPECTED_FAILURE") {
 		t.Fatalf("extra direct failure must fail UNEXPECTED_FAILURE, got %v", err)
@@ -539,7 +535,6 @@ func TestGoAdapterRejectsExtraDirectFailure(t *testing.T) {
 // TestGoAdapterRejectsSkippedSubtest proves a required skip can never become
 // success.
 func TestGoAdapterRejectsSkippedSubtest(t *testing.T) {
-	t.Parallel()
 	_, _, err := runGoSuite(t, negativeModuleFiles(t), negativeSuite(t, "TestSkipChild", "TestSkipChild/kid"), nil)
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "skip") {
 		t.Fatalf("skipped subtest must fail on skip, got %v", err)
@@ -549,7 +544,6 @@ func TestGoAdapterRejectsSkippedSubtest(t *testing.T) {
 // TestGoAdapterDetectsDuplicateSubtestNames proves duplicate child names
 // surface as unexpected native identities, never silent coverage.
 func TestGoAdapterDetectsDuplicateSubtestNames(t *testing.T) {
-	t.Parallel()
 	_, _, err := runGoSuite(t, negativeModuleFiles(t), negativeSuite(t, "TestDuplicateNames", "TestDuplicateNames/twin"), nil)
 	if err == nil || !strings.Contains(err.Error(), "DUPLICATE_TEST") {
 		t.Fatalf("duplicate subtest identity must fail DUPLICATE_TEST, got %v", err)
@@ -559,7 +553,6 @@ func TestGoAdapterDetectsDuplicateSubtestNames(t *testing.T) {
 // TestGoAdapterDetectsLateSourceMutation proves materialized sources are
 // re-verified after preparation: a scratch mutation fails the run.
 func TestGoAdapterDetectsLateSourceMutation(t *testing.T) {
-	t.Parallel()
 	files := conformanceFiles(t, nil)
 	suite := conformanceSuite(t, files)
 	_, _, err := runGoSuite(t, files, suite, func(runDir string) {
@@ -576,7 +569,6 @@ func TestGoAdapterDetectsLateSourceMutation(t *testing.T) {
 // TestGoAdapterRejectsAssertionSiteMismatch proves Prepare rejects a
 // declared call site that is not the typed helper call at that exact line.
 func TestGoAdapterRejectsAssertionSiteMismatch(t *testing.T) {
-	t.Parallel()
 	files := conformanceFiles(t, nil)
 	suite := conformanceSuite(t, files)
 	suite.Tests[0].Assertions[0].Line++
@@ -590,7 +582,6 @@ func TestGoAdapterRejectsAssertionSiteMismatch(t *testing.T) {
 // different helper package is rejected: only the byte-pinned embedded
 // transport may witness assertions.
 func TestGoAdapterRejectsLookalikeHelper(t *testing.T) {
-	t.Parallel()
 	files := conformanceFiles(t, func(source string) string {
 		return strings.Replace(source, `"machinery.test/conformance/machinerycheck"`, `"machinery.test/conformance/lookalike"`, 1)
 	})
@@ -606,11 +597,11 @@ func TestGoAdapterRejectsLookalikeHelper(t *testing.T) {
 // TestGoAdapterRejectsRuntimeIdentityMismatch proves a suite declaring a
 // different runtime version fails closed before any work.
 func TestGoAdapterRejectsRuntimeIdentityMismatch(t *testing.T) {
-	t.Parallel()
 	files := conformanceFiles(t, nil)
 	suite := conformanceSuite(t, files)
-	suite.Runtime = tdd.RuntimeRef{Profile: "go", Version: "1.26.0", Platform: "darwin/arm64", Closure: "sha256:" + strings.Repeat("a", 64)}
-	_, _, err := runGoSuite(t, files, suite, nil)
+	_, _, err := runGoSuiteChecked(t, files, suite, nil, func(s *tdd.Suite) {
+		s.Runtime = tdd.RuntimeRef{Profile: "go", Version: "1.26.0", Platform: "darwin/arm64", Closure: "sha256:" + strings.Repeat("a", 64)}
+	})
 	if err == nil || !strings.Contains(err.Error(), "UNSUPPORTED_VERSION") {
 		t.Fatalf("runtime identity mismatch must fail UNSUPPORTED_VERSION, got %v", err)
 	}
@@ -619,7 +610,6 @@ func TestGoAdapterRejectsRuntimeIdentityMismatch(t *testing.T) {
 // TestGoAdapterRejectsMissingRuntime proves an absent pinned runtime fails
 // before any suite work.
 func TestGoAdapterRejectsMissingRuntime(t *testing.T) {
-	t.Parallel()
 	if _, err := runtimeclosure.OpenGo(context.Background(), runtimeclosure.GoRequest{RuntimeRoot: filepath.Join(t.TempDir(), "absent")}); err == nil || !strings.Contains(err.Error(), "UNSUPPORTED_VERSION") {
 		t.Fatalf("absent runtime must fail UNSUPPORTED_VERSION, got %v", err)
 	}
@@ -639,11 +629,21 @@ var (
 func laneBinary(t *testing.T) string {
 	t.Helper()
 	laneBinaryOnce.Do(func() {
-		bin := filepath.Join(t.TempDir(), "integration-lane")
+		dir, err := os.MkdirTemp("", "machinery-lane-binary-")
+		if err != nil {
+			laneBinaryErr = err
+			return
+		}
+		bin := filepath.Join(dir, "integration-lane")
+		goExe, err := exec.LookPath("go")
+		if err != nil {
+			laneBinaryErr = err
+			return
+		}
 		scope := openAdapterScope(t)
 		defer closeAdapterScope(t, scope)
 		attached, err := scope.Attach(processscope.Command{
-			Executable: "go",
+			Executable: goExe,
 			Args:       []string{"build", "-o", bin, "./scripts/integration-lane"},
 			Dir:        repoRoot(t),
 			Env:        os.Environ(),
@@ -744,7 +744,7 @@ func laneSeedRoot(t *testing.T, includeGoFragment bool, tamperConformance func(s
 		if err != nil {
 			return err
 		}
-		write(filepath.ToSlash(rel), body)
+		write("testdata/integration-lanes/"+filepath.ToSlash(rel), body)
 		return nil
 	})
 	if err != nil {
@@ -848,11 +848,10 @@ func laneRun(t *testing.T, root string, envOverrides ...string) (bool, string, l
 // executes this story's fragment as a real native adapter conformance suite
 // alongside the frozen probes and the v1 pilot lane.
 func TestContributorLaneExecutesGoConformanceFragment(t *testing.T) {
-	t.Parallel()
 	root := laneSeedRoot(t, true, nil)
-	ok, _, report := laneRun(t, root)
+	ok, out, report := laneRun(t, root)
 	if !ok {
-		t.Fatalf("required lane with the go conformance fragment must pass: %+v", report)
+		t.Fatalf("required lane with the go conformance fragment must pass: %+v out=%q", report, out)
 	}
 	if report.Assurance == nil || report.Assurance.Status != "passed" {
 		t.Fatalf("assurance section missing or failed: %+v", report.Assurance)
@@ -893,7 +892,6 @@ func TestContributorLaneExecutesGoConformanceFragment(t *testing.T) {
 // TestContributorLaneRejectsConformanceOmission proves omitting this story's
 // required fragment fails the closed union instead of silently shrinking it.
 func TestContributorLaneRejectsConformanceOmission(t *testing.T) {
-	t.Parallel()
 	root := laneSeedRoot(t, false, nil)
 	ok, out, _ := laneRun(t, root)
 	if ok || !strings.Contains(strings.ToLower(out), "conformance") {
@@ -904,7 +902,6 @@ func TestContributorLaneRejectsConformanceOmission(t *testing.T) {
 // TestContributorLaneRejectsNativeSkipInConformanceFixture proves a native
 // skip inside the conformance fixture fails the lane on the real stream.
 func TestContributorLaneRejectsNativeSkipInConformanceFixture(t *testing.T) {
-	t.Parallel()
 	root := laneSeedRoot(t, true, func(source string) string {
 		return strings.Replace(source, "answer := 6 * 7", "t.Skip(\"required conformance must not skip\")\n\tanswer := 6 * 7", 1)
 	})
@@ -917,7 +914,6 @@ func TestContributorLaneRejectsNativeSkipInConformanceFixture(t *testing.T) {
 // TestContributorLaneRejectsRuntimeAbsence proves a stale go runtime fails
 // the lane before any suite runs.
 func TestContributorLaneRejectsRuntimeAbsence(t *testing.T) {
-	t.Parallel()
 	root := laneSeedRoot(t, true, nil)
 	shim := t.TempDir()
 	script := "#!/bin/sh\nif [ \"$1\" = \"version\" ]; then printf 'go version go1.26.9 %s/%s\\n' \"$(uname -s | tr A-Z a-z)\" \"$(uname -m)\"; exit 0; fi\nexit 1\n"

@@ -110,6 +110,42 @@ func assuranceSeed(t *testing.T, root string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// MAC-wi2u compatible extension (approved alongside its RED): downstream
+	// adapter fragments declare native-conformance sources inside the
+	// adapters' exclusively owned asset directories OUTSIDE
+	// testdata/integration-lanes. Seed every declared fragment source from
+	// the repository so the closed catalog validates identically in fixture
+	// roots; frozen v1 and probe seeding semantics are unchanged and the
+	// copy is idempotent for sources already seeded above.
+	for _, name := range entries {
+		if !strings.HasPrefix(name.Name(), "assurance-") || !strings.HasSuffix(name.Name(), ".json") {
+			continue
+		}
+		var fragment struct {
+			Suites []struct {
+				Sources []string `json:"source_files"`
+			} `json:"suites"`
+		}
+		b, err := os.ReadFile(filepath.Join(source, name.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(b, &fragment); err != nil {
+			t.Fatal(err)
+		}
+		for _, suite := range fragment.Suites {
+			for _, rel := range suite.Sources {
+				if strings.HasPrefix(rel, "testdata/integration-lanes/") {
+					continue // already seeded above with the frozen catalog
+				}
+				body, err := os.ReadFile(filepath.Join(filepath.Dir(filepath.Dir(source)), filepath.FromSlash(rel)))
+				if err != nil {
+					t.Fatal(err)
+				}
+				laneWrite(t, root, rel, string(body))
+			}
+		}
+	}
 }
 
 func assuranceFixture(t *testing.T) string {
