@@ -1,7 +1,7 @@
 ---
 id: MAC-jcl0
 title: "Fix go-crm G4 boundary mapping for internal/testoracle"
-status: in_progress
+status: closed
 priority: 1
 type: bug
 assignee: dev-g4
@@ -9,9 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-06T23:26:40Z
 created_by: ramirosalas
 updated_at: 2026-09-07T00:29:09Z
-content_hash: "sha256:e8bdb28d4bfc021dc19631bf49a20a889dedbc81a3a3a22776170d30c423ae3e"
+content_hash: "sha256:b2cc445ee6122adcfc57a5a4d40c6280ce17f7abacf645de0a7a8c818b377aeb"
 follows: [MAC-wi5z]
 labels: [accepted]
+closed_at: 2026-09-07T00:29:09Z
+close_reason: "Accepted: go-crm G4 boundary truth restored; three baseline failures cured; merged to local epic"
 ---
 
 ## Description
@@ -29,6 +31,7 @@ Pre-existing G4 finding surfaced truthfully by MAC-hgz1 goldens: internal/testor
 ## History
 - 2026-09-06T23:26:40Z status: open -> in_progress
 - 2026-09-06T23:26:40Z auto-follows: linked to predecessor MAC-wi5z
+- 2026-09-07T00:29:09Z status: in_progress -> closed
 
 ## Links
 - Parent: [[MAC-ui8a]]
