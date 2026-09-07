@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:51Z
 created_by: ramirosalas
-updated_at: 2026-09-07T10:08:47Z
-content_hash: "sha256:5348e48010218fcac242641b6fa67a938d9baefd82dc76f93ef7ccab8471c360"
+updated_at: 2026-09-07T18:47:00Z
+content_hash: "sha256:1cd58b6e3e7458e6e4e7527b36e60fcde9b7f7c80d745f2f4403ea8671d9a326"
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
 follows: [MAC-6h0s, MAC-bz1y]
@@ -219,3 +219,6 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-07T18:47:00Z ramirosalas
+ACCEPTED 2026-09-07 — RED eb38d9a (27 identities frozen, byte-pinned fixtures) -> GREEN 1a470a2. Full go-testing/v1 Adapter: assertion evidence via byte-pinned embedded machinery-check/v1 witness helper (sha256-pinned, AST-validated call sites), normalized machinery.tdd.event/v1 reconciliation (closed test2json vocabulary, witness/site/lifecycle/exit concordance); Go 1.27.1 RuntimeHandle identity verification; lane fragment executes the REAL production chain (InitStore->Capture->OpenGo+Validate->Prepare->Run->Close); every subprocess a verified child scope. 13 unit + 14 native + 4 lane subjects ok 94.1s; runtimeclosure 10 subjects ok; -race clean; lane green. Catalog union with avfp resolved at merge 96b3e4e (mechanical seams + one documented reconciliation: machinery root keeps strict closed union; foreign roots require >=1 conformance suite with exact per-suite validation). Overrun ~4150 vs ~2100 — contract-mandated negative calibration, established pattern; 2-line additive tdd/types.go carrier + two justified bz1y test-infra supersessions disclosed. RESIDUAL: Linux amd64 proof rides hosted CI. Record: .git/machinery-evidence-20260906.TEFZ7D/wi2u-record.md
