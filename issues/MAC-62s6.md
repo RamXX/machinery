@@ -1,17 +1,19 @@
 ---
 id: MAC-62s6
 title: "Register reviewed assurance revisions explicitly"
-status: open
+status: in_progress
 priority: 1
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:07Z
-content_hash: "sha256:3360541d8e28ad1f9b215eeb36c8948facb354d16dd356c384fd154d5c560180"
+updated_at: 2026-09-07T21:01:14Z
+content_hash: "sha256:26919906fe562e2bbc5940d0c22f5d4610b0344c521b1113a92c9d766154bfbc"
 blocks: [MAC-sqpt, MAC-u4oo, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-p9z1]
+follows: [MAC-p9z1]
+assignee: dev-MAC-62s6
 ---
 
 ## Description
@@ -93,11 +95,14 @@ status: new
 - 2026-09-06T09:10:18Z dep_added: blocks MAC-vx24
 - 2026-09-06T09:10:19Z dep_added: blocks MAC-ou97
 - 2026-09-07T10:08:34Z dep_removed: was_blocked_by MAC-p9z1
+- 2026-09-07T21:01:14Z status: open -> in_progress
+- 2026-09-07T21:01:14Z auto-follows: linked to predecessor MAC-p9z1
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-sqpt]], [[MAC-u4oo]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-p9z1]]
+- Follows: [[MAC-p9z1]]
 
 ## Comments
 

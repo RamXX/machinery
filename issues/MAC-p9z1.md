@@ -9,12 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:00:50Z
 created_by: ramirosalas
 updated_at: 2026-09-07T10:08:34Z
-content_hash: "sha256:a94c7a5455f928988647cdd0d372b6cb6f0b71056d2efa918aa5040a3d3abdd9"
+content_hash: "sha256:93ec2c700ee678810648706eb46d3777974121d9abdca60dc9d2d7996d51a581"
 was_blocked_by: [MAC-6h0s]
 follows: [MAC-6h0s]
 assignee: dev-MAC-p9z1
 closed_at: 2026-09-07T10:08:34Z
 close_reason: "Accepted: exact replay inputs retained outside governed sources; merged to local epic"
+led_to: [MAC-62s6]
 ---
 
 ## Description
@@ -109,6 +110,7 @@ status: new
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-6h0s]]
 - Follows: [[MAC-6h0s]]
+- Led to: [[MAC-62s6]]
 
 ## Comments
 
