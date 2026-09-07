@@ -114,15 +114,12 @@ func lifecycleRequirePinnedImage(t *testing.T, engine string) {
 	}
 }
 
-// lifecycleDockerOutput runs one bounded docker CLI probe with the ambient
-// daemon endpoint and returns its stdout and stderr.
-func lifecycleDockerOutput(t *testing.T, timeout time.Duration, args ...string) (string, string, error) {
-	t.Helper()
-	docker, err := exec.LookPath("docker")
-	if err != nil {
-		t.Fatalf("required checker lifecycle integration has no Docker engine: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(t.Context(), timeout)
+// lifecycleDockerRun runs one bounded docker CLI probe under ctx. Cleanup
+// paths must pass a context.Background() derivative: t.Context() is already
+// canceled once cleanups run, which would kill the probe before it reaches
+// the daemon.
+func lifecycleDockerRun(ctx context.Context, timeout time.Duration, docker string, args ...string) (string, string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, docker, args...)
 	cmd.Env = os.Environ()
@@ -132,6 +129,17 @@ func lifecycleDockerOutput(t *testing.T, timeout time.Duration, args ...string) 
 	cmd.Stderr = &stderr
 	runErr := cmd.Run()
 	return stdout.String(), stderr.String(), runErr
+}
+
+// lifecycleDockerOutput runs one bounded docker CLI probe with the ambient
+// daemon endpoint and returns its stdout and stderr.
+func lifecycleDockerOutput(t *testing.T, timeout time.Duration, args ...string) (string, string, error) {
+	t.Helper()
+	docker, err := exec.LookPath("docker")
+	if err != nil {
+		t.Fatalf("required checker lifecycle integration has no Docker engine: %v", err)
+	}
+	return lifecycleDockerRun(t.Context(), timeout, docker, args...)
 }
 
 func lifecycleCIDPath(work string) string {
@@ -249,7 +257,11 @@ func lifecycleForeignContainer(t *testing.T) string {
 		t.Fatalf("foreign survival control container could not start: %v\n%s\n%s", err, out, errOut)
 	}
 	t.Cleanup(func() {
-		_, _, _ = lifecycleDockerOutput(t, 30*time.Second, "rm", "-f", name)
+		docker, err := exec.LookPath("docker")
+		if err != nil {
+			return
+		}
+		_, _, _ = lifecycleDockerRun(context.Background(), 30*time.Second, docker, "rm", "-f", name)
 	})
 	return name
 }
