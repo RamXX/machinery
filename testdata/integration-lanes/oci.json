@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "suites": [
+    {
+      "id": "checker-oci-lifecycle",
+      "lane": "required",
+      "adapter": "go-json",
+      "package": "./cmd/machinery",
+      "source_files": ["cmd/machinery/checker_oci_lifecycle_test.go"],
+      "tests": [
+        "TestCheckerOCISuccessRunOwnsAndRemovesContainer",
+        "TestCheckerOCIMissingIdentityBeforeCreationIsSafe",
+        "TestCheckerOCIAlreadyExitedContainerIsRemoved",
+        "TestCheckerOCIForeignContainersSurviveCleanup",
+        "TestCheckerOCITimeoutForceRemovesOwnedContainer",
+        "TestCheckerOCITimeoutForceRemovesSIGTERMIgnoringWorkload",
+        "TestCheckerOCIBudgetsAreFiniteAndEnforced",
+        "TestCheckerOCIResourceExhaustionIsBoundedAndCleaned",
+        "TestCheckerOCIOutputBreachAbortsAndCleans",
+        "TestCheckerOCIRepeatedTimeoutsLeaveNoOrphans",
+        "TestCheckerOCIStubEngineReportsCleanupFailure",
+        "TestCheckerOCIStubEngineRefusesInvalidIdentity",
+        "TestCheckerOCIStubEngineCleanupSucceedsSilently",
+        "TestCheckerOCICLITimeoutPropagatesAndCleans"
+      ],
+      "runtimes": ["go", "docker"],
+      "timeout": "20m",
+      "stdout_limit": 4194304,
+      "stderr_limit": 4194304
+    }
+  ]
+}
