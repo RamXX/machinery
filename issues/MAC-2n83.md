@@ -1,17 +1,19 @@
 ---
 id: MAC-2n83
 title: "Recover interrupted publication without losing ownership"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:31Z
-content_hash: "sha256:ff5d309c4da142ca01dcb40bfaab5ae9a416e6d888527012ade79f010e9054ff"
+updated_at: 2026-09-07T04:45:47Z
+content_hash: "sha256:3a3ad4a0894938b34e823af725013c61461eaa61e55d0f54ffd209207a5b39ca"
 blocks: [MAC-vx24, MAC-ou97, MAC-u4oo]
 was_blocked_by: [MAC-hpqp]
+follows: [MAC-hpqp]
+assignee: dev-MAC-2n83
 ---
 
 ## Description
@@ -102,10 +104,13 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-05T19:45:32Z dep_added: blocked_by MAC-hpqp
 - 2026-09-06T09:10:11Z dep_added: blocks MAC-u4oo
 - 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
+- 2026-09-07T04:45:47Z status: open -> in_progress
+- 2026-09-07T04:45:47Z auto-follows: linked to predecessor MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-vx24]], [[MAC-ou97]], [[MAC-u4oo]]
 - Was blocked by: [[MAC-hpqp]]
+- Follows: [[MAC-hpqp]]
 
 ## Comments
