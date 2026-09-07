@@ -53,7 +53,9 @@ jobs:
         run: go run ./scripts/integration-lane --lane required
   # ---------------------------------------------------------------- build ---
   # Compile every release target and retain a Windows cross-build as an early
-  # portability signal. Windows is not a supported runtime or release target.
+  # portability signal. Windows is a release build target; native windows
+  # test execution remains out of scope (custody and assurance lanes are
+  # unix-only and refuse honestly there).
   # Verifies CGO_DISABLED static builds work (the release pipeline depends on it).
   build:
     strategy:

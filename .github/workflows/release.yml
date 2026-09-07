@@ -1,6 +1,6 @@
 # release.yml - cross-compile and publish the machinery binary on tag push.
-# Produces static binaries for Linux and macOS, checksums them,
-# and attaches everything to a GitHub Release. Users install without Go.
+# Produces static binaries for Linux, macOS, and Windows (amd64), checksums
+# them, and attaches everything to a GitHub Release. Users install without Go.
 # Publication is gated by scripts/release-policy: the exact release commit
 # must carry successful ci, formal, and security runs and descend from main.
 name: release
@@ -94,6 +94,8 @@ jobs:
             goarch: amd64
           - goos: darwin
             goarch: arm64
+          - goos: windows
+            goarch: amd64
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -181,7 +183,7 @@ jobs:
 
   # ------------------------------------------------------------- manifest ---
   # Bind the build artifacts to this release commit: a sorted sha256 manifest
-  # of exactly the eight build outputs, committed to the run's artifacts so
+  # of exactly the ten build outputs, committed to the run's artifacts so
   # publish can prove it publishes precisely what build produced, for exactly
   # this commit, with no substitution possible in between.
   manifest:
@@ -202,8 +204,8 @@ jobs:
           cd dist
           find . -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort >"$RUNNER_TEMP/manifest-names"
           count=$(wc -l <"$RUNNER_TEMP/manifest-names")
-          if [ "$count" -ne 8 ]; then
-            echo "::error::expected exactly 8 build artifacts, found $count"
+          if [ "$count" -ne 10 ]; then
+            echo "::error::expected exactly 10 build artifacts, found $count"
             exit 1
           fi
           {
@@ -337,16 +339,16 @@ jobs:
           discovered=$(mktemp)
           trap 'rm -f "$expected" "$discovered"' EXIT
           printf '%s\n' \
-            machinery-darwin-amd64 \
-            machinery-darwin-arm64 \
             machinery-linux-amd64 \
             machinery-linux-arm64 \
+            machinery-windows-amd64 \
             machinery-source.tar.gz \
             dist-manifest.txt \
             "machinery_${plain}_darwin_amd64.tar.gz" \
             "machinery_${plain}_darwin_arm64.tar.gz" \
             "machinery_${plain}_linux_amd64.tar.gz" \
-            "machinery_${plain}_linux_arm64.tar.gz" | LC_ALL=C sort >"$expected"
+            "machinery_${plain}_linux_arm64.tar.gz" \
+            "machinery_${plain}_windows_amd64.tar.gz" | LC_ALL=C sort >"$expected"
           if ! find dist -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort >"$discovered"; then
             echo "::error::release artifact discovery failed"
             exit 1

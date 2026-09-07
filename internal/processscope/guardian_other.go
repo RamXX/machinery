@@ -42,6 +42,10 @@ func readFrame(c *net.UnixConn) (payload []byte, files []*os.File, err error) {
 	return nil, nil, errf(CodeUnsupportedPlatform, "frame", "platform has no native guardian support")
 }
 
+func (fr *frameReader) read() ([]byte, []*os.File, error) {
+	return nil, nil, errf(CodeUnsupportedPlatform, "frame", "platform has no native guardian support")
+}
+
 func newGroupAttr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{}
 }

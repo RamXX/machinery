@@ -64,14 +64,6 @@ func reapPID(pid int) (bool, error) {
 	return wpid == pid, nil
 }
 
-func selfDigest() (string, error) {
-	exe, err := os.Executable()
-	if err != nil {
-		return "", err
-	}
-	return fileDigest(exe)
-}
-
 func newGroupAttr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{Setpgid: true}
 }
@@ -129,16 +121,6 @@ func writeFrame(c *net.UnixConn, payload []byte, files ...*os.File) error {
 		return errf(CodeInternalError, "frame", "short control write")
 	}
 	return nil
-}
-
-type frameReader struct {
-	c       *net.UnixConn
-	buf     []byte
-	pending []*os.File
-}
-
-func newFrameReader(c *net.UnixConn) *frameReader {
-	return &frameReader{c: c}
 }
 
 func (fr *frameReader) read() ([]byte, []*os.File, error) {
@@ -387,12 +369,4 @@ func runGuardian(io InternalIO, args []string) int {
 			return 0
 		}
 	}
-}
-
-func mustMarshal(v any) []byte {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return []byte(`{"t":"gstartfail","code":"INTERNAL_ERROR","message":"marshal"}`)
-	}
-	return b
 }
