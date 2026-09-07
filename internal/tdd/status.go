@@ -283,7 +283,7 @@ func readRunSummaries(store string) ([]runSummary, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, doc, err := readControlJSONFromBytes(name, raw)
+		doc, err := readControlJSONFromBytes(name, raw)
 		if err != nil {
 			return nil, err
 		}

@@ -432,7 +432,7 @@ func (v *verifier) verifyRequiredChecks(policy *releasePolicy, commit string) []
 	}
 	exact := make([]workflowRun, 0, len(runs))
 	for _, run := range runs {
-		if strings.ToLower(run.HeadSHA) == commit {
+		if strings.EqualFold(run.HeadSHA, commit) {
 			exact = append(exact, run)
 		}
 	}

@@ -9,6 +9,7 @@
 package tdd
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -185,7 +186,7 @@ func publishImmutableFile(finalPath string, perm os.FileMode, data []byte) error
 		if rerr != nil {
 			return rerr
 		}
-		if string(existing) != string(data) {
+		if !bytes.Equal(existing, data) {
 			return fmt.Errorf("INVALID_SCHEMA: immutable object %s holds different bytes than the canonical derivation; the store is corrupt", finalPath)
 		}
 		return nil
@@ -276,7 +277,7 @@ func encodeHeadCanonical(h headDoc) []byte {
 // decodeHeadClosed decodes one head document with the closed rules and
 // enforces that the supplied bytes ARE the canonical encoding.
 func decodeHeadClosed(raw []byte) (headDoc, error) {
-	_, doc, err := readControlJSONFromBytes("ledger/head.json", raw)
+	doc, err := readControlJSONFromBytes("ledger/head.json", raw)
 	if err != nil {
 		return headDoc{}, err
 	}
@@ -414,7 +415,7 @@ func decodeHeadClosed(raw []byte) (headDoc, error) {
 		}
 	}
 	// the bytes must BE the canonical encoding; anything else is tampering
-	if string(encodeHeadCanonical(h)) != string(raw) {
+	if !bytes.Equal(encodeHeadCanonical(h), raw) {
 		return headDoc{}, fmt.Errorf("CONTROL_ROLLBACK: head.json bytes are not the canonical head encoding")
 	}
 	if h.Generation == 0 && (len(h.Plans) > 0 || len(h.Milestones) > 0) {
@@ -691,7 +692,7 @@ func (v *storeView) loadIdentity(wantProject string) error {
 	if err != nil {
 		return err
 	}
-	_, doc, err := readControlJSONFromBytes("store.json", raw)
+	doc, err := readControlJSONFromBytes("store.json", raw)
 	if err != nil {
 		return err
 	}
@@ -717,7 +718,7 @@ func (v *storeView) loadIdentity(wantProject string) error {
 	if !validUUID(sid) || !validUUID(pid) {
 		return fmt.Errorf("INVALID_SCHEMA: store identity fields must be UUIDs")
 	}
-	if string(encodeStoreIdentity(sid, pid)) != string(raw) {
+	if !bytes.Equal(encodeStoreIdentity(sid, pid), raw) {
 		return fmt.Errorf("INVALID_SCHEMA: store.json bytes are not the canonical encoding")
 	}
 	if wantProject != "" && wantProject != pid {
@@ -758,12 +759,12 @@ func (v *storeView) close() error {
 
 // readControlJSONFromBytes decodes closed JSON metadata from bytes already
 // read (16 MiB cap enforced by the caller of readControlJSON).
-func readControlJSONFromBytes(name string, data []byte) ([]byte, *ir.Value, error) {
+func readControlJSONFromBytes(name string, data []byte) (*ir.Value, error) {
 	v, err := ir.LoadMachineJSONBytes(name, data)
 	if err != nil {
-		return nil, nil, fmt.Errorf("INVALID_SCHEMA: %s: %w", name, err)
+		return nil, fmt.Errorf("INVALID_SCHEMA: %s: %w", name, err)
 	}
-	return data, v, nil
+	return v, nil
 }
 
 // ---- initialization ----
@@ -1028,7 +1029,7 @@ func readArchiveFrame(data []byte, off int64) (payload []byte, next int64, err e
 	payload = data[off : off+n]
 	off += n
 	sum := sha256.Sum256(payload)
-	if string(data[off:off+32]) != string(sum[:]) {
+	if !bytes.Equal(data[off:off+32], sum[:]) {
 		return nil, 0, fmt.Errorf("INVALID_SCHEMA: record checksum mismatch")
 	}
 	return payload, off + 32, nil
@@ -1076,7 +1077,7 @@ func ImportStore(ctx context.Context, destPath, archivePath, projectID, expected
 	if err != nil {
 		return StoreImportResult{}, fmt.Errorf("INVALID_SCHEMA: %w", err)
 	}
-	if string(data[:len(archiveExportMagic())]) != string(archiveExportMagic()) {
+	if !bytes.Equal(data[:len(archiveExportMagic())], archiveExportMagic()) {
 		return StoreImportResult{}, fmt.Errorf("INVALID_SCHEMA: archive magic is not %s version 1", "MTDDARCV")
 	}
 	off := int64(len(archiveExportMagic()))
@@ -1110,7 +1111,7 @@ func ImportStore(ctx context.Context, destPath, archivePath, projectID, expected
 		}
 		return StoreImportResult{}, err
 	}
-	if err := buildStagedStore(staging, id, idxEntries, func(want importIndexEntry) ([]byte, error) {
+	if err := buildStagedStore(staging, idxEntries, func(want importIndexEntry) ([]byte, error) {
 		if off >= int64(len(data)) {
 			return nil, fmt.Errorf("INVALID_SCHEMA: archive ended before entry %s", want.path)
 		}
@@ -1169,7 +1170,7 @@ func ImportStore(ctx context.Context, destPath, archivePath, projectID, expected
 
 // decodeExportIndex decodes the closed index document.
 func decodeExportIndex(raw []byte) (entries []importIndexEntry, id StoreIdentity, headDigest string, generation, total int64, err error) {
-	_, doc, derr := readControlJSONFromBytes("export-index", raw)
+	doc, derr := readControlJSONFromBytes("export-index", raw)
 	if derr != nil {
 		return nil, id, "", 0, 0, derr
 	}
@@ -1329,7 +1330,7 @@ func pathBase(p string) string {
 
 // buildStagedStore materializes the archive into a staging root, pulling
 // each record through the supplied reader in index order.
-func buildStagedStore(staging string, id StoreIdentity, entries []importIndexEntry, next func(want importIndexEntry) ([]byte, error)) error {
+func buildStagedStore(staging string, entries []importIndexEntry, next func(want importIndexEntry) ([]byte, error)) error {
 	if err := os.Mkdir(staging, storeRootMod); err != nil {
 		return fmt.Errorf("CUSTODY_ERROR: creating staging root: %w", err)
 	}

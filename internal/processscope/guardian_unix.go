@@ -218,7 +218,7 @@ func runGuardian(io InternalIO, args []string) int {
 	defer signal.Stop(sigCh)
 
 	var devnull *os.File
-	openNull := func(write bool) *os.File {
+	openNull := func() *os.File {
 		if devnull != nil {
 			return devnull
 		}
@@ -260,17 +260,20 @@ func runGuardian(io InternalIO, args []string) int {
 		cmd.ExtraFiles = []*os.File{files[idx]}
 	}
 	if cmd.Stdin == nil {
-		cmd.Stdin = openNull(false)
+		cmd.Stdin = openNull()
 	}
 	if cmd.Stdout == nil {
-		cmd.Stdout = openNull(true)
+		cmd.Stdout = openNull()
 	}
 	if cmd.Stderr == nil {
-		cmd.Stderr = openNull(true)
+		cmd.Stderr = openNull()
 	}
-	for _, f := range files {
-		defer f.Close()
-	}
+	defer func() {
+		for i := len(files) - 1; i >= 0; i-- {
+			// Best-effort close of inherited job descriptors at guardian exit.
+			_ = files[i].Close()
+		}
+	}()
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 
 	done := make(chan error, 1)

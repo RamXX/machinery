@@ -131,9 +131,7 @@ var hookRegisterJob = func(b *broker, j *job) error {
 	return nil
 }
 
-var hookGroupSignal = func(pgid int, sig int) error {
-	return signalGroup(pgid, sig)
-}
+var hookGroupSignal = signalGroup
 
 func (b *broker) scopeByID(id string) *scopeNode {
 	b.mu.Lock()

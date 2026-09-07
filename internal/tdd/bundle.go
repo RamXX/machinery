@@ -8,6 +8,7 @@
 package tdd
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -135,7 +136,7 @@ func encodeBundleCanonical(entries []bundleEntryData, treeDigest string) []byte 
 // keys, kinds, portable modes, digests, roles, sorted unique paths, parent
 // presence and the recomputed tree digest.
 func decodeBundleClosed(raw []byte) ([]bundleEntryData, string, error) {
-	_, doc, err := readControlJSONFromBytes("bundle.json", raw)
+	doc, err := readControlJSONFromBytes("bundle.json", raw)
 	if err != nil {
 		return nil, "", err
 	}
@@ -338,7 +339,7 @@ func MaterializeBundle(ctx context.Context, storePath, projectID, ref, dest stri
 	if treeDigest != ref {
 		return fmt.Errorf("INVALID_SCHEMA: bundle at %s carries tree digest %s", ref, treeDigest)
 	}
-	if string(encodeBundleCanonical(entries, treeDigest)) != string(raw) {
+	if !bytes.Equal(encodeBundleCanonical(entries, treeDigest), raw) {
 		return fmt.Errorf("INVALID_SCHEMA: bundle.json bytes are not the canonical encoding")
 	}
 	// read-verify every referenced blob before touching the destination

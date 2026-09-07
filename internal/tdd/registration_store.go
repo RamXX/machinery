@@ -10,6 +10,7 @@
 package tdd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -79,7 +80,7 @@ func DecodeArchivedManifest(design, milestone string, raw []byte) (Manifest, err
 		return Manifest{}, fmt.Errorf("INVALID_SCHEMA: archived design root: %w", err)
 	}
 	msPath := filepath.Join(protocol.ControlDirName, protocol.MilestonesDirName, milestone+".json")
-	_, doc, err := readControlJSONFromBytes(msPath, raw)
+	doc, err := readControlJSONFromBytes(msPath, raw)
 	if err != nil {
 		return Manifest{}, err
 	}
@@ -742,7 +743,7 @@ func CommitRegistration(ctx context.Context, req StoreRegistrationRequest) (Stor
 // verifyArchivedControl fails unless the control is present byte-exact.
 func verifyArchivedControl(store string, c RegistrationControl) error {
 	raw, err := os.ReadFile(filepath.Join(store, "controls", strings.TrimPrefix(c.Digest, "sha256:")+".json"))
-	if err != nil || digestOfBytes(raw) != c.Digest || string(raw) != string(c.Bytes) {
+	if err != nil || digestOfBytes(raw) != c.Digest || !bytes.Equal(raw, c.Bytes) {
 		return fmt.Errorf("CUSTODY_ERROR: archived control %s is not byte-identical to the derived control; the idempotent exception requires all archived controls identical", c.Digest)
 	}
 	return nil

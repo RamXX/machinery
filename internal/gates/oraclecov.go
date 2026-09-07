@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -530,7 +531,7 @@ func stripExDocstrings(text string) string {
 			i = end
 			continue
 		}
-		if loc := exDocSingle.FindStringSubmatchIndex(line); loc != nil && loc[6] > 0 {
+		if loc := exDocSingle.FindStringSubmatchIndex(line); len(loc) > 6 && loc[6] > 0 {
 			for p := loc[6]; p < loc[7] && p < len(out); p++ {
 				if out[p] != '\n' {
 					out[p] = ' '
@@ -1065,11 +1066,11 @@ func (gf *goTestFile) testProvesParse(test *ast.FuncDecl, base string) bool {
 	}
 	recv := test.Type.Params.List[0].Names[0].Name
 	executed := executedClosures(test.Body)
-	if a.guarded(test.Body, recv, env, nil, executed) {
+	if a.guarded(test.Body, recv, env, nil) {
 		return true
 	}
 	for fl := range executed {
-		if p := testingParam(fl); p != "" && fl.Body != nil && a.guarded(fl.Body, p, env, nil, executed) {
+		if p := testingParam(fl); p != "" && fl.Body != nil && a.guarded(fl.Body, p, env, nil) {
 			return true
 		}
 	}
@@ -1470,32 +1471,32 @@ func testingParam(fl *ast.FuncLit) string {
 // guarded walks statements tracking the active if-conditions on the path; a
 // testing-receiver assertion credits when some active condition carries a
 // content-derived operand (see anyDerived).
-func (a *goAnalysis) guarded(n ast.Node, recv string, env *goEnv, conds []ast.Expr, executed map[*ast.FuncLit]bool) bool {
+func (a *goAnalysis) guarded(n ast.Node, recv string, env *goEnv, conds []ast.Expr) bool {
 	switch x := n.(type) {
 	case *ast.BlockStmt:
 		for _, st := range x.List {
-			if a.guarded(st, recv, env, conds, executed) {
+			if a.guarded(st, recv, env, conds) {
 				return true
 			}
 		}
 	case *ast.IfStmt:
-		next := append(conds[:len(conds):len(conds)], x.Cond)
-		if a.guarded(x.Body, recv, env, next, executed) || (x.Else != nil && a.guarded(x.Else, recv, env, conds, executed)) {
+		next := append(slices.Clone(conds), x.Cond)
+		if a.guarded(x.Body, recv, env, next) || (x.Else != nil && a.guarded(x.Else, recv, env, conds)) {
 			return true
 		}
 	case *ast.ForStmt:
-		return x.Body != nil && a.guarded(x.Body, recv, env, conds, executed)
+		return x.Body != nil && a.guarded(x.Body, recv, env, conds)
 	case *ast.RangeStmt:
-		return x.Body != nil && a.guarded(x.Body, recv, env, conds, executed)
+		return x.Body != nil && a.guarded(x.Body, recv, env, conds)
 	case *ast.SwitchStmt:
-		return x.Body != nil && a.guarded(x.Body, recv, env, conds, executed)
+		return x.Body != nil && a.guarded(x.Body, recv, env, conds)
 	case *ast.TypeSwitchStmt:
-		return x.Body != nil && a.guarded(x.Body, recv, env, conds, executed)
+		return x.Body != nil && a.guarded(x.Body, recv, env, conds)
 	case *ast.SelectStmt:
-		return x.Body != nil && a.guarded(x.Body, recv, env, conds, executed)
+		return x.Body != nil && a.guarded(x.Body, recv, env, conds)
 	case *ast.CaseClause:
 		for _, st := range x.Body {
-			if a.guarded(st, recv, env, conds, executed) {
+			if a.guarded(st, recv, env, conds) {
 				return true
 			}
 		}

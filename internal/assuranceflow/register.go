@@ -8,6 +8,7 @@
 package assuranceflow
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -160,7 +161,7 @@ func (s *controlSnapshot) revalidate() error {
 	}
 	for rel, want := range s.controls {
 		got, err := os.ReadFile(filepath.Join(s.designDir, protocol.ControlDirName, filepath.FromSlash(rel)))
-		if err != nil || string(got) != string(want) {
+		if err != nil || !bytes.Equal(got, want) {
 			return fmt.Errorf("STALE_INPUT: control %s changed during registration", rel)
 		}
 	}
@@ -206,7 +207,7 @@ func Register(ctx context.Context, req RegisterRequest, output io.Writer) (Regis
 		return Registration{}, err
 	}
 	// snapshot and loaded bytes must be the same original view
-	if string(snap.controls[protocol.PlanFileName]) != string(plan.Raw()) {
+	if !bytes.Equal(snap.controls[protocol.PlanFileName], plan.Raw()) {
 		return Registration{}, fmt.Errorf("STALE_INPUT: the plan changed between the original snapshot and loading")
 	}
 	selection, err := resolveSelection(req.Milestones, plan)
@@ -230,7 +231,7 @@ func Register(ctx context.Context, req RegisterRequest, output io.Writer) (Regis
 		if err != nil {
 			return Registration{}, err
 		}
-		if string(snap.controls[protocol.MilestonesDirName+"/"+id+".json"]) != string(m.Raw()) {
+		if !bytes.Equal(snap.controls[protocol.MilestonesDirName+"/"+id+".json"], m.Raw()) {
 			return Registration{}, fmt.Errorf("STALE_INPUT: manifest %s changed between the original snapshot and loading", id)
 		}
 		targets = append(targets, m)
@@ -257,7 +258,7 @@ func Register(ctx context.Context, req RegisterRequest, output io.Writer) (Regis
 	if err != nil {
 		return Registration{}, err
 	}
-	external, err := resolveExternalRegistered(ctx, req.Store, plan, targets, expected, registeredKeys)
+	external, err := resolveExternalRegistered(ctx, req.Store, plan, targets, registeredKeys)
 	if err != nil {
 		return Registration{}, err
 	}
@@ -357,7 +358,7 @@ func containsMilestone(ids []string, want string) bool {
 // design's targets: other finalized milestones of this design that are
 // already registered, and child designs that registered under their own
 // design command first.
-func resolveExternalRegistered(ctx context.Context, store string, plan tdd.Plan, targets []tdd.Manifest, expected tdd.ExpectedHead, registered map[tdd.MilestoneKey]tdd.HeadMilestoneEntry) ([]tdd.RegisteredManifest, error) {
+func resolveExternalRegistered(ctx context.Context, store string, plan tdd.Plan, targets []tdd.Manifest, registered map[tdd.MilestoneKey]tdd.HeadMilestoneEntry) ([]tdd.RegisteredManifest, error) {
 	covered := map[tdd.MilestoneKey]bool{}
 	for _, m := range targets {
 		covered[tdd.MilestoneKey{Design: plan.Design, Milestone: m.ID}] = true
