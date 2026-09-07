@@ -122,12 +122,13 @@ type runtimeReceipt struct {
 	ArchiveSHA string `json:"archive_sha256,omitempty"`
 }
 type report struct {
-	Version  int              `json:"version"`
-	Lane     string           `json:"lane"`
-	Status   string           `json:"status"`
-	Suites   []suiteReceipt   `json:"suites"`
-	Runtimes []runtimeReceipt `json:"runtimes"`
-	Cleanup  struct {
+	Version   int              `json:"version"`
+	Lane      string           `json:"lane"`
+	Status    string           `json:"status"`
+	Suites    []suiteReceipt   `json:"suites"`
+	Runtimes  []runtimeReceipt `json:"runtimes"`
+	Assurance *assuranceReport `json:"assurance,omitempty"`
+	Cleanup   struct {
 		Status string `json:"status"`
 	} `json:"cleanup"`
 	Custody custodyReceipt `json:"custody"`
@@ -245,6 +246,14 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 		fmt.Fprintln(stderr, "inventory:", err)
 		return 1
 	}
+	// The four-language assurance catalog validates before any provisioning
+	// or suite execution so a stale, incomplete or tampered catalog fails
+	// closed fast; foreign roots without it keep exact v1 semantics.
+	catalog, err := loadAssuranceCatalog(*root, suites)
+	if err != nil {
+		fmt.Fprintln(stderr, "assurance:", err)
+		return 1
+	}
 	if *pinPath == "" {
 		*pinPath = filepath.Join(*root, "testdata", "integration-lanes", "runtime-pins.json")
 	}
@@ -320,6 +329,23 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 		fmt.Fprintln(stderr, "provision:", err)
 		return 1
 	}
+	var assuranceRuntimes []runtimeReceipt
+	if catalog != nil {
+		r.Assurance = &assuranceReport{
+			Schema: assuranceSchemaIdentity, Status: "failed",
+			Platform: runtime.GOOS + "/" + runtime.GOARCH,
+			Adapters: []adapterReceipt{}, Runtimes: []runtimeReceipt{}, Suites: []suiteReceipt{},
+		}
+		// All four native adapter runtimes are verified before any suite of
+		// either lane runs; a missing or mismatched runtime is a hard
+		// prerequisite failure, never a skipped fragment.
+		assuranceRuntimes, err = provisionAssurance(ctx, custody, work, catalog)
+		r.Assurance.Runtimes = assuranceRuntimes
+		if err != nil {
+			fmt.Fprintln(stderr, "assurance provision:", err)
+			return 1
+		}
+	}
 	for _, s := range suites {
 		scratch, e := os.MkdirTemp(work, s.ID+"-")
 		if e != nil {
@@ -341,7 +367,40 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 			return 1
 		}
 	}
-	if _, err = fmt.Fprintf(stdout, "required integration lane: %d suites passed; report %s\n", len(r.Suites), *reportPath); err != nil {
+	if catalog != nil {
+		paths := map[string]string{}
+		for _, runtime := range assuranceRuntimes {
+			paths[runtime.ID] = runtime.Path
+		}
+		for i := range catalog.suites {
+			probe := catalog.suites[i]
+			scratch, e := os.MkdirTemp(work, probe.ID+"-")
+			if e != nil {
+				fmt.Fprintln(stderr, e)
+				return 1
+			}
+			receipt, e := executeAssuranceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe, paths)
+			r.Assurance.Suites = append(r.Assurance.Suites, receipt)
+			if e != nil {
+				fmt.Fprintln(stderr, probe.ID+":", e)
+				return 1
+			}
+		}
+		counts := map[string]int{}
+		for _, probe := range catalog.suites {
+			counts[probe.Adapter]++
+		}
+		for _, id := range assuranceClosedAdapters {
+			r.Assurance.Adapters = append(r.Assurance.Adapters, adapterReceipt{ID: id, Suites: counts[id], Status: "passed"})
+		}
+		r.Assurance.Status = "passed"
+	}
+	if catalog != nil {
+		_, err = fmt.Fprintf(stdout, "required integration lane: %d suites passed; %d assurance suites passed across %d native adapters; report %s\n", len(r.Suites), len(r.Assurance.Suites), len(r.Assurance.Adapters), *reportPath)
+	} else {
+		_, err = fmt.Fprintf(stdout, "required integration lane: %d suites passed; report %s\n", len(r.Suites), *reportPath)
+	}
+	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -492,6 +551,14 @@ func inventory(root string) ([]suite, error) {
 	for _, entry := range entries {
 		name := entry.Name()
 		if name == "schema.json" || name == "runtime-pins.json" || name == "CONTRACT.md" {
+			continue
+		}
+		// Assurance-catalog members (MAC-bz1y) are validated by the closed
+		// assurance loader, not interpreted as v1 fragments.
+		if name == "assurance.schema.json" || name == "assurance-runtime-pins.json" || name == "assurance.CONTRACT.md" || name == "assurance-probes" {
+			continue
+		}
+		if strings.HasPrefix(name, "assurance-") && strings.HasSuffix(name, ".json") {
 			continue
 		}
 		if strings.HasSuffix(name, ".integration.test.mjs") {

@@ -22,17 +22,33 @@ permissions:
 jobs:
   integration-required:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          # Exact first-release assurance catalog pin; go.mod is only the
+          # module's floor. The lane fails closed on any other identity.
+          go-version: "1.27.1"
           cache: true
-      # Linux hosted runners provide Docker and Node; the lane verifies both
-      # and provisions its immutable OCI and private Java/TLC closure.
+      # The four-language native assurance catalog pins exact runtimes; the
+      # lane verifies each identity against the pins before any suite runs.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26.8.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: 3.14.7
+      - uses: erlef/setup-beam@ee09b1e59bb240681c382eb1f0abc6a04af72764 # v1.23.0
+        with:
+          elixir-version: 1.20.4
+          otp-version: 29.0.6
+      - name: Install the pinned TypeScript compiler
+        run: npm install -g typescript@7.0.2
+      # Linux hosted runners provide Docker; the lane verifies it and
+      # provisions its immutable OCI and private Java/TLC closure.
       - name: Required runtime integration
         run: go run ./scripts/integration-lane --lane required
   # ---------------------------------------------------------------- build ---
@@ -151,8 +167,22 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          # Exact assurance catalog pin; the lane's black-box tests verify it.
+          go-version: "1.27.1"
           cache: true
+      # The lane's own test package executes the four native language probes.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26.8.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: 3.14.7
+      - uses: erlef/setup-beam@ee09b1e59bb240681c382eb1f0abc6a04af72764 # v1.23.0
+        with:
+          elixir-version: 1.20.4
+          otp-version: 29.0.6
+      - name: Install the pinned TypeScript compiler
+        run: npm install -g typescript@7.0.2
       - name: Go unit + experiment tests (with race detector)
         run: go test -race -count=1 ./... -timeout=20m
 
@@ -248,17 +278,33 @@ jobs:
         run: go test -count=1 -run TestGolden ./cmd/machinery
 
   # Exercise confinement, rename transactions, permissions, and portable-name
-  # rules on the supported native non-Linux filesystem.
+  # rules on the supported native non-Linux filesystem. This also executes
+  # the four-language native assurance probes on hosted darwin/arm64: exact
+  # runtimes are provisioned per the closed catalog pins and verified by the
+  # lane's tests; a missing or mismatched runtime fails, never skips.
   native-tests:
     runs-on: macos-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: "1.27.1"
           cache: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26.8.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: 3.14.7
+      - uses: erlef/setup-beam@ee09b1e59bb240681c382eb1f0abc6a04af72764 # v1.23.0
+        with:
+          elixir-version: 1.20.4
+          otp-version: 29.0.6
+      - name: Install the pinned TypeScript compiler
+        run: npm install -g typescript@7.0.2
       - name: Full non-race suite on native macOS
         run: go test -count=1 ./...
 

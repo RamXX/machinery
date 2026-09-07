@@ -104,7 +104,7 @@ func assuranceSeed(t *testing.T, root string) {
 		if err != nil {
 			return err
 		}
-		laneWrite(t, root, filepath.ToSlash(rel), string(b))
+		laneWrite(t, root, "testdata/integration-lanes/"+filepath.ToSlash(rel), string(b))
 		return nil
 	})
 	if err != nil {
@@ -455,7 +455,7 @@ func TestAssuranceCatalogNativeSkipCannotBecomeSuccess(t *testing.T) {
 		{"python", "testdata/integration-lanes/assurance-probes/python/probe_test.py",
 			"self.assertEqual(6 * 7, 42)", "self.skipTest(\"required assurance probe must not skip\")"},
 		{"elixir", "testdata/integration-lanes/assurance-probes/elixir/test/probe_test.exs",
-			"	test \"assurance runtime probe executes a native ExUnit closure\" do", "	@tag :skip\n	test \"assurance runtime probe executes a native ExUnit closure\" do"},
+			"  test \"assurance runtime probe executes a native ExUnit closure\" do", "  @tag :skip\n  test \"assurance runtime probe executes a native ExUnit closure\" do"},
 	} {
 		t.Run(tc.language, func(t *testing.T) {
 			root := assuranceFixture(t)

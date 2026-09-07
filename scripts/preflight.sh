@@ -107,6 +107,16 @@ else
   fail "ShellCheck is required at the version pinned in .shellcheck-version"
 fi
 
+# 4d. Native assurance runtimes (presence only) -----------------------------
+# The required lane's four-language catalog verifies exact identities and
+# fails closed; this early check only avoids burning minutes before the
+# missing prerequisite is reported there.
+say "native assurance runtime presence (node, python3, elixir, mix, tsc)"
+for tool in node python3 elixir mix tsc; do
+  command -v "$tool" >/dev/null 2>&1 ||
+    fail "required native assurance runtime '$tool' is missing (the lane pins Node 26.8.1 + TypeScript 7.0.2, CPython 3.14.7, Elixir/Mix 1.20.4 with OTP 29 / ERTS 17.0.6)"
+done
+
 # 5. go.mod / go.sum tidy (ci: tidy job) -----------------------------------
 say "go mod tidy (verify clean)"
 go mod tidy || fail "go mod tidy errored"
