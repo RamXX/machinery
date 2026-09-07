@@ -9,12 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
 updated_at: 2026-09-07T21:43:47Z
-content_hash: "sha256:1af642408bb46b6682d0e359075c20ce6e9e98f92678f50a0431ace86016d650"
+content_hash: "sha256:84c8dcd394fdd3f2f04c4571828328789807e3c71ef9037037b3b9600288d8f0"
 was_blocked_by: [MAC-p9z1]
 follows: [MAC-p9z1]
 assignee: dev-MAC-62s6
 closed_at: 2026-09-07T21:43:47Z
 close_reason: "Accepted: reviewed assurance revisions registered explicitly; merged to local epic"
+led_to: [MAC-3hzt]
 ---
 
 ## Description
@@ -108,6 +109,7 @@ status: new
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-p9z1]]
 - Follows: [[MAC-p9z1]]
+- Led to: [[MAC-3hzt]]
 
 ## Comments
 
