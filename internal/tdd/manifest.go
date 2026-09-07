@@ -263,13 +263,6 @@ func canonNative(n NativeID) string {
 	return canonObj(members)
 }
 
-func canonReviewKV(r Review) map[string]string {
-	return map[string]string{
-		"reviewer": canonString(r.Reviewer), "rationale": canonString(r.Rationale),
-		"subject_digest": canonString(r.SubjectDigest),
-	}
-}
-
 func canonExpectations(es []Expectation) string {
 	items := make([]string, 0, len(es))
 	for _, e := range es {

@@ -75,16 +75,6 @@ func sum256(b []byte) []byte { h := sha256.Sum256(b); return h[:] }
 // this is ledger data, never a value computed by an evaluator under test).
 func ratLit(num, den int64) *big.Rat { return big.NewRat(num, den) }
 
-// ratStr parses an exact rational from a decimal literal string (ledger data only).
-func ratStr(t *testing.T, s string) *big.Rat {
-	t.Helper()
-	r, ok := new(big.Rat).SetString(s)
-	if !ok {
-		t.Fatalf("bad rational literal %q", s)
-	}
-	return r
-}
-
 // ---------------------------------------------------------------------------
 // D1 core: controlled clause grammar, fact extraction, exact evaluator.
 // ---------------------------------------------------------------------------
@@ -892,20 +882,6 @@ func TestPortfolioPacketFrozenDesignInputsArePinned(t *testing.T) {
 			t.Logf("input %s sha256=%s", rel, shaHex(raw))
 		}
 	})
-}
-
-func machineOfStable(stable string) string {
-	switch {
-	case strings.HasPrefix(stable, "RECO"):
-		return "RecommendationRun"
-	case strings.HasPrefix(stable, "MARK"):
-		return "MarketDataFeed"
-	case strings.HasPrefix(stable, "PORT"):
-		return "Portfolio"
-	case strings.HasPrefix(stable, "REFE"):
-		return "ReferenceDataCommand"
-	}
-	return ""
 }
 
 // fsmExpectationDiagnostics reconciles the parsed oracle facts against an EXPECTATION
@@ -1955,21 +1931,6 @@ func loadFSMCorpus(t *testing.T) *fsmCorpus {
 	return c
 }
 
-func cloneFSMCorpus(c *fsmCorpus) *fsmCorpus {
-	out := &fsmCorpus{byName: map[string]*fsmDoc{}}
-	for _, d := range c.docs {
-		nd := fsmDoc{name: d.name,
-			machineJSON: append([]byte(nil), d.machineJSON...),
-			oracleMD:    append([]byte(nil), d.oracleMD...),
-			matrixMD:    append([]byte(nil), d.matrixMD...)}
-		nd.machine, _ = parseMachineJSON(nd.machineJSON)
-		nd.oracleRows, _ = parseOracleRows(nd.oracleMD)
-		out.docs = append(out.docs, nd)
-		out.byName[nd.name] = &out.docs[len(out.docs)-1]
-	}
-	return out
-}
-
 // equalActions treats nil and the empty list as equal (explicit empty lists).
 func equalActions(a, b []string) bool {
 	if len(a) == 0 && len(b) == 0 {
@@ -2020,8 +1981,6 @@ func fsmAuthorityDiagnostics(c *fsmCorpus) []string {
 	}
 	return diags
 }
-
-func fsmTransitionRows(m fsmMachine) []fsmRow { return m.Rows }
 
 // immediateEffects computes the ordered exit/transition/entry effect list for one oracle
 // row against a machine. Always rows are their own microstep (Always=true).
@@ -2157,32 +2116,6 @@ var fsmEffectLedger = map[string][]string{
 	"REFE-f67aa3": {"cancelReferenceOperation", "recordReferenceTimeout"},
 	"REFE-074a67": nil,
 	"REFE-c60610": {"recordReferenceError"},
-}
-
-// matrixUnitLedger is the literal named-unit kind inventory per machine.
-var matrixUnitLedger = map[string]map[string]string{
-	"RecommendationRun": {
-		"retriesExhausted": "guard", "recordPortfolio": "action", "incRetries": "action",
-		"publishReady": "action", "publishFailure": "action", "assertTerminalAbsorbing": "action",
-		"fetchPrices": "actor", "optimize": "actor",
-	},
-	"MarketDataFeed": {
-		"atThreshold": "guard", "probeSucceeded": "guard", "recordTrip": "action",
-		"incFailures": "action", "resetFailures": "action",
-	},
-	"Portfolio": {
-		"canDecide": "guard", "canReopen": "guard", "pendingIsUnderReview": "guard",
-		"pendingIsAccepted": "guard", "pendingIsRejected": "guard", "isRetriable": "guard",
-		"retriesExhausted": "guard", "priorIsProposed": "guard", "priorIsUnderReview": "guard",
-		"priorIsAccepted": "guard", "priorIsRejected": "guard", "setPendingAdvance": "action",
-		"setPendingAccept": "action", "setPendingReject": "action", "setPendingReopen": "action",
-		"commit": "action", "recordAccepted": "action", "incRetries": "action",
-		"recordRoutingError": "action", "persistDecision": "actor",
-	},
-	"ReferenceDataCommand": {
-		"selectEligibleConstituents": "actor", "upsertSecurityByTicker": "actor", "buildCandidateSet": "actor",
-		"recordReferenceError": "action", "cancelReferenceOperation": "action", "recordReferenceTimeout": "action",
-	},
 }
 
 // ---------------------------------------------------------------------------
@@ -2748,7 +2681,6 @@ func admErr(class, reason string) admBoundaryError {
 
 type admCounters struct {
 	runsCreated int
-	feedCalls   int
 	retries     int
 }
 
@@ -4583,7 +4515,6 @@ type storeState struct {
 	exists    bool
 	zeroBytes bool
 	schema    *uint64 // nil: missing metadata
-	mutated   bool
 }
 
 // valOpenStore: only a NONEXISTENT path exclusively initializes schemaVersion=1

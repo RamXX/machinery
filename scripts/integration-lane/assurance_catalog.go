@@ -1190,20 +1190,6 @@ func conformanceCallLine(testBytes []byte, id string) (int64, error) {
 	return 0, fmt.Errorf("conformance assertion %s has no typed call site in the frozen fixture", id)
 }
 
-// goModulePathOf reads the module path of a materialized fixture module.
-func goModulePathOf(dir string) (string, error) {
-	raw, err := regularBytes(filepath.Join(dir, "go.mod"), 1<<20)
-	if err != nil {
-		return "", err
-	}
-	for _, line := range strings.Split(string(raw), "\n") {
-		if fields := strings.Fields(strings.TrimSpace(line)); len(fields) == 2 && fields[0] == "module" {
-			return fields[1], nil
-		}
-	}
-	return "", fmt.Errorf("conformance fixture go.mod declares no module path")
-}
-
 // executeTypeScriptConformanceSuite executes the frozen node-test-typescript
 // /v1 conformance fixture through the REAL production assurance chain: the
 // frozen bytes are captured into a private content-addressed store bundle,

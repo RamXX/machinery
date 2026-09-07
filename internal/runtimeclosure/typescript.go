@@ -487,7 +487,7 @@ func openTypeScriptBinary(path string) (os.FileInfo, *os.File, []byte, error) {
 // bounded entries/bytes/depth, with a stable-identity double census. It
 // reuses the Java closure's bounded-tree accounting.
 func fingerprintTypeScriptPackage(root *os.Root) (string, error) {
-	names, infos, _, err := inventoryTypeScriptRoot(root)
+	names, infos, err := inventoryTypeScriptRoot(root)
 	if err != nil {
 		return "", err
 	}
@@ -507,7 +507,7 @@ func fingerprintTypeScriptPackage(root *os.Root) (string, error) {
 			return "", fmt.Errorf("hash TypeScript package closure entry %s: %w", slashName, err)
 		}
 	}
-	finalNames, _, _, err := inventoryTypeScriptRoot(root)
+	finalNames, _, err := inventoryTypeScriptRoot(root)
 	if err != nil {
 		return "", err
 	}
@@ -522,10 +522,10 @@ func fingerprintTypeScriptPackage(root *os.Root) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-func inventoryTypeScriptRoot(root *os.Root) ([]string, map[string]os.FileInfo, int64, error) {
+func inventoryTypeScriptRoot(root *os.Root) ([]string, map[string]os.FileInfo, error) {
 	limits := javaTreeLimits{maxDepth: typeScriptTreeMaxDepth, maxEntries: typeScriptTreeMaxEntries, maxBytes: typeScriptTreeMaxBytes}
 	if err := validateJavaTreeLimits("TypeScript package closure", limits); err != nil {
-		return nil, nil, 0, err
+		return nil, nil, err
 	}
 	budget := javaTreeBudget{label: "TypeScript package closure", limits: limits}
 	names := make([]string, 0, 1024)
@@ -581,10 +581,10 @@ func inventoryTypeScriptRoot(root *os.Root) ([]string, map[string]os.FileInfo, i
 		return nil
 	}
 	if err := walk("."); err != nil {
-		return nil, nil, 0, err
+		return nil, nil, err
 	}
 	sort.Strings(names)
-	return names, infos, budget.bytes, nil
+	return names, infos, nil
 }
 
 func hashTypeScriptFile(root *os.Root, name string, before os.FileInfo, hash io.Writer) error {

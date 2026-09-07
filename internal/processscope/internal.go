@@ -636,10 +636,6 @@ type msgRegContainer struct {
 	Daemon string `json:"daemon"`
 }
 
-type msgRegOK struct {
-	T string `json:"t"`
-}
-
 type msgJob struct {
 	T    string  `json:"t"`
 	Spec jobSpec `json:"spec"`

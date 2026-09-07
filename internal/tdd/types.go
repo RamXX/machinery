@@ -514,8 +514,7 @@ type EventSink func(Event) error
 // authority (additive compatible completion of the MAC-6h0s contract; no
 // existing field or behavior changed).
 type PreparedSuite struct {
-	opaque struct{}
-	state  any
+	state any
 }
 
 // NewPreparedSuite binds adapter-owned prepared state into the opaque

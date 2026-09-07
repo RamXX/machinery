@@ -182,11 +182,11 @@ type tsPrepared struct {
 
 // tsWritePinned writes exact bytes and verifies the written copy against the
 // pinned digest before returning.
-func tsWritePinned(path string, body []byte, mode os.FileMode) error {
+func tsWritePinned(path string, body []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, body, mode); err != nil {
+	if err := os.WriteFile(path, body, 0o644); err != nil {
 		return err
 	}
 	got, err := os.ReadFile(path)
@@ -300,14 +300,14 @@ func tsMaterializeAndCompile(ctx context.Context, req tdd.SuiteRequest, handle *
 		if tsDigestHex(target.body) != pins[filepath.Base(target.rel)] {
 			return nil, fmt.Errorf("INVALID_SCHEMA: embedded asset %s does not match its frozen pin", target.rel)
 		}
-		if err := tsWritePinned(filepath.Join(scratch, filepath.FromSlash(target.rel)), target.body, 0o644); err != nil {
+		if err := tsWritePinned(filepath.Join(scratch, filepath.FromSlash(target.rel)), target.body); err != nil {
 			return nil, err
 		}
 	}
 	compileInputs := []string{}
 	for _, file := range req.Suite.Files {
 		rel := filepath.ToSlash(filepath.Join(tsSrcDir, file))
-		if err := tsWritePinned(filepath.Join(scratch, filepath.FromSlash(rel)), sources[file], 0o644); err != nil {
+		if err := tsWritePinned(filepath.Join(scratch, filepath.FromSlash(rel)), sources[file]); err != nil {
 			return nil, err
 		}
 		compileInputs = append(compileInputs, rel)
@@ -320,10 +320,10 @@ func tsMaterializeAndCompile(ctx context.Context, req tdd.SuiteRequest, handle *
 	if tsDigestHex(tsHelperSource) != TypeScriptHelperPinnedSHA256 || tsDigestHex(tsAmbientSource) != TypeScriptAmbientPinnedSHA256 {
 		return nil, fmt.Errorf("INVALID_SCHEMA: embedded helper transport does not match its frozen pin")
 	}
-	if err := tsWritePinned(filepath.Join(scratch, filepath.FromSlash(helperRel)), tsHelperSource, 0o644); err != nil {
+	if err := tsWritePinned(filepath.Join(scratch, filepath.FromSlash(helperRel)), tsHelperSource); err != nil {
 		return nil, err
 	}
-	if err := tsWritePinned(filepath.Join(scratch, filepath.FromSlash(ambientRel)), tsAmbientSource, 0o644); err != nil {
+	if err := tsWritePinned(filepath.Join(scratch, filepath.FromSlash(ambientRel)), tsAmbientSource); err != nil {
 		return nil, err
 	}
 	compileInputs = append(compileInputs, ambientRel, helperRel)

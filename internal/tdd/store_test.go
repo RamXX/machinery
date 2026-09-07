@@ -371,11 +371,6 @@ func TestStoreOpenValidatesIdentityLayoutProject(t *testing.T) {
 	}
 }
 
-func withProject(p Plan, id string) Plan {
-	p.ProjectID = id
-	return p
-}
-
 // AC5: status is cheap, read-only and explicitly replay-not-performed, with
 // independent store/source/control/judgment digests and actionable
 // unregistered-draft diagnostics.
