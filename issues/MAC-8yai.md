@@ -9,12 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:01:52Z
 created_by: ramirosalas
 updated_at: 2026-09-07T21:01:13Z
-content_hash: "sha256:1d6f830eb4219dd8480138a67c4b7b1dc44dbed4be75631a7e518393674f18eb"
+content_hash: "sha256:017564e5f9a426e0da7558f1eed963cdf0f29db9de8a89bf155e39d5ffc96690"
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
 follows: [MAC-6h0s, MAC-bz1y]
 assignee: dev-MAC-8yai
 closed_at: 2026-09-07T21:01:13Z
 close_reason: "Accepted: Elixir assertions proven through native ExUnit; merged to local epic"
+led_to: [MAC-o82q]
 ---
 
 ## Description
@@ -116,6 +117,7 @@ status: new
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-6h0s]], [[MAC-bz1y]]
 - Follows: [[MAC-6h0s]], [[MAC-bz1y]]
+- Led to: [[MAC-o82q]]
 
 ## Comments
 
