@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-07T08:19:15Z
-content_hash: "sha256:b1ae182c5da3ab43b9c30279f92215e1d4fa7864b00bd6a95302fd16011322a9"
+updated_at: 2026-09-07T08:24:55Z
+content_hash: "sha256:92cf47c7c9cfd6f6de3cc59a8d06b529e7c819fe63e4fe88e1b165c760affab0"
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp, MAC-yhg5]
@@ -124,3 +124,6 @@ status: delivered
 - Follows: [[MAC-hpqp]], [[MAC-yhg5]]
 
 ## Comments
+
+### 2026-09-07T08:24:55Z ramirosalas
+ACCEPTED 2026-09-06 — RED 7865d3f (30 cases: 15 intended failures incl. adversarial native children; 15 controls) -> GREEN eb5cd68. defaultRunner: 600s deadline, independent 1MiB stdout/stderr ceilings, SIGTERM->SIGKILL escalation, single settle flag across error/close/EPIPE races; runMachinery validates hook response shapes (empty-success/allow/deny/block/systemMessage only; malformed/unknown/nonzero/transport block). ps-proof: adversarial child alive mid-run, gone after. Real built binary deny round-trip. Node 30/30 0 skips; Bun 1.0.26 green (bare-name spawn resolution defect documented as host residual, not claimed). One post-RED fakeRunner passthrough repair with re-RED proof (disclosed, reviewed here: infrastructure repair, no expectation weakened). 777 lines vs 650 nominal (633 excl. anchor-mandated lane artifacts) — within disclosed-overrun pattern. opencode lane fragment validated; lane 7 suites green on epic. Record: .git/machinery-evidence-20260906.TEFZ7D/hwdb-record.md
