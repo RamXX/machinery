@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "suites": [
+    {
+      "id": "opencode-governance-adapter",
+      "lane": "required",
+      "adapter": "node-tap",
+      "package": ".",
+      "source_files": ["testdata/integration-lanes/opencode.integration.test.mjs"],
+      "tests": ["opencode governance adapter executes its closed native subprocess inventory"],
+      "runtimes": ["node", "go"],
+      "timeout": "5m",
+      "stdout_limit": 1048576,
+      "stderr_limit": 1048576
+    }
+  ]
+}
