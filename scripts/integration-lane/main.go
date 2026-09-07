@@ -773,11 +773,11 @@ func (l *laneCustody) end(scope processscope.Scope) error {
 	l.mu.Lock()
 	l.jobs += len(rep.Jobs)
 	if !verified {
-		l.closed = append(l.closed, fmt.Errorf("guarded root cleanup: err=%v report=%+v", err, rep))
+		l.closed = append(l.closed, fmt.Errorf("guarded root cleanup: %w report=%+v", err, rep))
 	}
 	l.mu.Unlock()
 	if !verified {
-		return fmt.Errorf("guarded root cleanup did not verify: err=%v report=%+v", err, rep)
+		return fmt.Errorf("guarded root cleanup did not verify: %w report=%+v", err, rep)
 	}
 	return nil
 }
@@ -802,7 +802,7 @@ func (l *laneCustody) finalize(receipt *custodyReceipt) error {
 		}
 		jobs += len(rep.Jobs)
 		if !verified {
-			failures = append(failures, fmt.Errorf("inherited custody close: err=%v report=%+v", err, rep))
+			failures = append(failures, fmt.Errorf("inherited custody close: %w report=%+v", err, rep))
 		}
 	}
 	receipt.Mode = l.mode
@@ -1201,7 +1201,7 @@ func provisionFormal(work string) (retErr error) {
 		defer cancel()
 		rep, closeErr := scope.Close(closeCtx)
 		if closeErr != nil || rep.Status != processscope.StatusCleaned {
-			retErr = errors.Join(retErr, fmt.Errorf("provision-formal: custody cleanup did not verify: %v %+v", closeErr, rep))
+			retErr = errors.Join(retErr, fmt.Errorf("provision-formal: custody cleanup did not verify: %w %+v", closeErr, rep))
 		}
 	}()
 	ctx := processcontrol.WithScope(baseCtx, scope)

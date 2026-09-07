@@ -63,22 +63,19 @@ var (
 func custodyLaneBinary(t *testing.T) string {
 	t.Helper()
 	custodyBinaryOnce.Do(func() {
-		bin := filepath.Join(t.TempDir(), "integration-lane")
-		// The temp dir belongs to the first requesting test; keep the binary
-		// in a shared location that outlives individual tests.
 		dir, err := os.MkdirTemp("", "machinery-custody-binary-")
 		if err != nil {
 			custodyBinaryErr = err
 			return
 		}
-		bin = filepath.Join(dir, "integration-lane")
+		bin := filepath.Join(dir, "integration-lane")
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, "go", "build", "-o", bin, "./scripts/integration-lane")
 		cmd.Dir = laneRepo(t)
 		b, err := cmd.CombinedOutput()
 		if err != nil {
-			custodyBinaryErr = fmt.Errorf("lane build: %v %s", err, b)
+			custodyBinaryErr = fmt.Errorf("lane build: %w %s", err, b)
 			return
 		}
 		custodyBinaryPath = bin
