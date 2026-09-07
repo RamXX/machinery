@@ -508,8 +508,24 @@ type EventSink func(Event) error
 
 // PreparedSuite is opaque adapter-owned state produced ONLY by successful
 // Prepare (exact argv, build outputs and native inventory); it is not a
-// deserializable receipt.
-type PreparedSuite struct{ opaque struct{} }
+// deserializable receipt. MAC-wi2u completes the placeholder with an
+// unexported state carrier: only an adapter's own concrete state type is
+// accepted by its Run, so a foreign or deserialized value carries no
+// authority (additive compatible completion of the MAC-6h0s contract; no
+// existing field or behavior changed).
+type PreparedSuite struct {
+	opaque struct{}
+	state  any
+}
+
+// NewPreparedSuite binds adapter-owned prepared state into the opaque
+// carrier. It grants no authority by itself: the producing adapter's Run
+// validates the concrete state type it emitted.
+func NewPreparedSuite(state any) PreparedSuite { return PreparedSuite{state: state} }
+
+// PreparedState exposes the bound state to the owning adapter only; other
+// callers receive nil.
+func (p PreparedSuite) PreparedState() any { return p.state }
 
 // Execution contains the normalized event inventory, raw-stream digests,
 // target exit status and independent custody result of one suite run.

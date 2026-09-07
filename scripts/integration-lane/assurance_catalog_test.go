@@ -110,6 +110,42 @@ func assuranceSeed(t *testing.T, root string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// MAC-wi2u compatible extension (approved alongside its RED): downstream
+	// adapter fragments declare native-conformance sources inside the
+	// adapters' exclusively owned asset directories OUTSIDE
+	// testdata/integration-lanes. Seed every declared fragment source from
+	// the repository so the closed catalog validates identically in fixture
+	// roots; frozen v1 and probe seeding semantics are unchanged and the
+	// copy is idempotent for sources already seeded above.
+	for _, name := range entries {
+		if !strings.HasPrefix(name.Name(), "assurance-") || !strings.HasSuffix(name.Name(), ".json") {
+			continue
+		}
+		var fragment struct {
+			Suites []struct {
+				Sources []string `json:"source_files"`
+			} `json:"suites"`
+		}
+		b, err := os.ReadFile(filepath.Join(source, name.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(b, &fragment); err != nil {
+			t.Fatal(err)
+		}
+		for _, suite := range fragment.Suites {
+			for _, rel := range suite.Sources {
+				if strings.HasPrefix(rel, "testdata/integration-lanes/") {
+					continue // already seeded above with the frozen catalog
+				}
+				body, err := os.ReadFile(filepath.Join(filepath.Dir(filepath.Dir(source)), filepath.FromSlash(rel)))
+				if err != nil {
+					t.Fatal(err)
+				}
+				laneWrite(t, root, rel, string(body))
+			}
+		}
+	}
 }
 
 func assuranceFixture(t *testing.T) string {
@@ -282,7 +318,15 @@ func TestAssuranceCatalogExecutesFourLanguageProbesNatively(t *testing.T) {
 			t.Fatalf("adapter %s not accounted exactly: %+v", adapter.ID, adapter)
 		}
 	}
-	if len(report.Suites) != 1 || len(report.Assurance.Suites) != 4 {
+	// MAC-wi2u RED supersession (justified, approved with this RED): the
+	// exact count 4 pinned the probe-only catalog state. The closed catalog
+	// contract (assurance.CONTRACT.md) declares the downstream adapter
+	// stories (MAC-wi2u Go, MAC-avfp TypeScript, MAC-imtz Python, MAC-8yai
+	// Elixir) each add a NEW named native-conformance fragment, so the union
+	// count is >= 4 with all four frozen probe suites still present and
+	// exactly accounted below. The four probe receipts and the per-adapter
+	// probe accounting stay byte-exact.
+	if len(report.Suites) != 1 || len(report.Assurance.Suites) < 4 {
 		t.Fatalf("merged union must keep the v1 suite and add four assurance suites: %+v", report)
 	}
 	receipts := map[string]suiteReceipt{}
