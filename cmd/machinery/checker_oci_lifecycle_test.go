@@ -188,10 +188,45 @@ func lifecycleAssertContainerAbsent(t *testing.T, id string) {
 	}
 }
 
+// lifecycleLeakedRunningContainerIDs scans the daemon for containers of the
+// pinned checker image that are both RUNNING and created after started. The
+// ownership contract is "no owned RUNNING container remains": a pre-existing
+// dead container of the pinned image (a foreign fixture left by an unrelated
+// suite) is out of scope and must not fail unrelated lifecycle runs, while a
+// genuinely leaked test-owned container is still running (timeout leak) or
+// freshly created within the run window and stays detectable.
+func lifecycleLeakedRunningContainerIDs(t *testing.T, started time.Time) []string {
+	t.Helper()
+	out, errOut, err := lifecycleDockerOutput(t, 30*time.Second, "ps", "--no-trunc", "--format", "{{.ID}}", "--filter", "status=running", "--filter", "ancestor="+lifecycleImage)
+	if err != nil {
+		t.Fatalf("owned checker container inventory failed: %v\n%s\n%s", err, out, errOut)
+	}
+	leaked := []string{}
+	for _, id := range strings.Fields(out) {
+		created, errOut, err := lifecycleDockerOutput(t, 30*time.Second, "inspect", "--format", "{{.Created}}", id)
+		if err != nil {
+			if strings.Contains(strings.ToLower(created+errOut), "no such object") {
+				continue
+			}
+			t.Fatalf("running checker container %s could not be inspected: %v\n%s\n%s", id, err, created, errOut)
+		}
+		createdAt, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(created))
+		if err != nil {
+			t.Fatalf("running checker container %s has an unparsable creation time %q: %v", id, created, err)
+		}
+		if !createdAt.Before(started) {
+			leaked = append(leaked, id)
+		}
+	}
+	return leaked
+}
+
 // lifecycleAssertNoOwnedCheckerContainers is the post-return proof: every
 // captured identity must be absent, and no container of the pinned checker
-// image may remain on the daemon in any state.
-func lifecycleAssertNoOwnedCheckerContainers(t *testing.T, works ...string) {
+// image that is RUNNING and created after the test started may remain on the
+// daemon. Containers of the pinned image that predate the test (including
+// dead foreign fixtures) are outside this suite's ownership.
+func lifecycleAssertNoOwnedCheckerContainers(t *testing.T, started time.Time, works ...string) {
 	t.Helper()
 	for _, work := range works {
 		if id := lifecycleReadContainerID(t, work); id != "" {
@@ -199,12 +234,8 @@ func lifecycleAssertNoOwnedCheckerContainers(t *testing.T, works ...string) {
 			lifecycleAssertContainerAbsent(t, id)
 		}
 	}
-	out, errOut, err := lifecycleDockerOutput(t, 30*time.Second, "ps", "-aq", "--no-trunc", "--filter", "ancestor="+lifecycleImage)
-	if err != nil {
-		t.Fatalf("owned checker container inventory failed: %v\n%s\n%s", err, out, errOut)
-	}
-	if ids := strings.Fields(out); len(ids) != 0 {
-		t.Fatalf("leaked checker container(s) of the pinned image remain on the daemon: %v", ids)
+	if ids := lifecycleLeakedRunningContainerIDs(t, started); len(ids) != 0 {
+		t.Fatalf("leaked running checker container(s) of the pinned image created during the test remain on the daemon: %v", ids)
 	}
 }
 
@@ -294,7 +325,7 @@ func TestCheckerOCISuccessRunOwnsAndRemovesContainer(t *testing.T) {
 	if elapsed := time.Since(started); elapsed > 60*time.Second {
 		t.Fatalf("successful checker run was not bounded: %s", elapsed)
 	}
-	lifecycleAssertNoOwnedCheckerContainers(t, work)
+	lifecycleAssertNoOwnedCheckerContainers(t, started, work)
 }
 
 // TestCheckerOCIMissingIdentityBeforeCreationIsSafe covers cancellation before
@@ -312,7 +343,7 @@ func TestCheckerOCIMissingIdentityBeforeCreationIsSafe(t *testing.T) {
 	if elapsed := time.Since(started); elapsed > 30*time.Second {
 		t.Fatalf("pre-creation cancellation was not bounded: %s", elapsed)
 	}
-	lifecycleAssertNoOwnedCheckerContainers(t, work)
+	lifecycleAssertNoOwnedCheckerContainers(t, started, work)
 }
 
 // TestCheckerOCIAlreadyExitedContainerIsRemoved covers a workload that exits
@@ -322,11 +353,12 @@ func TestCheckerOCIAlreadyExitedContainerIsRemoved(t *testing.T) {
 	engine := lifecycleRealEngine(t)
 	lifecycleRequirePinnedImage(t, engine)
 	work := lifecycleWorkDir(t)
+	started := time.Now()
 	out, err := runCheckerOCI([]string{engine}, lifecycleImage, testRuntimePlatform, []string{"python3", "-c", "raise SystemExit(7)"}, testRuntimeClosure, 30*time.Second, work)
 	if err == nil || !strings.Contains(err.Error(), "exit status 7") {
 		t.Fatalf("already-exited workload diagnostic was not propagated: %v\n%s", err, out)
 	}
-	lifecycleAssertNoOwnedCheckerContainers(t, work)
+	lifecycleAssertNoOwnedCheckerContainers(t, started, work)
 }
 
 // TestCheckerOCIForeignContainersSurviveCleanup proves cleanup only ever
@@ -337,11 +369,12 @@ func TestCheckerOCIForeignContainersSurviveCleanup(t *testing.T) {
 	lifecycleRequirePinnedImage(t, engine)
 	foreign := lifecycleForeignContainer(t)
 	work := lifecycleWorkDir(t)
+	started := time.Now()
 	out, err := runCheckerOCI([]string{engine}, lifecycleImage, testRuntimePlatform, []string{"python3", "-c", "import time; time.sleep(120)"}, testRuntimeClosure, 4*time.Second, work)
 	if err == nil || !strings.Contains(err.Error(), "timed out after 4s") {
 		t.Fatalf("owned timeout run was not reported: %v\n%s", err, out)
 	}
-	lifecycleAssertNoOwnedCheckerContainers(t, work)
+	lifecycleAssertNoOwnedCheckerContainers(t, started, work)
 	lifecycleAssertForeignRunning(t, foreign)
 }
 
@@ -364,7 +397,7 @@ func TestCheckerOCITimeoutForceRemovesOwnedContainer(t *testing.T) {
 	if elapsed := time.Since(started); elapsed > 45*time.Second {
 		t.Fatalf("timeout cleanup exceeded the bounded daemon-side grace: %s", elapsed)
 	}
-	lifecycleAssertNoOwnedCheckerContainers(t, work)
+	lifecycleAssertNoOwnedCheckerContainers(t, started, work)
 }
 
 // TestCheckerOCITimeoutForceRemovesSIGTERMIgnoringWorkload proves the
@@ -383,7 +416,7 @@ func TestCheckerOCITimeoutForceRemovesSIGTERMIgnoringWorkload(t *testing.T) {
 	if elapsed := time.Since(started); elapsed > 45*time.Second {
 		t.Fatalf("SIGTERM-ignoring workload outlived the bounded cleanup: %s", elapsed)
 	}
-	lifecycleAssertNoOwnedCheckerContainers(t, work)
+	lifecycleAssertNoOwnedCheckerContainers(t, started, work)
 }
 
 // TestCheckerOCIBudgetsAreFiniteAndEnforced observes the live container while
@@ -394,6 +427,7 @@ func TestCheckerOCIBudgetsAreFiniteAndEnforced(t *testing.T) {
 	engine := lifecycleRealEngine(t)
 	lifecycleRequirePinnedImage(t, engine)
 	work := lifecycleWorkDir(t)
+	started := time.Now()
 	type runResult struct {
 		out string
 		err error
@@ -421,7 +455,7 @@ func TestCheckerOCIBudgetsAreFiniteAndEnforced(t *testing.T) {
 	case <-time.After(60 * time.Second):
 		t.Fatal("budgeted checker run did not return")
 	}
-	lifecycleAssertNoOwnedCheckerContainers(t, work)
+	lifecycleAssertNoOwnedCheckerContainers(t, started, work)
 }
 
 // TestCheckerOCIResourceExhaustionIsBoundedAndCleaned proves the daemon-side
@@ -440,7 +474,7 @@ func TestCheckerOCIResourceExhaustionIsBoundedAndCleaned(t *testing.T) {
 	if elapsed := time.Since(started); elapsed > 60*time.Second {
 		t.Fatalf("resource exhaustion handling exceeded the run bound: %s", elapsed)
 	}
-	lifecycleAssertNoOwnedCheckerContainers(t, work)
+	lifecycleAssertNoOwnedCheckerContainers(t, started, work)
 }
 
 // TestCheckerOCIOutputBreachAbortsAndCleans proves an unbounded-output
@@ -464,7 +498,7 @@ func TestCheckerOCIOutputBreachAbortsAndCleans(t *testing.T) {
 	if elapsed := time.Since(started); elapsed > 30*time.Second {
 		t.Fatalf("output breach was not aborted promptly: %s", elapsed)
 	}
-	lifecycleAssertNoOwnedCheckerContainers(t, work)
+	lifecycleAssertNoOwnedCheckerContainers(t, started, work)
 }
 
 // TestCheckerOCIRepeatedTimeoutsLeaveNoOrphans runs the timeout path three
@@ -473,6 +507,7 @@ func TestCheckerOCIRepeatedTimeoutsLeaveNoOrphans(t *testing.T) {
 	engine := lifecycleRealEngine(t)
 	lifecycleRequirePinnedImage(t, engine)
 	var works []string
+	started := time.Now()
 	for range 3 {
 		work := lifecycleWorkDir(t)
 		works = append(works, work)
@@ -480,9 +515,9 @@ func TestCheckerOCIRepeatedTimeoutsLeaveNoOrphans(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "timed out after 3s") {
 			t.Fatalf("repeated timeout run was not reported: %v\n%s", err, out)
 		}
-		lifecycleAssertNoOwnedCheckerContainers(t, work)
+		lifecycleAssertNoOwnedCheckerContainers(t, started, work)
 	}
-	lifecycleAssertNoOwnedCheckerContainers(t, works...)
+	lifecycleAssertNoOwnedCheckerContainers(t, started, works...)
 }
 
 // TestCheckerOCIStubEngineReportsCleanupFailure injects an engine whose rm
@@ -543,15 +578,12 @@ func TestCheckerOCICLITimeoutPropagatesAndCleans(t *testing.T) {
 	d := setupVerifyDesign(t)
 	registry := writeRawRegistryFile(t, "",
 		"checkers:\n  test:\n    runtime:\n      kind: oci\n      engine: ["+engine+"]\n      image: "+lifecycleImage+"\n      platform: "+testRuntimePlatform+"\n    run: [\"python3\", \"-c\", \"import time; time.sleep(120)\"]\n    timeout: \"4s\"\n")
+	started := time.Now()
 	out, errS, code := runVC(t, d.dir, registry)
 	if code != 1 || !strings.Contains(errS, "checker 'test' run failed") || !strings.Contains(errS, "timed out after 4s") {
 		t.Fatalf("checker timeout did not propagate through the verify-checkers CLI: code=%d\nstdout=%s\nstderr=%s", code, out, errS)
 	}
-	out2, errOut, err := lifecycleDockerOutput(t, 30*time.Second, "ps", "-aq", "--no-trunc", "--filter", "ancestor="+lifecycleImage)
-	if err != nil {
-		t.Fatalf("post-CLI owned container inventory failed: %v\n%s\n%s", err, out2, errOut)
-	}
-	if ids := strings.Fields(out2); len(ids) != 0 {
-		t.Fatalf("verify-checkers CLI left owned checker container(s) behind: %v", ids)
+	if ids := lifecycleLeakedRunningContainerIDs(t, started); len(ids) != 0 {
+		t.Fatalf("verify-checkers CLI left running checker container(s) of the pinned image created during the test behind: %v", ids)
 	}
 }
