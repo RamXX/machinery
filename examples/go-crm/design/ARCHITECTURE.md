@@ -115,6 +115,7 @@ externals:
 ignore:
   - "internal/testsupport/**"   # hard-TDD fakes shared by the test suites
   - "internal/arch/**"          # the architecture-boundary test package itself
+  - "internal/testoracle/**"    # the committed-oracle parser behind the test suites; imported only by _test.go files
 dependency_rules:
   allow:
     - crm.commands -> crm.session

@@ -2,46 +2,46 @@ attestation_version: 2
 attestations:
   - claim: g2.action-ownership
     kind: plan
-    attestor: Codex CRM design review
+    attestor: coordinator-review-pending
     date: 2026-09-02
-    note: 'Every domain action is assigned to the component that owns its state change and boundary effects.'
+    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g2.interface-contract-rightness
     kind: plan
-    attestor: Codex CRM design review
+    attestor: coordinator-review-pending
     date: 2026-09-02
-    note: 'Interface shapes, classified errors, retry behavior, and idempotency match the Go realization.'
+    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g2.placement-rightness
     kind: plan
-    attestor: Codex CRM design review
+    attestor: coordinator-review-pending
     date: 2026-09-02
-    note: 'Placement keeps domain decisions pure and confines LadybugDB access to the repository boundary.'
+    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g2.adoption-closure-discovery
     kind: plan
-    attestor: Codex CRM design review
+    attestor: coordinator-review-pending
     date: 2026-09-02
-    note: 'The local CLI, session, authorization, domain, repository, and declared externals form the complete adoption closure.'
+    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g2.event-contract-completeness
     kind: plan
-    attestor: Codex CRM design review
+    attestor: coordinator-review-pending
     date: 2026-09-02
-    note: 'The design is synchronous and declares no cross-component asynchronous event that needs a missing contract.'
+    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g2.nfr-content
     kind: plan
-    attestor: Codex CRM design review
+    attestor: coordinator-review-pending
     date: 2026-09-02
-    note: 'Security, reliability, operability, performance, and data-integrity claims are concrete and testable for the local CLI.'
+    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:1a71a260cdb4f5c6e5e5f472d2bfbaceb76cb05e76e6dbdef47209a93fcf2ec9}
+      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g3.guard-semantics
     kind: plan
     attestor: Codex CRM design review
