@@ -114,8 +114,8 @@ func TestParseElixirReporterStreamAcceptsRealVocabulary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("real reporter vocabulary rejected: %v", err)
 	}
-	if len(events) != 16 {
-		t.Fatalf("expected 16 decoded events, got %d", len(events))
+	if len(events) != 15 {
+		t.Fatalf("expected 15 decoded events, got %d", len(events))
 	}
 	if events[0].Type != "suite_started" || events[0].Config == nil {
 		t.Fatalf("suite_started did not decode: %+v", events[0])
@@ -153,11 +153,11 @@ func TestParseElixirReporterStreamAcceptsRealVocabulary(t *testing.T) {
 	if events[12].Type != "module_finished" || events[12].ModuleDone != "finished" {
 		t.Fatalf("module_finished did not decode: %+v", events[12])
 	}
-	if events[14].Type != "suite_finished" {
-		t.Fatalf("suite_finished missing: %+v", events[14])
+	if events[13].Type != "suite_finished" {
+		t.Fatalf("suite_finished missing: %+v", events[13])
 	}
-	if events[15].Type != ElixirReporterSentinel {
-		t.Fatalf("terminal sentinel missing: %+v", events[15])
+	if events[14].Type != ElixirReporterSentinel {
+		t.Fatalf("terminal sentinel missing: %+v", events[14])
 	}
 }
 
@@ -397,7 +397,7 @@ func TestReconcileElixirStreamRejectsViolations(t *testing.T) {
 	}{
 		{"missing-suite-started", drop("suite_started"), "INCOMPLETE_EVENTS"},
 		{"missing-module-start", drop("module_started"), "INCOMPLETE_EVENTS"},
-		{"missing-test-start", drop("test_started"), "INCOMPLETE_EVENTS"},
+		{"missing-test-start", drop("test_started"), "ASSERTION_MISMATCH"},
 		{"missing-test-finish", drop("test_finished"), "INCOMPLETE_EVENTS"},
 		{"missing-summary", drop("suite_finished"), "INCOMPLETE_EVENTS"},
 		{"missing-sentinel", drop(ElixirReporterSentinel), "INCOMPLETE_EVENTS"},
@@ -585,7 +585,7 @@ func TestValidateElixirSuiteRejectsCommentedCallSite(t *testing.T) {
 // channel, fixed locale/timezone/no-color, declared suite variables only,
 // and Mix/custody transport overrides never inherited.
 func TestBuildElixirRunEnv(t *testing.T) {
-	env, err := buildElixirRunEnv("/prep", "/opt/ex/bin", "/opt/erl/bin", "/prep/run/events.jsonl", []tdd.EnvironmentVar{
+	env, err := buildElixirRunEnv("/prep/run", "/opt/ex/bin", "/opt/erl/bin", "/prep/run/events.jsonl", []tdd.EnvironmentVar{
 		{Name: "SUITE_FLAG", Value: "1"}, {Name: "MIX_ENV", Value: "prod"}, {Name: "MACHINERY_ASSURANCE_EVENTS", Value: "/evil"},
 	})
 	if err != nil {

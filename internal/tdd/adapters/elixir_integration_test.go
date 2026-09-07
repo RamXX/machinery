@@ -210,7 +210,11 @@ func exRunCaptured(t *testing.T, ctx context.Context, files map[string][]byte, s
 // registered machinery-check/v1 call sites.
 func exConformanceSuite(t *testing.T, id string) tdd.Suite {
 	t.Helper()
-	fixture := string(exAssetBytes(t, "conformance/conformance_test.exs"))
+	return exConformanceSuiteOf(t, id, string(exAssetBytes(t, "conformance/conformance_test.exs")))
+}
+
+func exConformanceSuiteOf(t *testing.T, id, fixture string) tdd.Suite {
+	t.Helper()
 	lineOf := func(anchor string) int64 {
 		for i, line := range strings.Split(fixture, "\n") {
 			if strings.Contains(line, anchor) {
@@ -328,7 +332,7 @@ func TestElixirAdapterProvesNativeAssertionFailureRED(t *testing.T) {
 	}
 	unsafe := strings.Replace(string(frozen), "6 * 7 == 42", "6 * 7 == 43", 1)
 	files = map[string][]byte{"test/conformance_test.exs": []byte(unsafe)}
-	unsafeResult, err := exRunCaptured(t, ctx, files, exConformanceSuite(t, "calibration-unsafe"), tdd.Limits{}, nil)
+	unsafeResult, err := exRunCaptured(t, ctx, files, exConformanceSuiteOf(t, "calibration-unsafe", unsafe), tdd.Limits{}, nil)
 	if err != nil {
 		t.Fatalf("unsafe challenge must be reconciled, not errored: %v", err)
 	}
@@ -382,7 +386,7 @@ func TestElixirAdapterRejectsSkippedCase(t *testing.T) {
 		`  @tag :skip
   test "conformance multiple assertions", ctx do`, 1)
 	files := map[string][]byte{"test/conformance_test.exs": []byte(skipped)}
-	_, err := exRunCaptured(t, ctx, files, exConformanceSuite(t, "skip-case"), tdd.Limits{}, nil)
+	_, err := exRunCaptured(t, ctx, files, exConformanceSuiteOf(t, "skip-case", skipped), tdd.Limits{}, nil)
 	if err == nil || !strings.Contains(err.Error(), "UNSUPPORTED_FEATURE") {
 		t.Fatalf("native skip must be rejected as UNSUPPORTED_FEATURE: %v", err)
 	}
@@ -399,7 +403,7 @@ func TestElixirAdapterRejectsEarlyVMHalt(t *testing.T) {
 		`    Machinery.Check.check(ctx, "conformance/witness", 6 * 7 == 42)
     :erlang.halt(0)`, 1)
 	files := map[string][]byte{"test/conformance_test.exs": []byte(exiting)}
-	_, err := exRunCaptured(t, ctx, files, exConformanceSuite(t, "early-halt"), tdd.Limits{}, nil)
+	_, err := exRunCaptured(t, ctx, files, exConformanceSuiteOf(t, "early-halt", exiting), tdd.Limits{}, nil)
 	if err == nil || !strings.Contains(err.Error(), "INCOMPLETE_EVENTS") {
 		t.Fatalf("early VM halt must surface the truncated stream: %v", err)
 	}
@@ -416,7 +420,7 @@ func TestElixirAdapterRejectsUnregisteredAssertionFailure(t *testing.T) {
 		`    Machinery.Check.check(ctx, "conformance/multi-b", 4 * 5 == 20)
     assert 1 == 2`, 1)
 	files := map[string][]byte{"test/conformance_test.exs": []byte(direct)}
-	_, err := exRunCaptured(t, ctx, files, exConformanceSuite(t, "direct-failure"), tdd.Limits{}, nil)
+	_, err := exRunCaptured(t, ctx, files, exConformanceSuiteOf(t, "direct-failure", direct), tdd.Limits{}, nil)
 	if err == nil || !strings.Contains(err.Error(), "UNEXPECTED_FAILURE") {
 		t.Fatalf("direct native assert must be UNEXPECTED_FAILURE: %v", err)
 	}
@@ -433,11 +437,11 @@ func TestElixirAdapterRejectsOrdinaryRaiseAndSetupAssertion(t *testing.T) {
 		`    Machinery.Check.check(ctx, "conformance/multi-b", 4 * 5 == 20)
     raise "ordinary failure outside the transport"`, 1)
 	files := map[string][]byte{"test/conformance_test.exs": []byte(raising)}
-	_, err := exRunCaptured(t, ctx, files, exConformanceSuite(t, "ordinary-raise"), tdd.Limits{}, nil)
+	_, err := exRunCaptured(t, ctx, files, exConformanceSuiteOf(t, "ordinary-raise", raising), tdd.Limits{}, nil)
 	if err == nil || !strings.Contains(err.Error(), "UNEXPECTED_FAILURE") {
 		t.Fatalf("ordinary raise must be UNEXPECTED_FAILURE: %v", err)
 	}
-	setup := string(exAssetBytes(t, "conformance/conformance_test.exs")) + `
+	setupSource := string(exAssetBytes(t, "conformance/conformance_test.exs")) + `
 defmodule SetupAssertSuite do
   use ExUnit.Case, async: false
   require Machinery.Check
@@ -451,23 +455,22 @@ defmodule SetupAssertSuite do
   end
 end
 `
-	files = map[string][]byte{"test/conformance_test.exs": []byte(setup)}
-	setupLine := int64(strings.Index(setup, `test "setup assertion case"`))
-	if setupLine < 0 || strings.Count(setup[:setupLine], "\n") < 1 {
-		t.Fatal("setup fixture lacks the declared test")
-	}
-	setupDecl := int64(strings.Count(setup[:setupLine], "\n") + 1)
-	setupCall := int64(0)
-	for i, line := range strings.Split(setup, "\n") {
+	files = map[string][]byte{"test/conformance_test.exs": []byte(setupSource)}
+	suite := exConformanceSuiteOf(t, "setup-assert", setupSource)
+	suiteDecl := int64(0)
+	suiteCall := int64(0)
+	for i, line := range strings.Split(setupSource, "\n") {
+		if strings.Contains(line, `test "setup assertion case"`) && suiteDecl == 0 {
+			suiteDecl = int64(i + 1)
+		}
 		if strings.Contains(line, `Machinery.Check.check(ctx, "setup/case"`) {
-			setupCall = int64(i + 1)
+			suiteCall = int64(i + 1)
 		}
 	}
-	suite := exConformanceSuite(t, "setup-assert")
 	suite.Tests = append(suite.Tests, tdd.Test{
 		ID: "setup", Source: "test/conformance_test.exs",
-		Native:     tdd.NativeID{Module: "SetupAssertSuite", Name: "setup assertion case", File: "test/conformance_test.exs", Line: setupDecl},
-		Assertions: []tdd.Assertion{{ID: "setup/case", Source: "test/conformance_test.exs", Line: setupCall, Helper: tdd.AssertionHelperV1}},
+		Native:     tdd.NativeID{Module: "SetupAssertSuite", Name: "setup assertion case", File: "test/conformance_test.exs", Line: suiteDecl},
+		Assertions: []tdd.Assertion{{ID: "setup/case", Source: "test/conformance_test.exs", Line: suiteCall, Helper: tdd.AssertionHelperV1}},
 	})
 	_, err = exRunCaptured(t, ctx, files, suite, tdd.Limits{}, nil)
 	if err == nil || !strings.Contains(err.Error(), "UNEXPECTED_FAILURE") {
@@ -570,7 +573,7 @@ func TestElixirAdapterRejectsNeverSettlingTestAsTimeout(t *testing.T) {
 		`    Machinery.Check.check(ctx, "conformance/witness", 6 * 7 == 42)
     Process.sleep(:infinity)`, 1)
 	files := map[string][]byte{"test/conformance_test.exs": []byte(hanging)}
-	_, err := exRunCaptured(t, ctx, files, exConformanceSuite(t, "hang"), tdd.Limits{WallMS: 20000, CleanupMS: 10000}, nil)
+	_, err := exRunCaptured(t, ctx, files, exConformanceSuiteOf(t, "hang", hanging), tdd.Limits{WallMS: 20000, CleanupMS: 10000}, nil)
 	if err == nil || !strings.Contains(err.Error(), "TIMEOUT") {
 		t.Fatalf("never-settling native test must die on the wall deadline as TIMEOUT: %v", err)
 	}
@@ -640,8 +643,11 @@ func exLaneBinary(t *testing.T) string {
 
 // exLaneSeedRoot builds a foreign-module fixture lane root carrying the
 // frozen v1 pilot lane, the complete assurance catalog and this story's
-// fragment.
-func exLaneSeedRoot(t *testing.T, includeFragment bool, tamperConformance func(source string) string) string {
+// fragment. WithSeedSiblings controls whether the frozen go/node
+// conformance fragments are seeded alongside; the omission subject seeds
+// none so the closed union fails exactly on the missing conformance lane
+// (the frozen foreign-root contract of the catalog).
+func exLaneSeedRoot(t *testing.T, withSiblings, includeFragment bool, tamperConformance func(source string) string) string {
 	t.Helper()
 	root := t.TempDir()
 	write := func(rel string, body []byte) {
@@ -701,9 +707,15 @@ func exLaneSeedRoot(t *testing.T, includeFragment bool, tamperConformance func(s
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Seed every frozen fragment's conformance sources from the repository
-	// so the closed catalog validates identically in fixture roots.
-	for _, name := range []string{"assurance-go.json", "assurance-typescript.json"} {
+	// Seed the frozen sibling fragments and their conformance sources from
+	// the repository so the closed catalog validates identically in
+	// fixture roots; the omission subject seeds none of them so the union
+	// fails exactly on the missing native-conformance lane.
+	var fragments []string
+	if withSiblings {
+		fragments = []string{"assurance-go.json", "assurance-typescript.json"}
+	}
+	for _, name := range fragments {
 		body, err := os.ReadFile(filepath.Join(laneDir, name))
 		if err != nil {
 			t.Fatal(err)
@@ -823,7 +835,7 @@ func exLaneRun(t *testing.T, root string, envOverrides ...string) (bool, string,
 // suite alongside the frozen probes, the frozen go/node conformance
 // fragments and the v1 pilot lane.
 func TestContributorLaneExecutesElixirConformanceFragment(t *testing.T) {
-	root := exLaneSeedRoot(t, true, nil)
+	root := exLaneSeedRoot(t, true, true, nil)
 	ok, out, report := exLaneRun(t, root)
 	if !ok {
 		t.Fatalf("required lane with the elixir conformance fragment must pass: %+v output=%s", report, out)
@@ -868,7 +880,10 @@ func TestContributorLaneExecutesElixirConformanceFragment(t *testing.T) {
 // story's required fragment fails the closed union instead of silently
 // shrinking it.
 func TestElixirContributorLaneRejectsConformanceOmission(t *testing.T) {
-	root := exLaneSeedRoot(t, false, nil)
+	// Seeding no conformance fragments at all: omitting this story's
+	// fragment leaves the closed catalog without its required
+	// native-conformance lane (the frozen foreign-root union contract).
+	root := exLaneSeedRoot(t, false, false, nil)
 	ok, out, _ := exLaneRun(t, root)
 	if ok || !strings.Contains(strings.ToLower(out), "conformance") {
 		t.Fatalf("omitting the elixir conformance fragment must fail the union, ok=%v out=%q", ok, out)
@@ -879,7 +894,7 @@ func TestElixirContributorLaneRejectsConformanceOmission(t *testing.T) {
 // native skip inside the conformance fixture fails the lane on the real
 // stream.
 func TestElixirContributorLaneRejectsNativeSkipInConformanceFixture(t *testing.T) {
-	root := exLaneSeedRoot(t, true, func(source string) string {
+	root := exLaneSeedRoot(t, true, true, func(source string) string {
 		return strings.Replace(source, `  test "conformance multiple assertions", ctx do`,
 			`  @tag :skip
   test "conformance multiple assertions", ctx do`, 1)
@@ -893,7 +908,7 @@ func TestElixirContributorLaneRejectsNativeSkipInConformanceFixture(t *testing.T
 // TestElixirContributorLaneRejectsRuntimeAbsence proves a stale elixir
 // runtime fails the lane before any suite runs.
 func TestElixirContributorLaneRejectsRuntimeAbsence(t *testing.T) {
-	root := exLaneSeedRoot(t, true, nil)
+	root := exLaneSeedRoot(t, true, true, nil)
 	shim := t.TempDir()
 	if err := os.WriteFile(filepath.Join(shim, "elixir"), []byte("#!/bin/sh\necho \"Elixir 1.19.0\"\n"), 0o755); err != nil {
 		t.Fatal(err)

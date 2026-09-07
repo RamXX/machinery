@@ -387,11 +387,22 @@ func TestAssuranceCatalogIsMandatoryInMachineryLane(t *testing.T) {
 }
 
 func TestAssuranceCatalogRejectsIncompleteLanguageUnion(t *testing.T) {
+	// MAC-8yai justified supersession (disclosed with its GREEN): the
+	// dropped-probe subject moves from elixir-exunit/v1 to
+	// python-unittest/v1. The frozen probe fragment now coexists with the
+	// MAC-8yai native-conformance fragment, so dropping only the elixir
+	// probe suite no longer makes the adapter absent from the union; the
+	// catalog still fails closed on it (the orphaned probe-source check),
+	// but with a different diagnostic. python-unittest/v1 owns no
+	// conformance inventory yet, so dropping its probe suite keeps failing
+	// exactly at the closed-union boundary with the original diagnostic.
+	// The test's intent - removing one adapter's suites must fail the
+	// closed union - is unchanged.
 	root := assuranceFixture(t)
 	fragment := assuranceFragment(t, root)
 	var kept []any
 	for _, suite := range fragment["suites"].([]any) {
-		if suite.(map[string]any)["adapter"] != "elixir-exunit/v1" {
+		if suite.(map[string]any)["adapter"] != "python-unittest/v1" {
 			kept = append(kept, suite)
 		}
 	}

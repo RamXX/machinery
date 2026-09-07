@@ -97,6 +97,11 @@ var assuranceConformanceInventory = map[string][]string{
 		"conformance parent identity > conformance nested identity",
 		"conformance multiple assertions",
 	},
+	"elixir-exunit/v1": {
+		"conformance witness executes native assertion",
+		"conformance parent identity conformance nested identity",
+		"conformance multiple assertions",
+	},
 }
 
 // assuranceConformanceAssertions declares the registered machinery-check/v1
@@ -111,6 +116,7 @@ var assuranceConformanceAssertions = map[string][]string{
 	"conformance witness executes native assertion":             {"conformance/witness"},
 	"conformance parent identity > conformance nested identity": {"conformance/nested"},
 	"conformance multiple assertions":                           {"conformance/multi-a", "conformance/multi-b"},
+	"conformance parent identity conformance nested identity":   {"conformance/nested"},
 }
 
 // assuranceConformanceAssetPrefix is the exclusively owned adapter asset
@@ -118,6 +124,7 @@ var assuranceConformanceAssertions = map[string][]string{
 var assuranceConformanceAssetPrefix = map[string]string{
 	"go-testing/v1":           "internal/tdd/adapters/assets/go/",
 	"node-test-typescript/v1": "internal/tdd/adapters/assets/typescript/",
+	"elixir-exunit/v1":        "internal/tdd/adapters/assets/elixir/",
 }
 
 // assuranceLaneProjectUUID is the fixed project identity of the lane's
@@ -525,6 +532,10 @@ func validateConformanceSource(adapter, source string) error {
 	case "node-test-typescript/v1":
 		if base != "package.json" && base != "node-ambient.d.ts" && base != "machinery-check.ts" && !strings.HasSuffix(base, ".ts") {
 			return fmt.Errorf("node conformance source %s is not a TypeScript or module input", source)
+		}
+	case "elixir-exunit/v1":
+		if !strings.HasPrefix(source, prefix+"conformance/") || !strings.HasSuffix(base, "_test.exs") {
+			return fmt.Errorf("elixir conformance source %s is not a frozen test input of the owned conformance fixture", source)
 		}
 	}
 	return nil
@@ -1152,7 +1163,7 @@ func goModuleOf(modBytes []byte) string {
 // check(t, ...) / check(ct, ...) transports; each adapter's frozen fixture
 // only ever carries its own form.
 func conformanceCallLine(testBytes []byte, id string) (int64, error) {
-	for _, prefix := range []string{`machinerycheck.Check(t, "`, `check(t, "`, `check(ct, "`} {
+	for _, prefix := range []string{`machinerycheck.Check(t, "`, `check(t, "`, `check(ct, "`, `Machinery.Check.check(ctx, "`} {
 		anchor := prefix + id + `"`
 		for i, line := range strings.Split(string(testBytes), "\n") {
 			if strings.Contains(line, anchor) {
@@ -1416,6 +1427,268 @@ func conformanceDeclLine(testBytes []byte, name string) int64 {
 	for i, line := range strings.Split(string(testBytes), "\n") {
 		if strings.Contains(line, anchor) {
 			return int64(i + 1)
+		}
+	}
+	return 1
+}
+
+// executeElixirConformanceSuite executes the frozen elixir-exunit/v1
+// conformance fixture through the REAL production assurance chain: the
+// frozen bytes are captured into a private content-addressed store bundle,
+// the pinned Elixir 1.20.4 / OTP 29.0.6 (ERTS 17.0.6) runtime closure is
+// opened and validated under the lane's custody scope, the closed adapter
+// prepares the suite (verified materialization into the embedded harness,
+// byte-pinned transport, typed assertion call-site validation) and runs
+// the exact native Mix/ExUnit invocation, and the normalized
+// machinery.tdd.event/v1 stream is accounted exactly. This is adapter
+// conformance evidence, not a mock or a receipt.
+func executeElixirConformanceSuite(ctx context.Context, custody *laneCustody, root, scratch, evidence string, s assuranceSuite) (suiteReceipt, error) {
+	r := suiteReceipt{ID: s.ID, Adapter: s.Adapter, Selected: len(s.Tests), Tests: []testReceipt{}}
+	for _, name := range s.Tests {
+		r.Tests = append(r.Tests, testReceipt{Name: name, Source: s.Sources[0], Status: "not_started"})
+	}
+	src := filepath.Join(scratch, "src")
+	if err := os.MkdirAll(filepath.Join(src, "test"), 0o700); err != nil {
+		return r, err
+	}
+	for _, source := range s.Sources {
+		path, err := sourcePath(root, source)
+		if err != nil {
+			return r, err
+		}
+		b, err := regularBytes(path, 4<<20)
+		if err != nil {
+			return r, err
+		}
+		if err := os.WriteFile(filepath.Join(src, "test", filepath.Base(source)), b, 0o600); err != nil {
+			return r, err
+		}
+	}
+	testFile := "test/" + filepath.Base(s.Sources[0])
+	testBytes, err := regularBytes(filepath.Join(src, filepath.FromSlash(testFile)), 4<<20)
+	if err != nil {
+		return r, err
+	}
+	control := filepath.Join(scratch, "control")
+	if err := os.MkdirAll(control, 0o700); err != nil {
+		return r, err
+	}
+	if err := os.WriteFile(filepath.Join(control, "plan.json"), []byte(`{"schema":"machinery.tdd.plan/v1"}`), 0o600); err != nil {
+		return r, err
+	}
+	scope, err := custody.begin(scratch)
+	if err != nil {
+		return r, err
+	}
+	suiteErr := executeElixirConformance(ctx, scope, scratch, evidence, s, testBytes, testFile, &r)
+	closeErr := custody.end(scope)
+	if err := errors.Join(suiteErr, closeErr); err != nil {
+		return r, err
+	}
+	for source, want := range s.sourceHashes {
+		path, err := sourcePath(root, source)
+		if err != nil {
+			return r, err
+		}
+		b, err := regularBytes(path, 4<<20)
+		if err != nil || fmt.Sprintf("%x", sha256.Sum256(b)) != want {
+			return r, fmt.Errorf("conformance source changed during execution: %s: %v", source, err)
+		}
+	}
+	return r, nil
+}
+
+// executeElixirConformance runs one prepared conformance execution under the
+// live lane scope: closure validation, capture, adapter Prepare/Run and the
+// pure post-run closure revalidation.
+func executeElixirConformance(ctx context.Context, scope processscope.Scope, scratch, evidence string, s assuranceSuite, testBytes []byte, testFile string, r *suiteReceipt) error {
+	handle, err := runtimeclosure.OpenElixir(ctx, runtimeclosure.ElixirRequest{})
+	if err != nil {
+		return fmt.Errorf("pinned elixir closure: %w", err)
+	}
+	if err := handle.Validate(ctx, scope); err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("pinned elixir closure validation: %w", err)
+	}
+	suite := tdd.Suite{
+		ID:      s.ID,
+		Adapter: s.Adapter,
+		Runtime: handle.Identity(),
+		Root:    ".",
+		Files:   []string{testFile},
+	}
+	for _, name := range s.Tests {
+		test := tdd.Test{ID: name, Source: testFile, Native: tdd.NativeID{Module: "Machinery.ConformanceTest", Name: name, File: testFile, Line: elixirConformanceDeclLine(testBytes, name)}}
+		for _, id := range assuranceConformanceAssertions[name] {
+			line, err := conformanceCallLine(testBytes, id)
+			if err != nil {
+				_ = handle.Close()
+				return err
+			}
+			test.Assertions = append(test.Assertions, tdd.Assertion{ID: id, Source: testFile, Line: line, Helper: tdd.AssertionHelperV1})
+		}
+		suite.Tests = append(suite.Tests, test)
+	}
+	frozen := map[string][]byte{testFile: testBytes}
+	released := false
+	inputs := tdd.InputView{
+		SourceRoot:  srcRootOf(scratch),
+		DesignPath:  ".",
+		ControlRoot: filepath.Join(scratch, "control"),
+		Revalidate: func() error {
+			for name, want := range frozen {
+				got, err := os.ReadFile(filepath.Join(srcRootOf(scratch), filepath.FromSlash(name)))
+				if err != nil || fmt.Sprintf("%x", sha256.Sum256(got)) != fmt.Sprintf("%x", sha256.Sum256(want)) {
+					return fmt.Errorf("conformance fixture input %s changed", name)
+				}
+			}
+			return nil
+		},
+		Release: func() error {
+			if released {
+				return fmt.Errorf("double release")
+			}
+			released = true
+			return nil
+		},
+	}
+	store := filepath.Join(scratch, "store")
+	if _, err := tdd.InitStore(ctx, store, assuranceLaneProjectUUID); err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("conformance capture store: %w", err)
+	}
+	manifest := tdd.Manifest{
+		Schema: tdd.SchemaMilestone, ID: "M1", Revision: 1, Repository: ".",
+		ImplementationRoots: []string{"."}, Suites: []tdd.Suite{suite},
+	}
+	bundle, err := tdd.Capture(ctx, tdd.CaptureRequest{
+		Inputs: inputs, Manifest: manifest, Name: "conformance", Store: store,
+		Limits: tdd.Limits{WallMS: 300000},
+	})
+	if err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("conformance capture: %w", err)
+	}
+	adapter, err := adapters.Lookup(s.Adapter)
+	if err != nil {
+		_ = handle.Close()
+		return err
+	}
+	duration, err := time.ParseDuration(s.Timeout)
+	if err != nil {
+		_ = handle.Close()
+		return err
+	}
+	prepared, err := adapter.Prepare(ctx, tdd.SuiteRequest{
+		Inputs: inputs, Suite: suite, Source: bundle,
+		Scratch: filepath.Join(scratch, "run"), Runtime: handle, Scope: scope,
+		Limits: tdd.Limits{WallMS: duration.Milliseconds(), CleanupMS: 10000},
+	})
+	if err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("conformance prepare: %w", err)
+	}
+	var events []tdd.Event
+	execution, runErr := adapter.Run(ctx, prepared, func(e tdd.Event) error {
+		events = append(events, e)
+		return nil
+	})
+	closeErr := handle.Close()
+	if err := errors.Join(runErr, closeErr); err != nil {
+		return fmt.Errorf("native conformance execution failed: %w", err)
+	}
+	if execution.Outcome != "pass" || execution.ExitCode == nil || *execution.ExitCode != 0 {
+		return fmt.Errorf("native conformance outcome %q exit %+v is not a verified pass", execution.Outcome, execution.ExitCode)
+	}
+	if execution.Custody.Status != "cleaned" {
+		return fmt.Errorf("native conformance custody did not verify: %+v", execution.Custody)
+	}
+	started, passed, assertions := map[string]int{}, map[string]int{}, map[string]int{}
+	for _, e := range events {
+		switch e.Kind {
+		case "test-start":
+			if e.Native != nil {
+				started[e.Native.Name]++
+			}
+		case "test-end":
+			if e.Native != nil && e.Outcome == "pass" {
+				passed[e.Native.Name]++
+			}
+		case "assertion":
+			if e.Outcome == "pass" {
+				assertions[e.Assertion]++
+			}
+		}
+	}
+	wantAssertions := 0
+	for _, name := range s.Tests {
+		if started[name] != 1 || passed[name] != 1 {
+			return fmt.Errorf("conformance case %s not accounted exactly (started=%d passed=%d)", name, started[name], passed[name])
+		}
+		for _, id := range assuranceConformanceAssertions[name] {
+			wantAssertions++
+			if assertions[id] != 1 {
+				return fmt.Errorf("conformance assertion %s not witnessed exactly once (%d)", id, assertions[id])
+			}
+		}
+		for i := range r.Tests {
+			if r.Tests[i].Name == name {
+				r.Tests[i].Status = "passed"
+			}
+		}
+	}
+	if wantAssertions == 0 {
+		return fmt.Errorf("closed conformance inventory carries no registered assertions")
+	}
+	r.Started = len(started)
+	r.Passed = len(passed)
+	var payload []byte
+	for _, e := range events {
+		body, err := json.Marshal(e)
+		if err != nil {
+			return err
+		}
+		payload = append(append(payload, body...), '\n')
+	}
+	eventsFile, err := os.CreateTemp(evidence, s.ID+"-events-*")
+	if err != nil {
+		return err
+	}
+	r.Events = eventsFile.Name()
+	r.EventsSHA = fmt.Sprintf("%x", sha256.Sum256(payload))
+	_, writeErr := eventsFile.Write(payload)
+	closeErr = eventsFile.Close()
+	if err := errors.Join(writeErr, closeErr); err != nil {
+		return err
+	}
+	return nil
+}
+
+var elixirTestDeclPattern = regexp.MustCompile(`^\s*test\s+"([^"]+)"`)
+var elixirDescribePattern = regexp.MustCompile(`^\s*describe\s+"([^"]+)"`)
+
+// elixirConformanceDeclLine locates a declared case's native test
+// declaration line: the declared name is either the plain test text or the
+// describe-prefixed exact native name atom ExUnit reports.
+func elixirConformanceDeclLine(testBytes []byte, name string) int64 {
+	var describes []string
+	for _, line := range strings.Split(string(testBytes), "\n") {
+		if match := elixirDescribePattern.FindStringSubmatch(line); match != nil {
+			describes = append(describes, match[1])
+		}
+	}
+	for i, line := range strings.Split(string(testBytes), "\n") {
+		match := elixirTestDeclPattern.FindStringSubmatch(line)
+		if match == nil {
+			continue
+		}
+		if match[1] == name {
+			return int64(i + 1)
+		}
+		for _, describe := range describes {
+			if describe+" "+match[1] == name {
+				return int64(i + 1)
+			}
 		}
 	}
 	return 1

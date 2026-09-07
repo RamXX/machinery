@@ -195,6 +195,11 @@ func TestElixirClosureCloseIsPureRevalidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The copied launcher keeps its read-only install mode; make the
+	// private copy writable before appending the mutation byte.
+	if err := os.Chmod(victim, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(victim, append(append([]byte{}, body...), 0x00), 0o755); err != nil {
 		t.Fatal(err)
 	}
