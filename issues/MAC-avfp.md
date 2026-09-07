@@ -1,7 +1,7 @@
 ---
 id: MAC-avfp
 title: "Prove TypeScript assertions through native node tests"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:01:51Z
 created_by: ramirosalas
 updated_at: 2026-09-07T18:47:01Z
-content_hash: "sha256:5deae72b66295236c7f7ca199c60e6e750854081d4dba28d970ff1ddccdfd7b7"
-blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
+content_hash: "sha256:fa87cfef94b24e63733889b2ae9117adf9f6d4e44fd4a955f21946df8bd5d898"
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
 follows: [MAC-6h0s, MAC-bz1y]
 assignee: dev-MAC-avfp
+closed_at: 2026-09-07T18:47:01Z
+close_reason: "Accepted: TypeScript assertions proven through native node tests; merged to local epic"
 ---
 
 ## Description
@@ -106,10 +107,13 @@ status: new
 - 2026-09-07T10:08:47Z status: open -> in_progress
 - 2026-09-07T10:08:47Z auto-follows: linked to predecessor MAC-6h0s
 - 2026-09-07T10:08:47Z auto-follows: linked to predecessor MAC-bz1y
+- 2026-09-07T18:47:01Z status: in_progress -> closed
+- 2026-09-07T18:47:01Z dep_removed: no_longer_blocks MAC-sd7g
+- 2026-09-07T18:47:01Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T18:47:01Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-sd7g]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-6h0s]], [[MAC-bz1y]]
 - Follows: [[MAC-6h0s]], [[MAC-bz1y]]
 

@@ -9,10 +9,10 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T12:05:48Z
-content_hash: "sha256:3c7a244c081668f470fc067630442d841044b93371f8ece64678dd882bed2ee5"
-blocked_by: [MAC-62s6, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
+content_hash: "sha256:f0c06c1d8d587186d38169507e6e263c98afc0b9ac1a557b20801940758d0eb3"
+blocked_by: [MAC-62s6, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
 blocks: [MAC-gcrr, MAC-ou97]
-was_blocked_by: [MAC-olrx, MAC-p7jd, MAC-l7m0, MAC-p9wm, MAC-sh60, MAC-lnu6, MAC-wi5z, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-hpqp, MAC-2n83, MAC-bz1y, MAC-p9z1, MAC-wi2u]
+was_blocked_by: [MAC-olrx, MAC-p7jd, MAC-l7m0, MAC-p9wm, MAC-sh60, MAC-lnu6, MAC-wi5z, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-hpqp, MAC-2n83, MAC-bz1y, MAC-p9z1, MAC-wi2u, MAC-avfp]
 ---
 
 ## Description
@@ -168,12 +168,13 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-07T10:08:34Z dep_removed: was_blocked_by MAC-bz1y
 - 2026-09-07T10:08:35Z dep_removed: was_blocked_by MAC-p9z1
 - 2026-09-07T18:47:01Z dep_removed: was_blocked_by MAC-wi2u
+- 2026-09-07T18:47:01Z dep_removed: was_blocked_by MAC-avfp
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
-- Blocked by: [[MAC-62s6]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-pe9v]], [[MAC-sd7g]], [[MAC-sqpt]], [[MAC-wbxq]], [[MAC-rau8]], [[MAC-u4oo]], [[MAC-5ft8]], [[MAC-al5u]], [[MAC-1u2v]]
-- Was blocked by: [[MAC-olrx]], [[MAC-p7jd]], [[MAC-l7m0]], [[MAC-p9wm]], [[MAC-sh60]], [[MAC-lnu6]], [[MAC-wi5z]], [[MAC-qlw2]], [[MAC-cn7q]], [[MAC-6h0s]], [[MAC-hpqp]], [[MAC-2n83]], [[MAC-bz1y]], [[MAC-p9z1]], [[MAC-wi2u]]
+- Blocked by: [[MAC-62s6]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-pe9v]], [[MAC-sd7g]], [[MAC-sqpt]], [[MAC-wbxq]], [[MAC-rau8]], [[MAC-u4oo]], [[MAC-5ft8]], [[MAC-al5u]], [[MAC-1u2v]]
+- Was blocked by: [[MAC-olrx]], [[MAC-p7jd]], [[MAC-l7m0]], [[MAC-p9wm]], [[MAC-sh60]], [[MAC-lnu6]], [[MAC-wi5z]], [[MAC-qlw2]], [[MAC-cn7q]], [[MAC-6h0s]], [[MAC-hpqp]], [[MAC-2n83]], [[MAC-bz1y]], [[MAC-p9z1]], [[MAC-wi2u]], [[MAC-avfp]]
 
 ## Comments
 
