@@ -4,11 +4,11 @@ title: "Prove Go assertions through the native test runner"
 status: in_progress
 priority: 1
 type: feature
-labels: [hard-tdd]
+labels: [hard-tdd, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:51Z
 created_by: ramirosalas
-updated_at: 2026-09-07T18:47:00Z
+updated_at: 2026-09-07T18:47:01Z
 content_hash: "sha256:1cd58b6e3e7458e6e4e7527b36e60fcde9b7f7c80d745f2f4403ea8671d9a326"
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
