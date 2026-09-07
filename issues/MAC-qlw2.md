@@ -1,19 +1,20 @@
 ---
 id: MAC-qlw2
 title: "Retain native child ownership until cleanup completes"
-status: open
+status: closed
 priority: 0
 type: feature
 labels: [hard-tdd, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
-updated_at: 2026-09-07T00:29:09Z
-content_hash: "sha256:9589e504c249f5a96c120ca6aa5758ca879b264ad41aab54fb8015c458a06ea6"
-blocks: [MAC-cn7q, MAC-6h0s, MAC-vx24, MAC-ou97]
+updated_at: 2026-09-07T00:29:10Z
+content_hash: "sha256:9d48b4e063f443ea91fec4885bf091d9112b9db21bf1fe10e7a05ed81e5d5b53"
 was_blocked_by: [MAC-l7m0, MAC-p9wm]
 assignee: dev-MAC-qlw2
 follows: [MAC-l7m0]
+closed_at: 2026-09-07T00:29:10Z
+close_reason: "Accepted: native child ownership until cleanup completes, proven Darwin+Linux; critical-path unblocker delivered; merged to local epic"
 ---
 
 ## Description
@@ -122,10 +123,14 @@ status: in_progress
 - 2026-09-06T12:31:39Z dep_removed: was_blocked_by MAC-p9wm
 - 2026-09-06T17:01:33Z status: in_progress -> deferred
 - 2026-09-06T23:26:32Z status: deferred -> open
+- 2026-09-07T00:29:10Z status: open -> closed
+- 2026-09-07T00:29:10Z dep_removed: no_longer_blocks MAC-cn7q
+- 2026-09-07T00:29:10Z dep_removed: no_longer_blocks MAC-6h0s
+- 2026-09-07T00:29:10Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T00:29:10Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-cn7q]], [[MAC-6h0s]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-l7m0]], [[MAC-p9wm]]
 - Follows: [[MAC-l7m0]]
 
