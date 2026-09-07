@@ -1,7 +1,7 @@
 ---
 id: MAC-p9z1
 title: "Retain exact replay inputs outside governed sources"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:00:50Z
 created_by: ramirosalas
 updated_at: 2026-09-07T10:08:34Z
-content_hash: "sha256:7518e4b6b1ba08d9d1115de24fd65fbf13d421db7f0c298ac7f1a8c3beb24a8a"
-blocks: [MAC-62s6, MAC-wbxq, MAC-vx24, MAC-ou97]
+content_hash: "sha256:a94c7a5455f928988647cdd0d372b6cb6f0b71056d2efa918aa5040a3d3abdd9"
 was_blocked_by: [MAC-6h0s]
 follows: [MAC-6h0s]
 assignee: dev-MAC-p9z1
+closed_at: 2026-09-07T10:08:34Z
+close_reason: "Accepted: exact replay inputs retained outside governed sources; merged to local epic"
 ---
 
 ## Description
@@ -98,10 +99,14 @@ status: new
 - 2026-09-07T01:42:40Z dep_removed: was_blocked_by MAC-6h0s
 - 2026-09-07T09:15:42Z status: open -> in_progress
 - 2026-09-07T09:15:42Z auto-follows: linked to predecessor MAC-6h0s
+- 2026-09-07T10:08:34Z status: in_progress -> closed
+- 2026-09-07T10:08:35Z dep_removed: no_longer_blocks MAC-62s6
+- 2026-09-07T10:08:35Z dep_removed: no_longer_blocks MAC-wbxq
+- 2026-09-07T10:08:35Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T10:08:35Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-62s6]], [[MAC-wbxq]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-6h0s]]
 - Follows: [[MAC-6h0s]]
 
