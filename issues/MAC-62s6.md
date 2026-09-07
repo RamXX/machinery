@@ -1,7 +1,7 @@
 ---
 id: MAC-62s6
 title: "Register reviewed assurance revisions explicitly"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
 updated_at: 2026-09-07T21:43:47Z
-content_hash: "sha256:88bd12aa1df5b159e12c6f596d0ce8b7c0b99d01e15190b7499edd3138be4f8b"
-blocks: [MAC-sqpt, MAC-u4oo, MAC-vx24, MAC-ou97]
+content_hash: "sha256:1af642408bb46b6682d0e359075c20ce6e9e98f92678f50a0431ace86016d650"
 was_blocked_by: [MAC-p9z1]
 follows: [MAC-p9z1]
 assignee: dev-MAC-62s6
+closed_at: 2026-09-07T21:43:47Z
+close_reason: "Accepted: reviewed assurance revisions registered explicitly; merged to local epic"
 ---
 
 ## Description
@@ -97,10 +98,14 @@ status: new
 - 2026-09-07T10:08:34Z dep_removed: was_blocked_by MAC-p9z1
 - 2026-09-07T21:01:14Z status: open -> in_progress
 - 2026-09-07T21:01:14Z auto-follows: linked to predecessor MAC-p9z1
+- 2026-09-07T21:43:47Z status: in_progress -> closed
+- 2026-09-07T21:43:47Z dep_removed: no_longer_blocks MAC-sqpt
+- 2026-09-07T21:43:47Z dep_removed: no_longer_blocks MAC-u4oo
+- 2026-09-07T21:43:47Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T21:43:48Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-sqpt]], [[MAC-u4oo]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-p9z1]]
 - Follows: [[MAC-p9z1]]
 
