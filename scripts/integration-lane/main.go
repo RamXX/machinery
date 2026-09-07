@@ -390,6 +390,8 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 					receipt, e = executeTypeScriptConformanceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe)
 				case "python-unittest/v1":
 					receipt, e = executePythonConformanceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe)
+				case "elixir-exunit/v1":
+					receipt, e = executeElixirConformanceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe)
 				default:
 					e = fmt.Errorf("adapter %s owns no conformance executor", probe.Adapter)
 				}

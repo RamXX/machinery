@@ -1,0 +1,26 @@
+{
+  "schema": "machinery.assurance.lane/v1",
+  "fragment": "assurance-elixir",
+  "owner": "MAC-8yai",
+  "suites": [
+    {
+      "id": "assurance-elixir-conformance",
+      "lane": "assurance",
+      "adapter": "elixir-exunit/v1",
+      "kind": "native-conformance",
+      "package": ".",
+      "source_files": [
+        "internal/tdd/adapters/assets/elixir/conformance/conformance_test.exs"
+      ],
+      "tests": [
+        "conformance witness executes native assertion",
+        "conformance parent identity conformance nested identity",
+        "conformance multiple assertions"
+      ],
+      "runtimes": ["elixir"],
+      "timeout": "5m",
+      "stdout_limit": 1048576,
+      "stderr_limit": 1048576
+    }
+  ]
+}
