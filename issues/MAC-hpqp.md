@@ -9,11 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
 updated_at: 2026-09-06T13:00:55Z
-content_hash: "sha256:44dc1db60cdebd23462fceb781a10be440495f890d89422b61e5e1c7d41ba8b3"
+content_hash: "sha256:d8fe2ab4f768a78b20cec618e9344160a63af5385e046fa308b531ad78a9b772"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
-blocked_by: [MAC-cn7q]
+was_blocked_by: [MAC-cn7q]
 ---
 
 ## Description
@@ -476,11 +476,12 @@ status: new
 - 2026-09-05T21:43:52Z claimed by dev-MAC-hpqp
 - 2026-09-06T09:09:59Z dep_added: blocks MAC-bz1y
 - 2026-09-06T09:10:14Z dep_added: blocked_by MAC-cn7q
+- 2026-09-07T01:42:39Z dep_removed: was_blocked_by MAC-cn7q
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-hlae]], [[MAC-yhg5]], [[MAC-2n83]], [[MAC-hwdb]], [[MAC-vx24]], [[MAC-gcrr]], [[MAC-ou97]], [[MAC-hy71]], [[MAC-bz1y]]
-- Blocked by: [[MAC-cn7q]]
+- Was blocked by: [[MAC-cn7q]]
 - Follows: [[MAC-olrx]]
 
 ## Comments

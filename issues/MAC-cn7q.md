@@ -1,7 +1,7 @@
 ---
 id: MAC-cn7q
 title: "Keep formal subprocesses inside native custody"
-status: in_progress
+status: closed
 priority: 0
 type: feature
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
 updated_at: 2026-09-07T01:42:39Z
-content_hash: "sha256:ff2fa9408bcbb172a4cd3a4e87e61a8bfdf17ea7dd9d72376c70328ef34d058e"
-blocks: [MAC-pe9v, MAC-hpqp, MAC-vx24, MAC-ou97]
+content_hash: "sha256:8bf26d4cb5bbc9ba01db6ce279e9f2aca9463d7d660f194b4aa4da51dc370381"
 was_blocked_by: [MAC-qlw2]
 follows: [MAC-qlw2]
 assignee: dev-MAC-cn7q
+closed_at: 2026-09-07T01:42:39Z
+close_reason: "Accepted: formal subprocesses inside native custody; MAC-hpqp attachment integration delivered; merged to local epic"
 ---
 
 ## Description
@@ -100,10 +101,14 @@ status: new
 - 2026-09-07T00:29:10Z dep_removed: was_blocked_by MAC-qlw2
 - 2026-09-07T00:29:38Z status: open -> in_progress
 - 2026-09-07T00:29:38Z auto-follows: linked to predecessor MAC-qlw2
+- 2026-09-07T01:42:39Z status: in_progress -> closed
+- 2026-09-07T01:42:39Z dep_removed: no_longer_blocks MAC-pe9v
+- 2026-09-07T01:42:39Z dep_removed: no_longer_blocks MAC-hpqp
+- 2026-09-07T01:42:39Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T01:42:39Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-pe9v]], [[MAC-hpqp]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-qlw2]]
 - Follows: [[MAC-qlw2]]
 
