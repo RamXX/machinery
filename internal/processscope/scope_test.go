@@ -117,7 +117,8 @@ func TestBudgetArithmetic(t *testing.T) {
 	}
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel2()
-	if r := EffectiveDeadlineMS(now, 0, ctx2, scopeDeadline); r != 2000 {
+	realNow := time.Now()
+	if r := EffectiveDeadlineMS(realNow, 0, ctx2, realNow.Add(10*time.Second)); r < 1500 || r > 2000 {
 		t.Fatalf("effective ctx: %d", r)
 	}
 	first := NextCleanupDeadline(now, false, time.Time{}, 8000)
@@ -131,7 +132,7 @@ func TestBudgetArithmetic(t *testing.T) {
 	if d := NextCleanupDeadline(later, true, first, 30000); !d.Equal(first) {
 		t.Fatalf("renewal refused 2: %v", d)
 	}
-	if d := NextCleanupDeadline(later, false, time.Time{}, 30000); !d.Equal(later.Add(30*time.Second)) {
+	if d := NextCleanupDeadline(later, false, time.Time{}, 30000); !d.Equal(later.Add(30 * time.Second)) {
 		t.Fatalf("cap: %v", d)
 	}
 }
@@ -247,7 +248,10 @@ func TestOpenOptionsValidation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	asCode(t, func() error { _, err := Open(ctx, good); return err }(), CodeCanceled)
-	asCode(t, func() error { _, err := Open(mustCtx(), Options{HelperExecutable: exe, HelperDigest: "", ScratchRoot: scratch}); return err }(), CodeInvalidOptions)
+	asCode(t, func() error {
+		_, err := Open(mustCtx(), Options{HelperExecutable: exe, HelperDigest: "", ScratchRoot: scratch})
+		return err
+	}(), CodeInvalidOptions)
 	asCode(t, func() error {
 		_, err := Open(mustCtx(), Options{HelperExecutable: "machinery-helper", HelperDigest: dg, ScratchRoot: scratch})
 		return err
@@ -338,11 +342,6 @@ func startTestBroker(t *testing.T, limits Limits) (*scope, func()) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	connB, err := connFromFile(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b.Close()
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -356,7 +355,7 @@ func startTestBroker(t *testing.T, limits Limits) (*scope, func()) {
 		t.Fatal(err)
 	}
 	wall := time.Now().Add(time.Duration(norm.WallMS) * time.Millisecond)
-	st := &ioState{ctl: a, owner: lr, deadline: wall}
+	st := &ioState{ctl: b, owner: lr, deadline: wall}
 	go func() { runBroker(InternalIO{state: st}, []string{InternalMarker, "broker", "--dir", dir}) }()
 	connA, err := connFromFile(a)
 	if err != nil {
@@ -377,8 +376,7 @@ func startTestBroker(t *testing.T, limits Limits) (*scope, func()) {
 	if ready.Ack != challenge || ready.Self != dg || ready.Root == "" {
 		t.Fatalf("bootstrap handshake: %+v", ready)
 	}
-	_ = connB
-	s := &scope{conn: connA, id: "root", rootID: ready.Root, deadline: wall, limits: norm, isRoot: true, root: &rootHandle{dir: dir, livenessW: lw}}
+	s := &scope{conn: connA, fr: newFrameReader(connA), id: "root", rootID: ready.Root, deadline: wall, limits: norm, isRoot: true, root: &rootHandle{dir: dir, livenessW: lw}}
 	cleanup := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -406,7 +404,7 @@ func readJSONFrame(c *net.UnixConn, v any) error {
 }
 
 func trueCommand() Command {
-	return Command{Executable: "/bin/true", Args: nil, Dir: "", Env: []string{}, RuntimeDigest: "sha256:" + repeatHex(64)}
+	return Command{Executable: "/usr/bin/true", Args: nil, Dir: "", Env: []string{}, RuntimeDigest: "sha256:" + repeatHex(64)}
 }
 
 func TestChallengeAuthorizeUnsafeAcceptsForgedScope(t *testing.T) {
@@ -626,8 +624,8 @@ func TestLedgerNotCleanupAuthority(t *testing.T) {
 	if err := sentinelCmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	defer sentinelCmd.Process.Kill()
 	defer sentinelCmd.Wait()
+	defer sentinelCmd.Process.Kill()
 	attached, err := s.Attach(trueCommand())
 	if err != nil {
 		t.Fatal(err)

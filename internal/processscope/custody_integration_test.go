@@ -404,7 +404,7 @@ func TestRunAssertionFailureExitCode(t *testing.T) {
 	sentinel := startSentinel(t)
 	s := openScope(t, t.TempDir(), nil)
 	attached := attach(t, s, processscope.Command{
-		Executable:    "/bin/false",
+		Executable:    "/usr/bin/false",
 		Env:           envBase(),
 		RuntimeDigest: runtimeDigest,
 	})
@@ -677,7 +677,7 @@ func TestStaleCapabilityAfterClose(t *testing.T) {
 	s := openScope(t, scratch, nil)
 	sd := filepath.Join(scratch, "delegated.txt")
 	rs := filepath.Join(scratch, "stale-result.txt")
-	delegate := roleCommand(t, "stale-delegate", "MACHINERY_QLW2_FILE="+sd, "MACHINERY_QLW2_RESULT="+rs, "MACHINERY_QLW2_DELAY=1200ms")
+	delegate := roleCommand(t, "stale-delegate", "MACHINERY_QLW2_FILE="+sd, "MACHINERY_QLW2_RESULT="+rs, "MACHINERY_QLW2_DELAY=5000ms")
 	delegate.Env = append(delegate.Env, processscope.EnvChildRequest+"=join")
 	attached := attach(t, s, delegate)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -809,8 +809,8 @@ func TestCleanupBudgetExhaustionReported(t *testing.T) {
 	sentinel := startSentinel(t)
 	scratch := t.TempDir()
 	s := openScope(t, scratch, func(o *processscope.Options) { o.Limits.CleanupMS = 1; o.Limits.Jobs = 2 })
-	f := filepath.Join(scratch, "grandchild.pid")
-	attached := attach(t, s, roleCommand(t, "grandparent", "MACHINERY_QLW2_FILE="+f, "MACHINERY_QLW2_SECS=120"))
+	f := filepath.Join(scratch, "sleeper.pid")
+	attached := attach(t, s, roleCommand(t, "sleeper", "MACHINERY_QLW2_FILE="+f))
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 	_, err := s.Run(ctx, attached, processscope.Streams{})

@@ -5,6 +5,7 @@ package processscope
 import (
 	"net"
 	"os"
+	"syscall"
 )
 
 func platformSupported() bool { return false }
@@ -40,6 +41,12 @@ func writeFrame(c *net.UnixConn, payload []byte, files ...*os.File) error {
 func readFrame(c *net.UnixConn) (payload []byte, files []*os.File, err error) {
 	return nil, nil, errf(CodeUnsupportedPlatform, "frame", "platform has no native guardian support")
 }
+
+func newGroupAttr() *syscall.SysProcAttr {
+	return &syscall.SysProcAttr{}
+}
+
+func sigKillCode() int { return 9 }
 
 func runGuardian(io InternalIO, args []string) int {
 	return 1
