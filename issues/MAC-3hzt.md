@@ -1,7 +1,7 @@
 ---
 id: MAC-3hzt
 title: "Bug: journal recovery ABA witness still ctime-only (coarse-clock flake)"
-status: in_progress
+status: closed
 priority: 1
 type: bug
 assignee: dev-jrn
@@ -9,9 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-07T21:57:39Z
 created_by: ramirosalas
 updated_at: 2026-09-07T22:29:14Z
-content_hash: "sha256:ead0d6307e03ec01cd1fa660d6fe959537eb35c627e6ee465314372227d6f5ec"
+content_hash: "sha256:a61bc23c7974a01ffe82094648c3ca808c47cec065fe6c8e16c2c7309b173f52"
 follows: [MAC-62s6]
 labels: [accepted]
+closed_at: 2026-09-07T22:29:14Z
+close_reason: "Accepted: journal recovery ABA witness granularity-independent; confirmed on Linux; merged to local epic"
 ---
 
 ## Description
@@ -29,6 +31,7 @@ Found during MAC-o82q Linux confirmation (REPORT f3c2d8f4907283b63f7286fc905e5f4
 ## History
 - 2026-09-07T21:57:40Z status: open -> in_progress
 - 2026-09-07T21:57:40Z auto-follows: linked to predecessor MAC-62s6
+- 2026-09-07T22:29:14Z status: in_progress -> closed
 
 ## Links
 - Parent: [[MAC-ui8a]]
