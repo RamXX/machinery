@@ -383,7 +383,14 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 			if probe.Kind == assuranceConformanceKind {
 				// Adapter-native conformance suites execute through the
 				// closed production adapter chain, not the probe harness.
-				receipt, e = executeGoConformanceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe)
+				switch probe.Adapter {
+				case "go-testing/v1":
+					receipt, e = executeGoConformanceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe)
+				case "node-test-typescript/v1":
+					receipt, e = executeTypeScriptConformanceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe)
+				default:
+					e = fmt.Errorf("adapter %s owns no conformance executor", probe.Adapter)
+				}
 			} else {
 				receipt, e = executeAssuranceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe, paths)
 			}

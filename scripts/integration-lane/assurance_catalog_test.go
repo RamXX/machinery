@@ -110,9 +110,9 @@ func assuranceSeed(t *testing.T, root string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// MAC-wi2u compatible extension (approved alongside its RED): downstream
-	// adapter fragments declare native-conformance sources inside the
-	// adapters' exclusively owned asset directories OUTSIDE
+	// MAC-wi2u/MAC-avfp compatible extension (approved alongside their
+	// REDs): downstream adapter fragments declare native-conformance sources
+	// inside the adapters' exclusively owned asset directories OUTSIDE
 	// testdata/integration-lanes. Seed every declared fragment source from
 	// the repository so the closed catalog validates identically in fixture
 	// roots; frozen v1 and probe seeding semantics are unchanged and the
@@ -318,14 +318,15 @@ func TestAssuranceCatalogExecutesFourLanguageProbesNatively(t *testing.T) {
 			t.Fatalf("adapter %s not accounted exactly: %+v", adapter.ID, adapter)
 		}
 	}
-	// MAC-wi2u RED supersession (justified, approved with this RED): the
-	// exact count 4 pinned the probe-only catalog state. The closed catalog
-	// contract (assurance.CONTRACT.md) declares the downstream adapter
-	// stories (MAC-wi2u Go, MAC-avfp TypeScript, MAC-imtz Python, MAC-8yai
-	// Elixir) each add a NEW named native-conformance fragment, so the union
-	// count is >= 4 with all four frozen probe suites still present and
-	// exactly accounted below. The four probe receipts and the per-adapter
-	// probe accounting stay byte-exact.
+	// MAC-wi2u/MAC-avfp RED supersession (justified, approved with each
+	// RED): the exact count 4 pinned the probe-only catalog state. The
+	// closed catalog contract (assurance.CONTRACT.md) declares the
+	// downstream adapter stories (MAC-wi2u Go, MAC-avfp TypeScript,
+	// MAC-imtz Python, MAC-8yai Elixir) each add a NEW named
+	// native-conformance fragment, so the union count is >= 4 with all four
+	// frozen probe suites still present and exactly accounted below. The
+	// four probe receipts and the per-adapter probe accounting stay
+	// byte-exact.
 	if len(report.Suites) != 1 || len(report.Assurance.Suites) < 4 {
 		t.Fatalf("merged union must keep the v1 suite and add four assurance suites: %+v", report)
 	}
