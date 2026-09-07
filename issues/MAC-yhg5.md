@@ -4,7 +4,7 @@ title: "Own checker container lifetime deterministically"
 status: in_progress
 priority: 0
 type: bug
-labels: [hard-tdd]
+labels: [hard-tdd, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
