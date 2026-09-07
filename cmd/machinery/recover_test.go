@@ -166,11 +166,11 @@ func recoverHoldDesign(t *testing.T, design string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Plain exec.Command: an exec.CommandContext cancellation (including a
-	// deferred one firing when this helper returns) would kill the holder the
-	// instant the marker appears and silently void the concurrency fixture.
-	// The holder is terminated explicitly by the test cleanup instead.
-	cmd := exec.Command(executable, "-test.run=^TestRecoverCrashHelper$")
+	// The context is never canceled: cancellation would kill the holder the
+	// instant the marker appears and silently void the concurrency fixture
+	// (a deferred cancel fires as soon as this helper returns). The holder is
+	// terminated explicitly by the test cleanup instead.
+	cmd := exec.CommandContext(context.Background(), executable, "-test.run=^TestRecoverCrashHelper$")
 	cmd.Env = append(os.Environ(), "MACHINERY_RECOVER_CRASH_DESIGN="+design, "MACHINERY_RECOVER_CRASH_MODE=hold", "MACHINERY_RECOVER_HOLD_MARKER="+marker)
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)

@@ -980,10 +980,6 @@ func (l *Lock) expectedOutputRecords(expected []OutputExpectation) ([]publishExp
 	return records, fingerprintDigest(values), nil
 }
 
-func (l *Lock) pathFromExpectedRecord(recordPath string) (string, error) {
-	return expectedRecordPath(l.root, recordPath)
-}
-
 func expectedRecordPath(root, recordPath string) (string, error) {
 	if strings.HasPrefix(recordPath, "external:") {
 		path := strings.TrimPrefix(recordPath, "external:")
@@ -2545,7 +2541,7 @@ func RecoverInterrupted(designRoot string) (*RecoveryReport, error) {
 		return current, errors.Join(fmt.Errorf("complete interrupted publication (nothing was deleted; the journal is retained): %w", completeErr), lock.Release())
 	}
 	if _, err := os.Lstat(filepath.Join(lock.root, publishSentinel)); !errors.Is(err, fs.ErrNotExist) {
-		return current, errors.Join(fmt.Errorf("publication sentinel still present after recovery completion: %v", err), lock.Release())
+		return current, errors.Join(fmt.Errorf("publication sentinel still present after recovery completion: %w", err), lock.Release())
 	}
 	releaseErr := lock.Release()
 	final, err := InspectRecovery(designRoot)
