@@ -24,7 +24,7 @@ func newFormalDirectoryMutationSentinel(path string) (*formalMutationSentinel, e
 	}
 	// IN_ATTRIB is deliberately excluded: access-time updates caused by the
 	// inventory's own reads must not be mistaken for mutations.
-	mask := syscall.IN_MODIFY | syscall.IN_CREATE | syscall.IN_DELETE |
+	const mask = syscall.IN_MODIFY | syscall.IN_CREATE | syscall.IN_DELETE |
 		syscall.IN_MOVED_FROM | syscall.IN_MOVED_TO | syscall.IN_MOVE_SELF | syscall.IN_DELETE_SELF
 	if _, err := syscall.InotifyAddWatch(watch, path, mask); err != nil {
 		_ = syscall.Close(watch)

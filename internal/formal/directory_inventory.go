@@ -180,6 +180,16 @@ func sameFormalInventoryMetadata(left, right os.FileInfo) bool {
 }
 
 func readFormalDirectory(path string) (_ []os.DirEntry, retErr error) {
+	// The mutation-event sentinel is established before the first observation
+	// so the whole enumeration window is watched. When the kernel provides no
+	// event channel (or setup fails), the stat-metadata witness below still
+	// applies unchanged; the sentinel only ever adds rejections.
+	sentinel, sentinelErr := newFormalDirectoryMutationSentinel(path)
+	if sentinelErr != nil {
+		sentinel = nil
+	} else if sentinel != nil {
+		defer func() { _ = sentinel.Close() }()
+	}
 	before, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
@@ -207,6 +217,12 @@ func readFormalDirectory(path string) (_ []os.DirEntry, retErr error) {
 	finalOpened, finalWitness, err := snapshotFormalRootIdentity(root)
 	if err != nil || !sameFormalInventoryMetadata(after, finalOpened) || openedWitness != finalWitness {
 		return nil, errors.Join(err, fmt.Errorf("formal directory %s changed native identity while enumerating", path))
+	}
+	// Granularity-independent conjunct: kernel mutation events observed during
+	// the window reject the directory even when coarse inode timestamps make
+	// the before/after states compare equal (same-inode ABA).
+	if sentinel != nil && sentinel.Mutated() {
+		return nil, fmt.Errorf("formal directory %s changed between inventory passes (mutation events observed)", path)
 	}
 	return entries, nil
 }

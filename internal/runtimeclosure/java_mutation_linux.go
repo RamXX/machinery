@@ -29,7 +29,7 @@ func newJavaFileMutationSentinel(file *os.File) (*javaMutationSentinel, error) {
 	// IN_ATTRIB is deliberately excluded: access-time updates caused by the
 	// broker's own reads must not be mistaken for mutations. IN_MODIFY covers
 	// truncate/rewrite, the same-inode ABA class this sentinel exists for.
-	mask := syscall.IN_MODIFY | syscall.IN_MOVE_SELF | syscall.IN_DELETE_SELF
+	const mask = syscall.IN_MODIFY | syscall.IN_MOVE_SELF | syscall.IN_DELETE_SELF
 	if _, err := syscall.InotifyAddWatch(watch, procPath, mask); err != nil {
 		_ = syscall.Close(watch)
 		return nil, err
