@@ -257,6 +257,16 @@ checker. Files outside the image are visible only when declared under `runtime.i
 opens each through a rooted directory handle, rejects symlinks and special files, copies it into a
 private read-only `/checker` mount, and hashes the copied bytes into the closure.
 
+Input `source` paths are portable registry-relative paths: each one resolves against the directory
+containing the registry file, and `..` segments are rejected. With the default registry at
+`.machinery/checkers.local.yaml` that means inputs must live under `.machinery/` as well, which is
+why the example copies its adapter there. To bind committed files where they already live without
+that copy, place the registry beside them — for example `checkers.local.yaml` at the repository
+root — and pass `--registry checkers.local.yaml` (or an absolute path); the registry then resolves
+`tools/adapter.py` against the repo root, and the derived closure binds exactly the same content
+either way. A future contract may allow repo-root-relative sources from the default registry
+location; that extension is not implemented today.
+
 Tokens substituted into `run` and `verify` arguments:
 
 | Token | Substituted with |
@@ -303,12 +313,45 @@ explicit `--platform` and `--pull=never`.
 
 Every run uses a network-disabled, read-only container with all capabilities dropped, no-new-
 privileges, deterministic locale/time/home/temp variables, a bounded tmpfs, and only private `/work`
-and read-only `/checker` mounts. Standard output and error have a fixed 256 KiB total bound; timeout
-terminates the process tree and reports truncation or cleanup failures explicitly.
+and read-only `/checker` mounts. Container resources are closed, finite budgets — 128 MiB memory,
+half a CPU, and a 32-process pid limit — enforced fail-closed by the runner itself, not left to
+daemon goodwill. Standard output and error are capped at 128 KiB per stream (256 KiB total); the
+first dropped byte aborts the run, force-removes the container, and reports the breach, so a
+chatty checker cannot buffer past the bound or burn the timeout. Every container's identity is
+registered before it starts and force-removed through the same snapshotted engine on every return
+path — success, failure, timeout, or breach — so a killed run leaves no owned container behind;
+foreign containers are never touched.
 
 `machinery doctor` reads the registry and probes each distinct `runtime.engine` executable. It does
 not probe commands that exist only inside the image. A missing or unsafe engine is therefore reported
 before `verify-checkers`; no registry leaves doctor's output unchanged.
+
+## Containerized CI: the daemon must see the bind sources
+
+`verify-checkers` keeps checker scratch in a private OS temp directory and hands the engine exactly
+two binds from it: the writable `/work` and the read-only `/checker` inputs mount. The OCI engine is
+machinery's local control plane, resolved from `runtime.engine` and required to be a regular
+non-symlink executable that is copied and content-rechecked before use; machinery never assumes an
+ambient engine is already available, and a missing engine or unreachable daemon is an ERROR before
+anything runs.
+
+The daemon, not the CLI, resolves those bind source paths. Whatever runs the engine daemon must see
+the same absolute paths the CLI passes. On a laptop with a desktop engine that is usually automatic;
+in containerized CI the leg and the daemon must share the path layout. Docker-in-docker with the
+workspace mounted at an identical path is one option, not the only one — a daemon on the host, or in
+a sibling container sharing the workspace volume at the same mount point, works exactly as well,
+because the requirement is daemon-visible matching paths, not a specific topology. When the layout
+does not line up the failure is loud and specific: the daemon reports an error like `invalid mount
+config for type "bind": bind source path does not exist` (or a permission error on the source) while
+creating the checker container. That diagnostic means path layout, not the checker contract: fix the
+mount topology rather than weakening the registry.
+
+The declared `platform` is always passed (`--platform`, `--pull=never`) for both inspection and
+execution. A daemon that emulates the other architecture — Rosetta on Apple Silicon, qemu/binfmt on
+Linux — can therefore reproduce a `linux/amd64` checker closure on an `arm64` host: the
+digest-addressed userspace still executes with the declared platform's semantics. That is emulated
+reproduction of the checker run — evidence about the pinned image and its declared platform, not
+native-host test evidence for the host architecture.
 
 ## The two phases in operation
 
@@ -555,6 +598,7 @@ the external phase, having parsed none of the engine's formats.
 | `verdict: fail`, or a `pass` carrying a blocking finding | ERROR, with the blocking findings surfaced |
 | `projection.include` names a layer v1 does not project | ERROR, from `machinery project` and from the gate; never a silent omission |
 | registry entry or engine binary missing (`verify-checkers`) | ERROR, reported before anything is run |
+| bind source path invisible to the engine daemon | ERROR from the daemon at container create (`invalid mount config ... bind source path does not exist`) |
 | projection/evidence schema differs from v1.0 | ERROR (unsupported contract) |
 | committed projection machinery version differs but binding content is current | non-blocking provenance note |
 | fresh checker id/version differs from committed evidence | ERROR (the run is not reproducible) |
