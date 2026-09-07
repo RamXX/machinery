@@ -379,7 +379,19 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 				fmt.Fprintln(stderr, e)
 				return 1
 			}
-			receipt, e := executeAssuranceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe, paths)
+			var receipt suiteReceipt
+			if probe.Kind == assuranceConformanceKind {
+				// Adapter-native conformance suites execute through the
+				// closed production adapter chain, not the probe harness.
+				switch probe.Adapter {
+				case "node-test-typescript/v1":
+					receipt, e = executeTypeScriptConformanceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe)
+				default:
+					e = fmt.Errorf("adapter %s owns no conformance executor", probe.Adapter)
+				}
+			} else {
+				receipt, e = executeAssuranceSuite(ctx, custody, *root, scratch, filepath.Dir(*reportPath), probe, paths)
+			}
 			r.Assurance.Suites = append(r.Assurance.Suites, receipt)
 			if e != nil {
 				fmt.Fprintln(stderr, probe.ID+":", e)
@@ -388,7 +400,12 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 		}
 		counts := map[string]int{}
 		for _, probe := range catalog.suites {
-			counts[probe.Adapter]++
+			// The per-adapter receipt summarizes the frozen runtime-probe
+			// catalog; native-conformance suites are accounted in the suite
+			// receipts and their retained normalized event streams.
+			if probe.Kind == assuranceProbeKind {
+				counts[probe.Adapter]++
+			}
 		}
 		for _, id := range assuranceClosedAdapters {
 			r.Assurance.Adapters = append(r.Assurance.Adapters, adapterReceipt{ID: id, Suites: counts[id], Status: "passed"})

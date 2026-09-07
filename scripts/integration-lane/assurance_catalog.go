@@ -25,6 +25,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/RamXX/machinery/internal/processscope"
+	"github.com/RamXX/machinery/internal/runtimeclosure"
+	"github.com/RamXX/machinery/internal/tdd"
+	"github.com/RamXX/machinery/internal/tdd/adapters"
 )
 
 // assuranceSchemaSHA binds the closed assurance fragment schema bytes.
@@ -32,6 +37,7 @@ const assuranceSchemaSHA = "58d1f97a79570f24b1a382711a57745f130bf8dc3ffd93753d11
 
 const assuranceSchemaIdentity = "machinery.assurance.lane/v1"
 const assuranceProbeKind = "runtime-probe"
+const assuranceConformanceKind = "native-conformance"
 const machineryModulePath = "github.com/RamXX/machinery"
 
 // The exact first-release native catalog of docs/test-assurance-contract.md
@@ -70,6 +76,41 @@ var assuranceProbeInventory = map[string][]string{
 	"python-unittest/v1":      {"probe_test.AssuranceRuntimeProbe.test_assurance_runtime_probe"},
 	"elixir-exunit/v1":        {"assurance runtime probe executes a native ExUnit closure"},
 }
+
+// assuranceConformanceInventory is the closed per-adapter native-conformance
+// case inventory of the downstream adapter stories; a native-conformance
+// suite declares exactly its adapter's inventory. MAC-avfp (TypeScript) is
+// this story's entry; the other adapter stories plug theirs in when they
+// deliver, and until then those adapters own no conformance inventory and
+// no conformance suite is required of them.
+var assuranceConformanceInventory = map[string][]string{
+	"node-test-typescript/v1": {
+		"conformance witness executes native assertion",
+		"conformance parent identity",
+		"conformance parent identity > conformance nested identity",
+		"conformance multiple assertions",
+	},
+}
+
+// assuranceConformanceAssertions declares the registered machinery-check/v1
+// assertion call sites of each closed conformance case (empty for inventory
+// parents); the exact frozen lines are located in the fixture bytes at
+// execution time.
+var assuranceConformanceAssertions = map[string][]string{
+	"conformance witness executes native assertion":             {"conformance/witness"},
+	"conformance parent identity > conformance nested identity": {"conformance/nested"},
+	"conformance multiple assertions":                           {"conformance/multi-a", "conformance/multi-b"},
+}
+
+// assuranceConformanceAssetPrefix is the exclusively owned adapter asset
+// directory each native-conformance fixture must live under.
+var assuranceConformanceAssetPrefix = map[string]string{
+	"node-test-typescript/v1": "internal/tdd/adapters/assets/typescript/",
+}
+
+// assuranceLaneProjectUUID is the fixed project identity of the lane's
+// private capture store (a fresh store under the suite scratch root).
+const assuranceLaneProjectUUID = "7c1a4f6e-3b25-4d98-9a77-5a2c6f0e31aa"
 
 var assuranceOwnerPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]*-[a-z0-9]{4}$`)
 var assuranceOTPIdentity = regexp.MustCompile(`Erlang/OTP ` + assuranceOTPVersion + `([^\d.]|$)`)
@@ -244,8 +285,12 @@ func loadAssuranceCatalog(root string, v1 []suite) (*assuranceCatalog, error) {
 		}
 	}
 	present := map[string]bool{}
+	conformancePresent := map[string]bool{}
 	for _, s := range catalog.suites {
 		present[s.Adapter] = true
+		if s.Kind == assuranceConformanceKind {
+			conformancePresent[s.Adapter] = true
+		}
 		for _, id := range s.Runtimes {
 			catalog.neededGit = catalog.neededGit || id == "git"
 		}
@@ -253,6 +298,9 @@ func loadAssuranceCatalog(root string, v1 []suite) (*assuranceCatalog, error) {
 	for _, id := range assuranceClosedAdapters {
 		if !present[id] {
 			return nil, fmt.Errorf("assurance union incomplete: missing adapter %s", id)
+		}
+		if _, owned := assuranceConformanceInventory[id]; owned && !conformancePresent[id] {
+			return nil, fmt.Errorf("assurance union incomplete: adapter %s is missing its required native-conformance suite", id)
 		}
 	}
 	if hasProbes {
@@ -325,8 +373,11 @@ func validateAssuranceSuite(root string, s *assuranceSuite, ids, native, owned m
 	if !closedAdapter {
 		return fmt.Errorf("unknown assurance adapter %s", s.Adapter)
 	}
-	if s.Kind != assuranceProbeKind {
+	if s.Kind != assuranceProbeKind && s.Kind != assuranceConformanceKind {
 		return fmt.Errorf("unknown assurance suite kind %q", s.Kind)
+	}
+	if s.Kind == assuranceConformanceKind && len(assuranceConformanceInventory[s.Adapter]) == 0 {
+		return fmt.Errorf("adapter %s owns no closed native-conformance inventory", s.Adapter)
 	}
 	pkg := strings.TrimPrefix(s.Package, "./")
 	if s.Package != "." && (!strings.HasPrefix(s.Package, "./") || !pathPattern.MatchString(pkg) || filepath.Clean(pkg) != pkg || strings.Contains(pkg, "..")) {
@@ -353,6 +404,9 @@ func validateAssuranceSuite(root string, s *assuranceSuite, ids, native, owned m
 		return fmt.Errorf("assurance suite %s runtimes %v do not close over adapter %s", s.ID, s.Runtimes, s.Adapter)
 	}
 	inventory := assuranceProbeInventory[s.Adapter]
+	if s.Kind == assuranceConformanceKind {
+		inventory = assuranceConformanceInventory[s.Adapter]
+	}
 	known := map[string]bool{}
 	for _, name := range inventory {
 		known[name] = true
@@ -379,7 +433,11 @@ func validateAssuranceSuite(root string, s *assuranceSuite, ids, native, owned m
 		if err != nil {
 			return err
 		}
-		if err := validateAssuranceSource(s.Adapter, source); err != nil {
+		if s.Kind == assuranceConformanceKind {
+			if err := validateConformanceSource(s.Adapter, source); err != nil {
+				return err
+			}
+		} else if err := validateAssuranceSource(s.Adapter, source); err != nil {
 			return err
 		}
 		s.sourceHashes[source] = fmt.Sprintf("%x", sha256.Sum256(b))
@@ -413,6 +471,28 @@ func validateAssuranceSource(adapter, source string) error {
 		prefix := "testdata/integration-lanes/assurance-probes/elixir/"
 		if !strings.HasPrefix(source, prefix) {
 			return fmt.Errorf("elixir probe source %s is outside the mix project fixture", source)
+		}
+	}
+	return nil
+}
+
+// validateConformanceSource pins each native-conformance fixture inside its
+// adapter's exclusively owned asset directory with the adapter's closed
+// fixture grammar (node: the frozen module identity, the ambient type
+// closure, the helper transport and the TypeScript fixture).
+func validateConformanceSource(adapter, source string) error {
+	base := filepath.Base(source)
+	prefix, owned := assuranceConformanceAssetPrefix[adapter]
+	if !owned {
+		return fmt.Errorf("adapter %s owns no conformance asset directory", adapter)
+	}
+	if !strings.HasPrefix(source, prefix) {
+		return fmt.Errorf("conformance source %s is outside the adapter's owned asset directory %s", source, prefix)
+	}
+	switch adapter {
+	case "node-test-typescript/v1":
+		if base != "package.json" && base != "node-ambient.d.ts" && base != "machinery-check.ts" && !strings.HasSuffix(base, ".ts") {
+			return fmt.Errorf("node conformance source %s is not a TypeScript or module input", source)
 		}
 	}
 	return nil
@@ -786,3 +866,263 @@ func accountElixir(output string, r *suiteReceipt) error {
 	}
 	return errors.Join(failures...)
 }
+
+// executeTypeScriptConformanceSuite executes the frozen node-test-typescript
+// /v1 conformance fixture through the REAL production assurance chain: the
+// frozen bytes are captured into a private content-addressed store bundle,
+// the pinned Node 26.8.1 / TypeScript 7.0.2 runtime closure is opened and
+// validated under the lane's custody scope, the closed adapter prepares the
+// suite (verified materialization, embedded byte-pinned helper transport and
+// reporter, typed assertion call-site validation, separate pinned-compiler
+// build step) and runs the exact native invocation, and the normalized
+// machinery.tdd.event/v1 stream is accounted exactly. This is adapter
+// conformance evidence, not a mock or a receipt.
+func executeTypeScriptConformanceSuite(ctx context.Context, custody *laneCustody, root, scratch, evidence string, s assuranceSuite) (suiteReceipt, error) {
+	r := suiteReceipt{ID: s.ID, Adapter: s.Adapter, Selected: len(s.Tests), Tests: []testReceipt{}}
+	for _, name := range s.Tests {
+		r.Tests = append(r.Tests, testReceipt{Name: name, Source: s.Sources[0], Status: "not_started"})
+	}
+	src := filepath.Join(scratch, "src")
+	if err := os.MkdirAll(src, 0o700); err != nil {
+		return r, err
+	}
+	for _, source := range s.Sources {
+		path, err := sourcePath(root, source)
+		if err != nil {
+			return r, err
+		}
+		b, err := regularBytes(path, 4<<20)
+		if err != nil {
+			return r, err
+		}
+		if err := os.WriteFile(filepath.Join(src, filepath.Base(source)), b, 0o600); err != nil {
+			return r, err
+		}
+	}
+	testFile := "conformance.ts"
+	testBytes, err := regularBytes(filepath.Join(src, testFile), 4<<20)
+	if err != nil {
+		return r, err
+	}
+	control := filepath.Join(scratch, "control")
+	if err := os.MkdirAll(control, 0o700); err != nil {
+		return r, err
+	}
+	if err := os.WriteFile(filepath.Join(control, "plan.json"), []byte(`{"schema":"machinery.tdd.plan/v1"}`), 0o600); err != nil {
+		return r, err
+	}
+	scope, err := custody.begin(scratch)
+	if err != nil {
+		return r, err
+	}
+	suiteErr := executeTypeScriptConformance(ctx, scope, scratch, evidence, s, testBytes, testFile, &r)
+	closeErr := custody.end(scope)
+	if err := errors.Join(suiteErr, closeErr); err != nil {
+		return r, err
+	}
+	for source, want := range s.sourceHashes {
+		path, err := sourcePath(root, source)
+		if err != nil {
+			return r, err
+		}
+		b, err := regularBytes(path, 4<<20)
+		if err != nil || fmt.Sprintf("%x", sha256.Sum256(b)) != want {
+			return r, fmt.Errorf("conformance source changed during execution: %s: %v", source, err)
+		}
+	}
+	return r, nil
+}
+
+// executeTypeScriptConformance runs one prepared conformance execution under
+// the live lane scope: closure validation, capture, adapter Prepare/Run and
+// the pure post-run closure revalidation.
+func executeTypeScriptConformance(ctx context.Context, scope processscope.Scope, scratch, evidence string, s assuranceSuite, testBytes []byte, testFile string, r *suiteReceipt) error {
+	handle, err := runtimeclosure.OpenTypeScript(ctx, runtimeclosure.TypeScriptRequest{})
+	if err != nil {
+		return fmt.Errorf("pinned typescript closure: %w", err)
+	}
+	if err := handle.Validate(ctx, scope); err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("pinned typescript closure validation: %w", err)
+	}
+	suite := tdd.Suite{
+		ID:      s.ID,
+		Adapter: s.Adapter,
+		Runtime: handle.Identity(),
+		Root:    ".",
+		Files:   []string{testFile},
+	}
+	for _, name := range s.Tests {
+		path := strings.Split(name, " > ")
+		test := tdd.Test{ID: name, Source: testFile, Native: tdd.NativeID{Source: testFile, Path: path, Line: conformanceDeclLine(testBytes, path[0]), Column: 1}}
+		for _, id := range assuranceConformanceAssertions[name] {
+			line, err := conformanceCallLine(testBytes, id)
+			if err != nil {
+				_ = handle.Close()
+				return err
+			}
+			test.Assertions = append(test.Assertions, tdd.Assertion{ID: id, Source: testFile, Line: line, Helper: tdd.AssertionHelperV1})
+		}
+		suite.Tests = append(suite.Tests, test)
+	}
+	frozen := map[string][]byte{testFile: testBytes}
+	released := false
+	inputs := tdd.InputView{
+		SourceRoot:  srcRootOf(scratch),
+		DesignPath:  ".",
+		ControlRoot: filepath.Join(scratch, "control"),
+		Revalidate: func() error {
+			for name, want := range frozen {
+				got, err := os.ReadFile(filepath.Join(srcRootOf(scratch), name))
+				if err != nil || fmt.Sprintf("%x", sha256.Sum256(got)) != fmt.Sprintf("%x", sha256.Sum256(want)) {
+					return fmt.Errorf("conformance fixture input %s changed", name)
+				}
+			}
+			return nil
+		},
+		Release: func() error {
+			if released {
+				return fmt.Errorf("double release")
+			}
+			released = true
+			return nil
+		},
+	}
+	store := filepath.Join(scratch, "store")
+	if _, err := tdd.InitStore(ctx, store, assuranceLaneProjectUUID); err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("conformance capture store: %w", err)
+	}
+	manifest := tdd.Manifest{
+		Schema: tdd.SchemaMilestone, ID: "M1", Revision: 1, Repository: ".",
+		ImplementationRoots: []string{"."}, Suites: []tdd.Suite{suite},
+	}
+	bundle, err := tdd.Capture(ctx, tdd.CaptureRequest{
+		Inputs: inputs, Manifest: manifest, Name: "conformance", Store: store,
+		Limits: tdd.Limits{WallMS: 300000},
+	})
+	if err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("conformance capture: %w", err)
+	}
+	adapter, err := adapters.Lookup(s.Adapter)
+	if err != nil {
+		_ = handle.Close()
+		return err
+	}
+	duration, err := time.ParseDuration(s.Timeout)
+	if err != nil {
+		_ = handle.Close()
+		return err
+	}
+	prepared, err := adapter.Prepare(ctx, tdd.SuiteRequest{
+		Inputs: inputs, Suite: suite, Source: bundle,
+		Scratch: filepath.Join(scratch, "run"), Runtime: handle, Scope: scope,
+		Limits: tdd.Limits{WallMS: duration.Milliseconds(), CleanupMS: 10000},
+	})
+	if err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("conformance prepare: %w", err)
+	}
+	var events []tdd.Event
+	execution, runErr := adapter.Run(ctx, prepared, func(e tdd.Event) error {
+		events = append(events, e)
+		return nil
+	})
+	closeErr := handle.Close()
+	if err := errors.Join(runErr, closeErr); err != nil {
+		return fmt.Errorf("native conformance execution failed: %w", err)
+	}
+	if execution.Outcome != "pass" || execution.ExitCode == nil || *execution.ExitCode != 0 {
+		return fmt.Errorf("native conformance outcome %q exit %+v is not a verified pass", execution.Outcome, execution.ExitCode)
+	}
+	if execution.Custody.Status != "cleaned" {
+		return fmt.Errorf("native conformance custody did not verify: %+v", execution.Custody)
+	}
+	started, passed, assertions := map[string]int{}, map[string]int{}, map[string]int{}
+	for _, e := range events {
+		switch e.Kind {
+		case "test-start":
+			if e.Native != nil {
+				started[strings.Join(e.Native.Path, " > ")]++
+			}
+		case "test-end":
+			if e.Native != nil && e.Outcome == "pass" {
+				passed[strings.Join(e.Native.Path, " > ")]++
+			}
+		case "assertion":
+			if e.Outcome == "pass" {
+				assertions[e.Assertion]++
+			}
+		}
+	}
+	wantAssertions := 0
+	for _, name := range s.Tests {
+		if started[name] != 1 || passed[name] != 1 {
+			return fmt.Errorf("conformance case %s not accounted exactly (started=%d passed=%d)", name, started[name], passed[name])
+		}
+		for _, id := range assuranceConformanceAssertions[name] {
+			wantAssertions++
+			if assertions[id] != 1 {
+				return fmt.Errorf("conformance assertion %s not witnessed exactly once (%d)", id, assertions[id])
+			}
+		}
+		for i := range r.Tests {
+			if r.Tests[i].Name == name {
+				r.Tests[i].Status = "passed"
+			}
+		}
+	}
+	if wantAssertions == 0 {
+		return fmt.Errorf("closed conformance inventory carries no registered assertions")
+	}
+	r.Started = len(started)
+	r.Passed = len(passed)
+	var payload []byte
+	for _, e := range events {
+		body, err := json.Marshal(e)
+		if err != nil {
+			return err
+		}
+		payload = append(append(payload, body...), '\n')
+	}
+	eventsFile, err := os.CreateTemp(evidence, s.ID+"-events-*")
+	if err != nil {
+		return err
+	}
+	r.Events = eventsFile.Name()
+	r.EventsSHA = fmt.Sprintf("%x", sha256.Sum256(payload))
+	_, writeErr := eventsFile.Write(payload)
+	closeErr = eventsFile.Close()
+	if err := errors.Join(writeErr, closeErr); err != nil {
+		return err
+	}
+	return nil
+}
+
+// conformanceDeclLine locates a declared case's test( declaration line.
+func conformanceDeclLine(testBytes []byte, name string) int64 {
+	anchor := `test("` + name + `"`
+	for i, line := range strings.Split(string(testBytes), "\n") {
+		if strings.Contains(line, anchor) {
+			return int64(i + 1)
+		}
+	}
+	return 1
+}
+
+// conformanceCallLine locates the exact line of a registered assertion's
+// typed helper call in the frozen fixture bytes.
+func conformanceCallLine(testBytes []byte, id string) (int64, error) {
+	for _, prefix := range []string{`check(t, "`, `check(ct, "`} {
+		anchor := prefix + id + `"`
+		for i, line := range strings.Split(string(testBytes), "\n") {
+			if strings.Contains(line, anchor) {
+				return int64(i + 1), nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("conformance assertion %s has no typed call site in the frozen fixture", id)
+}
+
+func srcRootOf(scratch string) string { return filepath.Join(scratch, "src") }

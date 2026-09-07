@@ -9,7 +9,6 @@ package runtimeclosure
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,15 +114,25 @@ func TestTypeScriptClosureExpectedDigestEnforced(t *testing.T) {
 	}
 }
 
-// recordingScope counts scoped launches to prove the probe/Close boundary.
+// recordingScope counts scoped launches (including child-scoped probes) to
+// prove the probe/Close boundary; the counter is shared across the child
+// chain.
 type recordingScope struct {
 	processscope.Scope
-	runs int
+	runs *int
 }
 
 func (r *recordingScope) Run(ctx context.Context, cmd processscope.Command, streams processscope.Streams) (processscope.Result, error) {
-	r.runs++
+	*r.runs++
 	return r.Scope.Run(ctx, cmd, streams)
+}
+
+func (r *recordingScope) Child(ctx context.Context) (processscope.Scope, error) {
+	child, err := r.Scope.Child(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &recordingScope{Scope: child, runs: r.runs}, nil
 }
 
 // TestTypeScriptClosureValidateProbesUnderCustody freezes the identity
@@ -133,7 +142,8 @@ func TestTypeScriptClosureValidateProbesUnderCustody(t *testing.T) {
 	if tsSupportedPlatform() == "" {
 		t.Skip("UNSUPPORTED_PLATFORM: not a pinned native assurance platform")
 	}
-	scope := &recordingScope{Scope: openRuntimeCustodyScope(t)}
+	underlying := openRuntimeCustodyScope(t)
+	scope := &recordingScope{Scope: underlying, runs: new(int)}
 	defer func() { _ = closeRuntimeCustodyScope(t, scope.Scope, 45*time.Second) }()
 	ctx, cancel := tsOpenCtx(t)
 	defer cancel()
@@ -144,7 +154,7 @@ func TestTypeScriptClosureValidateProbesUnderCustody(t *testing.T) {
 	if err := handle.Validate(ctx, scope); err != nil {
 		t.Fatalf("pinned closure validation failed: %v", err)
 	}
-	if scope.runs != 2 {
+	if *scope.runs != 2 {
 		t.Fatalf("identity probes launched %d scoped subprocesses, want exactly the node and compiler probes", scope.runs)
 	}
 	if err := handle.Close(); err != nil {
@@ -172,13 +182,13 @@ func TestTypeScriptClosureValidateProbesUnderCustody(t *testing.T) {
 
 // TestTypeScriptClosureCloseIsPureRevalidation freezes the Close boundary:
 // Close never launches a process, detects late mutation of the retained
-// runtime bytes, and stays a single final revalidation.
+// runtime bytes, and stays a single final revalidation. The private copy
+// preserves the runtime's own shared-library layout so the real probes keep
+// working over copied bytes.
 func TestTypeScriptClosureCloseIsPureRevalidation(t *testing.T) {
 	if tsSupportedPlatform() == "" {
 		t.Skip("UNSUPPORTED_PLATFORM: not a pinned native assurance platform")
 	}
-	scratch := t.TempDir()
-	node := filepath.Join(scratch, "node")
 	discovered, err := discoverNodeForTest()
 	if err != nil {
 		t.Fatal(err)
@@ -187,8 +197,25 @@ func TestTypeScriptClosureCloseIsPureRevalidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "lib"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	node := filepath.Join(root, "bin", "node")
 	if err := os.WriteFile(node, body, 0o755); err != nil {
 		t.Fatal(err)
+	}
+	if lib := discoverNodeSharedLibraryForTest(t, discovered); lib != "" {
+		libBody, err := os.ReadFile(lib)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "lib", filepath.Base(lib)), libBody, 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	ctx, cancel := tsOpenCtx(t)
 	defer cancel()
@@ -196,7 +223,8 @@ func TestTypeScriptClosureCloseIsPureRevalidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pinned closure did not open over the private node copy: %v", err)
 	}
-	scope := &recordingScope{Scope: openRuntimeCustodyScope(t)}
+	underlying := openRuntimeCustodyScope(t)
+	scope := &recordingScope{Scope: underlying, runs: new(int)}
 	defer func() { _ = closeRuntimeCustodyScope(t, scope.Scope, 45*time.Second) }()
 	if err := handle.Validate(ctx, scope); err != nil {
 		t.Fatalf("private copy validation failed: %v", err)
@@ -208,7 +236,22 @@ func TestTypeScriptClosureCloseIsPureRevalidation(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "UNSUPPORTED_VERSION") {
 		t.Fatalf("late mutation of retained runtime bytes must fail the pure revalidation: %v", err)
 	}
-	if errors.Is(err, ErrTypeScriptClosureNotImplemented) {
-		t.Fatal("the RED placeholder cannot stand in for real revalidation evidence")
+}
+
+// discoverNodeSharedLibraryForTest mirrors the production discovery of the
+// node runtime's own shared library.
+func discoverNodeSharedLibraryForTest(t *testing.T, nodePath string) string {
+	t.Helper()
+	libDir := filepath.Join(filepath.Dir(filepath.Dir(nodePath)), "lib")
+	entries, err := os.ReadDir(libDir)
+	if err != nil {
+		return ""
 	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.Type().IsRegular() && strings.HasPrefix(name, "libnode.") && strings.HasSuffix(name, ".dylib") {
+			return filepath.Join(libDir, name)
+		}
+	}
+	return ""
 }

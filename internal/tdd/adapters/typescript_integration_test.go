@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -144,10 +145,13 @@ type tsChainResult struct {
 
 // tsRunCaptured captures frozen fixture files into a real content-addressed
 // store bundle and executes the declared suite through the closed production
-// chain: pinned runtime closure validated under the live scope, adapter
-// Prepare over the captured bundle, adapter Run with the recording sink.
-func tsRunCaptured(t *testing.T, ctx context.Context, scope processscope.Scope, files map[string][]byte, suite tdd.Suite, mutatePrepared func(scratch string)) (tsChainResult, error) {
+// chain on a fresh custody root (the lane's own per-suite pattern): pinned
+// runtime closure validated under the live scope, adapter Prepare over the
+// captured bundle, adapter Run with the recording sink.
+func tsRunCaptured(t *testing.T, ctx context.Context, files map[string][]byte, suite tdd.Suite, mutatePrepared func(scratch string)) (tsChainResult, error) {
 	t.Helper()
+	scope := openAdapterScope(t)
+	defer closeAdapterScope(t, scope)
 	var result tsChainResult
 	src := t.TempDir()
 	control := t.TempDir()
@@ -236,8 +240,12 @@ func tsConformanceSuite(t *testing.T, id string) tdd.Suite {
 	leaf := func(testID, name string, path []string, line int64, anchors ...string) tdd.Test {
 		test := tdd.Test{ID: testID, Source: "conformance.ts", Native: tdd.NativeID{Source: "conformance.ts", Path: path, Line: line, Column: 1}}
 		for _, anchor := range anchors {
+			match := regexp.MustCompile(`check\([a-zA-Z]+,\s*"([^"]+)"`).FindStringSubmatch(anchor)
+			if match == nil {
+				t.Fatalf("anchor %q does not name a typed helper call", anchor)
+			}
 			test.Assertions = append(test.Assertions, tdd.Assertion{
-				ID: strings.TrimSuffix(strings.TrimPrefix(anchor, "check(t, \""), "\""), Source: "conformance.ts",
+				ID: match[1], Source: "conformance.ts",
 				Line: callLine(anchor), Helper: tdd.AssertionHelperV1,
 			})
 		}
@@ -270,7 +278,7 @@ func TestTypeScriptAdapterExecutesRealCompiledSuiteNatively(t *testing.T) {
 	defer closeAdapterScope(t, scope)
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
-	result, err := tsRunCaptured(t, ctx, scope, tsFrozenFiles(t), tsConformanceSuite(t, "native-positive"), nil)
+	result, err := tsRunCaptured(t, ctx, tsFrozenFiles(t), tsConformanceSuite(t, "native-positive"), nil)
 	if err != nil {
 		t.Fatalf("real native suite execution failed: %v", err)
 	}
@@ -326,13 +334,13 @@ func TestTypeScriptAdapterProvesNativeAssertionFailureRED(t *testing.T) {
 	defer cancel()
 	frozen := tsAssetBytes(t, "conformance/conformance.ts")
 	files := map[string][]byte{"conformance.ts": frozen}
-	safeResult, err := tsRunCaptured(t, ctx, scope, files, tsConformanceSuite(t, "calibration-safe"), nil)
+	safeResult, err := tsRunCaptured(t, ctx, files, tsConformanceSuite(t, "calibration-safe"), nil)
 	if err != nil || safeResult.execution.Outcome != "pass" {
 		t.Fatalf("safe control must pass natively: err=%v outcome=%q", err, safeResult.execution.Outcome)
 	}
 	unsafe := strings.Replace(string(frozen), "6 * 7 === 42", "6 * 7 === 43", 1)
 	files = map[string][]byte{"conformance.ts": []byte(unsafe)}
-	unsafeResult, err := tsRunCaptured(t, ctx, scope, files, tsConformanceSuite(t, "calibration-unsafe"), nil)
+	unsafeResult, err := tsRunCaptured(t, ctx, files, tsConformanceSuite(t, "calibration-unsafe"), nil)
 	if err != nil {
 		t.Fatalf("unsafe challenge must be reconciled, not errored: %v", err)
 	}
@@ -369,7 +377,7 @@ func TestTypeScriptAdapterRejectsCompileFailureAsBuildError(t *testing.T) {
 	defer cancel()
 	broken := strings.Replace(string(tsAssetBytes(t, "conformance/conformance.ts")), "const answer", "const answer: number", 1)
 	files := map[string][]byte{"conformance.ts": []byte(broken + "\nconst brokenCompileGate: number = \"not a number\";\n")}
-	_, err := tsRunCaptured(t, ctx, scope, files, tsConformanceSuite(t, "compile-fail"), nil)
+	_, err := tsRunCaptured(t, ctx, files, tsConformanceSuite(t, "compile-fail"), nil)
 	if err == nil || !strings.Contains(err.Error(), "BUILD_ERROR") {
 		t.Fatalf("compile failure must be BUILD_ERROR: %v", err)
 	}
@@ -383,10 +391,11 @@ func TestTypeScriptAdapterRejectsSkippedCase(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
 	skipped := strings.Replace(string(tsAssetBytes(t, "conformance/conformance.ts")),
-		`check(t, "conformance/witness", 6 * 7 === 42);`,
-		`t.skip("required conformance case must not skip");`, 1)
+		`check(t, "conformance/multi-b", 4 * 5 === 20);`,
+		`check(t, "conformance/multi-b", 4 * 5 === 20);
+  t.skip("required conformance case must not skip");`, 1)
 	files := map[string][]byte{"conformance.ts": []byte(skipped)}
-	_, err := tsRunCaptured(t, ctx, scope, files, tsConformanceSuite(t, "skip-case"), nil)
+	_, err := tsRunCaptured(t, ctx, files, tsConformanceSuite(t, "skip-case"), nil)
 	if err == nil || !strings.Contains(err.Error(), "UNSUPPORTED_FEATURE") {
 		t.Fatalf("native skip must be rejected as UNSUPPORTED_FEATURE: %v", err)
 	}
@@ -400,25 +409,14 @@ func TestTypeScriptAdapterRejectsEarlyProcessExit(t *testing.T) {
 	defer closeAdapterScope(t, scope)
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
-	exiting := `import { test } from "node:test";
-import { check } from "./machinery-check.js";
-declare const process: { exit(code?: number): void };
-test("conformance witness executes native assertion", (t) => {
-  check(t, "conformance/witness", 6 * 7 === 42);
-  process.exit(0);
-});
-test("conformance parent identity", async (t) => {
-  await t.test("conformance nested identity", (ct) => {
-    check(ct, "conformance/nested", 2 * 7 === 14);
-  });
-});
-test("conformance multiple assertions", (t) => {
-  check(t, "conformance/multi-a", 3 * 5 === 15);
-  check(t, "conformance/multi-b", 4 * 5 === 20);
-});
-`
+	exiting := strings.Replace(string(tsAssetBytes(t, "conformance/conformance.ts")),
+		`check(t, "conformance/witness", 6 * 7 === 42);`,
+		`check(t, "conformance/witness", 6 * 7 === 42); process.exit(0);`, 1)
+	exiting = strings.Replace(exiting,
+		`import { check } from "./machinery-check.js";`,
+		`import { check } from "./machinery-check.js"; declare const process: { exit(code?: number): void };`, 1)
 	files := map[string][]byte{"conformance.ts": []byte(exiting)}
-	_, err := tsRunCaptured(t, ctx, scope, files, tsConformanceSuite(t, "early-exit"), nil)
+	_, err := tsRunCaptured(t, ctx, files, tsConformanceSuite(t, "early-exit"), nil)
 	if err == nil || !strings.Contains(err.Error(), "MISSING_TEST") {
 		t.Fatalf("early process exit must surface the unexecuted declared identity: %v", err)
 	}
@@ -433,10 +431,11 @@ func TestTypeScriptAdapterRejectsUnregisteredAssertionFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
 	direct := strings.Replace(string(tsAssetBytes(t, "conformance/conformance.ts")),
-		`check(t, "conformance/witness", 6 * 7 === 42);`,
-		`if (6 * 7 !== 42) { throw new Error("direct failure outside the transport"); }`, 1)
+		`check(t, "conformance/multi-b", 4 * 5 === 20);`,
+		`check(t, "conformance/multi-b", 4 * 5 === 20);
+  throw new Error("direct failure outside the transport");`, 1)
 	files := map[string][]byte{"conformance.ts": []byte(direct)}
-	_, err := tsRunCaptured(t, ctx, scope, files, tsConformanceSuite(t, "direct-failure"), nil)
+	_, err := tsRunCaptured(t, ctx, files, tsConformanceSuite(t, "direct-failure"), nil)
 	if err == nil || !strings.Contains(err.Error(), "UNEXPECTED_FAILURE") {
 		t.Fatalf("direct failure must be UNEXPECTED_FAILURE: %v", err)
 	}
@@ -450,7 +449,7 @@ func TestTypeScriptAdapterRejectsStalePreparedOutput(t *testing.T) {
 	defer closeAdapterScope(t, scope)
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
-	_, err := tsRunCaptured(t, ctx, scope, tsFrozenFiles(t), tsConformanceSuite(t, "stale"), func(scratch string) {
+	_, err := tsRunCaptured(t, ctx, tsFrozenFiles(t), tsConformanceSuite(t, "stale"), func(scratch string) {
 		candidates, _ := filepath.Glob(filepath.Join(scratch, "out", "conformance.js"))
 		if len(candidates) == 1 {
 			_ = os.WriteFile(candidates[0], []byte("// stale swap\n"), 0o644)
@@ -471,7 +470,7 @@ func TestTypeScriptAdapterRejectsAssertionSiteMismatch(t *testing.T) {
 	defer cancel()
 	suite := tsConformanceSuite(t, "site-mismatch")
 	suite.Tests[0].Assertions[0].Line = 3
-	_, err := tsRunCaptured(t, ctx, scope, tsFrozenFiles(t), suite, nil)
+	_, err := tsRunCaptured(t, ctx, tsFrozenFiles(t), suite, nil)
 	if err == nil || !strings.Contains(err.Error(), "ASSERTION_MISMATCH") {
 		t.Fatalf("registered call-site mismatch must be rejected: %v", err)
 	}
@@ -540,7 +539,7 @@ func TestTypeScriptAdapterRejectsNeverSettlingTestAsTimeout(t *testing.T) {
 		"test(\"conformance witness executes native assertion\", (): Promise<void> => new Promise(() => {}));\n"
 	suite := tdd.Suite{ID: "hang", Adapter: AdapterNodeTestTS, Root: ".", Files: []string{"conformance.ts"},
 		Tests: []tdd.Test{
-			{ID: "a", Source: "conformance.ts", Native: tdd.NativeID{Source: "conformance.ts", Path: []string{"conformance witness executes native assertion"}}},
+			{ID: "a", Source: "conformance.ts", Native: tdd.NativeID{Source: "conformance.ts", Path: []string{"conformance witness executes native assertion"}, Line: 2, Column: 1}},
 		}}
 	src := t.TempDir()
 	control := t.TempDir()
@@ -598,7 +597,12 @@ var (
 func laneBinary(t *testing.T) string {
 	t.Helper()
 	laneBinaryOnce.Do(func() {
-		bin := filepath.Join(t.TempDir(), "integration-lane")
+		buildDir, err := os.MkdirTemp("", "machinery-lane-binary-")
+		if err != nil {
+			laneBinaryErr = err
+			return
+		}
+		bin := filepath.Join(buildDir, "integration-lane")
 		scope := openAdapterScope(t)
 		defer closeAdapterScope(t, scope)
 		goExe, err := exec.LookPath("go")
@@ -613,10 +617,10 @@ func laneBinary(t *testing.T) string {
 		}
 		sum := sha256.Sum256(body)
 		attached, err := scope.Attach(processscope.Command{
-			Executable: goExe,
-			Args:       []string{"build", "-o", bin, "./scripts/integration-lane"},
-			Dir:        repoRoot(t),
-			Env:        os.Environ(),
+			Executable:    goExe,
+			Args:          []string{"build", "-o", bin, "./scripts/integration-lane"},
+			Dir:           repoRoot(t),
+			Env:           os.Environ(),
 			RuntimeDigest: "sha256:" + fmt.Sprintf("%x", sum),
 		})
 		if err != nil {
@@ -697,7 +701,7 @@ func laneSeedRoot(t *testing.T, includeFragment bool, tamperConformance func(sou
 		if err != nil {
 			return err
 		}
-		write(filepath.ToSlash(rel), body)
+		write("testdata/integration-lanes/"+filepath.ToSlash(rel), body)
 		return nil
 	})
 	if err != nil {
@@ -802,9 +806,9 @@ func laneRun(t *testing.T, root string, envOverrides ...string) (bool, string, l
 // conformance suite alongside the frozen probes and the v1 pilot lane.
 func TestContributorLaneExecutesTypeScriptConformanceFragment(t *testing.T) {
 	root := laneSeedRoot(t, true, nil)
-	ok, _, report := laneRun(t, root)
+	ok, out, report := laneRun(t, root)
 	if !ok {
-		t.Fatalf("required lane with the typescript conformance fragment must pass: %+v", report)
+		t.Fatalf("required lane with the typescript conformance fragment must pass: %+v output=%s", report, out)
 	}
 	if report.Assurance == nil || report.Assurance.Status != "passed" {
 		t.Fatalf("assurance section missing or failed: %+v", report.Assurance)
@@ -856,7 +860,8 @@ func TestContributorLaneRejectsConformanceOmission(t *testing.T) {
 // skip inside the conformance fixture fails the lane on the real stream.
 func TestContributorLaneRejectsNativeSkipInConformanceFixture(t *testing.T) {
 	root := laneSeedRoot(t, true, func(source string) string {
-		return strings.Replace(source, `check(t, "conformance/witness", 6 * 7 === 42);`, `t.skip("required conformance must not skip");`, 1)
+		return strings.Replace(source, `check(t, "conformance/multi-b", 4 * 5 === 20);`, `check(t, "conformance/multi-b", 4 * 5 === 20);
+  t.skip("required conformance must not skip");`, 1)
 	})
 	ok, out, _ := laneRun(t, root)
 	if ok || !strings.Contains(strings.ToLower(out), "skip") {

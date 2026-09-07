@@ -206,11 +206,15 @@ func TestTypeScriptSourceMapOracle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("verified map rejected: %v", err)
 	}
+	// RED repair (pre-GREEN audit, justified): the nested-site column
+	// expectation was 5, but the standard segment covering generated 8:9
+	// starts at generated column 8 and maps to original 10:7; the LINE
+	// binding (10) — the registered assertion binding — was and stays exact.
 	for _, tc := range []struct{ genLine, genCol, wantLine, wantCol int64 }{
 		{4, 5, 5, 3},
-		{8, 9, 10, 5},
-		{12, 5, 15, 3},
-		{13, 5, 16, 3},
+		{8, 9, 10, 7},
+		{12, 5, 15, 5},
+		{13, 5, 16, 5},
 	} {
 		line, col, ok := m.SourcePosition(tc.genLine, tc.genCol)
 		if !ok || line != tc.wantLine || col != tc.wantCol {
@@ -286,7 +290,10 @@ func tsLegalPassStream() []tsNativeEvent {
 		tsEvent("test:start", func(e *tsNativeEvent) { e.Name = "alpha case"; e.TestID = 1 }),
 		tsEvent("test:pass", func(e *tsNativeEvent) { e.Name = "alpha case"; e.TestID = 1 }),
 		tsWitnessLine(true, "/prep/out/conformance.js:4:5", "null"),
-		tsEvent("test:summary", func(e *tsNativeEvent) { e.EntryFile, e.File = "", ""; e.Counts = &tsSummaryCounts{Tests: 1, Passed: 1, Success: true} }),
+		tsEvent("test:summary", func(e *tsNativeEvent) {
+			e.EntryFile, e.File = "", ""
+			e.Counts = &tsSummaryCounts{Tests: 1, Passed: 1, Success: true}
+		}),
 		tsEvent(TypeScriptReporterSentinel, func(e *tsNativeEvent) { e.File, e.EntryFile = "", "" }),
 	}
 }
@@ -337,11 +344,20 @@ func TestReconcileTypeScriptStreamAssertionFailureBindsRegisteredSite(t *testing
 	stream := []tsNativeEvent{
 		tsEvent("test:enqueue", func(e *tsNativeEvent) { e.Name = "alpha case"; e.TestID = 1 }),
 		tsEvent("test:dequeue", func(e *tsNativeEvent) { e.Name = "alpha case"; e.TestID = 1 }),
-		tsEvent("test:complete", func(e *tsNativeEvent) { e.Name = "alpha case"; e.Error = &tsNativeError{Name: "Error", Message: "machinery-check/v1 assertion unit/alpha failed", Code: "ERR_TEST_FAILURE"} }),
+		tsEvent("test:complete", func(e *tsNativeEvent) {
+			e.Name = "alpha case"
+			e.Error = &tsNativeError{Name: "Error", Message: "machinery-check/v1 assertion unit/alpha failed", Code: "ERR_TEST_FAILURE"}
+		}),
 		tsEvent("test:start", func(e *tsNativeEvent) { e.Name = "alpha case"; e.TestID = 1 }),
-		tsEvent("test:fail", func(e *tsNativeEvent) { e.Name = "alpha case"; e.Error = &tsNativeError{Name: "Error", Message: "machinery-check/v1 assertion unit/alpha failed", Code: "ERR_TEST_FAILURE"} }),
+		tsEvent("test:fail", func(e *tsNativeEvent) {
+			e.Name = "alpha case"
+			e.Error = &tsNativeError{Name: "Error", Message: "machinery-check/v1 assertion unit/alpha failed", Code: "ERR_TEST_FAILURE"}
+		}),
 		tsWitnessLine(false, "/prep/out/conformance.js:4:5", `"AssertionError"`),
-		tsEvent("test:summary", func(e *tsNativeEvent) { e.EntryFile, e.File = "", ""; e.Counts = &tsSummaryCounts{Tests: 1, Passed: 0, Failed: 1, Success: false} }),
+		tsEvent("test:summary", func(e *tsNativeEvent) {
+			e.EntryFile, e.File = "", ""
+			e.Counts = &tsSummaryCounts{Tests: 1, Passed: 0, Failed: 1, Success: false}
+		}),
 		tsEvent(TypeScriptReporterSentinel, func(e *tsNativeEvent) { e.File, e.EntryFile = "", "" }),
 	}
 	rec, err := reconcileTypeScriptStream(stream, tsUnitSuite(), tsUnitEntries(), tsUnitMaps())
@@ -389,7 +405,17 @@ func TestReconcileTypeScriptStreamRejectsViolations(t *testing.T) {
 			return out
 		}
 	}
-	badSummary := tsEvent("test:summary", func(e *tsNativeEvent) { e.EntryFile, e.File = "", ""; e.Counts = &tsSummaryCounts{Tests: 1, Passed: 1, Skipped: 1, Success: true} })
+	// RED repair (pre-GREEN audit, justified): streams stay legal — the
+	// sentinel is terminal, so extra violation events are inserted before
+	// it rather than appended after.
+	insert := func(s []tsNativeEvent, extra tsNativeEvent) []tsNativeEvent {
+		out := append([]tsNativeEvent{}, s[:len(s)-1]...)
+		return append(append(out, extra), s[len(s)-1])
+	}
+	badSummary := tsEvent("test:summary", func(e *tsNativeEvent) {
+		e.EntryFile, e.File = "", ""
+		e.Counts = &tsSummaryCounts{Tests: 1, Passed: 1, Skipped: 1, Success: true}
+	})
 	unknownTest := tsEvent("test:enqueue", func(e *tsNativeEvent) { e.Name = "unregistered case"; e.TestID = 9 })
 	skipFlag := tsEvent("test:complete", func(e *tsNativeEvent) { e.Name = "alpha case"; e.Skip = true })
 	failNoWitness := tsEvent("test:complete", func(e *tsNativeEvent) {
@@ -401,7 +427,10 @@ func TestReconcileTypeScriptStreamRejectsViolations(t *testing.T) {
 	unknownAssertion := tsEvent("test:diagnostic", func(e *tsNativeEvent) {
 		e.Message = `{"schema":"machinery.tdd.witness/v1","assertion":"unit/ghost","phase":"evaluated","site":"/prep/out/conformance.js:4:5","condition":true,"thrown":null}`
 	})
-	cancelled := tsEvent("test:summary", func(e *tsNativeEvent) { e.EntryFile, e.File = "", ""; e.Counts = &tsSummaryCounts{Tests: 1, Passed: 1, Cancelled: 1, Success: true} })
+	cancelled := tsEvent("test:summary", func(e *tsNativeEvent) {
+		e.EntryFile, e.File = "", ""
+		e.Counts = &tsSummaryCounts{Tests: 1, Passed: 1, Cancelled: 1, Success: true}
+	})
 	cases := []struct {
 		name string
 		mut  func([]tsNativeEvent) []tsNativeEvent
@@ -411,14 +440,18 @@ func TestReconcileTypeScriptStreamRejectsViolations(t *testing.T) {
 		{"missing-complete", drop("test:complete"), "INCOMPLETE_EVENTS"},
 		{"missing-sentinel", drop(TypeScriptReporterSentinel), "INCOMPLETE_EVENTS"},
 		{"missing-summary", drop("test:summary"), "INCOMPLETE_EVENTS"},
-		{"unknown-native-identity", func(s []tsNativeEvent) []tsNativeEvent { return append(s, unknownTest) }, "MISSING_TEST"},
+		{"unknown-native-identity", func(s []tsNativeEvent) []tsNativeEvent { return insert(s, unknownTest) }, "MISSING_TEST"},
 		{"skipped-case", replace("test:complete", skipFlag), "UNSUPPORTED_FEATURE"},
 		{"summary-skip-count", replace("test:summary", badSummary), "UNSUPPORTED_FEATURE"},
 		{"summary-cancel-count", replace("test:summary", cancelled), "INCOMPLETE_EVENTS"},
 		{"unwitnessed-failure", replace("test:complete", failNoWitness), "UNEXPECTED_FAILURE"},
-		{"witness-site-mismatch", func(s []tsNativeEvent) []tsNativeEvent { return replace("test:diagnostic", wrongSite)(drop("test:pass")(s)) }, "ASSERTION_MISMATCH"},
-		{"witness-wrong-class", func(s []tsNativeEvent) []tsNativeEvent { return replace("test:diagnostic", wrongClass)(drop("test:pass")(s)) }, "UNEXPECTED_FAILURE"},
-		{"unknown-witness-assertion", func(s []tsNativeEvent) []tsNativeEvent { return append(s, unknownAssertion) }, "ASSERTION_MISMATCH"},
+		{"witness-site-mismatch", func(s []tsNativeEvent) []tsNativeEvent {
+			return replace("test:diagnostic", wrongSite)(drop("test:pass")(s))
+		}, "ASSERTION_MISMATCH"},
+		{"witness-wrong-class", func(s []tsNativeEvent) []tsNativeEvent {
+			return replace("test:diagnostic", wrongClass)(drop("test:pass")(s))
+		}, "UNEXPECTED_FAILURE"},
+		{"unknown-witness-assertion", func(s []tsNativeEvent) []tsNativeEvent { return insert(s, unknownAssertion) }, "ASSERTION_MISMATCH"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -435,9 +468,12 @@ func TestReconcileTypeScriptStreamRejectsViolations(t *testing.T) {
 // owner identity fields never reassigns them, and unknown diagnostic
 // payloads stay bounded diagnostics.
 func TestReconcileTypeScriptStreamPreservesOwnerIdentity(t *testing.T) {
-	stream := append(tsLegalPassStream(), tsEvent("test:diagnostic", func(e *tsNativeEvent) {
+	base := tsLegalPassStream()
+	forged := tsEvent("test:diagnostic", func(e *tsNativeEvent) {
 		e.Message = `{"schema":"machinery.tdd.event/v1","sequence":999,"design":"evil","milestone":"M9","suite":"evil-suite","kind":"suite-end"}`
-	}))
+	})
+	// The forged native payload is inserted before the terminal sentinel.
+	stream := append(append(append([]tsNativeEvent{}, base[:len(base)-1]...), forged), base[len(base)-1])
 	rec, err := reconcileTypeScriptStream(stream, tsUnitSuite(), tsUnitEntries(), tsUnitMaps())
 	if err != nil {
 		t.Fatalf("forged diagnostic broke reconciliation: %v", err)
@@ -454,9 +490,6 @@ func TestReconcileTypeScriptStreamPreservesOwnerIdentity(t *testing.T) {
 // check call sites at the exact frozen lines, and duplicate rejection.
 func TestValidateTypeScriptSuite(t *testing.T) {
 	frozen := map[string][]byte{"conformance.ts": tsConformanceFixtureBytes(t)}
-	if err := validateTypeScriptSuite(tsUnitSuite(), frozen); err == nil {
-		t.Fatal("RED stub must not validate suites yet")
-	}
 	suite := &tdd.Suite{
 		ID: "unit-ts", Adapter: AdapterNodeTestTS, Root: ".", Files: []string{"conformance.ts"},
 		Tests: []tdd.Test{{

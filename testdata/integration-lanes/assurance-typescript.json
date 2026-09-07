@@ -1,0 +1,30 @@
+{
+  "schema": "machinery.assurance.lane/v1",
+  "fragment": "assurance-typescript",
+  "owner": "MAC-avfp",
+  "suites": [
+    {
+      "id": "assurance-node-conformance",
+      "lane": "assurance",
+      "adapter": "node-test-typescript/v1",
+      "kind": "native-conformance",
+      "package": ".",
+      "source_files": [
+        "internal/tdd/adapters/assets/typescript/package.json",
+        "internal/tdd/adapters/assets/typescript/node-ambient.d.ts",
+        "internal/tdd/adapters/assets/typescript/machinery-check.ts",
+        "internal/tdd/adapters/assets/typescript/conformance/conformance.ts"
+      ],
+      "tests": [
+        "conformance witness executes native assertion",
+        "conformance parent identity",
+        "conformance parent identity > conformance nested identity",
+        "conformance multiple assertions"
+      ],
+      "runtimes": ["node", "tsc"],
+      "timeout": "5m",
+      "stdout_limit": 1048576,
+      "stderr_limit": 1048576
+    }
+  ]
+}
