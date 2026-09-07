@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
-updated_at: 2026-09-07T09:15:42Z
-content_hash: "sha256:bfca2d1d904e4749b10d0a3149879d92315978e9718e08e74490e98d053b786d"
+updated_at: 2026-09-07T10:08:33Z
+content_hash: "sha256:eca80287cfb9af479adeabea104e2fa9ebb8cd684fcc7806bcb7589d6c7ff8b8"
 blocks: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-al5u, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s, MAC-hpqp, MAC-hy71]
 follows: [MAC-6h0s, MAC-hpqp, MAC-hy71]
@@ -222,3 +222,6 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-07T10:08:33Z ramirosalas
+ACCEPTED 2026-09-07 — RED 6baff8b (13 failing subjects + 2 controls frozen) -> GREEN 14cbf8a. Closed machinery.assurance.lane/v1 fragment schema (sha256-pinned) with exact first-release pins (Go 1.27.1, Node 26.8.1 + tsc 7.0.2, CPython 3.14.7, Elixir 1.20.4/OTP 29/ERTS 17.0.6, Git 2.55.0, both native platforms); native runtime verification before any suite; four frozen per-language probe fixtures executed as REAL go test / tsc+node --test / python3 -I -m unittest / mix test custody jobs; mandatory catalog for machinery module, exact v1 semantics for foreign roots; hpqp pilot files byte-untouched. ci.yml provisions exact pinned runtimes; preflight early presence check. Lane e2e green: 8 v1 suites + 4 assurance suites across 4 native adapters, custody verified (37 jobs cleaned); all four runtimes verified on this host incl. Elixir 1.20.4. Overrun 17 files +1673 — frozen per-language fixtures chosen over generated probes for real tamper negatives (established pattern). RESIDUALS: hosted evidence awaits first CI run; Git 2.55.0 engages with its producer fragment; closure digests are the adapter stories RuntimeHandle obligation. Coordinator merged; lane fully green on epic. Record: .git/machinery-evidence-20260906.TEFZ7D/bz1y-record.md
