@@ -9,13 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-06T08:58:17Z
 created_by: ramirosalas
 updated_at: 2026-09-07T00:29:10Z
-content_hash: "sha256:008c80fd1d07be4b4ef4cdfeb2dde52f766c7af2caff8c2f71e78336dfed49f6"
+content_hash: "sha256:11cf7231b869c85e22019b42f64888ad0a50749476d68c0af7bc0606f5e7762d"
 was_blocked_by: [MAC-l7m0, MAC-p9wm]
 assignee: dev-MAC-qlw2
 follows: [MAC-l7m0]
 closed_at: 2026-09-07T00:29:10Z
 close_reason: "Accepted: native child ownership until cleanup completes, proven Darwin+Linux; critical-path unblocker delivered; merged to local epic"
-led_to: [MAC-cn7q]
+led_to: [MAC-cn7q, MAC-6h0s]
 ---
 
 ## Description
@@ -134,7 +134,7 @@ status: in_progress
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-l7m0]], [[MAC-p9wm]]
 - Follows: [[MAC-l7m0]]
-- Led to: [[MAC-cn7q]]
+- Led to: [[MAC-cn7q]], [[MAC-6h0s]]
 
 ## Comments
 

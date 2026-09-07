@@ -1,17 +1,19 @@
 ---
 id: MAC-6h0s
 title: "Reject incomplete executable assurance declarations"
-status: open
+status: in_progress
 priority: 1
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:06Z
-content_hash: "sha256:55b14f2117b73b758c9883781405680a8d773be5f773f6905ee18b9e76aaf8f8"
+updated_at: 2026-09-07T00:29:38Z
+content_hash: "sha256:0aa2ac2237c1166842360d8787c4d2ccf866e3f9cee66524ad9477b6221ea80e"
 blocks: [MAC-p9z1, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-qlw2]
+follows: [MAC-qlw2]
+assignee: dev-MAC-6h0s
 ---
 
 ## Description
@@ -102,11 +104,14 @@ status: new
 - 2026-09-06T09:10:16Z dep_added: blocks MAC-vx24
 - 2026-09-06T09:10:17Z dep_added: blocks MAC-ou97
 - 2026-09-07T00:29:10Z dep_removed: was_blocked_by MAC-qlw2
+- 2026-09-07T00:29:38Z status: open -> in_progress
+- 2026-09-07T00:29:38Z auto-follows: linked to predecessor MAC-qlw2
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-p9z1]], [[MAC-bz1y]], [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-qlw2]]
+- Follows: [[MAC-qlw2]]
 
 ## Comments
 
