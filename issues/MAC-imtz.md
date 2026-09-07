@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:52Z
 created_by: ramirosalas
-updated_at: 2026-09-07T18:47:02Z
-content_hash: "sha256:20d9d8fc4025d259c739bf901c536ba5485fb9b0aad68588cf5a66e9f27191be"
+updated_at: 2026-09-07T21:01:12Z
+content_hash: "sha256:f2b162d7594e21560893cd0fa964ae0b34225c4c81cb2d0354191e9a63ec6fb9"
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
 follows: [MAC-6h0s, MAC-bz1y]
@@ -219,3 +219,6 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-07T21:01:12Z ramirosalas
+ACCEPTED 2026-09-07 — RED 759d0f4 (20 intended failures + 7 controls, 3 frozen Python assets natively pin-verified; 2 justified supersessions disclosed) -> GREEN 3532a85. CPython 3.14.7 closure (interpreter bytes + full stdlib tree fingerprint + static patchlevel pin + scoped probe + pure revalidating Close); isolated-mode python3 -I execution via byte-pinned helper, static AST call-site validation, native TestLoader discovery with exact TestCase.id() reconciliation, AssertionError-only witness causality, closed env, __pycache__ guards, exit/summary concordance, late-mutation STALE_INPUT. Empirical finds pinned (planted pyc executed — guard load-bearing; setUp vs body correlation; unawaited coroutines via warning-error+unraisablehook+gc; double terminals). All owned packages ok; -race clean; vet clean; lane green on epic after union merge 1a25305 (assurance-python-conformance 4/4). Overrun 4016 vs 2100 — sibling precedent. RESIDUALS: Linux rides hosted CI; gracefully-cancelled pending tasks stdlib-indistinguishable (fail-open sub-shape, documented). Record: .git/machinery-evidence-20260906.TEFZ7D/imtz-record.md
