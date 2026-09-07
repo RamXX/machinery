@@ -4,11 +4,11 @@ title: "Reject unmodeled saga compensation paths"
 status: in_progress
 priority: 0
 type: bug
-labels: [hard-tdd, walking-skeleton]
+labels: [hard-tdd, walking-skeleton, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-07T08:24:54Z
+updated_at: 2026-09-07T08:24:55Z
 content_hash: "sha256:1ace7ed32fc4b4e2dc965764f8bfc9a6f4c34cbd90a97a29fd0a8286f7c7d08e"
 blocks: [MAC-ou97]
 was_blocked_by: [MAC-hpqp]
