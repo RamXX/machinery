@@ -311,15 +311,15 @@ func TestPythonAdapterRejectsAdversarialSuites(t *testing.T) {
 		code   string
 	}{
 		{"syntax error", strings.Replace(frozen, "import unittest", "import unittest\n(oops", 1), "BUILD_ERROR"},
-		{"module level raise", strings.Replace(frozen, "import machinery_check", "import machinery_check\nraise ValueError(\"boom\")", 1), "BUILD_ERROR"},
+		{"module level raise", frozen + "\nraise ValueError(\"boom\")\n", "BUILD_ERROR"},
 		{"skip decorator", replace("    def test_witness_pass(self):", "    @unittest.skip(\"no\")\n    def test_witness_pass(self):"), "UNSUPPORTED_FEATURE"},
 		{"expected failure decorator", replace("    def test_witness_pass(self):", "    @unittest.expectedFailure\n    def test_witness_pass(self):"), "UNSUPPORTED_FEATURE"},
 		{"custom failure exception", replace("class ConformanceWitness(unittest.TestCase):", "class ConformanceWitness(unittest.TestCase):\n    failureException = ValueError"), "UNSUPPORTED_FEATURE"},
 		{"subtest", replace("        machinery_check.check(self, \"conformance/witness-pass\", 6 * 7 == 42)", "        machinery_check.check(self, \"conformance/witness-pass\", 6 * 7 == 42)\n        with self.subTest(i=1):\n            pass"), "UNSUPPORTED_FEATURE"},
 		{"load_tests omission", frozen + "\n\ndef load_tests(loader, tests, pattern):\n    return tests\n", "UNSUPPORTED_FEATURE"},
-		{"early interpreter exit", strings.Replace(replace("        machinery_check.check(self, \"conformance/witness-pass\", 6 * 7 == 42)", "        machinery_check.check(self, \"conformance/witness-pass\", 6 * 7 == 42)\n        sys.exit(0)"), "import unittest", "import sys\nimport unittest", 1), "UNSUPPORTED_FEATURE"},
-		{"unittest monkeypatch", replace("        machinery_check.check(self, \"conformance/witness-pass\", 6 * 7 == 42)", "        unittest.TestCase.run = lambda self, result: None\n        machinery_check.check(self, \"conformance/witness-pass\", 6 * 7 == 42)"), "UNSUPPORTED_FEATURE"},
-		{"helper call in setup", strings.Replace(frozen, "class ConformanceWitness(unittest.TestCase):\n    def test_witness_pass(self):", "class ConformanceWitness(unittest.TestCase):\n    def setUp(self):\n        machinery_check.check(self, \"conformance/witness-pass\", True)\n    def test_witness_pass(self):", 1), "UNSUPPORTED_FEATURE"},
+		{"early interpreter exit", replace("        machinery_check.check(self, \"conformance/witness-pass\", 6 * 7 == 42)", "        import sys; machinery_check.check(self, \"conformance/witness-pass\", 6 * 7 == 42); sys.exit(0)"), "UNSUPPORTED_FEATURE"},
+		{"unittest monkeypatch", replace("        machinery_check.check(self, \"conformance/witness-pass\", 6 * 7 == 42)", "        unittest.TestCase.run = lambda self, result: None; machinery_check.check(self, \"conformance/witness-pass\", 6 * 7 == 42)"), "UNSUPPORTED_FEATURE"},
+		{"helper call in setup", frozen + "\n\nclass SetupOnly(unittest.TestCase):\n    def setUp(self):\n        machinery_check.check(self, \"setup/only\", True)\n", "UNSUPPORTED_FEATURE"},
 	}
 	for _, c := range cases {
 		files := map[string][]byte{"conformance_test.py": []byte(c.source)}
@@ -360,7 +360,7 @@ func TestPythonAdapterRejectsRuntimeFailures(t *testing.T) {
 		},
 		{
 			name: "duplicate terminal", class: "T", method: "test_t", id: "shape/t", code: "DUPLICATE_TERMINAL",
-			source: "import unittest\nimport machinery_check\n\nclass T(unittest.TestCase):\n    def test_t(self):\n        machinery_check.check(self, \"shape/t\", True)\n        self.assertEqual(1, 2)\n    def tearDown(self):\n        raise RuntimeError(\"teardown boom\")\n",
+			source: "import unittest\nimport machinery_check\n\nclass T(unittest.TestCase):\n    def test_t(self):\n        machinery_check.check(self, \"shape/t\", 1 + 1 == 3)\n    def tearDown(self):\n        raise RuntimeError(\"teardown boom\")\n",
 		},
 	}
 	for _, f := range fixtures {
@@ -397,29 +397,13 @@ func TestPythonAdapterRejectsStaleBytecode(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "STALE_INPUT") {
 		t.Fatalf("planted bytecode after preparation must be rejected: %v", err)
 	}
-	suiteDir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(suiteDir, "__pycache__"), 0o755); err != nil {
-		t.Fatal(err)
+	captured := map[string][]byte{
+		"conformance_test.py":                          pyAssetBytes(t, "conformance/conformance_test.py"),
+		"__pycache__/conformance_test.cpython-314.pyc": []byte("stale bytecode"),
 	}
-	if err := os.WriteFile(filepath.Join(suiteDir, "__pycache__", "conformance_test.cpython-314.pyc"), []byte("stale bytecode"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	scope := tsOpenAdapterScope(t)
-	defer tsCloseAdapterScope(t, scope)
-	handle, err := runtimeclosure.OpenPython(ctx, runtimeclosure.PythonRequest{})
-	if err != nil {
-		t.Fatalf("closure: %v", err)
-	}
-	defer func() { _ = handle.Close() }()
-	inputs := tdd.InputView{
-		SourceRoot: t.TempDir(), DesignPath: ".", ControlRoot: t.TempDir(),
-		Revalidate: func() error { return nil }, Release: func() error { return nil },
-	}
-	if _, err := Python().Prepare(ctx, tdd.SuiteRequest{
-		Inputs: inputs, Suite: pyConformanceSuite(t, "stale-pyc-existing"), Source: tdd.BundleRef{},
-		Scratch: filepath.Join(t.TempDir(), "run"), Runtime: handle, Scope: scope, Limits: tdd.Limits{WallMS: 60000},
-	}); err == nil || !strings.Contains(err.Error(), "INVALID_SCHEMA") {
-		t.Fatalf("a suite source without a captured bundle must be rejected: %v", err)
+	_, err = pyRunCaptured(t, ctx, captured, pyConformanceSuite(t, "stale-pyc-captured"), nil)
+	if err == nil || !strings.Contains(err.Error(), "STALE_INPUT") {
+		t.Fatalf("stale bytecode captured with the suite must be rejected at preparation: %v", err)
 	}
 }
 
@@ -677,7 +661,7 @@ func TestContributorLaneExecutesPythonConformanceFragment(t *testing.T) {
 	if err != nil || fmt.Sprintf("%x", sha256.Sum256(events)) != receipt.EventsSHA {
 		t.Fatalf("retained conformance events do not match the report hash: %v", err)
 	}
-	if !strings.Contains(string(events), "conformance_test.ConformanceAsync.test_async_witness") {
+	if !strings.Contains(string(events), `"Module":"conformance_test"`) || !strings.Contains(string(events), `"Method":"test_async_witness"`) {
 		t.Fatalf("retained conformance events are not the native normalized stream: %s", events)
 	}
 }

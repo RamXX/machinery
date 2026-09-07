@@ -16,7 +16,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 )
 
 // pySupportedPlatform pins the supported native pair anything below may
@@ -144,7 +143,13 @@ func TestPythonClosureValidateProbesUnderCustody(t *testing.T) {
 		t.Fatal("validating a closed handle must fail")
 	}
 	shim := t.TempDir()
-	python := filepath.Join(shim, "python3")
+	if err := os.MkdirAll(filepath.Join(shim, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(shim, "lib", "python3.14", "unittest"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	python := filepath.Join(shim, "bin", "python3")
 	if err := os.WriteFile(python, []byte("#!/bin/sh\necho Python 3.13.0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +183,10 @@ func TestPythonClosureCloseIsPureRevalidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := t.TempDir()
-	bin := filepath.Join(root, "python3")
+	if err := os.MkdirAll(filepath.Join(root, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bin := filepath.Join(root, "bin", "python3")
 	if err := os.WriteFile(bin, body, 0o755); err != nil {
 		t.Fatal(err)
 	}
