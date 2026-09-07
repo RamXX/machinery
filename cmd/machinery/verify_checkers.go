@@ -12,8 +12,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1029,10 +1031,12 @@ func snapshotCheckerExecutable(binDir string, index int, source checkerSnapshotS
 }
 
 type boundedCheckerOutput struct {
-	mu      sync.Mutex
-	buf     bytes.Buffer
-	dropped int64
-	limit   int
+	mu             sync.Mutex
+	buf            bytes.Buffer
+	dropped        int64
+	limit          int
+	onBreach       func()
+	breachNotified bool
 }
 
 func (w *boundedCheckerOutput) Write(p []byte) (int, error) {
@@ -1050,6 +1054,12 @@ func (w *boundedCheckerOutput) Write(p []byte) (int, error) {
 		_, _ = w.buf.Write(p[:remaining])
 	}
 	w.dropped += int64(len(p) - remaining)
+	if w.dropped > 0 && !w.breachNotified {
+		w.breachNotified = true
+		if w.onBreach != nil {
+			w.onBreach()
+		}
+	}
 	return len(p), nil
 }
 
@@ -1327,6 +1337,14 @@ func verifyLocalOCIImage(engineArgs []string, image, digest, platform string, ti
 // engine is snapshotted separately as machinery's control-plane dependency;
 // checker code, interpreters, modules, rules, loaders, and native libraries all
 // come from the digest-addressed image.
+//
+// Every invocation owns an unambiguous container identity: the engine records
+// the exact daemon-side container ID at <workDir>/checker.cid, and all return
+// paths -- success, nonzero exit, timeout, cancellation, or an output-limit
+// breach -- force-remove precisely that ID through the same snapshotted engine
+// before completion is reported. A cleanup failure is reported explicitly
+// instead of being silently dropped, and no container other than the captured
+// ID is ever removed.
 func runCheckerOCI(engineArgs []string, image, platform string, checkerArgs []string, runtimeDigest string, timeout time.Duration, workDir string) (string, error) {
 	if len(engineArgs) == 0 {
 		return "", fmt.Errorf("empty OCI engine command")
@@ -1338,13 +1356,23 @@ func runCheckerOCI(engineArgs []string, image, platform string, checkerArgs []st
 	if strings.Contains(mountSource, ",") {
 		return "", fmt.Errorf("checker work path contains a comma and cannot be represented by the closed OCI mount contract")
 	}
+	budgetFlags, err := checkerOCIBudgetFlags(checkerOCIDefaultBudget)
+	if err != nil {
+		return "", fmt.Errorf("checker OCI budget is invalid: %w", err)
+	}
+	cidPath := filepath.Join(workDir, checkerOCICIDFileName)
+	if err := os.Remove(cidPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("reset checker container identity file: %w", err)
+	}
 	mount := "type=bind,src=" + mountSource + ",dst=/work"
 	inputsMount := "type=bind,src=" + filepath.Join(mountSource, "runtime-inputs") + ",dst=/checker,readonly"
 	args := append([]string(nil), engineArgs...)
 	args = append(args,
-		"run", "--rm", "--pull=never", "--platform", platform, "--network=none", "--read-only",
-		"--cap-drop=ALL", "--security-opt=no-new-privileges", "--workdir=/work",
+		"run", "--pull=never", "--platform", platform, "--network=none", "--read-only",
+		"--cap-drop=ALL", "--security-opt=no-new-privileges",
 	)
+	args = append(args, budgetFlags...)
+	args = append(args, "--cidfile", cidPath, "--workdir=/work")
 	args = append(args, checkerOCIUserArgs()...)
 	args = append(args,
 		"--mount", mount,
@@ -1357,7 +1385,134 @@ func runCheckerOCI(engineArgs []string, image, platform string, checkerArgs []st
 		image,
 	)
 	args = append(args, checkerArgs...)
-	return runChecker(args, timeout, workDir)
+
+	// The first byte beyond the capture bound cancels the engine CLI so a
+	// flooding checker cannot stream until the timeout while its container
+	// keeps running on the daemon.
+	breachCtx, cancelBreach := context.WithCancel(context.Background())
+	defer cancelBreach()
+	breached := false
+	out, runErr := runCheckerObserving(breachCtx, args, timeout, workDir, func() {
+		breached = true
+		cancelBreach()
+	})
+
+	containerID, idErr := checkerContainerID(cidPath)
+	var cleanupErr error
+	if idErr != nil {
+		// An ambiguous identity is never forwarded to the engine; the
+		// inability to clean up deterministically is reported instead.
+		cleanupErr = idErr
+	} else {
+		cleanupErr = removeCheckerContainer(engineArgs, containerID, workDir)
+	}
+	if breached {
+		runErr = errors.Join(runErr, fmt.Errorf("checker exceeded the bounded output capture limit (%d bytes per stream); container was force-removed", checkerOutputLimit/2))
+	}
+	if cleanupErr != nil {
+		runErr = errors.Join(runErr, cleanupErr)
+	}
+	return out, runErr
+}
+
+const (
+	checkerOCICIDFileName = "checker.cid"
+
+	// The closed deterministic daemon-side resource budget for every checker
+	// container: finite memory, CPU and process counts, with no external
+	// override surface.
+	checkerOCIMemoryBytes int64 = 128 << 20
+	checkerOCINanoCPUs    int64 = 500_000_000
+	checkerOCIPidsLimit   int64 = 32
+)
+
+// checkerOCIBudget is the closed per-run container resource budget. It is
+// validated before the engine is invoked so an accidentally opened or drifted
+// configuration fails closed rather than executing an unbounded checker.
+type checkerOCIBudget struct {
+	memoryBytes int64
+	nanoCPUs    int64
+	pidsLimit   int64
+}
+
+var checkerOCIDefaultBudget = checkerOCIBudget{memoryBytes: checkerOCIMemoryBytes, nanoCPUs: checkerOCINanoCPUs, pidsLimit: checkerOCIPidsLimit}
+
+// checkerOCIExtraLabels carries additional container ownership labels for
+// in-process verification seams (for example the required integration lane's
+// per-run ownership witness). It is not reachable through configuration,
+// environment, or any registry input.
+var checkerOCIExtraLabels []string
+
+var checkerOCIHexContainerID = regexp.MustCompile(`^[a-f0-9]{64}$`)
+
+// checkerOCIBudgetFlags validates the budget and renders the exact engine
+// flags. Memory is exact bytes, CPU is exact nanocpus, and the PID limit is an
+// exact process count; every value must be positive and finite.
+func checkerOCIBudgetFlags(budget checkerOCIBudget) ([]string, error) {
+	if budget.memoryBytes <= 0 || budget.memoryBytes > 1<<40 {
+		return nil, fmt.Errorf("memory budget %d is outside the finite bounds (0, 1TiB]", budget.memoryBytes)
+	}
+	if budget.nanoCPUs <= 0 || budget.nanoCPUs > 64_000_000_000 {
+		return nil, fmt.Errorf("CPU budget %d nanocpus is outside the finite bounds (0, 64]", budget.nanoCPUs)
+	}
+	if budget.pidsLimit <= 0 || budget.pidsLimit > 1<<16 {
+		return nil, fmt.Errorf("PID budget %d is outside the finite bounds (0, 65536]", budget.pidsLimit)
+	}
+	flags := []string{
+		"--memory", strconv.FormatInt(budget.memoryBytes, 10),
+		"--cpus", strconv.FormatFloat(float64(budget.nanoCPUs)/1e9, 'g', -1, 64),
+		"--pids-limit", strconv.FormatInt(budget.pidsLimit, 10),
+	}
+	for _, label := range checkerOCIExtraLabels {
+		if label == "" || strings.ContainsAny(label, " \t\r\n\x00") {
+			return nil, fmt.Errorf("checker OCI ownership label %q is not a single well-formed label", label)
+		}
+		flags = append(flags, "--label", label)
+	}
+	return flags, nil
+}
+
+// checkerContainerID reads and validates the captured container identity. A
+// missing or empty identity file means no container was created; anything
+// other than exactly one full 64-hex daemon ID is ambiguous and must never be
+// forwarded to removal.
+func checkerContainerID(cidPath string) (string, error) {
+	body, err := os.ReadFile(cidPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read checker container identity: %w", err)
+	}
+	id := strings.TrimSpace(string(body))
+	if id == "" {
+		return "", nil
+	}
+	if !checkerOCIHexContainerID.MatchString(id) {
+		return "", fmt.Errorf("invalid checker container identity %q captured in %s", id, filepath.Base(cidPath))
+	}
+	return id, nil
+}
+
+// removeCheckerContainer performs the bounded daemon-side cleanup of exactly
+// the owned container identity. Force-removal reclaims containers whose
+// workload ignores SIGTERM as well as containers that already exited, and
+// removing an already-absent full ID is success. No other container is ever
+// addressed.
+func removeCheckerContainer(engineArgs []string, containerID, workDir string) error {
+	if containerID == "" {
+		return nil
+	}
+	args := append(append([]string(nil), engineArgs...), "rm", "-f", containerID)
+	out, err := runChecker(args, checkerOCIControlPlaneTimeout, workDir)
+	if err != nil {
+		diagnostic := strings.ToLower(strings.TrimSpace(out) + " " + err.Error())
+		if strings.Contains(diagnostic, "no such container") || strings.Contains(diagnostic, "no such object") {
+			return nil
+		}
+		return fmt.Errorf("checker container cleanup failed for %s: %w: %s", containerID, err, strings.TrimSpace(out))
+	}
+	return nil
 }
 
 // snapshotRootedCheckerFile opens the source through one directory capability
@@ -1435,13 +1590,25 @@ func snapshotRootedCheckerFile(root *os.Root, sourcePath, destinationPath string
 // is an error; the captured output is returned in both cases for the caller to
 // surface.
 func runChecker(args []string, timeout time.Duration, workDir string) (string, error) {
+	return runCheckerObserving(context.Background(), args, timeout, workDir, nil)
+}
+
+// runCheckerObserving is runChecker with an optional parent context and an
+// output-breach observer. When onBreach is non-nil it is invoked exactly once,
+// at the first byte dropped beyond the capture bound, so the caller can abort
+// the run instead of streaming until the timeout. With a background parent and
+// a nil observer it behaves identically to runChecker.
+func runCheckerObserving(ctx context.Context, args []string, timeout time.Duration, workDir string, onBreach func()) (string, error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("empty command")
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	if timeout <= 0 {
 		timeout = checker.DefaultCheckerTimeout
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.WaitDelay = checkerWaitDelay
@@ -1451,8 +1618,8 @@ func runChecker(args []string, timeout time.Duration, workDir string) (string, e
 		return "", err
 	}
 	cmd.Env = env
-	stdout := boundedCheckerOutput{limit: checkerOutputLimit / 2}
-	stderr := boundedCheckerOutput{limit: checkerOutputLimit / 2}
+	stdout := boundedCheckerOutput{limit: checkerOutputLimit / 2, onBreach: onBreach}
+	stderr := boundedCheckerOutput{limit: checkerOutputLimit / 2, onBreach: onBreach}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err = processcontrol.Run(ctx, cmd)
