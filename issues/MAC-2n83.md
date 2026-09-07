@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:46Z
 created_by: ramirosalas
-updated_at: 2026-09-07T04:45:47Z
-content_hash: "sha256:3a3ad4a0894938b34e823af725013c61461eaa61e55d0f54ffd209207a5b39ca"
+updated_at: 2026-09-07T07:22:43Z
+content_hash: "sha256:5f933a56b8c6422d0f73b4532a5ca7eedfb30721f9d62ce14e16d3d259a5668c"
 blocks: [MAC-vx24, MAC-ou97, MAC-u4oo]
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp]
@@ -114,3 +114,6 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - Follows: [[MAC-hpqp]]
 
 ## Comments
+
+### 2026-09-07T07:22:43Z ramirosalas
+ACCEPTED 2026-09-06 — RED 004e384 (4 reviewed corrections documented) -> GREEN 5c89fc6..749c1ae. InspectRecovery (strictly read-only: writer/outputs/journal inventory, native-identity statuses, live-writer probe, finalize/rerun/conflict taxonomy) + RecoverInterrupted (fully-validated transactions only, via the publication machinery's own resume/clear path) + new recover CLI in main.go. Native file identity preserved (no hash-equality shortcut); refusals: swapped/symlink-escape/mismatch/tampered-journal/concurrent-writer/partial. Real subprocess crash + Docker bind-mount exit-9 interruption + host-side recovery proven; idempotent second recovery harmless; fixture container cleaned by exact ID w/ label verification (t.Cleanup born in RED). Overrun +2182/-14 vs ~1300 (78% tests) — disclosed, proof not trimmed (established accepted pattern). Coordinator verified designlock+cmd suites, merged; lane green on epic (5 suites). Record: .git/machinery-evidence-20260906.TEFZ7D/2n83-record.md
