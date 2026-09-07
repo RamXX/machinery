@@ -67,7 +67,7 @@ func openFormalCustodyScope(t *testing.T) processscope.Scope {
 		HelperExecutable: exe,
 		HelperDigest:     custodyTestDigest(t, exe),
 		ScratchRoot:      t.TempDir(),
-		Limits:           processscope.Limits{Jobs: 4, WallMS: 2400000},
+		Limits:           processscope.Limits{Jobs: 4, WallMS: 2400000, CleanupMS: 30000},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -267,7 +267,7 @@ func TestVerifyFormalInScopeScopedEngineRunsUnderGuardianCustody(t *testing.T) {
 	t.Setenv("TLA_TOOLS_JAR_SHA256", sha)
 	envFile := filepath.Join(dir, "engine-env.txt")
 	ppidFile := filepath.Join(dir, "engine-ppid.txt")
-	engine := "if [ \"$1\" = '-cp' ]; then env > \"" + envFile + "\"; echo $PPID > \"" + ppidFile + "\"; echo 'No error has been found'; exit 0; fi\n"
+	engine := "env > \"" + envFile + "\"; echo $PPID > \"" + ppidFile + "\"; echo 'No error has been found'; exit 0\n"
 	javaPath := filepath.Join(dir, "runtime", "bin", "java")
 	writeJavaRuntime(t, javaPath, supportedJavaScript(engine))
 	t.Setenv("JAVA_TOOL_OPTIONS", "-javaagent:/hostile.jar")
@@ -365,6 +365,7 @@ func TestScopedFormalTLCCancellationReapsOwnedJVM(t *testing.T) {
 	writeManualLongTLCPair(t, design)
 
 	ctx, cancel := context.WithCancel(processcontrol.WithScope(context.Background(), s))
+	defer cancel() // a failed observation must never strand the engine
 	type outcome struct {
 		rc     int
 		stdout string
@@ -437,6 +438,7 @@ func TestScopedAlloyEngineCancellationReapsOwnedJVM(t *testing.T) {
 	als := writeHeavyAlloyModel(t, t.TempDir())
 
 	ctx, cancel := context.WithCancel(processcontrol.WithScope(context.Background(), s))
+	defer cancel() // a failed observation must never strand the engine
 	type outcome struct {
 		err error
 	}
@@ -446,7 +448,7 @@ func TestScopedAlloyEngineCancellationReapsOwnedJVM(t *testing.T) {
 		done <- outcome{err: err}
 	}()
 
-	pid := waitFormalJavaProcess(t, `org\.alloytools\.alloy\.dist`, 60*time.Second)
+	pid := waitFormalJavaProcess(t, `machinery-alloy-tool-.*verified-tool\.jar`, 60*time.Second)
 	if !custodyAlive(pid) {
 		t.Fatalf("observed Alloy JVM %d is not alive", pid)
 	}
@@ -463,7 +465,7 @@ func TestScopedAlloyEngineCancellationReapsOwnedJVM(t *testing.T) {
 	case <-time.After(120 * time.Second):
 		t.Fatal("canceled Alloy engine did not return")
 	}
-	waitFormalJavaProcessGone(t, `org\.alloytools\.alloy\.dist`, pid, 30*time.Second)
+	waitFormalJavaProcessGone(t, `machinery-alloy-tool-.*verified-tool\.jar`, pid, 30*time.Second)
 	// One identity probe + one Alloy engine ran as owned scoped jobs.
 	requireFormalCustodyClean(t, closeFormalCustodyScope(t, s, 60*time.Second), 2)
 	if !custodyAlive(sentinel) {

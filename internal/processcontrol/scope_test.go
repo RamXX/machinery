@@ -359,7 +359,10 @@ func TestScopedRunExecutesChildUnderGuardianCustody(t *testing.T) {
 	sentinel := custodySentinel(t)
 	s := openCustodyScope(t, nil)
 	envFile := filepath.Join(t.TempDir(), "scoped-env.txt")
-	cmd := custodyHelperCommand(t, "envdump", "MACHINERY_CUSTODY_FILE="+envFile, "JAVA_TOOL_OPTIONS=-javaagent:/hostile.jar")
+	// Hostile values stay ambient: the declared environment must be the only
+	// channel into the scoped child.
+	t.Setenv("JAVA_TOOL_OPTIONS", "-javaagent:/hostile.jar")
+	cmd := custodyHelperCommand(t, "envdump", "MACHINERY_CUSTODY_FILE="+envFile)
 	if err := AttachScope(cmd, s); err != nil {
 		t.Fatalf("attach: %v", err)
 	}
@@ -482,25 +485,33 @@ func TestScopedRunScopedGrandchildTerminationAndReap(t *testing.T) {
 	s := openCustodyScope(t, nil)
 	scratch := t.TempDir()
 	grandchild := filepath.Join(scratch, "grandchild.pid")
-	// The helper spawns a long-lived /bin/sleep grandchild, then exits as an
-	// intermediate parent; custody must still own the descendant.
-	cmd := exec.Command("/bin/sh", "-c", "/bin/sleep 300 & echo $! > "+grandchild)
+	// The helper spawns a long-lived /bin/sleep grandchild and exits as an
+	// intermediate parent; custody must still own the descendant and reap it
+	// before Run returns.
+	cmd := exec.Command("/bin/sh", "-c", "/bin/sleep 300 & echo $! > "+grandchild+"; sleep 2")
 	cmd.Env = []string{"PATH=/bin:/usr/bin"}
 	if err := AttachScope(cmd, s); err != nil {
 		t.Fatalf("attach: %v", err)
 	}
-	if err := Run(WithScope(context.Background(), s), cmd); err != nil {
-		t.Fatalf("scoped intermediate must exit cleanly: %v", err)
-	}
-	pid, err := strconv.Atoi(custodyWaitFile(t, grandchild, 10*time.Second))
+	runDone := make(chan error, 1)
+	go func() { runDone <- Run(WithScope(context.Background(), s), cmd) }()
+	pid, err := strconv.Atoi(strings.TrimSpace(custodyWaitFile(t, grandchild, 10*time.Second)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !custodyAlive(pid) {
-		t.Fatal("owned grandchild must be alive while the scope is open")
+		t.Fatal("owned grandchild must be alive while its intermediate parent runs")
 	}
+	select {
+	case runErr := <-runDone:
+		if runErr != nil {
+			t.Fatalf("scoped intermediate must exit cleanly: %v", runErr)
+		}
+	case <-time.After(60 * time.Second):
+		t.Fatal("scoped intermediate did not return")
+	}
+	custodyWaitGone(t, pid, 15*time.Second)
 	requireCustodyClean(t, closeCustodyScope(t, s, 45*time.Second), 1)
-	custodyWaitGone(t, pid, 10*time.Second)
 	if !custodyAlive(sentinel) {
 		t.Fatal("unrelated sentinel died")
 	}

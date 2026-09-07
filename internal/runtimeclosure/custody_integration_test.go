@@ -64,7 +64,7 @@ func openRuntimeCustodyScope(t *testing.T) processscope.Scope {
 		HelperExecutable: exe,
 		HelperDigest:     runtimeCustodyDigest(t, exe),
 		ScratchRoot:      t.TempDir(),
-		Limits:           processscope.Limits{Jobs: 4, WallMS: 1200000},
+		Limits:           processscope.Limits{Jobs: 4, WallMS: 1200000, CleanupMS: 30000},
 	})
 	if err != nil {
 		t.Fatal(err)

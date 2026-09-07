@@ -3,13 +3,16 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/RamXX/machinery/internal/install"
+	"github.com/RamXX/machinery/internal/processscope"
 	machversion "github.com/RamXX/machinery/internal/version"
 )
 
@@ -30,6 +33,9 @@ var (
 )
 
 func main() {
+	if exitCode, handled := serveInternalActivation(os.Args[1:]); handled {
+		os.Exit(exitCode)
+	}
 	if exitCode, err := enforceConsistentActivation(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -108,6 +114,32 @@ func newVersionCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// serveInternalActivation handles the authenticated internal custody
+// activation before any ordinary product execution: it acquires the inherited
+// internal channel error-first, rejects malformed or untrusted claims without
+// running normal CLI behavior, and serves verified broker/guardian requests
+// with the same candidate binary. It reports handled=false only for the
+// verified absence of any internal claim.
+func serveInternalActivation(args []string) (exitCode int, handled bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	io, present, err := processscope.InheritedInternalIO(ctx)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "machinery: refusing untrusted internal activation:", err)
+		return 1, true
+	}
+	if !present {
+		return 0, false
+	}
+	defer io.Close()
+	wasHandled, code := processscope.ServeInternal(args, io)
+	if !wasHandled {
+		fmt.Fprintln(os.Stderr, "machinery: internal channel claim without the internal marker; refusing normal execution")
+		return 1, true
+	}
+	return code, true
 }
 
 func enforceConsistentActivation() (int, error) {
