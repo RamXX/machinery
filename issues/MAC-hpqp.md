@@ -4,7 +4,7 @@ title: "Execute every required infrastructure test deterministically"
 status: in_progress
 priority: 0
 type: bug
-labels: [hard-tdd, red-approved]
+labels: [hard-tdd, red-approved, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
