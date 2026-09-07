@@ -103,7 +103,7 @@ func requireFormalCustodyClean(t *testing.T, rep processscope.CleanupReport, wan
 
 func formalCustodySentinel(t *testing.T) int {
 	t.Helper()
-	cmd := exec.Command("/bin/sleep", "300")
+	cmd := exec.CommandContext(t.Context(), "/bin/sleep", "300")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func waitFormalJavaProcess(t *testing.T, pattern string, timeout time.Duration) 
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		out, err := exec.Command("/usr/bin/pgrep", "-f", pattern).Output()
+		out, err := exec.CommandContext(t.Context(), "/usr/bin/pgrep", "-f", pattern).Output()
 		if err == nil {
 			for _, field := range strings.Fields(string(out)) {
 				pid, err := strconv.Atoi(field)
@@ -147,7 +147,7 @@ func waitFormalJavaProcessGone(t *testing.T, pattern string, pid int, timeout ti
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		out, _ := exec.Command("/usr/bin/pgrep", "-f", pattern).Output()
+		out, _ := exec.CommandContext(t.Context(), "/usr/bin/pgrep", "-f", pattern).Output()
 		gone := !custodyAlive(pid)
 		if !strings.Contains(string(out), strconv.Itoa(pid)) && gone {
 			return

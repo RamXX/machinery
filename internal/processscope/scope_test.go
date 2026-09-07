@@ -620,7 +620,7 @@ func TestContainerRegistrationReport(t *testing.T) {
 func TestLedgerNotCleanupAuthority(t *testing.T) {
 	s, cleanup := startTestBroker(t, Limits{})
 	defer cleanup()
-	sentinelCmd := exec.Command("/bin/sleep", "120")
+	sentinelCmd := exec.CommandContext(t.Context(), "/bin/sleep", "120")
 	if err := sentinelCmd.Start(); err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package processscope
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -617,7 +618,12 @@ func (b *broker) handleRun(ch *channel, m msgRun, files []*os.File) {
 	if b.dir != "" {
 		logf, _ = os.OpenFile(filepath.Join(b.dir, "guardian-"+spec.JobID+".log"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	}
-	gcmd := exec.Command(b.selfExe, InternalMarker, "guardian")
+	// The guardian's custody is owned by the env-passed wall deadline and the
+	// drain protocol; no ambient context exists inside the broker, and the
+	// direct-child Cancel of CommandContext must never race the drain, so the
+	// background context is used with Cancel neutered.
+	gcmd := exec.CommandContext(context.Background(), b.selfExe, InternalMarker, "guardian")
+	gcmd.Cancel = func() error { return nil }
 	gcmd.Env = []string{
 		EnvInternalCtl + "=3",
 		EnvInternalDeadline + "=" + fmt.Sprintf("%d", b.wallDeadline.UnixNano()),

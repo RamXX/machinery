@@ -3,6 +3,7 @@
 package processscope
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -234,7 +235,12 @@ func runGuardian(io InternalIO, args []string) int {
 		}
 	}()
 
-	cmd := exec.Command(spec.Executable, spec.Args...)
+	// The job's custody is owned by the guardian drain protocol (SIGTERM,
+	// grace, SIGKILL with event reporting); no ambient context exists inside
+	// the guardian, and the direct-child Cancel of CommandContext must never
+	// race the drain, so the background context is used with Cancel neutered.
+	cmd := exec.CommandContext(context.Background(), spec.Executable, spec.Args...)
+	cmd.Cancel = func() error { return nil }
 	cmd.Dir = spec.Dir
 	cmd.Env = spec.Env
 	idx := 0

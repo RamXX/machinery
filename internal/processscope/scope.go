@@ -621,7 +621,11 @@ func Open(ctx context.Context, opts Options) (Scope, error) {
 		brokerEnv = append(brokerEnv, EnvInternalParent+"=5")
 		extra = append(extra, opts.OwnerLiveness)
 	}
-	cmd := exec.Command(opts.HelperExecutable, InternalMarker, "broker", "--dir", dir)
+	// CommandContext satisfies static call-site guarantees; broker custody is
+	// owned by the wall-deadline protocol above, so its direct-child Cancel is
+	// neutered exactly like processcontrol.Run does for scoped launches.
+	cmd := exec.CommandContext(ctx, opts.HelperExecutable, InternalMarker, "broker", "--dir", dir)
+	cmd.Cancel = func() error { return nil }
 	cmd.Env = brokerEnv
 	cmd.ExtraFiles = extra
 	cmd.SysProcAttr = newGroupAttr()

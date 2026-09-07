@@ -148,7 +148,7 @@ func waitGone(t *testing.T, pid int, timeout time.Duration) {
 
 func startSentinel(t *testing.T) int {
 	t.Helper()
-	cmd := exec.Command("/bin/sleep", "120")
+	cmd := exec.CommandContext(t.Context(), "/bin/sleep", "120")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestHelperTarget(t *testing.T) {
 		if secs == "" {
 			secs = "300"
 		}
-		c := exec.Command("/bin/sleep", secs)
+		c := exec.CommandContext(context.Background(), "/bin/sleep", secs)
 		if err := c.Start(); err != nil {
 			t.Fatal(err)
 		}
@@ -261,7 +261,7 @@ func TestHelperTarget(t *testing.T) {
 		if delay == "" {
 			delay = "1500ms"
 		}
-		c := exec.Command(os.Args[0], "-test.run=^TestHelperTarget$", "-test.timeout=60s")
+		c := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestHelperTarget$", "-test.timeout=60s")
 		c.Env = envBase(
 			"MACHINERY_QLW2_ROLE=stale-child",
 			"MACHINERY_QLW2_RESULT="+result,
@@ -551,7 +551,7 @@ func TestOwnerLossBrokerSelfCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	owner := exec.Command(exe, "-test.run=^TestHelperTarget$", "-test.timeout=60s")
+	owner := exec.CommandContext(context.Background(), exe, "-test.run=^TestHelperTarget$", "-test.timeout=60s")
 	owner.Env = envBase(
 		"MACHINERY_QLW2_ROLE=owner",
 		"MACHINERY_QLW2_FILE="+h,

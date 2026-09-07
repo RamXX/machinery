@@ -100,7 +100,7 @@ func requireRuntimeCustodyClean(t *testing.T, rep processscope.CleanupReport, wa
 
 func runtimeCustodySentinel(t *testing.T) int {
 	t.Helper()
-	cmd := exec.Command("/bin/sleep", "300")
+	cmd := exec.CommandContext(t.Context(), "/bin/sleep", "300")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestAttachCustodyBindsScopeAfterSanitation(t *testing.T) {
 	dir := t.TempDir()
 	envFile := filepath.Join(dir, "env.txt")
 	ppidFile := filepath.Join(dir, "ppid.txt")
-	cmd := exec.Command("/bin/sh", "-c", "env > "+envFile+"; echo $PPID > "+ppidFile)
+	cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", "env > "+envFile+"; echo $PPID > "+ppidFile)
 	cmd.Env = Environment(dir, dir, "/usr/bin/true")
 	t.Setenv("JAVA_TOOL_OPTIONS", "-javaagent:/hostile.jar")
 	ctx := processcontrol.WithScope(context.Background(), s)
@@ -206,7 +206,7 @@ func TestAttachCustodyBindsScopeAfterSanitation(t *testing.T) {
 // challenge above: without a scope the ordinary compatibility path runs.
 func TestAttachCustodyAbsentScopeIsCompatibilityNoOp(t *testing.T) {
 	dir := t.TempDir()
-	cmd := exec.Command("/bin/echo", "hi")
+	cmd := exec.CommandContext(context.Background(), "/bin/echo", "hi")
 	cmd.Env = Environment(dir, dir, "/usr/bin/true")
 	if err := AttachCustody(context.Background(), cmd); err != nil {
 		t.Fatalf("absent scope must be a no-op: %v", err)
@@ -344,7 +344,7 @@ func TestScopedJavaEnvironmentExcludesHostileAmbient(t *testing.T) {
 	t.Setenv("JAVA_TOOL_OPTIONS", "-javaagent:/hostile.jar")
 	t.Setenv("JDK_JAVA_OPTIONS", "-Dhostile=true")
 	t.Setenv("CLASSPATH", "/hostile/classpath")
-	cmd := exec.Command("/bin/sh", "-c", "env > "+envFile)
+	cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", "env > "+envFile)
 	cmd.Env = Environment(dir, dir, "/usr/bin/true")
 	ctx := processcontrol.WithScope(context.Background(), s)
 	if err := AttachCustody(ctx, cmd); err != nil {

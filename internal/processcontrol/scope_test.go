@@ -138,14 +138,14 @@ func custodyHelperCommand(t *testing.T, role string, vars ...string) *exec.Cmd {
 		t.Fatal(err)
 	}
 	env := append([]string{"PATH=/bin:/usr/bin", "MACHINERY_CUSTODY_ROLE=" + role}, vars...)
-	cmd := exec.Command(exe, "-test.run=^TestCustodyScopeHelper$", "-test.timeout=290s")
+	cmd := exec.CommandContext(t.Context(), exe, "-test.run=^TestCustodyScopeHelper$", "-test.timeout=290s")
 	cmd.Env = env
 	return cmd
 }
 
 func custodySentinel(t *testing.T) int {
 	t.Helper()
-	cmd := exec.Command("/bin/sleep", "300")
+	cmd := exec.CommandContext(t.Context(), "/bin/sleep", "300")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func TestAttachScopeFailClosedOnMalformedCommand(t *testing.T) {
 func TestScopedRunPreservesOrdinaryRunCompatibility(t *testing.T) {
 	sentinel := custodySentinel(t)
 	s := openCustodyScope(t, nil)
-	cmd := exec.Command("/bin/echo", "hi")
+	cmd := exec.CommandContext(t.Context(), "/bin/echo", "hi")
 	cmd.Env = []string{"PATH=/bin:/usr/bin"}
 	if err := AttachScope(cmd, s); err != nil {
 		t.Fatalf("attach: %v", err)
@@ -276,7 +276,7 @@ func TestScopedRunPreservesOrdinaryRunCompatibility(t *testing.T) {
 func TestScopedRunClassifiesTargetExitStatus(t *testing.T) {
 	sentinel := custodySentinel(t)
 	s := openCustodyScope(t, nil)
-	cmd := exec.Command("/usr/bin/false")
+	cmd := exec.CommandContext(t.Context(), "/usr/bin/false")
 	cmd.Env = []string{"PATH=/bin:/usr/bin"}
 	if err := AttachScope(cmd, s); err != nil {
 		t.Fatalf("attach: %v", err)
@@ -320,7 +320,7 @@ func TestScopedRunCancellationPreservesErrorsIsSemantics(t *testing.T) {
 		}, context.Canceled},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := exec.Command("/bin/sleep", "300")
+			cmd := exec.CommandContext(t.Context(), "/bin/sleep", "300")
 			cmd.Env = []string{"PATH=/bin:/usr/bin"}
 			if err := AttachScope(cmd, s); err != nil {
 				t.Fatalf("attach: %v", err)
@@ -421,7 +421,7 @@ func TestScopedRunAmbiguousCustodyFailsClosed(t *testing.T) {
 	second := openCustodyScope(t, nil)
 	defer closeCustodyScope(t, second, 30*time.Second)
 	defer closeCustodyScope(t, first, 30*time.Second)
-	cmd := exec.Command("/bin/echo", "hi")
+	cmd := exec.CommandContext(t.Context(), "/bin/echo", "hi")
 	cmd.Env = []string{"PATH=/bin:/usr/bin"}
 	if err := AttachScope(cmd, first); err != nil {
 		t.Fatalf("attach: %v", err)
@@ -465,7 +465,7 @@ func TestScopedRunReportsCleanupFailureHonestly(t *testing.T) {
 }
 
 func TestExitStatusCoversUnscopedExitError(t *testing.T) {
-	cmd := exec.Command("/usr/bin/false")
+	cmd := exec.CommandContext(context.Background(), "/usr/bin/false")
 	cmd.Env = []string{"PATH=/bin:/usr/bin"}
 	err := Run(context.Background(), cmd)
 	if err == nil {
@@ -488,7 +488,7 @@ func TestScopedRunScopedGrandchildTerminationAndReap(t *testing.T) {
 	// The helper spawns a long-lived /bin/sleep grandchild and exits as an
 	// intermediate parent; custody must still own the descendant and reap it
 	// before Run returns.
-	cmd := exec.Command("/bin/sh", "-c", "/bin/sleep 300 & echo $! > "+grandchild+"; sleep 2")
+	cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", "/bin/sleep 300 & echo $! > "+grandchild+"; sleep 2")
 	cmd.Env = []string{"PATH=/bin:/usr/bin"}
 	if err := AttachScope(cmd, s); err != nil {
 		t.Fatalf("attach: %v", err)
