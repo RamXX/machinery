@@ -1,7 +1,7 @@
 ---
 id: MAC-o82q
 title: "Bug: ctime-witness ABA tests miss sub-tick mutations on coarse-clock Linux kernels"
-status: in_progress
+status: closed
 priority: 1
 type: bug
 assignee: dev-MAC-o82q
@@ -9,9 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-07T04:45:24Z
 created_by: ramirosalas
 updated_at: 2026-09-07T21:57:40Z
-content_hash: "sha256:bd25d22f94d3cf7e8e79af0e76b54be9f10812e9a6b75712529759ee55675610"
+content_hash: "sha256:23e5307b666477574a5a3aa8aa5b3e9e02d88722c85bdacd602eef75883a08e1"
 follows: [MAC-8yai]
 labels: [accepted]
+closed_at: 2026-09-07T21:57:40Z
+close_reason: "Accepted: ABA rejection granularity-independent via kernel mutation events; confirmed on coarse-clock Linux host; merged to local epic"
 ---
 
 ## Description
@@ -29,6 +31,7 @@ Genuine platform finding from the first native Linux run of the formal/runtimecl
 ## History
 - 2026-09-07T21:01:13Z status: open -> in_progress
 - 2026-09-07T21:01:14Z auto-follows: linked to predecessor MAC-8yai
+- 2026-09-07T21:57:40Z status: in_progress -> closed
 
 ## Links
 - Parent: [[MAC-ui8a]]
