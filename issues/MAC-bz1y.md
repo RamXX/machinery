@@ -9,9 +9,10 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
 updated_at: 2026-09-06T09:48:04Z
-content_hash: "sha256:9b5d9e2ad2a9dc9078ffd64c65d7d1fb94f6e81cb4c18dfedf80994d66aaabab"
-blocked_by: [MAC-hpqp, MAC-6h0s, MAC-hy71]
+content_hash: "sha256:9f6f84aa946c78cb64a368eccc4bf8342cc87ce1ee88a8f590e5b6477783e96c"
+blocked_by: [MAC-hpqp, MAC-hy71]
 blocks: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-al5u, MAC-vx24, MAC-ou97]
+was_blocked_by: [MAC-6h0s]
 ---
 
 ## Description
@@ -101,11 +102,13 @@ status: new
 - 2026-09-06T09:10:19Z dep_added: blocks MAC-vx24
 - 2026-09-06T09:10:20Z dep_added: blocks MAC-ou97
 - 2026-09-06T09:22:42Z dep_added: blocked_by MAC-hy71
+- 2026-09-07T01:42:40Z dep_removed: was_blocked_by MAC-6h0s
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-pe9v]], [[MAC-al5u]], [[MAC-vx24]], [[MAC-ou97]]
-- Blocked by: [[MAC-hpqp]], [[MAC-6h0s]], [[MAC-hy71]]
+- Blocked by: [[MAC-hpqp]], [[MAC-hy71]]
+- Was blocked by: [[MAC-6h0s]]
 
 ## Comments
 

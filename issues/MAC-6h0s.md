@@ -1,7 +1,7 @@
 ---
 id: MAC-6h0s
 title: "Reject incomplete executable assurance declarations"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
 updated_at: 2026-09-07T01:42:39Z
-content_hash: "sha256:835edcce1ff8b57d1a6139e1e6721422e1a903493b4df11a7f63aecd6d636a1f"
-blocks: [MAC-p9z1, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-vx24, MAC-ou97]
+content_hash: "sha256:94812f6458da5bde3728969410a2ba952679402d348214b46ccb5e3d67734dee"
 was_blocked_by: [MAC-qlw2]
 follows: [MAC-qlw2]
 assignee: dev-MAC-6h0s
+closed_at: 2026-09-07T01:42:39Z
+close_reason: "Accepted: executable assurance declaration validation complete; merged to local epic"
 ---
 
 ## Description
@@ -106,10 +107,18 @@ status: new
 - 2026-09-07T00:29:10Z dep_removed: was_blocked_by MAC-qlw2
 - 2026-09-07T00:29:38Z status: open -> in_progress
 - 2026-09-07T00:29:38Z auto-follows: linked to predecessor MAC-qlw2
+- 2026-09-07T01:42:40Z status: in_progress -> closed
+- 2026-09-07T01:42:40Z dep_removed: no_longer_blocks MAC-p9z1
+- 2026-09-07T01:42:40Z dep_removed: no_longer_blocks MAC-bz1y
+- 2026-09-07T01:42:40Z dep_removed: no_longer_blocks MAC-wi2u
+- 2026-09-07T01:42:40Z dep_removed: no_longer_blocks MAC-avfp
+- 2026-09-07T01:42:40Z dep_removed: no_longer_blocks MAC-imtz
+- 2026-09-07T01:42:40Z dep_removed: no_longer_blocks MAC-8yai
+- 2026-09-07T01:42:40Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T01:42:40Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-p9z1]], [[MAC-bz1y]], [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-qlw2]]
 - Follows: [[MAC-qlw2]]
 

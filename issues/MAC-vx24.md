@@ -9,10 +9,10 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
 updated_at: 2026-09-06T12:05:48Z
-content_hash: "sha256:44cd84bda68308dd8e1f69a60aa9d4b09e8d75cfba45f2dbe4d3a76428a70b44"
-blocked_by: [MAC-2n83, MAC-hpqp, MAC-6h0s, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
+content_hash: "sha256:2ea9d56c49728ddd69f8714fd372f9be9bbcf1e8583b4ca4488d8cc5c5796dde"
+blocked_by: [MAC-2n83, MAC-hpqp, MAC-p9z1, MAC-62s6, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
 blocks: [MAC-gcrr, MAC-ou97]
-was_blocked_by: [MAC-olrx, MAC-p7jd, MAC-l7m0, MAC-p9wm, MAC-sh60, MAC-lnu6, MAC-wi5z, MAC-qlw2, MAC-cn7q]
+was_blocked_by: [MAC-olrx, MAC-p7jd, MAC-l7m0, MAC-p9wm, MAC-sh60, MAC-lnu6, MAC-wi5z, MAC-qlw2, MAC-cn7q, MAC-6h0s]
 ---
 
 ## Description
@@ -162,12 +162,13 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-06T23:26:04Z dep_removed: was_blocked_by MAC-wi5z
 - 2026-09-07T00:29:10Z dep_removed: was_blocked_by MAC-qlw2
 - 2026-09-07T01:42:39Z dep_removed: was_blocked_by MAC-cn7q
+- 2026-09-07T01:42:40Z dep_removed: was_blocked_by MAC-6h0s
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
-- Blocked by: [[MAC-2n83]], [[MAC-hpqp]], [[MAC-6h0s]], [[MAC-p9z1]], [[MAC-62s6]], [[MAC-bz1y]], [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-pe9v]], [[MAC-sd7g]], [[MAC-sqpt]], [[MAC-wbxq]], [[MAC-rau8]], [[MAC-u4oo]], [[MAC-5ft8]], [[MAC-al5u]], [[MAC-1u2v]]
-- Was blocked by: [[MAC-olrx]], [[MAC-p7jd]], [[MAC-l7m0]], [[MAC-p9wm]], [[MAC-sh60]], [[MAC-lnu6]], [[MAC-wi5z]], [[MAC-qlw2]], [[MAC-cn7q]]
+- Blocked by: [[MAC-2n83]], [[MAC-hpqp]], [[MAC-p9z1]], [[MAC-62s6]], [[MAC-bz1y]], [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-pe9v]], [[MAC-sd7g]], [[MAC-sqpt]], [[MAC-wbxq]], [[MAC-rau8]], [[MAC-u4oo]], [[MAC-5ft8]], [[MAC-al5u]], [[MAC-1u2v]]
+- Was blocked by: [[MAC-olrx]], [[MAC-p7jd]], [[MAC-l7m0]], [[MAC-p9wm]], [[MAC-sh60]], [[MAC-lnu6]], [[MAC-wi5z]], [[MAC-qlw2]], [[MAC-cn7q]], [[MAC-6h0s]]
 
 ## Comments
 
