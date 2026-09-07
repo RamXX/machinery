@@ -81,8 +81,11 @@ It performs the following contract in order:
 5. Atomically replace the binary, then invoke the new binary's `install --from <staged-source>` for
    every recorded home group and native target. This lets a new release own its installation format
    instead of asking the old updater to understand future wrappers.
-6. Ask detected Claude Code and Codex CLIs to refresh their machinery plugins. Plugin cache files
-   are never edited directly.
+6. After the direct transaction commits, ask detected Claude Code and Codex CLIs to refresh their
+   machinery plugins. Plugin cache files are never edited directly, and host plugin stores are
+   never rolled back by machinery. A detected plugin that cannot be inspected or refreshed is a
+   returned failure whose error names the exact retry, and the unmet obligation is recorded so the
+   next update retries it.
 
 The command intentionally performs the work even when the requested tag equals the installed
 version. Explicit selectors restrict only the harness refresh while the binary still updates:
@@ -99,12 +102,21 @@ contain both custom portable homes and native host adapters. Native target place
 is authoritative when an explicit custom home overlaps a standard host path.
 
 All downloads and the direct-install plan are staged before binary replacement. The binary, direct
-harness artifacts, install targets, and receipt form one serialized transaction. If validation or a
-direct harness refresh fails, update restores the complete previous local generation and returns a
-non-zero error naming the failed operation. A detected host plugin that cannot be inspected or
-refreshed also makes the command fail; external host commands may have their own side effects, so
-the error names the exact retry. Use `--skip-plugins` only as an explicit opt-out from host plugin
-management.
+harness artifacts, native targets, and the receipt form one serialized, journaled transaction. If
+validation, a direct harness refresh, or the final receipt publication fails before the direct
+commit, update restores every root it owns to its complete pre-run state — including restoring a
+previously absent artifact to absence — and returns a non-zero error naming the failed operation.
+Concurrent foreign changes to a tracked path are refused rather than overwritten, and a killed run
+leaves a recoverable journal that interrupted journal recovery finishes at the next lock
+acquisition, with the diagnosis retained. Delegated placement children publish no intermediate
+receipts: the update parent inventories and validates the complete receipt itself, after every
+selected placement has succeeded and before the direct commit. `--skip-plugins` is an explicit
+opt-out of host plugin management only; receipt loading, validation, and plugin-ownership
+discovery still run, and their failures still abort before any change. An interrupted *design*
+publication (machinery writing generated design artifacts) is a separate journal with its own
+command: `machinery recover <design-dir>` reports it read-only — expected outputs and their
+content/mode status, journal and residue locations, live-writer status, and the safe recovery
+decision — and `--apply` completes a recovery only after full revalidation.
 
 Successful `machinery install` calls maintain the receipt, and successful `machinery uninstall`
 calls remove the corresponding entries. Single-target removal keeps the shared Agent Skills copy;
@@ -119,9 +131,29 @@ binary from the same release source, and all of it sits in one journaled transac
 at any step restores every root to the previous generation. The only observable gap is the
 refresh itself, during which a running host can see the new binary beside the previous release's
 skill and role docs; nothing from that window survives a completed update, and `machinery doctor`
-confirms a single version everywhere afterwards. Re-running the bootstrap installer over an
-existing install updates the binary and the default home group only; it plans from the default
-homes, not from the receipt, so recorded native targets are refreshed by `machinery update`.
+confirms a single version everywhere afterwards.
+
+### Bootstrap reruns converge with update
+
+The one-line installer delegates the whole binary + harness + receipt mutation to the same locked,
+crash-recoverable update transaction (`update --version <tag> --bootstrap-defaults`). On a valid
+supported receipt, `--bootstrap-defaults` uses the complete recorded home, native-target, and
+host-plugin plan plus standard-path discovery — the identical plan an ordinary `machinery update`
+without selectors uses — preserving each recorded group's copy/symlink mode. With no receipt, a
+first bootstrap installs the plugin-aware default homes (defaults skip any home the Claude Code
+plugin serves). Explicit homes or targets cannot be combined with `--bootstrap-defaults`; the
+installer then passes them as ordinary update selectors that restrict the refresh to those
+placements.
+
+A corrupt, unsupported, or unsafe receipt — malformed or trailing JSON, an unknown schema,
+unsafe permissions or file types, artifact or parent path/type substitutions, or uncertain
+plugin ownership — makes the run fail closed with a diagnostic naming the problem, with no
+silent fallback to the defaults; receipt and ownership inspection still run under `--skip-plugins`.
+An older supported schema is not rejected merely for being older. A valid receipt plus safely
+edited or missing owned regular content (unchanged safe parents and topology) is repaired to exact
+current-release content, and unrelated files are preserved — but absence alone is not treated as
+unsafe ownership, and repair never re-creates a missing root from nothing or proceeds through
+changed unsafe parents.
 
 The host-owned plugin cache updates on its own schedule and can therefore drift from the binary
 in either direction. That skew is detected, not tolerated:
@@ -180,6 +212,11 @@ runs the stop check on `session.idle`, but OpenCode's event API does not provide
 therefore surfaced in a warning toast and the application log, then its touched-file ledger is
 cleared so later idle events do not repeat stale results. This is an ergonomics difference, not a
 correctness exception: `machinery check` in CI remains authoritative for every host.
+
+Every governance subprocess the plugin spawns is bounded — a deadline plus a capped output capture
+terminates the child on breach — and every hook response is validated against the documented
+protocols before it is honored: unrecognized, truncated, or combined-protocol responses block
+rather than best-effort parse.
 
 OpenCode also lacks an equivalent guaranteed SessionStart context-injection hook. The native Agent
 Skills discovery and the installed `/design` command load the portability contract instead; after

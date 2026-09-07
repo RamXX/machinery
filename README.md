@@ -436,6 +436,21 @@ capacity, and observability beyond what the Phase 2 NFR record captures. The met
 to name every one of these residuals in the design artifacts rather than let a green check imply
 they are covered.
 
+Inside what is checked, four claims stay separate and must not be conflated: artifact consistency
+(a committed artifact is byte-fresh against the current design), proof execution (a solver actually
+ran and reproduced what the committed evidence says, in `verify-formal`/`verify-checkers`), test
+execution (your suite actually ran and passed — the `Gt` oracle-coverage gate credits static
+discovery of test references only, and tests were not executed by any machinery gate; its own
+label reads "static discovery; tests not executed"), and
+current review (`Gv` attestations carry an explicit kind — `plan`, `current`, or `historical` — so
+a design-time review is never silently read as a current implementation review). The known runtime
+exclusions above stay named, owned test obligations — replay, races between concurrent machine
+instances, message duplication and reordering, migration, restore, and load — until the standalone
+test-assurance contract's enforcement lanes land; naming an obligation in guidance enforces nothing
+by itself. When machinery itself writes design artifacts, an interrupted publication blocks readers
+fail-closed and `machinery recover <design-dir>` reports it read-only, with `--apply` completing
+only a fully revalidated publication.
+
 ## Install
 
 ### Prerequisites
@@ -604,10 +619,18 @@ machinery update --skip-plugins          # leave host-managed plugin caches alon
 ```
 
 Claude Code and Codex own their plugin caches. When those plugins are detected, update asks the
-host CLI to refresh them; it never edits cache directories directly. A missing host CLI or a
-managed-scope refusal is reported as a warning while direct skills and adapters still update. Open
-a new Codex task or run Claude Code's `/reload-plugins` after a plugin refresh. Full failure and
-recovery behavior is in the [agent portability guide](docs/agent-portability.md#updating-a-release).
+host CLI to refresh them; it never edits cache directories directly, and it cannot roll a host
+plugin cache back. Host plugin refresh runs after the binary and every direct placement have
+committed, so a missing host CLI, a failed or misunderstood plugin inventory, a managed-scope
+refusal, or a failed refresh is a returned failure, not a warning over a successful update: the
+direct update stays committed, the error names the exact retry (`claude plugin update
+machinery@machinery` or `codex plugin add machinery@machinery`), and the unmet obligation is
+recorded so the next update retries it. That post-commit plugin failure is distinct from plugin
+discovery, which runs earlier while planning: an unsafe or uncertain plugin-ownership discovery
+error fails the whole update before anything changes. Pass `--skip-plugins` to opt out of host
+plugin management entirely; receipt and ownership inspection still run. Open a new Codex task or
+run Claude Code's `/reload-plugins` after a plugin refresh. Full failure and recovery behavior is
+in the [agent portability guide](docs/agent-portability.md#updating-a-release).
 
 #### What an update looks like on an existing install
 
@@ -617,9 +640,12 @@ from the same release, inside one transaction: if any step fails, every root is 
 previous release and the command exits non-zero naming the failed step. Between the binary swap
 and the end of the refresh, a running agent host can briefly see the new binary next to the
 previous release's skill and role docs; that window lasts as long as the refresh itself, and
-nothing in it is left behind. Re-running the one-line installer over an existing install updates
-the binary and the default home group; recorded native targets (`--target`) are refreshed by
-`machinery update`, which reads the receipt.
+nothing in it is left behind. Re-running the one-line installer over an existing install converges
+with `machinery update`: when a valid receipt exists, the bootstrap uses the complete recorded
+home, native-target, and host-plugin plan — exactly what an ordinary `machinery update` without
+selectors uses — preserving each recorded group's copy/symlink mode. A first bootstrap with no
+receipt installs the plugin-aware default homes; explicit `MACHINERY_HOMES`/`MACHINERY_TARGETS`
+do not extend that bootstrap plan, they replace it with ordinary update selectors.
 
 Keep the binary and the Claude Code plugin on the same version. The plugin
 cache is host-owned and updates separately (`/plugin`), so it is possible to
@@ -745,7 +771,7 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
 - `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `alloy`, `refine`,
   `compose`, `check`, `attest`, `project`, `verify-checkers`, `baseline`, `verify-formal`, `verify-c4`,
   `pack`, `scale`, `sweep`, `embed`, `tokens-equal`, `doctor`, `preflight`, `install`, `update`,
-  `uninstall`, `completion`, and `version`.
+  `uninstall`, `recover`, `completion`, and `version`.
 - `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
   `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the full gate suite,
   see the table below), `pack/` (recursive decomposition via contract packs), `formal/` (TLC + Alloy
@@ -872,6 +898,12 @@ CI runs `go test -race ./...`. Beyond unit tests, three stronger nets are always
   OS/architecture; and runs the pii-flow adapter offline with the same `--platform` and
   `--pull=never` through the committed checker registry. These jobs are
   the engine halves; `machinery check` remains hermetic and dependency-free.
+- **Required integration lane**: `go run ./scripts/integration-lane --lane required` executes every
+  infrastructure-dependent suite — Docker-backed checker lifecycle, publication recovery, native
+  custody, adapter governance, and the documented checker registry/bind-path example — with exact
+  test inventories, pinned runtimes, real process/teardown accounting, and no skips: missing
+  infrastructure fails the lane with a diagnostic, it is never silently skipped. The same union of
+  lane fragments runs in local preflight and hosted CI.
 
 ## Built on
 
