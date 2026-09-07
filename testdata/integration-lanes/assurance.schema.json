@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://machinery.dev/schemas/integration-lane-assurance-v1.json",
+  "title": "Required native assurance conformance fragment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "fragment", "owner", "suites"],
+  "properties": {
+    "schema": {"const": "machinery.assurance.lane/v1"},
+    "fragment": {"type": "string", "pattern": "^assurance-[a-z0-9-]*$"},
+    "owner": {"type": "string", "pattern": "^[A-Z]{3}-[a-z0-9]{4}$"},
+    "suites": {
+      "type": "array", "minItems": 1,
+      "items": {"$ref": "#/$defs/suite"}
+    }
+  },
+  "$defs": {
+    "path": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*$"},
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "lane", "adapter", "kind", "package", "source_files", "tests", "runtimes", "timeout", "stdout_limit", "stderr_limit"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "lane": {"const": "assurance"},
+        "adapter": {"enum": ["go-testing/v1", "node-test-typescript/v1", "python-unittest/v1", "elixir-exunit/v1"]},
+        "kind": {"enum": ["runtime-probe"]},
+        "package": {"type": "string", "minLength": 1},
+        "source_files": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/path"}},
+        "tests": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "runtimes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["go", "node", "tsc", "python", "elixir", "git"]}},
+        "timeout": {"type": "string", "pattern": "^[1-9][0-9]*(ms|s|m)$"},
+        "stdout_limit": {"type": "integer", "minimum": 1, "maximum": 67108864},
+        "stderr_limit": {"type": "integer", "minimum": 1, "maximum": 67108864}
+      }
+    }
+  }
+}

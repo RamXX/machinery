@@ -1,0 +1,67 @@
+{
+  "schema": "machinery.assurance.lane/v1",
+  "fragment": "assurance-probes",
+  "owner": "MAC-bz1y",
+  "suites": [
+    {
+      "id": "assurance-probe-go",
+      "lane": "assurance",
+      "adapter": "go-testing/v1",
+      "kind": "runtime-probe",
+      "package": "./probe",
+      "source_files": ["testdata/integration-lanes/assurance-probes/go/assurance_probe_test.go"],
+      "tests": ["TestAssuranceRuntimeProbe"],
+      "runtimes": ["go"],
+      "timeout": "10m",
+      "stdout_limit": 1048576,
+      "stderr_limit": 1048576
+    },
+    {
+      "id": "assurance-probe-node",
+      "lane": "assurance",
+      "adapter": "node-test-typescript/v1",
+      "kind": "runtime-probe",
+      "package": ".",
+      "source_files": [
+        "testdata/integration-lanes/assurance-probes/node/package.json",
+        "testdata/integration-lanes/assurance-probes/node/node-builtins.d.ts",
+        "testdata/integration-lanes/assurance-probes/node/test.assurance-probe.ts"
+      ],
+      "tests": ["assurance runtime probe executes a native TypeScript closure"],
+      "runtimes": ["node", "tsc"],
+      "timeout": "10m",
+      "stdout_limit": 1048576,
+      "stderr_limit": 1048576
+    },
+    {
+      "id": "assurance-probe-python",
+      "lane": "assurance",
+      "adapter": "python-unittest/v1",
+      "kind": "runtime-probe",
+      "package": ".",
+      "source_files": ["testdata/integration-lanes/assurance-probes/python/probe_test.py"],
+      "tests": ["probe_test.AssuranceRuntimeProbe.test_assurance_runtime_probe"],
+      "runtimes": ["python"],
+      "timeout": "10m",
+      "stdout_limit": 1048576,
+      "stderr_limit": 1048576
+    },
+    {
+      "id": "assurance-probe-elixir",
+      "lane": "assurance",
+      "adapter": "elixir-exunit/v1",
+      "kind": "runtime-probe",
+      "package": ".",
+      "source_files": [
+        "testdata/integration-lanes/assurance-probes/elixir/mix.exs",
+        "testdata/integration-lanes/assurance-probes/elixir/test/test_helper.exs",
+        "testdata/integration-lanes/assurance-probes/elixir/test/probe_test.exs"
+      ],
+      "tests": ["assurance runtime probe executes a native ExUnit closure"],
+      "runtimes": ["elixir"],
+      "timeout": "10m",
+      "stdout_limit": 1048576,
+      "stderr_limit": 1048576
+    }
+  ]
+}
