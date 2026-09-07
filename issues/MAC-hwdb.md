@@ -8,8 +8,8 @@ labels: [hard-tdd, delivered]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-07T08:19:14Z
-content_hash: "sha256:49a05bf661ef95e12096ff00661b084bdaa67d7dcd59a7d79fe2c0cb5740119a"
+updated_at: 2026-09-07T08:19:15Z
+content_hash: "sha256:d5b9d806fe568e14a77660198c21a53a1ab0b763dde6ea2ae713948e7df71744"
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp, MAC-yhg5]
@@ -95,6 +95,17 @@ CONSUMES:
   endpoint: go run ./scripts/integration-lane --lane required (Makefile test-integration invokes same entrypoint).
 Additional acceptance criteria: fragment matches actual test sources both directions; all registered cases actually start/terminate with expected positive/negative outcomes; no cached/skipped/empty/partial/fabricated-summary success; real provisioned positive and missing-runtime/fresh-cache failure diagnostics; no owned container/process leaks. Required local preflight and hosted CI execute the same union. Do not edit shared root inventory; own only this fragment. RED source, fixture, fragment and runner configuration are frozen together after review. Any exact test names introduced in RED must remain registered through GREEN.
 No heavy preflight until final gate; no GitHub mutation; no active installation replacement. This note supersedes any earlier command implying service-backed tests execute in unprovisioned ordinary package suites.
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-07.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
+
 
 ## History
 - 2026-09-05T19:35:09Z dep_added: blocks MAC-gcrr
