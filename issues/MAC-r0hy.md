@@ -1,7 +1,7 @@
 ---
 id: MAC-r0hy
 title: "Ship windows/amd64 as a supported build target"
-status: open
+status: closed
 priority: 1
 type: task
 assignee: dev-win
@@ -9,8 +9,10 @@ parent: MAC-ui8a
 created_at: 2026-09-07T21:43:48Z
 created_by: ramirosalas
 updated_at: 2026-09-07T21:57:52Z
-content_hash: "sha256:db2c64ab5f438bac2c170c2a7bc62917e6c919eb06ddf88949a7841b0588d719"
+content_hash: "sha256:e79a600cc4863c4c1b257b6eb6103e421ad04a0a356e96ea22c1e90a1ee077e0"
 labels: [accepted]
+closed_at: 2026-09-07T21:57:52Z
+close_reason: "Accepted: windows/amd64 ships as build target with honest unsupported-custody semantics"
 ---
 
 ## Description
@@ -26,7 +28,7 @@ User requirement: release targets are exactly darwin (amd64/arm64), linux (amd64
 
 
 ## History
-
+- 2026-09-07T21:57:52Z status: open -> closed
 
 ## Links
 - Parent: [[MAC-ui8a]]
