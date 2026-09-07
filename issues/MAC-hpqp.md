@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T13:00:55Z
-content_hash: "sha256:d8fe2ab4f768a78b20cec618e9344160a63af5385e046fa308b531ad78a9b772"
+updated_at: 2026-09-07T04:45:24Z
+content_hash: "sha256:7ef1a822fe5cb235c5ed72522c66047c01dfe9a268320f0f8be9164bcc663f0b"
 blocks: [MAC-hlae, MAC-yhg5, MAC-2n83, MAC-hwdb, MAC-vx24, MAC-gcrr, MAC-ou97, MAC-hy71, MAC-bz1y]
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
@@ -995,3 +995,6 @@ status: in_progress
 - [x] All earlier failure and preservation evidence remains explicit.
 - [ ] Exact before-edit inventory/roles/authorization, new RED, implementation and Linux amd64/Darwin arm64 current replay remain pending.
 
+
+### 2026-09-07T04:45:24Z ramirosalas
+ACCEPTED 2026-09-06 — resumed 221525d + epic sync + AC8 custody resolution (46f6c85 RED / 3f4517e GREEN / ef6af49 lint) = tip ef6af49. Architecture hold resolved by coordinator decision recorded in-story: custody = processscope via processcontrol.WithScope/AttachScope (accepted qlw2+cn7q chain), no wrapper hack; contributor baseline unchanged (required Linux lane + macOS Docker Desktop); uncatchable owner death/hostile escape honestly cleanup-failed. Verification: native 17/17; tagged 6 roots/31 subleaves; Node pilot; FULL --lane required green twice (3 suites 1+5+1 tests, custody {passed, root, 11 jobs}, 5 runtimes pinned+verified); untagged separation confirmed; actionlint/vet/golangci/shellcheck clean; no owned residue; dagger-engine untouched. One [test-edit-authorized] native-test revision justified in-record. Shipped-ceiling findings (40s result-wait, 4 jobs/broker, 30s shared grace, macOS 8KB AF_UNIX) measured and designed around via accepted API only. RESIDUAL: hosted Linux CI declared not observed (no remote mutation; bundle /tmp/hpqp-linux-inputs). Coordinator merged; lane re-run green on epic (3 suites passed). Record: .git/machinery-evidence-20260906.TEFZ7D/hpqp-record.md
