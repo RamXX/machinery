@@ -88,6 +88,7 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newEmbedCmd())
 	root.AddCommand(newScaleCmd())
 	root.AddCommand(newSweepCmd())
+	root.AddCommand(newRecoverCmd())
 	root.AddCommand(newDoctorCmd())
 	root.AddCommand(newPreflightCmd())
 	root.AddCommand(newInstallCmd())

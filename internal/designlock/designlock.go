@@ -432,9 +432,9 @@ func acquire(designRoot string, reader bool) (*Lock, error) {
 				if readErr != nil {
 					return nil, errors.Join(fmt.Errorf("invalid interrupted Machinery publication sentinel: %w; no gate reads were performed", readErr), lock.Release())
 				}
-				return nil, errors.Join(fmt.Errorf("interrupted Machinery publication %q prevents a consistent design snapshot; no gate reads were performed; %s, then retry `machinery check %s`", record.Operation, record.Recovery, root), lock.Release())
+				return nil, errors.Join(fmt.Errorf("interrupted Machinery publication %q prevents a consistent design snapshot; no gate reads were performed; %s, or inspect it read-only with `machinery recover %s`, then retry `machinery check %s`", record.Operation, record.Recovery, root, root), lock.Release())
 			}
-			return nil, errors.Join(fmt.Errorf("interrupted Machinery publication journal %s prevents a consistent design snapshot; no gate reads were performed; rerun the exact writer command that was interrupted to recover, then retry `machinery check %s`", journal, root), lock.Release())
+			return nil, errors.Join(fmt.Errorf("interrupted Machinery publication journal %s prevents a consistent design snapshot; no gate reads were performed; rerun the exact writer command that was interrupted to recover, or inspect it read-only with `machinery recover %s`, then retry `machinery check %s`", journal, root, root), lock.Release())
 		}
 	}
 	snapshot, err := fingerprint(root)
@@ -449,18 +449,32 @@ func acquire(designRoot string, reader bool) (*Lock, error) {
 }
 
 func findInterruptedJournal(root string) (string, error) {
-	before, err := os.Lstat(root)
+	found, err := collectInterruptedJournalPaths(root)
 	if err != nil {
 		return "", err
 	}
+	if len(found) == 0 {
+		return "", nil
+	}
+	return found[0], nil
+}
+
+// collectInterruptedJournalPaths walks one design root through a retained
+// no-follow capability and reports every interrupted-publication journal
+// location, in deterministic sorted order. It never mutates anything.
+func collectInterruptedJournalPaths(root string) ([]string, error) {
+	before, err := os.Lstat(root)
+	if err != nil {
+		return nil, err
+	}
 	capability, err := os.OpenRoot(root)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer capability.Close()
 	inside, err := capability.Lstat(".")
 	if err != nil || !os.SameFile(before, inside) {
-		return "", fmt.Errorf("design root changed identity while inspecting interrupted publications")
+		return nil, fmt.Errorf("design root changed identity while inspecting interrupted publications")
 	}
 	budget := snapshotBudget{maxEntries: snapshotInventoryMaxEntries, maxBytes: snapshotAggregateMaxBytes, maxDepth: snapshotInventoryMaxDepth}
 	var found []string
@@ -506,13 +520,10 @@ func findInterruptedJournal(root string) (string, error) {
 		return nil
 	}
 	if err := walk(".", 0); err != nil {
-		return "", fmt.Errorf("inspect interrupted design publications: %w", err)
+		return nil, fmt.Errorf("inspect interrupted design publications: %w", err)
 	}
 	sort.Strings(found)
-	if len(found) == 0 {
-		return "", nil
-	}
-	return found[0], nil
+	return found, nil
 }
 
 func interruptedJournalRel(rel string) bool {
@@ -969,7 +980,7 @@ func (l *Lock) expectedOutputRecords(expected []OutputExpectation) ([]publishExp
 	return records, fingerprintDigest(values), nil
 }
 
-func (l *Lock) pathFromExpectedRecord(recordPath string) (string, error) {
+func expectedRecordPath(root, recordPath string) (string, error) {
 	if strings.HasPrefix(recordPath, "external:") {
 		path := strings.TrimPrefix(recordPath, "external:")
 		if !filepath.IsAbs(filepath.FromSlash(path)) {
@@ -981,11 +992,15 @@ func (l *Lock) pathFromExpectedRecord(recordPath string) (string, error) {
 	if path == "." || path == ".." || filepath.IsAbs(path) || strings.HasPrefix(path, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("publication sentinel has unsafe expected output %q", recordPath)
 	}
-	return filepath.Join(l.root, path), nil
+	return filepath.Join(root, path), nil
 }
 
 func (l *Lock) expectationFromRecord(record publishExpectedRecord) (OutputExpectation, error) {
-	path, err := l.pathFromExpectedRecord(record.Path)
+	return expectationFromRecord(l.root, record)
+}
+
+func expectationFromRecord(root string, record publishExpectedRecord) (OutputExpectation, error) {
+	path, err := expectedRecordPath(root, record.Path)
 	if err != nil {
 		return OutputExpectation{}, err
 	}
@@ -1853,6 +1868,10 @@ func fingerprintDigest(values map[string]string) string {
 type pathExclusions map[string]bool // true=subtree, false=exact entry
 
 func (l *Lock) excludedPaths(outputs []string) (pathExclusions, error) {
+	return excludedPathsFor(l.root, outputs)
+}
+
+func excludedPathsFor(root string, outputs []string) (pathExclusions, error) {
 	out := pathExclusions{publishSentinel: false}
 	for _, path := range outputs {
 		prefix := strings.HasSuffix(filepath.ToSlash(path), "/**")
@@ -1863,7 +1882,7 @@ func (l *Lock) excludedPaths(outputs []string) (pathExclusions, error) {
 		if err != nil {
 			return nil, err
 		}
-		rel, err := filepath.Rel(l.root, abs)
+		rel, err := filepath.Rel(root, abs)
 		if err != nil {
 			return nil, err
 		}
@@ -2388,4 +2407,507 @@ func With(designRoot string, fn func() error) (retErr error) {
 	}
 	defer func() { retErr = errors.Join(retErr, lock.Release()) }()
 	return fn()
+}
+
+// RecoveryAction is the safe, actionable decision for one design root after
+// read-only inspection of interrupted publication evidence.
+type RecoveryAction string
+
+const (
+	// RecoveryActionNone reports no interrupted publication evidence.
+	RecoveryActionNone RecoveryAction = "none"
+	// RecoveryActionFinalize reports a content-and-mode complete publication
+	// that a fresh process identity may safely finalize after revalidation.
+	RecoveryActionFinalize RecoveryAction = "finalize"
+	// RecoveryActionRerun reports an interruption whose only safe completion
+	// is rerunning the exact writer command that was interrupted.
+	RecoveryActionRerun RecoveryAction = "rerun-writer"
+	// RecoveryActionConflict reports tampered or ambiguous evidence that must
+	// be preserved untouched for manual review.
+	RecoveryActionConflict RecoveryAction = "conflict"
+)
+
+// RecoveryOutput is the read-only status of one declared expected output.
+type RecoveryOutput struct {
+	Path     string
+	Declared string
+	Status   string
+	Detail   string
+}
+
+// RecoveryJournal is one interrupted-publication journal found in the design.
+type RecoveryJournal struct {
+	Path   string
+	Role   string
+	Status string
+	Detail string
+}
+
+// RecoveryReport is the complete read-only inspection result for one design
+// root. Producing it never mutates, deletes, or rewrites any artifact.
+type RecoveryReport struct {
+	Root              string
+	Action            RecoveryAction
+	Writer            string
+	RecoveryCommand   string
+	InputFingerprint  string
+	InputInventory    string
+	DesignInputDigest string
+	OutputFingerprint string
+	Outputs           []RecoveryOutput
+	Journals          []RecoveryJournal
+	LiveWriter        bool
+	Finalized         bool
+	Reasons           []string
+}
+
+// InspectRecovery performs a strictly read-only inspection of one design
+// root: it identifies the interrupted publication's writer, recovery
+// instruction, expected output inventory with per-output status, every
+// journal and recovery residue location, whether a live process holds the
+// design snapshot lock, and the actionable safe recovery decision with the
+// exact reasons for every refusal. It never deletes evidence or changes
+// artifacts.
+func InspectRecovery(designRoot string) (*RecoveryReport, error) {
+	root, err := filepath.Abs(designRoot)
+	if err != nil {
+		return nil, fmt.Errorf("resolve design root: %w", err)
+	}
+	info, err := os.Lstat(root)
+	if err != nil {
+		return nil, fmt.Errorf("inspect design root: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, fmt.Errorf("design root must be a real directory, not a symlink or special entry")
+	}
+	return inspectRecoveryAt(root, true)
+}
+
+// RecoverInterrupted completes one interrupted publication from a fresh
+// process identity. It finalizes only a transaction whose exact expected
+// input and output inventories revalidate, whose journal is canonical and
+// rooted, and which no live writer owns; every other state is refused with
+// the exact conflict explained and all evidence preserved.
+func RecoverInterrupted(designRoot string) (*RecoveryReport, error) {
+	root, err := filepath.Abs(designRoot)
+	if err != nil {
+		return nil, fmt.Errorf("resolve design root: %w", err)
+	}
+	info, err := os.Lstat(root)
+	if err != nil {
+		return nil, fmt.Errorf("inspect design root: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, fmt.Errorf("design root must be a real directory, not a symlink or special entry")
+	}
+	report, err := InspectRecovery(designRoot)
+	if err != nil {
+		return report, err
+	}
+	if report.Action == RecoveryActionNone {
+		return report, nil
+	}
+	if report.Action != RecoveryActionFinalize {
+		return report, recoveryRefusalError(report)
+	}
+	lock, err := Acquire(designRoot)
+	if err != nil {
+		return report, err
+	}
+	// Revalidate under the held lock: the state may have changed since the
+	// unlocked inspection, and the completion below must operate on exactly
+	// the state that was inspected.
+	current, err := inspectRecoveryAt(lock.root, false)
+	if err != nil {
+		return report, errors.Join(err, lock.Release())
+	}
+	if current.Action == RecoveryActionNone {
+		return current, lock.Release()
+	}
+	if current.Action != RecoveryActionFinalize {
+		return current, errors.Join(recoveryRefusalError(current), lock.Release())
+	}
+	prior, err := readPublishRecord(lock.root)
+	if err != nil {
+		return current, errors.Join(err, lock.Release())
+	}
+	// Complete through the publication machinery itself: it re-derives the
+	// sentinel equality (which re-proves the recorded input inventory),
+	// revalidates every output twice through native file identities, refuses
+	// any residue, and clears the sentinel through its own hardened retire /
+	// quarantine / remove sequence.
+	completeErr := lock.publish(prior.Operation, prior.Recovery, nil, nil, true, func(*OutputScope) error { return nil })
+	if completeErr != nil {
+		return current, errors.Join(fmt.Errorf("complete interrupted publication (nothing was deleted; the journal is retained): %w", completeErr), lock.Release())
+	}
+	if _, err := os.Lstat(filepath.Join(lock.root, publishSentinel)); !errors.Is(err, fs.ErrNotExist) {
+		return current, errors.Join(fmt.Errorf("publication sentinel still present after recovery completion: %w", err), lock.Release())
+	}
+	releaseErr := lock.Release()
+	final, err := InspectRecovery(designRoot)
+	if err != nil {
+		return current, errors.Join(err, releaseErr)
+	}
+	final.Finalized = true
+	return final, releaseErr
+}
+
+func recoveryRefusalError(report *RecoveryReport) error {
+	return fmt.Errorf("refusing to complete the interrupted publication:\n  - %s\nnothing was modified; all evidence is preserved", strings.Join(report.Reasons, "\n  - "))
+}
+
+func inspectRecoveryAt(root string, probe bool) (*RecoveryReport, error) {
+	report := &RecoveryReport{Root: root, Action: RecoveryActionNone}
+	if probe {
+		held, err := filelock.Acquire(filepath.Join(root, scopeName))
+		switch {
+		case err == nil:
+			if err := held.Release(); err != nil {
+				return nil, fmt.Errorf("release design snapshot lock probe for %s: %w", root, err)
+			}
+		case filelock.IsContended(err):
+			report.LiveWriter = true
+		default:
+			return nil, fmt.Errorf("probe design snapshot lock for %s: %w", root, err)
+		}
+	}
+	journals, err := collectInterruptedJournals(root)
+	if err != nil {
+		return nil, err
+	}
+	report.Journals = journals
+	sentinel := RecoveryJournal{}
+	haveSentinel := false
+	var residue []string
+	for _, journal := range journals {
+		if journal.Path == publishSentinel {
+			sentinel, haveSentinel = journal, true
+			continue
+		}
+		residue = append(residue, journal.Path)
+	}
+	if !haveSentinel {
+		if len(residue) > 0 {
+			report.Action = RecoveryActionRerun
+			report.Reasons = append(report.Reasons, fmt.Sprintf("interrupted publication journals present (%s) without a publication sentinel; rerun the exact writer command that was interrupted", strings.Join(residue, ", ")))
+		} else {
+			report.Reasons = append(report.Reasons, "no interrupted publication found")
+		}
+		return report, nil
+	}
+	if sentinel.Status != "present" {
+		report.Action = RecoveryActionConflict
+		report.Reasons = append(report.Reasons, fmt.Sprintf("publication sentinel is invalid or not private (possibly tampered): %s", sentinel.Detail))
+		return report, nil
+	}
+	record, err := readPublishRecord(root)
+	if err != nil {
+		return nil, err
+	}
+	report.Writer = record.Operation
+	report.RecoveryCommand = record.Recovery
+	report.InputFingerprint = record.InputFingerprint
+	report.OutputFingerprint = record.OutputFingerprint
+	report.Outputs = inspectExpectedOutputs(root, record)
+	digest, digestErr := recoveryDesignInputDigest(root, record)
+	switch {
+	case digestErr != nil:
+		report.InputInventory = "unwitnessable"
+		report.Reasons = append(report.Reasons, fmt.Sprintf("current design cannot be witnessed for input comparison: %v", digestErr))
+	case digest == record.InputFingerprint:
+		report.InputInventory = "verified"
+		report.DesignInputDigest = digest
+	default:
+		report.InputInventory = "mismatch"
+		report.DesignInputDigest = digest
+		report.Reasons = append(report.Reasons, "input inventory does not match the recorded publication inputs: design inputs changed after the publication began, or the writer bound tracked external inputs that a fresh process cannot re-witness; rerun the exact writer command")
+	}
+	outputFailures := 0
+	for _, output := range report.Outputs {
+		if output.Status != "match" {
+			outputFailures++
+			report.Reasons = append(report.Reasons, output.Detail)
+		}
+	}
+	switch {
+	case report.LiveWriter:
+		report.Action = RecoveryActionRerun
+		report.Reasons = append(report.Reasons, "another process holds the design snapshot lock; let it finish or rerun the writer after it exits")
+	case len(residue) > 0:
+		report.Action = RecoveryActionRerun
+		report.Reasons = append(report.Reasons, fmt.Sprintf("publication recovery residue present (%s); rerun the exact writer command that was interrupted (its own recovery reconciles owned residue)", strings.Join(residue, ", ")))
+	case outputFailures > 0:
+		report.Action = RecoveryActionRerun
+	case report.InputInventory != "verified":
+		report.Action = RecoveryActionRerun
+	default:
+		report.Action = RecoveryActionFinalize
+	}
+	return report, nil
+}
+
+func recoveryJournalRole(rel string) string {
+	switch rel {
+	case publishSentinel:
+		return "publish-sentinel"
+	case publishSentinelStage:
+		return "publish-stage"
+	case publishSentinelRetired:
+		return "publish-sentinel-retired"
+	case publishSentinelStageRetired:
+		return "publish-stage-retired"
+	}
+	if publishQuarantineName(filepath.Base(filepath.FromSlash(rel))) {
+		return "publish-quarantine"
+	}
+	if embedScratchResidueRel(rel) {
+		return "embed-refresh-residue"
+	}
+	return "interrupted-transaction-journal"
+}
+
+func collectInterruptedJournals(root string) ([]RecoveryJournal, error) {
+	paths, err := collectInterruptedJournalPaths(root)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]RecoveryJournal, 0, len(paths))
+	for _, rel := range paths {
+		journal := RecoveryJournal{Path: rel, Role: recoveryJournalRole(rel), Status: "present"}
+		if rel == publishSentinel {
+			if _, readErr := readPublishRecord(root); readErr != nil {
+				journal.Status = "invalid"
+				journal.Detail = readErr.Error()
+			}
+		}
+		out = append(out, journal)
+	}
+	return out, nil
+}
+
+// inspectExpectedOutputs reports the read-only status of every declared
+// expected output, mirroring the publication's own validation semantics:
+// rooted no-follow inspection, native file identity before and after every
+// read, exact content digest, exact permission mode, and exact tree digest.
+func inspectExpectedOutputs(rootPath string, record publishRecord) []RecoveryOutput {
+	out := make([]RecoveryOutput, 0, len(record.Expected))
+	root, err := os.OpenRoot(rootPath)
+	if err != nil {
+		for _, item := range record.Expected {
+			out = append(out, RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "inspect-error", Detail: fmt.Sprintf("open design root: %v", err)})
+		}
+		return out
+	}
+	defer root.Close()
+	for _, item := range record.Expected {
+		expectation, err := expectationFromRecord(rootPath, item)
+		if err != nil {
+			out = append(out, RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "inspect-error", Detail: err.Error()})
+			continue
+		}
+		out = append(out, recoveryProbeOutput(root, rootPath, expectation, item))
+	}
+	return out
+}
+
+func recoveryInspectError(item publishExpectedRecord, format string, args ...any) RecoveryOutput {
+	return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "inspect-error", Detail: fmt.Sprintf(format, args...)}
+}
+
+func recoveryProbeOutput(root *os.Root, rootPath string, expectation OutputExpectation, item publishExpectedRecord) RecoveryOutput {
+	abs, err := filepath.Abs(expectation.path)
+	if err != nil {
+		return recoveryInspectError(item, "resolve output path: %v", err)
+	}
+	rel, err := filepath.Rel(rootPath, abs)
+	if err != nil {
+		return recoveryInspectError(item, "relate output path: %v", err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return recoveryProbeExternalOutput(expectation, item)
+	}
+	return recoveryProbeDesignOutput(root, rootPath, expectation, item, rel)
+}
+
+func recoveryProbeDesignOutput(root *os.Root, rootPath string, expectation OutputExpectation, item publishExpectedRecord, rel string) RecoveryOutput {
+	display := filepath.ToSlash(rel)
+	info, err := root.Lstat(rel)
+	if expectation.tree != nil || expectation.treeDigest != "" {
+		if errors.Is(err, fs.ErrNotExist) {
+			return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "missing", Detail: fmt.Sprintf("output tree %s is missing", display)}
+		}
+		if err != nil {
+			return recoveryInspectError(item, "inspect output tree %s: %v", display, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "tree-mismatch", Detail: fmt.Sprintf("output tree %s must be a real directory, not a symlink or file", display)}
+		}
+		got, ferr := fingerprintRoot(filepath.Join(rootPath, rel), false)
+		if ferr != nil {
+			return recoveryInspectError(item, "fingerprint output tree %s: %v", display, ferr)
+		}
+		confirmed, cerr := fingerprintRoot(filepath.Join(rootPath, rel), false)
+		if cerr != nil {
+			return recoveryInspectError(item, "fingerprint output tree %s: %v", display, cerr)
+		}
+		if changed := firstFingerprintChange(got, confirmed); changed != "" {
+			return recoveryInspectError(item, "output tree %s changed while validating at %s", display, changed)
+		}
+		want := expectation.treeDigest
+		if expectation.tree != nil {
+			want = fingerprintDigest(expectation.tree)
+		}
+		if digest := fingerprintDigest(got); digest != want {
+			return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "tree-mismatch", Detail: fmt.Sprintf("output tree %s contains unexpected, missing, or modified members (digest %s, want %s)", display, digest, want)}
+		}
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "match"}
+	}
+	if expectation.absent {
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "match"}
+		case err != nil:
+			return recoveryInspectError(item, "inspect deleted output %s: %v", display, err)
+		default:
+			return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "unexpected", Detail: fmt.Sprintf("output %s exists but was declared deleted", display)}
+		}
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "missing", Detail: fmt.Sprintf("output %s is missing", display)}
+	}
+	if err != nil {
+		return recoveryInspectError(item, "inspect output %s: %v", display, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "symlink", Detail: fmt.Sprintf("output %s must be a regular non-symlink file, not a symbolic link", display)}
+	}
+	if !info.Mode().IsRegular() {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "special", Detail: fmt.Sprintf("output %s must be a regular non-symlink file, not a special entry", display)}
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != expectation.mode.Perm() {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "mode-mismatch", Detail: fmt.Sprintf("output %s has mode %04o, want %04o", display, info.Mode().Perm(), expectation.mode.Perm())}
+	}
+	file, err := root.Open(rel)
+	if err != nil {
+		return recoveryInspectError(item, "open output %s: %v", display, err)
+	}
+	opened, statErr := file.Stat()
+	if statErr != nil || !sameFingerprintFile(info, opened) {
+		_ = file.Close()
+		return recoveryInspectError(item, "output %s changed identity while opening", display)
+	}
+	digest, readErr := streamFingerprint(display, file, opened.Size())
+	openedAfter, retainedStatErr := file.Stat()
+	closeErr := file.Close()
+	if err := errors.Join(readErr, retainedStatErr, closeErr); err != nil {
+		return recoveryInspectError(item, "read output %s: %v", display, err)
+	}
+	after, statErr := root.Lstat(rel)
+	if statErr != nil || !sameFingerprintFile(info, openedAfter) || !sameFingerprintFile(info, after) {
+		return recoveryInspectError(item, "output %s changed identity while reading", display)
+	}
+	if got := fmt.Sprintf("sha256:%x", digest); got != expectation.digest {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "content-mismatch", Detail: fmt.Sprintf("output %s has digest %s, want %s", display, got, expectation.digest)}
+	}
+	return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "match"}
+}
+
+// recoveryProbeExternalOutput applies the same read-only identity discipline
+// to outputs recorded outside the design root. The hardened apply path
+// independently revalidates external outputs through retained parent
+// capabilities, so a report is never sufficient for mutation.
+func recoveryProbeExternalOutput(expectation OutputExpectation, item publishExpectedRecord) RecoveryOutput {
+	abs := expectation.path
+	info, err := os.Lstat(abs)
+	if errors.Is(err, fs.ErrNotExist) {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "missing", Detail: fmt.Sprintf("external output %s is missing", abs)}
+	}
+	if err != nil {
+		return recoveryInspectError(item, "inspect external output %s: %v", abs, err)
+	}
+	for walk := abs; ; {
+		parent := filepath.Dir(walk)
+		if parent == walk {
+			break
+		}
+		parentInfo, parentErr := os.Lstat(parent)
+		if parentErr != nil {
+			return recoveryInspectError(item, "inspect external output ancestor %s: %v", parent, parentErr)
+		}
+		if parentInfo.Mode()&os.ModeSymlink != 0 || !parentInfo.IsDir() {
+			return recoveryInspectError(item, "external output ancestor %s must be a real directory, not a symlink or file", parent)
+		}
+		walk = parent
+	}
+	if expectation.absent {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "unexpected", Detail: fmt.Sprintf("external output %s exists but was declared deleted", abs)}
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "symlink", Detail: fmt.Sprintf("external output %s must be a regular non-symlink file, not a symbolic link", abs)}
+	}
+	if !info.Mode().IsRegular() {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "special", Detail: fmt.Sprintf("external output %s must be a regular non-symlink file, not a special entry", abs)}
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != expectation.mode.Perm() {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "mode-mismatch", Detail: fmt.Sprintf("external output %s has mode %04o, want %04o", abs, info.Mode().Perm(), expectation.mode.Perm())}
+	}
+	file, err := os.Open(abs)
+	if err != nil {
+		return recoveryInspectError(item, "open external output %s: %v", abs, err)
+	}
+	opened, statErr := file.Stat()
+	if statErr != nil || !sameFingerprintFile(info, opened) {
+		_ = file.Close()
+		return recoveryInspectError(item, "external output %s changed identity while opening", abs)
+	}
+	digest, readErr := streamFingerprint(abs, file, opened.Size())
+	openedAfter, retainedStatErr := file.Stat()
+	closeErr := file.Close()
+	if err := errors.Join(readErr, retainedStatErr, closeErr); err != nil {
+		return recoveryInspectError(item, "read external output %s: %v", abs, err)
+	}
+	after, statErr := os.Lstat(abs)
+	if statErr != nil || !sameFingerprintFile(info, openedAfter) || !sameFingerprintFile(info, after) {
+		return recoveryInspectError(item, "external output %s changed identity while reading", abs)
+	}
+	if got := fmt.Sprintf("sha256:%x", digest); got != expectation.digest {
+		return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "content-mismatch", Detail: fmt.Sprintf("external output %s has digest %s, want %s", abs, got, expectation.digest)}
+	}
+	return RecoveryOutput{Path: item.Path, Declared: item.Value, Status: "match"}
+}
+
+// recoveryDesignInputDigest recomputes the design-root portion of the
+// publication's recorded input fingerprint: the full snapshot filtered by
+// the exact declared output exclusions and recovery directories. It matches
+// the recorded value only when the writer tracked no external inputs and no
+// design input changed since the publication began.
+func recoveryDesignInputDigest(rootPath string, record publishRecord) (string, error) {
+	outputs := make([]string, 0, len(record.Outputs))
+	for _, identity := range record.Outputs {
+		if external := strings.TrimPrefix(identity, "external:"); external != identity {
+			outputs = append(outputs, filepath.FromSlash(external))
+			continue
+		}
+		subtree := strings.HasSuffix(identity, "/")
+		clean := strings.TrimSuffix(identity, "/")
+		abs := filepath.Join(rootPath, filepath.FromSlash(clean))
+		if subtree {
+			abs += "/**"
+		}
+		outputs = append(outputs, abs)
+	}
+	excluded, err := excludedPathsFor(rootPath, outputs)
+	if err != nil {
+		return "", err
+	}
+	snapshot, err := fingerprint(rootPath)
+	if err != nil {
+		return "", err
+	}
+	filtered := filterFingerprint(snapshot, excluded, recoveryOutputDirs(record.Outputs))
+	values := make(map[string]string, len(filtered))
+	for key, value := range filtered {
+		values["design:"+key] = value
+	}
+	return fingerprintDigest(values), nil
 }
