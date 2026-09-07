@@ -8,8 +8,8 @@ assignee: dev-MAC-o82q
 parent: MAC-ui8a
 created_at: 2026-09-07T04:45:24Z
 created_by: ramirosalas
-updated_at: 2026-09-07T21:01:14Z
-content_hash: "sha256:b195ab077578c4235a7a1f595e31b708390fc2e74c89ff05eb3507844efc9263"
+updated_at: 2026-09-07T21:57:40Z
+content_hash: "sha256:bd25d22f94d3cf7e8e79af0e76b54be9f10812e9a6b75712529759ee55675610"
 follows: [MAC-8yai]
 ---
 
@@ -34,3 +34,6 @@ Genuine platform finding from the first native Linux run of the formal/runtimecl
 - Follows: [[MAC-8yai]]
 
 ## Comments
+
+### 2026-09-07T21:57:40Z ramirosalas
+ACCEPTED 2026-09-07 — RED efb8142 (deterministic coarse-tick blindness proof via test-anchored 1-hour-bucket coarsener seam) -> GREEN ce0fe0b. Hybrid witness: ALL existing stat conjuncts kept + kernel mutation-event sentinel (inotify Linux / kqueue darwin-bsd; options 1-3 evaluated inapplicable at these sites — documented). Linux confirmation on the original failing host: TestFormalDirectoryInventoryRejectsSameDirectoryABA PASS 3/3 isolated + in-suite; TestOpenJavaLauncherRejectsSameInodeMetadataABA PASS 3/3 + in-suite; 4 coarse-clock tests pass; build/vet clean; JDK provisioned pin-verified. Frozen ABA tests NOT amended (zero existing test lines touched). +596/-2, 11 files. FOLLOW-UP FILED: journal recovery path still ctime-only (new bug, release-relevant flake). REMOTE-HOST-ONLY GAP (not CI): runtimeclosure adapters suites need Elixir/Node/Python on PATH — hosted CI provisions them per bz1y wiring. Coordinator merged. Record: .git/machinery-evidence-20260906.TEFZ7D/o82q-linux-report.md
