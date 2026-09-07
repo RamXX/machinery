@@ -1,7 +1,7 @@
 ---
 id: MAC-bz1y
 title: "Require four-language native assurance conformance lanes"
-status: in_progress
+status: closed
 priority: 0
 type: feature
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
 updated_at: 2026-09-07T10:08:34Z
-content_hash: "sha256:eca80287cfb9af479adeabea104e2fa9ebb8cd684fcc7806bcb7589d6c7ff8b8"
-blocks: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-pe9v, MAC-al5u, MAC-vx24, MAC-ou97]
+content_hash: "sha256:145afea0e924b26e8bdf4907d817576932e29877aa8cbaa7c5c45268826bb4e6"
 was_blocked_by: [MAC-6h0s, MAC-hpqp, MAC-hy71]
 follows: [MAC-6h0s, MAC-hpqp, MAC-hy71]
 assignee: dev-MAC-bz1y
+closed_at: 2026-09-07T10:08:34Z
+close_reason: "Accepted: four-language native assurance conformance lanes enforced; merged to local epic"
 ---
 
 ## Description
@@ -110,10 +111,18 @@ status: new
 - 2026-09-07T09:15:42Z auto-follows: linked to predecessor MAC-6h0s
 - 2026-09-07T09:15:42Z auto-follows: linked to predecessor MAC-hpqp
 - 2026-09-07T09:15:42Z auto-follows: linked to predecessor MAC-hy71
+- 2026-09-07T10:08:34Z status: in_progress -> closed
+- 2026-09-07T10:08:34Z dep_removed: no_longer_blocks MAC-wi2u
+- 2026-09-07T10:08:34Z dep_removed: no_longer_blocks MAC-avfp
+- 2026-09-07T10:08:34Z dep_removed: no_longer_blocks MAC-imtz
+- 2026-09-07T10:08:34Z dep_removed: no_longer_blocks MAC-8yai
+- 2026-09-07T10:08:34Z dep_removed: no_longer_blocks MAC-pe9v
+- 2026-09-07T10:08:34Z dep_removed: no_longer_blocks MAC-al5u
+- 2026-09-07T10:08:34Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T10:08:34Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-pe9v]], [[MAC-al5u]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-6h0s]], [[MAC-hpqp]], [[MAC-hy71]]
 - Follows: [[MAC-6h0s]], [[MAC-hpqp]], [[MAC-hy71]]
 
