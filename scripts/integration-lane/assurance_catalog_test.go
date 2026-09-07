@@ -282,7 +282,15 @@ func TestAssuranceCatalogExecutesFourLanguageProbesNatively(t *testing.T) {
 			t.Fatalf("adapter %s not accounted exactly: %+v", adapter.ID, adapter)
 		}
 	}
-	if len(report.Suites) != 1 || len(report.Assurance.Suites) != 4 {
+	// MAC-wi2u RED supersession (justified, approved with this RED): the
+	// exact count 4 pinned the probe-only catalog state. The closed catalog
+	// contract (assurance.CONTRACT.md) declares the downstream adapter
+	// stories (MAC-wi2u Go, MAC-avfp TypeScript, MAC-imtz Python, MAC-8yai
+	// Elixir) each add a NEW named native-conformance fragment, so the union
+	// count is >= 4 with all four frozen probe suites still present and
+	// exactly accounted below. The four probe receipts and the per-adapter
+	// probe accounting stay byte-exact.
+	if len(report.Suites) != 1 || len(report.Assurance.Suites) < 4 {
 		t.Fatalf("merged union must keep the v1 suite and add four assurance suites: %+v", report)
 	}
 	receipts := map[string]suiteReceipt{}
