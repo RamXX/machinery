@@ -1,7 +1,7 @@
 ---
 id: MAC-yhg5
 title: "Own checker container lifetime deterministically"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-07T07:22:44Z
-content_hash: "sha256:6f470326a780f6ff7b7a80b4a32ffa3190d5fa18628fd98e5f2d552d417ee935"
-blocks: [MAC-gcrr, MAC-ou97]
+content_hash: "sha256:e6ff7ccbc87c3eae5c1ef7ecf059a8aa4e20d64facaf8b3ee1c40b74f5127632"
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp]
 assignee: dev-MAC-yhg5
+closed_at: 2026-09-07T07:22:44Z
+close_reason: "Accepted: checker container lifetime owned deterministically; merged to local epic"
 ---
 
 ## Description
@@ -103,10 +104,12 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
 - 2026-09-07T04:45:47Z status: open -> in_progress
 - 2026-09-07T04:45:47Z auto-follows: linked to predecessor MAC-hpqp
+- 2026-09-07T07:22:44Z status: in_progress -> closed
+- 2026-09-07T07:22:44Z dep_removed: no_longer_blocks MAC-gcrr
+- 2026-09-07T07:22:44Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 - Was blocked by: [[MAC-hpqp]]
 - Follows: [[MAC-hpqp]]
 
