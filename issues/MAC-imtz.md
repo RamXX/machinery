@@ -1,7 +1,7 @@
 ---
 id: MAC-imtz
 title: "Prove Python assertions through native unittest"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:01:52Z
 created_by: ramirosalas
 updated_at: 2026-09-07T21:01:12Z
-content_hash: "sha256:f2b162d7594e21560893cd0fa964ae0b34225c4c81cb2d0354191e9a63ec6fb9"
-blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
+content_hash: "sha256:87e4aaddbbddd4c253f312cbc97c819a6cf58dc4b4977bcddcd2a27c770350b1"
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
 follows: [MAC-6h0s, MAC-bz1y]
 assignee: dev-MAC-imtz
+closed_at: 2026-09-07T21:01:12Z
+close_reason: "Accepted: Python assertions proven through native unittest; merged to local epic"
 ---
 
 ## Description
@@ -106,10 +107,13 @@ status: new
 - 2026-09-07T18:47:02Z status: open -> in_progress
 - 2026-09-07T18:47:02Z auto-follows: linked to predecessor MAC-6h0s
 - 2026-09-07T18:47:02Z auto-follows: linked to predecessor MAC-bz1y
+- 2026-09-07T21:01:12Z status: in_progress -> closed
+- 2026-09-07T21:01:12Z dep_removed: no_longer_blocks MAC-sd7g
+- 2026-09-07T21:01:12Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T21:01:12Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-sd7g]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-6h0s]], [[MAC-bz1y]]
 - Follows: [[MAC-6h0s]], [[MAC-bz1y]]
 
