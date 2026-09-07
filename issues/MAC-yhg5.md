@@ -1,17 +1,19 @@
 ---
 id: MAC-yhg5
 title: "Own checker container lifetime deterministically"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:46:06Z
-content_hash: "sha256:d71e62df017b801eb27409b981c6459d9e610ff9f9024c2b7000e97ec8013d1f"
+updated_at: 2026-09-07T04:45:47Z
+content_hash: "sha256:8f7ee01f9796b49d403e78af4e8833c3baaf502eb42baf7c933d73e577921ee7"
 blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-hpqp]
+follows: [MAC-hpqp]
+assignee: dev-MAC-yhg5
 ---
 
 ## Description
@@ -99,11 +101,14 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-05T19:36:15Z dep_added: blocks MAC-ou97
 - 2026-09-05T19:45:31Z dep_added: blocked_by MAC-hpqp
 - 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
+- 2026-09-07T04:45:47Z status: open -> in_progress
+- 2026-09-07T04:45:47Z auto-follows: linked to predecessor MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 - Was blocked by: [[MAC-hpqp]]
+- Follows: [[MAC-hpqp]]
 
 ## Comments
 

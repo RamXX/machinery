@@ -9,13 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:44:27Z
 created_by: ramirosalas
 updated_at: 2026-09-07T04:45:25Z
-content_hash: "sha256:ee08b378a9797f446112c537e429dfccf6daca969f7123e802a3382e3f574e8d"
+content_hash: "sha256:1c4c3bd49375b8bc9de7cc45cbe9d1b46e97d6f770da5919023126242294f90c"
 assignee: dev-MAC-hpqp
 follows: [MAC-olrx]
 was_blocked_by: [MAC-cn7q]
 closed_at: 2026-09-07T04:45:25Z
 close_reason: "Accepted: every required infrastructure test executes deterministically under native custody; AC8 hold resolved; merged to local epic"
-led_to: [MAC-2n83]
+led_to: [MAC-2n83, MAC-yhg5]
 ---
 
 ## Description
@@ -494,7 +494,7 @@ status: new
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-cn7q]]
 - Follows: [[MAC-olrx]]
-- Led to: [[MAC-2n83]]
+- Led to: [[MAC-2n83]], [[MAC-yhg5]]
 
 ## Comments
 
