@@ -301,6 +301,7 @@ type formalJournalAuthority struct {
 	file     *os.File
 	name     string
 	snapshot formalJournalSnapshot
+	sentinel *formalJournalMutationSentinel
 }
 
 func openNamedFormalJournalAuthority(root *os.Root, name string) (*formalJournalAuthority, error) {
@@ -318,15 +319,25 @@ func openNamedFormalJournalAuthority(root *os.Root, name string) (*formalJournal
 	if err != nil {
 		return nil, err
 	}
+	// The mutation-event sentinel is established on the opened descriptor
+	// before the first observation so the whole authority window is watched,
+	// bound to the opened inode even if the path is later replaced. When the
+	// kernel provides no event channel (or setup fails), the stat-metadata
+	// witness below still applies unchanged; the sentinel only ever adds
+	// rejections.
+	sentinel, sentinelErr := newFormalJournalMutationSentinel(file)
+	if sentinelErr != nil {
+		sentinel = nil
+	}
 	snapshot, snapshotErr := snapshotOpenedFormalJournal(file, false)
 	preWitness := ""
 	if snapshotErr == nil {
 		preWitness, err = formalNativeFileWitness(file, info)
 	}
 	if snapshotErr != nil || err != nil || !sameFormalJournalMetadata(info, snapshot.info) || preWitness != snapshot.witness {
-		return nil, errors.Join(snapshotErr, err, fmt.Errorf("formal transaction journal changed while opening"), file.Close())
+		return nil, errors.Join(snapshotErr, err, fmt.Errorf("formal transaction journal changed while opening"), file.Close(), sentinel.Close())
 	}
-	authority := &formalJournalAuthority{file: file, name: name, snapshot: snapshot}
+	authority := &formalJournalAuthority{file: file, name: name, snapshot: snapshot, sentinel: sentinel}
 	if err := authority.requireLive(root, "opened formal transaction journal"); err != nil {
 		return nil, errors.Join(err, file.Close())
 	}
@@ -344,6 +355,13 @@ func (authority *formalJournalAuthority) requireHeld() error {
 	if !sameFormalJournalMetadata(authority.snapshot.info, current.info) || authority.snapshot.witness != current.witness || !bytes.Equal(authority.snapshot.body, current.body) {
 		return fmt.Errorf("formal transaction journal authority changed identity, metadata, or exact bytes")
 	}
+	// Granularity-independent conjunct: kernel mutation events observed since
+	// the authority opened (or an earlier check accepted) reject the journal
+	// even when coarse inode timestamps make the states compare equal
+	// (same-inode content ABA).
+	if authority.sentinel.Mutated() {
+		return fmt.Errorf("formal transaction journal authority changed content (mutation events observed)")
+	}
 	return nil
 }
 
@@ -358,6 +376,9 @@ func (authority *formalJournalAuthority) requireHeldAfterUnlink() error {
 	if !sameFormalJournalObjectMetadata(authority.snapshot.info, current.info) || !sameFormalNativeObject(authority.snapshot.witness, current.witness) || !bytes.Equal(authority.snapshot.body, current.body) {
 		return fmt.Errorf("formal transaction journal authority changed object identity, metadata, or exact bytes")
 	}
+	if authority.sentinel.Mutated() {
+		return fmt.Errorf("formal transaction journal authority changed retained content (mutation events observed)")
+	}
 	return nil
 }
 
@@ -371,6 +392,9 @@ func (authority *formalJournalAuthority) refreshAfterRename(root *os.Root, label
 	}
 	if !sameFormalJournalObjectMetadata(authority.snapshot.info, current.info) || !sameFormalNativeObject(authority.snapshot.witness, current.witness) || !bytes.Equal(authority.snapshot.body, current.body) {
 		return fmt.Errorf("%s changed retained journal object, metadata, or exact bytes", label)
+	}
+	if authority.sentinel.Mutated() {
+		return fmt.Errorf("%s changed retained journal content (mutation events observed)", label)
 	}
 	authority.snapshot = current
 	return authority.requireLive(root, label)
@@ -387,7 +411,7 @@ func (authority *formalJournalAuthority) close() error {
 	if authority == nil || authority.file == nil {
 		return nil
 	}
-	err := authority.file.Close()
+	err := errors.Join(authority.sentinel.Close(), authority.file.Close())
 	authority.file = nil
 	return err
 }
@@ -451,7 +475,8 @@ func formalJournalChangeID(info os.FileInfo) string {
 		}
 		sec, nsec := field.FieldByName("Sec"), field.FieldByName("Nsec")
 		if sec.IsValid() && nsec.IsValid() && sec.CanInt() && nsec.CanInt() {
-			return fmt.Sprintf("ctime:%d:%d", sec.Int(), nsec.Int())
+			coarseSec, coarseNsec := formalCoarsenWitnessTime(sec.Int(), nsec.Int())
+			return fmt.Sprintf("ctime:%d:%d", coarseSec, coarseNsec)
 		}
 	}
 	sec, nsec := value.FieldByName("Ctime"), value.FieldByName("Ctimensec")
@@ -469,6 +494,7 @@ func formalJournalChangeID(info os.FileInfo) string {
 			nsecValue, nsecOK = int64(nsec.Uint()), true
 		}
 		if secOK && nsecOK {
+			secValue, nsecValue = formalCoarsenWitnessTime(secValue, nsecValue)
 			return fmt.Sprintf("ctime:%d:%d", secValue, nsecValue)
 		}
 	}
