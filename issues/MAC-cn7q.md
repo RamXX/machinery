@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
-updated_at: 2026-09-07T00:29:38Z
-content_hash: "sha256:62d187e6d3005c8953a7a54bc87e470f43dc252677ac990f31943b6ea5668779"
+updated_at: 2026-09-07T01:42:39Z
+content_hash: "sha256:ff2fa9408bcbb172a4cd3a4e87e61a8bfdf17ea7dd9d72376c70328ef34d058e"
 blocks: [MAC-pe9v, MAC-hpqp, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-qlw2]
 follows: [MAC-qlw2]
@@ -256,3 +256,6 @@ status: new
 - [x] Eleven paths, nine ACs and the checker ownership exclusion are explicit.
 - [ ] Exact before-RED inventory, implementation and both required native-host matrices remain pending.
 
+
+### 2026-09-07T01:42:39Z ramirosalas
+ACCEPTED 2026-09-06 — 3 commits ade0522..5b22bf6 (RED tdd-red, RED repair, GREEN). WithScope/AttachScope/ExitStatus per contract s8; formal probe/TLC/Alloy + runtimeclosure Java wired post-sanitation; ServeInternal error-first interception in main.go; fails closed (no unscoped fallback). Darwin arm64: 25 new native tests, real pinned Temurin 21.0.12.1+1 JVM observed before cancellation (provisioning + real TLC 401^3 + Alloy Ramsey-36), owned descendants reaped + sentinels survive, -race green, CLI battery (forged activation exit 1; SIGINT exit 130 all reaped). 11 files 1904 LOC < 2300 budget. Original formal/runtimeclosure tests byte-exact. RESIDUAL: Linux amd64 run prepared not executed (/tmp/cn7q-linux-inputs + pinned-Java provisioning spec); broker bounds scoped commands to CleanupMS+10s — >40s engine commands fail closed (verified cleanup) — documented honest limit. Coordinator merged; all three packages + epic suites ok. Record: .git/machinery-evidence-20260906.TEFZ7D/cn7q-record.md
