@@ -1,7 +1,7 @@
 ---
 id: MAC-8yai
 title: "Prove Elixir assertions through native ExUnit"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:01:52Z
 created_by: ramirosalas
 updated_at: 2026-09-07T21:01:13Z
-content_hash: "sha256:d12fd389cc58cc09f7042666e1d8a2a147029636d9a27e8f10146c0bd3d029c8"
-blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
+content_hash: "sha256:1d6f830eb4219dd8480138a67c4b7b1dc44dbed4be75631a7e518393674f18eb"
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
 follows: [MAC-6h0s, MAC-bz1y]
 assignee: dev-MAC-8yai
+closed_at: 2026-09-07T21:01:13Z
+close_reason: "Accepted: Elixir assertions proven through native ExUnit; merged to local epic"
 ---
 
 ## Description
@@ -106,10 +107,13 @@ status: new
 - 2026-09-07T18:47:02Z status: open -> in_progress
 - 2026-09-07T18:47:02Z auto-follows: linked to predecessor MAC-6h0s
 - 2026-09-07T18:47:02Z auto-follows: linked to predecessor MAC-bz1y
+- 2026-09-07T21:01:13Z status: in_progress -> closed
+- 2026-09-07T21:01:13Z dep_removed: no_longer_blocks MAC-sd7g
+- 2026-09-07T21:01:13Z dep_removed: no_longer_blocks MAC-vx24
+- 2026-09-07T21:01:13Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-sd7g]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-6h0s]], [[MAC-bz1y]]
 - Follows: [[MAC-6h0s]], [[MAC-bz1y]]
 
