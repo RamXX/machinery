@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
-updated_at: 2026-09-07T08:25:16Z
-content_hash: "sha256:07239957ae2dab027079d70064499aa2125b1dcaf5f3b12dc052a50468420454"
+updated_at: 2026-09-07T09:15:08Z
+content_hash: "sha256:23b95da2a01a0d8f8c1e611a4a52a3db2c3f1d4819dbd6e646d77c3dc64b6b29"
 blocks: [MAC-gcrr, MAC-ou97, MAC-bz1y]
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp]
@@ -112,3 +112,6 @@ This story modifies these shared workflow files only after MAC-hpqp acceptance. 
 - Follows: [[MAC-hpqp]]
 
 ## Comments
+
+### 2026-09-07T09:15:08Z ramirosalas
+ACCEPTED 2026-09-07 — RED 05687dc (46 deny scenarios behavioral, controls green, frozen through GREEN) -> GREEN 15433e1. scripts/release-policy verifier: exact-commit ci/formal/security success incl. job-level integration-lane identity, R01-R20 all block, timeout fails closed; tag/dispatch same prerequisites, least permissions, zero workflow-expression interpolation in run steps (contract-tested), 8 artifacts manifest-bound + publish re-hash; nightly ancestry fetch-depth:0; real shallow-clone deny R04 then unshallow ALLOW demo. docs/release-policy.json ready-to-apply required-checks payload (NOT applied, no remote mutation; release gate is active enforcement). actionlint clean. Overrun 2066 lines vs ~1100 — mandated evidence, established accepted pattern; one disclosed RED-fixture correction. RESIDUALS: branch protection unapplied (user applies at release); matrix context names need read-only confirmation pre-apply. Coordinator merged; release-policy suite + lane 8 suites green on epic. Record: .git/machinery-evidence-20260906.TEFZ7D/hy71-record.md
