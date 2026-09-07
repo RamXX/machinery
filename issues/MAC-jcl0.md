@@ -8,8 +8,8 @@ assignee: dev-g4
 parent: MAC-ui8a
 created_at: 2026-09-06T23:26:40Z
 created_by: ramirosalas
-updated_at: 2026-09-06T23:26:40Z
-content_hash: "sha256:a28d0d68c5b7a0f1d39f55444b8f88637dfd2c032da1c212c19725e03986f7a3"
+updated_at: 2026-09-07T00:29:09Z
+content_hash: "sha256:e8bdb28d4bfc021dc19631bf49a20a889dedbc81a3a3a22776170d30c423ae3e"
 follows: [MAC-wi5z]
 ---
 
@@ -34,3 +34,6 @@ Pre-existing G4 finding surfaced truthfully by MAC-hgz1 goldens: internal/testor
 - Follows: [[MAC-wi5z]]
 
 ## Comments
+
+### 2026-09-07T00:29:09Z ramirosalas
+ACCEPTED 2026-09-06 — root cause: internal/testoracle is test-only code (imported exclusively by _test.go); correct remedy is the Architecture Contract ignore list alongside testsupport/arch (ARCHITECTURE.md:118), exactly what the G4 error names. Golden refreshed via sanctioned -update; exitcode 1->0; Gt accounting re-classification 137->197 literals (classifier shared by design; zero missing-id errors); three pre-existing baseline failures flipped PASS (TestAttestImplementationCLI incl. frozen C-complete-sole-current-warning, TestCheckGreenSummaryLines, TestCheckImportsCleanOnGoCRM). 2 commits, 4 files +25/-23. Six g2.* claims hash-rebound with amendment notes. Coordinator verified + merged; targeted suites ok on epic.
