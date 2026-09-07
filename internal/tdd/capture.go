@@ -162,9 +162,9 @@ type captureEngine struct {
 	depthCap   int64
 	byteCap    int64
 	totalBytes int64
-	inodes      map[inodeIdentity]string
-	visited     map[string]bool
-	roleOf      func(rel string) string
+	inodes     map[inodeIdentity]string
+	visited    map[string]bool
+	roleOf     func(rel string) string
 }
 
 func newCaptureEngine(ctx context.Context, req CaptureRequest, store *storeView) (*captureEngine, error) {

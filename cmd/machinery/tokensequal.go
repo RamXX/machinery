@@ -22,7 +22,7 @@ func newTokensEqualCmd() *cobra.Command {
 			"even when these token streams are equal. Equality does not prove a formatting-only\n" +
 			"change or authorize edits to frozen tests.\n\n" +
 			"Exit status: 0 for equal token streams; 1 for different streams or a file read error.",
-		Args:  cobra.ExactArgs(2),
+		Args: cobra.ExactArgs(2),
 	}
 	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
 		output := trackCommandOutput()

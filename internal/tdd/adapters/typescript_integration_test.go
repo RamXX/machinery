@@ -64,6 +64,7 @@ const laneFragmentAssuranceTypeScript = `{
   ]
 }
 `
+
 // The package TestMain (processscope internal-IO dispatcher) is defined once
 // in go_integration_test.go and serves both adapter suites.
 
