@@ -27,6 +27,7 @@ func formalNativeFileWitness(_ *os.File, info os.FileInfo) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("formal file lacks native Unix generation identity")
 	}
+	sec, nsec = formalCoarsenWitnessTime(sec, nsec)
 	return fmt.Sprintf("unix:%x:%x:%x:%x", stat.Dev, stat.Ino, sec, nsec), nil
 }
 
@@ -43,6 +44,7 @@ func formalNativeInventoryWitness(file *os.File, info os.FileInfo) (string, erro
 	if !ok {
 		return "", fmt.Errorf("formal inventory entry lacks native Unix change time")
 	}
+	sec, nsec = formalCoarsenWitnessTime(sec, nsec)
 	return fmt.Sprintf("%s:change:%x:%x", identity, sec, nsec), nil
 }
 

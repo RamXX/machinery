@@ -364,6 +364,16 @@ func openJavaLauncher(root *os.Root, name string, maxBytes int64, afterOpen func
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	// The mutation-event sentinel is established right after the open so the
+	// read-and-verify window below is watched. When the kernel provides no
+	// event channel (or setup fails), the stat-metadata witness still applies
+	// unchanged; the sentinel only ever adds rejections.
+	sentinel, sentinelErr := newJavaFileMutationSentinel(file)
+	if sentinelErr != nil {
+		sentinel = nil
+	} else if sentinel != nil {
+		defer func() { _ = sentinel.Close() }()
+	}
 	opened, statErr := file.Stat()
 	if statErr != nil || !sameJavaFileSnapshot(before, opened) {
 		return nil, nil, nil, errors.Join(statErr, fmt.Errorf("java launcher changed identity or metadata while opening"), file.Close())
@@ -382,11 +392,30 @@ func openJavaLauncher(root *os.Root, name string, maxBytes int64, afterOpen func
 	if int64(len(body)) != before.Size() || !sameJavaFileSnapshot(before, afterInfo) || !sameJavaFileSnapshot(before, afterPath) {
 		return nil, nil, nil, errors.Join(fmt.Errorf("java launcher changed identity, metadata, or size while reading"), file.Close())
 	}
+	// Granularity-independent conjunct: kernel mutation events observed during
+	// the window reject the launcher even when coarse inode timestamps make
+	// the before/after states compare equal (same-inode ABA).
+	if sentinel != nil && sentinel.Mutated() {
+		return nil, nil, nil, errors.Join(fmt.Errorf("java launcher changed identity or metadata while reading (mutation events observed)"), file.Close())
+	}
 	return file, afterPath, body, nil
 }
 
 func sameJavaFileSnapshot(before, after os.FileInfo) bool {
 	return before != nil && after != nil && os.SameFile(before, after) && before.Mode() == after.Mode() && before.Size() == after.Size() && before.ModTime().Equal(after.ModTime()) && javaFileChangeID(before) == javaFileChangeID(after)
+}
+
+// javaWitnessTimeCoarsener, when non-nil, coarsens the timestamp components
+// of java launcher change IDs to simulate kernels whose inode timestamps tick
+// only coarsely. It exists so tests can reproduce coarse-clock ABA blindness
+// deterministically on any host. Production code always leaves it nil.
+var javaWitnessTimeCoarsener func(sec, nsec int64) (int64, int64)
+
+func javaCoarsenWitnessTime(sec, nsec int64) (int64, int64) {
+	if javaWitnessTimeCoarsener == nil {
+		return sec, nsec
+	}
+	return javaWitnessTimeCoarsener(sec, nsec)
 }
 
 func javaFileChangeID(info os.FileInfo) string {
@@ -404,12 +433,14 @@ func javaFileChangeID(info os.FileInfo) string {
 		}
 		sec, nsec := field.FieldByName("Sec"), field.FieldByName("Nsec")
 		if sec.IsValid() && nsec.IsValid() && sec.CanInt() && nsec.CanInt() {
-			return fmt.Sprintf("ctime:%d:%d", sec.Int(), nsec.Int())
+			csec, cnsec := javaCoarsenWitnessTime(sec.Int(), nsec.Int())
+			return fmt.Sprintf("ctime:%d:%d", csec, cnsec)
 		}
 	}
 	sec, nsec := value.FieldByName("Ctime"), value.FieldByName("Ctimensec")
 	if sec.IsValid() && nsec.IsValid() && sec.CanInt() && nsec.CanInt() {
-		return fmt.Sprintf("ctime:%d:%d", sec.Int(), nsec.Int())
+		csec, cnsec := javaCoarsenWitnessTime(sec.Int(), nsec.Int())
+		return fmt.Sprintf("ctime:%d:%d", csec, cnsec)
 	}
 	return ""
 }
