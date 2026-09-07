@@ -1,7 +1,7 @@
 ---
 id: MAC-hy71
 title: "Gate release publication on exact-commit verification"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
 updated_at: 2026-09-07T09:15:08Z
-content_hash: "sha256:23b95da2a01a0d8f8c1e611a4a52a3db2c3f1d4819dbd6e646d77c3dc64b6b29"
-blocks: [MAC-gcrr, MAC-ou97, MAC-bz1y]
+content_hash: "sha256:0009407558f9b29f48a0770ca1cee5c3dcfecec7f3bfde651c08d43e974f8bb1"
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp]
 assignee: dev-MAC-hy71
+closed_at: 2026-09-07T09:15:08Z
+close_reason: "Accepted: release publication gated on exact-commit verification; merged to local epic"
 ---
 
 ## Description
@@ -104,10 +105,13 @@ This story modifies these shared workflow files only after MAC-hpqp acceptance. 
 - 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
 - 2026-09-07T08:25:16Z status: open -> in_progress
 - 2026-09-07T08:25:16Z auto-follows: linked to predecessor MAC-hpqp
+- 2026-09-07T09:15:08Z status: in_progress -> closed
+- 2026-09-07T09:15:08Z dep_removed: no_longer_blocks MAC-gcrr
+- 2026-09-07T09:15:08Z dep_removed: no_longer_blocks MAC-ou97
+- 2026-09-07T09:15:08Z dep_removed: no_longer_blocks MAC-bz1y
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-gcrr]], [[MAC-ou97]], [[MAC-bz1y]]
 - Was blocked by: [[MAC-hpqp]]
 - Follows: [[MAC-hpqp]]
 
