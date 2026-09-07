@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:50Z
 created_by: ramirosalas
-updated_at: 2026-09-07T09:15:42Z
-content_hash: "sha256:6ccacc953244e94fb50a5c316756309d329250ef0cfbf3c595a82ae11f491f67"
+updated_at: 2026-09-07T10:08:34Z
+content_hash: "sha256:7518e4b6b1ba08d9d1115de24fd65fbf13d421db7f0c298ac7f1a8c3beb24a8a"
 blocks: [MAC-62s6, MAC-wbxq, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s]
 follows: [MAC-6h0s]
@@ -158,3 +158,6 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-07T10:08:34Z ramirosalas
+ACCEPTED 2026-09-07 — RED c4044f2 (29 subjects semantic vs refusing stubs; frozen SHAs recorded) + b28707d fixture repairs (3 unsatisfiable corrected, justified) -> GREEN baa0429. machinery.tdd.tree/v1 exact encoding vs independent oracle; durable gen-0 0700 content-addressed store outside all governed roots (canonical non-lexical checks); immutable read-verified objects, closed MTDDARCV export, validated atomic import preserving failed history (recorded-only never replayed); head-chain tamper/rollback fail-closed; read-only replay-not-performed status with 5 independent digests; concurrency -race clean; cancellation no-retry; budgets honored. 34/34 pass; vet/build clean; GOOS=linux build clean. Overrun 11 files/4957 LOC vs ~2300 — closed-schema decode + mandated breadth (established pattern); 8 own-RED fixture amendments justified. RESIDUALS: fsync-EIO injection infeasible (permission-bit failures used); capture defers project binding to Status; NegativeSensitivity=missing until replay exists (downstream); watch: windows toolchain breakage in processscope (not this path). Coordinator merged; tdd suite + lane green on epic. Record: .git/machinery-evidence-20260906.TEFZ7D/p9z1-record.md
