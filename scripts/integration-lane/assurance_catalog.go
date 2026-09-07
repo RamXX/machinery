@@ -79,10 +79,11 @@ var assuranceProbeInventory = map[string][]string{
 
 // assuranceConformanceInventory is the closed per-adapter native-conformance
 // case inventory of the downstream adapter stories; a native-conformance
-// suite declares exactly its adapter's inventory. MAC-wi2u (Go) and MAC-avfp
-// (TypeScript) are the first two entries; the Python/Elixir adapter stories
-// plug theirs in when they deliver, and until then those adapters own no
-// conformance inventory and no conformance suite is required of them.
+// suite declares exactly its adapter's inventory. MAC-wi2u (Go), MAC-avfp
+// (TypeScript) and MAC-imtz (Python) are the first three entries; the
+// Elixir adapter story plugs its in when it delivers, and until then that
+// adapter owns no conformance inventory and no conformance suite is
+// required of it.
 var assuranceConformanceInventory = map[string][]string{
 	"go-testing/v1": {
 		"TestConformanceWitnessPass",
@@ -96,6 +97,12 @@ var assuranceConformanceInventory = map[string][]string{
 		"conformance parent identity",
 		"conformance parent identity > conformance nested identity",
 		"conformance multiple assertions",
+	},
+	"python-unittest/v1": {
+		"conformance_test.ConformanceAsync.test_async_witness",
+		"conformance_test.ConformanceIdentity.test_class_identity",
+		"conformance_test.ConformanceMultiple.test_multiple",
+		"conformance_test.ConformanceWitness.test_witness_pass",
 	},
 }
 
@@ -111,6 +118,10 @@ var assuranceConformanceAssertions = map[string][]string{
 	"conformance witness executes native assertion":             {"conformance/witness"},
 	"conformance parent identity > conformance nested identity": {"conformance/nested"},
 	"conformance multiple assertions":                           {"conformance/multi-a", "conformance/multi-b"},
+	"conformance_test.ConformanceAsync.test_async_witness":      {"conformance/async-witness"},
+	"conformance_test.ConformanceIdentity.test_class_identity":  {"conformance/class-identity"},
+	"conformance_test.ConformanceMultiple.test_multiple":        {"conformance/multi-a", "conformance/multi-b"},
+	"conformance_test.ConformanceWitness.test_witness_pass":     {"conformance/witness-pass"},
 }
 
 // assuranceConformanceAssetPrefix is the exclusively owned adapter asset
@@ -118,6 +129,7 @@ var assuranceConformanceAssertions = map[string][]string{
 var assuranceConformanceAssetPrefix = map[string]string{
 	"go-testing/v1":           "internal/tdd/adapters/assets/go/",
 	"node-test-typescript/v1": "internal/tdd/adapters/assets/typescript/",
+	"python-unittest/v1":      "internal/tdd/adapters/assets/python/",
 }
 
 // assuranceLaneProjectUUID is the fixed project identity of the lane's
@@ -525,6 +537,10 @@ func validateConformanceSource(adapter, source string) error {
 	case "node-test-typescript/v1":
 		if base != "package.json" && base != "node-ambient.d.ts" && base != "machinery-check.ts" && !strings.HasSuffix(base, ".ts") {
 			return fmt.Errorf("node conformance source %s is not a TypeScript or module input", source)
+		}
+	case "python-unittest/v1":
+		if base != "machinery_check.py" && base != "bootstrap.py" && !strings.HasSuffix(base, ".py") {
+			return fmt.Errorf("python conformance source %s is not a Python module input", source)
 		}
 	}
 	return nil
@@ -1152,7 +1168,7 @@ func goModuleOf(modBytes []byte) string {
 // check(t, ...) / check(ct, ...) transports; each adapter's frozen fixture
 // only ever carries its own form.
 func conformanceCallLine(testBytes []byte, id string) (int64, error) {
-	for _, prefix := range []string{`machinerycheck.Check(t, "`, `check(t, "`, `check(ct, "`} {
+	for _, prefix := range []string{`machinerycheck.Check(t, "`, `check(t, "`, `check(ct, "`, `machinery_check.check(self, "`} {
 		anchor := prefix + id + `"`
 		for i, line := range strings.Split(string(testBytes), "\n") {
 			if strings.Contains(line, anchor) {
@@ -1359,6 +1375,244 @@ func executeTypeScriptConformance(ctx context.Context, scope processscope.Scope,
 		case "test-end":
 			if e.Native != nil && e.Outcome == "pass" {
 				passed[strings.Join(e.Native.Path, " > ")]++
+			}
+		case "assertion":
+			if e.Outcome == "pass" {
+				assertions[e.Assertion]++
+			}
+		}
+	}
+	wantAssertions := 0
+	for _, name := range s.Tests {
+		if started[name] != 1 || passed[name] != 1 {
+			return fmt.Errorf("conformance case %s not accounted exactly (started=%d passed=%d)", name, started[name], passed[name])
+		}
+		for _, id := range assuranceConformanceAssertions[name] {
+			wantAssertions++
+			if assertions[id] != 1 {
+				return fmt.Errorf("conformance assertion %s not witnessed exactly once (%d)", id, assertions[id])
+			}
+		}
+		for i := range r.Tests {
+			if r.Tests[i].Name == name {
+				r.Tests[i].Status = "passed"
+			}
+		}
+	}
+	if wantAssertions == 0 {
+		return fmt.Errorf("closed conformance inventory carries no registered assertions")
+	}
+	r.Started = len(started)
+	r.Passed = len(passed)
+	var payload []byte
+	for _, e := range events {
+		body, err := json.Marshal(e)
+		if err != nil {
+			return err
+		}
+		payload = append(append(payload, body...), '\n')
+	}
+	eventsFile, err := os.CreateTemp(evidence, s.ID+"-events-*")
+	if err != nil {
+		return err
+	}
+	r.Events = eventsFile.Name()
+	r.EventsSHA = fmt.Sprintf("%x", sha256.Sum256(payload))
+	_, writeErr := eventsFile.Write(payload)
+	closeErr = eventsFile.Close()
+	if err := errors.Join(writeErr, closeErr); err != nil {
+		return err
+	}
+	return nil
+}
+
+// executePythonConformanceSuite executes the frozen python-unittest/v1
+// conformance fixture through the REAL production assurance chain: the
+// frozen bytes are captured into a private content-addressed store bundle,
+// the pinned CPython 3.14.7 runtime closure is opened and validated under
+// the lane's custody scope, the closed adapter prepares the suite (verified
+// materialization, embedded byte-pinned helper transport and bootstrap
+// harness, typed assertion call-site validation, native TestLoader
+// discovery reconciliation) and runs the exact native invocation, and the
+// normalized machinery.tdd.event/v1 stream is accounted exactly. This is
+// adapter conformance evidence, not a mock or a receipt.
+func executePythonConformanceSuite(ctx context.Context, custody *laneCustody, root, scratch, evidence string, s assuranceSuite) (suiteReceipt, error) {
+	r := suiteReceipt{ID: s.ID, Adapter: s.Adapter, Selected: len(s.Tests), Tests: []testReceipt{}}
+	for _, name := range s.Tests {
+		r.Tests = append(r.Tests, testReceipt{Name: name, Source: s.Sources[0], Status: "not_started"})
+	}
+	src := filepath.Join(scratch, "src")
+	if err := os.MkdirAll(src, 0o700); err != nil {
+		return r, err
+	}
+	for _, source := range s.Sources {
+		path, err := sourcePath(root, source)
+		if err != nil {
+			return r, err
+		}
+		b, err := regularBytes(path, 4<<20)
+		if err != nil {
+			return r, err
+		}
+		if err := os.WriteFile(filepath.Join(src, filepath.Base(source)), b, 0o600); err != nil {
+			return r, err
+		}
+	}
+	testFile := "conformance_test.py"
+	testBytes, err := regularBytes(filepath.Join(src, testFile), 4<<20)
+	if err != nil {
+		return r, err
+	}
+	control := filepath.Join(scratch, "control")
+	if err := os.MkdirAll(control, 0o700); err != nil {
+		return r, err
+	}
+	if err := os.WriteFile(filepath.Join(control, "plan.json"), []byte(`{"schema":"machinery.tdd.plan/v1"}`), 0o600); err != nil {
+		return r, err
+	}
+	scope, err := custody.begin(scratch)
+	if err != nil {
+		return r, err
+	}
+	suiteErr := executePythonConformance(ctx, scope, scratch, evidence, s, testBytes, testFile, &r)
+	closeErr := custody.end(scope)
+	if err := errors.Join(suiteErr, closeErr); err != nil {
+		return r, err
+	}
+	for source, want := range s.sourceHashes {
+		path, err := sourcePath(root, source)
+		if err != nil {
+			return r, err
+		}
+		b, err := regularBytes(path, 4<<20)
+		if err != nil || fmt.Sprintf("%x", sha256.Sum256(b)) != want {
+			return r, fmt.Errorf("conformance source changed during execution: %s: %v", source, err)
+		}
+	}
+	return r, nil
+}
+
+// pythonIdentityOf renders a python native identity's TestCase.id() key.
+func pythonIdentityOf(n tdd.NativeID) string {
+	return n.Module + "." + n.Class + "." + n.Method
+}
+
+// executePythonConformance runs one prepared conformance execution under the
+// live lane scope: closure validation, capture, adapter Prepare/Run and the
+// pure post-run closure revalidation.
+func executePythonConformance(ctx context.Context, scope processscope.Scope, scratch, evidence string, s assuranceSuite, testBytes []byte, testFile string, r *suiteReceipt) error {
+	handle, err := runtimeclosure.OpenPython(ctx, runtimeclosure.PythonRequest{})
+	if err != nil {
+		return fmt.Errorf("pinned python closure: %w", err)
+	}
+	suite := tdd.Suite{
+		ID:      s.ID,
+		Adapter: s.Adapter,
+		Runtime: handle.Identity(),
+		Root:    ".",
+		Files:   []string{testFile},
+	}
+	for _, name := range s.Tests {
+		parts := strings.Split(name, ".")
+		if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+			_ = handle.Close()
+			return fmt.Errorf("python native identity %q is not a full module.class.method TestCase.id()", name)
+		}
+		test := tdd.Test{ID: name, Source: testFile, Native: tdd.NativeID{Module: parts[0], Class: parts[1], Method: parts[2]}}
+		for _, id := range assuranceConformanceAssertions[name] {
+			line, err := conformanceCallLine(testBytes, id)
+			if err != nil {
+				_ = handle.Close()
+				return err
+			}
+			test.Assertions = append(test.Assertions, tdd.Assertion{ID: id, Source: testFile, Line: line, Helper: tdd.AssertionHelperV1})
+		}
+		suite.Tests = append(suite.Tests, test)
+	}
+	frozen := map[string][]byte{testFile: testBytes}
+	released := false
+	inputs := tdd.InputView{
+		SourceRoot:  srcRootOf(scratch),
+		DesignPath:  ".",
+		ControlRoot: filepath.Join(scratch, "control"),
+		Revalidate: func() error {
+			for name, want := range frozen {
+				got, err := os.ReadFile(filepath.Join(srcRootOf(scratch), name))
+				if err != nil || fmt.Sprintf("%x", sha256.Sum256(got)) != fmt.Sprintf("%x", sha256.Sum256(want)) {
+					return fmt.Errorf("conformance fixture input %s changed", name)
+				}
+			}
+			return nil
+		},
+		Release: func() error {
+			if released {
+				return fmt.Errorf("double release")
+			}
+			released = true
+			return nil
+		},
+	}
+	store := filepath.Join(scratch, "store")
+	if _, err := tdd.InitStore(ctx, store, assuranceLaneProjectUUID); err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("conformance capture store: %w", err)
+	}
+	manifest := tdd.Manifest{
+		Schema: tdd.SchemaMilestone, ID: "M1", Revision: 1, Repository: ".",
+		ImplementationRoots: []string{"."}, Suites: []tdd.Suite{suite},
+	}
+	bundle, err := tdd.Capture(ctx, tdd.CaptureRequest{
+		Inputs: inputs, Manifest: manifest, Name: "conformance", Store: store,
+		Limits: tdd.Limits{WallMS: 300000},
+	})
+	if err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("conformance capture: %w", err)
+	}
+	adapter, err := adapters.Lookup(s.Adapter)
+	if err != nil {
+		_ = handle.Close()
+		return err
+	}
+	duration, err := time.ParseDuration(s.Timeout)
+	if err != nil {
+		_ = handle.Close()
+		return err
+	}
+	prepared, err := adapter.Prepare(ctx, tdd.SuiteRequest{
+		Inputs: inputs, Suite: suite, Source: bundle,
+		Scratch: filepath.Join(scratch, "run"), Runtime: handle, Scope: scope,
+		Limits: tdd.Limits{WallMS: duration.Milliseconds(), CleanupMS: 10000},
+	})
+	if err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("conformance prepare: %w", err)
+	}
+	var events []tdd.Event
+	execution, runErr := adapter.Run(ctx, prepared, func(e tdd.Event) error {
+		events = append(events, e)
+		return nil
+	})
+	closeErr := handle.Close()
+	if err := errors.Join(runErr, closeErr); err != nil {
+		return fmt.Errorf("native conformance execution failed: %w", err)
+	}
+	if execution.Outcome != "pass" || execution.ExitCode == nil || *execution.ExitCode != 0 {
+		return fmt.Errorf("native conformance outcome %q exit %+v is not a verified pass", execution.Outcome, execution.ExitCode)
+	}
+	if execution.Custody.Status != "cleaned" {
+		return fmt.Errorf("native conformance custody did not verify: %+v", execution.Custody)
+	}
+	started, passed, assertions := map[string]int{}, map[string]int{}, map[string]int{}
+	for _, e := range events {
+		switch e.Kind {
+		case "test-start":
+			if e.Native != nil {
+				started[pythonIdentityOf(*e.Native)]++
+			}
+		case "test-end":
+			if e.Native != nil && e.Outcome == "pass" {
+				passed[pythonIdentityOf(*e.Native)]++
 			}
 		case "assertion":
 			if e.Outcome == "pass" {

@@ -1,0 +1,27 @@
+{
+  "schema": "machinery.assurance.lane/v1",
+  "fragment": "assurance-python",
+  "owner": "MAC-imtz",
+  "suites": [
+    {
+      "id": "assurance-python-conformance",
+      "lane": "assurance",
+      "adapter": "python-unittest/v1",
+      "kind": "native-conformance",
+      "package": ".",
+      "source_files": [
+        "internal/tdd/adapters/assets/python/conformance/conformance_test.py"
+      ],
+      "tests": [
+        "conformance_test.ConformanceAsync.test_async_witness",
+        "conformance_test.ConformanceIdentity.test_class_identity",
+        "conformance_test.ConformanceMultiple.test_multiple",
+        "conformance_test.ConformanceWitness.test_witness_pass"
+      ],
+      "runtimes": ["python"],
+      "timeout": "5m",
+      "stdout_limit": 1048576,
+      "stderr_limit": 1048576
+    }
+  ]
+}
