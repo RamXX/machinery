@@ -9,13 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
 updated_at: 2026-09-07T01:42:39Z
-content_hash: "sha256:9b115e64f204962354e76e778c919acdca04abbd3e2cfec34c51b637a0823042"
+content_hash: "sha256:5b8099d3e420387448fad4de05d3300415e425ed28591b7fca9728c2bb9c6539"
 was_blocked_by: [MAC-qlw2]
 follows: [MAC-qlw2]
 assignee: dev-MAC-6h0s
 closed_at: 2026-09-07T01:42:39Z
 close_reason: "Accepted: executable assurance declaration validation complete; merged to local epic"
-led_to: [MAC-bz1y, MAC-p9z1, MAC-wi2u]
+led_to: [MAC-bz1y, MAC-p9z1, MAC-wi2u, MAC-avfp]
 ---
 
 ## Description
@@ -122,7 +122,7 @@ status: new
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-qlw2]]
 - Follows: [[MAC-qlw2]]
-- Led to: [[MAC-bz1y]], [[MAC-p9z1]], [[MAC-wi2u]]
+- Led to: [[MAC-bz1y]], [[MAC-p9z1]], [[MAC-wi2u]], [[MAC-avfp]]
 
 ## Comments
 
