@@ -1,17 +1,19 @@
 ---
 id: MAC-p9z1
 title: "Retain exact replay inputs outside governed sources"
-status: open
+status: in_progress
 priority: 1
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:00:50Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:06Z
-content_hash: "sha256:a3046fdabdfba46255bf0622d1f638108daf6eeb2a07829822fb635faaadaafd"
+updated_at: 2026-09-07T09:15:42Z
+content_hash: "sha256:6ccacc953244e94fb50a5c316756309d329250ef0cfbf3c595a82ae11f491f67"
 blocks: [MAC-62s6, MAC-wbxq, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s]
+follows: [MAC-6h0s]
+assignee: dev-MAC-p9z1
 ---
 
 ## Description
@@ -94,11 +96,14 @@ status: new
 - 2026-09-06T09:10:17Z dep_added: blocks MAC-vx24
 - 2026-09-06T09:10:18Z dep_added: blocks MAC-ou97
 - 2026-09-07T01:42:40Z dep_removed: was_blocked_by MAC-6h0s
+- 2026-09-07T09:15:42Z status: open -> in_progress
+- 2026-09-07T09:15:42Z auto-follows: linked to predecessor MAC-6h0s
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-62s6]], [[MAC-wbxq]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-6h0s]]
+- Follows: [[MAC-6h0s]]
 
 ## Comments
 
