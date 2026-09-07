@@ -4,7 +4,7 @@ title: "Keep formal subprocesses inside native custody"
 status: in_progress
 priority: 0
 type: feature
-labels: [hard-tdd]
+labels: [hard-tdd, accepted]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
