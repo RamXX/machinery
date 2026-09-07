@@ -1,17 +1,19 @@
 ---
 id: MAC-hy71
 title: "Gate release publication on exact-commit verification"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:33:47Z
 created_by: ramirosalas
-updated_at: 2026-09-05T19:45:33Z
-content_hash: "sha256:f40f19cbf0b5f4be41bfcdeedfb585b0d3404f5ed7cf9b667dbd7326493a0f65"
+updated_at: 2026-09-07T08:25:16Z
+content_hash: "sha256:07239957ae2dab027079d70064499aa2125b1dcaf5f3b12dc052a50468420454"
 blocks: [MAC-gcrr, MAC-ou97, MAC-bz1y]
 was_blocked_by: [MAC-hpqp]
+follows: [MAC-hpqp]
+assignee: dev-MAC-hy71
 ---
 
 ## Description
@@ -100,10 +102,13 @@ This story modifies these shared workflow files only after MAC-hpqp acceptance. 
 - 2026-09-05T19:45:33Z dep_added: blocked_by MAC-hpqp
 - 2026-09-06T09:22:42Z dep_added: blocks MAC-bz1y
 - 2026-09-07T04:45:25Z dep_removed: was_blocked_by MAC-hpqp
+- 2026-09-07T08:25:16Z status: open -> in_progress
+- 2026-09-07T08:25:16Z auto-follows: linked to predecessor MAC-hpqp
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-gcrr]], [[MAC-ou97]], [[MAC-bz1y]]
 - Was blocked by: [[MAC-hpqp]]
+- Follows: [[MAC-hpqp]]
 
 ## Comments
