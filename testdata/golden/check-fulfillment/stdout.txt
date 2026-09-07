@@ -34,8 +34,8 @@
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 18 skeleton citations
   ok
 == Gv-attest  attestation evidence ==
-  checked: 56 covered artifacts current, 12 attested claims, 12 claims owed
-  ok
+  warn   gt.conformance-test-shape: plan only; current implementation review missing
+  checked: 56 covered artifacts current, 12 attested claims, 12 plan judgments, 12 claims owed
 
 0 blocking (ERROR/DRIFT) finding(s)
 design-green: all applicable design gates green (add --impl for G4-import and Gt-tests toward platform-green)

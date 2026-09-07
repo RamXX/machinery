@@ -14,8 +14,11 @@ overlay states are not persisted. Writes are idempotent by `(portfolioId, versio
 ## Architecture context
 
 `pf.domain` computes transitions; `pf.app` invokes the `pf.repo` optimistic write and bounded
-backoff; the DuckDB adapter updates only at the expected version. Inject role, clock, and retry
-policy. No domain package imports DuckDB.
+backoff; the adapter captures expectedVersion, the frozen complete Save value, an independent
+OperationId and its OperationHandle, and calls the bound Save comparing both identities and
+the exact captured arguments before mutation; a retry creates a NEW attempt/id/handle. The
+DuckDB adapter updates only at the expected version. Inject role, clock, and retry policy.
+No domain package imports DuckDB.
 
 ## Behavior and oracles
 
@@ -23,6 +26,9 @@ Parse every row of `machines/Portfolio.oracle.md`: `PORT-27d66f`, `PORT-2bf44c`,
 `PORT-ddb44c`, `PORT-351dec`, `PORT-db3bb9`, `PORT-9facf7`, `PORT-5e6be0`, `PORT-f43140`,
 `PORT-d1647b`, `PORT-fb8c92`, `PORT-40b6e7`, `PORT-c4a186`, `PORT-f6e220`, `PORT-cba032`,
 `PORT-8c0400`, `PORT-3cb0b6`, `PORT-53d34b`, `PORT-3390a7`, and `PORT-3bd579`. Assert ordered actions.
+Assert next state AND the exact ordered exit/transition/entry action list for every row,
+including the empty-list rows and the separate always-microsteps; the terminal entry
+(routingFault) remains observable.
 
 ## TDD and implementation
 
@@ -33,8 +39,13 @@ implement transition, app overlay, and repository compare-and-update without cha
 ## Risks and recovery
 
 Bound retries and backoff. On non-retriable failure restore the exact prior domain stage; if no
-valid witness exists enter routingFault and persist no guessed value. After a crash, reload version
-and status before retrying; compare-and-update prevents duplicate decisions.
+valid witness exists enter routingFault and persist no guessed value. Retry only confirmed-Unpublished
+ConflictError/BusyError (or timeout-won IOError(COMMIT_TIMEOUT)); 5000 ms is the publication-
+admission deadline per attempt - an admitted commit finishing later stays authoritative, and a
+timeout winner denies publication and drains before the confirmed failure. An unresolved
+publication drives NO transition: report IOError(PUBLICATION_OUTCOME_UNKNOWN) exit 12 with no
+rollback and no automatic retry. After a crash, reload version and status before retrying;
+compare-and-update prevents duplicate decisions.
 
 ## Acceptance
 

@@ -1,51 +1,58 @@
-attestation_version: 1
+attestation_version: 2
 attestations:
   - claim: g2.action-ownership
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: The closed action-ownership table was reconciled actor by actor and assigns each of the 37 domain actions to exactly one deployed component.
+    note: 'The closed action-ownership table was reconciled actor by actor and assigns each of the 37 domain actions to exactly one deployed component.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
   - claim: g2.interface-contract-rightness
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: The only compile-time crossings are pure shared event schemas; all runtime service interaction is governed by the event contract, with explicit decode errors and retry-safe idempotency.
+    note: 'The only compile-time crossings are pure shared event schemas; all runtime service interaction is governed by the event contract, with explicit decode errors and retry-safe idempotency.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
   - claim: g2.placement-rightness
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: Stateful aggregates, saga, and outbox are placed with persistence and serialization matching their service ownership; value and CRUD records carry explicit no-machine or inline-placement reasons.
+    note: 'Stateful aggregates, saga, and outbox are placed with persistence and serialization matching their service ownership; value and CRUD records carry explicit no-machine or inline-placement reasons.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
   - claim: g2.adoption-closure-discovery
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: Elixir/OTP, Ecto, PostgreSQL, Oban, RabbitMQ, and the two external adapters were swept for separately operated closure members and bound to declared, mitigated dependencies.
+    note: 'Elixir/OTP, Ecto, PostgreSQL, Oban, RabbitMQ, and the two external adapters were swept for separately operated closure members and bound to declared, mitigated dependencies.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
   - claim: g2.event-contract-completeness
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: The reserve, release, capture, refund, dispatch, and reply flows were swept in both producer and consumer directions; order placement remains an explicitly local API-to-saga call.
+    note: 'The reserve, release, capture, refund, dispatch, and reply flows were swept in both producer and consumer directions; order placement remains an explicitly local API-to-saga call.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
   - claim: g2.nfr-content
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: Security, capacity, and observability claims were checked against the four-service topology, explicit retry bounds, outbox signals, and FailedDirty paging requirement.
+    note: 'Security, capacity, and observability claims were checked against the four-service topology, explicit retry bounds, outbox signals, and FailedDirty paging requirement.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
   - claim: g3.guard-semantics
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: Guard contracts were reconciled to their transition sites and invariant IDs; compound guards now expose closed CLAUSES vocabularies and routing guards have explicit fallbacks.
+    note: 'Guard contracts were reconciled to their transition sites and invariant IDs; compound guards now expose closed CLAUSES vocabularies and routing guards have explicit fallbacks.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
@@ -72,9 +79,10 @@ attestations:
       - path: machines/Shipment.matrix.md
         hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
   - claim: g3.invariant-enforcement
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: All 25 invariants have a machine unit or generated integrity carrier; creation-time validations and terminal-state properties are named units rather than prose-only assertions.
+    note: 'All 25 invariants have a machine unit or generated integrity carrier; creation-time validations and terminal-state properties are named units rather than prose-only assertions.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
@@ -101,9 +109,10 @@ attestations:
       - path: machines/Shipment.matrix.md
         hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
   - claim: g3.residual-transitions
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: Bus, gateway, database, carrier, timeout, retry exhaustion, and corrupt-router outcomes retain explicit transitions; unknown routing stops in a diagnosable routingFault residual rather than guessing domain state.
+    note: 'Bus, gateway, database, carrier, timeout, retry exhaustion, and corrupt-router outcomes retain explicit transitions; unknown routing stops in a diagnosable routingFault residual rather than guessing domain state.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
@@ -130,9 +139,10 @@ attestations:
       - path: machines/Shipment.matrix.md
         hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
   - claim: g3.event-redelivery
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: At-least-once commands and replies have event-contract rows, payload READS declarations, dedupe keys, and explicit stale or out-of-order dispositions in resting states.
+    note: 'At-least-once commands and replies have event-contract rows, payload READS declarations, dedupe keys, and explicit stale or out-of-order dispositions in resting states.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
@@ -159,16 +169,18 @@ attestations:
       - path: machines/Shipment.matrix.md
         hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
   - claim: gt.conformance-test-shape
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: The handoff requires one parser-backed conformance suite per machine that asserts target state and the complete ordered action list for every committed oracle row.
+    note: 'The handoff requires one parser-backed conformance suite per machine that asserts target state and the complete ordered action list for every committed oracle row.'
     covers:
       - path: BUILD.md
-        hash: sha256:24a8fd8a71a7504a6bd614520ee6ca5c6b72a0bd4386d2439c59042d91853baf
+        hash: sha256:3a2a2b9649c6a0d39e114c3b3236f589be618bf50a71ce039a9e2304f75cf61f
   - claim: g4.zero-context
+    kind: plan
     attestor: Codex production-readiness review
     date: 2026-09-02
-    note: The build plan fixes topology, versions, milestones, oracle-derived test obligations, formal checks, residuals, and state-migration discipline for an implementation agent with no conversation history.
+    note: 'The build plan fixes topology, versions, milestones, oracle-derived test obligations, formal checks, residuals, and state-migration discipline for an implementation agent with no conversation history.'
     covers:
       - path: BUILD.md
-        hash: sha256:24a8fd8a71a7504a6bd614520ee6ca5c6b72a0bd4386d2439c59042d91853baf
+        hash: sha256:3a2a2b9649c6a0d39e114c3b3236f589be618bf50a71ce039a9e2304f75cf61f

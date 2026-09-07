@@ -274,6 +274,9 @@ func saveReceipt(receipt installReceipt) (retErr error) {
 		return fmt.Errorf("inventory installed artifacts for receipt: %w", err)
 	}
 	normalizeReceipt(&receipt)
+	if err := validateReceipt(receipt); err != nil {
+		return fmt.Errorf("validate installation receipt before publication: %w", err)
+	}
 	if err := durableMkdirAllPrivate(filepath.Dir(path)); err != nil {
 		return err
 	}
@@ -319,19 +322,36 @@ func recordHomeInstallLocked(homes []string, copyAll bool) error {
 	if err != nil {
 		return err
 	}
-	next := homeInstall{Homes: abs, Copy: copyAll}
-	replaced := false
-	for i := range receipt.HomeInstalls {
-		if len(receipt.HomeInstalls[i].Homes) > 0 && sameInstallPath(receipt.HomeInstalls[i].Homes[0], abs[0]) {
-			receipt.HomeInstalls[i] = next
-			replaced = true
-			break
-		}
-	}
-	if !replaced {
-		receipt.HomeInstalls = append(receipt.HomeInstalls, next)
+	if err := receipt.setHomeInstall(homeInstall{Homes: abs, Copy: copyAll}); err != nil {
+		return err
 	}
 	return saveReceipt(receipt)
+}
+
+// setHomeInstall retains same-canonical replacement semantics without moving
+// ownership between recorded groups or silently forgetting conflicting groups.
+func (receipt *installReceipt) setHomeInstall(next homeInstall) error {
+	replace := -1
+	for i := range receipt.HomeInstalls {
+		group := receipt.HomeInstalls[i]
+		if sameInstallPath(group.Homes[0], next.Homes[0]) {
+			replace = i
+			continue
+		}
+		for _, prior := range group.Homes {
+			for _, home := range next.Homes {
+				if sameOrNestedPath(prior, home) {
+					return fmt.Errorf("home install paths overlap or repeat: %s and %s; retry with a nonconflicting recorded group or explicitly reconfigure the installation topology", prior, home)
+				}
+			}
+		}
+	}
+	if replace >= 0 {
+		receipt.HomeInstalls[replace] = next
+	} else {
+		receipt.HomeInstalls = append(receipt.HomeInstalls, next)
+	}
+	return nil
 }
 
 func recordTargetInstallLocked(names []string, copyAll bool) error {
@@ -343,20 +363,39 @@ func recordTargetInstallLocked(names []string, copyAll bool) error {
 	if err != nil {
 		return err
 	}
-	byName := map[string]targetInstall{}
-	for _, target := range receipt.Targets {
-		byName[target.Target] = target
-	}
 	for _, target := range targetOrder {
 		if set[target] {
-			byName[string(target)] = targetInstall{Target: string(target), Copy: copyAll}
+			receipt.setTargetInstall(targetInstall{Target: string(target), Copy: copyAll})
 		}
 	}
-	receipt.Targets = receipt.Targets[:0]
-	for _, target := range targetOrder {
-		if record, ok := byName[string(target)]; ok {
-			receipt.Targets = append(receipt.Targets, record)
+	return saveReceipt(receipt)
+}
+
+func (receipt *installReceipt) setTargetInstall(next targetInstall) {
+	for i, target := range receipt.Targets {
+		if target.Target == next.Target {
+			receipt.Targets[i] = next
+			return
 		}
+	}
+	receipt.Targets = append(receipt.Targets, next)
+}
+
+// recordRefreshPlanLocked publishes once, in the Update parent, after direct
+// refresh. Retain unselected receipt ownership and recorded plugin obligations;
+// discovery and explicit selections contribute the placements just completed.
+func recordRefreshPlanLocked(plan refreshPlan) error {
+	receipt, _, err := loadReceipt()
+	if err != nil {
+		return err
+	}
+	for _, group := range plan.HomeInstalls {
+		if err := receipt.setHomeInstall(group); err != nil {
+			return err
+		}
+	}
+	for _, target := range plan.Targets {
+		receipt.setTargetInstall(target)
 	}
 	return saveReceipt(receipt)
 }

@@ -189,9 +189,13 @@ design; the tool's contribution is the oracle and its stable ids.
    holds every verdict to a committed oracle row, so the record is checkable instead of
    living in PR prose. Summarize the round in the PR as before. An unadjudicated red test is a question, not a gate. A file only
    locks once it is born clean under this project's own formatter and linters and the commit
-   carrying it is green under every non-test gate the project enforces; after the lock there
-   is no legal remedy for a gate the file fails, short of an owner-sanctioned
-   formatting-only amendment with a token-identity proof.
+   carrying it is green under every non-test gate the project enforces.
+   Frozen test identity is defined by exact bytes and file inventory.
+   Any amendment requires explicit owner authorization, a new evidence revision, and replay
+   of RED and all applicable gates before the revised tests lock. Neither formatting nor token
+   equality authorizes an editing exemption.
+   A gate demanding a locked-file change requires an explicit amendment through this process;
+   the original evidence revision remains immutable.
 
 This is the one place this guide deliberately extends SKILL.md: the hard-TDD handoff
 describes greenfield, where every oracle row is normative from birth. On brownfield, rows
@@ -255,13 +259,19 @@ and is the default attestor for that design's LLM-attested gate halves.
   matters: two individually green design PRs can merge into a stale combination.
 
 **Merge protocol for generated files.** Never hand-resolve a conflict in a generated file.
-On any conflict in `*.oracle.md`, `formal/*.tla|cfg`, `packs/`, or `ratchet.json`: take
+On any conflict in `*.oracle.md`, `formal/*.tla|cfg`, or `packs/`: take
 either side, regenerate (`machinery oracle design/machines`, `machinery verify-formal
-design`, `machinery pack generate`, or `machinery baseline design --impl .`), commit, and
+design`, or `machinery pack generate design`), commit, and
 let `machinery check` arbitrate the result. The
 sources (machine JSON, matrix, contract, domain model) merge like ordinary text and their
 conflicts are resolved by humans as usual; the generated layer is always reconstructed,
 never merged.
+
+Conflicts in `ratchet.json` require explicit review of accepted boundary debt.
+A deliberate `machinery baseline design --impl .` rerun rewrites that snapshot and
+may accept new offender files even when no dependency rules are proposed. Review
+the ratchet and offender changes before adopting them; baseline is not routine
+artifact regeneration.
 
 **STATE.md.** The session ledger is single-writer: only the steward updates it, and only
 on the branch where an interrogation session is actually running. Cross-branch status
@@ -442,8 +452,11 @@ folding it into a substrate boundary manufactures allow-graph cycles.
   `import {x} from "@org/b"` resolves to the boundary owning `packages/b`, longest name
   first; an import into a discovered package that no boundary owns is reported as code
   outside the contract.
-- `ratchet.json` snapshots taken before the full-date stamp carry `YYYY-MM` and age from the
-  first of that month; rerun `machinery baseline` to restamp.
+- Legacy `ratchet.json` snapshots with `YYYY-MM` remain supported and age from the
+  first of that month. Without an explicit date or `SOURCE_DATE_EPOCH`, a baseline
+  rerun retains that date; no routine restamping is needed. Baseline remains a
+  deliberate debt-acceptance operation: review ratchet and offender changes before
+  adopting its result.
 
 ## 9. What "sustainable" looks like (the exit criteria)
 

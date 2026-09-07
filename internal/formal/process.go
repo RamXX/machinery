@@ -67,14 +67,26 @@ func runBoundedProcess(ctx context.Context, cmd *exec.Cmd, timeout time.Duration
 	return out, err
 }
 
+// openFormalJava is the ordinary compatibility entry; the scoped chain uses
+// openFormalJavaScoped with the inherited owner context.
 func openFormalJava(workdir string) (*runtimeclosure.Java, error) {
+	return openFormalJavaScoped(context.Background(), workdir)
+}
+
+func openFormalJavaScoped(ctx context.Context, workdir string) (*runtimeclosure.Java, error) {
 	java, err := runtimeclosure.OpenJava()
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), formalJavaProbeTimeout)
+	// The identity probe is bounded by the inherited owner context, never a
+	// fresh background deadline.
+	ctx, cancel := context.WithTimeout(ctx, formalJavaProbeTimeout)
+	defer cancel()
 	cmd := exec.CommandContext(ctx, java.Path(), "-XshowSettings:properties", "-version")
 	cmd.Env = runtimeclosure.Environment(workdir, workdir, java.Path())
+	if err := runtimeclosure.AttachCustody(ctx, cmd); err != nil {
+		return nil, errors.Join(fmt.Errorf("attach scoped custody to Java identity probe: %w", err), java.Close())
+	}
 	out, probeErr := runBoundedProcess(ctx, cmd, formalJavaProbeTimeout)
 	cancel()
 	identityErr := java.BindIdentity(out)

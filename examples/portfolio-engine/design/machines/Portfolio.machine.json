@@ -1,9 +1,9 @@
 {
   "id": "portfolio",
   "initial": "Proposed",
-  "_comment": "Portfolio review lifecycle. Realized as a pure transition function in pf.domain; the load-act-save loop runs in pf.app. Concurrency: two managers may review at once, so every state change is written through the commit overlay (committing/commitRetry/reverted) under a DuckDB optimistic version check; a conflicting write retries with backoff up to MaxRetries, then rolls back the in-memory transition and refuses. The overlay states are named for this domain (committing/commitRetry/reverted), not the persistence default, to show the pattern is not tied to any vocabulary.",
+  "_comment": "Portfolio review lifecycle. Realized as a pure transition function in pf.domain; the load-act-save loop runs in pf.app. Concurrency: two managers may review at once, so every state change is written through the commit overlay (committing/commitRetry/reverted) under a DuckDB optimistic version check; a conflicting write retries with backoff up to MaxRetries, then rolls back the in-memory transition and refuses. The overlay states are named for this domain (committing/commitRetry/reverted), not the persistence default, to show the pattern is not tied to any vocabulary. The conflict/retry/rollback rows are modeled outcomes of RESOLVED Unpublished results only: isRetriable receives only confirmed-Unpublished errors, and a publication that remains unresolved after drain drives no transition (reported as an unknown-outcome residual by the driver).",
   "_delays": {
-    "COMMIT_TIMEOUT": "5000 ms - DuckDB write timeout before a commit attempt is treated as failed",
+    "COMMIT_TIMEOUT": "5000 ms - publication-admission deadline per write attempt; an admitted commit may finish after this deadline and its authoritative Published/Unpublished/Unresolved result decides the outcome, with drain completed before any confirmed failure",
     "RETRY_BACKOFF": "~200 ms exponential backoff between optimistic-lock retries"
   },
   "_counters": {

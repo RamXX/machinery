@@ -33,7 +33,7 @@ func TestUpdateVerifiesReleaseAndRefreshesRecordedHarnesses(t *testing.T) {
 
 	const tag = "v9.9.9"
 	candidate := []byte("new machinery binary\n")
-	server := updateReleaseServer(t, tag, candidate, false)
+	server := updateNativeReleaseServer(t, tag, candidate, false)
 	defer server.Close()
 	oldGH := githubBase
 	githubBase = server.URL
@@ -49,7 +49,12 @@ func TestUpdateVerifiesReleaseAndRefreshesRecordedHarnesses(t *testing.T) {
 			return "machinery version " + tag + "\n", nil
 		}
 		calls = append(calls, append([]string{name}, args...))
-		return "refreshed\n", nil
+		// Component command observer with real downloaded-source placement.
+		opts, err := updatePlacementOptions(args)
+		if err != nil {
+			return "", err
+		}
+		return "refreshed\n", runUpdatePlacement(opts)
 	}
 	result, err := Update(UpdateOptions{
 		Version:     tag,
@@ -80,6 +85,10 @@ func TestUpdateVerifiesReleaseAndRefreshesRecordedHarnesses(t *testing.T) {
 			t.Errorf("refresh calls missing %q: %v", required, calls)
 		}
 	}
+	assertUpdateHomePlacement(t, filepath.Join(home, "a"), "", false)
+	assertUpdateHomePlacement(t, filepath.Join(home, "b"), filepath.Join(home, "a"), true)
+	assertUpdateHomePlacement(t, filepath.Join(home, ".agents"), "", false)
+	assertUpdateNativePlacement(t, home)
 }
 
 func TestUpdateRollsBackAllHomesBinaryAndReceiptOnLaterFailure(t *testing.T) {
@@ -184,12 +193,14 @@ func TestUpdateExecutesDownloadedBinaryForHarnessRefresh(t *testing.T) {
 	}
 	t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
 	t.Setenv("HOME", t.TempDir())
+	t.Setenv("MACHINERY_INTERNAL_TEST_LOCK_ROOT", t.TempDir())
 	const tag = "v9.9.5"
 	logPath := filepath.Join(t.TempDir(), "candidate.log")
 	script := "#!/bin/sh\n" +
 		"if [ \"$1\" = version ]; then printf 'machinery version " + tag + "\\n'; exit 0; fi\n" +
-		"printf '%s\\n' \"$*\" >> '" + strings.ReplaceAll(logPath, "'", "'\\''") + "'\n"
-	server := updateReleaseServer(t, tag, []byte(script), false)
+		"printf '%s\\n' \"$*\" >> '" + strings.ReplaceAll(logPath, "'", "'\\''") + "'\n" +
+		"exec '" + strings.ReplaceAll(os.Args[0], "'", "'\\''") + "' -test.run=^TestUpdatePlacementChildHelper$ -- \"$@\"\n"
+	server := updateNativeReleaseServer(t, tag, []byte(script), false)
 	defer server.Close()
 	oldGH := githubBase
 	githubBase = server.URL
@@ -199,12 +210,14 @@ func TestUpdateExecutesDownloadedBinaryForHarnessRefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	harnessHome := filepath.Join(t.TempDir(), ".agents")
+	var output bytes.Buffer
 	if _, err := Update(UpdateOptions{
 		Version:     tag,
 		Repo:        "acme/machinery",
 		Executable:  destination,
 		Homes:       []string{harnessHome},
 		SkipPlugins: true,
+		Out:         &output,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -218,6 +231,10 @@ func TestUpdateExecutesDownloadedBinaryForHarnessRefresh(t *testing.T) {
 			t.Errorf("candidate invocation missing %q: %s", required, log)
 		}
 	}
+	if !strings.Contains(output.String(), "actual placement child completed") {
+		t.Fatalf("downloaded candidate did not execute real placement helper: %s", &output)
+	}
+	assertUpdateHomePlacement(t, harnessHome, "", false)
 }
 
 func TestBinaryOnlyUpdateCandidateUsesDelegatedParentLock(t *testing.T) {
@@ -456,7 +473,7 @@ func TestUpdateRefreshesExistingDefaultInstallInPlace(t *testing.T) {
 
 	const tag = "v9.9.9"
 	candidate := []byte("new machinery binary\n")
-	server := updateReleaseServer(t, tag, candidate, false)
+	server := updateNativeReleaseServer(t, tag, candidate, false)
 	defer server.Close()
 	oldGH := githubBase
 	githubBase = server.URL
@@ -472,7 +489,12 @@ func TestUpdateRefreshesExistingDefaultInstallInPlace(t *testing.T) {
 			return "machinery version " + tag + "\n", nil
 		}
 		calls = append(calls, append([]string{name}, args...))
-		return "refreshed\n", nil
+		// Component command observer with real downloaded-source placement.
+		opts, err := updatePlacementOptions(args)
+		if err != nil {
+			return "", err
+		}
+		return "refreshed\n", runUpdatePlacement(opts)
 	}
 	result, err := Update(UpdateOptions{
 		Version:     tag,
@@ -505,6 +527,9 @@ func TestUpdateRefreshesExistingDefaultInstallInPlace(t *testing.T) {
 			t.Errorf("harness refresh ran %s, want the updated binary %s", call[0], resolvedDestination)
 		}
 	}
+	assertUpdateHomePlacement(t, agents, "", false)
+	assertUpdateHomePlacement(t, claude, agents, true)
+	assertUpdateNativePlacement(t, home)
 	assertNoInstallJournal(t)
 }
 

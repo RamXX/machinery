@@ -46,13 +46,15 @@
   checked: 1 plan documents, 6 declared milestones, 6 closed milestones, 6 acceptance files, 289 DoD ids bound, 7 DoD oracle sets bound, 6 closed milestones with accepted evidence, 6 commit bindings verified, commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry
   ok
 == Gv-attest  attestation evidence ==
-  checked: 54 covered artifacts current, 13 attested claims, 13 claims owed
+  note   Historical acceptance-file judgment only; Gv does not execute Ga ancestry validation or establish current implementation approval.
+  note   Hashes bind the observed files and scope; they do not prove tests ran, reviewer identity, or judgment correctness. Top-level Git administration and the exact Machinery attestation record are excluded; applications that use them as runtime inputs are outside this review boundary.
+  checked: 54 covered artifacts current, 13 attested claims, 11 plan judgments, 1 historical review records, 13 claims owed, 1 current implementation reviews, 38 implementation files bound, 49 scope entries bound
   ok
 == G4-import  code respects the contract ==
-  checked: 2 dirs pruned by contract ignore, 16 go files checked, 22 imports resolved, 14 test files skipped, 13 edges verified
+  checked: 3 dirs pruned by contract ignore, 16 go files checked, 22 imports resolved, 14 test files skipped, 13 edges verified
   ok
 == Gt-tests  oracle ids in the test suite ==
-  checked: 14 test files scanned, 5 machines, 275 oracle rows, 197 ids covered by literal, 2 formal oracles, 2 formal oracles covered, 6 clause-declared guards checked, 36 falsifying-clause ids covered
+  checked: 14 test files scanned, 5 machines, 275 oracle rows, 197 ids covered by literal, 2 formal oracles, 2 formal oracles covered, 6 clause-declared guards checked, 36 falsifying-clause ids covered, static discovery; tests not executed; unsupported parser structures remain uncovered
   ok
 
 0 blocking (ERROR/DRIFT) finding(s)

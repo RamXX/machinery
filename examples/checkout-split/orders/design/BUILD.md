@@ -289,6 +289,16 @@ the design changes, stable ids do not. Regenerate with `machinery oracle design/
 stable-id diff is the affected-test list. The `_ignores` declarations appear as the absence of
 outgoing rows, covered by the redelivery property below.
 
+**Wholesale conformance obligation.** The suite's per-row tests are wholesale, not transcribed: one
+conformance test parses the committed `machines/Order.oracle.md` table and `machines/Order.machine.json`
+directly. For every oracle row it reconstructs the declared source state and trigger, reconciles the row
+against the machine's declared guard inputs (the Order machine declares none, so the reconciliation must
+still prove the row's guard cell is `-`), fires the transition, and asserts both the next state and the
+complete ordered expected-actions list, including the legitimate entry and exit semantics the committed
+machine declares for the states involved (the oracle's state entry/exit table, e.g. Placed's `request`
+entry action). A conformance parser that checks only row ids or next states is incomplete. These are
+planned obligations for the future implementation suite, not evidence that any suite currently runs.
+
 **Guard-branch completeness analysis.** N/A: the Order machine declares no guards, so there is no
 conjunction clause to falsify.
 
@@ -367,9 +377,12 @@ green over the scaffolding and stubs the tests compile against, the suite runs r
 assertions, never on its own compile or import errors, and the new files are born clean under this
 project's own gates (`gofmt -l` reports nothing over them, `go vet ./...` is clean, and the RED
 commit itself is green under every non-test gate). The tests then lock; the implementer makes
-them pass without editing them. A locked file has no legal remedy for a gate it fails later,
-because nobody is allowed to touch it: that is a RED-phase defect, remedied by an owner-sanctioned
-formatting-only amendment carrying a token-identity proof, never a silent edit. GREEN is accepted only when the locked suite passes AND
+them pass without editing them. Frozen test identity is defined by exact bytes and file inventory.
+Any amendment requires explicit owner authorization, a new evidence revision, and replay
+of RED and all applicable gates before the revised tests lock. Neither formatting nor token
+equality authorizes an editing exemption.
+A gate demanding a locked-file change is a RED-phase defect requiring a design round-trip;
+the original evidence revision remains immutable. GREEN is accepted only when the locked suite passes AND
 `machinery check design --impl <dir>` is green again: no green path exists that crosses a
 boundary. Generated tests live apart from hand-written ones, so regenerating on a design change
 never clobbers them. A wrong test is a design defect: fix the design, regenerate

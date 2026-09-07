@@ -240,9 +240,12 @@ skips test files but checks everything they import), the suite runs red on faili
 never on its own compile errors, and the new files are born clean under this project's own gates
 (`mix format --check-formatted` and every linter the umbrella enforces pass over them, and the RED
 commit itself is green under every non-test gate). The tests are then locked; the implementer makes
-them pass without editing them. A locked file has no legal remedy for a gate it fails later,
-because nobody is allowed to touch it: that is a RED-phase defect, remedied by an owner-sanctioned
-formatting-only amendment carrying a token-identity proof, never a silent edit. GREEN is accepted only when the locked suite passes AND
+them pass without editing them. Frozen test identity is defined by exact bytes and file inventory.
+Any amendment requires explicit owner authorization, a new evidence revision, and replay
+of RED and all applicable gates before the revised tests lock. Neither formatting nor token
+equality authorizes an editing exemption.
+A gate demanding a locked-file change is a RED-phase defect requiring a design round-trip;
+the original evidence revision remains immutable. GREEN is accepted only when the locked suite passes AND
 `machinery check design --impl <dir>` is green again: code that passes the tests by crossing a
 boundary fails the gate; code that respects the boundaries but fails a test is not done. A wrong
 test is a design defect that returns to the design and the formal model. Generated transition tests

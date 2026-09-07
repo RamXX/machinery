@@ -42,18 +42,30 @@ type RunOptions struct {
 	// workspace root above --impl. It is populated only by Snapshot.RunSelected.
 	cargoWorkspaceManifest string
 	cargoWorkspaceLogical  string
+	attestationSubject     *attestationSubject
 }
 
 // Snapshot holds one exclusive design snapshot across selection, gate
 // execution, and any derived reporting that must agree with those reads.
 type Snapshot struct {
-	design        string
-	logicalDesign string
-	lock          *designlock.Lock
-	workspace     *designlock.ExternalTreeSnapshot
+	design                string
+	logicalDesign         string
+	lock                  *designlock.Lock
+	workspace             *designlock.ExternalTreeSnapshot
+	attestationCaptures   []*designlock.AttestationTreeSnapshot
+	attestationPending    []*pendingAttestationResult
+	attestationCustodyErr error
+	attestationFinalized  bool
 }
 
 var cargoAfterImplementationSnapshot = func() {}
+var attestationBeforeFinalRelease = func(*Snapshot) {}
+
+type implementationSnapshot interface {
+	Path() string
+	Logical() string
+	Close() error
+}
 
 func AcquireSnapshot(design string) (*Snapshot, error) {
 	lock, err := designlock.AcquireReader(design)
@@ -67,7 +79,28 @@ func AcquireSnapshot(design string) (*Snapshot, error) {
 	return &Snapshot{design: workspace.Path(), logicalDesign: design, lock: lock, workspace: workspace}, nil
 }
 
-func (s *Snapshot) Release() error { return errors.Join(s.workspace.Close(), s.lock.Release()) }
+func (s *Snapshot) Release() error {
+	if s.attestationFinalized {
+		return s.attestationCustodyErr
+	}
+	attestationBeforeFinalRelease(s)
+	var errs []error
+	errs = append(errs, s.attestationCustodyErr)
+	for _, capture := range s.attestationCaptures {
+		errs = append(errs, capture.CheckUnchanged())
+	}
+	if len(s.attestationCaptures) > 0 {
+		errs = append(errs, s.lock.CheckUnchanged())
+	}
+	for _, capture := range s.attestationCaptures {
+		errs = append(errs, capture.Close())
+	}
+	errs = append(errs, s.workspace.Close(), s.lock.Release())
+	s.attestationCustodyErr = s.LogicalError(errors.Join(errs...))
+	s.attestationFinalized = true
+	finalizeAttestationResults(s.attestationPending, s.attestationCustodyErr)
+	return s.attestationCustodyErr
+}
 
 // DesignPath is the immutable, topology-preserving design root consumers must
 // use for every design-derived read while the snapshot is held.
@@ -79,28 +112,66 @@ func (s *Snapshot) TrackExternal(paths ...string) error { return s.lock.TrackExt
 
 func (s *Snapshot) TrackExternalTree(path string) error { return s.lock.TrackExternalTree(path) }
 
-func (s *Snapshot) CheckUnchanged() error { return s.lock.CheckUnchanged() }
+func (s *Snapshot) CheckUnchanged() error {
+	if s.attestationFinalized {
+		return fmt.Errorf("snapshot released")
+	}
+	var errs []error
+	for _, capture := range s.attestationCaptures {
+		errs = append(errs, capture.CheckUnchanged())
+	}
+	errs = append(errs, s.lock.CheckUnchanged())
+	err := s.LogicalError(errors.Join(errs...))
+	if len(s.attestationCaptures) > 0 {
+		s.attestationCustodyErr = errors.Join(s.attestationCustodyErr, err)
+	}
+	return err
+}
 
 func (s *Snapshot) Select(gateList, impl string) (Selection, error) {
+	if s.attestationFinalized {
+		return Selection{}, fmt.Errorf("snapshot released")
+	}
 	sel, err := selectInSnapshot(s.design, gateList, impl)
 	if err != nil {
 		return sel, fmt.Errorf("%s", strings.ReplaceAll(err.Error(), s.design, s.logicalDesign))
 	}
-	return sel, s.lock.CheckUnchanged()
+	return sel, s.CheckUnchanged()
 }
 
 func (s *Snapshot) RunSelected(impl string, sel Selection, opt RunOptions) []*Gate {
+	if s.attestationFinalized {
+		return []*Gate{{Title: "G0-snapshot", Errs: []string{"GV_SCOPE_CUSTODY: snapshot released"}}}
+	}
 	if opt.GitDesign == "" {
 		opt.GitDesign = s.logicalDesign
 	}
 	logicalImpl := impl
-	var stable *designlock.ExternalTreeSnapshot
+	var stable implementationSnapshot
+	strict := false
+	closeGeneric := func() error {
+		if stable != nil && !strict {
+			return stable.Close()
+		}
+		return nil
+	}
+	failure := func(err error) []*Gate {
+		s.attestationCustodyErr = errors.Join(s.attestationCustodyErr, err)
+		return []*Gate{{Title: "G0-snapshot", Errs: []string{s.LogicalError(err).Error()}}}
+	}
 	var cargoWorkspace *designlock.RegularFileSnapshot
 	if impl != "" {
 		var err error
-		stable, err = s.lock.MaterializeExternalTree(impl)
+		if sel.Run["gv"] && (sel.Explicit || opt.Complete || AttestationActive(s.design) || AttestationOwed(s.design)) {
+			var capture *designlock.AttestationTreeSnapshot
+			opt.attestationSubject, capture, err = s.captureAttestationSubject(impl)
+			stable = capture
+			strict = true
+		} else {
+			stable, err = s.lock.MaterializeExternalTree(impl)
+		}
 		if err != nil {
-			return []*Gate{{Title: "G0-snapshot", Errs: []string{"snapshot implementation tree: " + err.Error()}}}
+			return failure(fmt.Errorf("snapshot implementation tree: %w", err))
 		}
 		if sel.Run["g4"] {
 			cargoAfterImplementationSnapshot()
@@ -112,12 +183,12 @@ func (s *Snapshot) RunSelected(impl string, sel Selection, opt RunOptions) []*Ga
 				workspacePath, locateErr = findCargoWorkspaceAuthority(stable.Path(), logicalImpl, contractIgnorePatterns(contract))
 			}
 			if locateErr != nil {
-				return []*Gate{{Title: "G0-snapshot", Errs: []string{"locate Cargo workspace authority: " + errors.Join(locateErr, stable.Close()).Error()}}}
+				return failure(fmt.Errorf("locate Cargo workspace authority: %w", errors.Join(locateErr, closeGeneric())))
 			}
 			if workspacePath != "" {
 				cargoWorkspace, err = s.lock.MaterializeRegularFile(workspacePath)
 				if err != nil {
-					return []*Gate{{Title: "G0-snapshot", Errs: []string{"snapshot Cargo workspace authority: " + errors.Join(err, stable.Close()).Error()}}}
+					return failure(fmt.Errorf("snapshot Cargo workspace authority: %w", errors.Join(err, closeGeneric())))
 				}
 				opt.cargoWorkspaceManifest = cargoWorkspace.Path()
 				opt.cargoWorkspaceLogical = workspacePath
@@ -133,17 +204,19 @@ func (s *Snapshot) RunSelected(impl string, sel Selection, opt RunOptions) []*Ga
 	if cargoWorkspace != nil {
 		remapGatePaths(out, cargoWorkspace.Path(), opt.cargoWorkspaceLogical)
 	}
-	if err := s.lock.CheckUnchanged(); err != nil {
+	if err := s.CheckUnchanged(); err != nil {
 		out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{err.Error()}})
 	}
-	if stable != nil {
-		if err := stable.Close(); err != nil {
-			out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{"remove private implementation snapshot: " + err.Error()}})
+	if stable != nil && !strict {
+		if err := closeGeneric(); err != nil {
+			s.attestationCustodyErr = errors.Join(s.attestationCustodyErr, err)
+			out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{"remove private implementation snapshot: " + s.LogicalError(err).Error()}})
 		}
 	}
 	if cargoWorkspace != nil {
 		if err := cargoWorkspace.Close(); err != nil {
-			out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{"remove private Cargo workspace snapshot: " + err.Error()}})
+			s.attestationCustodyErr = errors.Join(s.attestationCustodyErr, err)
+			out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{"remove private Cargo workspace snapshot: " + s.LogicalError(err).Error()}})
 		}
 	}
 	return out
@@ -250,7 +323,7 @@ func validateActivationDiscovery(design string) error {
 
 // Select resolves a --gate list (or, when gateList is empty, the default
 // suite) for design. impl is the implementation directory ("" when none was
-// supplied); it decides whether the machine-less-parent narrowing keeps G4.
+// supplied); it keeps G4 and any parent-owned relational Gt obligations.
 // The default narrows on a decomposed parent with no machines/, and an
 // unknown or empty gate name is an error.
 func Select(design, gateList, impl string) (Selection, error) {
@@ -275,7 +348,10 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
 			// layer is the children's, held by the packs; only the
-			// machine-dependent gates (G3, Gx, Gt) narrow away. G4 is NOT
+			// machine-dependent gates (G3, Gx) narrow away. Gt stays when
+			// --impl is supplied and the parent owns relational oracles:
+			// Policy/Isolation test obligations do not belong to children.
+			// G4 is NOT
 			// machine-dependent (the contract and the code suffice), so an
 			// explicit --impl keeps it: v0.3.x silently dropped G4 here and
 			// exited 0 over contract-DENIED edges (GATE-1). Every
@@ -329,12 +405,31 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 			if AttestationActive(design) || AttestationOwed(design) {
 				parts = append(parts, "gv")
 			}
+			parentOracles := false
 			if impl != "" {
 				parts = append(parts, "g4")
+				// Source annotations retain the obligation even if the last
+				// generated oracle is removed. Gp/Gn report that missing output.
+				parentOracles = HasPolicyAnnotation(design) || HasIsolationAnnotation(design)
+				for _, name := range formalOracleNames {
+					has, err := probeRegularFile(design, filepath.Join("formal", name))
+					if err != nil {
+						return sel, fmt.Errorf("cannot inspect parent oracle %s: %w", name, err)
+					}
+					if has {
+						parentOracles = true
+					}
+				}
+				if parentOracles {
+					parts = append(parts, "gt")
+				}
 			}
 			parts = append(parts, "g5")
 			list = strings.Join(parts, ",")
 			sel.Note = "note: decomposed parent with no machines/; running " + list + " (G3/Gx run on the child designs; gt skipped: no machines)"
+			if parentOracles {
+				sel.Note = "note: decomposed parent with no machines/; running " + list + " (G3/Gx run on the child designs; gt checks parent-owned relational obligations)"
+			}
 		}
 	}
 	if sel.Explicit {
@@ -368,14 +463,13 @@ func SelectRunAndNote(design, impl, gateList string, opt RunOptions) (sel Select
 	if err != nil {
 		return sel, nil, "", err
 	}
-	defer func() { retErr = errors.Join(retErr, snapshot.Release()) }()
 	sel, err = snapshot.Select(gateList, impl)
 	if err != nil {
-		return sel, nil, "", err
+		return sel, nil, "", errors.Join(err, snapshot.Release())
 	}
 	run = snapshot.RunSelected(impl, sel, opt)
 	note = snapshot.VersionSkewNote(run)
-	return sel, run, note, nil
+	return sel, run, note, snapshot.Release()
 }
 
 // RunSelected runs the selected gates in canonical order (Gm, Gs, Gu, Gp, Gi,
@@ -392,7 +486,11 @@ func RunSelected(design, impl string, sel Selection, opt RunOptions) []*Gate {
 	}
 	out := snapshot.RunSelected(impl, sel, opt)
 	if err := snapshot.Release(); err != nil {
-		out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{"release design snapshot lock: " + err.Error()}})
+		if len(out) == 1 && out[0].Title == "G0-snapshot" {
+			out[0].Errs = append(out[0].Errs, "release design snapshot lock: "+err.Error())
+		} else {
+			out = append(out, &Gate{Title: "G0-snapshot", Errs: []string{"release design snapshot lock: " + err.Error()}})
+		}
 	}
 	return out
 }
@@ -455,7 +553,7 @@ func runSelectedInSnapshot(design, impl string, sel Selection, opt RunOptions) [
 		out = append(out, CheckAdjudications(design))
 	}
 	if sel.Run["gv"] && (sel.Explicit || opt.Complete || AttestationActive(design) || AttestationOwed(design)) {
-		out = append(out, CheckAttestations(design))
+		out = append(out, checkAttestationsInSnapshot(design, opt.attestationSubject))
 	}
 	if sel.Run["g4"] && impl != "" {
 		out = append(out, checkImportsWithWorkspace(design, impl, nil, opt.cargoWorkspaceManifest))

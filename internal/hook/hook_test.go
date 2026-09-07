@@ -167,6 +167,51 @@ func copyTree(t *testing.T, src, dst string) {
 	if err := copyDesignTree(src, dst); err != nil {
 		t.Fatal(err)
 	}
+	// These Stop fixtures review design/ledger behavior, not the CRM runtime.
+	// Preserve cover bytes and historical acceptance anchors. The shipped
+	// document is migrated to v2 with explicit kinds and its gt row is a
+	// reviewed CURRENT claim over the implementation root; this fixture
+	// recasts only that row as unfulfilled test-plan intent and drops the
+	// manifest, which would otherwise require an implementation root the
+	// fixture deliberately does not carry.
+	path := filepath.Join(dst, gates.AttestationsFileName)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	replace := func(old, next string) {
+		if strings.Count(text, old) != 1 {
+			t.Fatalf("fixture migration needs exactly one %q", old)
+		}
+		text = strings.Replace(text, old, next, 1)
+	}
+	replace("  - claim: gt.conformance-test-shape\n    kind: current\n", "  - claim: gt.conformance-test-shape\n    kind: plan\n")
+	start := strings.Index(text, "\n    implementation:\n")
+	if start < 0 {
+		t.Fatalf("fixture migration cannot locate the gt implementation block")
+	}
+	if end := strings.Index(text[start+1:], "\n  - claim: "); end < 0 {
+		t.Fatalf("fixture migration cannot bound the gt implementation block")
+	} else {
+		text = text[:start] + text[start+1+end:]
+	}
+	line := strings.Split(text, "\n")
+	for i, l := range line {
+		if strings.HasPrefix(l, "    note: 'Substantive current review of the accepted parser-backed scope") {
+			line[i] = "    note: 'Fixture plan only; conformance tests are intended to cover every committed oracle row and assert next state plus ordered actions. No current implementation review or test execution is claimed.'"
+			text = strings.Join(line, "\n")
+			break
+		}
+	}
+	if !strings.Contains(text, "Fixture plan only") {
+		t.Fatalf("fixture migration did not recast the shipped current-review note")
+	}
+	writeFile(t, path, text)
+	g := gates.CheckAttestations(dst)
+	if len(g.Errs) != 0 || len(g.Drift) != 0 || len(g.Warns) != 1 || !strings.Contains(g.Warns[0], "gt.conformance-test-shape: plan only; current implementation review missing") || g.Counts["current implementation reviews"] != 0 || g.Counts["historical review records"] != 1 {
+		t.Fatalf("fixture must retain missing-current warning and historical evidence: %+v", g)
+	}
 }
 
 // copyDesignTree takes a governed reader snapshot before copying a shared

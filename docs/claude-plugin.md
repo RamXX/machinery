@@ -85,11 +85,17 @@ covered artifact is the turn that invalidated the judgment over it), G5 on decom
 when `impl` is configured. A phase you have
 not reached is not demanded of you; a phase you have reached is held.
 
-One narrowing difference from the CLI, stated plainly: on a machine-less decomposed parent,
-`machinery check`'s default selection skips Gt with a note ("gt skipped: no machines"), while the
-hook, whenever `impl` is configured, still runs Gt; with zero machines it has nothing to hold and
-reports vacuously green ("0 machines" on its checked line). Same fact, two renderings: the CLI
-names the skip, the hook shows the empty count; neither run hides it.
+A machine-less decomposed parent can still own Policy or Isolation test obligations. With
+`--impl`, `machinery check`'s default selection retains Gt when the parent has either a matching
+source annotation or a committed decision oracle. Deleting a generated oracle does not disarm
+its source annotation: Gt remains selected, and Gp or Gn reports the missing required output.
+The hook also runs Gt whenever `impl` is configured, including for parent-owned relational
+obligations.
+
+For a genuinely obligation-free machine-less parent, the CLI's default selection skips Gt with
+the note "gt skipped: no machines", while the hook with `impl` configured runs Gt and reports
+"0 machines" on its checked line. These describe an empty coverage obligation only when the
+parent also has no relational obligations; zero machines alone does not establish that.
 
 Ga is the same shape: the hook runs it, but never binds a commit, because mid-turn the commit the
 review ran on does not exist yet. The gate says so on its own note line, and CI (which passes

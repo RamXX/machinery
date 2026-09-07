@@ -71,6 +71,9 @@ func stableAttestationHashes(paths []string) ([]string, error) {
 // itself, which is the other value that must never be copied by hand.
 func newAttestCmd() *cobra.Command {
 	var listClaims bool
+	var design, impl string
+	var review gates.AttestationReview
+	const limits = "Hashes bind the observed files and scope; they do not prove tests ran, reviewer identity, or judgment correctness. Top-level Git administration and the exact Machinery attestation record are excluded; applications that use them as runtime inputs are outside this review boundary."
 	c := &cobra.Command{
 		Use:   "attest [<path> ...]",
 		Short: "Print attestation content hashes (and the claim vocabulary) for " + gates.AttestationsFileName,
@@ -78,14 +81,53 @@ func newAttestCmd() *cobra.Command {
 			"spelling, one 'sha256:<hex>  <path>' line per file. Paste the hash into the covered\n" +
 			"artifact's row in design/" + gates.AttestationsFileName + ". The shell equivalent is\n" +
 			"'shasum -a 256 <path>' (or 'sha256sum <path>') with the 'sha256:' prefix added.\n\n" +
-			"With --claims, print the closed attested-claim vocabulary instead.",
+			"With --claims, print the closed attested-claim vocabulary instead.\n\n" +
+			"Generate one complete v2 row with --design, --claim, --kind plan|current|historical,\n" +
+			"--attestor and --date YYYY-MM-DD. Current requires --impl; plan/historical forbid it.\n" +
+			"Review subjects, then merge the row into attestations.yaml. Generation never writes that file.\n" +
+			"Full-root-v1 has fixed bounds: 100000 entries, depth 64, 1 GiB/file, 8 GiB aggregate;\n" +
+			"the generated and merged evidence document must fit 16 MiB.\n" + limits,
 		Args: cobra.ArbitraryArgs,
 	}
 	c.Flags().BoolVar(&listClaims, "claims", false, "print the closed attested-claim vocabulary and exit")
+	c.Flags().StringVar(&design, "design", "", "logical design root for v2 generation")
+	c.Flags().StringVar(&impl, "impl", "", "complete implementation/test root for kind=current")
+	c.Flags().StringVar(&review.Claim, "claim", "", "one closed-vocabulary claim")
+	c.Flags().StringVar(&review.Kind, "kind", "", "plan, current, or historical")
+	c.Flags().StringVar(&review.Attestor, "attestor", "", "reviewer attribution (not authentication)")
+	c.Flags().StringVar(&review.Date, "date", "", "explicit review date YYYY-MM-DD")
+	c.Flags().StringVar(&review.Note, "note", "", "optional review note")
 	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
 		output := trackCommandOutput()
 		defer func() { retErr = output.join(retErr) }()
 		stdout, stderr := output.stdout, output.stderr
+		generation := false
+		for _, flag := range []string{"design", "impl", "claim", "kind", "attestor", "date", "note"} {
+			generation = generation || cmd.Flags().Changed(flag)
+		}
+		if generation {
+			var err error
+			if listClaims || len(args) > 0 {
+				err = fmt.Errorf("GV_SCHEMA: generation cannot combine --claims or positional files")
+			}
+			for _, flag := range []string{"design", "claim", "kind", "attestor", "date"} {
+				if !cmd.Flags().Changed(flag) {
+					err = errors.Join(err, fmt.Errorf("GV_SCHEMA: generation requires --%s", flag))
+				}
+			}
+			var body []byte
+			if err == nil {
+				body, err = gates.RenderAttestation(design, impl, review)
+			}
+			if err != nil {
+				fmt.Fprintf(stderr, "machinery attest: %s\n", err)
+				return commandExitBecause(1, err)
+			}
+			fmt.Fprintln(stderr, limits)
+			fmt.Fprintln(stderr, "Generated and merged evidence documents must fit the fixed 16 MiB document limit.")
+			fmt.Fprint(stdout, string(body))
+			return nil
+		}
 		if listClaims {
 			for _, id := range gates.AttestationClaimIDs() {
 				fmt.Fprintln(stdout, id)

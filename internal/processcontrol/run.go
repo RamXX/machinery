@@ -43,6 +43,19 @@ func Run(ctx context.Context, cmd *exec.Cmd) error {
 	if ctx == nil {
 		return fmt.Errorf("run subprocess: nil context")
 	}
+	// Explicit custody first: a command attachment or a scope-bearing context
+	// routes the launch through the verified broker. Scoped execution never
+	// falls back to the unscoped direct-child path below.
+	if binding, bound := takeScopedBinding(cmd); bound {
+		return runScoped(ctx, cmd, binding)
+	}
+	if scope := ScopeFromContext(ctx); scope != nil {
+		binding, err := newScopedBinding(cmd, scope)
+		if err != nil {
+			return err
+		}
+		return runScoped(ctx, cmd, binding)
+	}
 	// CommandContext satisfies static call-site guarantees, while tree
 	// cancellation remains owned here. Its direct-child Cancel would otherwise
 	// race the process-group/job termination below and strand descendants.

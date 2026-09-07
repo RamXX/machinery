@@ -805,6 +805,15 @@ actions of the five terminal states live in the oracle's state entry/exit table.
 change in this rebuild, which is exactly why the reused oracle and characterization suites are valid
 migration evidence (migration.yaml asset: oracle and characterization test suites).
 
+**Wholesale conformance obligation.** One wholesale conformance test per machine parses the committed
+`machines/<M>.oracle.md` table and `machines/<M>.machine.json` directly, never a transcription. For
+every oracle row it reconstructs the declared source state and trigger, reconciles the row against the
+machine's declared guard inputs, fires the transition, and asserts both the next state and the complete
+ordered expected-actions list, including the legitimate entry and exit semantics recorded in the
+oracle's state entry/exit table. A conformance parser that checks only row ids or next states is
+incomplete. This is a planned obligation for the rebuild's future implementation suite, not evidence
+that any suite currently runs.
+
 ### 7.2 Contract tests (per boundary, from section 4.6)
 
 One test per interface method x outcome. Repo tests run against a real disposable SurrealDB container
@@ -1110,9 +1119,12 @@ implementation `go.mod` and the compose file.
       satisfy those gates.
 4. **The tests are then LOCKED.** The implementer agent may not modify, weaken, skip, or delete them to make
    them pass. Locking is structural (the test files are owned by the test-writer; changes require a design
-   round-trip). If a gate later demands a change to a locked file, that is a RED-phase defect and not
-   license to edit: it takes an owner-sanctioned amendment that changes formatting only and carries a
-   token-identity proof (the file's token stream is identical before and after).
+   round-trip). Frozen test identity is defined by exact bytes and file inventory.
+   Any amendment requires explicit owner authorization, a new evidence revision, and replay
+   of RED and all applicable gates before the revised tests lock. Neither formatting nor token
+   equality authorizes an editing exemption.
+   A gate demanding a locked-file change is a RED-phase defect requiring that design round-trip;
+   the original evidence revision remains immutable.
 5. **The implementer agent** writes production code until the locked tests pass, honoring the section 4.5
    Architecture Contract (C-ARCH-01) and the section 10 realization rules.
 6. **GREEN acceptance bar**, both together: the locked suite passes AND

@@ -1,0 +1,63 @@
+package gates
+
+import (
+	"strings"
+	"testing"
+)
+
+// These extra cases exercise authoring boundaries without changing frozen RED.
+func TestReadsConsumerSupplementalPass(t *testing.T) {
+	cases := []struct{ name, matrix string }{
+		{"reordered_annotated_owner", "| consumer (participant) | contract |\n|---|---|\n| `payments` (worker) | `markPaid` READS{Order.id} |\n"},
+		{"escaped_pipe_before_owner", "| contract | consumer |\n|---|---|\n| x \\| `markPaid` READS{Order.id} | payments |\n"},
+		{"table_local_column_positions", "| contract | consumer |\n|---|---|\n| `markPaid` READS{Order.id} | payments |\n\n| consumer | contract |\n|---|---|\n| audit | `markPaid` READS{Order.paidAt} |\n"},
+		{"legacy_prose_unique_owner", "Consumes `markPaid` READS{Order.id}\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rows := readsConsumerRow("payments", "Order.id")
+			if tc.name == "table_local_column_positions" {
+				rows += readsConsumerRow("audit", "Order.paidAt")
+			}
+			g := readsConsumerCheck(t, readsConsumerDesign(t, rows, map[string]string{"PaymentHandler": tc.matrix}))
+			if len(g.Errs) != 0 || g.Counts["event-contract consumer reads declared"] == 0 {
+				t.Fatalf("valid declaration must execute and pass: errors=%v counts=%v", g.Errs, g.Counts)
+			}
+		})
+	}
+}
+
+func TestReadsConsumerSupplementalExactSetOrder(t *testing.T) {
+	m := readsConsumerDeclarations()
+	m["PaymentHandler"] = readsConsumerMatrixHeader + readsConsumerDeclaration("payments", "READS{Order.id, Order.paidAt}")
+	m["PaymentJournal"] = readsConsumerMatrixHeader + readsConsumerDeclaration("payments", "READS{`Order.paidAt`, `Order.id`}")
+	g := readsConsumerCheck(t, readsConsumerDesign(t, readsConsumerFanout(), m))
+	if len(g.Errs) != 0 {
+		t.Fatalf("the same exact set in a different order must agree: %v", g.Errs)
+	}
+}
+
+func TestReadsConsumerSupplementalFailClosed(t *testing.T) {
+	cases := []struct{ name, matrix, consumer string }{
+		{"duplicate_owner_columns", "| contract | consumer | consumer |\n|---|---|---|\n| `markPaid` READS{Order.id} | payments | payments |\n", "payments"},
+		{"short_explicit_owner_row", "| contract | consumer |\n|---|---|\n| `markPaid` READS{Order.id} |\n", "payments"},
+		{"extra_closing_brace", readsConsumerMatrixHeader + readsConsumerDeclaration("payments", "READS{Order.id}}"), "payments"},
+		{"unclosed_waiver_with_valid_declaration", readsConsumerMatrixHeader + readsConsumerDeclaration("payments", "READS{Order.id}"), "payments (no reads: wake-up"},
+		{"duplicate_waivers", readsConsumerMatrixHeader + readsConsumerDeclaration("payments", "READS{Order.id}"), "payments (no reads: wake-up) (no reads: )"},
+		{"unknown_owner_cannot_hide_behind_valid_row", readsConsumerMatrixHeader + readsConsumerDeclaration("payments", "READS{Order.id}") + readsConsumerDeclaration("archive", "READS{Order.id}"), "payments"},
+		{"nonconsumer_header_is_legacy", "| contract | nonconsumer |\n|---|---|\n| `markPaid` READS{Order.id} | payments |\n", "payments"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rows := readsConsumerRow(tc.consumer, readsConsumerAllFields)
+			if tc.name == "nonconsumer_header_is_legacy" {
+				rows += readsConsumerRow("audit", readsConsumerAllFields)
+			}
+			g := readsConsumerCheck(t, readsConsumerDesign(t, rows, map[string]string{"PaymentHandler": tc.matrix}))
+			readsConsumerRequireBlocked(t, g, tc.name)
+			if tc.name == "duplicate_owner_columns" && !strings.Contains(strings.Join(g.Errs, "\n"), "PaymentHandler.matrix.md:3") {
+				t.Fatalf("finding must address the physical declaring row: %v", g.Errs)
+			}
+		})
+	}
+}

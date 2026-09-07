@@ -796,11 +796,13 @@ func TestVersionSkewNoteNamesEveryApplicableCommand(t *testing.T) {
 		"machinery alloy " + design,
 		"machinery verify-formal --gen-only " + design,
 		"machinery pack generate " + design,
-		"machinery baseline " + design + " --impl <dir>",
 	} {
 		if !strings.Contains(note, want) {
 			t.Errorf("skew note omits %q: %q", want, note)
 		}
+	}
+	if strings.Contains(note, "machinery baseline") {
+		t.Errorf("version-skew regeneration must not accept boundary debt: %q", note)
 	}
 }
 
