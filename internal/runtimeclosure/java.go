@@ -389,6 +389,19 @@ func sameJavaFileSnapshot(before, after os.FileInfo) bool {
 	return before != nil && after != nil && os.SameFile(before, after) && before.Mode() == after.Mode() && before.Size() == after.Size() && before.ModTime().Equal(after.ModTime()) && javaFileChangeID(before) == javaFileChangeID(after)
 }
 
+// javaWitnessTimeCoarsener, when non-nil, coarsens the timestamp components
+// of java launcher change IDs to simulate kernels whose inode timestamps tick
+// only coarsely. It exists so tests can reproduce coarse-clock ABA blindness
+// deterministically on any host. Production code always leaves it nil.
+var javaWitnessTimeCoarsener func(sec, nsec int64) (int64, int64)
+
+func javaCoarsenWitnessTime(sec, nsec int64) (int64, int64) {
+	if javaWitnessTimeCoarsener == nil {
+		return sec, nsec
+	}
+	return javaWitnessTimeCoarsener(sec, nsec)
+}
+
 func javaFileChangeID(info os.FileInfo) string {
 	if info == nil || info.Sys() == nil {
 		return ""
@@ -404,12 +417,14 @@ func javaFileChangeID(info os.FileInfo) string {
 		}
 		sec, nsec := field.FieldByName("Sec"), field.FieldByName("Nsec")
 		if sec.IsValid() && nsec.IsValid() && sec.CanInt() && nsec.CanInt() {
-			return fmt.Sprintf("ctime:%d:%d", sec.Int(), nsec.Int())
+			csec, cnsec := javaCoarsenWitnessTime(sec.Int(), nsec.Int())
+			return fmt.Sprintf("ctime:%d:%d", csec, cnsec)
 		}
 	}
 	sec, nsec := value.FieldByName("Ctime"), value.FieldByName("Ctimensec")
 	if sec.IsValid() && nsec.IsValid() && sec.CanInt() && nsec.CanInt() {
-		return fmt.Sprintf("ctime:%d:%d", sec.Int(), nsec.Int())
+		csec, cnsec := javaCoarsenWitnessTime(sec.Int(), nsec.Int())
+		return fmt.Sprintf("ctime:%d:%d", csec, cnsec)
 	}
 	return ""
 }

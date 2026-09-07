@@ -13,6 +13,19 @@ import (
 // the two complete inventory passes. Production code always leaves it nil.
 var formalAfterDirectoryInventoryPass func(string)
 
+// formalWitnessTimeCoarsener, when non-nil, coarsens the timestamp components
+// of native formal witnesses to simulate kernels whose inode timestamps tick
+// only coarsely. It exists so tests can reproduce coarse-clock ABA blindness
+// deterministically on any host. Production code always leaves it nil.
+var formalWitnessTimeCoarsener func(sec, nsec int64) (int64, int64)
+
+func formalCoarsenWitnessTime(sec, nsec int64) (int64, int64) {
+	if formalWitnessTimeCoarsener == nil {
+		return sec, nsec
+	}
+	return formalWitnessTimeCoarsener(sec, nsec)
+}
+
 type formalCapturedDirEntry struct {
 	name string
 	info os.FileInfo
