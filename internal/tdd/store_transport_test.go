@@ -282,9 +282,13 @@ func TestImportRejectsMalformedTamperedOversized(t *testing.T) {
 		t.Fatal(err)
 	}
 	head := currentHeadDigest(t, store)
-	rebuild := func(mutate func(idx *archiveIndex, payloads [][]byte) [][]byte, name string) {
+	rebuild := func(mutate func(idx *archiveIndex, payloads [][]byte) [][]byte, name, wantCode string) {
 		t.Helper()
-		clone := idx
+		clone := archiveIndex{
+			Schema: idx.Schema, StoreID: idx.StoreID, ProjectID: idx.ProjectID,
+			HeadDigest: idx.HeadDigest, Generation: idx.Generation, TotalBytes: idx.TotalBytes,
+			Entries: append([]archiveIndexEntry(nil), idx.Entries...),
+		}
 		var pl [][]byte
 		for _, p := range payloads {
 			pl = append(pl, append([]byte(nil), p...))
@@ -297,32 +301,33 @@ func TestImportRejectsMalformedTamperedOversized(t *testing.T) {
 		archive := filepath.Join(t.TempDir(), name+".tddexp")
 		writeArchiveRaw(t, archive, append([][]byte{marshaled}, pl...))
 		dest := filepath.Join(t.TempDir(), name+"-dest")
-		if _, err := ImportStore(context.Background(), dest, archive, fixtureProjectID, head); err == nil || !strings.Contains(err.Error(), "INVALID_SCHEMA") {
+		if _, err := ImportStore(context.Background(), dest, archive, fixtureProjectID, head); err == nil || !strings.Contains(err.Error(), wantCode) {
 			t.Errorf("%s accepted: err = %v", name, err)
 		}
 		if _, err := os.Lstat(dest); !os.IsNotExist(err) {
 			t.Errorf("%s left a published destination behind", name)
 		}
 	}
-	// unknown schema
-	rebuild(func(i *archiveIndex, _ [][]byte) [][]byte { i.Schema = "someone.else/v9"; return payloads }, "schema")
+	// unknown schema (UNSUPPORTED_VERSION is the closed code for a foreign
+	// schema identity)
+	rebuild(func(i *archiveIndex, _ [][]byte) [][]byte { i.Schema = "someone.else/v9"; return payloads }, "schema", "UNSUPPORTED_VERSION")
 	// duplicate paths
 	rebuild(func(i *archiveIndex, _ [][]byte) [][]byte {
 		if len(i.Entries) > 0 {
 			i.Entries = append(i.Entries, i.Entries[0])
 		}
 		return payloads
-	}, "dup")
+	}, "dup", "INVALID_SCHEMA")
 	// declared size beyond the bundle cap
 	rebuild(func(i *archiveIndex, _ [][]byte) [][]byte {
 		i.Entries[0].Size = int64(1) << 40
 		return payloads
-	}, "oversize")
+	}, "oversize", "OUTPUT_LIMIT")
 	// index digest lying about a payload
 	rebuild(func(i *archiveIndex, _ [][]byte) [][]byte {
 		i.Entries[0].Digest = "sha256:" + strings.Repeat("0", 64)
 		return payloads
-	}, "digest-lie")
+	}, "digest-lie", "INVALID_SCHEMA")
 	// dropped blob record still referenced by the index
 	rebuild(func(i *archiveIndex, pl [][]byte) [][]byte {
 		for k, e := range i.Entries {
@@ -332,7 +337,7 @@ func TestImportRejectsMalformedTamperedOversized(t *testing.T) {
 			}
 		}
 		return pl
-	}, "missing-blob")
+	}, "missing-blob", "INVALID_SCHEMA")
 	// raw truncation mid-record
 	trunc := filepath.Join(t.TempDir(), "trunc.tddexp")
 	raw := mustRead(t, out)

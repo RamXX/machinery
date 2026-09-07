@@ -195,12 +195,12 @@ func digestHex(b []byte) string {
 // topology encoding (written directly against the contract text, not shared
 // with production code).
 func testTreeEnc(entries []struct {
-	Rel   string
-	Dir   bool
-	Perm  uint32
-	Size  int64
-	Dig   []byte
-	Role  string
+	Rel  string
+	Dir  bool
+	Perm uint32
+	Size int64
+	Dig  []byte
+	Role string
 }) string {
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Rel < entries[j].Rel })
 	h := sha256.New()
@@ -238,11 +238,11 @@ func testTreeEnc(entries []struct {
 // readBundleDoc decodes a store bundle.json for assertions (test-side,
 // independent of production decoders beyond JSON syntax).
 func readBundleDoc(t *testing.T, store, ref string) (raw []byte, entries map[string]struct {
-	Kind  string `json:"kind"`
-	Mode  int64  `json:"mode"`
-	Size  int64  `json:"size"`
+	Kind   string `json:"kind"`
+	Mode   int64  `json:"mode"`
+	Size   int64  `json:"size"`
 	Digest string `json:"digest"`
-	Role  string `json:"role"`
+	Role   string `json:"role"`
 }, treeDigest string) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(store, "objects", strings.TrimPrefix(ref, "sha256:"), "bundle.json"))
@@ -250,8 +250,8 @@ func readBundleDoc(t *testing.T, store, ref string) (raw []byte, entries map[str
 		t.Fatalf("read bundle.json: %v", err)
 	}
 	var doc struct {
-		Schema     string `json:"schema"`
-		Entries    []struct {
+		Schema  string `json:"schema"`
+		Entries []struct {
 			Path   string `json:"path"`
 			Kind   string `json:"kind"`
 			Mode   int64  `json:"mode"`
@@ -606,10 +606,11 @@ func TestCaptureRejectsStoreOverlap(t *testing.T) {
 	if naive(filepath.Join(base, "src-store"), base) == false {
 		t.Fatal("setup: naive twin must prefix-match")
 	}
-	// naive twin cannot distinguish sibling "src2" from child of "src"
+	// naive twin cannot distinguish sibling "src2" from child of "src": it
+	// ACCEPTS the sibling as inside — production must not
 	root := filepath.Join(base, "src")
-	if naive(filepath.Join(base, "src2"), root) {
-		t.Error("challenge twin: naive prefix check treats the sibling src2 as inside src; production must not")
+	if !naive(filepath.Join(base, "src2"), root) {
+		t.Fatal("challenge twin must accept the sibling to prove it is the weak variant")
 	}
 	// end to end: capture with an overlapping store fails closed
 	if _, err := InitStore(context.Background(), filepath.Join(src, "store"), fixtureProjectID); err != nil {

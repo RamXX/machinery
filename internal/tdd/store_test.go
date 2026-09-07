@@ -315,10 +315,10 @@ func TestStoreOpenValidatesIdentityLayoutProject(t *testing.T) {
 		t.Fatalf("init other: %v", err)
 	}
 	src, ctl, st, plan, manifests, inv, _ := boundStatusFixture(t)
-	// project mismatch is blocking
+	// project mismatch is blocking: the fixture store's project differs
+	// from the plan's requirement
 	badReq := statusRequest(src, ctl, st, plan, manifests, inv)
 	badReq.Store = other
-	badReq.Plan = withProject(plan, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	if _, err := Status(context.Background(), badReq); err == nil || !strings.Contains(err.Error(), "STORE_ROOT_MISMATCH") {
 		t.Errorf("project mismatch accepted: err = %v", err)
 	}
@@ -342,7 +342,7 @@ func TestStoreOpenValidatesIdentityLayoutProject(t *testing.T) {
 	if err := os.Chmod(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Status(context.Background(), statusRequest(src, ctl, st, plan, manifests, inv)); err == nil || !strings.Contains(err.Error(), "STORE_ROOT_MISMATCH") {
+	if _, err := Status(context.Background(), statusRequest(src, ctl, store, plan, manifests, inv)); err == nil || !strings.Contains(err.Error(), "STORE_ROOT_MISMATCH") {
 		t.Errorf("non-0700 store accepted: err = %v", err)
 	}
 	if err := os.Chmod(store, 0o700); err != nil {
@@ -352,7 +352,7 @@ func TestStoreOpenValidatesIdentityLayoutProject(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "foreign"), []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Status(context.Background(), statusRequest(src, ctl, st, plan, manifests, inv)); err == nil || !strings.Contains(err.Error(), "INVALID_SCHEMA") {
+	if _, err := Status(context.Background(), statusRequest(src, ctl, store, plan, manifests, inv)); err == nil || !strings.Contains(err.Error(), "INVALID_SCHEMA") {
 		t.Errorf("unknown store entry accepted: err = %v", err)
 	}
 	if err := os.Remove(filepath.Join(store, "foreign")); err != nil {
@@ -366,7 +366,7 @@ func TestStoreOpenValidatesIdentityLayoutProject(t *testing.T) {
 	if err := os.WriteFile(sj, []byte(`{"schema":"machinery.tdd.store/v1","store_id":"x"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Status(context.Background(), statusRequest(src, ctl, st, plan, manifests, inv)); err == nil || !strings.Contains(err.Error(), "INVALID_SCHEMA") {
+	if _, err := Status(context.Background(), statusRequest(src, ctl, store, plan, manifests, inv)); err == nil || !strings.Contains(err.Error(), "INVALID_SCHEMA") {
 		t.Errorf("corrupted store.json accepted: err = %v", err)
 	}
 }
@@ -603,26 +603,33 @@ func TestHeadChainValidationAndRollback(t *testing.T) {
 	if _, err := Status(context.Background(), statusRequest(src, ctl, store, plan, manifests, inv)); err == nil || !strings.Contains(err.Error(), "CONTROL_ROLLBACK") {
 		t.Errorf("tampered head accepted: err = %v", err)
 	}
-	// restore, then a discontinuous chain: previous names an unknown digest
+	// restore, advance a legitimately chained generation-2 head, then roll
+	// head.json back: a lone staged successor is recoverable, not corruption
 	archived1 := mustRead(t, filepath.Join(store, "ledger", "heads", strings.TrimPrefix(head1, "sha256:")+".json"))
-	if err := os.WriteFile(hj, archived1, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	unknown := "sha256:" + strings.Repeat("e", 64)
-	advanceHeadTo(t, store, fixtureProjectID, 2, unknown, nil, nil)
-	if _, err := Status(context.Background(), statusRequest(src, ctl, store, plan, manifests, inv)); err == nil || !strings.Contains(err.Error(), "CONTROL_ROLLBACK") {
-		t.Errorf("discontinuous chain accepted: err = %v", err)
-	}
-	// roll back to head1 while head2 is archived: ambiguous staged commit,
-	// valid old head + chained successor is recoverable, not corruption
 	if err := os.WriteFile(hj+".restore", archived1, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Rename(hj+".restore", hj); err != nil {
 		t.Fatal(err)
 	}
+	advanceHeadTo(t, store, fixtureProjectID, 2, head1, nil, []headMs{{Design: ".", Milestone: "M1", Revision: 2, Manifest: manifestDigest, Pred: manifestDigest}})
+	if _, err := Status(context.Background(), statusRequest(src, ctl, store, plan, manifests, inv)); err != nil {
+		t.Fatalf("chained generation-2 head rejected: %v", err)
+	}
+	if err := os.WriteFile(hj+".rb", archived1, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(hj+".rb", hj); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := Status(context.Background(), statusRequest(src, ctl, store, plan, manifests, inv)); err != nil {
 		t.Errorf("recoverable staged successor rejected: %v", err)
+	}
+	// a discontinuous chain: previous names an unknown digest
+	unknown := "sha256:" + strings.Repeat("e", 64)
+	advanceHeadTo(t, store, fixtureProjectID, 3, unknown, nil, nil)
+	if _, err := Status(context.Background(), statusRequest(src, ctl, store, plan, manifests, inv)); err == nil || !strings.Contains(err.Error(), "CONTROL_ROLLBACK") {
+		t.Errorf("discontinuous chain accepted: err = %v", err)
 	}
 	// a generation-zero head with entries is never valid
 	emptyHead := renderHeadCanon(fixtureProjectID, 0, "", nil, []headMs{{Design: ".", Milestone: "M1", Revision: 1, Manifest: manifestDigest}})
