@@ -1,0 +1,75 @@
+{
+  "policy_version": 1,
+  "description": "Machinery release publication policy, single source for scripts/release-policy. Release requires successful ci, formal, and security runs on the EXACT release commit (workflow identity, run conclusion, and every required job conclusion, including the required integration lane), a tag matching the numeric version pattern, and main ancestry for the release commit. Schedule events are excluded as evidence: only deliberate push, pull_request, and workflow_dispatch runs count. This file is verified locally by go test ./scripts/release-policy against captured API response fixtures and real disposable git repositories; fixture tests are not live remote enforcement.",
+  "application_status": "ready-to-apply but intentionally NOT applied: no GitHub branch protection, required checks, dispatch, publish, or any other remote mutation has been performed; locally tested policy is distinct from remotely enforced state",
+  "target": {
+    "repository": "RamXX/machinery",
+    "branch": "main"
+  },
+  "required_workflows": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "name": "ci",
+      "events": ["push", "pull_request"],
+      "required_jobs": ["integration-required", "lint", "test", "gates", "example-impls", "golden", "golden-native", "native-tests", "docs", "tidy", "modelith-render", "design-engines"]
+    },
+    {
+      "path": ".github/workflows/formal.yml",
+      "name": "formal",
+      "events": ["push", "pull_request", "workflow_dispatch"],
+      "required_jobs": ["integration-required", "verify-formal"]
+    },
+    {
+      "path": ".github/workflows/security.yml",
+      "name": "security",
+      "events": ["push", "pull_request", "workflow_dispatch"],
+      "required_jobs": ["govulncheck", "gitleaks"]
+    }
+  ],
+  "tag_pattern": "^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+  "main_ref": "refs/remotes/origin/main",
+  "artifact_inventory": {
+    "names": [
+      "machinery-darwin-amd64",
+      "machinery-darwin-arm64",
+      "machinery-linux-amd64",
+      "machinery-linux-arm64",
+      "machinery_{version}_darwin_amd64.tar.gz",
+      "machinery_{version}_darwin_arm64.tar.gz",
+      "machinery_{version}_linux_amd64.tar.gz",
+      "machinery_{version}_linux_arm64.tar.gz"
+    ]
+  },
+  "github_required_status_checks": {
+    "endpoint": "/repos/RamXX/machinery/branches/main/protection/required_status_checks",
+    "method": "PUT",
+    "payload": {
+      "strict": true,
+      "contexts": [
+        "integration-required",
+        "build (ubuntu-latest, linux, amd64, true)",
+        "build (ubuntu-latest, linux, arm64, false)",
+        "build (macos-latest, darwin, arm64, true)",
+        "build (ubuntu-latest, windows, amd64, false)",
+        "lint",
+        "test",
+        "gates",
+        "example-impls",
+        "golden",
+        "golden-native",
+        "native-tests",
+        "docs",
+        "tidy",
+        "modelith-render",
+        "design-engines",
+        "verify-formal",
+        "govulncheck",
+        "gitleaks",
+        "dependency-review"
+      ]
+    },
+    "apply_command": "jq '.github_required_status_checks.payload' docs/release-policy.json | gh api -X PUT repos/RamXX/machinery/branches/main/protection/required_status_checks --input - (branch protection must already exist: gh api repos/RamXX/machinery/branches/main/protection)",
+    "verify_command": "gh api repos/RamXX/machinery/branches/main/protection/required_status_checks --jq '.contexts[]'",
+    "pre_apply_name_confirmation": "gh api repos/RamXX/machinery/commits/<main-sha>/check-runs -H 'Accept: application/vnd.github+json' --jq '.check_runs[].name' and confirm every context above exists verbatim, especially the four matrix-expanded build names, before applying; a context that never appears on a commit would block every merge"
+  }
+}

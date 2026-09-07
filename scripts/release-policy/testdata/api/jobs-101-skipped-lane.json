@@ -1,0 +1,10 @@
+{"total_count": 8, "jobs": [
+  {"id": 21, "name": "integration-required", "status": "completed", "conclusion": "skipped"},
+  {"id": 22, "name": "build (ubuntu-latest, linux, amd64, true)", "status": "completed", "conclusion": "success"},
+  {"id": 23, "name": "lint", "status": "completed", "conclusion": "success"},
+  {"id": 24, "name": "test", "status": "completed", "conclusion": "success"},
+  {"id": 25, "name": "gates", "status": "completed", "conclusion": "success"},
+  {"id": 26, "name": "golden", "status": "completed", "conclusion": "success"},
+  {"id": 27, "name": "docs", "status": "completed", "conclusion": "success"},
+  {"id": 28, "name": "tidy", "status": "completed", "conclusion": "success"}
+]}

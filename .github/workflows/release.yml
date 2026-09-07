@@ -1,6 +1,8 @@
 # release.yml - cross-compile and publish the machinery binary on tag push.
 # Produces static binaries for Linux and macOS, checksums them,
 # and attaches everything to a GitHub Release. Users install without Go.
+# Publication is gated by scripts/release-policy: the exact release commit
+# must carry successful ci, formal, and security runs and descend from main.
 name: release
 
 on:
@@ -12,10 +14,10 @@ on:
         description: "Version tag (e.g. v0.1.0)"
         required: true
 
+# Least privilege by default; only the publish job escalates to what the
+# release and its attestations actually need.
 permissions:
-  contents: write      # needed to create the release
-  id-token: write      # SLSA build provenance (attest-build-provenance)
-  attestations: write  # SLSA build provenance (attest-build-provenance)
+  contents: read
 
 # A tag run and a manual run for the same version must never mutate one release
 # concurrently. Let the first run finish; never cancel a publication in flight.
@@ -24,6 +26,58 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ------------------------------------------------------------------ gate ---
+  # Tag and manual dispatch obey the SAME prerequisites: the exact release
+  # commit must carry successful ci, formal, and security runs (workflow
+  # identity, run conclusion, and required job conclusions, including the
+  # required integration lane) and must descend from main. Pending, failed,
+  # cancelled, skipped, stale-SHA, wrong-workflow-identity, and missing
+  # required checks all block; API unavailability denies (fail closed).
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # full history: tag resolution and main ancestry
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Resolve version
+        id: ver
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            version="$INPUT_VERSION"
+          else
+            version="$REF_NAME"
+          fi
+          if ! printf '%s\n' "$version" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::release version must be a numeric vMAJOR.MINOR.PATCH tag"
+            exit 1
+          fi
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+      - name: Verify release policy for the exact release commit
+        env:
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
+          RELEASE_POLICY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          go run ./scripts/release-policy \
+            -root . \
+            -tag "$RELEASE_VERSION" \
+            -expect-sha "$GITHUB_SHA" \
+            -api-base "https://api.github.com" \
+            -repository "$GITHUB_REPOSITORY"
+
   # ---------------------------------------------------------------- build ---
   # Cross-compile in a single matrix job. CGO is disabled so the binaries are
   # fully static (no libc dependency on Linux, works on any glibc/musl).
@@ -41,6 +95,7 @@ jobs:
           - goos: darwin
             goarch: arm64
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -124,13 +179,61 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  # ------------------------------------------------------------ publish ---
-  # Collect all artifacts, generate checksums, and create the GitHub Release.
-  publish:
+  # ------------------------------------------------------------- manifest ---
+  # Bind the build artifacts to this release commit: a sorted sha256 manifest
+  # of exactly the eight build outputs, committed to the run's artifacts so
+  # publish can prove it publishes precisely what build produced, for exactly
+  # this commit, with no substitution possible in between.
+  manifest:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download build outputs
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Bind build artifact identity to this release commit
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          cd dist
+          find . -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort >"$RUNNER_TEMP/manifest-names"
+          count=$(wc -l <"$RUNNER_TEMP/manifest-names")
+          if [ "$count" -ne 8 ]; then
+            echo "::error::expected exactly 8 build artifacts, found $count"
+            exit 1
+          fi
+          {
+            printf 'commit %s\n' "$RELEASE_COMMIT"
+            while IFS= read -r name; do
+              printf '%s  %s\n' "$(sha256sum "$name" | awk '{print $1}')" "$name"
+            done <"$RUNNER_TEMP/manifest-names"
+          } >dist-manifest.txt
+      - name: Upload build manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-manifest
+          path: dist/dist-manifest.txt
+          if-no-files-found: error
+
+  # ------------------------------------------------------------ publish ---
+  # Collect all artifacts, verify their identity against the gate and the
+  # build manifest, generate checksums, and create the GitHub Release.
+  publish:
+    needs: [build, gate, manifest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write      # needed to create the release
+      id-token: write      # SLSA build provenance (attest-build-provenance)
+      attestations: write  # SLSA build provenance (attest-build-provenance)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # full history: tag resolution and main ancestry
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -171,6 +274,20 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: Verify release policy and build artifact identity
+        env:
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
+          RELEASE_POLICY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          go run ./scripts/release-policy \
+            -root . \
+            -tag "$RELEASE_VERSION" \
+            -expect-sha "$GITHUB_SHA" \
+            -api-base "https://api.github.com" \
+            -repository "$GITHUB_REPOSITORY" \
+            -artifact-manifest dist/dist-manifest.txt \
+            -artifacts-dir dist
       - name: Reject release/repository/plugin/binary version mismatch
         env:
           RELEASE_VERSION: ${{ steps.ver.outputs.version }}
@@ -225,6 +342,7 @@ jobs:
             machinery-linux-amd64 \
             machinery-linux-arm64 \
             machinery-source.tar.gz \
+            dist-manifest.txt \
             "machinery_${plain}_darwin_amd64.tar.gz" \
             "machinery_${plain}_darwin_arm64.tar.gz" \
             "machinery_${plain}_linux_amd64.tar.gz" \
