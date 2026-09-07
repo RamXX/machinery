@@ -1,7 +1,7 @@
 ---
 id: MAC-hwdb
 title: "Bound OpenCode governance subprocesses"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [hard-tdd, delivered, accepted]
@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:30:27Z
 created_by: ramirosalas
 updated_at: 2026-09-07T08:24:55Z
-content_hash: "sha256:92cf47c7c9cfd6f6de3cc59a8d06b529e7c819fe63e4fe88e1b165c760affab0"
-blocks: [MAC-gcrr, MAC-ou97]
+content_hash: "sha256:b805a6d5025eef9cd81e8f0ffc7a175624d6352cd98178281508a8b287d71387"
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp, MAC-yhg5]
 assignee: dev-MAC-hwdb
+closed_at: 2026-09-07T08:24:55Z
+close_reason: "Accepted: opencode governance subprocesses bounded; merged to local epic"
 ---
 
 ## Description
@@ -116,10 +117,12 @@ status: delivered
 - 2026-09-07T07:22:57Z auto-follows: linked to predecessor MAC-hpqp
 - 2026-09-07T08:19:14Z status: in_progress -> in_progress
 - 2026-09-07T08:19:14Z auto-follows: linked to predecessor MAC-yhg5
+- 2026-09-07T08:24:55Z status: in_progress -> closed
+- 2026-09-07T08:24:55Z dep_removed: no_longer_blocks MAC-gcrr
+- 2026-09-07T08:24:55Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 - Was blocked by: [[MAC-hpqp]]
 - Follows: [[MAC-hpqp]], [[MAC-yhg5]]
 
