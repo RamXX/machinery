@@ -9,13 +9,13 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:00:51Z
 created_by: ramirosalas
 updated_at: 2026-09-07T10:08:34Z
-content_hash: "sha256:77d8db1e45123b97e1253b1ba457df03b3bf527e83ba5efdc8458f577d6072fb"
+content_hash: "sha256:a4b7f69b0015e1f680865effa3cc4a2e569afd6becf01d700f5e67a6fe96d6a0"
 was_blocked_by: [MAC-6h0s, MAC-hpqp, MAC-hy71]
 follows: [MAC-6h0s, MAC-hpqp, MAC-hy71]
 assignee: dev-MAC-bz1y
 closed_at: 2026-09-07T10:08:34Z
 close_reason: "Accepted: four-language native assurance conformance lanes enforced; merged to local epic"
-led_to: [MAC-wi2u, MAC-avfp, MAC-imtz]
+led_to: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai]
 ---
 
 ## Description
@@ -126,7 +126,7 @@ status: new
 - Parent: [[MAC-ui8a]]
 - Was blocked by: [[MAC-6h0s]], [[MAC-hpqp]], [[MAC-hy71]]
 - Follows: [[MAC-6h0s]], [[MAC-hpqp]], [[MAC-hy71]]
-- Led to: [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]]
+- Led to: [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]]
 
 ## Comments
 
