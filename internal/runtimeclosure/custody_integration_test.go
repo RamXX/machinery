@@ -171,13 +171,14 @@ func usePinnedJava(t *testing.T) {
 
 // TestAttachCustodyBindsScopeAfterSanitation is the unsafe-implementation
 // challenge for the sanitized-environment safe defaults: a scoped launch must
-// carry the custody attachment while staying sanitized.
+// run under a broker guardian (distinct parent) while staying sanitized.
 func TestAttachCustodyBindsScopeAfterSanitation(t *testing.T) {
 	s := openRuntimeCustodyScope(t)
 	defer closeRuntimeCustodyScope(t, s, 30*time.Second)
 	dir := t.TempDir()
 	envFile := filepath.Join(dir, "env.txt")
-	cmd := exec.Command("/bin/sh", "-c", "env > "+envFile)
+	ppidFile := filepath.Join(dir, "ppid.txt")
+	cmd := exec.Command("/bin/sh", "-c", "env > "+envFile+"; echo $PPID > "+ppidFile)
 	cmd.Env = Environment(dir, dir, "/usr/bin/true")
 	t.Setenv("JAVA_TOOL_OPTIONS", "-javaagent:/hostile.jar")
 	ctx := processcontrol.WithScope(context.Background(), s)
@@ -188,11 +189,16 @@ func TestAttachCustodyBindsScopeAfterSanitation(t *testing.T) {
 		t.Fatalf("scoped run: %v", err)
 	}
 	env := runtimeCustodyWaitFile(t, envFile, 10*time.Second)
-	if !strings.Contains(env, processscope.EnvAttachment+"=") {
-		t.Fatalf("scoped environment lacks the custody attachment after Environment sanitation:\n%s", env)
-	}
 	if strings.Contains(env, "hostile") {
 		t.Fatalf("ambient hostile values survived sanitation:\n%s", env)
+	}
+	ppidText := strings.TrimSpace(runtimeCustodyWaitFile(t, ppidFile, 10*time.Second))
+	ppid, err := strconv.Atoi(ppidText)
+	if err != nil {
+		t.Fatalf("guardian ppid %q: %v", ppidText, err)
+	}
+	if ppid == 0 || ppid == os.Getpid() || ppid == os.Getppid() {
+		t.Fatalf("scoped child must run under a distinct guardian parent, saw %d (self %d, parent %d)", ppid, os.Getpid(), os.Getppid())
 	}
 }
 

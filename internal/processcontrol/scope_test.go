@@ -53,7 +53,8 @@ func TestCustodyScopeHelper(t *testing.T) {
 	file := os.Getenv("MACHINERY_CUSTODY_FILE")
 	switch role {
 	case "envdump":
-		if err := os.WriteFile(file, []byte(strings.Join(os.Environ(), "\n")), 0o644); err != nil {
+		body := strings.Join(os.Environ(), "\n") + "\nPPID=" + strconv.Itoa(os.Getppid())
+		if err := os.WriteFile(file, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	case "marker":
@@ -350,10 +351,11 @@ func TestScopedRunCancellationPreservesErrorsIsSemantics(t *testing.T) {
 	}
 }
 
-// TestScopedRunAttachesCustodyEnvironmentVisibleToChild is the immutable
+// TestScopedRunExecutesChildUnderGuardianCustody is the immutable
 // unsafe-implementation challenge for the fail-closed safe defaults: it fails
-// unless the scoped child actually carries the broker attachment.
-func TestScopedRunAttachesCustodyEnvironmentVisibleToChild(t *testing.T) {
+// unless the scoped child actually ran under a broker guardian (distinct
+// parent) with a sanitized declared environment.
+func TestScopedRunExecutesChildUnderGuardianCustody(t *testing.T) {
 	sentinel := custodySentinel(t)
 	s := openCustodyScope(t, nil)
 	envFile := filepath.Join(t.TempDir(), "scoped-env.txt")
@@ -365,8 +367,14 @@ func TestScopedRunAttachesCustodyEnvironmentVisibleToChild(t *testing.T) {
 		t.Fatalf("scoped run: %v", err)
 	}
 	env := custodyWaitFile(t, envFile, 10*time.Second)
-	if !strings.Contains(env, processscope.EnvAttachment+"=") {
-		t.Fatalf("scoped child environment lacks the custody attachment entry:\n%s", env)
+	ppid := 0
+	for _, line := range strings.Split(env, "\n") {
+		if v, ok := strings.CutPrefix(line, "PPID="); ok {
+			ppid, _ = strconv.Atoi(v)
+		}
+	}
+	if ppid == 0 || ppid == os.Getpid() || ppid == os.Getppid() {
+		t.Fatalf("scoped child must run under a distinct guardian parent, saw ppid %d (self %d, parent %d):\n%s", ppid, os.Getpid(), os.Getppid(), env)
 	}
 	if strings.Contains(env, "hostile") {
 		t.Fatalf("declared hostile environment reached the scoped child:\n%s", env)

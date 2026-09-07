@@ -238,11 +238,11 @@ func TestVerifyFormalInScopeGenOnlyControlWithoutScope(t *testing.T) {
 	}
 }
 
-// TestVerifyFormalInScopeScopedEngineReceivesCustodyAttachment is the
+// TestVerifyFormalInScopeScopedEngineRunsUnderGuardianCustody is the
 // immutable unsafe-implementation challenge for the scope fail-closed safe
-// default: a scoped engine launch must actually carry the custody attachment
-// into the sanitized environment.
-func TestVerifyFormalInScopeScopedEngineReceivesCustodyAttachment(t *testing.T) {
+// default: a scoped engine launch must actually run under a broker guardian
+// with the sanitized declared environment.
+func TestVerifyFormalInScopeScopedEngineRunsUnderGuardianCustody(t *testing.T) {
 	s := openFormalCustodyScope(t)
 	defer closeFormalCustodyScope(t, s, 30*time.Second)
 	design := t.TempDir()
@@ -266,7 +266,8 @@ func TestVerifyFormalInScopeScopedEngineReceivesCustodyAttachment(t *testing.T) 
 	t.Setenv("TLA_TOOLS_JAR", jar)
 	t.Setenv("TLA_TOOLS_JAR_SHA256", sha)
 	envFile := filepath.Join(dir, "engine-env.txt")
-	engine := "if [ \"$1\" = '-cp' ]; then env > \"" + envFile + "\"; echo 'No error has been found'; exit 0; fi\n"
+	ppidFile := filepath.Join(dir, "engine-ppid.txt")
+	engine := "if [ \"$1\" = '-cp' ]; then env > \"" + envFile + "\"; echo $PPID > \"" + ppidFile + "\"; echo 'No error has been found'; exit 0; fi\n"
 	javaPath := filepath.Join(dir, "runtime", "bin", "java")
 	writeJavaRuntime(t, javaPath, supportedJavaScript(engine))
 	t.Setenv("JAVA_TOOL_OPTIONS", "-javaagent:/hostile.jar")
@@ -291,12 +292,27 @@ func TestVerifyFormalInScopeScopedEngineReceivesCustodyAttachment(t *testing.T) 
 	if env == "" {
 		t.Fatal("engine never observed its environment")
 	}
-	if !strings.Contains(env, processscope.EnvAttachment+"=") {
-		t.Fatalf("scoped TLC engine environment lacks the custody attachment:\n%s", env)
-	}
 	if strings.Contains(env, "hostile") {
 		t.Fatalf("hostile ambient environment reached the scoped TLC engine:\n%s", env)
 	}
+	ppidText := ""
+	deadline = time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if b, err := os.ReadFile(ppidFile); err == nil && len(b) > 0 {
+			ppidText = strings.TrimSpace(string(b))
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	ppid, err := strconv.Atoi(ppidText)
+	if err != nil {
+		t.Fatalf("engine guardian ppid %q: %v", ppidText, err)
+	}
+	if ppid == 0 || ppid == os.Getpid() || ppid == os.Getppid() {
+		t.Fatalf("scoped engine must run under a distinct guardian parent, saw %d (self %d, parent %d)", ppid, os.Getpid(), os.Getppid())
+	}
+	// One identity probe + one engine ran as owned scoped jobs.
+	requireFormalCustodyClean(t, closeFormalCustodyScope(t, s, 30*time.Second), 2)
 }
 
 func TestVerifyFormalInScopePortfolioDesignUnderCustody(t *testing.T) {
