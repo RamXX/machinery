@@ -124,17 +124,15 @@ func checkerFixtureHelperOnlyExitError(err error, want int) bool {
 	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		return exitErr.ExitCode() == want
-	}
 	if joined, ok := err.(interface{ Unwrap() []error }); ok {
-		errors := joined.Unwrap()
-		return len(errors) != 0 && allCheckerFixtureHelperExitErrors(errors, want)
+		children := joined.Unwrap()
+		return len(children) != 0 && allCheckerFixtureHelperExitErrors(children, want)
 	}
 	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
 		return checkerFixtureHelperOnlyExitError(wrapped.Unwrap(), want)
 	}
-	return false
+	var exitErr *exec.ExitError
+	return errors.As(err, &exitErr) && exitErr.ExitCode() == want
 }
 
 func allCheckerFixtureHelperExitErrors(errors []error, want int) bool {

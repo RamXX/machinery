@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -91,8 +92,8 @@ func cliReviewExec(t *testing.T, binary string, f *cliReviewFixture, args ...str
 	}
 	code := 0
 	if err != nil {
-		exit, ok := err.(*exec.ExitError)
-		if !ok {
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) {
 			t.Fatalf("CLI setup: %v", err)
 		}
 		code = exit.ExitCode()

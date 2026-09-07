@@ -2,6 +2,7 @@ package gates
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -311,8 +312,8 @@ func TestReadsConsumerCLI(t *testing.T) {
 				if err == nil {
 					t.Fatalf("unsafe %s contract returned CLI success:\n%s", tc.name, out)
 				}
-				exitErr, ok := err.(*exec.ExitError)
-				if !ok || exitErr.ExitCode() != 1 {
+				var exitErr *exec.ExitError
+				if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
 					t.Fatalf("expected gate rejection exit 1, not infrastructure failure: %v\n%s", err, out)
 				}
 				want := "read"
