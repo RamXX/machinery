@@ -144,11 +144,14 @@ async function reaped(pid, withinMs = 4000) {
 
 // A fake runner stands in for the spawn transport: the plugin is constructed
 // with NO `$` anywhere, exactly like OpenCode's Node plugin host provides it.
-function fakeRunner({ ok = true, exitCode = 0, stdout = "", stderr = "", error } = {}, calls = []) {
+// Unknown result fields (for example the truncation flags) pass through so
+// injected cases exercise the same result surface the real runner reports.
+function fakeRunner(config = {}, calls = []) {
+  const { ok = true, exitCode = 0, stdout = "", stderr = "", error, ...rest } = config
   return async (root, payload) => {
     calls.push({ root, payload })
-    if (!ok) return { ok: false, error }
-    return { ok: true, exitCode, stdout, stderr }
+    if (!ok) return { ok: false, error, ...rest }
+    return { ok: true, exitCode, stdout, stderr, ...rest }
   }
 }
 
