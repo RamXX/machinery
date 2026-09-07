@@ -425,9 +425,9 @@ func TestCaptureTreeDigestEncodingOracle(t *testing.T) {
 		Role string
 	}
 	oracle := testTreeEnc([]ent{
-		{Rel: ".", Dir: true, Perm: 0o755},
+		{Rel: ".", Dir: true, Perm: 0o755, Role: RoleDesign},
 		{Rel: "a.txt", Perm: 0o644, Size: int64(len(content)), Dig: sum[:], Role: RoleFrozen},
-		{Rel: "sub", Dir: true, Perm: 0o700},
+		{Rel: "sub", Dir: true, Perm: 0o700, Role: RoleSubject},
 		{Rel: "sub/b.txt", Perm: 0o600, Size: int64(len(content)), Dig: sum[:], Role: RoleSubject},
 	})
 	root := t.TempDir()
@@ -578,18 +578,23 @@ func TestCaptureRejectsStoreOverlap(t *testing.T) {
 	src := writeCaptureSource(t)
 	ctl := separateControlMaterialization(t, src)
 	base := t.TempDir()
+	inside := filepath.Join(base, "governed") // governed root really inside the store path
+	if err := os.MkdirAll(inside, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		name  string
 		store string
+		roots []string
 		ok    bool
 	}{
-		{"store inside source", filepath.Join(src, "store"), false},
-		{"store equals source", src, false},
-		{"source inside store", base, false},
-		{"store inside control root", filepath.Join(ctl, "store"), false},
-		{"boundary sibling", filepath.Join(base, "src-store"), true},
+		{"store inside source", filepath.Join(src, "store"), []string{src, ctl}, false},
+		{"store equals source", src, []string{src, ctl}, false},
+		{"governed root inside store", base, []string{inside, ctl}, false},
+		{"store inside control root", filepath.Join(ctl, "store"), []string{src, ctl}, false},
+		{"boundary sibling", filepath.Join(base, "src-store"), []string{src, ctl}, true},
 	} {
-		err := ValidateStorePlacement(tc.store, src, ctl)
+		err := ValidateStorePlacement(tc.store, tc.roots...)
 		if tc.ok && err != nil {
 			t.Errorf("%s: sibling store rejected: %v", tc.name, err)
 		}
@@ -626,7 +631,7 @@ func TestCaptureRejectsFrozenUnderMutableSubjectAndMissingSubjects(t *testing.T)
 		t.Fatalf("init store: %v", err)
 	}
 	m := captureManifest()
-	m.SubjectEntries = []SubjectEntry{{Path: "tests/fixtures", Kind: "directory"}}
+	m.SubjectEntries = []SubjectEntry{{Path: "tests", Kind: "directory"}}
 	_, err := Capture(context.Background(), CaptureRequest{Inputs: (&testInputView{src: src, ctl: ctl}).view(), Manifest: m, Name: "overlap", Store: store, Limits: captureLimits()})
 	if err == nil || !strings.Contains(err.Error(), "INVALID_SCHEMA") {
 		t.Errorf("frozen descendant under mutable subject accepted: err = %v", err)
