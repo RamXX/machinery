@@ -8,8 +8,8 @@ labels: [hard-tdd, walking-skeleton]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-07T07:22:57Z
-content_hash: "sha256:9de603ed8513af0f4f1a37e4c3500cb511d037fcf9b3ea7ffbbde904ab88d0db"
+updated_at: 2026-09-07T08:24:54Z
+content_hash: "sha256:1ace7ed32fc4b4e2dc965764f8bfc9a6f4c34cbd90a97a29fd0a8286f7c7d08e"
 blocks: [MAC-ou97]
 was_blocked_by: [MAC-hpqp]
 follows: [MAC-hpqp]
@@ -113,3 +113,6 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - Follows: [[MAC-hpqp]]
 
 ## Comments
+
+### 2026-09-07T08:24:54Z ramirosalas
+ACCEPTED 2026-09-06 — RED 7729086 frozen byte-identical (refine accepted compensateTimeout->Failed byte-identically; compose accepted all 10 mutations silently; CLI lane reproduced) -> GREEN 796495c, 757+/2- within budget. Reconciliation rules consistent across both generators: exact Compensating vocabulary, outstanding-obligations diagnostic for timeout-to-clean-final, finals absorbing, obligation removal fails closed; positive examples regenerate byte-identical. Mutation table M1-M7 + nested/guarded/extra/non-final each rejected for intended reason (unit + CLI incl. verify-formal refusal); unchanged control green. Saga lane fragment executes via the required lane (2/2 with real pinned Java/TLC). fulfillment check+verify-formal green (11 passed); checkout-split designs green. RESIDUAL: internal/install TestBootstrapReceiptCLI timeout pre-existing on base (verified by worker; watch item). Coordinator merged; refine/compose ok; lane 7 suites green on epic. Record: .git/machinery-evidence-20260906.TEFZ7D/hlae-record.md
