@@ -1,17 +1,19 @@
 ---
 id: MAC-wi2u
 title: "Prove Go assertions through the native test runner"
-status: open
+status: in_progress
 priority: 1
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:01:51Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:01Z
-content_hash: "sha256:692b7b4dca9bc0d998488eb82085dc7f0a9fdc484e770681011f0f2b68d7c695"
+updated_at: 2026-09-07T10:08:47Z
+content_hash: "sha256:5348e48010218fcac242641b6fa67a938d9baefd82dc76f93ef7ccab8471c360"
 blocks: [MAC-sd7g, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-6h0s, MAC-bz1y]
+follows: [MAC-6h0s, MAC-bz1y]
+assignee: dev-MAC-wi2u
 ---
 
 ## Description
@@ -101,11 +103,15 @@ status: new
 - 2026-09-06T09:10:21Z dep_added: blocks MAC-ou97
 - 2026-09-07T01:42:40Z dep_removed: was_blocked_by MAC-6h0s
 - 2026-09-07T10:08:34Z dep_removed: was_blocked_by MAC-bz1y
+- 2026-09-07T10:08:47Z status: open -> in_progress
+- 2026-09-07T10:08:47Z auto-follows: linked to predecessor MAC-6h0s
+- 2026-09-07T10:08:47Z auto-follows: linked to predecessor MAC-bz1y
 
 ## Links
 - Parent: [[MAC-ui8a]]
 - Blocks: [[MAC-sd7g]], [[MAC-vx24]], [[MAC-ou97]]
 - Was blocked by: [[MAC-6h0s]], [[MAC-bz1y]]
+- Follows: [[MAC-6h0s]], [[MAC-bz1y]]
 
 ## Comments
 
