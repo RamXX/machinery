@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "suites": [
+    {
+      "id": "runtime-go-pilot",
+      "lane": "required",
+      "adapter": "go-json",
+      "package": "./cmd/machinery",
+      "source_files": ["cmd/machinery/integration_lane_test.go"],
+      "tests": ["TestIntegrationLanePilotOCI", "TestIntegrationLanePilotFormal", "TestIntegrationLaneFullPath", "TestIntegrationLaneHostDescendantControl", "TestIntegrationLaneNodeEventControls"],
+      "runtimes": ["go", "docker", "java", "tlc", "node"],
+      "timeout": "15m",
+      "stdout_limit": 4194304,
+      "stderr_limit": 1048576
+    },
+    {
+      "id": "runtime-node-pilot",
+      "lane": "required",
+      "adapter": "node-tap",
+      "package": ".",
+      "source_files": ["testdata/integration-lanes/pilot.integration.test.mjs"],
+      "tests": ["required Node pilot executes a real child process"],
+      "runtimes": ["node"],
+      "timeout": "30s",
+      "stdout_limit": 1048576,
+      "stderr_limit": 1048576
+    }
+  ]
+}

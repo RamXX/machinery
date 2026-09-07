@@ -28,7 +28,7 @@ ACTIONLINT_VERSION := $(shell cat .actionlint-version 2>/dev/null)
 INSTALL_DIR ?= $(HOME)/.local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: build dev-link uninstall test test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight hooks lint-install help
+.PHONY: build dev-link uninstall test test-integration test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight hooks lint-install help
 
 build: ## Build the machinery binary from source into .bin/machinery (needs Go)
 	@mkdir -p .bin && go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery
@@ -52,8 +52,11 @@ uninstall: ## Remove machinery from every agent home
 	  echo "removed machinery from $$home"; \
 	done
 
-test: ## Run the full Go test suite (needs Go)
+test: ## Run the service-free native Go suite (needs Go)
 	@go test ./...
+
+test-integration: ## Provision and execute every required native runtime suite
+	@go run ./scripts/integration-lane --lane required
 
 test-install: ## Verify the install path lays down the canonical-copy + symlink topology (offline)
 	@go test -count=1 -run '[Ii]nstall' ./cmd/machinery ./internal/install
