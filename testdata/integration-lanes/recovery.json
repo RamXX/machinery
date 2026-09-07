@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "suites": [
+    {
+      "id": "recovery-docker",
+      "lane": "required",
+      "adapter": "go-json",
+      "package": "./cmd/machinery",
+      "source_files": ["cmd/machinery/recover_integration_test.go"],
+      "tests": ["TestRecoveryDockerBindMountPublication", "TestRecoveryDockerPartialRefusesRollback"],
+      "runtimes": ["go", "docker"],
+      "timeout": "15m",
+      "stdout_limit": 4194304,
+      "stderr_limit": 1048576
+    }
+  ]
+}
