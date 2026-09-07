@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T08:58:18Z
 created_by: ramirosalas
-updated_at: 2026-09-07T00:29:38Z
-content_hash: "sha256:0aa2ac2237c1166842360d8787c4d2ccf866e3f9cee66524ad9477b6221ea80e"
+updated_at: 2026-09-07T01:42:39Z
+content_hash: "sha256:835edcce1ff8b57d1a6139e1e6721422e1a903493b4df11a7f63aecd6d636a1f"
 blocks: [MAC-p9z1, MAC-bz1y, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-qlw2]
 follows: [MAC-qlw2]
@@ -189,3 +189,6 @@ status: new
 ### proof
 - [ ] All current story ACs, strengthened ownership/current-judgment requirements and protected frozen proof remain required.
 - [ ] Independent review/native execution/final acceptance pending.
+
+### 2026-09-07T01:42:39Z ramirosalas
+ACCEPTED 2026-09-06 — 2 commits 6332f3c..01113f2 (RED 90/90 corpus failing semantically, then GREEN). Closed plan/milestone decoders, Validate, AssuranceInventory over authoritative generators per contract s2/3/7; 7 runtime categories with unverified-blocking; red_control bijection + safe/unsafe pairs; position-only review projection; exact defaults/caps with one cumulative budget; real corrupted-tree integration. 0 fail/0 skip; vet/build clean; cycle-free. Corpus 4 valid / 86 invalid paired families. LOC +5385 vs ~2100 budget — closed-rejection completeness chosen over approximate cap (disclosed; same accepted overrun pattern as wi5z/qlw2). Owner-spelling for new key kinds flagged for downstream consumer confirmation. Coordinator merged; tdd+gates suites ok on epic. Record: .git/machinery-evidence-20260906.TEFZ7D/6h0s-record.md
