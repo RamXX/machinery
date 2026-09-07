@@ -485,7 +485,7 @@ func (e *captureEngine) walkEntry(rel, controlNS, judgmentPath string, depth int
 	}
 	if key, ok := inodeKey(fi); ok {
 		if prev, dup := e.inodes[key]; dup {
-			return fmt.Errorf("INVALID_SCHEMA: %q and %q are the same inode hardlinked at two captured paths; alias substitution is rejected", rel, prev)
+			return fmt.Errorf("INVALID_SCHEMA: %q and %q are the same inode hard-linked at two captured paths; alias substitution is rejected", rel, prev)
 		}
 		e.inodes[key] = rel
 	}

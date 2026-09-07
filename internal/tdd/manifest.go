@@ -506,7 +506,7 @@ func DesignPayloadDigest(designDir string) (string, error) {
 			return fmt.Errorf("INVALID_SCHEMA: special entry %q in the design payload is rejected (symlink/device/socket)", rel)
 		}
 		if seen > int(protocol.LimitEntriesMax) {
-			return fmt.Errorf("OUTPUT_LIMIT: design payload exceeds %d entries", int64(protocol.LimitEntriesMax))
+			return fmt.Errorf("OUTPUT_LIMIT: design payload exceeds %d entries", protocol.LimitEntriesMax)
 		}
 		return nil
 	})
@@ -555,7 +555,7 @@ func readControlJSON(p string) ([]byte, *ir.Value, error) {
 		return nil, nil, fmt.Errorf("INVALID_SCHEMA: %s must be a regular non-symlink control file", p)
 	}
 	if before.Size() > protocol.ControlInputMaxBytes {
-		return nil, nil, fmt.Errorf("OUTPUT_LIMIT: %s exceeds the %d-byte control-input cap", p, int64(protocol.ControlInputMaxBytes))
+		return nil, nil, fmt.Errorf("OUTPUT_LIMIT: %s exceeds the %d-byte control-input cap", p, protocol.ControlInputMaxBytes)
 	}
 	data, err := os.ReadFile(p)
 	if err != nil {

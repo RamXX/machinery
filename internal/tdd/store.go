@@ -1070,7 +1070,7 @@ func ImportStore(ctx context.Context, destPath, archivePath, projectID, expected
 		return StoreImportResult{}, fmt.Errorf("INVALID_SCHEMA: archive %s must be a regular non-symlink file", archivePath)
 	}
 	if fi.Size() > protocol.LimitBundleMaxBytes {
-		return StoreImportResult{}, fmt.Errorf("OUTPUT_LIMIT: archive exceeds the %d-byte bundle bound", int64(protocol.LimitBundleMaxBytes))
+		return StoreImportResult{}, fmt.Errorf("OUTPUT_LIMIT: archive exceeds the %d-byte bundle bound", protocol.LimitBundleMaxBytes)
 	}
 	data, err := os.ReadFile(archivePath)
 	if err != nil {
@@ -1085,7 +1085,7 @@ func ImportStore(ctx context.Context, destPath, archivePath, projectID, expected
 		return StoreImportResult{}, err
 	}
 	if int64(len(indexRaw)) > protocol.ControlInputMaxBytes {
-		return StoreImportResult{}, fmt.Errorf("OUTPUT_LIMIT: archive index exceeds the %d-byte control-input cap", int64(protocol.ControlInputMaxBytes))
+		return StoreImportResult{}, fmt.Errorf("OUTPUT_LIMIT: archive index exceeds the %d-byte control-input cap", protocol.ControlInputMaxBytes)
 	}
 	idxEntries, id, headDigest, generation, _, err := decodeExportIndex(indexRaw)
 	if err != nil {

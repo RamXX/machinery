@@ -635,7 +635,9 @@ func CommitRegistration(ctx context.Context, req StoreRegistrationRequest) (Stor
 	committed := false
 	defer func() {
 		if !committed {
-			w.release()
+			// Best-effort rollback release; the primary registration error is
+			// already on its way to the caller and must not be masked.
+			_ = w.release()
 		}
 	}()
 	// exact expected-head comparison with the idempotent exception

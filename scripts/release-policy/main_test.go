@@ -31,6 +31,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -674,7 +675,8 @@ func TestProcessInvocation(t *testing.T) {
 		cmd.Env = os.Environ()
 		out, err := cmd.CombinedOutput()
 		status := 0
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			status = exitErr.ExitCode()
 		} else if err != nil {
 			t.Fatalf("invoke verifier: %v\n%s", err, out)

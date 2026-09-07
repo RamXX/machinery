@@ -206,6 +206,22 @@ func Status(ctx context.Context, req StatusRequest) (StatusReport, error) {
 // exactly; subject drift is legitimate implementation change. A baseline
 // bundle that is absent is a missing binding; a bundle whose blobs vanished
 // is hard corruption.
+// retainedBaseline returns the retained baseline bundle entries when the
+// baseline is present and self-consistent. An unreadable, undecodable or
+// digest-mismatched baseline reads as absent (the "missing" binding state):
+// degradation to missing is deliberate, not an error.
+func retainedBaseline(store string, m *Manifest) ([]bundleEntryData, bool) {
+	raw, _, err := readControlJSON(filepath.Join(store, storeObjects, strings.TrimPrefix(m.Baseline, "sha256:"), "bundle.json"))
+	if err != nil {
+		return nil, false
+	}
+	entries, treeDigest, err := decodeBundleClosed(raw)
+	if err != nil || treeDigest != m.Baseline {
+		return nil, false
+	}
+	return entries, true
+}
+
 func bindingState(req StatusRequest, engine *inspectEngine) (string, error) {
 	if len(req.Manifests) == 0 {
 		return "missing", nil
@@ -214,12 +230,8 @@ func bindingState(req StatusRequest, engine *inspectEngine) (string, error) {
 	if m.Baseline == "" {
 		return "missing", nil
 	}
-	raw, _, err := readControlJSON(filepath.Join(req.Store, storeObjects, strings.TrimPrefix(m.Baseline, "sha256:"), "bundle.json"))
-	if err != nil {
-		return "missing", nil
-	}
-	entries, treeDigest, err := decodeBundleClosed(raw)
-	if err != nil || treeDigest != m.Baseline {
+	entries, ok := retainedBaseline(req.Store, m)
+	if !ok {
 		return "missing", nil
 	}
 	for _, e := range entries {

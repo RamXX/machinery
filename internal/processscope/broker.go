@@ -795,7 +795,9 @@ func (b *broker) retireJob(j *job) {
 			j.terminated = false
 		}
 		if j.guardian != nil {
-			j.guardian.Release()
+			// Best-effort handle release after the reap attempts above; the
+			// broker teardown path has no channel left to report it to.
+			_ = j.guardian.Release()
 		}
 	} else {
 		j.terminated = false

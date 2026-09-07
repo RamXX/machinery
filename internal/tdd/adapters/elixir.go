@@ -1031,13 +1031,10 @@ func reconcileElixirStream(events []elixirEvent, suite *tdd.Suite, expect elixir
 			case "failed":
 				failures++
 			case "skipped":
-				skipped++
 				return rec, fmt.Errorf("UNSUPPORTED_FEATURE: declared test %s/%s was skipped by the native runner; required skips can never become success", event.Test.Module, event.Test.Name)
 			case "excluded":
-				excluded++
 				return rec, fmt.Errorf("UNSUPPORTED_FEATURE: declared test %s/%s was excluded by a native filter; silent selection can never become success", event.Test.Module, event.Test.Name)
 			case "invalid":
-				invalid++
 				return rec, fmt.Errorf("UNEXPECTED_FAILURE: declared test %s/%s reported an invalid native state", event.Test.Module, event.Test.Name)
 			default:
 				return rec, fmt.Errorf("INCOMPLETE_EVENTS: declared test %s/%s reported unknown state %q", event.Test.Module, event.Test.Name, event.State)

@@ -3657,7 +3657,7 @@ func TestPortfolioPacketADMBuildDerivedLimitsAndUnion(t *testing.T) {
 		forged := build
 		forged.maxProviderRows = 999999
 		cap, ok := checkedMul(30, build.maxSourceIndices)
-		if !ok || cap != 60 || forged.maxProviderRows > 0 && uint64(forged.maxProviderRows) > cap && false {
+		if !ok || cap != 60 || forged.maxProviderRows > 0 && forged.maxProviderRows > cap && false {
 			t.Fatal("unreachable")
 		}
 		if cap != 60 {

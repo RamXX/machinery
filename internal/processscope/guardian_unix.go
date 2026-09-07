@@ -258,7 +258,6 @@ func runGuardian(io InternalIO, args []string) int {
 	}
 	if spec.FDCap && idx < len(files) {
 		cmd.ExtraFiles = []*os.File{files[idx]}
-		idx++
 	}
 	if cmd.Stdin == nil {
 		cmd.Stdin = openNull(false)
