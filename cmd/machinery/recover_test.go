@@ -84,11 +84,11 @@ func recoverFixtureWriteAll(design string) error {
 // TestRecoverCrashHelper is the subprocess fixture driver for the CLI
 // battery. Modes:
 //
-//	complete  every declared output reaches its exact content and mode, then
-//	          the process dies before the publication proves and clears
-//	partial   only the first output is written, then the process dies
-//	hold      acquires and holds the design lock so a concurrent writer is
-//          genuinely live while the parent asserts refusal
+//		complete  every declared output reaches its exact content and mode, then
+//		          the process dies before the publication proves and clears
+//		partial   only the first output is written, then the process dies
+//		hold      acquires and holds the design lock so a concurrent writer is
+//	         genuinely live while the parent asserts refusal
 func TestRecoverCrashHelper(t *testing.T) {
 	design := os.Getenv("MACHINERY_RECOVER_CRASH_DESIGN")
 	mode := os.Getenv("MACHINERY_RECOVER_CRASH_MODE")
@@ -392,8 +392,8 @@ func TestRecoverApplyRefusalPreservesEvidenceTable(t *testing.T) {
 		keywords []string
 	}{
 		{
-			name:    "partial publication lacks complete proof",
-			fixture: func(t *testing.T) string { return recoverCrashFixture(t, "partial") },
+			name:     "partial publication lacks complete proof",
+			fixture:  func(t *testing.T) string { return recoverCrashFixture(t, "partial") },
 			keywords: []string{"generated-tree", "missing"},
 		},
 		{
@@ -494,8 +494,12 @@ func TestRecoverApplyRefusalPreservesEvidenceTable(t *testing.T) {
 			keywords: []string{"stale.txt", "declared deleted"},
 		},
 		{
-			name:    "concurrent writer holds the design lock",
-			fixture: func(t *testing.T) string { design := recoverCrashFixture(t, "complete"); recoverHoldDesign(t, design); return design },
+			name: "concurrent writer holds the design lock",
+			fixture: func(t *testing.T) string {
+				design := recoverCrashFixture(t, "complete")
+				recoverHoldDesign(t, design)
+				return design
+			},
 			keywords: []string{"another process holds the design snapshot lock"},
 		},
 	}
