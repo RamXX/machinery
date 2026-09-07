@@ -1,4 +1,4 @@
-{"total_count": 13, "jobs": [
+{"total_count": 8, "jobs": [
   {"id": 1, "name": "integration-required", "status": "completed", "conclusion": "success"},
   {"id": 2, "name": "build (ubuntu-latest, linux, amd64, true)", "status": "completed", "conclusion": "success"},
   {"id": 3, "name": "lint", "status": "completed", "conclusion": "success"},

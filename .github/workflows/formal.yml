@@ -14,6 +14,10 @@ concurrency:
   group: formal-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: formal verification only reads the repository.
+permissions:
+  contents: read
+
 jobs:
   integration-required:
     runs-on: ubuntu-latest

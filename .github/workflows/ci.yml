@@ -15,6 +15,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: every CI job reads the repository and writes nothing.
+permissions:
+  contents: read
+
 jobs:
   integration-required:
     runs-on: ubuntu-latest
