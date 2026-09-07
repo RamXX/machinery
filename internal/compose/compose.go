@@ -250,6 +250,139 @@ func composeRequireStringArray(o *ir.Object, key string, required bool, where st
 	return nil
 }
 
+// --- saga closure reconciliation (mirrors refine.ReconcileSaga) ---
+
+// composeRequireModeled is the compose twin of refine's requireModeled: any
+// targeted transition on a compensation-relevant state outside the modeled
+// vocabulary fails closed. A silently dropped route would leave the generated
+// composition asserting the opposite of the coordinator machine.
+func composeRequireModeled(node *ir.Value, state string, allowed map[string]map[string]bool) {
+	for _, tr := range ir.TransitionsOf(node, nil, state) {
+		if tr.Target == "" {
+			continue
+		}
+		tgt := ir.Simple(tr.Target)
+		key := tr.Kind
+		if tr.Kind == "on" {
+			key = "on:" + tr.Event
+		}
+		if allowed[key][tgt] {
+			continue
+		}
+		die("state %s declares a transition the composition model does not carry (%s -> %s); remove the transition or extend the composition template",
+			ir.Repr(state), key, ir.Repr(tgt))
+	}
+}
+
+func composeInvokeBranchTargets(node *ir.Value, key string) map[string]bool {
+	out := map[string]bool{}
+	for _, tr := range ir.TransitionsOf(node, nil, "") {
+		if tr.Kind == key && tr.Target != "" {
+			out[ir.Simple(tr.Target)] = true
+		}
+	}
+	return out
+}
+
+func composeAfterTargets(node *ir.Value) map[string]bool {
+	out := map[string]bool{}
+	for _, tr := range ir.TransitionsOf(node, nil, "") {
+		if tr.Kind == "after" && tr.Target != "" {
+			out[ir.Simple(tr.Target)] = true
+		}
+	}
+	return out
+}
+
+func composeAlwaysTargets(node *ir.Value) map[string]bool {
+	out := map[string]bool{}
+	for _, tr := range ir.TransitionsOf(node, nil, "") {
+		if tr.Kind == "always" && tr.Target != "" {
+			out[ir.Simple(tr.Target)] = true
+		}
+	}
+	return out
+}
+
+// reconcileSagaClosure proves the coordinator's compensation subgraph is
+// exactly the one the composition template models: completion, error and
+// timeout routes into the retry loop, retry exhaustion to the explicit
+// FailedDirty residual, backoff to Compensating, absorbing final states, a
+// flat machine, and no top-level state outside the saga vocabulary. The
+// forward chain is validated separately (ForwardChain + the sequence match);
+// this closes the whole-machine reconciliation so a mutated compensation
+// route can never yield a byte-identical composition of the safer machine.
+func reconcileSagaClosure(machine *ir.Value, top map[string]*ir.Value, chain []string, terminal string) {
+	for _, e := range ir.WalkStates(machine.AsObject().Get2("states"), "") {
+		if strings.Contains(e.Path, ".") {
+			die("coordinator state %s is nested under another state; the composition model is flat and would silently drop nested behavior", ir.Repr(e.Path))
+		}
+	}
+	allowed := map[string]bool{terminal: true}
+	for _, s := range chain {
+		allowed[s] = true
+	}
+	for _, s := range []string{"Compensating", "compensateRetry", "Failed", "FailedDirty"} {
+		allowed[s] = true
+	}
+	var extra []string
+	for name := range top {
+		if !allowed[name] {
+			extra = append(extra, name)
+		}
+	}
+	if len(extra) > 0 {
+		sort.Strings(extra)
+		die("coordinator carries state %s outside the saga vocabulary (forward chain + Compensating + compensateRetry + final states); the composition model does not carry it", ir.Repr(extra[0]))
+	}
+	for _, s := range []string{"Compensating", "compensateRetry"} {
+		if top[s].AsObject().GetString("type") == "final" {
+			die("%s must not be final: it carries the outgoing saga transitions the composition model represents", ir.Repr(s))
+		}
+	}
+	comp := top["Compensating"]
+	if !setEq(composeInvokeBranchTargets(comp, "onDone"), map[string]bool{"Failed": true}) {
+		die("Compensating onDone must reach Failed (compensation complete); the composition model's CompensateDone asserts a clean Failed")
+	}
+	if !setEq(composeInvokeBranchTargets(comp, "onError"), map[string]bool{"compensateRetry": true}) {
+		die("Compensating onError must reach compensateRetry (the modeled compensation failure loop)")
+	}
+	// A timeout route from Compensating to a CLEAN final can fire while
+	// compensation obligations are still outstanding, but the composition
+	// model reaches Failed from Compensating only through CompensateDone,
+	// which requires every obligation clean.
+	for _, tr := range ir.TransitionsOf(comp, nil, "Compensating") {
+		if tr.Kind != "after" || tr.Target == "" {
+			continue
+		}
+		tgt := ir.Simple(tr.Target)
+		if tgt == "Failed" || tgt == terminal {
+			die("Compensating after:%s routes to %s: a timeout can fire while compensation obligations are still outstanding, but the composition model reaches %s from Compensating only with every obligation clean (CompensateDone); remove the route or model it", tr.Event, ir.Repr(tgt), ir.Repr(tgt))
+		}
+	}
+	cr := top["compensateRetry"]
+	if !setEq(composeAlwaysTargets(cr), map[string]bool{"FailedDirty": true}) || !setEq(composeAfterTargets(cr), map[string]bool{"Compensating": true}) {
+		die("compensateRetry must exhaust to FailedDirty and back off to Compensating")
+	}
+	for _, f := range []string{terminal, "Failed", "FailedDirty"} {
+		if top[f].AsObject().GetString("type") != "final" {
+			die("%s must be a final state", f)
+		}
+	}
+	composeRequireModeled(comp, "Compensating", map[string]map[string]bool{
+		"onDone":  {"Failed": true},
+		"onError": {"compensateRetry": true},
+		"after":   {"compensateRetry": true},
+	})
+	composeRequireModeled(cr, "compensateRetry", map[string]map[string]bool{
+		"always": {"FailedDirty": true},
+		"after":  {"Compensating": true},
+	})
+	for _, f := range []string{terminal, "Failed", "FailedDirty"} {
+		composeRequireModeled(top[f], f, nil)
+	}
+}
+
 func generateImpl(comp, machine *ir.Value, machineName string) (string, string, string) {
 	co := comp.AsObject()
 	name := ir.Title(co.GetString("composition"))
@@ -344,11 +477,12 @@ func generateImpl(comp, machine *ir.Value, machineName string) (string, string, 
 			top[st.Name] = st.Node
 		}
 	}
-	for _, needed := range []string{"Compensating", "Completed", "Failed", "FailedDirty"} {
+	for _, needed := range []string{"Compensating", "compensateRetry", "Completed", "Failed", "FailedDirty"} {
 		if _, ok := top[needed]; !ok {
 			die("coordinator has no %s state; the composition template expects the saga pattern", ir.Repr(needed))
 		}
 	}
+	reconcileSagaClosure(machine, top, chain, terminal)
 
 	sagaStates := append(append([]string{}, chain...), "Compensating", "Completed", "Failed", "FailedDirty")
 	var obligations [][3]string // (aggregate, to, undoTo)

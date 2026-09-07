@@ -1148,6 +1148,14 @@ func ReconcileSaga(machine, sem *ir.Value) (err error) {
 	states := strSlice(so.Get2("states"))
 	oblObj := so.Get2("obligations").AsObject()
 	top := topStates(machine)
+	// The emitted model is flat: a nested state (with or without targeted
+	// routes of its own) is behavior the model cannot represent, and carrying
+	// it silently would leave the proof asserting a different machine.
+	for _, e := range ir.WalkStates(machine.AsObject().Get2("states"), "") {
+		if strings.Contains(e.Path, ".") {
+			die("state %s is nested under another state; the saga model is flat and would silently drop nested behavior", ir.Repr(e.Path))
+		}
+	}
 	expected := map[string]bool{}
 	for _, s := range states {
 		expected[s] = true
@@ -1197,6 +1205,20 @@ func ReconcileSaga(machine, sem *ir.Value) (err error) {
 	if !setEq(setOf(invokeBranchTargets(comp, "onError")), map[string]bool{"compensateRetry": true}) {
 		die("Compensating onError must reach compensateRetry")
 	}
+	// A timeout route from Compensating to a CLEAN final (Failed/Completed) can
+	// fire while compensating obligations are still outstanding, but the
+	// emitted model reaches Failed from Compensating only through
+	// CompensateDone, which requires every obligation clean. Admitting the
+	// route would publish a byte-identical proof of the safer machine.
+	for _, tr := range ir.TransitionsOf(comp, nil, "Compensating") {
+		if tr.Kind != "after" || tr.Target == "" {
+			continue
+		}
+		tgt := ir.Simple(tr.Target)
+		if tgt == "Failed" || tgt == "Completed" {
+			die("Compensating after:%s routes to %s: a timeout can fire while compensation obligations are still outstanding, but the emitted model reaches %s from Compensating only with every obligation clean (CompensateDone); remove the route or model it", tr.Event, ir.Repr(tgt), ir.Repr(tgt))
+		}
+	}
 	cr := top["compensateRetry"]
 	crAlways := map[string]bool{}
 	for _, b := range alwaysBranchTargets(cr) {
@@ -1211,6 +1233,14 @@ func ReconcileSaga(machine, sem *ir.Value) (err error) {
 	for _, f := range []string{"Completed", "Failed", "FailedDirty"} {
 		if top[f].AsObject().GetString("type") != "final" {
 			die("%s must be a final state", f)
+		}
+	}
+	// Every non-final saga state carries the modeled outgoing transitions; a
+	// final annotation on one of them would let the real machine stop where
+	// the model keeps progressing.
+	for _, s := range append(append([]string{}, states...), "Compensating", "compensateRetry") {
+		if top[s].AsObject().GetString("type") == "final" {
+			die("%s must not be final: it carries the outgoing saga transitions the emitted model represents", ir.Repr(s))
 		}
 	}
 	// bidirectional closure: the machine must carry NOTHING beyond the saga
@@ -1239,7 +1269,7 @@ func ReconcileSaga(machine, sem *ir.Value) (err error) {
 	requireModeled(top["Compensating"], "Compensating", "saga", map[string]map[string]bool{
 		"onDone":  targets("Failed"),
 		"onError": targets("compensateRetry"),
-		"after":   targets("compensateRetry", "Failed"),
+		"after":   targets("compensateRetry"),
 	})
 	requireModeled(top["compensateRetry"], "compensateRetry", "saga", map[string]map[string]bool{
 		"always": targets("FailedDirty"),

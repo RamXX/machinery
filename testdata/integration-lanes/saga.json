@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "suites": [
+    {
+      "id": "saga-closure",
+      "lane": "required",
+      "adapter": "go-json",
+      "package": "./cmd/machinery",
+      "source_files": ["cmd/machinery/saga_closure_test.go"],
+      "tests": ["TestSagaClosureCLIRejectsUnsafeCompensationRoutes", "TestSagaClosureCLIPositiveControlStaysGreen"],
+      "runtimes": ["go", "java", "tlc"],
+      "timeout": "10m",
+      "stdout_limit": 4194304,
+      "stderr_limit": 1048576
+    }
+  ]
+}
