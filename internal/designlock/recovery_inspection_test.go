@@ -11,6 +11,7 @@ package designlock
 // controls pass today and must keep passing.
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -259,6 +260,386 @@ func TestRecoveryReaderGuidanceAdvertisesRecoverCommand(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "machinery recover") {
 			t.Fatalf("journal guidance does not advertise the recover inspection command: %v", err)
+		}
+	})
+}
+
+// GREEN phase (MAC-2n83): contract tests for InspectRecovery and
+// RecoverInterrupted themselves, exercising the exported recovery surface
+// over the same real-subprocess crash fixtures defined above.
+
+func recoveryReadSentinelBytes(t *testing.T, design string) []byte {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(design, publishSentinel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return body
+}
+
+func recoveryDesignFingerprint(t *testing.T, design string) map[string]string {
+	t.Helper()
+	values, err := fingerprint(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return values
+}
+
+func recoveryAssertEqualFingerprints(t *testing.T, before, after map[string]string) {
+	t.Helper()
+	if len(before) != len(after) {
+		t.Fatalf("design inventory changed: %d -> %d entries", len(before), len(after))
+	}
+	if changed := firstFingerprintChange(before, after); changed != "" {
+		t.Fatalf("design changed at %s", changed)
+	}
+}
+
+func TestInspectRecoveryReportsFullyPublishedTransaction(t *testing.T) {
+	design := recoveryCrashSubprocess(t, "pre-clear")
+	report, err := InspectRecovery(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Action != RecoveryActionFinalize {
+		t.Fatalf("action %s, want finalize; reasons=%v", report.Action, report.Reasons)
+	}
+	if report.Writer != recoveryFixtureWriter || report.RecoveryCommand != recoveryFixtureRecovery {
+		t.Fatalf("writer identity wrong: %q %q", report.Writer, report.RecoveryCommand)
+	}
+	if report.InputInventory != "verified" || report.DesignInputDigest != report.InputFingerprint {
+		t.Fatalf("input inventory %s digest %s recorded %s", report.InputInventory, report.DesignInputDigest, report.InputFingerprint)
+	}
+	if report.LiveWriter {
+		t.Fatal("no writer is live after a real subprocess crash")
+	}
+	if len(report.Outputs) != 3 {
+		t.Fatalf("expected the three declared outputs, got %v", report.Outputs)
+	}
+	for _, output := range report.Outputs {
+		if output.Status != "match" {
+			t.Fatalf("output %s status %s (%s)", output.Path, output.Status, output.Detail)
+		}
+	}
+	if len(report.Journals) != 1 || report.Journals[0].Path != publishSentinel || report.Journals[0].Role != "publish-sentinel" || report.Journals[0].Status != "present" {
+		t.Fatalf("journal inventory wrong: %v", report.Journals)
+	}
+}
+
+func TestInspectRecoveryIsReadOnlyAcrossBoundaries(t *testing.T) {
+	for _, boundary := range []string{"callback-start", "mid-callback", "pre-validation", "pre-clear"} {
+		t.Run(boundary, func(t *testing.T) {
+			design := recoveryCrashSubprocess(t, boundary)
+			before := recoveryDesignFingerprint(t, design)
+			sentinelBefore := recoveryReadSentinelBytes(t, design)
+			report, err := InspectRecovery(design)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Action != RecoveryActionRerun && report.Action != RecoveryActionFinalize {
+				t.Fatalf("boundary %s classified %s", boundary, report.Action)
+			}
+			recoveryAssertEqualFingerprints(t, before, recoveryDesignFingerprint(t, design))
+			if !bytes.Equal(sentinelBefore, recoveryReadSentinelBytes(t, design)) {
+				t.Fatal("inspection rewrote the publication sentinel")
+			}
+		})
+	}
+}
+
+func TestInspectRecoveryClassifiesIncompletePublicationsForWriterRerun(t *testing.T) {
+	for _, tc := range []struct {
+		boundary string
+		keyword  string
+	}{
+		{"callback-start", "digest"},
+		{"mid-callback", "missing"},
+	} {
+		t.Run(tc.boundary, func(t *testing.T) {
+			design := recoveryCrashSubprocess(t, tc.boundary)
+			report, err := InspectRecovery(design)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Action != RecoveryActionRerun {
+				t.Fatalf("action %s, want rerun-writer; reasons=%v", report.Action, report.Reasons)
+			}
+			joined := strings.Join(report.Reasons, "\n")
+			if !strings.Contains(joined, tc.keyword) {
+				t.Fatalf("reasons missing %q: %v", tc.keyword, report.Reasons)
+			}
+			if report.InputInventory != "verified" {
+				t.Fatalf("inputs must still verify for an incomplete publication: %s", report.InputInventory)
+			}
+		})
+	}
+}
+
+func TestInspectRecoveryRejectsTamperedSentinelAsConflict(t *testing.T) {
+	design := recoveryCrashSubprocess(t, "pre-clear")
+	sentinel := filepath.Join(design, publishSentinel)
+	body := recoveryReadSentinelBytes(t, design)
+	if err := os.WriteFile(sentinel, append(append([]byte(nil), body...), ' ', '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	report, err := InspectRecovery(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Action != RecoveryActionConflict {
+		t.Fatalf("action %s, want conflict; reasons=%v", report.Action, report.Reasons)
+	}
+	if !strings.Contains(strings.Join(report.Reasons, "\n"), "invalid") {
+		t.Fatalf("conflict reason must name the invalid sentinel: %v", report.Reasons)
+	}
+	if _, err := os.Stat(sentinel); err != nil {
+		t.Fatalf("inspection must preserve even tampered evidence: %v", err)
+	}
+}
+
+func TestInspectRecoveryDetectsInputInventoryMismatch(t *testing.T) {
+	design := recoveryCrashSubprocess(t, "pre-clear")
+	if err := os.WriteFile(filepath.Join(design, "source.md"), []byte("edited after the crash\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	report, err := InspectRecovery(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.InputInventory != "mismatch" {
+		t.Fatalf("input inventory %s, want mismatch", report.InputInventory)
+	}
+	if report.Action != RecoveryActionRerun {
+		t.Fatalf("action %s, want rerun-writer", report.Action)
+	}
+}
+
+func TestInspectRecoveryRefusesExternalTrackedInputAsUnwitnessable(t *testing.T) {
+	design := t.TempDir()
+	recoveryFixtureSeed(t, design)
+	external := filepath.Join(t.TempDir(), "ext-input.txt")
+	if err := os.WriteFile(external, []byte("tracked external input\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := Acquire(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lock.TrackExternal(external); err != nil {
+		t.Fatal(err)
+	}
+	expected, err := recoveryFixtureExpected(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testBeforeFinalOutputValidation = func() error { return errors.New("simulated crash with tracked externals") }
+	publishErr := lock.PublishExpectedRooted(recoveryFixtureWriter, recoveryFixtureRecovery, expected, func(*OutputScope) error {
+		return recoveryFixtureWriteAll(design)
+	})
+	testBeforeFinalOutputValidation = nil
+	if publishErr == nil {
+		t.Fatal("simulated crash succeeded")
+	}
+	if err := lock.Release(); err != nil {
+		t.Fatal(err)
+	}
+	report, err := InspectRecovery(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.InputInventory != "mismatch" || report.Action != RecoveryActionRerun {
+		t.Fatalf("tracked external input must be refused as unwitnessable: inventory=%s action=%s reasons=%v", report.InputInventory, report.Action, report.Reasons)
+	}
+}
+
+func TestInspectRecoveryReportsLiveWriter(t *testing.T) {
+	design := recoveryCrashSubprocess(t, "pre-clear")
+	lock, err := Acquire(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := InspectRecovery(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.LiveWriter || report.Action != RecoveryActionRerun {
+		t.Fatalf("live holder not detected: live=%t action=%s", report.LiveWriter, report.Action)
+	}
+	if !strings.Contains(strings.Join(report.Reasons, "\n"), "another process holds the design snapshot lock") {
+		t.Fatalf("live-writer reason missing: %v", report.Reasons)
+	}
+	if err := lock.Release(); err != nil {
+		t.Fatal(err)
+	}
+	report, err = InspectRecovery(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.LiveWriter || report.Action != RecoveryActionFinalize {
+		t.Fatalf("released holder still reported: live=%t action=%s", report.LiveWriter, report.Action)
+	}
+}
+
+func TestInspectRecoveryReportsCleanAndInnerJournalDesigns(t *testing.T) {
+	clean := t.TempDir()
+	report, err := InspectRecovery(clean)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Action != RecoveryActionNone || len(report.Journals) != 0 {
+		t.Fatalf("clean design misreported: %s %v", report.Action, report.Journals)
+	}
+	journaled := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(journaled, "formal"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(journaled, "formal/.machinery-formal-transaction.jsonl"), []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	report, err = InspectRecovery(journaled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Action != RecoveryActionRerun || len(report.Journals) != 1 || report.Journals[0].Role != "interrupted-transaction-journal" {
+		t.Fatalf("inner journal design misreported: %s %v", report.Action, report.Journals)
+	}
+}
+
+func TestRecoverInterruptedCompletesAndIsIdempotent(t *testing.T) {
+	for _, boundary := range []string{"pre-validation", "pre-clear"} {
+		t.Run(boundary, func(t *testing.T) {
+			design := recoveryCrashSubprocess(t, boundary)
+			report, err := RecoverInterrupted(design)
+			if err != nil {
+				t.Fatalf("recovery of a fully published %s transaction failed: %v; reasons=%v", boundary, err, report.Reasons)
+			}
+			if report.Action != RecoveryActionNone {
+				t.Fatalf("post-recovery action %s, want none", report.Action)
+			}
+			if _, err := os.Stat(filepath.Join(design, publishSentinel)); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("sentinel survived recovery: %v", err)
+			}
+			reader, err := AcquireReader(design)
+			if err != nil {
+				t.Fatalf("reader remained blocked after recovery: %v", err)
+			}
+			if err := reader.Release(); err != nil {
+				t.Fatal(err)
+			}
+			report, err = RecoverInterrupted(design)
+			if err != nil || report.Action != RecoveryActionNone {
+				t.Fatalf("second recovery not a harmless no-op: %v %s", err, report.Action)
+			}
+		})
+	}
+}
+
+func TestRecoverInterruptedRefusesAndPreservesEvidence(t *testing.T) {
+	t.Run("partial publication", func(t *testing.T) {
+		design := recoveryCrashSubprocess(t, "mid-callback")
+		before := recoveryDesignFingerprint(t, design)
+		sentinelBefore := recoveryReadSentinelBytes(t, design)
+		report, err := RecoverInterrupted(design)
+		if err == nil {
+			t.Fatalf("partial publication recovered: %+v", report)
+		}
+		if !strings.Contains(err.Error(), "nothing was modified") {
+			t.Fatalf("refusal must state preservation: %v", err)
+		}
+		if !strings.Contains(err.Error(), "missing") {
+			t.Fatalf("refusal must explain the incomplete output: %v", err)
+		}
+		recoveryAssertEqualFingerprints(t, before, recoveryDesignFingerprint(t, design))
+		if !bytes.Equal(sentinelBefore, recoveryReadSentinelBytes(t, design)) {
+			t.Fatal("refusal rewrote the publication sentinel")
+		}
+	})
+	t.Run("staged residue", func(t *testing.T) {
+		design := recoveryCrashSubprocess(t, "pre-clear")
+		stage := filepath.Join(design, publishSentinelStage)
+		if err := os.WriteFile(stage, []byte("{\"version\":1}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		before := recoveryDesignFingerprint(t, design)
+		report, err := RecoverInterrupted(design)
+		if err == nil {
+			t.Fatalf("staged residue recovered: %+v", report)
+		}
+		if report.Action != RecoveryActionRerun {
+			t.Fatalf("staged residue classified %s", report.Action)
+		}
+		recoveryAssertEqualFingerprints(t, before, recoveryDesignFingerprint(t, design))
+		if _, err := os.Stat(stage); err != nil {
+			t.Fatalf("refusal discarded the staged evidence instead of leaving it to the writer rerun: %v", err)
+		}
+	})
+	t.Run("symlink swap", func(t *testing.T) {
+		design := recoveryCrashSubprocess(t, "pre-clear")
+		outside := filepath.Join(t.TempDir(), "decoy.txt")
+		if err := os.WriteFile(outside, []byte("generated by the interrupted writer\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		target := filepath.Join(design, "generated.txt")
+		if err := os.Remove(target); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(outside, target); err != nil {
+			t.Fatal(err)
+		}
+		// The governed fingerprint refuses to witness a symlinked design (as
+		// it must), so this subtest witnesses the evidence directly.
+		witness := func() (string, os.FileInfo) {
+			info, err := os.Lstat(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			link, err := os.Readlink(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return link, info
+		}
+		linkBefore, infoBefore := witness()
+		sentinelBefore := recoveryReadSentinelBytes(t, design)
+		sourceBefore, err := os.ReadFile(filepath.Join(design, "source.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		report, err := RecoverInterrupted(design)
+		if err == nil {
+			t.Fatalf("symlink swap recovered: %+v", report)
+		}
+		if !strings.Contains(err.Error(), "symlink") {
+			t.Fatalf("refusal must name the symlink: %v", err)
+		}
+		linkAfter, infoAfter := witness()
+		if linkBefore != linkAfter || !os.SameFile(infoBefore, infoAfter) {
+			t.Fatal("refusal disturbed the swapped symlink evidence")
+		}
+		if !bytes.Equal(sentinelBefore, recoveryReadSentinelBytes(t, design)) {
+			t.Fatal("refusal rewrote the publication sentinel")
+		}
+		if sourceAfter, err := os.ReadFile(filepath.Join(design, "source.md")); err != nil || !bytes.Equal(sourceAfter, sourceBefore) {
+			t.Fatalf("refusal damaged design inputs: %v", err)
+		}
+	})
+	t.Run("live writer", func(t *testing.T) {
+		design := recoveryCrashSubprocess(t, "pre-clear")
+		lock, err := Acquire(design)
+		if err != nil {
+			t.Fatal(err)
+		}
+		report, err := RecoverInterrupted(design)
+		if err == nil {
+			_ = lock.Release()
+			t.Fatalf("live writer publication recovered: %+v", report)
+		}
+		if !strings.Contains(err.Error(), "another process holds the design snapshot lock") {
+			t.Fatalf("refusal must name the concurrent writer: %v", err)
+		}
+		if err := lock.Release(); err != nil {
+			t.Fatal(err)
 		}
 	})
 }

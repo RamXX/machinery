@@ -8,6 +8,7 @@ package main
 // filesystem; no in-process simulation stands in for a crash.
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -158,18 +159,18 @@ func recoverCrashFixture(t *testing.T, mode string) string {
 	return design
 }
 
-func recoverHoldFixture(t *testing.T) string {
+func recoverHoldDesign(t *testing.T, design string) {
 	t.Helper()
-	design := t.TempDir()
-	recoverSeedFixture(t, design)
 	marker := filepath.Join(t.TempDir(), "hold-marker")
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, executable, "-test.run=^TestRecoverCrashHelper$")
+	// Plain exec.Command: an exec.CommandContext cancellation (including a
+	// deferred one firing when this helper returns) would kill the holder the
+	// instant the marker appears and silently void the concurrency fixture.
+	// The holder is terminated explicitly by the test cleanup instead.
+	cmd := exec.Command(executable, "-test.run=^TestRecoverCrashHelper$")
 	cmd.Env = append(os.Environ(), "MACHINERY_RECOVER_CRASH_DESIGN="+design, "MACHINERY_RECOVER_CRASH_MODE=hold", "MACHINERY_RECOVER_HOLD_MARKER="+marker)
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
@@ -181,12 +182,11 @@ func recoverHoldFixture(t *testing.T) string {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		if _, err := os.Stat(marker); err == nil {
-			return design
+			return
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatal("concurrent writer fixture never became live")
-	return ""
 }
 
 func runRecoverCommand(t *testing.T, args ...string) (string, string, []int) {
@@ -397,6 +397,12 @@ func TestRecoverApplyRefusalPreservesEvidenceTable(t *testing.T) {
 			keywords: []string{"generated-tree", "missing"},
 		},
 		{
+			// A value substitution that keeps the sentinel byte-canonical and
+			// internally consistent is indistinguishable from a legitimate
+			// record and content-safe to finalize (the writer label is not
+			// part of any inventory proof), so the tamper battery uses a
+			// detectable non-canonical body instead: trailing bytes after the
+			// canonical JSON document.
 			name:    "tampered sentinel body",
 			fixture: func(t *testing.T) string { return recoverCrashFixture(t, "complete") },
 			mutate: func(t *testing.T, design string) {
@@ -404,11 +410,7 @@ func TestRecoverApplyRefusalPreservesEvidenceTable(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				tampered := strings.Replace(string(body), recoverFixtureWriter, "attacker-writer", 1)
-				if tampered == string(body) {
-					t.Fatal("tamper substitution did not apply")
-				}
-				if err := os.WriteFile(recoverSentinelPath(design), []byte(tampered), 0o600); err != nil {
+				if err := os.WriteFile(recoverSentinelPath(design), append(body, '\n', '\n'), 0o600); err != nil {
 					t.Fatal(err)
 				}
 			},
@@ -493,7 +495,7 @@ func TestRecoverApplyRefusalPreservesEvidenceTable(t *testing.T) {
 		},
 		{
 			name:    "concurrent writer holds the design lock",
-			fixture: func(t *testing.T) string { return recoverHoldFixture(t) },
+			fixture: func(t *testing.T) string { design := recoverCrashFixture(t, "complete"); recoverHoldDesign(t, design); return design },
 			keywords: []string{"another process holds the design snapshot lock"},
 		},
 	}
@@ -502,6 +504,13 @@ func TestRecoverApplyRefusalPreservesEvidenceTable(t *testing.T) {
 			design := tc.fixture(t)
 			if tc.mutate != nil {
 				tc.mutate(t, design)
+			}
+			// The user's view of their inputs at refusal time (possibly the
+			// very bytes an intentional edit left behind): recovery must
+			// preserve exactly this state, never roll it back.
+			sourceBefore, err := os.ReadFile(filepath.Join(design, "source.md"))
+			if err != nil {
+				t.Fatal(err)
 			}
 			before := recoverTreeFingerprint(t, design)
 			out, errB, codes := runRecoverCommand(t, design, "--apply")
@@ -528,7 +537,7 @@ func TestRecoverApplyRefusalPreservesEvidenceTable(t *testing.T) {
 			if _, err := os.Stat(recoverSentinelPath(design)); err != nil {
 				t.Fatalf("refusal deleted the publication sentinel: %v", err)
 			}
-			if source, err := os.ReadFile(filepath.Join(design, "source.md")); err != nil || string(source) != "design inputs must survive every recovery path\n" {
+			if source, err := os.ReadFile(filepath.Join(design, "source.md")); err != nil || !bytes.Equal(source, sourceBefore) {
 				t.Fatalf("refusal damaged design inputs: %v %q", err, source)
 			}
 		})

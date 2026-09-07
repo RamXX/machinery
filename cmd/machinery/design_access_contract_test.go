@@ -39,6 +39,7 @@ func TestEveryTopLevelCommandClassifiesDesignAccess(t *testing.T) {
 		"newEmbedCmd":          {"mixed", []string{"refresh-dry-run"}},
 		"newScaleCmd":          {"reader", []string{"default"}},
 		"newSweepCmd":          {"reader", []string{"default"}},
+		"newRecoverCmd":        {access: "mixed"},
 		"newDoctorCmd":         {access: "none"},
 		"newPreflightCmd":      {access: "none"},
 		"newInstallCmd":        {access: "none"},
