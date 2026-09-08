@@ -1,14 +1,15 @@
 ---
 id: MAC-svgi
 title: "custody test roots clamp their declared wall to a bootstrap open context, so long runs fail BUDGET_EXHAUSTED partway through"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [custody, ci]
 created_at: 2026-09-08T13:07:54Z
 created_by: ramirosalas
-updated_at: 2026-09-08T13:26:52Z
-content_hash: "sha256:146b69d0a5f24f783fb8752c76751352dadba103d536514e30bac8ef5e9d727f"
+updated_at: 2026-09-08T13:26:53Z
+content_hash: "sha256:67d2695dd82bd16aecdd083c192a7fa73f76f01a1196f074d08b602ff8147b6b"
+closed_at: 2026-09-08T13:26:53Z
 ---
 
 ## Description
@@ -49,7 +50,7 @@ Derive each helper's open context from the wall that helper declares, so the two
 
 
 ## History
-
+- 2026-09-08T13:26:53Z status: open -> closed
 
 ## Links
 
