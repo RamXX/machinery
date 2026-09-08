@@ -7,8 +7,8 @@ type: bug
 labels: [custody, flaky-under-load]
 created_at: 2026-09-08T16:04:00Z
 created_by: ramirosalas
-updated_at: 2026-09-08T16:04:00Z
-content_hash: "sha256:a52c98223d4c3f8d96a31fbce910add731a47c3e683f1256baa1da7fc658ea14"
+updated_at: 2026-09-08T16:31:03Z
+content_hash: "sha256:9d97d41517161fb073c876161f2b225cc805049babb192ad3dd372cead2e6729"
 ---
 
 ## Description
@@ -41,3 +41,12 @@ Fix (test only): startTestBroker joins the broker goroutine it started as part o
 
 
 ## Comments
+
+### 2026-09-08T16:31:03Z ramirosalas
+Fixed on fix/custody-load in 36f126d (internal/processscope/scope_test.go: startTestBroker joins the broker goroutine in its now-idempotent cleanup; TestChallengeAuthorizeUnsafeAcceptsForgedScope and TestChallengeRegistrationSkipObserved retire and join the broker built from the previous hook before replacing it).
+
+Before: go test -race -count=5 -run TestChallenge ./internal/processscope failed on an idle host in 0.5s with 'race detected during execution of test' (write at scope_test.go:432 against the read in runBroker at broker.go:303). Reproduced on the unchanged tree at afb5611.
+
+After: go test -race -count=5 -run TestChallenge ./internal/processscope green, and the full go test -race -count=5 ./internal/processscope ./internal/processcontrol green idle and under load.
+
+Test-only, no product behaviour changed.
