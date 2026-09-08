@@ -7,8 +7,8 @@ type: bug
 labels: [ci, integration-lane, mirror-drift]
 created_at: 2026-09-08T17:26:40Z
 created_by: ramirosalas
-updated_at: 2026-09-08T17:26:40Z
-content_hash: "sha256:402e27c1b4c7b441c96f071b1c6e385527b03aa3dd2302f91543453bf8f4464d"
+updated_at: 2026-09-08T17:26:48Z
+content_hash: "sha256:799fa90ee1b9dbd3d93c5c47bc43f77218735867bda6e114961c3d050788adb1"
 ---
 
 ## Description
@@ -41,3 +41,6 @@ One composite action (.github/actions/assurance-runtimes) owns the pins; the ci 
 
 
 ## Comments
+
+### 2026-09-08T17:26:48Z ramirosalas
+Fixed in d43af4c on branch fix/coldcache-test (composite action .github/actions/assurance-runtimes; ci lane, ci test, ci native, formal lane, nightly lane all use it). Workflow-shape and repository-contract tests green; actionlint clean.
