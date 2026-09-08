@@ -7,8 +7,8 @@ type: bug
 parent: MAC-ui8a
 created_at: 2026-09-08T02:21:09Z
 created_by: ramirosalas
-updated_at: 2026-09-08T10:15:28Z
-content_hash: "sha256:44e76f46559aeacae60bdbccc14c1deeea69d1525174ebb95381011a28c45054"
+updated_at: 2026-09-08T15:22:20Z
+content_hash: "sha256:9eebc29f415cb04f14c110c53dbd32ba3846478dab4c8b0461e186942023e8f5"
 assignee: dev-MAC-y2l2
 follows: [MAC-3hzt, MAC-r0hy]
 labels: [delivered]
@@ -990,3 +990,6 @@ Nothing in that directory was pruned.
   kind of bulk removal on the same shared store, unbatched. The rule needed to be attached to the
   operation (bulk mutation of a shared directory) rather than to the function I happened to be
   writing at the time.
+
+### 2026-09-08T15:22:19Z ramirosalas
+Owner ruling 2026-09-08: manual remediation is fine for pre-upgrade (rootless) ledgers; do NOT add an automatic doctor --repair mode that discards them. Story stays parked for 0.7.1 with the reviewed rework at c9322b9.
