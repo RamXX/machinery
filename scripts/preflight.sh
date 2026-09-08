@@ -156,7 +156,13 @@ make build || fail "build failed"
 
 # 9. race tests (ci: test job) ---------------------------------------------
 say "go test -race ./..."
-go test -race -count=1 ./... -timeout=20m || fail "unit/experiment tests failed"
+# The per-binary alarm must sit above the slowest legitimate package:
+# internal/install's serial fsync-bound suite measures ~1193s under race on
+# the documented host class (evidence run), leaving the previous 20m alarm
+# 0.5% of margin; ordinary IO jitter crossed it mid-fsync. 30m still kills
+# any hung test fail-closed while covering the realistic cost, and stays
+# below the mirrored CI job's own 40m budget.
+go test -race -count=1 ./... -timeout=30m || fail "unit/experiment tests failed"
 
 # Runtime tests carry machinery_integration and are absent from the native
 # suite above. Provision the pinned closure before selecting them here.

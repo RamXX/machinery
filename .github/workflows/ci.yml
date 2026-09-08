@@ -186,7 +186,7 @@ jobs:
       - name: Install the pinned TypeScript compiler
         run: npm install -g typescript@7.0.2
       - name: Go unit + experiment tests (with race detector)
-        run: go test -race -count=1 ./... -timeout=20m
+        run: go test -race -count=1 ./... -timeout=30m
 
   # ---------------------------------------------------------------- gates ---
   # Run the deterministic gate suite on every shipped example via the Go
