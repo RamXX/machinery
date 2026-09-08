@@ -1,14 +1,16 @@
 ---
 id: MAC-86fr
 title: "processscope writeFrame fails on frames larger than the unix socket send buffer (short control write)"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [custody, processscope]
 created_at: 2026-09-08T07:58:35Z
 created_by: ramirosalas
 updated_at: 2026-09-08T08:52:37Z
-content_hash: "sha256:ed1e646c5cfe333a8288bc328d6746fcc76fd395a545085fe1ef22c4c058b874"
+content_hash: "sha256:87c801f29163a3b5f228bb08fa9cb7f09b62c751737a50e8350d638013057085"
+closed_at: 2026-09-08T08:52:37Z
+close_reason: "Fixed in 10c4158; verified under a large inherited environment"
 ---
 
 ## Description
@@ -34,7 +36,7 @@ Any contributor or CI runner with a large environment cannot run the adapters pa
 
 
 ## History
-
+- 2026-09-08T08:52:37Z status: open -> closed
 
 ## Links
 
