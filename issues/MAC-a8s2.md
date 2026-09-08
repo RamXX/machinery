@@ -1,15 +1,17 @@
 ---
 id: MAC-a8s2
 title: "verify-formal fails on large designs: shared absolute cleanup deadline marks cleanly reaped jobs as budget-exceeded"
-status: open
+status: closed
 priority: 0
 type: bug
 labels: [regression, processscope, verify-formal]
 parent: MAC-ui8a
 created_at: 2026-09-08T07:54:06Z
 created_by: ramirosalas
-updated_at: 2026-09-08T08:51:13Z
-content_hash: "sha256:3e70660850b7aa358dfd0e256d596d799d424dffa668bb8583745f451f6d11ba"
+updated_at: 2026-09-08T09:27:48Z
+content_hash: "sha256:7eac6f1ea097c6982f6d40344213134bebcf88b52f6578e5e931dbb3320d6906"
+closed_at: 2026-09-08T09:27:48Z
+close_reason: "Landed on main (release 0.7.0 line) at 5c35463: 10c4158 custody cleanup grace per retirement; H2 verify-formal 167/167 on the combined 0.7.0 binary"
 ---
 
 ## Description
@@ -113,7 +115,7 @@ rather than deterministic across machines.
 Verified at release commit d1f2264 in the main checkout: internal/processscope/broker.go lines 740 (retireJob), 753-767 (waitUntil derivation and the 3s cap), 803 (budgetExceed), 814 (retireAll), 840 (buildReport) are unchanged. Reproduced again with the relocated 0.7.0 binary: machinery check design still reports 163 blocking findings on the same tree.
 
 ## History
-
+- 2026-09-08T09:27:48Z status: open -> closed
 
 ## Links
 - Parent: [[MAC-ui8a]]
