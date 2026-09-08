@@ -7,8 +7,8 @@ type: bug
 labels: [ci, gates, mirror-drift]
 created_at: 2026-09-08T12:46:59Z
 created_by: ramirosalas
-updated_at: 2026-09-08T12:46:59Z
-content_hash: "sha256:233913fb0b13e4921e16f6afb95c4e6ddd16003146f7e2515ae4f1c84e770b2c"
+updated_at: 2026-09-08T12:52:21Z
+content_hash: "sha256:4a1bb3d3f262f25389f74d32a7be9a83990ca98cb9affe1a65e1ea49d8ba8aa2"
 ---
 
 ## Description
@@ -74,3 +74,17 @@ contract tests that pin the CI/preflight/Makefile example wiring stay green.
 
 
 ## Comments
+
+### 2026-09-08T12:52:21Z ramirosalas
+Fixed on fix/ci-mirror at f681ebd.
+
+New scripts/example-gates.sh owns the accepted two-policy gate. Callers: scripts/preflight.sh:181 (phase 11), .github/workflows/ci.yml gates job step 'Gate every registered example with its exact capabilities', Makefile check target via EXAMPLE_GATES. scripts/shellcheck-files.txt gained the new script.
+
+Contract test TestExampleGatePolicyHasOneOwnerSharedByEveryMirror (cmd/machinery/repository_contract_test.go) pins the delegation in all three mirrors, forbids any mirror from re-spelling the policy, and proves the derived expectation fails closed when the check binary is silent.
+
+Verification:
+- scripts/example-gates.sh -> 'example gates: 8 registered example design suites passed' (3.0s)
+- go test -count=1 -run 'Preflight|Lane' ./scripts/integration-lane -> ok 18.0s (laneValidatePreflight still accepts preflight.sh)
+- go test -count=1 -run 'TestRepositoryDeterminismSurfaceContracts|TestExampleInventory|TestExampleGatePolicy|TestShellcheckInventory|TestPreflight' ./cmd/machinery -> ok 52.2s
+- go test -count=1 ./scripts/release-policy -> ok 13.0s
+- shellcheck over scripts/shellcheck-inventory.sh output -> clean; actionlint .github/workflows/*.yml -> clean; bash -n scripts/preflight.sh -> ok
