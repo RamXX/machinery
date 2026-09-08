@@ -1,15 +1,17 @@
 ---
 id: MAC-wcrd
 title: "Gx-trace READS field grammar narrowed to identifiers without notice; diagnostic misreports multi-word names as empty"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [regression, gates, gx-trace, diagnostics]
 parent: MAC-ui8a
 created_at: 2026-09-08T07:54:52Z
 created_by: ramirosalas
-updated_at: 2026-09-08T08:32:18Z
-content_hash: "sha256:fb592c2dc0d595a706439a8c22c64a218ba888fba60d860ff48408e25dac6ce6"
+updated_at: 2026-09-08T09:27:49Z
+content_hash: "sha256:c7141d0f9d17155d825861382f3f36d5aa167566c977d546d46145f0a11f1bea"
+closed_at: 2026-09-08T09:27:49Z
+close_reason: "Landed on main (release 0.7.0 line) at 5c35463: 5f2ef53 READS member grammar restored, empty-member diagnostic accurate"
 ---
 
 ## Description
@@ -95,7 +97,7 @@ BUILD shards all quote, so the rename is a design revision with its own re-attes
 
 
 ## History
-
+- 2026-09-08T09:27:49Z status: open -> closed
 
 ## Links
 - Parent: [[MAC-ui8a]]
