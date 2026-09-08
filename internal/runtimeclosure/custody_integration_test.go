@@ -58,13 +58,20 @@ func openRuntimeCustodyScope(t *testing.T) processscope.Scope {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// processscope.Open bounds the scope wall by the earliest of WallMS and
+	// the open context's deadline, so the open context is derived from the
+	// declared wall itself. A short bootstrap context here would silently
+	// clamp the whole custody root to that window, and every child scope
+	// opened after it has elapsed fails BUDGET_EXHAUSTED on a host slow
+	// enough to spend the window inside the work the wall was sized for.
+	const runtimeCustodyWallMS = 1200000
+	ctx, cancel := context.WithTimeout(context.Background(), runtimeCustodyWallMS*time.Millisecond)
 	defer cancel()
 	s, err := processscope.Open(ctx, processscope.Options{
 		HelperExecutable: exe,
 		HelperDigest:     runtimeCustodyDigest(t, exe),
 		ScratchRoot:      t.TempDir(),
-		Limits:           processscope.Limits{Jobs: 4, WallMS: 1200000, CleanupMS: 30000},
+		Limits:           processscope.Limits{Jobs: 4, WallMS: runtimeCustodyWallMS, CleanupMS: 30000},
 	})
 	if err != nil {
 		t.Fatal(err)

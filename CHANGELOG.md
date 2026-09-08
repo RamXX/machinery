@@ -10,6 +10,15 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A custody root grants the wall it declares, not the window its owner was opened with.**
+  `processscope.Open` bounds a scope's cumulative wall by the earliest of the declared `wall_ms`
+  and the open context's own deadline, so an open context sized as a bootstrap window quietly
+  becomes the real root wall. Every custody root the suites open now derives its open context from
+  the wall it declares, the correction 0.7.0 already applied to the contributor lane and to
+  `verify-formal`'s candidate scope. A 7-spec TLC portfolio measured at 85 s under the race
+  detector on 2 vCPU used to run out of a 60 s bootstrap window and fail every remaining spec with
+  `BUDGET_EXHAUSTED: root: inherited wall deadline has passed` against a declared 2,400,000 ms
+  wall. No cap changed: the declared budgets are what they always were.
 - **A finished Elixir suite whose ExUnit teardown crashes is no longer reported as a build
   error.** The embedded `elixir-exunit/v1` formatter used to stop itself while handling ExUnit's
   final `suite_finished` event, racing the `ExUnit.EventManager.stop/1` call the runner makes

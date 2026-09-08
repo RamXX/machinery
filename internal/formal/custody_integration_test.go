@@ -61,18 +61,62 @@ func openFormalCustodyScope(t *testing.T) processscope.Scope {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// processscope.Open bounds the scope wall by the earliest of WallMS and
+	// the open context's deadline, so the open context is derived from the
+	// declared wall itself. A short bootstrap context here would silently
+	// clamp the whole custody root to that window, and every child scope
+	// opened after it has elapsed fails BUDGET_EXHAUSTED on a host slow
+	// enough to spend the window inside the work the wall was sized for.
+	const formalCustodyWallMS = 2400000
+	ctx, cancel := context.WithTimeout(context.Background(), formalCustodyWallMS*time.Millisecond)
 	defer cancel()
 	s, err := processscope.Open(ctx, processscope.Options{
 		HelperExecutable: exe,
 		HelperDigest:     custodyTestDigest(t, exe),
 		ScratchRoot:      t.TempDir(),
-		Limits:           processscope.Limits{Jobs: 4, WallMS: 2400000, CleanupMS: 30000},
+		Limits:           processscope.Limits{Jobs: 4, WallMS: formalCustodyWallMS, CleanupMS: 30000},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return s
+}
+
+// TestFormalCustodyRootGrantsItsDeclaredWall pins the budget this suite's
+// custody root actually hands to the work under it.
+//
+// processscope.Open bounds a scope's cumulative wall by the earliest of the
+// declared WallMS and the open context's own deadline. An open context sized
+// as a bootstrap window therefore becomes the real root wall, and every child
+// scope opened after that window has elapsed fails BUDGET_EXHAUSTED, which on
+// a slow runner turned a whole portfolio of specs into "inherited wall
+// deadline has passed" partway through a run the declared wall covers.
+//
+// An attachment carries the scope's remaining budget, so it reports the wall
+// the root is really running under.
+func TestFormalCustodyRootGrantsItsDeclaredWall(t *testing.T) {
+	s := openFormalCustodyScope(t)
+	defer closeFormalCustodyScope(t, s, 30*time.Second)
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	attached, err := s.Attach(processscope.Command{
+		Executable:    "/bin/echo",
+		Args:          []string{"budget"},
+		Env:           []string{"PATH=/bin:/usr/bin"},
+		RuntimeDigest: "sha256:" + custodyTestDigest(t, exe),
+	})
+	if err != nil {
+		t.Fatalf("attach: %v", err)
+	}
+	// The declared wall is 2,400,000 ms; a bootstrap-clamped root reports the
+	// bootstrap window instead. The floor leaves room for the open handshake
+	// without admitting anything near a bootstrap-sized budget.
+	const declaredWallMS = 2400000
+	if attached.DeadlineMS < declaredWallMS-60000 {
+		t.Fatalf("custody root wall was clamped to %d ms; the declared wall is %d ms", attached.DeadlineMS, declaredWallMS)
+	}
 }
 
 func closeFormalCustodyScope(t *testing.T, s processscope.Scope, timeout time.Duration) processscope.CleanupReport {

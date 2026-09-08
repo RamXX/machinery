@@ -111,13 +111,20 @@ func openAdapterScope(t *testing.T) processscope.Scope {
 		t.Fatal(err)
 	}
 	sum := sha256.Sum256(body)
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// processscope.Open bounds the scope wall by the earliest of WallMS and
+	// the open context's deadline, so the open context is derived from the
+	// wall the caller declared. A short bootstrap context here would silently
+	// clamp the whole custody root to that window, and every child scope
+	// opened after it has elapsed fails BUDGET_EXHAUSTED on a host slow
+	// enough to spend the window inside the work the wall was sized for.
+	const adapterCustodyWallMS = 1200000
+	ctx, cancel := context.WithTimeout(context.Background(), adapterCustodyWallMS*time.Millisecond)
 	defer cancel()
 	scope, err := processscope.Open(ctx, processscope.Options{
 		HelperExecutable: exe,
 		HelperDigest:     fmt.Sprintf("%x", sum),
 		ScratchRoot:      t.TempDir(),
-		Limits:           processscope.Limits{Jobs: 4, WallMS: 1200000, CleanupMS: 30000},
+		Limits:           processscope.Limits{Jobs: 4, WallMS: adapterCustodyWallMS, CleanupMS: 30000},
 	})
 	if err != nil {
 		t.Fatalf("open custody scope: %v", err)

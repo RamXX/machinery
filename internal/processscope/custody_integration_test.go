@@ -40,16 +40,25 @@ func openScope(t *testing.T, scratch string, mod func(*processscope.Options)) pr
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The declared wall, stated rather than defaulted, so the open context
+	// below can be derived from it. This is the package default value; no cap
+	// changes here.
+	const scopeTestWallMS = 600000
 	opts := processscope.Options{
 		HelperExecutable: exe,
 		HelperDigest:     digestOf(t, exe),
 		ScratchRoot:      scratch,
-		Limits:           processscope.Limits{Jobs: 4},
+		Limits:           processscope.Limits{Jobs: 4, WallMS: scopeTestWallMS},
 	}
 	if mod != nil {
 		mod(&opts)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	// processscope.Open bounds the scope wall by the earliest of WallMS and
+	// the open context's deadline, so the open context is derived from the
+	// wall this scope declares. A short bootstrap context here would silently
+	// clamp the root to that window, and a long run of guarded jobs would
+	// start failing BUDGET_EXHAUSTED partway through for no declared reason.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(opts.Limits.WallMS)*time.Millisecond)
 	defer cancel()
 	s, err := processscope.Open(ctx, opts)
 	if err != nil {
