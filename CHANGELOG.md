@@ -309,11 +309,11 @@ parses the committed oracle table.
 **Attestation evidence v2 kinds (`Gv-attest`).** Unchanged: `attestation_version: 1` files still
 parse, and every claim the vocabulary classifies as design-only keeps passing as an implicit plan
 judgment, with a note asking for the explicit kind. `machinery check <design>` on a design-only
-design reports its missing-current warnings and still exits 0. Rejected now: a v1 row for a claim
-the vocabulary classifies as `current` (`gt.conformance-test-shape`, `g4.zero-context`,
-`g4.standin-coverage`, `g4.pack-event-discipline`, `ga.review-quality`), which used to pass as a
-design-only cover; a v2 `kind: current` row with no complete implementation subject; and a
-`kind: current` row evaluated without `--impl`. Findings:
+design reports its missing-current warnings and still exits 0. Rejected now: a v1 row for one of the
+three claims the vocabulary classifies as `current` (`gt.conformance-test-shape`,
+`g4.standin-coverage`, `g4.pack-event-discipline`), which used to pass as a design-only cover; a v2
+`kind: current` row with no complete implementation subject; and a `kind: current` row evaluated
+without `--impl`. Findings:
 
 ```
 GV_MISSING_IMPLEMENTATION_SUBJECT: gt.conformance-test-shape has legacy design-only covers; review the complete implementation/test scope and run machinery attest --design <design> --claim gt.conformance-test-shape --kind current --impl <root> --attestor <reviewer> --date YYYY-MM-DD, or explicitly recast as v2 kind=plan
@@ -332,8 +332,9 @@ machinery attest --design <design> --claim <claim> --kind current --impl <root> 
 
 and pass `--impl <root>` to every later `machinery check` that evaluates the claim. A subject whose
 bytes move after the review invalidates it (`GV_STALE_CONTENT`, `GV_SCOPE_INVENTORY`); review the
-changed scope and attest again. Historical acceptance-file judgments take `kind: historical` and
-establish history, not current approval.
+changed scope and attest again. `ga.review-quality` is the one historical-class claim: it takes
+`kind: historical` and establishes history, not current implementation approval. Every other claim
+in the vocabulary is plan-class and takes `kind: plan`.
 
 **`--impl` arming.** Unchanged: `G4-import` and `Gt-tests` still run only when `--impl` is
 supplied; `--complete` still requires `--impl`; an explicit `--gate g4` or `--gate gt` without
