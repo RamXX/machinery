@@ -161,17 +161,35 @@ func (s *scope) request(ctx context.Context, v any, files ...*os.File) (envFiles
 	defer timer.Stop()
 	select {
 	case ew := <-s.replyCh:
-		if ew.env.T == "refused" {
-			return envFiles{}, &Error{Code: ew.env.Code, Subject: ew.env.Subject, Message: ew.env.Message}
-		}
-		return ew, nil
+		return replyOrRefusal(ew)
 	case <-s.eofCh:
+		// The broker answers the root close and then exits, so the end of the
+		// control channel follows its own last reply by a few milliseconds.
+		// The single demux goroutine delivers that reply to replyCh strictly
+		// before it reads the end of the channel and closes eofCh, so once
+		// eofCh is closed any reply the broker did send is already buffered:
+		// draining it here is a settled read, not a second race. Without the
+		// drain, a caller that had not yet reached this select when both
+		// became ready got whichever case the runtime picked, and half the
+		// time it reported a delivered close report as a stale capability.
+		select {
+		case ew := <-s.replyCh:
+			return replyOrRefusal(ew)
+		default:
+		}
 		return envFiles{}, errf(CodeStaleCapability, s.id, "broker channel closed")
 	case <-ctx.Done():
 		return envFiles{}, errFromContext(ctx, s.id)
 	case <-timer.C:
 		return envFiles{}, errf(CodeTimeout, s.id, "control channel timed out")
 	}
+}
+
+func replyOrRefusal(ew envFiles) (envFiles, error) {
+	if ew.env.T == "refused" {
+		return envFiles{}, &Error{Code: ew.env.Code, Subject: ew.env.Subject, Message: ew.env.Message}
+	}
+	return ew, nil
 }
 
 func (s *scope) jobChanFor(id string) chan anyEnv {

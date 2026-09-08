@@ -10,6 +10,20 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A delivered close report is no longer reported as a lost control channel.** The broker answers
+  the root close and then exits: it writes the report, leaves the root channel loop, retires,
+  writes its ledger and closes the control connection, all within a few milliseconds. On the
+  caller's side one demux goroutine reads that reply into a buffered channel and then, a moment
+  later, reads the end of the channel and closes the end-of-channel signal. A caller that had not
+  yet reached its own select when both became ready got whichever of the two the runtime picked,
+  so a `cleaned` report already sitting in the buffer was announced as `STALE_CAPABILITY: root:
+  broker channel closed` with a synthesised `cleanup-failed` report carrying no job diagnostics.
+  It only ever hit the root close, since no other close ends the broker, and only on a host slow
+  enough to deschedule the caller between sending the close and waiting for its answer: three
+  adapter suites failed that way in the hosted non-race macOS job on a loaded three-core runner.
+  The caller now drains an already-delivered reply before it reports the end of the channel, which
+  is a settled read rather than a second race: the single demux goroutine cannot signal the end of
+  the channel before it has delivered every reply it read. No budget or cap changed.
 - **A killed process group is no longer read as a survivor while its members await reaping.** A
   job's retirement signalled the group, reaped the guardian, and then probed the group once. The
   members of a job are children of that guardian, so at the instant it is reaped they are orphans

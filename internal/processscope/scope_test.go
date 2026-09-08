@@ -1122,3 +1122,60 @@ func TestScopeCloseJoinsARetirementAlreadyClaimed(t *testing.T) {
 		t.Fatal("close never returned after the retirement it joined settled")
 	}
 }
+
+// TestRequestPrefersADeliveredReplyOverTheEndOfTheChannel freezes the root
+// close handshake against a broker that answers and then exits, which is what
+// the broker does: it writes the close report, returns from the root channel
+// loop, retires, writes its ledger and closes the control connection. The
+// caller's demux goroutine therefore buffers the reply and, a moment later,
+// observes the end of the channel. A caller that had not yet reached its own
+// select when both became ready used to get whichever of the two the runtime
+// picked, so a delivered "cleaned" report was reported as a stale capability
+// about half the time on a host slow enough to deschedule it there.
+//
+// The fixture puts the request in exactly that state deterministically: the
+// reply is written and the peer's write side is shut down before the demux
+// starts, and the request is only issued once eofCh is closed, which the
+// single demux goroutine cannot do before it has delivered the reply.
+func TestRequestPrefersADeliveredReplyOverTheEndOfTheChannel(t *testing.T) {
+	for i := 0; i < 64; i++ {
+		a, b, err := newChannelPair()
+		if err != nil {
+			t.Fatalf("channel pair: %v", err)
+		}
+		peer, err := connFromFile(b)
+		b.Close()
+		if err != nil {
+			a.Close()
+			t.Fatalf("peer channel: %v", err)
+		}
+		mine, err := connFromFile(a)
+		a.Close()
+		if err != nil {
+			peer.Close()
+			t.Fatalf("caller channel: %v", err)
+		}
+		if err := writeFrame(peer, mustMarshal(msgClosed{T: "closed", Report: CleanupReport{Status: StatusCleaned}})); err != nil {
+			t.Fatalf("write the close reply: %v", err)
+		}
+		if err := peer.CloseWrite(); err != nil {
+			t.Fatalf("end the control channel behind the reply: %v", err)
+		}
+		s := &scope{conn: mine, fr: newFrameReader(mine), id: "root", rootID: "root-fixture", deadline: time.Now().Add(time.Minute)}
+		s.ensureDemux()
+		select {
+		case <-s.eofCh:
+		case <-time.After(30 * time.Second):
+			t.Fatal("demux never observed the end of the control channel")
+		}
+		ew, err := s.request(context.Background(), msgClose{T: "close", Scope: "root"})
+		if err != nil {
+			t.Fatalf("iteration %d: a delivered close reply must not be reported as a lost channel: %v", i, err)
+		}
+		if ew.env.T != "closed" || ew.env.Report.Status != StatusCleaned {
+			t.Fatalf("iteration %d: close reply must survive the end of the channel, got %q %+v", i, ew.env.T, ew.env.Report)
+		}
+		mine.Close()
+		peer.Close()
+	}
+}
