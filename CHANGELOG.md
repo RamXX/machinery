@@ -6,7 +6,7 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-09-07
+## [0.7.0] - 2026-09-08
 
 ### Fixed
 
