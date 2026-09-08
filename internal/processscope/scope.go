@@ -103,12 +103,12 @@ func (s *scope) ensureDemux() {
 					if ch != nil {
 						ch <- m
 					}
-			case "started":
-				// Frames on one connection are read sequentially by this
-				// goroutine, so registering the job's result channel here,
-				// before the started reply is delivered to Run, guarantees
-				// the job's terminal result frame, whenever it arrives, finds
-				// its channel instead of being dropped as unreadable.
+				case "started":
+					// Frames on one connection are read sequentially by this
+					// goroutine, so registering the job's result channel here,
+					// before the started reply is delivered to Run, guarantees
+					// the job's terminal result frame, whenever it arrives, finds
+					// its channel instead of being dropped as unreadable.
 					s.jobsMu.Lock()
 					if s.jobChans[m.Job] == nil {
 						s.jobChans[m.Job] = make(chan anyEnv, 1)
