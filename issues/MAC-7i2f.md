@@ -1,14 +1,15 @@
 ---
 id: MAC-7i2f
 title: "custody test: replacing a package hook races the in-process broker that read it"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [custody, flaky-under-load]
 created_at: 2026-09-08T16:04:00Z
 created_by: ramirosalas
 updated_at: 2026-09-08T16:31:03Z
-content_hash: "sha256:9d97d41517161fb073c876161f2b225cc805049babb192ad3dd372cead2e6729"
+content_hash: "sha256:d80b2b2017990a645a6423182651cb7f4c214986b558e35b8937735e28ebce35"
+closed_at: 2026-09-08T16:31:03Z
 ---
 
 ## Description
@@ -35,7 +36,7 @@ Fix (test only): startTestBroker joins the broker goroutine it started as part o
 
 
 ## History
-
+- 2026-09-08T16:31:03Z status: open -> closed
 
 ## Links
 
