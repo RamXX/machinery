@@ -7,8 +7,8 @@ type: bug
 labels: [custody, flaky-under-load]
 created_at: 2026-09-08T15:45:58Z
 created_by: ramirosalas
-updated_at: 2026-09-08T15:45:58Z
-content_hash: "sha256:2b560d4aeaa532ed1d9d9cf86a7cc8014e0a95e83fc3f45eebde68c104d420ba"
+updated_at: 2026-09-08T16:30:55Z
+content_hash: "sha256:f10d7559f75d2073eb7b8400bbe3ad018d4124aed37ed0965936ef549a8cd5ee"
 ---
 
 ## Description
@@ -38,3 +38,12 @@ Fix (test only, no product budget touched): the helper polls under the wall it a
 
 
 ## Comments
+
+### 2026-09-08T16:30:55Z ramirosalas
+Fixed on fix/custody-load in f33e9aa (internal/processscope/custody_integration_test.go: ownerHelperWall/ownerHelperReportSlack/ownerHandoffMissing constants, the owner helper role, waitOwnerHandoff, waitPidFile).
+
+Test-only. The helper now polls for its grandchild under the 60s wall it already declares, keeps back a 10s report slack, and always writes a record: the pid, run:CODE when the run that owns the grandchild failed, or childpid:absent. The reader derives its wait from the same declared wall and prints the helper's own log when the record is missing or is not a pid; waitPidFile now names the content it could not parse. No product budget or shipped cap changed; docs/native-custody-contract.md untouched.
+
+Not reproduced in isolation: 40 runs of TestOwnerLossBrokerSelfCleanup under a parallel load generator at load average 78 to 105 all passed, so the fixed 10s helper poll was not observed to expire on this host outside the full sweep. What is certain from the code is the failure mode reported: the helper writes an empty file when its poll expires, waitFile ignores an empty file, and the reader then reports 'never appeared' after its own separate 20s, naming neither the helper's state nor its log. That silence is what is fixed.
+
+Gates: go test -race -count=5 ./internal/processscope ./internal/processcontrol green idle and under load (5 runs of this test in each); required integration lane green; gofmt, go vet, golangci-lint clean.
