@@ -2,6 +2,7 @@
 hooks/machinery-hook.sh
 install.sh
 scripts/c4-inventory.sh
+scripts/example-gates.sh
 scripts/example-inventory.sh
 scripts/git-safe.sh
 scripts/modelith-inventory.sh

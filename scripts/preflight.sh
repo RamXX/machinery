@@ -176,54 +176,10 @@ go test -count=1 ./internal/experiments/ || fail "adversarial gate-experiment su
 
 # 11. example gate suites (ci: gates job) ----------------------------------
 say "machinery check (all 8 example design suites)"
-# Two truthful policies mirror the accepted golden corpus (phase 10) and the
-# MAC-hgz1 v2 attestation migration. An example with a registered
-# implementation (go-crm) carries an accepted current implementation review
-# and must stay strictly green under --warnings-as-errors. A design-only
-# example is honestly plan-only: its behavioral current-class claims (the
-# gate's classification: gt.conformance-test-shape, g4.standin-coverage,
-# g4.pack-event-discipline) are attested as plans, so check must pass with
-# exactly the expected missing-current warnings, never promoted. The
-# expected warning set is derived from each design's committed
-# attestations.yaml, not hardcoded: a claim attested current expects no
-# warning, and any other warning, error, or drift still fails the phase.
-scripts/example-inventory.sh rows | while IFS=$'\t' read -r -a row; do
-  design=${row[0]}
-  impl=${row[1]}
-  complete=${row[5]}
-  if [[ "$impl" != - ]]; then
-    args=("$design" --warnings-as-errors --impl "$impl")
-    [[ "$complete" == no ]] || args+=(--complete)
-    .bin/machinery check "${args[@]}" || fail "gate suite: $design"
-    continue
-  fi
-  check_out=$preflight_work/phase11-check.out
-  expected=$preflight_work/phase11-expected.warns
-  actual=$preflight_work/phase11-actual.warns
-  awk '
-    BEGIN {
-      current["gt.conformance-test-shape"] = 1
-      current["g4.standin-coverage"] = 1
-      current["g4.pack-event-discipline"] = 1
-    }
-    function emit() {
-      if (claim != "" && current[claim] && kind != "current")
-        printf "  warn   %s: plan only; current implementation review missing\n", claim
-    }
-    /^  - claim:/ { emit(); claim = $3; kind = ""; next }
-    /^    kind:/ { kind = $2 }
-    END { emit() }
-  ' "$design/attestations.yaml" >"$expected"
-  if ! .bin/machinery check "$design" >"$check_out"; then
-    cat "$check_out" >&2
-    fail "gate suite: $design"
-  fi
-  { grep '^  warn ' "$check_out" >"$actual" || true; }
-  if ! diff -u "$expected" "$actual"; then
-    cat "$check_out" >&2
-    fail "gate suite warnings drifted from the plan-only expectation: $design"
-  fi
-done
+# The accepted two-policy gate is owned by one script, shared verbatim with
+# the CI gates job and the Makefile check target so the three mirrors cannot
+# drift apart. Read scripts/example-gates.sh for the policy itself.
+scripts/example-gates.sh .bin/machinery || fail "example gate suites failed"
 
 # 12. registered implementation module suites (ci: example-impls job) ------
 say "registered implementation module tests"

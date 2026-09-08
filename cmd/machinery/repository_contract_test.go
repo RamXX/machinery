@@ -476,6 +476,60 @@ func TestExampleInventoryIsClosedAndDrivesEveryRunner(t *testing.T) {
 	}
 }
 
+// TestExampleGatePolicyHasOneOwnerSharedByEveryMirror holds the accepted
+// two-policy example gate to a single executable owner. The hosted gates job
+// once carried its own copy of the loop and drifted from the local preflight,
+// failing every design-only example on its honest plan-only warnings. The
+// three mirrors must now call the same script, and only that script may spell
+// the policy out.
+func TestExampleGatePolicyHasOneOwnerSharedByEveryMirror(t *testing.T) {
+	repo := repoRootDir(t)
+	gates := mustRepositoryFile(t, filepath.Join(repo, "scripts", "example-gates.sh"))
+	for _, required := range []string{
+		"set -euo pipefail",
+		"scripts/example-inventory.sh rows",
+		`args=("$design" --warnings-as-errors --impl "$impl")`,
+		"args+=(--complete)",
+		`"$design/attestations.yaml"`,
+		`grep '^  warn ' "$check_out"`,
+		`diff -u "$expected" "$actual"`,
+		"gate suite warnings drifted from the plan-only expectation",
+	} {
+		if !strings.Contains(gates, required) {
+			t.Errorf("shared example-gate script lacks policy contract %q", required)
+		}
+	}
+
+	// Every mirror delegates, and none of them re-derives the policy.
+	mirrors := map[string]string{
+		"local preflight": mustRepositoryFile(t, filepath.Join(repo, "scripts", "preflight.sh")),
+		"CI gates job":    mustRepositoryFile(t, filepath.Join(repo, ".github", "workflows", "ci.yml")),
+		"Makefile check":  mustRepositoryFile(t, filepath.Join(repo, "Makefile")),
+	}
+	for name, body := range mirrors {
+		if !strings.Contains(body, "example-gates.sh") {
+			t.Errorf("%s does not call the shared example-gate script", name)
+		}
+		for _, drift := range []string{"attestations.yaml", "plan only; current implementation review missing", "--warnings-as-errors"} {
+			if strings.Contains(body, drift) {
+				t.Errorf("%s re-spells example-gate policy %q instead of delegating", name, drift)
+			}
+		}
+	}
+
+	// A tampered expectation must fail the gate rather than pass silently.
+	script := filepath.Join(repo, "scripts", "example-gates.sh")
+	fake := filepath.Join(t.TempDir(), "machinery")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(t.Context(), "bash", script, fake)
+	cmd.Dir = repo
+	if out, err := cmd.CombinedOutput(); err == nil || !strings.Contains(string(out), "drifted from the plan-only expectation") {
+		t.Fatalf("a silent check binary did not fail the plan-only diff: err=%v out=%s", err, out)
+	}
+}
+
 func TestDependencyReviewHasNoWarningOnlySeverityTier(t *testing.T) {
 	workflow := mustRepositoryFile(t, filepath.Join(repoRootDir(t), ".github", "workflows", "security.yml"))
 	if !strings.Contains(workflow, "fail-on-severity: low") {
@@ -774,10 +828,8 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		"MACHINERY_REQUIRE_OCI_GOLDEN: \"1\"",
 		"Souffl(e|é).*(external.checker|checker engine|CI pin|required)",
 		"stale host checker-runtime contract found",
-		"scripts/example-inventory.sh rows",
+		"scripts/example-gates.sh .bin/machinery",
 		"scripts/example-inventory.sh checkers",
-		`args+=(--impl "$impl")`,
-		"args+=(--complete)",
 		"go install github.com/rhysd/actionlint/cmd/actionlint@\"$version\"",
 		"actionlint .github/workflows/*.yml",
 		"scripts/shellcheck-inventory.sh",
@@ -913,10 +965,11 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 	makefile := mustRepositoryFile(t, filepath.Join(root, "Makefile"))
 	requireAll("Makefile formal suite", makefile,
 		"EXAMPLE_INVENTORY := scripts/example-inventory.sh",
+		"EXAMPLE_GATES := scripts/example-gates.sh",
 		"MODELITH_VERSION := v0.4.0",
 		"MODELITH_RENDER := scripts/modelith-render.sh",
 		"modelith-render-check: modelith-inventory modelith-render",
-		"$(EXAMPLE_INVENTORY) rows",
+		"$(EXAMPLE_GATES) $(MACH)",
 		"$(EXAMPLE_INVENTORY) formal",
 	)
 	preflight := mustRepositoryFile(t, filepath.Join(root, "scripts", "preflight.sh"))
@@ -925,7 +978,7 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		"make modelith-render-check",
 		"golangci-lint is required at the version pinned",
 		"does not match pin $want",
-		"scripts/example-inventory.sh rows",
+		"scripts/example-gates.sh .bin/machinery",
 		"scripts/example-inventory.sh checkers",
 		"scripts/shellcheck-inventory.sh",
 		`shellcheck "${shell_files[@]}"`,

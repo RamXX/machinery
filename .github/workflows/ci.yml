@@ -204,21 +204,11 @@ jobs:
           cache: true
       - name: Build machinery
         run: make build
+      # The accepted two-policy gate is owned by scripts/example-gates.sh and
+      # shared verbatim with the local preflight (phase 11) and the Makefile
+      # check target, so these three mirrors cannot drift apart.
       - name: Gate every registered example with its exact capabilities
-        run: |
-          set -euo pipefail
-          inventory=$(mktemp)
-          trap 'rm -f "$inventory"' EXIT
-          scripts/example-inventory.sh rows >"$inventory"
-          while IFS=$'\t' read -r -a row; do
-            design=${row[0]}
-            impl=${row[1]}
-            complete=${row[5]}
-            args=("$design" --warnings-as-errors)
-            [[ "$impl" == - ]] || args+=(--impl "$impl")
-            [[ "$complete" == no ]] || args+=(--complete)
-            .bin/machinery check "${args[@]}"
-          done <"$inventory"
+        run: scripts/example-gates.sh .bin/machinery
 
   # ---------------------------------------------- example impl module tests ---
   # Every registered example module has its own hermetic suite.

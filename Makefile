@@ -18,6 +18,9 @@ INTERNAL_VERSION := v0.7.0
 MODELITH_VERSION := v0.4.0
 MACH ?= $(CURDIR)/.bin/machinery
 EXAMPLE_INVENTORY := scripts/example-inventory.sh
+# Single owner of the accepted example-gate policy, shared verbatim with the
+# CI gates job and local preflight phase 11 so the mirrors cannot drift.
+EXAMPLE_GATES := scripts/example-gates.sh
 MODELITH_INVENTORY := scripts/modelith-inventory.sh
 MODELITH_RENDER := scripts/modelith-render.sh
 # Single source of truth for the linter version, shared with CI (ci.yml reads
@@ -68,13 +71,7 @@ golden-update: ## Re-capture the golden corpus from the current binary (review t
 	@go test -count=1 -run TestGolden ./cmd/machinery -update
 
 check: build ## Run the deterministic gate suite across the bundled examples
-	@$(EXAMPLE_INVENTORY) rows | while IFS=$$'\t' read -r -a row; do \
-		design="$${row[0]}"; impl="$${row[1]}"; complete="$${row[5]}"; \
-		args=("$$design" --warnings-as-errors); \
-		if [[ "$$impl" != - ]]; then args+=(--impl "$$impl"); fi; \
-		if [[ "$$complete" == yes ]]; then args+=(--complete); fi; \
-		$(MACH) check "$${args[@]}"; \
-	done
+	@$(EXAMPLE_GATES) $(MACH)
 
 verify-formal: build ## Regenerate + TLC-check the whole formal suite across the examples (needs Java)
 	@$(EXAMPLE_INVENTORY) formal | while IFS= read -r design; do \
