@@ -132,7 +132,16 @@ defmodule Machinery.Assurance.Reporter do
       excluded: JSON.int(state.counters.excluded)
     ))
 
-    {:stop, :normal, close(state)}
+    # The reporter must not stop itself here. ExUnit.Runner.run_with_trap/2
+    # calls ExUnit.EventManager.stop/1 right after this cast, and that
+    # function calls GenServer.stop/3 on every child the formatter
+    # DynamicSupervisor still lists. A formatter that terminates inside this
+    # cast opens a window in which it is already dead while the supervisor
+    # has not yet processed its exit signal; the teardown then exits with
+    # {:noproc, {GenServer, :stop, ...}} and kills the runner task after a
+    # complete run. The stream is closed here (sentinel written, device
+    # closed) and the process stays alive so ExUnit stops it exactly once.
+    {:noreply, close(state)}
   end
 
   def handle_cast(:max_failures_reached, state) do

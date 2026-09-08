@@ -10,6 +10,17 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A finished Elixir suite whose ExUnit teardown crashes is no longer reported as a build
+  error.** The embedded `elixir-exunit/v1` formatter used to stop itself while handling ExUnit's
+  final `suite_finished` event, racing the `ExUnit.EventManager.stop/1` call the runner makes
+  immediately afterwards: when the formatter supervisor had not yet processed the exit signal, the
+  teardown exited `{:noproc, {GenServer, :stop, [pid, :normal, :infinity]}}` and killed the runner
+  after the suite had already executed, intermittently on a loaded host. The formatter now closes
+  its event stream in place and stays alive, so ExUnit stops it exactly once. Independently, a mix
+  abort that happens after a complete, reconciled native run is classified as
+  `UNEXPECTED_FAILURE` naming the reconciled outcome, with the witnessed assertion outcomes
+  preserved on the execution record, instead of a `BUILD_ERROR` claiming a suite that compiled and
+  ran failed to build.
 - **A matrix's prose is narrative again, not a malformed `CLAUSES` declaration.** A declaration is
   a `CLAUSES{...}` group on a row of the named-unit contract table, which is the only shape 0.6.11
   read. An invariant-coverage bullet quoting a guard's vocabulary, an enumeration wrapped across

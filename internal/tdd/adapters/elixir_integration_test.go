@@ -376,6 +376,50 @@ func TestElixirAdapterRejectsCompileFailureAsBuildError(t *testing.T) {
 	}
 }
 
+// TestElixirAdapterSeparatesPostExecutionFaultFromBuildError freezes the
+// post-execution boundary (MAC-k3rb): a suite that compiled, executed and
+// reconciled a complete native stream, and whose mix process only then
+// aborted, is a distinct post-execution runtime fault carrying the
+// witnessed outcomes, never a BUILD_ERROR. The fault is injected
+// deterministically with an after_suite callback, which ExUnit invokes from
+// the same ExUnit.Runner.run_with_trap/2 frame that stops the event
+// manager, so it reproduces the class of the observed teardown noproc
+// without depending on scheduler timing.
+func TestElixirAdapterSeparatesPostExecutionFaultFromBuildError(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+	defer cancel()
+	faulting := string(exAssetBytes(t, "conformance/conformance_test.exs")) +
+		"\nExUnit.after_suite(fn _ -> exit(:machinery_post_execution_fault) end)\n"
+	files := map[string][]byte{"test/conformance_test.exs": []byte(faulting)}
+	result, err := exRunCaptured(t, ctx, files, exConformanceSuiteOf(t, "post-execution-fault", faulting), tdd.Limits{}, nil)
+	if err == nil {
+		t.Fatal("a mix abort after execution must never certify")
+	}
+	if strings.Contains(err.Error(), "BUILD_ERROR") {
+		t.Fatalf("a suite that already executed must not be classified as a build error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "UNEXPECTED_FAILURE") {
+		t.Fatalf("a post-execution abort must be UNEXPECTED_FAILURE: %v", err)
+	}
+	if !strings.Contains(err.Error(), `reconciled outcome "pass"`) {
+		t.Fatalf("the witnessed outcome must be reported with the fault: %v", err)
+	}
+	if result.execution.Outcome != "error" {
+		t.Fatalf("post-execution fault outcome %q is not the error outcome", result.execution.Outcome)
+	}
+	witnessed := map[string]string{}
+	for _, e := range result.execution.Events {
+		if e.Kind == "assertion" {
+			witnessed[e.Assertion] = e.Outcome
+		}
+	}
+	for _, id := range []string{"conformance/witness", "conformance/nested", "conformance/multi-a", "conformance/multi-b"} {
+		if witnessed[id] != "pass" {
+			t.Fatalf("witnessed assertion outcomes were not preserved on the execution record: %+v", witnessed)
+		}
+	}
+}
+
 // TestElixirAdapterRejectsSkippedCase freezes the skip boundary on the real
 // native stream: a required case skipped by tag can never certify.
 func TestElixirAdapterRejectsSkippedCase(t *testing.T) {

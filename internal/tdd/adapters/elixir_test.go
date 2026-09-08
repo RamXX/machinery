@@ -68,6 +68,38 @@ func TestElixirAssetInventoryMatchesFrozenPins(t *testing.T) {
 	}
 }
 
+// TestElixirReporterSurvivesItsOwnSuiteFinished freezes the deterministic
+// teardown shape of the embedded formatter (MAC-k3rb). ExUnit.Runner calls
+// ExUnit.EventManager.stop/1 immediately after the suite_finished cast, and
+// that function calls GenServer.stop/3 on every child the formatter
+// DynamicSupervisor still lists. A formatter that terminates itself inside
+// that cast races the supervisor's exit-signal handling: when the child is
+// still listed but already dead, the teardown exits
+// {:noproc, {GenServer, :stop, [pid, :normal, :infinity]}} and kills the
+// runner task after a fully executed suite. The reporter therefore closes
+// its stream in that cast and stays alive, so ExUnit stops it exactly once.
+func TestElixirReporterSurvivesItsOwnSuiteFinished(t *testing.T) {
+	source := string(elixirReporterSource)
+	clause := strings.Index(source, "def handle_cast({:suite_finished, _times_us}, state) do")
+	if clause < 0 {
+		t.Fatal("embedded reporter no longer declares the suite_finished formatter clause")
+	}
+	next := strings.Index(source[clause:], "\n  def ")
+	if next < 0 {
+		t.Fatal("embedded reporter suite_finished clause is unterminated")
+	}
+	body := source[clause : clause+next]
+	if strings.Contains(body, "{:stop,") {
+		t.Fatal("embedded reporter stops itself on suite_finished; that races ExUnit.EventManager.stop/1 into a noproc teardown")
+	}
+	if !strings.Contains(body, "{:noreply, close(state)}") {
+		t.Fatalf("embedded reporter suite_finished clause must close the stream and stay alive: %s", body)
+	}
+	if !strings.Contains(source, "def terminate(_reason, state), do: close(state)") {
+		t.Fatal("embedded reporter must still close its stream from terminate/2")
+	}
+}
+
 // TestElixirLookupResolvesClosedIdentity freezes the registry seam: the
 // closed adapter identity resolves through the shared Lookup and foreign
 // identities fail closed.

@@ -73,7 +73,7 @@ const (
 	// verified at materialization and re-verified after every native run.
 	ElixirMixPinnedSHA256       = "b7683871d74b1f1824bd6ada217306f5c923fd713620a40c617e1f41f3ba8af0"
 	ElixirJSONPinnedSHA256      = "49005258cac1f89e365c06da4748c4325dd6012eb28c4e5a8d3dbf77ab51d75e"
-	ElixirReporterPinnedSHA256  = "6562724bc4f47891ba42a2f4efe4446939e8ad29fcb722882097cc8f514155cd"
+	ElixirReporterPinnedSHA256  = "6f547fde32de5dcd10947b9aedc8a215d0d8006db71f7d65a71166065fa753d3"
 	ElixirCheckPinnedSHA256     = "a4a7890e05477bc4389a878f2eef7c1218897d1665ce34c52249418811eea061"
 	ElixirBootstrapPinnedSHA256 = "440a650f545d84838491ba617d30d587aff46e621eb4b8c111a824af5ab7f064"
 
@@ -463,9 +463,16 @@ func (a *ElixirAdapter) Run(ctx context.Context, prepared tdd.PreparedSuite, sin
 	case rec.Outcome == "pass" && result.ExitCode == 0:
 	case rec.Outcome == "assertion-fail" && result.ExitCode == 2:
 	case result.ExitCode == 1:
+		// The complete native stream was already reconciled here, so the
+		// suite compiled and ran: a mix-level abort at this point is a
+		// post-execution runtime fault (an ExUnit teardown exit, an
+		// after_suite callback failure, a VM abort), never a build error.
+		// The witnessed outcomes are preserved on the execution record so
+		// the fault is repairable without a re-run.
+		execution.Events = rec.Events
 		execution.Outcome = "error"
 		a.emitElixir(sink, rec.Events)
-		return execution, fmt.Errorf("BUILD_ERROR: suite %s aborted at the mix level after execution (exit=1 stdout: %s stderr: %s)", state.suite.ID, boundedString(stdout.String(), 2048), boundedString(stderr.String(), 2048))
+		return execution, fmt.Errorf("UNEXPECTED_FAILURE: suite %s completed its native run with reconciled outcome %q, then the mix process aborted after execution (exit=1 stdout: %s stderr: %s)", state.suite.ID, rec.Outcome, boundedString(stdout.String(), 2048), boundedString(stderr.String(), 2048))
 	default:
 		execution.Outcome = "error"
 		a.emitElixir(sink, rec.Events)
