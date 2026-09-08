@@ -883,7 +883,8 @@ func TestLaneStreamFailureNeverFormatsANilError(t *testing.T) {
 // hosted-run defect offline: with a cold module cache the selection command
 // writes "go: downloading ..." to stderr, and the lane treats any selection
 // stderr as failure. The module proxy is the host's own module cache in
-// proxy layout, so the reproduction needs no network.
+// proxy layout, completed once from the network so it holds every module
+// the closure names; the cold reproduction itself then needs no network.
 func TestWarmGoModuleClosureSilencesColdCacheSelection(t *testing.T) {
 	repo := laneRepo(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -892,13 +893,24 @@ func TestWarmGoModuleClosureSilencesColdCacheSelection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve host module cache: %v", err)
 	}
-	proxy := filepath.Join(strings.TrimSpace(string(hostCache)), "cache", "download")
-	if info, err := os.Stat(proxy); err != nil || !info.IsDir() {
-		t.Skipf("host module cache is not in proxy layout: %v", err)
-	}
 	goBin, err := exec.LookPath("go")
 	if err != nil {
 		t.Fatal(err)
+	}
+	// The host cache serves as the offline proxy below, so it must hold the
+	// complete module closure first, including modules only other platforms
+	// build (a cache populated by builds and tests on this host alone lacks
+	// them, and the warm step then fails on the first such module). This is
+	// the one network-using step of the test and it is bounded.
+	complete := exec.CommandContext(ctx, goBin, "mod", "download")
+	complete.Dir = repo
+	complete.Env = append(os.Environ(), "GOFLAGS=")
+	if out, err := complete.CombinedOutput(); err != nil {
+		t.Fatalf("complete the host module cache: %v\n%s", err, out)
+	}
+	proxy := filepath.Join(strings.TrimSpace(string(hostCache)), "cache", "download")
+	if info, err := os.Stat(proxy); err != nil || !info.IsDir() {
+		t.Fatalf("host module cache is not in proxy layout: %v", err)
 	}
 	// The Go toolchain writes the module cache read-only, so it cannot live
 	// under t.TempDir(): removal is restored explicitly here.
@@ -938,7 +950,7 @@ func TestWarmGoModuleClosureSilencesColdCacheSelection(t *testing.T) {
 	}
 	_, coldErrout, coldErr := selection(coldScratch)
 	if coldErr == nil && coldErrout == "" {
-		t.Skip("module cache did not go cold; the reproduction needs an empty GOMODCACHE")
+		t.Fatal("module cache did not go cold; the reproduction needs an empty GOMODCACHE")
 	}
 	if !strings.Contains(coldErrout, "go: downloading") {
 		t.Fatalf("cold selection did not reproduce the download noise: err=%v stderr=%q", coldErr, coldErrout)
