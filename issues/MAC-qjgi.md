@@ -7,8 +7,8 @@ type: bug
 labels: [custody, flaky-under-load]
 created_at: 2026-09-08T16:12:18Z
 created_by: ramirosalas
-updated_at: 2026-09-08T16:12:18Z
-content_hash: "sha256:af97c351cc8bcd86c38c30ba7aa6b1498c5e139da087095efc5f6343988e26fb"
+updated_at: 2026-09-08T16:31:13Z
+content_hash: "sha256:38c13032c62db32a2b49c8bafeb350ec637051dc09a1579c562cb65c2047398c"
 ---
 
 ## Description
@@ -39,3 +39,12 @@ Fix: both collectors pass every job in scope through retireJob, which joins a cl
 
 
 ## Comments
+
+### 2026-09-08T16:31:13Z ramirosalas
+Fixed on fix/custody-load in c944797 (internal/processscope/broker.go: retireAll and retireSubtree collect every job in scope, settleUnlaunched takes the claim under the broker lock, the cancel dispatch reads the claim under the same lock).
+
+Before: go test -race -count=5 ./internal/processscope failed on an idle host in TestRunTimeoutCleanup (custody_integration_test.go:499) with {Status:cleanup-failed Jobs:[{Registered:true Terminated:true Reaped:false}] Diagnostics:[]}. Terminated:true with Reaped:false is not a state any retirement ends in, only one it passes through: retireJob clears terminated when the reap fails.
+
+After: green, and the deterministic cover TestScopeCloseJoinsARetirementAlreadyClaimed (internal/processscope/scope_test.go) fails with exactly the reported shape when the !j.retired filter is put back in retireSubtree, and passes with it removed.
+
+Gates: go test -race -count=5 ./internal/processscope ./internal/processcontrol green idle and under a parallel load generator; go test -count=1 -run 'Formal|Custody|Scope|Verify' ./cmd/machinery green; required integration lane 8/8; gofmt, go vet, golangci-lint clean. No budget or shipped cap changed.
