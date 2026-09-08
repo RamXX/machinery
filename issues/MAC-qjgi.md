@@ -1,14 +1,15 @@
 ---
 id: MAC-qjgi
 title: "custody: a close steps over a retirement already claimed and reports its half-written state"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [custody, flaky-under-load]
 created_at: 2026-09-08T16:12:18Z
 created_by: ramirosalas
 updated_at: 2026-09-08T16:31:13Z
-content_hash: "sha256:38c13032c62db32a2b49c8bafeb350ec637051dc09a1579c562cb65c2047398c"
+content_hash: "sha256:8e08453c43476f50d9808e27d2ed53ce3c95f4dd524d224371ec09a8529869b1"
+closed_at: 2026-09-08T16:31:13Z
 ---
 
 ## Description
@@ -33,7 +34,7 @@ Fix: both collectors pass every job in scope through retireJob, which joins a cl
 
 
 ## History
-
+- 2026-09-08T16:31:13Z status: open -> closed
 
 ## Links
 
