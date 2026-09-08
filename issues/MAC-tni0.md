@@ -1,14 +1,15 @@
 ---
 id: MAC-tni0
 title: "custody test: the owner-loss handoff is bounded by a fixed helper poll and reports an empty file when it expires"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [custody, flaky-under-load]
 created_at: 2026-09-08T15:45:58Z
 created_by: ramirosalas
 updated_at: 2026-09-08T16:30:55Z
-content_hash: "sha256:f10d7559f75d2073eb7b8400bbe3ad018d4124aed37ed0965936ef549a8cd5ee"
+content_hash: "sha256:6c418f1c330dc3a5572ea219c9aa3c1a91c8802adbd5ec1182295365c17dbd45"
+closed_at: 2026-09-08T16:30:55Z
 ---
 
 ## Description
@@ -32,7 +33,7 @@ Fix (test only, no product budget touched): the helper polls under the wall it a
 
 
 ## History
-
+- 2026-09-08T16:30:55Z status: open -> closed
 
 ## Links
 
