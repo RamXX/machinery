@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -745,5 +746,94 @@ func TestTerminalResultSurvivesOvertakingItsCaller(t *testing.T) {
 	s.dropJobChan(jobID, ch)
 	if s.jobChans[jobID] != nil {
 		t.Fatal("the caller must retire its own job registration")
+	}
+}
+
+// TestCloseJoinsARetirementAlreadyInFlight covers the report a scope close
+// produces when the job it is closing over is already being retired.
+//
+// A job cancelled by its caller is retired on its own goroutine, and the
+// guardian may report the target's death as an ordinary exit rather than a
+// terminal drain. The caller's Run then returns on that result while the
+// retirement is still between signalling the group and reaping the guardian,
+// and the close that follows lands in the middle of it. A close that skips an
+// already-claimed job publishes that half-written state as a cleanup failure
+// on a job that goes on to terminate and reap cleanly, which is how a
+// well-behaved timeout came back as cleanup-failed on a loaded host.
+//
+// The window is opened deterministically here by holding the kill inside the
+// group-signal seam the broker already owns.
+func TestCloseJoinsARetirementAlreadyInFlight(t *testing.T) {
+	target := exec.Command("/bin/sleep", "60")
+	target.SysProcAttr = newGroupAttr()
+	if err := target.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = target.Process.Kill()
+		_, _ = target.Process.Wait()
+	}()
+
+	root := &scopeNode{id: "root"}
+	j := &job{
+		id:          "job-inflight",
+		scope:       root,
+		registered:  true,
+		guardianPID: target.Process.Pid,
+		pgid:        target.Process.Pid,
+		resultCh:    make(chan struct{}),
+		retireDone:  make(chan struct{}),
+	}
+	// The guardian already reported the target terminal, so the retirement
+	// does not spend its wait: it goes straight to the kill and the reap.
+	close(j.resultCh)
+	b := &broker{
+		rootID:       "root-test",
+		limits:       Limits{Jobs: 4, WallMS: 60000, CleanupMS: 3000},
+		wallDeadline: time.Now().Add(time.Minute),
+		scopes:       map[string]*scopeNode{"root": root},
+		jobs:         map[string]*job{j.id: j},
+		jobOrder:     []string{j.id},
+		containers:   map[string]*containerRec{},
+		nonces:       map[string]*attachRec{},
+	}
+	killSeen := make(chan struct{})
+	var killOnce sync.Once
+	b.groupSignal = func(pgid int, sig int) error {
+		if sig != sigKillCode() {
+			return signalGroup(pgid, sig)
+		}
+		killOnce.Do(func() { close(killSeen) })
+		// The retirement is now inside its own reap window with the job not
+		// yet settled, which is exactly where a concurrent close arrives.
+		time.Sleep(400 * time.Millisecond)
+		return signalGroup(pgid, sig)
+	}
+
+	claimed := make(chan struct{})
+	go func() {
+		defer close(claimed)
+		b.retireJob(j)
+	}()
+	select {
+	case <-killSeen:
+	case <-time.After(20 * time.Second):
+		t.Fatal("the claiming retirement never reached its kill")
+	}
+
+	// The close path retires the same job. It must not publish a report until
+	// the claiming retirement has settled the job's state.
+	b.retireJob(j)
+	rep := b.buildReport(root)
+	if rep.Status != StatusCleaned {
+		t.Fatalf("a close over a retirement still in flight must report the settled state: %+v", rep)
+	}
+	if len(rep.Jobs) != 1 || !rep.Jobs[0].Registered || !rep.Jobs[0].Terminated || !rep.Jobs[0].Reaped {
+		t.Fatalf("job state must be settled before it is reported: %+v", rep.Jobs)
+	}
+	select {
+	case <-claimed:
+	case <-time.After(20 * time.Second):
+		t.Fatal("the claiming retirement never finished")
 	}
 }

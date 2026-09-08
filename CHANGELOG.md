@@ -10,6 +10,17 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A scope close reports the settled state of a job already being retired.** A job cancelled by
+  its caller is retired on its own goroutine, and the guardian may report the target's death as an
+  ordinary exit rather than a terminal drain, so `Run` returns while that retirement is still
+  between marking the job terminated and reaping its guardian. The close that followed collected
+  only jobs no retirement had claimed, skipped that one, and published whatever half-written state
+  it found: `cleanup-failed` with `Terminated:true Reaped:false` and no diagnostic, on a job that
+  went on to terminate and reap cleanly. A close now joins a retirement already in flight instead
+  of skipping it, bounded by that retirement's own budget, so a job that truly refuses to die is
+  still reported unreaped with its `TIMEOUT` diagnostic. No shipped cap changed: the per-job
+  cleanup budget, the 30,000 ms cleanup cap and the 2 s hard reap window are unchanged, and
+  nothing runs longer than before, only the report waits for a settled answer.
 - **A guarded job that finishes before its caller can wait for it is no longer reported as a
   timeout.** The control channel registered a job's result channel when the broker's started frame
   arrived and retired that registration on delivery of the result, while `Run` claimed the channel

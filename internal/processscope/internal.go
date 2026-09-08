@@ -52,7 +52,14 @@ const (
 	frameLimit              = 1 << 20
 	hardReapWindow          = 2 * time.Second
 	retireWaitCap           = 3 * time.Second
-	diagLimit               = 4096
+	// retireJoinSlack bounds how long one retirement path waits for another
+	// that already claimed the same job. A retirement is itself bounded by
+	// retireWaitCap plus hardReapWindow; the slack covers the signalling and
+	// scheduling around those two on a loaded host without becoming a budget
+	// of its own. It is not a shipped cap: nothing runs longer because of it,
+	// it only decides how long a report waits for a settled answer.
+	retireJoinSlack = 2 * time.Second
+	diagLimit       = 4096
 )
 
 type Error struct {

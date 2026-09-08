@@ -50,7 +50,13 @@ type job struct {
 	gconn        *net.UnixConn
 	client       *channel
 	resultCh     chan struct{}
-	once         sync.Once
+	// retireDone is closed once this job's single retirement has settled its
+	// terminated/reaped state. A retirement started asynchronously (a job
+	// cancelled by its caller) runs concurrently with the close that follows
+	// it, so every other retirement path joins on this instead of skipping an
+	// already-claimed job and reporting its half-written state.
+	retireDone chan struct{}
+	once       sync.Once
 }
 
 type containerRec struct {
@@ -622,6 +628,7 @@ func (b *broker) handleRun(ch *channel, m msgRun, files []*os.File) {
 		registered: true,
 		client:     ch,
 		resultCh:   make(chan struct{}),
+		retireDone: make(chan struct{}),
 	}
 	if err := b.register(b, j); err != nil {
 		_ = ch.send(msgRefused{T: "refused", Code: CodeRegistrationFailed, Subject: "run", Message: "registration failed: " + err.Error()})
@@ -635,6 +642,9 @@ func (b *broker) handleRun(ch *channel, m msgRun, files []*os.File) {
 	if err != nil {
 		j.retired = true
 		j.terminal = true
+		// No guardian was ever launched, so this job's retirement is already
+		// settled; anything that later joins on it must not wait.
+		close(j.retireDone)
 		_ = ch.send(msgRefused{T: "refused", Code: CodeInternalError, Subject: "run", Message: "guardian channel creation failed"})
 		return
 	}
@@ -666,6 +676,7 @@ func (b *broker) handleRun(ch *channel, m msgRun, files []*os.File) {
 		}
 		j.retired = true
 		j.terminal = true
+		close(j.retireDone)
 		_ = ch.send(msgRefused{T: "refused", Code: CodeInternalError, Subject: "run", Message: "guardian launch failed: " + err.Error()})
 		return
 	}
@@ -789,9 +800,24 @@ func (b *broker) retireJob(j *job) {
 	b.mu.Lock()
 	if j.retired {
 		b.mu.Unlock()
+		// Another retirement already claimed this job. It may still be inside
+		// its own budget: a job cancelled by its caller is retired on a
+		// separate goroutine, and the close that follows the cancelled Run
+		// arrives while that retirement is between marking the job terminated
+		// and reaping its guardian. Returning here would let the close report
+		// that half-written state as a cleanup failure on a job that goes on
+		// to terminate and reap cleanly. Joining instead is bounded by the
+		// claiming retirement's own budget, and if that bound is exceeded this
+		// returns anyway, so a job that truly refuses to die is still reported
+		// unreaped rather than waited on forever.
+		select {
+		case <-j.retireDone:
+		case <-time.After(retireWaitCap + hardReapWindow + retireJoinSlack):
+		}
 		return
 	}
 	j.retired = true
+	defer close(j.retireDone)
 	inPass := b.cleanupPasses > 0
 	pending := b.cleanupPending
 	cleanupMS := b.limits.CleanupMS
