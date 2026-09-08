@@ -7,8 +7,8 @@ type: bug
 labels: [regression, gates, gx-trace]
 created_at: 2026-09-08T08:33:58Z
 created_by: ramirosalas
-updated_at: 2026-09-08T08:33:58Z
-content_hash: "sha256:5b11f17cb9ef2674c2a1605fccaec78ec7a5c15ee6b988e461a7af7f8da94fd8"
+updated_at: 2026-09-08T08:39:42Z
+content_hash: "sha256:dc6dbe2db81e9e7c528ede22f5c356bbfe9bca1f36714e6c8cc78db8bff70d21"
 ---
 
 ## Description
@@ -128,3 +128,23 @@ of the same family. Fixing it takes the H2 blocking count from 88 to 79.
 
 
 ## Comments
+
+### 2026-09-08T08:39:42Z ramirosalas
+Fixed on branch fix/MAC-3iga-wcrd at bd67c04 (worktree /Users/ramirosalas/workspace/machinery-worktrees/fix-gates), alongside 3e5ab40 (MAC-3iga) and fb045c1 (MAC-wcrd). Not merged, not pushed. Left open.
+
+RULING: regression, restored. `git show v0.6.11:internal/gates/payloadreads.go` collected a declaration only from a full `READS{...}` group (`readsDecl.FindStringSubmatch(line); if m == nil { continue }`), and v0.6.11's readscomplete.go consumed exactly those values. 0.7.0's `collectConsumerReads` took the bare word (`tokenIn("READS", line)`), so a sentence using the verb became a declaration that `parseConsumerReadSet` could only report as incomplete. No story asked for the word (MAC-p8ce bound complete sets to exact consumers) and no CHANGELOG entry documented it.
+
+Change (internal/gates/readscomplete.go): the collector requires `READS{` on the line. Prose using the verb is ignored. A row that does carry a group is judged exactly as before, including the one-complete-declaration-per-row rule, the declaration-suffix rule, the per-edge ownership rules and the payload reconciliation.
+
+Tests (internal/gates/reads_consumer_supplemental_test.go):
+- TestReadsConsumerBareWordProseIsNotADeclaration: a residual row naming `markPaid` and reading "this machine only READS those rows and never appends one" beside a valid sibling declaration. RED before the fix with exactly the reported message; green after.
+- TestReadsConsumerGroupBesideBareWordStillFails: `READS{Order.id} and separately READS the ledger` still blocks. Passed before and after, pinning the retained tightening.
+The frozen MAC-p8ce cases stay green, including unclosed_set, empty_members and duplicate_field.
+
+Verification: go test -race -count=1 ./internal/gates -timeout 15m PASS 88s; go test -count=1 -run 'Golden|Check|Gate|Clause|Reads' ./cmd/machinery PASS 49s (golden corpus unchanged); gofmt clean; go vet clean; golangci-lint run --config .golangci.yml 0 issues.
+
+H2 (read-only, commit c59bc81, machinery check design --warnings-as-errors): 88 blocking before this commit, 78 after.
+- "expected exactly one complete READS{field, ...} declaration per row" 9 -> 1
+- "legacy READS has ambiguous consumer ownership" 28 -> 26 (ReviewTask.matrix.md:13 and WatchedSource.matrix.md:90 were bare-word prose lines and are no longer collected at all)
+
+The one remaining case is NOT prose and is correctly reported: design/machines/DeclaredOperation.matrix.md:62 opens `READS{Tenant,` and closes the group two lines later, so the row's declaration is genuinely incomplete. v0.6.11 was silent on it because its regex is single-line, but the author did write a group and means it as a declaration; the diagnostic names the real problem and the repair is to join the lines. Kept deliberately, and the CHANGELOG 0.7.0 Fixed entry states it.
