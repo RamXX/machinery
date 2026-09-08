@@ -1,14 +1,16 @@
 ---
 id: MAC-26zx
 title: "integration-lane: cold module cache breaks native selection, and a nil error is formatted with %w"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [ci, integration-lane, cold-cache]
 created_at: 2026-09-08T13:03:43Z
 created_by: ramirosalas
-updated_at: 2026-09-08T13:28:33Z
-content_hash: "sha256:fbecf5237088aafb9af0e23068d1c6b3a512d60a83697af44982f7ea8d76ac46"
+updated_at: 2026-09-08T13:28:34Z
+content_hash: "sha256:8d01e86e62c16785ae8679d1cc8de405ced28713a7918b5d5ccd0d2d0210ab4e"
+closed_at: 2026-09-08T13:28:33Z
+close_reason: "Fixed at 399fbf0; required lane passes cold and warm, nil error never formatted with %w"
 ---
 
 ## Description
@@ -69,7 +71,7 @@ reproduction and the nil-error diagnostic are covered by tests in
 
 
 ## History
-
+- 2026-09-08T13:28:34Z status: open -> closed
 
 ## Links
 
