@@ -837,6 +837,32 @@ func (b *broker) forwardResult(j *job) {
 // The budget is exceeded when this retirement did not terminate and reap the
 // job within its own budget. Wall time that the run as a whole has already
 // spent never exhausts it.
+// groupDrained reports whether a killed process group is empty, polling until
+// the deadline the reap window already set.
+//
+// A group is not evidence of a survivor the instant it is killed. A killed
+// process stays visible to the group probe until its parent reaps it, and the
+// members of a job are children of its guardian: the moment the retirement
+// reaps that guardian they are orphans, and they disappear only once the
+// platform's init has reaped them in turn. A single probe taken between those
+// two events reads the group as alive and marks a job that terminated exactly
+// as asked unterminated, which is how a cancelled provisioning lane published
+// `cleanup-failed` with `Terminated:false Reaped:true` on roughly one Linux run
+// in twenty, with no diagnostic naming a survivor. The drain is polled inside
+// the reap window that already bounds this stage, so a group that truly
+// refuses to die is still reported after exactly the wait it was given before.
+func groupDrained(pgid int, deadline time.Time) bool {
+	for {
+		if !groupExists(pgid) {
+			return true
+		}
+		if !time.Now().Before(deadline) {
+			return false
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func (b *broker) retireJob(j *job) {
 	b.mu.Lock()
 	if j.retired {
@@ -904,7 +930,7 @@ func (b *broker) retireJob(j *job) {
 		}
 		if !j.reaped {
 			j.terminated = false
-		} else if groupExists(j.pgid) {
+		} else if !groupDrained(j.pgid, reapDeadline) {
 			j.terminated = false
 		}
 		if j.guardian != nil {

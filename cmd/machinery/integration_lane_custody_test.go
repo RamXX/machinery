@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -83,11 +84,47 @@ func atoiOr(s string, fallback int) int {
 	return n
 }
 
+// custodySortedPIDs orders one process-table snapshot so a selection made
+// from it does not depend on map iteration order.
+func custodySortedPIDs(table map[int][2]string) []int {
+	pids := make([]int, 0, len(table))
+	for pid := range table {
+		pids = append(pids, pid)
+	}
+	sort.Ints(pids)
+	return pids
+}
+
+// custodyPinnedJVM returns the pid of a live nested pinned JVM this lane
+// provisioned under cache, read from a single process-table snapshot: the TLC
+// engine when that snapshot holds it, otherwise the pinned Java identity
+// probe, which is real custody evidence but lives for a fraction of a second.
+// Nothing is selected by process name alone; the private cache path scopes
+// every match to processes this lane provisioned.
+func custodyPinnedJVM(table map[int][2]string, cache string) int {
+	probe := 0
+	for _, pid := range custodySortedPIDs(table) {
+		command := table[pid][1]
+		if !strings.Contains(command, cache) {
+			continue
+		}
+		if strings.Contains(command, "tlc2.TLC") {
+			return pid
+		}
+		if probe == 0 && strings.Contains(filepath.Base(command), "java") {
+			probe = pid
+		}
+	}
+	return probe
+}
+
 // custodyAssertGuardedAncestry walks the exact ancestry of pid and requires a
-// processscope guardian between it and the lane owner process.
-func custodyAssertGuardedAncestry(t *testing.T, pid, lanePID int, context string) {
+// processscope guardian between it and the lane owner process. The ancestry is
+// read from the caller's snapshot, the same one the process was observed live
+// in: a fresh table would answer for a different moment, and a process that
+// has since exited leaves an ancestry that reaches nothing.
+func custodyAssertGuardedAncestry(t *testing.T, table map[int][2]string, pid, lanePID int, context string) {
 	t.Helper()
-	table := custodyTable(t)
 	hasGuardian := false
 	reaches := false
 	cur := pid
@@ -187,42 +224,28 @@ func TestIntegrationLaneCustodyTransitiveTermination(t *testing.T) {
 		lanePID := cmd.Process.Pid
 		// Observe an actually active nested pinned JVM before cancelling. The
 		// private cache path scopes the observation to processes this lane
-		// provisioned; nothing is terminated by pattern.
+		// provisioned; nothing is terminated by pattern. One snapshot answers
+		// every question asked of that observation, because the pinned Java
+		// identity probe satisfies it and then exits within a fraction of a
+		// second: reading a second table to name the process, and a third to
+		// walk its ancestry, asks about a process that may already be gone.
 		deadline := time.Now().Add(4 * time.Minute)
-		jvmSeen := false
+		jvmPID := 0
+		var table map[int][2]string
 		for time.Now().Before(deadline) {
-			for _, entry := range custodyTable(t) {
-				if strings.Contains(entry[1], cache) && (strings.Contains(entry[1], "tlc2.TLC") || strings.Contains(filepath.Base(entry[1]), "java")) {
-					jvmSeen = true
-					break
-				}
-			}
-			if jvmSeen {
+			table = custodyTable(t)
+			jvmPID = custodyPinnedJVM(table, cache)
+			if jvmPID != 0 {
 				break
 			}
 			time.Sleep(50 * time.Millisecond)
 		}
-		if !jvmSeen {
+		if jvmPID == 0 {
 			_ = cmd.Process.Kill()
 			_, _ = cmd.Process.Wait()
 			t.Fatalf("no live nested pinned JVM was ever observed under the lane: %s", output.String())
 		}
-		jvmPID := 0
-		for pid, entry := range custodyTable(t) {
-			if strings.Contains(entry[1], cache) && strings.Contains(entry[1], "tlc2.TLC") {
-				jvmPID = pid
-				break
-			}
-		}
-		if jvmPID == 0 {
-			for pid, entry := range custodyTable(t) {
-				if strings.Contains(entry[1], cache) && strings.Contains(filepath.Base(entry[1]), "java") {
-					jvmPID = pid
-					break
-				}
-			}
-		}
-		custodyAssertGuardedAncestry(t, jvmPID, lanePID, "provisioning JVM")
+		custodyAssertGuardedAncestry(t, table, jvmPID, lanePID, "provisioning JVM")
 		if err := cmd.Process.Signal(os.Interrupt); err != nil {
 			t.Fatal(err)
 		}
@@ -247,7 +270,7 @@ func TestIntegrationLaneCustodyTransitiveTermination(t *testing.T) {
 			t.Fatal(e)
 		}
 		if raw.Status != "failed" || raw.Custody.Status != "passed" {
-			t.Fatalf("cancelled provisioning must fail honestly with verified owned-job cleanup: %s", b)
+			t.Fatalf("cancelled provisioning must fail honestly with verified owned-job cleanup: %s\nlane output: %s", b, output.String())
 		}
 	})
 	t.Run("suite", func(t *testing.T) {
@@ -287,7 +310,7 @@ func TestIntegrationLaneCustodyTransitiveTermination(t *testing.T) {
 			_, _ = cmd.Process.Wait()
 			t.Fatalf("suite descendant never became live: %s", output.String())
 		}
-		custodyAssertGuardedAncestry(t, pid, lanePID, "suite descendant")
+		custodyAssertGuardedAncestry(t, custodyTable(t), pid, lanePID, "suite descendant")
 		if err := cmd.Process.Signal(os.Interrupt); err != nil {
 			t.Fatal(err)
 		}
@@ -311,7 +334,7 @@ func TestIntegrationLaneCustodyTransitiveTermination(t *testing.T) {
 			t.Fatal(e)
 		}
 		if raw.Status != "failed" || raw.Custody.Status != "passed" {
-			t.Fatalf("cancelled suite must fail honestly with verified owned-job cleanup: %s", b)
+			t.Fatalf("cancelled suite must fail honestly with verified owned-job cleanup: %s\nlane output: %s", b, output.String())
 		}
 	})
 }

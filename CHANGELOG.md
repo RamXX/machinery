@@ -10,6 +10,27 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A killed process group is no longer read as a survivor while its members await reaping.** A
+  job's retirement signalled the group, reaped the guardian, and then probed the group once. The
+  members of a job are children of that guardian, so at the instant it is reaped they are orphans
+  the platform's init has yet to reap, and on Linux a killed-but-unreaped member still answers the
+  group probe (macOS skips those members, which is why the condition never showed there). The
+  single probe read them as a survivor and marked a job that terminated exactly as asked
+  unterminated: a cancelled required-lane run published `cleanup-failed` with `Terminated:false
+  Reaped:true` and no diagnostic naming any survivor, in 3 of 40 runs on a two-core Linux host.
+  The retirement now polls the group until it drains, inside the reap window that already bounds
+  that stage, so nothing waits longer than before and a group that truly refuses to die is still
+  reported unterminated. No budget or cap changed.
+- **The custody provisioning test no longer races the pinned Java identity probe it observes.**
+  The observation read three process-table snapshots: one to decide a nested pinned JVM was live,
+  a second to name its pid, a third to walk its ancestry. Provisioning runs a pinned
+  `java -XshowSettings:properties -version` identity probe under the private cache, which
+  satisfies the first snapshot and exits within a fraction of a second, so the second found
+  nothing and the walk reached nothing: `provisioning JVM process 0 does not belong to the lane
+  process tree`, in 6 of 40 runs on a two-core Linux host and in the hosted required lane. All
+  three questions are now answered from one snapshot, and the ancestry is walked in the same
+  snapshot the process was observed live in. Test-only: the observation is unchanged in what it
+  demands, and no budget or cap changed.
 - **A failed integration lane says what its native runner reported, and CI keeps the evidence.**
   The lane accounted a failed suite from the runner's event stream and printed only that
   accounting (`native test ... fail failed/skip`, `required execution incomplete: selected 1

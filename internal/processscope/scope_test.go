@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -859,6 +860,115 @@ func TestCloseJoinsARetirementAlreadyInFlight(t *testing.T) {
 	case <-time.After(20 * time.Second):
 		t.Fatal("the claiming retirement never finished")
 	}
+}
+
+// TestRetirementWaitsForAKilledGroupToDrain pins what the group probe means in
+// the moment after a job's process group is killed.
+//
+// The members of a job are children of its guardian, so the instant the
+// retirement reaps that guardian they are orphans the platform's init has yet
+// to reap, and the group still answers the probe. Reading that single answer as
+// a survivor marks a job that terminated exactly as asked unterminated: a
+// cancelled provisioning lane published `cleanup-failed` with
+// `Terminated:false Reaped:true` and no diagnostic naming any survivor, on
+// roughly one Linux run in twenty. The window is opened deterministically here
+// by giving the group a second member the test process owns, so nothing but
+// the test can make the group drain.
+func TestRetirementWaitsForAKilledGroupToDrain(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		reapAfter  time.Duration
+		terminated bool
+	}{
+		{name: "draining-group-terminated", reapAfter: 300 * time.Millisecond, terminated: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			guardian := exec.CommandContext(t.Context(), "/bin/sleep", "60")
+			guardian.SysProcAttr = newGroupAttr()
+			if err := guardian.Start(); err != nil {
+				t.Fatal(err)
+			}
+			pgid := guardian.Process.Pid
+			// A second group member whose only parent is this test: once the
+			// retirement kills the group it stays visible to the probe until
+			// the test reaps it, exactly as an orphaned member stays visible
+			// until init reaps it.
+			member := exec.CommandContext(t.Context(), "/bin/sleep", "60")
+			member.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: pgid}
+			if err := member.Start(); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				_ = member.Process.Kill()
+				_, _ = member.Process.Wait()
+				_ = guardian.Process.Kill()
+				_, _ = guardian.Process.Wait()
+			})
+
+			root := &scopeNode{id: "root"}
+			j := &job{
+				id:          "job-drain",
+				scope:       root,
+				registered:  true,
+				guardianPID: guardian.Process.Pid,
+				pgid:        pgid,
+				resultCh:    make(chan struct{}),
+				retireDone:  make(chan struct{}),
+			}
+			// The guardian already reported the target terminal, so the
+			// retirement goes straight to the kill and the reap.
+			close(j.resultCh)
+			b := &broker{
+				rootID:       "root-drain",
+				limits:       Limits{Jobs: 4, WallMS: 60000, CleanupMS: 3000},
+				wallDeadline: time.Now().Add(time.Minute),
+				scopes:       map[string]*scopeNode{"root": root},
+				jobs:         map[string]*job{j.id: j},
+				jobOrder:     []string{j.id},
+				containers:   map[string]*containerRec{},
+				nonces:       map[string]*attachRec{},
+				groupSignal:  signalGroup,
+			}
+			if tc.reapAfter > 0 {
+				go func() {
+					time.Sleep(tc.reapAfter)
+					_, _ = member.Process.Wait()
+				}()
+			}
+			b.retireJob(j)
+			if !j.reaped {
+				t.Fatalf("the retirement never reaped its own guardian: %+v", j)
+			}
+			if j.terminated != tc.terminated {
+				t.Fatalf("killed group reported terminated=%v, want %v", j.terminated, tc.terminated)
+			}
+			rep := b.buildReport(root)
+			if (rep.Status == StatusCleaned) != tc.terminated {
+				t.Fatalf("scope close reported %+v for a group whose drain was %v", rep, tc.terminated)
+			}
+		})
+	}
+	// The drain is a bound, not a promise: a group that still holds a live
+	// process spends the window it was given and is then reported as it was
+	// before, so a job that truly refuses to die is never called terminated.
+	t.Run("live-group-is-never-drained", func(t *testing.T) {
+		live := exec.CommandContext(t.Context(), "/bin/sleep", "60")
+		live.SysProcAttr = newGroupAttr()
+		if err := live.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_ = live.Process.Kill()
+			_, _ = live.Process.Wait()
+		})
+		start := time.Now()
+		if groupDrained(live.Process.Pid, start.Add(100*time.Millisecond)) {
+			t.Fatal("a group holding a live process was reported drained")
+		}
+		if elapsed := time.Since(start); elapsed < 100*time.Millisecond {
+			t.Fatalf("the drain gave up after %s, before the window it was given", elapsed)
+		}
+	})
 }
 
 // TestChannelHoldsHandedOverDescriptorUntilOwnerSpeaks pins the ownership rule
