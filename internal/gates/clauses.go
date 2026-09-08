@@ -47,6 +47,44 @@ func splitClauses(s string) []string {
 	return out
 }
 
+// siblingOracleGuards indexes the guard cells of every committed oracle once,
+// and answers which OTHER machine's oracle a guard governs. The answer decides
+// whether an owner-local declaration with no rows is a silent zero-obligation
+// case (no oracle governs the guard at all) or the ownership defect (a sibling
+// would have supplied the rows). Stems are visited in sorted order, so the
+// machine a diagnostic names is deterministic.
+func siblingOracleGuards(design string) func(owner, guard string) string {
+	type machineGuards struct {
+		stem  string
+		cells []string
+	}
+	var index []machineGuards
+	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.oracle.md") {
+		entry := machineGuards{stem: strings.TrimSuffix(filepath.Base(path), ".oracle.md")}
+		for _, row := range oracleGuardRows(readDesignOrEmpty(design, path)) {
+			if row.guard != "" {
+				entry.cells = append(entry.cells, row.guard)
+			}
+		}
+		if len(entry.cells) > 0 {
+			index = append(index, entry)
+		}
+	}
+	return func(owner, guard string) string {
+		for _, entry := range index {
+			if entry.stem == owner {
+				continue
+			}
+			for _, cell := range entry.cells {
+				if tokenIn(guard, cell) {
+					return entry.stem
+				}
+			}
+		}
+		return ""
+	}
+}
+
 // collectClauseDecls finds and validates CLAUSES declarations on matrix guard
 // rows. The matrix filename owns the declaration: Alpha.matrix.md can bind
 // only Alpha.machine.json and Alpha.oracle.md, even when another machine uses
@@ -55,6 +93,7 @@ func splitClauses(s string) []string {
 func collectClauseDecls(g *Gate, design string) []clauseSet {
 	var out []clauseSet
 	seen := map[[2]string]bool{}
+	siblings := siblingOracleGuards(design)
 	paths, _ := strictSortedGlob(g, filepath.Join(design, "machines"), "*.matrix.md", "clause matrix")
 	for _, path := range paths {
 		body, err := readDesignFile(design, path)
@@ -64,17 +103,31 @@ func collectClauseDecls(g *Gate, design string) []clauseSet {
 		}
 		owner := strings.TrimSuffix(filepath.Base(path), ".matrix.md")
 		for lineNo, line := range strings.Split(string(body), "\n") {
-			if !strings.Contains(line, "CLAUSES") && !strings.Contains(line, "RETIRED{") {
+			// A declaration is a GROUP, CLAUSES{...}, on a row of the
+			// named-unit contract table. Both halves matter, because a matrix
+			// also NARRATES its units: a contract cell says "reconciled to the
+			// CLAUSES declaration here", an invariant-coverage bullet quotes a
+			// guard's vocabulary, and a long enumeration wraps across lines.
+			// Prose is not a declaration; judging it as one reports a sentence
+			// fragment as the unit's name and holds the author to a row never
+			// written. A line carrying fewer than two pipes is not a row.
+			if !strings.Contains(line, "CLAUSES{") && !strings.Contains(line, "RETIRED{") {
+				continue
+			}
+			if strings.Count(line, "|") < 2 {
 				continue
 			}
 			cells := splitTableRow(line)
 			name := strings.Trim(strings.TrimSpace(cellAt(cells, 0)), "`")
-			loc := fmt.Sprintf("%s:%d: machine %q guard %q", filepath.Base(path), lineNo+1, owner, name)
+			loc := fmt.Sprintf("%s:%d: machine %q guard %q", filepath.Base(path), lineNo+1, owner, clipText(name))
 			m := clauseDecl.FindStringSubmatch(line)
-			if len(cells) < 3 || cellAt(cells, 1) != "guard" || name == "" ||
-				m == nil || strings.Count(line, "CLAUSES") != 1 ||
-				strings.Contains(clauseDecl.ReplaceAllString(line, ""), "RETIRED") {
-				g.Errs = append(g.Errs, loc+": malformed CLAUSES declaration; require one named guard row with CLAUSES{...} and optional RETIRED{...}")
+			switch {
+			case len(cells) < 2 || name == "":
+				g.Errs = append(g.Errs, loc+": CLAUSES declaration is not a named row of the named-unit contract table; declare the clauses on the unit's own row (| `name` | kind | ... CLAUSES{...} |)")
+				continue
+			case m == nil || strings.Count(line, "CLAUSES{") != 1 ||
+				strings.Contains(clauseDecl.ReplaceAllString(line, ""), "RETIRED{"):
+				g.Errs = append(g.Errs, loc+": malformed CLAUSES declaration; require one named row with a single CLAUSES{...} and optional RETIRED{...}")
 				continue
 			}
 			d := clauseSet{owner: owner, guard: name, active: splitClauses(m[1]), retired: splitClauses(m[2])}
@@ -116,8 +169,15 @@ func collectClauseDecls(g *Gate, design string) []clauseSet {
 							d.rows = append(d.rows, row)
 						}
 					}
-					if len(d.rows) == 0 {
-						g.Errs = append(g.Errs, loc+": owning oracle has no transition governed by this guard; another machine cannot supply it")
+					// A guard NO oracle governs owes nothing and is not a
+					// finding: v0.6.11 resolved rows across every machine, so
+					// an insert-only machine could declare the clauses of a
+					// guard that sits on its creation edge rather than on a
+					// guarded transition. What must never resolve is a
+					// declaration a SIBLING's oracle would have supplied,
+					// which is the ownership defect this validation closed.
+					if other := siblings(owner, name); len(d.rows) == 0 && other != "" {
+						g.Errs = append(g.Errs, loc+": owning oracle has no transition governed by this guard, but "+other+"'s does; another machine cannot supply it")
 					}
 				}
 			}
