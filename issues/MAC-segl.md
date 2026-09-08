@@ -1,14 +1,15 @@
 ---
 id: MAC-segl
 title: "Partial-witness journal recovery test slices past its own record"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [formal, journal, recovery, ci]
 created_at: 2026-09-08T23:26:30Z
 created_by: ramirosalas
-updated_at: 2026-09-08T23:26:30Z
-content_hash: "sha256:95086f75ed05a6368daf8af8c7e4e8ed25d8fdb470452ee74ffde12f7f313332"
+updated_at: 2026-09-08T23:41:42Z
+content_hash: "sha256:2868a93c7e8e2fec99c311fb8afb863485604657708195da2c39b4cce9f7944b"
+closed_at: 2026-09-08T23:41:42Z
 ---
 
 ## Description
@@ -30,7 +31,7 @@ The reader is sound: every true prefix of a valid record is recovered. The defec
 
 
 ## History
-
+- 2026-09-08T23:41:42Z status: open -> closed
 
 ## Links
 
