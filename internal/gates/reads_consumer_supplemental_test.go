@@ -89,3 +89,28 @@ func TestReadsConsumerEmptyMemberDiagnosticIsAccurate(t *testing.T) {
 		t.Fatalf("an empty member must be named as one: %v", g.Errs)
 	}
 }
+
+// A contract cell may use the verb. v0.6.11 collected a declaration only from
+// a full READS{...} group, so a row narrating what a machine reads was never a
+// declaration and armed no obligation.
+func TestReadsConsumerBareWordProseIsNotADeclaration(t *testing.T) {
+	const prose = "| `recomputeConsumed` | action | (ctx,evt) -> ctx | RESIDUAL, owned by the metering layer: " +
+		"the `markPaid` append is the producing layer's; this machine only READS those rows and never appends one | payments | `order-paid-final` |\n"
+	m := map[string]string{
+		"PaymentHandler": readsConsumerMatrixHeader + readsConsumerDeclaration("payments", "READS{Order.id}") + prose,
+	}
+	g := readsConsumerCheck(t, readsConsumerDesign(t, readsConsumerRow("payments", "Order.id"), m))
+	if len(g.Errs) != 0 || len(g.Drift) != 0 {
+		t.Fatalf("prose using the verb READS is not a declaration: errors=%v drift=%v", g.Errs, g.Drift)
+	}
+}
+
+// A row that does carry a group is judged exactly as before: a second bare
+// READS beside it leaves the row ambiguous.
+func TestReadsConsumerGroupBesideBareWordStillFails(t *testing.T) {
+	m := map[string]string{
+		"PaymentHandler": readsConsumerMatrixHeader + readsConsumerDeclaration("payments", "READS{Order.id} and separately READS the ledger"),
+	}
+	g := readsConsumerCheck(t, readsConsumerDesign(t, readsConsumerRow("payments", readsConsumerAllFields), m))
+	readsConsumerRequireBlocked(t, g, "a declaration beside a second bare READS is ambiguous")
+}

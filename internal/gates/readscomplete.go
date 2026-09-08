@@ -140,7 +140,14 @@ func collectConsumerReads(g *Gate, design string) []consumerReadsLine {
 		}
 		lines := strings.Split(string(body), "\n")
 		add := func(line string, lineNo int, cells, header []string) {
-			if !tokenIn("READS", line) {
+			// A declaration is a GROUP, READS{...}, which is what v0.6.11
+			// collected. READS is also an ordinary English verb, and a matrix
+			// uses it as one: a residual cell says the machine "only READS
+			// those rows" off an event another layer produces. Collecting the
+			// bare word makes that sentence a declaration that can only be
+			// reported as an incomplete one. A row that does carry a group is
+			// still held to exactly one complete declaration.
+			if !strings.Contains(line, "READS{") {
 				return
 			}
 			d := consumerReadsLine{text: line, events: line, where: filepath.Base(path) + ":" + strconv.Itoa(lineNo+1)}

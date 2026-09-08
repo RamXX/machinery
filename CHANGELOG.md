@@ -28,6 +28,13 @@ under their version heading when a release is cut.
   non-empty text, as it was in 0.6.11: `READS{Order.id, occurrence time, PAIR KEY}` declares three
   fields. Empty members and duplicates are still rejected, and an empty member is now reported as
   an empty member rather than as an "empty or malformed READS field" naming text that is neither.
+- **`READS` is an English verb again outside a declaration.** A consumer declaration is a
+  `READS{...}` group, as it was in 0.6.11. A residual or contract cell narrating that a machine
+  "only READS those rows" off an event another layer produces is prose: it is no longer collected
+  as a declaration and then reported as an incomplete one. A row that does carry a group is held
+  to exactly one complete declaration, unchanged: a `READS{...}` wrapped across two lines is an
+  incomplete declaration and still says so, because the group is what a row declares. Join the
+  lines.
 - **Installer reruns converge on the recorded installation.** The one-line installer over an
   existing install now refreshes the complete recorded home/native-target/plugin plan (each
   group's copy/symlink mode preserved) instead of the default homes only, identical to
