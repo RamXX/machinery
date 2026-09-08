@@ -442,3 +442,39 @@ func TestCompactionNeverReclaimsAGenerationThisProcessHasLocked(t *testing.T) {
 		t.Fatalf("compaction reclaimed %d entries after the lock was released, want 1", compaction.Reclaimed)
 	}
 }
+
+// TestStoreFullOfLiveObligationsStaysIntactAndStillArms is the other side of
+// the bound: when every obligation in the store belongs to a project root that
+// still exists, there is nothing safe to reclaim. Governance must keep working
+// and every obligation must survive, because discharging one here is exactly
+// the fail-open this retention policy refuses.
+func TestStoreFullOfLiveObligationsStaysIntactAndStillArms(t *testing.T) {
+	dir := isolateHookRetention(t)
+	live := managedRoot(t)
+	canonical, err := canonicalHookRoot(live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := []byte("revision 1\n" + hookStateRootLine(canonical) + "\ndesign\n")
+	for i := 0; i < hookStateDirRetentionCeiling+64; i++ {
+		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%064x.state", i)), body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before := hookStoreEntries(t, dir)
+	if out := runEvent(t, live, shellEvent("pressure", "echo governed")); out != "" {
+		t.Fatalf("a governed event under store pressure was not allowed: %s", out)
+	}
+	if after := hookStoreEntries(t, dir); after < before {
+		t.Fatalf("obligations for a live project root were reclaimed: %d entries, was %d", after, before)
+	}
+	if !hookStateBoundIsExhausted() {
+		t.Fatal("a compaction that reclaimed nothing did not stop this process from rescanning on every later write")
+	}
+	if out := runEvent(t, live, shellEvent("pressure-again", "echo governed")); out != "" {
+		t.Fatalf("a second governed event under store pressure was not allowed: %s", out)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, fmt.Sprintf("%064x.state", 0))); err != nil {
+		t.Fatalf("a live obligation was discharged under store pressure: %v", err)
+	}
+}

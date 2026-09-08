@@ -3431,10 +3431,24 @@ func TestShimDispatchesEveryPresentMarkerToGoValidation(t *testing.T) {
 			if runtime.GOOS == "windows" {
 				t.Skip("Unix-domain socket marker is unavailable on Windows")
 			}
-			var listenConfig net.ListenConfig
-			listener, err := listenConfig.Listen(t.Context(), "unix", marker)
+			// A Unix-domain socket address is limited to about 104 bytes, and
+			// every temporary directory this suite creates already exceeds
+			// that, so binding directly at the marker path made this case skip
+			// itself on every run. Bind under a short base and rename the
+			// socket into place: the marker is the same special file, and the
+			// case actually executes.
+			base, err := os.MkdirTemp(shortSocketBase, "mhs")
 			if err != nil {
-				t.Skipf("Unix-domain sockets unavailable: %v", err)
+				t.Fatalf("create short socket base: %v", err)
+			}
+			t.Cleanup(func() { _ = os.RemoveAll(base) })
+			var listenConfig net.ListenConfig
+			listener, err := listenConfig.Listen(t.Context(), "unix", filepath.Join(base, "s"))
+			if err != nil {
+				t.Fatalf("listen on a Unix-domain socket: %v", err)
+			}
+			if err := os.Rename(filepath.Join(base, "s"), marker); err != nil {
+				t.Skipf("socket marker cannot be placed beside the project root: %v", err)
 			}
 			return func() { _ = listener.Close() }
 		}},
