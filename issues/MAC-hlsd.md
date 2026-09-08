@@ -7,8 +7,8 @@ type: bug
 labels: [processscope, ci, custody, linux]
 created_at: 2026-09-08T18:00:37Z
 created_by: ramirosalas
-updated_at: 2026-09-08T18:00:37Z
-content_hash: "sha256:0837d7a1ddd41f795bbd4ccbfe64705ca8adb31076519aa5e77a54fbb48b19f1"
+updated_at: 2026-09-08T18:08:34Z
+content_hash: "sha256:3640b5cb1dd709c930d797039f6505fddbb97ae5c6b86989daeb0800b605d91f"
 ---
 
 ## Description
@@ -40,3 +40,14 @@ Fix: poll the group until it drains, bounded by the reap deadline that already b
 
 
 ## Comments
+
+### 2026-09-08T18:08:34Z ramirosalas
+Fixed on branch fix/lane-diag, commit 6ccf78e (internal/processscope/broker.go).
+
+retireJob's single post-reap probe 'else if groupExists(j.pgid)' is now 'else if !groupDrained(j.pgid, reapDeadline)'. groupDrained polls the group until it is empty, bounded by the same reapDeadline the reap loop already declared (hardReapWindow), so no budget grew: a group that truly refuses to die is still reported unterminated after exactly the wait it was given before, and an already-empty group costs one syscall as before.
+
+Evidence for the diagnosis: on Linux, TestRetirementWaitsForAKilledGroupToDrain/draining-group-terminated takes 0.31s (the killed member is held unreaped by the test for 300ms and the group probe keeps answering for the whole window), while the same subtest takes 0.02s on macOS, where killpg skips members awaiting reaping. That is the platform difference behind a failure the hosted Linux runner shows and macOS never does.
+
+Test added in internal/processscope/scope_test.go: TestRetirementWaitsForAKilledGroupToDrain builds the broker and job around a real group whose second member only the test can reap (the deterministic form of an orphan awaiting init), and asserts the retirement reports terminated with a cleaned scope report; a second subtest asserts a group holding a live process is never reported drained and that the drain spends the window it was given.
+
+Verification: go test ./internal/processscope ok; go test -race -count=2 ./internal/processscope ok (80s); on the Linux host, 40 of 40 runs of TestIntegrationLaneCustodyTransitiveTermination passed with this and MAC-0cuu applied, against 8 of 40 failing before (3 of those 8 were this bug: cleanup-failed with Terminated:false Reaped:true and no diagnostic). gofmt clean, golangci-lint 0 issues.
