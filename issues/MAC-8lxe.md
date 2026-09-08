@@ -1,15 +1,17 @@
 ---
 id: MAC-8lxe
 title: "SKILL.md not updated for v0.7.0 features, and doctor reports a content-stale installed skill as ok"
-status: open
+status: closed
 priority: 3
 type: bug
 labels: [docs, skill, doctor]
 parent: MAC-ui8a
 created_at: 2026-09-08T07:55:53Z
 created_by: ramirosalas
-updated_at: 2026-09-08T09:21:53Z
-content_hash: "sha256:f95ff3b574ae6ae620ef907c5b198008da2874a38453c254ce43e08234c3bb61"
+updated_at: 2026-09-08T09:27:50Z
+content_hash: "sha256:40163992144e3f7ef2a0e0aacb0b4964c7dc341e5403ebfd205c69483a1c2c96"
+closed_at: 2026-09-08T09:27:50Z
+close_reason: "Landed on main (release 0.7.0 line) at 5c35463: b372e19 SKILL.md updated for 0.7.0 and doctor reports a stale skill as stale (release-level only)"
 ---
 
 ## Description
@@ -71,7 +73,7 @@ project would silently keep driving v0.6.11-era procedure from a v0.7.0 binary.
 
 
 ## History
-
+- 2026-09-08T09:27:50Z status: open -> closed
 
 ## Links
 - Parent: [[MAC-ui8a]]
