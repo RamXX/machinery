@@ -1,14 +1,16 @@
 ---
 id: MAC-adjc
 title: "gates: ci.yml and the Makefile never mirrored the accepted design-only example gate policy"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [ci, gates, mirror-drift]
 created_at: 2026-09-08T12:46:59Z
 created_by: ramirosalas
 updated_at: 2026-09-08T12:52:21Z
-content_hash: "sha256:4a1bb3d3f262f25389f74d32a7be9a83990ca98cb9affe1a65e1ea49d8ba8aa2"
+content_hash: "sha256:2b9aaafb2216f417e34dd857da1772e85099a7b96a0a087e636724637a0bf374"
+closed_at: 2026-09-08T12:52:21Z
+close_reason: "Fixed at f681ebd; the three mirrors now share scripts/example-gates.sh and 8/8 examples pass"
 ---
 
 ## Description
@@ -68,7 +70,7 @@ contract tests that pin the CI/preflight/Makefile example wiring stay green.
 
 
 ## History
-
+- 2026-09-08T12:52:21Z status: open -> closed
 
 ## Links
 
