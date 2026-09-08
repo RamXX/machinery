@@ -1,15 +1,17 @@
 ---
 id: MAC-tk0i
 title: "Executable test assurance has no CLI surface in v0.7.0: no machinery tdd command, no --store/--assurance flags, design/assurance ignored"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [assurance, cli, docs-mismatch]
 parent: MAC-ui8a
 created_at: 2026-09-08T07:55:16Z
 created_by: ramirosalas
-updated_at: 2026-09-08T09:15:13Z
-content_hash: "sha256:a6571f38a7410dff3895b13967869aca61cce8397431523b44b6612899fba9f7"
+updated_at: 2026-09-08T09:27:50Z
+content_hash: "sha256:534282dcd66ead8db0bfb0911174cd7830492bc7b0709f215ecd30bbd1b4aded"
+closed_at: 2026-09-08T09:27:50Z
+close_reason: "Landed on main (release 0.7.0 line) at 5c35463: f9eef0b implementation status stated in the contract, CHANGELOG and README doc index"
 ---
 
 ## Description
@@ -101,7 +103,7 @@ adapter in M1 or to design around its absence.
 Verified at release commit d1f2264 in the main checkout: cmd/machinery/main.go still registers no newTddCmd (grep -c newTddCmd = 0), and skills/machinery/SKILL.md still has no tdd/assurance/elixir-exunit/recover mention.
 
 ## History
-
+- 2026-09-08T09:27:50Z status: open -> closed
 
 ## Links
 - Parent: [[MAC-ui8a]]
