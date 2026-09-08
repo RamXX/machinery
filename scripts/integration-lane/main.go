@@ -346,6 +346,25 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 			return 1
 		}
 	}
+	// Warming the module closure is work, and work only ever runs under a
+	// runtime whose identity already verified: the pin checks in provision
+	// and the assurance catalog's pinned `go version` both precede this
+	// point, so a stale or absent toolchain fails with the identity
+	// diagnostic that owns it instead of a download failure that hides it.
+	// Selection still never faces a cold cache: see warmGoModuleClosure.
+	for _, verified := range runtimes {
+		if verified.ID != "go" {
+			continue
+		}
+		warm, warmErr := warmGoModuleClosure(ctx, custody, *root, work, verified.Path)
+		runtimes = append(runtimes, warm)
+		r.Runtimes = runtimes
+		if warmErr != nil {
+			fmt.Fprintln(stderr, "provision:", warmErr)
+			return 1
+		}
+		break
+	}
 	for _, s := range suites {
 		scratch, e := os.MkdirTemp(work, s.ID+"-")
 		if e != nil {
@@ -1100,13 +1119,15 @@ func laneStreamFailure(what string, err error, streams ...string) error {
 var goDownloadProgress = regexp.MustCompile(`^go: (?:(?:downloading|extracting|finding) \S|no module dependencies to download$)`)
 
 // warmGoModuleClosure downloads the main module's dependency closure once,
-// before any package selection runs. On a fresh runner the module cache is
-// cold, so the first `go list` writes "go: downloading ..." progress to
-// stderr; the lane requires a silent stderr from selection and would report
-// that progress as a failure. Warming here concentrates the download in one
-// bounded, custody-guarded job whose stderr vocabulary is checked rather than
+// after every pinned runtime identity has verified and before any package
+// selection runs. On a fresh runner the module cache is cold, so the first
+// `go list` writes "go: downloading ..." progress to stderr; the lane
+// requires a silent stderr from selection and would report that progress as
+// a failure. Warming here concentrates the download in one bounded,
+// custody-guarded job whose stderr vocabulary is checked rather than
 // ignored, and produces its own receipt binding the go.sum the closure was
-// resolved against.
+// resolved against. It is the lane's first use of the Go toolchain for work,
+// so it must never precede the identity checks that qualify that toolchain.
 func warmGoModuleClosure(ctx context.Context, custody *laneCustody, root, work, goBin string) (runtimeReceipt, error) {
 	r := runtimeReceipt{ID: "go-modules", Status: "failed", Identity: "go.mod+go.sum"}
 	mod, err := regularBytes(filepath.Join(root, "go.mod"), 8<<20)
@@ -1190,15 +1211,6 @@ func provision(ctx context.Context, custody *laneCustody, root, work, cache stri
 				}
 			}
 			result = append(result, r)
-			if id == "go" {
-				// Selection must find a warm module cache: see
-				// warmGoModuleClosure for why a cold one fails the lane.
-				warm, err := warmGoModuleClosure(ctx, custody, root, work, r.Path)
-				result = append(result, warm)
-				if err != nil {
-					return result, err
-				}
-			}
 			continue
 		}
 		if !regexp.MustCompile(`^[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}$`).MatchString(p.Docker.Image) {

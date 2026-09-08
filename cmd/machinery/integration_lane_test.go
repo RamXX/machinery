@@ -650,8 +650,9 @@ func integrationAssertRuntimes(t *testing.T, rs []integrationRuntimeReceipt, wan
 	sort.Strings(got)
 	want = append([]string(nil), want...)
 	for _, id := range want {
-		// Provisioning the Go toolchain also warms its module closure, so the
-		// union owes that receipt exactly when it owes the go receipt.
+		// The lane warms the Go module closure once the pinned runtime
+		// identities verify, so the union owes that receipt exactly when it
+		// owes the go receipt.
 		if id == "go" {
 			want = append(want, "go-modules")
 			break
