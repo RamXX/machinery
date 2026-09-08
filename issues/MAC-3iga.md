@@ -8,8 +8,8 @@ labels: [regression, gates, gd-idcite]
 parent: MAC-ui8a
 created_at: 2026-09-08T07:54:31Z
 created_by: ramirosalas
-updated_at: 2026-09-08T07:54:31Z
-content_hash: "sha256:6e2ca1ca4dae843c9080a4eb0ac00833495a4726ba1c171617b01409767a6688"
+updated_at: 2026-09-08T08:05:40Z
+content_hash: "sha256:6ebbb291637438ac7708b6b9f1cf9454f4d0c28b4c33a00fc7ea16f1b9947278"
 ---
 
 ## Description
@@ -97,7 +97,7 @@ inventing an escape, both of which degrade the design.
 
 
 ## Notes
-
+Line-number correction, verified at release commit d1f2264 in the main checkout (the assessment worktree has since moved): the prose pre-filter is internal/gates/clauses.go:67-68, the table-row rejection is :74, the error text is emitted at :77, and the companion 'owning oracle has no transition governed by this guard' at :120. The 63-65/76 numbers in the original body were read from the pre-move worktree; the code is identical.
 
 ## History
 
