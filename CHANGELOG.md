@@ -109,28 +109,37 @@ under their version heading when a release is cut.
   buffering.
 - **Standalone contract documents** for native custody and executable test assurance
   (`docs/native-custody-contract.md`, `docs/test-assurance-contract.md`).
-- **Executable assurance declarations and four native test adapters.** A design may declare
-  `design/assurance/plan.json` and per-milestone manifests under a closed version-1 grammar that
-  binds every oracle row, guard clause, invariant, and runtime obligation to registered native
-  tests. Adapters for Go (`go test`, Go 1.27.1), TypeScript (`tsc` plus `node --test`, Node
-  26.8.1 / TypeScript 7.0.2), Python (`python -m unittest`, CPython 3.14.7), and Elixir
-  (`mix test`, Elixir 1.20.4 / OTP 29) run the real native runner under process custody in a
-  closed environment against a pinned, byte-verified runtime closure; each registered assertion
-  must be a typed helper call at its frozen line, and its outcome is witness-bound to that call
-  site. Skips, expected failures, unwitnessed failures, and late source mutation are rejected.
-  The required integration lane carries the assurance catalog: it verifies every adapter runtime
-  against the exact pins and executes frozen per-language probe fixtures with exact per-case
-  accounting; a missing or mismatched runtime fails the lane.
-- **Replay inputs are retained outside governed sources.** Capture publishes the exact subject,
-  dependency, frozen, and design payload inputs as content-addressed blobs in a private assurance
-  store (symlink escapes, hardlink aliases, and special files are rejected; the control namespace,
-  `.git`, and `attestations.yaml` are excluded), with a typed bundle encoding, a validated
-  export/import archive, and a read-only status report that never performs a replay.
-- **Reviewed assurance revisions are registered explicitly.** Registration validates lineage
-  (revision 1, or the predecessor plus one with the same key), archives the exact control bytes,
-  stages the successor, and advances the store head by compare-and-advance under a bounded
-  deadline; drafts never discharge registered requirements, and a registered deletion or an
-  untargeted registered mismatch blocks.
+- **Executable test assurance: the version-1 substrate and four native test adapters, with no CLI
+  surface yet.** This release lands the mechanism, not a consumer command. There is no
+  `machinery tdd` command, no `machinery check --store` or `--assurance strict`, and no gate that
+  reads `design/assurance/`: a design that commits `plan.json` today sees no diagnostic and no
+  change in its finding count from `machinery check`. What ships is the closed version-1 document
+  grammar and its validation, the authoritative obligation inventory over a held design snapshot
+  (BUILD milestones, committed oracle rows, guard-clause ids, invariant ids, declared runtime
+  obligations), and closed adapters for Go (`go test`, Go 1.27.1), TypeScript (`tsc` plus
+  `node --test`, Node 26.8.1 / TypeScript 7.0.2), Python (`python -m unittest`, CPython 3.14.7),
+  and Elixir (`mix test`, Elixir 1.20.4 / OTP 29). The one place those adapters execute is the
+  required integration lane, which verifies every adapter runtime against the exact pins and runs
+  frozen per-language probe and native-conformance fixtures under process custody with exact
+  per-case accounting; a missing or mismatched runtime fails the lane. Inside that lane each
+  registered assertion must be a typed helper call at its frozen line, its outcome is
+  witness-bound to that call site, and skips, expected failures, unwitnessed failures, and late
+  source mutation are rejected. `docs/test-assurance-contract.md` carries an
+  "Implementation status in 0.7.0" section naming shipped versus target surfaces; its section 7
+  CLI grammar is the target contract. Until it lands, bind tests to oracle rows with the
+  `Gt-tests` stable-id discipline.
+- **Replay inputs are retained outside governed sources** (library surface; no command exposes it
+  yet). Capture publishes the exact subject, dependency, frozen, and design payload inputs as
+  content-addressed blobs in a private assurance store (symlink escapes, hardlink aliases, and
+  special files are rejected; the control namespace, `.git`, and `attestations.yaml` are
+  excluded), with a typed bundle encoding, a validated export/import archive, and a read-only
+  status report that never performs a replay.
+- **Reviewed assurance revisions are registered explicitly** (library surface; no command exposes
+  it yet). Registration validates lineage (revision 1, or the predecessor plus one with the same
+  key), archives the exact control bytes, stages the successor, and advances the store head by
+  compare-and-advance under a bounded deadline; drafts never discharge registered requirements,
+  and a registered deletion or an untargeted registered mismatch blocks. It commits authored data
+  only and returns registered-not-executed; it never claims execution or replay.
 - **Release publication is gated on exact-commit verification.** `docs/release-policy.json` is
   the single policy source: a release requires successful `ci`, `formal`, and `security` runs on
   the exact release commit (every required job, including the required integration lane), a tag
@@ -178,7 +187,8 @@ under their version heading when a release is cut.
 - **Regeneration advice no longer accepts new debt**: baseline/ratchet guidance lists only the
   steps the ratchet actually needs.
 - **Milestone packets satisfy the standalone portfolio contract**, and incomplete executable
-  assurance declarations are rejected.
+  assurance declarations are rejected by the declaration validator (a library surface; no
+  command reads a declaration in this release).
 
 ### Compatibility and migration
 

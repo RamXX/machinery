@@ -4,6 +4,29 @@ Status: approved architecture contract, version 1. Approval establishes the requ
 Scope: executable hard-TDD assurance for Machinery and its consumers, plus native custody for the contributor integration lane. The implementation must prove every applicable obligation below.
 The [native custody architecture contract](native-custody-contract.md) refines only this contract's native-custody portion; it neither replaces the remainder nor establishes implementation or execution evidence.
 
+## Implementation status in 0.7.0
+
+Read this section before acting on anything below it. Everything below states the required behavior of the contract, in the present tense, as approved. It is the target, not an inventory of what the 0.7.0 binary does. In particular, **section 7's CLI grammar is the target contract: the `machinery tdd ...` command family and the `check --store` / `--assurance strict` flags do not exist in the 0.7.0 binary.**
+
+Shipped in 0.7.0, reachable today:
+
+- **The closed version-1 document grammar.** `internal/tdd` parses and validates `design/assurance/plan.json` and per-milestone manifests under the rules of sections 4 and 5, including cross-design resolution, control-namespace validation, and the review projections and subject digests of section 4 (`LoadPlan`, `LoadManifest`, `Validate`, `ReviewProjectionPlan`, `ReviewProjectionManifest`, `ReviewSubjectDigest`, `DesignPayloadDigest`, `ValidateControlNamespace`).
+- **The authoritative obligation inventory of section 3.** `gates.AssuranceInventory(design)` derives it over a held immutable design snapshot: root BUILD milestones, committed oracle rows (including the relational formal oracles), machine-owned guard-clause IDs, modelith invariant IDs, and the plan's declared runtime obligations, keyed by the `{design, kind, owner, id}` tuple.
+- **The content-addressed assurance store and replay-input retention of section 5.** `InitStore`, `Capture`, `MaterializeBundle`, `ExportStore` and `ImportStore` implement store initialization, validated capture (symlink escapes, hardlink aliases and special files rejected; the control namespace, `.git` and `attestations.yaml` excluded), the typed bundle encoding, and the validated export/import archive. `Status` is the read-only report; it performs no replay and launches no process.
+- **Explicit registration of reviewed revisions.** `assuranceflow.Register` validates lineage, archives the exact control bytes, stages the successor and advances the store head by compare-and-advance under a bounded deadline. It commits authored data only and returns registered-not-executed; it never claims execution, replay or `Gv` acceptance.
+- **The four closed native adapters of section 6:** `go-testing/v1`, `node-test-typescript/v1`, `python-unittest/v1` and `elixir-exunit/v1`, each with binary-embedded, hash-identified assertion and transport helpers, direct argv construction, and normalized event streams.
+- **Adapter execution in the contributor lane.** `go run ./scripts/integration-lane --lane required` verifies every adapter runtime against the exact pins in `testdata/integration-lanes/assurance-runtime-pins.json` and executes frozen per-language runtime-probe and native-conformance fixtures through the production adapter chain under process custody, with exact per-case accounting. A missing or mismatched runtime fails the lane; nothing is skipped.
+
+Not yet shipped in 0.7.0:
+
+- **Every `machinery tdd ...` command.** The binary registers no `tdd` command. `store init`, `store export`, `store import`, `scaffold`, `capture`, `register`, `red`, `green`, `status` and `verify` exist only as library entry points, and `scaffold`, `red` and `green` have no implementation at all.
+- **`machinery check --store <path>` and `--assurance strict`.** `check` accepts exactly `--impl`, `--commit`, `--gate`, `--complete` and `--warnings-as-errors`. `--complete` requires `--impl` and enforces the phase artifacts, closed milestones and zero warnings; it enforces no assurance replay.
+- **Any gate that reads `design/assurance/`.** No gate in the `check` suite reads `plan.json` or a milestone manifest. `gates.AssuranceInventory` is called only from `internal/assuranceflow`. A design that commits an assurance declaration, valid or schema-invalid, sees no diagnostic and no change in its finding count. The `gtd` activation described in section 3 (cheap `gtd` from BUILD, controls, a configured external store or a declaration; hooks that block on missing adoption) is not implemented.
+- **Independent replay over a consumer design.** `Execute` and `Verify` are not implemented. The adapters run only over the contributor lane's frozen fixtures, never over a consumer's declared suites, so no execution record, negative-sensitivity demonstration, or replay-this-invocation claim is available to a consumer.
+- **Adoption of a design's tests by the shipped gates.** `Gt-tests` remains static discovery of stable-id references in test files and executes nothing; its own label says so. It is not a fallback for this contract and establishes none of the dimensions in section 1.
+
+The consequence for a consumer of the 0.7.0 binary is exact: writing `design/assurance/plan.json` changes nothing that `machinery check` reports. Bind tests to oracle rows with the `Gt-tests` stable-id discipline until the CLI surface above lands, and read every present-tense statement below as the contract that surface must satisfy.
+
 ## 1. Decisions and guarantee boundary
 
 Native final verification supports Go, TypeScript, Python, and Elixir in the first release through four CLOSED adapters, not an arbitrary shell-command protocol. A supported language does not mean every framework in that language is supported.

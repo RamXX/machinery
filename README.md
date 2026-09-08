@@ -804,8 +804,16 @@ other process dependencies. Target languages it realizes: Elixir, Go, Rust, Type
   the [attestation evidence guide](docs/attestation-evidence.md) (the `attestations.yaml` schema,
   the closed claim vocabulary, staleness by content hash, `machinery attest`, and how the `gv` gate
   relates to `ga` and to the superseded PR-checklist idea),
-  and the [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft
-  rung-4 design note, not yet implemented).
+  the [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft
+  rung-4 design note, not yet implemented),
+  and two approved architecture contracts that state required behavior rather than shipped
+  commands: the [native custody contract](docs/native-custody-contract.md) and the
+  [executable test assurance contract](docs/test-assurance-contract.md). The assurance contract
+  opens with an "Implementation status in 0.7.0" section: this release ships the version-1
+  declaration grammar, the obligation inventory, the capture and registration store, and four
+  native test adapters exercised by the required integration lane, but no `machinery tdd`
+  command, no `check --store` or `--assurance strict` flag, and no gate that reads
+  `design/assurance/`.
 - `examples/go-crm/` the worked rebuild example: `design/legacy/` (the working prototype truth),
   `design/migration.yaml` (the checked transition), the target blueprint/formal models, and `impl/`
   (the verified Go build).
