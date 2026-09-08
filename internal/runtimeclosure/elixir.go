@@ -460,13 +460,19 @@ func validateErlangLayout(root string) error {
 
 // fingerprintElixirTree hashes the complete runtime tree topologically
 // under the elixir closure domain: sorted directory and file identities,
-// exact file bytes, in-tree file symlinks resolved and bound by their
-// relative target identity plus the resolved bytes, bounded
-// entries/bytes/depth, with a stable-identity double census. The pinned
-// trees are small (Elixir ~0.5k entries, OTP ~4.5k) against the shipped
-// bounds.
+// exact file bytes, file symlinks resolved and bound by their target
+// identity plus the resolved bytes, bounded entries/bytes/depth, with a
+// stable-identity double census. The pinned trees are small (Elixir ~0.5k
+// entries, OTP ~4.5k) against the shipped bounds.
 func fingerprintElixirTree(rootPath string, root *os.Root, label string) (string, error) {
 	budget := &elixirTreeBudget{label: label, entries: 0, bytes: 0}
+	// The root spelling the caller holds may itself traverse symlinks; every
+	// containment decision below is taken against its fully resolved form so
+	// an in-tree link is never mistaken for an escape.
+	resolvedRoot, err := filepath.EvalSymlinks(rootPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve the runtime tree root %s: %w", rootPath, err)
+	}
 	type entry struct {
 		name  string
 		kind  byte
@@ -484,18 +490,14 @@ func fingerprintElixirTree(rootPath string, root *os.Root, label string) (string
 			return err
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			target, err := resolveElixirLink(rootPath, rel)
+			bound, err := bindElixirLink(rootPath, resolvedRoot, rel)
 			if err != nil {
 				return err
 			}
-			body, digest, err := readElixirLinked(rootPath, target)
-			if err != nil {
+			if err := budget.add(1, bound.size); err != nil {
 				return err
 			}
-			if err := budget.add(1, int64(len(body))); err != nil {
-				return err
-			}
-			entries = append(entries, entry{name: rel, kind: 'l', size: int64(len(body)), extra: target + "\x00" + digest})
+			entries = append(entries, entry{name: rel, kind: bound.kind, size: bound.size, extra: bound.target + "\x00" + bound.digest})
 			return nil
 		}
 		if !info.IsDir() {
@@ -568,6 +570,8 @@ func fingerprintElixirTree(rootPath string, root *os.Root, label string) (string
 			_, _ = fmt.Fprintf(hash, "d\x00%s\x00", slashName)
 		case 'l':
 			_, _ = fmt.Fprintf(hash, "l\x00%s\x00%d\x00%s\x00", slashName, item.size, item.extra)
+		case 'x':
+			_, _ = fmt.Fprintf(hash, "x\x00%s\x00%d\x00%s\x00", slashName, item.size, item.extra)
 		default:
 			_, _ = fmt.Fprintf(hash, "f\x00%s\x00%d\x00%s\x00", slashName, item.size, item.extra)
 		}
@@ -575,37 +579,65 @@ func fingerprintElixirTree(rootPath string, root *os.Root, label string) (string
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-// resolveElixirLink resolves one in-tree symlink to its root-relative
-// target; escapes out of the tree fail closed.
-func resolveElixirLink(rootPath, rel string) (string, error) {
+// elixirLinkBinding is one symlink's contribution to the tree fingerprint:
+// its topological kind, the identity of what it points at, and the sha256 of
+// the exact bytes it delivers.
+type elixirLinkBinding struct {
+	kind   byte
+	target string
+	digest string
+	size   int64
+}
+
+// elixirOutsideTarget is the path-independent identity recorded for a link
+// whose resolved target lies outside the runtime tree. The bytes are still
+// bound exactly by digest; only the absolute install location, which differs
+// per host, is deliberately left out of the closure identity.
+const elixirOutsideTarget = "<outside-tree>"
+
+// bindElixirLink resolves one symlink and binds it by content.
+//
+// A link resolving inside the tree keeps its root-relative target identity
+// (kind 'l'). A link resolving outside is bound by its exact bytes under a
+// distinct kind ('x') and a path-independent target marker, so it can never
+// collide with an in-tree binding and any change to the bytes it delivers
+// still changes the closure digest.
+//
+// Rejecting out-of-tree targets outright is not sound as a completeness
+// claim and is wrong in practice: erlef/setup-beam installs Erlang/OTP by
+// copying the tool cache with Node's fs.cpSync, which rewrites every relative
+// symlink to an absolute path into the source tree. On a hosted macOS runner
+// $RUNNER_TEMP/.setup-beam/otp/bin/epmd therefore points at
+// $RUNNER_TOOL_CACHE/otp/<version>/<arch>/erts-*/bin/epmd. That is a real,
+// unmodified vendor layout, and the bytes it delivers are bound here exactly
+// as the in-tree copy's are. Only an unresolvable, non-regular or unbounded
+// target fails closed, and the diagnostic names both the link and what it
+// resolved to.
+func bindElixirLink(rootPath, resolvedRoot, rel string) (elixirLinkBinding, error) {
 	absolute := filepath.Join(rootPath, filepath.FromSlash(rel))
 	resolved, err := filepath.EvalSymlinks(absolute)
 	if err != nil {
-		return "", fmt.Errorf("resolve symlink %s: %w", rel, err)
+		return elixirLinkBinding{}, fmt.Errorf("resolve symlink %s: %w", rel, err)
 	}
-	relative, err := filepath.Rel(rootPath, resolved)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
-		return "", fmt.Errorf("symlink %s escapes the runtime tree", rel)
+	binding := elixirLinkBinding{kind: 'x', target: elixirOutsideTarget}
+	relative, relErr := filepath.Rel(resolvedRoot, resolved)
+	if relErr == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative) {
+		binding.kind, binding.target = 'l', filepath.ToSlash(relative)
 	}
-	if info, err := os.Lstat(resolved); err != nil || !info.Mode().IsRegular() {
-		return "", fmt.Errorf("symlink %s does not resolve to a regular file inside the tree", rel)
-	}
-	return filepath.ToSlash(relative), nil
-}
-
-// readElixirLinked reads the resolved target bytes of an in-tree symlink.
-func readElixirLinked(rootPath, targetRel string) ([]byte, string, error) {
-	resolved := filepath.Join(rootPath, filepath.FromSlash(targetRel))
 	info, err := os.Lstat(resolved)
-	if err != nil || !info.Mode().IsRegular() || info.Size() > elixirTreeMaxFile {
-		return nil, "", fmt.Errorf("symlink target %s is not a bounded regular file", targetRel)
+	if err != nil || !info.Mode().IsRegular() {
+		return elixirLinkBinding{}, fmt.Errorf("symlink %s resolves to %s, which is not a regular file", rel, resolved)
+	}
+	if info.Size() > elixirTreeMaxFile {
+		return elixirLinkBinding{}, fmt.Errorf("symlink %s resolves to %s, which exceeds the closure byte bound", rel, resolved)
 	}
 	body, err := os.ReadFile(resolved)
 	if err != nil || int64(len(body)) != info.Size() {
-		return nil, "", fmt.Errorf("symlink target %s changed while reading", targetRel)
+		return elixirLinkBinding{}, fmt.Errorf("symlink %s target %s changed while reading", rel, resolved)
 	}
 	sum := sha256.Sum256(body)
-	return body, hex.EncodeToString(sum[:]), nil
+	binding.digest, binding.size = hex.EncodeToString(sum[:]), int64(len(body))
+	return binding, nil
 }
 
 // hashElixirFile hashes one regular file's exact bytes under the root.
