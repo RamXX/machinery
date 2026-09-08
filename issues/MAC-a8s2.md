@@ -8,8 +8,8 @@ labels: [regression, processscope, verify-formal]
 parent: MAC-ui8a
 created_at: 2026-09-08T07:54:06Z
 created_by: ramirosalas
-updated_at: 2026-09-08T08:05:41Z
-content_hash: "sha256:79311d42d196a42ad50160aa771c9e70d66ff5fae80ac88f203728de3c4256f4"
+updated_at: 2026-09-08T08:51:13Z
+content_hash: "sha256:3e70660850b7aa358dfd0e256d596d799d424dffa668bb8583745f451f6d11ba"
 ---
 
 ## Description
@@ -119,3 +119,27 @@ Verified at release commit d1f2264 in the main checkout: internal/processscope/b
 - Parent: [[MAC-ui8a]]
 
 ## Comments
+
+### 2026-09-08T08:51:13Z ramirosalas
+Fixed on branch fix/MAC-a8s2, commit 10c4158 (not pushed, issue left open).
+
+The reported cause was real but was one of three single-shot assumptions in the broker, all of which only break once a run is large enough. Fixing only the first left verify-formal at exit 1.
+
+1. Shared cleanup instant (as reported). retireJob derived its wait from b.cleanupPending, one absolute instant armed at the first scope close and never re-armed. Every later retirement raced it, so cleanly terminated and reaped jobs were marked budgetExceed.
+2. Broker crash. The close dispatch read b.scopes["root"] after releasing the broker lock, racing the sibling child-scope registration that follows it. Go fatal error: concurrent map read and map write. The broker died and every later request failed STALE_CAPABILITY. This is what actually closed the broker channel, not the budget accounting.
+3. Truncated control record. writeFrame sent a record with a single WriteMsgUnix and treated a short write as a failure. The root cleanup report names every retired job (172 on H2, about 14 KB), which exceeds the AF_UNIX send buffer, so the close reply was truncated and the final root close failed with STALE_CAPABILITY even with zero budget exceedances. Confirmed by instrumentation: senderr=INTERNAL_ERROR: frame: short control write on a 200-job report.
+
+Chosen budget semantics: the cleanup grace bounds a cleanup pass, not the broker lifetime. beginCleanupPassLocked/endCleanupPass arm one grace per pass; a pass entered while another is in flight shares the grace already armed, so it never renews underneath the jobs it bounds. Each retirement gets the shipped per-job budget (cleanup_ms, capped at the shipped 30,000 ms cap and at 3 s) measured from its own start, clamped by its pass grace. All shipped numbers unchanged. Bounded because a broker admits at most limits.Jobs live jobs (shipped cap 4): a pass waits at most its grace in aggregate and reaps at most limits.Jobs x 2 s hard reap window, independent of how many jobs the run retired earlier. A job that really overruns is still reported budget-exceeded.
+
+Tests (internal/processscope/custody_integration_test.go):
+- TestSequentialRetirementsEachGetTheirOwnBudget: 200 sequential child-scope retirements plus a root close. Fails on the unmodified tree with the exact reported shape (Registered:true Terminated:true Reaped:true plus a TIMEOUT diagnostic at round ~4), and catches all three defects.
+- TestHungJobStillReportsBudgetExceeded: new ignore-term helper role proves a target that refuses SIGTERM is still cleanup-failed with a TIMEOUT diagnostic. The shipped TestCleanupBudgetExhaustionReported passes unchanged.
+
+Evidence, darwin/arm64:
+- go test -race -count=1 ./internal/processscope ./internal/processcontrol: ok, 40s
+- go test -count=1 -run 'Formal|Custody|Scope|Verify' ./cmd/machinery: ok, 56s
+- make build, gofmt, go vet ./..., golangci-lint run --config .golangci.yml: clean
+- go run ./scripts/integration-lane --lane required: 8 suites passed, 8 assurance suites across 4 native adapters, 5m07s
+- H2 at c59bc81 in a detached worktree: machinery verify-formal design -> 167 passed, 0 failed, exit 0, no custody error, 2m19s. Only tree change is the machinery-version stamp moving v0.6.11 -> v0.7.0 (expected for the release bump).
+
+Not verified: linux/amd64. Defects 2 and 3 are load- and size-dependent respectively, so the linux threshold will differ.
