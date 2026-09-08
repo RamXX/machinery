@@ -764,7 +764,7 @@ func TestTerminalResultSurvivesOvertakingItsCaller(t *testing.T) {
 // The window is opened deterministically here by holding the kill inside the
 // group-signal seam the broker already owns.
 func TestCloseJoinsARetirementAlreadyInFlight(t *testing.T) {
-	target := exec.Command("/bin/sleep", "60")
+	target := exec.CommandContext(t.Context(), "/bin/sleep", "60")
 	target.SysProcAttr = newGroupAttr()
 	if err := target.Start(); err != nil {
 		t.Fatal(err)
