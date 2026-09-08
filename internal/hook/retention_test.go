@@ -478,3 +478,35 @@ func TestStoreFullOfLiveObligationsStaysIntactAndStillArms(t *testing.T) {
 		t.Fatalf("a live obligation was discharged under store pressure: %v", err)
 	}
 }
+
+// TestStateReportNeverCreatesTheStore protects the durable-loss evidence. A
+// machine that never armed an obligation has no store, and a report that
+// materialized one would fabricate the very marker that tells a first
+// initialization from a store that was lost.
+func TestStateReportNeverCreatesTheStore(t *testing.T) {
+	isolateHookState(t)
+	dir, err := stateDirPathExact()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, repair := range []bool{false, true} {
+		var report strings.Builder
+		ok, err := StateReport(&report, repair)
+		if err != nil || !ok {
+			t.Fatalf("report on an absent store (repair=%v) ok=%v err=%v", repair, ok, err)
+		}
+		if !strings.Contains(report.String(), "no governance hook state store") {
+			t.Fatalf("report on an absent store (repair=%v) does not say so: %q", repair, report.String())
+		}
+		if _, err := os.Lstat(dir); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("a doctor report (repair=%v) created the store at %s: %v", repair, dir, err)
+		}
+	}
+	marker, err := stateInitializationMarkerPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(marker); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("a doctor report created the store initialization marker at %s: %v", marker, err)
+	}
+}
