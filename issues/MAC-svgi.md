@@ -7,8 +7,8 @@ type: bug
 labels: [custody, ci]
 created_at: 2026-09-08T13:07:54Z
 created_by: ramirosalas
-updated_at: 2026-09-08T13:07:54Z
-content_hash: "sha256:3835e6245faba1de6f499bdecf1b97b08d4182f52eccd744ed8ef55c28aa78bf"
+updated_at: 2026-09-08T13:26:52Z
+content_hash: "sha256:146b69d0a5f24f783fb8752c76751352dadba103d536514e30bac8ef5e9d727f"
 ---
 
 ## Description
@@ -55,3 +55,14 @@ Derive each helper's open context from the wall that helper declares, so the two
 
 
 ## Comments
+
+### 2026-09-08T13:26:52Z ramirosalas
+Fixed on fix/custody-budgets in e9b76b6.
+
+Every custody root the suites open now derives its open context from the wall it declares (internal/formal, internal/runtimeclosure, internal/processcontrol, internal/tdd/adapters go/typescript/elixir, internal/processscope). No cap changed.
+
+Measured: the 7-spec portfolio TLC run takes 85.19s under -race in a 2-CPU, 7GB golang:1.27.1 container, against the 60s bootstrap window it used to be clamped to and the 2,400,000ms wall it declares (28x margin). Hosted CI reached 77.9s before failing.
+
+Guard: TestFormalCustodyRootGrantsItsDeclaredWall reads the granted budget back off an attachment; with the old 60s open context it reports 59,971ms and fails.
+
+Verified: internal/formal, internal/processscope, internal/processcontrol, internal/runtimeclosure green under -race on darwin/arm64; processscope+processcontrol green under -race x2 in the 2-CPU container; required integration lane green (5m49s).
