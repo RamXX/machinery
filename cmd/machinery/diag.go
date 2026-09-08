@@ -283,6 +283,9 @@ func doctorRunUnlockedTo(targets []string, out io.Writer) (result error) {
 		for _, artifact := range artifacts {
 			if err := install.ValidateArtifact(artifact); err == nil {
 				fmt.Fprintf(out, "  ok       [%s] %s at %s\n", artifact.Target, artifact.Label, artifact.Path)
+				if artifact.Label == install.SkillLabel {
+					failures = append(failures, reportSkillRelease(out, artifact.Path))
+				}
 			} else {
 				fmt.Fprintf(out, "  ERROR    [%s] %s at %s is invalid: %v -- run machinery install --target %s\n", artifact.Target, artifact.Label, artifact.Path, err, strings.Join(targets, " --target "))
 				failures = append(failures, fmt.Errorf("invalid %s artifact %s: %w", artifact.Target, artifact.Path, err))
@@ -312,8 +315,9 @@ func doctorRunUnlockedTo(targets []string, out io.Writer) (result error) {
 		if filepath.Base(home) == ".claude" {
 			target = "claude"
 		}
-		if err := install.ValidateArtifact(install.Artifact{Target: target, Label: "machinery skill", Path: filepath.Join(home, "skills", "machinery")}); err == nil {
+		if err := install.ValidateArtifact(install.Artifact{Target: target, Label: install.SkillLabel, Path: filepath.Join(home, "skills", "machinery")}); err == nil {
 			fmt.Fprintf(out, "  ok       skill at %s/skills/machinery\n", home)
+			failures = append(failures, reportSkillRelease(out, filepath.Join(home, "skills", "machinery")))
 		} else {
 			fmt.Fprintf(out, "  ERROR    skill at %s/skills/machinery is invalid: %v -- run machinery install --target all\n", home, err)
 			failures = append(failures, fmt.Errorf("invalid machinery skill under %s: %w", home, err))
@@ -338,6 +342,28 @@ func doctorRunUnlockedTo(targets []string, out io.Writer) (result error) {
 		failures = append(failures, errors.New("update receipt is unreadable"))
 	}
 	return errors.Join(failures...)
+}
+
+// reportSkillRelease reports whether a structurally valid installed skill
+// carries this binary's release content. ValidateArtifact answers a different
+// question: it holds the installed bytes to the schema and to the receipt
+// digest recorded when they were installed, so a skill left behind by an older
+// release passes it and still teaches an agent superseded procedure. The
+// release the skill declares is the one thing that separates the two cases, and
+// the update command is the exact repair. It returns the failure to record, or
+// nil when the installed skill is current.
+func reportSkillRelease(out io.Writer, skillDir string) error {
+	want := strings.TrimPrefix(machversion.Version, "v")
+	got, err := install.InstalledSkillVersion(skillDir)
+	if err != nil {
+		fmt.Fprintf(out, "  ERROR    skill at %s declares no readable release version: %v -- run machinery update\n", skillDir, err)
+		return fmt.Errorf("unreadable installed skill release at %s: %w", skillDir, err)
+	}
+	if got != want {
+		fmt.Fprintf(out, "  stale    skill at %s is release %s; this binary is %s -- run machinery update\n", skillDir, got, want)
+		return fmt.Errorf("installed skill at %s is release %s, want %s", skillDir, got, want)
+	}
+	return nil
 }
 
 // reportCheckerBinaries checks that every checker configured in the local

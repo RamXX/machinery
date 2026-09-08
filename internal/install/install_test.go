@@ -336,6 +336,42 @@ func TestValidateArtifactBindsRecordedContentAndRejectsTruncatedTokens(t *testin
 	}
 }
 
+// The installed skill's declared release is the only local evidence that
+// separates "installed and intact" from "installed by an older release": the
+// receipt binds the bytes that were installed, not the release they came from.
+func TestInstalledSkillVersionReadsDeclaredReleaseAndFailsClosed(t *testing.T) {
+	body := "---\nname: machinery\nmetadata:\n  version: \"0.6.11\"\ndescription: >\n  x\n---\n\n# machinery\n"
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "SKILL.md"), body)
+	got, err := InstalledSkillVersion(dir)
+	if err != nil || got != "0.6.11" {
+		t.Fatalf("InstalledSkillVersion = %q, %v; want 0.6.11", got, err)
+	}
+
+	tagged := t.TempDir()
+	write(t, filepath.Join(tagged, "SKILL.md"), strings.Replace(body, "\"0.6.11\"", "\"v0.7.0\"", 1))
+	if got, err := InstalledSkillVersion(tagged); err != nil || got != "0.7.0" {
+		t.Fatalf("tagged InstalledSkillVersion = %q, %v; want 0.7.0", got, err)
+	}
+
+	for name, text := range map[string]string{
+		"no metadata version": "---\nname: machinery\n---\n\n# machinery\n",
+		"unterminated":        "---\nname: machinery\nmetadata:\n  version: \"0.7.0\n---\n",
+		"empty":               "---\nname: machinery\nmetadata:\n  version: \"\"\n---\n",
+	} {
+		bad := t.TempDir()
+		write(t, filepath.Join(bad, "SKILL.md"), text)
+		if got, err := InstalledSkillVersion(bad); err == nil {
+			t.Errorf("%s: accepted %q", name, got)
+		}
+	}
+
+	missing := t.TempDir()
+	if _, err := InstalledSkillVersion(missing); err == nil {
+		t.Error("absent SKILL.md was accepted")
+	}
+}
+
 func TestReceiptArtifactDigestIgnoresInstallTimeButDetectsModeAndContent(t *testing.T) {
 	installAt := func(timestamp time.Time) ([]receiptArtifact, string, string) {
 		t.Helper()

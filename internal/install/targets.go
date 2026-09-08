@@ -31,6 +31,36 @@ type Artifact struct {
 	Path   string
 }
 
+// SkillLabel is the artifact label of the installed machinery skill directory.
+const SkillLabel = "machinery skill"
+
+// InstalledSkillVersion reads the release version an installed skill directory
+// declares in its SKILL.md front matter, without a leading "v". It answers one
+// question a receipt digest cannot: whether an installed skill carries the
+// running binary's release content or another release's. The receipt records
+// what was installed, not which release it came from, so a skill left behind by
+// an older install validates against its own recorded digest and still teaches
+// an agent superseded procedure. The read is bounded, and a skill whose front
+// matter declares no version is an error rather than a silent pass.
+func InstalledSkillVersion(skillDir string) (string, error) {
+	raw, err := readInstallRegularFileExact(filepath.Join(skillDir, "SKILL.md"), 4<<20, false)
+	if err != nil {
+		return "", fmt.Errorf("read SKILL.md: %w", err)
+	}
+	text := strings.ReplaceAll(string(raw), "\r\n", "\n")
+	const marker = "\nmetadata:\n  version: \""
+	start := strings.Index(text, marker)
+	if start < 0 {
+		return "", errors.New("SKILL.md front matter declares no metadata version")
+	}
+	rest := text[start+len(marker):]
+	end := strings.Index(rest, "\"")
+	if end <= 0 {
+		return "", errors.New("SKILL.md metadata version is unterminated or empty")
+	}
+	return strings.TrimPrefix(rest[:end], "v"), nil
+}
+
 // ValidateArtifact verifies an installed adapter without following an
 // unexpected final symlink. Existence alone is not health: the artifact must
 // have the expected type, any allowed link must target the shared canonical

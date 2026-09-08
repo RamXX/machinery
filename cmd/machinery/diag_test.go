@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/RamXX/machinery/internal/runtimeclosure"
+	machversion "github.com/RamXX/machinery/internal/version"
 )
 
 type brokenDiagnosticWriter struct{ err error }
@@ -466,5 +467,51 @@ func copyDoctorFixture(t *testing.T, root, rel, source string, mode os.FileMode)
 	}
 	if err := os.WriteFile(dest, body, mode); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Doctor must distinguish an installed skill that is intact from one that
+// belongs to an older release. The second case is the one a user upgrading the
+// binary hits, and it is the one a receipt digest cannot see, so it must be
+// reported with the exact refresh command instead of "ok".
+func TestDoctorReportsSkillReleaseAgainstRunningBinary(t *testing.T) {
+	current := t.TempDir()
+	skillBody := func(v string) string {
+		return "---\nname: machinery\nmetadata:\n  version: \"" + v + "\"\ndescription: >\n  x\n---\n\n# machinery\n"
+	}
+	if err := os.WriteFile(filepath.Join(current, "SKILL.md"), []byte(skillBody(strings.TrimPrefix(machversion.Version, "v"))), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := reportSkillRelease(&out, current); err != nil {
+		t.Fatalf("current release skill reported as a failure: %v (%s)", err, out.String())
+	}
+	if out.Len() != 0 {
+		t.Fatalf("current release skill produced output: %s", out.String())
+	}
+
+	stale := t.TempDir()
+	if err := os.WriteFile(filepath.Join(stale, "SKILL.md"), []byte(skillBody("0.0.1")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	err := reportSkillRelease(&out, stale)
+	if err == nil {
+		t.Fatal("a skill from another release was accepted")
+	}
+	got := out.String()
+	for _, want := range []string{"  stale    skill at " + stale, "is release 0.0.1", strings.TrimPrefix(machversion.Version, "v"), "run machinery update"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("stale diagnostic %q omits %q", got, want)
+		}
+	}
+
+	unreadable := t.TempDir()
+	out.Reset()
+	if err := reportSkillRelease(&out, unreadable); err == nil {
+		t.Fatal("an unreadable installed skill was accepted")
+	}
+	if got := out.String(); !strings.Contains(got, "ERROR    skill at "+unreadable) || !strings.Contains(got, "run machinery update") {
+		t.Errorf("unreadable diagnostic = %q", got)
 	}
 }

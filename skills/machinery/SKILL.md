@@ -99,6 +99,15 @@ For existing systems, finish the intent classifications before this handoff.
 An unresolved corpus area blocks architecture; missing classification never
 means must-port.
 
+When the event contract arms consumer read completeness, every `(event,
+consumer)` edge owes its own declaration: one `READS{field, ...}` group on a
+payload-matrix row whose consumer column names that exact participant, or a
+`(no reads: <reason>)` waiver in that consumer cell. One consumer's declaration
+never covers a sibling and never transfers its waiver. A row carries exactly one
+complete group, so join a group wrapped across lines, and every row and machine
+stating one edge must agree on the exact field set. Members are ubiquitous
+language, not code symbols. `READS` in ordinary prose stays prose.
+
 Run `machinery check <design> --gate g2,gu` plus each artifact-activated gate,
 and `machinery verify-c4 <design>`. Record the required attestation rows.
 
@@ -108,6 +117,15 @@ Author one machine per lifecycle or operational envelope, its named-unit
 matrix, its oracle, and its formal semantics. Every dependency failure remains
 a transition even when architecture mitigates it. Every fully guarded handler
 states refusal behavior; every resting state states ignored events.
+
+A guard's falsifying-clause vocabulary is one `CLAUSES{...}` group on that
+guard's own row of the named-unit contract table, with at most one `RETIRED{...}`
+group inside the same declaration. Matrix prose that quotes a vocabulary is
+narrative, not a declaration. A declaration binds to its own machine:
+`Alpha.matrix.md` binds only `Alpha.machine.json` and `Alpha.oracle.md`, so two
+machines may reuse one guard name, and a declaration whose oracle rows only a
+sibling machine could supply is an error naming that sibling. A declared guard
+no oracle governs, such as one on a creation edge, owes nothing.
 
 Run `machinery oracle`, `machinery check <design> --gate g3`, and
 `machinery verify-formal <design>`. Read the verification reference for all
@@ -127,11 +145,31 @@ Run the full `machinery check <design>` and, once code exists,
 `machinery check <design> --impl <dir>`. A green design is the RED precondition;
 the locked tests and the same check are the GREEN acceptance boundary.
 
+Executable test assurance is a contract, not a command, in this release. There
+is no `machinery tdd`, `machinery check` accepts no `--store` or
+`--assurance strict`, and no gate reads `design/assurance/`, so a committed
+`plan.json` changes nothing the check reports. Bind tests to oracle rows through
+`Gt-tests` stable ids instead. `Gt` credits static discovery of active test
+references and executes nothing, so commented-out tests, unused declarations and
+uncalled helpers earn no coverage. `docs/test-assurance-contract.md` states which
+surfaces ship and which are the target.
+
 ## Evidence and closure
 
 - Generated artifacts are committed with their sources and never hand-edited.
-- `attestations.yaml` covers the full subject inventory for every judgment.
+- `attestations.yaml` covers the full subject inventory for every judgment, and
+  every row carries an explicit kind. `plan` is a design-time judgment. `current`
+  is a reviewed implementation: it requires a complete implementation subject and
+  `machinery check <design> --impl <root>`, and a subject whose bytes move
+  invalidates the review. `historical` records an acceptance-file judgment and
+  establishes history, not current approval. A design with no implementation yet
+  is plan-only: it warns that the current review is missing and still exits 0.
 - A milestone closes only with `acceptance/M<n>.yaml` bound to a reviewed commit.
+- If a design publication is interrupted, `machinery recover <design-dir>`
+  reports it read-only: expected outputs with content and mode status, journal
+  and residue locations, live-writer status, and the safe recovery decision.
+  `--apply` finalizes only a fully revalidated publication, and a refusal
+  preserves every piece of evidence.
 - Brownfield oracle failures are adjudicated as code-is-truth or
   model-is-truth; neither is silently normalized.
 - Run `machinery check` with zero errors, drift, or warnings before handoff.
@@ -161,6 +199,11 @@ child edits.
 For very large designs, `machinery scale <design>` informs the choice; team
 isolation remains a human decision it cannot infer.
 
+A decomposed parent with no `machines/` still owes its own tests: with `--impl`
+supplied, the default selection runs `Gt` whenever the parent owns relational
+obligations (a policy or isolation annotation, or a committed relational oracle
+under `formal/`). Those obligations belong to the parent, never to a child.
+
 ## Upgrade discipline
 
 Upgrade the binary, skill, roles, plugin manifests, and generated artifacts as
@@ -168,6 +211,15 @@ one versioned change. Run `machinery doctor`; any stale cache, invalid receipt,
 or mismatched skill version is a release blocker. Regenerate artifacts in a
 dedicated upgrade change and classify stable-id churn before design changes.
 
-`machinery update [--version <tag>]` refreshes the binary and recorded direct
-agent homes. Host plugin caches remain host-owned and must also be refreshed
+`machinery update [--version <tag>]` refreshes the binary and the complete
+recorded home, native-target, and plugin plan; rerunning the one-line installer
+over an existing install converges on the same plan. A failed host plugin
+refresh is a returned failure naming the exact retry, not a warning: host plugin
+caches remain host-owned, outside machinery's rollback, and must be refreshed
 through the host plugin manager.
+
+A release publishes a cross-compiled `machinery-windows-amd64` artifact, but the
+one-line installer and `machinery update` refuse Windows, so that asset is placed
+by hand. No native Windows runtime guarantee is claimed: process custody, formal
+verification, and the assurance lanes are unix-only. Use Linux or macOS for the
+full toolchain.
