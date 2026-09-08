@@ -282,10 +282,13 @@ func doctorRunUnlockedTo(targets []string, out io.Writer) (result error) {
 		fmt.Fprintln(out, "install status:")
 		for _, artifact := range artifacts {
 			if err := install.ValidateArtifact(artifact); err == nil {
-				fmt.Fprintf(out, "  ok       [%s] %s at %s\n", artifact.Target, artifact.Label, artifact.Path)
 				if artifact.Label == install.SkillLabel {
-					failures = append(failures, reportSkillRelease(out, artifact.Path))
+					if staleErr := reportSkillRelease(out, artifact.Path); staleErr != nil {
+						failures = append(failures, staleErr)
+						continue
+					}
 				}
+				fmt.Fprintf(out, "  ok       [%s] %s at %s\n", artifact.Target, artifact.Label, artifact.Path)
 			} else {
 				fmt.Fprintf(out, "  ERROR    [%s] %s at %s is invalid: %v -- run machinery install --target %s\n", artifact.Target, artifact.Label, artifact.Path, err, strings.Join(targets, " --target "))
 				failures = append(failures, fmt.Errorf("invalid %s artifact %s: %w", artifact.Target, artifact.Path, err))
@@ -315,12 +318,14 @@ func doctorRunUnlockedTo(targets []string, out io.Writer) (result error) {
 		if filepath.Base(home) == ".claude" {
 			target = "claude"
 		}
-		if err := install.ValidateArtifact(install.Artifact{Target: target, Label: install.SkillLabel, Path: filepath.Join(home, "skills", "machinery")}); err == nil {
-			fmt.Fprintf(out, "  ok       skill at %s/skills/machinery\n", home)
-			failures = append(failures, reportSkillRelease(out, filepath.Join(home, "skills", "machinery")))
-		} else {
+		skillDir := filepath.Join(home, "skills", "machinery")
+		if err := install.ValidateArtifact(install.Artifact{Target: target, Label: install.SkillLabel, Path: skillDir}); err != nil {
 			fmt.Fprintf(out, "  ERROR    skill at %s/skills/machinery is invalid: %v -- run machinery install --target all\n", home, err)
 			failures = append(failures, fmt.Errorf("invalid machinery skill under %s: %w", home, err))
+		} else if staleErr := reportSkillRelease(out, skillDir); staleErr != nil {
+			failures = append(failures, staleErr)
+		} else {
+			fmt.Fprintf(out, "  ok       skill at %s/skills/machinery\n", home)
 		}
 		if err := install.ValidateArtifact(install.Artifact{Target: target, Label: "machinery-fsm-author agent", Path: filepath.Join(home, "agents", "machinery-fsm-author.md")}); err == nil {
 			fmt.Fprintf(out, "  ok       fsm-author role at %s/agents\n", home)
@@ -350,8 +355,14 @@ func doctorRunUnlockedTo(targets []string, out io.Writer) (result error) {
 // digest recorded when they were installed, so a skill left behind by an older
 // release passes it and still teaches an agent superseded procedure. The
 // release the skill declares is the one thing that separates the two cases, and
-// the update command is the exact repair. It returns the failure to record, or
-// nil when the installed skill is current.
+// the update command is the exact repair. It prints nothing and returns nil
+// when the installed skill is current, so the caller reports the plain ok line.
+//
+// The limit is stated rather than hidden: this compares declared releases, not
+// bytes. Two skills that declare the same release but differ in content are
+// indistinguishable here, because the binary carries no copy of the release
+// content and the receipt records the bytes that were installed rather than the
+// release they came from.
 func reportSkillRelease(out io.Writer, skillDir string) error {
 	want := strings.TrimPrefix(machversion.Version, "v")
 	got, err := install.InstalledSkillVersion(skillDir)
