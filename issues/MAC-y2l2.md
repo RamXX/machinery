@@ -7,8 +7,8 @@ type: bug
 parent: MAC-ui8a
 created_at: 2026-09-08T02:21:09Z
 created_by: ramirosalas
-updated_at: 2026-09-08T07:43:02Z
-content_hash: "sha256:d4d8d56626d4e015cecb3d556ed2b10a5fdd54a3c939512d48f4b09bec244da8"
+updated_at: 2026-09-08T09:39:22Z
+content_hash: "sha256:a72d9d28185cb3db1ab5d89cd73182ac1d35ac0612251b11c2d858b977af55d9"
 assignee: dev-MAC-y2l2
 follows: [MAC-3hzt, MAC-r0hy]
 labels: [delivered]
@@ -341,3 +341,426 @@ pvg story merge, no pvg loop setup, no full preflight.
   bit me: an in-process concurrency test proves nothing about locking, and
   reclamation had to track which project locks this process already holds or it
   would have released an arming event's own lock out from under it.
+
+### 2026-09-08T09:39:22Z ramirosalas
+# Code review: MAC-y2l2 (story/MAC-y2l2, tip 74ff6b4, base 4bc4dad)
+
+Read-only review. No tests, builds, or `go` commands were run; no file in the repo was modified.
+Evidence is file:line against the branch tip unless stated otherwise.
+
+Verdict up front: **ACCEPT WITH CHANGES**. The mechanism is well built and the fail-closed
+discipline is preserved. Two findings are material: the fix does not remediate the store the bug
+report was actually filed about, and route retention holds the store-wide lock for an unbatched
+quarantined-deletion loop that can exceed the 10 s lock-wait budget of unrelated governed events.
+
+---
+
+## 1. Correctness of the retention policy
+
+**Verdict: sound in mechanism, but the reclamation predicate does not cover the reported
+incident.**
+
+The bound itself is right. `boundHookStateStore` (retention.go:196) runs on the arming write path,
+reads the store, and compacts only when `len(entries) > hookStateDirRetentionCeiling`
+(retention.go:207). Compaction targets 256 (retention.go:49), so the post-write count is always at
+or under 512, an eighth of the 4096 fail-closed limit (hook.go:71). Bytes follow from entries by
+construction, as documented (retention.go:28-33). The constants are documented in source and in
+docs/claude-plugin.md:196-201. AC 1a-1d hold.
+
+Reclamation safety (AC 1e) is genuinely conservative:
+
+- Only a generation whose ledger parses and whose recorded root is provably absent is reclaimable
+  (`hookStateGenerationLooksDead` retention.go:373, `hookStateRootVanished` retention.go:472).
+- `hookStateRootVanished` accepts **only** `os.ErrNotExist` (retention.go:477). EACCES on the root
+  or its parent, ESTALE on a dead NFS mount, EIO, ELOOP all fall through to "not vanished" and the
+  obligation is retained. A governed repo whose root is temporarily unreadable through permissions
+  or a broken network mount is therefore safe.
+- A generation with no ledger, a corrupt ledger, a legacy ledger with no root, or any durable temp
+  or noncanonical entry bound to its base is retained (`groupHookStateGenerations`
+  retention.go:344-350, `hookStateEntryEvidence` retention.go:296, the `generation.blocked ||
+  !generation.ledger` guard at retention.go:263).
+- Ordering is oldest-ledger-first (retention.go:352-358), so a freshly armed obligation is the last
+  candidate a bounded pass would reach. That materially shrinks the residual window below what the
+  story's residual note claims.
+
+**The residual that is real.** An unmounted volume path (`/Volumes/X` after eject) does not exist,
+so it reads as dead. The documented mitigation, "the next governed edit re-arms the obligation for
+the whole tree", does not cover the ordering that matters: edits happen, the volume is ejected, other
+repos push the store past 512, the volume is remounted, and the session's Stop then runs with no
+obligation and no gate. That is a fail-open, not a re-arm. It is narrow (the root must vanish while a
+session is live and the store must be over its ceiling at that moment) and the oldest-first ordering
+makes it narrower still. Accepting it is defensible; the residual text in docs/claude-plugin.md:214
+and retention.go:466-471 should say "the gate can be skipped for that session", not only "the next
+edit re-arms", because the current wording understates it.
+
+**The finding that blocks AC 2a as written.** Reclamation requires the `root` line, and only this
+version writes it (hook.go:3455). A ledger written by 0.6.11 has no root line, so `record.root == ""`,
+so `hookStateRootVanished("")` returns false at retention.go:474 and the generation is retained
+forever. The tests confirm this is intended: `TestCompactionNeverReclaimsLiveCorruptOrCrashEvidence
+Generations` fabricates `"revision 1\ndesign\n"` and asserts the "legacy ledger without a recorded
+root" survives (retention_test.go:253, :281).
+
+Consequence: **a store actually bricked by an older version does not heal.** Every one of its 4096
+entries is a rootless ledger for a deleted temp root, and none is reclaimable. Self-repair compacts
+zero, `doctor --repair` reclaims zero, and the machine stays bricked until a manual prune, which is
+exactly the remediation this story exists to remove. The user's own live store (153 entries, written
+by 0.6.11) is in that state today. A rootless ledger for a *live* project does get its root line back
+on the next governed event in that project (hook.go:3489 `if root != ""`), but a rootless ledger for a
+dead root is never rewritten, so precisely the garbage is permanently unreclaimable.
+
+Every proof of AC 2a and AC 3a uses new-format fixtures: `writeDeadGenerations` writes
+`hookStateRootLine(deadRoot)` (retention_test.go:68), and the doctor test replicates a ledger produced
+by the new binary (diag_test.go:~525). So the negative test is real for the format this version
+writes, and untested for the format the incident produced.
+
+The docs assert the healed case outright: "A store that is already at or above the fail-closed limit,
+left by an older version, repairs itself" (docs/claude-plugin.md:207). That statement is false as
+written and it sits on the mission-critical path, where a user reading it will not run the manual
+prune that they still need.
+
+**Required change (docs, minimum):** correct docs/claude-plugin.md:207 and the AC 2a claim to say
+self-repair applies to ledgers this version wrote, and give the explicit one-time remediation for a
+pre-upgrade store (remove `<digest>.state` files, never the directory, which the doc already says
+correctly at :219).
+
+**Owner ruling wanted (code, optional):** whether `doctor --repair` should get an explicit,
+non-default mode that discards rootless ledgers. It is a deliberate fail-open (each affected project
+re-arms on its next governed edit) and therefore not something to add silently, but without it the
+0.6.11 -> 0.7.x upgrade path still requires a manual prune.
+
+## 2. Witness-checked but not quarantined reclamation
+
+**Verdict: the trade is justified; the evidence loss is nil for the class of file being removed.**
+
+`removeWitnessedHookStateFile` (retention.go:437) reads twice, compares the witness, removes through
+the retained `os.Root`, and proves absence afterwards. It is materially the same integrity check as
+the quarantined path minus restorability.
+
+What a quarantine buys is a restorable intermediate state for an *interrupted* deletion. A generation
+that reaches this path has been proved dead twice, the second time under the project's own state lock
+(retention.go:400-431), and the removal is routes-first, ledger-last (retention.go:419-430), so an
+interrupted pass leaves the obligation readable and reclaimable again. There is nothing an audit could
+recover from a quarantine of a ledger whose only content is a touch class plus a path that no longer
+exists. A completed malicious or mistaken deletion is unrecoverable with or without quarantine, so the
+quarantine does not defend the adversarial case either.
+
+The 137 s vs 1.5 s figure justifies the one-time repair. It also justifies the steady state, which the
+delivery does not spell out: a routine 512 -> 256 pass removes ~256 files, which is ~16 s quarantined
+against ~0.1 s witnessed, and 16 s is already past the 10 s `hookStateLockWaitLimit` that every other
+governed event waits on. So the quarantine was not viable on the write path at all, not just at the
+4096 limit. That is a stronger argument than the one made and it should be the one in the comment at
+retention.go:391-397.
+
+One gap worth stating: nothing anywhere records *which* roots were reclaimed. `StateReport` gives
+counts (retention.go:591), the write path is silent (correct for a hook). Acceptable for 0.7.1; a
+future `doctor --repair --verbose` naming reclaimed roots would close it.
+
+## 3. Ledger format change
+
+**Verdict: a real one-way compatibility break, correctly disclosed, with a failure mode that is a
+brick until the user deletes files.**
+
+- New binary reads an old ledger: fine. No `root` line means `record.root == ""` (hook.go:3562 case
+  is simply not taken), the record parses, governance is unaffected, and only reclamation is refused.
+- Old binary reads a new ledger: `parseHookStateRecord` at 4bc4dad has no `root` case, so the line
+  falls to `default:` and the ledger is "corrupt or noncanonical". Every read of that project's state
+  then fails, and the hook fails closed. That is a **brick for that project**, not a warning: shell
+  and write tools are denied until the `<digest>.state` file is removed.
+
+Mixed-binary exposure is real but bounded by the store being per-user-home. The two cases that matter:
+
+- **CI pinned at 0.6.11 and a workstation at 0.7.x** with no shared home: no exposure. Different
+  stores, no interaction. This is the common case.
+- **Two checkouts sharing one per-user state dir** with different binaries (a `~/.local/bin`
+  machinery at 0.7.x and a repo-local or plugin-cached 0.6.11): full exposure. Whichever project the
+  new binary arms becomes unreadable to the old one. The plugin-cache version skew guard
+  (README.md:655) catches the plugin path, not a hand-placed older binary.
+- **Downgrade** (`machinery update --version v0.6.11` after running 0.7.x): every project armed by
+  0.7.x is bricked for that user until the files are removed.
+
+The break is stated in docs/claude-plugin.md:216-220 with the correct remediation and the correct
+warning not to remove the directory. That is the right disclosure. The parser is as strict as claimed:
+exactly one root line, position-bound by `classIndex != 0 || routeStarted || pendingStarted ||
+record.root != ""` (hook.go:3563), lowercase hex of a nonempty absolute cleaned path
+(hook.go:3466-3476), and nine noncanonical shapes are covered by
+`TestHookStateLedgerRejectsEveryNoncanonicalProjectRootLine` (retention_test.go:100). AC 4c holds.
+
+**Required change:** the downgrade break is user-visible and currently lives only in
+docs/claude-plugin.md. It belongs in the CHANGELOG `[Unreleased]` section as a compatibility note.
+See finding 8.
+
+## 4. Self-repair at 4096 and `doctor --repair`
+
+**Verdict: the original bug (doctor cannot remediate its own state) is fixed for new-format
+ledgers. No path deletes the marker or the store and then fails closed.**
+
+- `compactHookStateDir` enumerates with `dirscan.Read(dir, hookStateDirRepairMaxEntries)` directly
+  (retention.go:230), bypassing the 4096 ceiling. It never goes through the bounded reader, so it
+  cannot fail on the state it exists to repair.
+- Nested inventories inside a compaction (interrupted-deletion recovery at retention.go:412) are
+  covered by `hookStateRepairDepth` (retention.go:69), which raises the ceiling
+  (`hookStateDirEntryCeiling` retention.go:172) and suppresses the shared-lock reacquisition
+  (retention.go:150). Both are necessary and both are correct.
+- `countHookStateEntries` (retention.go:645) also reads under the repair ceiling, so a plain
+  `doctor` report states the real count of an over-limit store instead of failing on it. AC 2c holds
+  and `TestStateReportStatesTheStoreAndRepairsItAboveTheLimit` proves the entry count is identical
+  before and after a non-repair report (retention_test.go:~330).
+- `StateReport` returns before touching anything when the store is absent (retention.go:557), so
+  neither path creates the store or the marker. `TestStateReportNeverCreatesTheStore` asserts both
+  (retention_test.go:~470). AC 2e holds.
+- No path removes the marker or the store directory. Compaction removes only `<digest>.state` and
+  `<digest>.state.route-<digest>.json` entries it has proved dead; `.store-identity`
+  (hook.go:2021) classifies as `hookStateEntryUnrelated` (retention.go:283) and is never a candidate.
+
+**One dependency worth stating.** `compactHookStateDir` calls `validatedStateDirectoryBinding()`
+(retention.go:242), which requires a present, non-legacy initialization marker (hook.go:2532-2536).
+If the marker is missing or the directory identity has drifted, `doctor --repair` reports ERROR and
+cannot compact. In that state the hook already fails closed for the same reason, so repair could not
+have helped, but the diagnostic will say "could not be compacted" rather than naming the marker
+problem. Worth one line in the report or the doc so a user is not left chasing retention when the
+real fault is the binding.
+
+**Minor:** `StateReport` never returns a non-nil error on any path (every branch prints and returns
+`nil`), so the error branch in `reportHookStateStore` (diag.go:355) is unreachable and untested.
+Either drop the error return or make the resolve failure at retention.go:551 return it.
+
+## 5. Locking
+
+**Verdict: no deadlock or ordering hazard found in production paths. One latent recursion hazard,
+one inaccurate comment, and one lock-hold-time regression (see finding 6 of this section).**
+
+Lock order is consistent:
+
+- Arming write: project state lock (held by caller) -> store shared (`readHookStateDirLocked`
+  retention.go:145) -> store exclusive (`retainProjectRouteSnapshots` retention.go:527, and
+  `flush` retention.go:257) -> marker lock (via `readBoundedHookStateFile` hook.go:2518).
+- Compaction: marker lock taken and released inside `validatedStateDirectoryBinding` *before* the
+  store lock (retention.go:242 vs :257), then store exclusive, then per-project locks
+  **non-blocking** (`filelock.Acquire` retention.go:406, contended -> skip at :408).
+
+Because compaction never *waits* on a project lock, the ABBA cycle that project->store and
+store->project would otherwise create cannot close. I checked the counterpart directions
+specifically: `ensureStateDir` holds the marker lock (hook.go:2171) and does not enumerate the store
+(it calls `ensureStateDirectoryIdentity`, `readStateInitializationMarker`,
+`writeStateInitializationMarker`, none of which reach `dirscan`), so nothing takes the store lock
+while holding the marker lock. `removeHookFileWitness` and `readBoundedHookRootFile` do not
+enumerate either, so `retainProjectRouteSnapshots` holding the store exclusive lock never
+re-enters the shared acquisition.
+
+TOCTOU between screening and removal is closed correctly. `hookStateGenerationLooksDead` is an
+unlocked screen (retention.go:373) and the comment says so; `reclaimHookStateGeneration` re-reads
+the ledger and re-proves root absence *under the project's own state lock*
+(retention.go:414-418), which is the same scope `acquireStateLock` takes (hook.go:2960). An absent
+root cannot be canonicalized, so no other process can be arming that generation while the lock is
+held. This is right.
+
+**Per-process lock tracking (retention.go:88-116, hook.go:2977-2986):** correct and proved by
+`TestCompactionNeverReclaimsAGenerationThisProcessHasLocked` (retention_test.go:~415), including
+the negative half (releasing the lock makes the same generation reclaimable). Scope strings match:
+`statePath` builds `filepath.Join(dir, stateFileName(absRoot))` (hook.go:1897-1915) and
+`generation.base` is `<digest>.state` under the same `dir`, so `ledgerPath + ".session"` is
+byte-identical to the arming scope.
+
+**Comment inaccuracy on a mission-critical path.** Three comments justify the tracking with "POSIX
+record locks belong to the process, not to the acquisition: taking this scope again here would
+replace the lock" (retention.go:401-405, hook.go:2977, retention_test.go:~407). That is true only
+on the `fcntl` build (`//go:build aix || (solaris && !illumos)`, fcntl_unix.go:1). darwin, linux and
+every other unix machinery supports use `flock` (flock_unix.go:1), where a second acquisition on a
+new fd conflicts and returns contended, and the `fcntl` build additionally has an in-process
+reservation map (fcntl_unix.go:23-32) that refuses the second acquisition outright. So the stated
+hazard does not exist on the platforms this ships to, and on the platform where record locks do
+apply it is already prevented one layer down. Keep the mechanism (it is cheap and it makes the
+invariant explicit), but fix the comments: they justify a guard on a premise that is false where it
+runs.
+
+**Latent recursion.** If `readHookStateDir` were ever to return `ErrTooManyEntries` under the
+1,048,576-entry repair ceiling while a compaction `flush` holds the store exclusive lock (via
+`recoverHookDeletionQuarantines` at retention.go:412), the self-repair branch would call
+`compactHookStateDir` recursively and its own `flush` would block on a store lock this process
+already holds, for 10 s, then fail. Unreachable in practice (>1M entries), but a one-line guard
+(`if hookStateRepairDepth.Load() > 0 { return nil, hookStateOverLimit(...) }` at the top of the
+self-repair branch, retention.go:129) removes the class entirely.
+
+**Lock-hold-time regression, and the one change I would require in this file.**
+`retainProjectRouteSnapshots` takes the store-wide **exclusive** lock (retention.go:527) and then
+runs an unbatched loop of *quarantined* removals (retention.go:534-543 calling
+`removeHookFileWitness`, hook.go:3794). Compaction explicitly batches at 64 for exactly this reason
+and says so (retention.go:57-60, :250-253). Route retention does not. At the delivery's own measured
+63 ms per quarantined removal, ~158 surplus snapshots exceed the 10 s `hookStateLockWaitLimit` that
+`readHookStateDirLocked` waits on (retention.go:151), at which point governed events in **unrelated
+repositories** fail closed and deny their tool call. Surplus was unbounded before this change, so a
+long-lived project on an existing store can well be carrying hundreds of route snapshots, and the
+first governed event after the upgrade pays all of it at once.
+
+Required: bound the per-write surplus removal the same way compaction bounds a batch, either by
+releasing and reacquiring the store lock every N files or by capping how many surplus snapshots one
+write reclaims (the bound is per-project and converges over a few events either way).
+
+**Also worth stating:** the arming write path now performs two additional whole-store enumerations
+per governed event, `routeStatePaths` inside retain (retention.go:485 -> hook.go:1939 ->
+`readHookStateDir`) and `boundHookStateStore`'s own read (retention.go:203). At 512 entries this is
+cheap and the delivery's per-event timing is unchanged, but it should be in the docs as a stated cost
+of the bound.
+
+## 6. Tests
+
+**Verdict: substantive, with three gaps.**
+
+What is real:
+
+- **Negative before / positive after.** `TestStoreAtTheEntryLimitFailsClosedAndThenSelfRepairs`
+  (retention_test.go:~190) asserts `dirscan.Read(dir, hookStateDirMaxEntries)` returns
+  `ErrTooManyEntries` at the limit, then, with the process's single repair attempt deliberately
+  spent via `beginHookStateAutoCompaction()`, asserts a real governed event returns
+  `"permissionDecision":"deny"` and that the diagnostic names the store and
+  `machinery doctor --repair`. It then resets the flag to simulate a fresh hook process and asserts
+  the same event is allowed and the just-armed live obligation survives. That is a genuine
+  before/after, not a shape assertion.
+- **The bound is asserted, not just exercised.**
+  `TestHookStateStoreStaysBoundedAcrossThousandsOfInvocations` (retention_test.go:~155) runs 2000
+  real governed events against ephemeral roots and fails on `peak > hookStateDirRetentionCeiling`
+  and on `count >= hookStateDirMaxEntries`. The bound is the assertion.
+- **The fail-open direction is tested.** `TestStoreFullOfLiveObligationsStaysIntactAndStillArms`
+  (retention_test.go:~440) fills the store with obligations for a root that *exists*, and asserts
+  nothing is reclaimed and governance still works. This is the test that matters most and it is
+  present.
+- **Cross-process exclusion.** `TestCompactionExcludesConcurrentEnumerationInAnotherProcess`
+  (retention_test.go:~355) re-executes the test binary and asserts the parent's enumerations never
+  fail while the child compacts 1200 generations. Real subprocess, real contention.
+
+Sandbox: **yes, on every path I could find.** `internal/hook/TestMain` (testmain_test.go:26)
+redirects HOME, USERPROFILE, all five XDG vars, APPDATA/LOCALAPPDATA and TMPDIR/TMP/TEMP into one
+private root before any test runs, and honors an inherited root so the compaction child shares its
+parent's store (testmain_test.go:29-33). `TestHookTestStateStaysInsideItsOwnSandbox`
+(testmain_test.go:~97) is a standing guard that asserts both the resolved store path and the
+initialization marker path are inside that root, which covers the darwin case where
+`os.UserConfigDir` ignores XDG and derives from HOME. `cmd/machinery/TestMain`
+(cmd/machinery/testmain_test.go:28) already did the same, and the new doctor test additionally sets
+HOME/XDG_CONFIG_HOME per-test. One caveat: `cmd/machinery/TestMain` deliberately skips the
+HOME/TMPDIR redirect when the binary is re-invoked as a checker fixture
+(cmd/machinery/testmain_test.go:87-89); no doctor path runs in that mode, and `StateReport` never
+creates the store, so the worst case there is a read of the real store, not a write.
+
+Gaps:
+
+1. **The negative test does not cover the format the incident produced.** Every over-limit fixture
+   is written with `hookStateRootLine` (retention_test.go:68). There is no test that a store of
+   *rootless* 0.6.11 ledgers is reclaimed, because it is not. Add a test that pins the actual
+   behavior (a store of rootless dead ledgers is retained and the hook still fails closed), so the
+   limitation is encoded rather than implied. That test will also prevent someone later "fixing" it
+   silently into a fail-open.
+2. **The 2000-invocation test samples the count 1 in 25** (`if i%25 != 0 && i != invocations-1`,
+   retention_test.go:~176). The bound is enforced after every write so the sampled peak is sound,
+   but the sampling is not what makes it sound and the test does not say so.
+3. **Route retention's downstream effect is untested.** `TestRouteSnapshotsAreBoundedPerProjectRoot`
+   proves at most 8 snapshots survive and the just-written one always does, but no test runs a Stop
+   for a session whose snapshot was pruned. That session now falls into
+   `loadRouteSnapshot`'s recovery branch (hook.go:2899-2927), which blocks on divergent configs
+   where it previously matched exactly. Identical configs recover identically, so the risk is small,
+   but it is a new fail-closed path introduced by an 8-snapshot policy and it should have one test.
+
+The two changed existing tests are justified and both got stronger, as claimed. The
+`diag_test.go` change is a mechanical argument addition with no assertion changed. The socket-marker
+case (hook_test.go:3434-3451) was genuinely skipping on every run because a Unix-domain socket
+address is capped near 104 bytes; binding under a short base and renaming into place makes the case
+execute, and `t.Fatalf` replaces `t.Skipf` on the bind. Two notes: the case can *still* skip if the
+rename fails (hook_test.go:~3449), so "0 skipped tests" is conditional, not structural; and
+`shortSocketBase = "/tmp"` (shortsocket_unix_test.go:8) hardcodes a path outside the sandbox this
+same story introduced. It is test-only and cleaned up, but it is the one place in the branch that
+contradicts its own thesis, and it will fail on a host with a non-writable `/tmp`. Deriving it from
+the pre-sandbox `os.TempDir()` captured in `TestMain` would be consistent.
+
+Coverage: 77.6% for `internal/hook` is below the 80% floor. The developer discloses that the package
+has never met it and that retention.go's uncovered statements are IO-failure branches. Not introduced
+here, but 736 lines of new mission-critical code went in without a per-file coverage figure; worth
+asking for retention.go's own number.
+
+## 7. House style and hygiene
+
+**Verdict: clean.**
+
+- No em dashes anywhere in the diff (0 occurrences across all added and removed lines).
+- No emoji.
+- No "honest", "truthful", "transparent" self-labeling in code, comments, docs, or commit messages.
+  (The word "honest" appears once in the nd delivery comment, "the honest cost of the proof", which
+  is conversation with the PM, not generated content. Still better dropped from the habit.)
+- No TODO/FIXME/XXX. The only `fmt.Fprintln(os.Stderr, ...)` calls are `TestMain` bootstrap
+  diagnostics and the compaction child's failure reporting, which are correct uses.
+- Commit messages are substantive and explain cause before change. Each carries the required
+  `Claude-Session:` trailer.
+- Comments are accurate with the one exception in finding 5 (the POSIX record lock premise) and
+  the one in finding 1 (the residual understates the Stop-time consequence).
+- Naming and structure follow the file's existing conventions. `retention.go` at 697 lines joins the
+  repo's pre-existing `file_loc` warning list rather than introducing a new class of warning.
+
+## 8. Merge risk onto current main (5c35463: 24ac158 + 5c35463)
+
+Branch files that main also changed since 4bc4dad:
+
+| File | Conflict |
+| --- | --- |
+| `cmd/machinery/diag.go` | **Yes, textual.** Both add a helper immediately before the `// reportCheckerBinaries` comment: main adds `reportSkillRelease` (main's diag.go:352-378), the branch adds `reportHookStateStore` (branch diag.go:352-364). Same insertion anchor. Resolution is trivial: keep both. Additionally the branch changes the `doctorRunTo`/`doctorRunUnlockedTo` signatures (diag.go:245, :269) while main edits the body at :285 and :321; those are different lines and should auto-merge, but the whole function needs re-reading after resolution. |
+| `cmd/machinery/diag_test.go` | **Yes, textual, twice.** Both append a new test at EOF after `copyDoctorFixture`, and both add an import (branch: `fmt`; main: `machversion`). Both resolutions are keep-both. |
+| `README.md` | **No.** The branch edits the "### Prerequisites" paragraph at ~455-460; main's edits start at 484. Disjoint hunks. |
+
+**Semantic conflicts: none.** Main's change makes doctor fail on a stale installed skill; the branch
+makes doctor fail on an over-limit hook state store. They add independent entries to the same
+`failures` slice and compose correctly. `internal/gates`, `internal/install`, `internal/processscope`
+and the examples/golden churn on main have no code-path overlap with hook state, dirscan error
+wrapping, or the doctor command.
+
+**Behavior change to flag for the release, not a conflict.** `machinery doctor` now exits nonzero
+whenever the hook state store is at or above 4096, or whenever the store path cannot be resolved or
+inspected (`reportHookStateCount` returns false at retention.go:610; `StateReport` returns false at
+retention.go:553, :562, :566). The "above the ceiling but below the limit" case correctly returns
+true (retention.go:615), so the common state does not newly fail. But any CI or Makefile target that
+treats `machinery doctor` as a gate now has a new failure source, and a container with no resolvable
+HOME will now fail doctor where it may have passed. That belongs in the CHANGELOG.
+
+**Missing release artifact.** `CHANGELOG.md` has an `[Unreleased]` section (CHANGELOG.md:6) and the
+branch adds nothing to it, despite shipping a new user-visible flag (`doctor --repair`), a doctor
+exit-status change, and a one-way ledger format break with a manual remediation. Required before
+this goes into a release.
+
+---
+
+## Verdict
+
+**ACCEPT WITH CHANGES.**
+
+Required before merge:
+
+1. **Correct the self-repair claim.** docs/claude-plugin.md:207 states that a store left over-limit
+   by an older version repairs itself. It does not: pre-0.7.x ledgers carry no `root` line and are
+   permanently unreclaimable (retention.go:474). Rewrite that paragraph to scope self-repair to
+   ledgers this version wrote, and state the one-time manual remediation for a pre-upgrade store
+   (remove `<digest>.state` files, keep the directory). Same correction to the AC 2a wording in the
+   story.
+2. **Batch or cap route-retention surplus removal.** `retainProjectRouteSnapshots` (retention.go:527)
+   holds the store-wide exclusive lock across an unbatched loop of 63 ms quarantined removals. Past
+   ~158 surplus snapshots it exceeds the 10 s lock-wait budget and denies governed tool calls in
+   unrelated repositories. Apply the same batching rationale compaction already states at
+   retention.go:57-60.
+3. **Fix the record-lock comments.** retention.go:401-405, hook.go:2977 and retention_test.go:~407
+   justify the per-process lock tracking with `fcntl` semantics that do not apply on darwin or linux
+   (flock_unix.go:1). Keep the guard, restate the reason.
+4. **Strengthen the residual wording.** retention.go:466-471 and docs/claude-plugin.md:214 say the
+   next governed edit re-arms the obligation. Add that if no edit follows before Stop, that session's
+   gate does not run.
+5. **Add a CHANGELOG `[Unreleased]` entry** covering `doctor --repair`, the doctor exit-status
+   change, and the ledger downgrade break with its remediation.
+6. **Add the missing negative test** pinning that a store of rootless legacy ledgers is retained and
+   still fails closed, so the limitation cannot be silently converted into a fail-open later.
+
+Recommended, not blocking: guard the recursive-compaction path (retention.go:129); derive
+`shortSocketBase` from the pre-sandbox temp dir instead of hardcoding `/tmp`; add one test for a Stop
+whose route snapshot was pruned by the 8-snapshot bound; drop or wire up `StateReport`'s dead error
+return.
+
+**Release placement: 0.7.1, with the six changes above applied.** No owner design ruling is needed to
+ship it. The mechanism is correct, the fail-closed semantics are preserved, and the one deliberate
+fail-open (absent root means dead) is narrow, ordered last by oldest-first reclamation, and
+documented. The single question that does want an owner ruling is whether `doctor --repair` should
+gain an explicit, non-default mode that discards rootless legacy ledgers. That is a real fail-open
+decision and it should not be made by a developer or a reviewer; it can also wait, because with
+change 1 applied the user has a correct manual remediation for the only store that needs it.
