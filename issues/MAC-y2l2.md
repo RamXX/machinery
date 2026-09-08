@@ -7,8 +7,8 @@ type: bug
 parent: MAC-ui8a
 created_at: 2026-09-08T02:21:09Z
 created_by: ramirosalas
-updated_at: 2026-09-08T07:41:46Z
-content_hash: "sha256:ced2353e2c057d35d38bb1f9670652bf06f513ee767b34f4e5d4a5cc0bd89999"
+updated_at: 2026-09-08T07:41:47Z
+content_hash: "sha256:a0b3a77e2ed152d4eae01d01cda6a152bf6b8e31609301fea1f867e84d60f3d3"
 assignee: dev-MAC-y2l2
 follows: [MAC-3hzt, MAC-r0hy]
 labels: [delivered]
@@ -96,6 +96,16 @@ trade is stated rather than avoided.
 
 
 ## Notes
+
+
+## nd_contract
+status: delivered
+
+### evidence
+- Transitioned via pvg story deliver on 2026-09-08.
+
+### proof
+- [ ] Developer evidence block must remain authoritative above this contract.
 
 
 ## History
