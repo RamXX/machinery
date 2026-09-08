@@ -211,7 +211,7 @@ func TestWithScopeRejectsNilArguments(t *testing.T) {
 		}()
 		f()
 	}
-	mustPanic("nil context", func() { WithScope(nil, s) })
+	mustPanic("nil context", func() { WithScope(nil, s) }) //nolint:staticcheck // SA1012: nil context is the assertion under test
 	mustPanic("nil scope", func() { WithScope(context.Background(), nil) })
 }
 

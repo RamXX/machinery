@@ -157,7 +157,7 @@ func TestServeInternalRefusals(t *testing.T) {
 }
 
 func TestInheritedInternalIOContextAndClaims(t *testing.T) {
-	asCode(t, func() error { _, _, err := InheritedInternalIO(nil); return err }(), CodeInvalidSchema)
+	asCode(t, func() error { _, _, err := InheritedInternalIO(nil); return err }(), CodeInvalidSchema) //nolint:staticcheck // SA1012: nil context is the assertion under test
 	asCode(t, func() error { _, _, err := InheritedInternalIO(context.Background()); return err }(), CodeInvalidSchema)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -204,7 +204,7 @@ func TestInheritedInternalIOContextAndClaims(t *testing.T) {
 }
 
 func TestInheritedCapabilityClaims(t *testing.T) {
-	asCode(t, func() error { _, err := InheritedCapability(nil); return err }(), CodeInvalidSchema)
+	asCode(t, func() error { _, err := InheritedCapability(nil); return err }(), CodeInvalidSchema) //nolint:staticcheck // SA1012: nil context is the assertion under test
 	asCode(t, func() error { _, err := InheritedCapability(context.Background()); return err }(), CodeInvalidSchema)
 	t.Setenv(EnvCapability, "")
 	asCode(t, func() error { _, err := InheritedCapability(mustCtx()); return err }(), CodeCustodyError)
@@ -244,7 +244,7 @@ func TestOpenOptionsValidation(t *testing.T) {
 	}
 	scratch := t.TempDir()
 	good := Options{HelperExecutable: exe, HelperDigest: dg, ScratchRoot: scratch, Limits: Limits{Jobs: 2}}
-	asCode(t, func() error { _, err := Open(nil, good); return err }(), CodeInvalidSchema)
+	asCode(t, func() error { _, err := Open(nil, good); return err }(), CodeInvalidSchema) //nolint:staticcheck // SA1012: nil context is the assertion under test
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	asCode(t, func() error { _, err := Open(ctx, good); return err }(), CodeCanceled)
