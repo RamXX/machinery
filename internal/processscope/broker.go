@@ -102,6 +102,7 @@ type broker struct {
 	wallDeadline   time.Time
 	cleanupArmed   bool
 	cleanupPending time.Time
+	cleanupPasses  int
 	scopes         map[string]*scopeNode
 	jobs           map[string]*job
 	jobOrder       []string
@@ -179,9 +180,26 @@ func (b *broker) newScope(parent *scopeNode) *scopeNode {
 	return n
 }
 
-func (b *broker) armCleanupLocked() {
-	b.cleanupPending = NextCleanupDeadline(time.Now(), b.cleanupArmed, b.cleanupPending, b.limits.CleanupMS)
+// beginCleanupPassLocked arms the broker-wide cleanup grace for one cleanup
+// pass and must be paired with endCleanupPass. The grace bounds a pass, not
+// the lifetime of a broker that may serve an unbounded sequence of scope
+// closes: a pass entered while another is still in flight shares the grace
+// already armed, so it never renews underneath the jobs it is bounding, while
+// a later independent pass arms a fresh grace of the same shipped size.
+func (b *broker) beginCleanupPassLocked() {
+	b.cleanupPending = NextCleanupDeadline(time.Now(), b.cleanupPasses > 0, b.cleanupPending, b.limits.CleanupMS)
 	b.cleanupArmed = true
+	b.cleanupPasses++
+}
+
+// endCleanupPass releases one cleanup pass. The grace stays recorded for the
+// ledger; it simply stops bounding retirements once no pass is in flight.
+func (b *broker) endCleanupPass() {
+	b.mu.Lock()
+	if b.cleanupPasses > 0 {
+		b.cleanupPasses--
+	}
+	b.mu.Unlock()
 }
 
 func runBroker(io InternalIO, args []string) int {
@@ -300,9 +318,10 @@ func runBroker(io InternalIO, args []string) int {
 	}
 	b.mu.Lock()
 	b.markClosingLocked(b.scopes["root"])
-	b.armCleanupLocked()
+	b.beginCleanupPassLocked()
 	b.mu.Unlock()
 	b.retireAll()
+	b.endCleanupPass()
 	b.writeLedger()
 	conn.Close()
 	st.owner.Close()
@@ -418,12 +437,19 @@ func (b *broker) dispatch(ch *channel, payload []byte, files []*os.File) bool {
 		}
 		b.mu.Lock()
 		b.markClosingLocked(node)
-		b.armCleanupLocked()
+		b.beginCleanupPassLocked()
+		// The scope table is guarded state, and another channel goroutine may
+		// be registering a child scope at this instant. Decide whether this
+		// close ends the broker while the lock is held; reading the table
+		// afterwards is a concurrent map access that kills the broker
+		// outright and strands every later request as a stale capability.
+		isRoot := node == b.scopes["root"]
 		b.mu.Unlock()
 		b.retireSubtree(node)
+		b.endCleanupPass()
 		report := b.buildReport(node)
 		_ = ch.send(msgClosed{T: "closed", Report: report})
-		return node == b.scopes["root"]
+		return isRoot
 	case "childreq":
 		var m msgChildReq
 		if err := json.Unmarshal(payload, &m); err != nil {
@@ -738,6 +764,27 @@ func (b *broker) forwardResult(j *job) {
 	})
 }
 
+// retireJob terminates and reaps one job under its own retirement budget.
+//
+// The cleanup grace is accounted per retirement, not as one absolute instant
+// shared by every job the broker ever registers. Each retirement is allowed
+// the shipped per-job budget (the selected cleanup_ms, capped at the shipped
+// cleanup cap and at retireWaitCap) measured from the moment that retirement
+// starts. While a cleanup pass is in flight the budget is additionally clamped
+// by the grace that pass was armed with, so the pass as a whole cannot outlive
+// its grace. Retirements outside any pass, such as a single cancelled job,
+// are bounded by their own budget alone; a grace belonging to a pass that has
+// already ended binds nothing.
+//
+// Total cleanup time stays bounded. A broker admits at most limits.Jobs live
+// jobs (shipped cap 4), so a pass retires at most that many, its waiting is
+// bounded as a whole by the armed grace, and each reap is bounded by the hard
+// reap window: grace + limits.Jobs * hardReapWindow, independent of how many
+// jobs the run retired before this pass.
+//
+// The budget is exceeded when this retirement did not terminate and reap the
+// job within its own budget. Wall time that the run as a whole has already
+// spent never exhausts it.
 func (b *broker) retireJob(j *job) {
 	b.mu.Lock()
 	if j.retired {
@@ -745,32 +792,33 @@ func (b *broker) retireJob(j *job) {
 		return
 	}
 	j.retired = true
-	armed := b.cleanupArmed
+	inPass := b.cleanupPasses > 0
 	pending := b.cleanupPending
 	cleanupMS := b.limits.CleanupMS
 	b.mu.Unlock()
 
-	var waitUntil time.Time
-	if armed {
-		waitUntil = pending
-	} else {
-		w := cleanupMS
-		if w > limitsCaps.CleanupMS {
-			w = limitsCaps.CleanupMS
-		}
-		if w < 1 {
-			w = 1
-		}
-		waitUntil = time.Now().Add(time.Duration(w) * time.Millisecond)
+	start := time.Now()
+	w := cleanupMS
+	if w > limitsCaps.CleanupMS {
+		w = limitsCaps.CleanupMS
 	}
-	if cap := time.Now().Add(3 * time.Second); waitUntil.After(cap) {
-		waitUntil = cap
+	if w < 1 {
+		w = 1
+	}
+	waitUntil := start.Add(time.Duration(w) * time.Millisecond)
+	if capAt := start.Add(retireWaitCap); waitUntil.After(capAt) {
+		waitUntil = capAt
+	}
+	if inPass && waitUntil.After(pending) {
+		waitUntil = pending
 	}
 
 	_ = b.groupSignal(j.pgid, int(syscall.SIGTERM))
-	select {
-	case <-j.resultCh:
-	case <-time.After(time.Until(waitUntil)):
+	if wait := time.Until(waitUntil); wait > 0 {
+		select {
+		case <-j.resultCh:
+		case <-time.After(wait):
+		}
 	}
 	_ = b.groupSignal(j.pgid, int(syscall.SIGKILL))
 	j.terminated = true
@@ -854,7 +902,7 @@ func (b *broker) buildReport(node *scopeNode) CleanupReport {
 			rep.Status = StatusCleanupFailed
 		}
 		if j.budgetExceed {
-			rep.Diagnostics = append(rep.Diagnostics, Diagnostic{Code: CodeTimeout, Subject: j.id, Message: "shared cleanup budget exhausted before retirement completed"})
+			rep.Diagnostics = append(rep.Diagnostics, Diagnostic{Code: CodeTimeout, Subject: j.id, Message: "cleanup budget exhausted before this retirement completed"})
 			rep.Status = StatusCleanupFailed
 		}
 	}

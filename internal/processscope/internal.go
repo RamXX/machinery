@@ -51,6 +51,7 @@ const (
 	authWindow              = 5 * time.Second
 	frameLimit              = 1 << 20
 	hardReapWindow          = 2 * time.Second
+	retireWaitCap           = 3 * time.Second
 	diagLimit               = 4096
 )
 

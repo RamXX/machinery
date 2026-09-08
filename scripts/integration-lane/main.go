@@ -780,11 +780,13 @@ func integrationTagged(body []byte) bool {
 //     long-job protocol the custody suite itself uses: the guarded job writes
 //     its own bounded stdout/stderr/exit evidence, the Run call proceeds in
 //     the background, and completion is observed from that evidence.
-//   - Closing any scope arms one broker-wide final-cleanup grace and live
-//     jobs are capped per broker, so the lane opens one custody root per
-//     guarded run and verifies its terminal close before continuing. Every
-//     job is broker-registered before launch, guardian-owned, and terminally
-//     killed before reap, or cleanup is honestly reported failed.
+//   - Closing a scope arms one broker-wide cleanup grace for that cleanup
+//     pass, each retirement inside the pass gets its own budget within that
+//     grace, and live jobs are capped per broker, so the lane opens one
+//     custody root per guarded run and verifies its terminal close before
+//     continuing. Every job is broker-registered before launch,
+//     guardian-owned, and terminally killed before reap, or cleanup is
+//     reported failed.
 //
 // Nothing here invents a new process ownership interface.
 type laneCustody struct {

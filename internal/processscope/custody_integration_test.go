@@ -211,6 +211,15 @@ func TestHelperTarget(t *testing.T) {
 			t.Fatal(err)
 		}
 		time.Sleep(300 * time.Second)
+	case "ignore-term":
+		// Refuses the cooperative termination signal, so its retirement
+		// cannot complete inside the retirement budget and must be reported
+		// as exceeded rather than quietly cleaned.
+		signal.Ignore(syscall.SIGTERM)
+		if err := os.WriteFile(file, []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(300 * time.Second)
 	case "writer":
 		buf := bytes.Repeat([]byte("x"), 4096)
 		for i := 0; i < 512; i++ {
@@ -824,6 +833,122 @@ func TestCleanupBudgetExhaustionReported(t *testing.T) {
 		t.Fatal("cleanup-failed must carry diagnostics")
 	}
 	waitGone(t, pid, 10*time.Second)
+	if !alive(sentinel) {
+		t.Fatal("unrelated sentinel died")
+	}
+}
+
+// TestSequentialRetirementsEachGetTheirOwnBudget covers custody over a run
+// large enough to outgrow a single cleanup instant, a single scope table read
+// and a single socket send. It retires many short-lived guarded jobs one after
+// another through the same broker, each in its own child scope, then closes
+// the root.
+//
+//   - The cleanup grace belongs to the retirement it bounds: once the first
+//     scope close arms the grace, every later retirement still gets its own
+//     budget instead of racing one absolute instant the run has long passed.
+//     Every job here registers, terminates and reaps well inside its own
+//     budget, so none may be reported budget-exceeded.
+//   - The broker survives the churn: a close that reads the scope table
+//     outside the broker lock races the sibling child-scope registration that
+//     follows it and kills the broker outright.
+//   - The root cleanup report names every retired job, so it outgrows the
+//     socket send buffer. A control record must be written whole, not
+//     abandoned as a short write.
+//
+// Any of the three strands every later request as a stale capability, which is
+// how one large design used to fail wholesale.
+func TestSequentialRetirementsEachGetTheirOwnBudget(t *testing.T) {
+	sentinel := startSentinel(t)
+	scratch := t.TempDir()
+	// A small grace so the shared instant elapses within the first rounds and
+	// the defect shows up in seconds rather than at the shipped 30s cap.
+	s := openScope(t, scratch, func(o *processscope.Options) { o.Limits.CleanupMS = 500; o.Limits.Jobs = 4 })
+	echo := processscope.Command{
+		Executable:    "/bin/echo",
+		Args:          []string{"ok"},
+		Env:           envBase(),
+		RuntimeDigest: runtimeDigest,
+	}
+	const rounds = 200
+	for i := 0; i < rounds; i++ {
+		func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			child, err := s.Child(ctx)
+			if err != nil {
+				t.Fatalf("round %d: child scope: %v", i, err)
+			}
+			attached := attach(t, child, echo)
+			res, err := child.Run(ctx, attached, processscope.Streams{})
+			if err != nil {
+				t.Fatalf("round %d: run: %v", i, err)
+			}
+			if !res.Completed || res.ExitCode != 0 {
+				t.Fatalf("round %d: result: %+v", i, res)
+			}
+			rep := requireClean(t, closeScope(t, child, 30*time.Second), 1)
+			if len(rep.Diagnostics) != 0 {
+				t.Fatalf("round %d: a job that terminated and reaped inside its budget carries no diagnostics: %+v", i, rep)
+			}
+		}()
+	}
+	rep := closeScope(t, s, 60*time.Second)
+	if rep.Status != processscope.StatusCleaned {
+		t.Fatalf("root close after %d clean retirements must be cleanup-ok: %+v", rounds, rep)
+	}
+	if len(rep.Jobs) != rounds {
+		t.Fatalf("root report must account for all %d jobs, got %d", rounds, len(rep.Jobs))
+	}
+	if !alive(sentinel) {
+		t.Fatal("unrelated sentinel died")
+	}
+}
+
+// TestHungJobStillReportsBudgetExceeded is the other half of the same
+// contract: per-retirement accounting must not turn a real overrun into a
+// clean report. The target refuses SIGTERM, so its retirement cannot complete
+// inside its own budget and the close must report cleanup-failed with a
+// TIMEOUT diagnostic naming the job.
+func TestHungJobStillReportsBudgetExceeded(t *testing.T) {
+	sentinel := startSentinel(t)
+	scratch := t.TempDir()
+	s := openScope(t, scratch, func(o *processscope.Options) { o.Limits.CleanupMS = 200; o.Limits.Jobs = 2 })
+	f := filepath.Join(scratch, "ignore-term.pid")
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	child, err := s.Child(ctx)
+	if err != nil {
+		t.Fatalf("child scope: %v", err)
+	}
+	attached := attach(t, child, roleCommand(t, "ignore-term", "MACHINERY_QLW2_FILE="+f))
+	runDone := make(chan struct{})
+	go func() {
+		defer close(runDone)
+		_, _ = child.Run(context.Background(), attached, processscope.Streams{})
+	}()
+	pid := waitPidFile(t, f, 20*time.Second)
+
+	rep := closeScope(t, child, 60*time.Second)
+	if rep.Status != processscope.StatusCleanupFailed {
+		t.Fatalf("a job that could not be retired inside its budget must be reported cleanup-failed: %+v", rep)
+	}
+	timeout := false
+	for _, d := range rep.Diagnostics {
+		if d.Code == processscope.CodeTimeout {
+			timeout = true
+		}
+	}
+	if !timeout {
+		t.Fatalf("cleanup-failed from an exhausted retirement budget must carry a %s diagnostic: %+v", processscope.CodeTimeout, rep.Diagnostics)
+	}
+	waitGone(t, pid, 20*time.Second)
+	select {
+	case <-runDone:
+	case <-time.After(30 * time.Second):
+		t.Fatal("run never returned after the job was retired")
+	}
+	_ = closeScope(t, s, 60*time.Second)
 	if !alive(sentinel) {
 		t.Fatal("unrelated sentinel died")
 	}

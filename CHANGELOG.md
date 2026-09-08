@@ -41,6 +41,16 @@ under their version heading when a release is cut.
   clamped the declared 3,600,000 ms wall (and with it the formal-provision, image-pull, and suite
   budgets), so a cold JVM/TLC provision on a loaded host died as a scope timeout. The open context
   now derives from the declared wall itself; caps are unchanged and an overrunning job still dies.
+- **Large designs verify again.** `machinery verify-formal` failed on designs big enough to
+  outgrow three single-shot assumptions in native custody, reporting cleanly terminated and
+  reaped engine runs as `cleanup-failed` and then failing every remaining check with
+  `STALE_CAPABILITY`. The cleanup grace is now accounted per retirement instead of as one
+  absolute instant shared by every job a run ever launches; the broker decides whether a close
+  ends it while holding its own lock, instead of a concurrent read that could kill it outright;
+  and a control record larger than the socket send buffer, such as a cleanup report naming every
+  retired job, is written whole instead of abandoned as a short write. Every shipped budget keeps
+  its current value, cleanup time stays bounded, and a job that really does overrun its budget is
+  still reported.
 - **Custody results are awaited for the job's real deadline.** The broker's terminal-result wait
   is bounded by the effective deadline plus the cleanup grace instead of a fixed window, so a
   legitimately long job on a loaded host is no longer abandoned as a custody error, and a result

@@ -114,12 +114,23 @@ func writeFrame(c *net.UnixConn, payload []byte, files ...*os.File) error {
 		}
 		oob = syscall.UnixRights(fds...)
 	}
-	n, _, err := c.WriteMsgUnix(msg, oob, nil)
-	if err != nil {
-		return err
-	}
-	if n != len(msg) {
-		return errf(CodeInternalError, "frame", "short control write")
+	// A stream socket accepts only what fits in its send buffer, so one send
+	// of a record larger than that buffer is a short write, not a failure.
+	// The record is written until it is complete; the descriptor rights ride
+	// with the first send, because they belong to the record rather than to
+	// any byte of it. Treating the short write as a failure truncated exactly
+	// the records that grow with the work: a cleanup report naming every
+	// retired job of a large run.
+	for off := 0; off < len(msg); {
+		n, _, err := c.WriteMsgUnix(msg[off:], oob, nil)
+		if err != nil {
+			return err
+		}
+		if n <= 0 {
+			return errf(CodeInternalError, "frame", "control write made no progress")
+		}
+		off += n
+		oob = nil
 	}
 	return nil
 }
