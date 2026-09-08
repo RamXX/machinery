@@ -33,6 +33,15 @@ under their version heading when a release is cut.
   fixed slack to report with, and always writes a record naming what happened; the reader derives
   its wait from that same wall and prints the helper's log when the record is missing or is not a
   pid. Test-only: no product budget or shipped cap changed.
+- **A custody challenge test no longer races the broker it built from a hook it replaces.** The
+  challenge cases run the broker in process and replace a package-level hook to build a second
+  broker from the replacement. The broker reads those hooks once, when it is built, and everything
+  the test observes of the first broker afterwards travels through a kernel socket, which gives
+  the race detector no ordering: `go test -race -count=5 ./internal/processscope` reported
+  `race detected during execution of test` on an idle host within a second, while a single-count
+  sweep never did. The harness now joins the broker goroutine it started as part of its cleanup,
+  and each case retires and joins the broker built from the previous hook before replacing it.
+  Test-only: no product behaviour changed.
 - **A scope close reports the settled state of a job already being retired.** A job cancelled by
   its caller is retired on its own goroutine, and the guardian may report the target's death as an
   ordinary exit rather than a terminal drain, so `Run` returns while that retirement is still

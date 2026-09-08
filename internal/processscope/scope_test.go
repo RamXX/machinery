@@ -357,7 +357,11 @@ func startTestBroker(t *testing.T, limits Limits) (*scope, func()) {
 	}
 	wall := time.Now().Add(time.Duration(norm.WallMS) * time.Millisecond)
 	st := &ioState{ctl: b, owner: lr, deadline: wall}
-	go func() { runBroker(InternalIO{state: st}, []string{InternalMarker, "broker", "--dir", dir}) }()
+	served := make(chan struct{})
+	go func() {
+		defer close(served)
+		runBroker(InternalIO{state: st}, []string{InternalMarker, "broker", "--dir", dir})
+	}()
 	connA, err := connFromFile(a)
 	if err != nil {
 		t.Fatal(err)
@@ -378,12 +382,23 @@ func startTestBroker(t *testing.T, limits Limits) (*scope, func()) {
 		t.Fatalf("bootstrap handshake: %+v", ready)
 	}
 	s := &scope{conn: connA, fr: newFrameReader(connA), id: "root", rootID: ready.Root, deadline: wall, limits: norm, isRoot: true, root: &rootHandle{dir: dir, livenessW: lw}}
+	var once sync.Once
 	cleanup := func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		_, _ = s.Close(ctx)
-		connA.Close()
-		lw.Close()
+		once.Do(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_, _ = s.Close(ctx)
+			lw.Close()
+			// Joining the broker this scope owned is the only ordering a test
+			// that replaces a package hook can rely on. The broker reads the
+			// hooks once, when it is built, and everything the test observes
+			// afterwards travels through a kernel socket, which no race
+			// detector can see an ordering through: without this join, a
+			// later assignment to a hook races the construction of a broker
+			// the test has long finished talking to.
+			<-served
+			connA.Close()
+		})
 	}
 	return s, cleanup
 }
@@ -429,6 +444,11 @@ func TestChallengeAuthorizeUnsafeAcceptsForgedScope(t *testing.T) {
 		t.Fatalf("control: forged scope must be refused with AUTH_FAILED: %v", rep)
 	}
 
+	// The broker above read the default hook when it was built. It is retired
+	// and joined before the hook is replaced, so the challenge run below gets
+	// a broker built from the replacement and nothing reads a hook while it
+	// is being written.
+	cleanup()
 	hookAuthorizeRequest = func(bound, claimed string) error { return nil }
 	s2, cleanup2 := startTestBroker(t, Limits{})
 	defer cleanup2()
@@ -467,6 +487,9 @@ func TestChallengeRegistrationSkipObserved(t *testing.T) {
 		t.Fatalf("control: report must show registered job: %+v", rep)
 	}
 
+	// As above: the broker built from the default hook is retired and joined
+	// before the hook is replaced.
+	cleanup()
 	hookRegisterJob = func(b *broker, j *job) error { return nil }
 	s2, cleanup2 := startTestBroker(t, Limits{})
 	defer cleanup2()
