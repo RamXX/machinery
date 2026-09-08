@@ -1,14 +1,15 @@
 ---
 id: MAC-0cuu
 title: "custody provisioning subtest races the pinned Java identity probe it observes"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [integration-lane, ci, custody, flake]
 created_at: 2026-09-08T17:44:34Z
 created_by: ramirosalas
 updated_at: 2026-09-08T18:08:19Z
-content_hash: "sha256:851920ea889677a4c8cb33b081d4b690b7105eb04acd54af2185cbe6fa2b6d96"
+content_hash: "sha256:761c631bac31780a7419446437e7207427089f67301b43b0c0d5a237d102b5f9"
+closed_at: 2026-09-08T18:08:19Z
 ---
 
 ## Description
@@ -30,7 +31,7 @@ Fix: answer all three questions from one snapshot. Not reproducible on macOS in 
 
 
 ## History
-
+- 2026-09-08T18:08:19Z status: open -> closed
 
 ## Links
 
