@@ -187,10 +187,16 @@ func collectConsumerReads(g *Gate, design string) []consumerReadsLine {
 }
 
 var readsWord = regexp.MustCompile(`\bREADS\b`)
-var readFieldName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$`)
 
-// parseConsumerReadSet rejects empty, duplicate or malformed members instead of
-// silently discarding them. One row declares exactly one complete set.
+// parseConsumerReadSet rejects empty and duplicate members instead of silently
+// discarding them. One row declares exactly one complete set.
+//
+// A MEMBER is any trimmed, non-empty text, which is the grammar the tier has
+// always read. READS members name domain fields in the design's ubiquitous
+// language ('occurrence time', 'unsupported-element accounting'), not code
+// symbols; an identifier-only rule would narrow what a matrix can say about
+// the payload it reads, and the reconciliation against the payload cell is
+// whole-token containment, which needs no such rule.
 func parseConsumerReadSet(text string) ([]string, string) {
 	matches := readsDecl.FindAllStringSubmatch(text, -1)
 	if len(matches) != 1 || len(readsWord.FindAllStringIndex(text, -1)) != 1 {
@@ -205,10 +211,10 @@ func parseConsumerReadSet(text string) ([]string, string) {
 	for _, member := range strings.Split(matches[0][1], ",") {
 		field := strings.TrimSpace(member)
 		if len(field) >= 2 && field[0] == '`' && field[len(field)-1] == '`' {
-			field = field[1 : len(field)-1]
+			field = strings.TrimSpace(field[1 : len(field)-1])
 		}
-		if !readFieldName.MatchString(field) {
-			return nil, "empty or malformed READS field " + ir.Repr(member) + "; name each field explicitly, without empty members"
+		if field == "" {
+			return nil, "empty READS member " + ir.Repr(member) + "; name each field explicitly, and drop the stray separator"
 		}
 		if seen[field] {
 			return nil, "duplicate READS field " + ir.Repr(field)

@@ -61,3 +61,31 @@ func TestReadsConsumerSupplementalFailClosed(t *testing.T) {
 		})
 	}
 }
+
+// READS members name domain fields in the ubiquitous language, which is what
+// v0.6.11 accepted: any trimmed, non-empty member. Multi-word names are not
+// malformed, and no non-empty member is ever reported as empty.
+func TestReadsConsumerAcceptsMultiWordFieldNames(t *testing.T) {
+	const payload = "Order.id, occurrence time, PAIR KEY, unsupported-element accounting"
+	const declared = "READS{Order.id, occurrence time, PAIR KEY, unsupported-element accounting}"
+	m := map[string]string{"PaymentHandler": readsConsumerMatrixHeader + readsConsumerDeclaration("payments", declared)}
+	g := readsConsumerCheck(t, readsConsumerDesign(t, readsConsumerRow("payments", payload), m))
+	if len(g.Errs) != 0 || len(g.Drift) != 0 {
+		t.Fatalf("multi-word READS members are the v0.6.11 grammar: errors=%v drift=%v", g.Errs, g.Drift)
+	}
+	if g.Counts["declared read fields carried"] != 4 {
+		t.Fatalf("every declared member must be reconciled against the payload: counts=%v", g.Counts)
+	}
+}
+
+// A member that is present but not an identifier was reported as empty. The
+// remaining rejections keep their own accurate wording.
+func TestReadsConsumerEmptyMemberDiagnosticIsAccurate(t *testing.T) {
+	m := map[string]string{"PaymentHandler": readsConsumerMatrixHeader + readsConsumerDeclaration("payments", "READS{Order.id, }")}
+	g := readsConsumerCheck(t, readsConsumerDesign(t, readsConsumerRow("payments", readsConsumerAllFields), m))
+	readsConsumerRequireBlocked(t, g, "an empty member is still rejected")
+	joined := strings.Join(g.Errs, "\n")
+	if !strings.Contains(joined, "empty READS member") {
+		t.Fatalf("an empty member must be named as one: %v", g.Errs)
+	}
+}

@@ -10,6 +10,24 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A matrix's prose is narrative again, not a malformed `CLAUSES` declaration.** A declaration is
+  a `CLAUSES{...}` group on a row of the named-unit contract table, which is the only shape 0.6.11
+  read. An invariant-coverage bullet quoting a guard's vocabulary, an enumeration wrapped across
+  lines, a contract cell that mentions "the CLAUSES declaration here" or describes a RETIRED site,
+  and a row for a non-guard unit are all accepted as they were, instead of being reported as
+  malformed declarations whose "guard name" is a sentence fragment. Ambiguity is still rejected: a
+  row carrying two `CLAUSES{...}` groups, or a `RETIRED{...}` group the declaration does not carry,
+  names no single vocabulary and fails.
+- **A declared guard no oracle governs owes nothing again.** 0.6.11 resolved a declaration's
+  falsifying-clause obligations across every committed oracle, so a machine could declare the
+  clauses of a guard that sits on its creation edge rather than on a guarded transition, and owe
+  no tests. That case is silent once more. The ownership rule this release added stands: a
+  declaration whose rows only a SIBLING machine's oracle could supply is still an error, and the
+  diagnostic now names the sibling.
+- **Consumer `READS` members keep their ubiquitous-language grammar.** A member is any trimmed,
+  non-empty text, as it was in 0.6.11: `READS{Order.id, occurrence time, PAIR KEY}` declares three
+  fields. Empty members and duplicates are still rejected, and an empty member is now reported as
+  an empty member rather than as an "empty or malformed READS field" naming text that is neither.
 - **Installer reruns converge on the recorded installation.** The one-line installer over an
   existing install now refreshes the complete recorded home/native-target/plugin plan (each
   group's copy/symlink mode preserved) instead of the default homes only, identical to
@@ -123,6 +141,13 @@ under their version heading when a release is cut.
 
 ### Changed
 
+- **Guard clause declarations bind to their owning machine.** `Alpha.matrix.md` binds only
+  `Alpha.machine.json` and `Alpha.oracle.md`, so two machines may use one guard name without
+  either arming or satisfying the other's falsifying-clause obligation. Upgrade impact: a
+  declaration whose oracle rows only another machine could supply is now an error, and one row
+  declares one vocabulary (a second `CLAUSES{...}` group on the row, or a `RETIRED{...}` group the
+  declaration does not carry, is rejected). Move the declaration to the matrix of the machine
+  whose oracle governs the guard, and keep one group per row.
 - **Attestation evidence v2 kinds (`plan`/`current`/`historical`).** Example attestations
   migrated to explicit kinds: a `current` claim requires an implementation subject, legacy
   design-only covers are rejected with migration guidance, and implementation-subject changes
