@@ -629,6 +629,14 @@ func integrationAssertRuntimes(t *testing.T, rs []integrationRuntimeReceipt, wan
 			if r.Identity != "v1.7.4" || r.SHA256 != "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88" || r.SHA256 != integrationFileSHA(t, r.Path) {
 				t.Fatalf("wrong pinned TLC jar: %+v", r)
 			}
+		case "go-modules":
+			// The lane warms the module closure before any package selection
+			// so a cold runner cache cannot masquerade as a selection
+			// failure. The receipt binds the manifest that closure was
+			// resolved from and names no executable of its own.
+			if r.Identity != "go.mod+go.sum" || len(r.SHA256) != 64 || r.Path != "" {
+				t.Fatalf("module closure receipt is not evidence: %+v", r)
+			}
 		default:
 			t.Fatalf("unexpected runtime %q", r.ID)
 		}
@@ -641,6 +649,14 @@ func integrationAssertRuntimes(t *testing.T, rs []integrationRuntimeReceipt, wan
 	}
 	sort.Strings(got)
 	want = append([]string(nil), want...)
+	for _, id := range want {
+		// Provisioning the Go toolchain also warms its module closure, so the
+		// union owes that receipt exactly when it owes the go receipt.
+		if id == "go" {
+			want = append(want, "go-modules")
+			break
+		}
+	}
 	sort.Strings(want)
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("runtime union got=%v want=%v", got, want)
