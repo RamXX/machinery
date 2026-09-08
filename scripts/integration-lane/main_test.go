@@ -307,6 +307,176 @@ func TestLaneNativeFailuresCannotBecomeSuccess(t *testing.T) {
 	}
 }
 
+// The fail/skip accounting names the identity that failed and never what the
+// runner said while failing. A failure only a remote runner can reproduce
+// leaves nothing else behind, so the native streams are replayed with it.
+func TestLaneReplaysBoundedNativeStreamsOfAFailedSuite(t *testing.T) {
+	root, _ := laneFixture(t, `func TestPilot(t *testing.T) { t.Fatal("distinctive native failure witness") }`)
+	rc, out, report := laneInvoke(t, root)
+	if rc == 0 || report.Status == "passed" {
+		t.Fatalf("failing suite reported success: status=%d report=%+v output=%s", rc, report, out)
+	}
+	for _, required := range []string{
+		"native test TestPilot fail failed/skip",
+		"--- fixture native stdout: last ",
+		"distinctive native failure witness",
+		"--- end fixture native stdout ---",
+		"--- fixture native stderr: ",
+	} {
+		if !strings.Contains(out, required) {
+			t.Errorf("failed suite output lacks %q:\n%s", required, out)
+		}
+	}
+}
+
+// A passing suite has nothing to replay: the lane stays silent about streams
+// it never had to explain.
+func TestLaneReplaysNoNativeStreamsWhenTheSuitePasses(t *testing.T) {
+	root, _ := laneFixture(t, `func TestPilot(t *testing.T) { if 6*7 != 42 { t.Fatal("wrong result") } }`)
+	rc, out, report := laneInvoke(t, root)
+	if rc != 0 || report.Status != "passed" {
+		t.Fatalf("passing suite rejected: status=%d report=%+v output=%s", rc, report, out)
+	}
+	if strings.Contains(out, "native stdout") || strings.Contains(out, "native stderr") {
+		t.Errorf("passing suite replayed native streams:\n%s", out)
+	}
+}
+
+func TestLaneStreamTailIsBoundedAndStatesWhatItDropped(t *testing.T) {
+	lines := func(n, width int) string {
+		var b strings.Builder
+		for i := 1; i <= n; i++ {
+			b.WriteString(fmt.Sprintf("line-%d", i) + strings.Repeat("x", width) + "\n")
+		}
+		return b.String()
+	}
+	for _, tc := range []struct {
+		name       string
+		stream     string
+		kept       int
+		total      int
+		truncated  bool
+		mustHave   []string
+		mustNotHav []string
+	}{
+		{name: "empty"},
+		{name: "whole", stream: "first\nsecond\nthird\n", kept: 3, total: 3, mustHave: []string{"first", "third"}},
+		{
+			name: "line-bound", stream: lines(laneTailLines+300, 0),
+			kept: laneTailLines, total: laneTailLines + 300, truncated: true,
+			mustHave:   []string{"line-301\n", fmt.Sprintf("line-%d", laneTailLines+300)},
+			mustNotHav: []string{"line-300\n"},
+		},
+		{
+			name: "byte-bound", stream: lines(3, laneTailBytes/3),
+			kept: 2, total: 3, truncated: true,
+			mustHave: []string{"line-2", "line-3"}, mustNotHav: []string{"line-1"},
+		},
+		{
+			name: "single-line-byte-bound", stream: strings.Repeat("y", 2*laneTailBytes) + "\n",
+			kept: 1, total: 1, truncated: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tail, kept, total, truncated := laneStreamTail(tc.stream)
+			if kept != tc.kept || total != tc.total || truncated != tc.truncated {
+				t.Fatalf("bounded tail accounting %d/%d truncated=%v, want %d/%d truncated=%v", kept, total, truncated, tc.kept, tc.total, tc.truncated)
+			}
+			if len(tail) > laneTailBytes || kept > laneTailLines {
+				t.Fatalf("tail exceeds its bounds: %d bytes, %d lines", len(tail), kept)
+			}
+			if strings.HasSuffix(tail, "\n") {
+				t.Fatalf("tail carries a trailing newline the delimiter already owns")
+			}
+			for _, want := range tc.mustHave {
+				if !strings.Contains(tail, want) {
+					t.Errorf("tail dropped %q", want)
+				}
+			}
+			for _, unwanted := range tc.mustNotHav {
+				if strings.Contains(tail, unwanted) {
+					t.Errorf("tail kept %q past its bound", unwanted)
+				}
+			}
+		})
+	}
+}
+
+func TestLaneStreamReplayNamesTheSuiteAndItsBounds(t *testing.T) {
+	empty := laneStreamReplay("pilot", "stderr", "")
+	if empty != "--- pilot native stderr: empty ---\n" {
+		t.Errorf("empty stream is not stated: %q", empty)
+	}
+	var body strings.Builder
+	for i := 0; i < laneTailLines+1; i++ {
+		fmt.Fprintf(&body, "event %d\n", i)
+	}
+	replay := laneStreamReplay("pilot", "stdout", body.String())
+	for _, required := range []string{
+		fmt.Sprintf("--- pilot native stdout: last %d of %d lines,", laneTailLines, laneTailLines+1),
+		"truncated ---",
+		"event 200",
+		"--- end pilot native stdout ---\n",
+	} {
+		if !strings.Contains(replay, required) {
+			t.Errorf("replay lacks %q:\n%s", required, replay)
+		}
+	}
+	if strings.Contains(replay, "event 0\n") {
+		t.Error("replay kept a line past the line bound")
+	}
+}
+
+// Evidence that only a remote runner produced has to be collectable, and the
+// workflow and preflight lane invocations are pinned to an exact argument
+// string, so the directory is named through the environment.
+func TestLaneReportDirectoryIsNamedByEnvironmentAndDefaultsToATemporaryOne(t *testing.T) {
+	t.Run("named", func(t *testing.T) {
+		root, _ := laneFixture(t, `func TestPilot(t *testing.T) { t.Fatal("failed suites retain evidence too") }`)
+		dir := filepath.Join(t.TempDir(), "evidence")
+		t.Setenv(laneReportDirEnv, dir)
+		work := t.TempDir()
+		var out, errout bytes.Buffer
+		if status := run([]string{"--root", root, "--lane", "required", "--work-dir", filepath.Join(work, "owned"), "--cache-dir", filepath.Join(work, "cache")}, &out, &errout); status == 0 {
+			t.Fatalf("failing suite reported success: %s%s", out.String(), errout.String())
+		}
+		if _, err := os.Stat(filepath.Join(dir, "report.json")); err != nil {
+			t.Fatalf("named report directory holds no report: %v", err)
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		events := false
+		for _, entry := range entries {
+			events = events || strings.HasPrefix(entry.Name(), "fixture-events-")
+		}
+		if !events {
+			t.Fatalf("named report directory holds no retained native event stream: %v", entries)
+		}
+	})
+	t.Run("default", func(t *testing.T) {
+		root, _ := laneFixture(t, `func TestPilot(t *testing.T) { if 6*7 != 42 { t.Fatal("wrong result") } }`)
+		t.Setenv(laneReportDirEnv, "")
+		work := t.TempDir()
+		var out, errout bytes.Buffer
+		if status := run([]string{"--root", root, "--lane", "required", "--work-dir", filepath.Join(work, "owned"), "--cache-dir", filepath.Join(work, "cache")}, &out, &errout); status != 0 {
+			t.Fatalf("passing suite rejected: %s%s", out.String(), errout.String())
+		}
+		_, path, found := strings.Cut(strings.TrimSpace(out.String()), "; report ")
+		if !found {
+			t.Fatalf("lane does not name its report: %s", out.String())
+		}
+		t.Cleanup(func() { _ = os.RemoveAll(filepath.Dir(path)) })
+		if !strings.HasPrefix(path, os.TempDir()) {
+			t.Errorf("unnamed report directory left the temporary root: %s", path)
+		}
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("named report is absent: %v", err)
+		}
+	})
+}
+
 func TestLaneRuntimeAbsenceFailsBeforeTests(t *testing.T) {
 	r, _ := laneFixture(t, `func TestPilot(t *testing.T) { t.Fatal("must not execute without runtime") }`)
 	t.Setenv("PATH", t.TempDir())

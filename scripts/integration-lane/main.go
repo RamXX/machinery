@@ -191,12 +191,25 @@ func serveInternalActivation(args []string) (exitCode int, handled bool) {
 	return code, true
 }
 
+// laneReportDirEnv names the directory the lane retains its report and
+// evidence in when no explicit --report path is given.
+const laneReportDirEnv = "MACHINERY_INTEGRATION_REPORT_DIR"
+
 func run(args []string, stdout, stderr io.Writer) (status int) {
 	flags := flag.NewFlagSet("integration-lane", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	root := flags.String("root", ".", "repository root")
 	lane := flags.String("lane", "", "required named lane")
 	reportPath := flags.String("report", "", "retained machine-readable report")
+	// The report and every evidence file the run retains share one directory.
+	// A caller that must collect them afterwards (CI uploading the evidence of
+	// a failed job) needs to know that directory in advance, and the workflow
+	// and preflight invocations of this lane are pinned to an exact argument
+	// string, so the environment carries it. An unset variable keeps the
+	// private temporary directory the lane has always used. environment()
+	// drops every MACHINERY_INTEGRATION_ key, so a nested lane launched as a
+	// guarded job never inherits the outer run's directory.
+	reportDir := flags.String("report-dir", os.Getenv(laneReportDirEnv), "directory for the retained report and its evidence")
 	workParent := flags.String("work-dir", "", "parent for private scratch")
 	cache := flags.String("cache-dir", "", "private runtime cache")
 	pinPath := flags.String("pins", "", "runtime pin file")
@@ -263,10 +276,14 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 		return 1
 	}
 	if *reportPath == "" {
-		dir, e := os.MkdirTemp("", "machinery-integration-evidence-")
-		if e != nil {
-			fmt.Fprintln(stderr, e)
-			return 1
+		dir := *reportDir
+		if dir == "" {
+			temp, e := os.MkdirTemp("", "machinery-integration-evidence-")
+			if e != nil {
+				fmt.Fprintln(stderr, e)
+				return 1
+			}
+			dir = temp
 		}
 		*reportPath = filepath.Join(dir, "report.json")
 	}
@@ -383,6 +400,13 @@ func run(args []string, stdout, stderr io.Writer) (status int) {
 		}
 		if err = errors.Join(e, cleanupErr); err != nil {
 			fmt.Fprintln(stderr, s.ID+":", err)
+			// The accounting says which identities failed; the bounded
+			// native streams say what the runner reported while failing.
+			// Without them a remote-only failure has no diagnosis at all.
+			var streams *nativeStreamFailure
+			if errors.As(err, &streams) {
+				fmt.Fprint(stderr, streams.replay())
+			}
 			return 1
 		}
 	}
@@ -1094,6 +1118,88 @@ func shellQuote(path string) string {
 	return "'" + path + "'"
 }
 
+// A failed native suite execution is accounted from its event stream, and the
+// accounting alone never says what the runner reported. These bounds decide
+// how much of the native streams the lane replays with that accounting: the
+// last laneTailLines lines, and at most laneTailBytes of them.
+const (
+	laneTailLines = 200
+	laneTailBytes = 64 << 10
+)
+
+// laneStreamTail bounds a native stream to its tail: the last laneTailLines
+// lines, cut further to the last laneTailBytes bytes when those lines are
+// larger. It reports the kept and total line counts and whether anything was
+// dropped, so the replay can state exactly what it omitted.
+func laneStreamTail(stream string) (tail string, kept, total int, truncated bool) {
+	body := strings.TrimSuffix(stream, "\n")
+	if body == "" {
+		return "", 0, 0, false
+	}
+	lines := strings.Split(body, "\n")
+	total = len(lines)
+	if len(lines) > laneTailLines {
+		lines = lines[len(lines)-laneTailLines:]
+		truncated = true
+	}
+	tail = strings.Join(lines, "\n")
+	for len(tail) > laneTailBytes && len(lines) > 1 {
+		lines = lines[1:]
+		tail = strings.Join(lines, "\n")
+		truncated = true
+	}
+	if len(tail) > laneTailBytes {
+		tail = tail[len(tail)-laneTailBytes:]
+		truncated = true
+	}
+	return tail, len(lines), total, truncated
+}
+
+// laneStreamReplay renders one delimited native stream block for a failed
+// suite: the suite it belongs to, the stream it came from, how much of it is
+// shown, and the bounded tail itself. An empty stream is stated rather than
+// omitted, because silence is evidence too.
+func laneStreamReplay(suite, name, stream string) string {
+	tail, kept, total, truncated := laneStreamTail(stream)
+	if total == 0 {
+		return fmt.Sprintf("--- %s native %s: empty ---\n", suite, name)
+	}
+	scope := fmt.Sprintf("%d of %d lines, %d bytes", kept, total, len(tail))
+	if truncated {
+		scope += ", truncated"
+	}
+	return fmt.Sprintf("--- %s native %s: last %s ---\n%s\n--- end %s native %s ---\n", suite, name, scope, tail, suite, name)
+}
+
+// nativeStreamFailure carries the native streams of a failed suite execution
+// together with the failure itself, so the lane can replay what the runner
+// said next to the accounting it derived. The streams are already bounded by
+// the suite's own stdout and stderr budgets before they reach here.
+type nativeStreamFailure struct {
+	suite  string
+	stdout string
+	stderr string
+	err    error
+}
+
+func (f *nativeStreamFailure) Error() string { return f.err.Error() }
+
+func (f *nativeStreamFailure) Unwrap() error { return f.err }
+
+// replay renders both native streams of the failed suite in a fixed order.
+func (f *nativeStreamFailure) replay() string {
+	return laneStreamReplay(f.suite, "stdout", f.stdout) + laneStreamReplay(f.suite, "stderr", f.stderr)
+}
+
+// laneNativeFailure binds the native streams to a failed suite execution. A
+// nil error stays nil: a suite that passed has nothing to replay.
+func laneNativeFailure(suite, stdout, stderr string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return &nativeStreamFailure{suite: suite, stdout: stdout, stderr: stderr, err: err}
+}
+
 // laneStreamFailure builds one diagnostic for a guarded job that either
 // returned an error or spoke on a stream it must keep silent. A nil error is
 // described, never wrapped: %w applied to nil renders as %!w(<nil>) and hides
@@ -1537,14 +1643,14 @@ func execute(ctx context.Context, custody *laneCustody, root, work, cache, evide
 	out, errout, runErr := custody.run(ctx, work, root, env, duration, limit, s.StderrLimit, argv...)
 	events, err := os.CreateTemp(evidence, s.ID+"-events-*")
 	if err != nil {
-		return r, errors.Join(runErr, err)
+		return r, laneNativeFailure(s.ID, out, errout, errors.Join(runErr, err))
 	}
 	r.Events = events.Name()
 	r.EventsSHA = fmt.Sprintf("%x", sha256.Sum256([]byte(out)))
 	_, writeErr := events.WriteString(out)
 	closeErr := events.Close()
 	if err = errors.Join(writeErr, closeErr); err != nil {
-		return r, errors.Join(runErr, err)
+		return r, laneNativeFailure(s.ID, out, errout, errors.Join(runErr, err))
 	}
 	var eventErr error
 	if s.Adapter == "go-json" {
@@ -1569,7 +1675,7 @@ func execute(ctx context.Context, custody *laneCustody, root, work, cache, evide
 			eventErr = errors.Join(eventErr, fmt.Errorf("native source changed during execution: %s: %w", source, err))
 		}
 	}
-	return r, errors.Join(runErr, eventErr)
+	return r, laneNativeFailure(s.ID, out, errout, errors.Join(runErr, eventErr))
 }
 
 func accountGo(output, packageID string, r *suiteReceipt) error {

@@ -49,8 +49,22 @@ jobs:
         run: npm install -g typescript@7.0.2
       # Linux hosted runners provide Docker; the lane verifies it and
       # provisions its immutable OCI and private Java/TLC closure.
+      # The lane retains its report and every evidence file of the run in one
+      # directory. Naming that directory here, rather than in the invocation
+      # the wiring guards pin exactly, lets a failed run hand the evidence
+      # back: a remote-only failure is otherwise undiagnosable.
       - name: Required runtime integration
+        env:
+          MACHINERY_INTEGRATION_REPORT_DIR: ${{ runner.temp }}/integration-required-evidence
         run: go run ./scripts/integration-lane --lane required
+      - name: Retain required integration evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: integration-required-evidence
+          path: ${{ runner.temp }}/integration-required-evidence
+          if-no-files-found: warn
+          retention-days: 7
   # ---------------------------------------------------------------- build ---
   # Compile every release target and retain a Windows cross-build as an early
   # portability signal. Windows is a release build target; native windows

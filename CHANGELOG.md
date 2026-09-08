@@ -10,6 +10,19 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A failed integration lane says what its native runner reported, and CI keeps the evidence.**
+  The lane accounted a failed suite from the runner's event stream and printed only that
+  accounting (`native test ... fail failed/skip`, `required execution incomplete: selected 1
+  started 1 passed 0`), while the event stream itself and the report went to a private temporary
+  directory no workflow collects. A failure only a hosted runner reproduces was undiagnosable
+  from the log it left behind. A failed suite execution now replays the bounded tail of that
+  runner's own stdout and stderr next to the accounting: the last 200 lines, at most 64 KiB of
+  them, each block delimited and naming the suite. `--report-dir`, defaulted from
+  `MACHINERY_INTEGRATION_REPORT_DIR` because the workflow and preflight invocations of the lane
+  are pinned to an exact argument string, names the directory the report and its retained event
+  streams are written to; an unset variable keeps the private temporary directory. `ci.yml` and
+  `formal.yml` name that directory and upload it as an artifact when the job fails, with a
+  seven-day retention. No budget or cap changed.
 - **A child scope's control channel is no longer collected while its descriptor is in flight.**
   The broker created the socket pair for a new child scope, sent one end to the caller, and closed
   its own copy the moment the send returned. For as long as the descriptor was in flight its only
