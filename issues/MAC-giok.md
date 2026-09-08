@@ -1,14 +1,16 @@
 ---
 id: MAC-giok
 title: "Gx-trace collects bare READS prose as a consumer declaration"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [regression, gates, gx-trace]
 created_at: 2026-09-08T08:33:58Z
 created_by: ramirosalas
-updated_at: 2026-09-08T08:39:42Z
-content_hash: "sha256:dc6dbe2db81e9e7c528ede22f5c356bbfe9bca1f36714e6c8cc78db8bff70d21"
+updated_at: 2026-09-08T09:27:49Z
+content_hash: "sha256:4df6242f0fe9fa2f59d164cd43da2e20291cd37ecba749f398423aea5e1fb9b6"
+closed_at: 2026-09-08T09:27:49Z
+close_reason: "Landed on main (release 0.7.0 line) at 5c35463: 1537a06 bare READS prose no longer collected as a declaration"
 ---
 
 ## Description
@@ -122,7 +124,7 @@ of the same family. Fixing it takes the H2 blocking count from 88 to 79.
 
 
 ## History
-
+- 2026-09-08T09:27:49Z status: open -> closed
 
 ## Links
 
