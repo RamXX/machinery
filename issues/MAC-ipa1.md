@@ -7,8 +7,8 @@ type: bug
 labels: [custody, ci]
 created_at: 2026-09-08T13:07:30Z
 created_by: ramirosalas
-updated_at: 2026-09-08T13:07:30Z
-content_hash: "sha256:605ae9d17afc626bd40871663918a0370ac5a59e869e65859c057ddf8bd2085e"
+updated_at: 2026-09-08T13:27:03Z
+content_hash: "sha256:a76573af4c025bdd403f893bd986728e58e032ef48ed42f813778dfcf85bdfe0"
 ---
 
 ## Description
@@ -51,3 +51,14 @@ Make the registration belong to the caller for the whole call rather than to the
 
 
 ## Comments
+
+### 2026-09-08T13:27:03Z ramirosalas
+Fixed on fix/custody-budgets in 1170df1.
+
+internal/processscope/scope.go: the job's result-channel registration now belongs to Run for the whole call (the demux no longer deletes it on delivery; Run drops it on return), so a result that arrives before the caller reaches jobChanFor is waiting in the channel it claims. A duplicate result finds the buffered channel full and is dropped rather than blocking the control-channel reader.
+
+Reproduced in a 2-CPU, 7GB golang:1.27.1 container with --init (a subreaper is required; without one the orphan zombies mask this with a different signature): TestSequentialRetirementsEachGetTheirOwnBudget failed 3 of 8 runs at rounds 20, 70, 126 and 169, each waiting the full 30s. Broker instrumentation shows gexit terminal=false and forwardResult landing 30s before the client's cancel. After the fix: 8/8 clean, 25.1s.
+
+Guard: TestTerminalResultSurvivesOvertakingItsCaller orders the frames deterministically with a reply-frame barrier and fails without the fix.
+
+No budget changed. The runtimeclosure node probe failure could not be reproduced locally (the TypeScript closure skips on linux/arm64 and the container is arm64), but it is the same signature on a 30,000ms probe deadline with a one-line shell shim.
