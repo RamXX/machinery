@@ -1,14 +1,15 @@
 ---
 id: MAC-hkvk
 title: "custody: a handed-over channel descriptor is collected in flight and its socket flushed under its new owner"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [custody, flaky-under-load]
 created_at: 2026-09-08T15:45:46Z
 created_by: ramirosalas
 updated_at: 2026-09-08T16:30:43Z
-content_hash: "sha256:ae6595ff8d34889e868b479268d790a6d3acfed01d0779b1f67c3141b4ed9111"
+content_hash: "sha256:59e0cb64024246881afa3afacc3eb03cc7311ae63750c469c2e2e25857a86cbe"
+closed_at: 2026-09-08T16:30:43Z
 ---
 
 ## Description
@@ -35,7 +36,7 @@ Fix: the sender keeps its own open reference to a handed-over descriptor while i
 
 
 ## History
-
+- 2026-09-08T16:30:43Z status: open -> closed
 
 ## Links
 
