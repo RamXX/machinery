@@ -945,3 +945,70 @@ func channelHoldsPeer(ch *channel) bool {
 	defer ch.peerMu.Unlock()
 	return ch.peer != nil
 }
+
+// TestScopeCloseJoinsARetirementAlreadyClaimed pins the rule a close reports
+// under: a job whose retirement another path has already claimed is joined, not
+// stepped over. A Run cancelled by its caller is retired on its own goroutine,
+// and the close that follows arrives while that retirement sits between marking
+// the job terminated and reaping its guardian. A close that collects only
+// unclaimed jobs never reaches the join at all and publishes that half-written
+// state as a cleanup failure on a job that goes on to reap cleanly.
+func TestScopeCloseJoinsARetirementAlreadyClaimed(t *testing.T) {
+	root := &scopeNode{id: "root"}
+	limits, err := NormalizeLimits(Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := &broker{
+		rootID:       "root-join",
+		limits:       limits,
+		wallDeadline: time.Now().Add(time.Minute),
+		scopes:       map[string]*scopeNode{"root": root},
+		jobs:         map[string]*job{},
+		containers:   map[string]*containerRec{},
+		nonces:       map[string]*attachRec{},
+		authorize:    hookAuthorizeRequest,
+		register:     hookRegisterJob,
+		groupSignal:  hookGroupSignal,
+	}
+	j := &job{
+		id:         "job-inflight",
+		scope:      root,
+		registered: true,
+		resultCh:   make(chan struct{}),
+		retireDone: make(chan struct{}),
+	}
+	b.jobs[j.id] = j
+	b.jobOrder = append(b.jobOrder, j.id)
+	// The state a cancelled Run leaves behind: claimed, terminated, not yet
+	// reaped, with its retirement still running.
+	j.retired = true
+	j.terminated = true
+
+	reported := make(chan CleanupReport, 1)
+	go func() {
+		b.retireSubtree(root)
+		reported <- b.buildReport(root)
+	}()
+	select {
+	case rep := <-reported:
+		t.Fatalf("close reported past a retirement still in flight: %+v", rep)
+	case <-time.After(time.Second):
+	}
+
+	// The claiming retirement settles.
+	j.reaped = true
+	close(j.retireDone)
+
+	select {
+	case rep := <-reported:
+		if rep.Status != StatusCleaned {
+			t.Fatalf("a job that terminated and reaped inside its budget must close cleanly: %+v", rep)
+		}
+		if len(rep.Jobs) != 1 || !rep.Jobs[0].Registered || !rep.Jobs[0].Terminated || !rep.Jobs[0].Reaped {
+			t.Fatalf("report must carry the settled state of the joined job: %+v", rep.Jobs)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("close never returned after the retirement it joined settled")
+	}
+}

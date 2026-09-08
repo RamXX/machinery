@@ -441,12 +441,13 @@ func (b *broker) dispatch(ch *channel, payload []byte, files []*os.File) bool {
 		auth := b.scopeByID(m.Scope)
 		b.mu.Lock()
 		j := b.jobs[m.Job]
+		retired := j != nil && j.retired
 		b.mu.Unlock()
 		if j == nil || auth == nil || !j.scope.inSubtree(auth) {
 			_ = ch.send(msgRefused{T: "refused", Code: CodeStaleCapability, Subject: "cancel", Message: "unknown or foreign job"})
 			return false
 		}
-		if j.retired {
+		if retired {
 			return false
 		}
 		j.once.Do(func() {
@@ -673,11 +674,9 @@ func (b *broker) handleRun(ch *channel, m msgRun, files []*os.File) {
 
 	ga, gb, err := newChannelPair()
 	if err != nil {
-		j.retired = true
-		j.terminal = true
 		// No guardian was ever launched, so this job's retirement is already
 		// settled; anything that later joins on it must not wait.
-		close(j.retireDone)
+		b.settleUnlaunched(j)
 		_ = ch.send(msgRefused{T: "refused", Code: CodeInternalError, Subject: "run", Message: "guardian channel creation failed"})
 		return
 	}
@@ -707,9 +706,7 @@ func (b *broker) handleRun(ch *channel, m msgRun, files []*os.File) {
 		if logf != nil {
 			logf.Close()
 		}
-		j.retired = true
-		j.terminal = true
-		close(j.retireDone)
+		b.settleUnlaunched(j)
 		_ = ch.send(msgRefused{T: "refused", Code: CodeInternalError, Subject: "run", Message: "guardian launch failed: " + err.Error()})
 		return
 	}
@@ -929,11 +926,34 @@ func (b *broker) retireJob(j *job) {
 	b.forwardResult(j)
 }
 
+// retireAll and retireSubtree collect every job in scope, including the ones a
+// retirement has already claimed. Skipping a claimed job here is what strands
+// the join retireJob was given: a job cancelled by its caller is retired on its
+// own goroutine, and the close that follows the cancelled Run arrives while
+// that retirement is between marking the job terminated and reaping its
+// guardian. A retirement that has already settled joins instantly, so passing
+// every job through retireJob costs nothing and is the only way the report is
+// built from settled state.
+// settleUnlaunched settles the retirement of a job that never reached a
+// guardian. The claim is taken under the lock every other retirement path reads
+// it through, so a close running concurrently either does the retirement itself
+// or joins this one, and never both.
+func (b *broker) settleUnlaunched(j *job) {
+	b.mu.Lock()
+	claimed := !j.retired
+	j.retired = true
+	j.terminal = true
+	b.mu.Unlock()
+	if claimed {
+		close(j.retireDone)
+	}
+}
+
 func (b *broker) retireAll() {
 	b.mu.Lock()
 	jobs := make([]*job, 0, len(b.jobs))
 	for _, id := range b.jobOrder {
-		if j := b.jobs[id]; !j.retired {
+		if j := b.jobs[id]; j != nil {
 			jobs = append(jobs, j)
 		}
 	}
@@ -947,7 +967,7 @@ func (b *broker) retireSubtree(node *scopeNode) {
 	b.mu.Lock()
 	jobs := make([]*job, 0)
 	for _, id := range b.jobOrder {
-		if j := b.jobs[id]; !j.retired && j.scope.inSubtree(node) {
+		if j := b.jobs[id]; j != nil && j.scope.inSubtree(node) {
 			jobs = append(jobs, j)
 		}
 	}

@@ -42,6 +42,17 @@ under their version heading when a release is cut.
   sweep never did. The harness now joins the broker goroutine it started as part of its cleanup,
   and each case retires and joins the broker built from the previous hook before replacing it.
   Test-only: no product behaviour changed.
+- **A scope close joins a retirement already claimed instead of collecting nothing.** The join
+  0.7.0 gave `retireJob` was unreachable for the case it was written for: both collectors filtered
+  the job table on jobs no retirement had claimed, so a job claimed before the snapshot was never
+  passed to the join at all. A `Run` cancelled by its caller is retired on its own goroutine, and
+  the close that follows it arrived while that retirement sat between marking the job terminated
+  and reaping its guardian, so the close published that half-written state:
+  `cleanup-failed` with `Terminated:true Reaped:false` and no diagnostic, on a job that went on to
+  reap cleanly. `go test -race -count=5 ./internal/processscope` reported it on an idle host. Both
+  collectors now pass every job in scope through the join, which returns at once for a retirement
+  that has already settled, and the claim itself is taken and read under the broker's own lock. No
+  budget or cap changed.
 - **A scope close reports the settled state of a job already being retired.** A job cancelled by
   its caller is retired on its own goroutine, and the guardian may report the target's death as an
   ordinary exit rather than a terminal drain, so `Run` returns while that retirement is still
