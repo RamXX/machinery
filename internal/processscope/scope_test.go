@@ -837,3 +837,88 @@ func TestCloseJoinsARetirementAlreadyInFlight(t *testing.T) {
 		t.Fatal("the claiming retirement never finished")
 	}
 }
+
+// TestChannelHoldsHandedOverDescriptorUntilOwnerSpeaks pins the ownership rule
+// for a descriptor this side hands to another process: the sender keeps its own
+// open reference for as long as the descriptor is in flight, and releases it
+// only once the owner has proved it holds it, by the first record it sends.
+//
+// A descriptor whose only reference is the copy in flight on another socket is
+// what the platform's in-flight descriptor collector treats as unreachable. The
+// socket it names is then flushed under its new owner: the owner can still send
+// on it, and every read it ever makes returns end of file, which every caller
+// reads as a broker that closed the channel.
+func TestChannelHoldsHandedOverDescriptorUntilOwnerSpeaks(t *testing.T) {
+	a, b, err := newChannelPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	served := mustConn(a)
+	if served == nil {
+		t.Fatal("served channel end is not a unix connection")
+	}
+	// The owner's own copy of the handed-over descriptor, as a receiver would
+	// hold it after taking it off the wire.
+	owner, err := connFromFile(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer owner.Close()
+
+	ch := &channel{c: served, bound: "scope-handover", peer: b}
+	ch.fr = newFrameReader(served)
+	if !channelHoldsPeer(ch) {
+		t.Fatal("a channel must hold its own reference to the descriptor it was handed over on")
+	}
+
+	br := &broker{
+		rootID:       "root-handover",
+		wallDeadline: time.Now().Add(time.Minute),
+		scopes:       map[string]*scopeNode{},
+		jobs:         map[string]*job{},
+		containers:   map[string]*containerRec{},
+		nonces:       map[string]*attachRec{},
+		authorize:    hookAuthorizeRequest,
+		register:     hookRegisterJob,
+		groupSignal:  hookGroupSignal,
+	}
+	done := make(chan struct{})
+	go func() {
+		br.serveChannel(ch)
+		close(done)
+	}()
+
+	if channelHoldsPeer(ch) != true {
+		t.Fatal("the reference must still be held while nothing has been received")
+	}
+	if err := writeJSONFrame(owner, msgHello{T: "hello", Scope: "scope-handover", Role: RoleJoined}); err != nil {
+		t.Fatal(err)
+	}
+	var welcome msgWelcome
+	if err := readJSONFrame(owner, &welcome); err != nil {
+		t.Fatal(err)
+	}
+	if welcome.T != "welcome" || welcome.Root != br.rootID {
+		t.Fatalf("owner handshake: %+v", welcome)
+	}
+	// The reply just read was sent after the record that carried the owner's
+	// proof, so the release has already happened.
+	if channelHoldsPeer(ch) {
+		t.Fatal("the reference must be released once the owner has proved it holds the descriptor")
+	}
+	// The released reference is this side's alone: the owner's copy still works.
+	if err := writeJSONFrame(owner, msgHello{T: "hello", Scope: "scope-handover", Role: RoleJoined}); err != nil {
+		t.Fatalf("owner descriptor must survive the release: %v", err)
+	}
+	if err := readJSONFrame(owner, &welcome); err != nil {
+		t.Fatalf("owner descriptor must survive the release: %v", err)
+	}
+	owner.Close()
+	<-done
+}
+
+func channelHoldsPeer(ch *channel) bool {
+	ch.peerMu.Lock()
+	defer ch.peerMu.Unlock()
+	return ch.peer != nil
+}

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"syscall"
 	"time"
@@ -121,6 +122,12 @@ func writeFrame(c *net.UnixConn, payload []byte, files ...*os.File) error {
 	// any byte of it. Treating the short write as a failure truncated exactly
 	// the records that grow with the work: a cleanup report naming every
 	// retired job of a large run.
+	// The rights carry raw descriptor numbers, which are only meaningful for
+	// as long as the files that own them are alive: a file collected between
+	// the number being read and the send that transfers it takes its
+	// descriptor with it, and the send transfers a number that now names
+	// something else or nothing at all.
+	defer runtime.KeepAlive(files)
 	for off := 0; off < len(msg); {
 		n, _, err := c.WriteMsgUnix(msg[off:], oob, nil)
 		if err != nil {

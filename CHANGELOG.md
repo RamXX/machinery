@@ -10,6 +10,20 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A child scope's control channel is no longer collected while its descriptor is in flight.**
+  The broker created the socket pair for a new child scope, sent one end to the caller, and closed
+  its own copy the moment the send returned. For as long as the descriptor was in flight its only
+  reference was the copy inside that message, which is what the platform's in-flight descriptor
+  collector treats as unreachable: it flushes the receive side of the socket the descriptor names.
+  The caller received a live, connected channel it could still send on and every read of which
+  returned end of file, so its next request failed `STALE_CAPABILITY: scope-...: broker channel
+  closed` while the broker was alive, healthy, and still serving that very channel. On a loaded
+  host this took out roughly one run in six of a 200-retirement custody run, and in a
+  `verify-formal` pass it ends the run. The sender now keeps its own reference to a handed-over
+  descriptor for as long as it is in flight and releases it once the owner proves it holds it,
+  with the first record it sends; the capability channel a joined child is launched with follows
+  the same rule, and a control record's descriptor rights are held alive across the send that
+  transfers them. No budget or cap changed.
 - **A scope close reports the settled state of a job already being retired.** A job cancelled by
   its caller is retired on its own goroutine, and the guardian may report the target's death as an
   ordinary exit rather than a terminal drain, so `Run` returns while that retirement is still

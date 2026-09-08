@@ -77,6 +77,30 @@ type channel struct {
 	wmu   sync.Mutex
 	fr    *frameReader
 	bound string
+
+	// peer is this side's own open reference to the descriptor this channel
+	// was handed to its owner over. A descriptor whose only reference is the
+	// copy in flight on another socket is what the platform's in-flight
+	// descriptor collector treats as unreachable, and the socket it names is
+	// then flushed under its new owner: the owner can still send on it, and
+	// every read it ever makes returns end of file. Holding this reference
+	// keeps the descriptor reachable from a descriptor table for as long as
+	// it is in flight. It is released as soon as the owner proves it holds
+	// the descriptor, by the first record it sends.
+	peerMu sync.Mutex
+	peer   *os.File
+}
+
+// releasePeer drops this side's reference to the handed-over descriptor. It is
+// safe to call more than once and from more than one goroutine.
+func (ch *channel) releasePeer() {
+	ch.peerMu.Lock()
+	f := ch.peer
+	ch.peer = nil
+	ch.peerMu.Unlock()
+	if f != nil {
+		f.Close()
+	}
 }
 
 func (ch *channel) send(v any) error {
@@ -346,11 +370,16 @@ func mustRandomHex(n int) string {
 }
 
 func (b *broker) serveChannel(ch *channel) {
+	defer ch.releasePeer()
 	for {
 		payload, files, err := ch.fr.read()
 		if err != nil {
 			return
 		}
+		// A record read here was sent by the owner of the far end, so the
+		// descriptor this channel was handed over on has left flight and no
+		// longer needs this side's reference to stay reachable.
+		ch.releasePeer()
 		if quit := b.dispatch(ch, payload, files); quit {
 			return
 		}
@@ -472,14 +501,16 @@ func (b *broker) dispatch(ch *channel, payload []byte, files []*os.File) bool {
 			_ = ch.send(msgRefused{T: "refused", Code: CodeInternalError, Subject: "child", Message: "channel creation failed"})
 			return false
 		}
-		childCh := &channel{c: mustConn(a), bound: child.id}
+		childCh := &channel{c: mustConn(a), bound: child.id, peer: bb}
 		childCh.fr = newFrameReader(childCh.c)
-		go b.serveChannel(childCh)
 		if err := ch.sendWith(msgChildOK{T: "childok", Scope: child.id}, bb); err != nil {
-			bb.Close()
+			childCh.releasePeer()
+			if childCh.c != nil {
+				childCh.c.Close()
+			}
 			return false
 		}
-		bb.Close()
+		go b.serveChannel(childCh)
 	case "regcontainer":
 		var m msgRegContainer
 		if err := json.Unmarshal(payload, &m); err != nil {
@@ -564,6 +595,7 @@ func (b *broker) handleRun(ch *channel, m msgRun, files []*os.File) {
 
 	jobScope := node
 	var capConn *os.File
+	var capOwner *channel
 	if rec.cap {
 		child := b.newScope(node)
 		spec.ScopeID = child.id
@@ -574,10 +606,11 @@ func (b *broker) handleRun(ch *channel, m msgRun, files []*os.File) {
 		}
 		spec.CapEnv = encodeCapabilityEnv(3, child.id, b.rootID, b.wallDeadline)
 		spec.FDCap = true
-		capCh := &channel{c: mustConn(ca), bound: child.id}
+		capCh := &channel{c: mustConn(ca), bound: child.id, peer: cb}
 		capCh.fr = newFrameReader(capCh.c)
 		go b.serveChannel(capCh)
 		capConn = cb
+		capOwner = capCh
 		env := make([]string, 0, len(spec.Env))
 		for _, e := range spec.Env {
 			if e == EnvChildRequest+"=join" {
@@ -612,8 +645,8 @@ func (b *broker) handleRun(ch *channel, m msgRun, files []*os.File) {
 		}
 	}
 	if want != need {
-		if capConn != nil {
-			capConn.Close()
+		if capOwner != nil {
+			capOwner.releasePeer()
 		}
 		_ = ch.send(msgRefused{T: "refused", Code: CodeInvalidCommand, Subject: "run", Message: "stdio descriptor set does not match streams"})
 		return
@@ -693,12 +726,23 @@ func (b *broker) handleRun(ch *channel, m msgRun, files []*os.File) {
 	j.gconn = gch.c
 
 	if err := gch.sendWith(msgJob{T: "job", Spec: spec}, files...); err != nil {
+		// No target will ever join through this capability, so nothing is
+		// left to keep the descriptor reachable for.
+		if capOwner != nil {
+			capOwner.releasePeer()
+		}
 		j.once.Do(func() { j.cancelCode = CodeInternalError })
 		b.retireJob(j)
 		_ = ch.send(msgRefused{T: "refused", Code: CodeInternalError, Subject: "run", Message: "guardian dispatch failed"})
 		return
 	}
 	for _, f := range files {
+		// The capability descriptor stays owned by the channel that serves
+		// it until the joining child proves it holds it; every other
+		// descriptor in this record was borrowed for the send alone.
+		if capConn != nil && f == capConn {
+			continue
+		}
 		f.Close()
 	}
 
