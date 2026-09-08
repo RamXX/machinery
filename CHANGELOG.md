@@ -179,3 +179,206 @@ under their version heading when a release is cut.
   steps the ratchet actually needs.
 - **Milestone packets satisfy the standalone portfolio contract**, and incomplete executable
   assurance declarations are rejected.
+
+### Compatibility and migration
+
+Every tightening below is deliberate and was accepted with its own evidence before release; none of
+it is incidental. A design that was green on v0.6.11 can still become blocking on 0.7.0 without any
+design edit, so each entry states what still works unchanged, what is rejected now, the exact
+finding a consumer sees, and the exact edit or command that migrates. The reference counts come
+from one real private design that exited 0 on v0.6.11 and reports 78 blocking findings on 0.7.0.
+
+**Regeneration stamp.** Upgrading restamps generated artifacts and nothing else. The families that
+carry `machinery-version:` are `machines/*.tla`, `machines/*.cfg`, `machines/*.oracle.md`, and
+`formal/*.als`; on the reference design that is 254 files whose only changed line moves from
+`machinery-version: v0.6.11` to `machinery-version: v0.7.0`. Regenerate with the commands the gate
+suite prints for the design (`machinery oracle <design>`, `machinery tla <design>`,
+`machinery alloy <design>`, `machinery refine`/`machinery compose`/`machinery pack generate` where
+the design carries those families) and commit the stamp-only diff on its own.
+
+**Per-edge consumer `READS` declarations (`Gx-trace`, armed designs only).** Unchanged: a design
+that does not arm `machinery:reads-complete` in `ARCHITECTURE.md` is untouched, and a single-
+consumer event keeps its existing single `READS{...}` declaration as long as ownership resolves to
+exactly one participant. Rejected now: an event that fans out to two or more consumers, where one
+`READS{...}` used to satisfy every participant. Each `(event, consumer)` edge owes its own
+declaration. Finding (45 on the reference design):
+
+```
+event-contract row 7 (event 'markPaid'): no consumer READS declaration for event 'markPaid', consumer 'audit'; state READS{field, ...} beside the event name and name this participant in the matrix consumer column, or waive this consumer cell with '(no reads: <reason>)'
+```
+
+Migrate: in the payload matrix, give the row a `consumer` column naming the exact event-contract
+participant and write that participant's own `READS{...}`; repeat per consumer. A participant that
+reads nothing gets `(no reads: <reason>)` in its consumer cell instead. A waiver never transfers to
+a sibling, and one consumer may read a strict superset without imposing it on the others.
+
+**Legacy `READS` with ambiguous consumer ownership.** Unchanged: a legacy declaration with no
+consumer column still resolves when the event has exactly one distinct, named owner. Rejected now:
+the same declaration when the event has more than one participant, or an unnamed one. Finding (26
+on the reference design):
+
+```
+Payments.matrix.md:41: legacy READS for event 'markPaid' has ambiguous consumer ownership; add an explicit consumer column matching each event-contract participant
+```
+
+Migrate: add the `consumer` column to that matrix table and split the row per participant, as
+above. A consumer name that is not an exact event-contract participant is its own finding
+(`names consumer '...', not an exact event-contract consumer`), so copy the participant spelling
+from the `ARCHITECTURE.md` event-contract table.
+
+**Conflicting `READS` field sets across rows and matrices.** Unchanged: repeating the same edge
+with the identical field set in several rows or several matrices. Rejected now: two rows for one
+`(event, consumer)` edge whose exact field sets differ. Finding (4 on the reference design):
+
+```
+Audit.matrix.md:12: conflicting READS for event 'markPaid', consumer 'audit'; exact field set differs from Payments.matrix.md:41 (all rows and machines for this edge must agree)
+```
+
+Migrate: pick the true read set for that edge and make every row and machine state it identically,
+or split the edge by naming distinct consumers.
+
+**One complete `READS` group per row.** Unchanged: `READS` as an English verb in residual prose or
+in a contract cell ("the projection only READS those rows") is narrative again and is no longer
+collected as a declaration; a member is any trimmed, non-empty text in the design's ubiquitous
+language, so `READS{Order.id, occurrence time, PAIR KEY}` declares three fields. Rejected now: a
+row that carries a `READS{...}` group wrapped across two markdown lines, two groups on one row, or
+a group with an empty or duplicated member. Findings (1 on the reference design):
+
+```
+Payments.matrix.md:62: event 'markPaid', consumer 'ledger': expected exactly one complete READS{field, ...} declaration per row
+Payments.matrix.md:62: event 'markPaid', consumer 'ledger': empty READS member ''; name each field explicitly, and drop the stray separator
+```
+
+Migrate: join the wrapped group onto one line so the row carries exactly one closed
+`READS{field, ...}`, and drop the stray separator that produced the empty member.
+
+**One `CLAUSES` vocabulary per row (`Gd-idcite`).** Unchanged: a matrix's prose is narrative, not a
+declaration. An invariant-coverage bullet that quotes a guard's vocabulary, a contract cell that
+mentions "the CLAUSES declaration here", a description of a `RETIRED` site, an enumeration wrapped
+across lines, and a row for a non-guard unit are all accepted exactly as they were on v0.6.11.
+Rejected now: a named-unit contract row carrying two `CLAUSES{...}` groups, or a `RETIRED{...}`
+group that the declaration itself does not carry, because such a row names no single vocabulary.
+Finding (1 on the reference design):
+
+```
+Payments.matrix.md:18: machine "Payments" guard "guardPaid": malformed CLAUSES declaration; require one named row with a single CLAUSES{...} and optional RETIRED{...}
+```
+
+Migrate: keep one `CLAUSES{...}` group, with at most one `RETIRED{...}` inside the same
+declaration, on the unit's own row of the named-unit contract table.
+
+**Guard clause ownership resolves against sibling oracles.** Unchanged: a declared guard that no
+committed oracle governs at all owes nothing and reports nothing, which is v0.6.11 behavior
+restored. This covers the common creation-edge guard: a guard that gates an insert rather than a
+guarded transition is silent, and 0.7.0 does not require it to gate a transition. Rejected now: a
+declaration in `Alpha.matrix.md` whose falsifying-clause rows only `Beta.oracle.md` could supply.
+`Alpha.matrix.md` binds only `Alpha.machine.json` and `Alpha.oracle.md`, so two machines may reuse
+one guard name without either arming or satisfying the other's obligation. Finding:
+
+```
+Alpha.matrix.md:23: machine "Alpha" guard "guardApproved": owning oracle has no transition governed by this guard, but Beta's does; another machine cannot supply it
+```
+
+Migrate: move the declaration to the matrix of the machine whose oracle governs the guard.
+
+**Oracle coverage (`Gt-tests`) credits active discovery only.** Unchanged: a suite that names each
+stable id as a whole token in an active test body, or that cites the oracle file by name inside a
+single test with a connected read-parse-assert flow, still passes; `Gt` still executes no tests and
+labels itself `static discovery; tests not executed; unsupported parser structures remain
+uncovered`. Rejected now: evidence that is not executable at all, which used to pass: commented-out
+or disabled tests, unused declarations, uncalled parsers and helpers, and mentions outside a test
+body. Finding:
+
+```
+Payments.oracle.md: 12 of 40 stable ids appear in no test file (PAY-001, PAY-002, ...); key the tests on the stable ids, or parse the committed table at runtime by naming Payments.oracle.md in a test
+```
+
+Migrate: move the id references into active test bodies, or keep one real test that reads and
+parses the committed oracle table.
+
+**Attestation evidence v2 kinds (`Gv-attest`).** Unchanged: `attestation_version: 1` files still
+parse, and every claim the vocabulary classifies as design-only keeps passing as an implicit plan
+judgment, with a note asking for the explicit kind. `machinery check <design>` on a design-only
+design reports its missing-current warnings and still exits 0. Rejected now: a v1 row for a claim
+the vocabulary classifies as `current` (`gt.conformance-test-shape`, `g4.zero-context`,
+`g4.standin-coverage`, `g4.pack-event-discipline`, `ga.review-quality`), which used to pass as a
+design-only cover; a v2 `kind: current` row with no complete implementation subject; and a
+`kind: current` row evaluated without `--impl`. Findings:
+
+```
+GV_MISSING_IMPLEMENTATION_SUBJECT: gt.conformance-test-shape has legacy design-only covers; review the complete implementation/test scope and run machinery attest --design <design> --claim gt.conformance-test-shape --kind current --impl <root> --attestor <reviewer> --date YYYY-MM-DD, or explicitly recast as v2 kind=plan
+GV_MISSING_IMPLEMENTATION_SUBJECT: gt.conformance-test-shape requires a complete implementation subject
+GV_IMPL_REQUIRED: gt.conformance-test-shape requires --impl <reviewed-root>; the receipt locator grants no read authority
+```
+
+Migrate, whichever is true of the design. Design-only, no implementation to review yet: set
+`attestation_version: 2` and add `kind: plan` to the row; `machinery check` then warns
+`gt.conformance-test-shape: plan only; current implementation review missing` and exits 0. A real
+reviewed implementation: run
+
+```
+machinery attest --design <design> --claim <claim> --kind current --impl <root> --attestor <reviewer> --date YYYY-MM-DD
+```
+
+and pass `--impl <root>` to every later `machinery check` that evaluates the claim. A subject whose
+bytes move after the review invalidates it (`GV_STALE_CONTENT`, `GV_SCOPE_INVENTORY`); review the
+changed scope and attest again. Historical acceptance-file judgments take `kind: historical` and
+establish history, not current approval.
+
+**`--impl` arming.** Unchanged: `G4-import` and `Gt-tests` still run only when `--impl` is
+supplied; `--complete` still requires `--impl`; an explicit `--gate g4` or `--gate gt` without
+`--impl` is still an invocation error. Changed: a decomposed parent with no `machines/` and a
+supplied `--impl` now also runs `Gt` when the parent owns relational obligations (a policy or
+isolation annotation, or a committed relational oracle under `formal/`). v0.6.11 dropped `Gt` for
+that parent and reported nothing, so its policy and isolation test obligations were invisible.
+The selection note says so: `gt checks parent-owned relational obligations`. Migrate: give the
+parent's own tests the parent oracle's stable ids, or run without `--impl` to keep the design-only
+selection.
+
+**`G4-import` ignore globs.** Unchanged, and stated because it is easy to reach for the wrong file:
+`G4` prunes the implementation tree with the `ignore` glob list of the Architecture Contract in
+`ARCHITECTURE.md`, not with `.machineryignore`. `.machineryignore` at the design root still governs
+design-tree reads only, with the same gitignore-shaped subset (no negations, no re-inclusions).
+Neither file changed in 0.7.0.
+
+**Regeneration advice no longer proposes `machinery baseline`.** Unchanged: `machinery baseline
+<design> --impl <dir>` remains a supported explicit command. Changed: a version-skew or
+regeneration message on a design carrying a ratchet no longer lists it among the regeneration
+steps, because a baseline snapshot accepts tolerated import offenders and can widen accepted
+architecture debt. Its own output and help now say that a baseline accepts debt and needs review
+even when it proposes no new dependency rule. Migrate: nothing, unless a script pasted the printed
+regeneration list verbatim, in which case drop the baseline line from it and run baselines
+deliberately.
+
+**Installer reruns and update receipts.** Unchanged: `machinery update` without selectors, and
+explicit `--home`/`--target` selectors, behave as before; selectors still cannot be combined with
+`--bootstrap-defaults`. Changed: rerunning the one-line installer over an existing install now
+refreshes the complete recorded home, native-target, and host-plugin plan, preserving each recorded
+group's copy/symlink mode, instead of refreshing the default homes only. Rejected now: a corrupt,
+unsupported, or unsafe receipt, an unsafe artifact or parent substitution, and uncertain plugin
+ownership all fail closed with a diagnostic naming the problem, including under `--skip-plugins`,
+where older releases silently refreshed the default homes instead. Safely edited or missing owned
+regular content with unchanged safe parents is repaired to exact current-release content. Migrate:
+a failing rerun names the problem; repair or remove the reported artifact and rerun, or run
+`machinery install` with explicit `--home`/`--target` selectors to record a fresh plan.
+
+**Host plugin refresh failures are returned failures.** Changed: a missing host CLI, a failed or
+misunderstood plugin inventory, or a failed refresh is now a returned error naming the exact retry,
+where 0.6.11 reported a warning over a claimed-successful update. The direct update stays
+committed, and the retry obligation is recorded for the next update. Host-owned plugin caches are
+never rolled back by machinery. Migrate: run the exact command the error names (for Claude Code,
+`claude plugin update machinery@machinery`), or pass `--skip-plugins` to opt out of host plugin
+refresh entirely.
+
+**windows/amd64 release artifacts without installer support.** Added, with a stated limit: releases
+now publish `machinery-windows-amd64` and `machinery_<version>_windows_amd64.tar.gz`, but the
+one-line installer and `machinery update` still refuse Windows, so the asset is downloaded and
+placed by hand. Native Windows runtime guarantees are not claimed: process custody, formal
+verification, and the assurance lanes are unix-only and refuse on Windows. Migrate: use Linux or
+macOS for the full toolchain.
+
+**Contributors: the `SKIP_PREFLIGHT` bypass is gone.** Rejected now: `SKIP_PREFLIGHT=1 git push`.
+`scripts/preflight.sh` no longer honors the variable, and the pre-push hook, `CONTRIBUTING.md`, and
+the `make hooks` message say so. Migrate: run the full preflight, or remove the hook locally
+(`git config --unset core.hooksPath`) and accept that the exact-commit release gate is the only
+remaining check.
