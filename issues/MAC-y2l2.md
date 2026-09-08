@@ -11,6 +11,7 @@ updated_at: 2026-09-08T07:41:46Z
 content_hash: "sha256:ced2353e2c057d35d38bb1f9670652bf06f513ee767b34f4e5d4a5cc0bd89999"
 assignee: dev-MAC-y2l2
 follows: [MAC-3hzt, MAC-r0hy]
+labels: [delivered]
 ---
 
 ## Description
