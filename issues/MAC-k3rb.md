@@ -1,14 +1,16 @@
 ---
 id: MAC-k3rb
 title: "elixir adapter: ExUnit teardown noproc under load is reported as BUILD_ERROR after a completed run"
-status: open
+status: closed
 priority: 2
 type: bug
 labels: [flaky-under-load, adapters, elixir]
 created_at: 2026-09-08T08:21:09Z
 created_by: ramirosalas
-updated_at: 2026-09-08T11:44:38Z
-content_hash: "sha256:42385fe65d039e26626bee1a3a54c3f36c4eb6087128df6545e3d2226f440df8"
+updated_at: 2026-09-08T11:45:30Z
+content_hash: "sha256:d15352c57b640221464609b49c57a8099f872d0ce3d3e949d1455eb58daad11b"
+closed_at: 2026-09-08T11:45:30Z
+close_reason: "Fixed in 4d789cf (reporter no longer stops itself in suite_finished; post-execution faults classified UNEXPECTED_FAILURE, not BUILD_ERROR); landed on main"
 ---
 
 ## Description
@@ -43,7 +45,7 @@ Reproduce under load, decide the classification, and make the harness shutdown d
 
 
 ## History
-
+- 2026-09-08T11:45:30Z status: open -> closed
 
 ## Links
 
