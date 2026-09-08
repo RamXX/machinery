@@ -7,8 +7,8 @@ type: bug
 labels: [ci, lint, portability]
 created_at: 2026-09-08T12:44:36Z
 created_by: ramirosalas
-updated_at: 2026-09-08T12:44:36Z
-content_hash: "sha256:ef4c4ac9432093ccfafe447f053d011e1b109364eb7bf5fc58b9f76d096bce7e"
+updated_at: 2026-09-08T12:46:29Z
+content_hash: "sha256:5d208bf5ba7806f04e0ca643f41bb7665c828363abf519901ec05c802e555bad"
 ---
 
 ## Description
@@ -62,3 +62,14 @@ every supported unix target.
 
 
 ## Comments
+
+### 2026-09-08T12:46:29Z ramirosalas
+Fixed on fix/ci-mirror at 08b698d.
+
+internal/tdd/inode_unix.go:17 widened both Dev and Ino through a new type-parameterized helper widenIdentityField, so the conversion is never an identity conversion in any instantiation and needs no nolint.
+
+Verification:
+- GOOS=linux GOARCH=amd64 golangci-lint run --config .golangci.yml ./internal/tdd/... -> 0 issues (the same command on the pre-fix file reproduces the CI line verbatim).
+- golangci-lint run --config .golangci.yml ./internal/tdd/... (darwin/arm64) -> 0 issues.
+- go test -count=1 -run 'Inode|Widen|Hardlink' ./internal/tdd/ -> ok.
+- GOOS=linux go build ./internal/tdd/ -> ok.
