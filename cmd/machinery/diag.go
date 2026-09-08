@@ -19,6 +19,7 @@ import (
 
 	"github.com/RamXX/machinery/internal/checker"
 	"github.com/RamXX/machinery/internal/dirscan"
+	"github.com/RamXX/machinery/internal/hook"
 	"github.com/RamXX/machinery/internal/install"
 	"github.com/RamXX/machinery/internal/processcontrol"
 	"github.com/RamXX/machinery/internal/runtimeclosure"
@@ -241,8 +242,8 @@ func diagnosticPATHCandidateError(name string) error {
 // doctorRun mirrors the Makefile `doctor` target: preflight + install status.
 // With targets it checks each host's native adapter; without them it preserves
 // the original ~/.claude + ~/.agents report.
-func doctorRunTo(targets []string, out io.Writer) error {
-	return install.WithInstallInspectionLock(func() error { return doctorRunUnlockedTo(targets, out) })
+func doctorRunTo(targets []string, repair bool, out io.Writer) error {
+	return install.WithInstallInspectionLock(func() error { return doctorRunUnlockedTo(targets, repair, out) })
 }
 
 type diagnosticOutput struct {
@@ -265,7 +266,7 @@ func (output *diagnosticOutput) Write(p []byte) (int, error) {
 	return written, nil
 }
 
-func doctorRunUnlockedTo(targets []string, out io.Writer) (result error) {
+func doctorRunUnlockedTo(targets []string, repair bool, out io.Writer) (result error) {
 	output := &diagnosticOutput{destination: out}
 	out = output
 	defer func() { result = errors.Join(result, output.err) }()
@@ -299,6 +300,9 @@ func doctorRunUnlockedTo(targets []string, out io.Writer) (result error) {
 		}
 		if !reportUpdateReceipt(out) {
 			failures = append(failures, errors.New("update receipt is unreadable"))
+		}
+		if !reportHookStateStore(out, repair) {
+			failures = append(failures, errors.New("governance hook state store needs attention"))
 		}
 		return errors.Join(failures...)
 	}
@@ -346,6 +350,9 @@ func doctorRunUnlockedTo(targets []string, out io.Writer) (result error) {
 	if !reportUpdateReceipt(out) {
 		failures = append(failures, errors.New("update receipt is unreadable"))
 	}
+	if !reportHookStateStore(out, repair) {
+		failures = append(failures, errors.New("governance hook state store needs attention"))
+	}
 	return errors.Join(failures...)
 }
 
@@ -375,6 +382,20 @@ func reportSkillRelease(out io.Writer, skillDir string) error {
 		return fmt.Errorf("installed skill at %s is release %s, want %s", skillDir, got, want)
 	}
 	return nil
+}
+
+// reportHookStateStore states the governance hook state store's retention
+// status and, with repair, compacts it. Both read the store under a repair
+// ceiling, so doctor still works on the one store that matters: the one
+// already over its fail-closed limit, where every governed shell and write
+// tool in every repository on this machine is blocked.
+func reportHookStateStore(out io.Writer, repair bool) bool {
+	ok, err := hook.StateReport(out, repair)
+	if err != nil {
+		fmt.Fprintf(out, "  ERROR    governance hook state store report failed: %v\n", err)
+		return false
+	}
+	return ok
 }
 
 // reportCheckerBinaries checks that every checker configured in the local

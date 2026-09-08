@@ -455,8 +455,10 @@ only a fully revalidated publication.
 
 ### Prerequisites
 
-`machinery doctor` reports prerequisite and installation status. `machinery preflight` enforces the
-required versions and release checks. Neither command installs anything.
+`machinery doctor` reports prerequisite and installation status, including the governance hook state
+store described under [the plugin's durable state](docs/claude-plugin.md#the-durable-state-store-and-its-retention);
+`machinery doctor --repair` compacts that store. `machinery preflight` enforces the required versions
+and release checks. Neither command installs anything.
 
 **Required**
 

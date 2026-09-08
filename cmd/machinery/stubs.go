@@ -102,13 +102,16 @@ func openCandidateProcessScope(ctx context.Context) (processscope.Scope, error) 
 
 func newDoctorCmd() *cobra.Command {
 	var targets []string
+	var repair bool
 	c := &cobra.Command{Use: "doctor", Short: "Check prerequisites and install status", Args: cobra.NoArgs}
 	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
 		output := trackCommandOutput()
 		defer func() { retErr = output.join(retErr) }()
-		return doctorRunTo(targets, output.stdout)
+		return doctorRunTo(targets, repair, output.stdout)
 	}
 	c.Flags().StringArrayVar(&targets, "target", nil, "host adapter to inspect: claude, codex, opencode, or all (repeatable)")
+	c.Flags().BoolVar(&repair, "repair", false,
+		"compact the governance hook state store, reclaiming obligations whose project root no longer exists")
 	return c
 }
 

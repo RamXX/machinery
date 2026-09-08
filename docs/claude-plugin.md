@@ -182,5 +182,48 @@ loudly, it does not silently disable governance.
   `internal/gates.Select` / `RunSelected`. A missing or failing binary in a managed project blocks
   with a nonzero exit so a broken guard cannot silently become no governance.
 
+## The durable state store and its retention
+
+The obligation a governed edit arms has to outlive the process that armed it: a crash, a reboot, or a
+replacement session must still owe the stop-time gate run. It therefore lives outside the repository,
+in one per-user store under the user config directory (`machinery-hook-state-<home digest>/`), keyed
+by canonical project root: one ledger per root, plus one small route snapshot per host session that
+records which routing configuration the obligation was armed under. A successful stop-time check
+removes both.
+
+Every inventory of that store is bounded, and past 4096 entries the bound fails closed, which is
+correct for one store and catastrophic for the machine: with the store full, every governed shell and
+write tool in every repository is blocked. A store only grows through obligations nothing ever
+discharges, and a heavy local test sweep produces them by the thousand, one per temporary project
+root it creates, governs, and deletes.
+
+Retention keeps the store bounded on the write path, with two constants (`internal/hook/retention.go`):
+
+- at most 8 route snapshots per project root, newest first;
+- a store-wide retention ceiling of 512 entries, an eighth of the fail-closed limit, above which an
+  arming write compacts the store back to 256.
+
+Compaction reclaims whole generations, oldest first, and only those it can prove are dead: the ledger
+records its project root, and that root no longer exists on disk. A generation whose root still
+exists, whose ledger is absent, unparseable, or predates the recorded root, or which holds durable
+crash evidence, is never reclaimed, so compaction can shrink the store but can never discharge a live
+obligation. Reclamation runs in bounded batches under a store-wide lock, so bulk removal never
+outlasts the bounded enumeration retry of a governed event in another repository.
+
+A store that is already at or above the fail-closed limit, left by an older version, repairs itself:
+the first inventory that hits the limit compacts once under a repair-mode ceiling and retries. If the
+store is still over the limit afterwards, the hook keeps failing closed and its diagnostic names the
+store, the counts, and `machinery doctor --repair`, which compacts the same way from the command line
+and works at or above the limit. `machinery doctor` alone only reports.
+
+Two residuals are stated rather than hidden. An absent project root is indistinguishable from one on
+detached or unmounted storage, so an obligation for a project on a disconnected volume can be
+reclaimed while the store is over its ceiling; the next governed edit in that project re-arms the
+whole-tree obligation. And the ledger carries its project root from this version on, so a binary
+older than this one reads such a ledger as noncanonical and fails closed on it: a downgrade that
+meets a newer ledger blocks until the affected `<digest>.state` files are removed. Remove those
+files, never the store directory, whose initialization marker is what tells a first run from a lost
+store.
+
 Hooks load at session start: after installing or upgrading the plugin, restart the Claude Code
 session in the project.

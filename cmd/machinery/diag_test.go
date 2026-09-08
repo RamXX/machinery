@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -150,7 +151,7 @@ func TestDoctorDefaultRoutesAllOutputToCustomSink(t *testing.T) {
 	oldStdout := stdoutW
 	stdoutW = &global
 	t.Cleanup(func() { stdoutW = oldStdout })
-	_ = doctorRunUnlockedTo(nil, &custom)
+	_ = doctorRunUnlockedTo(nil, false, &custom)
 	if global.Len() != 0 {
 		t.Fatalf("default doctor bypassed custom sink:\n%s", global.String())
 	}
@@ -169,7 +170,7 @@ func TestDoctorPropagatesOutputFailure(t *testing.T) {
 	t.Setenv(runtimeclosure.JavaEnv, "")
 	t.Setenv(structurizrEnv, "")
 	sentinel := errors.New("closed diagnostic sink")
-	err := doctorRunUnlockedTo(nil, brokenDiagnosticWriter{err: sentinel})
+	err := doctorRunUnlockedTo(nil, false, brokenDiagnosticWriter{err: sentinel})
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("doctor discarded output failure: %v", err)
 	}
@@ -514,4 +515,106 @@ func TestDoctorReportsSkillReleaseAgainstRunningBinary(t *testing.T) {
 	if got := out.String(); !strings.Contains(got, "ERROR    skill at "+unreadable) || !strings.Contains(got, "run machinery update") {
 		t.Errorf("unreadable diagnostic = %q", got)
 	}
+}
+
+// TestDoctorReportsAndRepairsTheGovernanceHookStateStore covers the half of
+// the hook-state incident a user can act on: the store is already past its
+// fail-closed limit, every governed tool is blocked, and doctor must be able
+// to state and repair machinery's own state instead of failing on it.
+func TestDoctorReportsAndRepairsTheGovernanceHookStateStore(t *testing.T) {
+	base := t.TempDir()
+	home, config := filepath.Join(base, "home"), filepath.Join(base, "config")
+	for _, dir := range []string{home, config} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
+	t.Setenv("MACHINERY_CONFIG_DIR", privateTestConfigDir(t))
+	t.Setenv(runtimeclosure.JavaEnv, "")
+	t.Setenv(structurizrEnv, "")
+
+	// Arm one real governance obligation, then delete its project root: this
+	// is exactly what a local test sweep leaves behind, thousands of times.
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "design"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "design", "domain.modelith.yaml"), []byte("model: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	event := `{"hook_event_name":"PreToolUse","tool_name":"Bash","session_id":"doctor","tool_use_id":"doctor-op","tool_input":{"command":"echo governed"}}`
+	if out := runHookCmd(t, root, event); out != "" {
+		t.Fatalf("governed shell event was not allowed: %s", out)
+	}
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stores, err := filepath.Glob(filepath.Join(configDir, "machinery-hook-state-*"))
+	if err != nil || len(stores) != 1 {
+		t.Fatalf("hook state stores = %v (%v)", stores, err)
+	}
+	store := stores[0]
+	ledgers, err := filepath.Glob(filepath.Join(store, "*.state"))
+	if err != nil || len(ledgers) != 1 {
+		t.Fatalf("armed ledgers = %v (%v)", ledgers, err)
+	}
+	ledger, err := os.ReadFile(ledgers[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Replicate that dead obligation past the fail-closed entry limit, which
+	// is the state an older machinery left behind after a release sweep.
+	const overLimit = 4100
+	for i := 0; i < overLimit; i++ {
+		name := fmt.Sprintf("%064x.state", i)
+		if err := os.WriteFile(filepath.Join(store, name), ledger, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before := countStoreEntries(t, store)
+	if before < overLimit {
+		t.Fatalf("store holds %d entries, want at least %d", before, overLimit)
+	}
+
+	var report bytes.Buffer
+	_ = doctorRunUnlockedTo(nil, false, &report)
+	for _, want := range []string{store, "at or above its 4096-entry limit", "machinery doctor --repair"} {
+		if !strings.Contains(report.String(), want) {
+			t.Fatalf("doctor report does not state %q:\n%s", want, report.String())
+		}
+	}
+	if after := countStoreEntries(t, store); after != before {
+		t.Fatalf("a doctor report without --repair changed the store: %d entries, was %d", after, before)
+	}
+
+	var repaired bytes.Buffer
+	_ = doctorRunUnlockedTo(nil, true, &repaired)
+	if !strings.Contains(repaired.String(), "compacted: reclaimed") {
+		t.Fatalf("doctor --repair did not state what it reclaimed:\n%s", repaired.String())
+	}
+	after := countStoreEntries(t, store)
+	if after >= 4096 {
+		t.Fatalf("doctor --repair left %d entries, still at the fail-closed limit", after)
+	}
+	if after >= before {
+		t.Fatalf("doctor --repair reclaimed nothing: %d entries, was %d", after, before)
+	}
+}
+
+func countStoreEntries(t *testing.T, store string) int {
+	t.Helper()
+	entries, err := os.ReadDir(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return len(entries)
 }

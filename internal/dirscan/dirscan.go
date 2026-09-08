@@ -42,6 +42,11 @@ type directoryState struct {
 // snapshot, so it is discarded.
 var ErrChanged = errors.New("directory changed during enumeration")
 
+// ErrTooManyEntries marks an enumeration the caller's own ceiling refused. A
+// caller that owns the directory can compact it and retry under a repair
+// ceiling; a caller that does not own it keeps failing closed.
+var ErrTooManyEntries = errors.New("directory entry limit exceeded")
+
 // readAttempts bounds how often Read re-enumerates a directory that another
 // process changed mid-pass before giving up. Each successful attempt is a
 // consistent snapshot on its own (both passes agreed and the native change
@@ -204,7 +209,7 @@ func readEntries(dir directoryReader, path string, maxEntries int) ([]os.DirEntr
 		}
 		entries = append(entries, batch...)
 		if len(entries) > maxEntries {
-			return nil, fmt.Errorf("directory %s exceeds %d-entry limit", path, maxEntries)
+			return nil, fmt.Errorf("directory %s exceeds %d-entry limit: %w", path, maxEntries, ErrTooManyEntries)
 		}
 		if errors.Is(readErr, io.EOF) {
 			break

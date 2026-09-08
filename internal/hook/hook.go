@@ -1983,7 +1983,7 @@ func validHookHexDigest(value string) bool {
 }
 
 func boundedHookStateMatches(dir, kind string, match func(string) (bool, error)) ([]string, error) {
-	entries, err := dirscan.Read(dir, hookStateDirMaxEntries)
+	entries, err := readHookStateDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("inventory %s files: %w", kind, err)
 	}
@@ -2720,10 +2720,10 @@ func armProjectState(root string, in Input, cfg Config, designTouched, implTouch
 	} else if len(temps) > 0 {
 		return fmt.Errorf("incomplete hook route transaction: durable temp %s exists; refusing to overwrite crash evidence", temps[0])
 	}
-	if err := updateStateLocked(p, designTouched, implTouched, operation, "", routeSnapshotDigest(raw)); err != nil {
+	if err := updateStateLocked(p, root, designTouched, implTouched, operation, "", routeSnapshotDigest(raw)); err != nil {
 		return err
 	}
-	return writeRouteSnapshotLocked(routeStatePath(root, in.SessionID), raw)
+	return publishRouteSnapshotLocked(root, routeStatePath(root, in.SessionID), raw)
 }
 
 func routeSnapshotBody(cfg Config) ([]byte, error) {
@@ -2764,10 +2764,10 @@ func completeToolState(root string, cfg Config, in Input, designTouched, implTou
 	} else if len(temps) > 0 {
 		return fmt.Errorf("incomplete hook route transaction: durable temp %s exists; refusing to overwrite crash evidence", temps[0])
 	}
-	if err := updateStateLocked(p, designTouched, implTouched, "", operation, routeSnapshotDigest(raw)); err != nil {
+	if err := updateStateLocked(p, root, designTouched, implTouched, "", operation, routeSnapshotDigest(raw)); err != nil {
 		return err
 	}
-	return writeRouteSnapshotLocked(routeStatePath(root, in.SessionID), raw)
+	return publishRouteSnapshotLocked(root, routeStatePath(root, in.SessionID), raw)
 }
 
 func toolOperationToken(in Input) (string, error) {
@@ -2804,6 +2804,20 @@ func writeRouteSnapshot(root, sessionID string, body []byte) (returnErr error) {
 
 func writeRouteSnapshotLocked(p string, body []byte) error {
 	return writeHookStateBody(p, body, false)
+}
+
+// publishRouteSnapshotLocked writes one route snapshot and then applies both
+// retention bounds, under the state lock the caller already holds. Retention
+// runs on the write path so the store is bounded by construction rather than
+// by a cleanup somebody has to remember to run.
+func publishRouteSnapshotLocked(root, p string, body []byte) error {
+	if err := writeRouteSnapshotLocked(p, body); err != nil {
+		return err
+	}
+	if err := retainProjectRouteSnapshots(root, p); err != nil {
+		return err
+	}
+	return boundHookStateStore()
 }
 
 func writeHookStateBody(p string, body []byte, announcePhase bool) (returnErr error) {
@@ -2943,19 +2957,32 @@ func acquireHookFileLockContext(ctx context.Context, scope, kind string) (*filel
 }
 
 func acquireStateLock(stateFile string) (*stateLock, error) {
-	lock, err := acquireHookFileLock(stateFile+".session", "hook state for this session")
+	scope := stateFile + ".session"
+	lock, err := acquireHookFileLock(scope, "hook state for this session")
 	if err != nil {
 		return nil, err
 	}
-	return &stateLock{releaseFn: lock.Release}, nil
+	return trackedStateLock(scope, lock), nil
 }
 
 func acquireStateLockContext(ctx context.Context, stateFile string) (*stateLock, error) {
-	lock, err := acquireHookFileLockContext(ctx, stateFile+".session", "hook state for this session")
+	scope := stateFile + ".session"
+	lock, err := acquireHookFileLockContext(ctx, scope, "hook state for this session")
 	if err != nil {
 		return nil, err
 	}
-	return &stateLock{releaseFn: lock.Release}, nil
+	return trackedStateLock(scope, lock), nil
+}
+
+// trackedStateLock records the held scope for as long as the caller holds it.
+// Store reclamation runs inside these same processes and must never take a
+// project lock this process is already standing on.
+func trackedStateLock(scope string, lock *filelock.Lock) *stateLock {
+	noteHookStateLockHeld(scope)
+	return &stateLock{releaseFn: func() error {
+		noteHookStateLockReleased(scope)
+		return lock.Release()
+	}}
 }
 
 func (l *stateLock) release() error { return l.releaseFn() }
@@ -3051,7 +3078,7 @@ func replaceStateFileAtomic(temp, target string) (retErr error) {
 }
 
 func recoverHookReplacementQuarantines(root *os.Root, parent, target string, limit int64) error {
-	entries, err := dirscan.Read(parent, hookStateDirMaxEntries)
+	entries, err := readHookStateDir(parent)
 	if err != nil {
 		return err
 	}
@@ -3242,7 +3269,7 @@ func hookProjectQuarantinePaths(stateFile string) ([]string, error) {
 		return nil, err
 	}
 	dir := filepath.Dir(stateFile)
-	entries, err := dirscan.Read(dir, hookStateDirMaxEntries)
+	entries, err := readHookStateDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("inventory hook state retirement directories: %w", err)
 	}
@@ -3286,7 +3313,7 @@ func recoverHookDeletionQuarantines(stateFile string) (retErr error) {
 		return err
 	}
 	dir := filepath.Dir(stateFile)
-	entries, err := dirscan.Read(dir, hookStateDirMaxEntries)
+	entries, err := readHookStateDir(dir)
 	if err != nil {
 		return err
 	}
@@ -3401,18 +3428,45 @@ func appendState(root, sessionID, kind string) (returnErr error) {
 	defer func() {
 		returnErr = errors.Join(returnErr, lock.release())
 	}()
-	return updateStateLocked(p, kind == "design", kind == "impl", "", "", "")
+	if err := updateStateLocked(p, root, kind == "design", kind == "impl", "", "", ""); err != nil {
+		return err
+	}
+	return boundHookStateStore()
 }
 
 type hookStateRecord struct {
 	revision uint64
+	root     string
 	design   bool
 	impl     bool
 	pending  []string
 	routes   []string
 }
 
-func updateStateLocked(p string, addDesign, addImpl bool, addPending, removePending, addRoute string) error {
+// hookStateRootLine encodes the canonical project root the ledger belongs to.
+// The store is keyed by a digest of that root, which cannot be inverted, so
+// without this line nothing can tell an obligation for a live project from one
+// for a project root that was deleted long ago. Retention needs exactly that
+// distinction: it is the difference between compacting dead state and
+// discharging a live gate obligation. Hex keeps the line canonical and free of
+// separators no matter what the path contains.
+func hookStateRootLine(root string) string {
+	return "root " + hex.EncodeToString([]byte(root))
+}
+
+func parseHookStateRootLine(value string) (string, error) {
+	raw, err := hex.DecodeString(value)
+	if err != nil || len(raw) == 0 || strings.ToLower(value) != value {
+		return "", fmt.Errorf("hook state ledger is corrupt or noncanonical: project root must be lowercase hex of a nonempty path")
+	}
+	root := string(raw)
+	if !filepath.IsAbs(root) || filepath.Clean(root) != root {
+		return "", fmt.Errorf("hook state ledger is corrupt or noncanonical: project root must be one absolute cleaned path")
+	}
+	return root, nil
+}
+
+func updateStateLocked(p, root string, addDesign, addImpl bool, addPending, removePending, addRoute string) error {
 	temps, err := hookStateTemps(p)
 	if err != nil {
 		return err
@@ -3432,6 +3486,9 @@ func updateStateLocked(p string, addDesign, addImpl bool, addPending, removePend
 		return fmt.Errorf("hook state revision overflow")
 	}
 	record.revision++
+	if root != "" {
+		record.root = root
+	}
 	record.design = record.design || addDesign
 	record.impl = record.impl || addImpl
 	pending := make(map[string]bool, len(record.pending)+1)
@@ -3461,6 +3518,9 @@ func updateStateLocked(p string, addDesign, addImpl bool, addPending, removePend
 	}
 	var body strings.Builder
 	fmt.Fprintf(&body, "revision %d\n", record.revision)
+	if record.root != "" {
+		body.WriteString(hookStateRootLine(record.root) + "\n")
+	}
 	if record.design {
 		body.WriteString("design\n")
 	}
@@ -3499,6 +3559,15 @@ func parseHookStateRecord(raw []byte) (hookStateRecord, error) {
 	pendingStarted := false
 	for _, line := range lines[1:] {
 		switch {
+		case strings.HasPrefix(line, "root "):
+			if routeStarted || pendingStarted || classIndex != 0 || record.root != "" {
+				return hookStateRecord{}, fmt.Errorf("hook state ledger is corrupt or noncanonical: exactly one project root line is allowed, immediately after the revision")
+			}
+			root, err := parseHookStateRootLine(strings.TrimPrefix(line, "root "))
+			if err != nil {
+				return hookStateRecord{}, err
+			}
+			record.root = root
 		case !routeStarted && !pendingStarted && classIndex == 0 && line == "design":
 			record.design = true
 			classIndex++
@@ -3615,7 +3684,7 @@ func reapPendingState(root, sessionID string, observed []string) (revision uint6
 		return 0, 0, fmt.Errorf("incomplete hook route transaction: durable temp %s exists; refusing to overwrite crash evidence", temps[0])
 	}
 	for _, token := range observed {
-		if err := updateStateLocked(p, false, false, "", token, ""); err != nil {
+		if err := updateStateLocked(p, root, false, false, "", token, ""); err != nil {
 			return 0, 0, err
 		}
 		reaped++
