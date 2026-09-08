@@ -1,14 +1,15 @@
 ---
 id: MAC-wktt
 title: "integration lane hides the failing native test output and its evidence report"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [integration-lane, ci, diagnostics]
 created_at: 2026-09-08T17:30:21Z
 created_by: ramirosalas
 updated_at: 2026-09-08T17:41:57Z
-content_hash: "sha256:533638318a22b650e5305c3815c56705ec5aad514163046b9dd4123f9e515e26"
+content_hash: "sha256:40cf2c130eb8ba861664ce697c3648a83d359d077bf63556decca59faf6331ee"
+closed_at: 2026-09-08T17:41:57Z
 ---
 
 ## Description
@@ -33,7 +34,7 @@ Fix: on a failed suite execution print a bounded, clearly delimited tail of that
 
 
 ## History
-
+- 2026-09-08T17:41:57Z status: open -> closed
 
 ## Links
 
