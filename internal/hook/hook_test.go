@@ -3437,7 +3437,7 @@ func TestShimDispatchesEveryPresentMarkerToGoValidation(t *testing.T) {
 			// itself on every run. Bind under a short base and rename the
 			// socket into place: the marker is the same special file, and the
 			// case actually executes.
-			base, err := os.MkdirTemp(shortSocketBase, "mhs")
+			base, err := os.MkdirTemp(shortSocketBase(), "mhs")
 			if err != nil {
 				t.Fatalf("create short socket base: %v", err)
 			}

@@ -15,6 +15,13 @@ const hookTestControlRootEnv = "MACHINERY_INTERNAL_TEST_HOOK_CONTROL_ROOT"
 
 var hookTestControlRoot string
 
+// hookTestPreSandboxTempDir is the temp directory that was in effect before
+// TestMain redirected TMPDIR into the control root. A Unix-domain socket
+// address is capped near 104 bytes, which the control root's own paths exceed,
+// so the one case that needs a short path uses this instead of a fixed
+// location the host may not provide.
+var hookTestPreSandboxTempDir string
+
 // TestMain redirects every user-scoped path this package writes to before any
 // test runs. Without it the suite arms real governance obligations in the
 // invoking user's own hook state store: one ledger, and usually one route
@@ -26,8 +33,10 @@ var hookTestControlRoot string
 func TestMain(m *testing.M) {
 	if inherited := os.Getenv(hookTestControlRootEnv); inherited != "" {
 		hookTestControlRoot = inherited
+		hookTestPreSandboxTempDir = filepath.Clean(os.TempDir())
 		os.Exit(m.Run())
 	}
+	hookTestPreSandboxTempDir = filepath.Clean(os.TempDir())
 	root, err := os.MkdirTemp("", "machinery-hook-test-control-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "create hook test control root:", err)
@@ -115,6 +124,19 @@ func TestHookTestStateStaysInsideItsOwnSandbox(t *testing.T) {
 	if !hookTestPathWithin(marker, hookTestControlRoot) {
 		t.Fatalf("hook state initialization marker escaped the test control root: %s", marker)
 	}
+}
+
+// shortSocketBase is a base directory short enough for a Unix-domain socket
+// address, which is capped near 104 bytes. The control root's own paths exceed
+// that, which is right for state and wrong for a socket, so the one case that
+// needs a short path derives it from the temp directory that was in effect
+// before TestMain redirected TMPDIR rather than naming a fixed location the
+// host may not provide. Unused on Windows, where that case skips.
+func shortSocketBase() string {
+	if hookTestPreSandboxTempDir != "" {
+		return hookTestPreSandboxTempDir
+	}
+	return filepath.Clean(os.TempDir())
 }
 
 func hookTestPathWithin(path, root string) bool {

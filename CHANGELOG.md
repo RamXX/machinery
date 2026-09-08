@@ -37,6 +37,48 @@ under their version heading when a release is cut.
   the receipt is untouched. Reproduced and verified against the published v0.6.11 and v0.7.0
   assets in a fresh `HOME`.
 
+### Added
+
+- **`machinery doctor --repair` compacts the governance hook state store.** The per-user store the
+  hooks keep their gate obligations in now has a retention policy applied on every arming write: at
+  most 8 route snapshots per project root, and a store-wide ceiling of 512 entries, an eighth of the
+  4096-entry limit past which every bounded inventory fails and every governed shell and write tool
+  on the machine is blocked. Compaction reclaims only whole generations whose recorded project root
+  no longer exists on disk, so it can shrink the store but never discharge a live obligation.
+  `machinery doctor` reports the store's path, entry count and both bounds; `machinery doctor
+  --repair` compacts it. Both work when the store is already at or above the limit, which is the
+  only moment either matters. See the plugin guide's durable-state section for the policy and its
+  residuals.
+
+### Fixed
+
+- **The hook repairs its own state instead of bricking every repository.** A store filled past the
+  fail-closed limit used to deny every governed tool call until a human pruned it by hand. The first
+  inventory that hits the limit now compacts once under a repair ceiling and retries. This covers
+  ledgers written by 0.7.1 and later: a ledger written by 0.7.0 or older carries no project root, so
+  nothing can tell its obligation from a live one and compaction retains it. A store already over
+  the limit at upgrade time therefore needs a one-time manual removal of its `<digest>.state` files,
+  never of the store directory, whose initialization marker distinguishes a first run from a lost
+  store.
+
+### Changed
+
+- **`machinery doctor` exits nonzero on an unusable hook state store.** The new store report fails
+  the command when the store is at or above its 4096-entry limit, or when the store path cannot be
+  resolved or inspected (a container with no resolvable HOME, for instance). A store above the
+  retention ceiling but below the limit reports and passes, so the common state does not newly fail.
+  Any CI job or Makefile target that treats `machinery doctor` as a gate has a new failure source.
+
+### Compatibility
+
+- **The hook state ledger records its project root, which an older binary rejects.** This is what
+  lets retention prove an obligation is dead rather than guessing. A binary older than 0.7.1 reads a
+  ledger written by 0.7.1 as noncanonical and fails closed on it, so a downgrade, or a second older
+  binary sharing the same user home, blocks governance for the affected projects until their
+  `<digest>.state` files are removed. Remove the files, never the store directory. Reading in the
+  other direction is unaffected: 0.7.1 reads a pre-upgrade ledger normally and only declines to
+  reclaim it.
+
 ## [0.7.0] - 2026-09-08
 
 ### Fixed

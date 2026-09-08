@@ -208,22 +208,34 @@ records its project root, and that root no longer exists on disk. A generation w
 exists, whose ledger is absent, unparseable, or predates the recorded root, or which holds durable
 crash evidence, is never reclaimed, so compaction can shrink the store but can never discharge a live
 obligation. Reclamation runs in bounded batches under a store-wide lock, so bulk removal never
-outlasts the bounded enumeration retry of a governed event in another repository.
+outlasts the bounded enumeration retry of a governed event in another repository. The bound costs an
+arming event two whole-store enumerations, which is a few milliseconds at the retention ceiling and
+is the price of the ceiling being a property of every write.
 
-A store that is already at or above the fail-closed limit, left by an older version, repairs itself:
-the first inventory that hits the limit compacts once under a repair-mode ceiling and retries. If the
-store is still over the limit afterwards, the hook keeps failing closed and its diagnostic names the
-store, the counts, and `machinery doctor --repair`, which compacts the same way from the command line
-and works at or above the limit. `machinery doctor` alone only reports.
+Self-repair covers ledgers this version wrote, and only those. A store at or above the fail-closed
+limit whose entries carry a recorded project root heals itself: the first inventory that hits the
+limit compacts once under a repair-mode ceiling and retries. A store filled before the upgrade does
+not, and cannot: a ledger written by machinery 0.7.0 or older carries no project root, so nothing can
+tell its obligation from a live one, and compaction retains every one of them. That store stays
+failed closed until a human removes the pre-upgrade `<digest>.state` files (never the directory, see
+the downgrade note below), which is the one-time remediation for the upgrade and the only case that
+still needs it. Whichever kind of store it is, if it remains over the limit the hook keeps failing
+closed and its diagnostic names the store, the counts, and `machinery doctor --repair`, which
+compacts the same way from the command line and works at or above the limit. `machinery doctor`
+alone only reports, and it reports a nonzero exit when the store is at or above the limit or cannot
+be inspected.
 
 Two residuals are stated rather than hidden. An absent project root is indistinguishable from one on
 detached or unmounted storage, so an obligation for a project on a disconnected volume can be
-reclaimed while the store is over its ceiling; the next governed edit in that project re-arms the
-whole-tree obligation. And the ledger carries its project root from this version on, so a binary
-older than this one reads such a ledger as noncanonical and fails closed on it: a downgrade that
-meets a newer ledger blocks until the affected `<digest>.state` files are removed. Remove those
-files, never the store directory, whose initialization marker is what tells a first run from a lost
-store.
+reclaimed while the store is over its ceiling. That is a fail-open, not a deferral: the next governed
+edit in that project re-arms the whole-tree obligation, but if the volume returns and the session
+ends with no edit before Stop, that session's gate does not run at all. It stays narrow, since the
+root must vanish while a session is live and the store must be over its ceiling at that moment, and
+oldest-first reclamation reaches a freshly armed obligation last. And the ledger carries its project
+root from this version on, so a binary older than this one reads such a ledger as noncanonical and
+fails closed on it: a downgrade that meets a newer ledger blocks until the affected `<digest>.state`
+files are removed. Remove those files, never the store directory, whose initialization marker is what
+tells a first run from a lost store.
 
 Hooks load at session start: after installing or upgrading the plugin, restart the Claude Code
 session in the project.

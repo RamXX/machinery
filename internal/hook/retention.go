@@ -62,6 +62,19 @@ const (
 	// holding the store-wide reclamation lock. It bounds how long a governed
 	// event in an unrelated repository can wait behind housekeeping.
 	hookStateReclaimBatch = 64
+
+	// hookStateRouteReclaimBudget bounds how many surplus route snapshots one
+	// write reclaims. Surplus was unbounded before this policy existed, so the
+	// first governed event after an upgrade can meet hundreds of them; the
+	// budget converges the project over the next few events rather than paying
+	// for all of them inside one tool call.
+	hookStateRouteReclaimBudget = 16
+
+	// hookStateRouteReclaimBatch is how many of those one store-wide lock hold
+	// covers. Route snapshots are removed through the quarantined path, which
+	// costs tens of milliseconds each, so the hold stays far inside the
+	// hookStateLockWaitLimit an enumeration elsewhere is waiting on.
+	hookStateRouteReclaimBatch = 8
 )
 
 // hookStateRepairDepth raises the store enumeration ceiling while compaction
@@ -127,7 +140,13 @@ func readHookStateDir(dir string) ([]os.DirEntry, error) {
 	if err == nil || !errors.Is(err, dirscan.ErrTooManyEntries) {
 		return entries, err
 	}
-	if !beginHookStateAutoCompaction() {
+	// Compaction already owns the store on this call path, so its own nested
+	// inventory must not start a second pass: that pass would block on the
+	// store lock this process is holding until the lock-wait budget expires.
+	// Only reachable above the repair ceiling, which is a store no filesystem
+	// this hook governs will produce, and cheaper to exclude than to reason
+	// about.
+	if hookStateRepairDepth.Load() > 0 || !beginHookStateAutoCompaction() {
 		return nil, hookStateOverLimit(dir, err)
 	}
 	if _, compactErr := compactHookStateDir(dir, hookStateDirRetentionTarget); compactErr != nil {
@@ -145,9 +164,14 @@ func readHookStateDir(dir string) ([]os.DirEntry, error) {
 // enumeration retry absorbs it, but a compaction pass removes many files in a
 // row and would otherwise outlast every retry, turning housekeeping into a
 // denied tool call in an unrelated repository. Compaction itself already owns
-// the store, so it reads without reacquiring: POSIX record locks are held per
-// process, and a nested shared acquisition would silently downgrade the
-// exclusive one it is standing on.
+// the store, so it reads without reacquiring rather than blocking on the
+// exclusive lock it is holding.
+//
+// The repair-depth flag is process-wide, which is exact for a hook: one
+// process handles one event. A test binary that runs several events as
+// goroutines shares it, so one goroutine's compaction suppresses another's
+// shared acquisition; cross-process exclusion is therefore proved with a real
+// child process, never with goroutines.
 func readHookStateDirLocked(dir string) (entries []os.DirEntry, retErr error) {
 	if hookStateRepairDepth.Load() > 0 {
 		return dirscan.Read(dir, hookStateDirEntryCeiling())
@@ -481,11 +505,15 @@ func hookStateGenerationLooksDead(storeRoot *os.Root, dir string, generation *ho
 func reclaimHookStateGeneration(storeRoot *os.Root, dir string, generation *hookStateGeneration, quarantined bool) (removed int, retErr error) {
 	ledgerPath := filepath.Join(dir, generation.base)
 	scope := ledgerPath + ".session"
-	// POSIX record locks belong to the process, not to the acquisition: taking
-	// this scope again here would replace the lock an arming event in this same
-	// process is standing on, and releasing it would drop that event's
-	// protection. A generation whose lock this process already holds is
-	// therefore retained, never reclaimed.
+	// A generation this process is itself arming is retained, never reclaimed.
+	// The lock layer already refuses the second acquisition on every supported
+	// platform, so this guard is not what makes that safe: flock builds
+	// (darwin, linux and the other BSDs) scope the lock to the descriptor, so a
+	// second open conflicts and reports contention, and the fcntl builds (AIX,
+	// Solaris), where a record lock really does belong to the process, hold an
+	// in-process reservation that refuses it one layer down. The guard states
+	// the invariant where the decision is made, and keeps the accounting
+	// truthful: this generation is retained deliberately, not incidentally.
 	if hookStateLockHeldHere(scope) {
 		return 0, errHookStateGenerationRetained
 	}
@@ -573,15 +601,26 @@ func removeWitnessedHookStateFile(storeRoot *os.Root, name, display, kind string
 //
 // The residual is stated rather than hidden. A project root on detached or
 // unmounted storage is indistinguishable from a deleted one, so its obligation
-// can be reclaimed while the store is over its ceiling. The next governed edit
-// in that project re-arms the whole-tree obligation; the alternative, keeping
-// it, is what fails every tool in every other repository closed.
+// can be reclaimed while the store is over its ceiling. That is a fail-open,
+// not a deferral: the next governed edit in that project re-arms the whole-tree
+// obligation, but if the volume returns and the session ends with no edit
+// before Stop, that session's gate does not run at all. It stays narrow (the
+// root must vanish while a session is live and the store must be over its
+// ceiling at that moment) and oldest-ledger-first ordering reaches a freshly
+// armed obligation last. The alternative, retaining it, is what fails every
+// tool in every other repository closed.
 func hookStateRootVanished(root string) bool {
 	if root == "" || !filepath.IsAbs(root) {
 		return false
 	}
 	_, err := os.Lstat(root)
 	return errors.Is(err, os.ErrNotExist)
+}
+
+// routeSnapshotAge orders one project's route snapshots newest first.
+type routeSnapshotAge struct {
+	path    string
+	modTime time.Time
 }
 
 // retainProjectRouteSnapshots keeps at most hookStateRouteRetention route
@@ -596,11 +635,7 @@ func retainProjectRouteSnapshots(root, keep string) (retErr error) {
 	if len(paths) <= hookStateRouteRetention {
 		return nil
 	}
-	type snapshot struct {
-		path    string
-		modTime time.Time
-	}
-	ordered := make([]snapshot, 0, len(paths))
+	ordered := make([]routeSnapshotAge, 0, len(paths))
 	for _, path := range paths {
 		info, err := os.Lstat(path)
 		if err != nil {
@@ -609,7 +644,7 @@ func retainProjectRouteSnapshots(root, keep string) (retErr error) {
 			}
 			return err
 		}
-		ordered = append(ordered, snapshot{path: path, modTime: info.ModTime()})
+		ordered = append(ordered, routeSnapshotAge{path: path, modTime: info.ModTime()})
 	}
 	sort.Slice(ordered, func(i, j int) bool {
 		if ordered[i].path == keep || ordered[j].path == keep {
@@ -623,34 +658,59 @@ func retainProjectRouteSnapshots(root, keep string) (retErr error) {
 	if len(ordered) <= hookStateRouteRetention {
 		return nil
 	}
-	// Surplus removal is bulk mutation of the shared store, so it excludes
-	// enumerations for exactly as long as it takes, the same way a compaction
-	// batch does.
-	ctx, cancel := context.WithTimeout(context.Background(), hookStateLockWaitLimit)
-	defer cancel()
-	storeLock, err := filelock.AcquireWaitContext(ctx, hookStateStoreScope(filepath.Dir(keep)))
-	if err != nil {
-		return fmt.Errorf("hook state store could not be claimed for route retention within %s: %w", hookStateLockWaitLimit, err)
+	surplus := ordered[hookStateRouteRetention:]
+	// Two bounds, both about the store this write shares with every other
+	// repository on the machine. A quarantined removal costs tens of
+	// milliseconds, so one write reclaims at most a budget's worth (a project
+	// that accumulated surplus under an older version converges over the next
+	// few governed events instead of stalling one of them), and each store-wide
+	// lock hold covers at most a batch (an enumeration in an unrelated
+	// repository waits for one batch, never for the whole backlog, and never
+	// past its own lock-wait budget).
+	if len(surplus) > hookStateRouteReclaimBudget {
+		surplus = surplus[:hookStateRouteReclaimBudget]
 	}
-	defer func() { retErr = errors.Join(retErr, storeLock.Release()) }()
+	dir := filepath.Dir(keep)
 	removed := false
-	for _, surplus := range ordered[hookStateRouteRetention:] {
-		witness, err := readBoundedHookStateFile(surplus.path, "hook route snapshot", hookRouteMaxBytes)
+	for start := 0; start < len(surplus); start += hookStateRouteReclaimBatch {
+		end := min(start+hookStateRouteReclaimBatch, len(surplus))
+		batchRemoved, err := removeRouteSnapshotBatch(dir, surplus[start:end])
+		removed = removed || batchRemoved
 		if err != nil {
 			return err
 		}
-		if witness == nil {
-			continue
-		}
-		if err := removeHookFileWitness(surplus.path, "hook route snapshot", hookRouteMaxBytes, witness); err != nil {
-			return err
-		}
-		removed = true
 	}
 	if !removed {
 		return nil
 	}
-	return syncStateDirectory(filepath.Dir(keep))
+	return syncStateDirectory(dir)
+}
+
+// removeRouteSnapshotBatch removes one bounded run of surplus snapshots while
+// holding the store-wide lock, and releases it before the caller takes the
+// next run.
+func removeRouteSnapshotBatch(dir string, batch []routeSnapshotAge) (removed bool, retErr error) {
+	ctx, cancel := context.WithTimeout(context.Background(), hookStateLockWaitLimit)
+	defer cancel()
+	storeLock, err := filelock.AcquireWaitContext(ctx, hookStateStoreScope(dir))
+	if err != nil {
+		return false, fmt.Errorf("hook state store %s could not be claimed for route retention within %s: %w", dir, hookStateLockWaitLimit, err)
+	}
+	defer func() { retErr = errors.Join(retErr, storeLock.Release()) }()
+	for _, snapshot := range batch {
+		witness, err := readBoundedHookStateFile(snapshot.path, "hook route snapshot", hookRouteMaxBytes)
+		if err != nil {
+			return removed, err
+		}
+		if witness == nil {
+			continue
+		}
+		if err := removeHookFileWitness(snapshot.path, "hook route snapshot", hookRouteMaxBytes, witness); err != nil {
+			return removed, err
+		}
+		removed = true
+	}
+	return removed, nil
 }
 
 // StateReport writes the governance hook state store's retention status. With
@@ -664,8 +724,7 @@ func retainProjectRouteSnapshots(root, keep string) (retErr error) {
 func StateReport(w io.Writer, repair bool) (ok bool, retErr error) {
 	dir, err := stateDirPathExact()
 	if err != nil {
-		fmt.Fprintf(w, "  ERROR    governance hook state store cannot be resolved: %v\n", err)
-		return false, nil
+		return false, fmt.Errorf("resolve the governance hook state store: %w", err)
 	}
 	info, err := os.Lstat(dir)
 	if errors.Is(err, os.ErrNotExist) {
@@ -683,7 +742,7 @@ func StateReport(w io.Writer, repair bool) (ok bool, retErr error) {
 	if repair {
 		compaction, err := compactHookStateDir(dir, hookStateDirRetentionTarget)
 		if err != nil {
-			fmt.Fprintf(w, "  ERROR    governance hook state store %s could not be compacted: %v\n", dir, err)
+			fmt.Fprintf(w, "  ERROR    governance hook state store %s could not be compacted: %v. A missing or drifted store initialization marker fails here, and fails every governed event for the same reason, so read the message above as being about the store's identity rather than its retention\n", dir, err)
 			return false, nil
 		}
 		fmt.Fprintf(w, "  ok       governance hook state store %s compacted: reclaimed %d of %d entr%s for project roots that no longer exist\n",

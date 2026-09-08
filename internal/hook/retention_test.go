@@ -406,10 +406,9 @@ func TestCompactionExcludesConcurrentEnumerationInAnotherProcess(t *testing.T) {
 	}
 }
 
-// TestCompactionNeverReclaimsAGenerationThisProcessHasLocked pins the reentrancy
-// rule. POSIX record locks belong to the process, so reclaiming a generation
-// whose lock this process already holds would replace the arming event's own
-// lock and then release it out from under that event.
+// TestCompactionNeverReclaimsAGenerationThisProcessHasLocked pins the
+// reentrancy rule: a generation this process is itself arming is retained, and
+// the same generation becomes reclaimable once that lock is gone.
 func TestCompactionNeverReclaimsAGenerationThisProcessHasLocked(t *testing.T) {
 	dir := isolateHookRetention(t)
 	dead := filepath.Join(t.TempDir(), "root-that-no-longer-exists")
@@ -509,4 +508,145 @@ func TestStateReportNeverCreatesTheStore(t *testing.T) {
 	if _, err := os.Lstat(marker); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("a doctor report created the store initialization marker at %s: %v", marker, err)
 	}
+}
+
+// TestStoreOfLegacyRootlessLedgersIsRetainedAndKeepsFailingClosed pins the
+// limit of self-repair, so it cannot later be turned into a fail-open without
+// someone deciding to. A ledger written before this version carries no project
+// root, nothing can tell its obligation from a live one, and reclamation
+// therefore refuses every one of them. A store filled past the limit by an
+// older version stays failed closed until a human removes those files.
+func TestStoreOfLegacyRootlessLedgersIsRetainedAndKeepsFailingClosed(t *testing.T) {
+	dir := isolateHookRetention(t)
+	root := managedRoot(t)
+	legacy := []byte("revision 1\ndesign\n")
+	for i := 0; i < hookStateDirMaxEntries+8; i++ {
+		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%064x.state", i)), legacy, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before := hookStoreEntries(t, dir)
+
+	compaction, err := compactHookStateDir(dir, 0)
+	if err != nil {
+		t.Fatalf("compaction over a pre-upgrade store: %v", err)
+	}
+	if compaction.Reclaimed != 0 {
+		t.Fatalf("compaction reclaimed %d entries whose obligation it cannot tell from a live one", compaction.Reclaimed)
+	}
+	if compaction.Retained < hookStateDirMaxEntries {
+		t.Fatalf("compaction retained only %d of %d generations", compaction.Retained, before)
+	}
+
+	var repaired strings.Builder
+	ok, err := StateReport(&repaired, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		t.Fatalf("doctor --repair reported a pre-upgrade store as healthy: %q", repaired.String())
+	}
+	if !strings.Contains(repaired.String(), "at or above its 4096-entry limit") {
+		t.Fatalf("doctor --repair does not state that the store is still over the limit: %q", repaired.String())
+	}
+	if count := hookStoreEntries(t, dir); count != before {
+		t.Fatalf("a pre-upgrade store changed size: %d entries, was %d", count, before)
+	}
+
+	out := runEvent(t, root, shellEvent("legacy", "echo governed"))
+	if !strings.Contains(out, `"permissionDecision":"deny"`) {
+		t.Fatalf("a governed event on a pre-upgrade store over the limit was not denied: %q", out)
+	}
+	if count := hookStoreEntries(t, dir); count != before {
+		t.Fatalf("a denied event changed a pre-upgrade store: %d entries, was %d", count, before)
+	}
+}
+
+// TestStopRecoversRoutingAfterRetentionPrunedItsSnapshot covers what the route
+// bound does downstream. A session whose snapshot was reclaimed no longer has
+// an exact match at Stop time and falls into the shared-route recovery branch,
+// which must recover the same configuration rather than block.
+func TestStopRecoversRoutingAfterRetentionPrunedItsSnapshot(t *testing.T) {
+	isolateHookRetention(t)
+	root := managedRoot(t)
+	pruned := "session-000"
+	for i := 0; i < hookStateRouteRetention+4; i++ {
+		session := fmt.Sprintf("session-%03d", i)
+		if out := runEvent(t, root, shellEvent(session, "echo governed")); out != "" {
+			t.Fatalf("governed shell event was not allowed: %s", out)
+		}
+	}
+	if _, err := os.Lstat(routeStatePath(root, pruned)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("retention did not reclaim the oldest session's snapshot: %v", err)
+	}
+	cfg, present, err := loadRouteSnapshot(root, pruned)
+	if err != nil || !present {
+		t.Fatalf("routing recovery for a pruned session: present=%v err=%v", present, err)
+	}
+	if cfg.Design != "design" {
+		t.Fatalf("recovered routing = %+v, want the project's own design directory", cfg)
+	}
+	out := runEvent(t, root, Input{SessionID: pruned, HookEventName: "Stop"})
+	for _, forbidden := range []string{"routing", "route snapshot", "conflicting"} {
+		if strings.Contains(out, forbidden) {
+			t.Fatalf("Stop for a pruned session blocked on routing: %s", out)
+		}
+	}
+}
+
+// TestRouteRetentionReclaimsABoundedShareOfSurplusPerWrite pins the cost the
+// bound may impose on one governed event. Surplus was unbounded before this
+// policy existed, so the first event after an upgrade can meet hundreds of
+// snapshots; it must reclaim a bounded share and let the project converge over
+// the next few events instead of paying for the whole backlog inside one tool
+// call, with every other repository's enumeration waiting behind it.
+func TestRouteRetentionReclaimsABoundedShareOfSurplusPerWrite(t *testing.T) {
+	isolateHookRetention(t)
+	root := managedRoot(t)
+	if out := runEvent(t, root, shellEvent("first", "echo governed")); out != "" {
+		t.Fatalf("governed shell event was not allowed: %s", out)
+	}
+	body, err := os.ReadFile(routeStatePath(root, "first"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prefix := routeStatePrefix(root)
+	const surplus = 2*hookStateRouteReclaimBudget + hookStateRouteRetention
+	for i := 0; i < surplus; i++ {
+		if err := os.WriteFile(prefix+fmt.Sprintf("%064x", i)+".json", body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before := len(routeSnapshotPaths(t, root))
+
+	if out := runEvent(t, root, shellEvent("second", "echo governed")); out != "" {
+		t.Fatalf("governed shell event was not allowed: %s", out)
+	}
+	after := len(routeSnapshotPaths(t, root))
+	if reclaimed := before + 1 - after; reclaimed > hookStateRouteReclaimBudget {
+		t.Fatalf("one write reclaimed %d surplus snapshots, above the %d budget", reclaimed, hookStateRouteReclaimBudget)
+	}
+	if after <= hookStateRouteRetention {
+		t.Fatalf("one write reclaimed the whole backlog (%d snapshots left); the per-write budget did not apply", after)
+	}
+
+	for i := 0; i < surplus; i++ {
+		session := fmt.Sprintf("converge-%03d", i)
+		if out := runEvent(t, root, shellEvent(session, "echo governed")); out != "" {
+			t.Fatalf("governed shell event was not allowed: %s", out)
+		}
+		if len(routeSnapshotPaths(t, root)) <= hookStateRouteRetention {
+			return
+		}
+	}
+	t.Fatalf("route retention did not converge to %d snapshots over %d writes", hookStateRouteRetention, surplus)
+}
+
+func routeSnapshotPaths(t *testing.T, root string) []string {
+	t.Helper()
+	paths, err := routeStatePaths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return paths
 }
