@@ -1,14 +1,16 @@
 ---
 id: MAC-csh4
 title: "lint: unconvert flags the load-bearing Stat_t.Dev conversion on linux/amd64"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [ci, lint, portability]
 created_at: 2026-09-08T12:44:36Z
 created_by: ramirosalas
 updated_at: 2026-09-08T12:46:29Z
-content_hash: "sha256:5d208bf5ba7806f04e0ca643f41bb7665c828363abf519901ec05c802e555bad"
+content_hash: "sha256:65f1de2e78fcf31e7919188d9c458e665e7c656d6d8140d8e161bdc79db70b5c"
+closed_at: 2026-09-08T12:46:29Z
+close_reason: "Fixed at 08b698d; linux and darwin golangci-lint both clean"
 ---
 
 ## Description
@@ -56,7 +58,7 @@ every supported unix target.
 
 
 ## History
-
+- 2026-09-08T12:46:29Z status: open -> closed
 
 ## Links
 
