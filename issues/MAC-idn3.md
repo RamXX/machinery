@@ -7,8 +7,8 @@ type: bug
 labels: [flaky-under-load, integration-lane, custody]
 created_at: 2026-09-08T12:15:30Z
 created_by: ramirosalas
-updated_at: 2026-09-08T12:15:30Z
-content_hash: "sha256:54ce4743c2e079fb30a112602ce9c0929570c75fecfceb6cc3592d75aefbccdb"
+updated_at: 2026-09-08T13:27:22Z
+content_hash: "sha256:d02bc14420eafd77ea70859f249d51191349f82dabe2ccba26501f6379be53b7"
 ---
 
 ## Description
@@ -43,3 +43,10 @@ Decide the probe budget from measured cost with a stated margin (and log the mea
 
 
 ## Comments
+
+### 2026-09-08T13:27:22Z ramirosalas
+Likely the same root cause as MAC-ipa1, fixed on fix/custody-budgets in 1170df1.
+
+The go/python identity probes are exactly the shape that loses a result there: a job short enough (go version, python3 --version) to finish before its caller is rescheduled. The demux delivered the result and retired the registration before Run claimed the job channel, so Run registered a second empty channel, waited out the whole probe deadline and reported a bare 'processscope: TIMEOUT'. That matches the symptom, the load dependence, and the bare TIMEOUT diagnostic with no budget information.
+
+If so, the probe budget needs no change and no retry: the probe was never slow, its result was dropped. Leaving this open for the owner to re-run the lane under load and confirm before deciding whether the diagnostic ask still stands.
