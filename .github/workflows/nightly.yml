@@ -20,10 +20,7 @@ jobs:
         with:
           # Full history keeps the lane's ancestry/no-orphan validation honest.
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
+      - uses: ./.github/actions/assurance-runtimes
       - name: Required runtime integration
         run: go run ./scripts/integration-lane --lane required
   # Regenerate every committed generated artifact (oracles AND formal specs)

@@ -26,10 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
+      - uses: ./.github/actions/assurance-runtimes
       # The lane retains its report and every evidence file of the run in one
       # directory. Naming that directory here, rather than in the invocation
       # the wiring guards pin exactly, lets a failed run hand the evidence
