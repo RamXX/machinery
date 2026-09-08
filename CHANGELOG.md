@@ -250,9 +250,11 @@ or split the edge by naming distinct consumers.
 **One complete `READS` group per row.** Unchanged: `READS` as an English verb in residual prose or
 in a contract cell ("the projection only READS those rows") is narrative again and is no longer
 collected as a declaration; a member is any trimmed, non-empty text in the design's ubiquitous
-language, so `READS{Order.id, occurrence time, PAIR KEY}` declares three fields. Rejected now: a
-row that carries a `READS{...}` group wrapped across two markdown lines, two groups on one row, or
-a group with an empty or duplicated member. Findings (1 on the reference design):
+language, so `READS{Order.id, occurrence time, PAIR KEY}` declares three fields. Empty and
+duplicate members are rejected as they always were, and an empty member is now reported as an empty
+member rather than as a field name that is neither. Rejected now: a row that carries a `READS{...}`
+group wrapped across two markdown lines, or two groups on one row. Findings (1 on the reference
+design):
 
 ```
 Payments.matrix.md:62: event 'markPaid', consumer 'ledger': expected exactly one complete READS{field, ...} declaration per row
