@@ -7,8 +7,8 @@ type: bug
 labels: [ci, integration-lane, cold-cache]
 created_at: 2026-09-08T13:03:43Z
 created_by: ramirosalas
-updated_at: 2026-09-08T13:03:43Z
-content_hash: "sha256:db5e834b069102da2bf20e7961bc83db92c06ebaf90fb0b34d126a276d1b1832"
+updated_at: 2026-09-08T13:28:33Z
+content_hash: "sha256:fbecf5237088aafb9af0e23068d1c6b3a512d60a83697af44982f7ea8d76ac46"
 ---
 
 ## Description
@@ -75,3 +75,22 @@ reproduction and the nil-error diagnostic are covered by tests in
 
 
 ## Comments
+
+### 2026-09-08T13:28:33Z ramirosalas
+Fixed on fix/ci-mirror at 399fbf0 (lane) and 48514bf (tagged full-path contract).
+
+Root cause sites:
+- scripts/integration-lane/main.go:1413 (pre-fix): guard 'err != nil || errout != ""' with fmt.Errorf("native package selection failed: %w %s", err, errout); nil err renders as %!w(<nil>).
+- Same nil-%w shape at main.go:1094 (toolReceipt) and assurance_catalog.go:636 (probe selection).
+- No step warmed the module closure before selection, so a cold runner cache made 'go list' write 'go: downloading ...' to stderr.
+
+Fix:
+- warmGoModuleClosure (main.go) runs 'go mod download' once as a bounded (10m) custody-guarded job in the repo root before any selection, called from provision() right after the go tool receipt. Its stderr vocabulary is checked against goDownloadProgress (downloading/extracting/finding plus 'no module dependencies to download'); anything else fails closed. It emits its own receipt: id go-modules, identity go.mod+go.sum, sha256 over both manifests, no executable path.
+- laneStreamFailure replaces every '%w %s' guard that can see a nil error; it describes a nil error and keeps a real one unwrappable.
+
+Verification:
+- go test -count=1 -run 'TestLaneStreamFailure|TestWarmGoModuleClosure' ./scripts/integration-lane -> ok 0.9s. The cold-cache test is offline: it serves the host module cache in proxy layout (file://$GOMODCACHE/cache/download) into an empty GOMODCACHE, asserts the selection stderr carries 'go: downloading' before warming and is empty after.
+- go test -count=1 ./scripts/integration-lane -> ok 152.2s
+- Full required lane, warm: go run ./scripts/integration-lane --lane required -> exit 0, '8 suites passed; 8 assurance suites passed across 4 native adapters', 4m02s, custody 60 jobs verified.
+- Full required lane, cold (GOMODCACHE=$(mktemp -d)) -> exit 0, same 8+8, 5m01s. Both reports carry the go-modules receipt with the identical sha256.
+- go test -count=1 ./cmd/machinery -> ok 266.1s
