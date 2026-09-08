@@ -378,8 +378,11 @@ func TestScopedFormalTLCCancellationReapsOwnedJVM(t *testing.T) {
 		done <- outcome{rc: rc, stdout: stdout.String(), stderr: stderr.String()}
 	}()
 
-	// Observe the actually running pinned TLC JVM before cancelling.
-	pid := waitFormalJavaProcess(t, `tlc2\.TLC .*machinery-tlc-`, 60*time.Second)
+	// Observe the actually running pinned TLC JVM before cancelling. The match
+	// names this test's own spec pair: a pattern that admitted any TLC JVM on
+	// the host picked up a sibling package's (or a concurrent design's) engine
+	// during the full race sweep and reported it dead before cancellation.
+	pid := waitFormalJavaProcess(t, `tlc2\.TLC .*-config LongRun\.cfg LongRun\.tla`, 60*time.Second)
 	if !custodyAlive(pid) {
 		t.Fatalf("observed TLC JVM %d is not alive", pid)
 	}
@@ -402,7 +405,7 @@ func TestScopedFormalTLCCancellationReapsOwnedJVM(t *testing.T) {
 	}
 	// The owned JVM is terminated and reaped before return; the unrelated
 	// sentinel survives.
-	waitFormalJavaProcessGone(t, `tlc2\.TLC .*machinery-tlc-`, pid, 30*time.Second)
+	waitFormalJavaProcessGone(t, `tlc2\.TLC .*-config LongRun\.cfg LongRun\.tla`, pid, 30*time.Second)
 	requireFormalCustodyClean(t, closeFormalCustodyScope(t, s, 60*time.Second), 2)
 	if !custodyAlive(sentinel) {
 		t.Fatal("unrelated sentinel died")
