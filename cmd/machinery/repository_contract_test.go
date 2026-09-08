@@ -680,11 +680,14 @@ func TestAgentPortabilityDocumentationContracts(t *testing.T) {
 		t.Fatal("README must link the agent portability guide")
 	}
 	guide := mustRepositoryFile(t, filepath.Join(root, "docs", "agent-portability.md"))
+	// MAC-gcrr restated the recovery contract in stronger form: one journaled
+	// transaction, per-root restore to pre-run state, plugin refresh failures
+	// returned with the exact retry.
 	for _, required := range []string{
-		"form one serialized transaction",
-		"restores the complete previous local generation",
-		"detected host plugin",
-		"also makes the command fail",
+		"form one serialized, journaled transaction",
+		"restores every root it owns to its complete pre-run state",
+		"A detected plugin that cannot be inspected or refreshed",
+		"returns a non-zero error naming the failed operation",
 	} {
 		if !strings.Contains(guide, required) {
 			t.Errorf("agent portability guide is missing recovery contract %q", required)
