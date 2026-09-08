@@ -7,8 +7,8 @@ type: bug
 labels: [custody, processscope]
 created_at: 2026-09-08T07:58:35Z
 created_by: ramirosalas
-updated_at: 2026-09-08T07:58:35Z
-content_hash: "sha256:9b3c9f2f22b5e91e9b300214335f8239055fc6823c9c36905bee98dea2bc65ca"
+updated_at: 2026-09-08T08:52:37Z
+content_hash: "sha256:ed1e646c5cfe333a8288bc328d6746fcc76fd395a545085fe1ef22c4c058b874"
 ---
 
 ## Description
@@ -40,3 +40,6 @@ Any contributor or CI runner with a large environment cannot run the adapters pa
 
 
 ## Comments
+
+### 2026-09-08T08:52:37Z ramirosalas
+Fixed by 10c4158 (fix(processscope): account cleanup grace per retirement, not as one shared instant), which also loops writeFrame over partial WriteMsgUnix writes (descriptor rights ride with the first send). Verified 2026-09-08: TestContributorLaneRejectsRuntimeAbsence and TestTypeScriptContributorLaneRejectsConformanceOmission pass under a 7,616-byte inherited environment that previously failed with 'frame: short control write'. Landed on main ahead of the 0.7.0 tag.
