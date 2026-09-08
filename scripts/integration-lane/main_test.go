@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -675,5 +676,151 @@ func TestLanePreflightFailurePropagationControl(t *testing.T) {
 				t.Fatalf("real shell bypass control: err=%v out=%q", e, out)
 			}
 		})
+	}
+}
+
+// TestLaneStreamFailureNeverFormatsANilError freezes the diagnostic contract
+// broken on the first hosted run: a guarded job that returned no error but
+// spoke on a stream it must keep silent was reported as "%!w(<nil>)", which
+// destroyed the only evidence in the log.
+func TestLaneStreamFailureNeverFormatsANilError(t *testing.T) {
+	noise := "go: downloading github.com/spf13/cobra v1.10.2"
+	silent := laneStreamFailure("native package selection failed", nil, noise)
+	if silent == nil {
+		t.Fatal("a stream failure with no error must still be an error")
+	}
+	for _, text := range []string{silent.Error()} {
+		if strings.Contains(text, "%!") {
+			t.Errorf("nil error was formatted through a verb: %s", text)
+		}
+		if !strings.Contains(text, noise) || !strings.Contains(text, "native package selection failed") {
+			t.Errorf("diagnostic lost its evidence: %s", text)
+		}
+	}
+	wrapped := laneStreamFailure("native package selection failed", os.ErrClosed, noise)
+	if !errors.Is(wrapped, os.ErrClosed) {
+		t.Error("a real error must stay unwrappable-to")
+	}
+	if !strings.Contains(wrapped.Error(), noise) {
+		t.Errorf("wrapped diagnostic lost its stream: %s", wrapped)
+	}
+	if bare := laneStreamFailure("native package selection failed", os.ErrClosed); strings.Contains(bare.Error(), "%!") || !errors.Is(bare, os.ErrClosed) {
+		t.Errorf("empty stream produced a malformed diagnostic: %v", bare)
+	}
+}
+
+// TestWarmGoModuleClosureSilencesColdCacheSelection reproduces the first
+// hosted-run defect offline: with a cold module cache the selection command
+// writes "go: downloading ..." to stderr, and the lane treats any selection
+// stderr as failure. The module proxy is the host's own module cache in
+// proxy layout, so the reproduction needs no network.
+func TestWarmGoModuleClosureSilencesColdCacheSelection(t *testing.T) {
+	repo := laneRepo(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	hostCache, err := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
+	if err != nil {
+		t.Fatalf("resolve host module cache: %v", err)
+	}
+	proxy := filepath.Join(strings.TrimSpace(string(hostCache)), "cache", "download")
+	if info, err := os.Stat(proxy); err != nil || !info.IsDir() {
+		t.Skipf("host module cache is not in proxy layout: %v", err)
+	}
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The Go toolchain writes the module cache read-only, so it cannot live
+	// under t.TempDir(): removal is restored explicitly here.
+	cold, err := os.MkdirTemp("", "lane-cold-modcache-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = filepath.WalkDir(cold, func(path string, d os.DirEntry, err error) error {
+			if err == nil {
+				_ = os.Chmod(path, 0o700)
+			}
+			return nil
+		})
+		if err := os.RemoveAll(cold); err != nil {
+			t.Errorf("cold module cache was not removed: %v", err)
+		}
+	})
+	t.Setenv("GOMODCACHE", cold)
+	t.Setenv("GOPROXY", "file://"+filepath.ToSlash(proxy))
+	t.Setenv("GONOSUMDB", "*")
+	t.Setenv("GONOSUMCHECK", "1")
+	t.Setenv("GOFLAGS", "")
+
+	custody, err := newLaneCustody()
+	if err != nil {
+		t.Fatal(err)
+	}
+	work := t.TempDir()
+	selection := func(scratch string) (string, string, error) {
+		return custody.run(ctx, scratch, repo, environment(nil), 3*time.Minute, 1<<20, 4<<20, goBin, "list", "-json", "-tags", "machinery_integration", "./internal/checker")
+	}
+
+	coldScratch := filepath.Join(work, "cold")
+	if err := os.MkdirAll(coldScratch, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_, coldErrout, coldErr := selection(coldScratch)
+	if coldErr == nil && coldErrout == "" {
+		t.Skip("module cache did not go cold; the reproduction needs an empty GOMODCACHE")
+	}
+	if !strings.Contains(coldErrout, "go: downloading") {
+		t.Fatalf("cold selection did not reproduce the download noise: err=%v stderr=%q", coldErr, coldErrout)
+	}
+	// This is exactly the shape the lane rejected on the hosted runner.
+	if diagnostic := laneStreamFailure("native package selection failed", coldErr, coldErrout); !strings.Contains(diagnostic.Error(), "go: downloading") {
+		t.Fatalf("cold-cache diagnostic hid the cause: %v", diagnostic)
+	}
+
+	warmScratch := filepath.Join(work, "warm")
+	if err := os.MkdirAll(warmScratch, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := warmGoModuleClosure(ctx, custody, repo, warmScratch, goBin)
+	if err != nil {
+		t.Fatalf("warming the module closure failed: %v", err)
+	}
+	if receipt.ID != "go-modules" || receipt.Status != "passed" || len(receipt.SHA) != 64 || receipt.Identity != "go.mod+go.sum" {
+		t.Fatalf("module closure receipt is not evidence: %+v", receipt)
+	}
+
+	afterScratch := filepath.Join(work, "after")
+	if err := os.MkdirAll(afterScratch, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	out, errout, err := selection(afterScratch)
+	if err != nil || errout != "" {
+		t.Fatalf("selection after warming was not silent: err=%v stderr=%q", err, errout)
+	}
+	if !strings.Contains(out, `"ImportPath"`) {
+		t.Fatalf("selection produced no package description: %s", out)
+	}
+}
+
+// TestWarmGoModuleClosureRejectsUnexpectedStderr proves the warm step checks
+// the toolchain's stream vocabulary instead of ignoring stderr wholesale.
+func TestWarmGoModuleClosureRejectsUnexpectedStderr(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		line     string
+		progress bool
+	}{
+		{"download", "go: downloading github.com/spf13/cobra v1.10.2", true},
+		{"extract", "go: extracting github.com/spf13/cobra v1.10.2", true},
+		{"finding", "go: finding module for package example.com/x", true},
+		{"nothing-to-download", "go: no module dependencies to download", true},
+		{"warning", "go: warning: ignoring symlink", false},
+		{"error", "go: module lookup disabled by GOPROXY=off", false},
+		{"bare-prefix", "go: downloading", false},
+	} {
+		if got := goDownloadProgress.MatchString(tc.line); got != tc.progress {
+			t.Errorf("%s: progress classification = %v, want %v", tc.name, got, tc.progress)
+		}
 	}
 }

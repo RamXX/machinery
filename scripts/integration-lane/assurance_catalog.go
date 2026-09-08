@@ -633,7 +633,7 @@ func executeAssuranceSuite(ctx context.Context, custody *laneCustody, root, scra
 	case "go-testing/v1":
 		listOut, listErr, err := custody.run(ctx, scratch, scratch, environment(nil), time.Minute, 1<<20, 1<<20, paths["go"], "list", "-json", s.Package)
 		if err != nil || listErr != "" {
-			return r, fmt.Errorf("native probe selection failed: %w %s", err, listErr)
+			return r, laneStreamFailure("native probe selection failed", err, listErr)
 		}
 		var pkg struct {
 			ImportPath                string

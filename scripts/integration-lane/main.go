@@ -1075,6 +1075,65 @@ func shellQuote(path string) string {
 	return "'" + path + "'"
 }
 
+// laneStreamFailure builds one diagnostic for a guarded job that either
+// returned an error or spoke on a stream it must keep silent. A nil error is
+// described, never wrapped: %w applied to nil renders as %!w(<nil>) and hides
+// the only evidence the operator has.
+func laneStreamFailure(what string, err error, streams ...string) error {
+	detail := strings.TrimSpace(strings.Join(streams, " "))
+	switch {
+	case err == nil && detail == "":
+		return fmt.Errorf("%s", what)
+	case err == nil:
+		return fmt.Errorf("%s: unexpected diagnostic output: %s", what, detail)
+	case detail == "":
+		return fmt.Errorf("%s: %w", what, err)
+	default:
+		return fmt.Errorf("%s: %w: %s", what, err, detail)
+	}
+}
+
+// goDownloadProgress matches the only lines the Go toolchain is allowed to
+// write while warming a module closure: per-module progress, and the notice a
+// module with no external requirements emits. Anything else on that stream is
+// a real diagnostic and fails the warm step closed.
+var goDownloadProgress = regexp.MustCompile(`^go: (?:(?:downloading|extracting|finding) \S|no module dependencies to download$)`)
+
+// warmGoModuleClosure downloads the main module's dependency closure once,
+// before any package selection runs. On a fresh runner the module cache is
+// cold, so the first `go list` writes "go: downloading ..." progress to
+// stderr; the lane requires a silent stderr from selection and would report
+// that progress as a failure. Warming here concentrates the download in one
+// bounded, custody-guarded job whose stderr vocabulary is checked rather than
+// ignored, and produces its own receipt binding the go.sum the closure was
+// resolved against.
+func warmGoModuleClosure(ctx context.Context, custody *laneCustody, root, work, goBin string) (runtimeReceipt, error) {
+	r := runtimeReceipt{ID: "go-modules", Status: "failed", Identity: "go.mod+go.sum"}
+	mod, err := regularBytes(filepath.Join(root, "go.mod"), 8<<20)
+	if err != nil {
+		return r, fmt.Errorf("go module closure receipt: %w", err)
+	}
+	// A module with no external requirements ships no go.sum; its closure is
+	// then legitimately empty and binds to go.mod alone.
+	sum, err := regularBytes(filepath.Join(root, "go.sum"), 8<<20)
+	if err != nil && !os.IsNotExist(err) {
+		return r, fmt.Errorf("go module closure receipt: %w", err)
+	}
+	out, errout, err := custody.run(ctx, work, root, environment(nil), 10*time.Minute, 1<<20, 4<<20, goBin, "mod", "download")
+	if err != nil {
+		return r, laneStreamFailure("go module closure download failed", err, out, errout)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(errout), "\n") {
+		if line == "" || goDownloadProgress.MatchString(line) {
+			continue
+		}
+		return r, laneStreamFailure("go module closure download reported a diagnostic", nil, line)
+	}
+	r.SHA = fmt.Sprintf("%x", sha256.Sum256(append(append(append([]byte{}, mod...), 0), sum...)))
+	r.Status = "passed"
+	return r, nil
+}
+
 func toolReceipt(ctx context.Context, custody *laneCustody, scratch, id, arg string) (runtimeReceipt, error) {
 	r := runtimeReceipt{ID: id, Status: "failed"}
 	path, err := exec.LookPath(id)
@@ -1091,7 +1150,7 @@ func toolReceipt(ctx context.Context, custody *laneCustody, scratch, id, arg str
 	}
 	out, errout, err := custody.run(ctx, scratch, "", nil, 15*time.Second, 1<<20, 1<<20, path, arg)
 	if err != nil || errout != "" {
-		return r, fmt.Errorf("%s version failed: %w %s", id, err, errout)
+		return r, laneStreamFailure(id+" version failed", err, errout)
 	}
 	r.Path = path
 	r.SHA = fmt.Sprintf("%x", sha256.Sum256(b))
@@ -1131,6 +1190,15 @@ func provision(ctx context.Context, custody *laneCustody, root, work, cache stri
 				}
 			}
 			result = append(result, r)
+			if id == "go" {
+				// Selection must find a warm module cache: see
+				// warmGoModuleClosure for why a cold one fails the lane.
+				warm, err := warmGoModuleClosure(ctx, custody, root, work, r.Path)
+				result = append(result, warm)
+				if err != nil {
+					return result, err
+				}
+			}
 			continue
 		}
 		if !regexp.MustCompile(`^[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}$`).MatchString(p.Docker.Image) {
@@ -1410,7 +1478,7 @@ func execute(ctx context.Context, custody *laneCustody, root, work, cache, evide
 	if s.Adapter == "go-json" {
 		out, errout, err := custody.run(ctx, work, root, env, time.Minute, 1<<20, 1<<20, paths["go"], "list", "-json", "-tags", "machinery_integration", s.Package)
 		if err != nil || errout != "" {
-			return r, fmt.Errorf("native package selection failed: %w %s", err, errout)
+			return r, laneStreamFailure("native package selection failed", err, errout)
 		}
 		var pkg struct {
 			ImportPath                string
