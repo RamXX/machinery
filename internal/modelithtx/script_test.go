@@ -126,6 +126,10 @@ func scriptFixture(t *testing.T) string {
 	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "filelock"), filepath.Join(repo, "internal", "filelock"), "_test.go")
 	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "gitcontrol"), filepath.Join(repo, "internal", "gitcontrol"), "_test.go")
 	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "processcontrol"), filepath.Join(repo, "internal", "processcontrol"), "_test.go")
+	// MAC-cn7q wired processcontrol's scoped custody through
+	// internal/processscope; the synthetic module must carry it too or the
+	// bounded Git helper build fails for a missing intra-module package.
+	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "processscope"), filepath.Join(repo, "internal", "processscope"), "_test.go")
 	for _, component := range []string{"a", "b"} {
 		dir := filepath.Join(repo, "examples", component)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
