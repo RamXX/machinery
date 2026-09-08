@@ -1,14 +1,15 @@
 ---
 id: MAC-ipa1
 title: "processscope: a terminal result that overtakes its caller is lost, and the finished job reports TIMEOUT"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [custody, ci]
 created_at: 2026-09-08T13:07:30Z
 created_by: ramirosalas
 updated_at: 2026-09-08T13:27:03Z
-content_hash: "sha256:a76573af4c025bdd403f893bd986728e58e032ef48ed42f813778dfcf85bdfe0"
+content_hash: "sha256:ec31e7cab313a607ba6321567b710e3fa3f72c223342e56bf8e97d26bc31aabf"
+closed_at: 2026-09-08T13:27:03Z
 ---
 
 ## Description
@@ -45,7 +46,7 @@ Make the registration belong to the caller for the whole call rather than to the
 
 
 ## History
-
+- 2026-09-08T13:27:03Z status: open -> closed
 
 ## Links
 
