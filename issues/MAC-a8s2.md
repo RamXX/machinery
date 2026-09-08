@@ -8,8 +8,8 @@ labels: [regression, processscope, verify-formal]
 parent: MAC-ui8a
 created_at: 2026-09-08T07:54:06Z
 created_by: ramirosalas
-updated_at: 2026-09-08T07:54:06Z
-content_hash: "sha256:374e70b0174d4ea872959a3ce169cd62bee7f1e213a1b585cd42b8332a91c193"
+updated_at: 2026-09-08T08:05:41Z
+content_hash: "sha256:79311d42d196a42ad50160aa771c9e70d66ff5fae80ac88f203728de3c4256f4"
 ---
 
 ## Description
@@ -110,7 +110,7 @@ rather than deterministic across machines.
 
 
 ## Notes
-
+Verified at release commit d1f2264 in the main checkout: internal/processscope/broker.go lines 740 (retireJob), 753-767 (waitUntil derivation and the 3s cap), 803 (budgetExceed), 814 (retireAll), 840 (buildReport) are unchanged. Reproduced again with the relocated 0.7.0 binary: machinery check design still reports 163 blocking findings on the same tree.
 
 ## History
 
