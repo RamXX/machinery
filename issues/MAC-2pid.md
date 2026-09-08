@@ -1,14 +1,16 @@
 ---
 id: MAC-2pid
 title: "formal and nightly lane jobs install Go from go.mod and none of the pinned assurance runtimes"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [ci, integration-lane, mirror-drift]
 created_at: 2026-09-08T17:26:40Z
 created_by: ramirosalas
 updated_at: 2026-09-08T17:26:48Z
-content_hash: "sha256:799fa90ee1b9dbd3d93c5c47bc43f77218735867bda6e114961c3d050788adb1"
+content_hash: "sha256:187c840adf2832af0b44854908ad0376003ddaffbfd11ff044a289eea0b0a547"
+closed_at: 2026-09-08T17:26:48Z
+close_reason: "Fixed in d43af4c; lands with the next push"
 ---
 
 ## Description
@@ -35,7 +37,7 @@ One composite action (.github/actions/assurance-runtimes) owns the pins; the ci 
 
 
 ## History
-
+- 2026-09-08T17:26:48Z status: open -> closed
 
 ## Links
 
