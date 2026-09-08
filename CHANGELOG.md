@@ -10,6 +10,21 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **The partial-witness journal recovery proof no longer cuts a record it did not write.** The
+  proof appends the first N bytes of a witness record to a formal transaction journal, for every
+  N, and requires recovery to derive the rest. It took the number of cuts from a record seeded in
+  one directory but appended the bytes of a record seeded fresh in another. A native witness is
+  `unix:<device>:<inode>:<creation sec>:<creation nsec>` in hex, so the encoded record length moves
+  with the hex width of the inode and of the creation-time nanoseconds: over 200 seeds on one host
+  the record came out 83, 84, or 85 bytes. When the record under test was the shorter one, the last
+  cuts sliced past its end into the spare capacity of the encoding buffer, appending a complete
+  record plus stray bytes, and the reader rejected those bytes as malformed trailing data, which is
+  what they were. It surfaced as `new/byte-082` on a hosted macOS runner and reproduced here at
+  `new/byte-084` in 1 of 3 runs. Each cut is now bounded by the record it appends, and two pinned
+  cases hold the boundary steady on any host: a sweep with the narrowest and the widest
+  creation-time fields a witness can carry, and a check that a byte which cannot begin the next
+  expected record stays rejected. The journal reader is unchanged: every true prefix of a valid
+  record was already recovered, and the ABA and tamper rejections are untouched.
 - **A delivered close report is no longer reported as a lost control channel.** The broker answers
   the root close and then exits: it writes the report, leaves the root channel loop, retires,
   writes its ledger and closes the control connection, all within a few milliseconds. On the

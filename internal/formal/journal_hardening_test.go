@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,45 +15,115 @@ import (
 func TestFormalJournalRecoversEveryPartialWitnessByte(t *testing.T) {
 	for _, image := range []string{"old", "new"} {
 		t.Run(image, func(t *testing.T) {
-			probeDir := t.TempDir()
-			_, probeRoot, probeRecord := seedPartialFormalWitness(t, probeDir, image)
-			if err := probeRoot.Close(); err != nil {
+			forEachPartialFormalWitnessCut(t, image, assertPartialFormalWitnessCutRecovers)
+		})
+	}
+}
+
+// TestFormalJournalRecoversPartialWitnessAtPinnedWitnessWidths pins the cut
+// boundary independent of the host. The narrowest and the widest creation-time
+// fields a native Unix witness can carry move every later byte of the encoded
+// record, so both extremes are swept byte by byte.
+func TestFormalJournalRecoversPartialWitnessAtPinnedWitnessWidths(t *testing.T) {
+	for _, width := range []struct {
+		name  string
+		sec   int64
+		nsec  int64
+		field string
+	}{
+		{name: "narrowest", sec: 0, nsec: 0, field: ":0:0"},
+		{name: "widest", sec: math.MaxInt64, nsec: math.MaxInt64, field: ":7fffffffffffffff:7fffffffffffffff"},
+	} {
+		t.Run(width.name, func(t *testing.T) {
+			originalCoarsener := formalWitnessTimeCoarsener
+			t.Cleanup(func() { formalWitnessTimeCoarsener = originalCoarsener })
+			formalWitnessTimeCoarsener = func(int64, int64) (int64, int64) { return width.sec, width.nsec }
+			forEachPartialFormalWitnessCut(t, "new", func(t *testing.T, cut partialFormalWitnessCut) {
+				if strings.HasPrefix(cut.witness, "unix:") && !strings.HasSuffix(cut.witness, width.field) {
+					t.Fatalf("pinned witness = %q, want time fields %q", cut.witness, width.field)
+				}
+				assertPartialFormalWitnessCutRecovers(t, cut)
+			})
+		})
+	}
+}
+
+// TestFormalJournalRejectsTrailingBytesAfterCompleteWitness pins the other side
+// of the boundary: a byte that cannot begin the next expected record is not a
+// truncated witness, and stays rejected on every host.
+func TestFormalJournalRejectsTrailingBytesAfterCompleteWitness(t *testing.T) {
+	dir := t.TempDir()
+	_, root, record := seedPartialFormalWitness(t, dir, "new")
+	defer root.Close() //nolint:errcheck // test cleanup
+	appendRawFormalJournalBytes(t, dir, append(append([]byte(nil), record...), 0))
+	if _, _, err := readFormalJournal(root); err == nil || !strings.Contains(err.Error(), "malformed trailing data") {
+		t.Fatalf("junk after a complete witness record was accepted: %v", err)
+	}
+}
+
+type partialFormalWitnessCut struct {
+	dir     string
+	image   string
+	witness string
+	root    *os.Root
+	record  []byte
+	cut     int
+}
+
+// forEachPartialFormalWitnessCut seeds a fresh transaction for every cut and
+// hands the seed to run. Every seed carries its own native witness, and the
+// encoded record length tracks the hex width of the device, inode, and
+// creation-time fields, so the cut bound has to come from the record the
+// subtest actually appends. A bound taken from a record seeded elsewhere can
+// exceed that record and slice into the spare capacity of its encoding buffer.
+func forEachPartialFormalWitnessCut(t *testing.T, image string, run func(*testing.T, partialFormalWitnessCut)) {
+	t.Helper()
+	for cut := 1; ; cut++ {
+		dir := t.TempDir()
+		witness, root, record := seedPartialFormalWitness(t, dir, image)
+		if cut >= len(record) {
+			if err := root.Close(); err != nil {
 				t.Fatal(err)
 			}
-			for cut := 1; cut < len(probeRecord); cut++ {
-				t.Run(fmt.Sprintf("byte-%03d", cut), func(t *testing.T) {
-					dir := t.TempDir()
-					wantWitness, root, record := seedPartialFormalWitness(t, dir, image)
-					defer root.Close() //nolint:errcheck // test cleanup
-					appendRawFormalJournalBytes(t, dir, record[:cut])
-					header, phase, err := readFormalJournal(root)
-					if err != nil {
-						t.Fatalf("read %s witness cut %d: %v", image, cut, err)
-					}
-					if phase != map[string]string{"old": "parking", "new": "installing"}[image] {
-						t.Fatalf("phase = %q", phase)
-					}
-					gotWitness := header.Entries[0].OldWitness
-					if image == "new" {
-						gotWitness = header.Entries[0].NewWitness
-					}
-					if gotWitness != wantWitness {
-						t.Fatalf("derived witness = %q, want %q", gotWitness, wantWitness)
-					}
-					if err := recoverFormalTransaction(root, renameFormalRoot); err != nil {
-						t.Fatalf("recover %s witness cut %d: %v", image, cut, err)
-					}
-					body, err := os.ReadFile(filepath.Join(dir, "A.tla"))
-					if err != nil || string(body) != "old-a" {
-						t.Fatalf("recovered %s witness cut %d restored %q, %v", image, cut, body, err)
-					}
-					entries, err := os.ReadDir(dir)
-					if err != nil || len(entries) != 1 || entries[0].Name() != "A.tla" {
-						t.Fatalf("recovered %s witness cut %d residue: %v, %v", image, cut, entries, err)
-					}
-				})
+			if cut == 1 {
+				t.Fatalf("witness record %q is too short to cut", record)
 			}
+			return
+		}
+		t.Run(fmt.Sprintf("byte-%03d", cut), func(t *testing.T) {
+			defer root.Close() //nolint:errcheck // test cleanup
+			run(t, partialFormalWitnessCut{dir: dir, image: image, witness: witness, root: root, record: record, cut: cut})
 		})
+	}
+}
+
+func assertPartialFormalWitnessCutRecovers(t *testing.T, c partialFormalWitnessCut) {
+	t.Helper()
+	appendRawFormalJournalBytes(t, c.dir, c.record[:c.cut])
+	header, phase, err := readFormalJournal(c.root)
+	if err != nil {
+		t.Fatalf("read %s witness cut %d of %q: %v", c.image, c.cut, c.record, err)
+	}
+	if phase != map[string]string{"old": "parking", "new": "installing"}[c.image] {
+		t.Fatalf("phase = %q", phase)
+	}
+	gotWitness := header.Entries[0].OldWitness
+	if c.image == "new" {
+		gotWitness = header.Entries[0].NewWitness
+	}
+	if gotWitness != c.witness {
+		t.Fatalf("derived witness = %q, want %q", gotWitness, c.witness)
+	}
+	if err := recoverFormalTransaction(c.root, renameFormalRoot); err != nil {
+		t.Fatalf("recover %s witness cut %d: %v", c.image, c.cut, err)
+	}
+	body, err := os.ReadFile(filepath.Join(c.dir, "A.tla"))
+	if err != nil || string(body) != "old-a" {
+		t.Fatalf("recovered %s witness cut %d restored %q, %v", c.image, c.cut, body, err)
+	}
+	entries, err := os.ReadDir(c.dir)
+	if err != nil || len(entries) != 1 || entries[0].Name() != "A.tla" {
+		t.Fatalf("recovered %s witness cut %d residue: %v, %v", c.image, c.cut, entries, err)
 	}
 }
 
