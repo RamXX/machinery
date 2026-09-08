@@ -4,7 +4,7 @@
 # Installed by pointing git at this directory:  make hooks
 # (equivalently: git config core.hooksPath .githooks)
 #
-# Skip in an emergency with:  SKIP_PREFLIGHT=1 git push
+# There is no bypass: the gate runs on every push, and hosted CI re-runs it.
 set -euo pipefail
 
 hook_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)

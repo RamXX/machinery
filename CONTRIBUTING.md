@@ -39,14 +39,10 @@ make preflight
 (Not to be confused with `machinery preflight`, the end-user subcommand that
 checks toolchain prerequisites. `make preflight` is the contributor CI mirror.)
 
-In a genuine emergency you can bypass the hook for a single push:
-
-```sh
-SKIP_PREFLIGHT=1 git push
-```
-
-CI still enforces everything, so a bypassed push that would have failed locally
-just fails in CI instead.
+There is no bypass variable: the hook runs the full gate on every push, and
+hosted CI re-runs every gate on the pushed commit. Release publication is gated
+separately on the exact commit carrying successful ci, formal, and security
+runs (see `docs/release-policy.json`), so a red push can never publish.
 
 ## Bumping the linter
 

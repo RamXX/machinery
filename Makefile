@@ -97,7 +97,7 @@ preflight: ## Run every required local CI/formal gate, cheapest first
 hooks: ## Install the git pre-push hook (points core.hooksPath at .githooks)
 	@git config core.hooksPath .githooks
 	@chmod +x .githooks/pre-push scripts/preflight.sh
-	@echo "pre-push hook installed. Bypass once with: SKIP_PREFLIGHT=1 git push"
+	@echo "pre-push hook installed. There is no bypass; every push runs scripts/preflight.sh"
 
 lint-install: ## Install the pinned static-analysis tools so local matches CI exactly
 	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
