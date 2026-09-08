@@ -24,9 +24,29 @@ const designInventoryReadPage = 256
 var rootReadAfterInitial = func(string) {}
 var rootInventoryAfterFirst = func(string) {}
 
+// newInventoryMutationChannel opens the kernel mutation-event channel that
+// backs every root-directory witness in a single traversal. It is a variable
+// so a test can reproduce a host that cannot arm one.
+var newInventoryMutationChannel = dirscan.NewMutationChannel
+
+// inventoryChangeID is the native change stamp half of the witness. It is a
+// variable so a test can pin it to a constant and reproduce, on any host, a
+// kernel whose inode-clock resolution cannot separate an ABA mutation from a
+// quiescent directory.
+var inventoryChangeID = dirscan.ChangeID
+
+// rootDirectoryWitness is the two-conjunct consistency witness for one
+// enumerated directory. info and changeID are the native stat stamps; watch
+// is the kernel mutation-event view, which is the only conjunct that does not
+// depend on the resolution of the inode clock. On Linux before the
+// multigrain-timestamp work (mainline 6.13) every inode timestamp comes from
+// the coarse clock, one timer tick wide, so a create-then-delete or a
+// rename-and-back that completes inside one tick leaves every stat stamp
+// equal; only the event watch sees it.
 type rootDirectoryWitness struct {
 	info     os.FileInfo
 	changeID string
+	watch    *dirscan.MutationWatch
 }
 
 func probeRegularFile(design, rel string) (bool, error) {
@@ -236,11 +256,16 @@ func validateDesignInventoryBounded(design string, maxEntries, maxDepth int) err
 		return err
 	}
 	defer root.Close()
+	channel, err := newInventoryMutationChannel()
+	if err != nil {
+		return fmt.Errorf("design inventory %s has no reliable change witness: %w", design, err)
+	}
+	defer func() { _ = channel.Close() }()
 	caseFolded := map[string]string{}
 	entriesSeen := 0
 	var walk func(string, int) error
 	walk = func(dir string, depth int) error {
-		entries, witness, err := readRootDirectory(root, dir, maxEntries-entriesSeen)
+		entries, witness, err := readRootDirectory(root, dir, maxEntries-entriesSeen, channel)
 		if err != nil {
 			return err
 		}
@@ -287,7 +312,7 @@ func validateDesignInventoryBounded(design string, maxEntries, maxDepth int) err
 	return walk(".", 0)
 }
 
-func readRootDirectory(root *os.Root, rel string, maxEntries int) (_ []fs.DirEntry, witness rootDirectoryWitness, retErr error) {
+func readRootDirectory(root *os.Root, rel string, maxEntries int, channel *dirscan.MutationChannel) (_ []fs.DirEntry, witness rootDirectoryWitness, retErr error) {
 	if maxEntries < 0 {
 		return nil, rootDirectoryWitness{}, fmt.Errorf("design inventory exceeds %d-entry limit", designInventoryMaxEntries)
 	}
@@ -310,11 +335,20 @@ func readRootDirectory(root *os.Root, rel string, maxEntries int) (_ []fs.DirEnt
 	if !sameInventoryInfo(before, opened) {
 		return nil, rootDirectoryWitness{}, fmt.Errorf("design inventory directory %s changed identity while opening", filepath.ToSlash(rel))
 	}
-	changeID, err := dirscan.ChangeID(dir, opened)
+	// Arm the mutation-event watch before the first stat observation so it
+	// spans the whole witness window, and keep it in the witness so the
+	// caller's post-subtree revalidation drains the same watch. It survives
+	// the directory being restored to its original apparent state, which is
+	// exactly what a coarse inode clock cannot do.
+	watch, err := channel.Watch(dir)
+	if err != nil {
+		return nil, rootDirectoryWitness{}, fmt.Errorf("design inventory directory %s has no reliable change witness: %w", filepath.ToSlash(rel), err)
+	}
+	changeID, err := inventoryChangeID(dir, opened)
 	if err != nil || changeID == "" {
 		return nil, rootDirectoryWitness{}, errors.Join(err, fmt.Errorf("design inventory directory %s has no native change witness", filepath.ToSlash(rel)))
 	}
-	witness = rootDirectoryWitness{info: opened, changeID: changeID}
+	witness = rootDirectoryWitness{info: opened, changeID: changeID, watch: watch}
 	entries, err := readRootDirEntries(dir, maxEntries)
 	if err != nil {
 		return nil, rootDirectoryWitness{}, err
@@ -325,7 +359,7 @@ func readRootDirectory(root *os.Root, rel string, maxEntries int) (_ []fs.DirEnt
 	if err != nil {
 		return nil, rootDirectoryWitness{}, err
 	}
-	firstChange, err := dirscan.ChangeID(dir, firstAfter)
+	firstChange, err := inventoryChangeID(dir, firstAfter)
 	if err != nil || !sameInventoryInfo(opened, firstAfter) || firstChange != changeID {
 		return nil, rootDirectoryWitness{}, errors.Join(err, fmt.Errorf("design inventory directory %s changed while enumerating", filepath.ToSlash(rel)))
 	}
@@ -338,7 +372,7 @@ func readRootDirectory(root *os.Root, rel string, maxEntries int) (_ []fs.DirEnt
 	if err != nil {
 		return nil, rootDirectoryWitness{}, err
 	}
-	verifyChange, err := dirscan.ChangeID(verifyDir, verifyBefore)
+	verifyChange, err := inventoryChangeID(verifyDir, verifyBefore)
 	if err != nil || !sameInventoryInfo(opened, verifyBefore) || verifyChange != changeID {
 		return nil, rootDirectoryWitness{}, errors.Join(err, fmt.Errorf("design inventory directory %s changed before verification pass", filepath.ToSlash(rel)))
 	}
@@ -351,9 +385,12 @@ func readRootDirectory(root *os.Root, rel string, maxEntries int) (_ []fs.DirEnt
 	if err != nil {
 		return nil, rootDirectoryWitness{}, err
 	}
-	verifyAfterChange, err := dirscan.ChangeID(verifyDir, verifyAfter)
+	verifyAfterChange, err := inventoryChangeID(verifyDir, verifyAfter)
 	if err != nil || !sameInventoryInfo(opened, verifyAfter) || verifyAfterChange != changeID || !sameDirEntryNames(entries, verifyEntries) {
 		return nil, rootDirectoryWitness{}, errors.Join(err, fmt.Errorf("design inventory directory %s changed between inventory passes", filepath.ToSlash(rel)))
+	}
+	if witness.watch.Mutated() {
+		return nil, rootDirectoryWitness{}, fmt.Errorf("design inventory directory %s changed while enumerating (kernel mutation events observed)", filepath.ToSlash(rel))
 	}
 	if err := revalidateRootDirectory(root, rel, witness); err != nil {
 		return nil, rootDirectoryWitness{}, err
@@ -398,9 +435,16 @@ func revalidateRootDirectory(root *os.Root, rel string, before rootDirectoryWitn
 	if err != nil {
 		return err
 	}
-	changeID, err := dirscan.ChangeID(dir, opened)
+	changeID, err := inventoryChangeID(dir, opened)
 	if err != nil || !sameInventoryInfo(before.info, opened) || changeID != before.changeID {
 		return errors.Join(err, fmt.Errorf("design inventory directory %s changed while walking", filepath.ToSlash(rel)))
+	}
+	// The event watch outlives the enumeration deliberately: a witness held
+	// across a subtree walk, or across the lifetime of a source inventory
+	// handle, is revalidated here, and the stat stamps above cannot see an
+	// ABA that completed inside one tick of a coarse inode clock.
+	if before.watch.Mutated() {
+		return fmt.Errorf("design inventory directory %s changed while walking (kernel mutation events observed)", filepath.ToSlash(rel))
 	}
 	return nil
 }
@@ -429,6 +473,11 @@ func walkTreeDirBounded(base string, maxEntries, maxDepth int, fn fs.WalkDirFunc
 		return err
 	}
 	defer func() { retErr = errors.Join(retErr, root.Close()) }()
+	channel, err := newInventoryMutationChannel()
+	if err != nil {
+		return fmt.Errorf("tree %s has no reliable change witness: %w", base, err)
+	}
+	defer func() { retErr = errors.Join(retErr, channel.Close()) }()
 	rootInfo, err := root.Lstat(".")
 	if err != nil {
 		return err
@@ -442,7 +491,7 @@ func walkTreeDirBounded(base string, maxEntries, maxDepth int, fn fs.WalkDirFunc
 	entriesSeen := 0
 	var walk func(string, int) error
 	walk = func(dir string, depth int) error {
-		entries, witness, err := readRootDirectory(root, dir, maxEntries-entriesSeen)
+		entries, witness, err := readRootDirectory(root, dir, maxEntries-entriesSeen, channel)
 		if err != nil {
 			return err
 		}

@@ -103,6 +103,17 @@ func readOnce(path string, maxEntries int) (_ []os.DirEntry, retErr error) {
 	if !os.SameFile(before, opened) {
 		return nil, fmt.Errorf("directory %s changed identity while opening", path)
 	}
+	// The mutation-event watch is armed before the first observation so that
+	// it spans the whole two-pass window. It is the conjunct that does not
+	// depend on inode-timestamp resolution: without it, an ABA that completes
+	// inside one coarse-clock tick is invisible to every stat comparison
+	// below. A platform that cannot arm it refuses the enumeration rather
+	// than accepting one it cannot vouch for.
+	channel, watch, err := watchDirectory(dir)
+	if err != nil {
+		return nil, fmt.Errorf("directory %s has no reliable change witness: %w", path, err)
+	}
+	defer func() { retErr = errors.Join(retErr, channel.Close()) }()
 	initial, err := captureDirectoryState(dir)
 	if err != nil {
 		return nil, err
@@ -155,6 +166,9 @@ func readOnce(path string, maxEntries int) (_ []os.DirEntry, retErr error) {
 	if !sameEntryNames(entries, secondEntries) {
 		return nil, fmt.Errorf("directory %s changed between inventory passes: %w", path, ErrChanged)
 	}
+	if watch.Mutated() {
+		return nil, fmt.Errorf("directory %s changed while enumerating (kernel mutation events observed): %w", path, ErrChanged)
+	}
 	return entries, nil
 }
 
@@ -163,7 +177,7 @@ func captureDirectoryState(dir *os.File) (directoryState, error) {
 	if err != nil {
 		return directoryState{}, err
 	}
-	changeID, err := directoryChangeID(dir, info)
+	changeID, err := changeWitness(dir, info)
 	if err != nil {
 		return directoryState{}, err
 	}
@@ -177,8 +191,14 @@ func captureDirectoryState(dir *os.File) (directoryState, error) {
 // directory. Callers that enumerate through an os.Root retain their own
 // authority but share the same fail-closed platform witness as Read.
 func ChangeID(dir *os.File, info os.FileInfo) (string, error) {
-	return directoryChangeID(dir, info)
+	return changeWitness(dir, info)
 }
+
+// changeWitness is the platform change stamp behind ChangeID. It is a
+// variable so a test can pin it to a constant and reproduce, on any host, a
+// kernel whose timestamp resolution cannot separate an ABA mutation from a
+// quiescent directory.
+var changeWitness = directoryChangeID
 
 func sameDirectoryState(before, after directoryState) bool {
 	return stableInfo(before.info, after.info) && before.changeID == after.changeID

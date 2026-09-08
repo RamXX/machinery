@@ -34,6 +34,17 @@ const (
 
 var oracleInventoryAfterFirst = func(string) {}
 
+// newOracleMutationChannel opens the kernel mutation-event channel behind the
+// granularity-independent half of the oracle inventory witness. It is a
+// variable so a test can reproduce a host that cannot arm one.
+var newOracleMutationChannel = dirscan.NewMutationChannel
+
+// oracleChangeID is the native change stamp half of the witness. It is a
+// variable so a test can pin it to a constant and reproduce, on any host, a
+// kernel whose inode-clock resolution cannot separate an ABA mutation from a
+// quiescent directory.
+var oracleChangeID = dirscan.ChangeID
+
 func newOracleCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "oracle [<machines-dir> | <file.machine.json>...]",
@@ -777,7 +788,21 @@ func readOracleRootDir(root *os.Root, rel string, limit int) (_ []fs.DirEntry, r
 	if err != nil || !initial.IsDir() {
 		return nil, errors.Join(err, fmt.Errorf("oracle inventory root %s must be a real directory", rel))
 	}
-	changeID, err := dirscan.ChangeID(first, initial)
+	// The mutation-event watch spans the whole two-pass window and is the only
+	// conjunct that does not depend on inode-clock resolution: on a kernel
+	// without multigrain timestamps, an ABA that completes inside one coarse
+	// tick leaves every stat stamp below equal. A host that cannot arm one
+	// refuses the enumeration rather than accepting one it cannot vouch for.
+	channel, err := newOracleMutationChannel()
+	if err != nil {
+		return nil, fmt.Errorf("oracle inventory root %s has no reliable change witness: %w", rel, err)
+	}
+	defer func() { retErr = errors.Join(retErr, channel.Close()) }()
+	watch, err := channel.Watch(first)
+	if err != nil {
+		return nil, fmt.Errorf("oracle inventory root %s has no reliable change witness: %w", rel, err)
+	}
+	changeID, err := oracleChangeID(first, initial)
 	if err != nil || changeID == "" {
 		return nil, errors.Join(err, fmt.Errorf("oracle inventory root %s has no native change witness", rel))
 	}
@@ -790,7 +815,7 @@ func readOracleRootDir(root *os.Root, rel string, limit int) (_ []fs.DirEntry, r
 	if err != nil {
 		return nil, err
 	}
-	firstAfterChange, err := dirscan.ChangeID(first, firstAfter)
+	firstAfterChange, err := oracleChangeID(first, firstAfter)
 	if err != nil || !sameOracleDirInfo(initial, firstAfter) || firstAfterChange != changeID {
 		return nil, errors.Join(err, fmt.Errorf("oracle inventory root %s changed while enumerating", rel))
 	}
@@ -803,7 +828,7 @@ func readOracleRootDir(root *os.Root, rel string, limit int) (_ []fs.DirEntry, r
 	if err != nil {
 		return nil, err
 	}
-	secondChange, err := dirscan.ChangeID(second, secondBefore)
+	secondChange, err := oracleChangeID(second, secondBefore)
 	if err != nil || !sameOracleDirInfo(initial, secondBefore) || secondChange != changeID {
 		return nil, errors.Join(err, fmt.Errorf("oracle inventory root %s changed before verification pass", rel))
 	}
@@ -815,11 +840,14 @@ func readOracleRootDir(root *os.Root, rel string, limit int) (_ []fs.DirEntry, r
 	if err != nil {
 		return nil, err
 	}
-	secondAfterChange, err := dirscan.ChangeID(second, secondAfter)
+	secondAfterChange, err := oracleChangeID(second, secondAfter)
 	pathAfter, pathErr := root.Lstat(rel)
 	if err != nil || pathErr != nil || !sameOracleDirInfo(initial, secondAfter) || !sameOracleDirInfo(initial, pathAfter) || secondAfterChange != changeID ||
 		!slices.EqualFunc(entries, verify, func(a, b fs.DirEntry) bool { return a.Name() == b.Name() }) {
 		return nil, errors.Join(err, pathErr, fmt.Errorf("oracle inventory root %s changed between inventory passes", rel))
+	}
+	if watch.Mutated() {
+		return nil, fmt.Errorf("oracle inventory root %s changed while enumerating (kernel mutation events observed)", rel)
 	}
 	return entries, nil
 }

@@ -258,3 +258,116 @@ func TestWalkBoundedEnforcesDepthBeforeVisitingEntry(t *testing.T) {
 		t.Fatal("WalkBounded visited an entry beyond the depth ceiling")
 	}
 }
+
+// TestReadCatchesABAWithABlindChangeStamp is the configuration-independent
+// form of the two ABA tests above. It pins the native change stamp to a
+// constant, which is what a Linux kernel without multigrain timestamps
+// (mainline 6.13) effectively does for any mutation that completes inside one
+// coarse-clock tick, and requires the ABA to be caught anyway. It reproduces
+// the blindness on every host, including those whose real inode clock happens
+// to be fine enough to hide it.
+func TestReadCatchesABAWithABlindChangeStamp(t *testing.T) {
+	priorWitness := changeWitness
+	t.Cleanup(func() { changeWitness = priorWitness })
+	changeWitness = func(*os.File, os.FileInfo) (string, error) { return "blind-coarse-stamp", nil }
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "stable"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	initial, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior := afterEnumeration
+	t.Cleanup(func() { afterEnumeration = prior })
+	afterEnumeration = func(path string) {
+		if path != dir {
+			return
+		}
+		afterEnumeration = func(string) {}
+		transient := filepath.Join(dir, "transient")
+		if err := os.WriteFile(transient, nil, 0o600); err != nil {
+			t.Error(err)
+			return
+		}
+		if err := os.Remove(transient); err != nil {
+			t.Error(err)
+		}
+		if err := os.Chtimes(dir, initial.ModTime(), initial.ModTime()); err != nil {
+			t.Error(err)
+		}
+	}
+	retries := quietRetries(t)
+
+	entries, err := Read(dir, 10)
+	if err != nil {
+		t.Fatalf("Read failed closed on a transient create/delete ABA: %v", err)
+	}
+	if *retries != 1 || len(entries) != 1 || entries[0].Name() != "stable" {
+		t.Fatalf("ABA must be caught and re-enumerated even with a blind change stamp: retries=%d entries=%v", *retries, entries)
+	}
+}
+
+// TestReadRefusesWithoutMutationWitness pins the fail-closed direction: a
+// host that cannot arm the kernel mutation-event channel has no
+// granularity-independent witness left, so the enumeration is refused with a
+// diagnostic rather than accepted. The refusal is not a transient change, so
+// the bounded retry loop must not absorb it.
+func TestReadRefusesWithoutMutationWitness(t *testing.T) {
+	want := errors.New("no mutation-event channel on this host")
+	prior := watchDirectory
+	t.Cleanup(func() { watchDirectory = prior })
+	watchDirectory = func(*os.File) (*MutationChannel, *MutationWatch, error) { return nil, nil, want }
+	retries := quietRetries(t)
+
+	_, err := Read(t.TempDir(), 10)
+	if !errors.Is(err, want) || !strings.Contains(err.Error(), "no reliable change witness") {
+		t.Fatalf("Read error = %v, want a refusal naming the missing witness", err)
+	}
+	if *retries != 0 {
+		t.Fatalf("a missing witness is not a transient change: retries=%d", *retries)
+	}
+}
+
+// TestMutationWatchReportsRealNamespaceEvents pins the channel itself: a
+// watch armed on an open directory reports a create-then-delete that leaves
+// no trace in the directory's entry set, and Mutated stays true once latched.
+func TestMutationWatchReportsRealNamespaceEvents(t *testing.T) {
+	dir := t.TempDir()
+	handle, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = handle.Close() })
+	channel, err := NewMutationChannel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = channel.Close() })
+	watch, err := channel.Watch(handle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if watch.Mutated() {
+		t.Fatal("a quiescent directory must not report a mutation")
+	}
+	if !channel.hasEventChannel() {
+		t.Skip("this platform keeps the change-stamp witness instead of an event channel")
+	}
+
+	transient := filepath.Join(dir, "transient")
+	if err := os.WriteFile(transient, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(transient); err != nil {
+		t.Fatal(err)
+	}
+
+	if !watch.Mutated() {
+		t.Fatal("a create-then-delete inside the window must be reported")
+	}
+	if !watch.Mutated() {
+		t.Fatal("a latched mutation must not regress to false on a later drain")
+	}
+}

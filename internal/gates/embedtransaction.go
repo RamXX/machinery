@@ -1310,11 +1310,16 @@ func (tx *embedRootTransaction) embedResiduePathsBounded(maxEntries, maxDepth in
 	if maxDepth < 0 {
 		return nil, fmt.Errorf("embed transaction inventory depth limit must be non-negative")
 	}
+	channel, err := newInventoryMutationChannel()
+	if err != nil {
+		return nil, fmt.Errorf("embed transaction inventory has no reliable change witness: %w", err)
+	}
+	defer func() { _ = channel.Close() }()
 	var residue []string
 	entriesSeen := 0
 	var walk func(string, int) error
 	walk = func(dir string, depth int) error {
-		entries, witness, err := readRootDirectory(tx.root, dir, maxEntries-entriesSeen)
+		entries, witness, err := readRootDirectory(tx.root, dir, maxEntries-entriesSeen, channel)
 		if err != nil {
 			return err
 		}

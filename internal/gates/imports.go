@@ -58,7 +58,11 @@ type sourceFileInventory struct {
 	files       []string
 	listed      map[string]bool
 	witnesses   map[string]rootDirectoryWitness
-	closed      bool
+	// channel carries the mutation-event watches behind every witness above.
+	// It stays open for the whole custody window because the witnesses are
+	// revalidated at Close, long after the walk that recorded them.
+	channel *dirscan.MutationChannel
+	closed  bool
 }
 
 func (inventory *sourceFileInventory) Files() []string {
@@ -106,7 +110,7 @@ func (inventory *sourceFileInventory) Close() (retErr error) {
 			retErr = errors.Join(retErr, openErr)
 		} else {
 			opened, statErr := publicDir.Stat()
-			changeID, changeErr := dirscan.ChangeID(publicDir, opened)
+			changeID, changeErr := inventoryChangeID(publicDir, opened)
 			closeErr := publicDir.Close()
 			if statErr != nil || changeErr != nil || !sameInventoryInfo(rootWitness.info, opened) || changeID != rootWitness.changeID {
 				retErr = errors.Join(retErr, statErr, changeErr, fmt.Errorf("source inventory root %s changed during traversal", inventory.displayRoot))
@@ -114,7 +118,7 @@ func (inventory *sourceFileInventory) Close() (retErr error) {
 			retErr = errors.Join(retErr, closeErr)
 		}
 	}
-	retErr = errors.Join(retErr, inventory.root.Close())
+	retErr = errors.Join(retErr, inventory.root.Close(), inventory.channel.Close())
 	return retErr
 }
 
@@ -129,17 +133,22 @@ func walkSourceFilesBounded(root string, ignore []string, maxEntries, maxDepth i
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	channel, channelErr := newInventoryMutationChannel()
+	if channelErr != nil {
+		return nil, nil, nil, errors.Join(rootAuthority.Close(), fmt.Errorf("source inventory %s has no reliable change witness: %w", displayRoot, channelErr))
+	}
 	inventory = &sourceFileInventory{
 		root:        rootAuthority,
 		displayRoot: displayRoot,
 		listed:      map[string]bool{},
 		witnesses:   map[string]rootDirectoryWitness{},
+		channel:     channel,
 	}
 	openedInventory := inventory
 	valid := false
 	defer func() {
 		if !valid {
-			err = errors.Join(err, openedInventory.root.Close())
+			err = errors.Join(err, openedInventory.root.Close(), openedInventory.channel.Close())
 			inventory = nil
 		}
 	}()
@@ -157,7 +166,7 @@ func walkSourceFilesBounded(root string, ignore []string, maxEntries, maxDepth i
 			warns = append(warns, displayDir+": "+e.Error())
 			return nil
 		}
-		entries, witness, readErr := readRootDirectory(rootAuthority, relDir, maxEntries-entriesSeen)
+		entries, witness, readErr := readRootDirectory(rootAuthority, relDir, maxEntries-entriesSeen, channel)
 		if readErr != nil {
 			return fail(readErr)
 		}

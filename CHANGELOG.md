@@ -6,6 +6,27 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A directory ABA is caught on hosts whose inode clock is too coarse to see it.** The
+  fail-closed directory inventories in `internal/gates`, `internal/dirscan` and the `machinery
+  oracle` inventory proved that an enumeration was a snapshot by comparing native change stamps
+  across two independent passes. On Unix that stamp is the inode ctime, and on Linux kernels
+  without multigrain timestamps (mainline 6.13) every inode timestamp comes from the kernel's
+  coarse clock, one timer tick wide. A create-then-delete, or a rename-and-back, that completes
+  inside one tick leaves ctime, mtime, size and link count all identical, and
+  `STATX_CHANGE_COOKIE` is stripped from userspace requests on those kernels, so there was no
+  finer stamp to fall back to: the ABA defense accepted the enumeration, which is the fail-open
+  direction. Measured on Ubuntu 24.04, kernel `6.8.0-138-generic` with `CONFIG_HZ=1000`, inside a
+  container on both overlayfs and an ext4 bind mount, as root and as an unprivileged user; the
+  hosted CI runner did not show it because it runs `6.17.0-1022-azure`. Every such inventory now
+  also arms a kernel mutation-event watch (inotify on Linux, kqueue on the BSDs) for the whole
+  witness window, through the already-open directory descriptor rather than a path, so it stays
+  inside an `os.Root` confinement. Events do not depend on any clock and cannot be un-queued by a
+  later restore, so the ABA is reported whatever the timestamp resolution. Windows is unchanged:
+  its witness is the NTFS ChangeTime read from the retained handle, which this blindness does not
+  apply to.
+
 ## [0.7.2] - 2026-09-09
 
 ### Fixed
@@ -547,6 +568,24 @@ it is incidental. A design that was green on v0.6.11 can still become blocking o
 design edit, so each entry states what still works unchanged, what is rejected now, the exact
 finding a consumer sees, and the exact edit or command that migrates. The reference counts come
 from one real private design that exited 0 on v0.6.11 and reports 78 blocking findings on 0.7.0.
+
+**A directory inventory refuses a host that cannot arm a mutation-event watch.** Unchanged: every
+supported host (Linux with inotify, macOS and the BSDs with kqueue, Windows on its NTFS ChangeTime
+stamp) enumerates exactly as before. Rejected now: a host where the kernel event channel behind the
+granularity-independent half of the witness cannot be opened, because there is then no way to tell
+an ABA mutation from a quiescent directory. In practice that means an exhausted
+`fs/inotify/max_user_instances`, a kernel built without inotify, or a platform machinery does not
+ship for. Finding:
+
+```
+design inventory directory design has no reliable change witness: open directory mutation
+channel: too many open files
+```
+
+Migration: raise the limit (`sysctl fs.inotify.max_user_instances=256`) or free the instances the
+user already holds. This is the fail-closed direction and it is deliberate: accepting the
+enumeration on a change stamp whose resolution cannot be vouched for is what the 0.7.0 fix above
+removes.
 
 **Regeneration stamp.** Upgrading restamps generated artifacts and nothing else. The families that
 carry `machinery-version:` are `machines/*.tla`, `machines/*.cfg`, `machines/*.oracle.md`, and
