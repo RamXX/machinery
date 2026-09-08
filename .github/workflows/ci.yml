@@ -260,8 +260,12 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/assurance-runtimes
+      # The per-binary alarm mirrors the race job's 30m: without it Go's 10m
+      # default fires on the slowest packages (internal/install's fsync-bound
+      # suite, cmd/machinery) on the small hosted macOS VM and reports a
+      # timeout, not a result. Any hung test still dies inside the job's 60m.
       - name: Full non-race suite on native macOS
-        run: go test -count=1 ./...
+        run: go test -count=1 ./... -timeout=30m
 
   # ------------------------------------------------------------ docs gate ---
   # The toolchain command surface is documented in six places (README, SKILL,
