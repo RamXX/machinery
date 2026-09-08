@@ -1,14 +1,16 @@
 ---
 id: MAC-ticd
 title: "runtimeclosure: the Elixir tree fingerprint rejects the erlef/setup-beam OTP layout"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [ci, runtimeclosure, elixir]
 created_at: 2026-09-08T13:04:01Z
 created_by: ramirosalas
 updated_at: 2026-09-08T13:28:53Z
-content_hash: "sha256:456f777165de31a373ca3461fc56712f4cc489ef730985d949119b652bdf2c02"
+content_hash: "sha256:d51617e95d5bdef359e6670669bef58bde934288de5c50d991c13491d29f56c5"
+closed_at: 2026-09-08T13:28:53Z
+close_reason: "Fixed at 5f8d6a7; verified against the real OTP-29.0.6-macos-arm64 artifact put through fs.cpSync"
 ---
 
 ## Description
@@ -81,7 +83,7 @@ layout keeps passing.
 
 
 ## History
-
+- 2026-09-08T13:28:53Z status: open -> closed
 
 ## Links
 
