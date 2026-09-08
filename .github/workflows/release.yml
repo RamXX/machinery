@@ -339,6 +339,8 @@ jobs:
           discovered=$(mktemp)
           trap 'rm -f "$expected" "$discovered"' EXIT
           printf '%s\n' \
+            machinery-darwin-amd64 \
+            machinery-darwin-arm64 \
             machinery-linux-amd64 \
             machinery-linux-arm64 \
             machinery-windows-amd64 \

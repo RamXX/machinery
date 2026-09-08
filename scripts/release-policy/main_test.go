@@ -998,6 +998,47 @@ func TestCommittedPolicyPayloadMatchesWorkflows(t *testing.T) {
 	if !strings.Contains(release, fmt.Sprintf("if [ \"$count\" -ne %d ]", len(legs)*2)) {
 		t.Fatalf("release.yml manifest job must expect exactly %d build artifacts", len(legs)*2)
 	}
+	// The publish-time dist/ compare must expect the same closed matrix set
+	// plus exactly the two publish-stage additions: the downloaded
+	// dist-manifest.txt and the reproducible machinery-source.tar.gz. Every
+	// bare matrix binary — darwin included — is a published release asset
+	// (install.sh, checksums-sha256.txt, SLSA subject), so an undercount
+	// fails a real tag run and an overcount would mask substitution.
+	inventoryStart := strings.Index(release, "Require the exact release artifact inventory")
+	if inventoryStart < 0 {
+		t.Fatal("release.yml has no publish inventory step")
+	}
+	inventoryEnd := strings.Index(release[inventoryStart:], "Generate checksums")
+	if inventoryEnd < 0 {
+		t.Fatal("release.yml publish inventory step is not followed by checksum generation")
+	}
+	inventoryStep := release[inventoryStart : inventoryStart+inventoryEnd]
+	nameRe := regexp.MustCompile(`machinery(?:-[A-Za-z0-9.-]+|_\$\{plain\}_[A-Za-z0-9._]+)|dist-manifest\.txt`)
+	listed := map[string]bool{}
+	for _, name := range nameRe.FindAllString(inventoryStep, -1) {
+		if listed[name] {
+			t.Fatalf("publish inventory lists %q twice", name)
+		}
+		listed[name] = true
+	}
+	expectedDist := map[string]bool{"dist-manifest.txt": true, "machinery-source.tar.gz": true}
+	for _, leg := range legs {
+		expectedDist["machinery-"+leg[1]+"-"+leg[2]] = true
+		expectedDist[fmt.Sprintf("machinery_${plain}_%s_%s.tar.gz", leg[1], leg[2])] = true
+	}
+	if len(listed) != len(expectedDist) {
+		t.Fatalf("publish inventory must expect exactly %d dist files, found %d: %v", len(expectedDist), len(listed), listed)
+	}
+	for name := range expectedDist {
+		if !listed[name] {
+			t.Fatalf("publish inventory is missing %q", name)
+		}
+	}
+	for name := range listed {
+		if !expectedDist[name] {
+			t.Fatalf("publish inventory carries unexpected name %q", name)
+		}
+	}
 	github := policy.GitHubRequiredStatusChecks
 	if !github.Payload.Strict || len(github.Payload.Contexts) == 0 {
 		t.Fatal("branch-protection payload must be strict with non-empty contexts")
