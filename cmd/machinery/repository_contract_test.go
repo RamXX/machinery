@@ -839,9 +839,27 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		"find dist -mindepth 1 -maxdepth 1 -printf '%f\\n'",
 		`if ! cmp -s "$expected" "$discovered"`,
 		`[ -L "dist/$artifact" ]`,
+		"          - goos: windows\n            goarch: amd64",
+		"machinery-windows-amd64 \\",
+		"\"machinery_${plain}_windows_amd64.tar.gz\"",
 	)
-	if strings.Contains(release, "windows") {
-		t.Fatal("release workflow publishes or describes an unsupported Windows artifact")
+	// MAC-r0hy ships windows/amd64 as a cross-compiled release target. The
+	// windows platform set stays closed: exactly one windows matrix leg, paired
+	// with amd64, and every windows mention in the workflow must be one of the
+	// sanctioned windows/amd64 forms (matrix leg, bare binary, versioned
+	// tarball, header comment). Any other windows GOARCH or a native windows
+	// runner breaks the contract.
+	if legs := strings.Count(release, "- goos: windows"); legs != 1 {
+		t.Fatalf("release workflow must carry exactly one windows matrix leg (windows/amd64), found %d", legs)
+	}
+	for i, line := range strings.Split(release, "\n") {
+		if !strings.Contains(line, "windows") && !strings.Contains(line, "Windows") {
+			continue
+		}
+		if !strings.Contains(line, "windows-amd64") && !strings.Contains(line, "windows_amd64") &&
+			!strings.Contains(line, "goos: windows") && !strings.Contains(line, "Windows (amd64)") {
+			t.Fatalf("release workflow line %d mentions Windows outside the closed windows/amd64 inventory: %q", i+1, line)
+		}
 	}
 	packageStart := strings.Index(release, "      - name: Package tarball (pvg-compatible)")
 	if packageStart < 0 {

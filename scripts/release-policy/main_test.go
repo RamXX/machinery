@@ -38,6 +38,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -961,18 +962,41 @@ func TestCommittedPolicyPayloadMatchesWorkflows(t *testing.T) {
 	if !strings.Contains(release, policy.TagPattern) {
 		t.Fatalf("release.yml must enforce the same numeric tag pattern as the policy: %s", policy.TagPattern)
 	}
+	// The build matrix is the producer: every (goos, goarch) leg emits exactly
+	// the bare machinery-<goos>-<goarch> binary and the versioned
+	// machinery_{version}_<goos>_<goarch>.tar.gz tarball, and the manifest job
+	// hashes precisely those outputs (windows/amd64 included since MAC-r0hy).
+	// R18 enforces set equality between this inventory and dist-manifest.txt at
+	// publish time, so the committed policy must carry exactly the closed set
+	// of matrix outputs — nothing more, nothing less.
+	legRe := regexp.MustCompile(`(?m)^ +- goos: (\S+)\n +goarch: (\S+)$`)
+	legs := legRe.FindAllStringSubmatch(release, -1)
+	if len(legs) == 0 {
+		t.Fatal("release.yml publishes no build matrix legs")
+	}
+	expectedInventory := map[string]bool{}
+	for _, leg := range legs {
+		expectedInventory["machinery-"+leg[1]+"-"+leg[2]] = true
+		expectedInventory[fmt.Sprintf("machinery_{version}_%s_%s.tar.gz", leg[1], leg[2])] = true
+	}
+	if len(policy.ArtifactInventory.Names) != len(expectedInventory) {
+		t.Fatalf("artifact inventory must cover exactly the %d build matrix outputs (%d binary/tarball pairs), got %d names",
+			len(expectedInventory), len(legs), len(policy.ArtifactInventory.Names))
+	}
 	versioned := 0
 	for _, name := range policy.ArtifactInventory.Names {
+		if !expectedInventory[name] {
+			t.Fatalf("policy artifact %q is not a release build matrix output", name)
+		}
 		if strings.Contains(name, "{version}") {
 			versioned++
-			continue
-		}
-		if !strings.Contains(release, name) {
-			t.Fatalf("release.yml does not produce fixed policy artifact %s", name)
 		}
 	}
-	if len(policy.ArtifactInventory.Names) != 8 || versioned != 4 {
-		t.Fatalf("artifact inventory must cover four binaries and four versioned tarballs, got %d names, %d versioned", len(policy.ArtifactInventory.Names), versioned)
+	if versioned != len(legs) {
+		t.Fatalf("artifact inventory must carry one versioned tarball per matrix leg, got %d of %d legs", versioned, len(legs))
+	}
+	if !strings.Contains(release, fmt.Sprintf("if [ \"$count\" -ne %d ]", len(legs)*2)) {
+		t.Fatalf("release.yml manifest job must expect exactly %d build artifacts", len(legs)*2)
 	}
 	github := policy.GitHubRequiredStatusChecks
 	if !github.Payload.Strict || len(github.Payload.Contexts) == 0 {

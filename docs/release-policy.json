@@ -34,10 +34,12 @@
       "machinery-darwin-arm64",
       "machinery-linux-amd64",
       "machinery-linux-arm64",
+      "machinery-windows-amd64",
       "machinery_{version}_darwin_amd64.tar.gz",
       "machinery_{version}_darwin_arm64.tar.gz",
       "machinery_{version}_linux_amd64.tar.gz",
-      "machinery_{version}_linux_arm64.tar.gz"
+      "machinery_{version}_linux_arm64.tar.gz",
+      "machinery_{version}_windows_amd64.tar.gz"
     ]
   },
   "github_required_status_checks": {
