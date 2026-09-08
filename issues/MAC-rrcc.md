@@ -1,14 +1,15 @@
 ---
 id: MAC-rrcc
 title: "custody root close fails with STALE_CAPABILITY broker channel closed on loaded macOS"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [custody, macos, ci]
 created_at: 2026-09-08T20:08:53Z
 created_by: ramirosalas
-updated_at: 2026-09-08T20:33:27Z
-content_hash: "sha256:6bcfbf5d71f4dbf772010bf93741a432200ab87e957bcdd36fe8f72634f0dca5"
+updated_at: 2026-09-08T20:33:28Z
+content_hash: "sha256:ac101eac0e833e166d8550bfcb682947055dae1415ef2aded1f70f820f340ac5"
+closed_at: 2026-09-08T20:33:28Z
 ---
 
 ## Description
@@ -23,7 +24,7 @@ content_hash: "sha256:6bcfbf5d71f4dbf772010bf93741a432200ab87e957bcdd36fe8f72634
 
 
 ## History
-
+- 2026-09-08T20:33:28Z status: open -> closed
 
 ## Links
 
