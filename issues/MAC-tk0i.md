@@ -8,8 +8,8 @@ labels: [assurance, cli, docs-mismatch]
 parent: MAC-ui8a
 created_at: 2026-09-08T07:55:16Z
 created_by: ramirosalas
-updated_at: 2026-09-08T07:55:16Z
-content_hash: "sha256:335ddb17bb9af7b9c6ed11e71ef6323f109ac179b3893d3b1efb772aac1ce0ca"
+updated_at: 2026-09-08T08:05:41Z
+content_hash: "sha256:bbe5504ce1c7435df3fe42551026870c171380daacbc64bbebcc761b14b8c54f"
 ---
 
 ## Description
@@ -98,7 +98,7 @@ adapter in M1 or to design around its absence.
 
 
 ## Notes
-
+Verified at release commit d1f2264 in the main checkout: cmd/machinery/main.go still registers no newTddCmd (grep -c newTddCmd = 0), and skills/machinery/SKILL.md still has no tdd/assurance/elixir-exunit/recover mention.
 
 ## History
 
