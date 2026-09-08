@@ -1,14 +1,15 @@
 ---
 id: MAC-dl7y
 title: "processscope: a close that skips an in-flight retirement reports the job's half-written state as cleanup-failed"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [custody, ci]
 created_at: 2026-09-08T13:07:42Z
 created_by: ramirosalas
 updated_at: 2026-09-08T13:27:14Z
-content_hash: "sha256:cf80fdc9501cafdea5dbc5f915620787864d9ef10dd28ba2af5734da37cd75c8"
+content_hash: "sha256:f022392a97b5553d48eea7fd596c30e44b290f591bceb82d86af7a8c87bbf3db"
+closed_at: 2026-09-08T13:27:14Z
 ---
 
 ## Description
@@ -44,7 +45,7 @@ A retirement path that finds the job already claimed must join the claiming reti
 
 
 ## History
-
+- 2026-09-08T13:27:14Z status: open -> closed
 
 ## Links
 
