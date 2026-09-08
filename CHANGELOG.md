@@ -514,3 +514,13 @@ macOS for the full toolchain.
 the `make hooks` message say so. Migrate: run the full preflight, or remove the hook locally
 (`git config --unset core.hooksPath`) and accept that the exact-commit release gate is the only
 remaining check.
+
+**Known limitation, unchanged since 0.6.x: directory change witnesses on Linux before 6.13.** The
+fail-closed directory inventories (`internal/dirscan`, the gate confinement walker, the oracle
+inventory, the governance hook's design inventory) detect concurrent mutation through the
+directory's inode change stamp. On Linux kernels without multigrain timestamps (6.12 and older,
+including Ubuntu 24.04 LTS at 6.8) that stamp is one timer tick coarse and `STATX_CHANGE_COOKIE`
+is not exposed, so a create-then-delete completed inside one tick is not detected; hosted CI
+passes because its runner kernel is 6.17. Not a regression. A kernel-event
+witness (inotify, kqueue) is under review for 0.7.1. Until then, inventory results on such kernels
+are stamp-witnessed only.
