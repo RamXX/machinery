@@ -107,7 +107,12 @@ func recoveryDockerOwnContainer(t *testing.T, bindHost, boundary string) {
 		"--cidfile", cidfile,
 		"--volume", shared+":/work",
 		"--workdir", "/work",
-		"--user", "0:0",
+		// The writer runs as the host user: on a Linux host a root container
+		// leaves root-owned residue in the bind mount that the test process can
+		// neither inspect nor remove (macOS Docker Desktop maps ownership, which
+		// hid this). The publication under test is about interruption, not
+		// privilege, so the fixture needs no root.
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		"--env", "MACHINERY_RECOVERY_CRASH_DESIGN=/work/"+recoveryDockerDesignDir,
 		"--env", "MACHINERY_RECOVERY_CRASH_BOUNDARY="+boundary,
 		integrationPilotImage,
