@@ -9,11 +9,12 @@ parent: MAC-ui8a
 created_at: 2026-09-07T21:57:39Z
 created_by: ramirosalas
 updated_at: 2026-09-07T22:29:14Z
-content_hash: "sha256:a61bc23c7974a01ffe82094648c3ca808c47cec065fe6c8e16c2c7309b173f52"
+content_hash: "sha256:9c139267cf71cd0a98974d066c7d49fe01bee7c3220d3989978a97ff8fec82cd"
 follows: [MAC-62s6]
 labels: [accepted]
 closed_at: 2026-09-07T22:29:14Z
 close_reason: "Accepted: journal recovery ABA witness granularity-independent; confirmed on Linux; merged to local epic"
+led_to: [MAC-y2l2]
 ---
 
 ## Description
@@ -36,6 +37,7 @@ Found during MAC-o82q Linux confirmation (REPORT f3c2d8f4907283b63f7286fc905e5f4
 ## Links
 - Parent: [[MAC-ui8a]]
 - Follows: [[MAC-62s6]]
+- Led to: [[MAC-y2l2]]
 
 ## Comments
 

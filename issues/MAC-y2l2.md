@@ -1,14 +1,16 @@
 ---
 id: MAC-y2l2
 title: "Bug: governance hook-state grows unboundedly under heavy local test sweeps"
-status: open
+status: in_progress
 priority: 1
 type: bug
 parent: MAC-ui8a
 created_at: 2026-09-08T02:21:09Z
 created_by: ramirosalas
-updated_at: 2026-09-08T02:21:09Z
-content_hash: "sha256:770a733e7e009846be5b97852df851d7fe197d3f55f38a1152bf150651ea47e0"
+updated_at: 2026-09-08T05:53:07Z
+content_hash: "sha256:5dffe21385432e14d5566e010d593c0df7a533d4cc49f2968c546d5cb312892e"
+assignee: dev-MAC-y2l2
+follows: [MAC-3hzt]
 ---
 
 ## Description
@@ -24,9 +26,12 @@ Self-inflicted during release-candidate verification: go test -race ./... sweeps
 
 
 ## History
-
+- 2026-09-08T05:53:07Z status: open -> in_progress
+- 2026-09-08T05:53:07Z auto-follows: linked to predecessor MAC-3hzt
+- 2026-09-08T05:53:07Z claimed by dev-MAC-y2l2
 
 ## Links
 - Parent: [[MAC-ui8a]]
+- Follows: [[MAC-3hzt]]
 
 ## Comments
