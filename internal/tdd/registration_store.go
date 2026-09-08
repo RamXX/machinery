@@ -12,11 +12,13 @@ package tdd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/RamXX/machinery/internal/tdd/protocol"
@@ -530,27 +532,42 @@ func acquireStoreWriter(ctx context.Context, store string) (*storeWriter, error)
 		if err := checkCtx(ctx); err != nil {
 			return nil, err
 		}
+		// A concurrent release tears the staging namespace down the instant
+		// its token drops (release below); creation failures that are merely
+		// the namespace vanishing or being recreated mid-flight are retried,
+		// never surfaced as custody errors.
+		stagingReady := true
 		if err := os.MkdirAll(staging, storeRootMod); err != nil {
-			return nil, fmt.Errorf("CUSTODY_ERROR: opening transaction staging: %w", err)
-		}
-		if err := os.Mkdir(token, storeRootMod); err == nil {
-			deadline := time.Now().Add(writerLease).UnixMilli()
-			if werr := os.WriteFile(filepath.Join(token, "owner.json"), []byte(fmt.Sprintf(`{"deadline_ms":%d,"pid":%d}`, deadline, os.Getpid())), storeFileMod); werr != nil {
-				os.RemoveAll(token)
-				return nil, fmt.Errorf("CUSTODY_ERROR: recording writer ownership: %w", werr)
+			if st, serr := os.Stat(staging); serr != nil || !st.IsDir() {
+				if serr != nil && !os.IsNotExist(serr) {
+					return nil, fmt.Errorf("CUSTODY_ERROR: opening transaction staging: %w", err)
+				}
+				stagingReady = false
 			}
-			return &storeWriter{store: store, held: true}, nil
-		} else if !os.IsExist(err) {
-			return nil, fmt.Errorf("CUSTODY_ERROR: acquiring store writer: %w", err)
 		}
-		if tokenExpired(token) {
-			victim := filepath.Join(staging, fmt.Sprintf("expired-%d", time.Now().UnixNano()))
-			if rerr := os.Rename(token, victim); rerr == nil {
-				cctx, ccancel := cleanupContext()
-				_ = cctx
-				os.RemoveAll(victim)
-				ccancel()
-				continue
+		if stagingReady {
+			err := os.Mkdir(token, storeRootMod)
+			if err == nil {
+				deadline := time.Now().Add(writerLease).UnixMilli()
+				if werr := os.WriteFile(filepath.Join(token, "owner.json"), []byte(fmt.Sprintf(`{"deadline_ms":%d,"pid":%d}`, deadline, os.Getpid())), storeFileMod); werr != nil {
+					os.RemoveAll(token)
+					return nil, fmt.Errorf("CUSTODY_ERROR: recording writer ownership: %w", werr)
+				}
+				return &storeWriter{store: store, held: true}, nil
+			}
+			if os.IsExist(err) {
+				if tokenExpired(token) {
+					victim := filepath.Join(staging, fmt.Sprintf("expired-%d", time.Now().UnixNano()))
+					if rerr := os.Rename(token, victim); rerr == nil {
+						cctx, ccancel := cleanupContext()
+						_ = cctx
+						os.RemoveAll(victim)
+						ccancel()
+						continue
+					}
+				}
+			} else if !os.IsNotExist(err) {
+				return nil, fmt.Errorf("CUSTODY_ERROR: acquiring store writer: %w", err)
 			}
 		}
 		select {
@@ -575,7 +592,14 @@ func tokenExpired(token string) bool {
 }
 
 // release drops the writer and removes the transaction staging namespace so
-// the store returns to a quiescent, exportable state.
+// the store returns to a quiescent, exportable state. Teardown is ordered
+// against concurrent acquirers: while the token is held, this writer is the
+// only legal occupant of the namespace, so scratch is swept first; the token
+// then drops (the ownership barrier), and only then is the namespace itself
+// removed. A waiter may legitimately re-acquire the instant the token drops,
+// so an ENOTEMPTY namespace removal is delegated cleanup (that writer's own
+// release completes it), and teardown never deletes a live writer's token.
+// Commit authority is the head-chain CAS; staging cleanup is hygiene.
 func (w *storeWriter) release() error {
 	if w == nil || !w.held {
 		return nil
@@ -584,8 +608,28 @@ func (w *storeWriter) release() error {
 	cctx, ccancel := cleanupContext()
 	defer ccancel()
 	_ = cctx
-	if err := os.RemoveAll(filepath.Join(w.store, storeStaging)); err != nil {
+	staging := filepath.Join(w.store, storeStaging)
+	token := filepath.Join(staging, "writer.lock")
+	entries, err := os.ReadDir(staging)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return fmt.Errorf("CUSTODY_ERROR: releasing the store writer (the head may already be advanced; an exact retry confirms registration): %w", err)
+	}
+	for _, e := range entries {
+		if e.Name() == "writer.lock" {
+			continue
+		}
+		if rerr := os.RemoveAll(filepath.Join(staging, e.Name())); rerr != nil && !os.IsNotExist(rerr) {
+			return fmt.Errorf("CUSTODY_ERROR: releasing the store writer (the head may already be advanced; an exact retry confirms registration): %w", rerr)
+		}
+	}
+	if rerr := os.RemoveAll(token); rerr != nil && !os.IsNotExist(rerr) {
+		return fmt.Errorf("CUSTODY_ERROR: releasing the store writer (the head may already be advanced; an exact retry confirms registration): %w", rerr)
+	}
+	if rerr := os.Remove(staging); rerr != nil && !os.IsNotExist(rerr) && !errors.Is(rerr, syscall.ENOTEMPTY) {
+		return fmt.Errorf("CUSTODY_ERROR: releasing the store writer (the head may already be advanced; an exact retry confirms registration): %w", rerr)
 	}
 	return nil
 }
