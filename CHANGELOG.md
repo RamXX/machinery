@@ -24,6 +24,15 @@ under their version heading when a release is cut.
   with the first record it sends; the capability channel a joined child is launched with follows
   the same rule, and a control record's descriptor rights are held alive across the send that
   transfers them. No budget or cap changed.
+- **A custody suite's owner-loss handoff says why it never arrived.** The owner helper polled for
+  its grandchild's pid for a fixed 10 s and then wrote whatever it had read, so a chain that had
+  not come up inside that window wrote an empty file, which the reader ignores; the reader then
+  waited out its own separate 20 s and reported a file that never appeared. Neither number was
+  derived from the 60 s wall the helper declares, and neither the helper's own launch failure nor
+  its log reached the message. The helper now polls under the wall it declares, keeping back a
+  fixed slack to report with, and always writes a record naming what happened; the reader derives
+  its wait from that same wall and prints the helper's log when the record is missing or is not a
+  pid. Test-only: no product budget or shipped cap changed.
 - **A scope close reports the settled state of a job already being retired.** A job cancelled by
   its caller is retired on its own goroutine, and the guardian may report the target's death as an
   ordinary exit rather than a terminal drain, so `Run` returns while that retirement is still

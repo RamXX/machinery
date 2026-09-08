@@ -24,6 +24,27 @@ import (
 
 const runtimeDigest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
+const (
+	// ownerHelperWall is the wall the owner helper below declares for its own
+	// scope, and the root every wait in TestOwnerLossBrokerSelfCleanup is
+	// derived from. Before that helper can report the pid it owns it has to
+	// bring up three nested launches of this race-instrumented test binary and
+	// digest the executable for each of them; on a loaded host that is
+	// seconds, not milliseconds. A wait shorter than the wall the helper runs
+	// under reports a helper that is still working as a helper that never
+	// started.
+	ownerHelperWall = 60 * time.Second
+	// ownerHelperReportSlack is what the helper keeps back from that wall to
+	// write its handoff record, whatever happened. It stops polling for its
+	// grandchild this long before its own wall runs out.
+	ownerHelperReportSlack = 10 * time.Second
+	// ownerHandoffMissing is what the helper writes when the grandchild never
+	// reported inside the wall. An empty handoff file is indistinguishable
+	// from a helper that never started, and it costs the reader its whole
+	// wait to say nothing.
+	ownerHandoffMissing = "childpid:absent"
+)
+
 func digestOf(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)
@@ -136,9 +157,10 @@ func waitFile(t *testing.T, path string, timeout time.Duration) string {
 
 func waitPidFile(t *testing.T, path string, timeout time.Duration) int {
 	t.Helper()
-	n, err := strconv.Atoi(waitFile(t, path, timeout))
+	raw := waitFile(t, path, timeout)
+	n, err := strconv.Atoi(raw)
 	if err != nil {
-		t.Fatalf("pid file %s: %v", path, err)
+		t.Fatalf("pid file %s: %v (content %q)", path, err, raw)
 	}
 	return n
 }
@@ -320,7 +342,7 @@ func TestHelperTarget(t *testing.T) {
 		childFile := os.Getenv("MACHINERY_QLW2_CHILD_FILE")
 		exe, _ := os.Executable()
 		dg := digestOf(t, exe)
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), ownerHelperWall)
 		defer cancel()
 		s, err := processscope.Open(ctx, processscope.Options{
 			HelperExecutable: exe,
@@ -343,16 +365,38 @@ func TestHelperTarget(t *testing.T) {
 			os.WriteFile(file, []byte("attach:"+codeOf(err)), 0644)
 			return
 		}
-		go func() { s.Run(ctx, attached, processscope.Streams{}) }()
-		deadline := time.Now().Add(10 * time.Second)
-		for time.Now().Before(deadline) {
-			if _, err := os.Stat(childFile); err == nil {
+		runFailed := make(chan error, 1)
+		go func() {
+			res, rerr := s.Run(ctx, attached, processscope.Streams{})
+			if rerr != nil {
+				runFailed <- rerr
+				return
+			}
+			if !res.Started {
+				runFailed <- fmt.Errorf("job never started: %+v", res)
+			}
+		}()
+		// The handoff record is written when the owned grandchild reports its
+		// pid, when the run that owns it fails, or when this helper's own wall
+		// runs out, whichever comes first. Every one of those is a fact the
+		// reader can act on; an empty file is not.
+		handoff := ""
+		deadline := time.Now().Add(ownerHelperWall - ownerHelperReportSlack)
+		for handoff == "" && time.Now().Before(deadline) {
+			if b, rerr := os.ReadFile(childFile); rerr == nil && len(b) > 0 {
+				handoff = string(b)
 				break
 			}
-			time.Sleep(20 * time.Millisecond)
+			select {
+			case rerr := <-runFailed:
+				handoff = "run:" + codeOf(rerr)
+			case <-time.After(20 * time.Millisecond):
+			}
 		}
-		b, _ := os.ReadFile(childFile)
-		os.WriteFile(file, b, 0644)
+		if handoff == "" {
+			handoff = ownerHandoffMissing
+		}
+		os.WriteFile(file, []byte(handoff), 0644)
 		time.Sleep(300 * time.Millisecond)
 		syscall.Kill(os.Getpid(), syscall.SIGKILL)
 	default:
@@ -560,6 +604,38 @@ func TestInterruptionSIGINTClose(t *testing.T) {
 	}
 }
 
+// waitOwnerHandoff reads the pid the owner helper hands off, and reports the
+// helper's own log when the record is missing or is a diagnostic rather than a
+// pid. Without that, every way the helper can fail reads as one silent wait.
+func waitOwnerHandoff(t *testing.T, path, logPath string, timeout time.Duration) int {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	raw := ""
+	for time.Now().Before(deadline) {
+		if b, err := os.ReadFile(path); err == nil && len(b) > 0 {
+			raw = string(b)
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if raw == "" {
+		t.Fatalf("owner never wrote a handoff record to %s within %v; owner log:\n%s", path, timeout, readBest(logPath))
+	}
+	pid, err := strconv.Atoi(raw)
+	if err != nil {
+		t.Fatalf("owner handoff %q is not a pid: %v; owner log:\n%s", raw, err, readBest(logPath))
+	}
+	return pid
+}
+
+func readBest(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "(" + err.Error() + ")"
+	}
+	return string(b)
+}
+
 func TestOwnerLossBrokerSelfCleanup(t *testing.T) {
 	sentinel := startSentinel(t)
 	scratch := t.TempDir()
@@ -581,7 +657,11 @@ func TestOwnerLossBrokerSelfCleanup(t *testing.T) {
 	if err := owner.Start(); err != nil {
 		t.Fatal(err)
 	}
-	pid := waitPidFile(t, h, 20*time.Second)
+	// The wait is the wall the helper runs under plus the headroom it keeps
+	// back to report: the helper always writes a record inside that window, so
+	// reaching the end of this wait means the helper itself never got there,
+	// and its log says why.
+	pid := waitOwnerHandoff(t, h, filepath.Join(scratch, "owner.log"), ownerHelperWall+ownerHelperReportSlack)
 	if !alive(pid) {
 		t.Fatal("owned grandchild must be alive while owner lives")
 	}
