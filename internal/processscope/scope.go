@@ -103,7 +103,19 @@ func (s *scope) ensureDemux() {
 					if ch != nil {
 						ch <- m
 					}
-				case "refused", "attached", "childok", "closed", "started", "welcome", "regcontainerok":
+			case "started":
+				// Frames on one connection are read sequentially by this
+				// goroutine, so registering the job's result channel here,
+				// before the started reply is delivered to Run, guarantees
+				// the job's terminal result frame, whenever it arrives, finds
+				// its channel instead of being dropped as unreadable.
+					s.jobsMu.Lock()
+					if s.jobChans[m.Job] == nil {
+						s.jobChans[m.Job] = make(chan anyEnv, 1)
+					}
+					s.jobsMu.Unlock()
+					s.replyCh <- envFiles{env: m, files: files}
+				case "refused", "attached", "childok", "closed", "welcome", "regcontainerok":
 					s.replyCh <- envFiles{env: m, files: files}
 				}
 			}
@@ -149,9 +161,13 @@ func (s *scope) request(ctx context.Context, v any, files ...*os.File) (envFiles
 	}
 }
 
-func (s *scope) registerJobChan(id string) chan anyEnv {
+func (s *scope) jobChanFor(id string) chan anyEnv {
 	ch := make(chan anyEnv, 1)
 	s.jobsMu.Lock()
+	if cur := s.jobChans[id]; cur != nil {
+		s.jobsMu.Unlock()
+		return cur
+	}
 	s.jobChans[id] = ch
 	s.jobsMu.Unlock()
 	return ch
@@ -333,7 +349,7 @@ func (s *scope) Run(ctx context.Context, cmd Command, streams Streams) (Result, 
 		return Result{}, errf(CodeInternalError, "run", "unexpected control reply %q", ew.env.T)
 	}
 	jobID := ew.env.Job
-	jobCh := s.registerJobChan(jobID)
+	jobCh := s.jobChanFor(jobID)
 
 	cancelCh := make(chan string, 1)
 	var cancelOnce sync.Once
@@ -411,7 +427,13 @@ func (s *scope) Run(ctx context.Context, cmd Command, streams Streams) (Result, 
 		}
 	}()
 
-	hardLimit := time.Duration(s.limits.CleanupMS+10000) * time.Millisecond
+	// The give-up bound is budget-derived per the custody contract: the job's
+	// own effective wall deadline, plus the cleanup grace the broker may use
+	// to terminate and reap after that deadline, plus one fixed operational
+	// slack for result delivery. A fixed window measured from wait entry
+	// would abandon a still-running long job (a job may legitimately run for
+	// its whole deadline; eff is already bounded by the scope wall cap).
+	hardLimit := time.Duration(eff+s.limits.CleanupMS+10000) * time.Millisecond
 	var res anyEnv
 	select {
 	case res = <-jobCh:
