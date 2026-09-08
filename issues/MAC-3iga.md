@@ -1,15 +1,17 @@
 ---
 id: MAC-3iga
 title: "Gd-idcite CLAUSES collector matches prose lines, not guard table rows, and reports them as malformed declarations"
-status: open
+status: closed
 priority: 0
 type: bug
 labels: [regression, gates, gd-idcite]
 parent: MAC-ui8a
 created_at: 2026-09-08T07:54:31Z
 created_by: ramirosalas
-updated_at: 2026-09-08T08:31:51Z
-content_hash: "sha256:7b7db47b06471218c93291082a81836ec7f5b5b34b9552a75e93a93b9bf2a714"
+updated_at: 2026-09-08T09:27:49Z
+content_hash: "sha256:d1489dc48573c8b14b54c59ebb07145fe8f21fd897d59061c35d8666c61e96a9"
+closed_at: 2026-09-08T09:27:49Z
+close_reason: "Landed on main (release 0.7.0 line) at 5c35463: 9db810a CLAUSES declarations read from contract rows only; H2 check 163 to 78 with the sibling fixes"
 ---
 
 ## Description
@@ -100,7 +102,7 @@ inventing an escape, both of which degrade the design.
 Line-number correction, verified at release commit d1f2264 in the main checkout (the assessment worktree has since moved): the prose pre-filter is internal/gates/clauses.go:67-68, the table-row rejection is :74, the error text is emitted at :77, and the companion 'owning oracle has no transition governed by this guard' at :120. The 63-65/76 numbers in the original body were read from the pre-move worktree; the code is identical.
 
 ## History
-
+- 2026-09-08T09:27:49Z status: open -> closed
 
 ## Links
 - Parent: [[MAC-ui8a]]
