@@ -12,7 +12,7 @@ hardening release.
    release note naming the generator, the artifact families affected, and the regeneration
    command consumers run.
 2. **Proof-scope changes are never silently called equivalent.** If a release changes what a
-   green gate establishes — stronger evidence, weaker evidence, or differently-scoped evidence —
+   green gate establishes (stronger evidence, weaker evidence, or differently-scoped evidence),
    the note says so in those terms. A gate that now proves more is not "the same gate, faster",
    and a check that now proves less is a breaking change, not a cleanup.
 3. **Compatibility and migration get their own section** whenever a release changes schemas,
@@ -29,8 +29,8 @@ hardening release.
 
 ## The historic omission: v0.6.3
 
-The v0.6.3 TLA generator change — `Live_OverlayResolves`, and the WF conjunct omitted for
-machines with a `_refusal` state — altered regenerated `.tla` bytes for every consumer with a
+The v0.6.3 TLA generator change (`Live_OverlayResolves`, and the WF conjunct omitted for
+machines with a `_refusal` state) altered regenerated `.tla` bytes for every consumer with a
 `_refusal` machine and shipped with no release note at all. Consumers regenerated proofs,
 byte-compared artifacts, and had no way to know the change was intended. That omission is the
 motivating incident for this discipline.
@@ -42,7 +42,7 @@ living list under Unreleased) changes several proof scopes and one installer con
 release notes for it must state:
 
 - **Installer convergence (receipt-aware bootstrap).** Rerunning the one-line installer over an
-  existing install now converges with `machinery update` — the complete recorded plan, per-group
+  existing install now converges with `machinery update`: the complete recorded plan, per-group
   copy/symlink modes, safe repair of edited/missing owned artifacts, fail-closed unsafe receipts.
   Compatibility: explicit homes/targets still cannot combine with bootstrap defaults; a corrupt
   or unsafe receipt now fails closed where older releases silently refreshed the default homes.

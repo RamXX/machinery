@@ -439,13 +439,13 @@ they are covered.
 Inside what is checked, four claims stay separate and must not be conflated: artifact consistency
 (a committed artifact is byte-fresh against the current design), proof execution (a solver actually
 ran and reproduced what the committed evidence says, in `verify-formal`/`verify-checkers`), test
-execution (your suite actually ran and passed — the `Gt` oracle-coverage gate credits static
+execution (your suite actually ran and passed: the `Gt` oracle-coverage gate credits static
 discovery of test references only, and tests were not executed by any machinery gate; its own
 label reads "static discovery; tests not executed"), and
-current review (`Gv` attestations carry an explicit kind — `plan`, `current`, or `historical` — so
+current review (`Gv` attestations carry an explicit kind, `plan`, `current`, or `historical`, so
 a design-time review is never silently read as a current implementation review). The known runtime
-exclusions above stay named, owned test obligations — replay, races between concurrent machine
-instances, message duplication and reordering, migration, restore, and load — until the standalone
+exclusions above stay named, owned test obligations (replay, races between concurrent machine
+instances, message duplication and reordering, migration, restore, and load) until the standalone
 test-assurance contract's enforcement lanes land; naming an obligation in guidance enforces nothing
 by itself. When machinery itself writes design artifacts, an interrupted publication blocks readers
 fail-closed and `machinery recover <design-dir>` reports it read-only, with `--apply` completing
@@ -642,8 +642,8 @@ and the end of the refresh, a running agent host can briefly see the new binary 
 previous release's skill and role docs; that window lasts as long as the refresh itself, and
 nothing in it is left behind. Re-running the one-line installer over an existing install converges
 with `machinery update`: when a valid receipt exists, the bootstrap uses the complete recorded
-home, native-target, and host-plugin plan — exactly what an ordinary `machinery update` without
-selectors uses — preserving each recorded group's copy/symlink mode. A first bootstrap with no
+home, native-target, and host-plugin plan, exactly what an ordinary `machinery update` without
+selectors uses, preserving each recorded group's copy/symlink mode. A first bootstrap with no
 receipt installs the plugin-aware default homes; explicit `MACHINERY_HOMES`/`MACHINERY_TARGETS`
 do not extend that bootstrap plan, they replace it with ordinary update selectors.
 
@@ -899,8 +899,8 @@ CI runs `go test -race ./...`. Beyond unit tests, three stronger nets are always
   `--pull=never` through the committed checker registry. These jobs are
   the engine halves; `machinery check` remains hermetic and dependency-free.
 - **Required integration lane**: `go run ./scripts/integration-lane --lane required` executes every
-  infrastructure-dependent suite — Docker-backed checker lifecycle, publication recovery, native
-  custody, adapter governance, and the documented checker registry/bind-path example — with exact
+  infrastructure-dependent suite (Docker-backed checker lifecycle, publication recovery, native
+  custody, adapter governance, and the documented checker registry/bind-path example) with exact
   test inventories, pinned runtimes, real process/teardown accounting, and no skips: missing
   infrastructure fails the lane with a diagnostic, it is never silently skipped. The same union of
   lane fragments runs in local preflight and hosted CI.
