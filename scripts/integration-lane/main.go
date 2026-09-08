@@ -825,18 +825,29 @@ func (l *laneCustody) begin(scratch string) (processscope.Scope, error) {
 	if err != nil {
 		return nil, err
 	}
+	// laneRootWallMS is the declared cumulative wall for one guarded run's
+	// custody root: the shipped absolute cap, so every per-job budget the
+	// lane declares (a 12-minute formal provision, a 10-minute image pull,
+	// fragment suite timeouts) stays the binding budget. processscope.Open
+	// bounds the scope wall by the earliest of WallMS and the open
+	// context's deadline, so the open context is derived from this same
+	// constant: a short bootstrap context here would silently clamp every
+	// guarded job to that window (the cn7q load ceiling). The broker
+	// handshake stays independently bounded by the authenticated bootstrap
+	// window on the control channel.
+	const laneRootWallMS = 3600000
 	body, err := regularBytes(self, 256<<20)
 	if err != nil {
 		return nil, fmt.Errorf("custody helper identity: %w", err)
 	}
 	sum := sha256.Sum256(body)
-	openCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	openCtx, cancel := context.WithTimeout(context.Background(), laneRootWallMS*time.Millisecond)
 	defer cancel()
 	scope, err := processscope.Open(openCtx, processscope.Options{
 		HelperExecutable: self,
 		HelperDigest:     hex.EncodeToString(sum[:]),
 		ScratchRoot:      scratch,
-		Limits:           processscope.Limits{Jobs: 4, WallMS: 3600000, CleanupMS: 30000},
+		Limits:           processscope.Limits{Jobs: 4, WallMS: laneRootWallMS, CleanupMS: 30000},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("open native custody: %w", err)

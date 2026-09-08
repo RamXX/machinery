@@ -83,14 +83,20 @@ func openCandidateProcessScope(ctx context.Context) (processscope.Scope, error) 
 		return nil, fmt.Errorf("read candidate executable: %w", err)
 	}
 	digest := sha256.Sum256(body)
-	openCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	// processscope.Open bounds the scope wall by the earliest of WallMS and
+	// the open context's deadline, so the open context is derived from the
+	// declared wall itself: a short bootstrap context would silently clamp
+	// every engine execution to that window. The broker handshake stays
+	// independently bounded by the authenticated bootstrap window.
+	const candidateWallMS = 3600000
+	openCtx, cancel := context.WithTimeout(ctx, candidateWallMS*time.Millisecond)
 	defer cancel()
 	scratch := filepath.Join(os.TempDir(), fmt.Sprintf("machinery-processscope-%d", os.Getuid()))
 	return processscope.Open(openCtx, processscope.Options{
 		HelperExecutable: exe,
 		HelperDigest:     hex.EncodeToString(digest[:]),
 		ScratchRoot:      scratch,
-		Limits:           processscope.Limits{Jobs: 4, WallMS: 3600000, CleanupMS: 30000},
+		Limits:           processscope.Limits{Jobs: 4, WallMS: candidateWallMS, CleanupMS: 30000},
 	})
 }
 
