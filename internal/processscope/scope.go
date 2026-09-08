@@ -96,12 +96,25 @@ func (s *scope) ensureDemux() {
 				}
 				switch m.T {
 				case "result":
+					// The registration belongs to Run, which retires it when
+					// it is done with the job. Deleting it here would let a
+					// Run that has not yet reached jobChanFor register a
+					// second, empty channel and then wait out its whole
+					// deadline on it while the delivered result sat in the
+					// abandoned one: a short job whose result overtakes its
+					// own caller. The buffered channel holds the first
+					// terminal result; a later duplicate (the retirement of an
+					// already-reported job) finds the buffer full and is
+					// dropped rather than blocking this reader, which every
+					// other frame on the connection depends on.
 					s.jobsMu.Lock()
 					ch := s.jobChans[m.Job]
-					delete(s.jobChans, m.Job)
 					s.jobsMu.Unlock()
 					if ch != nil {
-						ch <- m
+						select {
+						case ch <- m:
+						default:
+						}
 					}
 				case "started":
 					// Frames on one connection are read sequentially by this
@@ -349,7 +362,11 @@ func (s *scope) Run(ctx context.Context, cmd Command, streams Streams) (Result, 
 		return Result{}, errf(CodeInternalError, "run", "unexpected control reply %q", ew.env.T)
 	}
 	jobID := ew.env.Job
+	// The demux registered this job's channel when it read the started frame
+	// and holds the registration until this call retires it, so a result that
+	// arrives before this line lands in the channel returned here.
 	jobCh := s.jobChanFor(jobID)
+	defer s.dropJobChan(jobID, jobCh)
 
 	cancelCh := make(chan string, 1)
 	var cancelOnce sync.Once
@@ -438,7 +455,6 @@ func (s *scope) Run(ctx context.Context, cmd Command, streams Streams) (Result, 
 	select {
 	case res = <-jobCh:
 	case <-time.After(hardLimit):
-		s.dropJobChan(jobID, jobCh)
 		close(watchDone)
 		<-watchStopped
 		forceClosePipes(stdinW, stdoutR, stderrR)

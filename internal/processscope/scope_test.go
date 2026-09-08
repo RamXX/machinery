@@ -651,3 +651,99 @@ func TestLedgerNotCleanupAuthority(t *testing.T) {
 		t.Fatal("historic ledger PID must never be used as cleanup authority")
 	}
 }
+
+// TestTerminalResultSurvivesOvertakingItsCaller covers the delivery of a
+// terminal result that reaches the control channel before the Run call that
+// asked for it has registered its interest in the job.
+//
+// The broker answers a run with a started frame and, for a job short enough to
+// finish first, the terminal result frame immediately behind it. Both are read
+// by one demux goroutine, so on a loaded host the result can be handled while
+// the caller is still descheduled between receiving the started reply and
+// claiming the job's result channel. The registration must therefore belong to
+// the caller for the whole call: if the demux retires it on delivery, the
+// caller registers a second, empty channel, waits out its entire deadline on
+// it and reports the finished job as a scope-cancellation timeout.
+//
+// The frames are ordered deterministically here: the demux reads one
+// connection sequentially, so a reply frame written after the result and
+// observed on replyCh proves the result frame was already handled.
+func TestTerminalResultSurvivesOvertakingItsCaller(t *testing.T) {
+	a, b, err := newChannelPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	defer b.Close()
+	client, err := connFromFile(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer, err := connFromFile(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &scope{conn: client, fr: newFrameReader(client), id: "scope-test", rootID: "root-test"}
+	s.ensureDemux()
+
+	const jobID = "job-overtaking"
+	write := func(v any) {
+		payload, merr := json.Marshal(v)
+		if merr != nil {
+			t.Fatal(merr)
+		}
+		if werr := writeFrame(peer, payload); werr != nil {
+			t.Fatal(werr)
+		}
+	}
+	write(msgStarted{T: "started", Job: jobID, Pid: 1})
+	select {
+	case ew := <-s.replyCh:
+		if ew.env.T != "started" || ew.env.Job != jobID {
+			t.Fatalf("unexpected started reply: %+v", ew.env)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("started reply was never delivered")
+	}
+
+	write(msgResult{T: "result", Job: jobID, Started: true, Completed: true, ExitCode: 0})
+	// A frame that lands on replyCh cannot be observed before the result frame
+	// ahead of it has been handled, so this receive is the ordering barrier.
+	write(msgClosed{T: "closed"})
+	select {
+	case ew := <-s.replyCh:
+		if ew.env.T != "closed" {
+			t.Fatalf("unexpected barrier reply: %+v", ew.env)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("barrier reply was never delivered")
+	}
+
+	ch := s.jobChanFor(jobID)
+	select {
+	case res := <-ch:
+		if !res.Completed || res.ExitCode != 0 {
+			t.Fatalf("terminal result was corrupted: %+v", res)
+		}
+	default:
+		t.Fatal("a terminal result delivered before its caller claimed the job channel was lost")
+	}
+
+	// A duplicate result for the same job (the retirement of a job already
+	// reported terminal) must be dropped, never block the demux.
+	write(msgResult{T: "result", Job: jobID, Started: true, Completed: true, ExitCode: 0})
+	write(msgResult{T: "result", Job: jobID, Started: true, Completed: true, ExitCode: 0})
+	write(msgClosed{T: "closed"})
+	select {
+	case ew := <-s.replyCh:
+		if ew.env.T != "closed" {
+			t.Fatalf("unexpected barrier reply: %+v", ew.env)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("a duplicate result blocked the control-channel reader")
+	}
+	s.dropJobChan(jobID, ch)
+	if s.jobChans[jobID] != nil {
+		t.Fatal("the caller must retire its own job registration")
+	}
+}

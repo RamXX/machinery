@@ -10,6 +10,17 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A guarded job that finishes before its caller can wait for it is no longer reported as a
+  timeout.** The control channel registered a job's result channel when the broker's started frame
+  arrived and retired that registration on delivery of the result, while `Run` claimed the channel
+  only after the started reply reached it. One reader handles both frames in order, so a job short
+  enough to finish first, an identity probe or any small guarded command, had its result delivered
+  and its registration retired before its own caller claimed it: `Run` then registered a second,
+  empty channel, waited out its whole deadline on it, and reported `TIMEOUT: job terminated by
+  scope cancellation` on a job that had already exited 0. The registration now belongs to the
+  caller for the whole call, so a result that arrives first is waiting in the channel the caller
+  claims, and a duplicate result for an already-reported job is dropped instead of stalling the
+  reader every other frame on that connection depends on. No budget changed.
 - **A custody root grants the wall it declares, not the window its owner was opened with.**
   `processscope.Open` bounds a scope's cumulative wall by the earliest of the declared `wall_ms`
   and the open context's own deadline, so an open context sized as a bootstrap window quietly
