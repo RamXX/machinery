@@ -9,10 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-07T21:43:48Z
 created_by: ramirosalas
 updated_at: 2026-09-07T21:57:52Z
-content_hash: "sha256:e79a600cc4863c4c1b257b6eb6103e421ad04a0a356e96ea22c1e90a1ee077e0"
+content_hash: "sha256:1d9ebbb6a52575d7a4c34c4f9b3480056a49a273ae69c4c49d839142c1e62365"
 labels: [accepted]
 closed_at: 2026-09-07T21:57:52Z
 close_reason: "Accepted: windows/amd64 ships as build target with honest unsupported-custody semantics"
+led_to: [MAC-y2l2]
 ---
 
 ## Description
@@ -32,6 +33,7 @@ User requirement: release targets are exactly darwin (amd64/arm64), linux (amd64
 
 ## Links
 - Parent: [[MAC-ui8a]]
+- Led to: [[MAC-y2l2]]
 
 ## Comments
 

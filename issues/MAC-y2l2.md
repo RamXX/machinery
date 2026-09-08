@@ -7,10 +7,10 @@ type: bug
 parent: MAC-ui8a
 created_at: 2026-09-08T02:21:09Z
 created_by: ramirosalas
-updated_at: 2026-09-08T05:53:59Z
-content_hash: "sha256:40e282372198024e02486e0bdac1663aef7df15d2850504e67098efdbee816c7"
+updated_at: 2026-09-08T07:41:46Z
+content_hash: "sha256:ced2353e2c057d35d38bb1f9670652bf06f513ee767b34f4e5d4a5cc0bd89999"
 assignee: dev-MAC-y2l2
-follows: [MAC-3hzt]
+follows: [MAC-3hzt, MAC-r0hy]
 ---
 
 ## Description
@@ -101,9 +101,11 @@ trade is stated rather than avoided.
 - 2026-09-08T05:53:07Z status: open -> in_progress
 - 2026-09-08T05:53:07Z auto-follows: linked to predecessor MAC-3hzt
 - 2026-09-08T05:53:07Z claimed by dev-MAC-y2l2
+- 2026-09-08T07:41:46Z status: in_progress -> in_progress
+- 2026-09-08T07:41:46Z auto-follows: linked to predecessor MAC-r0hy
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Follows: [[MAC-3hzt]]
+- Follows: [[MAC-3hzt]], [[MAC-r0hy]]
 
 ## Comments
