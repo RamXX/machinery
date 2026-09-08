@@ -1,14 +1,15 @@
 ---
 id: MAC-hlsd
 title: "a killed process group reads as a survivor while its members await reaping"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [processscope, ci, custody, linux]
 created_at: 2026-09-08T18:00:37Z
 created_by: ramirosalas
 updated_at: 2026-09-08T18:08:34Z
-content_hash: "sha256:3640b5cb1dd709c930d797039f6505fddbb97ae5c6b86989daeb0800b605d91f"
+content_hash: "sha256:0db639140fada5460e350cb24d1b1e538c3a45213a47ec1750ced5d1ec1c3edc"
+closed_at: 2026-09-08T18:08:34Z
 ---
 
 ## Description
@@ -34,7 +35,7 @@ Fix: poll the group until it drains, bounded by the reap deadline that already b
 
 
 ## History
-
+- 2026-09-08T18:08:34Z status: open -> closed
 
 ## Links
 
