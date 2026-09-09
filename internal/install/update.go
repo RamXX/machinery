@@ -396,7 +396,7 @@ func releaseAssetNameFor(goos, goarch string) (string, error) {
 	case "darwin", "linux":
 		return "machinery-" + goos + "-" + goarch, nil
 	case "windows":
-		return "", fmt.Errorf("unsupported operating system for self-update: windows (v0.7.1 publishes a windows/amd64 binary, but self-update supports Linux and macOS only)")
+		return "", fmt.Errorf("unsupported operating system for self-update: windows (v0.7.2 publishes a windows/amd64 binary, but self-update supports Linux and macOS only)")
 	default:
 		return "", fmt.Errorf("unsupported operating system for self-update: %s", goos)
 	}
@@ -631,15 +631,35 @@ codexRefresh:
 }
 
 var (
-	pluginVersionRE                 = `[0-9A-Za-z][0-9A-Za-z.+-]*`
-	claudeMarketplaceUpdateOutputRE = regexp.MustCompile(
-		`^Updating marketplace: machinery\.\.\.(?:Validating local marketplace\n)?✔ Successfully updated marketplace: machinery\n?$`,
-	)
+	pluginVersionRE = `[0-9A-Za-z][0-9A-Za-z.+-]*`
+	// The first line and the success line are the contract. Between them
+	// Claude Code prints progress it changes between its releases
+	// ("Validating local marketplace", then from 2.1.266 "Refreshing
+	// marketplace cache (timeout: 120s)…" glued to the first line), and
+	// pinning those lines made a successful refresh a returned error twice.
+	claudeMarketplaceUpdateFirstLineRE = regexp.MustCompile(`^Updating marketplace: machinery\.\.\.`)
+	claudeMarketplaceUpdateSuccessLine = "✔ Successfully updated marketplace: machinery"
+	claudeMarketplaceFailureMarkerRE   = regexp.MustCompile(`(?i)✘|\berror\b|\bfailed\b|\bwarning\b`)
 )
 
+// validateClaudeMarketplaceUpdateOutput proves the marketplace refresh by its
+// success line: the output must open with the update banner, end with the
+// exact success line, and carry no failure marker on any intermediate
+// progress line. Progress lines themselves belong to Claude Code and are not
+// pinned.
 func validateClaudeMarketplaceUpdateOutput(output string) error {
-	if !claudeMarketplaceUpdateOutputRE.MatchString(strings.ReplaceAll(output, "\r\n", "\n")) {
+	text := strings.TrimRight(strings.ReplaceAll(output, "\r\n", "\n"), "\n")
+	if !claudeMarketplaceUpdateFirstLineRE.MatchString(text) {
 		return fmt.Errorf("non-canonical Claude marketplace success output")
+	}
+	lines := strings.Split(text, "\n")
+	if lines[len(lines)-1] != claudeMarketplaceUpdateSuccessLine {
+		return fmt.Errorf("non-canonical Claude marketplace success output")
+	}
+	for _, line := range lines[:len(lines)-1] {
+		if claudeMarketplaceFailureMarkerRE.MatchString(line) {
+			return fmt.Errorf("marketplace refresh reported a failure marker before its success line: %q", line)
+		}
 	}
 	return nil
 }

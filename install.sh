@@ -63,7 +63,7 @@ case "$arch" in
 esac
 case "$os" in
   linux|darwin) ;;
-  msys*|mingw*|cygwin*|windows*) die "Windows is not supported by this installer in v0.7.1; download machinery-windows-amd64 from the releases page by hand" ;;
+  msys*|mingw*|cygwin*|windows*) die "Windows is not supported by this installer in v0.7.2; download machinery-windows-amd64 from the releases page by hand" ;;
   *) die "unsupported OS: $os" ;;
 esac
 binname="machinery"

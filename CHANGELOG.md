@@ -6,7 +6,23 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-09-09
+
 ### Fixed
+
+- **`machinery update` proves the Claude Code marketplace refresh by its success line.** On
+  0.7.1, with the inventory reader fixed, the refresh got one step further and failed again:
+  Claude Code 2.1.266 prints `Refreshing marketplace cache (timeout: 120s)…` between the update
+  banner and `✔ Successfully updated marketplace: machinery`, and the canonical-output check pinned
+  the exact lines, so a successful refresh was returned as `non-canonical Claude marketplace
+  success output` and the plugin never refreshed. This is the third closed-format defect in the
+  host-plugin reader class (the 0.6.9 plugin cache, the 0.7.0 inventory, now the marketplace
+  output). The check now requires the update banner first and the exact success line last, and
+  rejects any intermediate line carrying a failure marker (`✘`, `error`, `failed`, `warning`);
+  the progress lines between them belong to Claude Code and are no longer pinned. The 2.1.266
+  output is pinned as a fixture beside the older shape, with five rejected shapes. The plugin
+  update output (`Checking for updates ... ✔ Plugin "machinery" updated from 0.7.0 to 0.7.1 for
+  scope user.`) still matches its contract unchanged.
 
 - **`make ci-linux` carries a UTF-8 locale and reports both hosted jobs.** The first end-to-end
   run on a linux/amd64 VM (2026-09-09) showed two container defects: the image had no locale, so
@@ -19,6 +35,19 @@ under their version heading when a release is cut.
   container the directory ABA witness in `scripts/tree-inventory` is blind on a coarse-timestamp
   filesystem (two of its tests fail there and pass on the hosted runner), so the containerized
   sweep is not yet a faithful mirror of the hosted test job for that one package.
+
+### Compatibility and migration
+
+**Regeneration stamp.** As in 0.7.1: the `machinery-version:` families and the pii-flow checker
+projection move from `v0.7.1` to `v0.7.2` and nothing else in them changes. Regenerate with the
+commands the gate suite prints and commit the stamp-only diff on its own.
+
+**Claude Code marketplace refresh.** Unchanged: a refresh whose output ends in anything other than
+the exact success line, or carries a failure marker on any line, is still a returned error with a
+recorded obligation. Accepted now: any progress lines Claude Code prints between the banner and the
+success line. No migration; a 0.7.1 install whose update reported the non-canonical output migrates
+by running `machinery update --version v0.7.2` twice (the first run's parent is the 0.7.1 binary,
+which still rejects the output; the second run's parent is 0.7.2).
 
 ## [0.7.1] - 2026-09-09
 

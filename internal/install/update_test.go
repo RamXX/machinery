@@ -687,6 +687,23 @@ func TestPluginMutationSuccessOutputContracts(t *testing.T) {
 	if err := validateClaudeMarketplaceUpdateOutput(claudeMarketplaceSuccessOutput()); err != nil {
 		t.Fatal(err)
 	}
+	// Claude Code 2.1.266 (captured 2026-09-09): the progress line is glued to
+	// the banner and carries a timeout; machinery 0.7.1 rejected it as
+	// non-canonical and the plugin never refreshed.
+	if err := validateClaudeMarketplaceUpdateOutput(claudeMarketplaceSuccessOutput2_1_266); err != nil {
+		t.Fatal(err)
+	}
+	for _, rejected := range []string{
+		"Updating marketplace: machinery...Refreshing marketplace cache (timeout: 120s)…\n✘ Failed to update marketplace: machinery\n",
+		"Updating marketplace: machinery...Refreshing marketplace cache (timeout: 120s)…\nerror: network unreachable\n✔ Successfully updated marketplace: machinery\n",
+		"Updating marketplace: other...\n✔ Successfully updated marketplace: machinery\n",
+		"✔ Successfully updated marketplace: machinery\n",
+		"Updating marketplace: machinery...\n✔ Successfully updated marketplace: machinery\ntrailing\n",
+	} {
+		if err := validateClaudeMarketplaceUpdateOutput(rejected); err == nil {
+			t.Fatalf("marketplace output was accepted: %q", rejected)
+		}
+	}
 	for _, scope := range []string{"managed", "user", "project", "local"} {
 		if err := validateClaudePluginUpdateOutput(claudePluginSuccessOutput(scope), scope); err != nil {
 			t.Fatalf("scope %s: %v", scope, err)
@@ -710,6 +727,8 @@ func TestPluginMutationSuccessOutputContracts(t *testing.T) {
 func claudeMarketplaceSuccessOutput() string {
 	return "Updating marketplace: machinery...Validating local marketplace\n✔ Successfully updated marketplace: machinery\n"
 }
+
+const claudeMarketplaceSuccessOutput2_1_266 = "Updating marketplace: machinery...Refreshing marketplace cache (timeout: 120s)…\n✔ Successfully updated marketplace: machinery\n"
 
 func claudePluginSuccessOutput(scope string) string {
 	return "Checking for updates for plugin \"machinery@machinery\" at " + scope + " scope…\n✔ machinery is already at the latest version (0.6.2).\n"
