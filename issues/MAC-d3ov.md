@@ -7,8 +7,8 @@ type: bug
 labels: [install, doctor, field-defect]
 created_at: 2026-09-09T00:50:33Z
 created_by: ramirosalas
-updated_at: 2026-09-09T00:50:52Z
-content_hash: "sha256:93637fc482151cf32d998188f461ac311d9f987eb1ace6e822213b5e47d442fb"
+updated_at: 2026-09-09T16:06:01Z
+content_hash: "sha256:1c17cef2e44fe121d9d72c11019604b8dfeccb1d9246287a1696181064d53f5f"
 ---
 
 ## Description
@@ -50,3 +50,6 @@ Reproduce with a fresh HOME (install from the v0.7.0 release, run doctor), unify
 
 ### 2026-09-09T00:50:52Z ramirosalas
 Correction after a second run: a second `machinery update --version v0.7.0` converged both artifacts and doctor is now clean (no invalid lines). So the digest function is consistent; the defect is in the FIRST update over an existing v0.6.11 install: it left ~/.agents/skills/machinery and the build-writer role out of step with the receipt it wrote (fsm-author was fine), and only the rerun converged them. This contradicts the 0.7.0 'installer reruns converge' contract's first-run guarantee. Reproduce: fresh HOME with a v0.6.11 install (copy-mode home group plus symlinked ~/.claude), then update to v0.7.0 once, then doctor. Expected clean after one update.
+
+### 2026-09-09T16:06:01Z ramirosalas
+Reproduced in a fresh HOME from the published assets: install v0.6.11 (install.sh at v0.6.11), machinery update --version v0.7.0 --skip-plugins, doctor: same two digest pairs as the field report (e2262eda vs cc1d8dd4, 6c7c6cce vs 7db10557). The receipt after the first update is byte-identical to the 0.6.11 receipt; the tree on disk is 0.7.0. Root cause: commit 0ad71eb (MAC-2u36) moved receipt finalization from the placement child (internal/install/install.go:246 'opts.Record && !tx.delegated') to the update parent (internal/install/update.go:212 recordRefreshPlanLocked). On a cross-version update the parent is the OLD binary: 0.6.11's updateLocked has no recordRefreshPlanLocked (it relied on the child), and the 0.7.0 child, being delegated, leaves the receipt untouched. Nobody writes it. The second update runs with a 0.7.0 parent, which finalizes, so it converges. Fix: the 0.7.1 parent announces receipt ownership to its children through MACHINERY_INTERNAL_INSTALL_RECEIPT_OWNER=parent (internal/install/lock.go); a delegated child without the announcement records its own placement (recordDelegatedHomeInstallLocked / recordDelegatedTargetInstallLocked, retaining the recorded digest for an artifact a sibling child still has to place). Env rather than the capability payload because pre-0.7.1 children compare the payload byte for byte and a downgrade runs such a child. Test: TestDelegatedPlacementChildReceiptOwnership (real child under a prepared parent transaction, both modes); fails on pre-fix install.go with 'child left the receipt describing the previous release'.
