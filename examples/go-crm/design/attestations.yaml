@@ -109,8 +109,8 @@ attestations:
   - claim: gt.conformance-test-shape
     kind: current
     attestor: coordinator
-    date: 2026-09-06
-    note: 'Substantive current review of the accepted parser-backed scope (MAC-uzxr) over examples/go-crm/impl: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; native sensitivity controls fail on unsafe oracle edits and extra effects; go test ./... green over the full impl incl. real-boundary repo/session tests. Bounded: content-hash-bound scope review, not authenticated execution replay.'
+    date: 2026-09-09
+    note: 'Re-review after the dependency bump of golang.org/x/crypto 0.55.0 to 0.56.0 and the go directive 1.26 to 1.26.0 in examples/go-crm/impl (go.mod, go.sum only; no source or test change). Scope unchanged from the 2026-09-06 review: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; go test ./... green over the full impl on 2026-09-09 (session, testoracle). Bounded: content-hash-bound scope review, not authenticated execution replay.'
     covers:
       - {path: BUILD.md, hash: sha256:b8c4e1e88825f43dae1a543831ce66c865d58db7440335e5072d64e5769d5a89}
     implementation:
@@ -123,13 +123,13 @@ attestations:
           - path: go.mod
             type: file
             mode: "0644"
-            size: 666
-            hash: sha256:8e978f0eb6afd31e2d2a9719166b1a9866edc4c88b356c2ee3d0af898e6588e8
+            size: 668
+            hash: sha256:c123f0e384a2f927e0446c9e1b2ce53bc093e2ccb3ef1651b76b47a53acc91d0
           - path: go.sum
             type: file
             mode: "0644"
             size: 3751
-            hash: sha256:0eb1e3b9e9320ebdfe8471a8878db81f8d62c8c682c40dad02ab89208bb928ba
+            hash: sha256:74e584585582080a58bb37750279f7f830ecfd58a2e318939407ee15eb4b9f85
           - path: internal
             type: directory
             mode: "0755"
@@ -340,7 +340,7 @@ attestations:
             mode: "0644"
             size: 5813
             hash: sha256:7ddb253e6c4c2734885c69af4704df5c7350a5717ec60c5a5f454a7f3b898c53
-      hash: sha256:ae81098e391f68e3979055b3fbd64e6b65c5ebe8b30ae716676bda8bbb7d8300
+      hash: sha256:6ee96abc1941b6c282052e9032d12fbd0cd0740be4f42b5e70172e4eb00ddc78
   - claim: g4.zero-context
     kind: plan
     attestor: coordinator
