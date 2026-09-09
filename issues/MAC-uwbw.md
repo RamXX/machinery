@@ -1,14 +1,16 @@
 ---
 id: MAC-uwbw
 title: "update: Claude Code marketplace refresh rejected as non-canonical output (Refreshing marketplace cache line)"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [install, update, claude-code, field-defect]
 created_at: 2026-09-09T17:31:46Z
 created_by: ramirosalas
-updated_at: 2026-09-09T17:48:03Z
-content_hash: "sha256:104ccccd23122269e4b69421cef22b38776e07ea2d099790f54b7f6a9fd53f15"
+updated_at: 2026-09-09T18:28:12Z
+content_hash: "sha256:b37b747769f2f7ee8843ca1e3896f089b9e617a71cd4e417a64ecfbe195af7c1"
+closed_at: 2026-09-09T18:28:12Z
+close_reason: "Released in v0.7.2 (tag at 1e97df0, published 2026-09-09 18:25Z). Field-verified on the real host with Claude Code 2.1.266: the 0.7.2 parent refreshed the Claude plugin ('refreshed Claude Code plugin machinery@machinery in 1 scope(s)'); doctor clean; H2 at the single plan-only warning on the installed binary."
 ---
 
 ## Description
@@ -36,6 +38,7 @@ Prove success by the final success line and the exit status, treat intermediate 
 
 ## History
 - 2026-09-09T17:36:55Z status: open -> in_progress
+- 2026-09-09T18:28:12Z status: in_progress -> closed
 
 ## Links
 
