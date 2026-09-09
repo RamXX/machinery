@@ -7,8 +7,8 @@ type: feature
 labels: [release-process, ci, preflight]
 created_at: 2026-09-08T16:36:40Z
 created_by: ramirosalas
-updated_at: 2026-09-09T16:55:44Z
-content_hash: "sha256:2685f852b4bdb754bfa791e29240c3c60b60fd0e93847d9bdc411aad346d3165"
+updated_at: 2026-09-09T17:10:39Z
+content_hash: "sha256:7dcb57447db02d91920e2f77ab9c75e4d17fa55aa5b34ad5c695ae5daae5a980"
 ---
 
 ## Description
@@ -54,3 +54,6 @@ Landed on main at 0ee0366450c91fd2ac5d351142b45780adbaf7a1 (2026-09-09): items 1
 
 ### 2026-09-09T16:55:44Z ramirosalas
 ci-linux end-to-end on the Linux VM (2026-09-09, candidate 98b47e3, as deploy): the image builds and carries the pinned runtimes; the sweep fails in scripts/tree-inventory on the MAC-33sp container coarse-timestamp witness limitation (hosted ubuntu-latest passes), and because scripts/ci-linux.sh runs the sweep and the lane in one 'set -e' shell the lane does not run after a sweep failure. Follow-ups: run the lane even when the sweep fails (report both), mount a fine-grained-timestamp tmpfs for TMPDIR or land MAC-33sp, set a UTF-8 locale in the image (Elixir warns), and run as a non-root user.
+
+### 2026-09-09T17:10:39Z ramirosalas
+VM evidence run, second half (2026-09-09): after LANG=C.UTF-8, a shared TMPDIR mounted at the same path, and safe.directory in the system git config, the required lane inside the container reaches custody-go-pilot and fails there: integration_lane_custody_test.go:273/337 'cancelled provisioning/suite must fail with verified owned-job cleanup' because checker containers started through the host socket run outside the runner container's pid namespace, so process custody cannot witness their cleanup. Conclusion: the socket-sharing design cannot reproduce the integration-required job; ci-linux needs either a nested daemon (dind, privileged) or the lane run natively on the Linux VM with the pinned runtimes, and the sweep needs a fine-grained-timestamp TMPDIR (tree-inventory ABA witness, see the earlier comment). The sweep otherwise passed 30 of 32 packages on 2 CPUs. Local fixes for the three container defects are committed on main after the v0.7.1 tag.
