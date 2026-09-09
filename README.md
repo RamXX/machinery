@@ -486,7 +486,7 @@ and release checks. Neither command installs anything.
   This puts the `machinery` binary on `~/.local/bin` and runs `machinery install` to place the skill
   + role docs into your agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see
   [Agent homes](#agent-homes)). Override with environment variables, for example
-  `MACHINERY_VERSION=v0.7.0`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
+  `MACHINERY_VERSION=v0.7.1`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
   `MACHINERY_TARGETS="codex opencode"`. `MACHINERY_HOMES` accepts one full path per line, preserving
   spaces; use a literal newline between multiple homes.
 
@@ -497,7 +497,7 @@ and release checks. Neither command installs anything.
   machinery install                        # fetches the matching skill + role docs into your agent homes
   ```
 
-  **Windows support:** v0.7.0 publishes a cross-compiled `machinery-windows-amd64` binary and
+  **Windows support:** v0.7.1 publishes a cross-compiled `machinery-windows-amd64` binary and
   `machinery_<version>_windows_amd64.tar.gz` as release artifacts. The one-line installer and
   `machinery update` do not support Windows: download the asset by hand. Native Windows runtime
   guarantees are not claimed; process custody, formal verification, and the assurance lanes are
@@ -617,7 +617,7 @@ version matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.7.0          # force an exact release
+machinery update --version v0.7.1          # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
@@ -657,7 +657,7 @@ move one and not the other; machinery detects the skew and refuses rather than
 running a hook against a binary it was not built for:
 
 ```
-cached machinery plugin version 0.7.0 does not match running machinery v0.6.11;
+cached machinery plugin version 0.7.1 does not match running machinery v0.7.0;
 run 'claude plugin update machinery@machinery'
 ```
 

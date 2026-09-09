@@ -42,10 +42,10 @@ import (
 // can never masquerade as a semantic failure.
 var frozenPins = map[string]string{
 	"examples/portfolio-engine/design/machines/MarketDataFeed.machine.json":       "394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72",
-	"examples/portfolio-engine/design/machines/MarketDataFeed.oracle.md":          "0a291c46cde2dfcfc38a915557ef23713a32068ab68c1e12ee999753f1544011",
-	"examples/portfolio-engine/design/machines/Portfolio.oracle.md":               "ee71b46300862a123edfb9b71b9e7f93fb6c23936e2bbcc9f0974739e1286eba",
-	"examples/portfolio-engine/design/machines/RecommendationRun.oracle.md":       "a1bcbe1391227b4d1cc8589bbb96a1598109563998ad611aa404088a27e4fbff",
-	"examples/portfolio-engine/design/machines/ReferenceDataCommand.oracle.md":    "25ffdd5c35897fb10c24eff20c0a60f36c8d245a7e3da6746a4e2bed7ee4de07",
+	"examples/portfolio-engine/design/machines/MarketDataFeed.oracle.md":          "6e1e636d9f04505d9b3d4d4d89494241106665e79683a0ecbdd7b427650be76a",
+	"examples/portfolio-engine/design/machines/Portfolio.oracle.md":               "d5f472bdae8991e4ab24ca5610a085d99e6e363354da42620d5151dfaa946b7e",
+	"examples/portfolio-engine/design/machines/RecommendationRun.oracle.md":       "626464316c0c872ed0ff8bc76768d00899160d9b4e28ce4ea443ebd1d3fbb303",
+	"examples/portfolio-engine/design/machines/ReferenceDataCommand.oracle.md":    "12df076e200726fdaa1c7563983cc868b5e9db990b03d8eb38409ab39f3278ee",
 	"examples/portfolio-engine/design/BUILD/M3-optimizer.md":                      "621255b4ece8863c50c70cc0f9bc7ac3e831a6ad702a23408f5b41f80a3e3c67",
 	"examples/portfolio-engine/design/BUILD/M0-walking-skeleton.md":               "5a06ed03f8f8c693e679b480c77ba041b979d5c9d10c961677dd65eb370d9db2",
 	"examples/portfolio-engine/design/machines/RecommendationRun.matrix.md":       "423db91a3e78fdcb76940bb4b4e6be23727e47b62a82c2568dd58e130d8264a1",

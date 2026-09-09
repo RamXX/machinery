@@ -6,6 +6,8 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-09
+
 ### Fixed
 
 - **`machinery update` accepts the plugin inventory the current Claude Code writes.** The Claude
@@ -54,6 +56,15 @@ under their version heading when a release is cut.
   reads `no commit under review could be derived; evidence commits UNBOUND to git history` beside
   the existing non-blocking note, so an unbound run is never inferred from a missing note.
 
+- **The hook repairs its own state instead of bricking every repository.** A store filled past the
+  fail-closed limit used to deny every governed tool call until a human pruned it by hand. The first
+  inventory that hits the limit now compacts once under a repair ceiling and retries. This covers
+  ledgers written by 0.7.1 and later: a ledger written by 0.7.0 or older carries no project root, so
+  nothing can tell its obligation from a live one and compaction retains it. A store already over
+  the limit at upgrade time therefore needs a one-time manual removal of its `<digest>.state` files,
+  never of the store directory, whose initialization marker distinguishes a first run from a lost
+  store.
+
 ### Added
 
 - **`machinery doctor --repair` compacts the governance hook state store.** The per-user store the
@@ -67,17 +78,6 @@ under their version heading when a release is cut.
   only moment either matters. See the plugin guide's durable-state section for the policy and its
   residuals.
 
-### Fixed
-
-- **The hook repairs its own state instead of bricking every repository.** A store filled past the
-  fail-closed limit used to deny every governed tool call until a human pruned it by hand. The first
-  inventory that hits the limit now compacts once under a repair ceiling and retries. This covers
-  ledgers written by 0.7.1 and later: a ledger written by 0.7.0 or older carries no project root, so
-  nothing can tell its obligation from a live one and compaction retains it. A store already over
-  the limit at upgrade time therefore needs a one-time manual removal of its `<digest>.state` files,
-  never of the store directory, whose initialization marker distinguishes a first run from a lost
-  store.
-
 ### Changed
 
 - **`machinery doctor` exits nonzero on an unusable hook state store.** The new store report fails
@@ -85,18 +85,6 @@ under their version heading when a release is cut.
   resolved or inspected (a container with no resolvable HOME, for instance). A store above the
   retention ceiling but below the limit reports and passes, so the common state does not newly fail.
   Any CI job or Makefile target that treats `machinery doctor` as a gate has a new failure source.
-
-### Compatibility
-
-- **The hook state ledger records its project root, which an older binary rejects.** This is what
-  lets retention prove an obligation is dead rather than guessing. A binary older than 0.7.1 reads a
-  ledger written by 0.7.1 as noncanonical and fails closed on it, so a downgrade, or a second older
-  binary sharing the same user home, blocks governance for the affected projects until their
-  `<digest>.state` files are removed. Remove the files, never the store directory. Reading in the
-  other direction is unaffected: 0.7.1 reads a pre-upgrade ledger normally and only declines to
-  reclaim it.
-
-### Changed
 
 - **The gate is tiered: cheap on every push, heavy where it is enforced.** Releasing a one-line
   patch cost a 50-minute local gate per push, while five of the failures that broke the 0.7.0
@@ -121,6 +109,61 @@ under their version heading when a release is cut.
   container does and does not reproduce. The container runs the sweep as root; running it as an
   unprivileged user, and moving the fsync-bound install suite and the load-sensitive custody
   suites out of the parallel sweep into the lane with fixed budgets, stay open under MAC-qo6n.
+
+### Compatibility and migration
+
+Every entry below states what still works unchanged, what is rejected now, and the exact command
+that migrates. Nothing here changes a schema or a generator; the regeneration stamp is the only
+artifact change.
+
+**Regeneration stamp.** The families that carry `machinery-version:` (`machines/*.tla`,
+`machines/*.cfg`, `machines/*.oracle.md`, `formal/*.als`) and the pii-flow checker projection move
+from `v0.7.0` to `v0.7.1` and nothing else in them changes. Regenerate with the commands the gate
+suite prints for the design (`machinery oracle`, `machinery tla`, `machinery alloy`, and
+`machinery refine`/`machinery compose`/`machinery pack generate` where the design carries those
+families) and commit the stamp-only diff on its own.
+
+**Ga-accept on open milestones.** Unchanged: evidence for a closed milestone binds exactly as
+before, and a design with no acceptance file is untouched. Rejected now: an acceptance file on an
+open milestone whose `commit:` names a sha the repository holding the design does not hold, or one
+that is not an ancestor of the history anchor. Finding:
+
+```
+design/acceptance/M1.yaml: commit deadbeef... names no commit in the repository holding the design (history anchor is ...)
+```
+
+Migrate: record the sha the review actually read. A second consequence is visible on the command
+line: the `--commit` anchor has always been specified as a hex object id (`docs/acceptance-gate.md`),
+but on 0.7.0 a design with only open milestones never reached the resolver, so `--commit HEAD`
+passed silently there. On 0.7.1 it is rejected with `supplied history anchor must be a lowercase
+hexadecimal VCS object id or unambiguous prefix (7 to 64 characters)`. Pass `--commit
+"$(git rev-parse HEAD)"`, `$GITHUB_SHA`, or `MACHINERY_COMMIT=<sha>`; a repository-backed run with no
+anchor still derives HEAD itself.
+
+**Installation receipt after a cross-version update.** Unchanged: the receipt schema (2), every
+`machinery install` and `machinery uninstall` path, and updates whose parent is 0.7.1 or newer. Fixed
+in the field: a 0.6.11 install updated once to 0.7.1 converges in that one run. A 0.7.0 install whose
+`machinery doctor` already reports `artifact digest is ..., want receipt-bound ...` migrates by
+running `machinery update --version v0.7.1` once: the 0.7.0 parent finalizes the receipt itself. The
+announcement between parent and child (`MACHINERY_INTERNAL_INSTALL_RECEIPT_OWNER`) is internal and
+not a user surface.
+
+**Claude Code plugin inventory.** Unchanged: the Codex inventory reader, and a Claude inventory that
+is missing `id` or `scope` still fails closed with `Claude plugin entry N is missing required field`.
+Accepted now: any additional field Claude Code writes on an entry. No migration.
+
+**Contributor gate.** The pre-push hook no longer runs the heavy tier, so a push no longer proves the
+race sweep, the required lane, formal, C4, or the external checkers locally; hosted CI is
+authoritative for those, and `make preflight` or `make ci-linux` runs them locally on purpose. Run
+`make hooks` once after pulling so the hook points at the fast tier.
+
+- **The hook state ledger records its project root, which an older binary rejects.** This is what
+  lets retention prove an obligation is dead rather than guessing. A binary older than 0.7.1 reads a
+  ledger written by 0.7.1 as noncanonical and fails closed on it, so a downgrade, or a second older
+  binary sharing the same user home, blocks governance for the affected projects until their
+  `<digest>.state` files are removed. Remove the files, never the store directory. Reading in the
+  other direction is unaffected: 0.7.1 reads a pre-upgrade ledger normally and only declines to
+  reclaim it.
 
 ## [0.7.0] - 2026-09-08
 
