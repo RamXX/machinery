@@ -7,8 +7,8 @@ type: feature
 labels: [release-process, ci, preflight]
 created_at: 2026-09-08T16:36:40Z
 created_by: ramirosalas
-updated_at: 2026-09-08T16:36:40Z
-content_hash: "sha256:f92d63793bde87ed8759104c27e2321ec863deb30c5cd5960922acef7b3d3331"
+updated_at: 2026-09-09T16:38:38Z
+content_hash: "sha256:1af76db6bfa42a2253add000851277b9a447702639d71af682bdc012fddd4ed2"
 ---
 
 ## Description
@@ -48,3 +48,6 @@ Six push attempts, each paying the full pre-push gate (about 50 minutes: 20 to 3
 
 
 ## Comments
+
+### 2026-09-09T16:38:38Z ramirosalas
+Landed on main at 0ee0366450c91fd2ac5d351142b45780adbaf7a1 (2026-09-09): items 1 (fast pre-push tier, scripts/preflight-fast.sh, 1m25s measured), 2 (heavy tier unchanged in hosted CI and make preflight), 3 (make ci-linux: pinned 2-CPU linux/amd64 container, scripts/ci-linux.sh + scripts/ci-linux.dockerfile) and 5 (contract tests tightened, lane validator untouched). Still open: item 4 (move internal/install's fsync-bound suite and the load-sensitive custody/adapter suites out of the parallel race sweep into the required lane with fixed budgets and receipts; needs before/after measurement), and running the ci-linux sweep as a non-root user inside the container (root hides uid defects, see MAC-aldv). End-to-end ci-linux evidence run on the Linux VM pending in this session.
