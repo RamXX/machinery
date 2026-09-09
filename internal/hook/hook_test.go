@@ -196,17 +196,33 @@ func copyTree(t *testing.T, src, dst string) {
 	} else {
 		text = text[:start] + text[start+1+end:]
 	}
-	line := strings.Split(text, "\n")
-	for i, l := range line {
-		if strings.HasPrefix(l, "    note: 'Substantive current review of the accepted parser-backed scope") {
-			line[i] = "    note: 'Fixture plan only; conformance tests are intended to cover every committed oracle row and assert next state plus ordered actions. No current implementation review or test execution is claimed.'"
-			text = strings.Join(line, "\n")
+	// Recast the gt row's note. Keying off the note prose would re-break this
+	// fixture every time the shipped example is legitimately re-reviewed (a
+	// dependency bump under the bound implementation root is enough), so bound
+	// the row and rewrite whatever note it currently carries.
+	const gtRowHead = "  - claim: gt.conformance-test-shape\n"
+	if strings.Count(text, gtRowHead) != 1 {
+		t.Fatalf("fixture migration needs exactly one %q", gtRowHead)
+	}
+	rowAt := strings.Index(text, gtRowHead)
+	rowEnd := strings.Index(text[rowAt+1:], "\n  - claim: ")
+	if rowEnd < 0 {
+		t.Fatalf("fixture migration cannot bound the gt row")
+	}
+	rowEnd += rowAt + 1
+	rowLine := strings.Split(text[rowAt:rowEnd], "\n")
+	recast := false
+	for i, l := range rowLine {
+		if strings.HasPrefix(l, "    note: ") {
+			rowLine[i] = "    note: 'Fixture plan only; conformance tests are intended to cover every committed oracle row and assert next state plus ordered actions. No current implementation review or test execution is claimed.'"
+			recast = true
 			break
 		}
 	}
-	if !strings.Contains(text, "Fixture plan only") {
+	if !recast {
 		t.Fatalf("fixture migration did not recast the shipped current-review note")
 	}
+	text = text[:rowAt] + strings.Join(rowLine, "\n") + text[rowEnd:]
 	writeFile(t, path, text)
 	g := gates.CheckAttestations(dst)
 	if len(g.Errs) != 0 || len(g.Drift) != 0 || len(g.Warns) != 1 || !strings.Contains(g.Warns[0], "gt.conformance-test-shape: plan only; current implementation review missing") || g.Counts["current implementation reviews"] != 0 || g.Counts["historical review records"] != 1 {
