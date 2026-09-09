@@ -1,14 +1,16 @@
 ---
 id: MAC-d3ov
 title: "doctor reports a fresh 0.7.0 install as invalid: receipt-bound artifact digest differs from the recomputed digest"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [install, doctor, field-defect]
 created_at: 2026-09-09T00:50:33Z
 created_by: ramirosalas
-updated_at: 2026-09-09T16:06:01Z
-content_hash: "sha256:223ce3a4189c3a7caa1b863d50eb545f41c51b8831adb04b31c5e1bfe66ab47c"
+updated_at: 2026-09-09T16:18:44Z
+content_hash: "sha256:9e1702d1155d240070684267cfa399070fafe08c3905cd1156fc500c8ab65396"
+closed_at: 2026-09-09T16:18:44Z
+close_reason: "Fixed on main at 69e54b0: delegated placement child records its own placement when the update parent announces no receipt ownership (MACHINERY_INTERNAL_INSTALL_RECEIPT_OWNER); TestDelegatedPlacementChildReceiptOwnership. Reproduced from the published v0.6.11 and v0.7.0 assets in a fresh HOME; field verification (0.6.11 to 0.7.1 in a fresh HOME, doctor clean after one update) follows the release."
 ---
 
 ## Description
@@ -42,6 +44,7 @@ Reproduce with a fresh HOME (install from the v0.7.0 release, run doctor), unify
 
 ## History
 - 2026-09-09T16:06:01Z status: open -> in_progress
+- 2026-09-09T16:18:44Z status: in_progress -> closed
 
 ## Links
 
