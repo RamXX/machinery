@@ -212,6 +212,11 @@ func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool
 	g.Count("acceptance files", len(records))
 
 	ids := acceptanceOracleIDs(design, g)
+	// bindable is every record that discharges a milestone the plan declares,
+	// in ascending milestone order. Its commit is held to this history whether
+	// or not the milestone is closed yet: the sha names the tree the review
+	// read, and a sha this repository does not hold names no tree at all.
+	var bindable []int
 	for _, num := range sortedRecordNums(records) {
 		rec := records[num]
 		ref, ok := byNum[num]
@@ -219,10 +224,18 @@ func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool
 			g.Errs = append(g.Errs, fmt.Sprintf("%s: names milestone M%d, which no build-plan document declares; acceptance evidence binds to a planned milestone", rec.label, num))
 			continue
 		}
+		bindable = append(bindable, num)
 		checkDoDCoverage(g, design, rec, ref, ids)
 	}
+	closedSet := make(map[int]bool, len(closed))
+	for _, num := range closed {
+		closedSet[num] = true
+	}
+	// something to bind, or a closure to account for: either way the run has a
+	// binding mode, and the checked: line states which one below.
+	bindingWork := len(closed) > 0 || len(bindable) > 0
 
-	if len(closed) > 0 && !requireCommit {
+	if bindingWork && !requireCommit {
 		var resolveErr error
 		reviewed, provenance, resolveErr = resolveReviewCommit(gitDesign, commit)
 		if resolveErr != nil {
@@ -246,6 +259,16 @@ func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool
 			checkCommitBinding(g, gitDesign, rec, reviewed, provenance)
 		}
 	}
+	// Evidence on a milestone the plan has not closed yet is a review someone
+	// will read, and it names a commit exactly as a closed one does. Binding
+	// used to run only in the loop above, so that evidence could name a commit
+	// no repository holds and the gate reported ok with nothing said.
+	for _, num := range bindable {
+		if closedSet[num] {
+			continue // bound above, beside the closure finding it belongs to
+		}
+		checkCommitBinding(g, gitDesign, records[num], reviewed, provenance)
+	}
 	// the provenance is stated, never the sha: the source is what a reader
 	// cannot recover from the artifacts, while the sha is already in the
 	// evidence file and in the mismatch finding when the binding fails. It
@@ -259,8 +282,12 @@ func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool
 	case commitFromGit:
 		g.CheckedExtra("commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry")
 	case commitAbsent:
-		if len(closed) > 0 && !requireCommit && !commitResolveFailed {
+		// the degraded mode is a mode, not a silence: it is named on the
+		// checked: line beside the other three, so a reader never has to infer
+		// an unbound run from the absence of a note.
+		if bindingWork && !requireCommit && !commitResolveFailed {
 			g.Notes = append(g.Notes, "commit binding not checked: no --commit and no MACHINERY_COMMIT, and the design is not inside a git repository this binary can read; CI must run from a repository checkout or supply a history anchor")
+			g.CheckedExtra("no commit under review could be derived; evidence commits UNBOUND to git history")
 		}
 	}
 	return g

@@ -1045,34 +1045,120 @@ func TestCheckAcceptanceDerivedModeRefusesOptionShapedCommits(t *testing.T) {
 }
 
 // Outside a repository the binding still degrades to the stated non-check:
-// the default adds a lane, it does not remove the honest note.
+// the default adds a lane, it does not remove the honest note. The degraded
+// mode is also NAMED on the checked: line, in both milestone states, so a
+// reader sees an unbound run without inferring it from a missing note.
 func TestCheckAcceptanceOutsideRepoKeepsTheNote(t *testing.T) {
-	design := writeAcceptFixture(t, nil)
-	if head := gitHeadAt(design); head != "" {
-		t.Fatalf("the fixture must sit outside a git repository, got HEAD %s", head)
-	}
-	g := CheckAcceptance(design, "")
-	if !strings.Contains(strings.Join(g.Notes, "\n"), "not inside a git repository") {
-		t.Fatalf("the unchecked binding must state itself: %v", g.Notes)
-	}
-	if strings.Contains(checkedLine(g), "commit under review") {
-		t.Errorf("nothing was resolved, so nothing may claim provenance: %q", checkedLine(g))
+	openPlan := strings.Replace(acceptPlan, "Status: closed\n", "", 1)
+	for _, tc := range []struct {
+		name  string
+		files map[string]string
+	}{
+		{name: "closed milestone", files: nil},
+		{name: "open milestone", files: map[string]string{"BUILD.md": openPlan}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			design := writeAcceptFixture(t, tc.files)
+			if head := gitHeadAt(design); head != "" {
+				t.Fatalf("the fixture must sit outside a git repository, got HEAD %s", head)
+			}
+			g := CheckAcceptance(design, "")
+			if !strings.Contains(strings.Join(g.Notes, "\n"), "not inside a git repository") {
+				t.Fatalf("the unchecked binding must state itself: %v", g.Notes)
+			}
+			if want := "evidence commits UNBOUND to git history"; !strings.Contains(checkedLine(g), want) {
+				t.Errorf("the degraded binding mode must be on the checked line: %q", checkedLine(g))
+			}
+			if strings.Contains(checkedLine(g), "bound by ancestry") || strings.Contains(checkedLine(g), "bound by identity") {
+				t.Errorf("nothing was resolved, so no binding rule may be claimed: %q", checkedLine(g))
+			}
+			if g.Counts["commit bindings verified"] != 0 {
+				t.Errorf("nothing may be reported as bound: %+v", g.Counts)
+			}
+		})
 	}
 }
 
-// A design with nothing closed resolves no commit at all: the gate must not
-// shell out, and must not claim a provenance for a binding it never made.
-func TestCheckAcceptanceNoClosedMilestoneResolvesNoCommit(t *testing.T) {
-	repo := t.TempDir()
-	initGitRepo(t, repo)
-	plan := strings.Replace(acceptPlan, "Status: closed\n", "", 1)
-	design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), map[string]string{"BUILD.md": plan})
-	g := CheckAcceptance(design, "")
-	if len(g.Errs) != 0 {
-		t.Fatalf("evidence for an open milestone is not a finding: %v", g.Errs)
-	}
-	if strings.Contains(checkedLine(g), "commit under review") || len(g.Notes) != 0 {
-		t.Errorf("nothing is bound, so nothing is said: checked=%q notes=%v", checkedLine(g), g.Notes)
+// MAC-fs9e. The evidence commit is held to this history in BOTH milestone
+// states. Binding used to run only inside the closed-milestone loop, and the
+// commit was not even resolved unless something was closed, so acceptance
+// evidence on an OPEN milestone could name a sha no repository holds and Ga
+// reported ok with no finding and no binding mode on the checked: line.
+func TestCheckAcceptanceBindsEvidenceCommitInBothMilestoneStates(t *testing.T) {
+	openPlan := strings.Replace(acceptPlan, "Status: closed\n", "", 1)
+	for _, tc := range []struct {
+		name    string
+		open    bool
+		commit  func(gitFixture) string
+		wantErr string // "" means the binding must hold
+	}{
+		{
+			name:    "unresolvable commit, open milestone",
+			open:    true,
+			commit:  func(gitFixture) string { return acceptedCommit },
+			wantErr: "names no commit in the repository holding the design",
+		},
+		{
+			name:    "unresolvable commit, closed milestone",
+			commit:  func(gitFixture) string { return acceptedCommit },
+			wantErr: "names no commit in the repository holding the design",
+		},
+		{
+			name:    "non-ancestor commit, open milestone",
+			open:    true,
+			commit:  func(f gitFixture) string { return f.side },
+			wantErr: "is not an ancestor of history anchor",
+		},
+		{
+			name:    "non-ancestor commit, closed milestone",
+			commit:  func(f gitFixture) string { return f.side },
+			wantErr: "is not an ancestor of history anchor",
+		},
+		{
+			name:   "ancestor commit, open milestone",
+			open:   true,
+			commit: func(f gitFixture) string { return f.root },
+		},
+		{
+			name:   "ancestor commit, closed milestone",
+			commit: func(f gitFixture) string { return f.root },
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			f := initGitHistory(t, repo)
+			files := map[string]string{
+				// quoted for the same reason writeAncestryFixture quotes: a
+				// live abbreviation can be purely numeric
+				"acceptance/M0.yaml": strings.Replace(acceptEvidenceM0, "commit: "+acceptedCommit, "commit: \""+tc.commit(f)+"\"", 1),
+			}
+			if tc.open {
+				files["BUILD.md"] = openPlan
+			}
+			design := writeAcceptFixtureIn(t, filepath.Join(repo, "design"), files)
+			g := CheckAcceptance(design, "")
+			if want := "derived from git HEAD of the repository holding the design; evidence commit bound by ancestry"; !strings.Contains(checkedLine(g), want) {
+				t.Errorf("the binding mode must be visible whatever the milestone state: %q", checkedLine(g))
+			}
+			if tc.wantErr != "" {
+				if !strings.Contains(strings.Join(g.Errs, "\n"), tc.wantErr) {
+					t.Fatalf("want an error containing %q, got %v", tc.wantErr, g.Errs)
+				}
+				if g.Counts["commit bindings verified"] != 0 {
+					t.Errorf("a failed binding may not be counted as verified: %+v", g.Counts)
+				}
+				return
+			}
+			if len(g.Errs) != 0 {
+				t.Fatalf("the reviewed commit is in this history: %v", g.Errs)
+			}
+			if g.Counts["commit bindings verified"] != 1 {
+				t.Errorf("the evidence commit must be bound, not merely read: %+v", g.Counts)
+			}
+			if len(g.Notes) != 0 {
+				t.Errorf("a bound commit needs no note: %v", g.Notes)
+			}
+		})
 	}
 }
 

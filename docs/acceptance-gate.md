@@ -96,7 +96,10 @@ things, the way forcing `gp`, `gi`, or `gn` is.
   the table therefore invalidates the old evidence instead of silently changing its meaning.
 - **The evidence binds to the commit**, under one of two rules. Which one applies depends on where
   the commit under review came from, and the `checked:` line always names it, so the rule in force
-  is never inferred from the absence of a note. See "The two binding modes" below.
+  is never inferred from the absence of a note. See "The two binding modes" below. The binding is
+  checked on every acceptance file whose milestone the plan declares, whatever that milestone's
+  status: an OPEN milestone's evidence names a reviewed commit exactly as a closed one does, and a
+  sha this repository does not hold names no tree in either state.
 - **Milestone numbers are unambiguous.** Evidence is keyed by number alone. Root `BUILD.md` is the
   sole plan and acceptance authority; bounded `BUILD/*.md` execution packets cannot declare
   milestones, so a packet cannot silently introduce a second acceptance target.
@@ -135,8 +138,11 @@ and a commit from a branch this history never took, while allowing evidence-bear
 later milestone closures to follow the implementation commits they reviewed.
 
 **Neither.** Outside a git repository, or with no usable git, the binding degrades to a
-non-blocking note naming what was not checked, never to a silent pass. Complete mode remains
-fail-closed because it requires a resolvable history anchor.
+non-blocking note naming what was not checked, never to a silent pass. The degraded mode is a
+mode like the other three, so the `checked:` line names it too: `no commit under review could be
+derived; evidence commits UNBOUND to git history`. A reader never has to infer an unbound run
+from a missing note. Complete mode remains fail-closed because it requires a resolvable history
+anchor.
 
 Everything else is attested: whether the DoD was really met, whether the attestations are true,
 whether the findings list is complete. Ga is the record that someone with a name looked, on a
