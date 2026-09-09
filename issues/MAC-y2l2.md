@@ -7,11 +7,11 @@ type: bug
 parent: MAC-ui8a
 created_at: 2026-09-08T02:21:09Z
 created_by: ramirosalas
-updated_at: 2026-09-08T15:22:20Z
+updated_at: 2026-09-09T16:17:12Z
 content_hash: "sha256:9eebc29f415cb04f14c110c53dbd32ba3846478dab4c8b0461e186942023e8f5"
 assignee: dev-MAC-y2l2
 follows: [MAC-3hzt, MAC-r0hy]
-labels: [delivered]
+labels: [delivered, accepted]
 ---
 
 ## Description
