@@ -1,14 +1,16 @@
 ---
 id: MAC-9zpf
 title: "update: Claude Code plugin inventory rejected for unknown fields (enabled, installPath, installedAt, lastUpdated, mcpServers, version)"
-status: in_progress
+status: closed
 priority: 0
 type: bug
 labels: [install, update, claude-code, field-defect]
 created_at: 2026-09-09T00:49:00Z
 created_by: ramirosalas
-updated_at: 2026-09-09T16:06:00Z
-content_hash: "sha256:48af5e4879c7caa780c21f77048b43a3373ecdfa97cde81f59ae151f3f6672bd"
+updated_at: 2026-09-09T16:18:44Z
+content_hash: "sha256:164a88b0a5f55dd051c0564c7ccb2a06703d1e36ed8105f4c8accc9d1ffe536c"
+closed_at: 2026-09-09T16:18:44Z
+close_reason: "Fixed on main at 69e54b0: Claude plugin entries read as an open record (requirePresentPluginFields); 2026-09-08 inventory pinned as claudePluginInventoryFixture. Field verification follows the v0.7.1 release."
 ---
 
 ## Description
@@ -39,6 +41,7 @@ Read the inventory as an open record for the fields machinery does not consume (
 
 ## History
 - 2026-09-09T16:06:00Z status: open -> in_progress
+- 2026-09-09T16:18:44Z status: in_progress -> closed
 
 ## Links
 
