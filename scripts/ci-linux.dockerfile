@@ -69,4 +69,8 @@ COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 # treats any unexpected diagnostic as a failed identity (evidence run on the
 # Linux VM, 2026-09-09).
 ENV GOFLAGS=-buildvcs=false LANG=C.UTF-8 LC_ALL=C.UTF-8
+# The worktree is bind-mounted from a host user; git in the container refuses
+# to read a repository owned by another uid, and the lane's guarded jobs stamp
+# VCS status on every build. Trust the one mount point the runner uses.
+RUN git config --system --add safe.directory /src
 WORKDIR /src

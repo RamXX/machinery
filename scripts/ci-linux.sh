@@ -75,6 +75,15 @@ docker build --platform "$platform" -f scripts/ci-linux.dockerfile -t "$image" \
 evidence=$(mktemp -d)
 say "evidence directory: $evidence"
 
+# The lane's checker tests bind-mount their own temp directories into checker
+# containers. Those mounts are resolved by the HOST daemon, so a temp path that
+# exists only inside this container cannot be mounted ("bind source path does
+# not exist"). Mount one host directory at the same absolute path on both
+# sides and make it TMPDIR, so every temp path the tests create exists
+# identically on the host.
+shared_tmp=$(mktemp -d)
+say "shared TMPDIR (same path on host and container): $shared_tmp"
+
 # Caches live in named volumes: the run must not leave container-owned build
 # artifacts in the worktree, and a cold module cache is the slowest part of a
 # repeat run.
@@ -90,6 +99,8 @@ run_in_container() {
     ${ERL_FLAGS:+-e ERL_FLAGS="$ERL_FLAGS"} \
     -e GOCACHE=/gocache -e GOMODCACHE=/gomodcache \
     -e MACHINERY_INTEGRATION_REPORT_DIR=/evidence \
+    -e TMPDIR="$shared_tmp" \
+    -v "$shared_tmp:$shared_tmp" \
     -v "$repo_root:/src" \
     -v "$evidence:/evidence" \
     -v machinery-ci-linux-gocache:/gocache \
@@ -116,3 +127,4 @@ run_in_container 'go run ./scripts/integration-lane --lane required' || lane_sta
 
 printf '\n\033[32mci-linux OK: race sweep and required lane reproduced on %s with %s CPUs.\033[0m\n' "$platform" "$cpus"
 printf 'lane evidence retained in %s\n' "$evidence"
+rm -rf -- "$shared_tmp"
