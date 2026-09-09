@@ -63,6 +63,10 @@ RUN npm install -g typescript@7.0.2
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 
 # The lane and the sweep both write under the module cache; keep it inside the
-# image so a cold container does not re-download on every run.
-ENV GOFLAGS=-buildvcs=false
+# image so a cold container does not re-download on every run. The BEAM reads
+# its filename encoding from the locale: without a UTF-8 locale `elixir
+# --version` prints a latin1 warning on stderr, and the lane's runtime probe
+# treats any unexpected diagnostic as a failed identity (evidence run on the
+# Linux VM, 2026-09-09).
+ENV GOFLAGS=-buildvcs=false LANG=C.UTF-8 LC_ALL=C.UTF-8
 WORKDIR /src

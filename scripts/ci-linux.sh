@@ -81,27 +81,38 @@ say "evidence directory: $evidence"
 docker volume create machinery-ci-linux-gocache >/dev/null
 docker volume create machinery-ci-linux-gomodcache >/dev/null
 
-say "hosted ci test job + integration-required job on $cpus CPUs"
-docker run --rm --platform "$platform" --cpus "$cpus" --cpuset-cpus "$cpuset" \
-  -e GOMAXPROCS="$cpus" \
-  ${ERL_FLAGS:+-e ERL_FLAGS="$ERL_FLAGS"} \
-  -e GOCACHE=/gocache -e GOMODCACHE=/gomodcache \
-  -e MACHINERY_INTEGRATION_REPORT_DIR=/evidence \
-  -v "$repo_root:/src" \
-  -v "$evidence:/evidence" \
-  -v machinery-ci-linux-gocache:/gocache \
-  -v machinery-ci-linux-gomodcache:/gomodcache \
-  -v "$socket:/var/run/docker.sock" \
-  -w /src "$image" \
-  bash -euo pipefail -c '
-    go version
-    node --version
-    python3 --version
-    elixir --version
-    tsc --version
-    go test -race -count=1 ./... -timeout=30m
-    go run ./scripts/integration-lane --lane required
-  ' || fail "the containerized race sweep or required lane failed (evidence: $evidence)"
+# The two hosted jobs are independent: a red sweep must not hide the lane's
+# verdict, and a red lane must not hide the sweep's. Run both, then fail on
+# either, the way the hosted workflow reports two separate jobs.
+run_in_container() {
+  docker run --rm --platform "$platform" --cpus "$cpus" --cpuset-cpus "$cpuset" \
+    -e GOMAXPROCS="$cpus" \
+    ${ERL_FLAGS:+-e ERL_FLAGS="$ERL_FLAGS"} \
+    -e GOCACHE=/gocache -e GOMODCACHE=/gomodcache \
+    -e MACHINERY_INTEGRATION_REPORT_DIR=/evidence \
+    -v "$repo_root:/src" \
+    -v "$evidence:/evidence" \
+    -v machinery-ci-linux-gocache:/gocache \
+    -v machinery-ci-linux-gomodcache:/gomodcache \
+    -v "$socket:/var/run/docker.sock" \
+    -w /src "$image" \
+    bash -euo pipefail -c "$1"
+}
+
+say "runtime identities inside the container"
+run_in_container 'go version; node --version; python3 --version; elixir --version; tsc --version' ||
+  fail "the container does not carry the pinned runtimes"
+
+sweep_status=0
+say "hosted ci test job on $cpus CPUs: go test -race -count=1 ./... -timeout=30m"
+run_in_container 'go test -race -count=1 ./... -timeout=30m' || sweep_status=$?
+
+lane_status=0
+say "hosted integration-required job on $cpus CPUs: go run ./scripts/integration-lane --lane required"
+run_in_container 'go run ./scripts/integration-lane --lane required' || lane_status=$?
+
+[ "$sweep_status" -eq 0 ] || fail "the containerized race sweep failed (status $sweep_status; lane status $lane_status; evidence: $evidence)"
+[ "$lane_status" -eq 0 ] || fail "the containerized required lane failed (status $lane_status; evidence: $evidence)"
 
 printf '\n\033[32mci-linux OK: race sweep and required lane reproduced on %s with %s CPUs.\033[0m\n' "$platform" "$cpus"
 printf 'lane evidence retained in %s\n' "$evidence"

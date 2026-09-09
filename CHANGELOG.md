@@ -6,6 +6,20 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`make ci-linux` carries a UTF-8 locale and reports both hosted jobs.** The first end-to-end
+  run on a linux/amd64 VM (2026-09-09) showed two container defects: the image had no locale, so
+  `elixir --version` printed the BEAM's latin1 warning on stderr and the lane's runtime probe
+  rejected the Elixir identity (`TestAssuranceCatalogNativeSkipCannotBecomeSuccess` and the
+  required lane both fail on that diagnostic); and the sweep and the lane ran in one `set -e`
+  shell, so a red sweep hid the lane's verdict. The image now sets `LANG` and `LC_ALL` to
+  `C.UTF-8`, and the script runs the sweep and the lane as two container invocations and fails on
+  either, the way hosted CI reports two jobs. Known residual, recorded on MAC-33sp: inside the
+  container the directory ABA witness in `scripts/tree-inventory` is blind on a coarse-timestamp
+  filesystem (two of its tests fail there and pass on the hosted runner), so the containerized
+  sweep is not yet a faithful mirror of the hosted test job for that one package.
+
 ## [0.7.1] - 2026-09-09
 
 ### Fixed
