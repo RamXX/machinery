@@ -110,9 +110,9 @@ attestations:
     kind: current
     attestor: coordinator
     date: 2026-09-09
-    note: 'Re-review after the dependency bump of golang.org/x/crypto 0.55.0 to 0.56.0 and the go directive 1.26 to 1.26.0 in examples/go-crm/impl (go.mod, go.sum only; no source or test change). Scope unchanged from the 2026-09-06 review: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; go test ./... green over the full impl on 2026-09-09 (session, testoracle). Bounded: content-hash-bound scope review, not authenticated execution replay.'
+    note: 'Re-review after the dependency bump of golang.org/x/crypto 0.55.0 to 0.56.0 and the go directive 1.26 to 1.26.0 in examples/go-crm/impl (go.mod, go.sum only; no source or test change), and over the covered BUILD.md whose dependency pins were realigned to that authoritative go.mod (v0.55.0 to v0.56.0, go 1.26 to go 1.26.0; pin text only, no design change). Scope unchanged from the 2026-09-06 review: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; go test ./... green over the full impl on 2026-09-09 (session, testoracle). Bounded: content-hash-bound scope review, not authenticated execution replay.'
     covers:
-      - {path: BUILD.md, hash: sha256:b8c4e1e88825f43dae1a543831ce66c865d58db7440335e5072d64e5769d5a89}
+      - {path: BUILD.md, hash: sha256:2a70a7fde32d6ddf245b3e34d95d679474947b0695625064bef6864ce1b67206}
     implementation:
       root: ../impl
       policy: full-root-v1
@@ -344,10 +344,10 @@ attestations:
   - claim: g4.zero-context
     kind: plan
     attestor: coordinator
-    date: 2026-09-06
-    note: 'Re-reviewed 2026-09-06 over the corrected BUILD (bounded parser-backed suite evidence, declared rebuild migration context, x/crypto pin aligned to impl/go.mod); zero-context plan judgment stands over the corrected build document.'
+    date: 2026-09-09
+    note: 'Re-reviewed 2026-09-09 over the corrected BUILD (bounded parser-backed suite evidence, declared rebuild migration context, x/crypto pin realigned to impl/go.mod after the 0.55.0 to 0.56.0 bump); the only change since the 2026-09-06 review is dependency pin text, so the zero-context plan judgment stands over the corrected build document.'
     covers:
-      - {path: BUILD.md, hash: sha256:b8c4e1e88825f43dae1a543831ce66c865d58db7440335e5072d64e5769d5a89}
+      - {path: BUILD.md, hash: sha256:2a70a7fde32d6ddf245b3e34d95d679474947b0695625064bef6864ce1b67206}
   - claim: ga.review-quality
     kind: historical
     attestor: Codex release acceptance review

@@ -51,7 +51,14 @@ const (
 	// reReviewPrefix marks rows whose covered bytes changed (BUILD.md edits
 	// here, or the accepted MAC-lhu5 portfolio repair) and were therefore
 	// re-reviewed by the coordinator for this story.
-	reReviewPrefix     = "Re-reviewed 2026-09-06 over the corrected BUILD"
+	reReviewPrefix = "Re-reviewed 2026-09-06 over the corrected BUILD"
+	// crmBumpDate/crmBumpPrefix pin the two go-crm rows covering BUILD.md.
+	// They moved off reviewDate when the dependabot bump of
+	// golang.org/x/crypto (0.55.0 to 0.56.0) staled the pin text BUILD.md
+	// quotes from the authoritative impl/go.mod, forcing a re-review of the
+	// corrected document and of the bumped implementation root.
+	crmBumpDate        = "2026-09-09"
+	crmBumpPrefix      = "Re-reviewed 2026-09-09 over the corrected BUILD"
 	portfolioRenewal   = "Renews the 2026-09-02 Codex deterministic design review"
 	planOnlyWarnPrefix = "plan only; current implementation review missing"
 )
@@ -153,8 +160,8 @@ func expectedMigration() map[string][]migratedRow {
 	goCrm := planRows(g2Claims, origCodexCRM, "2026-09-02", []string{"ARCHITECTURE.md"})
 	goCrm = append(goCrm, planRows(g3Claims, origCodexCRM, "2026-09-02", crmMachines)...)
 	goCrm = append(goCrm,
-		migratedRow{claim: "gt.conformance-test-shape", kind: "current", attestor: coordinator, date: reviewDate, covers: []string{"BUILD.md"}},
-		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: coordinator, date: reviewDate, note: reReviewPrefix, covers: []string{"BUILD.md"}},
+		migratedRow{claim: "gt.conformance-test-shape", kind: "current", attestor: coordinator, date: crmBumpDate, covers: []string{"BUILD.md"}},
+		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: coordinator, date: crmBumpDate, note: crmBumpPrefix, covers: []string{"BUILD.md"}},
 		migratedRow{claim: "ga.review-quality", kind: "historical", attestor: origAccept, date: "2026-09-03", covers: acceptance},
 	)
 
@@ -390,7 +397,7 @@ func TestExampleAttestationMigration(t *testing.T) {
 			t.Errorf("go-crm BUILD.md must not assert whole-design greenfield; the design declares a rebuild/prototype migration with disposable nonproduction seed data")
 		}
 		if strings.Contains(goCrm, "v0.53.0") {
-			t.Errorf("go-crm BUILD.md pins the stale x/crypto v0.53.0; the authoritative impl/go.mod pins v0.55.0")
+			t.Errorf("go-crm BUILD.md pins the stale x/crypto v0.53.0; the authoritative pin is whatever impl/go.mod carries")
 		}
 		modBody, err := os.ReadFile(filepath.Join(root, "examples", "go-crm", "impl", "go.mod"))
 		if err != nil {

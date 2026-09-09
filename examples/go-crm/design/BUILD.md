@@ -1070,9 +1070,9 @@ message must direct the user to `crm restore` (COMM-b9aee2). Both are covered in
 Pin the environment so two implementing agents cannot diverge. The source of truth for pins is
 `impl/go.mod`.
 
-- Go 1.26 (`go 1.26` in `impl/go.mod`); one statically linked binary.
+- Go 1.26 (`go 1.26.0` in `impl/go.mod`); one statically linked binary.
 - `github.com/LadybugDB/go-ladybug` v0.17.0, imported only by `internal/repo/**` (C-ARCH-01).
-- `golang.org/x/crypto` v0.55.0 for argon2id (`golang.org/x/crypto/argon2`), matching the
+- `golang.org/x/crypto` v0.56.0 for argon2id (`golang.org/x/crypto/argon2`), matching the
   authoritative `impl/go.mod` pin.
 - Tests: the Go stdlib `testing` package only (no assertion or mocking libraries); integration
   tests run against a real temporary LadybugDB directory, no mocks.
