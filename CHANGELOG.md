@@ -96,6 +96,32 @@ under their version heading when a release is cut.
   other direction is unaffected: 0.7.1 reads a pre-upgrade ledger normally and only declines to
   reclaim it.
 
+### Changed
+
+- **The gate is tiered: cheap on every push, heavy where it is enforced.** Releasing a one-line
+  patch cost a 50-minute local gate per push, while five of the failures that broke the 0.7.0
+  release night were hosted-CI-only and invisible to it (MAC-qo6n). The push gate is now
+  `scripts/preflight-fast.sh`, the single owner of the cheap tier and the only thing
+  `.githooks/pre-push` runs: the aggregate whitespace diff, gofmt, `go vet`, golangci-lint for the
+  host and for `GOOS=linux`, actionlint, ShellCheck, `go mod tidy`, the docs gate, the Modelith
+  render check, the build, the example gate suites, and the golden corpus plus the gate-experiment
+  suite. Measured at 1m25s on the documented host class, against a 5-minute budget. There is still
+  no bypass variable, in either tier. `scripts/preflight.sh` keeps its role as the full local
+  mirror and now runs the cheap tier first, then the heavy tier unchanged (race sweep, required
+  native lane, implementation modules, formal verification, C4, external checkers). Hosted CI is
+  unchanged and remains authoritative for the heavy tier; the required job set and
+  `docs/release-policy.json` are untouched, so release publication is gated exactly as before.
+- **`make ci-linux` produces the Linux evidence before the push, not after it.** The hosted
+  `test` and `integration-required` jobs now run locally inside a pinned 2-CPU `linux/amd64`
+  container that carries the exact runtime identities `.github/actions/assurance-runtimes`
+  installs (Go 1.27.1, Node 26.8.1 with TypeScript 7.0.2, CPython 3.14.7, Elixir 1.20.4 on OTP
+  29.0.6), with the cpuset pinned so a runtime that sizes its scheduler from the visible core
+  count sees two cores the way the hosted runner does. `CONTRIBUTING.md` names it as the step
+  before any push that touches custody, the TDD adapters, or the lane, and states what the
+  container does and does not reproduce. The container runs the sweep as root; running it as an
+  unprivileged user, and moving the fsync-bound install suite and the load-sensitive custody
+  suites out of the parallel sweep into the lane with fixed budgets, stay open under MAC-qo6n.
+
 ## [0.7.0] - 2026-09-08
 
 ### Fixed
