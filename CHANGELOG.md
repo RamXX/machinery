@@ -15,7 +15,7 @@ under their version heading when a release is cut.
   required lane both fail on that diagnostic); and the sweep and the lane ran in one `set -e`
   shell, so a red sweep hid the lane's verdict. The image now sets `LANG` and `LC_ALL` to
   `C.UTF-8`, and the script runs the sweep and the lane as two container invocations and fails on
-  either, the way hosted CI reports two jobs. Known residual, recorded on MAC-33sp: inside the
+  either, the way hosted CI reports two jobs. Known residual: inside the
   container the directory ABA witness in `scripts/tree-inventory` is blind on a coarse-timestamp
   filesystem (two of its tests fail there and pass on the hosted runner), so the containerized
   sweep is not yet a faithful mirror of the hosted test job for that one package.
@@ -29,7 +29,7 @@ under their version heading when a release is cut.
   the fields Claude Code now adds (`enabled`, `installPath`, `installedAt`, `lastUpdated`,
   `mcpServers`, `version`), so on 0.7.0 every Claude Code user saw `Claude Code plugin inventory
   was not understood: Claude plugin entry 0 has unknown fields [...]`, the update returned an
-  error, and the plugin never refreshed (MAC-9zpf). machinery consumes `id` and `scope` only;
+  error, and the plugin never refreshed. machinery consumes `id` and `scope` only;
   the entry is now an open record for the fields it does not read, and it still fails closed
   when a consumed field is absent or malformed. The exact inventory Claude Code wrote on
   2026-09-08 is pinned as a fixture. The Codex inventory reader is unchanged: it is still a
@@ -38,8 +38,8 @@ under their version heading when a release is cut.
   the previous release.** After `machinery update --version v0.7.0` on a 0.6.11 install, doctor
   reported the installed skill and the build-writer role as invalid (`artifact digest is
   sha256:e2262eda..., want receipt-bound sha256:cc1d8dd4...`) although every file on disk was
-  byte-identical to the release, and a second update converged (MAC-d3ov). Cause: 0.7.0 moved
-  receipt finalization from the placement child to the update parent (MAC-2u36), but on a
+  byte-identical to the release, and a second update converged. Cause: 0.7.0 moved
+  receipt finalization from the placement child to the update parent, but on a
   cross-version update the parent is the old binary and the child is the new one. A 0.6.11
   parent never finalizes, and the 0.7.0 child left the receipt to a parent that would not write
   it, so the committed receipt still carried the 0.6.11 digests. The parent now announces to its
@@ -59,7 +59,7 @@ under their version heading when a release is cut.
   milestone still open was parsed, schema-checked and held to its DoD ids, and then its `commit:`
   field was never asked to name anything: `design/acceptance/M1.yaml` carrying a fabricated 40-hex
   sha, on an open M1, reported `Ga-accept ok` with no finding, and the `checked:` line named no
-  binding mode because no commit had been resolved to name one (MAC-fs9e). The resolution and
+  binding mode because no commit had been resolved to name one. The resolution and
   ancestry path existed and worked; on an open milestone nothing reached it. The evidence commit
   is now bound for every acceptance file whose milestone the plan declares, whatever that
   milestone's status, with the diagnostics the closed path already used: a sha the repository
@@ -102,7 +102,7 @@ under their version heading when a release is cut.
 
 - **The gate is tiered: cheap on every push, heavy where it is enforced.** Releasing a one-line
   patch cost a 50-minute local gate per push, while five of the failures that broke the 0.7.0
-  release night were hosted-CI-only and invisible to it (MAC-qo6n). The push gate is now
+  release night were hosted-CI-only and invisible to it. The push gate is now
   `scripts/preflight-fast.sh`, the single owner of the cheap tier and the only thing
   `.githooks/pre-push` runs: the aggregate whitespace diff, gofmt, `go vet`, golangci-lint for the
   host and for `GOOS=linux`, actionlint, ShellCheck, `go mod tidy`, the docs gate, the Modelith
@@ -122,7 +122,7 @@ under their version heading when a release is cut.
   before any push that touches custody, the TDD adapters, or the lane, and states what the
   container does and does not reproduce. The container runs the sweep as root; running it as an
   unprivileged user, and moving the fsync-bound install suite and the load-sensitive custody
-  suites out of the parallel sweep into the lane with fixed budgets, stay open under MAC-qo6n.
+  suites out of the parallel sweep into the lane with fixed budgets, stay open.
 
 ### Compatibility and migration
 

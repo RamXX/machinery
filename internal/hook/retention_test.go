@@ -394,8 +394,13 @@ func TestCompactionExcludesConcurrentEnumerationInAnotherProcess(t *testing.T) {
 			time.Sleep(time.Millisecond)
 		}
 	}
-	if enumerations < 5 {
-		t.Fatalf("the parent enumerated the store only %d time(s) while the child compacted it", enumerations)
+	// The count is a liveness witness that the two processes overlapped, not
+	// a timing budget: the property under test is that no enumeration failed
+	// while the child compacted. On the hosted macOS runner the parent
+	// enumerated a 1200-entry store only 3 times before a compaction of the
+	// same store finished, so any positive count is the proof.
+	if enumerations < 1 {
+		t.Fatalf("the parent never enumerated the store while the child compacted it")
 	}
 	remaining, err := countHookStateEntries(dir)
 	if err != nil {
