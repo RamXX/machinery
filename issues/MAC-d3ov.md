@@ -1,14 +1,14 @@
 ---
 id: MAC-d3ov
 title: "doctor reports a fresh 0.7.0 install as invalid: receipt-bound artifact digest differs from the recomputed digest"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [install, doctor, field-defect]
 created_at: 2026-09-09T00:50:33Z
 created_by: ramirosalas
 updated_at: 2026-09-09T16:06:01Z
-content_hash: "sha256:1c17cef2e44fe121d9d72c11019604b8dfeccb1d9246287a1696181064d53f5f"
+content_hash: "sha256:223ce3a4189c3a7caa1b863d50eb545f41c51b8831adb04b31c5e1bfe66ab47c"
 ---
 
 ## Description
@@ -41,7 +41,7 @@ Reproduce with a fresh HOME (install from the v0.7.0 release, run doctor), unify
 
 
 ## History
-
+- 2026-09-09T16:06:01Z status: open -> in_progress
 
 ## Links
 
