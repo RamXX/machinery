@@ -1,14 +1,14 @@
 ---
 id: MAC-9zpf
 title: "update: Claude Code plugin inventory rejected for unknown fields (enabled, installPath, installedAt, lastUpdated, mcpServers, version)"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [install, update, claude-code, field-defect]
 created_at: 2026-09-09T00:49:00Z
 created_by: ramirosalas
 updated_at: 2026-09-09T16:06:00Z
-content_hash: "sha256:6b8d9d757934067d77b09e6c498b07c4ced0d47a9946f45db95b1fdb60a5b494"
+content_hash: "sha256:48af5e4879c7caa780c21f77048b43a3373ecdfa97cde81f59ae151f3f6672bd"
 ---
 
 ## Description
@@ -38,7 +38,7 @@ Read the inventory as an open record for the fields machinery does not consume (
 
 
 ## History
-
+- 2026-09-09T16:06:00Z status: open -> in_progress
 
 ## Links
 
