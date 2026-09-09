@@ -695,7 +695,12 @@ func claudeMachineryScopes(raw string) ([]string, error) {
 	found := map[string]bool{}
 	validScope := map[string]bool{"managed": true, "user": true, "project": true, "local": true}
 	for i, entry := range entries {
-		if err := requirePluginFields(entry, []string{"id", "scope"}, fmt.Sprintf("Claude plugin entry %d", i)); err != nil {
+		// Claude Code owns this record and adds fields between releases
+		// (enabled, installPath, installedAt, lastUpdated, mcpServers,
+		// version, ...). machinery consumes id and scope only, so the entry
+		// is an open record: absent or malformed consumed fields fail closed,
+		// fields machinery does not read are ignored.
+		if err := requirePresentPluginFields(entry, []string{"id", "scope"}, fmt.Sprintf("Claude plugin entry %d", i)); err != nil {
 			return nil, err
 		}
 		var id, scope string
@@ -928,6 +933,18 @@ func decodePluginInventory(raw string, destination any) error {
 			err = fmt.Errorf("trailing JSON value")
 		}
 		return err
+	}
+	return nil
+}
+
+// requirePresentPluginFields validates an open object schema: every required
+// field must be present, and fields the caller does not consume are ignored.
+// Use it for records another tool owns and extends between its releases.
+func requirePresentPluginFields(object map[string]json.RawMessage, required []string, context string) error {
+	for _, key := range required {
+		if _, ok := object[key]; !ok {
+			return fmt.Errorf("%s is missing required field %q", context, key)
+		}
 	}
 	return nil
 }

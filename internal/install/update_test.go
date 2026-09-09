@@ -782,6 +782,10 @@ func TestClaudePluginInventoryScopes(t *testing.T) {
 		{"user only", `[{"id":"machinery@machinery","scope":"user"}]`, []string{"user"}},
 		{"managed only", `[{"id":"machinery@machinery","scope":"managed"}]`, []string{"managed"}},
 		{"canonical multi scope", `[{"id":"machinery@machinery","scope":"local"},{"id":"machinery@machinery","scope":"managed"},{"id":"machinery@machinery","scope":"project"},{"id":"machinery@machinery","scope":"user"}]`, []string{"managed", "user", "project", "local"}},
+		// MAC-9zpf: Claude Code 2.x writes an entry superset; machinery reads
+		// id and scope and must accept the fields it does not consume.
+		{"current Claude Code superset entry", claudePluginInventoryFixture, []string{"user"}},
+		{"unknown field on a foreign entry", `[{"id":"other@market","scope":"user","future":{"nested":[1,2]}}]`, nil},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -796,16 +800,53 @@ func TestClaudePluginInventoryScopes(t *testing.T) {
 	}
 	invalid := []string{
 		`[{"id":"machinery@machinery","id":"other@market","scope":"user"}]`,
-		`[{"id":"machinery@machinery","scope":"user","extra":true}]`,
 		`[{"id":"machinery@machinery","scope":"user"},{"id":"machinery@machinery","scope":"user"}]`,
 		`[{"id":"machinery@machinery","scope":"user"}] {}`,
+		`[{"id":"machinery@machinery","enabled":true}]`,
+		`[{"scope":"user","enabled":true}]`,
+		`[{"id":"machinery@machinery","scope":7,"enabled":true}]`,
 	}
 	for _, raw := range invalid {
 		if _, err := claudeMachineryScopes(raw); err == nil {
 			t.Fatalf("invalid Claude inventory was accepted: %s", raw)
 		}
 	}
+	if _, err := claudeMachineryScopes(`[{"id":"machinery@machinery","enabled":true}]`); err == nil || err.Error() != `Claude plugin entry 0 is missing required field "scope"` {
+		t.Fatalf("missing consumed field diagnostic = %v", err)
+	}
 }
+
+// claudePluginInventoryFixture is the `claude plugin list --json` entry Claude
+// Code wrote on 2026-09-08 for the installed machinery plugin, the exact shape
+// machinery 0.7.0 rejected in the field (MAC-9zpf), beside a foreign entry
+// carrying an mcpServers object.
+const claudePluginInventoryFixture = `[
+  {
+    "id": "atlassian@claude-plugins-official",
+    "version": "798f8138c976",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "/Users/example/.claude/plugins/cache/claude-plugins-official/atlassian/798f8138c976",
+    "installedAt": "2026-08-05T14:32:02.753Z",
+    "lastUpdated": "2026-09-08T16:31:35.492Z",
+    "mcpServers": {
+      "atlassian": {
+        "type": "http",
+        "url": "https://mcp.atlassian.com/v2/mcp"
+      }
+    }
+  },
+  {
+    "id": "machinery@machinery",
+    "version": "0.7.0",
+    "scope": "user",
+    "enabled": false,
+    "installPath": "/Users/example/.claude/plugins/cache/machinery/machinery/0.7.0",
+    "installedAt": "2026-08-05T14:32:12.704Z",
+    "lastUpdated": "2026-09-08T16:31:33.813Z"
+  }
+]
+`
 
 func TestCodexPluginInventoryInstalledStatus(t *testing.T) {
 	tests := []struct {

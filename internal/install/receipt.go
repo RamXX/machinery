@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -260,7 +261,23 @@ func rejectDuplicateJSONKeys(raw []byte) error {
 	return nil
 }
 
-func saveReceipt(receipt installReceipt) (retErr error) {
+// saveReceipt publishes the receipt with every recorded artifact digested
+// from disk; an absent artifact fails the publication (MAC-2u36).
+func saveReceipt(receipt installReceipt) error {
+	return publishReceipt(receipt, false)
+}
+
+// saveReceiptRetainingAbsent publishes the receipt for a delegated placement
+// child whose parent predates parent-side finalization. An artifact absent
+// from disk keeps the digest already recorded for it: a sibling child placed
+// under the same parent transaction may still have to repair it, and the old
+// parent will not inventory the plan afterwards. doctor still reports such an
+// artifact as missing; it is never reported as current.
+func saveReceiptRetainingAbsent(receipt installReceipt) error {
+	return publishReceipt(receipt, true)
+}
+
+func publishReceipt(receipt installReceipt, retainAbsent bool) (retErr error) {
 	receipt.SchemaVersion = receiptSchema
 	normalizeReceipt(&receipt)
 	path, err := installationReceiptPath()
@@ -270,7 +287,7 @@ func saveReceipt(receipt installReceipt) (retErr error) {
 	if len(receipt.HomeInstalls) == 0 && len(receipt.Targets) == 0 && len(receipt.HostPlugins) == 0 {
 		return durableRemove(path)
 	}
-	if err := refreshReceiptArtifacts(&receipt); err != nil {
+	if err := refreshReceiptArtifacts(&receipt, retainAbsent); err != nil {
 		return fmt.Errorf("inventory installed artifacts for receipt: %w", err)
 	}
 	normalizeReceipt(&receipt)
@@ -311,6 +328,16 @@ func recordHomeInstall(homes []string, copyAll bool) error {
 }
 
 func recordHomeInstallLocked(homes []string, copyAll bool) error {
+	return recordHomeInstallLockedWith(homes, copyAll, saveReceipt)
+}
+
+// recordDelegatedHomeInstallLocked records a placement made under a parent
+// that does not finalize the receipt itself (machinery before 0.7.1).
+func recordDelegatedHomeInstallLocked(homes []string, copyAll bool) error {
+	return recordHomeInstallLockedWith(homes, copyAll, saveReceiptRetainingAbsent)
+}
+
+func recordHomeInstallLockedWith(homes []string, copyAll bool, save func(installReceipt) error) error {
 	abs, err := absHomes(homes)
 	if err != nil {
 		return err
@@ -325,7 +352,7 @@ func recordHomeInstallLocked(homes []string, copyAll bool) error {
 	if err := receipt.setHomeInstall(homeInstall{Homes: abs, Copy: copyAll}); err != nil {
 		return err
 	}
-	return saveReceipt(receipt)
+	return save(receipt)
 }
 
 // setHomeInstall retains same-canonical replacement semantics without moving
@@ -355,6 +382,16 @@ func (receipt *installReceipt) setHomeInstall(next homeInstall) error {
 }
 
 func recordTargetInstallLocked(names []string, copyAll bool) error {
+	return recordTargetInstallLockedWith(names, copyAll, saveReceipt)
+}
+
+// recordDelegatedTargetInstallLocked records a placement made under a parent
+// that does not finalize the receipt itself (machinery before 0.7.1).
+func recordDelegatedTargetInstallLocked(names []string, copyAll bool) error {
+	return recordTargetInstallLockedWith(names, copyAll, saveReceiptRetainingAbsent)
+}
+
+func recordTargetInstallLockedWith(names []string, copyAll bool, save func(installReceipt) error) error {
 	set, err := parseTargets(names)
 	if err != nil {
 		return err
@@ -368,7 +405,7 @@ func recordTargetInstallLocked(names []string, copyAll bool) error {
 			receipt.setTargetInstall(targetInstall{Target: string(target), Copy: copyAll})
 		}
 	}
-	return saveReceipt(receipt)
+	return save(receipt)
 }
 
 func (receipt *installReceipt) setTargetInstall(next targetInstall) {
@@ -766,16 +803,24 @@ func normalizeReceipt(receipt *installReceipt) {
 	})
 }
 
-func refreshReceiptArtifacts(receipt *installReceipt) error {
+func refreshReceiptArtifacts(receipt *installReceipt, retainAbsent bool) error {
 	paths, err := receiptArtifactPaths(*receipt)
 	if err != nil {
 		return err
+	}
+	recorded := make(map[string]string, len(receipt.Artifacts))
+	for _, artifact := range receipt.Artifacts {
+		recorded[artifact.Path] = artifact.Digest
 	}
 	receipt.Artifacts = make([]receiptArtifact, 0, len(paths))
 	for _, path := range paths {
 		digest, err := artifactTreeDigest(path)
 		if err != nil {
-			return fmt.Errorf("digest %s: %w", path, err)
+			prior, known := recorded[path]
+			if !retainAbsent || !errors.Is(err, fs.ErrNotExist) || !known {
+				return fmt.Errorf("digest %s: %w", path, err)
+			}
+			digest = prior
 		}
 		receipt.Artifacts = append(receipt.Artifacts, receiptArtifact{Path: path, Digest: digest})
 	}

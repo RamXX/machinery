@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -12,10 +13,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func updatePlacementOptions(args []string) (Options, error) {
@@ -230,5 +234,105 @@ func assertUpdateNativePlacement(t *testing.T, home string) {
 	path := filepath.Join(home, ".config", "opencode", "plugins", "machinery.js")
 	if got, err := os.ReadFile(path); err != nil || string(got) != "export const MachineryPlugin = async () => ({})\n" {
 		t.Errorf("native plugin = %q, %v", got, err)
+	}
+}
+
+// MAC-d3ov: on a cross-version update the placement child is the new binary
+// and the parent is the old one. A parent older than 0.7.1 never publishes the
+// receipt (0.6.11 relied on the child; 0.7.0 finalizes without announcing it),
+// so a child that hears no announcement must record its own placement, and a
+// child under an announcing parent must leave the receipt to it.
+func TestDelegatedPlacementChildReceiptOwnership(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX child fixture")
+	}
+	for _, tc := range []struct {
+		name      string
+		announced bool
+	}{
+		{"legacy parent: child records its placement", false},
+		{"finalizing parent: child leaves the receipt", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("MACHINERY_CONFIG_DIR", privateConfigDir(t))
+			t.Setenv("HOME", t.TempDir())
+			home := filepath.Join(t.TempDir(), ".agents")
+			previous := fakeSource(t)
+			if err := Install(Options{Homes: []string{home}, From: previous, Record: true, Out: io.Discard}); err != nil {
+				t.Fatal(err)
+			}
+			receiptPath, err := installationReceiptPath()
+			if err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.ReadFile(receiptPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			next := fakeSource(t)
+			write(t, filepath.Join(next, "skills", "machinery", "SKILL.md"), "---\nname: machinery\n---\n\nnext release\n")
+			write(t, filepath.Join(next, "agents", RoleDocs[1]), "---\nname: role\ndescription: role\ntools: Read, Write\nmodel: opus\n---\n\nnext release role body\n")
+
+			// The update parent: it holds the operation lock and a prepared
+			// transaction over the group and the receipt while the child runs.
+			lock, err := acquireInstallOperationLock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				if err := lock.Release(); err != nil {
+					t.Error(err)
+				}
+			}()
+			tx, err := beginArtifactTransaction(append(homeInstallArtifactPaths([]string{home}), receiptPath))
+			if err != nil {
+				t.Fatal(err)
+			}
+			scope, err := installOperationScope()
+			if err != nil {
+				t.Fatal(err)
+			}
+			capability, cleanup, err := createInstallLockCapability(scope)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer cleanup()
+			env := setActivationEnvironment(os.Environ(), installLockCapabilityEnv, capability.String())
+			if tc.announced {
+				env = setActivationEnvironment(env, installReceiptOwnerEnv, installReceiptOwnerParent)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestUpdatePlacementChildHelper$", "--", "install", "--from", next, "--home", home)
+			cmd.Env = env
+			output, err := cmd.CombinedOutput()
+			if err != nil || !strings.Contains(string(output), "actual placement child completed") {
+				t.Fatalf("placement child: %v\n%s", err, output)
+			}
+			if err := tx.commit(); err != nil {
+				t.Fatal(err)
+			}
+			after, err := os.ReadFile(receiptPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, _ := os.ReadFile(filepath.Join(home, "skills", "machinery", "SKILL.md")); !strings.Contains(string(got), "next release") {
+				t.Fatalf("child did not place the next release: %q", got)
+			}
+			if tc.announced {
+				if !bytes.Equal(before, after) {
+					t.Fatalf("child rewrote a receipt its parent owns:\n%s", after)
+				}
+				return
+			}
+			if bytes.Equal(before, after) {
+				t.Fatalf("child left the receipt describing the previous release:\n%s", after)
+			}
+			for _, rel := range []string{filepath.Join("skills", "machinery"), filepath.Join("agents", RoleDocs[1])} {
+				if governed, err := validateReceiptArtifactDigest(filepath.Join(home, rel)); err != nil || !governed {
+					t.Errorf("%s after the child recorded: governed=%v err=%v", rel, governed, err)
+				}
+			}
+		})
 	}
 }

@@ -16,6 +16,19 @@ import (
 )
 
 const installLockCapabilityEnv = "MACHINERY_INTERNAL_INSTALL_LOCK_CAPABILITY"
+
+// installReceiptOwnerEnv tells a delegated placement child that its update
+// parent finalizes the installation receipt after every child has returned
+// (MAC-2u36). Parents older than 0.7.1 never announce it: 0.6.11 did not
+// finalize at all (its children recorded their own placements) and 0.7.0
+// finalizes silently. A child that hears no announcement records its own
+// placement, so a cross-version update never publishes a receipt that still
+// describes the previous release (MAC-d3ov). The announcement rides the
+// environment rather than the lock capability payload because every child
+// before 0.7.1 compares that payload byte for byte, and a downgrade through
+// machinery update runs exactly such a child.
+const installReceiptOwnerEnv = "MACHINERY_INTERNAL_INSTALL_RECEIPT_OWNER"
+const installReceiptOwnerParent = "parent"
 const activationCanonicalExecutableEnv = "MACHINERY_INTERNAL_CANONICAL_EXECUTABLE"
 const installInspectionWaitLimit = 10 * time.Second
 
@@ -448,6 +461,13 @@ func validateInstallLockCapability(encoded, scope string) error {
 func runCombinedWithInstallLockCapability(capability installLockCapability) commandRunner {
 	return func(name string, args ...string) (string, error) {
 		environment := setActivationEnvironment(os.Environ(), installLockCapabilityEnv, capability.String())
+		environment = setActivationEnvironment(environment, installReceiptOwnerEnv, installReceiptOwnerParent)
 		return runBoundedPluginCommand(environment, name, args...)
 	}
+}
+
+// parentFinalizesReceipt reports whether the update parent that delegated
+// this placement announced that it publishes the receipt itself.
+func parentFinalizesReceipt() bool {
+	return os.Getenv(installReceiptOwnerEnv) == installReceiptOwnerParent
 }

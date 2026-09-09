@@ -157,6 +157,11 @@ func installLocked(opts Options) (retErr error) {
 			if err := recordTargetInstallLocked(opts.Targets, opts.Copy); err != nil {
 				return rollbackInstallTransaction(tx, err)
 			}
+		} else if opts.Record && !parentFinalizesReceipt() {
+			// A parent older than 0.7.1 never publishes the receipt (MAC-d3ov).
+			if err := recordDelegatedTargetInstallLocked(opts.Targets, opts.Copy); err != nil {
+				return rollbackInstallTransaction(tx, err)
+			}
 		}
 		if err := source.verify(); err != nil {
 			return rollbackInstallTransaction(tx, err)
@@ -248,6 +253,15 @@ func installLocked(opts Options) (retErr error) {
 	// That parent publishes once all selected placement children have returned.
 	if opts.Record && !tx.delegated {
 		if err := recordHomeInstallLocked(homes, opts.Copy); err != nil {
+			return rollbackInstallTransaction(tx, err)
+		}
+	} else if opts.Record && !parentFinalizesReceipt() {
+		// A parent older than 0.7.1 never publishes the receipt: 0.6.11 relied
+		// on this child to record its own placement, 0.7.0 finalizes without
+		// announcing it. Record now, retaining the recorded digest of any
+		// artifact a later child still has to place, so the committed receipt
+		// never describes the previous release (MAC-d3ov).
+		if err := recordDelegatedHomeInstallLocked(homes, opts.Copy); err != nil {
 			return rollbackInstallTransaction(tx, err)
 		}
 	}

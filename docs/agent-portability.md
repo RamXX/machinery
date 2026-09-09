@@ -109,8 +109,10 @@ previously absent artifact to absence, and returns a non-zero error naming the f
 Concurrent foreign changes to a tracked path are refused rather than overwritten, and a killed run
 leaves a recoverable journal that interrupted journal recovery finishes at the next lock
 acquisition, with the diagnosis retained. Delegated placement children publish no intermediate
-receipts: the update parent inventories and validates the complete receipt itself, after every
-selected placement has succeeded and before the direct commit. `--skip-plugins` is an explicit
+receipts when the update parent announces that it inventories and validates the complete receipt
+itself, after every selected placement has succeeded and before the direct commit; a parent older
+than 0.7.1 makes no such announcement, and its (newer) placement children record their own
+placements so the committed receipt never describes the previous release. `--skip-plugins` is an explicit
 opt-out of host plugin management only; receipt loading, validation, and plugin-ownership
 discovery still run, and their failures still abort before any change. An interrupted *design*
 publication (machinery writing generated design artifacts) is a separate journal with its own

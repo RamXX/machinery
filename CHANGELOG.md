@@ -6,6 +6,37 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`machinery update` accepts the plugin inventory the current Claude Code writes.** The Claude
+  Code plugin refresh read each `claude plugin list --json` entry as a closed record and rejected
+  the fields Claude Code now adds (`enabled`, `installPath`, `installedAt`, `lastUpdated`,
+  `mcpServers`, `version`), so on 0.7.0 every Claude Code user saw `Claude Code plugin inventory
+  was not understood: Claude plugin entry 0 has unknown fields [...]`, the update returned an
+  error, and the plugin never refreshed (MAC-9zpf). machinery consumes `id` and `scope` only;
+  the entry is now an open record for the fields it does not read, and it still fails closed
+  when a consumed field is absent or malformed. The exact inventory Claude Code wrote on
+  2026-09-08 is pinned as a fixture. The Codex inventory reader is unchanged: it is still a
+  closed record, because the fields it consumes are the whole record.
+- **The first `machinery update` over a 0.6.11 install no longer leaves the receipt describing
+  the previous release.** After `machinery update --version v0.7.0` on a 0.6.11 install, doctor
+  reported the installed skill and the build-writer role as invalid (`artifact digest is
+  sha256:e2262eda..., want receipt-bound sha256:cc1d8dd4...`) although every file on disk was
+  byte-identical to the release, and a second update converged (MAC-d3ov). Cause: 0.7.0 moved
+  receipt finalization from the placement child to the update parent (MAC-2u36), but on a
+  cross-version update the parent is the old binary and the child is the new one. A 0.6.11
+  parent never finalizes, and the 0.7.0 child left the receipt to a parent that would not write
+  it, so the committed receipt still carried the 0.6.11 digests. The parent now announces to its
+  placement children that it publishes the receipt; a child that hears no announcement (a
+  parent older than 0.7.1) records its own placement, retaining the recorded digest of any
+  artifact a sibling child still has to place. The announcement rides the environment rather
+  than the lock capability payload because every child before 0.7.1 compares that payload byte
+  for byte, and a downgrade through `machinery update` runs exactly such a child. A test runs a
+  real placement child under a prepared parent transaction both ways: without the announcement
+  the receipt is rewritten and doctor's receipt-bound check passes for the placed tree; with it
+  the receipt is untouched. Reproduced and verified against the published v0.6.11 and v0.7.0
+  assets in a fresh `HOME`.
+
 ## [0.7.0] - 2026-09-08
 
 ### Fixed
