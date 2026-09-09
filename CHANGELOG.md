@@ -37,6 +37,23 @@ under their version heading when a release is cut.
   the receipt is untouched. Reproduced and verified against the published v0.6.11 and v0.7.0
   assets in a fresh `HOME`.
 
+- **Ga-accept binds the acceptance commit in both milestone states.** The gate resolved the
+  commit under review only when the build plan carried a milestone marked `Status: closed`, and
+  bound an evidence commit only inside that closed-milestone loop. Acceptance evidence for a
+  milestone still open was parsed, schema-checked and held to its DoD ids, and then its `commit:`
+  field was never asked to name anything: `design/acceptance/M1.yaml` carrying a fabricated 40-hex
+  sha, on an open M1, reported `Ga-accept ok` with no finding, and the `checked:` line named no
+  binding mode because no commit had been resolved to name one (MAC-fs9e). The resolution and
+  ancestry path existed and worked; on an open milestone nothing reached it. The evidence commit
+  is now bound for every acceptance file whose milestone the plan declares, whatever that
+  milestone's status, with the diagnostics the closed path already used: a sha the repository
+  holding the design does not hold, or one that is not an ancestor of the history anchor, is an
+  ERROR naming the sha and the anchor. Closed milestones bind where they always did, so finding
+  order and the `checked:` counts are unchanged. The degraded mode is kept and is now stated as a
+  mode rather than as silence: outside a repository, or with no usable git, the `checked:` line
+  reads `no commit under review could be derived; evidence commits UNBOUND to git history` beside
+  the existing non-blocking note, so an unbound run is never inferred from a missing note.
+
 ### Added
 
 - **`machinery doctor --repair` compacts the governance hook state store.** The per-user store the
