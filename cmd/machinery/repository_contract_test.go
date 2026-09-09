@@ -500,16 +500,25 @@ func TestExampleGatePolicyHasOneOwnerSharedByEveryMirror(t *testing.T) {
 		}
 	}
 
-	// Every mirror delegates, and none of them re-derives the policy.
+	// Every mirror delegates, and none of them re-derives the policy. The
+	// local mirror is the cheap tier: MAC-qo6n moved the example gate suites
+	// into scripts/preflight-fast.sh, which the pre-push hook and
+	// scripts/preflight.sh both run, so the gate keeps exactly one local
+	// owner instead of one per tier.
 	mirrors := map[string]string{
-		"local preflight": mustRepositoryFile(t, filepath.Join(repo, "scripts", "preflight.sh")),
-		"CI gates job":    mustRepositoryFile(t, filepath.Join(repo, ".github", "workflows", "ci.yml")),
-		"Makefile check":  mustRepositoryFile(t, filepath.Join(repo, "Makefile")),
+		"local preflight fast tier": mustRepositoryFile(t, filepath.Join(repo, "scripts", "preflight-fast.sh")),
+		"CI gates job":              mustRepositoryFile(t, filepath.Join(repo, ".github", "workflows", "ci.yml")),
+		"Makefile check":            mustRepositoryFile(t, filepath.Join(repo, "Makefile")),
 	}
 	for name, body := range mirrors {
 		if !strings.Contains(body, "example-gates.sh") {
 			t.Errorf("%s does not call the shared example-gate script", name)
 		}
+	}
+	// The heavy tier joins the no-re-derivation contract: it must reach the
+	// policy through the fast tier, never by spelling it out again.
+	mirrors["local preflight heavy tier"] = mustRepositoryFile(t, filepath.Join(repo, "scripts", "preflight.sh"))
+	for name, body := range mirrors {
 		for _, drift := range []string{"attestations.yaml", "plan only; current implementation review missing", "--warnings-as-errors"} {
 			if strings.Contains(body, drift) {
 				t.Errorf("%s re-spells example-gate policy %q instead of delegating", name, drift)
@@ -545,15 +554,30 @@ func TestDependencyReviewHasNoWarningOnlySeverityTier(t *testing.T) {
 func TestPreflightFailsClosedWithoutTrustedMergeBaseAndUsesBash32Syntax(t *testing.T) {
 	repo := repoRootDir(t)
 	script := filepath.Join(repo, "scripts", "preflight.sh")
-	body := mustRepositoryFile(t, script)
-	for _, forbidden := range []string{"git rev-parse HEAD^", "mapfile"} {
-		if strings.Contains(body, forbidden) {
-			t.Fatalf("preflight retains non-deterministic or non-portable construct %q", forbidden)
+	fastScript := filepath.Join(repo, "scripts", "preflight-fast.sh")
+	fast := mustRepositoryFile(t, fastScript)
+	// MAC-qo6n split the gate into two tiers. The cheap checks, and with them
+	// the fail-closed and Bash 3.2 contracts they carry, moved to the fast
+	// tier that the pre-push hook runs; the heavy tier reaches them by
+	// running it. Both scripts stay under the portability and parser checks.
+	for _, tier := range []struct{ name, path string }{{"preflight", script}, {"fast preflight", fastScript}} {
+		tierBody := mustRepositoryFile(t, tier.path)
+		for _, forbidden := range []string{"git rev-parse HEAD^", "mapfile"} {
+			if strings.Contains(tierBody, forbidden) {
+				t.Fatalf("%s retains non-deterministic or non-portable construct %q", tier.name, forbidden)
+			}
+		}
+		if output, err := exec.CommandContext(t.Context(), "/bin/bash", "-n", tier.path).CombinedOutput(); err != nil {
+			t.Fatalf("%s is not accepted by the platform Bash parser: %v\n%s", tier.name, err, output)
 		}
 	}
+	body := mustRepositoryFile(t, script)
+	if !strings.Contains(body, "scripts/preflight-fast.sh") {
+		t.Fatal("preflight must run the cheap tier through its single owner scripts/preflight-fast.sh")
+	}
 	for _, required := range []string{"PREFLIGHT_BASE_REF:-origin/main", "cannot resolve trusted aggregate-diff base", "while IFS= read -r shell_file", `shell_files+=("$shell_file")`} {
-		if !strings.Contains(body, required) {
-			t.Errorf("preflight lacks fail-closed/Bash 3.2 contract %q", required)
+		if !strings.Contains(fast, required) {
+			t.Errorf("fast preflight lacks fail-closed/Bash 3.2 contract %q", required)
 		}
 	}
 	ci := mustRepositoryFile(t, filepath.Join(repo, ".github", "workflows", "ci.yml"))
@@ -566,21 +590,23 @@ func TestPreflightFailsClosedWithoutTrustedMergeBaseAndUsesBash32Syntax(t *testi
 		}
 	}
 	for _, required := range []string{"reject_matches()", "scan failed", `*) fail "$scan_failure (status $status)"`} {
-		if !strings.Contains(body, required) {
-			t.Errorf("preflight lacks fail-closed negative-scan contract %q", required)
+		if !strings.Contains(fast, required) {
+			t.Errorf("fast preflight lacks fail-closed negative-scan contract %q", required)
 		}
 	}
-	if output, err := exec.CommandContext(t.Context(), "/bin/bash", "-n", script).CombinedOutput(); err != nil {
-		t.Fatalf("preflight is not accepted by the platform Bash parser: %v\n%s", err, output)
-	}
 
+	// Both entry points must refuse to gate anything without a trusted base:
+	// the fast tier because it owns the check, the full mirror because it
+	// must not reach the heavy tier past a skipped cheap one.
 	missingBase := "refs/machinery-test/missing-trusted-base"
-	cmd := exec.CommandContext(t.Context(), "/bin/bash", script)
-	cmd.Dir = repo
-	cmd.Env = append(os.Environ(), "PREFLIGHT_BASE_REF="+missingBase)
-	output, err := cmd.CombinedOutput()
-	if err == nil || !strings.Contains(string(output), "cannot resolve trusted aggregate-diff base "+missingBase) {
-		t.Fatalf("missing trusted base did not fail before partial diff: err=%v out=%s", err, output)
+	for _, tier := range []struct{ name, path string }{{"preflight", script}, {"fast preflight", fastScript}} {
+		cmd := exec.CommandContext(t.Context(), "/bin/bash", tier.path)
+		cmd.Dir = repo
+		cmd.Env = append(os.Environ(), "PREFLIGHT_BASE_REF="+missingBase)
+		output, err := cmd.CombinedOutput()
+		if err == nil || !strings.Contains(string(output), "cannot resolve trusted aggregate-diff base "+missingBase) {
+			t.Fatalf("%s: missing trusted base did not fail before partial diff: err=%v out=%s", tier.name, err, output)
+		}
 	}
 }
 
@@ -597,14 +623,21 @@ func TestShellGitOperationsUseBoundedSanitizedRunner(t *testing.T) {
 			t.Errorf("bounded Git helper lacks contract %q", required)
 		}
 	}
-	for _, rel := range []string{"scripts/preflight.sh", "scripts/modelith-inventory.sh", "scripts/modelith-render.sh"} {
+	// The Git-touching gate work lives in the cheap tier (the aggregate
+	// whitespace diff and the tidy diff), so that is where the bounded
+	// adapter is required. The ambient-Git ban covers every gate script,
+	// including the two that no longer shell out to Git at all.
+	for _, rel := range []string{"scripts/preflight-fast.sh", "scripts/modelith-inventory.sh", "scripts/modelith-render.sh"} {
 		body := mustRepositoryFile(t, filepath.Join(repo, filepath.FromSlash(rel)))
 		for _, required := range []string{"git-safe.sh", "git_safe"} {
 			if !strings.Contains(body, required) {
 				t.Errorf("%s lacks bounded Git adapter %q", rel, required)
 			}
 		}
-		bareGit := regexp.MustCompile(`(?m)^[[:space:]]*git[[:space:]]+(merge-base|diff|status|rev-parse|rev-list|show|fetch)\b`)
+	}
+	bareGit := regexp.MustCompile(`(?m)^[[:space:]]*git[[:space:]]+(merge-base|diff|status|rev-parse|rev-list|show|fetch)\b`)
+	for _, rel := range []string{"scripts/preflight.sh", "scripts/preflight-fast.sh", "scripts/ci-linux.sh", "scripts/modelith-inventory.sh", "scripts/modelith-render.sh"} {
+		body := mustRepositoryFile(t, filepath.Join(repo, filepath.FromSlash(rel)))
 		if match := bareGit.FindString(body); match != "" {
 			t.Errorf("%s retains unbounded ambient Git invocation %q", rel, strings.TrimSpace(match))
 		}
@@ -697,6 +730,8 @@ func TestShellcheckInventoryIsClosedAndSharedByLocalAndCI(t *testing.T) {
 	for _, required := range []string{
 		"install.sh",
 		"hooks/machinery-hook.sh",
+		"scripts/ci-linux.sh",
+		"scripts/preflight-fast.sh",
 		"scripts/preflight.sh",
 		"skills/machinery/tools/tlc.sh",
 	} {
@@ -717,7 +752,7 @@ func TestShellcheckInventoryIsClosedAndSharedByLocalAndCI(t *testing.T) {
 		t.Fatalf("incomplete ShellCheck corpus did not fail reverse coverage: err=%v out=%s", err, badOut)
 	}
 
-	for _, rel := range []string{"scripts/preflight.sh", ".github/workflows/ci.yml"} {
+	for _, rel := range []string{"scripts/preflight-fast.sh", ".github/workflows/ci.yml"} {
 		body := mustRepositoryFile(t, filepath.Join(repo, filepath.FromSlash(rel)))
 		for _, required := range []string{"scripts/shellcheck-inventory.sh", ".shellcheck-version"} {
 			if !strings.Contains(body, required) {
@@ -972,19 +1007,77 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		"$(EXAMPLE_GATES) $(MACH)",
 		"$(EXAMPLE_INVENTORY) formal",
 	)
+	// Two tiers, one owner per check. The cheap tier is what the pre-push
+	// hook runs; the heavy tier runs it and then the evidence gates hosted
+	// CI is authoritative for.
 	preflight := mustRepositoryFile(t, filepath.Join(root, "scripts", "preflight.sh"))
-	requireAll("local preflight", preflight,
+	requireAll("local preflight heavy tier", preflight,
+		"set -euo pipefail",
+		"scripts/preflight-fast.sh",
+		"go test -race -count=1 ./... -timeout=30m",
+		"go run ./scripts/integration-lane --lane required",
+		"make verify-formal",
+		"scripts/example-inventory.sh checkers",
+		`go build -o "$run_safe" ./scripts/run-safe`,
+		`"$docker_bin" pull --quiet --platform "$checker_platform" "$checker_image"`,
+	)
+	fastPreflight := mustRepositoryFile(t, filepath.Join(root, "scripts", "preflight-fast.sh"))
+	requireAll("local preflight fast tier", fastPreflight,
 		"set -euo pipefail",
 		"make modelith-render-check",
 		"golangci-lint is required at the version pinned",
 		"does not match pin $want",
+		"GOOS=linux golangci-lint run",
 		"scripts/example-gates.sh .bin/machinery",
-		"scripts/example-inventory.sh checkers",
 		"scripts/shellcheck-inventory.sh",
 		`shellcheck "${shell_files[@]}"`,
-		`go build -o "$run_safe" ./scripts/run-safe`,
-		`"$docker_bin" pull --quiet --platform "$checker_platform" "$checker_image"`,
+		"go test -count=1 -run TestGolden ./cmd/machinery",
+		"go test -count=1 ./internal/experiments/",
 	)
+	// The push gate must run the cheap tier and only the cheap tier, and it
+	// must stay bypass-free.
+	hook := mustRepositoryFile(t, filepath.Join(root, ".githooks", "pre-push"))
+	requireAll("pre-push hook", hook,
+		"set -euo pipefail",
+		`exec "$repo_root/scripts/preflight-fast.sh"`,
+	)
+	for _, heavy := range []string{"go test -race", "integration-lane", "verify-formal", "verify-c4", "verify-checkers", "SKIP_PREFLIGHT"} {
+		if strings.Contains(hook, heavy) {
+			t.Errorf("pre-push hook must not carry heavy-tier or bypass wiring %q", heavy)
+		}
+	}
+	makefileTiers := mustRepositoryFile(t, filepath.Join(root, "Makefile"))
+	requireAll("Makefile gate tiers", makefileTiers,
+		"preflight-fast: ##",
+		"ci-linux: ##",
+		"@scripts/preflight-fast.sh",
+		"@scripts/ci-linux.sh",
+	)
+	ciLinux := mustRepositoryFile(t, filepath.Join(root, "scripts", "ci-linux.sh"))
+	requireAll("containerized Linux evidence run", ciLinux,
+		"set -euo pipefail",
+		"scripts/ci-linux.dockerfile",
+		"--platform \"$platform\"",
+		"--cpus \"$cpus\"",
+		"go test -race -count=1 ./... -timeout=30m",
+		"go run ./scripts/integration-lane --lane required",
+	)
+	dockerfile := mustRepositoryFile(t, filepath.Join(root, "scripts", "ci-linux.dockerfile"))
+	// The container carries the same runtime identities the hosted jobs
+	// install; the lane re-verifies each one and fails closed.
+	requireAll("containerized Linux runtime pins", dockerfile,
+		"golang:1.27.1",
+		"node:26.8.1",
+		"python:3.14.7",
+		"1.20.4-erlang-29.0.6",
+		"typescript@7.0.2",
+	)
+	assurance := mustRepositoryFile(t, filepath.Join(root, ".github", "actions", "assurance-runtimes", "action.yml"))
+	for _, version := range []string{"1.27.1", "26.8.1", "3.14.7", "1.20.4", "29.0.6", "typescript@7.0.2"} {
+		if !strings.Contains(assurance, version) {
+			t.Errorf("containerized runtime pin %q has drifted from the hosted assurance-runtimes owner", version)
+		}
+	}
 	readme := mustRepositoryFile(t, filepath.Join(root, "README.md"))
 	requireAll("README formal proof count", readme,
 		"all 35 TLC proofs",

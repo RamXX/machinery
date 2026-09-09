@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
-# pre-push - run the local CI mirror before any push reaches the remote.
+# pre-push - run the cheap gate tier before any push reaches the remote.
 #
 # Installed by pointing git at this directory:  make hooks
 # (equivalently: git config core.hooksPath .githooks)
 #
-# There is no bypass: the gate runs on every push, and hosted CI re-runs it.
+# The hook runs scripts/preflight-fast.sh: static analysis, the build, the
+# example gate suites and the golden corpus. Budget: under 5 minutes.
+#
+# The heavy tier (race sweep, required native lane, formal/TLC, C4, external
+# checkers, native macOS) is authoritative in hosted CI, which re-runs every
+# gate on the pushed commit; release publication is gated on that exact commit
+# (docs/release-policy.json). Run it locally on purpose with `make preflight`,
+# or on Linux with `make ci-linux`.
+#
+# There is no bypass: the gate runs on every push.
 set -euo pipefail
 
 hook_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 repo_root=$(CDPATH='' cd -- "$hook_dir/.." && pwd -P)
-exec "$repo_root/scripts/preflight.sh"
+exec "$repo_root/scripts/preflight-fast.sh"

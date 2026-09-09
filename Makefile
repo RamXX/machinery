@@ -31,7 +31,7 @@ ACTIONLINT_VERSION := $(shell cat .actionlint-version 2>/dev/null)
 INSTALL_DIR ?= $(HOME)/.local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: build dev-link uninstall test test-integration test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight hooks lint-install help
+.PHONY: build dev-link uninstall test test-integration test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight preflight-fast ci-linux hooks lint-install help
 
 build: ## Build the machinery binary from source into .bin/machinery (needs Go)
 	@mkdir -p .bin && go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery
@@ -88,13 +88,20 @@ modelith-inventory: ## Require an exact source/render pair for every authoritati
 modelith-render-check: modelith-inventory modelith-render ## Regenerate committed Modelith renders and reject byte drift
 	@$(MODELITH_INVENTORY) git-diff
 
-preflight: ## Run every required local CI/formal gate, cheapest first
+preflight: ## Run every required local CI/formal gate: the fast tier, then the heavy tier
 	@scripts/preflight.sh
+
+preflight-fast: ## Run the cheap gate tier the pre-push hook runs (budget: under 5 minutes)
+	@scripts/preflight-fast.sh
+
+ci-linux: ## Reproduce the hosted race sweep + required lane in a pinned 2-CPU linux/amd64 container
+	@scripts/ci-linux.sh
 
 hooks: ## Install the git pre-push hook (points core.hooksPath at .githooks)
 	@git config core.hooksPath .githooks
-	@chmod +x .githooks/pre-push scripts/preflight.sh
-	@echo "pre-push hook installed. There is no bypass; every push runs scripts/preflight.sh"
+	@chmod +x .githooks/pre-push scripts/preflight.sh scripts/preflight-fast.sh scripts/ci-linux.sh
+	@echo "pre-push hook installed. There is no bypass; every push runs scripts/preflight-fast.sh"
+	@echo "heavy evidence: hosted CI on the pushed commit, or make preflight / make ci-linux locally"
 
 lint-install: ## Install the pinned static-analysis tools so local matches CI exactly
 	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
