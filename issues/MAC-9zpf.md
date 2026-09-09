@@ -7,8 +7,8 @@ type: bug
 labels: [install, update, claude-code, field-defect]
 created_at: 2026-09-09T00:49:00Z
 created_by: ramirosalas
-updated_at: 2026-09-09T00:49:00Z
-content_hash: "sha256:2a7dfcb74bd2b365bca899f30972ea7f066ea3bb6ab3fde29bd8b7510539349b"
+updated_at: 2026-09-09T16:06:00Z
+content_hash: "sha256:6b8d9d757934067d77b09e6c498b07c4ced0d47a9946f45db95b1fdb60a5b494"
 ---
 
 ## Description
@@ -44,3 +44,6 @@ Read the inventory as an open record for the fields machinery does not consume (
 
 
 ## Comments
+
+### 2026-09-09T16:06:00Z ramirosalas
+Root cause: internal/install/update.go:698 (claudeMachineryScopes) validated each Claude plugin entry with requirePluginFields, a closed schema of {id, scope}. Claude Code now writes enabled, installPath, installedAt, lastUpdated, mcpServers and version on every entry, so the inventory was rejected before any refresh. Fix: the entry is an open record for the fields machinery does not consume (new requirePresentPluginFields); absent or malformed id/scope still fail closed. Test: TestClaudePluginInventoryScopes pins the exact 2026-09-08 inventory (claudePluginInventoryFixture) and the missing-field diagnostic. Codex reader unchanged (closed record, fields consumed are the whole record).
