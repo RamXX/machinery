@@ -7,8 +7,8 @@ type: bug
 labels: [install, doctor, field-defect]
 created_at: 2026-09-09T00:50:33Z
 created_by: ramirosalas
-updated_at: 2026-09-09T00:50:33Z
-content_hash: "sha256:334cf31567fd3046a0ff9a4048043426a0eac28f520060ed6daa4b99506ab017"
+updated_at: 2026-09-09T00:50:52Z
+content_hash: "sha256:93637fc482151cf32d998188f461ac311d9f987eb1ace6e822213b5e47d442fb"
 ---
 
 ## Description
@@ -47,3 +47,6 @@ Reproduce with a fresh HOME (install from the v0.7.0 release, run doctor), unify
 
 
 ## Comments
+
+### 2026-09-09T00:50:52Z ramirosalas
+Correction after a second run: a second `machinery update --version v0.7.0` converged both artifacts and doctor is now clean (no invalid lines). So the digest function is consistent; the defect is in the FIRST update over an existing v0.6.11 install: it left ~/.agents/skills/machinery and the build-writer role out of step with the receipt it wrote (fsm-author was fine), and only the rerun converged them. This contradicts the 0.7.0 'installer reruns converge' contract's first-run guarantee. Reproduce: fresh HOME with a v0.6.11 install (copy-mode home group plus symlinked ~/.claude), then update to v0.7.0 once, then doctor. Expected clean after one update.
