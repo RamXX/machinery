@@ -1,17 +1,19 @@
 ---
 id: MAC-y2l2
 title: "Bug: governance hook-state grows unboundedly under heavy local test sweeps"
-status: in_progress
+status: closed
 priority: 1
 type: bug
 parent: MAC-ui8a
 created_at: 2026-09-08T02:21:09Z
 created_by: ramirosalas
 updated_at: 2026-09-09T16:17:12Z
-content_hash: "sha256:9eebc29f415cb04f14c110c53dbd32ba3846478dab4c8b0461e186942023e8f5"
+content_hash: "sha256:a7fb3784e4170e840105e3693bf6dd320e20a426323b7fbc952139c8246fc174"
 assignee: dev-MAC-y2l2
 follows: [MAC-3hzt, MAC-r0hy]
 labels: [delivered, accepted]
+closed_at: 2026-09-09T16:17:12Z
+close_reason: "Owner-directed acceptance for 0.7.1 (2026-09-09): rework c9322b9 reviewed in the 2026-09-08 session, owner ruled manual remediation for pre-upgrade ledgers; rebased onto main ff5f169 as aca989e; internal/hook (334s), internal/dirscan and cmd/machinery -run Doctor green with HOME sandboxed."
 ---
 
 ## Description
@@ -191,6 +193,7 @@ status: delivered
 - 2026-09-08T05:53:07Z claimed by dev-MAC-y2l2
 - 2026-09-08T07:41:46Z status: in_progress -> in_progress
 - 2026-09-08T07:41:46Z auto-follows: linked to predecessor MAC-r0hy
+- 2026-09-09T16:17:12Z status: in_progress -> closed
 
 ## Links
 - Parent: [[MAC-ui8a]]
