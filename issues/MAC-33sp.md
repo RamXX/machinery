@@ -7,8 +7,8 @@ type: bug
 labels: [security, linux, dirscan, gates]
 created_at: 2026-09-08T16:46:10Z
 created_by: ramirosalas
-updated_at: 2026-09-08T17:40:44Z
-content_hash: "sha256:c57c31369159c59463cc254056d71ac04419203314b012aa84e02c8271607d08"
+updated_at: 2026-09-09T16:55:43Z
+content_hash: "sha256:2d8ba236a2446a7b16de46d5b7dd7f9e74cd2c781a0a70a81d6ddef6aca81ff6"
 ---
 
 ## Description
@@ -424,3 +424,6 @@ If the team elects to ship anyway, the minimum set that removes the brick risk w
 its cross-subtree window with the same blind stamp on the same 6.8 kernels the entry was written
 for. Everything else on this list is correctable in an hour; that one is a design gap that will be
 believed fixed.
+
+### 2026-09-09T16:55:43Z ramirosalas
+2026-09-09 evidence: make ci-linux (pinned golang:1.27.1-trixie image, 2 CPUs, linux/amd64, Ubuntu 24.04 host kernel 6.8, Docker 29.7.2, run as deploy) fails TestInventoryRejectsContinuousDirectoryGrowth and TestInventoryRejectsSameDirectoryABADespiteRestoredMtime in scripts/tree-inventory at 0.00s, exactly the container directory-witness blindness this item describes, while the hosted ubuntu-latest test job on the same commit (98b47e3, 0.7.1 candidate) passes them. So the containerized sweep is not yet a faithful mirror of the hosted test job for this package; the fix on fix/aba-linux (af54c9f, HOLD after review) or a fine-grained-timestamp tmpfs for the test temp dirs in scripts/ci-linux.sh is needed before ci-linux can claim hosted-equivalent evidence.
