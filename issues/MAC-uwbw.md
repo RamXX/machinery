@@ -1,14 +1,14 @@
 ---
 id: MAC-uwbw
 title: "update: Claude Code marketplace refresh rejected as non-canonical output (Refreshing marketplace cache line)"
-status: open
+status: in_progress
 priority: 0
 type: bug
 labels: [install, update, claude-code, field-defect]
 created_at: 2026-09-09T17:31:46Z
 created_by: ramirosalas
 updated_at: 2026-09-09T17:36:55Z
-content_hash: "sha256:c92223512df445428c8e0a4d3dd6ff1373be6d7e33b06f2816f922f40abe87d3"
+content_hash: "sha256:c2be7e8cb2272db0dff07b3c8bf073c6d727225aea64018bf47fe70acb2f45ed"
 ---
 
 ## Description
@@ -35,7 +35,7 @@ Prove success by the final success line and the exit status, treat intermediate 
 
 
 ## History
-
+- 2026-09-09T17:36:55Z status: open -> in_progress
 
 ## Links
 
