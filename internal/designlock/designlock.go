@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/filelock"
 	"github.com/RamXX/machinery/internal/fsatomic"
 	"github.com/RamXX/machinery/internal/portablepath"
@@ -248,6 +249,33 @@ func (l *Lock) TrackExternal(paths ...string) error {
 	return nil
 }
 
+// watchFileContent arms the clock-independent half of the file witness.
+//
+// sameFingerprintFile compares mode, size, mtime and the inode change stamp
+// across the read window. On a Linux kernel without multigrain timestamps
+// every one of those is taken from the coarse clock, so a write-restore-and-
+// reset-mtime that completes inside one tick leaves them all identical and the
+// content ABA is accepted, which is the fail-open direction. A kernel mutation
+// event does not depend on any clock and cannot be un-queued by the restore.
+// The watch is armed through the already-open descriptor, never a path, so it
+// cannot resolve to a different file than the one being read.
+// newContentChannel is a variable so a test can reproduce a host that cannot
+// arm the event channel, and prove the fingerprint refuses instead of falling
+// back to the stamp alone.
+var newContentChannel = dirscan.NewMutationChannel
+
+var watchFileContent = func(f *os.File) (*dirscan.MutationChannel, *dirscan.MutationWatch, error) {
+	channel, err := newContentChannel()
+	if err != nil {
+		return nil, nil, err
+	}
+	watch, err := channel.Watch(f)
+	if err != nil {
+		return nil, nil, errors.Join(err, channel.Close())
+	}
+	return channel, watch, nil
+}
+
 func fingerprintExternal(path string) (string, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
@@ -265,6 +293,11 @@ func fingerprintExternal(path string) (string, error) {
 		_ = f.Close()
 		return "", fmt.Errorf("tracked external input %s changed identity while opening", path)
 	}
+	channel, watch, watchErr := watchFileContent(f)
+	if watchErr != nil {
+		return "", errors.Join(fmt.Errorf("tracked external input %s cannot be read under a mutation witness", path), watchErr, f.Close())
+	}
+	defer func() { _ = channel.Close() }()
 	if testAfterFingerprintFileOpen != nil {
 		testAfterFingerprintFileOpen(path)
 	}
@@ -281,7 +314,7 @@ func fingerprintExternal(path string) (string, error) {
 		testAfterFingerprintFileRead(path)
 	}
 	after, err := os.Lstat(path)
-	if err != nil || !sameFingerprintFile(info, openedAfter) || !sameFingerprintFile(info, after) {
+	if err != nil || !sameFingerprintFile(info, openedAfter) || !sameFingerprintFile(info, after) || watch.Mutated() {
 		return "", fmt.Errorf("tracked external input %s changed identity while reading", path)
 	}
 	return fmt.Sprintf("file:%o:%x", info.Mode().Perm(), digest), nil
@@ -297,7 +330,9 @@ func sameFingerprintFile(before, after os.FileInfo) bool {
 	return beforeChange == "" || afterChange == "" || beforeChange == afterChange
 }
 
-func fingerprintFileChangeID(info os.FileInfo) string {
+// fingerprintFileChangeID is a variable so a test can reproduce a host whose
+// inode clock is too coarse to witness a content ABA.
+var fingerprintFileChangeID = func(info os.FileInfo) string {
 	if info == nil || info.Sys() == nil {
 		return ""
 	}
@@ -2260,6 +2295,13 @@ func fingerprintRoot(rootPath string, skipGit bool) (out map[string]string, retE
 	out = map[string]string{}
 	caseFolded := map[string]string{}
 	budget := snapshotBudget{maxEntries: snapshotInventoryMaxEntries, maxBytes: snapshotAggregateMaxBytes, maxDepth: snapshotInventoryMaxDepth}
+	// One channel serves the whole traversal: the per-file watches are cheap,
+	// the channel itself is the scarce resource.
+	contentChannel, err := newContentChannel()
+	if err != nil {
+		return nil, fmt.Errorf("design inventory cannot be read under a mutation witness: %w", err)
+	}
+	defer func() { retErr = errors.Join(retErr, contentChannel.Close()) }()
 	var walk func(string, int) error
 	walk = func(dir string, depth int) error {
 		if err := budget.enterDirectory("design inventory directory "+filepath.ToSlash(dir), depth); err != nil {
@@ -2315,6 +2357,10 @@ func fingerprintRoot(rootPath string, skipGit bool) (out map[string]string, retE
 					_ = opened.Close()
 					return fmt.Errorf("design inventory entry %s changed identity while opening", display)
 				}
+				contentWatch, watchErr := contentChannel.Watch(opened)
+				if watchErr != nil {
+					return errors.Join(fmt.Errorf("design inventory entry %s cannot be read under a mutation witness", display), watchErr, opened.Close())
+				}
 				fullPath := filepath.Join(rootPath, rel)
 				if testAfterFingerprintFileOpen != nil {
 					testAfterFingerprintFileOpen(fullPath)
@@ -2329,7 +2375,7 @@ func fingerprintRoot(rootPath string, skipGit bool) (out map[string]string, retE
 					testAfterFingerprintFileRead(fullPath)
 				}
 				after, statErr := root.Lstat(rel)
-				if statErr != nil || !sameFingerprintFile(info, openedAfter) || !sameFingerprintFile(info, after) {
+				if statErr != nil || !sameFingerprintFile(info, openedAfter) || !sameFingerprintFile(info, after) || contentWatch.Mutated() {
 					return fmt.Errorf("design inventory entry %s changed identity while reading", display)
 				}
 				out[display] = fmt.Sprintf("file:%o:%x", info.Mode().Perm(), digest)

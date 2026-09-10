@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/fsatomic"
 )
 
@@ -2238,4 +2239,97 @@ func TestAcquireReaderRejectsMalformedAndSymlinkSentinel(t *testing.T) {
 			t.Fatalf("AcquireReader error = %v", err)
 		}
 	})
+}
+
+// TestFingerprintsRejectContentABAWithABlindChangeStamp pins the fix for the
+// coarse-clock blindness: it stubs the inode change stamp to a constant, which
+// is what a pre-multigrain Linux kernel effectively returns for any mutation
+// that completes inside one timer tick, and requires the content ABA to be
+// caught anyway. It reproduces the blindness on every host, including those
+// whose real inode clock happens to be fine enough to see it.
+func TestFingerprintsRejectContentABAWithABlindChangeStamp(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		fingerprint func(string, string) error
+	}{
+		{
+			name: "external",
+			fingerprint: func(_ string, path string) error {
+				_, err := fingerprintExternal(path)
+				return err
+			},
+		},
+		{
+			name: "rooted",
+			fingerprint: func(root, _ string) error {
+				_, err := fingerprintRoot(root, true)
+				return err
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			realChangeID := fingerprintFileChangeID
+			fingerprintFileChangeID = func(os.FileInfo) string { return "blind-coarse-stamp" }
+			t.Cleanup(func() { fingerprintFileChangeID = realChangeID })
+
+			root := t.TempDir()
+			path := filepath.Join(root, "input.txt")
+			original := []byte("stable\n")
+			if err := os.WriteFile(path, original, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.Lstat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mutated := false
+			testAfterFingerprintFileRead = func(got string) {
+				if mutated || got != path {
+					return
+				}
+				mutated = true
+				// Same length, same mode, mtime restored: with the stamp
+				// blinded, only a clock-independent witness can see this.
+				if err := os.WriteFile(path, []byte("CHANGED"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, original, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Chtimes(path, before.ModTime(), before.ModTime()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Cleanup(func() { testAfterFingerprintFileRead = nil })
+			if err := tc.fingerprint(root, path); err == nil || !strings.Contains(err.Error(), "changed identity while reading") {
+				t.Fatalf("content ABA must be caught with a blind change stamp: err = %v", err)
+			}
+			if !mutated {
+				t.Fatal("the fixture never ran the ABA")
+			}
+		})
+	}
+}
+
+// TestFingerprintsRefuseWithoutMutationWitness holds the fail-closed
+// direction: a host that cannot arm the event channel must refuse the
+// fingerprint, never accept it on the strength of a stamp that may be blind.
+func TestFingerprintsRefuseWithoutMutationWitness(t *testing.T) {
+	realChannel := newContentChannel
+	newContentChannel = func() (*dirscan.MutationChannel, error) {
+		return nil, errors.New("no mutation event channel on this host")
+	}
+	t.Cleanup(func() { newContentChannel = realChannel })
+
+	root := t.TempDir()
+	path := filepath.Join(root, "input.txt")
+	if err := os.WriteFile(path, []byte("stable\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fingerprintExternal(path); err == nil || !strings.Contains(err.Error(), "mutation witness") {
+		t.Fatalf("external fingerprint must refuse without a witness: err = %v", err)
+	}
+	if _, err := fingerprintRoot(root, true); err == nil || !strings.Contains(err.Error(), "mutation witness") {
+		t.Fatalf("rooted fingerprint must refuse without a witness: err = %v", err)
+	}
 }

@@ -27,6 +27,18 @@ under their version heading when a release is cut.
   its witness is the NTFS ChangeTime read from the retained handle, which this blindness does not
   apply to.
 
+- **A file content ABA is caught on those same hosts.** The directory inventories were not the only
+  surface the coarse clock blinded. `internal/designlock` proves a tracked external input and every
+  entry of a rooted design inventory did not change under it by comparing mode, size, mtime and the
+  same inode change stamp across the read window. A write, a restore of the original bytes, and an
+  `os.Chtimes` back to the original mtime, all completing inside one tick, left every one of those
+  identical, so a content ABA was accepted. Both fingerprint paths now arm the same kernel
+  mutation-event watch through the already-open descriptor for the read window, and refuse the
+  fingerprint outright when the channel cannot be armed rather than falling back to a stamp that may
+  be blind. One channel serves a whole rooted traversal. The regression tests stub the change stamp
+  to a constant, which is what a coarse-clock host effectively returns, so they reproduce the
+  blindness and prove the fix on every host regardless of the real clock resolution.
+
 ## [0.7.2] - 2026-09-09
 
 ### Fixed
