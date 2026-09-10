@@ -7,8 +7,8 @@ type: feature
 labels: [consumer, h2, build, packets, blocks-h2]
 created_at: 2026-09-08T21:59:19Z
 created_by: ramirosalas
-updated_at: 2026-09-10T14:45:25Z
-content_hash: "sha256:b221a043202d40f5f063b5dfb22b313fa63e09ecb4baa6df2d6407f004278133"
+updated_at: 2026-09-10T16:16:47Z
+content_hash: "sha256:37c754ce81a5c72832e8507bc4daf1d1a907e53849be45ff926650ea38932965"
 ---
 
 ## Description
@@ -73,3 +73,6 @@ ACCEPTANCE CRITERIA.
 8. No prose parsing: removing or re-wording the prose slice narrative in BUILD.md does not change any packet's bytes.
 
 FIRST CONSUMER STEP. H2 authors design/slices.yaml for M1-S1..M1-S6 from the prose that already assigns them. That authoring is the one manual step; everything downstream is generated.
+
+### 2026-09-10T16:16:47Z ramirosalas
+2026-09-10 SHIPPED on main as afb381c4 (releases in 0.8.0). Schema: design/slices.yaml, schema: 1, milestones[].slices[] with id <M>-S<n>, shard (exactly one BUILD file), budget (bytes; gate on bytes, documented divisor 3 bytes/token so 200K tokens = 600000), flat cites list (bare oracle stable/test id, oracleset:<path>, matrix:<Machine>, section:<path>#<heading id>, milestone:<path>, file:<path>, boundary:<id>, external:<id>, rule:<src> -> <dst>, row:<path>#<section>#<first-cell key>, invariant:<id>), milestones[].waivers[] {id, reason}. Command: machinery packet <design> --milestone <id> [--slice <id>] --out <dir>. Gate: Gw-packet, auto-activates on slices.yaml, after Gb: every citation resolves to exactly one excerpt, every packet fits its budget, every DoD-cited oracle id (ORACLESET expanded, the Ga set) is claimed by exactly one slice or waived; the command runs it first and writes nothing on failure. Packet: every excerpt verbatim under '### <cite> (<path>:<first>-<last>)', a computed obligation ledger (DoD prose is NOT copied, which is what makes AC8 hold), the acceptance entry shape, and per-source lines drawn; binds to the slice map by digest, never to whole files. AC2 pinned by golden testdata/golden/packet-fixture; AC3-AC8 covered by internal/gates/packet_test.go negative controls; go-crm ships a two-slice M1 map exercised by make check. AC1 (H2 M1-S1..S6 under budget) is H2's to prove once they author their map: handoff written to H2/docs/design-handoff/MACHINERY-PACKET-SLICES-2026-09-10.md. Reference: docs/packet-projection.md. Leaving open until H2 confirms AC1.
