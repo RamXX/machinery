@@ -7,8 +7,8 @@ type: feature
 labels: [consumer, h2, build, packets]
 created_at: 2026-09-08T21:59:19Z
 created_by: ramirosalas
-updated_at: 2026-09-08T21:59:19Z
-content_hash: "sha256:bc0a92eac77c14f7ac92545854ec7d468c2592cec6a4977d090c2a25bb97cb44"
+updated_at: 2026-09-10T14:36:38Z
+content_hash: "sha256:0e80b947fde4973b1d8628de545c9df378315dd650bbd1a35ff790c943ea8dcd"
 ---
 
 ## Description
@@ -37,3 +37,6 @@ H2 M1 slices M1-S1..M1-S6 (design/BUILD.md:1878-1955). Needed before the first R
 
 
 ## Comments
+
+### 2026-09-10T14:36:38Z ramirosalas
+2026-09-10: escalated. The H2 agent reports this now blocks H2 M1 from moving forward, so it is a cross-project blocker rather than only a P0 in this backlog. Note for whoever picks it up: the Acceptance Criteria and Design sections are still empty, so the story is not executable as written.
