@@ -687,6 +687,14 @@ func TestStoreConcurrentReaderWriterPressure(t *testing.T) {
 
 // AC6: permission failures are real custody failures, never silent success.
 func TestStorePermissionCustody(t *testing.T) {
+	// Root bypasses permission bits, so every assertion here would pass for
+	// the wrong reason: an unwritable parent is writable to uid 0. The same
+	// guard is in internal/gates, internal/lint and internal/install. The
+	// coverage is not lost, because the hosted test job and the containerized
+	// Dagger sweep both run as an unprivileged user.
+	if os.Geteuid() == 0 {
+		t.Skip("running as root; permission bits do not apply")
+	}
 	base := t.TempDir()
 	readonly := filepath.Join(base, "readonly")
 	if err := os.Mkdir(readonly, 0o500); err != nil {
