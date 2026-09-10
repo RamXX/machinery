@@ -27,8 +27,6 @@ import (
 // instead of being repeated here.
 const (
 	dindImage       = "docker:29.7.2-dind"
-	govulncheckPin  = "golang.org/x/vuln/cmd/govulncheck@v1.5.0"
-	modelithPin     = "github.com/stacklok/modelith/cmd/modelith@v0.4.0"
 	goTestTimeout   = "30m"
 	sharedTmpPath   = "/shared"
 	gitleaksImage   = "zricethezav/gitleaks:v8.30.0"
@@ -255,7 +253,8 @@ if [ -n "$unformatted" ]; then echo "not gofmt-clean:"; echo "$unformatted"; exi
 echo "gofmt clean"
 go vet ./...
 echo "go vet clean"
-go install github.com/rhysd/actionlint/cmd/actionlint@"$(cat .actionlint-version)"
+version=$(cat .actionlint-version)
+go install github.com/rhysd/actionlint/cmd/actionlint@"$version"
 "$(go env GOPATH)"/bin/actionlint .github/workflows/*.yml
 echo "actionlint clean"
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@"$(cat .golangci-version)"
@@ -282,14 +281,21 @@ echo "golangci-lint clean"`)
 		WithNewFile("/tmp/shellcheck-files", inventory), `
 version=$(cat .shellcheck-version)
 checksum=$(cat .shellcheck-linux-x86_64.sha256)
+install_dir=/tmp/shellcheck
 curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${version}/shellcheck-v${version}.linux.x86_64.tar.xz" -o /tmp/shellcheck.tar.xz
 echo "$checksum  /tmp/shellcheck.tar.xz" | sha256sum -c -
-mkdir -p /tmp/shellcheck
-tar -xJf /tmp/shellcheck.tar.xz --strip-components=1 -C /tmp/shellcheck
-test "$(/tmp/shellcheck/shellcheck --version | awk '$1 == "version:" {print $2}')" = "$version"
-mapfile -t shell_files </tmp/shellcheck-files
+mkdir -p "$install_dir"
+tar -xJf /tmp/shellcheck.tar.xz --strip-components=1 -C "$install_dir"
+test "$("$install_dir/shellcheck" --version | awk '$1 == "version:" {print $2}')" = "$version"
+# The same Bash 3.2-safe read loop scripts/preflight-fast.sh uses: the
+# array-reading builtin it replaces does not exist in the stock macOS Bash,
+# and the two mirrors keep one shape.
+shell_files=()
+while IFS= read -r shell_file; do
+  shell_files+=("$shell_file")
+done </tmp/shellcheck-files
 test "${#shell_files[@]}" -gt 0
-/tmp/shellcheck/shellcheck "${shell_files[@]}"
+"$install_dir/shellcheck" "${shell_files[@]}"
 echo "shellcheck clean (${#shell_files[@]} files)"`)
 	b.WriteString(out)
 	return b.String(), err
@@ -402,7 +408,7 @@ echo "no em dashes"`)
 // engine and rejects byte drift.
 func (m *Machinery) ModelithRender(ctx context.Context) (string, error) {
 	return shInCopy(ctx, m.Base(), `
-go install `+modelithPin+`
+go install github.com/stacklok/modelith/cmd/modelith@v0.4.0
 export PATH="$(go env GOPATH)/bin:$PATH"
 make modelith-render-check`)
 }
@@ -518,7 +524,7 @@ echo "formal suite clean, no diff"`)
 // Govulncheck scans the toolchain and every registered example module.
 func (m *Machinery) Govulncheck(ctx context.Context) (string, error) {
 	return sh(ctx, m.Base(), `
-go install `+govulncheckPin+`
+go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
 export PATH="$(go env GOPATH)/bin:$PATH"
 govulncheck ./...
 scripts/example-inventory.sh security | while IFS=$'\t' read -r impl module; do

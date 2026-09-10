@@ -557,6 +557,13 @@ func TestLaneWiringIsMandatoryAndNativeJobsAreServiceFree(t *testing.T) {
 			}
 		})
 	}
+	module, e := os.ReadFile(filepath.Join(repo, ".dagger/main.go"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := laneValidateOwner(string(module)); e != nil {
+		t.Error(e)
+	}
 	b, e := os.ReadFile(filepath.Join(repo, "scripts/preflight.sh"))
 	if e != nil {
 		t.Fatal(e)
@@ -575,6 +582,19 @@ func TestLaneWiringIsMandatoryAndNativeJobsAreServiceFree(t *testing.T) {
 }
 
 const laneExactInvocation = "go run ./scripts/integration-lane --lane required"
+
+// laneModuleCall is how a workflow reaches the lane now: the exact invocation
+// above lives in the Dagger module the call delegates to.
+const laneModuleCall = "dagger call integration-evidence"
+
+// laneValidateOwner requires the module to carry the exact lane invocation, so
+// converting a workflow to a `dagger call` cannot quietly change what runs.
+func laneValidateOwner(body string) error {
+	if !strings.Contains(body, laneExactInvocation) {
+		return fmt.Errorf("the Dagger module does not carry the exact lane invocation %q", laneExactInvocation)
+	}
+	return nil
+}
 
 // These are assertion helpers for the repository's executable wiring. They
 // inspect data only, never provision or execute a candidate runtime lane.
@@ -600,9 +620,16 @@ func laneValidateWorkflow(body []byte) error {
 	permissive := func(v any) bool { return v != nil && v != false }
 	for id, j := range wf.Jobs {
 		for _, s := range j.Steps {
-			if strings.Contains(s.Run, "./scripts/integration-lane") {
+			// The hosted Linux jobs reach the lane through the Dagger module,
+			// which carries the exact invocation (laneValidateOwner checks
+			// that). What the workflow still owes is that the call is
+			// mandatory: one job, unconditional, on Linux, never advisory.
+			if strings.Contains(s.Run, laneModuleCall) || strings.Contains(s.Run, "./scripts/integration-lane") {
 				found++
-				if strings.TrimSpace(s.Run) != laneExactInvocation || j.If != nil || s.If != nil || permissive(j.Continue) || permissive(s.Continue) || fmt.Sprint(j.RunsOn) != "ubuntu-latest" {
+				if j.If != nil || s.If != nil || permissive(j.Continue) || permissive(s.Continue) || fmt.Sprint(j.RunsOn) != "ubuntu-latest" {
+					return fmt.Errorf("%s does not execute exact mandatory Linux lane", id)
+				}
+				if strings.Contains(s.Run, "./scripts/integration-lane") && strings.TrimSpace(s.Run) != laneExactInvocation {
 					return fmt.Errorf("%s does not execute exact mandatory Linux lane", id)
 				}
 			}

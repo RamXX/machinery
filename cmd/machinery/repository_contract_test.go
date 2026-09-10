@@ -278,7 +278,8 @@ func TestPreflightC4DiscoveryFailsClosed(t *testing.T) {
 	if !strings.Contains(preflight, "unset MACHINERY_STRUCTURIZR_CLI MACHINERY_STRUCTURIZR_CLI_CLOSURE_SHA256") {
 		t.Fatal("preflight must use verify-c4's pinned provisioner instead of forwarding an unbound ambient Structurizr executable")
 	}
-	ci := mustRepositoryFile(t, filepath.Join(repo, ".github", "workflows", "ci.yml"))
+	ci := ciOwnerBody(t)
+	ciDelegates(t, "ci.yml", "dagger call design-engines")
 	for _, required := range []string{"scripts/c4-inventory.sh examples", `test -s "$c4_inventory"`, `done <"$c4_inventory"`} {
 		if !strings.Contains(ci, required) {
 			t.Errorf("CI lacks checked nonempty C4 discovery contract %q", required)
@@ -448,7 +449,9 @@ func TestExampleInventoryIsClosedAndDrivesEveryRunner(t *testing.T) {
 		}
 	})
 
-	for _, file := range []string{"Makefile", "scripts/preflight.sh", ".github/workflows/ci.yml", ".github/workflows/formal.yml", ".github/workflows/nightly.yml", ".github/workflows/security.yml"} {
+	// The hosted Linux jobs consume the inventory through the module; nightly
+	// still runs its own steps, so it keeps its own copy of the contract.
+	for _, file := range []string{"Makefile", "scripts/preflight.sh", ".dagger/main.go", ".github/workflows/nightly.yml"} {
 		body := mustRepositoryFile(t, filepath.Join(repo, filepath.FromSlash(file)))
 		if !strings.Contains(body, "example-inventory.sh") && file != "Makefile" {
 			t.Errorf("%s does not consume the checked example inventory", file)
@@ -482,6 +485,28 @@ func TestExampleInventoryIsClosedAndDrivesEveryRunner(t *testing.T) {
 // failing every design-only example on its honest plan-only warnings. The
 // three mirrors must now call the same script, and only that script may spell
 // the policy out.
+// ciOwnerBody returns the body that hosted CI actually executes for its Linux
+// jobs. Every one of them is a `dagger call <function>`, so the commands these
+// contracts pin live in the Dagger module and the workflow's own job is to
+// delegate to it. Checking the module keeps each policy's single owner
+// checkable; ciDelegates below holds the delegation itself.
+func ciOwnerBody(t *testing.T) string {
+	t.Helper()
+	return mustRepositoryFile(t, filepath.Join(repoRootDir(t), ".dagger", "main.go"))
+}
+
+// ciDelegates asserts the named workflow hands the job to the module rather
+// than growing a second copy of the commands.
+func ciDelegates(t *testing.T, workflow string, calls ...string) {
+	t.Helper()
+	body := mustRepositoryFile(t, filepath.Join(repoRootDir(t), ".github", "workflows", workflow))
+	for _, call := range calls {
+		if !strings.Contains(body, call) {
+			t.Errorf("%s does not delegate to the module with %q", workflow, call)
+		}
+	}
+}
+
 func TestExampleGatePolicyHasOneOwnerSharedByEveryMirror(t *testing.T) {
 	repo := repoRootDir(t)
 	gates := mustRepositoryFile(t, filepath.Join(repo, "scripts", "example-gates.sh"))
@@ -507,7 +532,7 @@ func TestExampleGatePolicyHasOneOwnerSharedByEveryMirror(t *testing.T) {
 	// owner instead of one per tier.
 	mirrors := map[string]string{
 		"local preflight fast tier": mustRepositoryFile(t, filepath.Join(repo, "scripts", "preflight-fast.sh")),
-		"CI gates job":              mustRepositoryFile(t, filepath.Join(repo, ".github", "workflows", "ci.yml")),
+		"CI gates job":              ciOwnerBody(t),
 		"Makefile check":            mustRepositoryFile(t, filepath.Join(repo, "Makefile")),
 	}
 	for name, body := range mirrors {
@@ -580,7 +605,8 @@ func TestPreflightFailsClosedWithoutTrustedMergeBaseAndUsesBash32Syntax(t *testi
 			t.Errorf("fast preflight lacks fail-closed/Bash 3.2 contract %q", required)
 		}
 	}
-	ci := mustRepositoryFile(t, filepath.Join(repo, ".github", "workflows", "ci.yml"))
+	ci := ciOwnerBody(t)
+	ciDelegates(t, "ci.yml", "dagger call lint")
 	if strings.Contains(ci, "mapfile") {
 		t.Fatal("CI retains mapfile, which is unavailable in the stock macOS Bash 3.2 runtime")
 	}
@@ -643,8 +669,7 @@ func TestShellGitOperationsUseBoundedSanitizedRunner(t *testing.T) {
 		}
 	}
 	for _, rel := range []string{
-		".github/workflows/ci.yml",
-		".github/workflows/formal.yml",
+		".dagger/main.go",
 		".github/workflows/nightly.yml",
 		".github/workflows/release.yml",
 	} {
@@ -698,7 +723,8 @@ func TestExternalEnginesUseBoundedClosedRunnerAndImmutableModelith(t *testing.T)
 		t.Error("Modelith executable source is not revalidated on both sides of publication")
 	}
 	preflight := mustRepositoryFile(t, filepath.Join(repo, "scripts", "preflight.sh"))
-	ci := mustRepositoryFile(t, filepath.Join(repo, ".github", "workflows", "ci.yml"))
+	ci := ciOwnerBody(t)
+	ciDelegates(t, "ci.yml", "dagger call design-engines")
 	for name, body := range map[string]string{"preflight": preflight, "CI": ci} {
 		for _, required := range []string{"./scripts/run-safe", "pull --quiet --platform", "image inspect --format", "run --rm --pull=never"} {
 			if !strings.Contains(body, required) {
@@ -752,7 +778,7 @@ func TestShellcheckInventoryIsClosedAndSharedByLocalAndCI(t *testing.T) {
 		t.Fatalf("incomplete ShellCheck corpus did not fail reverse coverage: err=%v out=%s", err, badOut)
 	}
 
-	for _, rel := range []string{"scripts/preflight-fast.sh", ".github/workflows/ci.yml"} {
+	for _, rel := range []string{"scripts/preflight-fast.sh", ".dagger/main.go"} {
 		body := mustRepositoryFile(t, filepath.Join(repo, filepath.FromSlash(rel)))
 		for _, required := range []string{"scripts/shellcheck-inventory.sh", ".shellcheck-version"} {
 			if !strings.Contains(body, required) {
@@ -832,25 +858,41 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		}
 	}
 
-	formal := mustRepositoryFile(t, filepath.Join(root, ".github", "workflows", "formal.yml"))
-	requireAll("formal workflow", formal,
+	ciDelegates(t, "formal.yml", "dagger call verify-formal", "dagger call integration-evidence")
+	requireAll("formal owner", ciOwnerBody(t),
 		"scripts/example-inventory.sh formal",
 		"go run ./scripts/git-safe -root . -- status --porcelain --untracked-files=all",
-		"Assert formal generation left no diff",
+		"formal verification regenerated tracked content or emitted an untracked artifact",
 	)
 	nightly := mustRepositoryFile(t, filepath.Join(root, ".github", "workflows", "nightly.yml"))
 	requireAll("nightly workflow", nightly,
 		"scripts/example-inventory.sh formal",
 		`oracle "$design/machines"`,
 	)
-	ci := mustRepositoryFile(t, filepath.Join(root, ".github", "workflows", "ci.yml"))
-	requireAll("CI workflow", ci,
+	// The workflow keeps the contracts that are workflow shape; the commands
+	// it used to carry are now pinned in the module it delegates to.
+	ciWorkflow := mustRepositoryFile(t, filepath.Join(root, ".github", "workflows", "ci.yml"))
+	requireAll("CI workflow", ciWorkflow,
 		"runs-on: macos-latest",
-		"goos: windows",
+		"timeout-minutes: 30",
+		"dagger call test",
+		"dagger call gates",
+		"dagger call golden",
+		"dagger call lint",
+		"dagger call docs",
+		"dagger call tidy",
+		"dagger call build",
+		"dagger call example-impls",
+		"dagger call modelith-render",
+		"dagger call design-engines",
+		"dagger call integration-evidence",
+	)
+	ci := ciOwnerBody(t)
+	requireAll("CI owner", ci,
+		`{"windows", "amd64"}`,
 		"go test -count=1 -run TestGolden ./cmd/machinery",
 		"go install github.com/stacklok/modelith/cmd/modelith@v0.4.0",
 		"make modelith-render-check",
-		"Assert committed engine trust roots",
 		"test -s .java-runtime-pin",
 		"test -s .structurizr-pin",
 		"verify-c4 \"$(dirname \"$dsl\")\"",
@@ -859,8 +901,7 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		"docker image inspect --format '{{json .RepoDigests}} {{.Os}}/{{.Architecture}}'",
 		"docker run --rm --pull=never --platform \"$platform\"",
 		"go build -o \"$runner\" ./scripts/run-safe",
-		"timeout-minutes: 30",
-		"MACHINERY_REQUIRE_OCI_GOLDEN: \"1\"",
+		"MACHINERY_REQUIRE_OCI_GOLDEN=1",
 		"Souffl(e|é).*(external.checker|checker engine|CI pin|required)",
 		"stale host checker-runtime contract found",
 		"scripts/example-gates.sh .bin/machinery",
@@ -871,13 +912,13 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		".shellcheck-linux-x86_64.sha256",
 		`"$install_dir/shellcheck" "${shell_files[@]}"`,
 	)
-	if strings.Contains(ci, "windows-latest") {
+	if strings.Contains(ciWorkflow, "windows-latest") {
 		t.Fatal("CI claims native Windows runtime validation; Windows must remain cross-compile-only until its durability contract is proven")
 	}
 	if strings.Contains(ci, "docker image inspect --platform") {
 		t.Fatal("CI uses docker image inspect --platform, which is not supported by standard Docker Engine")
 	}
-	if checkouts, fullHistory := strings.Count(ci, "actions/checkout@"), strings.Count(ci, "fetch-depth: 0"); checkouts == 0 || fullHistory != checkouts {
+	if checkouts, fullHistory := strings.Count(ciWorkflow, "actions/checkout@"), strings.Count(ciWorkflow, "fetch-depth: 0"); checkouts == 0 || fullHistory != checkouts {
 		t.Fatalf("CI full-history checkouts = %d for %d checkout steps", fullHistory, checkouts)
 	}
 	actionlintPin := strings.TrimSpace(mustRepositoryFile(t, filepath.Join(root, ".actionlint-version")))
