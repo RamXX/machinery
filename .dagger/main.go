@@ -139,7 +139,11 @@ func (m *Machinery) dockerd() *dagger.Service {
 		From(dindImage).
 		WithMountedCache("/var/lib/docker", dag.CacheVolume("machinery-dind"),
 			dagger.ContainerWithMountedCacheOpts{Sharing: dagger.CacheSharingModePrivate}).
-		WithMountedCache(sharedTmpPath, m.sharedTmp()).
+		// Same owner as the job side mounts it with: both sides must see the
+		// identical directory, or a scratch path the job creates is not the
+		// path the daemon resolves for a bind mount.
+		WithMountedCache(sharedTmpPath, m.sharedTmp(),
+			dagger.ContainerWithMountedCacheOpts{Owner: "1000:1000"}).
 		// Empty means "serve plain TCP"; the entrypoint otherwise generates
 		// a CA and refuses the unencrypted port.
 		WithEnvVariable("DOCKER_TLS_CERTDIR", "").
