@@ -160,6 +160,25 @@ func durableWriteBytes(path string, perm os.FileMode, data []byte) error {
 	return nil
 }
 
+// publishTransientRe matches the private temp entry publishImmutableFile
+// stages beside its final path.
+//
+// The name is part of the store schema, not an accident: the temp must live on
+// the same filesystem as the final path to be hard-linked into place, which
+// means it is briefly visible to any concurrent reader enumerating that
+// directory. Every strict enumeration therefore skips exactly this shape and
+// keeps rejecting everything else, so the namespace stays closed while a
+// publish in flight is no longer read as corruption.
+var publishTransientRe = regexp.MustCompile(`^\.publish-[0-9a-f]{16}$`)
+
+// isPublishTransient reports whether name is a publish temp in flight.
+func isPublishTransient(name string) bool { return publishTransientRe.MatchString(name) }
+
+// testAfterPublishStage runs while the temp is staged and before it is linked
+// into place, so a test can enumerate the directory at exactly the moment a
+// concurrent reader would see the transient.
+var testAfterPublishStage func(string)
+
 // publishImmutableFile atomically publishes exact bytes at a FINAL path
 // that may already exist: the bytes are written to a private temp file,
 // fsynced, then hard-linked into place (atomic no-replace). An existing
@@ -175,6 +194,9 @@ func publishImmutableFile(finalPath string, perm os.FileMode, data []byte) error
 		return err
 	}
 	defer os.Remove(tmp)
+	if testAfterPublishStage != nil {
+		testAfterPublishStage(tmp)
+	}
 	if err := os.Chmod(tmp, perm); err != nil {
 		return err
 	}
@@ -588,6 +610,9 @@ func validateHeadChain(root string, head headDoc, headDigest string) error {
 	}
 	for _, a := range archives {
 		name := a.Name()
+		if isPublishTransient(name) {
+			continue
+		}
 		if !strings.HasSuffix(name, ".json") || !blobNameRe.MatchString(strings.TrimSuffix(name, ".json")) {
 			return fmt.Errorf("INVALID_SCHEMA: ledger/heads/ holds unknown entry %q", name)
 		}
@@ -921,6 +946,9 @@ func collectStoreEntries(storePath string) ([]exportEntry, error) {
 			return nil, fmt.Errorf("INVALID_SCHEMA: cannot enumerate %s: %w", d.dir, err)
 		}
 		for _, f := range files {
+			if isPublishTransient(f.Name()) {
+				continue
+			}
 			if !f.Type().IsRegular() {
 				return nil, fmt.Errorf("INVALID_SCHEMA: %s holds non-regular entry %q", d.dir, f.Name())
 			}
@@ -948,6 +976,9 @@ func collectStoreEntries(storePath string) ([]exportEntry, error) {
 		return nil, fmt.Errorf("INVALID_SCHEMA: cannot enumerate objects/: %w", err)
 	}
 	for _, o := range objDirs {
+		if isPublishTransient(o.Name()) {
+			continue
+		}
 		if !o.IsDir() || !blobNameRe.MatchString(o.Name()) {
 			return nil, fmt.Errorf("INVALID_SCHEMA: objects/ holds unknown entry %q", o.Name())
 		}

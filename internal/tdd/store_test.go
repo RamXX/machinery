@@ -739,3 +739,85 @@ func TestStoreOperationsHonorCancellation(t *testing.T) {
 		t.Error("cancelled import succeeded")
 	}
 }
+
+// TestPublishTransientIsInvisibleToStrictEnumerations pins the fix for the
+// publish race: a reader that enumerates a store namespace while a publish is
+// staged must not read the writer's in-flight temp as corruption.
+//
+// The interleaving is deterministic, not load-dependent: the hook runs at the
+// exact point between staging the temp and linking it into place, which is the
+// window a concurrent reader could observe.
+func TestPublishTransientIsInvisibleToStrictEnumerations(t *testing.T) {
+	base := t.TempDir()
+	store := filepath.Join(base, "store")
+	if _, err := InitStore(context.Background(), store, fixtureProjectID); err != nil {
+		t.Fatal(err)
+	}
+	headsDir := filepath.Join(store, storeLedger, storeHeads)
+	if err := os.MkdirAll(headsDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	observed := 0
+	var enumErr error
+	testAfterPublishStage = func(tmp string) {
+		observed++
+		if _, err := os.Lstat(tmp); err != nil {
+			t.Errorf("the staged temp should exist inside the window: %v", err)
+		}
+		if !isPublishTransient(filepath.Base(tmp)) {
+			t.Errorf("staged temp %q is not the documented transient shape", filepath.Base(tmp))
+		}
+		// This is exactly what a concurrent reader does.
+		if _, err := collectStoreEntries(store); err != nil {
+			enumErr = err
+		}
+	}
+	t.Cleanup(func() { testAfterPublishStage = nil })
+
+	payload := []byte(`{"schema":"probe"}`)
+	target := filepath.Join(headsDir, digestHexBytes(payload)+".json")
+	if err := publishImmutableFile(target, storeFileMod, payload); err != nil {
+		t.Fatalf("publish failed: %v", err)
+	}
+	if observed != 1 {
+		t.Fatalf("the staging hook ran %d times, want 1", observed)
+	}
+	if enumErr != nil {
+		t.Fatalf("a reader saw the in-flight publish temp as corruption: %v", enumErr)
+	}
+}
+
+// TestStrictEnumerationsStillRejectUnknownEntries holds the other direction:
+// skipping the reserved transient must not open the namespace to anything else,
+// including another dot-entry.
+func TestStrictEnumerationsStillRejectUnknownEntries(t *testing.T) {
+	for _, name := range []string{
+		"not-a-head.json",
+		".publish-notactuallyhex",
+		".publish-0123456789abcdefg",
+		".publish-0123456789abcde",
+		".some-other-temp",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if isPublishTransient(name) {
+				t.Fatalf("%q must not be treated as the reserved publish transient", name)
+			}
+			base := t.TempDir()
+			store := filepath.Join(base, "store")
+			if _, err := InitStore(context.Background(), store, fixtureProjectID); err != nil {
+				t.Fatal(err)
+			}
+			blobs := filepath.Join(store, storeBlobs)
+			if err := os.MkdirAll(blobs, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(blobs, name), []byte("x"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := collectStoreEntries(store); err == nil || !strings.Contains(err.Error(), "unknown entry") {
+				t.Fatalf("unknown entry %q was not rejected: err = %v", name, err)
+			}
+		})
+	}
+}

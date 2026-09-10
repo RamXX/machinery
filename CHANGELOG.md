@@ -8,6 +8,19 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A publish in flight is no longer read as store corruption.** `publishImmutableFile` stages its
+  bytes in a private temp beside the final path, because a hard link into place requires the same
+  filesystem, so the temp is briefly visible to any reader enumerating that directory. Four strict
+  enumerations (`blobs/`, `controls/`, `runs/` and `ledger/heads/`, plus `objects/`) rejected it as
+  an unknown entry, so a healthy store reported `INVALID_SCHEMA: ledger/heads/ holds unknown entry
+  ".publish-<nonce>"` purely because another writer was mid-publish. Observed as an intermittent
+  `TestRegisterConflictingWriters` failure under a loaded containerized full-suite run. The temp's
+  name is now part of the schema rather than an accident: one documented predicate matches exactly
+  `.publish-` plus sixteen hex digits, every strict enumeration skips that and keeps rejecting
+  everything else, including any other dot-entry. The regression test interleaves an enumeration
+  with a publish deterministically through a hook between staging and linking, rather than relying
+  on load.
+
 - **A directory ABA is caught on hosts whose inode clock is too coarse to see it.** The
   fail-closed directory inventories in `internal/gates`, `internal/dirscan` and the `machinery
   oracle` inventory proved that an enumeration was a snapshot by comparing native change stamps
