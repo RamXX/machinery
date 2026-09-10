@@ -7,8 +7,8 @@ type: bug
 labels: [flaky-under-load, assuranceflow]
 created_at: 2026-09-08T08:21:09Z
 created_by: ramirosalas
-updated_at: 2026-09-08T08:21:09Z
-content_hash: "sha256:4011eddea2a5038416c3323e3cf197bdaf723c85a873e58acbf6f842bf8255c4"
+updated_at: 2026-09-10T07:35:14Z
+content_hash: "sha256:2716b499ea79ecaa6d6089a35a65805b0f1c253d1a4a39b23ea67b2750608047"
 ---
 
 ## Description
@@ -45,3 +45,6 @@ Reproduce under load (run the package with -count=20 while another race sweep ru
 
 
 ## Comments
+
+### 2026-09-10T07:35:14Z ramirosalas
+Related: MAC-1jhn is a second, distinct race in this same test. A reader enumerating ledger/heads/ observes a publisher's in-flight .publish-<nonce> entry (internal/tdd/store.go:173 stages the temp inside the directory it publishes into; store.go:592 rejects unknown entries) and fails INVALID_SCHEMA, not the EINVAL described here. Fixing either does not fix the other, so this title understates what TestRegisterConflictingWriters is catching. Observed 2026-09-10 on linux/amd64 kernel 7.0.0-30 in a container under the full non-race suite.
