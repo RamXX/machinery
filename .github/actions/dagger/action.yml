@@ -16,7 +16,11 @@ runs:
         test -n "$version" && test "$version" != "null"
         checksum=$(cat .dagger-linux-amd64.sha256)
         archive="$RUNNER_TEMP/dagger.tar.gz"
-        curl -fsSL "https://dl.dagger.io/dagger/releases/${version}/dagger_v${version}_linux_amd64.tar.gz" -o "$archive"
+        # Retry the fetch: a transient reset from the CDN failed a job on
+        # 2026-09-10 ("curl: (35) Recv failure: Connection reset by peer").
+        # The checksum below is what makes a retry safe to take.
+        curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
+          "https://dl.dagger.io/dagger/releases/${version}/dagger_v${version}_linux_amd64.tar.gz" -o "$archive"
         echo "$checksum  $archive" | sha256sum -c -
         install_dir="$RUNNER_TEMP/dagger-bin"
         mkdir -p "$install_dir"
