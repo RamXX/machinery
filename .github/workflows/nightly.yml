@@ -14,109 +14,53 @@ permissions:
 jobs:
   integration-required:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Full history keeps the lane's ancestry/no-orphan validation honest.
           fetch-depth: 0
-      - uses: ./.github/actions/assurance-runtimes
+      - uses: ./.github/actions/dagger
       - name: Required runtime integration
-        run: go run ./scripts/integration-lane --lane required
-  # Regenerate every committed generated artifact (oracles AND formal specs)
-  # and assert an empty git diff. Silent when fresh; a diff means a committed
-  # artifact is stale or a generator drifted.
+        run: |
+          set -euo pipefail
+          dagger call integration-evidence export --path="$RUNNER_TEMP/integration-required-evidence"
+          cat "$RUNNER_TEMP/integration-required-evidence/console.txt"
+          test "$(cat "$RUNNER_TEMP/integration-required-evidence/exit")" = 0
+
+  # Regenerate every committed artifact with the pinned generators and prove
+  # the tree is unchanged: the canary for a generator whose output drifted
+  # from what is committed.
   regen-clean-tree:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache: true
-      - name: Install Modelith v0.4.0 (pinned)
-        run: go install github.com/stacklok/modelith/cmd/modelith@v0.4.0
-      - name: Regenerate committed Modelith renders
-        run: make modelith-render
-      - name: Regenerate oracles with Go
-        run: |
-          set -euo pipefail
-          make build
-          scripts/example-inventory.sh formal | while IFS= read -r design; do
-            .bin/machinery oracle "$design/machines"
-          done
-          scripts/example-inventory.sh pack-parents | while IFS= read -r design; do
-            .bin/machinery pack generate "$design"
-          done
-      # verify-formal --gen-only runs the exact generator orchestration the
-      # checked run uses (tla + refine + compose, coordinator parsed as YAML),
-      # with TLC skipped so this job stays Java-free. The previous shell
-      # reimplementation of this loop misparsed a commented coordinator line;
-      # single-sourcing it in the binary is the fix.
-      - name: Regenerate formal specs with Go
-        run: |
-          set -euo pipefail
-          scripts/example-inventory.sh formal | while IFS= read -r d; do
-            .bin/machinery verify-formal --gen-only "$d" || exit 1
-          done
-      - name: Regenerate pack refinement proofs with Go
-        run: |
-          set -euo pipefail
-          scripts/example-inventory.sh pack-children | while IFS=$'\t' read -r design parent; do
-            test -n "$parent"
-            .bin/machinery pack refine "$design"
-          done
-      - name: Assert clean tree
-        run: |
-          status=$(go run ./scripts/git-safe -root . -- status --porcelain)
-          if [ -n "$status" ]; then
-            echo "$status"
-            echo "::error::regeneration dirtied the tree (a stale tracked artifact or a newly emitted file)"
-            exit 1
-          fi
+          fetch-depth: 0
+      - uses: ./.github/actions/dagger
+      - run: dagger call regen-clean-tree
 
   # The golden corpus + full unit suite, on a cadence: the canary for
   # environment-driven divergence (Go toolchain updates changing output).
+  # Full history is REQUIRED: the golden runs exercise the Ga acceptance gate,
+  # which proves every reviewed commit is an ancestor of HEAD.
   golden-nightly:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Full history is REQUIRED here: the golden check runs exercise the
-          # Ga acceptance gate, which proves every reviewed commit is an
-          # ancestor of HEAD. A shallow checkout severs that reachability and
-          # the acceptance ancestors become unavailable.
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Go unit suite
-        run: go test -count=1 ./... -timeout=20m
-      - name: Golden corpus
-        run: go test -count=1 -run TestGolden ./cmd/machinery
+      - uses: ./.github/actions/dagger
+      - run: dagger call golden-nightly
 
   # Nightly govulncheck - catches newly-disclosed CVEs in dependencies between
-  # PRs. Mirrors the security.yml job but on the schedule so we learn of a vuln
-  # the day it's disclosed, not the next time someone opens a PR.
+  # PRs. The same function security.yml runs, on the schedule, so we learn of a
+  # vuln the day it is disclosed rather than the next time someone opens a PR.
   vulncheck-nightly:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache: true
-      - run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
-          govulncheck ./...
-      - name: Registered example implementation vulnerability scans
-        run: |
-          set -euo pipefail
-          scripts/example-inventory.sh security | while IFS=$'\t' read -r impl module; do
-            case "$module" in
-              go) (cd "$impl" && govulncheck ./...) ;;
-              *) echo "::error::unsupported security module type $module: $impl"; exit 1 ;;
-            esac
-          done
+          fetch-depth: 0
+      - uses: ./.github/actions/dagger
+      - run: dagger call govulncheck

@@ -4,7 +4,7 @@
 [![Formal Verification](https://github.com/RamXX/machinery/actions/workflows/formal.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/formal.yml)
 [![Security](https://github.com/RamXX/machinery/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/security.yml)
 [![Nightly](https://github.com/RamXX/machinery/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/nightly.yml)
-[![Local CI: Dagger](https://img.shields.io/badge/local%20CI-Dagger%20v0.21.9-131226)](.dagger/main.go)
+[![CI: Dagger](https://img.shields.io/badge/CI-Dagger%20v0.21.9-131226)](.dagger/main.go)
 [![Go Reference](https://pkg.go.dev/badge/github.com/RamXX/machinery.svg)](https://pkg.go.dev/github.com/RamXX/machinery)
 [![Go Report Card](https://goreportcard.com/badge/github.com/RamXX/machinery)](https://goreportcard.com/report/github.com/RamXX/machinery)
 

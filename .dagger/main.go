@@ -371,7 +371,15 @@ func (m *Machinery) Docs(
 	baseRef string,
 ) (string, error) {
 	return sh(ctx, m.Base(), `
-go run ./scripts/git-safe -root . -- diff --check `+baseRef+`..HEAD
+# github.event.before is all-zeros on the first push to a new branch, and can
+# name a commit this checkout does not have after a force push. Either way the
+# aggregate change is measured against the parent.
+base="`+baseRef+`"
+if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+   || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+  base="HEAD~1"
+fi
+go run ./scripts/git-safe -root . -- diff --check "$base"..HEAD
 echo "no whitespace errors"
 
 grep_status=0
@@ -545,6 +553,51 @@ func (m *Machinery) Gitleaks(ctx context.Context) (string, error) {
 		WithMountedDirectory("/src", m.Source).
 		WithWorkdir("/src"),
 		`gitleaks detect --source . --redact --verbose --no-banner`)
+}
+
+// ------------------------------------------------------------- nightly ---
+
+// RegenCleanTree regenerates every committed artifact with the pinned
+// generators and proves the tree is unchanged: the canary for a generator
+// whose output drifted from what is committed.
+func (m *Machinery) RegenCleanTree(ctx context.Context) (string, error) {
+	return shInCopy(ctx, m.Base(), `
+go install github.com/stacklok/modelith/cmd/modelith@v0.4.0
+export PATH="$(go env GOPATH)/bin:$PATH"
+make modelith-render
+make build
+scripts/example-inventory.sh formal | while IFS= read -r design; do
+  .bin/machinery oracle "$design/machines"
+done
+scripts/example-inventory.sh pack-parents | while IFS= read -r design; do
+  .bin/machinery pack generate "$design"
+done
+# verify-formal --gen-only runs the exact generator orchestration the checked
+# run uses (tla + refine + compose, coordinator parsed as YAML), with TLC
+# skipped so this stays Java-free.
+scripts/example-inventory.sh formal | while IFS= read -r d; do
+  .bin/machinery verify-formal --gen-only "$d" || exit 1
+done
+scripts/example-inventory.sh pack-children | while IFS=$'\t' read -r design parent; do
+  test -n "$parent"
+  .bin/machinery pack refine "$design"
+done
+status=$(go run ./scripts/git-safe -root . -- status --porcelain)
+if [ -n "$status" ]; then
+  echo "$status"
+  echo "regeneration dirtied the tree (a stale tracked artifact or a newly emitted file)" >&2
+  exit 1
+fi
+echo "regeneration left the tree clean"`)
+}
+
+// GoldenNightly runs the full non-race suite and the byte corpus on a cadence:
+// the canary for environment-driven divergence, such as a Go toolchain update
+// changing generated output.
+func (m *Machinery) GoldenNightly(ctx context.Context) (string, error) {
+	return m.shInShared(ctx, m.withDocker(m.baseAs(ciUser), "golden-nightly"), "golden-nightly", `
+go test -count=1 ./... -timeout=20m
+go test -count=1 -run TestGolden ./cmd/machinery`)
 }
 
 // ------------------------------------------------------------------ all ---

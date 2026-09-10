@@ -451,7 +451,7 @@ func TestExampleInventoryIsClosedAndDrivesEveryRunner(t *testing.T) {
 
 	// The hosted Linux jobs consume the inventory through the module; nightly
 	// still runs its own steps, so it keeps its own copy of the contract.
-	for _, file := range []string{"Makefile", "scripts/preflight.sh", ".dagger/main.go", ".github/workflows/nightly.yml"} {
+	for _, file := range []string{"Makefile", "scripts/preflight.sh", ".dagger/main.go"} {
 		body := mustRepositoryFile(t, filepath.Join(repo, filepath.FromSlash(file)))
 		if !strings.Contains(body, "example-inventory.sh") && file != "Makefile" {
 			t.Errorf("%s does not consume the checked example inventory", file)
@@ -670,7 +670,6 @@ func TestShellGitOperationsUseBoundedSanitizedRunner(t *testing.T) {
 	}
 	for _, rel := range []string{
 		".dagger/main.go",
-		".github/workflows/nightly.yml",
 		".github/workflows/release.yml",
 	} {
 		body := mustRepositoryFile(t, filepath.Join(repo, filepath.FromSlash(rel)))
@@ -864,8 +863,9 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		"go run ./scripts/git-safe -root . -- status --porcelain --untracked-files=all",
 		"formal verification regenerated tracked content or emitted an untracked artifact",
 	)
-	nightly := mustRepositoryFile(t, filepath.Join(root, ".github", "workflows", "nightly.yml"))
-	requireAll("nightly workflow", nightly,
+	ciDelegates(t, "nightly.yml", "dagger call regen-clean-tree", "dagger call golden-nightly",
+		"dagger call govulncheck", "dagger call integration-evidence")
+	requireAll("nightly owner", ciOwnerBody(t),
 		"scripts/example-inventory.sh formal",
 		`oracle "$design/machines"`,
 	)
