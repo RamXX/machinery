@@ -20,7 +20,7 @@ import (
 // Makefile and the release workflow both inject it). Versions are numeric
 // only: the plain default below is what a bare `go build` without ldflags
 // reports, identical to the released binary of the same version.
-var version = "v0.7.2"
+var version = "v0.7.3"
 
 const activationReexecGuardEnv = "MACHINERY_INTERNAL_ACTIVATION_REEXEC_GUARD"
 
