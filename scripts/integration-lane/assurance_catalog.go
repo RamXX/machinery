@@ -682,8 +682,15 @@ func executeAssuranceSuite(ctx context.Context, custody *laneCustody, root, scra
 	case "python-unittest/v1":
 		// unittest writes its verbose per-case results and summary to the
 		// native stderr channel; that stream is the accounted evidence.
+		// -B is load-bearing, not hygiene: without it CPython writes
+		// __pycache__ bytecode into its own stdlib on first import of an
+		// uncached module, and runtimeclosure fingerprints that stdlib tree
+		// into the pinned closure digest. A suite run concurrently with the
+		// closure tests would otherwise move the trust root mid-run. -I does
+		// not imply -B (it implies -E -s), so PYTHONDONTWRITEBYTECODE in the
+		// environment cannot cover this invocation either.
 		var pythonErr string
-		_, pythonErr, runErr = custody.run(ctx, scratch, scratch, environment(nil), duration, s.StdoutLimit, s.StderrLimit, paths["python"], "-I", "-m", "unittest", "discover", "-v", "-s", ".", "-p", filepath.Base(s.Sources[0]))
+		_, pythonErr, runErr = custody.run(ctx, scratch, scratch, environment(nil), duration, s.StdoutLimit, s.StderrLimit, paths["python"], "-I", "-B", "-m", "unittest", "discover", "-v", "-s", ".", "-p", filepath.Base(s.Sources[0]))
 		evidenceStream = pythonErr
 		eventErr = accountPython(pythonErr, &r)
 	case "elixir-exunit/v1":
