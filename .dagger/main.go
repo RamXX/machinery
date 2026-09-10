@@ -32,6 +32,7 @@ const (
 	goTestTimeout   = "30m"
 	sharedTmpPath   = "/shared"
 	gitleaksImage   = "zricethezav/gitleaks:v8.30.0"
+	ciUser          = "ci"
 	shellcheckPlatf = dagger.Platform("linux/amd64")
 )
 
@@ -78,20 +79,42 @@ func (m *Machinery) platform() dagger.Platform { return dagger.Platform(m.Platfo
 // Base is the pinned polyglot toolchain: the exact runtime identities the
 // assurance catalog requires, built from the Dockerfile that already owns
 // them. Cache volumes keep the Go module and build caches warm across runs.
-func (m *Machinery) Base() *dagger.Container {
-	c := m.Source.
+func (m *Machinery) Base() *dagger.Container { return m.baseAs("") }
+
+// baseAs builds the toolchain container owned by user, or by root when user
+// is empty.
+//
+// Root is wrong for the test sweep: the hosted runner executes as an
+// unprivileged user, and root bypasses permission bits, so custody tests that
+// assert an unwritable path is refused silently pass instead
+// (TestStorePermissionCustody is the one that catches it). Running the sweep
+// as a real unprivileged user keeps that coverage rather than skipping it.
+func (m *Machinery) baseAs(user string) *dagger.Container {
+	img := m.Source.
 		DockerBuild(dagger.DirectoryDockerBuildOpts{
 			Dockerfile: "scripts/ci-linux.dockerfile",
 			Platform:   m.platform(),
-		}).
+		})
+	cacheOpts := dagger.ContainerWithMountedCacheOpts{}
+	dirOpts := dagger.ContainerWithMountedDirectoryOpts{}
+	if user != "" {
+		img = img.WithExec([]string{"bash", "-c",
+			"id -u " + user + " >/dev/null 2>&1 || useradd -u 1000 -m -s /bin/bash " + user})
+		cacheOpts.Owner = user
+		dirOpts.Owner = user
+	}
+	c := img.
 		WithEnvVariable("GOCACHE", "/gocache").
 		WithEnvVariable("GOMODCACHE", "/gomodcache").
-		WithMountedCache("/gocache", dag.CacheVolume("machinery-gocache")).
-		WithMountedCache("/gomodcache", dag.CacheVolume("machinery-gomodcache")).
-		WithMountedDirectory("/src", m.Source).
+		WithMountedCache("/gocache", dag.CacheVolume("machinery-gocache"), cacheOpts).
+		WithMountedCache("/gomodcache", dag.CacheVolume("machinery-gomodcache"), cacheOpts).
+		WithMountedDirectory("/src", m.Source, dirOpts).
 		WithWorkdir("/src")
 	if m.ErlFlags != "" {
 		c = c.WithEnvVariable("ERL_FLAGS", m.ErlFlags)
+	}
+	if user != "" {
+		c = c.WithUser(user)
 	}
 	return c
 }
@@ -146,7 +169,10 @@ func (m *Machinery) withDocker(c *dagger.Container, job string) *dagger.Containe
 	return c.
 		WithServiceBinding("docker", m.dockerd()).
 		WithEnvVariable("DOCKER_HOST", "tcp://docker:2375").
-		WithMountedCache(sharedTmpPath, m.sharedTmp()).
+		// uid 1000 so an unprivileged job can write here; root is not
+		// blocked by a 1000-owned directory.
+		WithMountedCache(sharedTmpPath, m.sharedTmp(),
+			dagger.ContainerWithMountedCacheOpts{Owner: "1000:1000"}).
 		WithExec([]string{"mkdir", "-p", sharedTmpPath + "/tmp/" + job}).
 		WithEnvVariable("TMPDIR", sharedTmpPath+"/tmp/"+job)
 }
@@ -290,7 +316,7 @@ echo "go.mod and go.sum tidy"`)
 
 // Test is the full race sweep over every package: the hosted ci test job.
 func (m *Machinery) Test(ctx context.Context) (string, error) {
-	return m.shInShared(ctx, m.withDocker(m.Base(), "test"), "test",
+	return m.shInShared(ctx, m.withDocker(m.baseAs(ciUser), "test"), "test",
 		`go test -race -count=1 ./... -timeout=`+goTestTimeout)
 }
 
