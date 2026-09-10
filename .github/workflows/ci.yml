@@ -195,7 +195,17 @@ jobs:
       - name: Documentation surface gate
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: dagger call docs --base-ref="$BASE_SHA"
+        run: |
+          set -euo pipefail
+          # github.event.before is all-zeros on the first push to a new branch,
+          # and names a commit this checkout may not have after a force push.
+          # Either way the aggregate change is measured against the parent.
+          base="${BASE_SHA:-}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="HEAD~1"
+          fi
+          dagger call docs --base-ref="$base"
 
   # ----------------------------------------------------------- tidy gate ---
   # go.mod / go.sum must be tidy and in sync. A stray dependency or a missing
