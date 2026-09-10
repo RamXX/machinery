@@ -305,7 +305,12 @@ func (a *PythonAdapter) Prepare(ctx context.Context, req tdd.SuiteRequest) (tdd.
 		suite: &suiteCopy, inputs: req.Inputs, scope: req.Scope, scratch: req.Scratch,
 		suiteDir: suiteDir, inventory: inventoryPath, report: filepath.Join(req.Scratch, "report.jsonl"),
 		pythonBin: handle.Binary(), closure: identity.Closure,
-		argv: []string{"-I", bootstrap, "run", inventoryPath, filepath.Join(req.Scratch, "report.jsonl")},
+		// -B, not just PYTHONDONTWRITEBYTECODE in env: -I is isolated mode,
+		// which makes CPython ignore every PYTHON* environment variable, so
+		// the env setting below cannot reach this interpreter. Without -B it
+		// writes __pycache__ into its own stdlib, and runtimeclosure
+		// fingerprints that tree into the pinned closure digest.
+		argv: []string{"-I", "-B", bootstrap, "run", inventoryPath, filepath.Join(req.Scratch, "report.jsonl")},
 		env:  env, limits: limits, fileDigests: digests,
 	}), nil
 }
@@ -455,8 +460,10 @@ func pythonRunProbe(ctx context.Context, scope processscope.Scope, handle *runti
 	}
 	var stdout, stderr bytes.Buffer
 	result, err := goGuardedChild(ctx, scope, processscope.Command{
-		Executable:    handle.Binary(),
-		Args:          append([]string{"-I", bootstrap}, args...),
+		Executable: handle.Binary(),
+		// -B for the same reason as the suite argv: isolated mode ignores
+		// PYTHONDONTWRITEBYTECODE from the environment.
+		Args:          append([]string{"-I", "-B", bootstrap}, args...),
 		Dir:           dir,
 		Env:           env,
 		RuntimeDigest: handle.Identity().Closure,
