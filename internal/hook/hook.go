@@ -1795,6 +1795,12 @@ func selectGatesCheckedInSnapshot(snapshot *gates.Snapshot, designDir string, cf
 		// decomposed parent: the manifest BUILD.md is still its artifact
 		run["gb"] = true
 	}
+	if gates.HasSliceMap(designDir) {
+		// an authored slice map is checkable from the design alone: a
+		// citation that stopped resolving, or a claim that moved, is exactly
+		// the drift an executor would otherwise inherit in its packet
+		run["gw"] = true
+	}
 	if gates.EmbedActive(designDir) {
 		// a declared embed is checkable from the documents alone, so the
 		// stop hook holds it at every turn end: a copy edited on one side is

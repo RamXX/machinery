@@ -36,7 +36,7 @@ func TestFlagUsageStringsCarryNoBackquotes(t *testing.T) {
 func allCommands() []*cobra.Command {
 	return []*cobra.Command{
 		newLintCmd(), newOracleCmd(), newTokensEqualCmd(), newTLACmd(), newAlloyCmd(),
-		newRefineCmd(), newComposeCmd(), newCheckCmd(), newAttestCmd(), newProjectCmd(),
+		newRefineCmd(), newComposeCmd(), newCheckCmd(), newAttestCmd(), newProjectCmd(), newPacketCmd(),
 		newVerifyCheckersCmd(), newBaselineCmd(), newVerifyFormalCmd(), newVerifyC4Cmd(),
 		newPackCmd(), newEmbedCmd(), newScaleCmd(), newSweepCmd(), newDoctorCmd(),
 		newPreflightCmd(), newInstallCmd(), newUpdateCmd(), newUninstallCmd(),

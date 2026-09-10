@@ -1,0 +1,27 @@
+schema: 1
+milestones:
+  - id: M1
+    slices:
+      - id: M1-S1
+        shard: BUILD/core.md
+        budget: 12000
+        cites:
+          - section:BUILD/core.md#8.1
+          - milestone:BUILD/core.md
+          - section:BUILD.md#11
+          - DEAL-38ba11
+          - matrix:Deal
+          - boundary:crm.domain
+          - external:external.db
+          - rule:crm.domain -> crm.repo
+          - row:ARCHITECTURE.md#3#db
+          - row:ARCHITECTURE.md#6#crm.domain -> crm.repo
+          - invariant:deal-stage-forward
+      - id: M1-S2
+        shard: BUILD/core.md
+        budget: 12000
+        cites:
+          - section:BUILD/core.md#8.2
+          - DEAL-1fe825
+          - oracleset:formal/Policy.oracle.md
+          - invariant:rbac-write-scope

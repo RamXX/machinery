@@ -1,0 +1,14 @@
+kind: DomainModel
+version: v1
+title: Deal desk
+entities:
+  Deal:
+    attributes:
+      stage: DealStage
+invariants:
+  - id: deal-stage-forward
+    statement: >
+      A deal's stage only moves forward, except through the sanctioned reopen.
+  - id: rbac-write-scope
+    statement: >
+      Only an actor whose role grants write scope may mutate a deal.

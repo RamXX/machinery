@@ -1,0 +1,38 @@
+# Authored slice map for the per-slice packet projection (machinery packet, Gw-packet).
+# M1 is the Deal aggregate slice; its DoD owes every row of the Deal oracle. Two slices
+# split that work by concern without splitting any source: M1-S1 builds the lifecycle
+# machine against its oracle and matrix, M1-S2 builds the persist overlay against the
+# repository contract and the mitigation posture. Only M1-S1 claims oracle rows.
+schema: 1
+milestones:
+  - id: M1
+    slices:
+      - id: M1-S1
+        shard: BUILD.md
+        budget: 90000
+        cites:
+          - milestone:BUILD.md
+          - section:BUILD.md#5.1
+          - section:BUILD.md#7.1
+          - section:BUILD.md#11
+          - oracleset:machines/Deal.oracle.md
+          - matrix:Deal
+          - boundary:crm.domain
+          - rule:crm.domain -> crm.authz
+          - rule:crm.domain -> crm.repo
+          - invariant:deal-stage-forward
+          - invariant:deal-won-has-closedate
+          - invariant:rbac-write-scope
+      - id: M1-S2
+        shard: BUILD.md
+        budget: 60000
+        cites:
+          - milestone:BUILD.md
+          - section:BUILD.md#4.6
+          - section:BUILD.md#4.7
+          - section:BUILD.md#11
+          - boundary:crm.repo
+          - external:external.ladybug
+          - rule:crm.repo -> external.ladybug
+          - row:ARCHITECTURE.md#5#crm.commands -> crm.repo
+          - section:ARCHITECTURE.md#6

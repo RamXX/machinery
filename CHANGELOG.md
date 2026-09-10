@@ -6,6 +6,33 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **`machinery packet` and the `Gw-packet` gate: bounded per-slice executor packets projected
+  from an authored slice map.** A manifest-mode design can exceed the context window of the
+  executor that has to build one of its slices (H2's M1: 300K to 470K tokens per slice against a
+  200K budget). The owner ruled that the sources are not split by hand and the executor is not
+  swapped for a larger one. The design gains one authored, machine-readable artifact,
+  `design/slices.yaml`, binding each slice of a milestone to exactly one BUILD shard, a byte
+  budget, and the element ids it cites: oracle rows by stable id, whole oracle sets, matrices,
+  shard sections by heading id, milestone blocks, files, Architecture Contract boundaries,
+  externals, dependency rules and table rows, and invariants. `machinery packet <design>
+  --milestone M1 --out <dir>` projects one packet per slice carrying only what the slice cites,
+  every excerpt a verbatim copy under its citation and source `path:line`, plus the milestone's
+  computed obligation ledger, the acceptance entry shape, and the lines drawn per source. The
+  projection reads ids and never prose: re-wording the slice narrative in BUILD.md changes no
+  packet. It is byte-reproducible for the same design bytes, and the golden corpus pins it over a
+  committed fixture design. The budget is a byte proxy with one fixed documented divisor (3 bytes
+  per token; declare a 200K-token executor as `budget: 600000`); no tokenizer is vendored or
+  called. `Gw-packet` auto-activates on `slices.yaml`, runs after `Gb-plan`, and fails closed:
+  every citation resolves to exactly one excerpt, every packet fits its budget, and every
+  obligation the milestone owes (the DoD-cited oracle ids `Ga-accept` binds evidence to,
+  `ORACLESET{...}` expanded) is claimed by exactly one slice or carries a recorded waiver;
+  unclaimed, double-claimed and claimed-and-waived obligations, stale waivers, dangling
+  citations and missing shards are ERRORs. The command runs the gate first and writes nothing
+  when it fails. The stop hook selects `gw` whenever the map exists. Reference:
+  [docs/packet-projection.md](docs/packet-projection.md).
+
 ### Fixed
 
 - **A publish in flight is no longer read as store corruption.** `publishImmutableFile` stages its

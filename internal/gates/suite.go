@@ -246,7 +246,7 @@ func (s *Snapshot) VersionSkewNote(gs []*Gate) string {
 // KnownGate; two hand-kept lists once drifted.
 var knownGateSet = map[string]bool{
 	"gm": true, "gs": true, "gu": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
-	"g3": true, "gd": true, "gl": true, "gx": true, "gk": true, "gb": true, "ge": true, "ga": true, "gj": true, "gv": true, "g4": true, "gt": true, "g5": true,
+	"g3": true, "gd": true, "gl": true, "gx": true, "gk": true, "gb": true, "gw": true, "ge": true, "ga": true, "gj": true, "gv": true, "g4": true, "gt": true, "g5": true,
 }
 
 // KnownGate reports whether name names a gate this suite can run.
@@ -343,7 +343,7 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 	if err := validateActivationDiscovery(design); err != nil {
 		return sel, err
 	}
-	list := "gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,ge,ga,gj,gv,g4,gt,g5"
+	list := "gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
@@ -392,6 +392,9 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 			}
 			if HasBuildDoc(design) {
 				parts = append(parts, "gb")
+			}
+			if HasSliceMap(design) {
+				parts = append(parts, "gw")
 			}
 			if EmbedActive(design) {
 				parts = append(parts, "ge")
@@ -538,6 +541,9 @@ func runSelectedInSnapshot(design, impl string, sel Selection, opt RunOptions) [
 	}
 	if sel.Run["gb"] && (sel.Explicit || opt.Complete || HasBuildDoc(design)) {
 		out = append(out, CheckBuildPlan(design))
+	}
+	if sel.Run["gw"] && (sel.Explicit || HasSliceMap(design)) {
+		out = append(out, CheckPackets(design))
 	}
 	if sel.Run["ge"] && (sel.Explicit || EmbedActive(design)) {
 		out = append(out, CheckEmbeds(design))

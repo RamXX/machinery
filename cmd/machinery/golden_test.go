@@ -493,3 +493,33 @@ func assertSameFileSet(t *testing.T, goldenDirPath string, produced []string, ex
 		t.Errorf("golden files no longer produced: %v", missing)
 	}
 }
+
+// TestGoldenPacket pins the per-slice packet projection byte for byte over the
+// committed fixture design: the same design bytes must produce the same
+// packets on every platform and every run (MAC-jr21 acceptance criterion 2).
+func TestGoldenPacket(t *testing.T) {
+	root := repoRootDir(t)
+	design := filepath.Join(root, "testdata", "packet-fixture", "design")
+	outDir := t.TempDir()
+	out, errS, code := runBin(t, "packet", "--milestone", "M1", "--out", outDir, design)
+	out = strings.ReplaceAll(out, filepath.ToSlash(outDir), "<out>")
+	g := goldenDir(t, "packet-fixture")
+	compareOrUpdate(t, filepath.Join(g, "stdout.txt"), out)
+	compareOrUpdate(t, filepath.Join(g, "stderr.txt"), errS)
+	compareOrUpdate(t, filepath.Join(g, "exitcode.txt"), fmt.Sprintf("%d\n", code))
+	produced, err := filepath.Glob(filepath.Join(outDir, "*.packet.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(produced) == 0 {
+		t.Fatal("packet produced no packets")
+	}
+	for _, p := range produced {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compareOrUpdate(t, filepath.Join(g, filepath.Base(p)), string(data))
+	}
+	assertSameFileSet(t, g, produced, ".md")
+}

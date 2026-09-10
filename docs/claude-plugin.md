@@ -77,7 +77,8 @@ matching `formal/{policy,integrity,isolation}.relational.yaml` exists (the relat
 [policy](policy-layer.md), [integrity](integrity-layer.md), and [isolation](isolation-layer.md)
 guides), G2 once `workspace.dsl` or `ARCHITECTURE.md` exists, G3
 once `machines/*.machine.json` exist, Gx once the domain model and machines both exist, Gb once
-`BUILD.md` exists, Ga once `acceptance/` exists or a milestone is marked `Status: closed` (see the
+`BUILD.md` exists, Gw once `slices.yaml` exists (the authored slice map; see the
+[packet projection guide](packet-projection.md)), Ga once `acceptance/` exists or a milestone is marked `Status: closed` (see the
 [milestone acceptance guide](acceptance-gate.md)), Gv once `attestations.yaml` exists (the
 committed attested-claim rows; see the [attestation evidence guide](attestation-evidence.md), and
 note that the stop hook is exactly where staleness must surface, since the turn that edited a

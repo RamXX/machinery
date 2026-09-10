@@ -31,6 +31,7 @@ func TestEveryTopLevelCommandClassifiesDesignAccess(t *testing.T) {
 		"newCheckCmd":          {"reader", []string{"default", "selected-gate", "complete"}},
 		"newAttestCmd":         {access: "stable-file-reader"},
 		"newProjectCmd":        {access: "writer"},
+		"newPacketCmd":         {"reader", []string{"default"}},
 		"newVerifyCheckersCmd": {"reader", []string{"all", "selected"}},
 		"newBaselineCmd":       {access: "writer"},
 		"newVerifyFormalCmd":   {access: "writer"},
@@ -178,6 +179,9 @@ func designReaderContractCases() []designReaderContractCase {
 			return []string{"--registry", registry, "--checker", "test", design}
 		}},
 		{"newVerifyC4Cmd", "default", newVerifyC4Cmd, func(design, _, _ string) []string { return []string{design} }},
+		{"newPacketCmd", "default", newPacketCmd, func(design, impl, _ string) []string {
+			return []string{"--milestone", "M1", "--out", filepath.Join(impl, "packets"), design}
+		}},
 		{"newEmbedCmd", "refresh-dry-run", newEmbedCmd, func(design, _, _ string) []string { return []string{"refresh", "--dry-run", design} }},
 		{"newScaleCmd", "default", newScaleCmd, func(design, _, _ string) []string { return []string{design} }},
 		{"newSweepCmd", "default", newSweepCmd, func(design, _, _ string) []string { return []string{designAccessMarker, design} }},

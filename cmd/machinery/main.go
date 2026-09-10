@@ -80,6 +80,7 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newCheckCmd())
 	root.AddCommand(newAttestCmd())
 	root.AddCommand(newProjectCmd())
+	root.AddCommand(newPacketCmd())
 	root.AddCommand(newVerifyCheckersCmd())
 	root.AddCommand(newBaselineCmd())
 	root.AddCommand(newVerifyFormalCmd())
