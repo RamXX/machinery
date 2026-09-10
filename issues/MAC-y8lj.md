@@ -7,8 +7,8 @@ type: task
 labels: [ci, dagger, release]
 created_at: 2026-09-10T14:34:57Z
 created_by: ramirosalas
-updated_at: 2026-09-10T14:34:57Z
-content_hash: "sha256:d5878763ea6205856691b0cec675a9ae47eca02d04dad7c5954d72168db21f99"
+updated_at: 2026-09-10T16:40:13Z
+content_hash: "sha256:0b42c150bbb306ffb3bfdeede5da82b114c436d43e8ed41c98d4da92c9d2a18e"
 ---
 
 ## Description
@@ -83,3 +83,6 @@ failure is most expensive.
 
 
 ## Comments
+
+### 2026-09-10T16:40:13Z ramirosalas
+2026-09-10: deliberately left unconverted for the 0.8.0 release. The acceptance criterion requires the converted build's exported artifacts to byte-match what the pre-change pipeline produced for the same commit and version before publication, and the pre-change pipeline only runs on the tag push that publishes, so no validation path existed inside this release. Next release: land the ReleaseBuild function and the delegated build job on main first, then compare its artifacts against the previous release's assets for that release's commit before tagging.
