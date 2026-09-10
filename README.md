@@ -4,6 +4,7 @@
 [![Formal Verification](https://github.com/RamXX/machinery/actions/workflows/formal.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/formal.yml)
 [![Security](https://github.com/RamXX/machinery/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/security.yml)
 [![Nightly](https://github.com/RamXX/machinery/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/nightly.yml)
+[![Local CI: Dagger](https://img.shields.io/badge/local%20CI-Dagger%20v0.21.9-131226)](.dagger/main.go)
 [![Go Reference](https://pkg.go.dev/badge/github.com/RamXX/machinery.svg)](https://pkg.go.dev/github.com/RamXX/machinery)
 [![Go Report Card](https://goreportcard.com/badge/github.com/RamXX/machinery)](https://goreportcard.com/report/github.com/RamXX/machinery)
 
@@ -916,6 +917,39 @@ CI runs `go test -race ./...`. Beyond unit tests, three stronger nets are always
   test inventories, pinned runtimes, real process/teardown accounting, and no skips: missing
   infrastructure fails the lane with a diagnostic, it is never silently skipped. The same union of
   lane fragments runs in local preflight and hosted CI.
+
+### Where the gates run
+
+The same gates run in three tiers. Nothing in a lower tier is a substitute for a higher one, and
+each tier states what it cannot cover rather than reporting a thinner run as green.
+
+| Tier | Command | Covers | Cost |
+|------|---------|--------|------|
+| Pre-push | `make preflight-fast` | the cheap gate tier the hook enforces on every push | under 5 minutes |
+| Local, native | `make preflight` | the fast tier plus the race sweep, the required integration lane, formal verification, C4 compilation, and checker reproduction, all on the host | tens of minutes |
+| Local, containerized | `make dagger-ci` | every containerizable hosted job, reproducibly | tens of minutes |
+| Release gate | hosted CI | all of the above plus the macOS-only jobs | on every push |
+
+`make dagger-ci` runs the [Dagger](https://dagger.io/) module in `.dagger/`, where each function is
+one hosted job. Run a single job with `make dagger-job JOB=lint`, and `dagger functions` lists them.
+The module does not restate the runtime pins: its base container is built from
+`scripts/ci-linux.dockerfile`, which remains the single owner of the Go, Node, TypeScript, CPython,
+and Elixir/OTP identities and is shared with `make ci-linux`. The race sweep runs as an
+unprivileged user inside the container, because root bypasses permission bits and would turn the
+custody tests that assert an unwritable path is refused into silent passes.
+
+Three things the containerized tier deliberately does not claim:
+
+- **The macOS jobs.** `native-tests` and `golden-native` exercise the supported non-Linux
+  filesystem and the byte corpus on darwin. A Linux container cannot reproduce them, and hosted CI
+  remains their only gate.
+- **The two platform-pinned jobs on an arm64 host.** The assurance catalog pins `linux/amd64` and
+  `darwin/arm64` as the only native assurance platforms, so `test` and `integration-required` fail
+  closed in a `linux/arm64` container. On Apple Silicon run them natively through `make preflight`,
+  which is on a pinned platform, or containerized on a `linux/amd64` machine. Emulation is not a
+  workaround: the identity probes build a closed environment that cannot carry the BEAM flags an
+  emulated OTP needs.
+- **GitHub-native checks.** `dependency-review` is a hosted action with no local equivalent.
 
 ## Built on
 
