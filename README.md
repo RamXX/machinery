@@ -927,22 +927,31 @@ each tier states what it cannot cover rather than reporting a thinner run as gre
 |------|---------|--------|------|
 | Pre-push | `make preflight-fast` | the cheap gate tier the hook enforces on every push | under 5 minutes |
 | Local, native | `make preflight` | the fast tier plus the race sweep, the required integration lane, formal verification, C4 compilation, and checker reproduction, all on the host | tens of minutes |
-| Local, containerized | `make dagger-ci` | every containerizable hosted job, reproducibly | tens of minutes |
-| Release gate | hosted CI | all of the above plus the macOS-only jobs | on every push |
+| Local, containerized | `make dagger-ci` | every containerizable hosted job, byte-identical to what CI runs | tens of minutes |
+| Release gate | hosted CI | the same module functions, plus the macOS-only jobs | on every push |
 
-`make dagger-ci` runs the [Dagger](https://dagger.io/) module in `.dagger/`, where each function is
-one hosted job. Run a single job with `make dagger-job JOB=lint`, and `dagger functions` lists them.
-The module does not restate the runtime pins: its base container is built from
+The [Dagger](https://dagger.io/) module in `.dagger/` is not a local convenience that shadows CI:
+every Linux job in `ci.yml`, `formal.yml`, and `security.yml` is a `dagger call` of the function
+named after it, so the gate has one definition and `make dagger-ci` runs what the runner runs. Run
+a single job with `make dagger-job JOB=lint`; `dagger functions` lists them. The hosted runner
+installs the CLI from the version `dagger.json` owns, verified against a committed checksum.
+
+The module does not restate the runtime pins either: its base container is built from
 `scripts/ci-linux.dockerfile`, which remains the single owner of the Go, Node, TypeScript, CPython,
 and Elixir/OTP identities and is shared with `make ci-linux`. The race sweep runs as an
 unprivileged user inside the container, because root bypasses permission bits and would turn the
 custody tests that assert an unwritable path is refused into silent passes.
 
+The wiring guards in `cmd/machinery/repository_contract_test.go` and
+`scripts/integration-lane/main_test.go` hold this together: they require the module to carry each
+pinned command verbatim and the workflow to delegate rather than restate it, so neither half can
+drift from the other.
+
 Three things the containerized tier deliberately does not claim:
 
-- **The macOS jobs.** `native-tests` and `golden-native` exercise the supported non-Linux
-  filesystem and the byte corpus on darwin. A Linux container cannot reproduce them, and hosted CI
-  remains their only gate.
+- **The macOS jobs.** `native-tests`, `golden-native`, and the native darwin `build-native`
+  exercise the supported non-Linux filesystem and the byte corpus on darwin. A Linux container
+  cannot reproduce them, so they stay hand-written workflow steps and hosted CI is their only gate.
 - **The two platform-pinned jobs on an arm64 host.** The assurance catalog pins `linux/amd64` and
   `darwin/arm64` as the only native assurance platforms, so `test` and `integration-required` fail
   closed in a `linux/arm64` container. On Apple Silicon run them natively through `make preflight`,
