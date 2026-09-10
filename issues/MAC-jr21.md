@@ -4,10 +4,10 @@ title: "Per-slice packet projection: generate bounded executor packets from a de
 status: open
 priority: 0
 type: feature
-labels: [consumer, h2, build, packets]
+labels: [consumer, h2, build, packets, blocks-h2]
 created_at: 2026-09-08T21:59:19Z
 created_by: ramirosalas
-updated_at: 2026-09-10T14:36:38Z
+updated_at: 2026-09-10T14:36:44Z
 content_hash: "sha256:0e80b947fde4973b1d8628de545c9df378315dd650bbd1a35ff790c943ea8dcd"
 ---
 
