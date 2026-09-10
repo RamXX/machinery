@@ -31,7 +31,7 @@ ACTIONLINT_VERSION := $(shell cat .actionlint-version 2>/dev/null)
 INSTALL_DIR ?= $(HOME)/.local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: build dev-link uninstall test test-integration test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight preflight-fast ci-linux hooks lint-install help
+.PHONY: build dev-link uninstall test test-integration test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight preflight-fast dagger-ci dagger-job ci-linux hooks lint-install help
 
 build: ## Build the machinery binary from source into .bin/machinery (needs Go)
 	@mkdir -p .bin && go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery
@@ -93,6 +93,13 @@ preflight: ## Run every required local CI/formal gate: the fast tier, then the h
 
 preflight-fast: ## Run the cheap gate tier the pre-push hook runs (budget: under 5 minutes)
 	@scripts/preflight-fast.sh
+
+dagger-ci: ## Run every containerizable CI job in Dagger, concurrently (needs Docker)
+	@dagger call ci
+
+dagger-job: ## Run one Dagger CI job: make dagger-job JOB=lint (see: dagger functions)
+	@test -n "$(JOB)" || { echo "set JOB, for example: make dagger-job JOB=lint"; exit 1; }
+	@dagger call $(JOB)
 
 ci-linux: ## Reproduce the hosted race sweep + required lane in a pinned 2-CPU linux/amd64 container
 	@scripts/ci-linux.sh

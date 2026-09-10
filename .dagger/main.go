@@ -31,6 +31,7 @@ const (
 	modelithPin     = "github.com/stacklok/modelith/cmd/modelith@v0.4.0"
 	goTestTimeout   = "30m"
 	sharedTmpPath   = "/shared"
+	gitleaksImage   = "zricethezav/gitleaks:v8.30.0"
 	shellcheckPlatf = dagger.Platform("linux/amd64")
 )
 
@@ -40,6 +41,8 @@ type Machinery struct {
 	// Platform every job container runs on. Empty means the host's own
 	// architecture, which is what makes a local run fast.
 	Platform string
+	// Extra BEAM flags forwarded into every job container.
+	ErlFlags string
 }
 
 func New(
@@ -53,10 +56,21 @@ func New(
 	source *dagger.Directory,
 	// Target platform, for example linux/amd64 to mirror the hosted runners
 	// exactly. Defaults to the host architecture.
+	//
+	// The assurance catalog pins linux/amd64 and darwin/arm64 as the only
+	// native assurance platforms, so the integration lane fails closed
+	// anywhere else. On an arm64 host that means Test and
+	// IntegrationRequired need this set to linux/amd64, and then they run
+	// under emulation.
 	// +optional
 	platform string,
+	// Extra BEAM flags, forwarded the way scripts/ci-linux.sh forwards them.
+	// Under emulation the BEAM's JIT traps, and "+JMsingle true" is what
+	// makes an emulated Elixir suite run at all.
+	// +optional
+	erlFlags string,
 ) *Machinery {
-	return &Machinery{Source: source, Platform: platform}
+	return &Machinery{Source: source, Platform: platform, ErlFlags: erlFlags}
 }
 
 func (m *Machinery) platform() dagger.Platform { return dagger.Platform(m.Platform) }
@@ -65,7 +79,7 @@ func (m *Machinery) platform() dagger.Platform { return dagger.Platform(m.Platfo
 // assurance catalog requires, built from the Dockerfile that already owns
 // them. Cache volumes keep the Go module and build caches warm across runs.
 func (m *Machinery) Base() *dagger.Container {
-	return m.Source.
+	c := m.Source.
 		DockerBuild(dagger.DirectoryDockerBuildOpts{
 			Dockerfile: "scripts/ci-linux.dockerfile",
 			Platform:   m.platform(),
@@ -76,6 +90,10 @@ func (m *Machinery) Base() *dagger.Container {
 		WithMountedCache("/gomodcache", dag.CacheVolume("machinery-gomodcache")).
 		WithMountedDirectory("/src", m.Source).
 		WithWorkdir("/src")
+	if m.ErlFlags != "" {
+		c = c.WithEnvVariable("ERL_FLAGS", m.ErlFlags)
+	}
+	return c
 }
 
 // sharedTmp is one directory mounted at the same absolute path in both the
@@ -449,6 +467,17 @@ done
 echo "govulncheck clean"`)
 }
 
+// Gitleaks scans the full history and the working tree for secrets. The
+// hosted job uses the vendor's GitHub action; this is the same scanner from
+// the vendor's own pinned image.
+func (m *Machinery) Gitleaks(ctx context.Context) (string, error) {
+	return sh(ctx, dag.Container(dagger.ContainerOpts{Platform: m.platform()}).
+		From(gitleaksImage).
+		WithMountedDirectory("/src", m.Source).
+		WithWorkdir("/src"),
+		`gitleaks detect --source . --redact --verbose --no-banner`)
+}
+
 // ------------------------------------------------------------------ all ---
 
 type jobResult struct {
@@ -476,6 +505,7 @@ func (m *Machinery) Ci(ctx context.Context) (string, error) {
 		{"design-engines", m.DesignEngines},
 		{"verify-formal", m.VerifyFormal},
 		{"govulncheck", m.Govulncheck},
+		{"gitleaks", m.Gitleaks},
 		{"integration-required", m.IntegrationRequired},
 		{"test", m.Test},
 	}
