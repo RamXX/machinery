@@ -1,5 +1,5 @@
 ---- MODULE Session ----
-\* machinery-version: v0.7.3
+\* machinery-version: v0.7.2
 EXTENDS Naturals
 
 \* Generated from Session.machine.json by machinery tla. Control-flow model.

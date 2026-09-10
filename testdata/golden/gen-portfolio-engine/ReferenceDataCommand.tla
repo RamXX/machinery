@@ -1,5 +1,5 @@
 ---- MODULE ReferenceDataCommand ----
-\* machinery-version: v0.7.3
+\* machinery-version: v0.7.2
 EXTENDS Naturals
 
 \* Generated from ReferenceDataCommand.machine.json by machinery tla. Control-flow model.

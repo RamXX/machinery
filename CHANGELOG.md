@@ -6,8 +6,6 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
-## [0.7.3] - 2026-09-10
-
 ### Fixed
 
 - **A publish in flight is no longer read as store corruption.** `publishImmutableFile` stages its
@@ -53,32 +51,6 @@ under their version heading when a release is cut.
   be blind. One channel serves a whole rooted traversal. The regression tests stub the change stamp
   to a constant, which is what a coarse-clock host effectively returns, so they reproduce the
   blindness and prove the fix on every host regardless of the real clock resolution.
-
-### Compatibility and migration
-
-**Regeneration stamp.** The `machinery-version:` families and the pii-flow checker projection move
-from `v0.7.2` to `v0.7.3` and nothing else in them changes. Regenerate with the commands the gate
-suite prints and commit the stamp-only diff on its own.
-
-**The directory and content witnesses can now refuse where they previously accepted.** This is a
-proof-scope change in the stronger direction, and it has an operational edge. On Linux and the BSDs
-the witness arms a kernel mutation-event channel (an inotify instance or a kqueue) for the duration
-of each enumeration. A host that cannot supply one, most plausibly a Linux box whose
-`fs.inotify.max_user_instances` is exhausted, now fails the enumeration closed rather than falling
-back to a change stamp whose resolution may be blind. The remedy is to raise that limit; the gate
-will not silently degrade. Windows is unchanged: its witness is the NTFS ChangeTime read from the
-retained handle, which this blindness does not apply to, so no event channel is used or required
-there. A platform machinery does not build for refuses rather than degrading.
-
-**What a green gate now establishes.** On a host whose inode clock is one timer tick wide, which is
-every Linux kernel before mainline 6.13, a create-then-delete or a rename-and-back inside one tick
-was previously accepted by the directory inventories, and a write-restore-and-reset-mtime inside one
-tick was previously accepted by the file content fingerprints. Both are now caught. A design that
-passed `machinery check` on such a host under 0.7.2 was proved less than the output claimed; re-run
-the gates on 0.7.3 to get the evidence the run reports.
-
-**No schema, CLI, attestation or installation-receipt changes.** A 0.7.2 install migrates with
-`machinery update --version v0.7.3` and nothing else.
 
 ## [0.7.2] - 2026-09-09
 
