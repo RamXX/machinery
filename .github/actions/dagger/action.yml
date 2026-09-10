@@ -1,0 +1,25 @@
+# dagger - install the pinned Dagger CLI, verified against a committed checksum.
+#
+# The version has one owner: dagger.json's engineVersion, which is also what
+# every local `dagger call` uses. The checksum is committed beside it so a
+# moved or replaced upstream artifact fails the job instead of running.
+name: dagger
+description: Install the pinned Dagger CLI verified against the committed checksum
+runs:
+  using: composite
+  steps:
+    - name: Install the pinned Dagger CLI
+      shell: bash
+      run: |
+        set -euo pipefail
+        version=$(jq -r '.engineVersion' dagger.json | sed 's/^v//')
+        test -n "$version" && test "$version" != "null"
+        checksum=$(cat .dagger-linux-amd64.sha256)
+        archive="$RUNNER_TEMP/dagger.tar.gz"
+        curl -fsSL "https://dl.dagger.io/dagger/releases/${version}/dagger_v${version}_linux_amd64.tar.gz" -o "$archive"
+        echo "$checksum  $archive" | sha256sum -c -
+        install_dir="$RUNNER_TEMP/dagger-bin"
+        mkdir -p "$install_dir"
+        tar -xzf "$archive" -C "$install_dir" dagger
+        test "$("$install_dir/dagger" version | awk '{print $2}')" = "v${version}"
+        echo "$install_dir" >> "$GITHUB_PATH"

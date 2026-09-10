@@ -27,17 +27,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/assurance-runtimes
-      # Linux hosted runners provide Docker; the lane verifies it and
-      # provisions its immutable OCI and private Java/TLC closure.
-      # The lane retains its report and every evidence file of the run in one
-      # directory. Naming that directory here, rather than in the invocation
-      # the wiring guards pin exactly, lets a failed run hand the evidence
-      # back: a remote-only failure is otherwise undiagnosable.
+      - uses: ./.github/actions/dagger
+      # The lane's evidence directory is exported whatever the outcome, so a
+      # remote-only failure stays diagnosable from what the runner kept.
       - name: Required runtime integration
-        env:
-          MACHINERY_INTEGRATION_REPORT_DIR: ${{ runner.temp }}/integration-required-evidence
-        run: go run ./scripts/integration-lane --lane required
+        run: |
+          set -euo pipefail
+          dagger call integration-evidence export --path="$RUNNER_TEMP/integration-required-evidence"
+          cat "$RUNNER_TEMP/integration-required-evidence/console.txt"
+          test "$(cat "$RUNNER_TEMP/integration-required-evidence/exit")" = 0
       - name: Retain required integration evidence
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -52,28 +50,20 @@ jobs:
   # test execution remains out of scope (custody and assurance lanes are
   # unix-only and refuse honestly there).
   # Verifies CGO_DISABLED static builds work (the release pipeline depends on it).
+  # Every cross-compiled target is built in one container, which also smoke-
+  # tests the one target that can execute there. Darwin is built and smoke-
+  # tested natively below, because no Linux container can run a darwin binary.
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            goos: linux
-            goarch: amd64
-            native: true
-          - os: ubuntu-latest
-            goos: linux
-            goarch: arm64
-            native: false
-          - os: macos-latest
-            goos: darwin
-            goarch: arm64
-            native: true
-          - os: ubuntu-latest
-            goos: windows
-            goarch: amd64
-            native: false
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/dagger
+      - run: dagger call build
+
+  build-native:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -82,15 +72,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Build (static, CGO disabled)
+      - name: Build (static, CGO disabled) on native darwin/arm64
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
         run: go build -trimpath -ldflags "-s -w -X main.version=ci" -o machinery ./cmd/machinery
       - name: Smoke-test --version
-        # Cross-compiled targets cannot execute on the build runner.
-        if: matrix.native
         run: ./machinery version
 
   # ----------------------------------------------------------------- lint ---
@@ -102,56 +88,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: gofmt (formatting gate)
-        run: |
-          unformatted=$(gofmt -l cmd/ internal/)
-          if [ -n "$unformatted" ]; then
-            echo "::error::Files are not gofmt-clean:"
-            echo "$unformatted"
-            exit 1
-          fi
-      - name: go vet
-        run: go vet ./...
-      - name: Install and run pinned actionlint
-        run: |
-          version=$(cat .actionlint-version)
-          go install github.com/rhysd/actionlint/cmd/actionlint@"$version"
-          actionlint .github/workflows/*.yml
-      - name: Install and run pinned ShellCheck on the closed shell corpus
-        run: |
-          set -euo pipefail
-          version=$(cat .shellcheck-version)
-          checksum=$(cat .shellcheck-linux-x86_64.sha256)
-          archive="$RUNNER_TEMP/shellcheck.tar.xz"
-          install_dir="$RUNNER_TEMP/shellcheck"
-          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${version}/shellcheck-v${version}.linux.x86_64.tar.xz" -o "$archive"
-          echo "$checksum  $archive" | sha256sum -c -
-          mkdir -p "$install_dir"
-          tar -xJf "$archive" --strip-components=1 -C "$install_dir"
-          test "$("$install_dir/shellcheck" --version | awk '$1 == "version:" {print $2}')" = "$version"
-          scripts/shellcheck-inventory.sh >"$RUNNER_TEMP/shellcheck-files"
-          shell_files=()
-          while IFS= read -r shell_file; do
-            shell_files+=("$shell_file")
-          done <"$RUNNER_TEMP/shellcheck-files"
-          test "${#shell_files[@]}" -gt 0
-          "$install_dir/shellcheck" "${shell_files[@]}"
-      - name: Read pinned golangci-lint version
-        id: gciv
-        run: echo "version=$(cat .golangci-version)" >> "$GITHUB_OUTPUT"
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          # Uses the v2 config in .golangci.yml. The linter version is the single
-          # source of truth in .golangci-version, shared with the local preflight
-          # gate (make lint-install) so CI and local run the identical linter.
-          # Bump that file deliberately, with the diff reviewed.
-          # The action must be v7+ to accept a golangci-lint v2 version string.
-          version: ${{ steps.gciv.outputs.version }}
-          args: --config .golangci.yml --timeout 5m
+      - uses: ./.github/actions/dagger
+      - run: dagger call lint
 
   # ----------------------------------------------------------------- test ---
   # The Go unit + experiment suite (every package). This is the fast feedback
@@ -162,9 +100,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/assurance-runtimes
-      - name: Go unit + experiment tests (with race detector)
-        run: go test -race -count=1 ./... -timeout=30m
+      - uses: ./.github/actions/dagger
+      - run: dagger call test
 
   # ---------------------------------------------------------------- gates ---
   # Run the deterministic gate suite on every shipped example via the Go
@@ -176,17 +113,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Build machinery
-        run: make build
-      # The accepted two-policy gate is owned by scripts/example-gates.sh and
-      # shared verbatim with the local preflight (phase 11) and the Makefile
-      # check target, so these three mirrors cannot drift apart.
-      - name: Gate every registered example with its exact capabilities
-        run: scripts/example-gates.sh .bin/machinery
+      - uses: ./.github/actions/dagger
+      - run: dagger call gates
 
   # ---------------------------------------------- example impl module tests ---
   # Every registered example module has its own hermetic suite.
@@ -196,19 +124,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false
-      - name: Registered implementation module suites
-        run: |
-          set -euo pipefail
-          scripts/example-inventory.sh impl-modules | while IFS=$'\t' read -r design impl module; do
-            case "$module" in
-              go) (cd "$impl" && go test ./... -count=1) ;;
-              *) echo "::error::unsupported implementation module type $module: $design"; exit 1 ;;
-            esac
-          done
+      - uses: ./.github/actions/dagger
+      - run: dagger call example-impls
 
   # -------------------------------------------------------------- golden ---
   # The golden-corpus scoreboard, REQUIRED. The corpus under testdata/golden
@@ -223,14 +140,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Golden corpus (byte-for-byte, deterministic subcommands)
-        run: go test -count=1 -run TestGolden ./cmd/machinery
-      - name: Adversarial gate-experiment suite
-        run: go test -count=1 ./internal/experiments/
+      - uses: ./.github/actions/dagger
+      - run: dagger call golden
 
   # Run the same byte-for-byte corpus on native macOS. Windows remains a
   # cross-compilation signal only and is not a supported runtime target.
@@ -280,47 +191,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: No whitespace errors in the aggregate change
+      - uses: ./.github/actions/dagger
+      - name: Documentation surface gate
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: go run ./scripts/git-safe -root . -- diff --check "$BASE_SHA..HEAD"
-      - name: No stale toolchain or checker-runtime references in the doc surface
-        run: |
-          grep_status=0
-          grep -rnE "PyYAML|pyyaml|uv run|oracle_gen\.py|machine_lint\.py|machinery_check\.py|tla_gen\.py|refine_gen\.py|compose_gen\.py|diff-all\.sh|capture-golden\.sh" \
-            README.md skills/ agents/ docs/ Makefile || grep_status=$?
-          case "$grep_status" in
-            0) echo "::error::stale Python-toolchain reference found (the toolchain is the Go binary)"; exit 1 ;;
-            1) ;;
-            *) echo "::error::stale Python-toolchain scan failed with status $grep_status"; exit 1 ;;
-          esac
-          grep_status=0
-          grep -rnEi "Souffl(e|é).*(external.checker|checker engine|CI pin|required)|external.checker.*Souffl(e|é)" \
-            README.md docs/ examples/pii-flow/README.md || grep_status=$?
-          case "$grep_status" in
-            0) echo "::error::stale host checker-runtime contract found"; exit 1 ;;
-            1) ;;
-            *) echo "::error::host checker-runtime scan failed with status $grep_status"; exit 1 ;;
-          esac
-          echo "doc surface clean"
-      # The pattern uses literal UTF-8 octets: stock macOS Bash 3.2 does not
-      # decode \u escapes, and this keeps .github/ safe to scan without a
-      # self-match.
-      - name: No em dashes in the doc surface (house style)
-        run: |
-          grep_status=0
-          em_dash=$(printf '\342\200\224')
-          grep -rn "$em_dash" README.md CONTRIBUTING.md install.sh skills/ agents/ docs/ examples/ commands/ adapters/ hooks/ Makefile .github/ || grep_status=$?
-          case "$grep_status" in
-            0) echo "::error::em dash found; house style forbids it"; exit 1 ;;
-            1) ;;
-            *) echo "::error::em-dash scan failed with status $grep_status"; exit 1 ;;
-          esac
-          echo "no em dashes"
+        run: dagger call docs --base-ref="$BASE_SHA"
 
   # ----------------------------------------------------------- tidy gate ---
   # go.mod / go.sum must be tidy and in sync. A stray dependency or a missing
@@ -331,14 +206,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: go mod tidy (verify clean)
-        run: |
-          go mod tidy
-          go run ./scripts/git-safe -root . -- diff --exit-code -- go.mod go.sum
+      - uses: ./.github/actions/dagger
+      - run: dagger call tidy
 
   # ---------------------------------------------------- Modelith render ---
   # Modelith is the engine half of the domain-model phase. Regenerate every
@@ -351,14 +220,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Install Modelith v0.4.0 (pinned)
-        run: go install github.com/stacklok/modelith/cmd/modelith@v0.4.0
-      - name: Assert committed Modelith renders are fresh
-        run: make modelith-render-check
+      - uses: ./.github/actions/dagger
+      - run: dagger call modelith-render
 
   # ----------------------------------------------- external engines gate ---
   # Pure machinery gates remain dependency-free. This required job exercises
@@ -371,65 +234,5 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Build machinery
-        run: make build
-      - name: Assert committed engine trust roots
-        run: |
-          set -euo pipefail
-          test -s .java-runtime-pin
-          test -s .structurizr-pin
-      - name: Compile every example workspace.dsl
-        run: |
-          set -euo pipefail
-          c4_inventory=$(mktemp)
-          trap 'rm -f "$c4_inventory"' EXIT
-          scripts/c4-inventory.sh examples >"$c4_inventory"
-          test -s "$c4_inventory"
-          while IFS= read -r dsl; do
-            .bin/machinery verify-c4 "$(dirname "$dsl")"
-          done <"$c4_inventory"
-      - name: Provision immutable external-checker OCI runtime
-        run: |
-          set -euo pipefail
-          command -v docker
-          runner=$RUNNER_TEMP/machinery-run-safe
-          runner_build_stderr=$RUNNER_TEMP/machinery-run-safe-build.stderr
-          if ! go build -o "$runner" ./scripts/run-safe 2>"$runner_build_stderr"; then
-            cat "$runner_build_stderr" >&2
-            exit 1
-          fi
-          if [ -s "$runner_build_stderr" ]; then
-            cat "$runner_build_stderr" >&2
-            echo "::error::building bounded external-command runner emitted stderr"
-            exit 1
-          fi
-          image=python@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc
-          platform=linux/amd64
-          pull_receipt=$("$runner" -timeout 10m -stdout-limit 4096 -stderr-limit 65536 -- \
-            docker pull --quiet --platform "$platform" "$image")
-          case "$pull_receipt" in
-            "$image"|"docker.io/library/$image") ;;
-            *) echo "::error::Docker pull returned a non-canonical image receipt: $pull_receipt"; exit 1 ;;
-          esac
-          inspect=$("$runner" -timeout 30s -stdout-limit 65536 -stderr-limit 4096 -- \
-            docker image inspect --format '{{json .RepoDigests}} {{.Os}}/{{.Architecture}}' "$image")
-          case "$inspect" in
-            *\"$image\"*" $platform") ;;
-            *) echo "::error::local OCI identity does not match $image on $platform: $inspect"; exit 1 ;;
-          esac
-          "$runner" -timeout 2m -stdout-limit 4096 -stderr-limit 4096 -- \
-            docker run --rm --pull=never --platform "$platform" --network=none --read-only "$image" python3 --version
-      - name: Required real OCI checker golden
-        env:
-          MACHINERY_REQUIRE_OCI_GOLDEN: "1"
-        run: go test -count=1 -run '^TestVerifyCheckersPiiFlowEngineGolden$' ./cmd/machinery
-      - name: Re-run every registered external checker
-        run: |
-          set -euo pipefail
-          scripts/example-inventory.sh checkers | while IFS=$'\t' read -r design registry; do
-            .bin/machinery verify-checkers "$design" --registry "$registry"
-          done
+      - uses: ./.github/actions/dagger
+      - run: dagger call design-engines

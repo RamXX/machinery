@@ -22,24 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache: true
-      - name: Run govulncheck (machinery toolchain)
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
-          govulncheck ./...
-      # Also scan every registered example implementation module.
-      - name: Run govulncheck (registered example impls)
-        run: |
-          set -euo pipefail
-          scripts/example-inventory.sh security | while IFS=$'\t' read -r impl module; do
-            case "$module" in
-              go) (cd "$impl" && govulncheck ./...) ;;
-              *) echo "::error::unsupported security module type $module: $impl"; exit 1 ;;
-            esac
-          done
+          fetch-depth: 0
+      - uses: ./.github/actions/dagger
+      - run: dagger call govulncheck
 
   # gitleaks scans the full history and the working tree for secrets (API keys,
   # tokens, private keys) on every trigger (full clone, fetch-depth 0).
@@ -49,11 +35,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # full history for secret scanning
-      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # If you have a paid Gitleaks license, set GITLEAKS_LICENSE; otherwise
-          # the OSS scan runs on push/PR (the free tier is sufficient here).
+      - uses: ./.github/actions/dagger
+      - run: dagger call gitleaks
 
   # Dependency Review (GitHub native): blocks PRs that introduce a dependency
   # with a known vulnerability or an incompatible license. Only on PRs.

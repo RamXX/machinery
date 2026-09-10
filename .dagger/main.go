@@ -455,13 +455,46 @@ done
 echo "every registered external checker re-ran"`)
 }
 
+// IntegrationEvidence runs the required native runtime integration lane and
+// returns its evidence directory whatever the outcome, with the lane's exit
+// status in `exit` and its console output in `console.txt`.
+//
+// A lane failure that only a runner reproduces is undiagnosable from the log
+// alone, which is why the hosted job retains this directory. A plain failing
+// exec would abort the pipeline and take the evidence with it, so the lane
+// runs without -e here and the verdict travels inside the directory.
+func (m *Machinery) IntegrationEvidence() *dagger.Directory {
+	return m.withDocker(m.Base(), "integration-required").
+		WithEnvVariable("MACHINERY_INTEGRATION_REPORT_DIR", "/evidence").
+		WithExec([]string{"bash", "-c", `
+set +e
+mkdir -p /evidence
+rm -rf ` + sharedTmpPath + `/work/integration-required
+mkdir -p ` + sharedTmpPath + `/work/integration-required
+cp -a /src/. ` + sharedTmpPath + `/work/integration-required/
+cd ` + sharedTmpPath + `/work/integration-required
+go run ./scripts/integration-lane --lane required 2>&1 | tee /evidence/console.txt
+echo "${PIPESTATUS[0]}" > /evidence/exit
+exit 0`}).
+		Directory("/evidence")
+}
+
 // IntegrationRequired runs the required native runtime integration lane: the
 // four-language assurance probes against the exact pinned runtime identities.
 func (m *Machinery) IntegrationRequired(ctx context.Context) (string, error) {
-	return m.shInShared(ctx, m.withDocker(m.Base(), "integration-required").
-		WithEnvVariable("MACHINERY_INTEGRATION_REPORT_DIR", "/evidence"),
-		"integration-required",
-		`go run ./scripts/integration-lane --lane required`)
+	evidence := m.IntegrationEvidence()
+	console, err := evidence.File("console.txt").Contents(ctx)
+	if err != nil {
+		return "", err
+	}
+	status, err := evidence.File("exit").Contents(ctx)
+	if err != nil {
+		return console, err
+	}
+	if strings.TrimSpace(status) != "0" {
+		return console, fmt.Errorf("required integration lane failed (exit %s)", strings.TrimSpace(status))
+	}
+	return console, nil
 }
 
 // VerifyFormal regenerates and TLC-checks every registered formal example,

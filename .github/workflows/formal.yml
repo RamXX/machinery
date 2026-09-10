@@ -26,15 +26,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/assurance-runtimes
+      - uses: ./.github/actions/dagger
       # The lane retains its report and every evidence file of the run in one
-      # directory. Naming that directory here, rather than in the invocation
-      # the wiring guards pin exactly, lets a failed run hand the evidence
-      # back: a remote-only failure is otherwise undiagnosable.
+      # directory, exported whatever the outcome, so a remote-only failure
+      # stays diagnosable from what the runner kept.
       - name: Required runtime integration
-        env:
-          MACHINERY_INTEGRATION_REPORT_DIR: ${{ runner.temp }}/integration-required-evidence
-        run: go run ./scripts/integration-lane --lane required
+        run: |
+          set -euo pipefail
+          dagger call integration-evidence export --path="$RUNNER_TEMP/integration-required-evidence"
+          cat "$RUNNER_TEMP/integration-required-evidence/console.txt"
+          test "$(cat "$RUNNER_TEMP/integration-required-evidence/exit")" = 0
       - name: Retain required integration evidence
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -47,28 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache: true
-      # Cache checksum-pinned engines and the hermetically provisioned Java runtime.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/machinery
-          key: machinery-engines-tla2tools-v1.7.4-java-21.0.12.1-1
-      - name: Build machinery
-        run: make build
-      - name: Regenerate + TLC-check every registered formal example
-        run: |
-          set -euo pipefail
-          scripts/example-inventory.sh formal | while IFS= read -r design; do
-            .bin/machinery verify-formal "$design"
-          done
-      - name: Assert formal generation left no diff
-        run: |
-          status=$(go run ./scripts/git-safe -root . -- status --porcelain --untracked-files=all)
-          if [ -n "$status" ]; then
-            echo "$status"
-            echo "::error::formal verification regenerated tracked content or emitted an untracked artifact"
-            exit 1
-          fi
+          fetch-depth: 0
+      - uses: ./.github/actions/dagger
+      - run: dagger call verify-formal
