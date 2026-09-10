@@ -1,5 +1,5 @@
 ---- MODULE Deal ----
-\* machinery-version: v0.7.2
+\* machinery-version: v0.8.0
 EXTENDS Naturals
 
 \* Generated from Deal.machine.json by machinery tla. Control-flow model.

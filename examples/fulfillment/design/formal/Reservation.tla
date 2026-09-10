@@ -1,5 +1,5 @@
 ---- MODULE Reservation ----
-\* machinery-version: v0.7.2
+\* machinery-version: v0.8.0
 EXTENDS Naturals
 
 \* Generated from Reservation.machine.json by machinery tla. Control-flow model.
