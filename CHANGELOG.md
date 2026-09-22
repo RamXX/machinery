@@ -6,6 +6,8 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-22
+
 ### Added
 
 - **`Gr-reads` binds compile-time design-file consumers to their implementation follow-ups.** A
@@ -51,6 +53,8 @@ under their version heading when a release is cut.
   vocabulary across differently named units. Empty, duplicate, malformed, repeated,
   and conflicting declarations fail. The existing example corpus required no correction.
 
+### Changed
+
 - **Gx-trace accepts H2's machine-written authorization grammar.** Resource
   action lists, producer-narrowed residual marks, and the all-presets-withheld
   residual verb fallback are first-class inventory
@@ -63,6 +67,10 @@ under their version heading when a release is cut.
   declarations from pass identities, human reasons, referenced owner sets, and
   typed Modelith enums. A declared verification that does not change its
   resource owes no resource-write admission.
+- **The packet reference states the lane-scope protocol assumed by per-slice execution.** A
+  commit named `integrator-request(<slice>)` may carry integrator-owned paths for reconciliation,
+  and a design lane's complete diff is treated as that same kind of request. Projects can
+  implement scope gates against this convention.
 
 ### Fixed
 
@@ -74,13 +82,46 @@ under their version heading when a release is cut.
   re-fired. New pending tokens no longer fingerprint the tree; existing hashed ledger lines remain
   readable. The gate obligation runs only after every exact tool completion is recorded.
 
-### Documentation
+### Compatibility and migration
 
-- **The packet reference now states the lane-scope protocol assumed by per-slice execution.** A
-  commit named `integrator-request(<slice>)` may carry integrator-owned paths for reconciliation,
-  and a design lane's complete diff is treated as that same kind of request. Projects can now
-  implement their scope gates against an explicit convention instead of rejecting the handoff the
-  packet protocol requires.
+**Generated output.** The oracle, TLA+, Alloy, checker-projection, and packet generators now
+emit the `v0.9.0` machinery stamp. This restamps the committed example oracles and formal
+artifacts, pii-flow checker projection, and golden corpus, including its packet fixture. Run
+`machinery oracle <design>/machines`, `machinery verify-formal <design> --gen-only` (which also
+regenerates opted-in Alloy layers), and `machinery project <design>` for those example families;
+run `make golden-update` to recapture the corpus, including `machinery packet` output. The
+release-preparation regeneration changes only version stamps. The packet fixture's shared
+fixture obligations changed its content earlier in this release cycle. Consumers should
+regenerate and commit their generated design artifacts on upgrade.
+
+**Proof scope.** A green Gx-trace now establishes four additional design-side conditions: an
+explicit closed event payload equals its Architecture Contract fields; every autonomous write
+has one declared authorization admission; named-unit facts resolve to a declared source or a
+reasoned row-local derivation; and a closed vocabulary has one exact `VALUES` set. H2's
+machine-written inventory forms are accepted with declared-subject resolution. This is stronger
+evidence than a green 0.8.0 Gx-trace. `Gr-reads` adds review-history evidence only for contracts
+that declare `reads:`; design-only checks warn and `--impl` checks artifact-reader follow-ups in
+Git history. `Gw-packet` now records shared fixture-module obligations when `fixtures:` is present.
+These gates do not execute an implementation or prove the correctness of a reader edit.
+
+**Existing designs.** A design green under 0.8.0 can now report Gx findings for an event row's
+explicit `payload {field, ...}` or `payload is exactly {field, ...}` that disagrees with the
+Architecture Contract; an unlisted `System` action or matrix cascade/consumer producer;
+an unresolved backticked fact; or a row calling a vocabulary closed, an enum, or a reason class
+without exactly one matching `VALUES{a, b, c}` group. Answer these with the matching contract
+payload fields, a g2-attested `AUTHORIZATION.md` row with an `Entity.action` subject and
+either a backticked declared capability or `(no authorization: reason)` admission, a declared
+model/matrix source or
+`derived: fact_name (reason)` in that fact's row, and an exact `VALUES{...}` group
+(`VALUES name{...}` for a shared vocabulary). H2 resource action lists,
+producer-narrowed residual marks, and all-presets-withheld residual verbs are also valid
+authorization declarations. For a compile-time design reader, add a root contract-v2
+`reads:` row with design-relative `artifact`, implementation-relative `reader`, and full
+40-character reviewed Git commit, then check with `machinery check <design> --impl <impl>`.
+The optional `fixtures:` list in `design/slices.yaml` uses unique, clean implementation-relative
+paths; regenerate packets to carry every consumer slice. Designs without those optional
+declarations retain their previous shapes. Upgrade an install with
+`machinery update --version v0.9.0`.
 
 ## [0.8.0] - 2026-09-10
 
