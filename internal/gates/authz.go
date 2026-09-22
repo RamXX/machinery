@@ -21,6 +21,10 @@ var (
 	h2ResourceCell          = regexp.MustCompile("^\\s*`([A-Za-z][A-Za-z0-9_]*)`(?:\\s|$)")
 	h2MachineWritten        = regexp.MustCompile(`\bMACHINE-WRITTEN\{([^}]*)\}`)
 	h2MachineWrittenBy      = regexp.MustCompile(`\bMACHINE-WRITTEN-BY\{([^}]*)\}`)
+	h2RuleRow               = regexp.MustCompile(`\bRULE\b`)
+	h2NeverVerb             = regexp.MustCompile("(?i)\\bNEVER\\s+`?(create|update|delete)`?\\s*:\\s*([^.;]+)")
+	h2NoWrite               = regexp.MustCompile(`(?i)\b(?:writes? nothing|no (?:resource )?write|without writing|does not (?:change|update|write|mutate) (?:the )?(?:recorded |stored )?row|never (?:changes?|adjusts?) (?:the )?(?:recorded |stored )?row)\b`)
+	h2ConditionalWrite      = regexp.MustCompile(`(?i)\b(?:but|unless|except|however)\b[^.;]*\b(?:write|writes|append|create|update|record|insert|set)\b`)
 	c4OwnerDeclaration      = regexp.MustCompile(`(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*(?:softwareSystem|container|component)\b`)
 )
 
@@ -28,14 +32,140 @@ type authorizationRow struct {
 	subject, admission, where string
 }
 
+type h2ResidualRow struct {
+	granted map[string]bool
+	text    string
+}
+
+// A cell's leading clause is the grant. Later mentions such as "no update"
+// explain that grant; they never become grants themselves. Semicolon clauses
+// are separate preset groups, so their verb sets are unioned for the purpose
+// of asking whether every preset withholds one verb.
+func h2GrantedVerbs(cell string) map[string]bool {
+	granted := map[string]bool{}
+	for _, clause := range strings.Split(cell, ";") {
+		clause = strings.ToLower(strings.TrimSpace(strings.ReplaceAll(clause, "`", "")))
+		if strings.HasPrefix(clause, "every verb") {
+			for _, verb := range []string{"create", "read", "update", "delete"} {
+				granted[verb] = true
+			}
+			continue
+		}
+		for {
+			var verb string
+			for _, candidate := range []string{"create", "read", "update", "delete"} {
+				if strings.HasPrefix(clause, candidate) && (len(clause) == len(candidate) || !valueMember.MatchString(clause[:len(candidate)+1])) {
+					verb = candidate
+					break
+				}
+			}
+			if verb == "" {
+				break
+			}
+			granted[verb] = true
+			clause = strings.TrimSpace(strings.TrimLeft(clause[len(verb):], ", "))
+			clause = strings.TrimPrefix(clause, "and ")
+			clause = strings.TrimPrefix(clause, "or ")
+		}
+	}
+	return granted
+}
+
+func h2ResidualAdmits(row h2ResidualRow, action, description string) bool {
+	if row.granted["create"] && row.granted["update"] && row.granted["delete"] {
+		return false
+	}
+	// Where all write verbs are withheld, a System action is machine-owned.
+	// This is the reader's verb fallback for append-only rows and Trial.
+	if !row.granted["create"] && !row.granted["update"] && !row.granted["delete"] {
+		return true
+	}
+	// A mixed row can identify the exact action under a withheld verb. H2
+	// uses "NEVER create: enqueue ..." and "NEVER create: produce ...".
+	for _, match := range h2NeverVerb.FindAllStringSubmatch(row.text, -1) {
+		if !row.granted[strings.ToLower(match[1])] && strings.Contains(match[2], "`"+action+"`") {
+			return true
+		}
+	}
+	// The ExtractionRun row assigns every lifecycle stage to System while
+	// granting create only for enqueue. The stage descriptions say Begin/Finish.
+	if !row.granted["update"] && strings.Contains(strings.ToLower(row.text), "every stage being system's arm") {
+		lower := strings.ToLower(strings.TrimSpace(description))
+		return strings.HasPrefix(lower, "begin ") || strings.HasPrefix(lower, "finish ")
+	}
+	return false
+}
+
+func h2ReadOnlyAction(description string) bool {
+	lower := strings.ToLower(strings.TrimSpace(description))
+	if h2NoWriteStatement(lower) {
+		return true
+	}
+	// A declaration that only re-executes and verifies recorded hashes is a
+	// comparison, not a write of the resource. H2's Verdict replay uses this
+	// wording; the rule is about the declaration, never the action's name.
+	if strings.HasPrefix(lower, "re-execute and verify ") && strings.Contains(lower, "recorded hashes") {
+		return !strings.Contains(lower, "write") && !strings.Contains(lower, "record the") && !strings.Contains(lower, "update") && !strings.Contains(lower, "create") && !strings.Contains(lower, "append")
+	}
+	return false
+}
+
+func h2NoWriteStatement(text string) bool {
+	match := h2NoWrite.FindStringIndex(text)
+	if len(match) != 2 {
+		return false
+	}
+	return !h2ConditionalWrite.MatchString(text[match[1]:])
+}
+
+func h2MatrixReadOnlyActions(design string) map[string]bool {
+	readOnly := map[string]bool{}
+	paths, _ := filepath.Glob(filepath.Join(design, "machines", "*.matrix.md"))
+	for _, path := range paths {
+		body, err := readDesignFile(design, path)
+		if err != nil {
+			continue
+		}
+		resource := strings.TrimSuffix(filepath.Base(path), ".matrix.md")
+		for _, line := range strings.Split(string(body), "\n") {
+			if !h2NoWriteStatement(line) {
+				continue
+			}
+			if strings.HasPrefix(line, "- `") {
+				if end := strings.Index(line[3:], "`"); end >= 0 {
+					readOnly[resource+"."+line[3:3+end]] = true
+				}
+			}
+		}
+		for _, table := range ir.ParseMdTables(string(body)) {
+			ai := ir.FindCol(table.Header, "action")
+			if ai < 0 {
+				continue
+			}
+			for _, row := range table.Rows {
+				if !h2NoWriteStatement(strings.Join(row, " ")) {
+					continue
+				}
+				action := strings.Trim(ir.CleanCell(cellAt(row, ai)), " `")
+				if valueMember.MatchString(action) {
+					readOnly[resource+"."+action] = true
+				}
+			}
+		}
+	}
+	return readOnly
+}
+
 // h2AuthorizationInventory reads declarations only from the two tables that
 // carry H2's compile-time inventory. Mentions in explanatory prose do not
 // grant an action. A producer mark is an admission for its named producers,
 // never a name-wide machine-written grant.
-func h2AuthorizationInventory(g *Gate, design string) (map[string]bool, bool) {
+func h2AuthorizationInventory(g *Gate, design string, dm *ir.Value) (map[string]bool, bool) {
 	admitted := map[string]bool{}
 	nameAdmitted := map[string]bool{}
 	producerNarrowed := map[string]bool{}
+	listCovered := map[string]bool{}
+	residualRows := map[string]h2ResidualRow{}
 	found := false
 	paths, _ := strictSortedGlob(g, filepath.Join(design, "machines"), "*.matrix.md", "authorization matrix")
 	for _, path := range paths {
@@ -62,6 +192,7 @@ func h2AuthorizationInventory(g *Gate, design string) (map[string]bool, bool) {
 				}
 				resource := match[1]
 				if wi >= 0 {
+					listCovered[resource] = true
 					groups := h2MachineWritten.FindAllStringSubmatch(cellAt(row, wi), -1)
 					if len(groups) > 0 {
 						found = true
@@ -81,6 +212,15 @@ func h2AuthorizationInventory(g *Gate, design string) (map[string]bool, bool) {
 					}
 				}
 				if residual {
+					granted := map[string]bool{}
+					for _, header := range []string{"platform_admin", "tenant_admin", "every other preset"} {
+						for verb := range h2GrantedVerbs(cellAt(row, ir.FindCol(table.Header, header))) {
+							granted[verb] = true
+						}
+					}
+					if !h2RuleRow.MatchString(resourceCell) {
+						residualRows[resource] = h2ResidualRow{granted: granted, text: strings.Join(row, " ")}
+					}
 					byGroups := h2MachineWrittenBy.FindAllStringSubmatch(resourceCell, -1)
 					if len(byGroups) > 0 {
 						found = true
@@ -120,6 +260,29 @@ func h2AuthorizationInventory(g *Gate, design string) (map[string]bool, bool) {
 		}
 		admitted[subject] = true
 	}
+	entities := dm.AsObject().GetObject("entities")
+	for _, resource := range entities.Keys() {
+		if listCovered[resource] {
+			continue
+		}
+		row, ok := residualRows[resource]
+		if !ok {
+			continue
+		}
+		for _, action := range objSlice(entities.Get2(resource).AsObject().Get2("actions")) {
+			if action.Kind != ir.KindObject || action.AsObject().GetString("actor") != "System" {
+				continue
+			}
+			name := strings.TrimSpace(action.AsObject().GetString("name"))
+			if name == "" || h2ReadOnlyAction(action.AsObject().GetString("description")) {
+				continue
+			}
+			if h2ResidualAdmits(row, name, action.AsObject().GetString("description")) {
+				admitted[resource+"."+name] = true
+				found = true
+			}
+		}
+	}
 	return admitted, found
 }
 
@@ -129,6 +292,7 @@ type authorizationDocument struct {
 
 func authorizationObligations(g *Gate, design string, dm *ir.Value) map[string]string {
 	out := map[string]string{}
+	matrixReadOnly := h2MatrixReadOnlyActions(design)
 	entities := dm.AsObject().GetObject("entities")
 	for _, entity := range entities.Keys() {
 		for _, action := range objSlice(entities.Get2(entity).AsObject().Get2("actions")) {
@@ -136,7 +300,7 @@ func authorizationObligations(g *Gate, design string, dm *ir.Value) map[string]s
 				continue
 			}
 			name := strings.TrimSpace(action.AsObject().GetString("name"))
-			if name != "" {
+			if name != "" && !h2ReadOnlyAction(action.AsObject().GetString("description")) && !matrixReadOnly[entity+"."+name] {
 				out[entity+"."+name] = "System action"
 			}
 		}
@@ -243,7 +407,7 @@ func checkAuthorizationInventory(g *Gate, design string, dm *ir.Value) {
 		return
 	}
 	documents, markers := authorizationInventoryCorpus(g, design)
-	h2Admitted, h2Found := h2AuthorizationInventory(g, design)
+	h2Admitted, h2Found := h2AuthorizationInventory(g, design, dm)
 	if markers == 0 && !h2Found {
 		g.Errs = append(g.Errs, "System writes exist but the design has no <!-- machinery:authorization-inventory --> marker and closed authorization inventory")
 	} else if markers > 1 {

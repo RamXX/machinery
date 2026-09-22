@@ -223,7 +223,7 @@ type h2Action struct {
 	name, description string
 }
 
-func h2ResidualFixture(t *testing.T, resource string, actions []h2Action, residualRow, actionMatrix string) *Gate {
+func h2ResidualFixture(t *testing.T, resource string, actions []h2Action, residualRow, actionMatrix string, machineWrittenList ...string) *Gate {
 	t.Helper()
 	design := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(design, "machines"), 0o755); err != nil {
@@ -237,8 +237,12 @@ func h2ResidualFixture(t *testing.T, resource string, actions []h2Action, residu
 	mustWrite(t, filepath.Join(design, "domain.modelith.yaml"), model.String())
 	mustWrite(t, filepath.Join(design, "machines", resource+".machine.json"),
 		fmt.Sprintf(`{"id":%q,"initial":"Open","states":{"Open":{"type":"final"}}}`, resource))
-	mustWrite(t, filepath.Join(design, "machines", "Principal.matrix.md"),
-		"| resource | platform_admin | tenant_admin | every other preset |\n|---|---|---|---|\n"+residualRow+"\n")
+	principal := "| resource | platform_admin | tenant_admin | every other preset |\n|---|---|---|---|\n" + residualRow + "\n"
+	if len(machineWrittenList) > 0 {
+		principal += "\n| resource | machine-written actions | what the verb columns still decide |\n|---|---|---|\n" +
+			"| `" + resource + "` | " + machineWrittenList[0] + " | the verb columns decide the other actions |\n"
+	}
+	mustWrite(t, filepath.Join(design, "machines", "Principal.matrix.md"), principal)
 	if actionMatrix != "" {
 		mustWrite(t, filepath.Join(design, "machines", resource+".matrix.md"), actionMatrix)
 	}
@@ -329,5 +333,52 @@ func TestAuthorizationH2ReadOnlyActionUsesDeclaration(t *testing.T) {
 		"## Model actions\n\n- `replay` (actor System): creates a successor verdict row.\n")
 	if g.Counts["authorization obligations admitted"] != 1 {
 		t.Fatalf("the action name replay must not suppress a declared write: %v, %+v", g.Errs, g.Counts)
+	}
+}
+
+func TestAuthorizationH2MatrixNoWriteStatement(t *testing.T) {
+	row := "| `Verdict` (residual `unknown-never-compliant`) | `read` | `read` | `read`. NO preset holds `create`, `update` or `delete` |"
+	matrix := "| action | reason |\n|---|---|\n| `compare_pins` | Verifies the five stored hashes and writes nothing to this Verdict row. |\n"
+	g := h2ResidualFixture(t, "Verdict", []h2Action{{"compare_pins", "Compare pinned results against the existing verdict."}}, row, matrix)
+	if hasErr(g, "System action 'Verdict.compare_pins'") || g.Counts["authorization obligations admitted"] != 0 {
+		t.Fatalf("an action-specific matrix no-write statement owes no write admission: %v, %+v", g.Errs, g.Counts)
+	}
+}
+
+func TestAuthorizationH2ConditionalNoWriteStillOwesAdmission(t *testing.T) {
+	row := "| `Verdict` (residual `unknown-never-compliant`) | `read` | `read` | `read`. NO preset holds `create`, `update` or `delete` |"
+	g := h2ResidualFixture(t, "Verdict", []h2Action{{"compare_pins", "Verify pinned hashes; no write occurs on a match, but append a successor Verdict on divergence."}}, row, "")
+	if got := g.Counts["authorization obligations admitted"]; got != 1 {
+		t.Fatalf("a conditional no-write statement still declares a write path: %v, %+v", g.Errs, g.Counts)
+	}
+}
+
+func TestAuthorizationH2ResidualListClosesFallback(t *testing.T) {
+	row := "| `Norm` (residual `rbac-reviewer-approval`) | `read` and `update` | `read` | `read` and `update`. NEVER `create`: `draft` is `System` |"
+	g := h2ResidualFixture(t, "Norm", []h2Action{{"draft", "Create a draft norm from extracted source material."}}, row, "", "MACHINE-WRITTEN{advance}")
+	if !hasErr(g, "System action 'Norm.draft' has no authorization row") {
+		t.Fatalf("a closed machine-written list must block the residual fallback: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationH2RelationalRuleDoesNotUseResidualFallback(t *testing.T) {
+	row := "| `Connector` (RULE `rbac-view-only-read`) | `read` | `read` | `read` |"
+	g := h2ResidualFixture(t, "Connector", []h2Action{{"provision", "Create a connector."}}, row, "")
+	if !hasErr(g, "System action 'Connector.provision' has no authorization row") {
+		t.Fatalf("a RULE-owned row belongs to the relational policy, not the residual fallback: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationH2ResidualMixedVerbKeepsOtherDebt(t *testing.T) {
+	row := "| `ConversionReport` (residual `conversion-report-first-class`) | `read` | `read` and `update` | `read` and `update`. NEVER `create`: `produce` is the run's own act through the machine |"
+	g := h2ResidualFixture(t, "ConversionReport", []h2Action{
+		{"produce", "Write the report for a live run. Postcondition: status pending."},
+		{"reconcile", "Update the report after human review. Postcondition: status reconciled."},
+	}, row, "")
+	if hasErr(g, "System action 'ConversionReport.produce'") || !hasErr(g, "System action 'ConversionReport.reconcile' has no authorization row") {
+		t.Fatalf("withheld create admits produce but a granted update does not admit reconcile: %v", g.Errs)
+	}
+	if got := g.Counts["authorization obligations admitted"]; got != 1 {
+		t.Fatalf("only produce is admitted, got %d: %v", got, g.Errs)
 	}
 }

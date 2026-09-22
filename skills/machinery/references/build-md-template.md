@@ -454,13 +454,17 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   inferred to denote the same vocabulary. A same-named Modelith enum must
   agree exactly. A cited vocabulary owned by another model entity, or an enum
   typed on this entity, does not need a second local declaration.
-- Every Modelith action whose actor is `System`, plus every producer named by
+- Every Modelith action whose actor is `System` and writes its resource, plus every producer named by
   a matrix cascade or consumer-arm table, has an admission in either a marked
   hand-written authorization inventory, covered by g2 attestation rows, or the
   H2 matrix form. `MACHINE-WRITTEN{action, ...}` belongs in a resource's
   machine-written actions cell; `MACHINE-WRITTEN-BY{action: producer, ...}`
   belongs in its residual verb table resource cell and admits only those
-  producers. Residual seat cells govern non-System actor verbs. The matrix
+  producers. For a resource with no machine-written list row, the residual
+  verb table admits a System write when every preset withholds its write verb.
+  A list row closes that fallback. An action declared to verify a recorded row
+  without changing it owes no resource-write admission. Residual seat cells
+  govern non-System actor verbs. The matrix
   form needs no marker document. A
   producer column must be distinct from a `producer / consumer` prose column.
   Its admission cell names one capability as a backticked dotted identifier

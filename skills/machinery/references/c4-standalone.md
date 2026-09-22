@@ -437,7 +437,7 @@ sets, so give the mapping an artifact and G2 holds it in both directions. The he
 
 ## System authorization inventories (required when System writes exist)
 
-Every Modelith action whose actor is `System` is an autonomous write obligation. A matrix table
+Every Modelith action whose actor is `System` and writes its resource is an autonomous write obligation. An action whose Modelith description or action-specific matrix row establishes that it only verifies a recorded row without changing it owes no resource-write admission. A matrix table
 with a distinct `producer` column and a cascade or consumer column adds one subject from each
 producer cell to the
 same obligation set. One hand-written Markdown artifact in the design, conventionally
@@ -467,7 +467,11 @@ in a machine matrix are a first-class source. Gx reads
 `MACHINE-WRITTEN-BY{action: producer, ...}` only in the residual table's
 resource cell. The first admits that resource's named System action by name;
 the second admits it only under the stated producer set. An action cannot have
-both marks. Residual seat columns grant verbs to non-System actors. A design
+both marks. For a resource with no machine-written list row, the residual verb
+table also admits a System write when every preset column withholds that
+action's write verb. A resource with a list row is held to that closed list;
+its residual verb cells cannot add an action. Residual seat columns grant
+verbs to non-System actors. A design
 using this matrix source owes no authorization marker; actions not granted by
 the matrix still report a missing admission.
 

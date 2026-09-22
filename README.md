@@ -762,8 +762,12 @@ Gx closes autonomous writes against either a marked, g2-attested hand-written
 authorization inventory or the H2 matrix form. The matrix form reads
 `MACHINE-WRITTEN{action, ...}` only from a `machine-written actions` cell and
 `MACHINE-WRITTEN-BY{action: producer, ...}` only from the resource cell of a
-residual verb table. The latter admits only the named producers. A residual
-seat's verb grant governs a non-System actor, not a System dispatch. A design
+residual verb table. The latter admits only the named producers. When a
+resource has no machine-written list row, a System write is also admitted if
+every residual preset column withholds its write verb. A list row closes that
+fallback. A System action declared to verify a stored row without changing it
+owes no resource-write admission. A residual seat's verb grant governs a
+non-System actor. A design
 whose residual table carries these marks owes no marker document. A marked
 inventory still requires one exact row per System action and matrix producer;
 its backticked dotted admission must start with a declared C4 element id, or
