@@ -4080,6 +4080,41 @@ func TestStopReapsArmedOperationThatNeverRanOnRefiredStop(t *testing.T) {
 	}
 }
 
+// OpenCode has no stop-hook re-fire. A host denial happens after machinery's
+// PreToolUse allow and produces neither tool execution nor PostToolUse, then
+// every session.idle arrives as a first Stop. When the governed tree still
+// matches the state recorded at arm time, that pending operation is a proven
+// no-op and must expire on that first Stop so the durable gate obligation can
+// run instead of wedging the session forever.
+func TestStopExpiresPendingOperationWhenGovernedTreeIsUnchanged(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	sid := "denied-with-unchanged-tree"
+	t.Cleanup(func() { _ = clearState(root, sid) })
+
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "notes.txt"))
+	pre.ToolUseID = "denied-before-execution"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("allowed edit preflight unexpectedly emitted output: %s", out)
+	}
+	// The host refuses the tool. The governed tree remains byte-identical and
+	// no PostToolUse event exists for the adapter to forward.
+	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	if strings.Contains(out, `"decision":"block"`) {
+		t.Fatalf("unchanged pending operation wedged first Stop: %s", out)
+	}
+	if !strings.Contains(out, "expired 1 unchanged tool operation") {
+		t.Fatalf("pending no-op expiration must be explicit: %s", out)
+	}
+	record, err := readStateRecord(root, sid)
+	if err != nil {
+		t.Fatalf("read state after expiration: %v", err)
+	}
+	if len(record.pending) != 0 {
+		t.Fatalf("expiration left %d pending token(s) behind", len(record.pending))
+	}
+}
+
 // The reap must never race a live process: a background task still running is
 // evidence of exactly the concurrent mutation the pending ledger guards.
 func TestStopRefusesToReapWhileBackgroundTasksRun(t *testing.T) {
