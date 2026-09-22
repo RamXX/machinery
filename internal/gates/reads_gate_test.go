@@ -91,8 +91,8 @@ func TestDeclaredReadsAcceptsReaderRenameWithArtifactEdit(t *testing.T) {
 func TestDeclaredReadsRejectsRawAuthoredValuesInOrder(t *testing.T) {
 	_, design, impl, reviewed := declaredReadRepo(t)
 	contract := strings.ReplaceAll(readContractTemplate(t), "REVIEW_COMMIT", reviewed)
-	contract = strings.ReplaceAll(contract, "machines/Principal.matrix.md", " machines/Principal.matrix.md ")
-	contract = strings.ReplaceAll(contract, "lib/principal_reader.ex", " lib/principal_reader.ex ")
+	contract = strings.ReplaceAll(contract, "machines/Principal.matrix.md", `" machines/Principal.matrix.md "`)
+	contract = strings.ReplaceAll(contract, "lib/principal_reader.ex", `" lib/principal_reader.ex "`)
 	mustWriteReadFile(t, filepath.Join(design, "ARCHITECTURE.md"), contract)
 	g := CheckDeclaredReads(design, impl, design, impl)
 	if len(g.Errs) != 2 || !strings.Contains(g.Errs[0], "reads artifact") || !strings.Contains(g.Errs[1], "reads reader") {

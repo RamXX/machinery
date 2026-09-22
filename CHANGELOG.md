@@ -12,13 +12,14 @@ under their version heading when a release is cut.
   contract v2 Architecture Contract may declare root `reads:` rows with a design-relative
   `artifact`, implementation-relative `reader`, and full reviewed Git commit. Design-only checks
   warn that the coupling exists. With `--impl`, the gate fails closed unless the review commit is
-  an ancestor, both paths were tracked there, and every later commit or current change set that
-  changes the artifact also changes the reader. The new gate is artifact-activated, joins the
+  an ancestor, the artifact and reader lineage were tracked there, and every later commit or current change set that
+  changes the artifact also changes the reader. Merge-parent tree diffs and reader renames are
+  included. The new gate is artifact-activated, joins the
   default and explicit gate vocabulary, and is proven by a warning golden plus Git-backed failing
   and passing fixtures. Existing designs without `reads:` keep byte-identical gate output.
 - **Slice packets carry their fixture-module obligations.** A slice may now declare an optional,
   non-empty `fixtures:` list of clean implementation-relative paths in `design/slices.yaml`.
-  `Gw-packet` fails closed on malformed or duplicate paths, reverse-indexes shared fixtures, and
+  `Gw-packet` fails closed on null, malformed, nonportable, or duplicate paths, reverse-indexes shared fixtures, and
   states the complete sorted consumer-slice set in every affected packet so executors know which
   suites a fixture change obligates. The committed packet fixture now binds one shared module to
   two slices, so its golden packet bytes, size counts, and section numbering intentionally change;
@@ -27,13 +28,12 @@ under their version heading when a release is cut.
 
 ### Fixed
 
-- **Host-denied tools no longer leave an OpenCode session permanently in flight.** Every pending
-  hook operation now records a mutation-witnessed content and topology hash of the governed design
-  and configured implementation trees before execution. If a host permission layer refuses the
-  tool after Machinery allows it, no `PostToolUse` event exists; on `Stop`, an unchanged hash now
-  proves the operation completed as a no-op, expires its token, and proceeds through the still-armed
-  gate obligation. A changed or legacy token retains the conservative block and explicit re-fire
-  path, and a live background task always prevents expiration.
+- **Host-denied tools carry an exact terminal signal into governance.** OpenCode translates a
+  refused permission, a tool error, or an idle turn with a file-tool `tool.execute.before` but no matching
+  `tool.execute.after` into `PostToolUseFailure` with the call id and explicit reason. Shell calls
+  without a terminal event remain armed because they may leave a delayed writer. Stop keeps
+  every remaining pending token armed, even when the governed tree hash is unchanged or Stop is
+  re-fired. The gate obligation runs only after every exact tool completion is recorded.
 
 ### Documentation
 

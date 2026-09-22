@@ -4039,10 +4039,8 @@ func TestDialogPlainRegister(t *testing.T) {
 	})
 }
 
-// A changed tree with no PostToolUse is the crash case. The first Stop stays
-// conservative; a host re-fire may reap the token, but must still run gates
-// against the durable project-wide obligation.
-func TestStopReapsChangedArmedOperationOnRefiredStop(t *testing.T) {
+// A changed tree with no terminal event stays armed through a Stop re-fire.
+func TestRefiredStopCannotReapChangedArmedOperation(t *testing.T) {
 	isolateHookState(t)
 	root := managedRoot(t)
 	sid := "denied-after-arm"
@@ -4063,11 +4061,12 @@ func TestStopReapsChangedArmedOperationOnRefiredStop(t *testing.T) {
 	}
 
 	out = runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop", StopHookActive: true})
-	if strings.Contains(out, `"decision":"block"`) {
-		t.Fatalf("re-fired Stop stayed wedged on an operation that never ran: %s", out)
+	if !strings.Contains(out, `"decision":"block"`) {
+		t.Fatalf("re-fired Stop is not a completion witness: %s", out)
 	}
-	if !strings.Contains(out, "reaped 1 tool operation") {
-		t.Fatalf("a reap must never be silent: %s", out)
+	pre.HookEventName = "PostToolUseFailure"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("host completion: %s", out)
 	}
 	record, err := readStateRecord(root, sid)
 	if err != nil {
@@ -4078,13 +4077,9 @@ func TestStopReapsChangedArmedOperationOnRefiredStop(t *testing.T) {
 	}
 }
 
-// OpenCode has no stop-hook re-fire. A host denial happens after machinery's
-// PreToolUse allow and produces neither tool execution nor PostToolUse, then
-// every session.idle arrives as a first Stop. When the governed tree still
-// matches the state recorded at arm time, that pending operation is a proven
-// no-op and must expire on that first Stop so the durable gate obligation can
-// run instead of wedging the session forever.
-func TestStopExpiresPendingOperationWhenGovernedTreeIsUnchanged(t *testing.T) {
+// OpenCode's refusal must be translated to an exact failed completion. An
+// unchanged hash alone cannot close the operation.
+func TestHostDenialRequiresExactFailureCompletion(t *testing.T) {
 	isolateHookState(t)
 	root := managedRoot(t)
 	sid := "denied-with-unchanged-tree"
@@ -4098,11 +4093,12 @@ func TestStopExpiresPendingOperationWhenGovernedTreeIsUnchanged(t *testing.T) {
 	// The host refuses the tool. The governed tree remains byte-identical and
 	// no PostToolUse event exists for the adapter to forward.
 	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
-	if strings.Contains(out, `"decision":"block"`) {
-		t.Fatalf("unchanged pending operation wedged first Stop: %s", out)
+	if !strings.Contains(out, `"decision":"block"`) {
+		t.Fatalf("unchanged tree is not completion: %s", out)
 	}
-	if !strings.Contains(out, "expired 1 unchanged tool operation") {
-		t.Fatalf("pending no-op expiration must be explicit: %s", out)
+	pre.HookEventName = "PostToolUseFailure"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("denial completion: %s", out)
 	}
 	record, err := readStateRecord(root, sid)
 	if err != nil {
@@ -4205,9 +4201,8 @@ func TestStopRefusesToReapWhileBackgroundTasksRun(t *testing.T) {
 	}
 }
 
-// Reaping clears the in-flight ledger; it must not clear the obligation to
-// gate. A red tree still blocks on the re-fired Stop.
-func TestReapedStopStillGatesTheTree(t *testing.T) {
+// A denied completion closes its token but retains the gate obligation.
+func TestDeniedCompletionStillGatesTheTree(t *testing.T) {
 	isolateHookState(t)
 	root := t.TempDir()
 	copyTree(t, crmDesign, filepath.Join(root, "design"))
@@ -4229,6 +4224,10 @@ func TestReapedStopStillGatesTheTree(t *testing.T) {
 		t.Fatalf("allowed edit preflight unexpectedly emitted output: %s", out)
 	}
 
+	pre.HookEventName = "PostToolUseFailure"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("denial completion: %s", out)
+	}
 	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop", StopHookActive: true})
 	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "DRIFT") {
 		t.Fatalf("reap discharged a drifted tree without gating it: %s", out)

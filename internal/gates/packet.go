@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/portablepath"
 	"github.com/RamXX/machinery/internal/version"
 )
 
@@ -375,7 +376,7 @@ func (d *packetDesign) loadSliceMap() *sliceMap {
 				d.sliceMapErr("%s: budget must be a positive integer number of bytes", swhere)
 			}
 			sl.budget = budget
-			if fv := so.Get2("fixtures"); fv != nil && fv.Kind != ir.KindNull {
+			if fv := so.Get2("fixtures"); fv != nil {
 				if fv.Kind != ir.KindArray || len(fv.AsArray()) == 0 {
 					d.sliceMapErr("%s: fixtures must be a non-empty list of clean implementation-relative paths", swhere)
 				} else {
@@ -385,9 +386,9 @@ func (d *packetDesign) loadSliceMap() *sliceMap {
 							d.sliceMapErr("%s: fixtures[%d] is not a non-empty string", swhere, k)
 							continue
 						}
-						fixture, ok := packetRelPath(fitem.AsString())
-						if !ok {
-							d.sliceMapErr("%s: fixture %s is not a clean implementation-relative path", swhere, ir.Repr(strings.TrimSpace(fitem.AsString())))
+						fixture := fitem.AsString()
+						if err := portablepath.ValidateRelative(fixture); err != nil {
+							d.sliceMapErr("%s: fixture %s is not a clean implementation-relative path", swhere, ir.Repr(fixture))
 							continue
 						}
 						if seenFixture[fixture] {

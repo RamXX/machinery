@@ -89,7 +89,7 @@ func parseDeclaredReads(g *Gate, contract *ir.Value) []declaredRead {
 		if o == nil {
 			continue
 		}
-		row := declaredRead{artifact: strings.TrimSpace(o.GetString("artifact")), reader: strings.TrimSpace(o.GetString("reader")), reviewed: strings.TrimSpace(o.GetString("reviewed"))}
+		row := declaredRead{artifact: o.GetString("artifact"), reader: o.GetString("reader"), reviewed: o.GetString("reviewed")}
 		if row.artifact == "" || row.reader == "" || row.reviewed == "" {
 			continue
 		}
@@ -104,7 +104,8 @@ func parseDeclaredReads(g *Gate, contract *ir.Value) []declaredRead {
 
 func validateDeclaredRead(g *Gate, design string, row declaredRead) bool {
 	valid := true
-	for label, value := range map[string]string{"artifact": row.artifact, "reader": row.reader} {
+	for _, field := range []struct{ label, value string }{{"artifact", row.artifact}, {"reader", row.reader}} {
+		label, value := field.label, field.value
 		if err := portablepath.ValidateRelative(value); err != nil {
 			g.Errs = append(g.Errs, fmt.Sprintf("reads %s %s is not a portable relative path: %v", label, ir.Repr(value), err))
 			valid = false
@@ -154,23 +155,80 @@ func checkDeclaredReadHistory(gitDesign, gitImpl string, row declaredRead, g *Ga
 	if !ancestor {
 		return fmt.Errorf("declared-read reviewed commit %s is not an ancestor of HEAD %s", reviewed, head)
 	}
-	for _, path := range []string{artifact, reader} {
-		listed, err := runGitExact(repo, "cat-file", "-e", reviewed+":"+path)
-		if err != nil || listed != "" {
-			return fmt.Errorf("declared-read path %s was not tracked at reviewed commit %s", ir.Repr(path), reviewed)
-		}
-	}
-	log, err := runGitExact(repo, "log", "--format=commit:%H", "--name-only", "--no-renames", reviewed+".."+head, "--", artifact, reader)
+	commits, err := runGitExact(repo, "rev-list", "--reverse", reviewed+".."+head)
 	if err != nil {
-		return fmt.Errorf("read declared-read change history: %w", err)
+		return fmt.Errorf("enumerate declared-read commits: %w", err)
 	}
-	for _, change := range parseDeclaredReadLog(log) {
-		if change.paths[artifact] && !change.paths[reader] {
-			return fmt.Errorf("declared-read artifact %s changed without reader %s in the same commit %s", row.artifact, row.reader, change.commit)
+	type parentDiff struct {
+		commit  string
+		changes []declaredReadFileChange
+	}
+	var diffs []parentDiff
+	for _, commit := range strings.Fields(commits) {
+		line, err := runGitExact(repo, "rev-list", "--parents", "-n", "1", commit)
+		if err != nil {
+			return fmt.Errorf("read parents of declared-read commit %s: %w", commit, err)
 		}
-		if change.paths[artifact] {
-			g.Count("paired artifact changes")
+		parents := strings.Fields(line)
+		if len(parents) < 2 || parents[0] != commit {
+			return fmt.Errorf("declared-read commit %s has no verifiable parent", commit)
 		}
+		for _, parent := range parents[1:] {
+			output, err := runGitExact(repo, "diff-tree", "-r", "-M", "--name-status", "-z", parent, commit)
+			if err != nil {
+				return fmt.Errorf("read declared-read tree diff for %s against %s: %w", commit, parent, err)
+			}
+			changes, err := parseDeclaredReadDiff(output)
+			if err != nil {
+				return fmt.Errorf("parse declared-read tree diff for %s: %w", commit, err)
+			}
+			diffs = append(diffs, parentDiff{commit, changes})
+		}
+	}
+	// Resolve the current reader's custody backwards through actual Git rename
+	// edges. A path introduced only after the review cannot stand in for the
+	// reviewed reader, even when it changed alongside the artifact.
+	readerPaths := map[string]bool{reader: true}
+	for changed := true; changed; {
+		changed = false
+		for _, diff := range diffs {
+			for _, change := range diff.changes {
+				if strings.HasPrefix(change.status, "R") && readerPaths[change.new] && !readerPaths[change.old] {
+					readerPaths[change.old] = true
+					changed = true
+				}
+			}
+		}
+	}
+	if _, err := runGitExact(repo, "cat-file", "-e", reviewed+":"+artifact); err != nil {
+		return fmt.Errorf("declared-read path %s was not tracked at reviewed commit %s", ir.Repr(artifact), reviewed)
+	}
+	readerReviewed := false
+	for candidate := range readerPaths {
+		if _, err := runGitExact(repo, "cat-file", "-e", reviewed+":"+candidate); err == nil {
+			readerReviewed = true
+			break
+		}
+	}
+	if !readerReviewed {
+		return fmt.Errorf("declared-read reader %s has no tracked custody at reviewed commit %s", ir.Repr(reader), reviewed)
+	}
+	pairedCommits := map[string]bool{}
+	for _, diff := range diffs {
+		artifactChanged, readerChanged := false, false
+		for _, change := range diff.changes {
+			artifactChanged = artifactChanged || change.old == artifact || change.new == artifact
+			readerChanged = readerChanged || readerPaths[change.old] || readerPaths[change.new]
+		}
+		if artifactChanged && !readerChanged {
+			return fmt.Errorf("declared-read artifact %s changed without reader %s in the same commit %s", row.artifact, row.reader, diff.commit)
+		}
+		if artifactChanged {
+			pairedCommits[diff.commit] = true
+		}
+	}
+	for range pairedCommits {
+		g.Count("paired artifact changes")
 	}
 	diff, err := runGitExact(repo, "diff", "--name-only", "--no-renames", "HEAD", "--", artifact, reader)
 	if err != nil {
@@ -191,21 +249,33 @@ func checkDeclaredReadHistory(gitDesign, gitImpl string, row declaredRead, g *Ga
 	return nil
 }
 
-type declaredReadChange struct {
-	commit string
-	paths  map[string]bool
-}
+type declaredReadFileChange struct{ status, old, new string }
 
-func parseDeclaredReadLog(text string) []declaredReadChange {
-	var out []declaredReadChange
-	for _, line := range strings.Split(text, "\n") {
-		if strings.HasPrefix(line, "commit:") {
-			out = append(out, declaredReadChange{commit: strings.TrimPrefix(line, "commit:"), paths: map[string]bool{}})
-		} else if line != "" && len(out) > 0 {
-			out[len(out)-1].paths[line] = true
-		}
+func parseDeclaredReadDiff(output string) ([]declaredReadFileChange, error) {
+	if output == "" {
+		return nil, nil
 	}
-	return out
+	fields := strings.Split(strings.TrimSuffix(output, "\x00"), "\x00")
+	var changes []declaredReadFileChange
+	for i := 0; i < len(fields); {
+		status := fields[i]
+		i++
+		if status == "" || i >= len(fields) {
+			return nil, fmt.Errorf("malformed name-status record")
+		}
+		old := fields[i]
+		i++
+		change := declaredReadFileChange{status: status, old: old, new: old}
+		if strings.HasPrefix(status, "R") || strings.HasPrefix(status, "C") {
+			if i >= len(fields) {
+				return nil, fmt.Errorf("incomplete rename record")
+			}
+			change.new = fields[i]
+			i++
+		}
+		changes = append(changes, change)
+	}
+	return changes, nil
 }
 
 func repoRelativePath(repo, target string) (string, error) {

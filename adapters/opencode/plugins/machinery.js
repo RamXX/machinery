@@ -309,6 +309,29 @@ async function recordWarning(client, message) {
 export const MachineryPlugin = async ({ client, directory, worktree }, options = {}) => {
   const run = options.runner ?? defaultRunner
   const root = worktree || directory
+  const pending = new Map()
+  const permissions = new Map()
+  const sessionCalls = (id) => {
+    if (!pending.has(id)) pending.set(id, new Map())
+    return pending.get(id)
+  }
+  const failedCompletion = async (id, callID, reason) => {
+    const calls = pending.get(id)
+    const call = calls?.get(callID)
+    if (!call) return
+    const response = await runMachinery(run, root, {
+      session_id: id,
+      tool_use_id: callID,
+      cwd: root,
+      hook_event_name: "PostToolUseFailure",
+      tool_name: call.tool,
+      tool_input: call.input,
+      error: reason,
+    })
+    const failure = denial(response)
+    if (failure) throw new Error(failure)
+    calls.delete(callID)
+  }
 
   return {
     "tool.execute.before": async (input, output) => {
@@ -324,11 +347,16 @@ export const MachineryPlugin = async ({ client, directory, worktree }, options =
       })
       const failure = denial(response)
       if (failure) throw new Error(failure)
+      sessionCalls(sessionID(input)).set(toolUseID(input), { tool, input: toolInput(output.args) })
     },
 
     "tool.execute.after": async (input, output) => {
       const tool = toolNames[input.tool]
       if (!tool) return
+      if (input.error || output.error) {
+        await failedCompletion(sessionID(input), toolUseID(input), "OpenCode tool.execute.after reported a tool error")
+        return
+      }
       const args = input.args || output.args || {}
       const response = await runMachinery(run, root, {
         session_id: sessionID(input),
@@ -340,11 +368,36 @@ export const MachineryPlugin = async ({ client, directory, worktree }, options =
       })
       const failure = denial(response)
       if (failure) throw new Error(failure)
+      pending.get(sessionID(input))?.delete(toolUseID(input))
     },
 
     event: async ({ event }) => {
       const id = sessionID(event)
+      if (event.type === "permission.asked" || event.type === "permission.updated") {
+        const permission = event.properties || {}
+        if (permission.id && permission.callID) permissions.set(permission.id, { id, callID: permission.callID })
+        return
+      }
+      if (event.type === "permission.replied") {
+        const reply = event.properties || {}
+        const permission = permissions.get(reply.permissionID)
+        permissions.delete(reply.permissionID)
+        if (permission && (reply.response === "reject" || reply.response === "deny")) {
+          await failedCompletion(permission.id, permission.callID, "OpenCode permission.replied refused the tool call")
+        }
+        return
+      }
       if (event.type !== "session.idle") return
+
+      // OpenCode's idle event closes its synchronous file-tool turn. A shell
+      // can leave an external writer running after idle; its missing after
+      // event is not a reliable denial witness. Keep that token armed until
+      // OpenCode reports an exact permission reply or tool completion.
+      for (const [callID, call] of [...(pending.get(id)?.entries() || [])]) {
+        if (call.tool !== "Bash") {
+          await failedCompletion(id, callID, "OpenCode session.idle after file-tool execute.before without execute.after")
+        }
+      }
 
       const response = await runMachinery(run, root, {
         session_id: id,

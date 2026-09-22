@@ -35,7 +35,7 @@ Each row is a closed mapping with these fields:
 |---|---|
 | `artifact` | Required portable path relative to the design root. It must resolve to a regular file. |
 | `reader` | Required portable path relative to `--impl`. It must resolve to a regular file when an implementation is supplied. |
-| `reviewed` | Required full 40-character lowercase Git commit. Both paths must be tracked at this commit, and it must be an ancestor of the current HEAD. |
+| `reviewed` | Required full 40-character lowercase Git commit. The artifact and the reader's rename ancestor must be tracked at this commit, and it must be an ancestor of the current HEAD. |
 | `_comment` | Optional non-empty string. |
 
 Unknown keys, duplicate artifact-reader pairs, empty lists, non-portable paths, missing files, short
@@ -57,8 +57,10 @@ machines/Principal.matrix.md: an implementation reads this file through lib/poli
 The warning is deliberate. A design-only lane cannot prove what happened in the implementation,
 but it can keep the coupling visible at the commit boundary.
 
-With `--impl`, Gr walks every commit after `reviewed` through HEAD. Any commit that changes the
-artifact must change the declared reader in that same commit. The same rule applies to the current
+With `--impl`, Gr walks every commit after `reviewed` through HEAD and checks the tree diff against
+each parent of a merge. A reader rename carries custody from the reviewed path to the current
+declared path. Any commit that changes the artifact must change that reader in the same parent
+comparison. The same rule applies to the current
 uncommitted change set. An artifact-only change is an ERROR. A paired change is recorded in the
 gate's checked count. The gate does not execute the compiler or decide whether the reader update is
 correct; it proves that the implementation follow-up was present for review.
