@@ -209,7 +209,8 @@ shared hook protocol. In particular, it forwards OpenCode's `patchText`, whose p
 `*** Add/Update/Move/Delete File` markers.
 
 The adapter can reject a generated-artifact edit synchronously in `tool.execute.before`. It also
-runs exact `PostToolUseFailure` completion when OpenCode reports a rejected permission or tool error.
+runs exact `PostToolUseFailure` completion when OpenCode reports a rejected permission, a tool-part
+error, or a tool error in the after hook.
 When OpenCode reports `session.idle` with a recorded file-tool before call but no matching after
 call, the adapter records that terminal asymmetry with an explicit idle reason before asking the
 hook to check the gate. A shell can leave a delayed writer running after idle, so its unmatched

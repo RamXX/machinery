@@ -29,7 +29,7 @@ under their version heading when a release is cut.
 ### Fixed
 
 - **Host-denied tools carry an exact terminal signal into governance.** OpenCode translates a
-  refused permission, a tool error, or an idle turn with a file-tool `tool.execute.before` but no matching
+  refused permission, a tool-part error, a tool error in the after hook, or an idle turn with a file-tool `tool.execute.before` but no matching
   `tool.execute.after` into `PostToolUseFailure` with the call id and explicit reason. Shell calls
   without a terminal event remain armed because they may leave a delayed writer. Stop keeps
   every remaining pending token armed, even when the governed tree hash is unchanged or Stop is

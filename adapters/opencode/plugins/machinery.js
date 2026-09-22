@@ -373,6 +373,13 @@ export const MachineryPlugin = async ({ client, directory, worktree }, options =
 
     event: async ({ event }) => {
       const id = sessionID(event)
+      if (event.type === "message.part.updated") {
+        const part = event.properties?.part
+        if (part?.type === "tool" && part.state?.status === "error" && part.id && part.sessionID) {
+          await failedCompletion(part.sessionID, part.id, "OpenCode message.part.updated reported a terminal tool error")
+        }
+        return
+      }
       if (event.type === "permission.asked" || event.type === "permission.updated") {
         const permission = event.properties || {}
         if (permission.id && permission.callID) permissions.set(permission.id, { id, callID: permission.callID })
