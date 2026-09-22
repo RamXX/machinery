@@ -127,6 +127,29 @@ func TestPacketProjectionClean(t *testing.T) {
 	}
 }
 
+func TestPacketCarriesSharedFixtureObligations(t *testing.T) {
+	design := packetFixture(t)
+	rewriteFixtureFile(t, design, "slices.yaml", "        budget: 12000\n        cites:\n", "        budget: 12000\n        fixtures:\n          - test/support/release_fixture.ex\n        cites:\n")
+	packets, g := ProjectPackets(design, "M1", "")
+	if len(g.Errs) > 0 {
+		t.Fatalf("fixture declaration failed: %v", g.Errs)
+	}
+	if g.Counts["fixture bindings"] != 2 || g.Counts["fixture modules"] != 1 {
+		t.Fatalf("fixture counts = %v", g.Counts)
+	}
+	for _, packet := range packets {
+		body := string(packet.Body)
+		for _, want := range []string{
+			"## 7. Fixture obligations",
+			"`test/support/release_fixture.ex` feeds suites of slices M1-S1 and M1-S2; run every consuming slice suite after changing it.",
+		} {
+			if !strings.Contains(body, want) {
+				t.Errorf("%s packet lacks %q\n%s", packet.Slice, want, body)
+			}
+		}
+	}
+}
+
 // AC2: two runs over the same bytes are byte-identical.
 func TestPacketProjectionIsByteReproducible(t *testing.T) {
 	design := packetFixture(t)
