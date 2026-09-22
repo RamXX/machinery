@@ -1,6 +1,7 @@
 package gates
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -215,5 +216,118 @@ func TestAuthorizationH2RejectsConflictingAndMalformedProducerMarks(t *testing.T
 				t.Fatalf("invalid H2 inventory must fail: %v", g.Errs)
 			}
 		})
+	}
+}
+
+type h2Action struct {
+	name, description string
+}
+
+func h2ResidualFixture(t *testing.T, resource string, actions []h2Action, residualRow, actionMatrix string) *Gate {
+	t.Helper()
+	design := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(design, "machines"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var model strings.Builder
+	fmt.Fprintf(&model, "kind: DomainModel\nversion: v1\nentities:\n  %s:\n    attributes: [{name: state, type: string}]\n    actions:\n", resource)
+	for _, action := range actions {
+		fmt.Fprintf(&model, "      - {name: %s, actor: System, description: %q}\n", action.name, action.description)
+	}
+	mustWrite(t, filepath.Join(design, "domain.modelith.yaml"), model.String())
+	mustWrite(t, filepath.Join(design, "machines", resource+".machine.json"),
+		fmt.Sprintf(`{"id":%q,"initial":"Open","states":{"Open":{"type":"final"}}}`, resource))
+	mustWrite(t, filepath.Join(design, "machines", "Principal.matrix.md"),
+		"| resource | platform_admin | tenant_admin | every other preset |\n|---|---|---|---|\n"+residualRow+"\n")
+	if actionMatrix != "" {
+		mustWrite(t, filepath.Join(design, "machines", resource+".matrix.md"), actionMatrix)
+	}
+	return CheckTraceability(design)
+}
+
+func TestAuthorizationH2ResidualWithheldWrites(t *testing.T) {
+	cases := []struct {
+		resource, row, matrix string
+		actions               []h2Action
+		admitted              int
+	}{
+		{
+			resource: "Verdict",
+			row:      "| `Verdict` (residual `unknown-never-compliant`) | `read` | `read`, WITHIN ITS OWN `Tenant` | `read`. NO preset holds `create`, `update` or `delete`: `evaluate` and `replay` are `System` and a verdict is insert-only |",
+			matrix:   "## Model actions\n\n- `evaluate` (actor System): the kernel records the outcome. Insert-only.\n- `replay` (actor System): re-run a recorded verdict and recompute hashes; any divergence is an integrity incident.\n\n| name | kind | contract (pre / post) |\n|---|---|---|\n| `replayAndCompareHashes` | actor | re-evaluates pinned inputs and compares hashes; the stored row is never adjusted to match replay |\n",
+			actions: []h2Action{
+				{"evaluate", "Run NIL over a fact bundle and an approved release; record the decision with its full hash set."},
+				{"replay", "Re-execute and verify byte-identical results against recorded hashes; divergence is an integrity incident."},
+			},
+			admitted: 1,
+		},
+		{
+			resource: "Trial",
+			row:      "| `Trial` (residual `trial-provision-requires-release`) | read. `provision`, `notify_expiry` and `erase` are System producers through the machine, never a preset act, and no preset creates, updates or deletes a trial. | read, WITHIN ITS OWN `Tenant` | read, the prospect's clock within the trial tenant. |",
+			matrix:   "| action | reason |\n|---|---|\n| `provision` | The creation action. A released submission mints the row. |\n",
+			actions: []h2Action{
+				{"provision", "Create the trial tenant with the funnel's capability set and caps. Postcondition: status provisioned."},
+				{"notify_expiry", "Enter the notice window before expiry. Postcondition: status expiring."},
+				{"erase", "Close the window and drive the trial tenant's erasure cascade. Postcondition: status erased."},
+			},
+			admitted: 3,
+		},
+		{
+			resource: "TenantRoleRevision",
+			row:      "| `TenantRoleRevision` | read | read, WITHIN ITS OWN `Tenant`. Nothing writes it but `appendRoleRevision`, in the transaction of the change it records | denied |",
+			actions:  []h2Action{{"record", "Append the revision record in the SAME TRANSACTION as the role change that caused it."}},
+			admitted: 1,
+		},
+		{
+			resource: "ReviewTask",
+			row:      "| `ReviewTask` (residual `rbac-reviewer-approval`) | `read` and `update` | `read` and `update`, WITHIN ITS OWN `Tenant` | `read` and `update`. NEVER `create`: `enqueue` is `System`, the producing assembly's guarded branch. NEVER `delete`: a resolution is append-only |",
+			actions:  []h2Action{{"enqueue", "Create with exactly one typed subject and route to the scope-appropriate queue. Postcondition: status open."}},
+			admitted: 1,
+		},
+		{
+			resource: "ConversionReport",
+			row:      "| `ConversionReport` (residual `conversion-report-first-class`) | `read` | `read` and `update`, WITHIN ITS OWN `Tenant` | `read` and `update`: human accept and reject; read alone for every other tenant preset. NEVER `create`: `produce` is the run's own act through the machine |",
+			actions:  []h2Action{{"produce", "In the run's page-accounting stage, write the report with every per-page count. Postcondition: status pending."}},
+			admitted: 1,
+		},
+		{
+			resource: "ExtractionRun",
+			row:      "| `ExtractionRun` (residual `run-single-live`) | `create` and `read`: `enqueue` is a platform act; no `update`, no `delete`, every stage being System's arm | `create` and `read`, WITHIN ITS OWN `Tenant`: `enqueue`; no `update`, no `delete` | `create` and `read`: `enqueue` for full_except_account_management; read alone for every other tenant preset |",
+			actions: []h2Action{
+				{"start", "Begin extraction over pinned input versions with a recorded configuration. Precondition: no other live run."},
+				{"complete", "Finish with artifacts and recorded quality metrics."},
+			},
+			admitted: 2,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.resource, func(t *testing.T) {
+			g := h2ResidualFixture(t, tc.resource, tc.actions, tc.row, tc.matrix)
+			for _, action := range tc.actions {
+				if hasErr(g, "System action '"+tc.resource+"."+action.name+"' has no authorization row") {
+					t.Fatalf("H2 residual row must settle %s.%s: %v", tc.resource, action.name, g.Errs)
+				}
+			}
+			if hasErr(g, "no <!-- machinery:authorization-inventory -->") {
+				t.Fatalf("H2 residual table is an authorization source: %v", g.Errs)
+			}
+			if got := g.Counts["authorization obligations admitted"]; got != tc.admitted {
+				t.Fatalf("admitted %d, want %d: %v", got, tc.admitted, g.Errs)
+			}
+		})
+	}
+}
+
+func TestAuthorizationH2ReadOnlyActionUsesDeclaration(t *testing.T) {
+	row := "| `Verdict` (residual `unknown-never-compliant`) | `read` | `read` | `read`. NO preset holds `create`, `update` or `delete` |"
+	matrix := "## Model actions\n\n- `verify_again` (actor System): re-run a recorded verdict and recompute hashes; any divergence is an integrity incident.\n\n| name | kind | contract (pre / post) |\n|---|---|---|\n| `verifyAndCompareHashes` | actor | compares the pinned hashes; the stored row is never adjusted to match verification |\n"
+	g := h2ResidualFixture(t, "Verdict", []h2Action{{"verify_again", "Re-execute and verify byte-identical results against recorded hashes; divergence is an integrity incident."}}, row, matrix)
+	if hasErr(g, "System action 'Verdict.verify_again'") || g.Counts["authorization obligations admitted"] != 0 {
+		t.Fatalf("a declared verification with no Verdict write owes no write admission: %v, %+v", g.Errs, g.Counts)
+	}
+	g = h2ResidualFixture(t, "Verdict", []h2Action{{"replay", "Create a successor verdict row with the compared hashes."}}, row,
+		"## Model actions\n\n- `replay` (actor System): creates a successor verdict row.\n")
+	if g.Counts["authorization obligations admitted"] != 1 {
+		t.Fatalf("the action name replay must not suppress a declared write: %v, %+v", g.Errs, g.Counts)
 	}
 }
