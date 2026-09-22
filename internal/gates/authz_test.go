@@ -353,6 +353,15 @@ func TestAuthorizationH2ConditionalNoWriteStillOwesAdmission(t *testing.T) {
 	}
 }
 
+func TestAuthorizationH2InvalidBranchWritesNothingStillOwesAdmission(t *testing.T) {
+	row := "| `ApplicabilityElection` (residual `election-blanket-inherits`) | `read` | `read` | `read` |"
+	description := "Record that a norm family arrived under this standing blanket election and inherited its posture. Precondition: the named release serves the arriving family; anything else writes nothing and is refused by name. Postcondition: one entry in inherited_family_arrivals and its rerun obligation recorded in the same transaction."
+	g := h2ResidualFixture(t, "ApplicabilityElection", []h2Action{{"record_family_arrival", description}}, row, "", "MACHINE-WRITTEN{record_family_arrival}")
+	if got := g.Counts["authorization obligations admitted"]; got != 1 {
+		t.Fatalf("a refusal branch that writes nothing does not erase the admitted write: %v, %+v", g.Errs, g.Counts)
+	}
+}
+
 func TestAuthorizationH2ResidualListClosesFallback(t *testing.T) {
 	row := "| `Norm` (residual `rbac-reviewer-approval`) | `read` and `update` | `read` | `read` and `update`. NEVER `create`: `draft` is `System` |"
 	g := h2ResidualFixture(t, "Norm", []h2Action{{"draft", "Create a draft norm from extracted source material."}}, row, "", "MACHINE-WRITTEN{advance}")
