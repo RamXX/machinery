@@ -38,6 +38,9 @@ type RunOptions struct {
 	// GitDesign is the logical checkout path used only for VCS object queries
 	// when design itself is an immutable private materialization.
 	GitDesign string
+	// GitImpl is the logical implementation path used with GitDesign for
+	// Gr-reads history queries after the implementation has been snapshotted.
+	GitImpl string
 	// cargoWorkspaceManifest is an immutable exact-file snapshot of a Cargo
 	// workspace root above --impl. It is populated only by Snapshot.RunSelected.
 	cargoWorkspaceManifest string
@@ -147,6 +150,9 @@ func (s *Snapshot) RunSelected(impl string, sel Selection, opt RunOptions) []*Ga
 		opt.GitDesign = s.logicalDesign
 	}
 	logicalImpl := impl
+	if opt.GitImpl == "" {
+		opt.GitImpl = logicalImpl
+	}
 	var stable implementationSnapshot
 	strict := false
 	closeGeneric := func() error {
@@ -246,7 +252,7 @@ func (s *Snapshot) VersionSkewNote(gs []*Gate) string {
 // KnownGate; two hand-kept lists once drifted.
 var knownGateSet = map[string]bool{
 	"gm": true, "gs": true, "gu": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
-	"g3": true, "gd": true, "gl": true, "gx": true, "gk": true, "gb": true, "gw": true, "ge": true, "ga": true, "gj": true, "gv": true, "g4": true, "gt": true, "g5": true,
+	"g3": true, "gd": true, "gl": true, "gx": true, "gr": true, "gk": true, "gb": true, "gw": true, "ge": true, "ga": true, "gj": true, "gv": true, "g4": true, "gt": true, "g5": true,
 }
 
 // KnownGate reports whether name names a gate this suite can run.
@@ -343,7 +349,7 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 	if err := validateActivationDiscovery(design); err != nil {
 		return sel, err
 	}
-	list := "gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5"
+	list := "gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
@@ -387,6 +393,9 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 				}
 			}
 			parts = append(parts, "g2", "gl")
+			if HasDeclaredReads(design) {
+				parts = append(parts, "gr")
+			}
 			if HasCheckers(design) {
 				parts = append(parts, "gk")
 			}
@@ -476,7 +485,7 @@ func SelectRunAndNote(design, impl, gateList string, opt RunOptions) (sel Select
 }
 
 // RunSelected runs the selected gates in canonical order (Gm, Gs, Gu, Gp, Gi,
-// Gn, Gc, G2, G3, Gd, Gl, Gx, Gk, Gb, Ge, Ga, Gj, Gv, G4, Gt, G5) with `machinery check`'s applicability
+// Gn, Gc, G2, G3, Gd, Gl, Gx, Gr, Gk, Gb, Gw, Ge, Ga, Gj, Gv, G4, Gt, G5) with `machinery check`'s applicability
 // rules: opt-in gates run only when their source exists (or when explicitly
 // requested), G4 and Gt only with an impl dir, and G5 only when explicitly
 // requested or when the design is decomposed. opt carries the run-time inputs
@@ -535,6 +544,9 @@ func runSelectedInSnapshot(design, impl string, sel Selection, opt RunOptions) [
 	}
 	if sel.Run["gx"] {
 		out = append(out, CheckTraceability(design))
+	}
+	if sel.Run["gr"] && (sel.Explicit || HasDeclaredReads(design)) {
+		out = append(out, CheckDeclaredReads(design, impl, opt.GitDesign, opt.GitImpl))
 	}
 	if sel.Run["gk"] && (sel.Explicit || HasCheckers(design)) {
 		out = append(out, CheckExternalCheckers(design)...)

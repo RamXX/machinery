@@ -310,6 +310,21 @@ func TestGatesReportWhatTheyChecked(t *testing.T) {
 	}
 }
 
+func TestDeclaredReadObligationIsVisibleWithoutImplementation(t *testing.T) {
+	design, _ := fixture(t)
+	arch := filepath.Join(design, "ARCHITECTURE.md")
+	raw, err := os.ReadFile(arch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.Replace(string(raw), "dependency_rules:\n", "reads:\n  - artifact: machines/Widget.matrix.md\n    reader: internal/widget_matrix.go\n    reviewed: \"0000000000000000000000000000000000000000\"\ndependency_rules:\n", 1)
+	mustWrite(t, arch, text)
+	g := gates.CheckDeclaredReads(design, "", design, "")
+	if len(g.Errs) != 0 || !containsAnyOf(g.Warns, "an implementation reads this file") {
+		t.Fatalf("declared read disappeared from the design-only gate: errs=%v warns=%v", g.Errs, g.Warns)
+	}
+}
+
 // ----------------------- experiment A: empty design ------------------------
 
 func TestEmptyDesignFailsEveryGate(t *testing.T) {
