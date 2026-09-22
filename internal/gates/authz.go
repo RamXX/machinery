@@ -25,6 +25,7 @@ var (
 	h2NeverVerb             = regexp.MustCompile("(?i)\\bNEVER\\s+`?(create|update|delete)`?\\s*:\\s*([^.;]+)")
 	h2NoWrite               = regexp.MustCompile(`(?i)\b(?:writes? nothing|no (?:resource )?write|without writing|does not (?:change|update|write|mutate) (?:the )?(?:recorded |stored )?row|never (?:changes?|adjusts?) (?:the )?(?:recorded |stored )?row)\b`)
 	h2ConditionalWrite      = regexp.MustCompile(`(?i)\b(?:but|unless|except|however)\b[^.;]*\b(?:write|writes|append|create|update|record|insert|set)\b`)
+	h2PositiveWrite         = regexp.MustCompile(`(?i)\b(?:record|records|recorded|append|appends|appended|write|writes|written|create|creates|created|update|updates|updated|persist|persists|persisted|set|sets|emit|emits|emitted)\b`)
 	c4OwnerDeclaration      = regexp.MustCompile(`(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*(?:softwareSystem|container|component)\b`)
 )
 
@@ -115,7 +116,11 @@ func h2NoWriteStatement(text string) bool {
 	if len(match) != 2 {
 		return false
 	}
-	return !h2ConditionalWrite.MatchString(text[match[1]:])
+	// A refusal branch can write nothing while the successful branch records
+	// the action's result. Only a whole-action no-write claim removes its
+	// authorization obligation.
+	withoutClaim := text[:match[0]] + text[match[1]:]
+	return !h2ConditionalWrite.MatchString(text[match[1]:]) && !h2PositiveWrite.MatchString(withoutClaim)
 }
 
 func h2MatrixReadOnlyActions(design string) map[string]bool {
