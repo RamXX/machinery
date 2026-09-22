@@ -6,6 +6,16 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Host-denied tools no longer leave an OpenCode session permanently in flight.** Every pending
+  hook operation now records a mutation-witnessed content and topology hash of the governed design
+  and configured implementation trees before execution. If a host permission layer refuses the
+  tool after Machinery allows it, no `PostToolUse` event exists; on `Stop`, an unchanged hash now
+  proves the operation completed as a no-op, expires its token, and proceeds through the still-armed
+  gate obligation. A changed or legacy token retains the conservative block and explicit re-fire
+  path, and a live background task always prevents expiration.
+
 ## [0.8.0] - 2026-09-10
 
 ### Added
