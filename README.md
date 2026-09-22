@@ -758,6 +758,11 @@ make verify-formal   # regenerates and checks all 35 TLC proofs + the relational
 | G5-pack | decomposed designs only: packs fresh, children pinned to the current packs, refinement proofs fresh, and every boundary-event row held to its direction (`consumes` or `produces` exactly; any other value is an ERROR rather than a silently dropped row). |
 | ERROR / DRIFT / WARN | ERROR is blocking; DRIFT means a generated artifact is stale, also blocking; WARN is advisory. |
 
+Gx also closes autonomous writes against the marked authorization inventory. Every Modelith action
+whose actor is `System`, plus every producer named by a matrix cascade or consumer-arm table, owes
+one exact row with a non-empty admission or `(no authorization: <reason>)`. Missing, duplicate,
+orphan, empty, and reasonless rows are blocking findings.
+
 ## Use
 
 In an agent session (Claude Code, Codex, OpenCode, or any runtime that loads Agent Skills), from the

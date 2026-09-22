@@ -121,6 +121,12 @@ binds it to that row's one event and requires exact set equality with the
 Architecture Contract payload cell. Payload prose without a group defines
 nothing.
 
+Every action whose Modelith actor is `System`, and every producer named by a
+matrix cascade or consumer arm, owes one row in the marked Architecture
+Contract authorization inventory. Name the admitting capability or use the
+row-local `(no authorization: <reason>)` waiver. Gx-trace holds the inventory
+closed in both directions.
+
 Run `machinery check <design> --gate g2,gu` plus each artifact-activated gate,
 and `machinery verify-c4 <design>`. Record the required attestation rows.
 

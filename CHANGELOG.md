@@ -32,6 +32,13 @@ under their version heading when a release is cut.
   set. Malformed, duplicate, conflicting, missing, multi-event, and unequal declarations are
   blocking findings, and a mismatch prints both spellings. Existing examples remain green because
   ordinary payload prose is not a declaration; this is an opt-in compatibility extension.
+- **Gx-trace now closes autonomous writes against an authorization inventory.** Every Modelith
+  action whose actor is `System`, plus each producer named by a matrix cascade or consumer arm,
+  must have one exact row in the marked Architecture Contract inventory. The row names an admitting
+  capability or uses `(no authorization: <reason>)`; missing, duplicate, orphan, empty, and
+  reasonless rows fail. This intentionally made the fulfillment, portfolio-engine, and
+  checkout-split child examples red; their previously implicit internal capabilities are now
+  recorded, and the golden corpus is regenerated with the new authorization counts.
 
 ### Fixed
 

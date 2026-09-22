@@ -434,6 +434,11 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   Architecture Contract payload cell. Field order is immaterial; empty,
   duplicate, malformed, conflicting, missing, or multi-event declarations
   fail. A payload mention without a group stays prose and defines nothing.
+- Every Modelith action whose actor is `System`, plus every producer named by
+  a matrix cascade or consumer-arm table, appears exactly once in the marked
+  design authorization inventory. Its admission cell names
+  the enforced capability or carries `(no authorization: <reason>)`. Empty,
+  missing, duplicate, orphan, and reasonless-waiver rows fail in Gx-trace.
 - Incident-derived invariants and fixtures carry a PROVENANCE pointer to the
   primary record (the customer report, the post-mortem document), so the
   attested re-derivation set is enumerable; a fixture named after an

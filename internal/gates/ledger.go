@@ -386,10 +386,10 @@ func checkHouseStyle(g *Gate, design string) {
 				if !machineryMarkerishRe.MatchString(c) {
 					continue
 				}
-				if embedMarker.MatchString(c) || readsCompleteMarker.MatchString(c) {
+				if embedMarker.MatchString(c) || readsCompleteMarker.MatchString(c) || authorizationMarker.MatchString(c) {
 					continue
 				}
-				findings = append(findings, finding{rel, lineNo + 1, "marker-shaped comment " + strconv.Quote(c) + " matches no known machinery marker grammar (machinery:embed, machinery:reads-complete); a near-miss marker arms nothing", false})
+				findings = append(findings, finding{rel, lineNo + 1, "marker-shaped comment " + strconv.Quote(c) + " matches no known machinery marker grammar (machinery:embed, machinery:reads-complete, machinery:authorization-inventory); a near-miss marker arms nothing", false})
 			}
 		}
 		return nil

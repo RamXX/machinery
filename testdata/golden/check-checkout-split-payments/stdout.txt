@@ -15,13 +15,13 @@
   checked: 1 machines, 3 transitions, 1 tla-generable, 1 oracles fresh, 3 named units covered, 4 dotted references checked
   ok
 == Gd-idcite  design-side stable-id citations ==
-  checked: 6 citations resolved, 11 files scanned, 3 committed oracle ids
+  checked: 6 citations resolved, 12 files scanned, 3 committed oracle ids
   ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 11 files style-scanned, 4 duplicate tables embed-marked
+  checked: 12 files style-scanned, 4 duplicate tables embed-marked
   ok
 == Gx-trace  cross-layer traceability ==
-  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 lifecycle semantics annotations, 1 control-flow-only semantics, 1 placement rows with machines, 1 entities placed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor)
+  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 lifecycle semantics annotations, 1 control-flow-only semantics, 1 placement rows with machines, 1 entities placed, 3 authorization obligations admitted, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 1 invariants enforced, 1 invariants unit-backed (guard/action/actor)
   ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 3 milestones, 3 DoD-bearing milestones, 1 skeleton NFR lines, 1 skeleton citations

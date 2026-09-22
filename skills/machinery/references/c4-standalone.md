@@ -435,6 +435,28 @@ sets, so give the mapping an artifact and G2 holds it in both directions. The he
   boundary/external id.
 - A design without the table keeps the old posture: the mapping is attested.
 
+## System authorization inventory (required when System writes exist)
+
+Every Modelith action whose actor is `System` is an autonomous write obligation. A matrix table
+whose headers name a `producer` and a cascade or consumer arm adds each producer it names to the
+same obligation set. One hand-written Markdown artifact in the design, conventionally
+`AUTHORIZATION.md` or ARCHITECTURE.md, must carry this marker and one closed inventory:
+
+```
+<!-- machinery:authorization-inventory -->
+```
+
+| authorization subject | admission |
+|---|---|
+| `Order.markPaid` | internal capability `orders.write` |
+| `SearchIndex.rebuild` | `(no authorization: isolated rebuild worker has no caller identity)` |
+
+Each obligation appears exactly once by exact subject. Admission is non-empty prose naming the
+capability the implementation enforces. A genuinely unauthorizable internal write uses
+`(no authorization: <reason>)`; the reason is mandatory. Missing, duplicate, empty, and orphan rows
+are errors. The inventory is closed in both directions, so deleting a System action or matrix
+producer also requires deleting its stale authorization row.
+
 ## Persistence and placement (the C4 to FSM bridge)
 
 For every **stateful** component, decide and record. This determines how the Phase 3 machine is realized
