@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -446,6 +446,31 @@ test("native real machinery binary governs a managed root end to end", { timeout
       assert.match(err.message, /machinery oracle/)
       return true
     })
+    // OpenCode refuses the first call after our before hook, emits no after,
+    // then another call mutates the tree before every idle (each is a first Stop).
+    const observed = []
+    const governed = await MachineryPlugin({ client: {}, directory: root, worktree: "" }, {
+      runner: async (r, payload) => {
+        const result = await defaultRunner(r, payload)
+        observed.push({ payload, result })
+        return result
+      },
+    })
+    await governed["tool.execute.before"]({ tool: "write", sessionID: "refused-session", callID: "refused-call" }, { args: { filePath: path.join(root, "design", "refused.txt") } })
+    await governed["tool.execute.before"]({ tool: "write", sessionID: "refused-session", callID: "other-call" }, { args: { filePath: path.join(root, "design", "other.txt") } })
+    await writeFile(path.join(root, "design", "other.txt"), "unrelated mutation\n")
+    await governed["tool.execute.after"]({ tool: "write", sessionID: "refused-session", callID: "other-call", args: { filePath: path.join(root, "design", "other.txt") } }, {})
+    for (let i = 0; i < 2; i++) {
+      await governed.event({ event: { type: "session.idle", properties: { sessionID: "refused-session" } } })
+    }
+    assert.ok(observed.some(({ payload }) => payload.hook_event_name === "PostToolUseFailure" && payload.tool_use_id === "refused-call"), "refusal must be translated as exact failed completion")
+    const stops = observed.filter(({ payload }) => payload.hook_event_name === "Stop")
+    assert.equal(stops.length, 2)
+    assert.ok(stops.every(({ result }) => !result.stdout.includes('"decision":"block"')), "each idle must discharge its gate result")
+    const stateFiles = await readdir(configDir, { recursive: true })
+    for (const file of stateFiles.filter((name) => name.endsWith(".state"))) {
+      assert.doesNotMatch(await readFile(path.join(configDir, file), "utf8"), /pending /)
+    }
     // The same transport stays silent on an unmanaged root: the documented
     // empty-success protocol through the real binary.
     const bare = await mkdtemp(path.join(scratch, "unmanaged-"))

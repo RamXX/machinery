@@ -4113,6 +4113,65 @@ func TestStopExpiresPendingOperationWhenGovernedTreeIsUnchanged(t *testing.T) {
 	}
 }
 
+func TestStopKeepsArmedOperationBeforeScheduledLateWriter(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	sid := "scheduled-late-writer"
+	t.Cleanup(func() { _ = clearState(root, sid) })
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "notes.txt"))
+	pre.ToolUseID = "scheduled-write"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("preflight: %s", out)
+	}
+	// The host has not reported completion. Stop sees the same tree, but the
+	// scheduled writer still owns the armed operation.
+	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	if !strings.Contains(out, `"decision":"block"`) {
+		t.Fatalf("unchanged tree discharged live writer: %s", out)
+	}
+	record, err := readStateRecord(root, sid)
+	if err != nil || len(record.pending) != 1 || !record.design {
+		t.Fatalf("lost armed obligation: %+v, %v", record, err)
+	}
+	writeFile(t, filepath.Join(root, "design", "notes.txt"), "late write\n")
+	out = runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	if !strings.Contains(out, `"decision":"block"`) {
+		t.Fatalf("late write escaped pending gate: %s", out)
+	}
+}
+
+func TestHostDenialAfterUnrelatedMutationAllowsRepeatedFirstStops(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	sid := "opencode-denial-with-other-write"
+	t.Cleanup(func() { _ = clearState(root, sid) })
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "denied.txt"))
+	pre.ToolUseID = "denied-call"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("preflight: %s", out)
+	}
+	other := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "other.txt"))
+	other.ToolUseID = "other-call"
+	if out := runEvent(t, root, other); out != "" {
+		t.Fatalf("other preflight: %s", out)
+	}
+	writeFile(t, filepath.Join(root, "design", "other.txt"), "other write\n")
+	other.HookEventName = "PostToolUse"
+	if out := runEvent(t, root, other); out != "" {
+		t.Fatalf("other completion: %s", out)
+	}
+	pre.HookEventName = "PostToolUseFailure"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("denial completion: %s", out)
+	}
+	for i := 0; i < 2; i++ {
+		out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+		if strings.Contains(out, "in-flight tool") {
+			t.Fatalf("idle %d wedged after denial: %s", i, out)
+		}
+	}
+}
+
 // The reap must never race a live process: a background task still running is
 // evidence of exactly the concurrent mutation the pending ledger guards.
 func TestStopRefusesToReapWhileBackgroundTasksRun(t *testing.T) {

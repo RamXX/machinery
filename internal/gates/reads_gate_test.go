@@ -48,6 +48,70 @@ func TestDeclaredReadsAcceptsArtifactAndReaderInSameCommit(t *testing.T) {
 	}
 }
 
+func TestDeclaredReadsRejectsMergeResolutionArtifactOnly(t *testing.T) {
+	root, design, impl, _ := declaredReadRepo(t)
+	base := strings.TrimSpace(mustRunReadGit(t, root, "rev-parse", "HEAD"))
+	matrix := filepath.Join(design, "machines", "Principal.matrix.md")
+	mustRunReadGit(t, root, "checkout", "-qb", "reader-side")
+	mustWriteReadFile(t, matrix, "# reader side\n")
+	mustWriteReadFile(t, filepath.Join(impl, "lib", "principal_reader.ex"), "# reader side\n")
+	mustRunReadGit(t, root, "add", ".")
+	mustRunReadGit(t, root, "commit", "-qm", "reader side artifact")
+	mustRunReadGit(t, root, "checkout", "-q", "-B", "main-side", base)
+	mustWriteReadFile(t, matrix, "# main side\n")
+	mustWriteReadFile(t, filepath.Join(impl, "lib", "principal_reader.ex"), "# main side\n")
+	mustRunReadGit(t, root, "add", ".")
+	mustRunReadGit(t, root, "commit", "-qm", "main side artifact")
+	cmd := exec.CommandContext(t.Context(), "git", "-C", root, "merge", "--no-ff", "--no-commit", "reader-side")
+	if out, err := cmd.CombinedOutput(); err == nil || !strings.Contains(string(out), "CONFLICT") {
+		t.Fatalf("expected merge conflict, err=%v output=%s", err, out)
+	}
+	mustWriteReadFile(t, matrix, "# resolved artifact\n")
+	mustWriteReadFile(t, filepath.Join(impl, "lib", "principal_reader.ex"), "# main side\n")
+	mustRunReadGit(t, root, "add", ".")
+	mustRunReadGit(t, root, "commit", "-qm", "resolve artifact without reader")
+	g := CheckDeclaredReads(design, impl, design, impl)
+	wantErr(t, g, "changed without reader")
+}
+
+func TestDeclaredReadsAcceptsReaderRenameWithArtifactEdit(t *testing.T) {
+	root, design, impl, reviewed := declaredReadRepo(t)
+	matrix := filepath.Join(design, "machines", "Principal.matrix.md")
+	mustWriteReadFile(t, matrix, "# changed artifact\n")
+	mustRunReadGit(t, root, "mv", "impl/lib/principal_reader.ex", "impl/lib/renamed_reader.ex")
+	mustWriteReadFile(t, filepath.Join(design, "ARCHITECTURE.md"), strings.ReplaceAll(strings.ReplaceAll(readContractTemplate(t), "REVIEW_COMMIT", reviewed), "lib/principal_reader.ex", "lib/renamed_reader.ex"))
+	mustRunReadGit(t, root, "add", ".")
+	mustRunReadGit(t, root, "commit", "-qm", "move reader with artifact")
+	g := CheckDeclaredReads(design, impl, design, impl)
+	if len(g.Errs) != 0 || g.Counts["paired artifact changes"] != 1 {
+		t.Fatalf("reader move lost custody: errs=%v counts=%v", g.Errs, g.Counts)
+	}
+}
+
+func TestDeclaredReadsRejectsRawAuthoredValuesInOrder(t *testing.T) {
+	_, design, impl, reviewed := declaredReadRepo(t)
+	contract := strings.ReplaceAll(readContractTemplate(t), "REVIEW_COMMIT", reviewed)
+	contract = strings.ReplaceAll(contract, "machines/Principal.matrix.md", " machines/Principal.matrix.md ")
+	contract = strings.ReplaceAll(contract, "lib/principal_reader.ex", " lib/principal_reader.ex ")
+	mustWriteReadFile(t, filepath.Join(design, "ARCHITECTURE.md"), contract)
+	g := CheckDeclaredReads(design, impl, design, impl)
+	if len(g.Errs) != 2 || !strings.Contains(g.Errs[0], "reads artifact") || !strings.Contains(g.Errs[1], "reads reader") {
+		t.Fatalf("both raw path errors must be pinned in artifact, reader order: %v", g.Errs)
+	}
+	mustWriteReadFile(t, filepath.Join(design, "ARCHITECTURE.md"), strings.ReplaceAll(readContractTemplate(t), "REVIEW_COMMIT", " "+reviewed+" "))
+	g = CheckDeclaredReads(design, impl, design, impl)
+	wantErr(t, g, "reviewed must be a full 40-character lowercase Git commit")
+}
+
+func readContractTemplate(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "declared-reads", "ARCHITECTURE.md.tmpl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
 func TestDeclaredReadsWarnsWithoutImplementation(t *testing.T) {
 	_, design, _, _ := declaredReadRepo(t)
 	g := CheckDeclaredReads(design, "", design, "")

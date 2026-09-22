@@ -156,7 +156,11 @@ func TestPacketFixtureDeclarationFailsClosed(t *testing.T) {
 		finding string
 	}{
 		{"not a list", " fixture.ex", "fixtures must be a non-empty list"},
+		{"null", " null", "fixtures must be a non-empty list"},
 		{"not portable", "\n          - ../fixture.ex", "is not a clean implementation-relative path"},
+		{"drive relative", "\n          - 'C:fixture.ex'", "is not a clean implementation-relative path"},
+		{"device basename", "\n          - 'test/CON.txt'", "is not a clean implementation-relative path"},
+		{"whitespace", "\n          - ' fixture.ex'", "is not a clean implementation-relative path"},
 		{"duplicate", "\n          - fixture.ex\n          - fixture.ex", "fixtures repeats 'fixture.ex'"},
 	}
 	for _, tt := range tests {
