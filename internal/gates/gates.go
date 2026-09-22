@@ -2001,6 +2001,7 @@ func CheckTraceability(design string) *Gate {
 	// G5 rather than reported twice for one defect (see eventwiring.go)
 	archText := readDesignOrEmpty(design, filepath.Join(design, "ARCHITECTURE.md"))
 	checkAuthorizationInventory(g, design, dm)
+	checkFactResolution(g, design, archText, dm)
 	if !pack.HasPack(design) {
 		checkEventWiring(g, design, archText)
 	}

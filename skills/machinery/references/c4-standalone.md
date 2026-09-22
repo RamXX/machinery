@@ -602,6 +602,18 @@ not code expressions. Ordinary matrix prose that mentions a payload remains pros
 twin. Once either declaration spelling is used, it must be the one complete payload statement on
 that row.
 
+### Named-unit fact resolution
+
+Gx-trace treats a backticked snake-case identifier in a named-unit contract, clause, or payload
+column as a fact reference. The fact must resolve to a Modelith attribute, a machine `context` key,
+or a field carried by an Architecture Contract event payload. The snake-case restriction keeps
+unit names and ordinary backticked prose outside this grammar.
+
+A fact computed only inside one unit and never stored uses the row-local waiver
+`derived: risk_score (weighted fraud inputs)`. The identifier and a non-empty reason are required.
+The waiver admits only `risk_score` on that row; it does not create a design-wide fact or satisfy
+another row.
+
 ### Machine-checkable format (mandatory on a decomposed parent)
 
 `machinery pack generate` extracts each subsystem's boundary events from this table by exact

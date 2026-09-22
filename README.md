@@ -763,6 +763,10 @@ whose actor is `System`, plus every producer named by a matrix cascade or consum
 one exact row with a non-empty admission or `(no authorization: <reason>)`. Missing, duplicate,
 orphan, empty, and reasonless rows are blocking findings.
 
+Gx resolves backticked snake-case facts in named-unit contract, clause, and payload columns against
+Modelith attributes, machine context keys, and Architecture Contract event payloads. A fact computed
+only by the unit uses the row-local `derived: fact_name (<reason>)` waiver; an empty reason fails.
+
 ## Use
 
 In an agent session (Claude Code, Codex, OpenCode, or any runtime that loads Agent Skills), from the

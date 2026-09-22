@@ -39,6 +39,11 @@ under their version heading when a release is cut.
   reasonless rows fail. This intentionally made the fulfillment, portfolio-engine, and
   checkout-split child examples red; their previously implicit internal capabilities are now
   recorded, and the golden corpus is regenerated with the new authorization counts.
+- **Gx-trace now resolves named-unit facts.** Backticked snake-case facts in contract, clause, and
+  payload columns must resolve to a Modelith attribute, machine context key, event-contract payload,
+  or a reasoned row-local `derived: fact_name (<reason>)` waiver. This intentionally exposed
+  `feed_circuit_open` in the portfolio-engine corpus; its row now records that the operator log
+  signal is derived rather than stored.
 
 ### Fixed
 

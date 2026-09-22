@@ -434,6 +434,12 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   Architecture Contract payload cell. Field order is immaterial; empty,
   duplicate, malformed, conflicting, missing, or multi-event declarations
   fail. A payload mention without a group stays prose and defines nothing.
+- In named-unit contract, clause, and payload columns, a backticked snake-case
+  fact such as `authored_default_ref` resolves to a Modelith attribute, a
+  machine `context` key, or a field carried by the Architecture Contract event
+  payload. A unit-computed value that is intentionally not stored uses the
+  row-local grammar `derived: authored_default_ref (<reason>)`. The fact name
+  and non-empty reason are mandatory; the waiver covers only that row.
 - Every Modelith action whose actor is `System`, plus every producer named by
   a matrix cascade or consumer-arm table, appears exactly once in the marked
   design authorization inventory. Its admission cell names

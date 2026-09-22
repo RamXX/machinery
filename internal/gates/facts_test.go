@@ -59,10 +59,10 @@ func TestFactsRejectUnknownNamedUnitFact(t *testing.T) {
 	}
 }
 
-func TestFactsRejectUnknownEventPayloadFact(t *testing.T) {
-	g := factFixture(t, "persists `order_total`", "`ghost_fact`")
-	if !hasErr(g, "unresolved fact 'ghost_fact'") {
-		t.Fatalf("an event payload fact with no declaration must fail: %v", g.Errs)
+func TestFactsEventPayloadDeclaresFact(t *testing.T) {
+	g := factFixture(t, "persists `event_fact`", "`event_fact`")
+	if hasErr(g, "unresolved fact 'event_fact'") {
+		t.Fatalf("an event-contract payload field is a readable fact declaration: %v", g.Errs)
 	}
 }
 

@@ -50,14 +50,14 @@ attestations:
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
   - claim: g3.guard-semantics
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: guard predicates re-checked against the revised row contracts (failures+1>=5 as a bounded counter, isRetriable over confirmed-Unpublished errors only, admission deadlines named as result-admission bounds); oracle byte-idempotence confirmed (no churn).'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-read the guard contracts after classifying feed_circuit_open as a derived operator log signal; the waiver changes no guard predicate or refusal semantics.'
     covers:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:1b8769ec9961f42494f8e35c9b532e52b6b4177666d9b4cbc083cc2e08c9afff
+        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md
@@ -72,14 +72,14 @@ attestations:
         hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: g3.invariant-enforcement
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: invariant carriers re-checked; the resolved-envelope assumption and the pure/terminal persistence distinction keep optimizer and reference invariants on their named actor contracts.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-read invariant carriers after classifying feed_circuit_open as a derived operator log signal; no carrier or enforcement claim changed.'
     covers:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:1b8769ec9961f42494f8e35c9b532e52b6b4177666d9b4cbc083cc2e08c9afff
+        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md
@@ -94,14 +94,14 @@ attestations:
         hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: g3.residual-transitions
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: the new unresolved-publication residual rows (ReferenceDataCommand, Portfolio) and the stale-callback row (MarketDataFeed) state causal no-publication/no-transition outcomes; no mitigation deletes a failure.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-read residual transitions after classifying feed_circuit_open as a derived operator log signal; the classification does not remove or alter a failure transition.'
     covers:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:1b8769ec9961f42494f8e35c9b532e52b6b4177666d9b4cbc083cc2e08c9afff
+        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md
@@ -116,14 +116,14 @@ attestations:
         hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: g3.event-redelivery
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: no machine consumes an external asynchronous event; synchronous retries stay governed by the idempotent read, versioned write, cancellation, and rollback contracts.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-read event behavior after classifying feed_circuit_open as a derived operator log signal; no consumed event or redelivery contract changed.'
     covers:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:1b8769ec9961f42494f8e35c9b532e52b6b4177666d9b4cbc083cc2e08c9afff
+        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md

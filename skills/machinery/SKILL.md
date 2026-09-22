@@ -146,6 +146,12 @@ machines may reuse one guard name, and a declaration whose oracle rows only a
 sibling machine could supply is an error naming that sibling. A declared guard
 no oracle governs, such as one on a creation edge, owes nothing.
 
+Backticked snake-case facts in named-unit contract, clause, and payload columns
+must resolve to a Modelith attribute, machine context key, or Architecture
+Contract event-payload field. A unit-local computed fact uses
+`derived: fact_name (<reason>)` on the same row; the reason is mandatory and
+the waiver does not declare the fact for any other row.
+
 Run `machinery oracle`, `machinery check <design> --gate g3`, and
 `machinery verify-formal <design>`. Read the verification reference for all
 four semantics patterns, including `control-flow-only`.
