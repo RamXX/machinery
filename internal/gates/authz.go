@@ -14,19 +14,19 @@ import (
 )
 
 var (
-	authorizationMarker     = regexp.MustCompile(`<!--\s*machinery:authorization-inventory\s*-->`)
-	noAuthorization         = regexp.MustCompile(`\(no authorization:\s*([^)]*)\)`)
-	authorizationCapability = regexp.MustCompile("^`([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+)`$")
-	authorizationSubject    = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$`)
-	h2ResourceCell          = regexp.MustCompile("^\\s*`([A-Za-z][A-Za-z0-9_]*)`(?:\\s|$)")
-	h2MachineWritten        = regexp.MustCompile(`\bMACHINE-WRITTEN\{([^}]*)\}`)
-	h2MachineWrittenBy      = regexp.MustCompile(`\bMACHINE-WRITTEN-BY\{([^}]*)\}`)
-	h2RuleRow               = regexp.MustCompile(`\bRULE\b`)
-	h2NeverVerb             = regexp.MustCompile("(?i)\\bNEVER\\s+`?(create|update|delete)`?\\s*:\\s*([^.;]+)")
-	h2NoWrite               = regexp.MustCompile(`(?i)\b(?:writes? nothing|no (?:resource )?write|without writing|does not (?:change|update|write|mutate) (?:the )?(?:recorded |stored )?row|never (?:changes?|adjusts?) (?:the )?(?:recorded |stored )?row)\b`)
-	h2ConditionalWrite      = regexp.MustCompile(`(?i)\b(?:but|unless|except|however)\b[^.;]*\b(?:write|writes|append|create|update|record|insert|set)\b`)
-	h2PositiveWrite         = regexp.MustCompile(`(?i)\b(?:record|records|recorded|append|appends|appended|write|writes|written|create|creates|created|update|updates|updated|persist|persists|persisted|set|sets|emit|emits|emitted)\b`)
-	c4OwnerDeclaration      = regexp.MustCompile(`(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*(?:softwareSystem|container|component)\b`)
+	authorizationMarker    = regexp.MustCompile(`<!--\s*machinery:authorization-inventory\s*-->`)
+	noAuthorization        = regexp.MustCompile(`\(no authorization:\s*([^)]*)\)`)
+	authorizationAdmission = regexp.MustCompile("^`([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)*)`$")
+	authorizationSubject   = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$`)
+	h2ResourceCell         = regexp.MustCompile("^\\s*`([A-Za-z][A-Za-z0-9_]*)`(?:\\s|$)")
+	h2MachineWritten       = regexp.MustCompile(`\bMACHINE-WRITTEN\{([^}]*)\}`)
+	h2MachineWrittenBy     = regexp.MustCompile(`\bMACHINE-WRITTEN-BY\{([^}]*)\}`)
+	h2RuleRow              = regexp.MustCompile(`\bRULE\b`)
+	h2NeverVerb            = regexp.MustCompile("(?i)\\bNEVER\\s+`?(create|update|delete)`?\\s*:\\s*([^.;]+)")
+	h2NoWrite              = regexp.MustCompile(`(?i)\b(?:writes? nothing|no (?:resource )?write|without writing|does not (?:change|update|write|mutate) (?:the )?(?:recorded |stored )?row|never (?:changes?|adjusts?) (?:the )?(?:recorded |stored )?row)\b`)
+	h2ConditionalWrite     = regexp.MustCompile(`(?i)\b(?:but|unless|except|however)\b[^.;]*\b(?:write|writes|append|create|update|record|insert|set)\b`)
+	h2PositiveWrite        = regexp.MustCompile(`(?i)\b(?:record|records|recorded|append|appends|appended|write|writes|written|create|creates|created|update|updates|updated|persist|persists|persisted|set|sets|emit|emits|emitted)\b`)
+	c4OwnerDeclaration     = regexp.MustCompile(`(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*(?:softwareSystem|container|component)\b`)
 )
 
 type authorizationRow struct {
@@ -419,10 +419,47 @@ func checkAuthorizationInventory(g *Gate, design string, dm *ir.Value) {
 		g.Errs = append(g.Errs, "authorization inventory marker appears "+strconv.Itoa(markers)+" times; one design has exactly one closed authorization inventory")
 	}
 	rows := collectAuthorizationRows(g, documents)
-	c4Owners := map[string]bool{}
+	declaredSubjects := map[string]bool{}
 	if body, err := readDesignFile(design, filepath.Join(design, "workspace.dsl")); err == nil {
 		for _, match := range c4OwnerDeclaration.FindAllStringSubmatch(string(body), -1) {
-			c4Owners[match[1]] = true
+			declaredSubjects[match[1]] = true
+		}
+	}
+	for subject, kind := range obligations {
+		if kind == "matrix producer" {
+			declaredSubjects[subject] = true
+		}
+	}
+	paths, _ := strictSortedGlob(g, filepath.Join(design, "machines"), "*.matrix.md", "authorization matrix")
+	for _, path := range paths {
+		body, err := readDesignFile(design, path)
+		if err != nil {
+			continue
+		}
+		for _, table := range ir.ParseMdTables(string(body)) {
+			if ir.FindCol(table.Header, "resource") < 0 || ir.FindCol(table.Header, "every other preset") < 0 {
+				continue
+			}
+			for _, header := range table.Header {
+				name := ir.CleanCell(header)
+				if name != "resource" && authorizationSubject.MatchString(name) {
+					declaredSubjects[name] = true
+				}
+			}
+			for _, row := range table.Rows {
+				for _, match := range h2MachineWrittenBy.FindAllStringSubmatch(cellAt(row, ir.FindCol(table.Header, "resource")), -1) {
+					parts := strings.Split(match[1], ":")
+					if len(parts) != 2 {
+						continue
+					}
+					for _, producer := range strings.Split(parts[1], ",") {
+						producer = strings.TrimSpace(producer)
+						if authorizationSubject.MatchString(producer) {
+							declaredSubjects[producer] = true
+						}
+					}
+				}
+			}
 		}
 	}
 	if markers > 0 && len(rows) == 0 {
@@ -458,16 +495,16 @@ func checkAuthorizationInventory(g *Gate, design string, dm *ir.Value) {
 			continue
 		}
 		if row.admission == "" {
-			g.Errs = append(g.Errs, row.where+": authorization admission is empty; name the admitting capability or waive with '(no authorization: <reason>)'")
+			g.Errs = append(g.Errs, row.where+": authorization admission is empty; name a declared subject or waive with '(no authorization: <reason>)'")
 			continue
 		}
-		if !authorizationCapability.MatchString(row.admission) {
-			g.Errs = append(g.Errs, row.where+": admission must name one capability as a backticked dotted identifier or waive with '(no authorization: <reason>)'")
+		match := authorizationAdmission.FindStringSubmatch(row.admission)
+		if match == nil {
+			g.Errs = append(g.Errs, row.where+": admission must name one declared subject as a backticked identifier or waive with '(no authorization: <reason>)'")
 			continue
 		}
-		owner := strings.SplitN(strings.Trim(row.admission, "`"), ".", 2)[0]
-		if !c4Owners[owner] {
-			g.Errs = append(g.Errs, row.where+": admission owner "+ir.Repr(owner)+" is not a C4 element in workspace.dsl")
+		if !declaredSubjects[match[1]] {
+			g.Errs = append(g.Errs, row.where+": admission subject "+ir.Repr(match[1])+" is not declared by workspace.dsl or an authorization matrix")
 			continue
 		}
 		g.Count("authorization obligations admitted")

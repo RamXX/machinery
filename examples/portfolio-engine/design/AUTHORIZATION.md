@@ -4,4 +4,4 @@
 
 | authorization subject | admission |
 |---|---|
-| `Holding.set` | `pf.optimizer.portfolio.write` |
+| `Holding.set` | `pf` |

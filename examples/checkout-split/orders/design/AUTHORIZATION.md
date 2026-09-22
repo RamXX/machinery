@@ -4,5 +4,5 @@
 
 | authorization subject | admission |
 |---|---|
-| `Order.markPaid` | `orders.svc.order.write` |
-| `Order.markDeclined` | `orders.svc.order.write` |
+| `Order.markPaid` | `orders` |
+| `Order.markDeclined` | `orders` |

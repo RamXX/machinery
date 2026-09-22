@@ -4,38 +4,38 @@ attestations:
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
-    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:155e2f510b36ac47ade19bb32c8c0d005432b57a351a5c994aa946678b8c4138}]
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:0aff75de9e3c7847d974f27f8910de7639e9c5ad88843b90025d11e42ed6298a}]
   - claim: g2.interface-contract-rightness
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
-    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:155e2f510b36ac47ade19bb32c8c0d005432b57a351a5c994aa946678b8c4138}]
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:0aff75de9e3c7847d974f27f8910de7639e9c5ad88843b90025d11e42ed6298a}]
   - claim: g2.placement-rightness
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
-    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:155e2f510b36ac47ade19bb32c8c0d005432b57a351a5c994aa946678b8c4138}]
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:0aff75de9e3c7847d974f27f8910de7639e9c5ad88843b90025d11e42ed6298a}]
   - claim: g2.adoption-closure-discovery
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
-    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:155e2f510b36ac47ade19bb32c8c0d005432b57a351a5c994aa946678b8c4138}]
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:0aff75de9e3c7847d974f27f8910de7639e9c5ad88843b90025d11e42ed6298a}]
   - claim: g2.event-contract-completeness
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
-    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:155e2f510b36ac47ade19bb32c8c0d005432b57a351a5c994aa946678b8c4138}]
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:0aff75de9e3c7847d974f27f8910de7639e9c5ad88843b90025d11e42ed6298a}]
   - claim: g2.nfr-content
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
-    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:155e2f510b36ac47ade19bb32c8c0d005432b57a351a5c994aa946678b8c4138}]
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; the new inventory is a plan assertion about implementation authorization, not proof of an implemented permission check.'
+    covers: [{path: ARCHITECTURE.md, hash: sha256:8a1ec0b1f7c9ab2c8a9c1b8734f3b05b814ea8a473367ac9679fd456bbc6fbcb}, {path: AUTHORIZATION.md, hash: sha256:0aff75de9e3c7847d974f27f8910de7639e9c5ad88843b90025d11e42ed6298a}]
   - claim: g3.guard-semantics
     kind: plan
     attestor: Machinery production-readiness review

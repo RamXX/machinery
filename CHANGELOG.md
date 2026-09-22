@@ -28,8 +28,10 @@ under their version heading when a release is cut.
 - **Gx-trace accepts H2's machine-written authorization grammar.** Resource
   action lists, producer-narrowed residual marks, and the all-presets-withheld
   residual verb fallback are first-class inventory
-  declarations without a marker document. Marked admission owners resolve to
-  declared C4 elements. Fact resolution now reads declared content and relation
+  declarations without a marker document. A marked admission must name an exact
+  declared C4 element, matrix producer, or residual-table preset; a fabricated
+  capability suffix is a finding. The gate proves row existence and declared-subject
+  resolution, with capability-list resolution tracked in NEXT. Fact resolution now reads declared content and relation
   sources, groups prose-only nested map keys into one typing gap, and excludes
   H2's quoted rejections. Closed-vocabulary detection distinguishes finite
   declarations from pass identities, human reasons, referenced owner sets, and

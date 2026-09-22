@@ -56,7 +56,7 @@ func TestAuthorizationInventoryMissingSystemActionErrors(t *testing.T) {
 }
 
 func TestAuthorizationInventoryAdmitsSystemAction(t *testing.T) {
-	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n", "")
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders` |\n", "")
 	if hasErr(g, "authorization") {
 		t.Fatalf("an admitted System action must pass: %v", g.Errs)
 	}
@@ -78,12 +78,12 @@ func TestAuthorizationInventoryWaiverRequiresReason(t *testing.T) {
 
 func TestAuthorizationInventoryProducerArmCreatesObligation(t *testing.T) {
 	matrix := "\n| cascade | producer | outcome |\n|---|---|---|\n| persist | `Order.reindex` | emitted |\n"
-	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n", matrix)
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders` |\n", matrix)
 	if !hasErr(g, "matrix producer 'Order.reindex' has no authorization row") {
 		t.Fatalf("a named cascade producer must be admitted independently: %v", g.Errs)
 	}
 	g = authzFixture(t, authzHeader+
-		"| `Order.markPaid` | `orders.write` |\n| `Order.reindex` | `orders.reindex` |\n", matrix)
+		"| `Order.markPaid` | `orders` |\n| `Order.reindex` | `Order.reindex` |\n", matrix)
 	if hasErr(g, "authorization") {
 		t.Fatalf("both obligations are admitted: %v", g.Errs)
 	}
@@ -91,7 +91,7 @@ func TestAuthorizationInventoryProducerArmCreatesObligation(t *testing.T) {
 
 func TestAuthorizationInventoryRejectsDuplicateAndOrphanRows(t *testing.T) {
 	g := authzFixture(t, authzHeader+
-		"| `Order.markPaid` | `orders.write` |\n| `Order.markPaid` | `orders.write` |\n| `Order.ghost` | `orders.ghost` |\n", "")
+		"| `Order.markPaid` | `orders` |\n| `Order.markPaid` | `orders` |\n| `Order.ghost` | `orders.ghost` |\n", "")
 	joined := strings.Join(g.Errs, "\n")
 	for _, want := range []string{"duplicate authorization row", "names no System action or matrix producer"} {
 		if !strings.Contains(joined, want) {
@@ -102,7 +102,7 @@ func TestAuthorizationInventoryRejectsDuplicateAndOrphanRows(t *testing.T) {
 
 func TestAuthorizationInventoryIgnoresCombinedProducerConsumerProse(t *testing.T) {
 	matrix := "\n| cascade | producer / consumer | outcome |\n|---|---|---|\n| persist | `Order.reindex` and `Order.repair` | emitted |\n"
-	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n", matrix)
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders` |\n", matrix)
 	if hasErr(g, "matrix producer") {
 		t.Fatalf("combined prose column must not arm producer obligations: %v", g.Errs)
 	}
@@ -110,7 +110,7 @@ func TestAuthorizationInventoryIgnoresCombinedProducerConsumerProse(t *testing.T
 
 func TestAuthorizationInventoryUsesOneSubjectPerProducerCell(t *testing.T) {
 	matrix := "\n| cascade | producer | outcome |\n|---|---|---|\n| persist | `Order.reindex` (via `Order.repair`) | emitted |\n"
-	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n| `Order.reindex` | `orders.reindex` |\n", matrix)
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders` |\n| `Order.reindex` | `Order.reindex` |\n", matrix)
 	if hasErr(g, "matrix producer 'Order.repair'") || hasErr(g, "matrix producer 'Order.reindex'") {
 		t.Fatalf("one producer cell names one cleaned subject: %v", g.Errs)
 	}
@@ -118,7 +118,7 @@ func TestAuthorizationInventoryUsesOneSubjectPerProducerCell(t *testing.T) {
 
 func TestAuthorizationInventoryRejectsTwoProducerSubjectsInOneCell(t *testing.T) {
 	matrix := "\n| cascade | producer | outcome |\n|---|---|---|\n| persist | `Order.reindex` and `Order.repair` | emitted |\n"
-	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n", matrix)
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders` |\n", matrix)
 	if !hasErr(g, "producer cell must name one subject") {
 		t.Fatalf("two subjects must not turn into a phantom obligation: %v", g.Errs)
 	}
@@ -150,7 +150,7 @@ func TestAuthorizationInventoryFindingNamesSourcePath(t *testing.T) {
 
 func TestAuthorizationInventoryRejectsProseAdmission(t *testing.T) {
 	g := authzFixture(t, authzHeader+"| `Order.markPaid` | TODO |\n", "")
-	if !hasErr(g, "admission must name one capability") {
+	if !hasErr(g, "admission must name one declared subject") {
 		t.Fatalf("free text cannot prove an admitting capability: %v", g.Errs)
 	}
 }
@@ -190,12 +190,33 @@ func TestAuthorizationH2ResidualSeatGrant(t *testing.T) {
 
 func TestAuthorizationAdmissionResolvesC4Owner(t *testing.T) {
 	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `fictional.capability` |\n", "")
-	if !hasErr(g, "admission owner 'fictional' is not a C4 element") {
-		t.Fatalf("a dotted token without a declared owner cannot admit a write: %v", g.Errs)
+	if !hasErr(g, "admission subject 'fictional.capability' is not declared") {
+		t.Fatalf("an undeclared admission cannot admit a write: %v", g.Errs)
 	}
-	g = authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n", "")
-	if hasErr(g, "admission owner") {
-		t.Fatalf("declared C4 owner must pass: %v", g.Errs)
+	g = authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.nonexistentCapability` |\n", "")
+	if !hasErr(g, "admission subject 'orders.nonexistentCapability' is not declared") {
+		t.Fatalf("a fabricated suffix under a real C4 element must fail: %v", g.Errs)
+	}
+	g = authzFixture(t, authzHeader+"| `Order.markPaid` | `orders` |\n", "")
+	if hasErr(g, "admission subject") {
+		t.Fatalf("declared C4 subject must pass: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationAdmissionResolvesMatrixProducerAndPreset(t *testing.T) {
+	producer := "\n| cascade | producer | outcome |\n|---|---|---|\n| persist | `Order.reindex` | emitted |\n"
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `Order.reindex` |\n| `Order.reindex` | `orders` |\n", producer)
+	if hasErr(g, "admission subject") {
+		t.Fatalf("a matrix producer is a declared admission subject: %v", g.Errs)
+	}
+	residual := "\n| resource | platform_admin | tenant_admin | every other preset |\n|---|---|---|---|\n| `Other` | `read` | `read` | `read` |\n"
+	g = authzFixture(t, authzHeader+"| `Order.markPaid` | `platform_admin` |\n", residual)
+	if hasErr(g, "admission subject") {
+		t.Fatalf("a residual-table preset is a declared admission subject: %v", g.Errs)
+	}
+	g = authzFixture(t, authzHeader+"| `Order.markPaid` | `invented_preset` |\n", residual)
+	if !hasErr(g, "admission subject 'invented_preset' is not declared") {
+		t.Fatalf("an undeclared preset must fail: %v", g.Errs)
 	}
 }
 

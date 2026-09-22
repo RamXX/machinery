@@ -4,62 +4,62 @@ attestations:
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted MAC-lhu5-revised ARCHITECTURE.md: the action-ownership table is unchanged and the ten Modelith actions still map exactly once; the new operation/publication API rows carry the same owners.'
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted MAC-lhu5-revised ARCHITECTURE.md: the action-ownership table is unchanged and the ten Modelith actions still map exactly once; the new operation/publication API rows carry the same owners.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
       - path: AUTHORIZATION.md
-        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
+        hash: sha256:c067418c479ed44b0c9e76e31525a66c35d72b6f096487280b9ff26880368f1a
   - claim: g2.interface-contract-rightness
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: interface contracts re-read over the added OptimizerLimits/ReferenceLimits shapes, the closed InfeasibleError reasons, and the RepoSession/OperationId/Handle/Snapshot publication API; the injective CLI exit-code map and closed bound vocabulary close the previously open edges.'
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: interface contracts re-read over the added OptimizerLimits/ReferenceLimits shapes, the closed InfeasibleError reasons, and the RepoSession/OperationId/Handle/Snapshot publication API; the injective CLI exit-code map and closed bound vocabulary close the previously open edges.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
       - path: AUTHORIZATION.md
-        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
+        hash: sha256:c067418c479ed44b0c9e76e31525a66c35d72b6f096487280b9ff26880368f1a
   - claim: g2.placement-rightness
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the one-process Python/DuckDB topology is unchanged; the breaker threshold literal failures+1>=5 and the admission-vs-return bound categories keep persistence decisions with their owners.'
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the one-process Python/DuckDB topology is unchanged; the breaker threshold literal failures+1>=5 and the admission-vs-return bound categories keep persistence decisions with their owners.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
       - path: AUTHORIZATION.md
-        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
+        hash: sha256:c067418c479ed44b0c9e76e31525a66c35d72b6f096487280b9ff26880368f1a
   - claim: g2.adoption-closure-discovery
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the revision adds no sidecar, operator, service, or stateful backend; the runtime closure remains the declared market-data credential/provider and the DuckDB file.'
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the revision adds no sidecar, operator, service, or stateful backend; the runtime closure remains the declared market-data credential/provider and the DuckDB file.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
       - path: AUTHORIZATION.md
-        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
+        hash: sha256:c067418c479ed44b0c9e76e31525a66c35d72b6f096487280b9ff26880368f1a
   - claim: g2.event-contract-completeness
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the design remains synchronous with no asynchronous channel or external event consumer; the two declared external calls keep their reasoned N/A.'
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the design remains synchronous with no asynchronous channel or external event consumer; the two declared external calls keep their reasoned N/A.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
       - path: AUTHORIZATION.md
-        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
+        hash: sha256:c067418c479ed44b0c9e76e31525a66c35d72b6f096487280b9ff26880368f1a
   - claim: g2.nfr-content
     kind: plan
     attestor: Codex lane/next-gates
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: NFR claims re-read against the resolved-outcome error-row filter, the named admission deadlines, and owner-only store permissions.'
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and checked each admission as an exact declared plan subject; re-read the current inventory against Modelith and workspace.dsl; every admission now exactly names a declared C4 element; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: NFR claims re-read against the resolved-outcome error-row filter, the named admission deadlines, and owner-only store permissions.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
       - path: AUTHORIZATION.md
-        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
+        hash: sha256:c067418c479ed44b0c9e76e31525a66c35d72b6f096487280b9ff26880368f1a
   - claim: g3.guard-semantics
     kind: plan
     attestor: Codex lane/next-gates

@@ -770,7 +770,8 @@ owes no resource-write admission. A residual seat's verb grant governs a
 non-System actor. A design
 whose residual table carries these marks owes no marker document. A marked
 inventory still requires one exact row per System action and matrix producer;
-its backticked dotted admission must start with a declared C4 element id, or
+its backticked admission must exactly name a declared C4 element, matrix
+producer, or residual-table preset, or
 use `(no authorization: <reason>)`. Missing, duplicate, conflicting, empty,
 orphan, and reasonless entries are blocking findings.
 

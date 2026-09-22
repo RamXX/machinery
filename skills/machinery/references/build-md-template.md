@@ -467,8 +467,11 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   govern non-System actor verbs. The matrix
   form needs no marker document. A
   producer column must be distinct from a `producer / consumer` prose column.
-  Its admission cell names one capability as a backticked dotted identifier
-  starting with a declared C4 element id or
+  Its admission cell names one exact declared subject as a backticked
+  identifier: a C4 element id, a matrix producer name, or a preset in the
+  residual verb table. An invented suffix under a C4 id fails. Gx proves row
+  existence and declared-subject resolution; capability-list resolution is
+  later work. Alternatively, the cell
   carries `(no authorization: <reason>)`. Empty,
   missing, duplicate, orphan, and reasonless-waiver rows fail in Gx-trace.
 - Incident-derived invariants and fixtures carry a PROVENANCE pointer to the

@@ -125,7 +125,8 @@ Every action whose Modelith actor is `System`, and every producer named in an
 exact producer column of a matrix cascade or consumer table, needs an
 authorization admission. A marked hand-written inventory (`AUTHORIZATION.md`
 or `ARCHITECTURE.md`) gives exact subject rows and is covered by g2 attestations.
-Its dotted admission starts with a C4 element id; a row may instead use
+Its admission exactly names a declared C4 element, matrix producer, or
+residual-table preset; a row may instead use
 `(no authorization: <reason>)`. A matrix may carry the H2 form instead:
 `MACHINE-WRITTEN{action, ...}` in a resource's machine-written actions cell,
 and `MACHINE-WRITTEN-BY{action: producer, ...}` in the residual verb table's

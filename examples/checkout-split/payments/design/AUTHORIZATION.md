@@ -4,6 +4,6 @@
 
 | authorization subject | admission |
 |---|---|
-| `Payment.request` | `payments.svc.payment.write` |
-| `Payment.capture` | `payments.svc.payment.write` |
-| `Payment.decline` | `payments.svc.payment.write` |
+| `Payment.request` | `payments` |
+| `Payment.capture` | `payments` |
+| `Payment.decline` | `payments` |

@@ -450,12 +450,12 @@ must be covered by the g2 attestation rows with a truthful review record:
 
 | authorization subject | admission |
 |---|---|
-| `Order.markPaid` | internal capability `orders.write` |
+| `Order.markPaid` | `orders` |
 | `SearchIndex.rebuild` | `(no authorization: isolated rebuild worker has no caller identity)` |
 
 Each producer cell names one identifier after Markdown annotations are removed; prose naming multiple
-subjects is an error. Each obligation appears exactly once by exact subject. Admission is one backticked dotted capability
-identifier whose first segment resolves to a `workspace.dsl` element id. The inventory records a plan assertion; implementation enforcement is reviewed
+subjects is an error. Each obligation appears exactly once by exact subject. Admission is one backticked identifier that exactly names a declared subject: a C4 element id in `workspace.dsl`, a producer name declared by a matrix, or a preset named in the residual verb table. A real C4 id followed by an invented capability suffix is not a declared subject and fails Gx. The gate proves the row exists and its admission names a declared subject. Resolving that subject against a capability list and checking implementation enforcement are separate work.
+The inventory records a plan assertion; implementation enforcement is reviewed
 separately. A genuinely unauthorizable internal write uses
 `(no authorization: <reason>)`; the reason is mandatory. Missing, duplicate, empty, and orphan rows
 are errors. The inventory is closed in both directions, so deleting a System action or matrix
