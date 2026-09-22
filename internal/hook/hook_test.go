@@ -4039,14 +4039,10 @@ func TestDialogPlainRegister(t *testing.T) {
 	})
 }
 
-// A tool that machinery allows can still be refused afterwards by the host
-// permission layer, by another PreToolUse hook, or by the user. That refusal
-// produces no PostToolUse event, so the armed token can never be cleared by
-// the normal path. Blocking on it forever wedges the session and, worse, skips
-// the gate run that would actually inspect the tree. The first Stop still
-// blocks (the crash case's chance to complete); the re-fired Stop reaps and
-// gates.
-func TestStopReapsArmedOperationThatNeverRanOnRefiredStop(t *testing.T) {
+// A changed tree with no PostToolUse is the crash case. The first Stop stays
+// conservative; a host re-fire may reap the token, but must still run gates
+// against the durable project-wide obligation.
+func TestStopReapsChangedArmedOperationOnRefiredStop(t *testing.T) {
 	isolateHookState(t)
 	root := managedRoot(t)
 	sid := "denied-after-arm"
@@ -4057,7 +4053,9 @@ func TestStopReapsArmedOperationThatNeverRanOnRefiredStop(t *testing.T) {
 	if out := runEvent(t, root, pre); out != "" {
 		t.Fatalf("allowed edit preflight unexpectedly emitted output: %s", out)
 	}
-	// The tool is refused here. No PostToolUse ever arrives.
+	// The tool ran and changed the governed tree, but its PostToolUse was lost.
+	// The changed fingerprint keeps the first Stop conservative.
+	writeFile(t, filepath.Join(root, "design", "notes.txt"), "tool ran\n")
 
 	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
 	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "in-flight tool") {

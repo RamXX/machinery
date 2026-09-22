@@ -437,6 +437,18 @@ func AcquireReader(designRoot string) (*Lock, error) {
 	return acquire(designRoot, true)
 }
 
+// FingerprintTree returns the content-and-topology digest used by design
+// snapshots. It reads the tree twice under the same bounded mutation witness
+// as AcquireReader and excludes only a top-level .git entry. An unstable or
+// unsupported tree fails closed instead of returning a digest.
+func FingerprintTree(root string) (string, error) {
+	values, err := fingerprint(root)
+	if err != nil {
+		return "", err
+	}
+	return fingerprintDigest(values), nil
+}
+
 func acquire(designRoot string, reader bool) (*Lock, error) {
 	root, err := filepath.Abs(designRoot)
 	if err != nil {
