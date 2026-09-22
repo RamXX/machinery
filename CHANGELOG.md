@@ -27,6 +27,14 @@ under their version heading when a release is cut.
   gate obligation. A changed or legacy token retains the conservative block and explicit re-fire
   path, and a live background task always prevents expiration.
 
+### Documentation
+
+- **The packet reference now states the lane-scope protocol assumed by per-slice execution.** A
+  commit named `integrator-request(<slice>)` may carry integrator-owned paths for reconciliation,
+  and a design lane's complete diff is treated as that same kind of request. Projects can now
+  implement their scope gates against an explicit convention instead of rejecting the handoff the
+  packet protocol requires.
+
 ## [0.8.0] - 2026-09-10
 
 ### Added

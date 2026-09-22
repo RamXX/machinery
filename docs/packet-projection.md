@@ -203,6 +203,26 @@ packet M1-S1 -> out/M1-S1.packet.md: 412336 bytes of 600000 budget (137446 token
 The gate runs over the whole milestone even when one slice is selected, because the
 coverage rule is a property of the milestone, not of a slice.
 
+## Lane-scope protocol
+
+Packet projection assumes one executor lane per slice and an integrator that owns shared files.
+Machinery does not implement a project's lane-scope gate, but that gate needs the same two
+conventions the packet handoff uses:
+
+1. A commit whose subject is `integrator-request(<slice>)` may carry integrator-owned paths. The
+   slice token names the requesting slice, and the commit is a request for the integrator to land or
+   reconcile those paths. A scope gate must classify this commit by its subject before applying the
+   ordinary per-lane path allowlist.
+2. A design lane's whole diff is an integrator request. Design files are shared authority rather
+   than executor-owned implementation paths, so the lane hands that diff to the integrator under
+   the same review and reconciliation rule even when it contains more than one commit.
+
+These are permissions to request shared edits, not permissions to merge them directly. The
+integrator remains responsible for reconciling concurrent requests, running every affected slice
+suite, regenerating packets, and landing the shared result. A project may encode stricter naming or
+metadata, but its scope gate must preserve these two meanings or it will reject the handoff protocol
+the packets were projected for.
+
 ## Authoring the slice map
 
 The one manual step is writing `slices.yaml` from the plan that already assigns work to
