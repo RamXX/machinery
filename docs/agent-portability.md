@@ -214,8 +214,9 @@ error, or a tool error in the after hook.
 When OpenCode reports `session.idle` with a recorded file-tool before call but no matching after
 call, the adapter records that terminal asymmetry with an explicit idle reason before asking the
 hook to check the gate. A shell can leave a delayed writer running after idle, so its unmatched
-call stays armed until OpenCode reports an exact refusal or completion. A matching tree hash by
-itself never closes an armed operation. The adapter
+call stays armed until OpenCode reports an exact refusal or completion. Existing hook ledgers
+with tree hashes remain readable, but new pending calls carry no tree hash because it cannot
+prove completion. The adapter
 runs the stop check on `session.idle`, but OpenCode's event API does not provide the same reliable
 "block this stop and force another agent turn" contract as Claude Code and Codex. A red idle check is
 therefore surfaced in a warning toast and the application log, while its touched-file ledger is

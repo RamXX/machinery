@@ -28,6 +28,8 @@ const closedInventory = [
   "PostToolUse propagates an explicit block decision",
   "shell tools participate in PostToolUse governance",
   "plugin constructs without a Bun $ and routes governed calls through the runner",
+  "permission reply and tool error report exact denied completions",
+  "OpenCode tool-part error closes only the refused shell call",
   "a spawn failure fails closed with the transport error",
   "an unknown JSON response field blocks instead of passing",
   "a non-object JSON response blocks instead of passing",

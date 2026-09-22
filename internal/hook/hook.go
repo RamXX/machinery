@@ -44,7 +44,6 @@ import (
 	"time"
 
 	"github.com/RamXX/machinery/internal/checker"
-	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/filelock"
 	"github.com/RamXX/machinery/internal/fsatomic"
@@ -2678,10 +2677,6 @@ func armProjectState(root string, in Input, cfg Config, designTouched, implTouch
 	if err != nil {
 		return err
 	}
-	pendingHash, err := governedTreeHash(root, cfg)
-	if err != nil {
-		return fmt.Errorf("fingerprint governed tree before tool execution: %w", err)
-	}
 	raw, err := routeSnapshotBody(cfg)
 	if err != nil {
 		return err
@@ -2700,7 +2695,7 @@ func armProjectState(root string, in Input, cfg Config, designTouched, implTouch
 	} else if len(temps) > 0 {
 		return fmt.Errorf("incomplete hook route transaction: durable temp %s exists; refusing to overwrite crash evidence", temps[0])
 	}
-	if err := updateStateLocked(p, root, designTouched, implTouched, operation, pendingHash, "", routeSnapshotDigest(raw)); err != nil {
+	if err := updateStateLocked(p, root, designTouched, implTouched, operation, "", routeSnapshotDigest(raw)); err != nil {
 		return err
 	}
 	return publishRouteSnapshotLocked(root, routeStatePath(root, in.SessionID), raw)
@@ -2744,7 +2739,7 @@ func completeToolState(root string, cfg Config, in Input, designTouched, implTou
 	} else if len(temps) > 0 {
 		return fmt.Errorf("incomplete hook route transaction: durable temp %s exists; refusing to overwrite crash evidence", temps[0])
 	}
-	if err := updateStateLocked(p, root, designTouched, implTouched, "", "", operation, routeSnapshotDigest(raw)); err != nil {
+	if err := updateStateLocked(p, root, designTouched, implTouched, "", operation, routeSnapshotDigest(raw)); err != nil {
 		return err
 	}
 	return publishRouteSnapshotLocked(root, routeStatePath(root, in.SessionID), raw)
@@ -2760,25 +2755,6 @@ func toolOperationToken(in Input) (string, error) {
 		binary.BigEndian.PutUint64(size[:], uint64(len(value)))
 		_, _ = h.Write(size[:])
 		_, _ = h.Write([]byte(value))
-	}
-	return fmt.Sprintf("%x", h.Sum(nil)), nil
-}
-
-func governedTreeHash(root string, cfg Config) (string, error) {
-	h := sha256.New()
-	designRoot := filepath.Join(root, filepath.FromSlash(designRel(cfg)))
-	designHash, err := designlock.FingerprintTree(designRoot)
-	if err != nil {
-		return "", fmt.Errorf("design tree: %w", err)
-	}
-	fmt.Fprintf(h, "design\x00%s\x00", designHash)
-	if cfg.Impl != "" {
-		implRoot := filepath.Join(root, filepath.FromSlash(cfg.Impl))
-		implHash, err := designlock.FingerprintTree(implRoot)
-		if err != nil {
-			return "", fmt.Errorf("implementation tree: %w", err)
-		}
-		fmt.Fprintf(h, "impl\x00%s\x00", implHash)
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
@@ -3427,7 +3403,7 @@ func appendState(root, sessionID, kind string) (returnErr error) {
 	defer func() {
 		returnErr = errors.Join(returnErr, lock.release())
 	}()
-	if err := updateStateLocked(p, root, kind == "design", kind == "impl", "", "", "", ""); err != nil {
+	if err := updateStateLocked(p, root, kind == "design", kind == "impl", "", "", ""); err != nil {
 		return err
 	}
 	return boundHookStateStore()
@@ -3466,7 +3442,7 @@ func parseHookStateRootLine(value string) (string, error) {
 	return root, nil
 }
 
-func updateStateLocked(p, root string, addDesign, addImpl bool, addPending, addPendingHash, removePending, addRoute string) error {
+func updateStateLocked(p, root string, addDesign, addImpl bool, addPending, removePending, addRoute string) error {
 	temps, err := hookStateTemps(p)
 	if err != nil {
 		return err
@@ -3497,10 +3473,7 @@ func updateStateLocked(p, root string, addDesign, addImpl bool, addPending, addP
 	}
 	if addPending != "" {
 		pending[addPending] = true
-		if record.pendingHashes == nil {
-			record.pendingHashes = map[string]string{}
-		}
-		record.pendingHashes[addPending] = addPendingHash
+		delete(record.pendingHashes, addPending)
 	}
 	if removePending != "" {
 		delete(pending, removePending)

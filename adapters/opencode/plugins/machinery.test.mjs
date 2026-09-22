@@ -234,7 +234,7 @@ test("OpenCode tool-part error closes only the refused shell call", async () => 
   const plugin = await MachineryPlugin({ client: {}, directory: "/project", worktree: "" }, { runner: fakeRunner({}, calls) })
   await plugin["tool.execute.before"]({ tool: "bash", sessionID: "part-session", callID: "shell-refused" }, { args: { command: "touch design/a" } })
   await plugin["tool.execute.before"]({ tool: "bash", sessionID: "part-session", callID: "shell-still-running" }, { args: { command: "schedule delayed writer" } })
-  await plugin.event({ event: { type: "message.part.updated", properties: { part: { id: "prt-456", callID: "shell-refused", sessionID: "part-session", type: "tool", state: { status: "error", error: "permission denied" } } } } })
+  await plugin.event({ event: { type: "message.part.updated", properties: { part: { id: "prt-456", callID: "shell-refused", sessionID: "part-session", messageID: "msg-1", type: "tool", tool: "bash", state: { status: "error", input: { command: "touch design/a" }, error: "permission denied", time: { start: 1, end: 2 } } } } } })
   assert.deepEqual(calls.filter(({ payload }) => payload.hook_event_name === "PostToolUseFailure").map(({ payload }) => payload.tool_use_id), ["shell-refused"])
 })
 
@@ -504,7 +504,7 @@ test("native real machinery binary governs a managed root end to end", { timeout
       },
     })
     await shell["tool.execute.before"]({ tool: "bash", sessionID: "shell-denial-session", callID: "call-123" }, { args: { command: "cd /sandbox/refused" } })
-    await shell.event({ event: { type: "message.part.updated", properties: { part: { id: "prt-456", callID: "call-123", sessionID: "shell-denial-session", type: "tool", state: { status: "error", error: "permission denied" } } } } })
+    await shell.event({ event: { type: "message.part.updated", properties: { part: { id: "prt-456", callID: "call-123", sessionID: "shell-denial-session", messageID: "msg-123", type: "tool", tool: "bash", state: { status: "error", input: { command: "cd /sandbox/refused" }, error: "permission denied", time: { start: 1, end: 2 } } } } } })
     await shell["tool.execute.before"]({ tool: "write", sessionID: "shell-denial-session", callID: "unrelated-write" }, { args: { filePath: path.join(root, "design", "after-denial.txt") } })
     await writeFile(path.join(root, "design", "after-denial.txt"), "unrelated mutation\n")
     await shell["tool.execute.after"]({ tool: "write", sessionID: "shell-denial-session", callID: "unrelated-write", args: { filePath: path.join(root, "design", "after-denial.txt") } }, {})

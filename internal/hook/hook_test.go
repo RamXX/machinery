@@ -4127,6 +4127,20 @@ func TestPreToolUseArmsWithoutReadingUnrelatedImplementationTree(t *testing.T) {
 	if err != nil || len(record.pending) != 1 || !record.design {
 		t.Fatalf("PreToolUse did not arm its exact pending obligation: record=%+v err=%v", record, err)
 	}
+	if len(record.pendingHashes) != 0 {
+		t.Fatalf("new pending operation wrote an unused tree hash: %v", record.pendingHashes)
+	}
+}
+
+func TestHookStateStillReadsLegacyHashedPendingLine(t *testing.T) {
+	token := strings.Repeat("a", 64)
+	hash := strings.Repeat("b", 64)
+	for _, pending := range []string{"pending " + token, "pending " + token + " " + hash} {
+		record, err := parseHookStateRecord([]byte("revision 1\ndesign\n" + pending + "\n"))
+		if err != nil || len(record.pending) != 1 || record.pending[0] != token {
+			t.Fatalf("pending line %q was not read: record=%+v err=%v", pending, record, err)
+		}
+	}
 }
 
 func TestStopKeepsArmedOperationBeforeScheduledLateWriter(t *testing.T) {

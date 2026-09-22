@@ -155,12 +155,13 @@ func checkDeclaredReadHistory(gitDesign, gitImpl string, row declaredRead, g *Ga
 	if !ancestor {
 		return fmt.Errorf("declared-read reviewed commit %s is not an ancestor of HEAD %s", reviewed, head)
 	}
-	commits, err := runGitExact(repo, "rev-list", "--reverse", reviewed+".."+head)
+	commits, err := runGitExact(repo, "rev-list", "--topo-order", "--reverse", reviewed+".."+head)
 	if err != nil {
 		return fmt.Errorf("enumerate declared-read commits: %w", err)
 	}
 	type parentDiff struct {
 		commit  string
+		parent  string
 		changes []declaredReadFileChange
 	}
 	var diffs []parentDiff
@@ -182,43 +183,44 @@ func checkDeclaredReadHistory(gitDesign, gitImpl string, row declaredRead, g *Ga
 			if err != nil {
 				return fmt.Errorf("parse declared-read tree diff for %s: %w", commit, err)
 			}
-			diffs = append(diffs, parentDiff{commit, changes})
-		}
-	}
-	// Resolve the current reader's custody backwards through actual Git rename
-	// edges. A path introduced only after the review cannot stand in for the
-	// reviewed reader, even when it changed alongside the artifact.
-	readerPaths := map[string]bool{reader: true}
-	for changed := true; changed; {
-		changed = false
-		for _, diff := range diffs {
-			for _, change := range diff.changes {
-				if strings.HasPrefix(change.status, "R") && readerPaths[change.new] && !readerPaths[change.old] {
-					readerPaths[change.old] = true
-					changed = true
-				}
-			}
+			diffs = append(diffs, parentDiff{commit, parent, changes})
 		}
 	}
 	if _, err := runGitExact(repo, "cat-file", "-e", reviewed+":"+artifact); err != nil {
 		return fmt.Errorf("declared-read path %s was not tracked at reviewed commit %s", ir.Repr(artifact), reviewed)
 	}
-	readerReviewed := false
-	for candidate := range readerPaths {
-		if _, err := runGitExact(repo, "cat-file", "-e", reviewed+":"+candidate); err == nil {
-			readerReviewed = true
-			break
-		}
-	}
-	if !readerReviewed {
-		return fmt.Errorf("declared-read reader %s has no tracked custody at reviewed commit %s", ir.Repr(reader), reviewed)
-	}
+	// Walk each parent edge backwards from the declared reader at HEAD. A
+	// rename transfers custody only across that edge; an old path recreated in
+	// a later commit never becomes a reader again. Reverse topological order
+	// makes each child path known before examining any of its parent diffs.
+	readerAt := map[string]string{head: reader}
 	pairedCommits := map[string]bool{}
-	for _, diff := range diffs {
+	for i := len(diffs) - 1; i >= 0; i-- {
+		diff := diffs[i]
+		childPath := readerAt[diff.commit]
+		if childPath == "" {
+			return fmt.Errorf("declared-read reader custody at commit %s cannot be verified", diff.commit)
+		}
+		if _, err := runGitExact(repo, "cat-file", "-e", diff.commit+":"+childPath); err != nil {
+			return fmt.Errorf("declared-read reader %s was not tracked at commit %s", ir.Repr(childPath), diff.commit)
+		}
+		parentPath := childPath
+		for _, change := range diff.changes {
+			if strings.HasPrefix(change.status, "R") && change.new == childPath {
+				parentPath = change.old
+			}
+		}
+		if _, err := runGitExact(repo, "cat-file", "-e", diff.parent+":"+parentPath); err != nil {
+			return fmt.Errorf("declared-read reader %s has no tracked custody at parent %s", ir.Repr(parentPath), diff.parent)
+		}
+		if prior := readerAt[diff.parent]; prior != "" && prior != parentPath {
+			return fmt.Errorf("declared-read reader custody at commit %s is ambiguous", diff.parent)
+		}
+		readerAt[diff.parent] = parentPath
 		artifactChanged, readerChanged := false, false
 		for _, change := range diff.changes {
 			artifactChanged = artifactChanged || change.old == artifact || change.new == artifact
-			readerChanged = readerChanged || readerPaths[change.old] || readerPaths[change.new]
+			readerChanged = readerChanged || change.old == parentPath || change.new == childPath
 		}
 		if artifactChanged && !readerChanged {
 			return fmt.Errorf("declared-read artifact %s changed without reader %s in the same commit %s", row.artifact, row.reader, diff.commit)
@@ -226,6 +228,12 @@ func checkDeclaredReadHistory(gitDesign, gitImpl string, row declaredRead, g *Ga
 		if artifactChanged {
 			pairedCommits[diff.commit] = true
 		}
+	}
+	if readerAt[reviewed] == "" {
+		return fmt.Errorf("declared-read reader %s has no tracked custody at reviewed commit %s", ir.Repr(reader), reviewed)
+	}
+	if _, err := runGitExact(repo, "cat-file", "-e", reviewed+":"+readerAt[reviewed]); err != nil {
+		return fmt.Errorf("declared-read reader %s has no tracked custody at reviewed commit %s", ir.Repr(reader), reviewed)
 	}
 	for range pairedCommits {
 		g.Count("paired artifact changes")

@@ -32,8 +32,9 @@ under their version heading when a release is cut.
   refused permission, a tool-part error, a tool error in the after hook, or an idle turn with a file-tool `tool.execute.before` but no matching
   `tool.execute.after` into `PostToolUseFailure` with the call id and explicit reason. Shell calls
   without a terminal event remain armed because they may leave a delayed writer. Stop keeps
-  every remaining pending token armed, even when the governed tree hash is unchanged or Stop is
-  re-fired. The gate obligation runs only after every exact tool completion is recorded.
+  every remaining pending token armed, even when the governed tree is unchanged or Stop is
+  re-fired. New pending tokens no longer fingerprint the tree; existing hashed ledger lines remain
+  readable. The gate obligation runs only after every exact tool completion is recorded.
 
 ### Documentation
 

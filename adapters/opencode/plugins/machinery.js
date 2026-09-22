@@ -375,8 +375,8 @@ export const MachineryPlugin = async ({ client, directory, worktree }, options =
       const id = sessionID(event)
       if (event.type === "message.part.updated") {
         const part = event.properties?.part
-        if (part?.type === "tool" && part.state?.status === "error" && part.id && part.sessionID) {
-          await failedCompletion(part.sessionID, part.id, "OpenCode message.part.updated reported a terminal tool error")
+        if (part?.type === "tool" && part.state?.status === "error" && part.callID && part.sessionID) {
+          await failedCompletion(part.sessionID, part.callID, "OpenCode message.part.updated reported a terminal tool error")
         }
         return
       }
