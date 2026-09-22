@@ -217,6 +217,18 @@ test("plugin constructs without a Bun $ and routes governed calls through the ru
   assert.equal(calls[0].payload.tool_input.file_path, "design/BUILD.md")
 })
 
+test("permission reply and tool error report exact denied completions", async () => {
+  const calls = []
+  const plugin = await MachineryPlugin({ client: {}, directory: "/project", worktree: "" }, { runner: fakeRunner({}, calls) })
+  await plugin["tool.execute.before"]({ tool: "write", sessionID: "s", callID: "denied" }, { args: { filePath: "/project/design/a" } })
+  await plugin.event({ event: { type: "permission.updated", properties: { id: "permission-1", sessionID: "s", callID: "denied" } } })
+  await plugin.event({ event: { type: "permission.replied", properties: { sessionID: "s", permissionID: "permission-1", response: "reject" } } })
+  await plugin["tool.execute.before"]({ tool: "write", sessionID: "s", callID: "errored" }, { args: { filePath: "/project/design/b" } })
+  await plugin["tool.execute.after"]({ tool: "write", sessionID: "s", callID: "errored", args: { filePath: "/project/design/b" } }, { error: { message: "tool refused" } })
+  const failures = calls.filter(({ payload }) => payload.hook_event_name === "PostToolUseFailure")
+  assert.deepEqual(failures.map(({ payload }) => payload.tool_use_id), ["denied", "errored"])
+})
+
 test("a spawn failure fails closed with the transport error", async () => {
   const after = await afterHandler({ ok: false, error: new Error("spawn machinery ENOENT") })
   await assert.rejects(() => after(postInput, {}), (err) => {
