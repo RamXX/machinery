@@ -483,6 +483,12 @@ test("native real machinery binary governs a managed root end to end", { timeout
     for (const file of stateFiles.filter((name) => name.endsWith(".state"))) {
       assert.doesNotMatch(await readFile(path.join(configDir, file), "utf8"), /pending /)
     }
+    const late = await MachineryPlugin({ client: {}, directory: root, worktree: "" }, {})
+    await late["tool.execute.before"]({ tool: "bash", sessionID: "late-session", callID: "late-writer" }, { args: { command: "schedule delayed writer" } })
+    const delayedWrite = sleep(50).then(() => writeFile(path.join(root, "design", "late.txt"), "late write\n"))
+    await assert.rejects(() => late.event({ event: { type: "session.idle", properties: { sessionID: "late-session" } } }), /in-flight tool/)
+    await delayedWrite
+    await assert.rejects(() => late.event({ event: { type: "session.idle", properties: { sessionID: "late-session" } } }), /in-flight tool/)
     // The same transport stays silent on an unmanaged root: the documented
     // empty-success protocol through the real binary.
     const bare = await mkdtemp(path.join(scratch, "unmanaged-"))
