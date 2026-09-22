@@ -64,6 +64,8 @@ const (
 	nextGateDate       = "2026-09-22"
 	nextGateG2Prefix   = "Re-reviewed 2026-09-22 over AUTHORIZATION.md"
 	nextGateG3Prefix   = "Re-reviewed 2026-09-22 over the MarketDataFeed derived fact waiver"
+	legacyCRMReview    = "Re-reviewed 2026-09-22 over current ARCHITECTURE.md"
+	fulfillmentReview  = "Re-reviewed 2026-09-22 over current BUILD.md"
 	planOnlyWarnPrefix = "plan only; current implementation review missing"
 )
 
@@ -154,23 +156,27 @@ func expectedMigration() map[string][]migratedRow {
 		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: origReview, date: "2026-09-02", covers: []string{"BUILD.md"}},
 	)
 
-	// fulfillment: BUILD.md already carries the sound prospective wholesale
-	// obligation; nothing changed, so all rows keep original provenance.
+	// fulfillment: the two BUILD-covering rows were re-reviewed against current
+	// bytes after the frozen-test amendment; they remain plan judgments.
 	fulfillment := planRows(g2Claims, nextGateAttestor, nextGateDate, []string{"ARCHITECTURE.md", "AUTHORIZATION.md"})
 	for i := range fulfillment {
 		fulfillment[i].note = nextGateG2Prefix
 	}
 	fulfillment = append(fulfillment, planRows(g3Claims, origCodexProd, "2026-09-02", fulfillmentMachines)...)
 	fulfillment = append(fulfillment,
-		migratedRow{claim: "gt.conformance-test-shape", kind: "plan", attestor: origCodexProd, date: "2026-09-02", covers: []string{"BUILD.md"}},
-		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: origCodexProd, date: "2026-09-02", covers: []string{"BUILD.md"}},
+		migratedRow{claim: "gt.conformance-test-shape", kind: "plan", attestor: nextGateAttestor, date: nextGateDate, note: fulfillmentReview, covers: []string{"BUILD.md"}},
+		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: nextGateAttestor, date: nextGateDate, note: fulfillmentReview, covers: []string{"BUILD.md"}},
 	)
 
-	// go-crm: the only design with an accepted implementation. Its gt row is a
+	// go-crm: six Architecture Contract rows were re-reviewed over the current
+	// bytes after the testoracle ignore amendment. Its gt row is a
 	// real current review over examples/go-crm/impl; the zero-context row is a
 	// re-reviewed plan over the corrected BUILD.md; historical acceptance
 	// stays historical with original provenance.
-	goCrm := planRows(g2Claims, origCodexCRM, "2026-09-02", []string{"ARCHITECTURE.md"})
+	goCrm := planRows(g2Claims, nextGateAttestor, nextGateDate, []string{"ARCHITECTURE.md"})
+	for i := range goCrm {
+		goCrm[i].note = legacyCRMReview
+	}
 	goCrm = append(goCrm, planRows(g3Claims, origCodexCRM, "2026-09-02", crmMachines)...)
 	goCrm = append(goCrm,
 		migratedRow{claim: "gt.conformance-test-shape", kind: "current", attestor: coordinator, date: crmBumpDate, covers: []string{"BUILD.md"}},

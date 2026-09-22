@@ -182,17 +182,17 @@ attestations:
         hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
   - claim: gt.conformance-test-shape
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'The handoff requires one parser-backed conformance suite per machine that asserts target state and the complete ordered action list for every committed oracle row.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over current BUILD.md sections 5 and 8: the plan still requires one parser-backed wholesale conformance suite per each of six committed machine oracles, asserting source and guard outcome, target state, and the complete ordered action list for every row. The 2026-09-06 frozen-test amendment changes revision custody, not conformance shape. This remains a plan judgment; no implementation is attested.'
     covers:
       - path: BUILD.md
         hash: sha256:3a2a2b9649c6a0d39e114c3b3236f589be618bf50a71ce039a9e2304f75cf61f
   - claim: g4.zero-context
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'The build plan fixes topology, versions, milestones, oracle-derived test obligations, formal checks, residuals, and state-migration discipline for an implementation agent with no conversation history.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over current BUILD.md sections 1 through 10: topology, source artifacts, six machines, formal checks, traceability, M0-M5 milestones, toolchain, residuals, and state migration remain specified for a new implementer. The 2026-09-06 amendment now requires owner authorization, a new evidence revision, and replay for any frozen-test change. The plan judgment stands.'
     covers:
       - path: BUILD.md
         hash: sha256:3a2a2b9649c6a0d39e114c3b3236f589be618bf50a71ce039a9e2304f75cf61f
