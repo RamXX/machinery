@@ -18,10 +18,109 @@ var (
 	noAuthorization         = regexp.MustCompile(`\(no authorization:\s*([^)]*)\)`)
 	authorizationCapability = regexp.MustCompile("^`([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+)`$")
 	authorizationSubject    = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$`)
+	h2ResourceCell          = regexp.MustCompile("^\\s*`([A-Za-z][A-Za-z0-9_]*)`(?:\\s|$)")
+	h2MachineWritten        = regexp.MustCompile(`\bMACHINE-WRITTEN\{([^}]*)\}`)
+	h2MachineWrittenBy      = regexp.MustCompile(`\bMACHINE-WRITTEN-BY\{([^}]*)\}`)
+	c4OwnerDeclaration      = regexp.MustCompile(`(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*(?:softwareSystem|container|component)\b`)
 )
 
 type authorizationRow struct {
 	subject, admission, where string
+}
+
+// h2AuthorizationInventory reads declarations only from the two tables that
+// carry H2's compile-time inventory. Mentions in explanatory prose do not
+// grant an action. A producer mark is an admission for its named producers,
+// never a name-wide machine-written grant.
+func h2AuthorizationInventory(g *Gate, design string) (map[string]bool, bool) {
+	admitted := map[string]bool{}
+	nameAdmitted := map[string]bool{}
+	producerNarrowed := map[string]bool{}
+	found := false
+	paths, _ := strictSortedGlob(g, filepath.Join(design, "machines"), "*.matrix.md", "authorization matrix")
+	for _, path := range paths {
+		body, err := readDesignFile(design, path)
+		if err != nil {
+			continue
+		}
+		for _, table := range ir.ParseMdTables(string(body)) {
+			ri := ir.FindCol(table.Header, "resource")
+			if ri < 0 {
+				continue
+			}
+			wi := ir.FindCol(table.Header, "machine-written actions")
+			residual := wi < 0 && ir.FindCol(table.Header, "platform_admin") >= 0 && ir.FindCol(table.Header, "tenant_admin") >= 0 && ir.FindCol(table.Header, "every other preset") >= 0
+			if wi < 0 && !residual {
+				continue
+			}
+			for i, row := range table.Rows {
+				resourceCell := cellAt(row, ri)
+				match := h2ResourceCell.FindStringSubmatch(resourceCell)
+				if match == nil {
+					g.Errs = append(g.Errs, filepath.Base(path)+": resource row "+strconv.Itoa(i+1)+": inventory resource cell must start with one backticked resource")
+					continue
+				}
+				resource := match[1]
+				if wi >= 0 {
+					groups := h2MachineWritten.FindAllStringSubmatch(cellAt(row, wi), -1)
+					if len(groups) > 0 {
+						found = true
+					}
+					if len(groups) != 1 {
+						g.Errs = append(g.Errs, filepath.Base(path)+": resource "+resource+": inventory row needs exactly one MACHINE-WRITTEN mark")
+					}
+					for _, group := range groups {
+						for _, raw := range strings.Split(group[1], ",") {
+							action := strings.TrimSpace(raw)
+							if !valueMember.MatchString(action) {
+								g.Errs = append(g.Errs, filepath.Base(path)+": resource "+resource+": invalid MACHINE-WRITTEN action "+ir.Repr(action))
+								continue
+							}
+							nameAdmitted[resource+"."+action] = true
+						}
+					}
+				}
+				if residual {
+					byGroups := h2MachineWrittenBy.FindAllStringSubmatch(resourceCell, -1)
+					if len(byGroups) > 0 {
+						found = true
+					}
+					for _, group := range byGroups {
+						tokens := strings.Split(group[1], ",")
+						first := strings.Split(tokens[0], ":")
+						if len(first) != 2 || !valueMember.MatchString(strings.TrimSpace(first[0])) || !valueMember.MatchString(strings.TrimSpace(first[1])) {
+							g.Errs = append(g.Errs, filepath.Base(path)+": resource "+resource+": invalid MACHINE-WRITTEN-BY entry "+ir.Repr(tokens[0]))
+							continue
+						}
+						valid := true
+						for _, producer := range tokens[1:] {
+							if strings.Contains(producer, ":") {
+								g.Errs = append(g.Errs, filepath.Base(path)+": resource "+resource+": MACHINE-WRITTEN-BY names one action followed by producers")
+								valid = false
+							} else if !valueMember.MatchString(strings.TrimSpace(producer)) {
+								g.Errs = append(g.Errs, filepath.Base(path)+": resource "+resource+": invalid MACHINE-WRITTEN-BY entry "+ir.Repr(producer))
+								valid = false
+							}
+						}
+						if valid {
+							producerNarrowed[resource+"."+strings.TrimSpace(first[0])] = true
+						}
+					}
+				}
+			}
+		}
+	}
+	for subject := range nameAdmitted {
+		admitted[subject] = true
+	}
+	for subject := range producerNarrowed {
+		if nameAdmitted[subject] {
+			g.Errs = append(g.Errs, subject+": both name-admitted and producer-narrowed in H2 authorization inventory")
+			continue
+		}
+		admitted[subject] = true
+	}
+	return admitted, found
 }
 
 type authorizationDocument struct {
@@ -144,16 +243,29 @@ func checkAuthorizationInventory(g *Gate, design string, dm *ir.Value) {
 		return
 	}
 	documents, markers := authorizationInventoryCorpus(g, design)
-	if markers == 0 {
+	h2Admitted, h2Found := h2AuthorizationInventory(g, design)
+	if markers == 0 && !h2Found {
 		g.Errs = append(g.Errs, "System writes exist but the design has no <!-- machinery:authorization-inventory --> marker and closed authorization inventory")
 	} else if markers > 1 {
 		g.Errs = append(g.Errs, "authorization inventory marker appears "+strconv.Itoa(markers)+" times; one design has exactly one closed authorization inventory")
 	}
 	rows := collectAuthorizationRows(g, documents)
+	c4Owners := map[string]bool{}
+	if body, err := readDesignFile(design, filepath.Join(design, "workspace.dsl")); err == nil {
+		for _, match := range c4OwnerDeclaration.FindAllStringSubmatch(string(body), -1) {
+			c4Owners[match[1]] = true
+		}
+	}
 	if markers > 0 && len(rows) == 0 {
 		g.Errs = append(g.Errs, "authorization inventory marker has no table with authorization subject and admission columns")
 	}
 	seen := map[string]bool{}
+	for subject := range h2Admitted {
+		if _, ok := obligations[subject]; ok {
+			seen[subject] = true
+			g.Count("authorization obligations admitted")
+		}
+	}
 	for _, row := range rows {
 		if row.subject == "" {
 			g.Errs = append(g.Errs, row.where+": authorization row names no subject")
@@ -182,6 +294,11 @@ func checkAuthorizationInventory(g *Gate, design string, dm *ir.Value) {
 		}
 		if !authorizationCapability.MatchString(row.admission) {
 			g.Errs = append(g.Errs, row.where+": admission must name one capability as a backticked dotted identifier or waive with '(no authorization: <reason>)'")
+			continue
+		}
+		owner := strings.SplitN(strings.Trim(row.admission, "`"), ".", 2)[0]
+		if !c4Owners[owner] {
+			g.Errs = append(g.Errs, row.where+": admission owner "+ir.Repr(owner)+" is not a C4 element in workspace.dsl")
 			continue
 		}
 		g.Count("authorization obligations admitted")

@@ -438,7 +438,9 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   snake-case plus the Modelith attribute naming styles. `Entity.attr` resolves the named pair;
   a single-word fact is checked when preceded by an explicit fact verb. Facts
   also resolve to Modelith enum members and actions, event names and payload
-  fields, machine context keys, failure-catalog identifiers, and members of a
+  fields (including prose-shaped payload cells), Class C content keys, vertical
+  YAML fields, relation names and keys, architecture join keys, machine context
+  keys, failure-catalog identifiers, and members of a
   `VALUES` group on the same row. A unit-computed value uses the
   row-local grammar `derived: authored_default_ref (<reason>)`. The fact name
   and non-empty reason are mandatory; the waiver covers only that row.
@@ -450,12 +452,19 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   vocabulary shared by multiple units and reconciles their sets. Without a
   name, identity is the normalized unit name; distinct unit names are not
   inferred to denote the same vocabulary. A same-named Modelith enum must
-  agree exactly.
+  agree exactly. A cited vocabulary owned by another model entity, or an enum
+  typed on this entity, does not need a second local declaration.
 - Every Modelith action whose actor is `System`, plus every producer named by
-  a matrix cascade or consumer-arm table, appears exactly once in the marked
-  hand-written authorization inventory, covered by g2 attestation rows. A
+  a matrix cascade or consumer-arm table, has an admission in either a marked
+  hand-written authorization inventory, covered by g2 attestation rows, or the
+  H2 matrix form. `MACHINE-WRITTEN{action, ...}` belongs in a resource's
+  machine-written actions cell; `MACHINE-WRITTEN-BY{action: producer, ...}`
+  belongs in its residual verb table resource cell and admits only those
+  producers. Residual seat cells govern non-System actor verbs. The matrix
+  form needs no marker document. A
   producer column must be distinct from a `producer / consumer` prose column.
-  Its admission cell names one capability as a backticked dotted identifier or
+  Its admission cell names one capability as a backticked dotted identifier
+  starting with a declared C4 element id or
   carries `(no authorization: <reason>)`. Empty,
   missing, duplicate, orphan, and reasonless-waiver rows fail in Gx-trace.
 - Incident-derived invariants and fixtures carry a PROVENANCE pointer to the

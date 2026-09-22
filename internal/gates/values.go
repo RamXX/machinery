@@ -15,11 +15,58 @@ import (
 )
 
 var (
-	valuesGroup     = regexp.MustCompile(`\bVALUES(?:\s+([A-Za-z][A-Za-z0-9_-]*))?\s*\{([^}]*)\}`)
-	valuesOpening   = regexp.MustCompile(`\bVALUES(?:\s+[A-Za-z][A-Za-z0-9_-]*)?\s*\{`)
-	closedVocabWord = regexp.MustCompile(`(?i)(\bclosed\b.*\b(vocabulary|enum)\b|\breason\s+class\b)`)
-	valueMember     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
+	valuesGroup        = regexp.MustCompile(`\bVALUES(?:\s+([A-Za-z][A-Za-z0-9_-]*))?\s*\{([^}]*)\}`)
+	valuesOpening      = regexp.MustCompile(`\bVALUES(?:\s+[A-Za-z][A-Za-z0-9_-]*)?\s*\{`)
+	closedVocabWord    = regexp.MustCompile(`(?i)\bclosed\b[^.;]{0,80}\b(vocabulary|enum|trigger set)\b`)
+	reasonClassWord    = regexp.MustCompile(`(?i)\breason\s+class\b`)
+	reasonClassMembers = regexp.MustCompile("(?i)\\breason\\s+class\\s*(?:`[a-z][a-z0-9_]*`|\\([^)]*,[^)]*\\))")
+	valueMember        = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 )
+
+func closedVocabularyDebt(dm *ir.Value, owner, contract string) bool {
+	lower := strings.ToLower(contract)
+	if reasonClassWord.MatchString(contract) {
+		if strings.Contains(lower, "pass identity") && strings.Contains(lower, "as the reason class") {
+			return false
+		}
+		if reasonClassMembers.MatchString(contract) {
+			return true
+		}
+	}
+	if !closedVocabWord.MatchString(contract) {
+		return false
+	}
+	if strings.Contains(contract, "CLAUSE VOCABULARY IS UNCHANGED") {
+		return false
+	}
+	entities := dm.AsObject().GetObject("entities")
+	if entities != nil {
+		// A referenced owner may carry a content-defined vocabulary. The
+		// unit using it does not redeclare that set.
+		for _, entity := range entities.Keys() {
+			if entity == owner || !strings.Contains(contract, "`"+entity+"`") {
+				continue
+			}
+			if strings.Contains(strings.ToLower(entities.Get2(entity).AsObject().GetString("definition")), "vocabulary") {
+				return false
+			}
+		}
+		if e := entities.Get2(owner); e != nil {
+			obj := e.AsObject()
+			if strings.Contains(lower, "vocabulary it was checked against") && strings.Contains(strings.ToLower(obj.GetString("definition")), "vocabulary lives") {
+				return false
+			}
+			for _, attr := range objSlice(obj.Get2("attributes")) {
+				name := attr.AsObject().GetString("name")
+				typeName := attr.AsObject().GetString("type")
+				if name != "" && strings.Contains(lower, strings.ToLower(name)) && modelEnumValues(dm)[vocabularyKey(typeName)] != nil {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
 
 func vocabularyKey(s string) string {
 	return strings.Map(func(r rune) rune {
@@ -109,7 +156,7 @@ func checkClosedVocabularies(g *Gate, design string, dm *ir.Value) {
 			if len(groups) == 0 {
 				if valuesOpening.MatchString(contract) {
 					g.Errs = append(g.Errs, where+": malformed VALUES declaration; write VALUES{a, b, c}")
-				} else if closedVocabWord.MatchString(contract) {
+				} else if closedVocabularyDebt(dm, strings.TrimSuffix(filepath.Base(path), ".matrix.md"), contract) {
 					g.Errs = append(g.Errs, where+": "+ir.Repr(name)+" closed vocabulary has no VALUES{...} declaration; prose may quote the values but cannot define them")
 				}
 				continue

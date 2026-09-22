@@ -435,13 +435,13 @@ sets, so give the mapping an artifact and G2 holds it in both directions. The he
   boundary/external id.
 - A design without the table keeps the old posture: the mapping is attested.
 
-## System authorization inventory (required when System writes exist)
+## System authorization inventories (required when System writes exist)
 
 Every Modelith action whose actor is `System` is an autonomous write obligation. A matrix table
 with a distinct `producer` column and a cascade or consumer column adds one subject from each
 producer cell to the
 same obligation set. One hand-written Markdown artifact in the design, conventionally
-`AUTHORIZATION.md` or ARCHITECTURE.md, must carry this marker and one closed inventory. The artifact
+`AUTHORIZATION.md` or ARCHITECTURE.md, may carry this marker and one closed inventory. The artifact
 must be covered by the g2 attestation rows with a truthful review record:
 
 ```
@@ -455,11 +455,21 @@ must be covered by the g2 attestation rows with a truthful review record:
 
 Each producer cell names one identifier after Markdown annotations are removed; prose naming multiple
 subjects is an error. Each obligation appears exactly once by exact subject. Admission is one backticked dotted capability
-identifier. The inventory records a plan assertion; implementation enforcement is reviewed
+identifier whose first segment resolves to a `workspace.dsl` element id. The inventory records a plan assertion; implementation enforcement is reviewed
 separately. A genuinely unauthorizable internal write uses
 `(no authorization: <reason>)`; the reason is mandatory. Missing, duplicate, empty, and orphan rows
 are errors. The inventory is closed in both directions, so deleting a System action or matrix
 producer also requires deleting its stale authorization row.
+
+Alternatively, the H2 residual verb table and machine-written action inventory
+in a machine matrix are a first-class source. Gx reads
+`MACHINE-WRITTEN{action, ...}` only in a `machine-written actions` cell and
+`MACHINE-WRITTEN-BY{action: producer, ...}` only in the residual table's
+resource cell. The first admits that resource's named System action by name;
+the second admits it only under the stated producer set. An action cannot have
+both marks. Residual seat columns grant verbs to non-System actors. A design
+using this matrix source owes no authorization marker; actions not granted by
+the matrix still report a missing admission.
 
 ## Persistence and placement (the C4 to FSM bridge)
 
@@ -612,14 +622,18 @@ Gx-trace checks backticked identifiers in named-unit contract, clause, or payloa
 snake-case and the attribute spelling styles present in Modelith. It also resolves `Entity.attr` by the named
 entity and attribute. Single-word identifiers require an explicit fact verb such as `persists` or
 `reads`. Facts resolve to Modelith attributes, enum members and actions, machine `context` keys,
-event-contract event names and payload fields, failure-catalog identifiers, or members of a
+event-contract event names and payload fields (including snake-case members of
+prose-shaped payload cells), Class C keys in the content knob register, vertical
+YAML fields, Modelith relation names and keyed references, architecture join
+keys, failure-catalog identifiers, or members of a
 `VALUES` group on the same row. Quoted reason classes, classifications, producer names, and
 explicitly negated or rejected fields remain prose. Gx reports the number of named-unit rows scanned.
 
 A fact computed only inside one unit and never stored uses the row-local waiver
 `derived: risk_score (weighted fraud inputs)`. The identifier and a non-empty reason are required.
 The waiver admits only `risk_score` on that row; it does not create a design-wide fact or satisfy
-another row.
+another row. A string attribute whose description lists closed nested keys
+does not make them typed members; the row reports one typed-map gap.
 
 ### Closed vocabulary declarations
 
@@ -632,7 +646,9 @@ The matrix unit name owns an unnamed declaration. After case and separators are 
 named `orderState` matches the Modelith enum `OrderState`, and Gx-trace requires exact set equality.
 Use `VALUES reason_class{missing, stale, conflicting}` when different units share one vocabulary;
 declarations with the same explicit name must have identical sets. Without an explicit name, Gx
-cannot infer that two differently named units intend one vocabulary.
+cannot infer that two differently named units intend one vocabulary. A unit
+that cites a vocabulary owned by another model entity, or whose owning entity
+types the set with a Modelith enum, does not redeclare it with `VALUES`.
 
 ### Machine-checkable format (mandatory on a decomposed parent)
 

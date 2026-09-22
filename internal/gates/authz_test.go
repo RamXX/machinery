@@ -37,6 +37,7 @@ func authzFixture(t *testing.T, inventory, extraMatrix string) *Gate {
 		"| name | kind | maps to |\n|---|---|---|\n| `saveOrder` | actor | `order-paid-final` |\n"+extraMatrix)
 	arch := "# A\n\n## Placement\n\n| component (placement) | persistence |\n|---|---|\n| `Order` | in-memory |\n\n" + inventory
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
+	mustWrite(t, filepath.Join(design, "workspace.dsl"), "workspace \"Orders\" {\n  model {\n    orders = container \"Orders\" \"Owner\" \"Go\"\n  }\n}\n")
 	return CheckTraceability(design)
 }
 
@@ -150,5 +151,69 @@ func TestAuthorizationInventoryRejectsProseAdmission(t *testing.T) {
 	g := authzFixture(t, authzHeader+"| `Order.markPaid` | TODO |\n", "")
 	if !hasErr(g, "admission must name one capability") {
 		t.Fatalf("free text cannot prove an admitting capability: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationH2MachineWrittenInventory(t *testing.T) {
+	// H2 keeps both forms in Principal.matrix.md, without a marker document.
+	matrix := "\n| resource | platform_admin | tenant_admin | every other preset |\n|---|---|---|---|\n" +
+		"| `Order` (residual `order-paid-final`, MACHINE-WRITTEN-BY{markPaid: settlement_consumer}) | `read` | `read` | `read` |\n" +
+		"\n| resource | machine-written actions | what the verb columns still decide |\n|---|---|---|\n" +
+		"| `Order` | MACHINE-WRITTEN{advance} | markPaid is producer narrowed |\n"
+	g := authzFixture(t, "", matrix)
+	if hasErr(g, "no <!-- machinery:authorization-inventory -->") || hasErr(g, "System action 'Order.markPaid'") {
+		t.Fatalf("H2 producer mark must be an inventory admission: %v", g.Errs)
+	}
+	if g.Counts["authorization obligations admitted"] == 0 {
+		t.Fatalf("H2 admission must be counted: %+v", g.Counts)
+	}
+}
+
+func TestAuthorizationH2MachineWrittenListIsResourceScoped(t *testing.T) {
+	matrix := "\n| resource | machine-written actions | what the verb columns still decide |\n|---|---|---|\n" +
+		"| `Other` | MACHINE-WRITTEN{markPaid} | none |\n"
+	g := authzFixture(t, "", matrix)
+	if !hasErr(g, "System action 'Order.markPaid' has no authorization row") {
+		t.Fatalf("another resource's list cannot admit this action: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationH2ResidualSeatGrant(t *testing.T) {
+	matrix := "\n| resource | platform_admin | tenant_admin | every other preset |\n|---|---|---|---|\n" +
+		"| `Order` (residual `order-paid-final`) | `read` | `update`, WITHIN ITS OWN `Tenant` | `read` |\n"
+	g := authzFixture(t, "", matrix)
+	if !hasErr(g, "no <!-- machinery:authorization-inventory -->") {
+		t.Fatalf("a seat grant cannot authorize a System dispatch: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationAdmissionResolvesC4Owner(t *testing.T) {
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `fictional.capability` |\n", "")
+	if !hasErr(g, "admission owner 'fictional' is not a C4 element") {
+		t.Fatalf("a dotted token without a declared owner cannot admit a write: %v", g.Errs)
+	}
+	g = authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n", "")
+	if hasErr(g, "admission owner") {
+		t.Fatalf("declared C4 owner must pass: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationH2RejectsConflictingAndMalformedProducerMarks(t *testing.T) {
+	cases := []struct{ mark, list, want string }{
+		{"MACHINE-WRITTEN-BY{markPaid: settlement_consumer, other: wrong}", "MACHINE-WRITTEN{advance}", "one action followed by producers"},
+		{"MACHINE-WRITTEN-BY{markPaid: settlement_consumer}", "MACHINE-WRITTEN{markPaid, advance}", "both name-admitted and producer-narrowed"},
+		{"MACHINE-WRITTEN-BY{markPaid: }", "MACHINE-WRITTEN{advance}", "invalid MACHINE-WRITTEN-BY"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.want, func(t *testing.T) {
+			matrix := "\n| resource | platform_admin | tenant_admin | every other preset |\n|---|---|---|---|\n" +
+				"| `Order` (residual `order-paid-final`, " + tc.mark + ") | `read` | `read` | `read` |\n" +
+				"\n| resource | machine-written actions | what the verb columns still decide |\n|---|---|---|\n" +
+				"| `Order` | " + tc.list + " | prose |\n"
+			g := authzFixture(t, "", matrix)
+			if !hasErr(g, tc.want) {
+				t.Fatalf("invalid H2 inventory must fail: %v", g.Errs)
+			}
+		})
 	}
 }

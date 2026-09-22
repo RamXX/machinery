@@ -758,14 +758,23 @@ make verify-formal   # regenerates and checks all 35 TLC proofs + the relational
 | G5-pack | decomposed designs only: packs fresh, children pinned to the current packs, refinement proofs fresh, and every boundary-event row held to its direction (`consumes` or `produces` exactly; any other value is an ERROR rather than a silently dropped row). |
 | ERROR / DRIFT / WARN | ERROR is blocking; DRIFT means a generated artifact is stale, also blocking; WARN is advisory. |
 
-Gx also closes autonomous writes against a marked, g2-attested hand-written authorization inventory. Every Modelith action
-whose actor is `System`, plus every producer named by a matrix cascade or consumer-arm table, owes
-one exact row with a backticked dotted capability or `(no authorization: <reason>)`. Missing, duplicate,
-orphan, empty, and reasonless rows are blocking findings.
+Gx closes autonomous writes against either a marked, g2-attested hand-written
+authorization inventory or the H2 matrix form. The matrix form reads
+`MACHINE-WRITTEN{action, ...}` only from a `machine-written actions` cell and
+`MACHINE-WRITTEN-BY{action: producer, ...}` only from the resource cell of a
+residual verb table. The latter admits only the named producers. A residual
+seat's verb grant governs a non-System actor, not a System dispatch. A design
+whose residual table carries these marks owes no marker document. A marked
+inventory still requires one exact row per System action and matrix producer;
+its backticked dotted admission must start with a declared C4 element id, or
+use `(no authorization: <reason>)`. Missing, duplicate, conflicting, empty,
+orphan, and reasonless entries are blocking findings.
 
 Gx resolves backticked facts in named-unit contract, clause, and payload columns against
 Modelith attributes, enum members and actions, machine context keys, event names and payload fields,
-failure-catalog identifiers, and same-row VALUES members. It recognizes snake-case and Modelith attribute spelling
+failure-catalog identifiers, content register Class C keys, vertical YAML fields,
+relationship names and keys, architecture join keys, and same-row VALUES members.
+Prose-shaped event payload cells also declare snake-case fields. It recognizes snake-case and Modelith attribute spelling
 styles and `Entity.attr`; single-word facts require an explicit fact verb. A fact computed
 only by the unit uses the row-local `derived: fact_name (<reason>)` waiver; an empty reason fails.
 
@@ -773,8 +782,9 @@ Gx also closes named-unit vocabularies with `VALUES{a, b, c}`. Rows that call a 
 an enum, or a reason class owe the declaration. A same-named Modelith enum must have the exact set;
 otherwise the matrix row is the one closed source. `VALUES name{...}` binds a vocabulary shared by
 different units; unnamed declarations use unit names and cannot infer cross-unit identity.
-Duplicate, empty, malformed, and repeated groups
-fail.
+Duplicate, empty, malformed, and repeated groups fail. A referenced vocabulary
+owned by another model entity, or an enum typed on the owning entity, does not
+require a second local `VALUES` group.
 
 ## Use
 

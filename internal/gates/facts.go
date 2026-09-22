@@ -12,29 +12,51 @@ import (
 )
 
 var (
-	factReference = regexp.MustCompile("`([A-Za-z][A-Za-z0-9_.]*)`")
-	derivedFact   = regexp.MustCompile(`(?i)^derived:\s*([A-Za-z][A-Za-z0-9_.]*)\s*\(([^)]*)\)`)
-	derivedWord   = regexp.MustCompile(`(?i)\bderived\s*:`)
-	valueRole     = regexp.MustCompile(`(?i)(?:reason class|failure class|closure basis|failing clause|disposition|prior status|subject kind|kind|marker|outcome|only for|marks?(?:\s+\w+){0,3}|classifies?\s+a)\s*(?:is|of|,|:)?\s*$`)
-	valueSequence = regexp.MustCompile(`(?i)(?:reason|failure) class[^.;]{0,160}$`)
-	valueSuffix   = regexp.MustCompile(`(?i)^\s*(?:derivation\b|with no basis\b)`)
-	producerRole  = regexp.MustCompile(`(?i)(?:closed\s+|only\s+)?producer\s*(?:is|:)?\s*$`)
-	negativeFact  = regexp.MustCompile(`(?i)(?:there is no|never|not|without)\s*$`)
+	factReference     = regexp.MustCompile("`([A-Za-z][A-Za-z0-9_.]*)`")
+	derivedFact       = regexp.MustCompile(`(?i)^derived:\s*([A-Za-z][A-Za-z0-9_.]*)\s*\(([^)]*)\)`)
+	derivedWord       = regexp.MustCompile(`(?i)\bderived\s*:`)
+	valueRole         = regexp.MustCompile(`(?i)(?:reason class|failure class|closure basis|failing clause|disposition|prior status|subject kind|kind|marker|outcome|only for|marks?(?:\s+\w+){0,3}|classifies?\s+a)\s*(?:is|of|,|:)?\s*$`)
+	valueSequence     = regexp.MustCompile(`(?i)(?:reason|failure) class[^.;]{0,160}$`)
+	valueSuffix       = regexp.MustCompile(`(?i)^\s*(?:derivation\b|with no basis\b)`)
+	producerRole      = regexp.MustCompile(`(?i)(?:closed\s+|only\s+)?producer\s*(?:is|:)?\s*$`)
+	negativeFact      = regexp.MustCompile(`(?i)(?:there is no|never|not|without)\s*$`)
+	prosePayloadField = regexp.MustCompile(`\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b`)
+	knobKey           = regexp.MustCompile(`\bkey:\s*([a-z][a-z0-9_]*)\s*,\s*class:\s*C\b`)
+	verticalField     = regexp.MustCompile(`(?m)^\s+([a-z][a-z0-9]*(?:_[a-z0-9]+)+):`)
+	joinPair          = regexp.MustCompile("(?i)\\b(?:keyed by|the) pair\\s*\\(`([a-z][a-z0-9_]*)`,\\s*`([a-z][a-z0-9_]*)`\\)")
 )
 
 type factUniverse struct {
 	declared             map[string]bool
 	entities             map[string]bool
+	untypedMaps          map[string]map[string]bool
 	snake, camel, single bool
 }
 
 func declaredFacts(dm *ir.Value, design, archText string) factUniverse {
 	out := map[string]bool{}
-	universe := factUniverse{declared: out, entities: map[string]bool{}}
+	universe := factUniverse{declared: out, entities: map[string]bool{}, untypedMaps: map[string]map[string]bool{}}
 	entities := dm.AsObject().GetObject("entities")
 	for _, ename := range entities.Keys() {
 		universe.entities[ename] = true
 		for _, attr := range objSlice(entities.Get2(ename).AsObject().Get2("attributes")) {
+			if attr.AsObject().GetString("type") == "string" {
+				desc := attr.AsObject().GetString("description")
+				const intro = "KEY NAMES ARE CLOSED AND STATED HERE:"
+				if at := strings.Index(desc, intro); at >= 0 {
+					segment := desc[at+len(intro):]
+					if end := strings.Index(segment, ". A key"); end >= 0 {
+						segment = segment[:end]
+					}
+					keys := map[string]bool{}
+					for _, match := range factReference.FindAllStringSubmatch(segment, -1) {
+						keys[match[1]] = true
+					}
+					if len(keys) > 0 {
+						universe.untypedMaps[ename+"."+attr.AsObject().GetString("name")] = keys
+					}
+				}
+			}
 			if name := attr.AsObject().GetString("name"); name != "" {
 				out[name] = true
 				out[ename+"."+name] = true
@@ -51,6 +73,18 @@ func declaredFacts(dm *ir.Value, design, archText string) factUniverse {
 			if name := action.AsObject().GetString("name"); name != "" {
 				out[name] = true
 				out[ename+"."+name] = true
+			}
+		}
+		for _, relation := range objSlice(entities.Get2(ename).AsObject().Get2("relationships")) {
+			target := relation.AsObject().GetString("entity")
+			if target == "" || entities.Get2(target) == nil {
+				continue
+			}
+			name := strings.ToLower(target[:1]) + target[1:]
+			out[ename+"."+name] = true
+			if relation.AsObject().GetString("cardinality") == "n:1" {
+				out[name+"_id"] = true
+				out[ename+"."+name+"_id"] = true
 			}
 		}
 	}
@@ -77,7 +111,10 @@ func declaredFacts(dm *ir.Value, design, archText string) factUniverse {
 		}
 		fields, why := architecturePayloadFields(row.Cell("payload"))
 		if why != "" {
-			continue
+			// A contract may spell payload members as prose rather than a
+			// tokenized group. Snake-case names in that payload cell still
+			// declare fields; prose in other cells does not.
+			fields = prosePayloadField.FindAllString(row.Cell("payload"), -1)
 		}
 		for _, field := range fields {
 			out[field] = true
@@ -85,6 +122,23 @@ func declaredFacts(dm *ir.Value, design, archText string) factUniverse {
 				out[field[dot+1:]] = true
 			}
 		}
+	}
+	if body, err := readDesignFile(design, filepath.Join(design, "content", "knob-register.yaml")); err == nil {
+		for _, match := range knobKey.FindAllStringSubmatch(string(body), -1) {
+			out[match[1]] = true
+		}
+	}
+	for _, path := range sortedGlob(filepath.Join(design, "content", "verticals"), "*.vertical.yaml") {
+		body, err := readDesignFile(design, path)
+		if err != nil {
+			continue
+		}
+		for _, match := range verticalField.FindAllStringSubmatch(string(body), -1) {
+			out[match[1]] = true
+		}
+	}
+	for _, match := range joinPair.FindAllStringSubmatch(archText, -1) {
+		out[match[1]], out[match[2]] = true, true
 	}
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
 		body, err := readDesignFile(design, path)
@@ -180,7 +234,8 @@ func negativeFactReference(cell string, start int) bool {
 		right = start + next
 	}
 	segment := strings.ToLower(cell[left:right])
-	return strings.Contains(segment, "weighed and refused")
+	return strings.Contains(segment, "weighed and refused") ||
+		(strings.Contains(segment, "earlier reading") && strings.Contains(segment, "proves"))
 }
 
 func valueOrProducerReference(cell string, start int, name string) bool {
@@ -280,6 +335,8 @@ func checkFactResolution(g *Gate, design, archText string, dm *ir.Value) {
 				}
 			}
 			seen := map[string]bool{}
+			mapGap := ""
+			rowText := strings.Join(cells, " ")
 			for _, col := range cols {
 				cell := cellAt(cells, col)
 				for _, loc := range factReference.FindAllStringSubmatchIndex(cell, -1) {
@@ -298,8 +355,20 @@ func checkFactResolution(g *Gate, design, archText string, dm *ir.Value) {
 					if waived[fact] {
 						continue
 					}
+					for attr, keys := range universe.untypedMaps {
+						if keys[fact] && strings.Contains(rowText, "`"+strings.TrimPrefix(attr, strings.SplitN(attr, ".", 2)[0]+".")+"`") {
+							mapGap = attr
+							break
+						}
+					}
+					if mapGap != "" && universe.untypedMaps[mapGap][fact] {
+						continue
+					}
 					g.Errs = append(g.Errs, where+": unresolved fact "+ir.Repr(fact)+"; declare a Modelith attribute, enum member, action, machine context key or unit, event name or payload field, same-row VALUES member, or add derived: "+fact+" (<reason>) on this row")
 				}
+			}
+			if mapGap != "" {
+				g.Errs = append(g.Errs, where+": "+mapGap+" needs a typed map for its closed keys; a string attribute description is not a structured member declaration")
 			}
 		}
 	}

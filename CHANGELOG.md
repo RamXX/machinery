@@ -25,6 +25,14 @@ under their version heading when a release is cut.
   two slices, so its golden packet bytes, size counts, and section numbering intentionally change;
   the fixture corrects the corpus to exercise the new gate behavior. Maps without `fixtures:` keep
   their prior packet shape and gate output.
+- **Gx-trace accepts H2's machine-written authorization grammar.** Resource
+  action lists and producer-narrowed residual marks are first-class inventory
+  declarations without a marker document. Marked admission owners resolve to
+  declared C4 elements. Fact resolution now reads declared content and relation
+  sources, groups prose-only nested map keys into one typing gap, and excludes
+  H2's quoted rejections. Closed-vocabulary detection distinguishes finite
+  declarations from pass identities, human reasons, referenced owner sets, and
+  typed Modelith enums.
 
 - **Gx-trace now reconciles declared event-payload twins.** A matrix event row may declare one
   closed payload with `payload {field, ...}` or `payload is exactly {field, ...}`. The declaration

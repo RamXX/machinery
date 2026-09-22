@@ -122,12 +122,15 @@ Architecture Contract payload cell. Payload prose without a group defines
 nothing.
 
 Every action whose Modelith actor is `System`, and every producer named in an
-exact producer column of a matrix cascade or consumer table, owes one row in a
-marked hand-written authorization inventory (`AUTHORIZATION.md` or
-`ARCHITECTURE.md`). Cover that artifact with the g2 attestation rows. Name the
-admitting capability as one backticked dotted identifier or use the
-row-local `(no authorization: <reason>)` waiver. Gx-trace holds the inventory
-closed in both directions.
+exact producer column of a matrix cascade or consumer table, needs an
+authorization admission. A marked hand-written inventory (`AUTHORIZATION.md`
+or `ARCHITECTURE.md`) gives exact subject rows and is covered by g2 attestations.
+Its dotted admission starts with a C4 element id; a row may instead use
+`(no authorization: <reason>)`. A matrix may carry the H2 form instead:
+`MACHINE-WRITTEN{action, ...}` in a resource's machine-written actions cell,
+and `MACHINE-WRITTEN-BY{action: producer, ...}` in the residual verb table's
+resource cell. The latter is producer-narrowed. A residual seat-side verb grant
+governs a non-System actor. A matrix with these marks needs no marker document.
 
 Run `machinery check <design> --gate g2,gu` plus each artifact-activated gate,
 and `machinery verify-c4 <design>`. Record the required attestation rows.
@@ -152,7 +155,8 @@ Backticked facts in named-unit contract, clause, and payload columns use the
 snake-case grammar plus Modelith attribute naming styles, including `Entity.attr` and single-word facts
 used with an explicit fact verb. They resolve to a Modelith attribute, enum
 member, action, machine context key, event name or payload field, failure-catalog
-identifier, or a `VALUES` member on the same row. A unit-local computed fact uses
+identifier, a Class C content knob, a versioned vertical field, a model relation,
+an architecture join key, or a `VALUES` member on the same row. A unit-local computed fact uses
 `derived: fact_name (<reason>)` on the same row; the reason is mandatory and
 the waiver does not declare the fact for any other row. Quoted reason classes,
 classifications, producer names, and negated or rejected fields remain prose.
@@ -162,7 +166,8 @@ uses exactly one `VALUES{a, b, c}` group. Different units sharing a vocabulary
 can name it with `VALUES reason_class{a, b, c}`. Gx-trace compares it as a set with a
 same-named Modelith enum after case and separator normalization. Without such
 an enum, the row is the vocabulary's one declaration; prose cannot define a
-second list.
+second list. A cited vocabulary owned by another model entity and a matching
+enum typed on the owning entity need no duplicate unit-local declaration.
 
 Run `machinery oracle`, `machinery check <design> --gate g3`, and
 `machinery verify-formal <design>`. Read the verification reference for all

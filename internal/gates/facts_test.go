@@ -26,6 +26,11 @@ entities:
 
 func factFixture(t *testing.T, contract, payload string) *Gate {
 	t.Helper()
+	return CheckTraceability(factDesign(t, contract, payload))
+}
+
+func factDesign(t *testing.T, contract, payload string) string {
+	t.Helper()
 	design := t.TempDir()
 	for _, dir := range []string{"machines", "formal"} {
 		if err := os.MkdirAll(filepath.Join(design, dir), 0o755); err != nil {
@@ -44,7 +49,101 @@ func factFixture(t *testing.T, contract, payload string) *Gate {
 		wiringHeader + "| markPaid | orders | payments | " + payload + " | at-least-once | none | event_id |\n" +
 		"\n## Traceability\n\n| invariant | where |\n|---|---|\n| order-paid-final | `Order` guard |\n"
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
-	return CheckTraceability(design)
+	return design
+}
+
+func TestFactsH2ClassBFalsePositives(t *testing.T) {
+	t.Run("class C content knob", func(t *testing.T) {
+		design := factDesign(t, "the `target_artifact_lexicon` knob's Class C re-dating formula; persists `ghost_fact`", "`event_id`")
+		if err := os.MkdirAll(filepath.Join(design, "content"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		mustWrite(t, filepath.Join(design, "content", "knob-register.yaml"), "knobs:\n  - {key: target_artifact_lexicon, class: C}\n")
+		g := CheckTraceability(design)
+		if hasErr(g, "unresolved fact 'target_artifact_lexicon'") || !hasErr(g, "unresolved fact 'ghost_fact'") {
+			t.Fatalf("knob declaration must resolve only its key: %v", g.Errs)
+		}
+	})
+	t.Run("rejected former heuristic", func(t *testing.T) {
+		g := factFixture(t, "The earlier reading, that a finding carrying an `interpretation_id` stands independently, proves only a citation; persists `ghost_fact`", "`event_id`")
+		if hasErr(g, "unresolved fact 'interpretation_id'") || !hasErr(g, "unresolved fact 'ghost_fact'") {
+			t.Fatalf("rejected heuristic must not assert a fact: %v", g.Errs)
+		}
+	})
+	for _, tc := range []struct{ name, row string }{
+		{"DocumentVersion outbox", "records `version.withdrawn` in the transaction, idempotent by `withdrawn_at`"},
+		{"GapAnalysis consumer", "retires the run with the withdrawal and `withdrawn_at`, never a successor"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := factFixture(t, tc.row, "withdrawn version ref, withdrawn_at, and prior status")
+			if hasErr(g, "unresolved fact 'withdrawn_at'") {
+				t.Fatalf("payload cell declares the field: %v", g.Errs)
+			}
+		})
+	}
+	t.Run("relationship name", func(t *testing.T) {
+		design := factDesign(t, "subject resolves inside `Order.tenant`", "`event_id`")
+		model := strings.Replace(factModel, "entities:\n", "entities:\n  Tenant: {}\n", 1)
+		model = strings.Replace(model, "    actions: [{name: markPaid}]", "    relationships: [{entity: Tenant, cardinality: 'n:1'}]\n    actions: [{name: markPaid}]", 1)
+		mustWrite(t, filepath.Join(design, "domain.modelith.yaml"), model)
+		g := CheckTraceability(design)
+		if hasErr(g, "unresolved fact 'Order.tenant'") {
+			t.Fatalf("relationship-backed name must resolve: %v", g.Errs)
+		}
+	})
+	t.Run("vertical field", func(t *testing.T) {
+		design := factDesign(t, "rule whose `deadline_confidence` is capped", "`event_id`")
+		if err := os.MkdirAll(filepath.Join(design, "content", "verticals"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		mustWrite(t, filepath.Join(design, "content", "verticals", "pipeline.vertical.yaml"), "rules:\n  - id: rule-1\n    deadline_confidence: verify_with_customer\n")
+		g := CheckTraceability(design)
+		if hasErr(g, "unresolved fact 'deadline_confidence'") {
+			t.Fatalf("vertical field must resolve: %v", g.Errs)
+		}
+	})
+	t.Run("relationship key", func(t *testing.T) {
+		design := factDesign(t, "read the seat's keyed `identity_id` reference", "`event_id`")
+		model := strings.Replace(factModel, "entities:\n", "entities:\n  Identity: {}\n", 1)
+		model = strings.Replace(model, "    actions: [{name: markPaid}]", "    relationships: [{entity: Identity, cardinality: 'n:1'}]\n    actions: [{name: markPaid}]", 1)
+		mustWrite(t, filepath.Join(design, "domain.modelith.yaml"), model)
+		g := CheckTraceability(design)
+		if hasErr(g, "unresolved fact 'identity_id'") {
+			t.Fatalf("keyed relation must resolve: %v", g.Errs)
+		}
+	})
+	t.Run("architecture join key", func(t *testing.T) {
+		design := factDesign(t, "join record keyed by (`principal_id`, `tenant_role_id`)", "`event_id`")
+		f := filepath.Join(design, "ARCHITECTURE.md")
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mustWrite(t, f, string(b)+"\n| `PrincipalTenantRole` | the pair (`principal_id`, `tenant_role_id`) |\n")
+		g := CheckTraceability(design)
+		if hasErr(g, "unresolved fact 'principal_id'") || hasErr(g, "unresolved fact 'tenant_role_id'") {
+			t.Fatalf("architecture join keys must resolve: %v", g.Errs)
+		}
+	})
+}
+
+func TestFactsH2UntypedPinnedInputsIsOneGap(t *testing.T) {
+	design := factDesign(t, "writes the `pinned_inputs` attribute under `document_version_shas`, `case_member_refs`, and `release_ir_hash`; persists `ghost_fact`", "`event_id`")
+	model := strings.Replace(factModel, "      - {name: order_total, type: integer}", "      - {name: order_total, type: integer}\n      - name: pinned_inputs\n        type: string\n        description: 'THE KEY NAMES ARE CLOSED AND STATED HERE: `document_version_shas`, `case_member_refs`, `release_ir_hash`. A key not carried is missing.'", 1)
+	mustWrite(t, filepath.Join(design, "domain.modelith.yaml"), model)
+	g := CheckTraceability(design)
+	joined := strings.Join(g.Errs, "\n")
+	if !strings.Contains(joined, "pinned_inputs needs a typed map") || strings.Count(joined, "pinned_inputs needs a typed map") != 1 {
+		t.Fatalf("closed prose keys are one model typing gap: %v", g.Errs)
+	}
+	for _, key := range []string{"document_version_shas", "case_member_refs", "release_ir_hash"} {
+		if hasErr(g, "unresolved fact '"+key+"'") {
+			t.Fatalf("duplicate key finding for %s: %v", key, g.Errs)
+		}
+	}
+	if !hasErr(g, "unresolved fact 'ghost_fact'") {
+		t.Fatalf("unrelated fact must still fail: %v", g.Errs)
+	}
 }
 
 func TestFactsResolveAcrossModelContextAndEventPayload(t *testing.T) {

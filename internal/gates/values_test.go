@@ -9,6 +9,11 @@ import (
 
 func valuesFixture(t *testing.T, rows string) *Gate {
 	t.Helper()
+	return CheckTraceability(valuesDesign(t, rows))
+}
+
+func valuesDesign(t *testing.T, rows string) string {
+	t.Helper()
 	design := t.TempDir()
 	for _, dir := range []string{"machines", "formal"} {
 		if err := os.MkdirAll(filepath.Join(design, dir), 0o755); err != nil {
@@ -23,7 +28,42 @@ func valuesFixture(t *testing.T, rows string) *Gate {
 		"| name | kind | contract (pre / post) | maps to |\n|---|---|---|---|\n"+rows)
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"),
 		"# A\n\n## Placement\n\n| component (placement) | persistence |\n|---|---|\n| `Order` | in-memory |\n")
-	return CheckTraceability(design)
+	return design
+}
+
+func TestValuesH2ClassCFalsePositives(t *testing.T) {
+	cases := []struct{ name, prose string }{
+		{"pass identity", "with the pass identity (mapping id plus retirement version) as the reason class"},
+		{"composite narrative", "stores the pass identity and the refusal class; idempotent by tenant and subject"},
+		{"unrelated long cell", "a closed producer is checked first, then the guard verifies provenance. THE CLAUSE VOCABULARY IS UNCHANGED"},
+		{"human reason", "records the refused acceptance with the acting reviewer, the reason class (the finding is advisory against pending-effective text)"},
+		{"related owner", "the submitted classification is not in the closed vocabulary the item's `RiskMethodology` declares"},
+		{"related value", "records the refused value and the closed vocabulary it was checked against"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			design := valuesDesign(t, "| `h2Unit` | guard | "+tc.prose+" | `order-paid-final` |\n")
+			if tc.name == "related owner" || tc.name == "related value" {
+				model := strings.Replace(factModel, "entities:\n", "entities:\n  RiskMethodology:\n    definition: the classification vocabulary is declared by the methodology\n", 1)
+				model = strings.Replace(model, "  Order:\n", "  Order:\n    definition: the classification vocabulary lives in RiskMethodology definitions\n", 1)
+				mustWrite(t, filepath.Join(design, "domain.modelith.yaml"), model)
+			}
+			g := CheckTraceability(design)
+			if hasErr(g, "closed vocabulary has no VALUES") {
+				t.Fatalf("H2 reference is not a local closed set: %v", g.Errs)
+			}
+		})
+	}
+	t.Run("owned Modelith enum", func(t *testing.T) {
+		design := valuesDesign(t, "| `guardRetentionTriggerNamed` | guard | the closed trigger set is intake, supersession, relationship end, asset retirement, or declared event; `trigger` is a NOT NULL enum column | `order-paid-final` |\n")
+		model := strings.Replace(factModel, "  OrderState:\n", "  RetentionTrigger:\n    values: [{name: intake}, {name: supersession}]\n  OrderState:\n", 1)
+		model = strings.Replace(model, "      - {name: state, type: OrderState}", "      - {name: trigger, type: RetentionTrigger}\n      - {name: state, type: OrderState}", 1)
+		mustWrite(t, filepath.Join(design, "domain.modelith.yaml"), model)
+		g := CheckTraceability(design)
+		if hasErr(g, "closed vocabulary has no VALUES") {
+			t.Fatalf("entity's typed trigger owns the set: %v", g.Errs)
+		}
+	})
 }
 
 func TestValuesRequiresDeclarationForClosedProse(t *testing.T) {
