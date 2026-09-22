@@ -614,6 +614,18 @@ A fact computed only inside one unit and never stored uses the row-local waiver
 The waiver admits only `risk_score` on that row; it does not create a design-wide fact or satisfy
 another row.
 
+### Closed vocabulary declarations
+
+A named-unit contract that calls a vocabulary closed, an enum, or a reason class declares the set
+on that row as `VALUES{missing, stale, conflicting}`. A row carries exactly one group. Members are
+non-empty, distinct identifiers; order is immaterial. Prose may quote the declared vocabulary but
+never defines another list.
+
+The matrix unit name owns the declaration. After case and separators are normalized, a unit named
+`orderState` matches the Modelith enum `OrderState`, and Gx-trace requires exact set equality. If no
+enum has that name, the matrix row is the one closed source and a second declaration for the same
+unit is an error.
+
 ### Machine-checkable format (mandatory on a decomposed parent)
 
 `machinery pack generate` extracts each subsystem's boundary events from this table by exact

@@ -440,6 +440,12 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   payload. A unit-computed value that is intentionally not stored uses the
   row-local grammar `derived: authored_default_ref (<reason>)`. The fact name
   and non-empty reason are mandatory; the waiver covers only that row.
+- A named-unit row that calls a vocabulary closed, an enum, or a reason class
+  declares its members once with `VALUES{a, b, c}`. Members are distinct
+  identifiers and order is immaterial. When the normalized unit name matches
+  a Modelith enum name, the two sets must agree exactly. Without a matching
+  enum, that row is the one closed declaration; prose may quote it but cannot
+  define a second list.
 - Every Modelith action whose actor is `System`, plus every producer named by
   a matrix cascade or consumer-arm table, appears exactly once in the marked
   design authorization inventory. Its admission cell names

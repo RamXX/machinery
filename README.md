@@ -767,6 +767,11 @@ Gx resolves backticked snake-case facts in named-unit contract, clause, and payl
 Modelith attributes, machine context keys, and Architecture Contract event payloads. A fact computed
 only by the unit uses the row-local `derived: fact_name (<reason>)` waiver; an empty reason fails.
 
+Gx also closes named-unit vocabularies with `VALUES{a, b, c}`. Rows that call a vocabulary closed,
+an enum, or a reason class owe the declaration. A same-named Modelith enum must have the exact set;
+otherwise the matrix row is the one closed source. Duplicate, empty, malformed, and repeated groups
+fail.
+
 ## Use
 
 In an agent session (Claude Code, Codex, OpenCode, or any runtime that loads Agent Skills), from the

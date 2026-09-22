@@ -2002,6 +2002,7 @@ func CheckTraceability(design string) *Gate {
 	archText := readDesignOrEmpty(design, filepath.Join(design, "ARCHITECTURE.md"))
 	checkAuthorizationInventory(g, design, dm)
 	checkFactResolution(g, design, archText, dm)
+	checkClosedVocabularies(g, design, dm)
 	if !pack.HasPack(design) {
 		checkEventWiring(g, design, archText)
 	}

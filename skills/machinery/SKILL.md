@@ -152,6 +152,12 @@ Contract event-payload field. A unit-local computed fact uses
 `derived: fact_name (<reason>)` on the same row; the reason is mandatory and
 the waiver does not declare the fact for any other row.
 
+A named-unit row that calls a vocabulary closed, an enum, or a reason class
+uses exactly one `VALUES{a, b, c}` group. Gx-trace compares it as a set with a
+same-named Modelith enum after case and separator normalization. Without such
+an enum, the row is the vocabulary's one declaration; prose cannot define a
+second list.
+
 Run `machinery oracle`, `machinery check <design> --gate g3`, and
 `machinery verify-formal <design>`. Read the verification reference for all
 four semantics patterns, including `control-flow-only`.

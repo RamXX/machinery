@@ -44,6 +44,10 @@ under their version heading when a release is cut.
   or a reasoned row-local `derived: fact_name (<reason>)` waiver. This intentionally exposed
   `feed_circuit_open` in the portfolio-engine corpus; its row now records that the operator log
   signal is derived rather than stored.
+- **Gx-trace now closes matrix vocabularies.** A row that calls a vocabulary closed, an enum, or a
+  reason class must declare exactly one `VALUES{a, b, c}` group. A same-named Modelith enum must
+  agree as a set; otherwise the row is the one closed source. Empty, duplicate, malformed, repeated,
+  and conflicting declarations fail. The existing example corpus required no correction.
 
 ### Fixed
 
