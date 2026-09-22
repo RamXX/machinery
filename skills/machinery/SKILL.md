@@ -108,6 +108,13 @@ complete group, so join a group wrapped across lines, and every row and machine
 stating one edge must agree on the exact field set. Members are ubiquitous
 language, not code symbols. `READS` in ordinary prose stays prose.
 
+When implementation code parses a design artifact during compilation or build, declare that
+dependency with a root `reads:` row in the Architecture Contract: design-relative `artifact`,
+implementation-relative `reader`, and the full reviewed Git commit. This lower-case YAML grammar is
+not the event-payload `READS{...}` grammar above. `Gr-reads` warns in a design-only run and, with
+`--impl`, fails when an artifact-changing commit did not change its declared reader in the same
+commit. The exact closed grammar is in `docs/declared-reads.md`.
+
 Run `machinery check <design> --gate g2,gu` plus each artifact-activated gate,
 and `machinery verify-c4 <design>`. Record the required attestation rows.
 

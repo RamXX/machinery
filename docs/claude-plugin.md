@@ -130,7 +130,7 @@ machinery-managed. All fields optional:
 - `gates`: a staged `--gate` list, the brownfield adoption ratchet from the
   [team guide](brownfield-team-guide.md). Empty selects gates progressively by which artifacts
   exist.
-- `impl`: implementation directory for the impl-facing gates, G4-import and Gt-tests. Setting it
+- `impl`: implementation directory for the impl-facing gates, Gr-reads, G4-import and Gt-tests. Setting it
   turns on import-boundary enforcement
   for ordinary coding sessions, the "no drift" case: an undeclared cross-boundary import, or a new
   offender file on a baselined edge, blocks the turn that wrote it instead of waiting for CI.

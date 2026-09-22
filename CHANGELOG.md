@@ -6,6 +6,17 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **`Gr-reads` binds compile-time design-file consumers to their implementation follow-ups.** A
+  contract v2 Architecture Contract may declare root `reads:` rows with a design-relative
+  `artifact`, implementation-relative `reader`, and full reviewed Git commit. Design-only checks
+  warn that the coupling exists. With `--impl`, the gate fails closed unless the review commit is
+  an ancestor, both paths were tracked there, and every later commit or current change set that
+  changes the artifact also changes the reader. The new gate is artifact-activated, joins the
+  default and explicit gate vocabulary, and is proven by a warning golden plus Git-backed failing
+  and passing fixtures. Existing designs without `reads:` keep byte-identical gate output.
+
 ### Fixed
 
 - **Host-denied tools no longer leave an OpenCode session permanently in flight.** Every pending

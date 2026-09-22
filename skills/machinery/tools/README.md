@@ -42,7 +42,7 @@ One line per subcommand:
 - `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
   `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate
   composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
-- `machinery check <design-dir> [--impl <code-dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5]` the deterministic
+- `machinery check <design-dir> [--impl <code-dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5]` the deterministic
   gate suite (Gm-transition on rebuild/hybrid contracts; Gs-surface on legacy surface ledgers;
   Gu-surfaces on the target surface ledger `surfaces.yaml` (every action whose actor is a person is
   mapped to a named surface or explicitly deferred, and every mapped act resolves against the domain
@@ -53,7 +53,9 @@ One line per subcommand:
   G3-machine, Gx-trace (machine states against the lifecycle enum, machine events against the
   entity's actions, a machine or a `(no machine: <reason>)` waiver per persistence-placement row, a
   placement row or a `(not placed: <reason>)` waiver per declared entity, an enforcement row per
-  invariant); Ge-embed on declared table copies, artifact-activated on any `machinery:embed` marker
+  invariant); Gr-reads on Architecture Contract `reads:` declarations (design-only warning, or
+  with `--impl`, every artifact-changing commit since the recorded review also changed the declared
+  reader); Ge-embed on declared table copies, artifact-activated on any `machinery:embed` marker
   under the design (every marked table's rows held byte-identical to the source it names);
   Gk-checkers on external-checker manifests, artifact-activated on
   `design/checkers/*.checker.yaml`; Gb-plan on build plan structure, artifact-activated on `design/BUILD.md`;
