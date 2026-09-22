@@ -564,6 +564,22 @@ consumes; a shard arms the tier only once it can answer for every row it carries
 answer differently from the parent is `(shard-local: <reason>)` territory, the Ge escape). An
 unarmed design carries no obligation at all.
 
+### Event-payload twin declarations (opt-in per matrix row)
+
+A matrix event row may restate the exact payload it implements with one group in any cell:
+`payload {Order.id, Order.paidAt}` or `payload is exactly {Order.id, Order.paidAt}`. This is a
+declaration, not prose. It binds to the row's one event and Gx-trace compares the field set with the
+payload cell of the Architecture Contract row for that event. Field order does not matter. Empty or
+duplicate members, malformed or repeated groups, a row naming zero or several events, conflicting
+declarations, an event with no architecture row, and unequal sets are errors. The mismatch prints
+both spellings.
+
+The architecture payload cell supplies its closed set through backticked field names, or through a
+comma-separated list in which every member is an identifier. Use domain names such as `Order.id`,
+not code expressions. Ordinary matrix prose that mentions a payload remains prose and creates no
+twin. Once either declaration spelling is used, it must be the one complete payload statement on
+that row.
+
 ### Machine-checkable format (mandatory on a decomposed parent)
 
 `machinery pack generate` extracts each subsystem's boundary events from this table by exact

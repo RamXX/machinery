@@ -115,6 +115,12 @@ not the event-payload `READS{...}` grammar above. `Gr-reads` warns in a design-o
 `--impl`, fails when an artifact-changing commit did not change its declared reader in the same
 commit. The exact closed grammar is in `docs/declared-reads.md`.
 
+When a matrix event row restates a complete payload, use exactly one
+`payload {field, ...}` or `payload is exactly {field, ...}` group. Gx-trace
+binds it to that row's one event and requires exact set equality with the
+Architecture Contract payload cell. Payload prose without a group defines
+nothing.
+
 Run `machinery check <design> --gate g2,gu` plus each artifact-activated gate,
 and `machinery verify-c4 <design>`. Record the required attestation rows.
 

@@ -26,6 +26,13 @@ under their version heading when a release is cut.
   the fixture corrects the corpus to exercise the new gate behavior. Maps without `fixtures:` keep
   their prior packet shape and gate output.
 
+- **Gx-trace now reconciles declared event-payload twins.** A matrix event row may declare one
+  closed payload with `payload {field, ...}` or `payload is exactly {field, ...}`. The declaration
+  binds to that row's one event and must equal the Architecture Contract event row's payload field
+  set. Malformed, duplicate, conflicting, missing, multi-event, and unequal declarations are
+  blocking findings, and a mismatch prints both spellings. Existing examples remain green because
+  ordinary payload prose is not a declaration; this is an opt-in compatibility extension.
+
 ### Fixed
 
 - **Host-denied tools carry an exact terminal signal into governance.** OpenCode translates a
@@ -43,7 +50,6 @@ under their version heading when a release is cut.
   and a design lane's complete diff is treated as that same kind of request. Projects can now
   implement their scope gates against an explicit convention instead of rejecting the handoff the
   packet protocol requires.
-
 ## [0.8.0] - 2026-09-10
 
 ### Added

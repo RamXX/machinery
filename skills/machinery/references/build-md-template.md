@@ -428,6 +428,12 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   own payload is an ERROR in Gx-trace instead of a warning here. Empty or
   malformed sets, duplicate fields or consumer columns, conflicting sets,
   and blank or unknown explicit consumers also fail the armed tier.
+- An event row that restates the complete payload declares exactly one
+  `payload {field, ...}` or `payload is exactly {field, ...}` group. Gx-trace
+  binds it to that row's one event and requires set equality with the
+  Architecture Contract payload cell. Field order is immaterial; empty,
+  duplicate, malformed, conflicting, missing, or multi-event declarations
+  fail. A payload mention without a group stays prose and defines nothing.
 - Incident-derived invariants and fixtures carry a PROVENANCE pointer to the
   primary record (the customer report, the post-mortem document), so the
   attested re-derivation set is enumerable; a fixture named after an

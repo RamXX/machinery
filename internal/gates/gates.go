@@ -2003,6 +2003,9 @@ func CheckTraceability(design string) *Gate {
 	if !pack.HasPack(design) {
 		checkEventWiring(g, design, archText)
 	}
+	// A matrix may opt into a closed restatement of one event payload. Once
+	// written, the twin must agree exactly with the Architecture Contract row.
+	checkPayloadTwins(g, design, archText)
 	// the consumer-READS completeness tier, armed by the design's own marker.
 	// It runs on a packed design too: G5 reconciles boundary-event DIRECTION
 	// from the generated events.md and has no notion of READS, so nothing
