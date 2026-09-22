@@ -229,6 +229,14 @@ test("permission reply and tool error report exact denied completions", async ()
   assert.deepEqual(failures.map(({ payload }) => payload.tool_use_id), ["denied", "errored"])
 })
 
+test("OpenCode tool-part error closes only the refused shell call", async () => {
+  const calls = []
+  const plugin = await MachineryPlugin({ client: {}, directory: "/project", worktree: "" }, { runner: fakeRunner({}, calls) })
+  await plugin["tool.execute.before"]({ tool: "bash", sessionID: "part-session", callID: "shell-refused" }, { args: { command: "touch design/a" } })
+  await plugin.event({ event: { type: "message.part.updated", properties: { part: { id: "shell-refused", sessionID: "part-session", type: "tool", state: { status: "error", error: "permission denied" } } } } })
+  assert.deepEqual(calls.filter(({ payload }) => payload.hook_event_name === "PostToolUseFailure").map(({ payload }) => payload.tool_use_id), ["shell-refused"])
+})
+
 test("a spawn failure fails closed with the transport error", async () => {
   const after = await afterHandler({ ok: false, error: new Error("spawn machinery ENOENT") })
   await assert.rejects(() => after(postInput, {}), (err) => {
