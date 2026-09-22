@@ -189,13 +189,13 @@ func TestAuthorizationH2ResidualSeatGrant(t *testing.T) {
 }
 
 func TestAuthorizationAdmissionResolvesC4Owner(t *testing.T) {
-	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `fictional.capability` |\n", "")
-	if !hasErr(g, "admission subject 'fictional.capability' is not declared") {
-		t.Fatalf("an undeclared admission cannot admit a write: %v", g.Errs)
-	}
-	g = authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.nonexistentCapability` |\n", "")
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.nonexistentCapability` |\n", "")
 	if !hasErr(g, "admission subject 'orders.nonexistentCapability' is not declared") {
 		t.Fatalf("a fabricated suffix under a real C4 element must fail: %v", g.Errs)
+	}
+	g = authzFixture(t, authzHeader+"| `Order.markPaid` | `fictional.capability` |\n", "")
+	if !hasErr(g, "admission subject 'fictional.capability' is not declared") {
+		t.Fatalf("an undeclared admission cannot admit a write: %v", g.Errs)
 	}
 	g = authzFixture(t, authzHeader+"| `Order.markPaid` | `orders` |\n", "")
 	if hasErr(g, "admission subject") {
