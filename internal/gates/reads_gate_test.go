@@ -88,6 +88,34 @@ func TestDeclaredReadsAcceptsReaderRenameWithArtifactEdit(t *testing.T) {
 	}
 }
 
+func TestDeclaredReadsRejectsRecreatedObsoleteReaderPath(t *testing.T) {
+	root, design, impl, reviewed := declaredReadRepo(t)
+	matrix := filepath.Join(design, "machines", "Principal.matrix.md")
+	oldReader := filepath.Join(impl, "lib", "principal_reader.ex")
+	newReader := filepath.Join(impl, "lib", "renamed_reader.ex")
+	mustRunReadGit(t, root, "mv", "impl/lib/principal_reader.ex", "impl/lib/renamed_reader.ex")
+	mustWriteReadFile(t, filepath.Join(design, "ARCHITECTURE.md"), strings.ReplaceAll(strings.ReplaceAll(readContractTemplate(t), "REVIEW_COMMIT", reviewed), "lib/principal_reader.ex", "lib/renamed_reader.ex"))
+	mustRunReadGit(t, root, "add", ".")
+	mustRunReadGit(t, root, "commit", "-qm", "move declared reader")
+
+	// The former pathname now belongs to an unrelated file. Its later edit
+	// cannot stand in for a follow-up to the live declared reader.
+	mustWriteReadFile(t, oldReader, "# unrelated file at former pathname\n")
+	mustRunReadGit(t, root, "add", ".")
+	mustRunReadGit(t, root, "commit", "-qm", "recreate old pathname")
+	mustWriteReadFile(t, matrix, "# changed artifact\n")
+	mustWriteReadFile(t, oldReader, "# changed unrelated file\n")
+	mustRunReadGit(t, root, "add", ".")
+	mustRunReadGit(t, root, "commit", "-qm", "artifact paired only with obsolete path")
+	if _, err := os.Stat(newReader); err != nil {
+		t.Fatal(err)
+	}
+	g := CheckDeclaredReads(design, impl, design, impl)
+	if !hasErr(g, "changed without reader lib/renamed_reader.ex in the same commit") || g.Counts["paired artifact changes"] != 0 {
+		t.Fatalf("obsolete reader path satisfied current reader: errs=%v counts=%v", g.Errs, g.Counts)
+	}
+}
+
 func TestDeclaredReadsRejectsRawAuthoredValuesInOrder(t *testing.T) {
 	_, design, impl, reviewed := declaredReadRepo(t)
 	contract := strings.ReplaceAll(readContractTemplate(t), "REVIEW_COMMIT", reviewed)

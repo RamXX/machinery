@@ -4109,6 +4109,26 @@ func TestHostDenialRequiresExactFailureCompletion(t *testing.T) {
 	}
 }
 
+func TestPreToolUseArmsWithoutReadingUnrelatedImplementationTree(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	writeFile(t, filepath.Join(root, ConfigName), `{"design":"design","impl":"impl"}`)
+	writeFile(t, filepath.Join(root, "impl", "main.go"), "package main\n")
+	if err := os.Symlink("main.go", filepath.Join(root, "impl", "alias.go")); err != nil {
+		t.Fatal(err)
+	}
+	sid := "unrelated-impl-inventory"
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "notes.txt"))
+	pre.ToolUseID = "write-design-notes"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("PreToolUse depended on unrelated implementation inventory: %s", out)
+	}
+	record, err := readStateRecord(root, sid)
+	if err != nil || len(record.pending) != 1 || !record.design {
+		t.Fatalf("PreToolUse did not arm its exact pending obligation: record=%+v err=%v", record, err)
+	}
+}
+
 func TestStopKeepsArmedOperationBeforeScheduledLateWriter(t *testing.T) {
 	isolateHookState(t)
 	root := managedRoot(t)
