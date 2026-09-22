@@ -25,19 +25,6 @@ under their version heading when a release is cut.
   two slices, so its golden packet bytes, size counts, and section numbering intentionally change;
   the fixture corrects the corpus to exercise the new gate behavior. Maps without `fixtures:` keep
   their prior packet shape and gate output.
-- **Gx-trace accepts H2's machine-written authorization grammar.** Resource
-  action lists, producer-narrowed residual marks, and the all-presets-withheld
-  residual verb fallback are first-class inventory
-  declarations without a marker document. A marked admission must name an exact
-  declared C4 element, matrix producer, or residual-table preset; a fabricated
-  capability suffix is a finding. The gate proves row existence and declared-subject
-  resolution, with capability-list resolution tracked in NEXT. Fact resolution now reads declared content and relation
-  sources, groups prose-only nested map keys into one typing gap, and excludes
-  H2's quoted rejections. Closed-vocabulary detection distinguishes finite
-  declarations from pass identities, human reasons, referenced owner sets, and
-  typed Modelith enums. A declared verification that does not change its
-  resource owes no resource-write admission.
-
 - **Gx-trace now reconciles declared event-payload twins.** A matrix event row may declare one
   closed payload with `payload {field, ...}` or `payload is exactly {field, ...}`. The declaration
   binds to that row's one event and must equal the Architecture Contract event row's payload field
@@ -64,6 +51,19 @@ under their version heading when a release is cut.
   vocabulary across differently named units. Empty, duplicate, malformed, repeated,
   and conflicting declarations fail. The existing example corpus required no correction.
 
+- **Gx-trace accepts H2's machine-written authorization grammar.** Resource
+  action lists, producer-narrowed residual marks, and the all-presets-withheld
+  residual verb fallback are first-class inventory
+  declarations without a marker document. A marked admission must name an exact
+  declared C4 element, matrix producer, or residual-table preset; a fabricated
+  capability suffix is a finding. The gate proves row existence and declared-subject
+  resolution, with capability-list resolution tracked in NEXT. Fact resolution now reads declared content and relation
+  sources, groups prose-only nested map keys into one typing gap, and excludes
+  H2's quoted rejections. Closed-vocabulary detection distinguishes finite
+  declarations from pass identities, human reasons, referenced owner sets, and
+  typed Modelith enums. A declared verification that does not change its
+  resource owes no resource-write admission.
+
 ### Fixed
 
 - **Host-denied tools carry an exact terminal signal into governance.** OpenCode translates a
@@ -81,6 +81,7 @@ under their version heading when a release is cut.
   and a design lane's complete diff is treated as that same kind of request. Projects can now
   implement their scope gates against an explicit convention instead of rejecting the handoff the
   packet protocol requires.
+
 ## [0.8.0] - 2026-09-10
 
 ### Added
