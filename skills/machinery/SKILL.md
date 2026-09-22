@@ -147,11 +147,13 @@ self-contained packet for a smaller execution model. Matrix linkage gives
 milestones and reusable domain shards an exact reciprocal many-to-many graph;
 each execution unit is one milestone-shard pair and reads the root plus that
 workstream shard. When root plus shard exceeds the executor's window, author
-`design/slices.yaml` (one shard, a byte budget, and the element ids each slice
-cites) and hand the executor `machinery packet <design> --milestone <id> --out
+`design/slices.yaml` (one shard, a byte budget, the element ids each slice
+cites, and optional implementation-relative fixture modules that obligate its suite) and hand the executor `machinery packet <design> --milestone <id> --out
 <dir>` output instead: only what the slice cites, every excerpt under its stable
 id and source path:line, held by `Gw-packet` so no obligation of the milestone is
 dropped. The slice map is authored; the packets are generated and never edited.
+When slices share a fixture, declare that path on every consuming slice. Each
+packet then states the full set of suites that must run after the fixture changes.
 
 Run the full `machinery check <design>` and, once code exists,
 `machinery check <design> --impl <dir>`. A green design is the RED precondition;

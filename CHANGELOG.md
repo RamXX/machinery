@@ -16,6 +16,14 @@ under their version heading when a release is cut.
   changes the artifact also changes the reader. The new gate is artifact-activated, joins the
   default and explicit gate vocabulary, and is proven by a warning golden plus Git-backed failing
   and passing fixtures. Existing designs without `reads:` keep byte-identical gate output.
+- **Slice packets carry their fixture-module obligations.** A slice may now declare an optional,
+  non-empty `fixtures:` list of clean implementation-relative paths in `design/slices.yaml`.
+  `Gw-packet` fails closed on malformed or duplicate paths, reverse-indexes shared fixtures, and
+  states the complete sorted consumer-slice set in every affected packet so executors know which
+  suites a fixture change obligates. The committed packet fixture now binds one shared module to
+  two slices, so its golden packet bytes, size counts, and section numbering intentionally change;
+  the fixture corrects the corpus to exercise the new gate behavior. Maps without `fixtures:` keep
+  their prior packet shape and gate output.
 
 ### Fixed
 

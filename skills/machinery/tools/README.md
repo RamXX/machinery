@@ -61,7 +61,8 @@ One line per subcommand:
   `design/checkers/*.checker.yaml`; Gb-plan on build plan structure, artifact-activated on `design/BUILD.md`;
   Gw-packet on the authored slice map, artifact-activated on `design/slices.yaml` (every citation
   resolves, every projected packet fits its byte budget, every DoD obligation is claimed by exactly one
-  slice or waived);
+  slice or waived, and optional implementation-relative fixture modules are projected with every
+  consuming slice suite);
   Ga-accept on milestone acceptance evidence, artifact-activated on `design/acceptance/` or any
   milestone marked `Status: closed`, and binding that evidence to `--commit`;
   Gv-attest on the attested halves themselves, artifact-activated on `design/attestations.yaml`
@@ -77,7 +78,8 @@ One line per subcommand:
 - `machinery packet <design-dir> --milestone <id> --out <dir> [--slice <id>]` projects one bounded
   executor packet per slice from `design/slices.yaml`: the cited shard sections, oracle rows, matrices,
   Architecture Contract rows and invariants, each excerpt verbatim under its stable id and source
-  path:line, byte-reproducible for the same design bytes. Runs Gw-packet first and writes nothing
+  path:line, plus any stated fixture obligations and their complete consumer sets,
+  byte-reproducible for the same design bytes. Runs Gw-packet first and writes nothing
   when it fails; prints one size line per packet in bytes and token-equivalents at 3 bytes per
   token. See `docs/packet-projection.md`.
 - `machinery project <design-dir>` writes the committed projection for every external-checker
