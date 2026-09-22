@@ -115,6 +115,24 @@ not the event-payload `READS{...}` grammar above. `Gr-reads` warns in a design-o
 `--impl`, fails when an artifact-changing commit did not change its declared reader in the same
 commit. The exact closed grammar is in `docs/declared-reads.md`.
 
+When a matrix event row restates a complete payload, use exactly one
+`payload {field, ...}` or `payload is exactly {field, ...}` group. Gx-trace
+binds it to that row's one event and requires exact set equality with the
+Architecture Contract payload cell. Payload prose without a group defines
+nothing.
+
+Every action whose Modelith actor is `System`, and every producer named in an
+exact producer column of a matrix cascade or consumer table, needs an
+authorization admission. A marked hand-written inventory (`AUTHORIZATION.md`
+or `ARCHITECTURE.md`) gives exact subject rows and is covered by g2 attestations.
+Its admission exactly names a declared C4 element, matrix producer, or
+residual-table preset; a row may instead use
+`(no authorization: <reason>)`. A matrix may carry the H2 form instead:
+`MACHINE-WRITTEN{action, ...}` in a resource's machine-written actions cell,
+and `MACHINE-WRITTEN-BY{action: producer, ...}` in the residual verb table's
+resource cell. The latter is producer-narrowed. A residual seat-side verb grant
+governs a non-System actor. A matrix with these marks needs no marker document.
+
 Run `machinery check <design> --gate g2,gu` plus each artifact-activated gate,
 and `machinery verify-c4 <design>`. Record the required attestation rows.
 
@@ -133,6 +151,24 @@ narrative, not a declaration. A declaration binds to its own machine:
 machines may reuse one guard name, and a declaration whose oracle rows only a
 sibling machine could supply is an error naming that sibling. A declared guard
 no oracle governs, such as one on a creation edge, owes nothing.
+
+Backticked facts in named-unit contract, clause, and payload columns use the
+snake-case grammar plus Modelith attribute naming styles, including `Entity.attr` and single-word facts
+used with an explicit fact verb. They resolve to a Modelith attribute, enum
+member, action, machine context key, event name or payload field, failure-catalog
+identifier, a Class C content knob, a versioned vertical field, a model relation,
+an architecture join key, or a `VALUES` member on the same row. A unit-local computed fact uses
+`derived: fact_name (<reason>)` on the same row; the reason is mandatory and
+the waiver does not declare the fact for any other row. Quoted reason classes,
+classifications, producer names, and negated or rejected fields remain prose.
+
+A named-unit row that calls a vocabulary closed, an enum, or a reason class
+uses exactly one `VALUES{a, b, c}` group. Different units sharing a vocabulary
+can name it with `VALUES reason_class{a, b, c}`. Gx-trace compares it as a set with a
+same-named Modelith enum after case and separator normalization. Without such
+an enum, the row is the vocabulary's one declaration; prose cannot define a
+second list. A cited vocabulary owned by another model entity and a matching
+enum typed on the owning entity need no duplicate unit-local declaration.
 
 Run `machinery oracle`, `machinery check <design> --gate g3`, and
 `machinery verify-formal <design>`. Read the verification reference for all

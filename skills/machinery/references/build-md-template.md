@@ -428,6 +428,52 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   own payload is an ERROR in Gx-trace instead of a warning here. Empty or
   malformed sets, duplicate fields or consumer columns, conflicting sets,
   and blank or unknown explicit consumers also fail the armed tier.
+- An event row that restates the complete payload declares exactly one
+  `payload {field, ...}` or `payload is exactly {field, ...}` group. Gx-trace
+  binds it to that row's one event and requires set equality with the
+  Architecture Contract payload cell. Field order is immaterial; empty,
+  duplicate, malformed, conflicting, missing, or multi-event declarations
+  fail. A payload mention without a group stays prose and defines nothing.
+- In named-unit contract, clause, and payload columns, backticked facts use
+  snake-case plus the Modelith attribute naming styles. `Entity.attr` resolves the named pair;
+  a single-word fact is checked when preceded by an explicit fact verb. Facts
+  also resolve to Modelith enum members and actions, event names and payload
+  fields (including prose-shaped payload cells), Class C content keys, vertical
+  YAML fields, relation names and keys, architecture join keys, machine context
+  keys, failure-catalog identifiers, and members of a
+  `VALUES` group on the same row. A unit-computed value uses the
+  row-local grammar `derived: authored_default_ref (<reason>)`. The fact name
+  and non-empty reason are mandatory; the waiver covers only that row.
+  Quoted reason classes, classifications, producer names, and negated or
+  rejected fields are prose, not fact obligations.
+- A named-unit row that calls a vocabulary closed, an enum, or a reason class
+  declares its members once with `VALUES{a, b, c}`. Members are distinct
+  identifiers and order is immaterial. `VALUES reason_class{a, b, c}` names a
+  vocabulary shared by multiple units and reconciles their sets. Without a
+  name, identity is the normalized unit name; distinct unit names are not
+  inferred to denote the same vocabulary. A same-named Modelith enum must
+  agree exactly. A cited vocabulary owned by another model entity, or an enum
+  typed on this entity, does not need a second local declaration.
+- Every Modelith action whose actor is `System` and writes its resource, plus every producer named by
+  a matrix cascade or consumer-arm table, has an admission in either a marked
+  hand-written authorization inventory, covered by g2 attestation rows, or the
+  H2 matrix form. `MACHINE-WRITTEN{action, ...}` belongs in a resource's
+  machine-written actions cell; `MACHINE-WRITTEN-BY{action: producer, ...}`
+  belongs in its residual verb table resource cell and admits only those
+  producers. For a resource with no machine-written list row, the residual
+  verb table admits a System write when every preset withholds its write verb.
+  A list row closes that fallback. An action declared to verify a recorded row
+  without changing it owes no resource-write admission. Residual seat cells
+  govern non-System actor verbs. The matrix
+  form needs no marker document. A
+  producer column must be distinct from a `producer / consumer` prose column.
+  Its admission cell names one exact declared subject as a backticked
+  identifier: a C4 element id, a matrix producer name, or a preset in the
+  residual verb table. An invented suffix under a C4 id fails. Gx proves row
+  existence and declared-subject resolution; capability-list resolution is
+  later work. Alternatively, the cell
+  carries `(no authorization: <reason>)`. Empty,
+  missing, duplicate, orphan, and reasonless-waiver rows fail in Gx-trace.
 - Incident-derived invariants and fixtures carry a PROVENANCE pointer to the
   primary record (the customer report, the post-mortem document), so the
   attested re-derivation set is enumerable; a fixture named after an

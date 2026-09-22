@@ -2,44 +2,44 @@ attestation_version: 2
 attestations:
   - claim: g2.action-ownership
     kind: plan
-    attestor: Codex CRM design review
-    date: 2026-09-02
-    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 3, 4, and 7a: the action-owner table still assigns domain actions to session or domain components; the 2026-09-06 change only adds internal/testoracle/** to the test-only ignore list and changes no owner mapping. The plan judgment stands.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g2.interface-contract-rightness
     kind: plan
-    attestor: Codex CRM design review
-    date: 2026-09-02
-    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 4 and 5: allowed and denied edges, interface shapes, typed errors, and retry rules are unchanged; internal/testoracle is imported only by _test.go files, so the new ignore entry introduces no runtime crossing. The plan judgment stands.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g2.placement-rightness
     kind: plan
-    attestor: Codex CRM design review
-    date: 2026-09-02
-    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 1 and 7: each aggregate, session, and command execution retains its placement, persistence, and single-writer transaction rule. The testoracle ignore entry does not change deployment or storage. The plan judgment stands.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g2.adoption-closure-discovery
     kind: plan
-    attestor: Codex CRM design review
-    date: 2026-09-02
-    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 2, 4, and 6: LadybugDB store and argon2 are still inventoried with mitigation and residual handling. The added internal/testoracle ignore covers a committed-oracle parser used only by tests, not an operated runtime closure. The plan judgment stands.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g2.event-contract-completeness
     kind: plan
-    attestor: Codex CRM design review
-    date: 2026-09-02
-    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 1 and 5: this local CLI declares no asynchronous event stream; its session, repository, authorization, and domain crossings retain explicit errors and idempotency rules. The test-only ignore addition changes no event or interface contract. The plan judgment stands.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g2.nfr-content
     kind: plan
-    attestor: Codex CRM design review
-    date: 2026-09-02
-    note: 'Amended 2026-09-06 under MAC-jcl0: the Architecture Contract ignore list gained internal/testoracle/** (test-only committed-oracle parser, imported only by _test.go files), resolving the G4 unmapped-file error on internal/testoracle/fsm.go. Prior attestor/date/note covered the pre-amendment ARCHITECTURE.md bytes preserved in git history; independent review over the amended bytes is pending.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 1, 6, and 8: local security, single-writer capacity, and exit-code and stderr observability remain explicit. Ignoring the test-only oracle parser changes none of these runtime assumptions. The plan judgment stands.'
     covers:
       - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
   - claim: g3.guard-semantics

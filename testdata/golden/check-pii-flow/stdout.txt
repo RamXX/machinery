@@ -20,7 +20,7 @@
   checked: 13 files style-scanned, 4 duplicate tables embed-marked
   ok
 == Gx-trace  cross-layer traceability ==
-  checked: 4 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 lifecycle semantics annotations, 1 control-flow-only semantics, 1 placement rows with machines, 2 placement rows waived, 3 entities placed, 1 entities placement-waived, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 5 invariants waived with reason, 2 invariants enforced, 1 invariants checker-claimed (external checker), 1 invariants unit-backed (guard/action/actor)
+  checked: 4 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 lifecycle semantics annotations, 1 control-flow-only semantics, 1 placement rows with machines, 2 placement rows waived, 3 entities placed, 1 entities placement-waived, 1 named-unit fact rows scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 5 invariants waived with reason, 2 invariants enforced, 1 invariants checker-claimed (external checker), 1 invariants unit-backed (guard/action/actor)
   ok
 == Gk-pii-flow external checker ==
   checked: 3 layers projected, 6 invariants claimed, 5 residuals (waived with reason), 1 committed projection fresh, 1 evidence bound to runtime closure, 1 evidence bound to design, 1 elements covered

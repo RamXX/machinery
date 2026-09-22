@@ -60,6 +60,12 @@ const (
 	crmBumpDate        = "2026-09-09"
 	crmBumpPrefix      = "Re-reviewed 2026-09-09 over the corrected BUILD"
 	portfolioRenewal   = "Renews the 2026-09-02 Codex deterministic design review"
+	nextGateAttestor   = "Codex lane/next-gates"
+	nextGateDate       = "2026-09-22"
+	nextGateG2Prefix   = "Re-reviewed 2026-09-22 over AUTHORIZATION.md"
+	nextGateG3Prefix   = "Re-reviewed 2026-09-22 over the MarketDataFeed derived fact waiver"
+	legacyCRMReview    = "Re-reviewed 2026-09-22 over current ARCHITECTURE.md"
+	fulfillmentReview  = "Re-reviewed 2026-09-22 over current BUILD.md"
 	planOnlyWarnPrefix = "plan only; current implementation review missing"
 )
 
@@ -114,7 +120,10 @@ func expectedMigration() map[string][]migratedRow {
 	// checkout-split/orders: 14 rows. Design rows and the pack row keep their
 	// original provenance and covers; the three BUILD-covering behavioral
 	// rows are re-reviewed plans over the corrected BUILD.md.
-	orders := planRows(g2Claims, origReview, "2026-09-02", []string{"ARCHITECTURE.md"})
+	orders := planRows(g2Claims, nextGateAttestor, nextGateDate, []string{"ARCHITECTURE.md", "AUTHORIZATION.md"})
+	for i := range orders {
+		orders[i].note = nextGateG2Prefix
+	}
 	orders = append(orders, planRows(g3Claims, origReview, "2026-09-02",
 		machineCovers("Order"))...)
 	orders = append(orders,
@@ -125,7 +134,10 @@ func expectedMigration() map[string][]migratedRow {
 	)
 
 	// checkout-split/payments: mirror of orders.
-	payments := planRows(g2Claims, origReview, "2026-09-02", []string{"ARCHITECTURE.md"})
+	payments := planRows(g2Claims, nextGateAttestor, nextGateDate, []string{"ARCHITECTURE.md", "AUTHORIZATION.md"})
+	for i := range payments {
+		payments[i].note = nextGateG2Prefix
+	}
 	payments = append(payments, planRows(g3Claims, origReview, "2026-09-02",
 		machineCovers("Payment"))...)
 	payments = append(payments,
@@ -144,20 +156,27 @@ func expectedMigration() map[string][]migratedRow {
 		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: origReview, date: "2026-09-02", covers: []string{"BUILD.md"}},
 	)
 
-	// fulfillment: BUILD.md already carries the sound prospective wholesale
-	// obligation; nothing changed, so all rows keep original provenance.
-	fulfillment := planRows(g2Claims, origCodexProd, "2026-09-02", []string{"ARCHITECTURE.md"})
+	// fulfillment: the two BUILD-covering rows were re-reviewed against current
+	// bytes after the frozen-test amendment; they remain plan judgments.
+	fulfillment := planRows(g2Claims, nextGateAttestor, nextGateDate, []string{"ARCHITECTURE.md", "AUTHORIZATION.md"})
+	for i := range fulfillment {
+		fulfillment[i].note = nextGateG2Prefix
+	}
 	fulfillment = append(fulfillment, planRows(g3Claims, origCodexProd, "2026-09-02", fulfillmentMachines)...)
 	fulfillment = append(fulfillment,
-		migratedRow{claim: "gt.conformance-test-shape", kind: "plan", attestor: origCodexProd, date: "2026-09-02", covers: []string{"BUILD.md"}},
-		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: origCodexProd, date: "2026-09-02", covers: []string{"BUILD.md"}},
+		migratedRow{claim: "gt.conformance-test-shape", kind: "plan", attestor: nextGateAttestor, date: nextGateDate, note: fulfillmentReview, covers: []string{"BUILD.md"}},
+		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: nextGateAttestor, date: nextGateDate, note: fulfillmentReview, covers: []string{"BUILD.md"}},
 	)
 
-	// go-crm: the only design with an accepted implementation. Its gt row is a
+	// go-crm: six Architecture Contract rows were re-reviewed over the current
+	// bytes after the testoracle ignore amendment. Its gt row is a
 	// real current review over examples/go-crm/impl; the zero-context row is a
 	// re-reviewed plan over the corrected BUILD.md; historical acceptance
 	// stays historical with original provenance.
-	goCrm := planRows(g2Claims, origCodexCRM, "2026-09-02", []string{"ARCHITECTURE.md"})
+	goCrm := planRows(g2Claims, nextGateAttestor, nextGateDate, []string{"ARCHITECTURE.md"})
+	for i := range goCrm {
+		goCrm[i].note = legacyCRMReview
+	}
 	goCrm = append(goCrm, planRows(g3Claims, origCodexCRM, "2026-09-02", crmMachines)...)
 	goCrm = append(goCrm,
 		migratedRow{claim: "gt.conformance-test-shape", kind: "current", attestor: coordinator, date: crmBumpDate, covers: []string{"BUILD.md"}},
@@ -176,13 +195,13 @@ func expectedMigration() map[string][]migratedRow {
 
 	// portfolio-engine: no implementation exists; all twelve rows are plans
 	// renewed by review over the accepted MAC-lhu5-revised subjects.
-	portfolio := planRows(g2Claims, coordinator, reviewDate, []string{"ARCHITECTURE.md"})
+	portfolio := planRows(g2Claims, nextGateAttestor, nextGateDate, []string{"ARCHITECTURE.md", "AUTHORIZATION.md"})
 	for i := range portfolio {
-		portfolio[i].note = portfolioRenewal
+		portfolio[i].note = nextGateG2Prefix
 	}
-	portfolio = append(portfolio, planRows(g3Claims, coordinator, reviewDate, portfolioMachines)...)
+	portfolio = append(portfolio, planRows(g3Claims, nextGateAttestor, nextGateDate, portfolioMachines)...)
 	for i := len(portfolio) - 4; i < len(portfolio); i++ {
-		portfolio[i].note = portfolioRenewal
+		portfolio[i].note = nextGateG3Prefix
 	}
 	portfolio = append(portfolio,
 		migratedRow{claim: "gt.conformance-test-shape", kind: "plan", attestor: coordinator, date: reviewDate, note: portfolioRenewal, covers: portfolioBuild},

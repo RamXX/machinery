@@ -25,6 +25,44 @@ under their version heading when a release is cut.
   two slices, so its golden packet bytes, size counts, and section numbering intentionally change;
   the fixture corrects the corpus to exercise the new gate behavior. Maps without `fixtures:` keep
   their prior packet shape and gate output.
+- **Gx-trace now reconciles declared event-payload twins.** A matrix event row may declare one
+  closed payload with `payload {field, ...}` or `payload is exactly {field, ...}`. The declaration
+  binds to that row's one event and must equal the Architecture Contract event row's payload field
+  set. Malformed, duplicate, conflicting, missing, multi-event, and unequal declarations are
+  blocking findings, and a mismatch prints both spellings. Existing examples remain green because
+  ordinary payload prose is not a declaration; this is an opt-in compatibility extension.
+- **Gx-trace now closes autonomous writes against an authorization inventory.** Every Modelith
+  action whose actor is `System`, plus each producer named by a matrix cascade or consumer arm,
+  must have one exact row in a marked, g2-attested hand-written inventory. The row names one backticked dotted admitting
+  capability or uses `(no authorization: <reason>)`; missing, duplicate, orphan, empty, and
+  reasonless rows fail. This intentionally made the fulfillment, portfolio-engine, and
+  checkout-split child examples red; their previously implicit internal capabilities are now
+  recorded, and the golden corpus is regenerated with the new authorization counts.
+- **Gx-trace now resolves named-unit facts.** Backticked facts in contract, clause, and
+  payload columns follow snake-case and Modelith attribute spelling styles and resolve to model attributes, enum
+  members, actions, machine context keys, event names and payload fields, failure-catalog ids,
+  same-row VALUES members,
+  or a reasoned row-local `derived: fact_name (<reason>)` waiver. This intentionally exposed
+  `feed_circuit_open` in the portfolio-engine corpus; its row now records that the operator log
+  signal is derived rather than stored.
+- **Gx-trace now closes matrix vocabularies.** A row that calls a vocabulary closed, an enum, or a
+  reason class must declare exactly one `VALUES{a, b, c}` group. A same-named Modelith enum must
+  agree as a set; otherwise the row is the one closed source. `VALUES name{...}` binds a shared
+  vocabulary across differently named units. Empty, duplicate, malformed, repeated,
+  and conflicting declarations fail. The existing example corpus required no correction.
+
+- **Gx-trace accepts H2's machine-written authorization grammar.** Resource
+  action lists, producer-narrowed residual marks, and the all-presets-withheld
+  residual verb fallback are first-class inventory
+  declarations without a marker document. A marked admission must name an exact
+  declared C4 element, matrix producer, or residual-table preset; a fabricated
+  capability suffix is a finding. The gate proves row existence and declared-subject
+  resolution, with capability-list resolution tracked in NEXT. Fact resolution now reads declared content and relation
+  sources, groups prose-only nested map keys into one typing gap, and excludes
+  H2's quoted rejections. Closed-vocabulary detection distinguishes finite
+  declarations from pass identities, human reasons, referenced owner sets, and
+  typed Modelith enums. A declared verification that does not change its
+  resource owes no resource-write admission.
 
 ### Fixed
 

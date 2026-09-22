@@ -16,10 +16,10 @@
   checked: 6 machines, 144 transitions, 6 tla-generable, 6 oracles fresh, 175 named units covered
   ok
 == Gd-idcite  design-side stable-id citations ==
-  checked: 34 citations resolved, 27 files scanned, 144 committed oracle ids, 3 guards with clause declarations, 29 guard rows read for clause completeness, 3 guard rows with a clause declaration
+  checked: 34 citations resolved, 28 files scanned, 144 committed oracle ids, 3 guards with clause declarations, 29 guard rows read for clause completeness, 3 guard rows with a clause declaration
   ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 27 files style-scanned
+  checked: 28 files style-scanned
   ok
 == Gx-trace  cross-layer traceability ==
   note   FulfillmentSaga: 1 operational-overlay states (compensateRetry)
@@ -28,14 +28,14 @@
   note   Payment: 9 operational-overlay states (authorizing, capturing, refunding, gatewayRetry, gatewayResume, persisting, persistRetry, rolledBack, routingFault)
   note   Reservation: 4 operational-overlay states (persisting, persistRetry, rolledBack, routingFault)
   note   Shipment: 6 operational-overlay states (dispatching, carrierRetry, persisting, persistRetry, rolledBack, routingFault)
-  checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 6 lifecycle semantics annotations, 5 control-flow-only semantics, 3 placement rows with machines, 4 placement rows waived, 1 entities placement-waived, 11 entities placed, 5 mitigation rows with residual handlers, 4 event-contract reactions waived, 5 event-contract emissions traced, 4 event-contract reactions traced, 3 event-contract emissions waived, 13 event-contract consumer reads declared, 22 declared read fields carried, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 24 invariants unit-backed (guard/action/actor), 1 invariants integrity-checked (relational model)
+  checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 6 lifecycle semantics annotations, 5 control-flow-only semantics, 3 placement rows with machines, 4 placement rows waived, 1 entities placement-waived, 11 entities placed, 5 mitigation rows with residual handlers, 21 authorization obligations admitted, 89 named-unit fact rows scanned, 5 unit facts resolved, 4 event-contract reactions waived, 5 event-contract emissions traced, 4 event-contract reactions traced, 3 event-contract emissions waived, 13 event-contract consumer reads declared, 22 declared read fields carried, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 24 invariants unit-backed (guard/action/actor), 1 invariants integrity-checked (relational model)
   ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 18 skeleton citations
   ok
 == Gv-attest  attestation evidence ==
   warn   gt.conformance-test-shape: plan only; current implementation review missing
-  checked: 56 covered artifacts current, 12 attested claims, 12 plan judgments, 12 claims owed
+  checked: 62 covered artifacts current, 12 attested claims, 12 plan judgments, 12 claims owed
 
 0 blocking (ERROR/DRIFT) finding(s)
 design-green: all applicable design gates green (add --impl for G4-import and Gt-tests toward platform-green)
