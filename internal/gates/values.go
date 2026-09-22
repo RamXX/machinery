@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	valuesGroup     = regexp.MustCompile(`VALUES\{([^}]*)\}`)
-	valuesWord      = regexp.MustCompile(`\bVALUES\b`)
+	valuesGroup     = regexp.MustCompile(`\bVALUES(?:\s+([A-Za-z][A-Za-z0-9_-]*))?\s*\{([^}]*)\}`)
+	valuesOpening   = regexp.MustCompile(`\bVALUES(?:\s+[A-Za-z][A-Za-z0-9_-]*)?\s*\{`)
 	closedVocabWord = regexp.MustCompile(`(?i)(\bclosed\b.*\b(vocabulary|enum)\b|\breason\s+class\b)`)
 	valueMember     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 )
@@ -75,7 +75,12 @@ func parseValues(body string) ([]string, string) {
 
 func checkClosedVocabularies(g *Gate, design string, dm *ir.Value) {
 	enums := modelEnumValues(dm)
-	declared := map[string]string{}
+	type declaration struct {
+		where  string
+		values []string
+		named  bool
+	}
+	declared := map[string]declaration{}
 	paths, _ := strictSortedGlob(g, filepath.Join(design, "machines"), "*.matrix.md", "vocabulary matrix")
 	for _, path := range paths {
 		body, err := readDesignFile(design, path)
@@ -102,7 +107,7 @@ func checkClosedVocabularies(g *Gate, design string, dm *ir.Value) {
 			where := filepath.Base(path) + ":" + strconv.Itoa(lineNo+1)
 			groups := valuesGroup.FindAllStringSubmatch(contract, -1)
 			if len(groups) == 0 {
-				if valuesWord.MatchString(contract) {
+				if valuesOpening.MatchString(contract) {
 					g.Errs = append(g.Errs, where+": malformed VALUES declaration; write VALUES{a, b, c}")
 				} else if closedVocabWord.MatchString(contract) {
 					g.Errs = append(g.Errs, where+": "+ir.Repr(name)+" closed vocabulary has no VALUES{...} declaration; prose may quote the values but cannot define them")
@@ -113,23 +118,35 @@ func checkClosedVocabularies(g *Gate, design string, dm *ir.Value) {
 				g.Errs = append(g.Errs, where+": vocabulary row must carry exactly one VALUES{a, b, c} declaration")
 				continue
 			}
-			values, why := parseValues(groups[0][1])
+			values, why := parseValues(groups[0][2])
 			if why != "" {
 				g.Errs = append(g.Errs, where+": "+why)
 				continue
 			}
-			key := vocabularyKey(name)
+			vocabulary := name
+			if groups[0][1] != "" {
+				vocabulary = groups[0][1]
+			}
+			key := vocabularyKey(vocabulary)
 			if key == "" {
 				g.Errs = append(g.Errs, where+": VALUES declaration belongs to an empty unit name")
 				continue
 			}
 			if prior, ok := declared[key]; ok {
-				g.Errs = append(g.Errs, where+": vocabulary "+ir.Repr(name)+" already has its one declaration at "+prior)
+				if !prior.named || groups[0][1] == "" {
+					g.Errs = append(g.Errs, where+": vocabulary "+ir.Repr(vocabulary)+" already has its one declaration at "+prior.where)
+					continue
+				}
+				if strings.Join(prior.values, "\x00") != strings.Join(values, "\x00") {
+					g.Errs = append(g.Errs, where+": conflicting VALUES for "+ir.Repr(vocabulary)+": "+prior.where+" spells "+fmt.Sprint(prior.values)+", this row spells "+fmt.Sprint(values))
+					continue
+				}
+				g.Count("closed vocabularies reconciled")
 				continue
 			}
-			declared[key] = where
+			declared[key] = declaration{where: where, values: values, named: groups[0][1] != ""}
 			if expected, ok := enums[key]; ok && strings.Join(values, "\x00") != strings.Join(expected, "\x00") {
-				g.Errs = append(g.Errs, where+": VALUES mismatch for "+ir.Repr(name)+": matrix spells "+fmt.Sprint(values)+", Modelith enum spells "+fmt.Sprint(expected))
+				g.Errs = append(g.Errs, where+": VALUES mismatch for "+ir.Repr(vocabulary)+": matrix spells "+fmt.Sprint(values)+", Modelith enum spells "+fmt.Sprint(expected))
 				continue
 			}
 			g.Count("closed vocabularies declared")

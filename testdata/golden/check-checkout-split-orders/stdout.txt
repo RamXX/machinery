@@ -21,7 +21,7 @@
   checked: 12 files style-scanned, 4 duplicate tables embed-marked
   ok
 == Gx-trace  cross-layer traceability ==
-  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 lifecycle semantics annotations, 1 control-flow-only semantics, 1 placement rows with machines, 1 entities placed, 2 authorization obligations admitted, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 2 invariants enforced, 2 invariants unit-backed (guard/action/actor)
+  checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 lifecycle semantics annotations, 1 control-flow-only semantics, 1 placement rows with machines, 1 entities placed, 2 authorization obligations admitted, 4 named-unit fact rows scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 2 invariants enforced, 2 invariants unit-backed (guard/action/actor)
   ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 4 milestones, 4 DoD-bearing milestones, 1 skeleton NFR lines, 1 skeleton citations
@@ -33,7 +33,7 @@
   warn   gt.conformance-test-shape: plan only; current implementation review missing
   warn   g4.standin-coverage: plan only; current implementation review missing
   warn   g4.pack-event-discipline: plan only; current implementation review missing
-  checked: 23 covered artifacts current, 14 attested claims, 14 plan judgments, 14 claims owed
+  checked: 29 covered artifacts current, 14 attested claims, 14 plan judgments, 14 claims owed
 == G5-pack  contract packs ==
   checked: 6 pack files, 1 pack hash verified, 3 refinement artifacts fresh, 1 owned entities present, 3 owned attributes present, 1 owned enums shape-checked, 1 owned invariants intact, 1 delegated invariants traced, 1 produced events emitted, 2 consumed events handled, pack revision 1
   ok

@@ -438,9 +438,11 @@ sets, so give the mapping an artifact and G2 holds it in both directions. The he
 ## System authorization inventory (required when System writes exist)
 
 Every Modelith action whose actor is `System` is an autonomous write obligation. A matrix table
-whose headers name a `producer` and a cascade or consumer arm adds each producer it names to the
+with a distinct `producer` column and a cascade or consumer column adds one subject from each
+producer cell to the
 same obligation set. One hand-written Markdown artifact in the design, conventionally
-`AUTHORIZATION.md` or ARCHITECTURE.md, must carry this marker and one closed inventory:
+`AUTHORIZATION.md` or ARCHITECTURE.md, must carry this marker and one closed inventory. The artifact
+must be covered by the g2 attestation rows with a truthful review record:
 
 ```
 <!-- machinery:authorization-inventory -->
@@ -451,8 +453,10 @@ same obligation set. One hand-written Markdown artifact in the design, conventio
 | `Order.markPaid` | internal capability `orders.write` |
 | `SearchIndex.rebuild` | `(no authorization: isolated rebuild worker has no caller identity)` |
 
-Each obligation appears exactly once by exact subject. Admission is non-empty prose naming the
-capability the implementation enforces. A genuinely unauthorizable internal write uses
+Each producer cell names one identifier after Markdown annotations are removed; prose naming multiple
+subjects is an error. Each obligation appears exactly once by exact subject. Admission is one backticked dotted capability
+identifier. The inventory records a plan assertion; implementation enforcement is reviewed
+separately. A genuinely unauthorizable internal write uses
 `(no authorization: <reason>)`; the reason is mandatory. Missing, duplicate, empty, and orphan rows
 are errors. The inventory is closed in both directions, so deleting a System action or matrix
 producer also requires deleting its stale authorization row.
@@ -604,10 +608,13 @@ that row.
 
 ### Named-unit fact resolution
 
-Gx-trace treats a backticked snake-case identifier in a named-unit contract, clause, or payload
-column as a fact reference. The fact must resolve to a Modelith attribute, a machine `context` key,
-or a field carried by an Architecture Contract event payload. The snake-case restriction keeps
-unit names and ordinary backticked prose outside this grammar.
+Gx-trace checks backticked identifiers in named-unit contract, clause, or payload columns using
+snake-case and the attribute spelling styles present in Modelith. It also resolves `Entity.attr` by the named
+entity and attribute. Single-word identifiers require an explicit fact verb such as `persists` or
+`reads`. Facts resolve to Modelith attributes, enum members and actions, machine `context` keys,
+event-contract event names and payload fields, failure-catalog identifiers, or members of a
+`VALUES` group on the same row. Quoted reason classes, classifications, producer names, and
+explicitly negated or rejected fields remain prose. Gx reports the number of named-unit rows scanned.
 
 A fact computed only inside one unit and never stored uses the row-local waiver
 `derived: risk_score (weighted fraud inputs)`. The identifier and a non-empty reason are required.
@@ -621,10 +628,11 @@ on that row as `VALUES{missing, stale, conflicting}`. A row carries exactly one 
 non-empty, distinct identifiers; order is immaterial. Prose may quote the declared vocabulary but
 never defines another list.
 
-The matrix unit name owns the declaration. After case and separators are normalized, a unit named
-`orderState` matches the Modelith enum `OrderState`, and Gx-trace requires exact set equality. If no
-enum has that name, the matrix row is the one closed source and a second declaration for the same
-unit is an error.
+The matrix unit name owns an unnamed declaration. After case and separators are normalized, a unit
+named `orderState` matches the Modelith enum `OrderState`, and Gx-trace requires exact set equality.
+Use `VALUES reason_class{missing, stale, conflicting}` when different units share one vocabulary;
+declarations with the same explicit name must have identical sets. Without an explicit name, Gx
+cannot infer that two differently named units intend one vocabulary.
 
 ### Machine-checkable format (mandatory on a decomposed parent)
 

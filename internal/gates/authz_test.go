@@ -54,7 +54,7 @@ func TestAuthorizationInventoryMissingSystemActionErrors(t *testing.T) {
 }
 
 func TestAuthorizationInventoryAdmitsSystemAction(t *testing.T) {
-	g := authzFixture(t, authzHeader+"| `Order.markPaid` | internal machine capability `orders.write` |\n", "")
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n", "")
 	if hasErr(g, "authorization") {
 		t.Fatalf("an admitted System action must pass: %v", g.Errs)
 	}
@@ -76,12 +76,12 @@ func TestAuthorizationInventoryWaiverRequiresReason(t *testing.T) {
 
 func TestAuthorizationInventoryProducerArmCreatesObligation(t *testing.T) {
 	matrix := "\n| cascade | producer | outcome |\n|---|---|---|\n| persist | `Order.reindex` | emitted |\n"
-	g := authzFixture(t, authzHeader+"| `Order.markPaid` | internal capability |\n", matrix)
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n", matrix)
 	if !hasErr(g, "matrix producer 'Order.reindex' has no authorization row") {
 		t.Fatalf("a named cascade producer must be admitted independently: %v", g.Errs)
 	}
 	g = authzFixture(t, authzHeader+
-		"| `Order.markPaid` | internal capability |\n| `Order.reindex` | producer capability |\n", matrix)
+		"| `Order.markPaid` | `orders.write` |\n| `Order.reindex` | `orders.reindex` |\n", matrix)
 	if hasErr(g, "authorization") {
 		t.Fatalf("both obligations are admitted: %v", g.Errs)
 	}
@@ -89,11 +89,66 @@ func TestAuthorizationInventoryProducerArmCreatesObligation(t *testing.T) {
 
 func TestAuthorizationInventoryRejectsDuplicateAndOrphanRows(t *testing.T) {
 	g := authzFixture(t, authzHeader+
-		"| `Order.markPaid` | first |\n| `Order.markPaid` | second |\n| `Order.ghost` | stale |\n", "")
+		"| `Order.markPaid` | `orders.write` |\n| `Order.markPaid` | `orders.write` |\n| `Order.ghost` | `orders.ghost` |\n", "")
 	joined := strings.Join(g.Errs, "\n")
 	for _, want := range []string{"duplicate authorization row", "names no System action or matrix producer"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("inventory closure must report %q: %v", want, g.Errs)
 		}
+	}
+}
+
+func TestAuthorizationInventoryIgnoresCombinedProducerConsumerProse(t *testing.T) {
+	matrix := "\n| cascade | producer / consumer | outcome |\n|---|---|---|\n| persist | `Order.reindex` and `Order.repair` | emitted |\n"
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n", matrix)
+	if hasErr(g, "matrix producer") {
+		t.Fatalf("combined prose column must not arm producer obligations: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationInventoryUsesOneSubjectPerProducerCell(t *testing.T) {
+	matrix := "\n| cascade | producer | outcome |\n|---|---|---|\n| persist | `Order.reindex` (via `Order.repair`) | emitted |\n"
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n| `Order.reindex` | `orders.reindex` |\n", matrix)
+	if hasErr(g, "matrix producer 'Order.repair'") || hasErr(g, "matrix producer 'Order.reindex'") {
+		t.Fatalf("one producer cell names one cleaned subject: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationInventoryRejectsTwoProducerSubjectsInOneCell(t *testing.T) {
+	matrix := "\n| cascade | producer | outcome |\n|---|---|---|\n| persist | `Order.reindex` and `Order.repair` | emitted |\n"
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | `orders.write` |\n", matrix)
+	if !hasErr(g, "producer cell must name one subject") {
+		t.Fatalf("two subjects must not turn into a phantom obligation: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationInventoryMalformedMarkersAndAdmissions(t *testing.T) {
+	cases := []struct{ name, inventory, want string }{
+		{"no marker", "", "no <!-- machinery:authorization-inventory --> marker"},
+		{"two markers", authzHeader + "| `Order.markPaid` | cap |\n<!-- machinery:authorization-inventory -->\n", "marker appears 2 times"},
+		{"no table", "<!-- machinery:authorization-inventory -->\n", "marker has no table"},
+		{"empty admission", authzHeader + "| `Order.markPaid` | |\n", "admission is empty"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := authzFixture(t, tc.inventory, "")
+			if !hasErr(g, tc.want) {
+				t.Fatalf("want %q: %v", tc.want, g.Errs)
+			}
+		})
+	}
+}
+
+func TestAuthorizationInventoryFindingNamesSourcePath(t *testing.T) {
+	g := authzFixture(t, authzHeader+"| `Order.ghost` | stale |\n", "")
+	if !hasErr(g, "ARCHITECTURE.md:") {
+		t.Fatalf("row finding must name its source artifact: %v", g.Errs)
+	}
+}
+
+func TestAuthorizationInventoryRejectsProseAdmission(t *testing.T) {
+	g := authzFixture(t, authzHeader+"| `Order.markPaid` | TODO |\n", "")
+	if !hasErr(g, "admission must name one capability") {
+		t.Fatalf("free text cannot prove an admitting capability: %v", g.Errs)
 	}
 }

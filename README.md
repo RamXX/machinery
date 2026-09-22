@@ -758,18 +758,22 @@ make verify-formal   # regenerates and checks all 35 TLC proofs + the relational
 | G5-pack | decomposed designs only: packs fresh, children pinned to the current packs, refinement proofs fresh, and every boundary-event row held to its direction (`consumes` or `produces` exactly; any other value is an ERROR rather than a silently dropped row). |
 | ERROR / DRIFT / WARN | ERROR is blocking; DRIFT means a generated artifact is stale, also blocking; WARN is advisory. |
 
-Gx also closes autonomous writes against the marked authorization inventory. Every Modelith action
+Gx also closes autonomous writes against a marked, g2-attested hand-written authorization inventory. Every Modelith action
 whose actor is `System`, plus every producer named by a matrix cascade or consumer-arm table, owes
-one exact row with a non-empty admission or `(no authorization: <reason>)`. Missing, duplicate,
+one exact row with a backticked dotted capability or `(no authorization: <reason>)`. Missing, duplicate,
 orphan, empty, and reasonless rows are blocking findings.
 
-Gx resolves backticked snake-case facts in named-unit contract, clause, and payload columns against
-Modelith attributes, machine context keys, and Architecture Contract event payloads. A fact computed
+Gx resolves backticked facts in named-unit contract, clause, and payload columns against
+Modelith attributes, enum members and actions, machine context keys, event names and payload fields,
+failure-catalog identifiers, and same-row VALUES members. It recognizes snake-case and Modelith attribute spelling
+styles and `Entity.attr`; single-word facts require an explicit fact verb. A fact computed
 only by the unit uses the row-local `derived: fact_name (<reason>)` waiver; an empty reason fails.
 
 Gx also closes named-unit vocabularies with `VALUES{a, b, c}`. Rows that call a vocabulary closed,
 an enum, or a reason class owe the declaration. A same-named Modelith enum must have the exact set;
-otherwise the matrix row is the one closed source. Duplicate, empty, malformed, and repeated groups
+otherwise the matrix row is the one closed source. `VALUES name{...}` binds a vocabulary shared by
+different units; unnamed declarations use unit names and cannot infer cross-unit identity.
+Duplicate, empty, malformed, and repeated groups
 fail.
 
 ## Use

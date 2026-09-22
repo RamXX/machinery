@@ -67,3 +67,26 @@ func TestValuesRejectsMalformedDuplicateAndRepeatedGroups(t *testing.T) {
 		}
 	}
 }
+
+func TestValuesWordInProseDoesNotArmDeclaration(t *testing.T) {
+	g := valuesFixture(t, "| `saveOrder` | actor | The VALUES of the two new columns are described elsewhere. | `order-paid-final` |\n")
+	if hasErr(g, "VALUES") {
+		t.Fatalf("uppercase prose is not a declaration: %v", g.Errs)
+	}
+}
+
+func TestValuesOpenedGroupIsMalformed(t *testing.T) {
+	g := valuesFixture(t, "| `saveOrder` | actor | VALUES{open, closed | `order-paid-final` |\n")
+	if !hasErr(g, "malformed VALUES declaration") {
+		t.Fatalf("opened group must fail closed: %v", g.Errs)
+	}
+}
+
+func TestValuesNamedVocabularyReconcilesAcrossUnits(t *testing.T) {
+	rows := "| `firstUnit` | guard | reason class VALUES refusal_reason{missing, stale} | `order-paid-final` |\n" +
+		"| `secondUnit` | guard | reason class VALUES refusal_reason{missing, conflicting} | `order-paid-final` |\n"
+	g := valuesFixture(t, rows)
+	if !hasErr(g, "conflicting VALUES for 'refusal_reason'") {
+		t.Fatalf("one named vocabulary cannot carry two member sets: %v", g.Errs)
+	}
+}

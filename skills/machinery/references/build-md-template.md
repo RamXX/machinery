@@ -434,22 +434,29 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   Architecture Contract payload cell. Field order is immaterial; empty,
   duplicate, malformed, conflicting, missing, or multi-event declarations
   fail. A payload mention without a group stays prose and defines nothing.
-- In named-unit contract, clause, and payload columns, a backticked snake-case
-  fact such as `authored_default_ref` resolves to a Modelith attribute, a
-  machine `context` key, or a field carried by the Architecture Contract event
-  payload. A unit-computed value that is intentionally not stored uses the
+- In named-unit contract, clause, and payload columns, backticked facts use
+  snake-case plus the Modelith attribute naming styles. `Entity.attr` resolves the named pair;
+  a single-word fact is checked when preceded by an explicit fact verb. Facts
+  also resolve to Modelith enum members and actions, event names and payload
+  fields, machine context keys, failure-catalog identifiers, and members of a
+  `VALUES` group on the same row. A unit-computed value uses the
   row-local grammar `derived: authored_default_ref (<reason>)`. The fact name
   and non-empty reason are mandatory; the waiver covers only that row.
+  Quoted reason classes, classifications, producer names, and negated or
+  rejected fields are prose, not fact obligations.
 - A named-unit row that calls a vocabulary closed, an enum, or a reason class
   declares its members once with `VALUES{a, b, c}`. Members are distinct
-  identifiers and order is immaterial. When the normalized unit name matches
-  a Modelith enum name, the two sets must agree exactly. Without a matching
-  enum, that row is the one closed declaration; prose may quote it but cannot
-  define a second list.
+  identifiers and order is immaterial. `VALUES reason_class{a, b, c}` names a
+  vocabulary shared by multiple units and reconciles their sets. Without a
+  name, identity is the normalized unit name; distinct unit names are not
+  inferred to denote the same vocabulary. A same-named Modelith enum must
+  agree exactly.
 - Every Modelith action whose actor is `System`, plus every producer named by
   a matrix cascade or consumer-arm table, appears exactly once in the marked
-  design authorization inventory. Its admission cell names
-  the enforced capability or carries `(no authorization: <reason>)`. Empty,
+  hand-written authorization inventory, covered by g2 attestation rows. A
+  producer column must be distinct from a `producer / consumer` prose column.
+  Its admission cell names one capability as a backticked dotted identifier or
+  carries `(no authorization: <reason>)`. Empty,
   missing, duplicate, orphan, and reasonless-waiver rows fail in Gx-trace.
 - Incident-derived invariants and fixtures carry a PROVENANCE pointer to the
   primary record (the customer report, the post-mortem document), so the

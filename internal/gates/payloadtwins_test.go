@@ -79,3 +79,35 @@ func TestPayloadTwinsOneDeclarationCannotCoverSeveralEvents(t *testing.T) {
 		t.Fatalf("one payload declaration must bind to exactly one event: %v", g.Errs)
 	}
 }
+
+func TestPayloadTwinsProseWithReadsGroupDoesNotArm(t *testing.T) {
+	g := payloadTwinFixture(t, "`Order.id`",
+		"| `markPaid` | `applyPayment` | prose about payload then READS{Order.id} | `order-paid-final` |\n")
+	if hasErr(g, "payload twin row") || hasErr(g, "payload declaration") {
+		t.Fatalf("payload prose beside another grammar is not a declaration: %v", g.Errs)
+	}
+}
+
+func TestPayloadTwinsUnclosedGroupIsMalformed(t *testing.T) {
+	g := payloadTwinFixture(t, "`Order.id`",
+		"| `markPaid` | `applyPayment` | payload {Order.id | `order-paid-final` |\n")
+	if !hasErr(g, "exactly one complete payload") {
+		t.Fatalf("an opened payload group must fail closed: %v", g.Errs)
+	}
+}
+
+func TestPayloadTwinsEscapedPipeKeepsEventCell(t *testing.T) {
+	g := payloadTwinFixture(t, "`Order.id`",
+		"| `markPaid` | `applyPayment` | payload {Order.id}; demote \\| retire | `order-paid-final` |\n")
+	if hasErr(g, "names 0 events") || g.Counts["event payload twins reconciled"] != 1 {
+		t.Fatalf("escaped pipe must preserve the declaring row: %v, %+v", g.Errs, g.Counts)
+	}
+}
+
+func TestArchitecturePayloadRejectsLossyPlainList(t *testing.T) {
+	g := payloadTwinFixture(t, "Order.id, Order.total (cents)",
+		"| `markPaid` | `applyPayment` | payload {Order.id} | `order-paid-final` |\n")
+	if !hasErr(g, "cannot reconcile a matrix payload declaration") {
+		t.Fatalf("malformed architecture field must not be discarded: %v", g.Errs)
+	}
+}

@@ -2,57 +2,69 @@ attestation_version: 2
 attestations:
   - claim: g2.action-ownership
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted MAC-lhu5-revised ARCHITECTURE.md: the action-ownership table is unchanged and the ten Modelith actions still map exactly once; the new operation/publication API rows carry the same owners.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted MAC-lhu5-revised ARCHITECTURE.md: the action-ownership table is unchanged and the ten Modelith actions still map exactly once; the new operation/publication API rows carry the same owners.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
+      - path: AUTHORIZATION.md
+        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
   - claim: g2.interface-contract-rightness
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: interface contracts re-read over the added OptimizerLimits/ReferenceLimits shapes, the closed InfeasibleError reasons, and the RepoSession/OperationId/Handle/Snapshot publication API; the injective CLI exit-code map and closed bound vocabulary close the previously open edges.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: interface contracts re-read over the added OptimizerLimits/ReferenceLimits shapes, the closed InfeasibleError reasons, and the RepoSession/OperationId/Handle/Snapshot publication API; the injective CLI exit-code map and closed bound vocabulary close the previously open edges.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
+      - path: AUTHORIZATION.md
+        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
   - claim: g2.placement-rightness
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the one-process Python/DuckDB topology is unchanged; the breaker threshold literal failures+1>=5 and the admission-vs-return bound categories keep persistence decisions with their owners.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the one-process Python/DuckDB topology is unchanged; the breaker threshold literal failures+1>=5 and the admission-vs-return bound categories keep persistence decisions with their owners.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
+      - path: AUTHORIZATION.md
+        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
   - claim: g2.adoption-closure-discovery
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the revision adds no sidecar, operator, service, or stateful backend; the runtime closure remains the declared market-data credential/provider and the DuckDB file.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the revision adds no sidecar, operator, service, or stateful backend; the runtime closure remains the declared market-data credential/provider and the DuckDB file.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
+      - path: AUTHORIZATION.md
+        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
   - claim: g2.event-contract-completeness
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the design remains synchronous with no asynchronous channel or external event consumer; the two declared external calls keep their reasoned N/A.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: the design remains synchronous with no asynchronous channel or external event consumer; the two declared external calls keep their reasoned N/A.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
+      - path: AUTHORIZATION.md
+        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
   - claim: g2.nfr-content
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: NFR claims re-read against the resolved-outcome error-row filter, the named admission deadlines, and owner-only store permissions.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised ARCHITECTURE.md: NFR claims re-read against the resolved-outcome error-row filter, the named admission deadlines, and owner-only store permissions.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:bcc1a73d9d944142aaa6a5540133a2bbaee79676ca4698272d0392e9b2a39e94
+      - path: AUTHORIZATION.md
+        hash: sha256:49fd7e87d7b7e34b4fbf15ed67d3605b28a7e9d0d969b62b5141a6ed28025aad
   - claim: g3.guard-semantics
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: guard predicates re-checked against the revised row contracts (failures+1>=5 as a bounded counter, isRetriable over confirmed-Unpublished errors only, admission deadlines named as result-admission bounds); oracle byte-idempotence confirmed (no churn).'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over the MarketDataFeed derived fact waiver: feed_circuit_open is an operator log signal emitted by recordTrip, not a stored Modelith fact; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: guard predicates re-checked against the revised row contracts (failures+1>=5 as a bounded counter, isRetriable over confirmed-Unpublished errors only, admission deadlines named as result-admission bounds); oracle byte-idempotence confirmed (no churn).'
     covers:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
@@ -72,9 +84,9 @@ attestations:
         hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: g3.invariant-enforcement
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: invariant carriers re-checked; the resolved-envelope assumption and the pure/terminal persistence distinction keep optimizer and reference invariants on their named actor contracts.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over the MarketDataFeed derived fact waiver: feed_circuit_open is an operator log signal emitted by recordTrip, not a stored Modelith fact; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: invariant carriers re-checked; the resolved-envelope assumption and the pure/terminal persistence distinction keep optimizer and reference invariants on their named actor contracts.'
     covers:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
@@ -94,9 +106,9 @@ attestations:
         hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: g3.residual-transitions
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: the new unresolved-publication residual rows (ReferenceDataCommand, Portfolio) and the stale-callback row (MarketDataFeed) state causal no-publication/no-transition outcomes; no mitigation deletes a failure.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over the MarketDataFeed derived fact waiver: feed_circuit_open is an operator log signal emitted by recordTrip, not a stored Modelith fact; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: the new unresolved-publication residual rows (ReferenceDataCommand, Portfolio) and the stale-callback row (MarketDataFeed) state causal no-publication/no-transition outcomes; no mitigation deletes a failure.'
     covers:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
@@ -116,9 +128,9 @@ attestations:
         hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: g3.event-redelivery
     kind: plan
-    attestor: coordinator
-    date: 2026-09-06
-    note: 'Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: no machine consumes an external asynchronous event; synchronous retries stay governed by the idempotent read, versioned write, cancellation, and rollback contracts.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over the MarketDataFeed derived fact waiver: feed_circuit_open is an operator log signal emitted by recordTrip, not a stored Modelith fact; prior review note: Renews the 2026-09-02 Codex deterministic design review over the accepted revised machines/matrices: no machine consumes an external asynchronous event; synchronous retries stay governed by the idempotent read, versioned write, cancellation, and rollback contracts.'
     covers:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72

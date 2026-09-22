@@ -121,9 +121,11 @@ binds it to that row's one event and requires exact set equality with the
 Architecture Contract payload cell. Payload prose without a group defines
 nothing.
 
-Every action whose Modelith actor is `System`, and every producer named by a
-matrix cascade or consumer arm, owes one row in the marked Architecture
-Contract authorization inventory. Name the admitting capability or use the
+Every action whose Modelith actor is `System`, and every producer named in an
+exact producer column of a matrix cascade or consumer table, owes one row in a
+marked hand-written authorization inventory (`AUTHORIZATION.md` or
+`ARCHITECTURE.md`). Cover that artifact with the g2 attestation rows. Name the
+admitting capability as one backticked dotted identifier or use the
 row-local `(no authorization: <reason>)` waiver. Gx-trace holds the inventory
 closed in both directions.
 
@@ -146,14 +148,18 @@ machines may reuse one guard name, and a declaration whose oracle rows only a
 sibling machine could supply is an error naming that sibling. A declared guard
 no oracle governs, such as one on a creation edge, owes nothing.
 
-Backticked snake-case facts in named-unit contract, clause, and payload columns
-must resolve to a Modelith attribute, machine context key, or Architecture
-Contract event-payload field. A unit-local computed fact uses
+Backticked facts in named-unit contract, clause, and payload columns use the
+snake-case grammar plus Modelith attribute naming styles, including `Entity.attr` and single-word facts
+used with an explicit fact verb. They resolve to a Modelith attribute, enum
+member, action, machine context key, event name or payload field, failure-catalog
+identifier, or a `VALUES` member on the same row. A unit-local computed fact uses
 `derived: fact_name (<reason>)` on the same row; the reason is mandatory and
-the waiver does not declare the fact for any other row.
+the waiver does not declare the fact for any other row. Quoted reason classes,
+classifications, producer names, and negated or rejected fields remain prose.
 
 A named-unit row that calls a vocabulary closed, an enum, or a reason class
-uses exactly one `VALUES{a, b, c}` group. Gx-trace compares it as a set with a
+uses exactly one `VALUES{a, b, c}` group. Different units sharing a vocabulary
+can name it with `VALUES reason_class{a, b, c}`. Gx-trace compares it as a set with a
 same-named Modelith enum after case and separator normalization. Without such
 an enum, the row is the vocabulary's one declaration; prose cannot define a
 second list.

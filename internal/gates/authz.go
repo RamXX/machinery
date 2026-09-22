@@ -14,12 +14,18 @@ import (
 )
 
 var (
-	authorizationMarker = regexp.MustCompile(`<!--\s*machinery:authorization-inventory\s*-->`)
-	noAuthorization     = regexp.MustCompile(`\(no authorization:\s*([^)]*)\)`)
+	authorizationMarker     = regexp.MustCompile(`<!--\s*machinery:authorization-inventory\s*-->`)
+	noAuthorization         = regexp.MustCompile(`\(no authorization:\s*([^)]*)\)`)
+	authorizationCapability = regexp.MustCompile("^`([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+)`$")
+	authorizationSubject    = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$`)
 )
 
 type authorizationRow struct {
 	subject, admission, where string
+}
+
+type authorizationDocument struct {
+	path, text string
 }
 
 func authorizationObligations(g *Gate, design string, dm *ir.Value) map[string]string {
@@ -44,24 +50,17 @@ func authorizationObligations(g *Gate, design string, dm *ir.Value) map[string]s
 			continue
 		}
 		for _, table := range ir.ParseMdTables(string(body)) {
-			headers := strings.ToLower(strings.Join(table.Header, " "))
-			if !strings.Contains(headers, "producer") ||
-				(!strings.Contains(headers, "cascade") && !strings.Contains(headers, "consumer")) {
+			pi := ir.FindCol(table.Header, "producer")
+			if pi < 0 || strings.Contains(strings.ToLower(ir.CleanCell(table.Header[pi])), "producer / consumer") ||
+				(ir.FindCol(table.Header, "cascade") < 0 && ir.FindCol(table.Header, "consumer") < 0) {
 				continue
 			}
-			pi := colContaining(table.Header, "producer")
-			for _, row := range table.Rows {
-				cell := cellAt(row, pi)
-				var subjects []string
-				for _, match := range payloadBacktick.FindAllStringSubmatch(cell, -1) {
-					subjects = append(subjects, match[1])
-				}
-				if len(subjects) == 0 {
-					if subject := ir.CleanCell(cell); subject != "" {
-						subjects = append(subjects, subject)
+			for i, row := range table.Rows {
+				if subject := ir.CleanCell(cellAt(row, pi)); subject != "" {
+					if !authorizationSubject.MatchString(subject) {
+						g.Errs = append(g.Errs, filepath.Base(path)+": producer row "+strconv.Itoa(i+1)+": producer cell must name one subject, got "+ir.Repr(subject))
+						continue
 					}
-				}
-				for _, subject := range subjects {
 					out[subject] = "matrix producer"
 				}
 			}
@@ -70,31 +69,39 @@ func authorizationObligations(g *Gate, design string, dm *ir.Value) map[string]s
 	return out
 }
 
-func collectAuthorizationRows(g *Gate, archText string) []authorizationRow {
+func collectAuthorizationRows(g *Gate, documents []authorizationDocument) []authorizationRow {
 	var out []authorizationRow
-	for _, table := range ir.ParseMdTables(archText) {
-		si := colContaining(table.Header, "authorization subject")
-		ai := colContaining(table.Header, "admission")
-		if si < 0 && ai < 0 {
-			continue
-		}
-		if si < 0 || ai < 0 {
-			g.Errs = append(g.Errs, "authorization inventory table must have authorization subject and admission columns")
-			continue
-		}
-		for i, row := range table.Rows {
-			subject := ir.CleanCell(cellAt(row, si))
-			out = append(out, authorizationRow{
-				subject: subject, admission: strings.TrimSpace(cellAt(row, ai)),
-				where: "authorization row " + strconv.Itoa(i+1),
-			})
+	for _, document := range documents {
+		lines := strings.Split(document.text, "\n")
+		lineAt := 0
+		for _, table := range ir.ParseMdTables(document.text) {
+			si := colContaining(table.Header, "authorization subject")
+			ai := colContaining(table.Header, "admission")
+			if si < 0 && ai < 0 {
+				continue
+			}
+			if si < 0 || ai < 0 {
+				g.Errs = append(g.Errs, document.path+": authorization inventory table must have authorization subject and admission columns")
+				continue
+			}
+			for i, row := range table.Rows {
+				for lineAt < len(lines) && strings.TrimSpace(lines[lineAt]) != strings.TrimSpace(table.RowLines[i]) {
+					lineAt++
+				}
+				subject := ir.CleanCell(cellAt(row, si))
+				out = append(out, authorizationRow{
+					subject: subject, admission: strings.TrimSpace(cellAt(row, ai)),
+					where: document.path + ":" + strconv.Itoa(lineAt+1) + " authorization row " + strconv.Itoa(i+1),
+				})
+				lineAt++
+			}
 		}
 	}
 	return out
 }
 
-func authorizationInventoryCorpus(g *Gate, design string) (string, int) {
-	var documents []string
+func authorizationInventoryCorpus(g *Gate, design string) ([]authorizationDocument, int) {
+	var documents []authorizationDocument
 	markers := 0
 	err := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
@@ -122,13 +129,13 @@ func authorizationInventoryCorpus(g *Gate, design string) (string, int) {
 			return nil
 		}
 		markers += len(found)
-		documents = append(documents, string(body))
+		documents = append(documents, authorizationDocument{path: filepath.ToSlash(rel), text: string(body)})
 		return nil
 	})
 	if err != nil {
 		g.Errs = append(g.Errs, "authorization inventory scan failed: "+err.Error())
 	}
-	return strings.Join(documents, "\n"), markers
+	return documents, markers
 }
 
 func checkAuthorizationInventory(g *Gate, design string, dm *ir.Value) {
@@ -136,13 +143,13 @@ func checkAuthorizationInventory(g *Gate, design string, dm *ir.Value) {
 	if len(obligations) == 0 {
 		return
 	}
-	corpus, markers := authorizationInventoryCorpus(g, design)
+	documents, markers := authorizationInventoryCorpus(g, design)
 	if markers == 0 {
 		g.Errs = append(g.Errs, "System writes exist but the design has no <!-- machinery:authorization-inventory --> marker and closed authorization inventory")
 	} else if markers > 1 {
 		g.Errs = append(g.Errs, "authorization inventory marker appears "+strconv.Itoa(markers)+" times; one design has exactly one closed authorization inventory")
 	}
-	rows := collectAuthorizationRows(g, corpus)
+	rows := collectAuthorizationRows(g, documents)
 	if markers > 0 && len(rows) == 0 {
 		g.Errs = append(g.Errs, "authorization inventory marker has no table with authorization subject and admission columns")
 	}
@@ -171,6 +178,10 @@ func checkAuthorizationInventory(g *Gate, design string, dm *ir.Value) {
 		}
 		if row.admission == "" {
 			g.Errs = append(g.Errs, row.where+": authorization admission is empty; name the admitting capability or waive with '(no authorization: <reason>)'")
+			continue
+		}
+		if !authorizationCapability.MatchString(row.admission) {
+			g.Errs = append(g.Errs, row.where+": admission must name one capability as a backticked dotted identifier or waive with '(no authorization: <reason>)'")
 			continue
 		}
 		g.Count("authorization obligations admitted")

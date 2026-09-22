@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 const factModel = `kind: DomainModel
@@ -74,5 +76,113 @@ func TestFactsDerivedWaiverRequiresReason(t *testing.T) {
 	g = factFixture(t, "computes `risk_score`; derived: risk_score ()", "`event_id`")
 	if !hasErr(g, "derived waiver for 'risk_score' names no reason") {
 		t.Fatalf("an empty derived reason must fail: %v", g.Errs)
+	}
+}
+
+func TestFactsResolveModelEnumActionAndSameRowValues(t *testing.T) {
+	g := factFixture(t, "`Paid`, `markPaid`, VALUES{review_pending, release_ready}, then `release_ready`", "`event_id`")
+	if hasErr(g, "unresolved fact") {
+		t.Fatalf("declared enum, action, and row vocabulary members resolve: %v", g.Errs)
+	}
+}
+
+func TestFactsRejectQualifiedUnknownFact(t *testing.T) {
+	g := factFixture(t, "persists `Order.ghost_field`", "`event_id`")
+	if !hasErr(g, "unresolved fact 'Order.ghost_field'") {
+		t.Fatalf("qualified unknown fact must fail: %v", g.Errs)
+	}
+}
+
+func TestFactsRejectSingleWordFactInSingleWordModel(t *testing.T) {
+	g := factFixture(t, "persists `stage`", "`event_id`")
+	if !hasErr(g, "unresolved fact 'stage'") {
+		t.Fatalf("single-word fact must be checked when the model uses that grammar: %v", g.Errs)
+	}
+}
+
+func TestFactsDerivedWaiverMustBeWellFormedAndNamed(t *testing.T) {
+	g := factFixture(t, "uses `risk_score`; derived: risk_score (calculated) and derived: ghost_fact", "`event_id`")
+	if !hasErr(g, "malformed derived waiver") {
+		t.Fatalf("one valid waiver must not hide a malformed sibling: %v", g.Errs)
+	}
+	g = factFixture(t, "uses `risk_score`; derived: ghost_fact (unrelated)", "`event_id`")
+	if !hasErr(g, "waiver for 'ghost_fact' names no fact") {
+		t.Fatalf("a waiver must name a fact on the row: %v", g.Errs)
+	}
+}
+
+func TestFactUniverseIncludesModelVocabularyActionsAndEvents(t *testing.T) {
+	dm, err := ir.LoadYAML([]byte(`kind: DomainModel
+version: v1
+enums:
+  RefusalReason:
+    values: [{name: wrong_tenant}]
+entities:
+  Finding:
+    attributes: [{name: standing_basis, type: string}, {name: stage, type: string}, {name: reviewStatus, type: string}]
+    actions: [{name: raise_remediation}]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := declaredFacts(dm, t.TempDir(), wiringHeader+"| review_started | a | b | stage | once | none | key |\n")
+	for _, name := range []string{"wrong_tenant", "raise_remediation", "Finding.raise_remediation", "Finding.standing_basis", "review_started"} {
+		if !u.declared[name] {
+			t.Errorf("%s missing from fact universe", name)
+		}
+	}
+	if !u.snake || !u.camel || !u.single {
+		t.Fatalf("attribute spelling styles missing: %+v", u)
+	}
+	if !u.candidate("Finding.standing_basis", "`Finding.standing_basis`", 0) || !u.candidate("reviewStatus", "`reviewStatus`", 0) || !u.candidate("stage", "persists `stage`", 9) {
+		t.Fatal("model-derived grammar does not recognize the three fact shapes")
+	}
+}
+
+func TestFactsDoNotTreatReasonMembersOrProducerNamesAsFacts(t *testing.T) {
+	g := factFixture(t,
+		"records reason class (`wrong_tenant`, `not_verified`) and closure basis `source_observing_again`; closed producer is `Order.reindex`",
+		"`event_id`")
+	for _, name := range []string{"wrong_tenant", "not_verified", "source_observing_again", "Order.reindex"} {
+		if hasErr(g, "unresolved fact '"+name+"'") {
+			t.Fatalf("%s is a value or producer, not a fact: %v", name, g.Errs)
+		}
+	}
+}
+
+func TestFactsDoNotRequireNegatedOrRejectedColumns(t *testing.T) {
+	g := factFixture(t,
+		"There is no `correlation_absent` basis. The `promotion_requested_at` and `promotion_requesting_principal_id` columns were weighed and refused; persists `ghost_fact`.",
+		"`event_id`")
+	for _, name := range []string{"correlation_absent", "promotion_requested_at", "promotion_requesting_principal_id"} {
+		if hasErr(g, "unresolved fact '"+name+"'") {
+			t.Fatalf("negative statement about %s is not a fact requirement: %v", name, g.Errs)
+		}
+	}
+	if !hasErr(g, "unresolved fact 'ghost_fact'") {
+		t.Fatalf("positive write must still be checked: %v", g.Errs)
+	}
+}
+
+func TestFactsDoNotTreatClassificationAndFailureCodesAsFields(t *testing.T) {
+	g := factFixture(t,
+		"for a `study_item` derivation, marks the call `unvalidated_by_platform`; routes work only for `defective_output`; classifies a `controlled_upstream` with no basis; records the reason class `refused` or `insert_failed` on error; persists `ghost_fact`",
+		"`event_id`")
+	for _, name := range []string{"study_item", "unvalidated_by_platform", "defective_output", "controlled_upstream", "insert_failed"} {
+		if hasErr(g, "unresolved fact '"+name+"'") {
+			t.Fatalf("%s is a quoted value, not a field: %v", name, g.Errs)
+		}
+	}
+	if !hasErr(g, "unresolved fact 'ghost_fact'") {
+		t.Fatalf("positive fact use must still fail: %v", g.Errs)
+	}
+}
+
+func TestFactsDoNotTreatKindAndFailureClassMembersAsFields(t *testing.T) {
+	g := factFixture(t, "derivation source (kind `study_item`, ref input); records the failure class `refused` or `insert_failed` on error", "`event_id`")
+	for _, name := range []string{"study_item", "insert_failed"} {
+		if hasErr(g, "unresolved fact '"+name+"'") {
+			t.Fatalf("%s is a vocabulary member: %v", name, g.Errs)
+		}
 	}
 }

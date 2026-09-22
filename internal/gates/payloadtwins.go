@@ -25,7 +25,7 @@ import (
 
 var (
 	payloadDeclaration = regexp.MustCompile(`(?i)payload(?:\s+is\s+exactly)?\s*\{([^}]*)\}`)
-	payloadWord        = regexp.MustCompile(`(?i)\bpayload\b`)
+	payloadOpening     = regexp.MustCompile(`(?i)\bpayload(?:\s+is\s+exactly)?\s*\{`)
 	payloadField       = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.]*$`)
 	payloadBacktick    = regexp.MustCompile("`([A-Za-z][A-Za-z0-9_.]*)`")
 )
@@ -74,9 +74,10 @@ func architecturePayloadFields(cell string) ([]string, string) {
 	var fields []string
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
-		if payloadField.MatchString(part) {
-			fields = append(fields, part)
+		if part == "" || !payloadField.MatchString(part) {
+			return nil, "payload cell contains non-identifier field " + ir.Repr(part) + "; backtick each field or use a comma-separated identifier list"
 		}
+		fields = append(fields, part)
 	}
 	if len(fields) == 0 {
 		return nil, "payload cell states no closed field set; backtick each field or use a comma-separated identifier list"
@@ -113,8 +114,7 @@ func collectPayloadTwinDeclarations(g *Gate, design string) []payloadTwinDeclara
 		}
 		lines := strings.Split(string(body), "\n")
 		for lineNo, line := range lines {
-			if !strings.HasPrefix(strings.TrimSpace(line), "|") || !payloadWord.MatchString(line) ||
-				(!strings.Contains(line, "{") && !strings.Contains(line, "}")) {
+			if !strings.HasPrefix(strings.TrimSpace(line), "|") || !payloadOpening.MatchString(line) {
 				continue
 			}
 			matches := payloadDeclaration.FindAllStringSubmatch(line, -1)
@@ -133,8 +133,8 @@ func collectPayloadTwinDeclarations(g *Gate, design string) []payloadTwinDeclara
 				if ei < 0 {
 					continue
 				}
-				for _, row := range tbl.Rows {
-					if strings.Join(row, " | ") == strings.Join(splitTableRow(line), " | ") {
+				for i, row := range tbl.Rows {
+					if strings.TrimSpace(tbl.RowLines[i]) == strings.TrimSpace(line) {
 						eventCell = cellAt(row, ei)
 					}
 				}

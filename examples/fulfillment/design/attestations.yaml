@@ -2,52 +2,64 @@ attestation_version: 2
 attestations:
   - claim: g2.action-ownership
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'The closed action-ownership table was reconciled actor by actor and assigns each of the 37 domain actions to exactly one deployed component.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: The closed action-ownership table was reconciled actor by actor and assigns each of the 37 domain actions to exactly one deployed component.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+      - path: AUTHORIZATION.md
+        hash: sha256:209fb6bda9447fcc23918ec05e4eb4ff4421f039bff1854c04c00f1ec4ff81a6
   - claim: g2.interface-contract-rightness
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'The only compile-time crossings are pure shared event schemas; all runtime service interaction is governed by the event contract, with explicit decode errors and retry-safe idempotency.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: The only compile-time crossings are pure shared event schemas; all runtime service interaction is governed by the event contract, with explicit decode errors and retry-safe idempotency.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+      - path: AUTHORIZATION.md
+        hash: sha256:209fb6bda9447fcc23918ec05e4eb4ff4421f039bff1854c04c00f1ec4ff81a6
   - claim: g2.placement-rightness
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'Stateful aggregates, saga, and outbox are placed with persistence and serialization matching their service ownership; value and CRUD records carry explicit no-machine or inline-placement reasons.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Stateful aggregates, saga, and outbox are placed with persistence and serialization matching their service ownership; value and CRUD records carry explicit no-machine or inline-placement reasons.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+      - path: AUTHORIZATION.md
+        hash: sha256:209fb6bda9447fcc23918ec05e4eb4ff4421f039bff1854c04c00f1ec4ff81a6
   - claim: g2.adoption-closure-discovery
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'Elixir/OTP, Ecto, PostgreSQL, Oban, RabbitMQ, and the two external adapters were swept for separately operated closure members and bound to declared, mitigated dependencies.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Elixir/OTP, Ecto, PostgreSQL, Oban, RabbitMQ, and the two external adapters were swept for separately operated closure members and bound to declared, mitigated dependencies.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+      - path: AUTHORIZATION.md
+        hash: sha256:209fb6bda9447fcc23918ec05e4eb4ff4421f039bff1854c04c00f1ec4ff81a6
   - claim: g2.event-contract-completeness
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'The reserve, release, capture, refund, dispatch, and reply flows were swept in both producer and consumer directions; order placement remains an explicitly local API-to-saga call.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: The reserve, release, capture, refund, dispatch, and reply flows were swept in both producer and consumer directions; order placement remains an explicitly local API-to-saga call.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+      - path: AUTHORIZATION.md
+        hash: sha256:209fb6bda9447fcc23918ec05e4eb4ff4421f039bff1854c04c00f1ec4ff81a6
   - claim: g2.nfr-content
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'Security, capacity, and observability claims were checked against the four-service topology, explicit retry bounds, outbox signals, and FailedDirty paging requirement.'
+    attestor: Codex lane/next-gates
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over AUTHORIZATION.md: checked the exact System-action subjects against Modelith and inspected each named admission as a plan capability; implementation enforcement remains a separate review; prior review note: Security, capacity, and observability claims were checked against the four-service topology, explicit retry bounds, outbox signals, and FailedDirty paging requirement.'
     covers:
       - path: ARCHITECTURE.md
         hash: sha256:87e209f0b7c243e7b07ff71b9e2c2ec4a04c1d6e7d7af2694368e879424daa4b
+      - path: AUTHORIZATION.md
+        hash: sha256:209fb6bda9447fcc23918ec05e4eb4ff4421f039bff1854c04c00f1ec4ff81a6
   - claim: g3.guard-semantics
     kind: plan
     attestor: Codex production-readiness review
