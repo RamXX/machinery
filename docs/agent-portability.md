@@ -209,10 +209,18 @@ shared hook protocol. In particular, it forwards OpenCode's `patchText`, whose p
 `*** Add/Update/Move/Delete File` markers.
 
 The adapter can reject a generated-artifact edit synchronously in `tool.execute.before`. It also
+runs exact `PostToolUseFailure` completion when OpenCode reports a rejected permission, a tool-part
+error, or a tool error in the after hook.
+When OpenCode reports `session.idle` with a recorded file-tool before call but no matching after
+call, the adapter records that terminal asymmetry with an explicit idle reason before asking the
+hook to check the gate. A shell can leave a delayed writer running after idle, so its unmatched
+call stays armed until OpenCode reports an exact refusal or completion. Existing hook ledgers
+with tree hashes remain readable, but new pending calls carry no tree hash because it cannot
+prove completion. The adapter
 runs the stop check on `session.idle`, but OpenCode's event API does not provide the same reliable
 "block this stop and force another agent turn" contract as Claude Code and Codex. A red idle check is
-therefore surfaced in a warning toast and the application log, then its touched-file ledger is
-cleared so later idle events do not repeat stale results. This is an ergonomics difference, not a
+therefore surfaced in a warning toast and the application log, while its touched-file ledger is
+retained until the deterministic hook discharges it. This is an ergonomics difference, not a
 correctness exception: `machinery check` in CI remains authoritative for every host.
 
 Every governance subprocess the plugin spawns is bounded (a deadline plus a capped output capture

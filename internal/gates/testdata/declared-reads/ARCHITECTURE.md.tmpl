@@ -1,0 +1,17 @@
+# Declared reads fixture
+
+## Architecture Contract
+
+```yaml
+contract_version: 2
+boundaries:
+  - id: app
+    code: ["lib/**"]
+reads:
+  - artifact: machines/Principal.matrix.md
+    reader: lib/principal_reader.ex
+    reviewed: "REVIEW_COMMIT"
+dependency_rules:
+  allow: []
+  deny: []
+```

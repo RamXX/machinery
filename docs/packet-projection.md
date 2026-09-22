@@ -24,6 +24,8 @@ milestones:
       - id: M1-S1
         shard: BUILD/core.md
         budget: 600000
+        fixtures:
+          - test/support/release_fixture.ex
         cites:
           - section:BUILD/core.md#8.5
           - section:BUILD/core.md#9
@@ -61,7 +63,14 @@ here owes nothing to this gate.
 | `id` | `<milestone>-S<n>`, with `<milestone>` the enclosing milestone's id and `<n>` a positive integer. Unique across the file. This is the stable slice id the packet file is named by. |
 | `shard` | Exactly one design-relative path to a regular `.md` file. In a manifest design this is the slice's BUILD shard (`BUILD/core.md`); in a full-mode design it may be `BUILD.md`. Every `section:` and `milestone:` citation of a file under `BUILD/` must name this shard: a slice bound to one shard never pulls another shard's content. |
 | `budget` | Positive integer, bytes. The packet file must not exceed it. See "The budget metric". |
+| `fixtures` | Optional non-empty list of clean implementation-relative paths. Each path names a fixture module whose change obligates this slice's bound suite to run. A path is stated at most once per slice. When multiple slices name the same path, every one of their packets names the complete consumer set. |
 | `cites` | Non-empty list of citations (below). Order is the author's; the packet groups them by kind and keeps authored order within a kind. A citation listed twice is an error. |
+
+Fixture paths use forward slashes, cannot be absolute or contain `.` or `..` segments, and are
+interpreted relative to the implementation root by the executor. `Gw-packet` does not inspect an
+implementation tree, so it holds the declaration's shape and projection, not the module's
+existence. The fixture is an execution obligation: after changing it, run the suites of every
+slice listed as a consumer in the packet.
 
 ### Waivers
 
@@ -120,12 +129,19 @@ the packet carries the row once under its stable id. Test ids renumber; cite the
 5. **Matrices.** Every `matrix:` file.
 6. **Architecture Contract.** Every `boundary:`, `external:`, `rule:`, and `row:` excerpt.
 7. **Invariants.** Every `invariant:` excerpt with its traceability row.
-8. **Acceptance entry shape.** A `design/acceptance/M<n>.yaml` skeleton whose `dod_ids` list is
+8. **Fixture obligations, when declared.** Every fixture bound to the slice, plus the complete
+   sorted list of slices that bind the same path. This section is omitted when the slice declares
+   no fixtures, preserving the earlier packet shape for existing maps.
+9. **Acceptance entry shape.** A `design/acceptance/M<n>.yaml` skeleton whose `dod_ids` list is
    the full obligation set of the milestone, annotated with the claiming slice, so the executor
    sees what the milestone review will bind.
-9. **Sources.** Every design file the packet drew from, with the line ranges it drew. The packet
+10. **Sources.** Every design file the packet drew from, with the line ranges it drew. The packet
    binds to the excerpted bytes it carries and to the slice map, whose SHA-256 the header
    states; it does not bind to whole files, so an edit elsewhere in a source never changes it.
+
+The rendered heading numbers are conditional: without fixture obligations, Acceptance and Sources
+remain sections 7 and 8; with them, Fixture obligations is section 7 and the later headings move to
+8 and 9.
 
 Every excerpt is headed by `### <citation> (<path>:<first>-<last>)`, with the line range
 1-based and inclusive, followed by the source lines copied byte for byte. Markdown excerpts are
@@ -174,14 +190,18 @@ file is an error. Runs after `Gb-plan`, whose milestone parse it reuses, and bef
   one excerpt.
 - **Every packet fits its budget.** The projected bytes for each slice are compared with the
   declared budget. An over-budget slice is an ERROR naming the bytes and the budget.
+- **Every fixture obligation is well formed and stated.** Each `fixtures:` item is a clean,
+  portable implementation-relative path, with no duplicates within a slice. The projector builds
+  the reverse map and carries every shared fixture's complete, deterministically sorted consumer
+  set into each affected packet.
 - **Every obligation is claimed exactly once.** The obligations a milestone owes are the
   committed oracle ids its DoD cites whole-token, `ORACLESET{...}` expanded, the same set
   `Ga-accept` binds acceptance evidence to. Each must be claimed by exactly one slice (a bare
   id or an `oracleset:` that contains it) or carry a waiver. Unclaimed, double-claimed, and
   contradicted (claimed and waived) obligations are ERRORs.
 
-The `checked:` line reports milestones, slices, obligations claimed and waived, and the
-projected bytes per slice.
+The `checked:` line reports fixture modules and slice bindings when any are declared, milestones,
+slices, obligations claimed and waived, and the projected bytes per slice.
 
 `machinery packet` runs the same gate before writing anything and writes nothing when it
 fails. A packet that would have been over budget, or a projection that would have dropped an
@@ -203,6 +223,26 @@ packet M1-S1 -> out/M1-S1.packet.md: 412336 bytes of 600000 budget (137446 token
 The gate runs over the whole milestone even when one slice is selected, because the
 coverage rule is a property of the milestone, not of a slice.
 
+## Lane-scope protocol
+
+Packet projection assumes one executor lane per slice and an integrator that owns shared files.
+Machinery does not implement a project's lane-scope gate, but that gate needs the same two
+conventions the packet handoff uses:
+
+1. A commit whose subject is `integrator-request(<slice>)` may carry integrator-owned paths. The
+   slice token names the requesting slice, and the commit is a request for the integrator to land or
+   reconcile those paths. A scope gate must classify this commit by its subject before applying the
+   ordinary per-lane path allowlist.
+2. A design lane's whole diff is an integrator request. Design files are shared authority rather
+   than executor-owned implementation paths, so the lane hands that diff to the integrator under
+   the same review and reconciliation rule even when it contains more than one commit.
+
+These are permissions to request shared edits, not permissions to merge them directly. The
+integrator remains responsible for reconciling concurrent requests, running every affected slice
+suite, regenerating packets, and landing the shared result. A project may encode stricter naming or
+metadata, but its scope gate must preserve these two meanings or it will reject the handoff protocol
+the packets were projected for.
+
 ## Authoring the slice map
 
 The one manual step is writing `slices.yaml` from the plan that already assigns work to
@@ -215,9 +255,11 @@ slices in prose. A workable order:
 3. For each slice, cite the shard sections its executor must read (`section:`), the machine
    contracts behind its rows (`matrix:`), the contract items and mitigation rows it must
    honor (`boundary:`, `rule:`, `row:`), and the invariants it enforces (`invariant:`).
-4. Run `machinery packet` and read the size line. A slice over budget cites too much for one
+4. Add each shared or suite-support fixture to `fixtures:` on every slice whose bound suite must
+   run after that module changes. Do not list the same fixture twice within one slice.
+5. Run `machinery packet` and read the size line. A slice over budget cites too much for one
    executor: narrow the sections to subsections, or split the slice and move claims.
-5. Commit `slices.yaml`. `Gw-packet` now holds it on every `machinery check`.
+6. Commit `slices.yaml`. `Gw-packet` now holds it on every `machinery check`.
 
 Packets are outputs, never inputs: they are regenerated for every executor run and are not
 committed to the design.

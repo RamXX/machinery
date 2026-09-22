@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -215,6 +215,27 @@ test("plugin constructs without a Bun $ and routes governed calls through the ru
   assert.equal(calls[0].payload.tool_name, "Write")
   assert.equal(calls[0].payload.tool_use_id, "call-1")
   assert.equal(calls[0].payload.tool_input.file_path, "design/BUILD.md")
+})
+
+test("permission reply and tool error report exact denied completions", async () => {
+  const calls = []
+  const plugin = await MachineryPlugin({ client: {}, directory: "/project", worktree: "" }, { runner: fakeRunner({}, calls) })
+  await plugin["tool.execute.before"]({ tool: "write", sessionID: "s", callID: "denied" }, { args: { filePath: "/project/design/a" } })
+  await plugin.event({ event: { type: "permission.updated", properties: { id: "permission-1", sessionID: "s", callID: "denied" } } })
+  await plugin.event({ event: { type: "permission.replied", properties: { sessionID: "s", permissionID: "permission-1", response: "reject" } } })
+  await plugin["tool.execute.before"]({ tool: "write", sessionID: "s", callID: "errored" }, { args: { filePath: "/project/design/b" } })
+  await plugin["tool.execute.after"]({ tool: "write", sessionID: "s", callID: "errored", args: { filePath: "/project/design/b" } }, { error: { message: "tool refused" } })
+  const failures = calls.filter(({ payload }) => payload.hook_event_name === "PostToolUseFailure")
+  assert.deepEqual(failures.map(({ payload }) => payload.tool_use_id), ["denied", "errored"])
+})
+
+test("OpenCode tool-part error closes only the refused shell call", async () => {
+  const calls = []
+  const plugin = await MachineryPlugin({ client: {}, directory: "/project", worktree: "" }, { runner: fakeRunner({}, calls) })
+  await plugin["tool.execute.before"]({ tool: "bash", sessionID: "part-session", callID: "shell-refused" }, { args: { command: "touch design/a" } })
+  await plugin["tool.execute.before"]({ tool: "bash", sessionID: "part-session", callID: "shell-still-running" }, { args: { command: "schedule delayed writer" } })
+  await plugin.event({ event: { type: "message.part.updated", properties: { part: { id: "prt-456", callID: "shell-refused", sessionID: "part-session", messageID: "msg-1", type: "tool", tool: "bash", state: { status: "error", input: { command: "touch design/a" }, error: "permission denied", time: { start: 1, end: 2 } } } } } })
+  assert.deepEqual(calls.filter(({ payload }) => payload.hook_event_name === "PostToolUseFailure").map(({ payload }) => payload.tool_use_id), ["shell-refused"])
 })
 
 test("a spawn failure fails closed with the transport error", async () => {
@@ -446,6 +467,59 @@ test("native real machinery binary governs a managed root end to end", { timeout
       assert.match(err.message, /machinery oracle/)
       return true
     })
+    // OpenCode refuses the first call after our before hook, emits no after,
+    // then another call mutates the tree before every idle (each is a first Stop).
+    const observed = []
+    const governed = await MachineryPlugin({ client: {}, directory: root, worktree: "" }, {
+      runner: async (r, payload) => {
+        const result = await defaultRunner(r, payload)
+        observed.push({ payload, result })
+        return result
+      },
+    })
+    await governed["tool.execute.before"]({ tool: "write", sessionID: "refused-session", callID: "refused-call" }, { args: { filePath: path.join(root, "design", "refused.txt") } })
+    await governed["tool.execute.before"]({ tool: "write", sessionID: "refused-session", callID: "other-call" }, { args: { filePath: path.join(root, "design", "other.txt") } })
+    await writeFile(path.join(root, "design", "other.txt"), "unrelated mutation\n")
+    await governed["tool.execute.after"]({ tool: "write", sessionID: "refused-session", callID: "other-call", args: { filePath: path.join(root, "design", "other.txt") } }, {})
+    for (let i = 0; i < 2; i++) {
+      await governed.event({ event: { type: "session.idle", properties: { sessionID: "refused-session" } } })
+    }
+    assert.ok(observed.some(({ payload }) => payload.hook_event_name === "PostToolUseFailure" && payload.tool_use_id === "refused-call"), "refusal must be translated as exact failed completion")
+    const stops = observed.filter(({ payload }) => payload.hook_event_name === "Stop")
+    assert.equal(stops.length, 2)
+    assert.ok(stops.every(({ result }) => !result.stdout.includes('"decision":"block"')), "each idle must discharge its gate result")
+    const stateFiles = await readdir(configDir, { recursive: true })
+    for (const file of stateFiles.filter((name) => name.endsWith(".state"))) {
+      assert.doesNotMatch(await readFile(path.join(configDir, file), "utf8"), /pending /)
+    }
+    // OpenCode's terminal tool-part carries its own id plus the Bash callID.
+    // A sandbox-refused shell has no execute.after, then another call can
+    // mutate the design before each idle (each idle is a first Stop).
+    const shellObserved = []
+    const shell = await MachineryPlugin({ client: {}, directory: root, worktree: "" }, {
+      runner: async (r, payload) => {
+        const result = await defaultRunner(r, payload)
+        shellObserved.push({ payload, result })
+        return result
+      },
+    })
+    await shell["tool.execute.before"]({ tool: "bash", sessionID: "shell-denial-session", callID: "call-123" }, { args: { command: "cd /sandbox/refused" } })
+    await shell.event({ event: { type: "message.part.updated", properties: { part: { id: "prt-456", callID: "call-123", sessionID: "shell-denial-session", messageID: "msg-123", type: "tool", tool: "bash", state: { status: "error", input: { command: "cd /sandbox/refused" }, error: "permission denied", time: { start: 1, end: 2 } } } } } })
+    await shell["tool.execute.before"]({ tool: "write", sessionID: "shell-denial-session", callID: "unrelated-write" }, { args: { filePath: path.join(root, "design", "after-denial.txt") } })
+    await writeFile(path.join(root, "design", "after-denial.txt"), "unrelated mutation\n")
+    await shell["tool.execute.after"]({ tool: "write", sessionID: "shell-denial-session", callID: "unrelated-write", args: { filePath: path.join(root, "design", "after-denial.txt") } }, {})
+    for (let i = 0; i < 2; i++) {
+      await shell.event({ event: { type: "session.idle", properties: { sessionID: "shell-denial-session" } } })
+    }
+    assert.deepEqual(shellObserved.filter(({ payload }) => payload.hook_event_name === "PostToolUseFailure").map(({ payload }) => payload.tool_use_id), ["call-123"])
+    assert.equal(shellObserved.filter(({ payload }) => payload.hook_event_name === "Stop").length, 2)
+    assert.ok(shellObserved.filter(({ payload }) => payload.hook_event_name === "Stop").every(({ result }) => !result.stdout.includes('"decision":"block"')))
+    const late = await MachineryPlugin({ client: {}, directory: root, worktree: "" }, {})
+    await late["tool.execute.before"]({ tool: "bash", sessionID: "late-session", callID: "late-writer" }, { args: { command: "schedule delayed writer" } })
+    const delayedWrite = sleep(50).then(() => writeFile(path.join(root, "design", "late.txt"), "late write\n"))
+    await assert.rejects(() => late.event({ event: { type: "session.idle", properties: { sessionID: "late-session" } } }), /in-flight tool/)
+    await delayedWrite
+    await assert.rejects(() => late.event({ event: { type: "session.idle", properties: { sessionID: "late-session" } } }), /in-flight tool/)
     // The same transport stays silent on an unmanaged root: the documented
     // empty-success protocol through the real binary.
     const bare = await mkdtemp(path.join(scratch, "unmanaged-"))

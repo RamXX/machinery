@@ -108,6 +108,13 @@ complete group, so join a group wrapped across lines, and every row and machine
 stating one edge must agree on the exact field set. Members are ubiquitous
 language, not code symbols. `READS` in ordinary prose stays prose.
 
+When implementation code parses a design artifact during compilation or build, declare that
+dependency with a root `reads:` row in the Architecture Contract: design-relative `artifact`,
+implementation-relative `reader`, and the full reviewed Git commit. This lower-case YAML grammar is
+not the event-payload `READS{...}` grammar above. `Gr-reads` warns in a design-only run and, with
+`--impl`, fails when an artifact-changing commit did not change its declared reader in the same
+commit. The exact closed grammar is in `docs/declared-reads.md`.
+
 Run `machinery check <design> --gate g2,gu` plus each artifact-activated gate,
 and `machinery verify-c4 <design>`. Record the required attestation rows.
 
@@ -140,11 +147,13 @@ self-contained packet for a smaller execution model. Matrix linkage gives
 milestones and reusable domain shards an exact reciprocal many-to-many graph;
 each execution unit is one milestone-shard pair and reads the root plus that
 workstream shard. When root plus shard exceeds the executor's window, author
-`design/slices.yaml` (one shard, a byte budget, and the element ids each slice
-cites) and hand the executor `machinery packet <design> --milestone <id> --out
+`design/slices.yaml` (one shard, a byte budget, the element ids each slice
+cites, and optional implementation-relative fixture modules that obligate its suite) and hand the executor `machinery packet <design> --milestone <id> --out
 <dir>` output instead: only what the slice cites, every excerpt under its stable
 id and source path:line, held by `Gw-packet` so no obligation of the milestone is
 dropped. The slice map is authored; the packets are generated and never edited.
+When slices share a fixture, declare that path on every consuming slice. Each
+packet then states the full set of suites that must run after the fixture changes.
 
 Run the full `machinery check <design>` and, once code exists,
 `machinery check <design> --impl <dir>`. A green design is the RED precondition;

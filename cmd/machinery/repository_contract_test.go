@@ -92,6 +92,19 @@ func TestOpenCodeAdapterContracts(t *testing.T) {
 	}
 }
 
+func TestPacketProjectionStatesLaneScopeProtocol(t *testing.T) {
+	root := repoRootDir(t)
+	doc := mustRepositoryFile(t, filepath.Join(root, "docs", "packet-projection.md"))
+	for _, required := range []string{
+		"integrator-request(<slice>)",
+		"A design lane's whole diff is an integrator request",
+	} {
+		if !strings.Contains(doc, required) {
+			t.Errorf("packet projection reference is missing lane-scope convention %q", required)
+		}
+	}
+}
+
 func TestHookFailureDiagnosticsDoNotGuessVersionSkew(t *testing.T) {
 	root := repoRootDir(t)
 	shim := mustRepositoryFile(t, filepath.Join(root, "hooks", "machinery-hook.sh"))

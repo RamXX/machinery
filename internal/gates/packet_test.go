@@ -127,6 +127,52 @@ func TestPacketProjectionClean(t *testing.T) {
 	}
 }
 
+func TestPacketCarriesSharedFixtureObligations(t *testing.T) {
+	design := packetFixture(t)
+	packets, g := ProjectPackets(design, "M1", "")
+	if len(g.Errs) > 0 {
+		t.Fatalf("fixture declaration failed: %v", g.Errs)
+	}
+	if g.Counts["fixture bindings"] != 2 || g.Counts["fixture modules"] != 1 {
+		t.Fatalf("fixture counts = %v", g.Counts)
+	}
+	for _, packet := range packets {
+		body := string(packet.Body)
+		for _, want := range []string{
+			"## 7. Fixture obligations",
+			"`test/support/release_fixture.ex` feeds suites of slices M1-S1 and M1-S2; run every consuming slice suite after changing it.",
+		} {
+			if !strings.Contains(body, want) {
+				t.Errorf("%s packet lacks %q\n%s", packet.Slice, want, body)
+			}
+		}
+	}
+}
+
+func TestPacketFixtureDeclarationFailsClosed(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		finding string
+	}{
+		{"not a list", " fixture.ex", "fixtures must be a non-empty list"},
+		{"null", " null", "fixtures must be a non-empty list"},
+		{"not portable", "\n          - ../fixture.ex", "is not a clean implementation-relative path"},
+		{"drive relative", "\n          - 'C:fixture.ex'", "is not a clean implementation-relative path"},
+		{"device basename", "\n          - 'test/CON.txt'", "is not a clean implementation-relative path"},
+		{"whitespace", "\n          - ' fixture.ex'", "is not a clean implementation-relative path"},
+		{"duplicate", "\n          - fixture.ex\n          - fixture.ex", "fixtures repeats 'fixture.ex'"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			design := packetFixture(t)
+			rewriteFixtureFile(t, design, "slices.yaml", "        fixtures:\n          - test/support/release_fixture.ex\n", "        fixtures:"+tt.value+"\n")
+			_, g := ProjectPackets(design, "", "")
+			wantErr(t, g, tt.finding)
+		})
+	}
+}
+
 // AC2: two runs over the same bytes are byte-identical.
 func TestPacketProjectionIsByteReproducible(t *testing.T) {
 	design := packetFixture(t)
@@ -199,7 +245,7 @@ func TestPacketExcerptsResolveToSource(t *testing.T) {
 // projected.
 func TestPacketOverBudgetFails(t *testing.T) {
 	design := packetFixture(t)
-	rewriteFixtureFile(t, design, "slices.yaml", "budget: 12000\n        cites:\n          - section:BUILD/core.md#8.1", "budget: 500\n        cites:\n          - section:BUILD/core.md#8.1")
+	rewriteFixtureFile(t, design, "slices.yaml", "budget: 12000\n        fixtures:\n          - test/support/release_fixture.ex\n        cites:\n          - section:BUILD/core.md#8.1", "budget: 500\n        fixtures:\n          - test/support/release_fixture.ex\n        cites:\n          - section:BUILD/core.md#8.1")
 	packets, g := ProjectPackets(design, "M1", "")
 	wantErr(t, g, "slice M1-S1 projects to")
 	wantErr(t, g, "over its declared budget of 500")
@@ -255,7 +301,7 @@ func TestPacketDanglingCitationsFail(t *testing.T) {
 	cases := []struct{ name, old, new, want string }{
 		{"unknown oracle id", "          - DEAL-38ba11\n", "          - DEAL-ffffff\n", "cites oracle id DEAL-ffffff, which no committed oracle declares"},
 		{"unknown section", "section:BUILD/core.md#8.1", "section:BUILD/core.md#8.9", `no heading of BUILD/core.md has id '8.9'`},
-		{"missing shard", "shard: BUILD/core.md\n        budget: 12000\n        cites:\n          - section:BUILD/core.md#8.1", "shard: BUILD/gone.md\n        budget: 12000\n        cites:\n          - section:BUILD/core.md#8.1", "shard BUILD/gone.md does not exist in the design"},
+		{"missing shard", "shard: BUILD/core.md\n        budget: 12000\n        fixtures:\n          - test/support/release_fixture.ex\n        cites:\n          - section:BUILD/core.md#8.1", "shard: BUILD/gone.md\n        budget: 12000\n        fixtures:\n          - test/support/release_fixture.ex\n        cites:\n          - section:BUILD/core.md#8.1", "shard BUILD/gone.md does not exist in the design"},
 		{"foreign shard", "section:BUILD/core.md#8.1", "section:BUILD/other.md#8.1", "cites BUILD/other.md, but the slice is bound to shard BUILD/core.md"},
 		{"unknown boundary", "boundary:crm.domain", "boundary:crm.nope", `declares no boundaries item with id 'crm.nope'`},
 		{"unknown rule", "rule:crm.domain -> crm.repo", "rule:crm.repo -> crm.nope", `no dependency_rules allow, deny, or baseline entry reads 'crm.repo -> crm.nope'`},

@@ -1,0 +1,5 @@
+== Gr-reads  implementation design-file consumers ==
+  warn   machines/Principal.matrix.md: an implementation reads this file through lib/principal_reader.ex; land any edit with its reader follow-up and run with --impl to verify the review history
+  checked: 1 declared reads, 1 artifacts resolved
+
+0 blocking (ERROR/DRIFT) finding(s)

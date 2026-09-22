@@ -323,9 +323,10 @@ var (
 )
 
 var (
-	contractRootKeys     = stringSet("contract_version", "boundaries", "externals", "ignore", "dependency_rules", "_comment")
+	contractRootKeys     = stringSet("contract_version", "boundaries", "externals", "ignore", "reads", "dependency_rules", "_comment")
 	contractBoundaryKeys = stringSet("id", "kind", "element", "code", "exposes", "modules", "provides", "consumes", "_comment")
 	contractExternalKeys = stringSet("id", "element", "imports", "modules", "_comment")
+	contractReadKeys     = stringSet("artifact", "reader", "reviewed", "_comment")
 	contractRuleKeys     = stringSet("allow", "deny", "baseline", "assert", "notes", "_comment")
 	contractAssertKeys   = stringSet("no_path", "_comment")
 )
@@ -420,6 +421,25 @@ func validateContractSchema(g *Gate, co *ir.Object) {
 		}
 	}
 	contractStringList(g, co, "ignore", "root", false)
+	if rv := co.Get2("reads"); rv != nil {
+		if rv.Kind != ir.KindArray || len(rv.AsArray()) == 0 {
+			g.Errs = append(g.Errs, "Architecture Contract: reads must be a non-empty list of mappings")
+		} else {
+			for i, item := range rv.AsArray() {
+				o := item.AsObject()
+				where := fmt.Sprintf("reads[%d]", i)
+				if o == nil {
+					g.Errs = append(g.Errs, "Architecture Contract: "+where+" is not a mapping")
+					continue
+				}
+				contractUnknownKeys(g, o, contractReadKeys, where)
+				contractString(g, o, "artifact", where, true)
+				contractString(g, o, "reader", where, true)
+				contractString(g, o, "reviewed", where, true)
+				contractString(g, o, "_comment", where, false)
+			}
+		}
+	}
 	if rv := co.Get2("dependency_rules"); rv != nil {
 		rules := rv.AsObject()
 		if rules == nil {

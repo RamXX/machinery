@@ -4039,14 +4039,8 @@ func TestDialogPlainRegister(t *testing.T) {
 	})
 }
 
-// A tool that machinery allows can still be refused afterwards by the host
-// permission layer, by another PreToolUse hook, or by the user. That refusal
-// produces no PostToolUse event, so the armed token can never be cleared by
-// the normal path. Blocking on it forever wedges the session and, worse, skips
-// the gate run that would actually inspect the tree. The first Stop still
-// blocks (the crash case's chance to complete); the re-fired Stop reaps and
-// gates.
-func TestStopReapsArmedOperationThatNeverRanOnRefiredStop(t *testing.T) {
+// A changed tree with no terminal event stays armed through a Stop re-fire.
+func TestRefiredStopCannotReapChangedArmedOperation(t *testing.T) {
 	isolateHookState(t)
 	root := managedRoot(t)
 	sid := "denied-after-arm"
@@ -4057,7 +4051,9 @@ func TestStopReapsArmedOperationThatNeverRanOnRefiredStop(t *testing.T) {
 	if out := runEvent(t, root, pre); out != "" {
 		t.Fatalf("allowed edit preflight unexpectedly emitted output: %s", out)
 	}
-	// The tool is refused here. No PostToolUse ever arrives.
+	// The tool ran and changed the governed tree, but its PostToolUse was lost.
+	// The changed fingerprint keeps the first Stop conservative.
+	writeFile(t, filepath.Join(root, "design", "notes.txt"), "tool ran\n")
 
 	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
 	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "in-flight tool") {
@@ -4065,11 +4061,12 @@ func TestStopReapsArmedOperationThatNeverRanOnRefiredStop(t *testing.T) {
 	}
 
 	out = runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop", StopHookActive: true})
-	if strings.Contains(out, `"decision":"block"`) {
-		t.Fatalf("re-fired Stop stayed wedged on an operation that never ran: %s", out)
+	if !strings.Contains(out, `"decision":"block"`) {
+		t.Fatalf("re-fired Stop is not a completion witness: %s", out)
 	}
-	if !strings.Contains(out, "reaped 1 tool operation") {
-		t.Fatalf("a reap must never be silent: %s", out)
+	pre.HookEventName = "PostToolUseFailure"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("host completion: %s", out)
 	}
 	record, err := readStateRecord(root, sid)
 	if err != nil {
@@ -4077,6 +4074,131 @@ func TestStopReapsArmedOperationThatNeverRanOnRefiredStop(t *testing.T) {
 	}
 	if len(record.pending) != 0 {
 		t.Fatalf("reap left %d pending token(s) behind", len(record.pending))
+	}
+}
+
+// OpenCode's refusal must be translated to an exact failed completion. An
+// unchanged hash alone cannot close the operation.
+func TestHostDenialRequiresExactFailureCompletion(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	sid := "denied-with-unchanged-tree"
+	t.Cleanup(func() { _ = clearState(root, sid) })
+
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "notes.txt"))
+	pre.ToolUseID = "denied-before-execution"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("allowed edit preflight unexpectedly emitted output: %s", out)
+	}
+	// The host refuses the tool. The governed tree remains byte-identical and
+	// no PostToolUse event exists for the adapter to forward.
+	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	if !strings.Contains(out, `"decision":"block"`) {
+		t.Fatalf("unchanged tree is not completion: %s", out)
+	}
+	pre.HookEventName = "PostToolUseFailure"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("denial completion: %s", out)
+	}
+	record, err := readStateRecord(root, sid)
+	if err != nil {
+		t.Fatalf("read state after expiration: %v", err)
+	}
+	if len(record.pending) != 0 {
+		t.Fatalf("expiration left %d pending token(s) behind", len(record.pending))
+	}
+}
+
+func TestPreToolUseArmsWithoutReadingUnrelatedImplementationTree(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	writeFile(t, filepath.Join(root, ConfigName), `{"design":"design","impl":"impl"}`)
+	writeFile(t, filepath.Join(root, "impl", "main.go"), "package main\n")
+	if err := os.Symlink("main.go", filepath.Join(root, "impl", "alias.go")); err != nil {
+		t.Fatal(err)
+	}
+	sid := "unrelated-impl-inventory"
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "notes.txt"))
+	pre.ToolUseID = "write-design-notes"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("PreToolUse depended on unrelated implementation inventory: %s", out)
+	}
+	record, err := readStateRecord(root, sid)
+	if err != nil || len(record.pending) != 1 || !record.design {
+		t.Fatalf("PreToolUse did not arm its exact pending obligation: record=%+v err=%v", record, err)
+	}
+	if len(record.pendingHashes) != 0 {
+		t.Fatalf("new pending operation wrote an unused tree hash: %v", record.pendingHashes)
+	}
+}
+
+func TestHookStateStillReadsLegacyHashedPendingLine(t *testing.T) {
+	token := strings.Repeat("a", 64)
+	hash := strings.Repeat("b", 64)
+	for _, pending := range []string{"pending " + token, "pending " + token + " " + hash} {
+		record, err := parseHookStateRecord([]byte("revision 1\ndesign\n" + pending + "\n"))
+		if err != nil || len(record.pending) != 1 || record.pending[0] != token {
+			t.Fatalf("pending line %q was not read: record=%+v err=%v", pending, record, err)
+		}
+	}
+}
+
+func TestStopKeepsArmedOperationBeforeScheduledLateWriter(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	sid := "scheduled-late-writer"
+	t.Cleanup(func() { _ = clearState(root, sid) })
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "notes.txt"))
+	pre.ToolUseID = "scheduled-write"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("preflight: %s", out)
+	}
+	// The host has not reported completion. Stop sees the same tree, but the
+	// scheduled writer still owns the armed operation.
+	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	if !strings.Contains(out, `"decision":"block"`) {
+		t.Fatalf("unchanged tree discharged live writer: %s", out)
+	}
+	record, err := readStateRecord(root, sid)
+	if err != nil || len(record.pending) != 1 || !record.design {
+		t.Fatalf("lost armed obligation: %+v, %v", record, err)
+	}
+	writeFile(t, filepath.Join(root, "design", "notes.txt"), "late write\n")
+	out = runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	if !strings.Contains(out, `"decision":"block"`) {
+		t.Fatalf("late write escaped pending gate: %s", out)
+	}
+}
+
+func TestHostDenialAfterUnrelatedMutationAllowsRepeatedFirstStops(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	sid := "opencode-denial-with-other-write"
+	t.Cleanup(func() { _ = clearState(root, sid) })
+	pre := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "denied.txt"))
+	pre.ToolUseID = "denied-call"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("preflight: %s", out)
+	}
+	other := editEvent("PreToolUse", "Write", sid, filepath.Join(root, "design", "other.txt"))
+	other.ToolUseID = "other-call"
+	if out := runEvent(t, root, other); out != "" {
+		t.Fatalf("other preflight: %s", out)
+	}
+	writeFile(t, filepath.Join(root, "design", "other.txt"), "other write\n")
+	other.HookEventName = "PostToolUse"
+	if out := runEvent(t, root, other); out != "" {
+		t.Fatalf("other completion: %s", out)
+	}
+	pre.HookEventName = "PostToolUseFailure"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("denial completion: %s", out)
+	}
+	for i := 0; i < 2; i++ {
+		out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+		if strings.Contains(out, "in-flight tool") {
+			t.Fatalf("idle %d wedged after denial: %s", i, out)
+		}
 	}
 }
 
@@ -4113,9 +4235,8 @@ func TestStopRefusesToReapWhileBackgroundTasksRun(t *testing.T) {
 	}
 }
 
-// Reaping clears the in-flight ledger; it must not clear the obligation to
-// gate. A red tree still blocks on the re-fired Stop.
-func TestReapedStopStillGatesTheTree(t *testing.T) {
+// A denied completion closes its token but retains the gate obligation.
+func TestDeniedCompletionStillGatesTheTree(t *testing.T) {
 	isolateHookState(t)
 	root := t.TempDir()
 	copyTree(t, crmDesign, filepath.Join(root, "design"))
@@ -4137,6 +4258,10 @@ func TestReapedStopStillGatesTheTree(t *testing.T) {
 		t.Fatalf("allowed edit preflight unexpectedly emitted output: %s", out)
 	}
 
+	pre.HookEventName = "PostToolUseFailure"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatalf("denial completion: %s", out)
+	}
 	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop", StopHookActive: true})
 	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "DRIFT") {
 		t.Fatalf("reap discharged a drifted tree without gating it: %s", out)

@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/portablepath"
 	"github.com/RamXX/machinery/internal/version"
 )
 
@@ -130,6 +131,15 @@ func ProjectPackets(design, milestone, slice string) ([]Packet, *Gate) {
 	if sm == nil {
 		return nil, g
 	}
+	fixtureUsers := sm.fixtureConsumers()
+	fixtureBindings := 0
+	for _, users := range fixtureUsers {
+		fixtureBindings += len(users)
+	}
+	if fixtureBindings > 0 {
+		g.Count("fixture modules", len(fixtureUsers))
+		g.Count("fixture bindings", fixtureBindings)
+	}
 	plan := d.rootPlan()
 	if plan == nil {
 		return nil, g
@@ -150,7 +160,7 @@ func ProjectPackets(design, milestone, slice string) ([]Packet, *Gate) {
 		var projected []*packetProjection
 		for i := range ms.slices {
 			sl := &ms.slices[i]
-			p := d.projectSlice(ms, sl, plan, block, obligations, ledger)
+			p := d.projectSlice(ms, sl, plan, block, obligations, ledger, fixtureUsers)
 			projected = append(projected, p)
 			g.Count("slices")
 			if len(p.body) > sl.budget {
@@ -188,6 +198,21 @@ type sliceMap struct {
 	milestones []sliceMilestone
 }
 
+func (sm *sliceMap) fixtureConsumers() map[string][]string {
+	users := map[string][]string{}
+	for _, ms := range sm.milestones {
+		for _, sl := range ms.slices {
+			for _, fixture := range sl.fixtures {
+				users[fixture] = append(users[fixture], sl.id)
+			}
+		}
+	}
+	for fixture := range users {
+		sort.Strings(users[fixture])
+	}
+	return users
+}
+
 type sliceMilestone struct {
 	id      string
 	num     int
@@ -196,11 +221,12 @@ type sliceMilestone struct {
 }
 
 type sliceSpec struct {
-	id     string
-	num    int
-	shard  string
-	budget int
-	cites  []string
+	id       string
+	num      int
+	shard    string
+	budget   int
+	fixtures []string
+	cites    []string
 }
 
 type sliceWaiver struct {
@@ -211,7 +237,7 @@ type sliceWaiver struct {
 var (
 	sliceMapRootKeys      = map[string]bool{"schema": true, "milestones": true}
 	sliceMapMilestoneKeys = map[string]bool{"id": true, "slices": true, "waivers": true}
-	sliceMapSliceKeys     = map[string]bool{"id": true, "shard": true, "budget": true, "cites": true}
+	sliceMapSliceKeys     = map[string]bool{"id": true, "shard": true, "budget": true, "fixtures": true, "cites": true}
 	sliceMapWaiverKeys    = map[string]bool{"id": true, "reason": true}
 )
 
@@ -350,6 +376,30 @@ func (d *packetDesign) loadSliceMap() *sliceMap {
 				d.sliceMapErr("%s: budget must be a positive integer number of bytes", swhere)
 			}
 			sl.budget = budget
+			if fv := so.Get2("fixtures"); fv != nil {
+				if fv.Kind != ir.KindArray || len(fv.AsArray()) == 0 {
+					d.sliceMapErr("%s: fixtures must be a non-empty list of clean implementation-relative paths", swhere)
+				} else {
+					seenFixture := map[string]bool{}
+					for k, fitem := range fv.AsArray() {
+						if fitem == nil || fitem.Kind != ir.KindString {
+							d.sliceMapErr("%s: fixtures[%d] is not a non-empty string", swhere, k)
+							continue
+						}
+						fixture := fitem.AsString()
+						if err := portablepath.ValidateRelative(fixture); err != nil {
+							d.sliceMapErr("%s: fixture %s is not a clean implementation-relative path", swhere, ir.Repr(fixture))
+							continue
+						}
+						if seenFixture[fixture] {
+							d.sliceMapErr("%s: fixtures repeats %s; each fixture obligation is stated once per slice", swhere, ir.Repr(fixture))
+							continue
+						}
+						seenFixture[fixture] = true
+						sl.fixtures = append(sl.fixtures, fixture)
+					}
+				}
+			}
 			cv := so.Get2("cites")
 			if cv == nil || cv.Kind != ir.KindArray || len(cv.AsArray()) == 0 {
 				d.sliceMapErr("%s: cites must be a non-empty list of citations", swhere)
@@ -848,7 +898,7 @@ func (d *packetDesign) sliceErr(sl *sliceSpec, format string, args ...interface{
 }
 
 // projectSlice resolves every citation of a slice and renders its packet.
-func (d *packetDesign) projectSlice(ms sliceMilestone, sl *sliceSpec, plan *rootPlan, block *planBlock, obligations []string, ledger map[string]string) *packetProjection {
+func (d *packetDesign) projectSlice(ms sliceMilestone, sl *sliceSpec, plan *rootPlan, block *planBlock, obligations []string, ledger map[string]string, fixtureUsers map[string][]string) *packetProjection {
 	d.touched = map[string][]lineRange{}
 	d.touch(block.rel, block.first, block.first)
 	if block.demo >= 0 {
@@ -921,8 +971,18 @@ func (d *packetDesign) projectSlice(ms sliceMilestone, sl *sliceSpec, plan *root
 		}
 	}
 
-	// 7. acceptance entry shape
-	w("## 7. Acceptance entry shape\n\n")
+	acceptanceSection := 7
+	if len(sl.fixtures) > 0 {
+		w("## 7. Fixture obligations\n\n")
+		for _, fixture := range sl.fixtures {
+			w("- `%s` feeds suites of slices %s; run every consuming slice suite after changing it.\n", fixture, joinPacketList(fixtureUsers[fixture]))
+		}
+		w("\n")
+		acceptanceSection++
+	}
+
+	// acceptance entry shape
+	w("## %d. Acceptance entry shape\n\n", acceptanceSection)
 	w("The milestone review commits `acceptance/%s.yaml` with this shape; `dod_ids` is the full\n", ms.id)
 	w("obligation set of the milestone, every id exactly once, with the slice that claims it noted here.\n\n")
 	w("```yaml\nmilestone: %d\ncommit: <the commit the review ran on>\nverdict: REJECTED\ndod_ids:\n", ms.num)
@@ -934,11 +994,11 @@ func (d *packetDesign) projectSlice(ms sliceMilestone, sl *sliceSpec, plan *root
 	}
 	w("attestations: []\nfindings: []\nreviewer: <who or what produced the review>\ndate: <YYYY-MM-DD>\n```\n\n")
 
-	// 8. sources: every file the packet drew from and the lines it drew. The
+	// sources: every file the packet drew from and the lines it drew. The
 	// packet binds to the excerpted bytes, which it carries verbatim, and to
 	// the slice map by digest; it does not bind to whole files, so an edit
 	// elsewhere in a source file never changes a packet.
-	w("## 8. Sources\n\n| path | lines drawn |\n|---|---|\n")
+	w("## %d. Sources\n\n| path | lines drawn |\n|---|---|\n", acceptanceSection+1)
 	var rels []string
 	for rel := range d.touched {
 		rels = append(rels, rel)
@@ -949,6 +1009,19 @@ func (d *packetDesign) projectSlice(ms sliceMilestone, sl *sliceSpec, plan *root
 	}
 	d.touched = nil
 	return &packetProjection{slice: sl, body: []byte(b.String())}
+}
+
+func joinPacketList(items []string) string {
+	switch len(items) {
+	case 0:
+		return "(none)"
+	case 1:
+		return items[0]
+	case 2:
+		return items[0] + " and " + items[1]
+	default:
+		return strings.Join(items[:len(items)-1], ", ") + ", and " + items[len(items)-1]
+	}
 }
 
 func (d *packetDesign) countOwned(claimed, obligations []string) int {

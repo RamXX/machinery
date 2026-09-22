@@ -5,6 +5,8 @@ milestones:
       - id: M1-S1
         shard: BUILD/core.md
         budget: 12000
+        fixtures:
+          - test/support/release_fixture.ex
         cites:
           - section:BUILD/core.md#8.1
           - milestone:BUILD/core.md
@@ -20,6 +22,8 @@ milestones:
       - id: M1-S2
         shard: BUILD/core.md
         budget: 12000
+        fixtures:
+          - test/support/release_fixture.ex
         cites:
           - section:BUILD/core.md#8.2
           - DEAL-1fe825
