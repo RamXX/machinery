@@ -158,6 +158,7 @@ func TestUnknownDeclarationGroup(t *testing.T) {
 		{"consumer private group", "MACHINE-WRITTEN{Order.status}", "MACHINE-WRITTEN"},
 		{"misspelled group", "WRITE{Order.status}", "WRITE"},
 		{"known groups", "CLAUSES{a-b} READS{x} VALUES{a, b} ORACLESET{o} WRITES{}", ""},
+		{"retired clauses group", "CLAUSES{resolved-task, applied-record} RETIRED{sop-coverage}", ""},
 		{"named VALUES", "VALUES reason{a, b}", ""},
 		{"camel-case type literal", "`RankedConstituent{rank, ticker}`", ""},
 		{"lower-case literal", "`err{ErrUnavailable,ErrConflict}`", ""},

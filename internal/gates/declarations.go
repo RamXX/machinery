@@ -69,7 +69,7 @@ const (
 // knownDeclarationGroups is the closed group-name vocabulary. `payload {`
 // is lower-case and never reaches the upper-case opening scan.
 var knownDeclarationGroups = map[string]bool{
-	"CLAUSES": true, "READS": true, "VALUES": true, "ORACLESET": true,
+	"CLAUSES": true, "RETIRED": true, "READS": true, "VALUES": true, "ORACLESET": true,
 	GroupWrites: true, GroupUses: true, GroupCarries: true, GroupSupersedes: true,
 }
 
