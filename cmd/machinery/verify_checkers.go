@@ -25,6 +25,7 @@ import (
 	"github.com/RamXX/machinery/internal/checker"
 	"github.com/RamXX/machinery/internal/designlock"
 	"github.com/RamXX/machinery/internal/dirscan"
+	"github.com/RamXX/machinery/internal/gates"
 	"github.com/RamXX/machinery/internal/processcontrol"
 	machversion "github.com/RamXX/machinery/internal/version"
 )
@@ -212,7 +213,14 @@ func verifyOneChecker(design, sourceDesign, registryPath string, snapshot *desig
 	if err != nil {
 		return fail("cannot hash current domain model: %s", err)
 	}
-	current, err := checker.Generate(model, man, designID, machversion.Version)
+	var facts *checker.DesignFacts
+	if checker.NeedsDesignFacts(man) {
+		facts, err = gates.LoadDesignFacts(sourceDesign)
+		if err != nil {
+			return fail("cannot read current design facts: %s", err)
+		}
+	}
+	current, err := checker.GenerateWithFacts(model, facts, man, designID, machversion.Version)
 	if err != nil {
 		return fail("cannot regenerate current projection: %s", err)
 	}

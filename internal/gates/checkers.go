@@ -103,7 +103,15 @@ func checkOneChecker(design, manifestPath string) *Gate {
 		g.Errs = append(g.Errs, err.Error())
 		return g
 	}
-	fresh, err := checker.Generate(model, man, designID, version.Version)
+	var facts *checker.DesignFacts
+	if checker.NeedsDesignFacts(man) {
+		facts, err = LoadDesignFacts(design)
+		if err != nil {
+			g.Errs = append(g.Errs, "cannot read design facts for the v2 projection: "+err.Error())
+			return g
+		}
+	}
+	fresh, err := checker.GenerateWithFacts(model, facts, man, designID, version.Version)
 	if err != nil {
 		g.Errs = append(g.Errs, err.Error())
 		return g
