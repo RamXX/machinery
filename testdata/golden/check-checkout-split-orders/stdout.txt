@@ -24,7 +24,7 @@
   checked: 1 entities, 1 lifecycle machines traced, 1 lifecycle entities with machines, 1 lifecycle semantics annotations, 1 control-flow-only semantics, 1 placement rows with machines, 1 entities placed, 2 authorization obligations admitted, 4 named-unit fact rows scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 2 invariants enforced, 2 invariants unit-backed (guard/action/actor)
   ok
 == Gy-rules  consistency rules over projected facts ==
-  checked: 6 rule files evaluated, 77 facts, 0 shadow finding(s)
+  checked: 6 rule files evaluated, 77 facts
   ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 4 milestones, 4 DoD-bearing milestones, 1 skeleton NFR lines, 1 skeleton citations

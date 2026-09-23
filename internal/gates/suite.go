@@ -241,7 +241,6 @@ func remapGatePaths(gs []*Gate, from, to string) {
 		remap(gate.Errs)
 		remap(gate.Drift)
 		remap(gate.Warns)
-		remap(gate.Shadow)
 		remap(gate.Notes)
 		remap(gate.checkedExtra)
 		if gate.explain != nil {

@@ -113,7 +113,7 @@ func TestRulesSupplyAbsentLayersEmpty(t *testing.T) {
 		t.Fatal("the fixture must have no matrices layer")
 	}
 	g := CheckRules(design, false)
-	if len(g.Errs)+len(g.Warns)+len(g.Shadow) != 0 {
+	if len(g.Errs)+len(g.Warns) != 0 {
 		t.Fatalf("absent layers must be empty inputs, not errors: %+v", g)
 	}
 	if g.Counts["rule files evaluated"] != 6 {
@@ -137,19 +137,19 @@ finding_ghost("Nowhere.unit", E) :- entity(E).
 	}
 	g := NewGate(RulesGateTitle)
 	checkRulesOver(g, set, facts, true)
-	if len(g.Shadow) != 1 || g.Shadow[0] != "Nowhere.unit (no source): ghost (fact 'Order')" {
-		t.Fatalf("shadow = %q", g.Shadow)
+	if len(g.Errs) != 1 || g.Errs[0] != "Nowhere.unit (no source): ghost (fact 'Order')" {
+		t.Fatalf("errs = %q", g.Errs)
 	}
 	var out bytes.Buffer
-	if blocking := g.Emit(&out); blocking != 0 {
-		t.Fatalf("a SHADOW finding never blocks, got %d", blocking)
+	if blocking := g.Emit(&out); blocking != 1 {
+		t.Fatalf("a finding_ tuple is a blocking ERROR, got %d", blocking)
 	}
 	want := `== Gy-rules  consistency rules over projected facts ==
-  SHADOW Nowhere.unit (no source): ghost (fact 'Order')
+  ERROR  Nowhere.unit (no source): ghost (fact 'Order')
          finding_ghost("Nowhere.unit", "Order")  [ghost.dl rule 1]
            entity("Order")  [fact domain.modelith.yaml:11]
   checked: 1 rule files evaluated, `
-	if !strings.HasPrefix(out.String(), want) || !strings.Contains(out.String(), ", 1 shadow finding(s)\n  ok\n") {
+	if !strings.HasPrefix(out.String(), want) || strings.Contains(out.String(), "\n  ok\n") {
 		t.Fatalf("emitted:\n%s", out.String())
 	}
 }
@@ -186,8 +186,8 @@ func TestRulesExplainWithZeroFindingsPrintsNothingExtra(t *testing.T) {
 	if plain.String() != explained.String() {
 		t.Fatalf("explain changed a zero-finding run:\n%s\nvs\n%s", plain.String(), explained.String())
 	}
-	if !strings.Contains(plain.String(), "0 shadow finding(s)") {
-		t.Fatalf("the shadow count is always on the checked: line:\n%s", plain.String())
+	if !strings.HasSuffix(plain.String(), "\n  ok\n") {
+		t.Fatalf("a zero-finding run is ok:\n%s", plain.String())
 	}
 }
 
@@ -226,12 +226,12 @@ func TestRulesGateRunsInTheDefaultSuiteAndHonorsExplain(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if blocking := run[0].Emit(&out); blocking != 0 {
-		t.Fatalf("shadow findings must not block:\n%s", out.String())
+	if blocking := run[0].Emit(&out); blocking == 0 {
+		t.Fatalf("finding_ tuples block:\n%s", out.String())
 	}
 	text := out.String()
 	for _, want := range []string{
-		"  SHADOW ARCHITECTURE.md:12: row 'TypeD': dangling_replacement (old 'Ghost')\n",
+		"  ERROR  ARCHITECTURE.md:12: row 'TypeD': dangling_replacement (old 'Ghost')\n",
 		"         finding_dangling_replacement(\"TypeD\", \"Ghost\")  [supersession.dl rule 6]\n",
 		"           supersedes(\"TypeD\", \"Ghost\")  [fact ARCHITECTURE.md:12]\n",
 	} {
@@ -249,8 +249,8 @@ func TestRulesBundledExamplesAreClean(t *testing.T) {
 			continue
 		}
 		g := CheckRules(design, false)
-		if len(g.Errs)+len(g.Warns)+len(g.Shadow) != 0 {
-			t.Fatalf("%s: errs=%v warns=%v findings=%v", rel, g.Errs, g.Warns, g.Shadow)
+		if len(g.Errs)+len(g.Warns) != 0 {
+			t.Fatalf("%s: errs=%v warns=%v", rel, g.Errs, g.Warns)
 		}
 	}
 }

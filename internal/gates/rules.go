@@ -8,10 +8,8 @@
 // catalog, and run with derivation recording on. Its output relations are
 // findings by name:
 //
-//	finding_<code>   SHADOW in this stage: printed and counted on the checked:
-//	                 line, never blocking and never a warning. Stage 4 promotes
-//	                 them to ERROR.
-//	warn_<code>      a real warning.
+//	finding_<code>   an ERROR of the gate.
+//	warn_<code>      a warning.
 //
 // The first attribute of an output relation names the kind of its subject id
 // (unit, action, subject, type), and the gate resolves the id to a design
@@ -368,14 +366,12 @@ func checkRulesOver(g *Gate, set *ruleSet, facts *checker.DesignFacts, explain b
 	findings, errs := evaluateRules(set, facts)
 	g.Errs = append(g.Errs, errs...)
 	sources := indexFactSources(facts)
-	shadow := 0
 	for _, f := range findings {
 		msg := sources.message(f)
 		if f.output.warn {
 			g.Warns = append(g.Warns, msg)
 		} else {
-			g.Shadow = append(g.Shadow, msg)
-			shadow++
+			g.Errs = append(g.Errs, msg)
 		}
 		if explain {
 			g.addExplain(msg, sources.explainLines(f.file, f.tree))
@@ -387,5 +383,4 @@ func checkRulesOver(g *Gate, set *ruleSet, facts *checker.DesignFacts, explain b
 		inputs += len(rows)
 	}
 	g.Count("facts", inputs)
-	g.CheckedExtra(fmt.Sprintf("%d shadow finding(s)", shadow))
 }

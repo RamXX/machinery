@@ -23,15 +23,18 @@ func init() {
 		"rules-actor-uncarried", "rules-carrier-misplaced")
 }
 
-// rulesFindings runs Gy-rules and returns its SHADOW and warning lines. The
-// gate itself must not fail: every fixture projects and every rule runs.
+// rulesFindings runs Gy-rules and returns its ERROR and warning lines. The
+// gate itself must run: every fixture projects, the shipped rules load, and
+// no rule file stops at a limit; every ERROR is then a rule's finding.
 func rulesFindings(t *testing.T, design string) []string {
 	t.Helper()
 	g := gates.CheckRules(design, false)
-	if len(g.Errs) != 0 {
-		t.Fatalf("Gy-rules errored: %v", g.Errs)
+	for _, e := range g.Errs {
+		if strings.HasPrefix(e, "cannot project") || strings.HasPrefix(e, "the shipped consistency rules") || strings.HasPrefix(e, "rules/consistency/") {
+			t.Fatalf("Gy-rules did not run: %v", g.Errs)
+		}
 	}
-	return append(append([]string(nil), g.Shadow...), g.Warns...)
+	return append(append([]string(nil), g.Errs...), g.Warns...)
 }
 
 func requireRuleFinding(t *testing.T, name, design string) {

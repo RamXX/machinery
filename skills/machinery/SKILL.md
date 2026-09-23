@@ -173,7 +173,7 @@ you to write `VALUES OrderState{...}`. Prose that calls a vocabulary closed
 declares nothing.
 
 Five more groups state what a unit touches. Gx-trace parses them and fails a
-malformed one; Gy-rules (below) reads them in shadow. Members use the dotted
+malformed one; Gy-rules (below) decides on them. Members use the dotted
 identifier grammar of payload fields; a group opens and closes in one table
 cell; a row carries at most one group of each name.
 
@@ -201,18 +201,17 @@ backticks.
 
 Gy-rules (`--gate gy`, active on a design with `machines/` or an
 `AUTHORIZATION.md`) evaluates the shipped Datalog rules under
-`rules/consistency/` over the design's projected facts. In this release its
-`finding_*` results print as `SHADOW` lines: counted on the `checked:` line
-(`N shadow finding(s)`), never blocking, never a warning. They preview what the
-0.9.0 Gx checks become: an uncovered System action (`authz_missing`), a stale or
-unresolvable admission (`authz_orphan`, `authz_unknown_capability`), a
-`USES{}`/`WRITES{}` member no declaration resolves (`fact_unresolved`), a
-`VALUES` group disagreeing with the same-named enum (`values_disagree`), a
-`payload {}` twin out of step with its contract row (`payload_twin`), an actor
-naming no `CARRIES{}` (`actor_uncarried`), and supersession cycles, dangling
-replacements and duplicate owners. Treat a SHADOW line as a design gap to close
-now. `warn_effect_uncarried` (a unit with a non-empty `WRITES{}` and no
-`CARRIES{}`) is a real warning. `machinery check <design> --gate gy --explain`
+`rules/consistency/` over the design's projected facts. Every `finding_*`
+result is an ERROR: an uncovered System or produced action (`authz_missing`),
+a stale or unresolvable admission (`authz_orphan`,
+`authz_unknown_capability`), a `PRODUCES{}` member the model does not declare
+(`produces_unknown_action`), a `USES{}`/`WRITES{}` member no declaration
+resolves (`fact_unresolved`), a `VALUES` group disagreeing with the
+same-named enum (`values_disagree`), a `payload {}` twin out of step with its
+contract row (`payload_twin`), an actor with no `CARRIES{}` or a writing
+action with none (`effect_uncarried`), `CARRIES{}` on a unit that is neither
+an action nor an actor (`carrier_misplaced`), and supersession cycles,
+dangling replacements and duplicate owners. `machinery check <design> --gate gy --explain`
 prints under each finding its derivation: the rule file and rule number, then
 the facts it matched with their `path:line` sources.
 
@@ -269,7 +268,6 @@ surfaces ship and which are the target.
 - Brownfield oracle failures are adjudicated as code-is-truth or
   model-is-truth; neither is silently normalized.
 - Run `machinery check` with zero errors, drift, or warnings before handoff.
-  Gy-rules SHADOW lines do not block it; report them.
 - If a Paivot nd story owns the work, append the current `nd_contract` with
   command evidence and per-AC proof; use the standard story transition commands.
 

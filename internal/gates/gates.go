@@ -29,13 +29,10 @@ import (
 
 // Gate holds findings plus an explicit record of what was verified.
 type Gate struct {
-	Title string
-	Errs  []string
-	Drift []string
-	Warns []string
-	// Shadow holds findings of a rule running in shadow mode (Gy-rules in
-	// Stage 3): printed and counted, never blocking and never a warning.
-	Shadow       []string
+	Title        string
+	Errs         []string
+	Drift        []string
+	Warns        []string
 	Notes        []string
 	Counts       map[string]int
 	countOrder   []string // insertion order of count keys (matches Python dict)
@@ -189,13 +186,13 @@ func (g *Gate) CheckedExtra(segment string) {
 }
 
 // Emit prints the gate like Python (ERRS, DRIFT, warns, notes, checked:, ok),
-// with SHADOW findings after the warnings. Returns the number of blocking
-// findings (errs + drift); a SHADOW finding never blocks and never makes the
-// gate less than ok.
+// each finding followed by its derivation lines when it carries any (Gy-rules
+// with --explain). Returns the number of blocking findings (errs + drift).
 func (g *Gate) Emit(out io.Writer) int {
 	fmt.Fprintf(out, "== %s ==\n", g.Title)
 	for _, e := range g.Errs {
 		fmt.Fprintf(out, "  ERROR  %s\n", e)
+		g.emitExplain(out, e)
 	}
 	for _, d := range g.Drift {
 		fmt.Fprintf(out, "  DRIFT  %s\n", d)
@@ -203,10 +200,6 @@ func (g *Gate) Emit(out io.Writer) int {
 	for _, w := range g.Warns {
 		fmt.Fprintf(out, "  warn   %s\n", w)
 		g.emitExplain(out, w)
-	}
-	for _, s := range g.Shadow {
-		fmt.Fprintf(out, "  SHADOW %s\n", s)
-		g.emitExplain(out, s)
 	}
 	for _, a := range g.Notes {
 		fmt.Fprintf(out, "  note   %s\n", a)

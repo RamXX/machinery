@@ -139,37 +139,36 @@ var MachineryCheckExperiments = []Experiment{
 	{Name: "undeclared-fact-reference", Tool: "check", Mutation: "a contract cell quotes `Widget.status` outside any group",
 		ExpectSubstr: "undeclared fact reference `Widget.status`", ExpectExit: false},
 	// 2026-09-22, consistency layer Stage 3: the shipped Datalog rules of
-	// Gy-rules. finding_ relations run in shadow (printed, counted, never
-	// blocking) and warn_ relations are warnings, so none of these exits
-	// nonzero yet; Stage 4 promotes the finding_ tier to ERROR.
+	// Gy-rules. Since Stage 4 every finding_ relation is an ERROR, so each
+	// of these exits nonzero.
 	{Name: "rules-authz-missing", Tool: "check", Mutation: "Widget.publish becomes a System action with no authorization row",
-		ExpectSubstr: "row 'Widget.publish': authz_missing", ExpectExit: false},
+		ExpectSubstr: "row 'Widget.publish': authz_missing", ExpectExit: true},
 	{Name: "rules-authz-orphan", Tool: "check", Mutation: "an authorization row admits Widget.publish, which is not a System action",
-		ExpectSubstr: "row 'Widget.publish': authz_orphan", ExpectExit: false},
+		ExpectSubstr: "row 'Widget.publish': authz_orphan", ExpectExit: true},
 	{Name: "rules-authz-unknown-capability", Tool: "check", Mutation: "an admission names appX, a fabricated suffix of the c4 element app",
-		ExpectSubstr: "authz_unknown_capability (capability 'appX')", ExpectExit: false},
+		ExpectSubstr: "authz_unknown_capability (capability 'appX')", ExpectExit: true},
 	{Name: "rules-fact-unresolved", Tool: "check", Mutation: "USES{Widget.stat} names no declared fact",
-		ExpectSubstr: "row 'Widget.guardCanPublish': fact_unresolved (fact 'Widget.stat')", ExpectExit: false},
+		ExpectSubstr: "row 'Widget.guardCanPublish': fact_unresolved (fact 'Widget.stat')", ExpectExit: true},
 	{Name: "rules-values-disagree", Tool: "check", Mutation: "VALUES WidgetStatus{} adds a member the enum lacks",
-		ExpectSubstr: "values_disagree (group 'WidgetStatus', member 'Archived')", ExpectExit: false},
+		ExpectSubstr: "values_disagree (group 'WidgetStatus', member 'Archived')", ExpectExit: true},
 	{Name: "rules-payload-twin", Tool: "check", Mutation: "a matrix payload {} omits one field of the contract's event payload",
-		ExpectSubstr: "payload_twin (event 'widget.published', field 'Widget.status')", ExpectExit: false},
+		ExpectSubstr: "payload_twin (event 'widget.published', field 'Widget.status')", ExpectExit: true},
 	{Name: "rules-supersession-cycle", Tool: "check", Mutation: "SUPERSEDES rows close A > B > C > A",
-		ExpectSubstr: "row 'WidgetA': supersession_cycle", ExpectExit: false},
+		ExpectSubstr: "row 'WidgetA': supersession_cycle", ExpectExit: true},
 	{Name: "rules-effect-uncarried", Tool: "check", Mutation: "an action declares WRITES{Widget.status} and no CARRIES{}",
-		ExpectSubstr: "row 'Widget.commit': effect_uncarried", ExpectExit: false},
+		ExpectSubstr: "row 'Widget.commit': effect_uncarried", ExpectExit: true},
 	{Name: "rules-actor-uncarried", Tool: "check", Mutation: "the saveWidget actor loses its CARRIES{} group",
-		ExpectSubstr: "row 'Widget.saveWidget': effect_uncarried", ExpectExit: false},
+		ExpectSubstr: "row 'Widget.saveWidget': effect_uncarried", ExpectExit: true},
 	{Name: "rules-carrier-misplaced", Tool: "check", Mutation: "a guard row declares CARRIES{signal:published}",
-		ExpectSubstr: "row 'Widget.guardCanPublish': carrier_misplaced (kind 'guard')", ExpectExit: false},
+		ExpectSubstr: "row 'Widget.guardCanPublish': carrier_misplaced (kind 'guard')", ExpectExit: true},
 	// 2026-09-23, consistency layer Stage 4: PRODUCES{} declares the action a
 	// cascade or consumer arm performs, so a produced action owes an admission
 	// whatever its Modelith actor, and a produced name the model lacks is its
 	// own finding.
 	{Name: "rules-produces-owes-admission", Tool: "check", Mutation: "a matrix row declares PRODUCES{Widget.publish} (a non-System action) and no authorization row admits it",
-		ExpectSubstr: "row 'Widget.publish': authz_missing", ExpectExit: false},
+		ExpectSubstr: "row 'Widget.publish': authz_missing", ExpectExit: true},
 	{Name: "rules-produces-unknown-action", Tool: "check", Mutation: "PRODUCES{Widget.unpublish} names an action the model does not declare",
-		ExpectSubstr: "row 'Widget.commit': produces_unknown_action (action 'Widget.unpublish')", ExpectExit: false},
+		ExpectSubstr: "row 'Widget.commit': produces_unknown_action (action 'Widget.unpublish')", ExpectExit: true},
 }
 
 // RefineExperiments are the data-refinement reconciliation failures.
