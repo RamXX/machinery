@@ -46,7 +46,7 @@
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 6 closed milestones, 1 skeleton NFR lines, 14 skeleton citations
   ok
 == Gw-packet  per-slice packet projection ==
-  checked: 1 milestones, 58 obligations owed, 58 obligations claimed, 2 slices, M1-S1 39612/90000 bytes, M1-S2 16271/60000 bytes
+  checked: 1 milestones, 58 obligations owed, 58 obligations claimed, 2 slices, M1-S1 39613/90000 bytes, M1-S2 16272/60000 bytes
   ok
 == Ga-accept  milestone acceptance evidence ==
   checked: 1 plan documents, 6 declared milestones, 6 closed milestones, 6 acceptance files, 289 DoD ids bound, 7 DoD oracle sets bound, 6 closed milestones with accepted evidence, 6 commit bindings verified, commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry

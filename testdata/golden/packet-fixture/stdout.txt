@@ -1,5 +1,5 @@
 == Gw-packet  per-slice packet projection ==
-  checked: 1 fixture modules, 2 fixture bindings, 1 milestones, 4 obligations owed, 4 obligations claimed, 2 slices, M1-S1 4912/12000 bytes, M1-S2 3080/12000 bytes
+  checked: 1 fixture modules, 2 fixture bindings, 1 milestones, 4 obligations owed, 4 obligations claimed, 2 slices, M1-S1 4913/12000 bytes, M1-S2 3081/12000 bytes
   ok
-packet M1-S1 -> <out>/M1-S1.packet.md: 4912 bytes of 12000 budget (1638 token-equivalents at 3 bytes per token)
-packet M1-S2 -> <out>/M1-S2.packet.md: 3080 bytes of 12000 budget (1027 token-equivalents at 3 bytes per token)
+packet M1-S1 -> <out>/M1-S1.packet.md: 4913 bytes of 12000 budget (1638 token-equivalents at 3 bytes per token)
+packet M1-S2 -> <out>/M1-S2.packet.md: 3081 bytes of 12000 budget (1027 token-equivalents at 3 bytes per token)

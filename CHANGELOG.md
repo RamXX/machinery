@@ -6,6 +6,8 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-23
+
 ### Added
 
 - **Declaration groups `WRITES{}`, `USES{}`, `CARRIES{}` and `SUPERSEDES{}` (consistency layer,

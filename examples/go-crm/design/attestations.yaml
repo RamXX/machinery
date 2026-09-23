@@ -109,10 +109,10 @@ attestations:
   - claim: gt.conformance-test-shape
     kind: current
     attestor: coordinator
-    date: 2026-09-09
-    note: 'Re-review after the dependency bump of golang.org/x/crypto 0.55.0 to 0.56.0 and the go directive 1.26 to 1.26.0 in examples/go-crm/impl (go.mod, go.sum only; no source or test change), and over the covered BUILD.md whose dependency pins were realigned to that authoritative go.mod (v0.55.0 to v0.56.0, go 1.26 to go 1.26.0; pin text only, no design change). Scope unchanged from the 2026-09-06 review: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; go test ./... green over the full impl on 2026-09-09 (session, testoracle). Bounded: content-hash-bound scope review, not authenticated execution replay.'
+    date: 2026-09-23
+    note: 'Re-reviewed 2026-09-23 after the dependency bump of golang.org/x/crypto 0.56.0 to 0.57.0 and golang.org/x/sys 0.47.0 to 0.48.0 in examples/go-crm/impl (go.mod, go.sum only; no source or test change), and over the covered BUILD.md whose x/crypto pin was realigned to that authoritative go.mod (v0.56.0 to v0.57.0; pin text only, no design change). Scope unchanged from the 2026-09-09 review: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; go test ./... green over the full impl on 2026-09-23 (session, testoracle). Bounded: content-hash-bound scope review, not authenticated execution replay.'
     covers:
-      - {path: BUILD.md, hash: sha256:2a70a7fde32d6ddf245b3e34d95d679474947b0695625064bef6864ce1b67206}
+      - {path: BUILD.md, hash: sha256:02f11ecad138d967d6cf6a19cc400be360074c0b688be5a5b14024631a1bf8cf}
     implementation:
       root: ../impl
       policy: full-root-v1
@@ -124,12 +124,12 @@ attestations:
             type: file
             mode: "0644"
             size: 668
-            hash: sha256:c123f0e384a2f927e0446c9e1b2ce53bc093e2ccb3ef1651b76b47a53acc91d0
+            hash: sha256:ddc18bebf69358caad2a5f551e042f113984ca27943b21a73873d55859613bfa
           - path: go.sum
             type: file
             mode: "0644"
             size: 3751
-            hash: sha256:74e584585582080a58bb37750279f7f830ecfd58a2e318939407ee15eb4b9f85
+            hash: sha256:e7699722b28e564ef9c464c568e496745396dbc86f99c3edfe7eda108a85421f
           - path: internal
             type: directory
             mode: "0755"
@@ -340,14 +340,14 @@ attestations:
             mode: "0644"
             size: 5813
             hash: sha256:7ddb253e6c4c2734885c69af4704df5c7350a5717ec60c5a5f454a7f3b898c53
-      hash: sha256:6ee96abc1941b6c282052e9032d12fbd0cd0740be4f42b5e70172e4eb00ddc78
+      hash: sha256:8692e702397051f24584342eb556ee34861f06898dcf533716ad8a8d9dbd91b2
   - claim: g4.zero-context
     kind: plan
     attestor: coordinator
-    date: 2026-09-09
-    note: 'Re-reviewed 2026-09-09 over the corrected BUILD (bounded parser-backed suite evidence, declared rebuild migration context, x/crypto pin realigned to impl/go.mod after the 0.55.0 to 0.56.0 bump); the only change since the 2026-09-06 review is dependency pin text, so the zero-context plan judgment stands over the corrected build document.'
+    date: 2026-09-23
+    note: 'Re-reviewed 2026-09-23 over the corrected BUILD (bounded parser-backed suite evidence, declared rebuild migration context, x/crypto pin realigned to impl/go.mod after the 0.56.0 to 0.57.0 bump); the only change since the 2026-09-09 review is dependency pin text, so the zero-context plan judgment stands over the corrected build document.'
     covers:
-      - {path: BUILD.md, hash: sha256:2a70a7fde32d6ddf245b3e34d95d679474947b0695625064bef6864ce1b67206}
+      - {path: BUILD.md, hash: sha256:02f11ecad138d967d6cf6a19cc400be360074c0b688be5a5b14024631a1bf8cf}
   - claim: ga.review-quality
     kind: historical
     attestor: Codex release acceptance review
