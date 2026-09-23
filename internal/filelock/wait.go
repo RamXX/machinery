@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"time"
 )
 
@@ -24,6 +25,32 @@ func IsContended(err error) bool {
 
 func defaultAcquireWaitContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), acquireWaitLimit)
+}
+
+// AcquireFileWaitContext takes an exclusive advisory lock on the file name
+// inside dir, an existing private directory the caller owns, and waits until
+// the earlier of ctx ending and the package acquisition limit that bounds
+// AcquireWait. Unlike the scope locks, whose files live in a per-user (or, for
+// test binaries, per-executable) lock namespace, this lock lives beside the
+// resource it guards: every process that reaches dir contends on the same
+// file. The kernel releases the lock when its holder dies, so a crashed holder
+// never strands a waiter; recovering whatever the holder left behind is the
+// next holder's job.
+func AcquireFileWaitContext(ctx context.Context, dir, name string) (*Lock, error) {
+	label := filepath.Join(dir, name)
+	if ctx == nil {
+		return nil, fmt.Errorf("acquire lock for %s: nil context", label)
+	}
+	bounded, cancel := context.WithTimeout(ctx, acquireWaitLimit)
+	defer cancel()
+	if err := bounded.Err(); err != nil {
+		return nil, fmt.Errorf("acquire lock for %s: %w", label, err)
+	}
+	location, err := openLockLocationInDir(dir, name)
+	if err != nil {
+		return nil, err
+	}
+	return acquireAt(bounded, label, location, false, false, acquireHooks{})
 }
 
 func waitForLock(ctx context.Context, scope string, try func() (bool, error)) error {
