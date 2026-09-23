@@ -310,6 +310,188 @@ same way: a Go test suite encodes every vacuity and drift attack from adversaria
 a permanent regression, and CI runs the tests, the gates, the proofs, and the example builds on
 every push.
 
+## Where the design must agree with itself: the rules gate
+
+The layers above each check one kind of artifact against its own rules. The hardest remaining
+defects are statements in two places that must agree and do not. Four illustrations, in the
+fulfillment example's vocabulary:
+
+- A payment matrix row says the `order.paid` event carries four fields, `{orderId, amount,
+  currency, paidAt}`. The Architecture Contract's event table says it carries three. The consumer
+  built from one and the producer built from the other disagree at runtime.
+- The domain model declares `Order.markPaid` with actor `System`: the system performs it on its
+  own, with no person behind it. Nobody wrote a row in the authorization inventory saying which
+  component is allowed to do that. The system performs a write no one ever authorized.
+- A matrix row says a unit writes `Order.paidTwice`, an attribute the model does not have.
+- An actor unit calls an external service and nothing says what carries its effect: a column, an
+  outbox event, a sink, a signal.
+
+### The first attempt, and why it was removed
+
+Release 0.9.0 caught several of these by reading prose. The checks decided whether a matrix cell
+was a write from phrases such as "writes nothing" or "never adjusts the row", whether a cell named
+a closed vocabulary from words such as "reason class", and whether a backticked token was a fact
+from the words around it. They carried 35 compiled regular expressions. A design that phrased the
+same contract differently got a different verdict, and a `System` action whose description said
+"writes nothing" was treated as read-only and owed no authorization row. Heuristics over prose are
+exactly the "trust the reader" problem this project exists to remove, so they were deleted
+(2,639 lines, with their tests) and replaced with the consistency layer, which rests on four ideas.
+The consistency layer is listed under Unreleased in [CHANGELOG.md](CHANGELOG.md): it ships in the
+release after 0.9.0, and until then you get it by building from source.
+
+### 1. Declarations are grammar
+
+A design states each fact the gates act on in a declaration with a closed grammar: an upper-case
+group name followed by a braced, comma-separated list, placed in one table cell.
+
+- `WRITES{Order.status, OutboxMessage.status}`: the stored facts a unit writes. `WRITES{}` alone
+  states a read-only unit.
+- `USES{Order.totalCents, LineItem.quantity}`: the facts a unit reads or names.
+- `PRODUCES{Order.markPaid}`: on the row that names a cascade or consumer arm, the model actions
+  that arm performs. Each produced action owes an authorization row whatever its actor.
+- `CARRIES{column:Order.status, outbox:OutboxMessage}`: what carries an effect. Kinds are
+  `column`, `outbox`, `sink`, `signal`, and `action`.
+- `VALUES{a, b, c}` or `VALUES OrderState{...}`: a closed vocabulary, bound to a Modelith enum by
+  exact name.
+- `payload {orderId, amount}`: an event payload twin on a matrix event row.
+- `derived: fact_name (<reason>)`: a row-local waiver for a computed fact that is never stored.
+- `CLAUSES{...}` (with `RETIRED{...}`): a guard's falsifying clauses. `READS{field, ...}`: the
+  payload fields one consumer reads. `ORACLESET{...}`: a named set of oracle ids a milestone cites.
+- `SUPERSEDES{type:LegacyDeal}` and `RESERVED{type:ReadbackReceipt}`: on Architecture Contract
+  rows only, a type this row replaces, or reserves as not yet defined.
+- The authorization inventory: a table in `AUTHORIZATION.md` carrying the marker
+  `<!-- machinery:authorization-inventory -->`, one row per autonomous action, admitting it with a
+  backticked capability declared in `workspace.dsl` or waiving it with
+  `(no authorization: <reason>)`.
+
+Two rules close the grammar. An upper-case `NAME{` in a matrix cell that is not one of `CLAUSES`,
+`READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `PRODUCES`, `CARRIES`, `SUPERSEDES`, or `RESERVED`
+is an error, so a misspelled or private group never passes as prose. And a backticked snake_case or
+`Entity.attr` token in a contract, clause, or payload cell that no group on its row declares is a
+Gl-ledger warning: declare it or drop the backticks. **Prose never declares.** A sentence may quote
+a fact; it cannot create one.
+
+### 2. Facts are projected once
+
+`machinery project` is the single reader of the design. It turns the model, the machines, the
+matrices, the event contract, the C4 model, the authorization inventory, the oracles, the milestones,
+and the supersession rows into relations (projection schema 2.0), each row with a stable id and its
+source `path:line`. Only identifiers and enumerated values are projected, never prose.
+`machinery project <design> --facts <dir>` writes those relations as tab-separated `.facts` files,
+the input format Soufflé and the in-process evaluator read directly, plus a `relations.txt` index.
+The same facts feed the rules gate and any external checker, so every gate sees one reading of the
+design.
+
+### 3. Rules are data, and two engines must agree
+
+The methodology rules are Datalog files under [`rules/consistency/`](rules/README.md), embedded in
+the binary at build time. There are eight: `authz.dl`, `bindings.dl`, `carriers.dl`, `facts.dl`,
+`payload.dl`, `records.dl`, `supersession.dl`, and `values.dl`, 326 lines in all. Each output
+relation named `finding_<code>` is an ERROR with that code. A rule reads like the obligation it
+enforces:
+
+```
+finding_authz_missing(A) :- system_write(A), !admitted(A), !no_authorization(A).
+```
+
+Gy-rules evaluates them with `internal/datalog`, an in-process semi-naive evaluator with stratified
+negation, written against the Go standard library only. `machinery check` therefore stays hermetic:
+no Docker, no solver, and it runs in the stop hook. The rule language is a subset that real
+[Soufflé](https://souffle-lang.github.io/) accepts unchanged, and parity is tested, not assumed:
+
+- `TestRulesParity` runs every rule file over every bundled example design plus one synthetic design
+  on which every output relation has tuples: 8 rule files by 9 designs, 72 runs, and each output
+  relation must be identical under both engines (rows are sorted before comparing, because Soufflé
+  fixes no row order).
+- `TestParity` in `internal/datalog` runs the evaluator's own corpus of 19 programs (transitive
+  closure, stratified negation, aggregates, and the programs both engines must reject, such as a
+  cycle through negation) under both engines.
+- The `datalog-parity` CI job runs both in an image built from pinned inputs
+  (`scripts/souffle.dockerfile`), and fails if a test skipped its Soufflé half.
+
+A new consistency check is a rule file plus a fixture that fails without it and a near neighbor
+that must not fire. It needs no new Go.
+
+### 4. Every finding says why
+
+`machinery check <design> --gate gy --explain` prints, under each finding, the derivation that
+produced it: the rule file and rule number, then every fact it matched with its source. Remove the
+`Order.markPaid` row from the fulfillment example's `AUTHORIZATION.md`, add a member the model does
+not declare to a `WRITES{}` group, and the gate prints:
+
+```
+== Gy-rules  consistency rules over projected facts ==
+  ERROR  fulfillment.modelith.yaml:127: row 'Order.markPaid': authz_missing
+         finding_authz_missing("Order.markPaid")  [authz.dl rule 7]
+           system_write("Order.markPaid")  [authz.dl rule 4]
+             action("Order.markPaid", "Order", "markPaid", "System")  [fact fulfillment.modelith.yaml:127]
+  ERROR  machines/Order.matrix.md:12: row 'Order.persistOrder': fact_unresolved (fact 'Order.paidTwice')
+         finding_fact_unresolved("Order.persistOrder", "Order.paidTwice")  [facts.dl rule 9]
+           named_fact("Order.persistOrder", "Order.paidTwice")  [facts.dl rule 8]
+             unit_writes("Order.persistOrder", "Order.paidTwice")  [fact machines/Order.matrix.md:12]
+  checked: 8 rule files evaluated, 1269 facts
+
+2 blocking (ERROR/DRIFT) finding(s)
+```
+
+You can read that trace without knowing Datalog. The action is declared at line 127 with actor
+`System`. Rule 4 makes it a system write, and rule 7 fires because nothing admits it.
+
+### What the rules catch, file by file
+
+- `authz.dl`: a `System` or produced action with no admission (`authz_missing`), a stale row
+  (`authz_orphan`), a capability no `workspace.dsl` element declares
+  (`authz_unknown_capability`), and a `PRODUCES{}` member the model does not declare
+  (`produces_unknown_action`).
+- `facts.dl`: a `USES{}` or `WRITES{}` member that resolves to no attribute, enum member, machine
+  context key, payload field, or same-row `derived:` or `VALUES` declaration (`fact_unresolved`).
+- `values.dl`: a `VALUES` group that disagrees with its enum (`values_disagree`), and two units
+  spelling one shared vocabulary differently (`values_conflict`).
+- `payload.dl`: a `payload {}` twin that is not equal to its contract row (`payload_twin`). This is
+  the four-fields-against-three scene.
+- `carriers.dl`: an actor, or an action with a non-empty `WRITES{}`, that names no `CARRIES{}`
+  (`effect_uncarried`), and a `CARRIES{}` on a unit that is neither (`carrier_misplaced`).
+- `supersession.dl`: two owners of one type, supersession cycles, a replacement whose old type
+  nobody owns, a `RESERVED` type some artifact already owns, and an executor packet that cites the
+  row of a superseded type.
+- `records.dl`: a matrix with neither a machine nor a `(no machine: <reason>)` placement waiver
+  (`orphan_matrix`), and a waiver on a component that has a machine. This is how an append-only,
+  contract-only record is declared.
+- `bindings.dl`: under `--impl` only, a BUILD.md oracle binding table that says an oracle id is
+  unbound while a test binds it (`milestone_binding_stale`), or names a test file that binds
+  nothing for it (`milestone_binding_phantom`).
+
+What a green Gy-rules proves is stated in its release notes: over declared facts only, every
+`System` and produced action has one admission naming a declared capability, every declared fact
+resolves, every enum-bound `VALUES` group equals its enum, every `payload {}` twin equals its
+contract row, every effect names a carrier, and type supersession is acyclic with owned
+replacements. It says nothing about facts a design only mentions in prose.
+
+A design written for 0.9.0 migrates by declaring what the prose used to imply; the skill's
+"Migrating from the 0.9.0 prose inference" section walks through each case. For one release,
+Gx-trace warns on a design that declares no `WRITES{}`, `USES{}`, or `PRODUCES{}` anywhere and quotes
+a fact-shaped token in prose.
+
+### Bring your own checker
+
+Some invariants need domain knowledge machinery does not have: a sensitive-data-flow property, a
+statute encoded as rules, a units-of-measure check. The external checker contract lets any
+deterministic analyzer gate a design with the same discipline as the built-in gates. You commit a
+tool-neutral manifest (`design/checkers/<id>.checker.yaml`) naming the projection slice you need and
+the invariants you claim, and the evidence your engine produced. **Gk-\<id\>** then checks, with no
+engine and no network, that the committed projection is fresh, that the evidence binds to it by
+`input_hash` and to the manifest's `runtime_closure`, that the verdict is pass, and that every
+claimed invariant is covered or declared a residual with a reason. `machinery verify-checkers`
+is the engine half: it re-runs your adapter from an immutable, digest-pinned OCI image and confirms
+the committed evidence reproduces. The guide is [docs/external-checkers.md](docs/external-checkers.md).
+
+The reference is [`examples/pii-flow`](examples/pii-flow/README.md). Its central invariant, no
+sensitive attribute reaches the export sink unredacted, is a Datalog program, `rules.dl`, that
+Soufflé 2.5 evaluates inside a digest-pinned `linux/amd64` image. The Python adapter beside it only
+translates between machinery's JSON contracts and Soufflé's files; it computes no part of the
+verdict, and it fails closed (writing no evidence) on any engine error, any unexpected output, or a
+projection other than the one its manifest asked for.
+
 ## The envelope for agentic systems
 
 "Most software is a state machine" is a claim about control flow, not about cognition, and agentic
@@ -336,7 +518,94 @@ it cannot.
 
 machinery is built this way itself: a gated pipeline around a non-deterministic conductor.
 
+## Holding the code to the design
+
+A blueprint is only useful if the code stays bound to it. These gates exist because each of these
+things happened, or nearly did.
+
+### A test suite that looks complete and runs nothing
+
+A suite names every oracle id, but some of those tests are commented out or disabled, some are
+declared and never called, and some ids appear only in a comment outside any test body. A coverage count based on the names
+alone reports full coverage.
+
+**Gt-tests** (with `--impl`) requires every stable id in the committed oracles to appear as a whole
+token in an active test body, or a test that parses the committed oracle table in one connected
+read-parse-assert flow. Commented-out and disabled tests, unused declarations, and uncalled helpers
+earn nothing. Gt labels itself "static discovery; tests not executed", because it executes nothing:
+whether the tests pass is your test runner's job, and machinery says so instead of implying more.
+
+### A design that stays green while the compiler that parses it breaks
+
+An implementation parses a design file at build time: a compile-time macro reads a matrix and
+rejects tokens it does not know. Someone adds a token to the matrix. Every design gate is green,
+G4 and Gt are green, and the next build fails.
+
+**Gr-reads** makes that coupling explicit. A root `reads:` row in the Architecture Contract names
+the design artifact, the implementation reader, and the full reviewed Git commit. Without `--impl`
+each row warns that the reader must land with its follow-up. With `--impl`, the gate walks every
+commit since the reviewed one, and any commit (or uncommitted change set) that changes the artifact
+without changing its reader is an ERROR. See [docs/declared-reads.md](docs/declared-reads.md).
+
+### A milestone closed by assertion
+
+"M3 is done" said in a chat message, checked by nobody. **Ga-accept** requires committed evidence,
+`design/acceptance/M<n>.yaml`, for every milestone marked `Status: closed`, bound to a reviewed
+commit in the repository history and to the literal or `ORACLESET{...}`-expanded oracle ids its
+definition of done cites. See [docs/acceptance-gate.md](docs/acceptance-gate.md).
+
+### A review that went stale
+
+Someone judged that the interface contracts were right. Two weeks later an agent edited
+`ARCHITECTURE.md`. The judgment is now about a file that no longer exists.
+
+**Gv-attest** records the attested halves in `design/attestations.yaml`: a claim from a closed
+vocabulary, an attestor, a date, and the covered artifacts with their SHA-256 content hashes. An
+edited artifact makes the row stale and blocks. Each row carries a kind: `plan` (a design-time
+judgment), `current` (a reviewed implementation, bound to a complete implementation manifest and
+invalidated when its bytes move), or `historical` (an acceptance-file judgment, which establishes
+history and never current approval). A design with no implementation yet is plan-only: a claim
+that owes a current review warns that the review is missing and the check still exits 0. The
+pii-flow example ships no implementation, so it carries exactly that one warning by design:
+
+```
+== Gv-attest  attestation evidence ==
+  warn   gt.conformance-test-shape: plan only; current implementation review missing
+```
+
+Whether a judgment is true is never checked; that is the point of the split. `machinery attest`
+prints the hashes the gate expects. See [docs/attestation-evidence.md](docs/attestation-evidence.md).
+
+### An agent that ends its turn with the design red
+
+Inside a Claude Code or Codex session with the repository plugin installed, hooks make the
+deterministic half of the gates part of the session itself. A turn that touched the design, or the
+watched implementation, cannot end until `machinery check` has run. DRIFT blocks the stop with
+the gate output as the reason, and the model fixes it and tries again. Import-boundary findings
+block once `design/ratchet.json` arms them. Plain ERRORs only warn, because a half-built design is
+a normal state mid-interrogation. The hook refuses to discharge while any tool call it saw start has
+not reported an end, so a shell command that is still writing cannot slip past an unchanged tree.
+OpenCode's adapter runs the same check when the session goes idle, but its event API cannot hold a
+turn open, so a red result there is a warning. CI's `machinery check` remains the merge authority
+on every host.
+
+### An executor that cannot hold the whole design
+
+A large milestone plus its shard plus the architecture can exceed the executor's context window.
+Splitting the sources by hand loses obligations silently. Instead you author `design/slices.yaml`,
+and `machinery packet <design> --milestone M1 --out <dir>` projects one packet per slice containing
+only what the slice cites, each excerpt verbatim under its stable id and source `path:line`.
+**Gw-packet** holds the map: every citation resolves, every packet fits its declared byte budget,
+every shared fixture names all of its consuming slices, and every obligation the milestone owes is
+claimed by exactly one slice or carries a recorded waiver. See
+[docs/packet-projection.md](docs/packet-projection.md).
+
 ## The pipeline
+
+The conductor (the machinery skill, running in your agent) takes a design through these phases. It
+is an interrogation, not a form: it pushes on naming and on "what must always be true," and it does
+not advance a phase until that phase's gate passes. Each line under a phase lists the deterministic
+half (`tool:`) and the attested half (`attested:`).
 
 ```
 Phase 0  Frame        what, who, purpose, target language
@@ -347,6 +616,7 @@ Rebuild  Transition   legacy model + target model + migration.yaml + surface led
 Phase 1  Modelith     domain model
          tool: modelith lint clean; pinned render engine reproduces every committed *.modelith.md
                after the mechanical em-dash normalization
+               Gc-carrier (every invariant has a named carrier or a reasoned waiver)
          attested: lifecycle enums, action pre/post, invariant owners, scenario coverage
 Phase 1.5 Relational  static relational models (opt-in, per invariant shape):
            policy    access control      -> Gp-policy    (Policy.als + Policy.oracle.md)
@@ -355,30 +625,31 @@ Phase 1.5 Relational  static relational models (opt-in, per invariant shape):
          tool: each gate binds + covers; committed models fresh; solver via verify-formal
          attested: the annotations state what the prose invariants mean
 Opt-in   External     bring-your-own deterministic checker (SAST, AST, Datalog, graph reasoner):
-           checkers   -> Gk-checkers (input_hash binds, coverage holds; engine via verify-checkers)
+           checkers   -> Gk-<id> (input_hash binds, coverage holds; engine via verify-checkers)
          tool: projection is fresh; committed evidence binds to it; verdict is pass; coverage complete
          attested: the manifest claims the elements the checker is responsible for
 Phase 2  C4           architecture + contract (+ surfaces.yaml, the target surface ledger)
          tool: G2-c4 (contract parses and binds; allow graph acyclic; mitigation coverage;
-               every relationship the DSL DRAWS judged by the same allow/deny/baseline rules
-               G4 judges an import by; an interface contract per allowed edge, and no row for
-               an edge nobody allows; NFR record present with all three topics; every event
-               table names its source, answers every column, and names participants the model
-               declares; opt-in tables held closed: action ownership, adoption closure)
+               drawn relationships judged by the allow/deny/baseline rules; an interface
+               contract per allowed edge; NFR record with all three topics; event tables
+               answered and resolved; opt-in action-ownership and adoption-closure tables)
                Gu-surfaces (every act a person performs has a named surface or a deferral;
                sources: names where the act list was enumerated from)
                engine: verify-c4 (workspace.dsl compiles under structurizr-cli)
          attested: each contract's shape is the right one; the NFR record's content; the
                    dependency declaration and the persona walk are complete
-Phase 3  XState       state machines
+Phase 3  XState       state machines + named-unit matrices + generated oracles
          tool: G3-machine (lint; every invoke has onError + timeout; every fully guarded handler
                declares its guard-false disposition; delays consumed both ways; oracle fresh;
                matrix reconciled)
+               Gd-idcite (stable-id citations resolve; CLAUSES and READS declarations hold)
+               Gy-rules (the consistency rules over the declared, projected facts)
+               engine: verify-formal (TLC over the generated TLA+, Alloy over the relational models)
          attested: each guard enforces the invariant it names; residual failure transitions kept
                    (bindable: the mitigation table's opt-in "handled by" column resolves per row)
 Phase 4  BUILD.md     the blueprint
-         tool: Gx-trace + Gr-reads + Gb-plan + Ge-embed (+ G4-import and Gt-tests once code exists;
-               Gw-packet once a slice map projects bounded per-slice executor packets)
+         tool: Gx-trace + Gr-reads + Gb-plan + Ge-embed (+ G4-import and Gt-tests once code
+               exists; Gw-packet once a slice map projects bounded per-slice executor packets)
                Gx also reconciles the event-contract rows against the machines: a consumed
                event some machine handles or ignores, a produced event some action or matrix
                row fires, or a `(no machine: <reason>)` waiver in the cell that owes it
@@ -392,9 +663,8 @@ Brownfld Adjudication characterization verdicts (design/adjudications/, activate
                model-is-truth verdict names its filed defect)
          attested: whether each verdict is right
 Any      Attestation  the attested halves themselves (design/attestations.yaml, on presence)
-         tool: Gv-attest (each row names a claim from a closed vocabulary, an attestor,
-               and the covered artifacts with their content hashes; an edited artifact
-               makes the judgment STALE)
+         tool: Gv-attest (claim from a closed vocabulary, attestor, covered artifacts and
+               their content hashes; an edited artifact makes the judgment STALE)
          attested: whether each judgment is true, which is the point of the split
 Always   Ledgers      STATE.md / DECISIONS.md formats + house style
          tool: Gl-ledger (self-review grammar; dated entries; em-dash/emoji scan, warn
@@ -402,10 +672,127 @@ Always   Ledgers      STATE.md / DECISIONS.md formats + house style
          attested: the ledgers' content; which phases owe a self-review line
 ```
 
-An interrogation, not a form. The conductor pushes on naming and on "what must always be true," and
-does not advance a phase until its gate passes. Every gate splits into a deterministic half the
-tool verifies and an attested half the conductor checks by judgment; the skill spells out that
-split per gate, and the table above keeps the two apart.
+The skill ([skills/machinery/SKILL.md](skills/machinery/SKILL.md)) spells out the split per gate
+and is the operator's contract.
+
+## The gates
+
+`machinery check <design>` runs the default suite: every gate whose artifacts exist. `--gate`
+takes a comma list from exactly this vocabulary:
+
+```
+gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5
+```
+
+Each gate prints a header, a `checked:` line with its counts, and either `ok` or findings at one of
+three severities: **ERROR** blocks; **DRIFT** means a generated artifact is stale, and also blocks;
+**WARN** is advisory (`--warnings-as-errors` promotes it). The last line counts blocking findings.
+`--complete` (which requires `--impl`) is the final-handoff mode: every phase artifact present,
+milestones closed, zero warnings.
+
+Gate 1 is `modelith lint` on the domain model. The binary has no `g1`, by design: Phase 1's gate is
+Modelith's own linter.
+
+### Transition and surface ledgers
+
+- **Gm-transition** (rebuild and hybrid designs, `migration.yaml`): every legacy entity disposed,
+  replaced attributes and lifecycle values fully mapped, ordered source-of-truth phases with
+  rollback, an evidence-based cutover, owned transitional risks. Mapping rows may declare `tests:`,
+  and with `--impl` every named regression identifier must appear in the test corpus.
+- **Gs-surface** (a legacy surface ledger, `legacy/surface.yaml`): all six surface classes
+  inventoried or waived, every route, command, table, job, event, and integration covered, dropped,
+  or deferred, and covered bindings resolve against the target. An `as_of:` anchor that is neither
+  an ISO date, a VCS revision, nor a tag-like token warns.
+- **Gu-surfaces** (a target surface ledger, `surfaces.yaml`): every action whose actor is a person
+  is mapped to a named surface (screen, admin command, API route, config release) or deferred with a
+  reason; each mapped act resolves against the domain model and matches its actor; every act is
+  stated once; `sources:` names where the act list came from; once BUILD.md declares milestones,
+  every `milestone:` resolves.
+
+### Model and relational layers
+
+- **Gc-carrier**: every declared invariant has a named carrier (an action's `preserves`, a
+  relational layer, a machine matrix unit, an external checker's coverage claim) or an explicit
+  waiver with a reason. It needs only the domain model, so it runs from Phase 1: an obligation the
+  design does not carry fails the moment it is written.
+- **Gp-policy** (a policy annotation): the annotation binds to the domain model, covers every
+  top-level invariant, and the committed `Policy.als` and `Policy.oracle.md` byte-match a fresh
+  generation.
+- **Gi-integrity** and **Gn-isolation** (each with its annotation): the annotation binds to the
+  domain model, and the committed `Integrity.als`, or `Isolation.als` and `Isolation.oracle.md`,
+  byte-match a fresh generation.
+- **Gk-\<id\>** (one per checker manifest): the committed projection is fresh, evidence binds to it
+  via `input_hash`, the verdict is pass, and the coverage claim is complete.
+
+### Architecture
+
+- **G2-c4**: the Architecture Contract parses and binds to `workspace.dsl`; the allow graph is
+  acyclic (cycles that close only through `baseline:` edges warn as ratchet debt); `assert: no_path`
+  claims hold over the transitive closure; every dependency has a mitigation row; the NFR record
+  mentions security, capacity, and observability; every event-contract table names its enumeration
+  source and every row answers producer, consumer, payload, delivery, ordering, and dedupe, with
+  producer and consumer resolving to declared elements; every allowed crossing has an interface
+  contract row (edge, shape, errors, idempotency) or a `(no contract: <reason>)` waiver, and no row
+  exists for an edge nobody allows. Every relationship the DSL draws is judged by the same rules
+  G4 judges a code edge by. Opt-in by table presence: action ownership (every model action owned
+  once by a resolvable component) and adoption closure. `machinery verify-c4` is the engine phase.
+- **Gr-reads** (contracts with root `reads:` rows): described above.
+
+### Behavior and traceability
+
+- **G3-machine**: structural lint, the TLA generator's own admissibility pass (a machine G3 passes
+  is one `verify-formal` can generate), retry-counter accounting, derived-deadline span checks, the
+  dotted-reference name-rot audit, `_branch_order` for overlapping guarded branches; committed
+  oracles byte-match a fresh generation, matrices reconcile, named units are covered. A matrix with
+  no machine is accepted only with a `(no machine: <reason>)` placement waiver.
+- **Gd-idcite** (designs with machines): every stable-id citation in hand-written files resolves to
+  a committed oracle row; positional `T-<TAG>-NN` citations warn; `CLAUSES{...}` and `READS{...}`
+  declarations catch clause drift and payload-sufficiency drift; a conjunctive guard contract with
+  no clause vocabulary warns, waivable per row with `(single-clause: <reason>)`.
+- **Gx-trace**: states to enum values, events to actions, invariants to enforcement rows, entities to
+  persistence-placement rows; mitigation `handled by` names resolve to a machine or invoke actor;
+  event-contract rows reconcile against the machines (a consumed event is handled or ignored, a
+  produced event appears in some action or matrix cell, or the cell carries a
+  `(no machine: <reason>)` waiver). Armed by a `<!-- machinery:reads-complete -->` marker, every
+  `(event, consumer)` edge owes its own `READS{...}` declaration or a `(no reads: <reason>)` waiver.
+  Gx also reports the shape errors of every declaration group and of the authorization inventory;
+  what they mean is Gy-rules'.
+- **Gy-rules** (designs with `machines/` or an `AUTHORIZATION.md`): the shipped rules over the
+  projected facts, as described [above](#where-the-design-must-agree-with-itself-the-rules-gate).
+  `--explain` prints each finding's derivation.
+
+### Build plan and delivery
+
+- **Gb-plan** (a BUILD.md): milestones are unique `**M<n> - <title>**` markers, the walking skeleton
+  comes first (or carries a waiver), every milestone has a `DoD:` line, the skeleton's DoD cites a
+  committed oracle id, and the skeleton carries an `NFR:` line. In `Mode: manifest`, each milestone
+  has exactly one `Demo:` line. `Linkage: pairwise` (the default) keeps one bounded
+  `BUILD/M<n>-*.md` packet per milestone; `Linkage: matrix` requires reciprocal milestone-to-shard
+  links that match exactly in both directions.
+- **Gw-packet** (a `slices.yaml`): described above.
+- **Ge-embed** (a `machinery:embed` marker): every marked table is held to its declared source
+  (`subset`: each row byte-identical to a source row; `complete`: every selected source row
+  present), with `(shard-local: <reason>)` exempting what it names. `machinery embed refresh`
+  writes what this gate checks.
+- **Ga-accept**, **Gj-adjudication**, **Gv-attest**: acceptance evidence, characterization verdicts
+  (every verdict binds to one committed oracle id; a model-is-truth verdict names its filed defect),
+  and attestation evidence, each active when its artifact exists.
+- **Gl-ledger** (always): `STATE.md` self-review lines parse, `DECISIONS.md` entries carry real
+  dates, and the house-style scan warns on em dashes and emojis across the hand-written design tree
+  (an em dash in a generated `*.modelith.md` render is an ERROR, because the post-render strip is
+  mechanical). A `.machineryignore` at the design root (gitignore-shaped, patterns relative to the
+  root, no negations) keeps non-design paths, such as a spike's vendored dependencies, out of every
+  design-tree walker.
+
+### Code and composition
+
+- **G4-import** (with `--impl`): code imports respect the contract boundaries in Go, Python,
+  TypeScript/JavaScript, Elixir, and Rust.
+- **Gt-tests** (with `--impl`): described above, including one falsifying-clause id per active
+  clause of every `CLAUSES{...}`-declared guard. A decomposed parent with no machines still runs Gt
+  when it owns relational obligations.
+- **G5-pack** (decomposed designs): packs fresh, children pinned to the current packs, refinement
+  proofs fresh, and every boundary-event row held to its direction (`consumes` or `produces`).
 
 ## Proof it works: the go-crm example
 
