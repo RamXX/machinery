@@ -523,6 +523,13 @@ func splitRowCells(s string) []string {
 	return cells
 }
 
+// SplitRowCells is the exported form of the GFM row splitter ParseMdTables
+// uses: one markdown table row in, its cells out (untrimmed), with `\|`
+// honored as a literal pipe. A caller that needs line numbers walks the
+// lines itself and splits each row here, so the cell boundaries it sees are
+// exactly the ones every table-reading gate sees.
+func SplitRowCells(row string) []string { return splitRowCells(strings.TrimSpace(row)) }
+
 // ParseMdTables mirrors machine_lint.parse_md_tables.
 func ParseMdTables(text string) []MdTable {
 	var blocks [][]string

@@ -2003,6 +2003,9 @@ func CheckTraceability(design string) *Gate {
 	checkAuthorizationInventory(g, design, dm)
 	checkFactResolution(g, design, archText, dm)
 	checkClosedVocabularies(g, design, dm)
+	// the declaration grammar family (WRITES, USES, CARRIES, SUPERSEDES) and
+	// the closed group-name vocabulary: parse-time findings only (declarations.go)
+	checkDeclarations(g, design, archText)
 	if !pack.HasPack(design) {
 		checkEventWiring(g, design, archText)
 	}
