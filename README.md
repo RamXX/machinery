@@ -457,93 +457,100 @@ only a fully revalidated publication.
 
 ### Prerequisites
 
-`machinery doctor` reports prerequisite and installation status, including the governance hook state
-store described under [the plugin's durable state](docs/claude-plugin.md#the-durable-state-store-and-its-retention);
-`machinery doctor --repair` compacts that store. `machinery preflight` enforces the required versions
-and release checks. Neither command installs anything.
+`machinery doctor` reports prerequisite and installation status, including the governance hook
+state store described under
+[the plugin's durable state](docs/claude-plugin.md#the-durable-state-store-and-its-retention).
+`machinery doctor --repair` compacts that store. `machinery preflight` enforces the required
+versions and release checks. Neither command installs anything.
 
 **Required**
 
-- **[modelith](https://modelith.sh/)** -- Phase 1 domain-model lint and render. Primary install is
-  [Homebrew](https://brew.sh/) (macOS and Linux): `brew install stacklok/tap/modelith`. Secondary:
-  with the [Go](https://go.dev/dl/) toolchain on any OS,
-  `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` (then put `$(go env GOPATH)/bin` on
-  your `PATH`); or download a prebuilt
-  binary (macOS, Linux, Windows) from the
+- **[modelith](https://modelith.sh/)**, for Phase 1 domain-model lint and render. With
+  [Homebrew](https://brew.sh/) (macOS and Linux): `brew install stacklok/tap/modelith`. With the
+  [Go](https://go.dev/dl/) toolchain on any OS:
+  `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0`, then put `$(go env GOPATH)/bin`
+  on your `PATH`. Or download a prebuilt binary (macOS, Linux, Windows) from the
   [releases](https://github.com/stacklok/modelith/releases). machinery pins modelith at `v0.4.0`,
-  and `machinery preflight` fails when the installed version does not match the pin. Full options:
+  and `machinery preflight` fails when the installed version does not match. Full options:
   [modelith.sh/cli](https://modelith.sh/cli/).
-- **machinery** -- the deterministic gate tools and formal generators, plus the agent skill and role
-  docs. A single static binary (no Python, no Go runtime). Three ways to install:
+- **machinery**: the gate tools and formal generators, plus the agent skill and role docs. It is a
+  single static binary with no Python and no Go runtime. There are three ways to install it.
 
-  **One line, no clone** (downloads the checksum-verified binary, then installs the skill; no Git, no
-  Go, no Make):
+  **One line, no clone.** This downloads the checksum-verified binary and installs the skill. It
+  needs no Git, Go, or Make:
   ```bash
   curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh
   ```
   The script's exit status reports the install. It ends with `machinery preflight`; a gap that
-  check finds (typically modelith, which only Phase 1 authoring needs, never `machinery check`)
-  is printed and the script still exits 0. Set `MACHINERY_REQUIRE_PREFLIGHT=1` to make that
-  check fatal in images that must carry the complete toolchain.
-  This puts the `machinery` binary on `~/.local/bin` and runs `machinery install` to place the skill
-  + role docs into your agent homes (real files under `~/.agents`, symlinked into `~/.claude`; see
-  [Agent homes](#agent-homes)). Override with environment variables, for example
-  `MACHINERY_VERSION=v0.9.0`, `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
-  `MACHINERY_TARGETS="codex opencode"`. `MACHINERY_HOMES` accepts one full path per line, preserving
-  spaces; use a literal newline between multiple homes.
+  check finds (typically modelith, which only Phase 1 authoring needs, never `machinery check`) is
+  printed and the script still exits 0. Set `MACHINERY_REQUIRE_PREFLIGHT=1` to make that check
+  fatal in images that must carry the complete toolchain. The script puts `machinery` on
+  `~/.local/bin` and runs `machinery install` to place the skill and role docs into your agent homes
+  (real files under `~/.agents`, symlinked into `~/.claude`; see [Agent homes](#agent-homes)).
+  Environment variables override it, for example `MACHINERY_VERSION=v0.9.0`,
+  `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
+  `MACHINERY_TARGETS="codex opencode"`. `MACHINERY_HOMES` takes one full path per line, preserving
+  spaces; separate several homes with a literal newline.
 
-  **Binary by hand** (macOS arm64/x86, Linux amd64/arm64): download
-  `machinery-<os>-<arch>` from the [releases page](https://github.com/RamXX/machinery/releases), put
-  it on your `PATH`, then let it install its own skill:
+  **Binary by hand** (macOS arm64 and x86, Linux amd64 and arm64): download
+  `machinery-<os>-<arch>` from the [releases page](https://github.com/RamXX/machinery/releases),
+  put it on your `PATH`, and let it install its own skill:
   ```bash
   machinery install                        # fetches the matching skill + role docs into your agent homes
   ```
 
-  **Windows support:** v0.9.0 publishes a cross-compiled `machinery-windows-amd64` binary and
+  **Windows:** v0.9.0 publishes a cross-compiled `machinery-windows-amd64` binary and
   `machinery_<version>_windows_amd64.tar.gz` as release artifacts. The one-line installer and
-  `machinery update` do not support Windows: download the asset by hand. Native Windows runtime
-  guarantees are not claimed; process custody, formal verification, and the assurance lanes are
+  `machinery update` do not support Windows, so download the asset by hand. Native Windows runtime
+  guarantees are not claimed: process custody, formal verification, and the assurance lanes are
   unix-only and refuse on Windows. Use Linux or macOS for the full toolchain.
 
-  **Build from source** (if you have [Go](https://go.dev/dl/) 1.27+; `go.mod` pins 1.27.1):
+  **Build from source** (with [Go](https://go.dev/dl/) 1.27+; `go.mod` pins 1.27.1). This is also
+  how you get the unreleased consistency layer before the next release:
   ```bash
   go build -o machinery ./cmd/machinery    # then: machinery install --from .
   ```
 
 **Optional**
 
-- **[Java](https://adoptium.net/) 21.0.12.1+1** -- only for `machinery verify-formal` and
-  `machinery verify-c4`; machinery accepts distributor-independent OpenJDK/HotSpot builds of this
-  exact checksum-pinned Temurin build, fingerprints the complete runtime closure, and runs it in a minimal fixed
-  environment. `machinery verify-formal` runs
-  [TLC](https://github.com/tlaplus/tlaplus) to model-check the proofs and, on designs with a policy
-  annotation, [Alloy](https://alloytools.org/) to check the relational policy model (the binary
-  fetches the pinned, checksum-verified
+- **[Java](https://adoptium.net/) 21.0.12.1+1**, only for `machinery verify-formal` and
+  `machinery verify-c4`. machinery accepts distributor-independent OpenJDK/HotSpot builds of this
+  exact checksum-pinned Temurin build, fingerprints the complete runtime closure, and runs it in a
+  minimal fixed environment. `verify-formal` runs [TLC](https://github.com/tlaplus/tlaplus) to
+  model-check the proofs and [Alloy](https://alloytools.org/) to check the relational models; the
+  binary fetches the pinned, checksum-verified
   [tla2tools.jar](https://github.com/tlaplus/tlaplus/releases) and
   [org.alloytools.alloy.dist.jar](https://github.com/AlloyTools/org.alloytools.alloy/releases) into
-  your cache on first use). macOS:
-  `brew install --cask temurin`; Linux: `sudo apt install default-jdk` or
-  machinery provisions the archive pinned in `.java-runtime-pin` into its private cache, or [download Temurin](https://adoptium.net/temurin/releases/);
-  Windows: `winget install EclipseAdoptium.Temurin.21.JDK` or
-  [download](https://adoptium.net/temurin/releases/). Without Java you still get the full design and
-  every deterministic gate; with it you add the machine-checked proofs (the top of the correctness
-  ladder above). The default engine path ignores ambient `java` and provisions the committed archive
-  pin. An explicit `MACHINERY_JAVA` override is accepted only with the exact source-controlled
-  closure digest in `MACHINERY_JAVA_CLOSURE_SHA256`; the version string alone is never trusted.
-- **[Structurizr CLI](https://github.com/structurizr/cli)** -- only to export C4 diagrams from
-  `workspace.dsl` (the [Structurizr DSL](https://github.com/structurizr/dsl) text and every gate need
-  no export); needs the same Java 21.0.12.1+1 runtime. Any OS: download a
-   [release zip](https://github.com/structurizr/cli/releases), unzip, and add it to `PATH`
-   (`structurizr.sh` on macOS/Linux, `structurizr.bat` on Windows); or run the
-   [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`. The pure
-   G2 gate stays dependency-free; this repository's required CI downloads a checksum-pinned CLI and
-   compiles every committed `workspace.dsl` as the engine half. Machinery provisions the ZIP named
-   by its embedded `.structurizr-pin` trust root. An explicit `MACHINERY_STRUCTURIZR_CLI` override
-   additionally requires its source-controlled full-tree digest in
-   `MACHINERY_STRUCTURIZR_CLI_CLOSURE_SHA256`.
+  your cache on first use. The default engine path ignores ambient `java` and provisions the archive
+  pinned in `.java-runtime-pin` into a private cache. To use a JDK you installed yourself (macOS
+  `brew install --cask temurin`; Linux `sudo apt install default-jdk` or
+  [download Temurin](https://adoptium.net/temurin/releases/); Windows
+  `winget install EclipseAdoptium.Temurin.21.JDK`), set `MACHINERY_JAVA`; the override is accepted
+  only with the exact source-controlled closure digest in `MACHINERY_JAVA_CLOSURE_SHA256`, and the
+  version string alone is never trusted. Without Java you still get the full design and every
+  deterministic gate. With it you add the machine-checked proofs.
+- **[Structurizr CLI](https://github.com/structurizr/cli)**, only to export C4 diagrams from
+  `workspace.dsl` (the [Structurizr DSL](https://github.com/structurizr/dsl) text and every gate
+  need no export). It needs the same Java 21.0.12.1+1 runtime. Download a
+  [release zip](https://github.com/structurizr/cli/releases), unzip it, and add it to `PATH`
+  (`structurizr.sh` on macOS and Linux, `structurizr.bat` on Windows), or run the
+  [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`. The pure G2
+  gate stays dependency-free. machinery provisions the ZIP named by its embedded `.structurizr-pin`
+  trust root; an explicit `MACHINERY_STRUCTURIZR_CLI` override also requires its source-controlled
+  full-tree digest in `MACHINERY_STRUCTURIZR_CLI_CLOSURE_SHA256`.
 
-Everything after install is a `machinery` subcommand run on your own design path, no clone and no
-Make:
+Why Java is optional: generating every artifact (the oracles, the TLA+ specs, the Alloy models) is
+the Go binary's job and needs no JVM. Only checking the proofs runs under TLC and Alloy, which are
+Java programs. The deterministic gates already catch malformed machines, drift, and boundary
+erosion, but they cannot tell you that a saga can strand money, that a retry can loop forever, or
+that a subsystem breaks the contract its neighbors assume. Model checking proves those
+exhaustively. A setup without Java is a complete, gated design; adding Java upgrades "structurally
+consistent" to "machine-checked."
+
+### Commands
+
+Everything after install is a `machinery` subcommand run on your own design path, with no clone and
+no Make:
 
 ```sh
 machinery install                     # place the skill + role docs into your agent homes
@@ -554,48 +561,60 @@ machinery doctor --target all         # inspect every host-specific artifact
 machinery uninstall --target all      # remove every host adapter and the shared skill
 machinery preflight                   # enforce the pinned release prerequisites
 machinery check <your-design>         # run the deterministic gate suite
+machinery check <design> --gate gy --explain
+                                      # the rules gate, with each finding's derivation
 machinery check <design> --impl <dir> \
   --complete --warnings-as-errors     # require a final, closed, zero-warning handoff
 machinery baseline <design> --impl .  # brownfield Stage 1: propose baseline rules, write the ratchet
-machinery verify-formal <your-design> # regenerate + TLC-check the proofs (needs Java)
+machinery verify-formal <your-design> # regenerate + TLC/Alloy-check the proofs (needs Java)
+machinery verify-c4 <your-design>     # compile workspace.dsl under structurizr-cli (needs Java)
+machinery project <design>            # write the external-checker projections
+machinery project <design> --facts <dir>
+                                      # write the design's fact relations as .facts files
+machinery verify-checkers <design>    # re-run external checkers and confirm their evidence
 machinery oracle <dir|files...>       # regenerate transition oracles (a directory, or named machine files;
                                       #   valid machines regenerate past a broken sibling)
 machinery oracle <dir> --diff \        # classify the churn instead of writing; --against reads the
   --against <git-ref>                 #   baseline at a git ref, so the affected-test list survives
                                       #   a regeneration that is already written
+machinery alloy <design>              # generate the opted-in relational models and decision oracles
+machinery packet <design> --milestone M1 --out <dir>
+                                      # project bounded per-slice executor packets
+machinery attest <path>               # print the content hash an attestation row must carry
 machinery sweep <name> <design>       # list every hand-written mention of a unit/guard/event/knob
 machinery embed refresh <design>      # re-copy every machinery:embed table from its source
                                       #   (--dry-run to report without writing)
+machinery scale <design>              # measure a design and recommend sharding or recursion
+machinery recover <design-dir>        # inspect an interrupted publication; --apply completes it
 ```
 
-The `Makefile` is contributor-only (building and testing machinery itself); `make help` lists those
-targets. End users never need it. If you are hacking on machinery itself, see
+The `Makefile` is for contributors (building and testing machinery itself); `make help` lists its
+targets. End users never need it. If you are hacking on machinery, see
 [CONTRIBUTING.md](CONTRIBUTING.md) and run `make hooks` once to arm the pre-push gate.
 
 ### Agent homes
 
 machinery's core is host-neutral: one Agent Skill, one pair of canonical role bodies, one artifact
-contract, and one deterministic CLI. `machinery install` preserves the original portable layout by
-placing the skill under `<home>/skills/machinery` and the two role docs under `<home>/agents`. The
-default homes are `~/.agents` (the cross-agent convention) and `~/.claude` (Claude Code); the first
-holds real files and the rest are symlinked to it, so there is one canonical copy to update.
-Each release also publishes `machinery-source.tar.gz`, a reproducible, commit-timestamped snapshot
-with normalized ownership. Its digest is in `checksums-sha256.txt`; install and update fetch that
-exact asset for matching skill and role sources instead of an unversioned branch archive.
+contract, and one deterministic CLI. `machinery install` places the skill under
+`<home>/skills/machinery` and the two role docs under `<home>/agents`. The default homes are
+`~/.agents` (the cross-agent convention) and `~/.claude` (Claude Code). The first holds real files
+and the rest are symlinked to it, so there is one canonical copy to update. Each release also
+publishes `machinery-source.tar.gz`, a reproducible, commit-timestamped snapshot with normalized
+ownership. Its digest is in `checksums-sha256.txt`, and install and update fetch that exact asset
+for matching skill and role sources instead of an unversioned branch archive.
 
 - **`machinery install` (recommended).** Fetches the skill from the release that matches the binary
-  and lays it down as above. `--home` (repeatable) overrides the set, `--copy` copies into every home
-  instead of symlinking, and `--from <dir>` installs from a local checkout. `machinery uninstall`
-  removes it.
-- **`make dev-link` (developer).** Symlinks every home directly into a working-tree checkout, so
-  edits to the skill are live. That is what you want when hacking on machinery itself, not for a
-  plain install.
+  and lays it down as above. `--home` (repeatable) overrides the set, `--copy` copies into every
+  home instead of symlinking, and `--from <dir>` installs from a local checkout.
+  `machinery uninstall` removes it.
+- **`make dev-link` (developer).** Symlinks every home into a working-tree checkout so edits to the
+  skill are live. Use it when hacking on machinery itself.
 
 For native host surfaces, use repeatable `--target claude|codex|opencode|all`. Codex gets TOML
-subagents under `~/.codex/agents`; OpenCode gets native subagents, commands, and a governance plugin
-under `~/.config/opencode`; both reuse the skill at `~/.agents/skills`. The renderers strip
-host-specific frontmatter and wrap the same canonical role bodies, so there are no Claude, Codex,
-and OpenCode prompt forks to drift apart. `--target` and `--home` cannot be combined.
+subagents under `~/.codex/agents`; OpenCode gets native subagents, commands, and a governance
+plugin under `~/.config/opencode`; both reuse the skill at `~/.agents/skills`. The renderers strip
+host-specific frontmatter and wrap the same canonical role bodies, so there are no per-host prompt
+forks to drift apart. `--target` and `--home` cannot be combined.
 
 ```bash
 machinery install --target codex
@@ -605,77 +624,70 @@ machinery doctor --target all
 ```
 
 Every runtime follows the capability contract in the skill: use fresh-context roles when supported,
-otherwise execute the same role inline; use lifecycle hooks when supported, otherwise run explicit
-checks. CI `machinery check` is always the merge authority. The exact topology, feature matrix,
-OpenCode stop-hook limitation, and adapter extension rules are in the
+otherwise run the same role inline; use lifecycle hooks when supported, otherwise run explicit
+checks. CI `machinery check` is always the merge authority. The topology, feature matrix, the
+OpenCode stop-hook limitation, and the adapter extension rules are in the
 [agent portability guide](docs/agent-portability.md).
 
-Every successful CLI install records its exact topology (custom home groups, symlink/copy mode,
+### Updating
+
+Every successful CLI install records its exact topology (custom home groups, symlink or copy mode,
 and native targets) in the user config directory. `machinery update` uses that receipt, plus
-standard-path discovery for older installations, to force-download the requested release, verify
-its published checksum and reported version, replace the running binary atomically, and refresh
-every recorded harness from the same release source. It does not skip work when the requested
-version matches the installed version.
+standard-path discovery for older installations, to force-download the requested release, verify its
+published checksum and reported version, replace the running binary atomically, and refresh every
+recorded harness from the same release source. It does not skip work when the requested version
+matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.9.0          # force an exact release
+machinery update --version v0.9.0        # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
 
-Claude Code and Codex own their plugin caches. When those plugins are detected, update asks the
-host CLI to refresh them; it never edits cache directories directly, and it cannot roll a host
-plugin cache back. Host plugin refresh runs after the binary and every direct placement have
-committed, so a missing host CLI, a failed or misunderstood plugin inventory, a managed-scope
-refusal, or a failed refresh is a returned failure, not a warning over a successful update: the
-direct update stays committed, the error names the exact retry (`claude plugin update
-machinery@machinery` or `codex plugin add machinery@machinery`), and the unmet obligation is
-recorded so the next update retries it. That post-commit plugin failure is distinct from plugin
-discovery, which runs earlier while planning: an unsafe or uncertain plugin-ownership discovery
-error fails the whole update before anything changes. Pass `--skip-plugins` to opt out of host
-plugin management entirely; receipt and ownership inspection still run. Open a new Codex task or
-run Claude Code's `/reload-plugins` after a plugin refresh. Full failure and recovery behavior is
-in the [agent portability guide](docs/agent-portability.md#updating-a-release).
+An installation spans several filesystem roots (the binary, a direct home group, native targets).
+`machinery update` swaps the binary first and then refreshes every recorded placement from the same
+release, inside one transaction: if any step fails, every root is restored to the previous release
+and the command exits non-zero naming the failed step. Between the binary swap and the end of the
+refresh, a running agent host can briefly see the new binary next to the previous release's skill
+and role docs; that window lasts as long as the refresh, and nothing in it is left behind.
 
-#### What an update looks like on an existing install
+Re-running the one-line installer over an existing install converges with `machinery update`: when
+a valid receipt exists, the bootstrap uses the complete recorded home, native-target, and
+host-plugin plan, exactly what an ordinary `machinery update` without selectors uses, preserving
+each recorded group's copy or symlink mode. A first bootstrap with no receipt installs the
+plugin-aware default homes. Explicit `MACHINERY_HOMES` or `MACHINERY_TARGETS` do not extend that
+bootstrap plan; they replace it with ordinary update selectors.
 
-An installation spans several filesystem roots (the binary, a direct home group, native
-targets). `machinery update` swaps the binary first and then refreshes every recorded placement
-from the same release, inside one transaction: if any step fails, every root is restored to the
-previous release and the command exits non-zero naming the failed step. Between the binary swap
-and the end of the refresh, a running agent host can briefly see the new binary next to the
-previous release's skill and role docs; that window lasts as long as the refresh itself, and
-nothing in it is left behind. Re-running the one-line installer over an existing install converges
-with `machinery update`: when a valid receipt exists, the bootstrap uses the complete recorded
-home, native-target, and host-plugin plan, exactly what an ordinary `machinery update` without
-selectors uses, preserving each recorded group's copy/symlink mode. A first bootstrap with no
-receipt installs the plugin-aware default homes; explicit `MACHINERY_HOMES`/`MACHINERY_TARGETS`
-do not extend that bootstrap plan, they replace it with ordinary update selectors.
+Claude Code and Codex own their plugin caches. When those plugins are detected, update asks the host
+CLI to refresh them. It never edits cache directories directly, and it cannot roll a host plugin
+cache back. Host plugin refresh runs after the binary and every direct placement have committed, so
+a missing host CLI, a failed or misunderstood plugin inventory, a managed-scope refusal, or a failed
+refresh is a returned failure, not a warning over a successful update: the direct update stays
+committed, the error names the exact retry (`claude plugin update machinery@machinery` or
+`codex plugin add machinery@machinery`), and the unmet obligation is recorded so the next update
+retries it. That post-commit plugin failure is distinct from plugin discovery, which runs earlier
+while planning: an unsafe or uncertain plugin-ownership discovery error fails the whole update
+before anything changes. Pass `--skip-plugins` to opt out of host plugin management entirely;
+receipt and ownership inspection still run. Open a new Codex task or run Claude Code's
+`/reload-plugins` after a plugin refresh. Failure and recovery behavior is in the
+[agent portability guide](docs/agent-portability.md#updating-a-release).
 
-Keep the binary and the Claude Code plugin on the same version. The plugin
-cache is host-owned and updates separately (`/plugin`), so it is possible to
-move one and not the other; machinery detects the skew and refuses rather than
-running a hook against a binary it was not built for:
+Keep the binary and the Claude Code plugin on the same version. The plugin cache is host-owned and
+updates separately (`/plugin`), so one can move without the other. machinery detects the skew and
+refuses rather than running a hook against a binary it was not built for:
 
 ```
 cached machinery plugin version 0.7.2 does not match running machinery v0.7.1;
 run 'claude plugin update machinery@machinery'
 ```
 
-The gate tools are a single Go binary (no Python runtime). `verify-formal` downloads a version-pinned,
-checksum-verified `tla2tools.jar` on first use. CI runs the full suite on Linux and macOS, all gate
-runs, the full formal suite with a generated-diff assertion, pinned Modelith render reproduction,
-the native macOS golden corpus, Structurizr compilation for every example, the pinned OCI
-external-checker closure, release-target builds, Windows cross-compilation, security scanning, and
-the go-crm build on every push.
-
 ### Claude Code plugin (optional, recommended for Claude Code)
 
-For Claude Code specifically, this repository is also a plugin: the same skill and role agents,
-plus `/machinery:design`, `/machinery:check`, `/machinery:init`, and `/machinery:status` commands,
-plus hooks that make the deterministic half of the gates non-optional inside every session. Install
-the binary first (the hooks call it), then the plugin:
+For Claude Code, this repository is also a plugin: the same skill and role agents, the
+`/machinery:design`, `/machinery:check`, `/machinery:init`, and `/machinery:status` commands, and
+hooks that make the deterministic half of the gates part of every session. Install the binary first
+(the hooks call it), then the plugin:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh
@@ -687,23 +699,23 @@ curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | s
 ```
 
 In a machinery-managed project (a `.machinery.json` at the root, or the conventional
-`design/domain.modelith.yaml`), the hooks: announce the governance contract at session start, deny
-hand-edits to generated artifacts (`*.oracle.md`, `formal/*.tla` and `*.cfg`, `packs/`, `pack/`),
-and run `machinery check` before any turn that touched the design (or watched sources, with
-`"impl"` configured) is allowed to end; DRIFT and import-boundary violations block, mid-phase
-ERRORs only warn. During a deliberate multi-agent wave, touch `<design>/.machinery-wave` (first
-line: TTL in minutes, default 45) and red gates surface as messages instead of blocking until the
-sentinel is deleted or its TTL lapses; a stale sentinel is reported and ignored. The sentinel is
-operator-created, never agent-created: the PreToolUse hook denies agent file-tool writes to it, so
-a session cannot defer its own gates (deleting it, which closes the wave, stays allowed). In every other repository the hooks are a strict no-op: they exit before reading
-anything, so the plugin never disturbs other projects or plugins. Details, including the
-`.machinery.json` reference: the [Claude Code plugin guide](docs/claude-plugin.md).
+`design/domain.modelith.yaml`), the hooks announce the governance contract at session start, deny
+hand-edits to generated artifacts (`*.oracle.md`, `formal/*.tla`, `*.cfg`, and `*.als`, `packs/`,
+`pack/`, `ratchet.json`), and run `machinery check` before any turn that touched the design (or
+watched sources, with `"impl"` configured) is allowed to end. DRIFT and armed import-boundary
+violations block; mid-phase ERRORs only warn. During a deliberate multi-agent wave, the operator
+creates `<design>/.machinery-wave` and red gates surface as messages instead of blocking while it
+is open. The sentinel is operator-created, never agent-created: the PreToolUse hook denies agent
+writes to it, so a session cannot defer its own gates (deleting it, which closes the wave, stays
+allowed). In every other repository the hooks are a strict no-op and never disturb other projects
+or plugins. Details, including the `.machinery.json` reference and the exact sentinel contents:
+the [Claude Code plugin guide](docs/claude-plugin.md).
 
 With the plugin installed, the default `machinery install` detects it and skips `~/.claude` (the
-plugin already serves the skill and agents there). The legacy no-target install remains unchanged;
-Codex and OpenCode users can opt into their native adapters with `--target`.
+plugin already serves the skill and agents there). Codex and OpenCode users can opt into their
+native adapters with `--target`.
 
-## Quickstart (five minutes)
+## Quickstart
 
 Install without cloning, then run the binary on any design:
 
@@ -721,59 +733,19 @@ make build
 .bin/machinery check examples/go-crm/design --impl examples/go-crm/impl
 ```
 
-The check prints one block per gate. Each block carries a `checked:` line, the exact counts of
-what was actually verified (a gate that finds nothing to check fails rather than passing), and a
-verdict: `ok`, or findings at three severities defined in the table below. The final line
-summarizes blocking findings; a zero there is a clean design. Then, if Java is present:
+The check prints one block per gate, each with its `checked:` counts and a verdict. The last lines
+summarize:
+
+```
+0 blocking (ERROR/DRIFT) finding(s)
+platform-green: design gates, G4-import, and Gt-tests all green
+```
+
+Then, if Java is present:
 
 ```bash
 make verify-formal   # regenerates and checks all 35 TLC proofs + the relational (Alloy) suites
 ```
-
-| Gate | One line |
-|---|---|
-| Gate 1 | `modelith lint` on the domain model (Phase 1). The binary has no `g1`, by design: Phase 1's gate is modelith's own linter. |
-| Gm-transition | rebuild/hybrid designs only: every legacy entity disposed, replaced attributes and lifecycle values fully mapped, ordered source-of-truth phases with rollback, evidence-based cutover, owned transitional risks; mapping rows may declare `tests:` and with `--impl` every named regression identifier must appear in the test corpus. |
-| Gs-surface | designs with a legacy surface ledger only: all six surface classes inventoried or waived, every route/command/table/job/event/integration covered, dropped, or deferred, and covered bindings resolve against the target design. An `as_of:` anchor that is neither an ISO date, a VCS revision, nor a tag-like token warns: the format is not pinned by the schema, but prose where an anchor belongs compares against nothing. |
-| Gu-surfaces | designs with a target surface ledger only (`design/surfaces.yaml`): every action whose actor is a person is mapped to a named surface (screen, admin command, API route, config release) or explicitly deferred with a reason, each mapped act resolves against the domain model and matches the actor it declares, every act is stated exactly once, persona-level deferrals name an actor the model actually declares, `sources:` (required) names where the act list was enumerated from, and once BUILD.md declares milestones every `milestone:` resolves to one of them by number or title. |
-| Gp-policy | designs with a policy annotation only: it binds to the domain model, covers every top-level invariant, and the committed `Policy.als` and `Policy.oracle.md` byte-match a fresh generation. |
-| Gi-integrity | designs with an integrity annotation only: it binds to the domain model and the committed `Integrity.als` byte-matches a fresh generation. |
-| Gn-isolation | designs with an isolation annotation only: it binds to the domain model and the committed `Isolation.als` and `Isolation.oracle.md` byte-match a fresh generation. |
-| Gk-\<id\> | designs with a checker manifest only, one instance per manifest: the committed projection is fresh, evidence binds to it via `input_hash`, the verdict is pass, and the manifest's coverage claim is complete. Engine via `machinery verify-checkers`; bring-your-own deterministic checker (SAST, AST, Datalog, graph reasoner). |
-| Gc-carrier | every declared invariant has a named carrier: an action's `preserves`, a relational layer, a machine matrix unit, an external checker's coverage claim, or an explicit waiver with a reason (`formal/waivers.yaml` or a layer's residuals). Needs only the domain model, so it runs from Phase 1; declaring an obligation the design does not carry fails the moment it is written, not months later. |
-| G2-c4 | the Architecture Contract parses, binds to `workspace.dsl`, the allow graph is acyclic (cycles closing only through `baseline:` edges warn as ratchet debt), `assert: no_path` claims hold over the transitive closure, every dependency has a mitigation row, the NFR record exists and mentions security, capacity, and observability, every event-contract table names its enumeration source, and every allowed boundary crossing has an interface-contract row (edge, shape, errors, idempotency) or a `(no contract: <reason>)` waiver, with no row for an edge no allow rule declares. Every relationship `workspace.dsl` DRAWS is judged by the same allow/deny/baseline rules G4-import judges a code edge by (an endpoint no element declares is an error; an endpoint the contract never claimed carries no obligation and stays visible in the counts; the converse is not required, since a diagram is legitimately partial). Every event-contract row answers each of its columns (producer, consumer, payload, delivery, ordering, dedupe) and its producer and consumer resolve to a declared element or external, the same resolution a mitigation row gets. Opt-in by table presence: the action-ownership table (every model action owned exactly once by a resolvable component) and the adoption-closure table (every closure member declared and mitigated, scorecard cells dated). `machinery verify-c4` is the engine phase: workspace.dsl compiles under structurizr-cli export. |
-| G3-machine | machines pass structural lint, the TLA generator's own admissibility pass (a machine G3 passes is a machine `verify-formal` can generate), retry-counter accounting (leg-entry resets, or a proof-carrying `_counters` waiver), derived-deadline span checks (the stamped-absolute-deadline idiom), the dotted-reference name-rot audit, and the `_branch_order` requirement for overlapping guarded branches; committed oracles byte-match a fresh generation, matrices reconcile, named units covered. |
-| Gd-idcite | designs with machines only: every stable-id citation in hand-written files resolves to a committed oracle row (letter-suffixed forms are falsifying-clause derivatives; `design/removed-ids.txt` is the dated allowance; DECISIONS.md and STATE.md are historical ledgers, counted not judged), positional `T-<TAG>-NN` citations warn, rule-15 form-b row counts are verified against their tables, and opt-in `CLAUSES{...}`/`READS{...}` declarations catch clause drift and payload-sufficiency drift (the `READS{...}` tier stands down for the events an armed event contract names: Gx-trace judges those at ERROR strength instead, so one defect earns one finding); a guard row whose contract statement is a conjunction or disjunction and declares NO clause vocabulary warns, waivable per row with `(single-clause: <reason>)`. |
-| Gx-trace | cross-layer traceability: states to enum values, events to actions, invariants to enforcement rows, and entities to persistence-placement rows (every declared entity has a row or a `(not placed: <reason>)` waiver; the entity list is closed, so the table's completeness is checked, not attested). When the mitigation table carries a `handled by` column, every name resolves to a committed machine or one of its invoke actors, or waives with `(no residual: <reason>)`. The event-contract rows are reconciled against the machines with the pack gate's own semantics: a consumed event is handled or `_ignores`-ed by some machine, a produced event appears whole-token in some machine action or matrix cell, or the cell that owes the obligation carries a `(no machine: <reason>)` waiver. A design that carries a pack is left to G5, which reconciles the same rows from the generated `events.md`, so one defect never earns two findings. Opt-in by a `<!-- machinery:reads-complete -->` marker in ARCHITECTURE.md, the consumer-READS completeness tier: every event-contract row then owes a `READS{field, ...}` declaration on a matrix row naming its event and its exact participant in a `consumer` column (matrix filenames name machines, not consumers), or a `(no reads: <reason>)` waiver in the consumer cell for a consumer that genuinely reads nothing off the payload (a pure signal), and every declared field must appear whole-token in that row's payload cell. Read sets and waivers are consumer-local; repeated declarations for the same event and consumer must agree on the exact set, including across machines. Legacy declarations without a consumer column work only when the event has one distinct consumer; ambiguous fan-out requires adding explicit consumer columns. Empty, malformed, duplicate-field or conflicting declarations and blank or unknown explicit consumers fail. A `(no machine: <reason>)` waiver answers a different question and never discharges it. An unarmed design carries no obligation and keeps Gd's opt-in warn tier exactly as it was. Gx also reports the shape errors of the declaration groups and of the authorization inventory; what they mean is Gy-rules'. For one release it warns on a design that relied on the 0.9.0 prose inference (no `WRITES{}`, `USES{}` or `PRODUCES{}` anywhere, a fact-shaped token quoted in prose). |
-| Gy-rules | designs with `machines/` or an `AUTHORIZATION.md`: the shipped Datalog rules under `rules/consistency/` run in process over the design's declared, projected facts: every System or `PRODUCES{}` action has one admission naming a declared capability, every `USES{}`/`WRITES{}` fact resolves, `VALUES` groups agree with their enum or with each other, `payload {}` twins equal their contract row, every actor and writing action names a `CARRIES{}` (and only those do), and type supersession is acyclic with owned replacements (a `migration.yaml` disposition owns its legacy type). Every `finding_*` result is an ERROR; a `warn_*` result is a warning. `--explain` prints each finding's derivation (rule file and rule number, then the matched facts with their `path:line` sources). A CI lane holds every rule file to native Souffle on every example. |
-| Gr-reads | designs whose Architecture Contract declares root `reads:` rows: every design-relative artifact and implementation-relative reader path is portable and resolves. Without `--impl`, each row warns that the compile-time consumer must land with its follow-up. With `--impl`, the recorded full Git review commit must be an ancestor, both paths must exist there, and every later commit or current uncommitted change set that changes the artifact must also change its reader. History or custody that cannot be proved fails closed. See [the declaration reference](docs/declared-reads.md). |
-| Gb-plan | designs with a BUILD.md only: milestones are unique `**M<n> - <title>**` markers, the walking skeleton comes first (or carries an explicit waiver), every milestone has a `DoD:` line, the skeleton DoD cites a committed oracle id, and the skeleton block carries an `NFR:` line naming the NFR-record mechanisms it instantiates. In `Mode: manifest`, each milestone also has exactly one standalone, non-empty `Demo:` line. `Linkage: pairwise` (the default when absent) preserves one direct bounded `BUILD/M<n>-*.md` packet per milestone. `Linkage: matrix` instead requires one or more `Shard:` links per milestone plus one reciprocal, canonical `Milestones: M1, M3` declaration per shard; the many-to-many inventory must match exactly in both directions. |
-| Gw-packet | designs with a `slices.yaml` only: the authored slice map binds each slice of a milestone to one shard, the element ids it cites (oracle rows, oracle sets, matrices, shard sections, milestone blocks, files, Architecture Contract boundaries, externals, rules and table rows, invariants), and optional implementation-relative fixture modules whose changes obligate its suite. Every citation resolves to exactly one excerpt, every projected packet fits its declared byte budget, every shared fixture is carried with its complete slice-consumer set, and every obligation the milestone owes (the DoD-cited oracle ids Ga binds evidence to) is claimed by exactly one slice or carries a recorded waiver. `machinery packet <design> --milestone M1 --out <dir>` writes the packets this gate holds, each excerpt verbatim under its stable id and source `path:line`, byte-reproducible for the same design bytes. See the [packet projection guide](docs/packet-projection.md). |
-| Ga-accept | once the build starts, milestone by milestone: committed acceptance evidence per closed milestone binds to a reviewed commit in the selected repository history (the derived HEAD or an explicit `--commit`/`MACHINERY_COMMIT` anchor, by ancestry), and to the literal or `ORACLESET{...}`-expanded oracle ids its DoD cites. |
-| Gl-ledger | always: every STATE.md `self-review:` line parses (five keys, `clean`/`fixed`/`fixed(<reason>)`/`accepted(<reason>)`), DECISIONS.md dated entries are real dates, author-proposed unconfirmed items are counted as a note, and the house-style scan warns on em dashes and emojis across the hand-written design tree. An em dash in a generated `*.modelith.md` render is an ERROR instead: the renderer emits them and the post-render strip is mechanical, so a survivor is a skipped step, not a style opinion. A `.machineryignore` at the design root (gitignore-shaped, patterns relative to the root, no negations) keeps paths that are not authored design (a spike's vendored dependencies) out of every design-tree walker; Gl's `checked:` line reports how many paths it ignored. |
-| Gj-adjudication | designs with `adjudications/` only: every characterization verdict file parses, binds to a committed oracle stable id (one verdict per id), carries verdict/date/note, and every model-is-truth verdict names its filed defect. |
-| Gv-attest | designs with `attestations.yaml` only: every attested-claim row resolves to the closed claim vocabulary (no id twice), names an attestor and a real date, and covers artifacts whose hashes still match, so an edited artifact makes the row STALE and blocks. Inventory-wide claims must cover their full subject: all machines and matrices for `g3.*`, all BUILD artifacts for the G4/GT build claims, all acceptance files for review quality, and all pack files for pack-event discipline. A claim whose artifact exists but carries no row warns. Whether a judgment is true is never checked, by design. `machinery attest <path>` prints the hash the gate expects. |
-| Ge-embed | designs carrying a `machinery:embed` marker only: every marked table is held to the source it declares (`subset`: each row is byte-identical to a source row; `complete`: every selected source row is present), with `(shard-local: <reason>)` exempting exactly the row or cell it names. A row copied twice into one embed warns (a copy carries the source's rows; neither claim catches a repeat on its own). The sanctioned shard-copy duplication, checked instead of promised. `machinery embed refresh <design>` writes what this gate checks: a keyed, idempotent re-copy that leaves localized rows alone and reports (never deletes) a row with no source row. |
-| G4-import | code imports respect the contract boundaries (Go, Python, TypeScript/JavaScript, Elixir, Rust). |
-| Gt-tests | with `--impl` only: every stable id in the committed oracles appears whole-token in a test file, or a test parses the committed oracle table (the conformance idiom); for every `CLAUSES{...}`-declared guard, each governed oracle row also owes one suffixed falsifying-clause id per active clause (the conformance parse never discharges those); the hard-TDD RED-exit check made deterministic. |
-| G5-pack | decomposed designs only: packs fresh, children pinned to the current packs, refinement proofs fresh, and every boundary-event row held to its direction (`consumes` or `produces` exactly; any other value is an ERROR rather than a silently dropped row). |
-| ERROR / DRIFT / WARN | ERROR is blocking; DRIFT means a generated artifact is stale, also blocking; WARN is advisory. |
-
-Matrix rows declare what a unit touches with a closed family of groups: `WRITES{Entity.attr, ...}`
-(stored facts a unit writes; `WRITES{}` is read-only), `USES{fact, ...}` (facts a unit reads or
-names), `PRODUCES{Entity.action, ...}` (the actions a cascade or consumer arm performs),
-`CARRIES{kind:target, ...}` (what carries an effect: `column`, `outbox`, `sink`, `signal`,
-`action`), `VALUES{a, b}` or `VALUES name{a, b}` (a closed vocabulary), `payload {f, ...}` (an
-event payload twin) and the row-local `derived: fact (<reason>)` waiver; Architecture Contract
-rows carry `SUPERSEDES{type:OldName}`, and a marked `AUTHORIZATION.md` table admits each System or
-produced action. Gx-trace parses them and fails malformed, empty (except `WRITES{}`), duplicate,
-unterminated, and repeated groups, malformed inventory rows, and any upper-case `NAME{` in a
-matrix cell outside the closed group vocabulary. Gy-rules decides what they mean, over the
-declared facts only: prose never declares (see
-[docs/consistency-layer-proposal.md](docs/consistency-layer-proposal.md)). Gl-ledger warns on a
-backticked snake_case or `Entity.attr` token in a contract, clause, or payload cell that no group
-on its row declares, and on an unnamed `VALUES{...}` whose unit name matches an enum only up to
-case.
 
 ## Use
 
@@ -784,230 +756,199 @@ project you want to design:
 Design a new <system> with machinery.
 ```
 
-With the Claude Code plugin, `/machinery:design <what you want>` does the same thing explicitly,
-and `/machinery:status` reports where a design stands. The conductor takes it from Phase 0. It is fully standalone: no tracker, no project settings, no
-other process dependencies. Target languages it realizes: Elixir, Go, Rust, TypeScript, Python.
+With the Claude Code plugin, `/machinery:design <what you want>` does the same thing explicitly, and
+`/machinery:status` reports where a design stands. The conductor starts at Phase 0. It is fully
+standalone: no tracker, no project settings, no other process dependencies. Target languages it
+realizes: Elixir, Go, Rust, TypeScript, Python.
+
+The skill also defines a revision mode (design changes after code exists: stable test ids, oracle
+diffs as the affected-test list, and a mandatory state-migration note for persisted machines) and a
+sharding rule for designs beyond roughly ten stateful components. `machinery scale` measures a
+design and recommends sharding or recursive decomposition; whether a subsystem team needs its own
+contract is still a human decision.
 
 ## How it is put together
 
-- `skills/machinery/SKILL.md` the conductor, plus phase-selected `references/` (XState format, C4
-  technique, verification evidence, archaeology classification, BUILD.md template, and bounded
-  execution packets) and `tools/` (the TLC shell wrappers, `tlc.sh` and `verify_formal.sh`).
-- `cmd/machinery/` the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `alloy`, `refine`,
-  `compose`, `check`, `attest`, `project`, `packet`, `verify-checkers`, `baseline`, `verify-formal`, `verify-c4`,
-  `pack`, `scale`, `sweep`, `embed`, `tokens-equal`, `doctor`, `preflight`, `install`, `update`,
-  `uninstall`, `recover`, `completion`, and `version`.
-- `internal/` the Go toolchain: `ir/` (order-preserving machine model), `lint/`, `oracle/`, `tla/`,
-  `alloy/` (the relational proof generators), `refine/`, `compose/`, `gates/` (the full gate suite,
-  see the table below), `pack/` (recursive decomposition via contract packs), `formal/` (TLC + Alloy
-  orchestration), `install/` (skill placement behind `machinery install`), `experiments/` (the
-  shared mutation-experiment table). Every package has unit tests.
-- `agents/` two synthesis subagents (the machine author and the build-doc writer).
-- `commands/`, `hooks/`, `.claude-plugin/`, and `.codex-plugin/` the Claude Code and Codex plugin
-  surfaces: slash commands where supported, the shared gate-enforcing hooks and shim, and both
-  manifests. The repo root is the plugin; see the [Claude Code plugin guide](docs/claude-plugin.md)
-  and [agent portability guide](docs/agent-portability.md).
-- `adapters/opencode/` the OpenCode commands and thin JavaScript translation layer. The methodology
-  and gate behavior remain in the shared skill and binary.
-- `docs/` the deep dives: the [rebuild and hybrid guide](docs/rebuild-guide.md) (dual domain truths,
-  migration contract, coexistence and rollback test protocol), the
-  [policy layer guide](docs/policy-layer.md) (the annotation
-  reference, the meta-checks in plain language, the authorization-oracle test pattern, greenfield
-  and brownfield workflows), the [brownfield team guide](docs/brownfield-team-guide.md) (staged
-  adoption ladder, baseline allow rules, PR discipline, CI recipes), the
-  [Claude Code plugin guide](docs/claude-plugin.md) (hooks, `.machinery.json` reference, commands),
-  the [agent portability guide](docs/agent-portability.md) (Claude Code, Codex, OpenCode, and
-  capability fallbacks),
-  the [external checkers guide](docs/external-checkers.md) (the pluggable-checker contract: the
-  projection and evidence schemas, the tool-neutral manifest, the git-ignored resolution registry,
-  the pure `gk` gate plus the `verify-checkers` engine phase, and how to adapt a signed-artifact or
-  probabilistic engine you cannot modify),
-  the [milestone acceptance guide](docs/acceptance-gate.md) (the closed marker, the acceptance
-  evidence schema, the `ga` gate's DoD-id and commit bindings, and the CI recipe),
-  the [packet projection guide](docs/packet-projection.md) (the `slices.yaml` schema, the
-  citation kinds, fixture obligations, the byte budget and its documented divisor, and the `gw`
-  gate's coverage rule),
-  the [compile-time design reads guide](docs/declared-reads.md) (the Architecture Contract
-  `reads:` grammar, review baseline, and `Gr-reads` history rule),
-  the [attestation evidence guide](docs/attestation-evidence.md) (the `attestations.yaml` schema,
-  the closed claim vocabulary, staleness by content hash, `machinery attest`, and how the `gv` gate
-  relates to `ga` and to the superseded PR-checklist idea),
-  the [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft
-  rung-4 design note, not yet implemented),
-  and two approved architecture contracts that state required behavior rather than shipped
-  commands: the [native custody contract](docs/native-custody-contract.md) and the
-  [executable test assurance contract](docs/test-assurance-contract.md). The assurance contract
-  opens with an "Implementation status in 0.7.0" section: this release ships the version-1
-  declaration grammar, the obligation inventory, the capture and registration store, and four
-  native test adapters exercised by the required integration lane, but no `machinery tdd`
-  command, no `check --store` or `--assurance strict` flag, and no gate that reads
-  `design/assurance/`.
-- `examples/go-crm/` the worked rebuild example: `design/legacy/` (the working prototype truth),
-  `design/migration.yaml` (the checked transition), the target blueprint/formal models, and `impl/`
-  (the verified Go build).
-- `examples/surreal-crm/` the store-swap rebuild example: the go-crm system moving from the
-  embedded store to SurrealDB in Docker. Exercises Gs-surface (the legacy surface ledger,
-  `design/legacy/surface.yaml`) and an all-reuse `migration.yaml`; its machines and oracles are
-  byte-identical to go-crm's, which is the point: mitigations reclassify failures, the domain
-  does not move.
-- `examples/fulfillment/` the distributed stress test: `design/` only (six machines, eight proofs,
-  and `FINDINGS.md`, the record of what strained and what was fixed).
-- `examples/portfolio-engine/` a second design-only example in a different domain and language (a
-  Python drawdown portfolio recommender): exercises the terminal-lifecycle pattern and a
-  persistence overlay renamed from the defaults, proving the formal layer is not hardcoded to one
-  vocabulary. Its root BUILD manifest and six milestone packets are the worked large-project,
-  small-model execution handoff.
-- `examples/checkout-split/` the recursive-decomposition example: a parent design that stops at
-  contracts (`decomposition.yaml`, two abstract contract machines, generated `packs/`) plus two
-  child designs, each a full machinery run against its frozen pack, with a TLC-checked proof that
-  its machine refines the contract the neighbor relies on (G5-pack holds both sides: pack
-  freshness, hash pinning in both directions, frozen public shape, boundary-event coverage, and
-  refinement-proof freshness). Designs scale by verifying parts against contracts, never against
-  the flattened system; this is that principle applied to the design process itself. When to
-  escalate: `machinery scale` measures a design and recommends sharding or recursion.
-- `examples/pii-flow/` the external-checker reference: a small but complete design (model with a
-  `DataSubject` lifecycle machine, an Architecture Contract whose export-never-reaches-back claim
-  is a checked `no_path` assertion) whose central invariant, no sensitive attribute reaches the
-  export sink unredacted, is decided by a standard-library fixed-point checker in a digest-pinned
-  OCI Python userspace under the Gk contract. The full default gate suite passes on it; the checker's coverage claim is the carrier
-  Gc credits for the flow invariant, and its declared residuals carry the two process controls no
-  static flow graph can decide.
-- `testdata/golden/` the byte-for-byte golden corpus: expected stdout, stderr, exit code, and every
-  generated artifact for the deterministic subcommands (lint, oracle, and tla on the four
-  standalone examples, refine and compose where semantics annotations exist; check on every
-  example design root; pack generate and scale on checkout-split),
-  checked by `go test ./cmd/machinery -run TestGolden`; the Go experiment
-  table lives in `internal/experiments/`.
+- `skills/machinery/SKILL.md`: the conductor, plus phase-selected `references/` (XState format, C4
+  technique, verification evidence, archaeology classification, the BUILD.md template, and bounded
+  execution packets) and `tools/` (the TLC shell wrappers `tlc.sh` and `verify_formal.sh`, and the
+  tools README).
+- `cmd/machinery/`: the single Go binary (cobra CLI): `lint`, `oracle`, `tla`, `alloy`, `refine`,
+  `compose`, `check`, `attest`, `project`, `packet`, `verify-checkers`, `baseline`,
+  `verify-formal`, `verify-c4`, `pack`, `scale`, `sweep`, `embed`, `tokens-equal`, `doctor`,
+  `preflight`, `install`, `update`, `uninstall`, `recover`, `completion`, and `version`.
+- `internal/`: the Go toolchain. `ir/` (order-preserving machine model), `lint/`, `oracle/`,
+  `tla/`, `alloy/` (the relational generators), `refine/`, `compose/`, `gates/` (the gate suite),
+  `checker/` (the projection and its relation catalog), `datalog/` (the in-process rule evaluator),
+  `pack/` (recursive decomposition via contract packs), `formal/` (TLC and Alloy orchestration),
+  `install/` (skill placement), `hook/` (the governance hooks), and `experiments/` (the adversarial
+  mutation suite). Every package has unit tests.
+- `rules/consistency/`: the shipped Datalog rules, catalogued in [rules/README.md](rules/README.md).
+- `schemas/`: the projection (1.0 and 2.0) and evidence JSON schemas.
+- `agents/`: the two synthesis roles (the machine author and the build-doc writer).
+- `commands/`, `hooks/`, `.claude-plugin/`, and `.codex-plugin/`: the Claude Code and Codex plugin
+  surfaces (slash commands where supported, the shared gate-enforcing hooks and shim, and both
+  manifests). The repository root is the plugin.
+- `adapters/opencode/`: the OpenCode commands and a thin JavaScript translation layer. The
+  methodology and gate behavior stay in the shared skill and binary.
+- `examples/`: go-crm, surreal-crm, fulfillment, portfolio-engine, checkout-split, and pii-flow, as
+  described above. `examples/inventory.tsv` lists every bundled design and how CI runs it.
+- `testdata/golden/`: the byte-for-byte golden corpus (see below).
+- `docs/`: the guides.
+  - Layers: [policy](docs/policy-layer.md), [integrity](docs/integrity-layer.md),
+    [isolation](docs/isolation-layer.md), [external checkers](docs/external-checkers.md) (the
+    projection and evidence schemas, the manifest, the git-ignored resolution registry, the pure
+    `gk` gate and the `verify-checkers` engine phase, and how to wrap an engine you cannot modify),
+    and the [consistency layer](docs/consistency-layer-proposal.md) (declarations, projection 2.0,
+    the rules, and each stage as implemented).
+  - Delivery: [milestone acceptance](docs/acceptance-gate.md),
+    [packet projection](docs/packet-projection.md), [compile-time design reads](docs/declared-reads.md),
+    [attestation evidence](docs/attestation-evidence.md).
+  - Existing systems: [rebuild and hybrid](docs/rebuild-guide.md),
+    [surface ledger](docs/surface-ledger.md), [target surfaces](docs/target-surfaces.md),
+    [brownfield team guide](docs/brownfield-team-guide.md).
+  - Hosts: [Claude Code plugin](docs/claude-plugin.md) and the
+    [agent portability guide](docs/agent-portability.md).
+  - Contracts not yet shipped as commands: the
+    [decision-lifecycle refinement pattern](docs/decision-lifecycle-pattern.md) (a draft rung-4 design
+    note), the [native custody contract](docs/native-custody-contract.md), and the
+    [executable test assurance contract](docs/test-assurance-contract.md). The assurance contract
+    opens with an "Implementation status in 0.7.0" section: the release ships the version-1
+    declaration grammar, the obligation inventory, the capture and registration store, and four
+    native test adapters exercised by the required integration lane, but no `machinery tdd`
+    command, no `check --store` or `--assurance strict` flag, and no gate that reads
+    `design/assurance/`.
 
 See `skills/machinery/tools/README.md` for the checkers and generators, and
-`examples/go-crm/design/formal/README.md` for the proofs. The skill also defines a revision mode
-(design changes after code exists: stable test ids, oracle diffs as the affected-test list, and a
-mandatory state-migration note for persisted machines) and a sharding rule for designs beyond
-roughly ten stateful components.
+`examples/go-crm/design/formal/README.md` for the proofs.
 
-## Testing & CI
+## Testing and CI
 
-The Go toolchain has full unit tests in every package, including `internal/formal`. The adversarial
-mutation suite (every vacuity and drift finding from the design reviews, lint mutations plus the
-full gate suite run against a synthesized design/impl fixture) runs as Go tests in
-`internal/experiments`. Current coverage:
+Every Go package has unit tests. The adversarial mutation suite in `internal/experiments` encodes
+every vacuity and drift attack found in the design reviews (lint mutations plus the full gate suite
+run against synthesized design and implementation fixtures) as permanent regressions. Current
+own-package coverage:
 
 | Package | Coverage | Role |
 |---------|----------|------|
-| `internal/version` | 96% | version stamps and skew detection |
-| `internal/tla` | 93% | TLA+ control-flow generator |
-| `internal/hook` | 89% | progressive governance and generated-artifact protection |
-| `internal/lint` | 89% | structural lint + matrix reconciliation |
-| `internal/alloy` | 88% | policy, integrity, and isolation generators/oracles |
-| `internal/oracle` | 87% | transition oracle (content-hashed ids) |
-| `internal/refine` | 87% | data-refinement (3 patterns) |
-| `internal/compose` | 86% | cross-aggregate composition |
-| `internal/gates` | 75% | the full gate suite (G5 also exercised via `internal/experiments`) |
-| `internal/install` | 75% | skill placement behind `machinery install` (fetch, extract, canonical+symlink layout) |
-| `internal/pack` | 72% | contract packs (the mutation suite lives in `internal/experiments`) |
-| `internal/ir` | 63% | shared IR (covered transitively via lint/gates) |
-| `internal/formal` | 52% | TLC/Alloy orchestration (solver-run paths need Java) |
-| **internal/ overall** | **79%** | own-package tests only; the cross-package adversarial suites in `internal/experiments` exercise gates and pack further (cmd/ is thin CLI plumbing) |
+| `internal/datalog` | 96.1% | the in-process Datalog evaluator |
+| `internal/version` | 94.4% | version stamps and skew detection |
+| `internal/oracle` | 92.9% | transition oracle (content-hashed ids) |
+| `internal/lint` | 89.4% | structural lint and matrix reconciliation |
+| `internal/tla` | 89.2% | TLA+ control-flow generator |
+| `internal/alloy` | 89.2% | policy, integrity, and isolation generators and oracles |
+| `internal/refine` | 86.3% | data refinement (3 patterns) |
+| `internal/compose` | 85.7% | cross-aggregate composition |
+| `internal/gates` | 85.6% | the gate suite (G5 also exercised through `internal/experiments`) |
+| `internal/hook` | 77.8% | progressive governance and generated-artifact protection |
+| `internal/checker` | 74.8% | projection, relation catalog, checker registry and evidence |
+| `internal/install` | 74.2% | skill placement behind `machinery install` and `update` |
+| `internal/formal` | 74.2% | TLC and Alloy orchestration (solver-run paths need Java) |
+| `internal/pack` | 73.1% | contract packs (the mutation suite lives in `internal/experiments`) |
+| `internal/ir` | 67.1% | shared IR (covered further through lint and gates) |
 
-Run `go test -coverprofile=cover.out ./internal/... && go tool cover -func=cover.out` locally.
-CI runs `go test -race ./...`. Beyond unit tests, three stronger nets are always green in CI:
+These are own-package figures from `go test -cover` on this branch; the cross-package adversarial
+suites in `internal/experiments` exercise gates and packs further, and `cmd/` is thin CLI plumbing.
 
-- **Golden corpus**: `testdata/golden` byte-compares stdout, stderr, exit code, and every generated
-  artifact for the deterministic subcommands: lint, oracle, and tla on the four standalone
-  examples (go-crm, fulfillment, portfolio-engine, pii-flow), refine and compose where semantics
-  annotations exist; check on every example design root (the checkout-split runs pin the G5-pack
-  output, the pii-flow runs pin the full default suite and the hermetic Gk gate); and
-  pack generate and scale on checkout-split (`make golden`;
-  re-captured with `make golden-update` after intended output changes). Environment-dependent
-  commands (verify-formal, doctor, preflight) are exercised by the formal-verification and CI jobs
-  instead. The same byte corpus runs natively on Linux and macOS; Windows is cross-compiled only.
-- **Formal verification**: `machinery verify-formal` regenerates and TLC-model-checks all 35 TLA+
+Run `go test -coverprofile=cover.out ./internal/... && go tool cover -func=cover.out` locally. CI
+runs `go test -race ./...`. Beyond unit tests, these nets are always green in CI:
+
+- **Golden corpus.** `testdata/golden` byte-compares stdout, stderr, exit code, and every generated
+  artifact for the deterministic subcommands: lint, oracle, and tla on the four standalone examples
+  (go-crm, fulfillment, portfolio-engine, pii-flow), refine and compose where semantics annotations
+  exist, check on every example design root (pinning the Gy-rules, G5-pack, and Gk output among the
+  rest), and pack generate and scale on checkout-split (`make golden`, re-captured with
+  `make golden-update` after intended output changes). The same corpus runs natively on Linux and
+  macOS; Windows is cross-compiled only.
+- **Formal verification.** `machinery verify-formal` regenerates and TLC-model-checks all 35 TLA+
   proofs across the seven example designs that carry formal suites (8 in go-crm, 8 in surreal-crm,
   8 in fulfillment, 6 in portfolio-engine, 4 in checkout-split, two per child including the
-  contract-refinement proofs, and 1 in pii-flow). Pii-flow's central sensitive-data invariant is
-  still held separately by its external checker; its lifecycle machine supplies the control-flow
-  proof. The required workflow also rejects any generated diff after the solver run. Strict manual
-  pairs, when present, start with `\* machinery:manual`, require a sibling cfg, and are reported as
-  declared/not-regenerated while TLC still checks them; an unmarked orphan pair or half fails.
-- **Engine reproduction**: required CI installs Modelith v0.4.0 and reproduces every committed
-  domain render after the renderer's mechanical house-style normalization; compiles every example
-  `workspace.dsl` with checksum-pinned Structurizr CLI v2025.11.09; provisions the exact Python image
-  digest for the registry-bound `linux/amd64` platform; verifies its local `RepoDigests` and
-  OS/architecture; and runs the pii-flow adapter offline with the same `--platform` and
-  `--pull=never` through the committed checker registry. These jobs are
-  the engine halves; `machinery check` remains hermetic and dependency-free.
-- **Required integration lane**: `go run ./scripts/integration-lane --lane required` executes every
+  contract-refinement proofs, and 1 in pii-flow), plus the Alloy suites, and the required workflow
+  rejects any generated diff after the solver run. The sole hand-written exception is a strict
+  manual TLA pair: the module's first line is exactly `\* machinery:manual` and a same-basename
+  `.cfg` is mandatory. Manual pairs are reported as declared/not-regenerated while TLC still checks
+  them; an unmarked orphan pair or half fails.
+- **Rules parity.** The `datalog-parity` job runs every shipped rule file and the evaluator's
+  program corpus under both engines, as described above.
+- **Engine reproduction.** Required CI installs Modelith v0.4.0 and reproduces every committed
+  domain render after the mechanical house-style normalization; compiles every example
+  `workspace.dsl` with checksum-pinned Structurizr CLI v2025.11.09; provisions the pinned checker
+  runtime by digest for `linux/amd64`, verifying its local `RepoDigests` and OS/architecture;
+  rebuilds the pii-flow image reproducibly and refuses any digest but its pin; and re-runs every
+  registered checker offline with `--pull=never`. These jobs are the engine halves;
+  `machinery check` stays hermetic and dependency-free.
+- **Required integration lane.** `go run ./scripts/integration-lane --lane required` runs every
   infrastructure-dependent suite (Docker-backed checker lifecycle, publication recovery, native
-  custody, adapter governance, and the documented checker registry/bind-path example) with exact
-  test inventories, pinned runtimes, real process/teardown accounting, and no skips: missing
-  infrastructure fails the lane with a diagnostic, it is never silently skipped. The same union of
-  lane fragments runs in local preflight and hosted CI.
+  custody, adapter governance, and the documented checker registry and bind-path example) with
+  exact test inventories, pinned runtimes, real process and teardown accounting, and no skips.
+  Missing infrastructure fails the lane with a diagnostic. The same lane fragments run in local
+  preflight and hosted CI.
 
 ### Where the gates run
 
-The same gates run in three tiers. Nothing in a lower tier is a substitute for a higher one, and
-each tier states what it cannot cover rather than reporting a thinner run as green.
+The same gates run in tiers. A lower tier never substitutes for a higher one, and each tier states
+what it cannot cover instead of reporting a thinner run as green.
 
 | Tier | Command | Covers | Cost |
 |------|---------|--------|------|
-| Pre-push | `make preflight-fast` | the cheap gate tier the hook enforces on every push | under 5 minutes |
-| Local, native | `make preflight` | the fast tier plus the race sweep, the required integration lane, formal verification, C4 compilation, and checker reproduction, all on the host | tens of minutes |
-| Local, containerized | `make dagger-ci` | every containerizable hosted job, byte-identical to what CI runs | tens of minutes |
-| Release gate | hosted CI | the same module functions, plus the macOS-only jobs | on every push |
+| Pre-push | `make preflight-fast` | the cheap tier the hook enforces on every push | under 5 minutes |
+| Local, native | `make preflight` | the fast tier plus the race sweep, the integration lane, formal verification, C4 compilation, checker reproduction, and rules parity | tens of minutes |
+| Local, containerized | `make dagger-ci` | every containerizable hosted job, identical to what CI runs | tens of minutes |
+| Release gate | hosted CI | the same module functions, plus the macOS-only jobs | every push |
 
-The [Dagger](https://dagger.io/) module in `.dagger/` is not a local convenience that shadows CI:
-every Linux job in `ci.yml`, `formal.yml`, and `security.yml` is a `dagger call` of the function
-named after it, so the gate has one definition and `make dagger-ci` runs what the runner runs. Run
-a single job with `make dagger-job JOB=lint`; `dagger functions` lists them. The hosted runner
-installs the CLI from the version `dagger.json` owns, verified against a committed checksum.
+The [Dagger](https://dagger.io/) module in `.dagger/` is how CI runs, not a local copy of it: every
+Linux job in `ci.yml`, `formal.yml`, and `security.yml` is a `dagger call` of the function named
+after it, so each gate has one definition and `make dagger-ci` runs what the runner runs. Run one
+job with `make dagger-job JOB=lint`; `dagger functions` lists them. The hosted runner installs the
+Dagger CLI at the version `dagger.json` owns (v0.21.9), verified against a committed checksum.
 
-The module does not restate the runtime pins either: its base container is built from
-`scripts/ci-linux.dockerfile`, which remains the single owner of the Go, Node, TypeScript, CPython,
-and Elixir/OTP identities and is shared with `make ci-linux`. The race sweep runs as an
-unprivileged user inside the container, because root bypasses permission bits and would turn the
-custody tests that assert an unwritable path is refused into silent passes.
+The module does not restate the runtime pins. Its base container is built from
+`scripts/ci-linux.dockerfile`, the single owner of the Go (1.27.1), Node (26.8.1) with TypeScript
+(7.0.2), CPython (3.14.7), and Elixir (1.20.4) on OTP (29.0.6) identities, shared with
+`make ci-linux`. The race sweep runs as an unprivileged user inside the container, because root
+bypasses permission bits and would turn the custody tests that assert an unwritable path is refused
+into silent passes. The wiring guards in `cmd/machinery/repository_contract_test.go` and
+`scripts/integration-lane/main_test.go` require the module to carry each pinned command verbatim and
+the workflows to delegate rather than restate it, so neither half can drift from the other.
 
-The wiring guards in `cmd/machinery/repository_contract_test.go` and
-`scripts/integration-lane/main_test.go` hold this together: they require the module to carry each
-pinned command verbatim and the workflow to delegate rather than restate it, so neither half can
-drift from the other.
+Three things the containerized tier does not claim:
 
-Three things the containerized tier deliberately does not claim:
-
-- **The macOS jobs.** `native-tests`, `golden-native`, and the native darwin `build-native`
-  exercise the supported non-Linux filesystem and the byte corpus on darwin. A Linux container
-  cannot reproduce them, so they stay hand-written workflow steps and hosted CI is their only gate.
+- **The macOS jobs.** `native-tests`, `golden-native`, and the native darwin `build-native` exercise
+  the supported non-Linux filesystem and the byte corpus on darwin. A Linux container cannot
+  reproduce them, so hosted CI is their only gate.
 - **The two platform-pinned jobs on an arm64 host.** The assurance catalog pins `linux/amd64` and
   `darwin/arm64` as the only native assurance platforms, so `test` and `integration-required` fail
-  closed in a `linux/arm64` container. On Apple Silicon run them natively through `make preflight`,
-  which is on a pinned platform, or containerized on a `linux/amd64` machine. Emulation is not a
-  workaround: the identity probes build a closed environment that cannot carry the BEAM flags an
-  emulated OTP needs.
+  closed in a `linux/arm64` container. On Apple Silicon, run them natively through
+  `make preflight`, or containerized on a `linux/amd64` machine. Emulation is not a workaround: the
+  identity probes build a closed environment that cannot carry the BEAM flags an emulated OTP needs.
 - **GitHub-native checks.** `dependency-review` is a hosted action with no local equivalent.
 
 ## Built on
 
-machinery is a thin methodology over these external projects. It invokes or emits their notations and
+machinery is a thin methodology over these projects. It invokes them or emits their notations and
 bundles none of them.
 
-- [Modelith](https://modelith.sh/) -- the domain-model language and linter (Phase 1).
-- [C4 model](https://c4model.com/) -- the architecture technique (Phase 2).
+- [Modelith](https://modelith.sh/): the domain-model language and linter (Phase 1).
+- [C4 model](https://c4model.com/): the architecture technique (Phase 2).
 - [Structurizr DSL](https://github.com/structurizr/dsl) and
-  [Structurizr CLI](https://github.com/structurizr/cli) -- architecture-as-code, and optional C4
+  [Structurizr CLI](https://github.com/structurizr/cli): architecture as code, and optional C4
   diagram export.
-- [XState](https://github.com/statelyai/xstate) and [Stately](https://stately.ai/) -- the
+- [XState](https://github.com/statelyai/xstate) and [Stately](https://stately.ai/): the
   state-machine JSON format (notation only; machinery does not run the library) and its visualizer.
-- [TLA+ and TLC](https://github.com/tlaplus/tlaplus) -- the specification language and model checker
-  (the behavioral formal layer).
-- [Alloy](https://alloytools.org/) -- the relational model finder (the static relational layers;
-  `machinery alloy` emits its notation and `verify-formal` runs the pinned analyzer).
-- [Eclipse Temurin / Adoptium](https://adoptium.net/) -- the JVM that runs TLC.
-- [Go](https://go.dev/) -- to build machinery from source and to install Modelith.
-- [LadybugDB](https://github.com/LadybugDB/go-ladybug) -- the embedded store used only by the go-crm
+- [TLA+ and TLC](https://github.com/tlaplus/tlaplus): the specification language and model checker
+  for behavior.
+- [Alloy](https://alloytools.org/): the relational model finder for the static relational layers.
+- [Soufflé](https://souffle-lang.github.io/): the Datalog engine the shipped rules are held to in
+  the parity lane, and the engine inside the pii-flow reference image.
+- [Eclipse Temurin / Adoptium](https://adoptium.net/): the JVM that runs TLC and Alloy.
+- [Go](https://go.dev/): to build machinery from source and to install Modelith.
+- [Dagger](https://dagger.io/): the CI module every Linux job runs through.
+- [LadybugDB](https://github.com/LadybugDB/go-ladybug): the embedded store used only by the go-crm
   example, not a machinery dependency.
 
 ## License
 
-Copyright 2026 Ramiro Salas. Licensed under the Apache License 2.0; see `LICENSE`. 
-`machinery` invokes `modelith` and emits XState and C4 notation; it bundles none of them, so no dependency's license binds
-it. The tools it works with are permissively licensed and compatible with Apache-2.0: Modelith and Structurizr are Apache-2.0, XState and LadybugDB are MIT, and C4 is an open notation.
+Copyright 2026 Ramiro Salas. Licensed under the Apache License 2.0; see `LICENSE`. machinery invokes
+`modelith` and emits XState and C4 notation; it bundles none of them, so no dependency's license
+binds it. The tools it works with are permissively licensed and compatible with Apache-2.0:
+Modelith and Structurizr are Apache-2.0, XState and LadybugDB are MIT, and C4 is an open notation.
