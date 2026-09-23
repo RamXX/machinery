@@ -564,7 +564,7 @@ func runSelectedInSnapshot(design, impl string, sel Selection, opt RunOptions) [
 	}
 	if sel.Run["gy"] {
 		if RulesActive(design) {
-			out = append(out, CheckRules(design, opt.Explain))
+			out = append(out, CheckRulesImpl(design, impl, opt.Explain))
 		} else if sel.Explicit {
 			out = append(out, rulesNotActivated())
 		}

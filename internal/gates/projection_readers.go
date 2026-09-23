@@ -1135,6 +1135,7 @@ func (b *factBuilder) milestones() {
 	b.mark("milestones")
 	if hasPlan {
 		b.planMilestones("BUILD.md")
+		b.milestoneBindings("BUILD.md")
 	}
 	if hasSlices {
 		b.sliceClaims(SliceMapFile)
@@ -1182,6 +1183,97 @@ func (b *factBuilder) planMilestones(rel string) {
 			b.add(rel, line, "dod_id", "ms:"+id, id, orc)
 		}
 	}
+}
+
+// bindingPath is one bound-at path: relative, slash-separated, no spaces,
+// no parent segment.
+var bindingPath = regexp.MustCompile(`^[A-Za-z0-9_.@+-]+(?:/[A-Za-z0-9_.@+-]+)*$`)
+
+// milestoneBindings projects BUILD.md's oracle binding table: every table
+// whose header has an oracle column (oracle, oracle id) and a bound-at column
+// (bound at). Each row is keyed by one oracle id (a test id is normalized to
+// its stable id when a committed oracle declares it; any other id is
+// projected as stated, and Gb owns whether it exists) and its bound-at cell
+// is either the literal unbound (milestone_says_unbound) or one or more
+// comma-separated test file paths relative to the implementation root
+// (milestone_says_bound per path). Backticks are tolerated; anything else in
+// the cell is an error, because the cell is a declaration, not prose.
+func (b *factBuilder) milestoneBindings(rel string) {
+	text, ok := b.read(rel)
+	if !ok {
+		return
+	}
+	known := map[string]string{}
+	for _, row := range b.oracleRows {
+		known[row.stableID] = row.stableID
+		if row.testID != "" && row.testID != "-" {
+			known[row.testID] = row.stableID
+		}
+	}
+	for _, r := range walkTableRows(text) {
+		oi, bi := ir.FindCol(r.header, "oracle", "oracle id"), ir.FindCol(r.header, "bound at")
+		if oi < 0 || bi < 0 {
+			continue
+		}
+		where := fmt.Sprintf("%s:%d", rel, r.line)
+		oracle := ir.CleanCell(cellAt(r.cells, oi))
+		if oracle == "" {
+			continue
+		}
+		if !oracleIDShape.MatchString(oracle) || oracleIDShape.FindString(oracle) != oracle {
+			b.fail("%s: oracle binding row key %q is not one oracle id", where, oracle)
+			continue
+		}
+		if sid, ok := known[oracle]; ok {
+			oracle = sid
+		}
+		cell := strings.TrimSpace(strings.ReplaceAll(cellAt(r.cells, bi), "`", ""))
+		if strings.EqualFold(cell, "unbound") {
+			b.add(rel, r.line, "milestone_says_unbound", "orc:"+oracle, oracle)
+			continue
+		}
+		var paths []string
+		for _, p := range strings.Split(cell, ",") {
+			p = strings.TrimSpace(p)
+			if !bindingPath.MatchString(p) || strings.Contains("/"+p+"/", "/../") || strings.Contains("/"+p+"/", "/./") {
+				paths = nil
+				break
+			}
+			paths = append(paths, p)
+		}
+		if len(paths) == 0 {
+			b.fail("%s: bound-at cell for %s must be the literal unbound or test file paths relative to the implementation root, got %q", where, oracle, cell)
+			continue
+		}
+		for _, p := range paths {
+			b.add(rel, r.line, "milestone_says_bound", "orc:"+oracle, oracle, p)
+		}
+	}
+}
+
+// AddImplBindings adds the implementation facts of the milestones layer to
+// a design's facts: test_file for every test file Gt's corpus scans under
+// impl, and bound_at for every committed oracle row one of them binds
+// (OracleBindings). Each row's source is the test file, relative to impl. It
+// returns the corpus problems, which the caller reports.
+func AddImplBindings(facts *checker.DesignFacts, design, impl string) []string {
+	rows := map[string][]string{}
+	for _, row := range facts.Rows("oracle_row") {
+		base := row.Values[1] + ".oracle.md"
+		rows[base] = append(rows[base], row.Values[0])
+	}
+	bindings, files, problems := OracleBindings(design, impl, rows)
+	for _, f := range files {
+		if err := facts.Add("test_file", "test:"+f, checker.Source{Path: f, Line: 1}, f); err != nil {
+			problems = append(problems, err.Error())
+		}
+	}
+	for _, bd := range bindings {
+		if err := facts.Add("bound_at", "orc:"+bd.Oracle, checker.Source{Path: bd.Path, Line: 1}, bd.Oracle, bd.Path); err != nil {
+			problems = append(problems, err.Error())
+		}
+	}
+	return problems
 }
 
 // sliceClaims projects slices.yaml: each slice's oracle citations (a bare

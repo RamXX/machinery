@@ -60,20 +60,26 @@ func TestRulesParity(t *testing.T) {
 		t.Fatal(err)
 	}
 	both := 0
-	type target struct{ name, path string }
+	type target struct{ name, path, impl string }
 	var targets []target
 	for _, rel := range bundledDesigns(t) {
-		targets = append(targets, target{rel, filepath.Join("..", "..", filepath.FromSlash(rel))})
+		targets = append(targets, target{rel, filepath.Join("..", "..", filepath.FromSlash(rel)), ""})
 	}
 	// The examples fire few rules; the synthetic design fires the rest, so
-	// parity also covers populated outputs of every rule body.
-	targets = append(targets, target{"synthetic/every-rule-fires", writeFactsDesign(t, t.TempDir(), everyRuleFires)})
+	// parity also covers populated outputs of every rule body. Its
+	// implementation supplies the --impl relations (bound_at, test_file).
+	targets = append(targets, target{"synthetic/every-rule-fires", writeFactsDesign(t, t.TempDir(), everyRuleFires), writeFactsDesign(t, t.TempDir(), everyRuleFiresImpl)})
 	nonEmpty := map[string]bool{}
 	for _, tg := range targets {
 		rel := tg.name
 		facts, err := LoadDesignFacts(tg.path)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if tg.impl != "" {
+			if problems := AddImplBindings(facts, tg.path, tg.impl); len(problems) > 0 {
+				t.Fatal(problems)
+			}
 		}
 		factsDir := t.TempDir()
 		writeRuleFacts(t, facts, factsDir)
@@ -176,10 +182,19 @@ entities:
 		"| component | placement | persistence |\n|---|---|---|\n" +
 		"| `Order` (no machine: a stale waiver) | in-process | row |\n" +
 		"| `Receipt` (no machine: an append-only record) | in-process | row |\n",
+	"machines/Order.oracle.md":   "| test id | stable id | guard |\n|---|---|---|\n| T-ORD-01 | ORD-aaaaaa | - |\n| T-ORD-02 | ORD-bbbbbb | - |\n",
+	"BUILD.md":                   "# BUILD\n\n## 9.1 Oracle bindings\n\n| oracle | bound at |\n|---|---|\n| ORD-aaaaaa | unbound |\n| T-ORD-02 | `order_test.go` |\n",
 	"slices.yaml":                "milestones:\n  - id: M1\n    slices:\n      - id: M1-S1\n        cites:\n          - row:ARCHITECTURE.md#types#TypeB\n          - row:ARCHITECTURE.md#types#TypeD\n",
 	"machines/Ledger.matrix.md":  "| name | kind | pre / post |\n|---|---|---|\n| `checkLedger` | guard | - |\n",
 	"machines/Receipt.matrix.md": "| name | kind | pre / post |\n|---|---|---|\n| `checkReceipt` | guard | - |\n",
 	"migration.yaml":             "contract_version: 1\nmode: rebuild\ndispositions:\n  - legacy: TypeD\n    target: Order\n    strategy: replace\n    rationale: r\n",
 	"AUTHORIZATION.md": "<!-- machinery:authorization-inventory -->\n\n| authorization subject | admission |\n|---|---|\n" +
 		"| Order.pay | `nowhere` |\n| Order.view | `nowhere` |\n",
+}
+
+// everyRuleFiresImpl is everyRuleFires' implementation: its one test file
+// binds ORD-aaaaaa, which BUILD.md says is unbound, and not ORD-bbbbbb, which
+// BUILD.md says it binds.
+var everyRuleFiresImpl = map[string]string{
+	"order_test.go": "package order\n\nimport \"testing\"\n\nfunc TestPay(t *testing.T) { t.Log(\"ORD-aaaaaa\") }\n",
 }

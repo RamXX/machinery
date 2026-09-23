@@ -189,6 +189,13 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "row 'WidgetReceipt': stale_reservation", ExpectExit: true},
 	{Name: "rules-superseded-in-packet", Tool: "check", Mutation: "slices.yaml cites the table row of WidgetV1, which WidgetV2 supersedes",
 		ExpectSubstr: "slices.yaml:6: row 'M1-S1': superseded_in_packet (type 'WidgetV1')", ExpectExit: true},
+	// 2026-09-23, consistency layer Stage 5 (NEXT.md entry 37 residual): the
+	// BUILD.md oracle binding table against the oracle ids the locked suite
+	// binds under --impl.
+	{Name: "rules-milestone-binding-stale", Tool: "check", Mutation: "BUILD.md says a Widget oracle id is unbound while internal/app/app_test.go binds it (--impl)",
+		ExpectSubstr: ": milestone_binding_stale", ExpectExit: true},
+	{Name: "rules-milestone-binding-phantom", Tool: "check", Mutation: "BUILD.md says a Widget oracle id is bound at internal/app/app_test.go, which binds only another id (--impl)",
+		ExpectSubstr: "milestone_binding_phantom (path 'internal/app/app_test.go')", ExpectExit: true},
 }
 
 // RefineExperiments are the data-refinement reconciliation failures.

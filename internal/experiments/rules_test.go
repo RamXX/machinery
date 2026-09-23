@@ -7,7 +7,9 @@ package experiments
 // as loudly as a missing one.
 
 import (
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -21,7 +23,8 @@ func init() {
 		"rules-supersession-cycle", "rules-effect-uncarried",
 		"rules-produces-owes-admission", "rules-produces-unknown-action",
 		"rules-actor-uncarried", "rules-carrier-misplaced", "rules-values-conflict",
-		"rules-stale-reservation", "rules-superseded-in-packet")
+		"rules-stale-reservation", "rules-superseded-in-packet",
+		"rules-milestone-binding-stale", "rules-milestone-binding-phantom")
 }
 
 // rulesFindings runs Gy-rules and returns its ERROR and warning lines. The
@@ -29,9 +32,15 @@ func init() {
 // no rule file stops at a limit; every ERROR is then a rule's finding.
 func rulesFindings(t *testing.T, design string) []string {
 	t.Helper()
-	g := gates.CheckRules(design, false)
+	return rulesFindingsImpl(t, design, "")
+}
+
+// rulesFindingsImpl is rulesFindings with an implementation root (--impl).
+func rulesFindingsImpl(t *testing.T, design, impl string) []string {
+	t.Helper()
+	g := gates.CheckRulesImpl(design, impl, false)
 	for _, e := range g.Errs {
-		if strings.HasPrefix(e, "cannot project") || strings.HasPrefix(e, "the shipped consistency rules") || strings.HasPrefix(e, "rules/consistency/") {
+		if strings.HasPrefix(e, "cannot project") || strings.HasPrefix(e, "cannot read the implementation") || strings.HasPrefix(e, "the shipped consistency rules") || strings.HasPrefix(e, "rules/consistency/") {
 			t.Fatalf("Gy-rules did not run: %v", g.Errs)
 		}
 	}
@@ -290,4 +299,79 @@ func TestRulesSupersededInPacket(t *testing.T) {
 	supersessionTable(t, near, "| WidgetV2 | SUPERSEDES{type:WidgetV1} |", "| WidgetV1 | the original type |")
 	slicesCiting(t, near, "WidgetV2")
 	refuteRuleFinding(t, near, "superseded_in_packet")
+}
+
+// widgetOracleIDs returns the first two stable ids of the fixture's
+// committed Widget oracle.
+func widgetOracleIDs(t *testing.T, design string) (string, string) {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(design, "machines", "Widget.oracle.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := regexp.MustCompile(`\b[A-Z][A-Z0-9]*-[0-9a-f]{6}\b`).FindAllString(string(body), -1)
+	if len(ids) < 2 || ids[0] == ids[1] {
+		t.Fatalf("fixture drift: the Widget oracle has ids %v", ids)
+	}
+	return ids[0], ids[1]
+}
+
+// bindingFixture writes a locked suite that binds the first Widget oracle id,
+// and a BUILD.md binding table with the given rows (%1 and %2 stand for the
+// first two stable ids).
+func bindingFixture(t *testing.T, rows ...string) (design, impl string) {
+	t.Helper()
+	design, impl = fixture(t)
+	first, second := widgetOracleIDs(t, design)
+	mustWrite(t, filepath.Join(impl, "internal", "app", "app_test.go"),
+		"package app\n\nimport \"testing\"\n\nfunc TestPublish(t *testing.T) { t.Log(\""+first+"\") }\n")
+	table := "\n## Oracle bindings\n\n| oracle | bound at |\n|---|---|\n"
+	for _, r := range rows {
+		table += strings.NewReplacer("%1", first, "%2", second).Replace(r) + "\n"
+	}
+	editFile(t, filepath.Join(design, "BUILD.md"), "\n## State migration", table+"\n## State migration")
+	return design, impl
+}
+
+func requireImplRuleFinding(t *testing.T, name, design, impl string) {
+	t.Helper()
+	e := experimentNamed(t, name)
+	if got := rulesFindingsImpl(t, design, impl); !containsAny(got, e.ExpectSubstr) {
+		t.Fatalf("%s escaped Gy-rules under --impl: %v", e.Name, got)
+	}
+}
+
+func refuteImplRuleFinding(t *testing.T, design, impl, code string) {
+	t.Helper()
+	for _, f := range rulesFindingsImpl(t, design, impl) {
+		if strings.Contains(f, ": "+code) {
+			t.Fatalf("near-neighbour fired %s: %s", code, f)
+		}
+	}
+}
+
+// BUILD.md says an oracle is unbound while the locked suite binds it. The
+// agreeing table is silent, and so is the disagreeing one without --impl.
+func TestRulesMilestoneBindingStale(t *testing.T) {
+	design, impl := bindingFixture(t, "| %1 | unbound |")
+	requireImplRuleFinding(t, "rules-milestone-binding-stale", design, impl)
+	refuteRuleFinding(t, design, "milestone_binding_stale")
+
+	near, nearImpl := bindingFixture(t, "| %1 | `internal/app/app_test.go` |", "| %2 | unbound |")
+	refuteImplRuleFinding(t, near, nearImpl, "milestone_binding_")
+}
+
+// BUILD.md names a path that binds nothing for the oracle: a file that binds
+// another oracle, and a file that does not exist. The agreeing row is
+// silent, and the disagreeing ones are silent without --impl.
+func TestRulesMilestoneBindingPhantom(t *testing.T) {
+	design, impl := bindingFixture(t, "| %2 | `internal/app/app_test.go` |", "| %1 | internal/app/gone_test.go |")
+	requireImplRuleFinding(t, "rules-milestone-binding-phantom", design, impl)
+	if got := rulesFindingsImpl(t, design, impl); !containsAny(got, "milestone_binding_phantom (path 'internal/app/gone_test.go')") {
+		t.Fatalf("a bound-at path naming no test file must be a phantom: %v", got)
+	}
+	refuteRuleFinding(t, design, "milestone_binding_phantom")
+
+	near, nearImpl := bindingFixture(t, "| %1 | internal/app/app_test.go |")
+	refuteImplRuleFinding(t, near, nearImpl, "milestone_binding_")
 }

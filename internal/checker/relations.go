@@ -109,6 +109,19 @@ var relationCatalog = []RelationSpec{
 	// packet_cites names the row key of each row:<path>#<section>#<key>
 	// citation a slice makes in slices.yaml, the table row its packet carries.
 	{Name: "packet_cites", Layer: "milestones", Columns: []string{"slice", "row"}},
+	// milestone_says_bound and milestone_says_unbound are BUILD.md's oracle
+	// binding table (a table with an oracle column and a bound-at column): a
+	// row keyed by oracle id whose bound-at cell names test file paths, or
+	// the literal unbound.
+	{Name: "milestone_says_bound", Layer: "milestones", Columns: []string{"oracle", "path"}},
+	{Name: "milestone_says_unbound", Layer: "milestones", Columns: []string{"oracle"}},
+	// bound_at and test_file come from the implementation, only when a check
+	// is given --impl: test_file is every test file Gt's corpus scans, and
+	// bound_at(oracle, path) a committed oracle row that file binds under Gt's
+	// credit rules. Paths are relative to --impl. The project command reads no
+	// implementation, so it always emits both empty.
+	{Name: "bound_at", Layer: "milestones", Columns: []string{"oracle", "path"}},
+	{Name: "test_file", Layer: "milestones", Columns: []string{"path"}},
 
 	{Name: "type_owner", Layer: "supersession", Columns: []string{"type", "owner"}},
 	{Name: "supersedes", Layer: "supersession", Columns: []string{"new", "old"}},

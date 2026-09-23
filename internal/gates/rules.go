@@ -58,6 +58,8 @@ var ruleSubjectSources = map[string][]string{
 	"component": {"no_machine_waiver"},
 	// a slices.yaml slice id
 	"slice": {"packet_cites", "slice_claim"},
+	// an oracle stable id, located at its BUILD.md binding row
+	"oracle": {"milestone_says_bound", "milestone_says_unbound", "oracle_row"},
 }
 
 // ruleLimits bounds every rule evaluation explicitly. A design projection is
@@ -352,6 +354,14 @@ func rulesNotActivated() *Gate {
 // CheckRules runs Gy-rules on a design. With explain, every finding carries
 // its derivation tree, printed under it by Emit.
 func CheckRules(design string, explain bool) *Gate {
+	return CheckRulesImpl(design, "", explain)
+}
+
+// CheckRulesImpl runs Gy-rules with an implementation root. With impl, the
+// facts also carry the milestones layer's implementation relations
+// (test_file, bound_at; see AddImplBindings); without it they are empty, and
+// the rules that join them stay silent.
+func CheckRulesImpl(design, impl string, explain bool) *Gate {
 	g := NewGate(RulesGateTitle)
 	set, err := shippedRules()
 	if err != nil {
@@ -362,6 +372,11 @@ func CheckRules(design string, explain bool) *Gate {
 	if err != nil {
 		g.Errs = append(g.Errs, "cannot project the design's facts for the consistency rules: "+err.Error())
 		return g
+	}
+	if impl != "" {
+		for _, p := range AddImplBindings(facts, design, impl) {
+			g.Errs = append(g.Errs, "cannot read the implementation's oracle bindings for the consistency rules: "+p)
+		}
 	}
 	checkRulesOver(g, set, facts, explain)
 	return g

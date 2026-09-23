@@ -21,6 +21,7 @@ func TestShippedRulesLoad(t *testing.T) {
 	}
 	want := map[string][]string{
 		"authz.dl":        {"finding_authz_missing", "finding_authz_orphan", "finding_authz_unknown_capability", "finding_produces_unknown_action"},
+		"bindings.dl":     {"finding_milestone_binding_stale", "finding_milestone_binding_phantom"},
 		"carriers.dl":     {"finding_effect_uncarried", "finding_carrier_misplaced"},
 		"facts.dl":        {"finding_fact_unresolved"},
 		"payload.dl":      {"finding_payload_twin"},
@@ -117,7 +118,7 @@ func TestRulesSupplyAbsentLayersEmpty(t *testing.T) {
 	if len(g.Errs)+len(g.Warns) != 0 {
 		t.Fatalf("absent layers must be empty inputs, not errors: %+v", g)
 	}
-	if g.Counts["rule files evaluated"] != 7 {
+	if g.Counts["rule files evaluated"] != 8 {
 		t.Fatalf("every rule file must run: %v", g.Counts)
 	}
 }

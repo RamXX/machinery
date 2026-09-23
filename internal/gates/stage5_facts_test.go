@@ -79,3 +79,63 @@ func TestProjectionReservedAndPacketCites(t *testing.T) {
 		}
 	}
 }
+
+// The binding table parses into milestone_says_*: a test id normalizes to
+// its stable id, backticks are tolerated, several paths split on commas.
+func TestProjectionMilestoneBindings(t *testing.T) {
+	files := map[string]string{
+		"machines/Order.oracle.md": "| test id | stable id |\n|---|---|\n| T-ORD-01 | ORD-aaaaaa |\n",
+		"BUILD.md":                 "# BUILD\n\n| oracle | bound at |\n|---|---|\n| T-ORD-01 | `a_test.go`, b/c_test.go |\n| ORD-cccccc | Unbound |\n| | skipped |\n",
+	}
+	facts, err := LoadDesignFacts(writeFactsDesign(t, t.TempDir(), files))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(factRows(facts, "milestone_says_bound"), ","); got != "ORD-aaaaaa|a_test.go,ORD-aaaaaa|b/c_test.go" {
+		t.Fatalf("milestone_says_bound = %s", got)
+	}
+	if got := strings.Join(factRows(facts, "milestone_says_unbound"), ","); got != "ORD-cccccc" {
+		t.Fatalf("milestone_says_unbound = %s", got)
+	}
+	if n := len(facts.Rows("bound_at")) + len(facts.Rows("test_file")); n != 0 {
+		t.Fatalf("without --impl the implementation relations are empty, got %d rows", n)
+	}
+	for _, cell := range []string{"bound in a_test.go", "../escape_test.go", "/abs/a_test.go", "a_test.go,"} {
+		files["BUILD.md"] = "# BUILD\n\n| oracle | bound at |\n|---|---|\n| ORD-aaaaaa | " + cell + " |\n"
+		if _, err := LoadDesignFacts(writeFactsDesign(t, t.TempDir(), files)); err == nil || !strings.Contains(err.Error(), "must be the literal unbound or test file paths") {
+			t.Fatalf("%q: got %v", cell, err)
+		}
+	}
+	files["BUILD.md"] = "# BUILD\n\n| oracle | bound at |\n|---|---|\n| ORD aaaaaa | unbound |\n"
+	if _, err := LoadDesignFacts(writeFactsDesign(t, t.TempDir(), files)); err == nil || !strings.Contains(err.Error(), "is not one oracle id") {
+		t.Fatalf("a malformed row key must fail: %v", err)
+	}
+}
+
+// The suite hands --impl to Gy-rules: with it the binding twins fire, and
+// without it the same design is silent on them.
+func TestRulesMilestoneBindingsNeedImpl(t *testing.T) {
+	design := writeFactsDesign(t, t.TempDir(), everyRuleFires)
+	impl := writeFactsDesign(t, t.TempDir(), everyRuleFiresImpl)
+	codes := func(impl string) string {
+		_, run, _, err := SelectRunAndNote(design, impl, "gy", RunOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, e := range run[0].Errs {
+			if strings.Contains(e, "milestone_binding") {
+				got = append(got, e)
+			}
+		}
+		return strings.Join(got, "\n")
+	}
+	want := "BUILD.md:7: row 'ORD-aaaaaa': milestone_binding_stale\n" +
+		"BUILD.md:8: row 'ORD-bbbbbb': milestone_binding_phantom (path 'order_test.go')"
+	if got := codes(impl); got != want {
+		t.Fatalf("with --impl:\n%s\nwant:\n%s", got, want)
+	}
+	if got := codes(""); got != "" {
+		t.Fatalf("without --impl the binding rules must stay silent: %s", got)
+	}
+}

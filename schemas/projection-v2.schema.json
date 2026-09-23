@@ -1316,7 +1316,11 @@
             "milestone",
             "dod_id",
             "slice_claim",
-            "packet_cites"
+            "packet_cites",
+            "milestone_says_bound",
+            "milestone_says_unbound",
+            "bound_at",
+            "test_file"
           ],
           "additionalProperties": false,
           "properties": {
@@ -1423,6 +1427,106 @@
                     "$ref": "#/$defs/symbol"
                   },
                   "row": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
+            },
+            "milestone_says_bound": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "oracle",
+                  "path"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "oracle": {
+                    "$ref": "#/$defs/symbol"
+                  },
+                  "path": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
+            },
+            "milestone_says_unbound": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "oracle"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "oracle": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
+            },
+            "bound_at": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "oracle",
+                  "path"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "oracle": {
+                    "$ref": "#/$defs/symbol"
+                  },
+                  "path": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
+            },
+            "test_file": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "path"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "path": {
                     "$ref": "#/$defs/symbol"
                   }
                 }

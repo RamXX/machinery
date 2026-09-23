@@ -315,19 +315,68 @@ func goHeader(text string) string {
 // the evidence must all live in the same file (the Gt citation rule).
 func fileNameCited(base string, corpus testCorpusData) bool {
 	for _, f := range corpus.files {
-		if f.goFile != nil {
-			if f.goFile.coversOracle(base) {
-				return true
-			}
-			continue
-		}
-		for _, b := range f.bodies {
-			if fileNameMentionedInString(base, b) && hasParseEvidence(b) {
-				return true
-			}
+		if f.parsesOracle(base) {
+			return true
 		}
 	}
 	return false
+}
+
+// parsesOracle reports whether this one test file earns the wholesale
+// conformance-parse credit for the oracle named base (see fileNameCited).
+func (f corpusFile) parsesOracle(base string) bool {
+	if f.goFile != nil {
+		return f.goFile.coversOracle(base)
+	}
+	for _, b := range f.bodies {
+		if fileNameMentionedInString(base, b) && hasParseEvidence(b) {
+			return true
+		}
+	}
+	return false
+}
+
+// OracleBinding is one committed oracle row a test file binds: the file
+// names the row's stable id whole-token in its executable test text, or
+// parses the row's whole oracle (the wholesale credit). Path is relative to
+// the implementation root, slash-separated.
+type OracleBinding struct {
+	Oracle, Path string
+}
+
+// OracleBindings reads, with Gt's own test corpus and credit rules, which
+// test file binds which committed oracle row. rows maps each oracle file
+// base name (Order.oracle.md, Policy.oracle.md) to its stable ids. It
+// returns the bindings, every test file scanned, and the corpus problems Gt
+// would report (an unwalkable or unreadable implementation tree). Nothing is
+// executed: a binding is static discovery, as it is for Gt.
+func OracleBindings(design, impl string, rows map[string][]string) ([]OracleBinding, []string, []string) {
+	g := NewGate("oracle bindings")
+	if fi, err := os.Stat(impl); err != nil || !fi.IsDir() {
+		return nil, nil, []string{fmt.Sprintf("--impl %s is not a directory", ir.Repr(impl))}
+	}
+	corpus := testCorpus(design, impl, g)
+	bases := make([]string, 0, len(rows))
+	for base := range rows {
+		bases = append(bases, base)
+	}
+	sort.Strings(bases)
+	var bindings []OracleBinding
+	var files []string
+	for _, f := range corpus.files {
+		rel := filepath.ToSlash(f.rel)
+		files = append(files, rel)
+		text := strings.Join(f.bodies, "\n")
+		for _, base := range bases {
+			wholesale := f.parsesOracle(base)
+			for _, id := range rows[base] {
+				if wholesale || idTokenIn(id, text) {
+					bindings = append(bindings, OracleBinding{Oracle: id, Path: rel})
+				}
+			}
+		}
+	}
+	return bindings, files, g.Errs
 }
 
 // fileNameMentionedInString finds a whole-token, string-literal mention of
