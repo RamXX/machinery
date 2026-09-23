@@ -8,109 +8,333 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/RamXX/machinery.svg)](https://pkg.go.dev/github.com/RamXX/machinery)
 [![Go Report Card](https://goreportcard.com/badge/github.com/RamXX/machinery)](https://goreportcard.com/report/github.com/RamXX/machinery)
 
-**Design software once, as a state machine, and let everything else be derived and proven from it:
-the tests, the architecture contracts, the build instructions, and machine-checked proofs of
-correctness.** machinery is a design methodology and toolchain that turns a fuzzy idea into a
-build-ready, formally verified blueprint that a coding agent with zero prior context can implement
-under hard TDD.
+machinery is a design methodology and a toolchain for building software with AI coding agents.
+You design the system once, as a domain model, an architecture, and a set of state machines. The
+tests, the architecture contracts, the build instructions, and machine-checked proofs are then
+generated from that design or checked against it. The result is a blueprint that a coding agent
+with no prior context can implement under hard TDD, and a gate suite that keeps the code and the
+design from drifting apart afterwards.
 
-## Why it exists
+## The problem
 
-AI coding agents make it cheap to write software fast. They do not make it safe to write large
-software. On anything past a toy, correctness degrades quietly: the design and the code drift apart,
-a cross-cutting invariant gets violated three files away from where it was written, a failure mode
-nobody enumerated takes down production at 3am. The usual answer is "review it carefully," which is
-another way of saying "trust the model." Trust does not scale.
+AI coding agents make writing software cheap. They do not make writing large software safe.
 
-machinery takes the opposite stance. It treats correctness as something you **construct and check**,
-not something you hope for. The design is a single source of truth. Everything downstream is either
-generated from it (so it cannot drift) or checked against it by a deterministic tool or an exhaustive
-proof (so a mistake is caught, not shipped). The model does the creative work; the machine holds the
-line.
+On a small program, an agent's mistakes are visible: the program runs or it does not. Past a few
+thousand lines, mistakes stop being loud. A rule stated in one file is broken three files away. The
+design says one thing and the code does another, and nothing notices, because nothing compares
+them. A failure mode that nobody listed shows up in production, and the postmortem finds that every
+individual change looked reasonable.
 
-## The thesis
+Consider one sentence from the guard-contract table of a design document (an illustration):
 
-Most software is a state machine. Make that explicit and the rest follows. machinery separates a
-design into three layers that compose rather than merely coexist:
+> `canPay`: an order may be paid only while it is unpaid and the captured amount matches the total.
 
-- **The what**, a domain model ([Modelith](https://modelith.sh/)): the entities, the relationships,
-  and the invariants that must always hold. Linted.
-- **The how**, an architecture ([C4](https://c4model.com/)): the components, the deployment, and what
-  every dependency does when it fails. Contract-checked.
-- **The behavior**, state machines in the [XState](https://github.com/statelyai/xstate) v5 JSON
-  format (the notation, not the library): every state, transition, guard, timeout, and failure mode,
-  conditioned on the architecture the previous layer fixed. Model-checked.
+One agent implements the amount check. Another writes the test, which exercises the amount check.
+Both read the same sentence and each took one half of it. The review passes, because the reviewer
+reads the sentence, sees an amount check and a test for it, and the sentence "sounds covered." The
+order can now be paid twice.
 
-The state machines come last because they need the other two as inputs, and half of each machine is
-*derived* from the domain model rather than invented. A narrow design ends in one self-contained
-`BUILD.md`. A large design ends in a root milestone/demo manifest. Its declared linkage is either
-pairwise (one bounded, self-contained execution packet per milestone) or matrix (reciprocal
-many-to-many links between milestones and reusable domain shards). The machines remain both the
-test oracle and the formal spec.
+The usual answer is "review it carefully." That answer does not scale, for three reasons:
 
-For a rebuild or hybrid migration, machinery keeps a second, legacy domain model instead of blending
-current and intended behavior into one document. A checked `migration.yaml` disposes every legacy
-entity and salvageable asset, maps replaced data and lifecycle states, and defines the coexistence,
-rollback, and cutover contract. The target still goes through the complete pipeline below.
+- **Review reads prose, and prose has no closed meaning.** Every reader, human or model, fills the
+  gaps slightly differently. Two agents working from the same paragraph can build two different
+  systems and both be right about what the paragraph said.
+- **The defects that matter are relational.** They live between artifacts: the enum in the domain
+  model against the states in the machine, the fields an event carries in one table against another
+  table, the rows in an authorization list against the actions the system performs on its own. A
+  reviewer looking at one file at a time cannot see them, and there are too many pairs to check by
+  eye.
+- **Agents change things faster than people can re-review.** A review is a judgment about a
+  snapshot. Ten edits later, nobody knows whether it still holds.
 
-To be clear about that XState reference: machinery uses the XState config **format** as a linted
-notation and does not run the XState library. The lint is our own (a deliberately narrowed subset,
-plus annotations like `_role` and `_exhaustive` that are not XState), and so are the oracle generator
-and the model checking. The de-annotated config loads into [Stately](https://stately.ai/) and
-`@xstate/graph` for optional visualization and covering-path generation, and a TypeScript build may
-adopt XState directly, while Go, Rust, Python, and Elixir targets hand-roll the state field. The
-guarantees come from machinery's tooling and [TLC](https://github.com/tlaplus/tlaplus), the model
-checker for [TLA+](https://lamport.azurewebsites.net/tla/tla.html) (Leslie Lamport's formal
-specification language for state-transition systems), never from XState.
+"Review it carefully" really means "trust the model, and trust the reviewer." Trust does not scale.
 
-### Why these notations, and not the obvious alternatives
+## The stance: construct and check
 
-Each layer's notation was chosen to be text-based, generable, and machine-checkable, not for
-familiarity:
+machinery treats correctness as something you construct and check, never something you hope for.
 
-- **Modelith, not UML class diagrams or prose.** It is purpose-built to carry entity lifecycle and
-  invariants as first-class, lintable data, which is what lets half of each state machine be
-  *derived* instead of hand-written; a diagram or a prose spec carries none of that as checkable
-  structure.
-- **C4, not UML component diagrams or arc42.** It has a text form (Structurizr DSL) a gate can parse
-  and bind, and it centers components and their dependencies, exactly where the per-dependency
-  failure posture lives; UML is diagram-first and heavier, and arc42 is a documentation template
-  rather than a checkable model.
-- **XState v5 JSON, not SCXML or a hand-rolled DSL.** JSON is trivially generable and byte-diffable,
-  the v5 shape already has the constructs we need (hierarchy, guards, `invoke`, delays), and the
-  ecosystem (Stately, `@xstate/graph`) gives visualization and covering-path generation for free;
-  SCXML is XML with weaker tooling, and a bespoke DSL means owning a parser and a visualizer forever.
-- **TLA+ and TLC for behavior, not property-based testing.** TLC checks a finite instance
-  *exhaustively* for the temporal properties that matter here (termination, deadlock-freedom,
-  safety, liveness) and returns a concrete counterexample; property-based tests sample the state
-  space rather than exhaust it.
-- **Alloy for the static relational layers, where TLC never looks.** Some invariants are relations
-  over configurations, not steps over time: no state machine enforces them, so TLC cannot check them,
-  and a structural linter sees only well-formed prose. Bounded relational search is exactly Alloy's
-  strength. machinery has three opt-in relational algebras, each generated from the domain model plus
-  a short annotation (`machinery alloy`), each solver-checked by `verify-formal`: **policy** (access
-  control: roles, ownership, team scoping), **integrity** (structure: uniqueness, singletons,
-  cardinality), and **isolation** (multi-tenant reference isolation). Nobody hand-writes Alloy, the
-  same rule as the TLA+.
+The design is the single source of truth. Everything downstream is one of two things:
 
-## Agentic systems: the machine is the envelope, not the agent
+- **Generated from the design**, so it cannot drift. The transition oracles (the tables of expected
+  behavior that tests key on), the TLA+ specifications, the Alloy models, the authorization decision
+  tables, the checker projections, and the executor packets are all produced by the `machinery`
+  binary. Committed copies are byte-compared against a fresh generation on every check, and a stale
+  one is reported as DRIFT.
+- **Checked against the design** by a deterministic tool or an exhaustive proof, so a mistake is
+  caught instead of shipped. `machinery check` runs with no model in the loop. TLC and the Alloy
+  analyzer search every state or configuration within a bound and return a concrete
+  counterexample when something is wrong.
+
+The model (the LLM) does the creative work: interrogating the product owner, naming things,
+proposing invariants and failure postures. The machine holds the line.
+
+Why keep the model out of the gates? A gate is only useful if the same bytes always get the same
+verdict. A model asked "does this design satisfy its invariants?" can answer differently on two
+runs, can be talked out of a finding, and cannot show its work in a form anyone can re-check. A
+deterministic check gives the same answer every time and says exactly what it counted. That is
+also why generation beats co-authoring: an artifact derived from the design by a program cannot
+disagree with the design, while a hand-maintained copy starts drifting on the first edit.
+
+Two rules hold this stance in place.
+
+**Every gate has two halves, and they stay separate.** The deterministic half is what the tool
+verifies: the contract parses, the oracle is fresh, every id resolves, every hash binds. The
+attested half is what a reviewer judges: whether a guard enforces the invariant it names, whether an
+interface contract has the right shape, whether the blueprint is buildable with zero context. The
+tool never pretends to check the second half. It records who judged it, against which bytes, and
+reports the judgment stale the moment those bytes change (see Gv-attest below).
+
+**A gate cannot pass on absence.** Every gate prints a `checked:` line with the exact counts of what
+it verified. A gate that finds nothing to check fails instead of passing, so an empty directory, a
+misnamed file, or a parser that silently matched nothing does not read as green.
+
+## The thesis: most software is a state machine
+
+Most software, where it matters, is a state machine. An order is placed, paid, shipped, delivered,
+or refunded. A saga reserves, charges, ships, and compensates. A background job is queued, running,
+retrying, or dead. Make those machines explicit and most of the rest follows.
+
+machinery splits a design into three layers:
+
+- **The what: a domain model** in [Modelith](https://modelith.sh/). Entities, relationships,
+  lifecycle enums, actions with their actors, and the invariants that must always hold. Linted.
+- **The how: an architecture** in [C4](https://c4model.com/), written as Structurizr DSL plus an
+  Architecture Contract. Components, allowed and denied dependencies, interface contracts, the event
+  contract, and what every dependency does when it fails. Contract-checked.
+- **The behavior: state machines** in the [XState](https://github.com/statelyai/xstate) v5 JSON
+  format. Every state, transition, guard, timeout, and failure path, conditioned on the architecture
+  the previous layer fixed. Model-checked.
+
+The layers compose; they do not merely sit side by side. A lifecycle enum in the domain model is
+the state set of a machine. An action in the model is an event and a transition. An invariant is a
+guard, or an edge that structurally cannot exist. A side effect is an `invoke` with a
+success path, a failure path, and a timeout, and the dependency it calls has a failure posture in the
+architecture. The gates check those links by construction, so a state with no enum value, an event
+with no action, or an invariant with no enforcement row is a finding.
+
+The machines come last because they need the other two as inputs. About half of each machine is
+derived from the domain model rather than invented, which is why a mid-tier model can safely write
+machines once a strong one has fixed the domain (see [Which model to use where](#which-model-to-use-where)).
+
+A narrow design ends in one self-contained `BUILD.md`. A large design ends in a root milestone and
+demo manifest whose linkage is either pairwise (one bounded, self-contained execution packet per
+milestone) or matrix (reciprocal many-to-many links between milestones and reusable domain shards).
+Either way the machines remain both the test oracle and the formal specification.
+
+### About the XState reference
+
+machinery uses the XState config format as a linted notation and does not run the XState library.
+The lint is machinery's own (a deliberately narrowed subset, plus annotations such as `_role` and
+`_exhaustive` that are not XState), and so are the oracle generator and the model checking. The
+de-annotated config loads into [Stately](https://stately.ai/) and `@xstate/graph` for optional
+visualization and covering-path generation. A TypeScript build may adopt XState directly; Go, Rust,
+Python, and Elixir targets hand-roll the state field. The guarantees come from machinery's tooling
+and from [TLC](https://github.com/tlaplus/tlaplus), the model checker for
+[TLA+](https://lamport.azurewebsites.net/tla/tla.html) (Leslie Lamport's specification language for
+state-transition systems). They never come from XState.
+
+### Why these notations
+
+Each notation was chosen because it is text, can be generated, and can be checked by a machine.
+Familiarity was not the criterion.
+
+- **Modelith, over UML class diagrams or prose.** It carries entity lifecycles and invariants as
+  lintable data, which is what lets half of each machine be derived. A diagram or a prose spec
+  carries none of that as checkable structure.
+- **C4, over UML component diagrams or arc42.** Its Structurizr DSL is text a gate can parse and
+  bind, and it centers components and their dependencies, which is where each failure posture
+  lives. UML is diagram-first and heavier; arc42 is a documentation template, not a checkable model.
+- **XState v5 JSON, over SCXML or a bespoke DSL.** JSON is easy to generate and to diff byte for
+  byte, the v5 shape already has hierarchy, guards, `invoke`, and delays, and Stately and
+  `@xstate/graph` provide visualization and covering paths. SCXML is XML with weaker tooling, and a
+  bespoke DSL means owning a parser and a visualizer forever.
+- **TLA+ and TLC for behavior, over property-based testing.** TLC checks a finite instance
+  exhaustively for termination, deadlock-freedom, safety, and liveness, and returns a concrete
+  counterexample. Property-based tests sample the state space; they do not exhaust it.
+- **Alloy for static relations, where TLC never looks.** Some invariants are relations over
+  configurations, not steps over time. No machine enforces them, so TLC cannot check them, and a
+  linter sees only well-formed prose. Bounded relational search is what Alloy does. Nobody
+  hand-writes the Alloy, just as nobody hand-writes the TLA+.
+- **Datalog for consistency between artifacts.** Whether two tables agree, whether every autonomous
+  write has an authorization row, whether every fact a contract names resolves: these are joins
+  over declared facts. They are written as rules and run under two engines (see
+  [the rules gate](#where-the-design-must-agree-with-itself-the-rules-gate)).
+
+## What each layer catches
+
+A layer earns its place by catching a defect nothing else would. Except for the `canPay`
+illustration carried over from above, the scenes below come from the bundled examples and from this
+project's history, and each ends with the mechanism that now catches it.
+
+### The domain model: an enum that drifted from its machine
+
+In the order-fulfillment example, the domain model's saga status said `Running` while the saga
+machine had split that into `Reserving`, `Paying`, and `Shipping`. Worse, the machine had a
+`FailedDirty` residual state (compensation retries exhausted, a person must intervene) that the
+enum did not list at all. Code generated from the enum would have had no way to represent a saga
+stuck half-compensated.
+
+Caught by **Gx-trace**, the cross-layer traceability gate: every machine state must map to an enum
+value and every event to an action. The same gate demanded the five lifecycle machines the design
+had not yet written.
+
+### The machines: a refund that could leave a customer charged
+
+The same example's saga, as first drawn, attempted a refund once during compensation. If that
+single attempt failed, the saga moved on: the payment stayed captured and nothing was returned.
+Every state looked reasonable in isolation.
+
+Caught by **TLC**, run by `machinery verify-formal` over a data-refined model generated from a
+six-line semantics annotation. It produced the exact six-step counterexample. The fix, one
+idempotent retried compensation step with an explicit `FailedDirty` residual when retries run out,
+is now proven: money and stock are never silently lost, with compensation modeled per obligation so
+a partial compensation is a real, checked state. **G3-machine** holds the structural side on every
+check: every `invoke` has an error path and a timeout, every retry loop has its own bounded
+counter, and every fully guarded handler states what happens when the guard is false.
+
+### The guard written in prose: an order paid twice
+
+Back to the `canPay` sentence from [The problem](#the-problem). The defect was that one sentence
+held two conditions and nothing forced anyone to test both. machinery makes the clauses data. The
+guard's row in the named-unit matrix declares them:
+
+```
+| `canPay` | guard | ... | CLAUSES{unpaid, amountMatches} | ...
+```
+
+Now every oracle row the guard governs owes one suffixed falsifying-clause test id per clause, and
+**Gt-tests** reports each one no test names. A suite that only ever falsifies `amountMatches`
+leaves the `unpaid` id uncovered, by name. **Gd-idcite** warns on a guard row whose contract is a
+conjunction and declares no clause vocabulary, so the sentence cannot stay a sentence by accident.
+
+### Access control: a manager who provably cannot write their own records
+
+The go-crm example shipped with role- and ownership-based access rules that had survived prose
+review, every gate, eight TLC proofs, and a full TDD build. They still held two defects. A Manager
+without a team could not write even the records it owned, because write scope was granted by team
+membership and nothing required a Manager to have a team. And a Manager could reassign a record to
+someone outside its own authority in one legal step.
+
+Caught by the **policy layer**. One short annotation, `design/formal/policy.relational.yaml`,
+states who acts (the role enum), what they act on (the owned entities), and per-verb scopes from a
+four-word algebra (`all | own | team | none`). `machinery alloy` compiles it with the domain model
+into `Policy.als`, whose generated meta-checks include `CapableWritesOwn` and
+`ReassignRetainsAuthority`. The Alloy analyzer answered with a counterexample in domain vocabulary:
+
+```
+FAIL  Policy/CapableWritesOwn
+      counterexample: User$5{role=Manager$0, team=(none)} Record$0{owner=User$5}
+```
+
+The same annotation compiles to `Policy.oracle.md`, a 70-row authorization decision table that the
+implementation's test suite asserts case by case. **Gp-policy** fails the build when the annotation
+stops matching the model, when a cross-cutting invariant is neither compiled nor waived, or when a
+committed artifact is stale. The full guide is [docs/policy-layer.md](docs/policy-layer.md).
+
+### Structure: two orders sharing one payment
+
+Fulfillment's model said each order has one payment. Forward field multiplicity alone does not say
+that a payment belongs to at most one order, so two orders could share one.
+
+Caught by the **integrity layer** (`integrity.relational.yaml`, compiled to `Integrity.als`, held by
+**Gi-integrity**). It carries the inverse side of a `1:1` relationship as a fact of the model, and it
+checks uniqueness, singletons ("exactly one pipeline is the default"), and mandatory relationships
+for joint satisfiability. Two constraints that are each well-formed but cannot both hold turn the
+model red, which the linter cannot see. See [docs/integrity-layer.md](docs/integrity-layer.md).
+
+### Tenancy: a task that leaks a deal
+
+A sales rep may read their own task. The task links to a deal. If nothing forbids it, the deal
+belongs to another team, and reading the task leaks it. Access rules never see this, because the
+leak is in the reference graph and no single record's ownership is wrong.
+
+Caught by the **isolation layer** (`isolation.relational.yaml`, compiled to `Isolation.als` and a
+tenant-scoping decision table `Isolation.oracle.md`, held by **Gn-isolation**). It proves, among
+other things, that two records whose reference fields share even one target are owned in the same
+tenant. See [docs/isolation-layer.md](docs/isolation-layer.md).
+
+Policy, integrity, and isolation are the three opt-in Alloy algebras. Each is generated from the
+domain model plus a short annotation, each is solver-checked by `verify-formal`, and each costs
+nothing where it does not apply: a design without the annotation never runs any of it. Together
+with the consistency rules below they are machinery's four relational layers: three answer
+questions about what configurations are legal, and one answers whether the design's own statements
+agree.
+
+### The architecture: an edge nobody allowed
+
+An agent adds an import from the web handler straight into the payments database adapter because
+it was the shortest path. Each file still compiles.
+
+Caught by **G2-c4** at design time and **G4-import** at code time. G2 parses the Architecture
+Contract, binds it to `workspace.dsl`, requires an acyclic allow graph, a failure posture (mitigation
+row) for every dependency, an interface contract for every allowed crossing, and an NFR record
+covering security, capacity, and observability, and it judges every relationship the diagram draws
+by the same allow, deny, and baseline rules. G4 then reads the implementation's import statements
+(Go, Python, TypeScript/JavaScript, Elixir, Rust) and judges every edge by those rules.
+
+## The correctness ladder
+
+The scenes above use four kinds of check, and they differ in strength. machinery pushes each layer
+as far up this ladder as it can go.
+
+1. **Generate, do not co-author.** Anything derivable is generated from the design sources: the
+   transition oracles (with content-derived stable ids that survive design revisions), the TLA+
+   specs, and, where an annotation exists, the Alloy models and decision oracles. G3 byte-diffs
+   every committed oracle against a fresh generation on every check. The pinned Modelith engine
+   regenerates every committed domain render in required CI, followed by the mechanical em-dash
+   normalization and a byte-diff. `verify-formal` regenerates the formal specs from source, and the
+   required formal workflow and the nightly clean-tree job both assert that the committed copies
+   match. Staleness is caught as drift, never assumed away.
+2. **Deterministic symbolic gates that cannot pass on absence.** With no model in the loop,
+   `machinery check` verifies that machines are well-formed (reachability, unambiguous targets, no
+   dead ends, an error path and a timeout on every side effect, every event handled or explicitly
+   ignored in every resting state), that the architecture contract binds to the C4 model and every
+   dependency has a failure posture, that the layers trace to each other, that the design's
+   declared facts agree (the rules gate, below), and that the code respects the boundaries.
+3. **Model checking.** Each machine is finite, so TLC checks it exhaustively: retry loops bounded
+   (each loop with its own counter), every operation terminates, nothing gets stuck half-done, no
+   deadlock. Every generated spec states its assumptions in its header (guards erased soundly for
+   safety, liveness conditional on guard exhaustiveness that the linter discharges, single instance,
+   no data at this rung), so a green check reads as exactly what it is. The same rung extends
+   sideways into static relations through the three Alloy layers.
+4. **Refinement and assume-guarantee.** Data and composition annotations are reconciled against the
+   machines before anything is emitted, so a drifted annotation fails generation instead of proving
+   a stale twin. Each subsystem is proven to refine the small contract its neighbors rely on; the
+   composition instances that same contract module, and TLC checks that the composition satisfies
+   it. Parts are verified against contracts, never against the flattened system, which is how this
+   scales past one machine.
+
+Rungs 1 through 3 are generated from the design automatically; rungs 2 and 4 also use short
+declarative annotations that the generators verify against the machines. The toolchain is held the
+same way: a Go test suite encodes every vacuity and drift attack from adversarial design reviews as
+a permanent regression, and CI runs the tests, the gates, the proofs, and the example builds on
+every push.
+
+## The envelope for agentic systems
 
 "Most software is a state machine" is a claim about control flow, not about cognition, and agentic
-programs are where the difference bites. An agent is a non-deterministic policy (an LLM choosing which
-tool to call) running inside a deterministic envelope: the perceive-act-observe loop, tool execution,
-budgets, guardrails, approval gates, side-effect compensation, sub-agent orchestration. The envelope
-is the state machine; the policy is not, and machinery does not pretend otherwise.
+programs are where the difference shows. An agent is a non-deterministic policy (an LLM choosing
+which tool to call) running inside a deterministic envelope: the perceive-act-observe loop, tool
+execution, budgets, guardrails, approval gates, side-effect compensation, and sub-agent
+orchestration. The envelope is the state machine. The policy is not, and machinery does not pretend
+otherwise.
 
-What machinery models is the containment. Every tool is an `invoke` with an enumerated failure set, a
-timeout, and an idempotency key, so the action space is bounded even when the choice within it is not;
-the loop is a machine whose termination and budget are model-checked, so it provably stops; every
-irreversible action is a saga with compensation and an explicit stalled-dirty residual; every
-guardrail is a guard tied to an invariant; sub-agents coordinate through the event-contract table. The
-LLM decision itself is a contracted, non-deterministic oracle machinery fences but never tries to
-prove. You get liveness (it stops, within budget, and cleans up) without usefulness (that it chose
-well), so keep the action space enumerated and the high-stakes guardrails deterministic: that is the
-region machinery can prove, and whatever you leave to the model's discretion is region it cannot.
-Fittingly, machinery is itself built this way, a gated pipeline around a non-deterministic conductor.
+What machinery models is the containment:
+
+- Every tool is an `invoke` with an enumerated failure set, a timeout, and an idempotency key, so the
+  action space is bounded even when the choice within it is not.
+- The loop is a machine whose termination and budget are model-checked, so it provably stops.
+- Every irreversible action is a saga with compensation and an explicit stalled-dirty residual.
+- Every guardrail is a guard tied to an invariant.
+- Sub-agents coordinate through the event-contract table.
+
+The LLM decision itself is a contracted, non-deterministic oracle that machinery fences but never
+tries to prove. You get liveness (it stops, within budget, and cleans up) without usefulness (that
+it chose well). So keep the action space enumerated and the high-stakes guardrails deterministic:
+that is the region machinery can prove, and whatever you leave to the model's discretion is a region
+it cannot.
+
+machinery is built this way itself: a gated pipeline around a non-deterministic conductor.
 
 ## The pipeline
 
@@ -182,103 +406,6 @@ An interrogation, not a form. The conductor pushes on naming and on "what must a
 does not advance a phase until its gate passes. Every gate splits into a deterministic half the
 tool verifies and an attested half the conductor checks by judgment; the skill spells out that
 split per gate, and the table above keeps the two apart.
-
-## The policy layer: access control as a checked model
-
-Most business systems carry a handful of cross-cutting access rules: who may read, write, or
-reassign what, scoped by role, ownership, and team. These rules are the classic blind spot: no
-state machine enforces them (so model checking never sees them), a linter only checks that the
-prose is well-formed, and every agent that touches the codebase interprets the English slightly
-differently. The go-crm example shipped with an RBAC rule set that had survived prose review,
-every gate, eight formal proofs, and a full TDD build, and it still contained two real defects
-(a Manager without a team provably could not write its own records, and a Manager could hand a
-record to someone outside its own authority in one legal step).
-
-The policy layer closes that gap without asking anyone to learn a formal language. You (or the
-conductor, during the Phase 1 interrogation) write one short annotation,
-`design/formal/policy.relational.yaml`: who acts (the role enum), what they act on (the owned
-entities), and per-verb scopes from a four-word algebra (`all | own | team | none`). Everything
-else is generated and machine-held:
-
-- **`machinery alloy <design>`** compiles the annotation plus the domain model into two artifacts.
-  `Policy.als` is a relational model with a standard meta-check suite; the
-  [Alloy analyzer](https://alloytools.org/) searches every configuration within a bound and
-  returns a concrete counterexample when the rules hide a hole ("here is the teamless Manager and
-  the record it cannot touch"). `Policy.oracle.md` is the same policy enumerated as a decision
-  table: every role, verb, and ownership case with its expected verdict, under stable ids.
-- **Your implementation consumes the table.** One conformance test parses the oracle and asserts
-  the authorization function on every reachable row. From then on, policy-versus-code drift in
-  either direction is a failing test that names the exact case.
-- **The gates hold all of it.** Gp-policy fails the build when the annotation stops matching the
-  domain model, when a cross-cutting invariant is neither compiled nor explicitly waived, or when
-  a committed artifact is stale; the plugin hooks refuse hand-edits to the generated files.
-
-The layer is opt-in and costs nothing where it does not apply: a design without access-control
-invariants (fulfillment, portfolio-engine) never sees it. Where it does apply, the annotation is
-also an interrogation instrument: it forces the questions prose lets you skip, like "must a
-Manager have a team?" and "where may a reassigned record go?", which is exactly where the go-crm
-defects lived. The full guide, including the annotation reference, the oracle test pattern, and
-the brownfield workflow, is [docs/policy-layer.md](docs/policy-layer.md).
-
-## What makes it production-grade: the correctness ladder
-
-A domain-model linter is table stakes. The differentiator is that machinery pushes deterministic and
-formal correctness into every layer, strongest first:
-
-1. **Generate, do not co-author.** Anything derivable is generated from the design sources: the
-   transition oracle (with content-derived stable ids that survive design revisions), the TLA+
-   specs, and, on designs with a policy annotation, the Alloy model plus the authorization oracle
-   (the policy enumerated as a decision table the implementation tests consume).
-   G3 then byte-diffs every committed oracle against a fresh generation on every check. The pinned
-   Modelith engine regenerates every committed domain render in required CI (including any legacy
-   render), followed by the mechanical em-dash normalization and a byte-diff. The
-   formal specs are regenerated from source by `verify-formal` (with the required formal workflow
-   and the nightly regen-clean-tree job both asserting the committed copies match), so staleness is
-   caught as drift, never assumed away. The sole non-generated exception is a strict manual TLA
-   pair: the module's first line is exactly `\* machinery:manual`, a same-basename `.cfg` is
-   mandatory, and any unmarked orphan pair or half is an error. Manual pairs are TLC-checked and
-   counted as declared and checked, but are never regenerated.
-2. **Deterministic symbolic gates that cannot pass on absence.** `machinery check` verifies, with no
-   LLM in the loop: machines are well-formed (reachability, unambiguous targets, no dead ends, every
-   side effect has an error path and a timeout, every resting state handles or explicitly ignores
-   every event), the architecture contract binds to the C4 model and every dependency has a failure
-   posture, the layers trace to each other by construction (states to enum values, events to actions,
-   invariants to enforcement rows), and the code respects the boundaries (Go, Python,
-   TypeScript/JavaScript, Elixir, Rust). Every gate prints what it actually checked; a gate that
-   finds nothing to check fails instead of passing.
-3. **Model checking.** Each machine is finite, so TLC checks it exhaustively: retry loops bounded
-   (each loop with its own counter), every operation terminates, nothing gets stuck half-done, no
-   deadlock. Every generated spec states its assumptions in its header (guards erased soundly for
-   safety, liveness conditional on guard exhaustiveness that the linter discharges, single instance,
-   no data at this rung), so a green check reads as exactly what it is. The same rung extends
-   sideways into statics: when a design carries access-control invariants, `machinery alloy`
-   compiles them (from a short policy annotation) into a bounded relational model that Alloy
-   searches exhaustively within scope, with generated meta-checks for the classes of defect a
-   policy hides best: a write-capable role whose own records are out of scope, a reassignment that
-   escapes the actor's own authority, a granted verb that is exercisable nowhere.
-4. **Refinement and assume-guarantee.** The data-and-composition annotations are reconciled against
-   the machines before anything is emitted, so a drifted annotation fails generation instead of
-   proving a stale twin. Each subsystem is proven to refine the small contract its neighbors rely
-   on; the composition instances that same contract module and TLC additionally checks the
-   composition satisfies it. Parts are verified against contracts, never against the flattened
-   system, which is the only way this scales to real size.
-
-Rungs 1 through 3 are generated from the design automatically. Rungs 2 and 4 are generated from
-short declarative annotations that the generators verify against the machines. And the toolchain
-that holds all of this together is itself held: a Go test suite encodes every vacuity and drift
-attack from an adversarial design review as a permanent regression, and CI runs the tests, the
-gates, the proofs, and the example build on every push.
-
-Generating every artifact (the oracle, the TLA+ specs, the reconciled models) is the `machinery`
-Go binary itself and needs no [Java](https://adoptium.net/). Only the *checking* of the proofs (rungs 3 and 4, and rung 2's refinement) runs under
-TLC, which is a Java program, so **Java is required only for `machinery verify-formal`**. That step is
-optional but recommended: the deterministic gates (rung 2's generation and every symbolic check)
-already catch malformed machines, drift, and boundary erosion, but they cannot tell you that a saga
-can strand money, that a retry can loop forever, or that a subsystem violates the contract its
-neighbors assume. The model checking is what proves those, exhaustively, with a concrete
-counterexample when it fails (it caught two real defects in the examples below, and the relational
-policy layer caught two more in go-crm's RBAC). A Java-free setup is
-a complete, gated design; adding Java upgrades "structurally consistent" to "machine-checked."
 
 ## Proof it works: the go-crm example
 
