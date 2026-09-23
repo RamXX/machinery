@@ -46,9 +46,12 @@ const (
 // ruleSubjectSources maps the first attribute name of an output relation to
 // the relations whose first column locates that subject, in the order they
 // are tried. It is the whole of the gate's knowledge about subjects; a rule
-// file declaring any other first attribute is rejected at load.
+// file declaring any other first attribute is rejected at load. A unit
+// subject falls back to the declaration rows: a declaration on a matrix row
+// that names no unit (a consumed-event row) has the matrix id as its subject,
+// and those rows carry its location.
 var ruleSubjectSources = map[string][]string{
-	"unit":    {"unit"},
+	"unit":    {"unit", "unit_declares", "unit_derived"},
 	"action":  {"action"},
 	"subject": {"admission", "no_authorization", "action"},
 	"type":    {"type_owner", "supersedes"},

@@ -60,9 +60,18 @@ func TestRulesParity(t *testing.T) {
 		t.Fatal(err)
 	}
 	both := 0
+	type target struct{ name, path string }
+	var targets []target
 	for _, rel := range bundledDesigns(t) {
-		design := filepath.Join("..", "..", filepath.FromSlash(rel))
-		facts, err := LoadDesignFacts(design)
+		targets = append(targets, target{rel, filepath.Join("..", "..", filepath.FromSlash(rel))})
+	}
+	// The examples fire few rules; the synthetic design fires the rest, so
+	// parity also covers populated outputs of every rule body.
+	targets = append(targets, target{"synthetic/every-rule-fires", writeFactsDesign(t, t.TempDir(), everyRuleFires)})
+	nonEmpty := map[string]bool{}
+	for _, tg := range targets {
+		rel := tg.name
+		facts, err := LoadDesignFacts(tg.path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -86,6 +95,9 @@ func TestRulesParity(t *testing.T) {
 				for _, out := range rf.prog.OutputRelations() {
 					if viaFiles.FormatCSV(out) != viaGate.FormatCSV(out) {
 						t.Fatalf("%s: the facts files and the in-process facts disagree", out)
+					}
+					if viaGate.FormatCSV(out) != "" {
+						nonEmpty[out] = true
 					}
 				}
 				if souffle == "" {
@@ -115,10 +127,51 @@ func TestRulesParity(t *testing.T) {
 			})
 		}
 	}
+	// duplicate_owner cannot fire yet: ARCHITECTURE.md is the only artifact
+	// that owns a type, so no design can give one type two owners.
+	for _, set := range set.files {
+		for _, o := range set.outputs {
+			if !nonEmpty[o.relation] && o.relation != "finding_duplicate_owner" {
+				t.Errorf("parity never compared a populated %s; extend everyRuleFires", o.relation)
+			}
+		}
+	}
 	if souffle != "" {
-		t.Logf("rules parity: %d rule files x examples ran under both engines", both)
-		if want := len(set.files) * len(bundledDesigns(t)); both != want {
+		t.Logf("rules parity: %d rule file runs (%d files x %d designs) compared under both engines", both, len(set.files), len(targets))
+		if want := len(set.files) * len(targets); both != want {
 			t.Fatalf("%d of %d rule file runs compared", both, want)
 		}
 	}
+}
+
+// everyRuleFires is a design on which every shipped output relation except
+// finding_duplicate_owner has at least one tuple.
+var everyRuleFires = map[string]string{
+	"domain.modelith.yaml": `kind: DomainModel
+version: v1
+enums:
+  OrderStatus:
+    values: [{name: Placed}, {name: Paid}]
+entities:
+  Order:
+    attributes:
+      - {name: status, type: OrderStatus}
+      - {name: total, type: integer}
+    actions:
+      - {name: pay, actor: System}
+      - {name: refund, actor: System}
+      - {name: view}
+`,
+	"machines/Order.machine.json": factsMachine,
+	"machines/Order.matrix.md": "| name | kind | event | pre / post |\n|---|---|---|---|\n" +
+		"| `canPay` | guard | - | USES{Order.stat} VALUES OrderStatus{Placed, Voided} |\n" +
+		"| `persist` | actor | - | WRITES{Order.status} |\n" +
+		"| `announce` | action | `order.paid` | payload {Order.id} |\n",
+	"ARCHITECTURE.md": "# Architecture\n\n| event | producer | consumer | delivery | payload |\n|---|---|---|---|---|\n" +
+		"| `order.paid` | app | ledger | at-least-once | `Order.id`, `Order.total` |\n\n" +
+		"| type | replaces |\n|---|---|\n" +
+		"| TypeA | SUPERSEDES{type:TypeB} |\n| TypeB | SUPERSEDES{type:TypeC} |\n| TypeC | SUPERSEDES{type:TypeA} |\n" +
+		"| TypeD | SUPERSEDES{type:Ghost} |\n",
+	"AUTHORIZATION.md": "<!-- machinery:authorization-inventory -->\n\n| authorization subject | admission |\n|---|---|\n" +
+		"| Order.pay | `nowhere` |\n| Order.view | `nowhere` |\n",
 }
