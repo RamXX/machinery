@@ -258,6 +258,88 @@ Decisions settled while implementing:
   `MaxIterations` (default 1,000,000 evaluation rounds summed over all strata). Hitting
   either returns an error wrapping `ErrLimit` and no result.
 
+#### Stage 3, as implemented
+
+`Gy-rules` (letter `gy`, in the `--gate` vocabulary and the default suite after `gx`) runs the
+rule files under `rules/consistency/`, embedded by the `rules` package: `authz.dl`, `facts.dl`,
+`values.dl`, `payload.dl`, `carriers.dl`, `supersession.dl`. Each is plain data in the subset above
+and runs unchanged under Soufflé.
+
+- **Activation.** A design with a `machines/` directory or an `AUTHORIZATION.md`. An explicit
+  `--gate gy` on any other design prints the gate with `note   not activated: the design has no
+  machines/ and no AUTHORIZATION.md, ...`; the default suite skips it silently.
+- **Facts.** Built in process by the Stage 2 reader (`LoadDesignFacts`); nothing is written. Every
+  catalog relation is supplied, so a relation of a layer the design lacks is an empty input, never
+  a missing-input error. A design that cannot be projected is an ERROR of the gate.
+- **Load-time contract**, checked once per process and by `TestShippedRulesLoad` at test time, so a
+  broken rule file fails this repository's tests rather than a user's check: every file parses;
+  every `.input` is a catalog relation of the same arity; every `.output` is named
+  `finding_<code>` or `warn_<code>`, and every relation so named is an `.output`; no two files emit
+  one relation; every output attribute is a symbol, and the first names the subject kind (`unit`,
+  `action`, `subject`, `type`), which is how the gate locates the subject.
+- **Severity.** `finding_*` tuples are the new `SHADOW` severity: printed as `  SHADOW <message>`
+  after the warnings, counted on the `checked:` line as `N shadow finding(s)` (always shown, zero
+  included), never blocking, never a warning, not even under `--warnings-as-errors` or
+  `--complete`. `warn_*` tuples are ordinary warnings. Stage 4 promotes `finding_*` to ERROR.
+- **Messages.** `path:line: row 'X': <code> (attr 'value', ...)`, where `X` is the subject id and
+  the location is the first projected row whose first column is `X` in the relations its kind
+  names (`unit`, then the declaration rows `unit_declares` and `unit_derived`, so a finding on a
+  matrix row that names no unit is still located; `action`; `admission`, `no_authorization`,
+  `action` for a `subject`; `type_owner`, `supersedes` for a `type`). A subject no row carries
+  prints as `X (no source): <code>`.
+- **Limits.** `MaxTuples` 2,000,000 and `MaxIterations` 100,000 per rule file, set explicitly. A
+  hit is `ERROR rules/consistency/<file>: evaluation stopped at a resource limit (...)`; the other
+  files still run.
+- **`--explain`.** Under each finding, indented, the derivation tree: the finding tuple with
+  `[<file> rule <n>]` (1-based index in source order), then each tuple the rule's positive body
+  atoms matched, derived ones with their rule and input facts with `[fact <path>:<line>]`. Negated
+  and aggregated literals hold by absence and have no witness, so they are not printed. A design
+  with no findings prints nothing extra.
+
+What the rules read and decide, where the text above left it open:
+
+- **authz.dl.** A System write is a Modelith action with actor `System`, unless the matrix unit
+  of the same id declares `WRITES{}` with no member (the unit and action ids coincide when the
+  matrix is named after the entity). Matrix cascade and consumer producers are not obligations:
+  projection v2 has no relation for them (the producer cell is prose-shaped), so the 0.9.0
+  heuristic still covers them. Capabilities resolve against `c4_element` ids only; no declared
+  capability list exists yet (NEXT.md's authorization entry).
+- **facts.dl.** A `USES{}` or `WRITES{}` member resolves to an `attr` id, an `enum_member` id, a
+  `context_key`, or an `event_payload_field`, or to a `derived:` waiver or `VALUES` member on the
+  same unit (both are row-local declarations). `WRITES{Order.status}` joins `attr` directly,
+  because fact columns carry stable ids without their kind prefix; the fixture
+  `rules-fact-unresolved` pins it.
+- **values.dl.** Group and enum names are compared exactly, and an enum no attribute uses is not
+  projected, so it binds no group.
+- **carriers.dl.** Entry 20 ships in two tiers. `warn_effect_uncarried`: an action or actor unit
+  with a non-empty `WRITES{}` and no `CARRIES{}` (a real warning; no bundled design has one).
+  `finding_actor_uncarried`: an actor unit with no `CARRIES{}` that is not declared read-only by
+  `WRITES{}`. It is SHADOW, not warning, because the bundled designs' 42 actor units predate
+  `CARRIES{}`, and the example gate policy treats any warning as a failure; the promotion path is
+  to add `CARRIES{}` to those actors, then promote both to `finding_` and on to ERROR at Stage 4.
+- **supersession.dl.** `duplicate_owner` cannot fire yet: ARCHITECTURE.md is the only artifact
+  that owns a type. `dangling_replacement` fires on go-crm's `SUPERSEDES{type:LegacyDeal}`,
+  because the legacy type lives in `migration.yaml`, which projects no `type_owner`. The rule is
+  right on its input; the gap is the projection's.
+- **`unit_declares(unit, group)`** was added to projection 2.0 for these rules (one row per group
+  present on a row: `WRITES`, `USES`, `CARRIES`, `VALUES`, `CLAUSES`, `READS`, `payload`).
+
+Evidence. `TestRulesParity` runs every rule file over every bundled example and one synthetic
+design on which every output but `finding_duplicate_owner` has tuples, under Soufflé and
+`internal/datalog`, comparing sorted outputs: 54 runs (6 files by 9 designs), all equal. The CI
+job `datalog-parity` runs it, with the evaluator's own parity corpus, in an image built from pinned
+inputs (`scripts/souffle.dockerfile`: Ubuntu 24.04 and golang 1.27.1 by digest, the Soufflé 2.5
+`.deb` by sha256, dependencies from a fixed Ubuntu snapshot), and fails if a test skipped its
+Soufflé half. `TestRulesShadowAgreement` compares the class A to D subjects of the 0.9.0 Gx checks
+with the `finding_*` subjects: on every activated example both are empty. Three fixtures record the
+structural discrepancies, each with a verdict:
+
+| Case | Only in | Right side and why |
+|---|---|---|
+| a System action whose description says it writes nothing | rules (`authz_missing`) | rules: the claim is prose; `WRITES{}` on the unit declares it |
+| a fact backticked in a contract cell, in no group | heuristic (unresolved fact) | rules: a bare token is prose, which Gl-ledger already warns on |
+| `VALUES{...}` on unit `orderState` against enum `OrderState` | heuristic (`VALUES` mismatch) | heuristic, on intent; the fix is a normalized group key in the projection, or the explicit `VALUES OrderState{...}` |
+
 ## 4. The rules, written out
 
 These replace the four 0.9.0 checks and cover the open gaps. Each is short enough to

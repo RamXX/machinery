@@ -65,7 +65,7 @@ the three commands you actually run.
   instead writes the design's fact relations as `.facts` files for a Datalog engine (see "Facts"
   below) and touches no checker projection.
 - **`machinery check <design> --gate gk`** is the pure, hermetic gate (`Gk-<id>` per checker), one of
-  the names in `--gate`'s vocabulary: `gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5`. It never runs an
+  the names in `--gate`'s vocabulary: `gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5`. It never runs an
   engine and never touches the registry; it reconciles the manifest, byte-matches the committed
   projection, and checks that the committed evidence binds and covers the claim.
 - **`machinery verify-checkers <design> [--registry <path>] [--checker <id>]`** is the engine phase,

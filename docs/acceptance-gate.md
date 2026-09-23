@@ -170,6 +170,6 @@ the same resolution and ancestry proof.
 
 ## Where this sits in the suite
 
-Ga runs after Gb in the default suite ordering (`gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5`):
+Ga runs after Gb in the default suite ordering (`gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5`):
 the plan's shape is settled before its discharge is judged. It is a build-time gate, not a
 design-phase one; a design that has closed no milestone never sees it.

@@ -37,6 +37,28 @@ under their version heading when a release is cut.
   columns): the input Souffle and the in-process evaluator read without an adapter. The directory
   is staged and renamed into place, refuses to replace anything but facts output, and is
   byte-identical across reruns of an unchanged design. No checker manifest is needed.
+- **Gy-rules (consistency layer, Stage 3), in shadow.** A new gate, `gy` in the `--gate`
+  vocabulary and in the default suite, active on a design with `machines/` or an
+  `AUTHORIZATION.md`. It evaluates the Datalog rules shipped under `rules/consistency/`
+  (`authz`, `facts`, `values`, `payload`, `carriers`, `supersession`) with the in-process
+  evaluator over the design's facts, built in memory (nothing is written). `finding_*` results
+  print as a new `SHADOW` severity: counted on the `checked:` line as `N shadow finding(s)`, never
+  blocking and never a warning, including under `--warnings-as-errors` and `--complete`. Findings
+  read `path:line: row 'X': <code>`. `warn_effect_uncarried` (a unit with a non-empty `WRITES{}`
+  and no `CARRIES{}`) is a real warning. The bundled designs report 0 to 13 shadow findings each,
+  all actors without `CARRIES{}` plus go-crm's `LegacyDeal` replacement, which no design artifact
+  declares.
+- **`machinery check --explain`.** Prints under each Gy-rules finding the derivation that
+  produced it: the rule file and 1-based rule index, then the matched facts with their
+  `path:line` sources.
+- **`unit_declares(unit, group)` in projection 2.0.** One row per declaration group present on a
+  matrix row (`WRITES`, `USES`, `CARRIES`, `VALUES`, `CLAUSES`, `READS`, `payload`), so
+  `WRITES{}` (declared read-only) is distinguishable from no `WRITES` group. The published
+  `schemas/projection-v2.schema.json` gains the relation; it is now regenerated from the relation
+  catalog by `go test ./internal/checker -run TestProjectionV2SchemaIsGenerated -update`.
+- **CI `datalog-parity` job.** Runs every shipped rule file over every bundled example, and the
+  evaluator's own program corpus, under both engines against Souffle 2.5 in an image built from
+  pinned inputs (`scripts/souffle.dockerfile`), mirrored as `dagger call datalog-parity`.
 
 ### Changed
 
