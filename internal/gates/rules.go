@@ -12,7 +12,7 @@
 //	warn_<code>      a warning.
 //
 // The first attribute of an output relation names the kind of its subject id
-// (unit, action, subject, type), and the gate resolves the id to a design
+// (the keys of ruleSubjectSources), and the gate resolves the id to a design
 // location through the projection's sources, so a finding reads
 // `machines/Order.matrix.md:12: row 'Order.persistOrder': <code>`.
 package gates
@@ -53,6 +53,9 @@ var ruleSubjectSources = map[string][]string{
 	"action":  {"action"},
 	"subject": {"admission", "no_authorization", "action"},
 	"type":    {"type_owner", "supersedes"},
+	// a matrix stem, and a component named by a placement row
+	"matrix":    {"matrix"},
+	"component": {"no_machine_waiver"},
 }
 
 // ruleLimits bounds every rule evaluation explicitly. A design projection is

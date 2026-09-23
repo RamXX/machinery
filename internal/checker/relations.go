@@ -60,6 +60,9 @@ var relationCatalog = []RelationSpec{
 	{Name: "invoke", Layer: "machines", Columns: []string{"state", "service"}},
 	{Name: "context_key", Layer: "machines", Columns: []string{"machine", "key"}},
 
+	// matrix names every machines/<X>.matrix.md by its stem, whether or not a
+	// machine of the same stem exists (a contract-only record has none).
+	{Name: "matrix", Layer: "matrices", Columns: []string{"id"}, Defines: true},
 	{Name: "unit", Layer: "matrices", Columns: []string{"id", "machine", "name", "kind"}, Defines: true},
 	{Name: "unit_clauses", Layer: "matrices", Columns: []string{"unit", "clause", "status"}},
 	{Name: "unit_reads", Layer: "matrices", Columns: []string{"unit", "event", "field"}},
@@ -89,6 +92,11 @@ var relationCatalog = []RelationSpec{
 	{Name: "boundary", Layer: "c4", Columns: []string{"id", "element", "role"}, Defines: true},
 	{Name: "allowed_edge", Layer: "c4", Columns: []string{"src", "dst"}},
 	{Name: "reads_row", Layer: "c4", Columns: []string{"artifact", "reader"}},
+	// no_machine_waiver names each component whose persistence-and-placement
+	// row carries '(no machine: <reason>)' with a reason: a contract-only
+	// record. The reason is prose and is not projected; a waiver naming no
+	// reason is no waiver and projects nothing.
+	{Name: "no_machine_waiver", Layer: "c4", Columns: []string{"component"}},
 
 	{Name: "admission", Layer: "authorization", Columns: []string{"subject", "capability"}, Defines: true},
 	{Name: "no_authorization", Layer: "authorization", Columns: []string{"subject"}, Defines: true},

@@ -1526,7 +1526,10 @@ func CheckMachines(design string) *Gate {
 	}
 	// Reconcile in both directions. A generated-looking artifact with no
 	// source machine is stale inventory, not an additional verified machine;
-	// exact basename identity is the only deterministic association.
+	// exact basename identity is the only deterministic association. The one
+	// exception is a contract-only record's matrix, declared by its
+	// placement waiver (NoMachineWaivers); a waiver never excuses an oracle.
+	contractOnly := contractOnlyMatrices(design)
 	for _, spec := range []struct {
 		paths  []string
 		suffix string
@@ -1534,9 +1537,16 @@ func CheckMachines(design string) *Gate {
 	}{{oraclePaths, ".oracle.md", "oracle"}, {matrixPaths, ".matrix.md", "matrix"}} {
 		for _, path := range spec.paths {
 			stem := strings.TrimSuffix(filepath.Base(path), spec.suffix)
-			if !machineStems[stem] {
-				g.Errs = append(g.Errs, fmt.Sprintf("%s: orphan %s has no corresponding %s.machine.json; remove the stale artifact or restore its exact-basename machine", filepath.Base(path), spec.kind, stem))
+			if machineStems[stem] {
+				continue
 			}
+			if spec.kind == "matrix" && contractOnly[stem] {
+				// a contract-only record: its placement row waives the
+				// machine, and the matrix is the record's contract
+				g.Count("contract-only matrices (no machine: waived)")
+				continue
+			}
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: orphan %s has no corresponding %s.machine.json; remove the stale artifact or restore its exact-basename machine (a contract-only record's matrix is declared by '(no machine: <reason>)' on its placement row)", filepath.Base(path), spec.kind, stem))
 		}
 	}
 	if len(files) == 0 {
@@ -2345,16 +2355,93 @@ func placementSubjects(cell string) []string {
 // buried anywhere else in the row is prose, and an empty reason is an
 // unanswered design question, not a waiver (GATE-5).
 func placementWaived(row []string, placementCol int) bool {
+	reason, found := placementWaiverReason(row, placementCol)
+	return found && reason != ""
+}
+
+// placementWaiverReason is the one reader of the '(no machine: <reason>)'
+// waiver: it looks only in the component cell and the machine-placement
+// cell, and returns the first waiver's trimmed reason ("" when every waiver
+// token names none) and whether a waiver token is present at all.
+func placementWaiverReason(row []string, placementCol int) (string, bool) {
 	cells := []string{row[0]}
 	if placementCol > 0 && placementCol < len(row) {
 		cells = append(cells, row[placementCol])
 	}
+	found := false
 	for _, cell := range cells {
-		if m := noMachineWaiverRe.FindStringSubmatch(cell); len(m) > 1 && strings.TrimSpace(m[1]) != "" {
-			return true
+		for _, m := range noMachineWaiverRe.FindAllStringSubmatch(cell, -1) {
+			if reason := strings.TrimSpace(m[1]); reason != "" {
+				return reason, true
+			}
+			found = true
 		}
 	}
-	return false
+	return "", found
+}
+
+// NoMachineWaiver is one '(no machine: <reason>)' placement waiver: the
+// component the row places (its first backticked subject), the waiver's
+// reason ("" when it names none, which is no waiver) and the row's 1-based
+// line in ARCHITECTURE.md.
+type NoMachineWaiver struct {
+	Component string
+	Reason    string
+	Line      int
+}
+
+// NoMachineWaivers reads every persistence-and-placement table of an
+// ARCHITECTURE.md text, as Gx's placement check does, and returns each row
+// whose first component carries the waiver. A '(not placed: ...)' row places
+// nothing and so waives nothing. It is the single source of the
+// contract-only record declaration: the no_machine_waiver fact, G3's orphan
+// matrix report and Gd's clause ownership all read it, so they cannot
+// disagree about which matrix is waived.
+func NoMachineWaivers(archText string) []NoMachineWaiver {
+	var out []NoMachineWaiver
+	for _, r := range walkTableRows(archText) {
+		hl := strings.ToLower(strings.Join(r.header, " "))
+		if !strings.Contains(hl, "placement") || !strings.Contains(hl, "persistence") || len(r.cells) == 0 {
+			continue
+		}
+		named := placementSubjects(r.cells[0])
+		if len(named) == 0 || notPlacedWaiverRe.MatchString(r.cells[0]) {
+			continue
+		}
+		mp := ir.FindCol(r.header, "machine placement", "placement", "machine")
+		if reason, found := placementWaiverReason(r.cells, mp); found {
+			out = append(out, NoMachineWaiver{Component: named[0], Reason: reason, Line: r.line})
+		}
+	}
+	return out
+}
+
+// contractOnlyMatrices names the matrices a design declares contract-only:
+// a machines/<X>.matrix.md with no machines/<X>.machine.json whose component
+// X carries a '(no machine: <reason>)' placement waiver with a reason. A
+// waiver on a component that has a machine declares nothing here (Gy-rules
+// reports it as waived_machine_present), and a matrix with neither is a
+// stale orphan, which G3 and Gy-rules both report.
+func contractOnlyMatrices(design string) map[string]bool {
+	out := map[string]bool{}
+	arch := readDesignOrEmpty(design, filepath.Join(design, "ARCHITECTURE.md"))
+	if arch == "" {
+		return out
+	}
+	mdir := filepath.Join(design, "machines")
+	for _, w := range NoMachineWaivers(normalizeNewlines([]byte(arch))) {
+		if w.Reason == "" {
+			continue
+		}
+		if fi, err := os.Lstat(filepath.Join(mdir, w.Component+".matrix.md")); err != nil || !fi.Mode().IsRegular() {
+			continue
+		}
+		if _, err := os.Lstat(filepath.Join(mdir, w.Component+".machine.json")); err == nil {
+			continue
+		}
+		out[w.Component] = true
+	}
+	return out
 }
 
 func backtickTokens(s string) []string {

@@ -24,6 +24,7 @@ func TestShippedRulesLoad(t *testing.T) {
 		"carriers.dl":     {"finding_effect_uncarried", "finding_carrier_misplaced"},
 		"facts.dl":        {"finding_fact_unresolved"},
 		"payload.dl":      {"finding_payload_twin"},
+		"records.dl":      {"finding_orphan_matrix", "finding_waived_machine_present"},
 		"supersession.dl": {"finding_duplicate_owner", "finding_supersession_cycle", "finding_dangling_replacement"},
 		"values.dl":       {"finding_values_disagree", "finding_values_conflict"},
 	}
@@ -116,7 +117,7 @@ func TestRulesSupplyAbsentLayersEmpty(t *testing.T) {
 	if len(g.Errs)+len(g.Warns) != 0 {
 		t.Fatalf("absent layers must be empty inputs, not errors: %+v", g)
 	}
-	if g.Counts["rule files evaluated"] != 6 {
+	if g.Counts["rule files evaluated"] != 7 {
 		t.Fatalf("every rule file must run: %v", g.Counts)
 	}
 }

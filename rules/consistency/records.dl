@@ -1,0 +1,30 @@
+// Contract-only records (proposal section 4, rule G; NEXT.md entry 13).
+//
+// A matrix names the units of a machine of the same stem. A matrix with no
+// machine is legal only as a contract-only record: an immutable or
+// creation-time record whose ARCHITECTURE.md persistence-and-placement row
+// waives the machine with '(no machine: <reason>)'. The waiver is the
+// declaration; G3 and Gd read the same waiver (gates.NoMachineWaivers), so a
+// waived matrix is neither a G3 orphan nor a Gd missing owner.
+//
+// finding_orphan_matrix: a matrix with neither a machine nor a waiver (a
+// stale artifact, or a record whose placement row forgot the waiver).
+//
+// finding_waived_machine_present: a waiver on a component that has a
+// machine. The waiver says there is no lifecycle and the machine says there
+// is one; one of the two statements is stale.
+
+.decl matrix(id:symbol)
+.input matrix
+.decl machine(id:symbol)
+.input machine
+.decl no_machine_waiver(component:symbol)
+.input no_machine_waiver
+
+.decl finding_orphan_matrix(matrix:symbol)
+.output finding_orphan_matrix
+finding_orphan_matrix(M) :- matrix(M), !machine(M), !no_machine_waiver(M).
+
+.decl finding_waived_machine_present(component:symbol)
+.output finding_waived_machine_present
+finding_waived_machine_present(C) :- no_machine_waiver(C), machine(C).

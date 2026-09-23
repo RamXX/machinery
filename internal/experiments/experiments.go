@@ -171,6 +171,17 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "row 'Widget.publish': authz_missing", ExpectExit: true},
 	{Name: "rules-produces-unknown-action", Tool: "check", Mutation: "PRODUCES{Widget.unpublish} names an action the model does not declare",
 		ExpectSubstr: "row 'Widget.commit': produces_unknown_action (action 'Widget.unpublish')", ExpectExit: true},
+	// 2026-09-23, consistency layer Stage 5 (NEXT.md entry 13): a matrix with
+	// no machine is a contract-only record only when its placement row waives
+	// the machine with a reason; G3 and Gy-rules read the same waiver.
+	{Name: "record-orphan-matrix", Tool: "check", Mutation: "a matrix with no machine whose placement row carries no '(no machine: <reason>)' waiver",
+		ExpectSubstr: "ErasureRecord.matrix.md: orphan matrix has no corresponding ErasureRecord.machine.json", ExpectExit: true},
+	{Name: "record-orphan-matrix-rule", Tool: "check", Mutation: "the same unwaived matrix, under Gy-rules",
+		ExpectSubstr: "row 'ErasureRecord': orphan_matrix", ExpectExit: true},
+	{Name: "record-waiver-empty-reason", Tool: "check", Mutation: "the placement waiver reads '(no machine: )', naming no reason",
+		ExpectSubstr: "placement row component `ErasureRecord` has no machine and no '(no machine: <reason>)' waiver", ExpectExit: true},
+	{Name: "record-waived-machine-present", Tool: "check", Mutation: "the Widget placement row waives the machine Widget has",
+		ExpectSubstr: "row 'Widget': waived_machine_present", ExpectExit: true},
 }
 
 // RefineExperiments are the data-refinement reconciliation failures.

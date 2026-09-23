@@ -557,6 +557,7 @@ func (b *factBuilder) matrices() {
 			continue
 		}
 		matrix := strings.TrimSuffix(filepath.Base(rel), ".matrix.md")
+		b.add(rel, 1, "matrix", "matrix:"+matrix, matrix)
 		machine := ""
 		if b.exists("machines/" + matrix + ".machine.json") {
 			machine = matrix
@@ -815,7 +816,21 @@ func (b *factBuilder) architecture() {
 	}
 	b.events(rel, text)
 	b.contract(rel, text)
+	b.placementWaivers(rel, text)
 	b.supersession(rel, text)
+}
+
+// placementWaivers projects each '(no machine: <reason>)' placement waiver
+// that names a reason as no_machine_waiver(component), read by
+// NoMachineWaivers, the reader G3 and Gd consult for the same declaration.
+// A waiver with no reason is no waiver (Gx reports the row) and projects
+// nothing, so its matrix, if any, stays an orphan for the rules.
+func (b *factBuilder) placementWaivers(rel, text string) {
+	for _, w := range NoMachineWaivers(text) {
+		if w.Reason != "" {
+			b.add(rel, w.Line, "no_machine_waiver", "placement:"+w.Component, w.Component)
+		}
+	}
 }
 
 func (b *factBuilder) events(rel, text string) {
