@@ -1,0 +1,21 @@
+// Constant-only comparisons, underscore-prefixed variable names (ordinary
+// variables, not wildcards), a variable repeated in the head, and an
+// aggregate whose result variable is already bound by a positive atom.
+.decl k(a:symbol)
+.input k
+.decl v(a:symbol, b:symbol)
+.input v
+.decl yes(a:symbol)
+.output yes
+yes(X) :- k(X), "a" != "b".
+.decl no(a:symbol)
+.output no
+no(_x) :- k(_x), "a" = "b".
+.decl dup(a:symbol, b:symbol)
+.output dup
+dup(_x, _x) :- k(_x).
+.decl c(a:symbol, n:number)
+c(K, N) :- k(K), N = count : { v(K, _) }.
+.decl same_size(a:symbol, b:symbol)
+.output same_size
+same_size(A, B) :- c(A, N), k(B), A != B, N = count : { v(B, _) }.
