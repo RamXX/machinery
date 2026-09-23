@@ -915,7 +915,9 @@ func (b *factBuilder) contract(rel, text string) {
 // is the row's subject: the first name of a table row's first cell, or the
 // contract item id of a fence line. type_owner records the artifact that
 // declares the type (ARCHITECTURE.md here; a schema catalog would add its own
-// path), so a rule can find two artifacts claiming one type.
+// path), so a rule can find two artifacts claiming one type. A
+// RESERVED{type:Name} row projects reserved(Name, <row subject>): the row
+// states the type is not defined yet, and owns nothing.
 func (b *factBuilder) supersession(rel, text string) {
 	b.mark("supersession")
 	decls, errs := ParseContractDeclarations(rel, []byte(text))
@@ -934,7 +936,15 @@ func (b *factBuilder) supersession(rel, text string) {
 			}
 		}
 		if !unitNameShape.MatchString(subject) {
-			b.fail("%s:%d: SUPERSEDES row subject %q is not an identifier", rel, d.Line, subject)
+			b.fail("%s:%d: %s row subject %q is not an identifier", rel, d.Line, d.Group, subject)
+			continue
+		}
+		if d.Group == GroupReserved {
+			// a reservation claims the type is not defined yet; the
+			// reserving row owns nothing
+			for _, p := range d.Pairs {
+				b.add(rel, d.Line, "reserved", "type:"+p.Target, p.Target, subject)
+			}
 			continue
 		}
 		b.add(rel, d.Line, "type_owner", "type:"+subject, subject, checker.PortableSourcePath(rel))
@@ -1175,8 +1185,9 @@ func (b *factBuilder) planMilestones(rel string) {
 }
 
 // sliceClaims projects slices.yaml: each slice's oracle citations (a bare
-// oracle id, or oracleset:<path> expanded) as slice_claim rows. Gw-packet owns
-// the slice map's validation; this reader needs only ids and cites.
+// oracle id, or oracleset:<path> expanded) as slice_claim rows, and each
+// row:<path>#<section>#<key> citation as packet_cites(slice, key). Gw-packet
+// owns the slice map's validation; this reader needs only ids and cites.
 func (b *factBuilder) sliceClaims(rel string) {
 	text, ok := b.read(rel)
 	if !ok {
@@ -1196,6 +1207,16 @@ func (b *factBuilder) sliceClaims(rel string) {
 			}
 			for _, cite := range yamlItems(yamlMap(sl, "cites")) {
 				c := strings.TrimSpace(cite.Value)
+				if target, ok := strings.CutPrefix(c, "row:"); ok {
+					// row:<path>#<section id>#<key>: the packet carries the
+					// table row keyed <key>; Gw-packet resolves the row
+					if _, rest, ok := splitHash2(target); ok {
+						if _, key, ok := splitHash2(rest); ok {
+							b.add(rel, cite.Line, "packet_cites", "slice:"+id, id, key)
+						}
+					}
+					continue
+				}
 				var ids []string
 				switch {
 				case packetStableIDRe.MatchString(c) || packetTestIDRe.MatchString(c):

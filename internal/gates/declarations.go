@@ -20,6 +20,10 @@
 //	                                    column, outbox, sink, signal, action
 //	SUPERSEDES{type:LegacyOrder}        on an Architecture Contract row: this row
 //	                                    replaces a stable type id (kind type only)
+//	RESERVED{type:ReadbackReceipt}      on an Architecture Contract row: this row
+//	                                    reserves a type id as not yet defined
+//	                                    (kind type only); once any artifact owns
+//	                                    the type, the reservation is stale
 //
 // What is enforced here is the grammar, at parse time, and the closure of the
 // group-name vocabulary (the Gy-rules gate decides on the projected facts): an upper-case
@@ -61,7 +65,7 @@ import (
 	"github.com/RamXX/machinery/internal/ir"
 )
 
-// Declaration group names. The five below are parsed here; the rest are
+// Declaration group names. The six below are parsed here; the rest are
 // owned elsewhere and only recognized, so the unknown-group rule accepts them.
 const (
 	GroupWrites     = "WRITES"
@@ -69,6 +73,7 @@ const (
 	GroupProduces   = "PRODUCES"
 	GroupCarries    = "CARRIES"
 	GroupSupersedes = "SUPERSEDES"
+	GroupReserved   = "RESERVED"
 )
 
 // knownDeclarationGroups is the closed group-name vocabulary. `payload {`
@@ -76,13 +81,18 @@ const (
 var knownDeclarationGroups = map[string]bool{
 	"CLAUSES": true, "RETIRED": true, "READS": true, "VALUES": true, "ORACLESET": true,
 	GroupWrites: true, GroupUses: true, GroupProduces: true, GroupCarries: true, GroupSupersedes: true,
+	GroupReserved: true,
 }
+
+// contractGroups are the groups that belong on Architecture Contract rows
+// and never in a matrix.
+var contractGroups = map[string]bool{GroupSupersedes: true, GroupReserved: true}
 
 // parsedHere reports whether a group is parsed by this file (the rest are
 // recognized only, and parsed by their own owners).
 func parsedHere(group string) bool {
 	switch group {
-	case GroupWrites, GroupUses, GroupProduces, GroupCarries, GroupSupersedes:
+	case GroupWrites, GroupUses, GroupProduces, GroupCarries, GroupSupersedes, GroupReserved:
 		return true
 	}
 	return false
@@ -93,7 +103,7 @@ func parsedHere(group string) bool {
 var producedAction = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*\.[A-Za-z][A-Za-z0-9_]*$`)
 
 // carrierKinds is the closed CARRIES kind vocabulary; supersessionKinds the
-// closed SUPERSEDES one (Stage 1 admits type replacement only).
+// closed SUPERSEDES and RESERVED one (type ids only).
 var (
 	carrierKinds      = map[string]bool{"column": true, "outbox": true, "sink": true, "signal": true, "action": true}
 	supersessionKinds = map[string]bool{"type": true}
@@ -107,15 +117,15 @@ var (
 // group is reported whole.
 var groupOpening = regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])([A-Z][A-Z0-9_-]*[A-Z0-9])\{`)
 
-// Declaration is one parsed WRITES, USES, PRODUCES, CARRIES, or SUPERSEDES group.
+// Declaration is one parsed WRITES, USES, PRODUCES, CARRIES, SUPERSEDES or RESERVED group.
 type Declaration struct {
 	File    string            // design-relative, slash-separated path
 	Line    int               // 1-based line of the table row
 	Row     string            // the row's unit name (named-unit tables) or first cell
 	Column  string            // header label of the cell carrying the group
-	Group   string            // GroupWrites, GroupUses, GroupProduces, GroupCarries, GroupSupersedes
-	Members []string          // members in source order; "kind:target" for CARRIES/SUPERSEDES
-	Pairs   []DeclarationPair // CARRIES and SUPERSEDES members, split
+	Group   string            // GroupWrites, GroupUses, GroupProduces, GroupCarries, GroupSupersedes, GroupReserved
+	Members []string          // members in source order; "kind:target" for CARRIES/SUPERSEDES/RESERVED
+	Pairs   []DeclarationPair // CARRIES, SUPERSEDES and RESERVED members, split
 }
 
 // DeclarationPair is one kind:target member.
@@ -279,8 +289,8 @@ func parseGroup(span groupSpan) (Declaration, string) {
 		}
 	case GroupCarries:
 		d.Members, d.Pairs, why = parseKindPairs(GroupCarries, span.body, carrierKinds)
-	case GroupSupersedes:
-		d.Members, d.Pairs, why = parseKindPairs(GroupSupersedes, span.body, supersessionKinds)
+	case GroupSupersedes, GroupReserved:
+		d.Members, d.Pairs, why = parseKindPairs(span.name, span.body, supersessionKinds)
 	}
 	return d, why
 }
@@ -355,7 +365,7 @@ func ParseMatrixDeclarations(file string, body []byte) ([]Declaration, []Declara
 			for _, span := range scanGroups(cell) {
 				switch {
 				case !knownDeclarationGroups[span.name]:
-					fail("unknown declaration group " + span.name + "{...}; known groups are CARRIES, CLAUSES, ORACLESET, PRODUCES, READS, USES, VALUES, WRITES (SUPERSEDES on Architecture Contract rows) and payload {...}")
+					fail("unknown declaration group " + span.name + "{...}; known groups are CARRIES, CLAUSES, ORACLESET, PRODUCES, READS, USES, VALUES, WRITES (RESERVED and SUPERSEDES on Architecture Contract rows) and payload {...}")
 					continue
 				case !parsedHere(span.name):
 					continue // CLAUSES, READS, VALUES, ORACLESET: owned by their own parsers
@@ -365,8 +375,8 @@ func ParseMatrixDeclarations(file string, body []byte) ([]Declaration, []Declara
 				case span.nested:
 					fail(span.name + "{...} contains another '{' before it closes; groups do not nest")
 					continue
-				case span.name == GroupSupersedes:
-					fail("SUPERSEDES{...} belongs on an Architecture Contract row, not in a matrix")
+				case contractGroups[span.name]:
+					fail(span.name + "{...} belongs on an Architecture Contract row, not in a matrix")
 					continue
 				}
 				perGroup[span.name]++
@@ -394,7 +404,7 @@ func ParseMatrixDeclarations(file string, body []byte) ([]Declaration, []Declara
 var contractBoundaryID = regexp.MustCompile(`^\s*-\s*id:\s*["']?([^"'\s#]+)`)
 
 // ParseContractDeclarations walks an ARCHITECTURE.md and returns every
-// SUPERSEDES declaration on an Architecture Contract row: a markdown table
+// SUPERSEDES and RESERVED declaration on an Architecture Contract row: a markdown table
 // row (row identity is its first cell), or a line of the contract YAML fence
 // (row identity is the enclosing `- id:` item, else "contract"). Other group
 // names are not read here; the unknown-group rule is a matrix rule.
@@ -403,10 +413,10 @@ func ParseContractDeclarations(file string, body []byte) ([]Declaration, []Decla
 	var decls []Declaration
 	var errs []DeclarationError
 	visit := func(line int, row, column string, cells []string) {
-		count := 0
+		count := map[string]int{}
 		for _, cell := range cells {
 			for _, span := range scanGroups(cell) {
-				if span.name != GroupSupersedes {
+				if !contractGroups[span.name] {
 					continue
 				}
 				fail := func(msg string) {
@@ -414,15 +424,15 @@ func ParseContractDeclarations(file string, body []byte) ([]Declaration, []Decla
 				}
 				switch {
 				case span.end < 0:
-					fail("SUPERSEDES{ is never closed in its cell; a group opens and closes inside one table cell and cannot span cells or rows")
+					fail(span.name + "{ is never closed in its cell; a group opens and closes inside one table cell and cannot span cells or rows")
 					continue
 				case span.nested:
-					fail("SUPERSEDES{...} contains another '{' before it closes; groups do not nest")
+					fail(span.name + "{...} contains another '{' before it closes; groups do not nest")
 					continue
 				}
-				count++
-				if count > 1 {
-					fail("row carries more than one SUPERSEDES group; merge them into one closed set")
+				count[span.name]++
+				if count[span.name] > 1 {
+					fail("row carries more than one " + span.name + " group; merge them into one closed set")
 					continue
 				}
 				d, why := parseGroup(span)
@@ -438,7 +448,7 @@ func ParseContractDeclarations(file string, body []byte) ([]Declaration, []Decla
 	for _, r := range walkTableRows(text) {
 		visit(r.line, rowIdentity(r), "", r.cells)
 	}
-	if fence, ok := ir.ContractFence(text); ok && strings.Contains(fence, GroupSupersedes+"{") {
+	if fence, ok := ir.ContractFence(text); ok && (strings.Contains(fence, GroupSupersedes+"{") || strings.Contains(fence, GroupReserved+"{")) {
 		if at := strings.Index(text, fence); at >= 0 {
 			first := strings.Count(text[:at], "\n") + 1
 			row := "contract"

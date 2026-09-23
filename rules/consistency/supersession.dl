@@ -4,12 +4,19 @@
 // Architecture Contract for the subject of a SUPERSEDES{type:Old} row, and
 // migration.yaml for each legacy entity it disposes with a replacement (a
 // retired legacy entity is replaced by nothing and owned by no artifact);
-// supersedes(new, old) is one replacement.
+// supersedes(new, old) is one replacement. reserved(type, row) is a
+// RESERVED{type:Name} contract row's claim that the type is not defined yet;
+// packet_cites(slice, row) is a slices.yaml row:<path>#<section>#<key>
+// citation, keyed by the cited row's first cell.
 
 .decl type_owner(type:symbol, owner:symbol)
 .input type_owner
 .decl supersedes(new:symbol, old:symbol)
 .input supersedes
+.decl reserved(type:symbol, row:symbol)
+.input reserved
+.decl packet_cites(slice:symbol, row:symbol)
+.input packet_cites
 
 // Two artifacts claim one type.
 .decl finding_duplicate_owner(type:symbol)
@@ -32,3 +39,19 @@ owned(T) :- type_owner(T, _).
 .decl finding_dangling_replacement(type:symbol, old:symbol)
 .output finding_dangling_replacement
 finding_dangling_replacement(N, O) :- supersedes(N, O), !owned(O).
+
+// A reservation of a type an artifact now owns: the missing-definition claim
+// went stale when the type was promoted, and it competes with the owner as
+// active input until it is removed.
+.decl finding_stale_reservation(type:symbol)
+.output finding_stale_reservation
+finding_stale_reservation(T) :- reserved(T, _), owned(T).
+
+.decl superseded(type:symbol)
+superseded(T) :- supersedes(_, T).
+
+// A slice packet that carries the row of a superseded type: the executor
+// would read the replaced definition as its current contract.
+.decl finding_superseded_in_packet(slice:symbol, type:symbol)
+.output finding_superseded_in_packet
+finding_superseded_in_packet(S, T) :- packet_cites(S, T), superseded(T).

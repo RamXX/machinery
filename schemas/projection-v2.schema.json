@@ -1315,7 +1315,8 @@
           "required": [
             "milestone",
             "dod_id",
-            "slice_claim"
+            "slice_claim",
+            "packet_cites"
           ],
           "additionalProperties": false,
           "properties": {
@@ -1399,6 +1400,33 @@
                   }
                 }
               }
+            },
+            "packet_cites": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "slice",
+                  "row"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "slice": {
+                    "$ref": "#/$defs/symbol"
+                  },
+                  "row": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
             }
           }
         },
@@ -1406,7 +1434,8 @@
           "type": "object",
           "required": [
             "type_owner",
-            "supersedes"
+            "supersedes",
+            "reserved"
           ],
           "additionalProperties": false,
           "properties": {
@@ -1459,6 +1488,33 @@
                     "$ref": "#/$defs/symbol"
                   },
                   "old": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
+            },
+            "reserved": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "type",
+                  "row"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "type": {
+                    "$ref": "#/$defs/symbol"
+                  },
+                  "row": {
                     "$ref": "#/$defs/symbol"
                   }
                 }

@@ -25,7 +25,7 @@ func TestShippedRulesLoad(t *testing.T) {
 		"facts.dl":        {"finding_fact_unresolved"},
 		"payload.dl":      {"finding_payload_twin"},
 		"records.dl":      {"finding_orphan_matrix", "finding_waived_machine_present"},
-		"supersession.dl": {"finding_duplicate_owner", "finding_supersession_cycle", "finding_dangling_replacement"},
+		"supersession.dl": {"finding_duplicate_owner", "finding_supersession_cycle", "finding_dangling_replacement", "finding_stale_reservation", "finding_superseded_in_packet"},
 		"values.dl":       {"finding_values_disagree", "finding_values_conflict"},
 	}
 	if len(set.files) != len(want) {

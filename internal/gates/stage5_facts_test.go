@@ -54,3 +54,28 @@ func TestProjectionNoMachineWaiverAndMatrix(t *testing.T) {
 		t.Fatalf("contractOnlyMatrices = %v", got)
 	}
 }
+
+// RESERVED{type:X} projects reserved(X, row) and gives the reserving row no
+// ownership; a slices.yaml row: citation projects packet_cites(slice, key),
+// and a malformed row citation (Gw-packet's to report) projects nothing.
+func TestProjectionReservedAndPacketCites(t *testing.T) {
+	design := writeFactsDesign(t, t.TempDir(), map[string]string{
+		"ARCHITECTURE.md": "# Architecture\n\n## Types\n\n| type | note |\n|---|---|\n" +
+			"| WireDraft | RESERVED{type:Receipt, type:Manifest} |\n| Receipt | SUPERSEDES{type:ReceiptV0} |\n",
+		"slices.yaml": "milestones:\n  - id: M1\n    slices:\n      - id: M1-S1\n        cites:\n" +
+			"          - row:ARCHITECTURE.md#types#ReceiptV0\n          - row:ARCHITECTURE.md#types\n          - section:ARCHITECTURE.md#types\n",
+	})
+	facts, err := LoadDesignFacts(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rel, want := range map[string]string{
+		"reserved":     "Manifest|WireDraft,Receipt|WireDraft",
+		"type_owner":   "Receipt|ARCHITECTURE.md",
+		"packet_cites": "M1-S1|ReceiptV0",
+	} {
+		if got := strings.Join(factRows(facts, rel), ","); got != want {
+			t.Fatalf("%s = %s, want %s", rel, got, want)
+		}
+	}
+}

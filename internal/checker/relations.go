@@ -106,9 +106,15 @@ var relationCatalog = []RelationSpec{
 	{Name: "milestone", Layer: "milestones", Columns: []string{"id", "status"}, Defines: true},
 	{Name: "dod_id", Layer: "milestones", Columns: []string{"milestone", "oracle"}},
 	{Name: "slice_claim", Layer: "milestones", Columns: []string{"slice", "oracle"}},
+	// packet_cites names the row key of each row:<path>#<section>#<key>
+	// citation a slice makes in slices.yaml, the table row its packet carries.
+	{Name: "packet_cites", Layer: "milestones", Columns: []string{"slice", "row"}},
 
 	{Name: "type_owner", Layer: "supersession", Columns: []string{"type", "owner"}},
 	{Name: "supersedes", Layer: "supersession", Columns: []string{"new", "old"}},
+	// reserved names each type a RESERVED{type:Name} contract row declares as
+	// not yet defined, with the reserving row's subject.
+	{Name: "reserved", Layer: "supersession", Columns: []string{"type", "row"}},
 }
 
 var relationByName = func() map[string]RelationSpec {

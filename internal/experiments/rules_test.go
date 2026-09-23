@@ -20,7 +20,8 @@ func init() {
 		"rules-fact-unresolved", "rules-values-disagree", "rules-payload-twin",
 		"rules-supersession-cycle", "rules-effect-uncarried",
 		"rules-produces-owes-admission", "rules-produces-unknown-action",
-		"rules-actor-uncarried", "rules-carrier-misplaced", "rules-values-conflict")
+		"rules-actor-uncarried", "rules-carrier-misplaced", "rules-values-conflict",
+		"rules-stale-reservation", "rules-superseded-in-packet")
 }
 
 // rulesFindings runs Gy-rules and returns its ERROR and warning lines. The
@@ -245,4 +246,48 @@ func TestRulesCarrierMisplaced(t *testing.T) {
 
 	near, _ := fixture(t)
 	refuteRuleFinding(t, near, "carrier_misplaced")
+}
+
+// A reservation claims a type is not defined yet; once a contract row owns
+// the type, the claim is stale. A reservation of a type nobody owns, and one
+// of a different type beside an owner, are silent.
+func TestRulesStaleReservation(t *testing.T) {
+	design, _ := fixture(t)
+	supersessionTable(t, design,
+		"| WireDraft | RESERVED{type:WidgetReceipt} |",
+		"| WidgetReceipt | SUPERSEDES{type:WidgetReceiptV0} |")
+	requireRuleFinding(t, "rules-stale-reservation", design)
+
+	near, _ := fixture(t)
+	supersessionTable(t, near, "| WireDraft | RESERVED{type:WidgetReceipt} |")
+	refuteRuleFinding(t, near, "stale_reservation")
+
+	other, _ := fixture(t)
+	supersessionTable(t, other,
+		"| WireDraft | RESERVED{type:WidgetManifest} |",
+		"| WidgetReceipt | SUPERSEDES{type:WidgetReceiptV0} |")
+	refuteRuleFinding(t, other, "stale_reservation")
+}
+
+func slicesCiting(t *testing.T, design string, rows ...string) {
+	t.Helper()
+	cites := ""
+	for _, row := range rows {
+		cites += "          - row:ARCHITECTURE.md#types#" + row + "\n"
+	}
+	mustWrite(t, filepath.Join(design, "slices.yaml"), "milestones:\n  - id: M1\n    slices:\n      - id: M1-S1\n        cites:\n"+cites)
+}
+
+// A packet must not carry a superseded definition as its current contract:
+// citing the replaced row is a finding, citing the replacing row is not.
+func TestRulesSupersededInPacket(t *testing.T) {
+	design, _ := fixture(t)
+	supersessionTable(t, design, "| WidgetV2 | SUPERSEDES{type:WidgetV1} |", "| WidgetV1 | the original type |")
+	slicesCiting(t, design, "WidgetV1")
+	requireRuleFinding(t, "rules-superseded-in-packet", design)
+
+	near, _ := fixture(t)
+	supersessionTable(t, near, "| WidgetV2 | SUPERSEDES{type:WidgetV1} |", "| WidgetV1 | the original type |")
+	slicesCiting(t, near, "WidgetV2")
+	refuteRuleFinding(t, near, "superseded_in_packet")
 }

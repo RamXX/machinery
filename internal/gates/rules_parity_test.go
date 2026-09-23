@@ -172,10 +172,11 @@ entities:
 		"| `order.paid` | app | ledger | at-least-once | `Order.id`, `Order.total` |\n\n" +
 		"| type | replaces |\n|---|---|\n" +
 		"| TypeA | SUPERSEDES{type:TypeB} |\n| TypeB | SUPERSEDES{type:TypeC} |\n| TypeC | SUPERSEDES{type:TypeA} |\n" +
-		"| TypeD | SUPERSEDES{type:Ghost} |\n\n" +
+		"| TypeD | SUPERSEDES{type:Ghost} |\n| DraftContract | RESERVED{type:TypeA} |\n\n" +
 		"| component | placement | persistence |\n|---|---|---|\n" +
 		"| `Order` (no machine: a stale waiver) | in-process | row |\n" +
 		"| `Receipt` (no machine: an append-only record) | in-process | row |\n",
+	"slices.yaml":                "milestones:\n  - id: M1\n    slices:\n      - id: M1-S1\n        cites:\n          - row:ARCHITECTURE.md#types#TypeB\n          - row:ARCHITECTURE.md#types#TypeD\n",
 	"machines/Ledger.matrix.md":  "| name | kind | pre / post |\n|---|---|---|\n| `checkLedger` | guard | - |\n",
 	"machines/Receipt.matrix.md": "| name | kind | pre / post |\n|---|---|---|\n| `checkReceipt` | guard | - |\n",
 	"migration.yaml":             "contract_version: 1\nmode: rebuild\ndispositions:\n  - legacy: TypeD\n    target: Order\n    strategy: replace\n    rationale: r\n",

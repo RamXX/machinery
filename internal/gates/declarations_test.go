@@ -64,6 +64,7 @@ func TestParseMatrixDeclarationsGrammar(t *testing.T) {
 		{name: "carries bad target", contract: "CARRIES{column:Order status}", err: `target 'Order status' is not a dotted identifier`},
 		{name: "carries fullwidth colon is no colon", contract: "CARRIES{column\uff1aOrder.status}", err: "has no kind"},
 		{name: "supersedes in a matrix", contract: "SUPERSEDES{type:OldOrder}", err: "SUPERSEDES{...} belongs on an Architecture Contract row, not in a matrix"},
+		{name: "reserved in a matrix", contract: "RESERVED{type:Receipt}", err: "RESERVED{...} belongs on an Architecture Contract row, not in a matrix"},
 		{name: "unterminated", contract: "WRITES{Order.status", err: "WRITES{ is never closed in its cell"},
 		{name: "nested", contract: "WRITES{Order{status}}", err: "groups do not nest"},
 		{name: "two writes groups", contract: "WRITES{Order.status} and WRITES{Order.total}", err: "row carries more than one WRITES group"},
@@ -239,6 +240,13 @@ func TestParseContractDeclarations(t *testing.T) {
 		{name: "duplicate", arch: "| type | note |\n|---|---|\n| `Order` | SUPERSEDES{type:A, type:A} |\n", err: "duplicate member"},
 		{name: "two on a row", arch: "| type | note |\n|---|---|\n| `Order` | SUPERSEDES{type:A} | SUPERSEDES{type:B} |\n", err: "more than one SUPERSEDES group"},
 		{name: "unterminated", arch: "| type | note |\n|---|---|\n| `Order` | SUPERSEDES{type:A |\n", err: "never closed"},
+		{name: "reserved beside supersedes", arch: "| type | note |\n|---|---|\n| `Draft` | RESERVED{type:Receipt, type:Manifest} SUPERSEDES{type:Old} |\n", want: []Declaration{
+			{File: "ARCHITECTURE.md", Line: 3, Row: "Draft", Group: GroupReserved, Members: []string{"type:Receipt", "type:Manifest"}, Pairs: []DeclarationPair{{"type", "Receipt"}, {"type", "Manifest"}}},
+			{File: "ARCHITECTURE.md", Line: 3, Row: "Draft", Group: GroupSupersedes, Members: []string{"type:Old"}, Pairs: []DeclarationPair{{"type", "Old"}}},
+		}},
+		{name: "reserved empty", arch: "| type | note |\n|---|---|\n| `Draft` | RESERVED{} |\n", err: "RESERVED{} is empty"},
+		{name: "reserved unknown kind", arch: "| type | note |\n|---|---|\n| `Draft` | RESERVED{entity:Receipt} |\n", err: `RESERVED member 'entity:Receipt' has unknown kind 'entity'`},
+		{name: "two reserved on a row", arch: "| type | note |\n|---|---|\n| `Draft` | RESERVED{type:A} | RESERVED{type:B} |\n", err: "more than one RESERVED group"},
 		{name: "other groups are not read here", arch: "| type | note |\n|---|---|\n| `Order` | FOO{x} WRITES{bad member} |\n"},
 		{name: "CRLF", arch: strings.ReplaceAll("| type | note |\n|---|---|\n| `Order` | SUPERSEDES{type:A} |\n", "\n", "\r\n"), want: []Declaration{
 			{File: "ARCHITECTURE.md", Line: 3, Row: "Order", Group: GroupSupersedes, Members: []string{"type:A"}, Pairs: []DeclarationPair{{"type", "A"}}},

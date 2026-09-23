@@ -52,10 +52,12 @@ var ruleSubjectSources = map[string][]string{
 	"unit":    {"unit", "unit_declares", "unit_derived"},
 	"action":  {"action"},
 	"subject": {"admission", "no_authorization", "action"},
-	"type":    {"type_owner", "supersedes"},
+	"type":    {"type_owner", "supersedes", "reserved"},
 	// a matrix stem, and a component named by a placement row
 	"matrix":    {"matrix"},
 	"component": {"no_machine_waiver"},
+	// a slices.yaml slice id
+	"slice": {"packet_cites", "slice_claim"},
 }
 
 // ruleLimits bounds every rule evaluation explicitly. A design projection is

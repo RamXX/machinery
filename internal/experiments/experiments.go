@@ -182,6 +182,13 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "placement row component `ErasureRecord` has no machine and no '(no machine: <reason>)' waiver", ExpectExit: true},
 	{Name: "record-waived-machine-present", Tool: "check", Mutation: "the Widget placement row waives the machine Widget has",
 		ExpectSubstr: "row 'Widget': waived_machine_present", ExpectExit: true},
+	// 2026-09-23, consistency layer Stage 5 (NEXT.md entry 15): a reservation
+	// of a type an artifact now owns is stale, and a packet citing the row of
+	// a superseded type carries a replaced definition as its contract.
+	{Name: "rules-stale-reservation", Tool: "check", Mutation: "a contract row reserves WidgetReceipt with RESERVED{} while another row owns it",
+		ExpectSubstr: "row 'WidgetReceipt': stale_reservation", ExpectExit: true},
+	{Name: "rules-superseded-in-packet", Tool: "check", Mutation: "slices.yaml cites the table row of WidgetV1, which WidgetV2 supersedes",
+		ExpectSubstr: "slices.yaml:6: row 'M1-S1': superseded_in_packet (type 'WidgetV1')", ExpectExit: true},
 }
 
 // RefineExperiments are the data-refinement reconciliation failures.
