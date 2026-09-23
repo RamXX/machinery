@@ -1,8 +1,10 @@
 // Source supersession (proposal section 4, rule F; NEXT.md entry 15).
 //
-// type_owner(type, owner) names the artifact declaring a type (today a
-// SUPERSEDES{type:Old} row of the Architecture Contract; a schema catalog
-// would add its own path); supersedes(new, old) is one replacement.
+// type_owner(type, owner) names the artifact declaring a type: the
+// Architecture Contract for the subject of a SUPERSEDES{type:Old} row, and
+// migration.yaml for each legacy entity it disposes with a replacement (a
+// retired legacy entity is replaced by nothing and owned by no artifact);
+// supersedes(new, old) is one replacement.
 
 .decl type_owner(type:symbol, owner:symbol)
 .input type_owner

@@ -127,11 +127,9 @@ func TestRulesParity(t *testing.T) {
 			})
 		}
 	}
-	// duplicate_owner cannot fire yet: ARCHITECTURE.md is the only artifact
-	// that owns a type, so no design can give one type two owners.
 	for _, set := range set.files {
 		for _, o := range set.outputs {
-			if !nonEmpty[o.relation] && o.relation != "finding_duplicate_owner" {
+			if !nonEmpty[o.relation] {
 				t.Errorf("parity never compared a populated %s; extend everyRuleFires", o.relation)
 			}
 		}
@@ -144,8 +142,9 @@ func TestRulesParity(t *testing.T) {
 	}
 }
 
-// everyRuleFires is a design on which every shipped output relation except
-// finding_duplicate_owner has at least one tuple.
+// everyRuleFires is a design on which every shipped output relation has at
+// least one tuple. TypeD is claimed twice: the contract row declaring it and
+// the migration.yaml disposition treating it as a legacy type.
 var everyRuleFires = map[string]string{
 	"domain.modelith.yaml": `kind: DomainModel
 version: v1
@@ -172,6 +171,7 @@ entities:
 		"| type | replaces |\n|---|---|\n" +
 		"| TypeA | SUPERSEDES{type:TypeB} |\n| TypeB | SUPERSEDES{type:TypeC} |\n| TypeC | SUPERSEDES{type:TypeA} |\n" +
 		"| TypeD | SUPERSEDES{type:Ghost} |\n",
+	"migration.yaml": "contract_version: 1\nmode: rebuild\ndispositions:\n  - legacy: TypeD\n    target: Order\n    strategy: replace\n    rationale: r\n",
 	"AUTHORIZATION.md": "<!-- machinery:authorization-inventory -->\n\n| authorization subject | admission |\n|---|---|\n" +
 		"| Order.pay | `nowhere` |\n| Order.view | `nowhere` |\n",
 }

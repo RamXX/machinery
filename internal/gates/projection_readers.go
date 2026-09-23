@@ -68,6 +68,7 @@ func LoadDesignFacts(design string) (*checker.DesignFacts, error) {
 	b.machines()
 	b.matrices()
 	b.architecture()
+	b.migration()
 	b.workspace()
 	b.authorization()
 	b.milestones()
@@ -925,6 +926,41 @@ func (b *factBuilder) supersession(rel, text string) {
 		for _, p := range d.Pairs {
 			b.add(rel, d.Line, "supersedes", "type:"+subject, subject, p.Target)
 		}
+	}
+}
+
+// migration projects the legacy types a migration.yaml disposes with a
+// replacement: every disposition naming a target (strategy reuse, wrap or
+// replace) becomes type_owner(<legacy>, migration.yaml), so a
+// SUPERSEDES{type:<legacy>} on the replacing contract row resolves to the
+// artifact that owns the legacy type. A retired legacy entity names no target,
+// is replaced by nothing, and is not claimed. Gm-transition owns the
+// contract's validity; this reader needs only the names.
+func (b *factBuilder) migration() {
+	rel := MigrationContractName
+	if !b.exists(rel) {
+		return
+	}
+	text, ok := b.read(rel)
+	if !ok {
+		return
+	}
+	root, err := parseYAMLDocument(rel, text)
+	if err != nil {
+		b.fail("%s", err.Error())
+		return
+	}
+	b.mark("supersession")
+	for _, item := range yamlItems(yamlMap(root, "dispositions")) {
+		legacy, target := yamlScalar(item, "legacy"), yamlScalar(item, "target")
+		if legacy == "" || target == "" {
+			continue
+		}
+		if !unitNameShape.MatchString(legacy) {
+			b.fail("%s:%d: disposition legacy %q is not an identifier", rel, item.Line, legacy)
+			continue
+		}
+		b.add(rel, item.Line, "type_owner", "type:"+legacy, legacy, rel)
 	}
 }
 

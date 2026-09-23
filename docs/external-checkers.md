@@ -180,7 +180,7 @@ first line) that a gate uses to print a human location, and one string per colum
 | `authorization` | `admission(subject, capability)`, `no_authorization(subject)` | `action:Entity.name` | the table under the `machinery:authorization-inventory` marker |
 | `oracles` | `oracle_row(id, machine, transition)` | `orc:id` | `machines/*.oracle.md`, `formal/Policy.oracle.md`, `formal/Isolation.oracle.md` |
 | `milestones` | `milestone(id, status)`, `dod_id(milestone, oracle)`, `slice_claim(slice, oracle)` | `ms:M<n>`, `slice:M<n>-S<k>` | BUILD.md's Build plan and `slices.yaml` |
-| `supersession` | `type_owner(type, owner)`, `supersedes(new, old)` | `type:Name` | `SUPERSEDES{type:Old}` on Architecture Contract rows |
+| `supersession` | `type_owner(type, owner)`, `supersedes(new, old)` | `type:Name` | `SUPERSEDES{type:Old}` on Architecture Contract rows; each legacy entity `migration.yaml` disposes with a target (`type_owner(Legacy, migration.yaml)`) |
 
 What the layers settle:
 

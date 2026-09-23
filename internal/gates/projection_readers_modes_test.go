@@ -425,3 +425,67 @@ func TestFactsProducesProjectsBesideWrites(t *testing.T) {
 		}
 	}
 }
+
+// migrationSupersession is a design whose migration.yaml disposes LegacyOrder
+// with a replacement and retires LegacyAudit, and whose contract rows name
+// supersessions.
+func migrationSupersession(t *testing.T, contractRows string) string {
+	t.Helper()
+	return writeFactsDesign(t, t.TempDir(), map[string]string{
+		"migration.yaml": "contract_version: 1\nmode: rebuild\ndispositions:\n" +
+			"  - legacy: LegacyOrder\n    target: Order\n    strategy: replace\n    rationale: r\n" +
+			"  - legacy: LegacyAudit\n    strategy: retire\n    rationale: r\n",
+		"ARCHITECTURE.md": "# Architecture\n\n| type | replaces |\n|---|---|\n" + contractRows,
+	})
+}
+
+func supersessionFindings(t *testing.T, design string) []string {
+	t.Helper()
+	facts, err := LoadDesignFacts(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, err := shippedRules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	findings, errs := evaluateRules(set, facts)
+	if len(errs) > 0 {
+		t.Fatal(errs)
+	}
+	var out []string
+	for _, f := range findings {
+		if f.file == "supersession.dl" {
+			out = append(out, f.output.code+" "+strings.Join(f.tuple, "|"))
+		}
+	}
+	return out
+}
+
+// A disposition with a replacement makes migration.yaml the owner of the
+// legacy type, so SUPERSEDES{type:LegacyOrder} resolves; a retired legacy
+// entity is replaced by nothing and claimed by nobody, which raises no
+// finding while no row supersedes it. The other direction still holds: a
+// replacement of a type no artifact owns dangles, including the retired one.
+func TestFactsMigrationOwnsDisposedLegacyTypes(t *testing.T) {
+	design := migrationSupersession(t, "| Order | SUPERSEDES{type:LegacyOrder} |\n")
+	facts, err := LoadDesignFacts(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := factRows(facts, "type_owner"); strings.Join(got, " ") != "LegacyOrder|migration.yaml Order|ARCHITECTURE.md" {
+		t.Fatalf("type_owner = %v", got)
+	}
+	if row := facts.Rows("type_owner")[0]; row.Source.Path != "migration.yaml" || row.Source.Line != 4 || row.StableID != "type:LegacyOrder" {
+		t.Fatalf("a migration owner row carries the disposition's source: %+v", row)
+	}
+	if got := supersessionFindings(t, design); len(got) != 0 {
+		t.Fatalf("a replacement of a disposed legacy type must resolve: %v", got)
+	}
+
+	dangling := migrationSupersession(t, "| Order | SUPERSEDES{type:LegacyInvoice} |\n| Audit | SUPERSEDES{type:LegacyAudit} |\n")
+	want := []string{"dangling_replacement Audit|LegacyAudit", "dangling_replacement Order|LegacyInvoice"}
+	if got := supersessionFindings(t, dangling); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("replacements of unowned types must dangle: %v", got)
+	}
+}

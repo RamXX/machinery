@@ -51,7 +51,7 @@
   SHADOW machines/Session.matrix.md:13: row 'Session.writeSessionFile': actor_uncarried
   SHADOW machines/Task.matrix.md:12: row 'Task.saveTask': actor_uncarried
   SHADOW machines/User.matrix.md:12: row 'User.saveUser': actor_uncarried
-  checked: 6 rule files evaluated, 1290 facts, 11 shadow finding(s)
+  checked: 6 rule files evaluated, 1299 facts, 11 shadow finding(s)
   ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 14 skeleton citations
