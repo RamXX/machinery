@@ -278,7 +278,7 @@ func (c *compiler) positiveAtom(s *scope, a atom, stage int) (catom, error) {
 				ca.args[j] = argRef{kind: argCheck, slot: v.slot}
 				// A variable repeated within this atom is not bound when the
 				// lookup key is built, so it is checked per tuple instead.
-				if !(v.byAtom && v.stage == stage) {
+				if !v.byAtom || v.stage != stage {
 					ca.mask |= 1 << uint(j)
 				}
 			} else {

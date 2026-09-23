@@ -342,7 +342,7 @@ func (p *parser) literal(inAgg bool) (literal, error) {
 		return literal{}, err
 	}
 	if t.kind == tBang {
-		p.take()
+		_, _ = p.take() // the peeked token; peek already surfaced any error
 		a, err := p.atom()
 		if err != nil {
 			return literal{}, err

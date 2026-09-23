@@ -31,7 +31,7 @@ type Derivation struct {
 // everything else bytewise. types may be nil (all symbol).
 func compareTuples(a, b []string, types []Type) int {
 	for j := range a {
-		if types != nil && types[j] == Number {
+		if j < len(types) && types[j] == Number {
 			x, _ := strconv.ParseInt(a[j], 10, 64)
 			y, _ := strconv.ParseInt(b[j], 10, 64)
 			if x != y {

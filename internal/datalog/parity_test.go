@@ -23,6 +23,7 @@ package datalog
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -93,7 +94,7 @@ func TestParity(t *testing.T) {
 						ours[name] = res.FormatCSV(name)
 					}
 				}
-				for _, p := range souffleProblems(souffle, dir, t.TempDir(), perr, ours) {
+				for _, p := range souffleProblems(t.Context(), souffle, dir, t.TempDir(), perr, ours) {
 					t.Error(p)
 				}
 				ran++
@@ -151,7 +152,7 @@ func TestParity(t *testing.T) {
 // souffleProblems runs souffle on the program in dir and lists every way its
 // outputs differ from ours (both sides sorted). perr is our parse error, if
 // any, in which case Soufflé is only required to reject the program too.
-func souffleProblems(souffle, dir, tmp string, perr error, ours map[string]string) []string {
+func souffleProblems(ctx context.Context, souffle, dir, tmp string, perr error, ours map[string]string) []string {
 	out := filepath.Join(tmp, "souffle-out")
 	empty := filepath.Join(tmp, "souffle-nofacts")
 	for _, d := range []string{out, empty} {
@@ -163,7 +164,7 @@ func souffleProblems(souffle, dir, tmp string, perr error, ours map[string]strin
 	if _, err := os.Stat(factsDir); err != nil {
 		factsDir = empty
 	}
-	cmd := exec.Command(souffle, "-F", factsDir, "-D", out, filepath.Join(dir, "program.dl"))
+	cmd := exec.CommandContext(ctx, souffle, "-F", factsDir, "-D", out, filepath.Join(dir, "program.dl"))
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err := cmd.Run()
@@ -252,17 +253,17 @@ func TestParityHarnessDetectsDifferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	good := map[string]string{"path": res.FormatCSV("path")}
-	if p := souffleProblems(souffle, dir, t.TempDir(), nil, good); len(p) != 0 {
+	if p := souffleProblems(t.Context(), souffle, dir, t.TempDir(), nil, good); len(p) != 0 {
 		t.Fatalf("unexpected problems: %v", p)
 	}
 	tampered := map[string]string{"path": strings.Replace(good["path"], "a\tb\n", "a\tz\n", 1)}
-	if p := souffleProblems(souffle, dir, t.TempDir(), nil, tampered); len(p) != 1 || !strings.Contains(p[0], "parity failure") {
+	if p := souffleProblems(t.Context(), souffle, dir, t.TempDir(), nil, tampered); len(p) != 1 || !strings.Contains(p[0], "parity failure") {
 		t.Fatalf("a changed row was not reported: %v", p)
 	}
-	if p := souffleProblems(souffle, dir, t.TempDir(), nil, map[string]string{}); len(p) != 1 {
+	if p := souffleProblems(t.Context(), souffle, dir, t.TempDir(), nil, map[string]string{}); len(p) != 1 {
 		t.Fatalf("an extra souffle output was not reported: %v", p)
 	}
-	if p := souffleProblems(souffle, dir, t.TempDir(), errors.New("rejected"), nil); len(p) != 1 {
+	if p := souffleProblems(t.Context(), souffle, dir, t.TempDir(), errors.New("rejected"), nil); len(p) != 1 {
 		t.Fatalf("souffle accepting a program we reject was not reported: %v", p)
 	}
 }
