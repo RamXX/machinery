@@ -59,8 +59,11 @@ RUN for tool in erl erlc escript elixir elixirc mix iex; do \
 RUN npm install -g typescript@7.0.2
 
 # The Docker client only. The lane talks to the host daemon over the socket
-# the runner mounts; no daemon runs inside this image.
+# the runner mounts; no daemon runs inside this image. The buildx plugin comes
+# along because scripts/pii-flow-image.sh rebuilds the pinned pii-flow checker
+# image with a digest-pinned BuildKit and must reproduce its exact digest.
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=dockercli /usr/local/libexec/docker/cli-plugins/docker-buildx /usr/local/libexec/docker/cli-plugins/docker-buildx
 
 # The lane and the sweep both write under the module cache; keep it inside the
 # image so a cold container does not re-download on every run. The BEAM reads

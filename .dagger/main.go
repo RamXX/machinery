@@ -474,7 +474,11 @@ esac
   docker run --rm --pull=never --platform "$platform" --network=none --read-only "$image" python3 --version
 echo "pinned external-checker OCI runtime provisioned"
 
-MACHINERY_REQUIRE_OCI_GOLDEN=1 go test -count=1 -run '^TestVerifyCheckersPiiFlowEngineGolden$' ./cmd/machinery
+# The pii-flow reference runs its rules under Souffle: rebuild that image
+# reproducibly and refuse any digest other than the registry's pin.
+scripts/pii-flow-image.sh
+
+MACHINERY_REQUIRE_OCI_GOLDEN=1 go test -count=1 -run '^(TestVerifyCheckersPiiFlowEngineGolden|TestPiiFlowSouffleVerdicts)$' ./cmd/machinery
 
 scripts/example-inventory.sh checkers | while IFS=$'\t' read -r design registry; do
   .bin/machinery verify-checkers "$design" --registry "$registry"

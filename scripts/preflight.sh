@@ -122,6 +122,7 @@ esac
 "$run_safe" -timeout 2m -stdout-limit 4096 -stderr-limit 4096 -- \
   "$docker_bin" run --rm --pull=never --platform "$checker_platform" --network=none --read-only \
   "$checker_image" python3 --version || fail "pinned external-checker image cannot run offline on $checker_platform"
+scripts/pii-flow-image.sh "$docker_bin" || fail "could not provision the pinned pii-flow checker image"
 if [ -z "${DOCKER_HOST:-}" ]; then
   DOCKER_HOST=$("$run_safe" -timeout 30s -stdout-limit 4096 -stderr-limit 4096 -- \
     "$docker_bin" context inspect --format '{{(index .Endpoints "docker").Host}}') ||
