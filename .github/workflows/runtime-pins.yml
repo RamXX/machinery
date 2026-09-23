@@ -1,0 +1,68 @@
+# runtime-pins.yml - weekly check that every pinned native runtime (OTP, erts,
+# Elixir, Node, TypeScript, Python, Java, Go) is the latest upstream release.
+# Dependabot covers Go modules and actions; this covers the runtimes the
+# assurance lane and the formal engines pin. When a pin is behind, or an
+# upstream index cannot be read, it opens (or updates) the single issue
+# "runtime pins behind upstream" with the report table.
+name: runtime-pins
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC, alongside Dependabot
+  workflow_dispatch: {}
+
+concurrency:
+  group: runtime-pins
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Report runtime pins
+        id: report
+        run: |
+          set -uo pipefail
+          status=0
+          go run ./scripts/runtime-pins -strict > "$RUNNER_TEMP/runtime-pins.md" || status=$?
+          cat "$RUNNER_TEMP/runtime-pins.md"
+          printf 'status=%s\n' "$status" >> "$GITHUB_OUTPUT"
+      - name: Open or update the drift issue
+        if: steps.report.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ steps.report.outputs.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="runtime pins behind upstream"
+          body="$RUNNER_TEMP/issue.md"
+          {
+            if [ "$STATUS" = 1 ]; then
+              echo "At least one pinned runtime is behind its latest upstream release."
+            else
+              echo "At least one upstream release index could not be read, so the pins could not be checked."
+            fi
+            echo
+            cat "$RUNNER_TEMP/runtime-pins.md"
+            echo
+            echo "Bump the pins as described in CONTRIBUTING.md (Runtime pins). Run: $RUN_URL"
+          } > "$body"
+          number=$(gh issue list --state open --search "in:title \"$title\"" --json number,title \
+            --jq "map(select(.title == \"$title\")) | first | .number // empty")
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file "$body"
+          else
+            gh issue create --title "$title" --body-file "$body"
+          fi
+          exit 1
