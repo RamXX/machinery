@@ -177,7 +177,8 @@ func (m *Machinery) dockerd() *dagger.Service {
 // earlier job or daemon; an unprivileged mkdir there fails with EACCES and
 // the job dies before its first test.
 func (m *Machinery) withDocker(c *dagger.Container, job, user string) *dagger.Container {
-	dir := sharedTmpPath + "/tmp/" + job
+	tmp := sharedTmpPath + "/tmp/" + job
+	work := sharedTmpPath + "/work/" + job
 	c = c.
 		WithServiceBinding("docker", m.dockerd()).
 		WithEnvVariable("DOCKER_HOST", "tcp://docker:2375").
@@ -186,9 +187,14 @@ func (m *Machinery) withDocker(c *dagger.Container, job, user string) *dagger.Co
 		WithMountedCache(sharedTmpPath, m.sharedTmp(),
 			dagger.ContainerWithMountedCacheOpts{Owner: "1000:1000"}).
 		WithUser("root").
+		// Both per-job directories (TMPDIR, and the worktree copy shInShared
+		// makes) are reset here as root, so a leftover owned by another uid
+		// from an earlier run cannot block the job's own rm -rf or mkdir.
 		WithExec([]string{"bash", "-euo", "pipefail", "-c",
-			"mkdir -p " + dir + " && chown 1000:1000 " + sharedTmpPath + "/tmp " + dir}).
-		WithEnvVariable("TMPDIR", dir)
+			"rm -rf " + tmp + " " + work +
+				" && mkdir -p " + tmp + " " + work +
+				" && chown 1000:1000 " + sharedTmpPath + "/tmp " + sharedTmpPath + "/work " + tmp + " " + work}).
+		WithEnvVariable("TMPDIR", tmp)
 	if user != "" {
 		c = c.WithUser(user)
 	}
