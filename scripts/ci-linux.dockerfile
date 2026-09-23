@@ -2,7 +2,7 @@
 # tier in.
 #
 # Every runtime identity here mirrors .github/actions/assurance-runtimes, the
-# single owner of the hosted runtime pins: Go 1.27.1, Node 26.10.0 with
+# single owner of the hosted runtime pins: Go 1.27.1, Node 26.9.0 with
 # TypeScript 7.0.2, CPython 3.14.7, Elixir 1.20.4 on OTP 29.1.1. The required
 # lane re-verifies each identity against testdata/integration-lanes and fails
 # closed, so a drifted stage here fails loudly instead of producing evidence
@@ -13,7 +13,7 @@
 # MACHINERY_CI_LINUX_<STAGE>_IMAGE for every stage.
 
 ARG GO_IMAGE=golang:1.27.1-trixie
-ARG NODE_IMAGE=node:26.10.0-trixie-slim
+ARG NODE_IMAGE=node:26.9.0-trixie-slim
 ARG PYTHON_IMAGE=python:3.14.7-slim-trixie
 ARG ELIXIR_IMAGE=hexpm/elixir:1.20.4-erlang-29.1.1-debian-trixie-20260918-slim
 ARG DOCKER_CLI_IMAGE=docker:29.7.2-cli
@@ -34,7 +34,7 @@ RUN apt-get update \
       libreadline8 libssl3 zlib1g \
  && rm -rf /var/lib/apt/lists/*
 
-# Node 26.10.0 and its npm, from the pinned upstream image.
+# Node 26.9.0 and its npm, from the pinned upstream image.
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \

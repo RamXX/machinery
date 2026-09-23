@@ -40,7 +40,7 @@ scripts/preflight-fast.sh || fail "cheap gate tier failed"
 say "native assurance runtime presence (node, python3, elixir, mix, tsc)"
 for tool in node python3 elixir mix tsc; do
   command -v "$tool" >/dev/null 2>&1 ||
-    fail "required native assurance runtime '$tool' is missing (the lane pins Node 26.10.0 + TypeScript 7.0.2, CPython 3.14.7, Elixir/Mix 1.20.4 with OTP 29 / ERTS 17.1)"
+    fail "required native assurance runtime '$tool' is missing (the lane pins Node 26.9.0 + TypeScript 7.0.2, CPython 3.14.7, Elixir/Mix 1.20.4 with OTP 29 / ERTS 17.1)"
 done
 
 # 3. race tests (ci: test job) ---------------------------------------------
