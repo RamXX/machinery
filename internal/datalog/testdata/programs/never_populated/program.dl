@@ -1,0 +1,9 @@
+// A relation declared but never populated (no rules, no input): negating
+// it removes nothing and outputting it writes an empty file.
+.decl item(x:symbol)
+.input item
+.decl waiver(x:symbol)
+.output waiver
+.decl finding_unwaived(x:symbol)
+.output finding_unwaived
+finding_unwaived(X) :- item(X), !waiver(X).

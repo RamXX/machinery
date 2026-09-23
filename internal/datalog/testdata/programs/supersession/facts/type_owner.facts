@@ -1,0 +1,6 @@
+Money	billing
+Money	ledger
+Address	crm
+Address	shipping
+Sku	catalog
+LegacyRef	archive

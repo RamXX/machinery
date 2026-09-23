@@ -1,0 +1,9 @@
+// Duplicate input lines are one tuple: relations are sets.
+.decl pair(a:symbol, b:symbol)
+.input pair
+.decl out(a:symbol, b:symbol)
+.output out
+out(A, B) :- pair(A, B).
+.decl n(c:number)
+.output n
+n(C) :- C = count : { pair(_, _) }.

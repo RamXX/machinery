@@ -1,0 +1,28 @@
+// Rule A of the proposal: every System write owes an admission row.
+.decl action(a:symbol, e:symbol, n:symbol, actor:symbol)
+.input action
+.decl unit_carries(u:symbol, k:symbol, t:symbol)
+.input unit_carries
+.decl admission(a:symbol, c:symbol)
+.input admission
+.decl no_authorization(a:symbol, r:symbol)
+.input no_authorization
+.decl c4_element(c:symbol, k:symbol, p:symbol)
+.input c4_element
+.decl declared_capability(c:symbol)
+.input declared_capability
+.decl system_write(a:symbol)
+system_write(A) :- action(A, _, _, "System").
+system_write(A) :- unit_carries(_, "action", A).
+.decl finding_authz_missing(a:symbol)
+.output finding_authz_missing
+finding_authz_missing(A) :- system_write(A), !admission(A, _), !no_authorization(A, _).
+.decl finding_authz_orphan(a:symbol)
+.output finding_authz_orphan
+finding_authz_orphan(A) :- admission(A, _), !system_write(A).
+.decl finding_authz_unknown_capability(a:symbol, c:symbol)
+.output finding_authz_unknown_capability
+finding_authz_unknown_capability(A, C) :- admission(A, C), !capability(C).
+.decl capability(c:symbol)
+capability(C) :- c4_element(C, _, _).
+capability(C) :- declared_capability(C).

@@ -1,0 +1,1 @@
+program.dl:9:15: relations are not stratifiable: cycle through negation p -> r -> q -> p (r depends on p through negation)

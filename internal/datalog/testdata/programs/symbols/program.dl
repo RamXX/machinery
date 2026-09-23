@@ -1,0 +1,15 @@
+// Symbols with spaces, quotes, backslash sequences, empty fields, non-ASCII
+// text and a long value, plus constants with spaces in the program. A tab is
+// always a column separator in a fact file; the two-character sequence
+// backslash-t is two ordinary characters in both engines.
+.decl name(id:symbol, label:symbol)
+.input name
+.decl copy(id:symbol, label:symbol)
+.output copy
+copy(I, L) :- name(I, L).
+.decl spaced(id:symbol)
+.output spaced
+spaced(I) :- name(I, "two words").
+.decl tagged(id:symbol, tag:symbol)
+.output tagged
+tagged(I, "has a tag") :- name(I, _), I != "".

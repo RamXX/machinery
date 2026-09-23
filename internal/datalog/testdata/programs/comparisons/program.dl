@@ -1,0 +1,16 @@
+// = and != over bound variables and constants, and a variable repeated
+// within one atom.
+.decl pair(a:symbol, b:symbol)
+.input pair
+.decl reflexive(a:symbol)
+.output reflexive
+reflexive(A) :- pair(A, A).
+.decl equal(a:symbol)
+.output equal
+equal(A) :- pair(A, B), A = B.
+.decl distinct(a:symbol, b:symbol)
+.output distinct
+distinct(A, B) :- pair(A, B), A != B, B != "skip".
+.decl is_x(a:symbol)
+.output is_x
+is_x(A) :- pair(A, _), A = "x".

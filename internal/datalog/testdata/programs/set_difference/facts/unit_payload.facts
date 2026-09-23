@@ -1,0 +1,4 @@
+unit:Order.confirm	order.confirmed	orderId
+unit:Order.confirm	order.confirmed	total
+unit:Order.confirm	order.confirmed	currency
+unit:Order.cancel	order.cancelled	orderId

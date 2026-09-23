@@ -1,0 +1,7 @@
+// Transitive closure over a graph with a cycle.
+.decl edge(a:symbol, b:symbol)
+.input edge
+.decl path(a:symbol, b:symbol)
+.output path
+path(X, Y) :- edge(X, Y).
+path(X, Z) :- path(X, Y), edge(Y, Z).
