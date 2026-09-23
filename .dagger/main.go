@@ -546,6 +546,31 @@ fi
 echo "formal suite clean, no diff"`)
 }
 
+// soufflePlatform is the one platform the upstream Soufflé release is built
+// for; on an arm64 host the parity lane runs under emulation.
+const soufflePlatform = dagger.Platform("linux/amd64")
+
+// DatalogParity is the hosted datalog-parity job: the Soufflé parity tests of
+// internal/datalog and of the shipped Gy-rules rule files, run in the image
+// scripts/souffle.dockerfile builds from pinned inputs (base and Go images by
+// digest, the Soufflé release asset by sha256, dependencies from a fixed
+// Ubuntu snapshot). scripts/datalog-parity.sh fails when a test skipped its
+// Soufflé half.
+func (m *Machinery) DatalogParity(ctx context.Context) (string, error) {
+	c := m.Source.
+		DockerBuild(dagger.DirectoryDockerBuildOpts{
+			Dockerfile: "scripts/souffle.dockerfile",
+			Platform:   soufflePlatform,
+		}).
+		WithEnvVariable("GOCACHE", "/gocache").
+		WithEnvVariable("GOMODCACHE", "/gomodcache").
+		WithMountedCache("/gocache", dag.CacheVolume("machinery-gocache-souffle")).
+		WithMountedCache("/gomodcache", dag.CacheVolume("machinery-gomodcache")).
+		WithMountedDirectory("/src", m.Source).
+		WithWorkdir("/src")
+	return sh(ctx, c, "scripts/datalog-parity.sh")
+}
+
 // Govulncheck scans the toolchain and every registered example module.
 func (m *Machinery) Govulncheck(ctx context.Context) (string, error) {
 	return sh(ctx, m.Base(), `
@@ -642,6 +667,7 @@ func (m *Machinery) Ci(ctx context.Context) (string, error) {
 		{"docs", func(ctx context.Context) (string, error) { return m.Docs(ctx, "HEAD~1") }},
 		{"modelith-render", m.ModelithRender},
 		{"design-engines", m.DesignEngines},
+		{"datalog-parity", m.DatalogParity},
 		{"verify-formal", m.VerifyFormal},
 		{"govulncheck", m.Govulncheck},
 		{"gitleaks", m.Gitleaks},

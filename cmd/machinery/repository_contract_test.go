@@ -899,6 +899,7 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		"dagger call example-impls",
 		"dagger call modelith-render",
 		"dagger call design-engines",
+		"dagger call datalog-parity",
 		"dagger call integration-evidence",
 	)
 	ci := ciOwnerBody(t)

@@ -37,7 +37,9 @@ make preflight-fast   # the same tier, on demand
 
 **Heavy tier, authoritative in hosted CI.** The race sweep, the required native
 integration lane, formal verification with TLC, C4 compilation, the external
-checker reproduction, and the native macOS suite run in
+checker reproduction, the Soufflé parity lane for the shipped Datalog rules
+(`datalog-parity`, reproducible with `make dagger-job JOB=datalog-parity`), and
+the native macOS suite run in
 `.github/workflows/ci.yml` and `formal.yml` on the pushed commit. Nothing local
 is authoritative for them. Run the full mirror locally when you want it:
 
