@@ -9,7 +9,7 @@ States trace to enum `UserStatus`. Events trace to `User` actions `disable`/`ena
 
 | name | kind | signature | pre / post | maps to |
 |---|---|---|---|---|
-| `saveUser` | actor | `(input{userId,status,actor}) -> UserRow \| err{ErrConstraint,ErrConflict,ErrDiskFull,ErrTimeout,ErrLocked}` | pre: guard passed, tx open. post: node `status` atomically, or unchanged on err | C4 `crm.domain -> crm.repo` then `crm.repo -> store` (Cypher SaveUser) |
+| `saveUser` | actor | `(input{userId,status,actor}) -> UserRow \| err{ErrConstraint,ErrConflict,ErrDiskFull,ErrTimeout,ErrLocked}` | pre: guard passed, tx open. post: node `status` atomically, or unchanged on err CARRIES{column:User.status} | C4 `crm.domain -> crm.repo` then `crm.repo -> store` (Cypher SaveUser) |
 | `guardAdminAuthority` | guard | `(ctx,evt) -> bool` | true iff `actor.role == Admin` (the verb is granted) | inv `rbac-crud-verbs` (disable/enable are Admin actions) |
 | `pendingIsActive` / `pendingIsDisabled` | guard | `(ctx) -> bool` | true iff `ctx.pendingStatus` equals that status | - (persist success routing) |
 | `priorIsActive` / `priorIsDisabled` | guard | `(ctx) -> bool` | true iff `ctx.priorStatus` equals that status | - (rollback routing) |

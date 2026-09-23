@@ -34,7 +34,7 @@ func experimentNamed(t *testing.T, name string) Experiment {
 func mutateSaveWidgetContract(t *testing.T, design, contract string) {
 	t.Helper()
 	editFile(t, filepath.Join(design, "machines", "Widget.matrix.md"),
-		"| atomic persist |", "| "+contract+" |")
+		"| atomic persist CARRIES{column:Widget.status} |", "| "+contract+" |")
 }
 
 func TestMalformedWritesDeclarationIsError(t *testing.T) {

@@ -69,7 +69,7 @@ attestations:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
       - path: machines/FulfillmentSaga.matrix.md
-        hash: sha256:537049bf3fdd6e916c0d091f939d0e50de9f0a92d24fc8573a012956d245d305
+        hash: sha256:156b865e17d990137fd7fb2fc390534ca8cf10a7abf187045f0c0338652ac4fc
       - path: machines/Order.machine.json
         hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
       - path: machines/Order.matrix.md
@@ -77,19 +77,19 @@ attestations:
       - path: machines/OutboxMessage.machine.json
         hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
       - path: machines/OutboxMessage.matrix.md
-        hash: sha256:d4db76c9536e4cfd3de351924f41a3dedec0d131922e291c7f7c0ff7e482fc77
+        hash: sha256:059f6e17fbe54e41b0a43c6b17c3e0fcc1775123d80c7bea9e3c3a86cb733087
       - path: machines/Payment.machine.json
         hash: sha256:2321294295c4638418423637a1ba7bacc703c682bdc8aa9c14744fa8e4613758
       - path: machines/Payment.matrix.md
-        hash: sha256:307c8e56c4f0d9925aceb09323e86f8b33965ad4dae0411f8afbc73f4b6b630d
+        hash: sha256:64e76c6665b9c9a789d7010faa374b24149fe8bd4740926eea21df2c1449c8c4
       - path: machines/Reservation.machine.json
         hash: sha256:b6a2e1b943da3bd59ee6e9d84ba264a3b55ab3af7cd0d1ab1b1ba614328d4da7
       - path: machines/Reservation.matrix.md
-        hash: sha256:3a7f97e54e3663fba3367abbd276a5476b68ab073a7b2a5c9bcbef96559bb9cf
+        hash: sha256:3ff74ec0f8e1dd9eedda6e64e315efe34a602b97dfe5ba7cc49bd11eec0fa669
       - path: machines/Shipment.machine.json
         hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
       - path: machines/Shipment.matrix.md
-        hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
+        hash: sha256:d8f955994f5c2d0b5d9ce7d29f8534523fa947f9759d7e095258c10b54e6c034
   - claim: g3.invariant-enforcement
     kind: plan
     attestor: Codex production-readiness review
@@ -99,7 +99,7 @@ attestations:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
       - path: machines/FulfillmentSaga.matrix.md
-        hash: sha256:537049bf3fdd6e916c0d091f939d0e50de9f0a92d24fc8573a012956d245d305
+        hash: sha256:156b865e17d990137fd7fb2fc390534ca8cf10a7abf187045f0c0338652ac4fc
       - path: machines/Order.machine.json
         hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
       - path: machines/Order.matrix.md
@@ -107,19 +107,19 @@ attestations:
       - path: machines/OutboxMessage.machine.json
         hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
       - path: machines/OutboxMessage.matrix.md
-        hash: sha256:d4db76c9536e4cfd3de351924f41a3dedec0d131922e291c7f7c0ff7e482fc77
+        hash: sha256:059f6e17fbe54e41b0a43c6b17c3e0fcc1775123d80c7bea9e3c3a86cb733087
       - path: machines/Payment.machine.json
         hash: sha256:2321294295c4638418423637a1ba7bacc703c682bdc8aa9c14744fa8e4613758
       - path: machines/Payment.matrix.md
-        hash: sha256:307c8e56c4f0d9925aceb09323e86f8b33965ad4dae0411f8afbc73f4b6b630d
+        hash: sha256:64e76c6665b9c9a789d7010faa374b24149fe8bd4740926eea21df2c1449c8c4
       - path: machines/Reservation.machine.json
         hash: sha256:b6a2e1b943da3bd59ee6e9d84ba264a3b55ab3af7cd0d1ab1b1ba614328d4da7
       - path: machines/Reservation.matrix.md
-        hash: sha256:3a7f97e54e3663fba3367abbd276a5476b68ab073a7b2a5c9bcbef96559bb9cf
+        hash: sha256:3ff74ec0f8e1dd9eedda6e64e315efe34a602b97dfe5ba7cc49bd11eec0fa669
       - path: machines/Shipment.machine.json
         hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
       - path: machines/Shipment.matrix.md
-        hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
+        hash: sha256:d8f955994f5c2d0b5d9ce7d29f8534523fa947f9759d7e095258c10b54e6c034
   - claim: g3.residual-transitions
     kind: plan
     attestor: Codex production-readiness review
@@ -129,7 +129,7 @@ attestations:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
       - path: machines/FulfillmentSaga.matrix.md
-        hash: sha256:537049bf3fdd6e916c0d091f939d0e50de9f0a92d24fc8573a012956d245d305
+        hash: sha256:156b865e17d990137fd7fb2fc390534ca8cf10a7abf187045f0c0338652ac4fc
       - path: machines/Order.machine.json
         hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
       - path: machines/Order.matrix.md
@@ -137,19 +137,19 @@ attestations:
       - path: machines/OutboxMessage.machine.json
         hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
       - path: machines/OutboxMessage.matrix.md
-        hash: sha256:d4db76c9536e4cfd3de351924f41a3dedec0d131922e291c7f7c0ff7e482fc77
+        hash: sha256:059f6e17fbe54e41b0a43c6b17c3e0fcc1775123d80c7bea9e3c3a86cb733087
       - path: machines/Payment.machine.json
         hash: sha256:2321294295c4638418423637a1ba7bacc703c682bdc8aa9c14744fa8e4613758
       - path: machines/Payment.matrix.md
-        hash: sha256:307c8e56c4f0d9925aceb09323e86f8b33965ad4dae0411f8afbc73f4b6b630d
+        hash: sha256:64e76c6665b9c9a789d7010faa374b24149fe8bd4740926eea21df2c1449c8c4
       - path: machines/Reservation.machine.json
         hash: sha256:b6a2e1b943da3bd59ee6e9d84ba264a3b55ab3af7cd0d1ab1b1ba614328d4da7
       - path: machines/Reservation.matrix.md
-        hash: sha256:3a7f97e54e3663fba3367abbd276a5476b68ab073a7b2a5c9bcbef96559bb9cf
+        hash: sha256:3ff74ec0f8e1dd9eedda6e64e315efe34a602b97dfe5ba7cc49bd11eec0fa669
       - path: machines/Shipment.machine.json
         hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
       - path: machines/Shipment.matrix.md
-        hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
+        hash: sha256:d8f955994f5c2d0b5d9ce7d29f8534523fa947f9759d7e095258c10b54e6c034
   - claim: g3.event-redelivery
     kind: plan
     attestor: Codex production-readiness review
@@ -159,7 +159,7 @@ attestations:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
       - path: machines/FulfillmentSaga.matrix.md
-        hash: sha256:537049bf3fdd6e916c0d091f939d0e50de9f0a92d24fc8573a012956d245d305
+        hash: sha256:156b865e17d990137fd7fb2fc390534ca8cf10a7abf187045f0c0338652ac4fc
       - path: machines/Order.machine.json
         hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
       - path: machines/Order.matrix.md
@@ -167,19 +167,19 @@ attestations:
       - path: machines/OutboxMessage.machine.json
         hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
       - path: machines/OutboxMessage.matrix.md
-        hash: sha256:d4db76c9536e4cfd3de351924f41a3dedec0d131922e291c7f7c0ff7e482fc77
+        hash: sha256:059f6e17fbe54e41b0a43c6b17c3e0fcc1775123d80c7bea9e3c3a86cb733087
       - path: machines/Payment.machine.json
         hash: sha256:2321294295c4638418423637a1ba7bacc703c682bdc8aa9c14744fa8e4613758
       - path: machines/Payment.matrix.md
-        hash: sha256:307c8e56c4f0d9925aceb09323e86f8b33965ad4dae0411f8afbc73f4b6b630d
+        hash: sha256:64e76c6665b9c9a789d7010faa374b24149fe8bd4740926eea21df2c1449c8c4
       - path: machines/Reservation.machine.json
         hash: sha256:b6a2e1b943da3bd59ee6e9d84ba264a3b55ab3af7cd0d1ab1b1ba614328d4da7
       - path: machines/Reservation.matrix.md
-        hash: sha256:3a7f97e54e3663fba3367abbd276a5476b68ab073a7b2a5c9bcbef96559bb9cf
+        hash: sha256:3ff74ec0f8e1dd9eedda6e64e315efe34a602b97dfe5ba7cc49bd11eec0fa669
       - path: machines/Shipment.machine.json
         hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
       - path: machines/Shipment.matrix.md
-        hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
+        hash: sha256:d8f955994f5c2d0b5d9ce7d29f8534523fa947f9759d7e095258c10b54e6c034
   - claim: gt.conformance-test-shape
     kind: plan
     attestor: Codex lane/next-gates

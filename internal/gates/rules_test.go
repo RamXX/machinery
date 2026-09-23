@@ -21,7 +21,7 @@ func TestShippedRulesLoad(t *testing.T) {
 	}
 	want := map[string][]string{
 		"authz.dl":        {"finding_authz_missing", "finding_authz_orphan", "finding_authz_unknown_capability", "finding_produces_unknown_action"},
-		"carriers.dl":     {"warn_effect_uncarried", "finding_actor_uncarried"},
+		"carriers.dl":     {"finding_effect_uncarried", "finding_carrier_misplaced"},
 		"facts.dl":        {"finding_fact_unresolved"},
 		"payload.dl":      {"finding_payload_twin"},
 		"supersession.dl": {"finding_duplicate_owner", "finding_supersession_cycle", "finding_dangling_replacement"},
@@ -220,7 +220,7 @@ func TestRulesGateNotActivatedWhenExplicitlySelected(t *testing.T) {
 }
 
 func TestRulesGateRunsInTheDefaultSuiteAndHonorsExplain(t *testing.T) {
-	design := filepath.Join("..", "..", "examples", "go-crm", "design")
+	design := writeFactsDesign(t, t.TempDir(), everyRuleFires)
 	_, run, _, err := SelectRunAndNote(design, "", "gy", RunOptions{Explain: true})
 	if err != nil {
 		t.Fatal(err)
@@ -231,38 +231,60 @@ func TestRulesGateRunsInTheDefaultSuiteAndHonorsExplain(t *testing.T) {
 	}
 	text := out.String()
 	for _, want := range []string{
-		"  SHADOW ARCHITECTURE.md:216: row 'Deal': dangling_replacement (old 'LegacyDeal')\n",
-		"         finding_dangling_replacement(\"Deal\", \"LegacyDeal\")  [supersession.dl rule 6]\n",
-		"           supersedes(\"Deal\", \"LegacyDeal\")  [fact ARCHITECTURE.md:216]\n",
+		"  SHADOW ARCHITECTURE.md:12: row 'TypeD': dangling_replacement (old 'Ghost')\n",
+		"         finding_dangling_replacement(\"TypeD\", \"Ghost\")  [supersession.dl rule 6]\n",
+		"           supersedes(\"TypeD\", \"Ghost\")  [fact ARCHITECTURE.md:12]\n",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("missing %q in:\n%s", want, text)
 		}
 	}
-	if strings.Contains(text, "warn ") {
-		t.Fatalf("go-crm must stay warning-free:\n%s", text)
+}
+
+// Every bundled example is clean under the shipped rules.
+func TestRulesBundledExamplesAreClean(t *testing.T) {
+	for _, rel := range bundledDesigns(t) {
+		design := filepath.Join("..", "..", filepath.FromSlash(rel))
+		if !RulesActive(design) {
+			continue
+		}
+		g := CheckRules(design, false)
+		if len(g.Errs)+len(g.Warns)+len(g.Shadow) != 0 {
+			t.Fatalf("%s: errs=%v warns=%v findings=%v", rel, g.Errs, g.Warns, g.Shadow)
+		}
 	}
 }
 
-// Warnings from warn_ relations are real warnings; the shadow count excludes
-// them.
+// A warn_ relation is a real warning: the shipped rules carry none today,
+// so a rule set of one warn_ rule pins the tier.
 func TestRulesWarnTierIsARealWarning(t *testing.T) {
 	design := writeFactsDesign(t, t.TempDir(), map[string]string{
 		"machines/Order.machine.json": factsMachine,
 		"machines/Order.matrix.md": "| name | kind | signature | pre / post |\n|---|---|---|---|\n" +
 			"| `recordPay` | action | `(ctx) -> ctx` | WRITES{Order.status} |\n",
 	})
-	g := CheckRules(design, false)
-	if len(g.Warns) != 1 || g.Warns[0] != "machines/Order.matrix.md:3: row 'Order.recordPay': effect_uncarried" {
-		t.Fatalf("warns = %q", g.Warns)
+	set, err := loadRuleSet(ruleFS(map[string]string{"w.dl": `.decl unit_writes(unit:symbol, fact:symbol)
+.input unit_writes
+.decl warn_writer(unit:symbol)
+.output warn_writer
+warn_writer(U) :- unit_writes(U, _).
+`}), "r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	facts, err := LoadDesignFacts(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := NewGate(RulesGateTitle)
+	checkRulesOver(g, set, facts, false)
+	if len(g.Warns) != 1 || g.Warns[0] != "machines/Order.matrix.md:3: row 'Order.recordPay': writer" || len(g.Errs) != 0 {
+		t.Fatalf("warns = %q errs = %q", g.Warns, g.Errs)
 	}
 	var out bytes.Buffer
 	g.Emit(&out)
-	// The fixture model's System action Order.pay has no inventory row: that
-	// is the one shadow finding, and the warning is not counted with it.
-	if !strings.Contains(out.String(), "  SHADOW domain.modelith.yaml:21: row 'Order.pay': authz_missing\n") ||
-		!strings.Contains(out.String(), ", 1 shadow finding(s)\n") || strings.Contains(out.String(), "\n  ok\n") {
-		t.Fatalf("a warning is not ok and is not a shadow finding:\n%s", out.String())
+	if strings.Contains(out.String(), "\n  ok\n") {
+		t.Fatalf("a warning is not ok:\n%s", out.String())
 	}
 }
 

@@ -10,8 +10,8 @@ this document is the named-unit contract table and the failure catalog.
 
 | name | kind | signature | pre / post | maps to | test | fixture |
 |---|---|---|---|---|---|---|
-| `publishToBus` | actor | `(messageId, messageType) -> ok \| err` | publishes the payload to the bus; the same messageId may be published more than once across attempts (consumers dedupe), never zero times for a row that stays Pending | C4 `outbox -> bus`; inv `outbox-at-least-once` | integration | real RabbitMQ (docker compose) |
-| `persistOutboxRow` | actor | `(messageId, status) -> row \| err{ErrUnavailable,ErrConflict}` | marks the row Published or Consumed in its own transaction | C4 `outbox -> orderDb` | integration | real Postgres |
+| `publishToBus` | actor | `(messageId, messageType) -> ok \| err` | publishes the payload to the bus; the same messageId may be published more than once across attempts (consumers dedupe), never zero times for a row that stays Pending CARRIES{sink:bus} | C4 `outbox -> bus`; inv `outbox-at-least-once` | integration | real RabbitMQ (docker compose) |
+| `persistOutboxRow` | actor | `(messageId, status) -> row \| err{ErrUnavailable,ErrConflict}` | marks the row Published or Consumed in its own transaction CARRIES{column:OutboxMessage.status} | C4 `outbox -> orderDb` | integration | real Postgres |
 | `pendingIsPublished` / `pendingIsConsumed` | guard | `(ctx) -> bool` | true iff `ctx.pendingStatus` equals that status | - (persist success routing) | unit | pure |
 | `priorIsPending` / `priorIsPublished` | guard | `(ctx) -> bool` | true iff `ctx.priorStatus` equals that status; a rollback to Pending is the at-least-once re-drive point | inv `outbox-at-least-once` | unit | pure |
 | `isErrUnavailable` / `isErrConflict` | guard | `(ctx,evt) -> bool` | true iff `evt.error` is that typed repo error | C4 3 DB failure classes | unit | pure |

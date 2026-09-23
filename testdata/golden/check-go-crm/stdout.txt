@@ -37,27 +37,16 @@
   note   Deal: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   Task: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
-  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 3 lifecycle semantics annotations, 2 control-flow-only semantics, 5 placement rows with machines, 2 placement rows waived, 9 entities placed, 6 mitigation rows with residual handlers, 1 residual handlers waived, 84 named-unit fact rows scanned, 2 unit facts resolved, 1 declaration groups parsed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 27 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 15 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
+  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 3 lifecycle semantics annotations, 2 control-flow-only semantics, 5 placement rows with machines, 2 placement rows waived, 9 entities placed, 6 mitigation rows with residual handlers, 1 residual handlers waived, 84 named-unit fact rows scanned, 2 unit facts resolved, 12 declaration groups parsed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 27 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 15 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
   ok
 == Gy-rules  consistency rules over projected facts ==
-  SHADOW machines/CommandExecution.matrix.md:14: row 'CommandExecution.executeInTx': actor_uncarried
-  SHADOW machines/CommandExecution.matrix.md:12: row 'CommandExecution.openDatabase': actor_uncarried
-  SHADOW machines/CommandExecution.matrix.md:13: row 'CommandExecution.resolveSession': actor_uncarried
-  SHADOW machines/Deal.matrix.md:12: row 'Deal.saveDeal': actor_uncarried
-  SHADOW machines/Session.matrix.md:16: row 'Session.clearSessionFile': actor_uncarried
-  SHADOW machines/Session.matrix.md:15: row 'Session.loadUser': actor_uncarried
-  SHADOW machines/Session.matrix.md:14: row 'Session.readSessionFile': actor_uncarried
-  SHADOW machines/Session.matrix.md:12: row 'Session.verifyCredentials': actor_uncarried
-  SHADOW machines/Session.matrix.md:13: row 'Session.writeSessionFile': actor_uncarried
-  SHADOW machines/Task.matrix.md:12: row 'Task.saveTask': actor_uncarried
-  SHADOW machines/User.matrix.md:12: row 'User.saveUser': actor_uncarried
-  checked: 6 rule files evaluated, 1627 facts, 11 shadow finding(s)
+  checked: 6 rule files evaluated, 1653 facts, 0 shadow finding(s)
   ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 6 closed milestones, 1 skeleton NFR lines, 14 skeleton citations
   ok
 == Gw-packet  per-slice packet projection ==
-  checked: 1 milestones, 58 obligations owed, 58 obligations claimed, 2 slices, M1-S1 39585/90000 bytes, M1-S2 16271/60000 bytes
+  checked: 1 milestones, 58 obligations owed, 58 obligations claimed, 2 slices, M1-S1 39612/90000 bytes, M1-S2 16271/60000 bytes
   ok
 == Ga-accept  milestone acceptance evidence ==
   checked: 1 plan documents, 6 declared milestones, 6 closed milestones, 6 acceptance files, 289 DoD ids bound, 7 DoD oracle sets bound, 6 closed milestones with accepted evidence, 6 commit bindings verified, commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry

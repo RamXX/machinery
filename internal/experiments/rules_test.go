@@ -19,7 +19,8 @@ func init() {
 		"rules-authz-missing", "rules-authz-orphan", "rules-authz-unknown-capability",
 		"rules-fact-unresolved", "rules-values-disagree", "rules-payload-twin",
 		"rules-supersession-cycle", "rules-effect-uncarried",
-		"rules-produces-owes-admission", "rules-produces-unknown-action")
+		"rules-produces-owes-admission", "rules-produces-unknown-action",
+		"rules-actor-uncarried", "rules-carrier-misplaced")
 }
 
 // rulesFindings runs Gy-rules and returns its SHADOW and warning lines. The
@@ -170,14 +171,11 @@ func TestRulesSupersessionCycle(t *testing.T) {
 }
 
 // WRITES{} declares a read-only action, which owes no carrier; a writing
-// action with no CARRIES{} is a warning.
+// action with no CARRIES{} is a finding.
 func TestRulesEffectUncarried(t *testing.T) {
 	design, _ := fixture(t)
 	contractOf(t, design, "commit status", "commit status. WRITES{Widget.status}")
 	requireRuleFinding(t, "rules-effect-uncarried", design)
-	if g := gates.CheckRules(design, false); !containsAny(g.Warns, "effect_uncarried") {
-		t.Fatalf("effect_uncarried is warning tier, not shadow: %v", g.Warns)
-	}
 
 	near, _ := fixture(t)
 	contractOf(t, near, "commit status", "commit status. WRITES{}")
@@ -208,4 +206,26 @@ func TestRulesProducesUnknownAction(t *testing.T) {
 	near, _ := fixture(t)
 	contractOf(t, near, "commit status", "commit status. PRODUCES{Widget.publish}")
 	refuteRuleFinding(t, near, "produces_unknown_action")
+}
+
+// An actor owes a carrier whether or not it lists WRITES: the fixture's
+// saveWidget actor carries its column, and dropping the group is a finding.
+func TestRulesActorUncarried(t *testing.T) {
+	design, _ := fixture(t)
+	editFile(t, filepath.Join(design, "machines", "Widget.matrix.md"), "atomic persist CARRIES{column:Widget.status}", "atomic persist")
+	requireRuleFinding(t, "rules-actor-uncarried", design)
+
+	near, _ := fixture(t)
+	refuteRuleFinding(t, near, "effect_uncarried")
+}
+
+// Carriers belong to actions and actors: CARRIES{} on a guard row is a
+// finding, and the same group on the actor row is not.
+func TestRulesCarrierMisplaced(t *testing.T) {
+	design, _ := fixture(t)
+	contractOf(t, design, "actor may publish", "actor may publish. CARRIES{signal:published}")
+	requireRuleFinding(t, "rules-carrier-misplaced", design)
+
+	near, _ := fixture(t)
+	refuteRuleFinding(t, near, "carrier_misplaced")
 }

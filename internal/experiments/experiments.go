@@ -158,6 +158,10 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "row 'WidgetA': supersession_cycle", ExpectExit: false},
 	{Name: "rules-effect-uncarried", Tool: "check", Mutation: "an action declares WRITES{Widget.status} and no CARRIES{}",
 		ExpectSubstr: "row 'Widget.commit': effect_uncarried", ExpectExit: false},
+	{Name: "rules-actor-uncarried", Tool: "check", Mutation: "the saveWidget actor loses its CARRIES{} group",
+		ExpectSubstr: "row 'Widget.saveWidget': effect_uncarried", ExpectExit: false},
+	{Name: "rules-carrier-misplaced", Tool: "check", Mutation: "a guard row declares CARRIES{signal:published}",
+		ExpectSubstr: "row 'Widget.guardCanPublish': carrier_misplaced (kind 'guard')", ExpectExit: false},
 	// 2026-09-23, consistency layer Stage 4: PRODUCES{} declares the action a
 	// cascade or consumer arm performs, so a produced action owes an admission
 	// whatever its Modelith actor, and a produced name the model lacks is its

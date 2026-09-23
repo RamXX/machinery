@@ -49,15 +49,15 @@ attestations:
     note: 'Every named guard was reviewed against its independent clauses, source-state structure, and invariant mapping.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
-      - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
+      - {path: machines/CommandExecution.matrix.md, hash: sha256:867dde7588f4f28bb2d3f2794ff722bc2f1597a704c1c3c095591486a120a6b9}
       - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
-      - {path: machines/Deal.matrix.md, hash: sha256:40f1339eb0c142c1741386f8f79c6ca9043eee325a50a7b93a93e2f7b97d32a0}
+      - {path: machines/Deal.matrix.md, hash: sha256:0bcc84715397dffd3bbdf7cbf84b8fe0e9bba3c216205951736f58d5f3b7338d}
       - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
-      - {path: machines/Session.matrix.md, hash: sha256:2bafb36ce3a4f4800fc1bf36fa1eb0c3e08fb39616dae864d4c81291cda7d1c6}
+      - {path: machines/Session.matrix.md, hash: sha256:659f582de0c658d080e730dad1ec4fb1b623e0c563ecbb995c95bc0a04c17880}
       - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
-      - {path: machines/Task.matrix.md, hash: sha256:e1fc8c68e7e7ded94d90d034ab796f69d3d43a554a341d87e95bd9a64a92cf80}
+      - {path: machines/Task.matrix.md, hash: sha256:ce1317ccd0a67c50d107fe27ced39dd64bcb9b485c2e693b87c6a2f8b809d3fa}
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
-      - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
+      - {path: machines/User.matrix.md, hash: sha256:3aa52a3823f6c0d7ba10d78e8613360e06053c70d2173be2164ba45acecb513b}
   - claim: g3.invariant-enforcement
     kind: plan
     attestor: Codex CRM design review
@@ -65,15 +65,15 @@ attestations:
     note: 'Every machine-carried invariant is bound to the guard, action, or actor unit that enforces it; non-machine carriers are explicit.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
-      - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
+      - {path: machines/CommandExecution.matrix.md, hash: sha256:867dde7588f4f28bb2d3f2794ff722bc2f1597a704c1c3c095591486a120a6b9}
       - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
-      - {path: machines/Deal.matrix.md, hash: sha256:40f1339eb0c142c1741386f8f79c6ca9043eee325a50a7b93a93e2f7b97d32a0}
+      - {path: machines/Deal.matrix.md, hash: sha256:0bcc84715397dffd3bbdf7cbf84b8fe0e9bba3c216205951736f58d5f3b7338d}
       - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
-      - {path: machines/Session.matrix.md, hash: sha256:2bafb36ce3a4f4800fc1bf36fa1eb0c3e08fb39616dae864d4c81291cda7d1c6}
+      - {path: machines/Session.matrix.md, hash: sha256:659f582de0c658d080e730dad1ec4fb1b623e0c563ecbb995c95bc0a04c17880}
       - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
-      - {path: machines/Task.matrix.md, hash: sha256:e1fc8c68e7e7ded94d90d034ab796f69d3d43a554a341d87e95bd9a64a92cf80}
+      - {path: machines/Task.matrix.md, hash: sha256:ce1317ccd0a67c50d107fe27ced39dd64bcb9b485c2e693b87c6a2f8b809d3fa}
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
-      - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
+      - {path: machines/User.matrix.md, hash: sha256:3aa52a3823f6c0d7ba10d78e8613360e06053c70d2173be2164ba45acecb513b}
   - claim: g3.residual-transitions
     kind: plan
     attestor: Codex CRM design review
@@ -81,15 +81,15 @@ attestations:
     note: 'Classified store and session failures retain bounded retry, rollback, and fail-closed residual transitions.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
-      - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
+      - {path: machines/CommandExecution.matrix.md, hash: sha256:867dde7588f4f28bb2d3f2794ff722bc2f1597a704c1c3c095591486a120a6b9}
       - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
-      - {path: machines/Deal.matrix.md, hash: sha256:40f1339eb0c142c1741386f8f79c6ca9043eee325a50a7b93a93e2f7b97d32a0}
+      - {path: machines/Deal.matrix.md, hash: sha256:0bcc84715397dffd3bbdf7cbf84b8fe0e9bba3c216205951736f58d5f3b7338d}
       - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
-      - {path: machines/Session.matrix.md, hash: sha256:2bafb36ce3a4f4800fc1bf36fa1eb0c3e08fb39616dae864d4c81291cda7d1c6}
+      - {path: machines/Session.matrix.md, hash: sha256:659f582de0c658d080e730dad1ec4fb1b623e0c563ecbb995c95bc0a04c17880}
       - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
-      - {path: machines/Task.matrix.md, hash: sha256:e1fc8c68e7e7ded94d90d034ab796f69d3d43a554a341d87e95bd9a64a92cf80}
+      - {path: machines/Task.matrix.md, hash: sha256:ce1317ccd0a67c50d107fe27ced39dd64bcb9b485c2e693b87c6a2f8b809d3fa}
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
-      - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
+      - {path: machines/User.matrix.md, hash: sha256:3aa52a3823f6c0d7ba10d78e8613360e06053c70d2173be2164ba45acecb513b}
   - claim: g3.event-redelivery
     kind: plan
     attestor: Codex CRM design review
@@ -97,15 +97,15 @@ attestations:
     note: 'These invocation-local synchronous machines consume no external at-least-once event stream; retry replays are bounded per instance.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
-      - {path: machines/CommandExecution.matrix.md, hash: sha256:6b4c7c1dd8a89330ecc8a8e9f1bd0ccac9ac7e957cb8a64ecda7e29f7c18f6c3}
+      - {path: machines/CommandExecution.matrix.md, hash: sha256:867dde7588f4f28bb2d3f2794ff722bc2f1597a704c1c3c095591486a120a6b9}
       - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
-      - {path: machines/Deal.matrix.md, hash: sha256:40f1339eb0c142c1741386f8f79c6ca9043eee325a50a7b93a93e2f7b97d32a0}
+      - {path: machines/Deal.matrix.md, hash: sha256:0bcc84715397dffd3bbdf7cbf84b8fe0e9bba3c216205951736f58d5f3b7338d}
       - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
-      - {path: machines/Session.matrix.md, hash: sha256:2bafb36ce3a4f4800fc1bf36fa1eb0c3e08fb39616dae864d4c81291cda7d1c6}
+      - {path: machines/Session.matrix.md, hash: sha256:659f582de0c658d080e730dad1ec4fb1b623e0c563ecbb995c95bc0a04c17880}
       - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
-      - {path: machines/Task.matrix.md, hash: sha256:e1fc8c68e7e7ded94d90d034ab796f69d3d43a554a341d87e95bd9a64a92cf80}
+      - {path: machines/Task.matrix.md, hash: sha256:ce1317ccd0a67c50d107fe27ced39dd64bcb9b485c2e693b87c6a2f8b809d3fa}
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
-      - {path: machines/User.matrix.md, hash: sha256:ceb80ef91f52d1bf9eb103c1a83bdb36afcddfcbd5de4120c91881932adc1df0}
+      - {path: machines/User.matrix.md, hash: sha256:3aa52a3823f6c0d7ba10d78e8613360e06053c70d2173be2164ba45acecb513b}
   - claim: gt.conformance-test-shape
     kind: current
     attestor: coordinator

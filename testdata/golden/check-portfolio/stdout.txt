@@ -22,16 +22,10 @@
 == Gx-trace  cross-layer traceability ==
   note   Portfolio: 4 operational-overlay states (committing, commitRetry, reverted, routingFault)
   note   RecommendationRun: 1 operational-overlay states (collectRetry)
-  checked: 6 entities, 2 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 2 lifecycle semantics annotations, 3 placement rows with machines, 5 placement rows waived, 6 entities placed, 1 authorization obligations admitted, 39 named-unit fact rows scanned, 1 derived facts waived, 3 unit facts resolved, 6 build packets scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 13 invariants enforced, 13 invariants unit-backed (guard/action/actor), 5 invariants waived with reason
+  checked: 6 entities, 2 operational machines, 2 lifecycle machines traced, 2 lifecycle entities with machines, 2 lifecycle semantics annotations, 3 placement rows with machines, 5 placement rows waived, 6 entities placed, 1 authorization obligations admitted, 39 named-unit fact rows scanned, 1 derived facts waived, 3 unit facts resolved, 6 declaration groups parsed, 6 build packets scanned, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 13 invariants enforced, 13 invariants unit-backed (guard/action/actor), 5 invariants waived with reason
   ok
 == Gy-rules  consistency rules over projected facts ==
-  SHADOW machines/Portfolio.matrix.md:31: row 'Portfolio.persistDecision': actor_uncarried
-  SHADOW machines/RecommendationRun.matrix.md:17: row 'RecommendationRun.fetchPrices': actor_uncarried
-  SHADOW machines/RecommendationRun.matrix.md:18: row 'RecommendationRun.optimize': actor_uncarried
-  SHADOW machines/ReferenceDataCommand.matrix.md:13: row 'ReferenceDataCommand.buildCandidateSet': actor_uncarried
-  SHADOW machines/ReferenceDataCommand.matrix.md:11: row 'ReferenceDataCommand.selectEligibleConstituents': actor_uncarried
-  SHADOW machines/ReferenceDataCommand.matrix.md:12: row 'ReferenceDataCommand.upsertSecurityByTicker': actor_uncarried
-  checked: 6 rule files evaluated, 383 facts, 6 shadow finding(s)
+  checked: 6 rule files evaluated, 400 facts, 0 shadow finding(s)
   ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 3 skeleton citations, 6 milestone demos, 42 packet sections, 6 execution packets, linkage mode pairwise (execution unit: one bounded zero-context packet)
