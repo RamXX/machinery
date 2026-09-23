@@ -2,4 +2,4 @@
 
 | token | meaning |
 |---|---|
-| MACHINE-WRITTEN | compiler-owned policy |
+| OWNED-BY | compiler-owned policy |

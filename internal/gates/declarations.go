@@ -1,13 +1,14 @@
 // Package gates implements deterministic design checks. This file owns the
-// declaration grammar family of the consistency layer, Stage 1
+// declaration grammar family of the consistency layer
 // (docs/consistency-layer-proposal.md, section 3.1).
 //
 // Machinery has one declaration idiom: an upper-case word immediately
 // followed by a braced, comma-separated closed list, placed in a table cell.
-// CLAUSES{}, READS{}, VALUES{} and ORACLESET{} are parsed by their own
-// owners (clausedecl.go, payloadreads.go, values.go, the Gb packet reader).
-// This file adds five members and parses them into typed values, so the
-// projection can turn them into facts without re-reading the design:
+// CLAUSES{}, READS{} and ORACLESET{} are parsed by their own owners
+// (clausedecl.go, payloadreads.go, the Gb packet reader). This file parses
+// the rest into typed values, so the projection can turn them into facts
+// without re-reading the design, and holds the 0.9.0 declaration parsers
+// (VALUES{}, payload {}, derived:, the AUTHORIZATION.md table) at its end:
 //
 //	WRITES{Order.status, Order.total}   the closed set of stored facts a unit writes
 //	WRITES{}                            a read-only unit
@@ -50,6 +51,7 @@
 package gates
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -479,4 +481,337 @@ func checkDeclarations(g *Gate, design, archText string) []Declaration {
 	}
 	g.Count("declaration groups parsed", len(all))
 	return all
+}
+
+// ---------------------------------------------------------------- the 0.9.0 declarations
+//
+// The declarations 0.9.0 introduced are parsed here beside the Stage 1 groups:
+// VALUES{a, b} and VALUES name{a, b}, payload {f, ...} (and its spelling
+// payload is exactly {f, ...}), the row-local derived: fact (reason) waiver,
+// and the marked AUTHORIZATION.md table. Each parser reads only its grammar;
+// what the declarations mean is decided by the Gy-rules gate over their
+// projected facts, and Gx-trace reports only their shape errors.
+
+var (
+	valuesGroup   = regexp.MustCompile(`\bVALUES(?:\s+([A-Za-z][A-Za-z0-9_-]*))?\s*\{([^}]*)\}`)
+	valuesOpening = regexp.MustCompile(`\bVALUES(?:\s+[A-Za-z][A-Za-z0-9_-]*)?\s*\{`)
+	valueMember   = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
+
+	payloadDeclaration = regexp.MustCompile(`(?i)payload(?:\s+is\s+exactly)?\s*\{([^}]*)\}`)
+	payloadOpening     = regexp.MustCompile(`(?i)\bpayload(?:\s+is\s+exactly)?\s*\{`)
+	payloadField       = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.]*$`)
+	payloadBacktick    = regexp.MustCompile("`([A-Za-z][A-Za-z0-9_.]*)`")
+
+	derivedFact = regexp.MustCompile(`(?i)^derived:\s*([A-Za-z][A-Za-z0-9_.]*)\s*\(([^)]*)\)`)
+	derivedWord = regexp.MustCompile(`(?i)\bderived\s*:`)
+
+	authorizationMarker    = regexp.MustCompile(`<!--\s*machinery:authorization-inventory\s*-->`)
+	noAuthorization        = regexp.MustCompile(`\(no authorization:\s*([^)]*)\)`)
+	authorizationAdmission = regexp.MustCompile("^`([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)*)`$")
+	authorizationSubject   = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$`)
+)
+
+// parseValues parses a VALUES body: distinct identifier members, sorted.
+func parseValues(body string) ([]string, string) {
+	if strings.TrimSpace(body) == "" {
+		return nil, "VALUES declaration has no members"
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, raw := range strings.Split(body, ",") {
+		member := strings.TrimSpace(raw)
+		if member == "" {
+			return nil, "VALUES declaration contains an empty member"
+		}
+		if !valueMember.MatchString(member) {
+			return nil, "VALUES member " + ir.Repr(member) + " is not an identifier"
+		}
+		if seen[member] {
+			return nil, "VALUES declaration has duplicate member " + ir.Repr(member)
+		}
+		seen[member] = true
+		out = append(out, member)
+	}
+	sort.Strings(out)
+	return out, ""
+}
+
+// parseClosedFieldSet parses a payload {...} body: distinct dotted fields
+// (an optional pair of backticks tolerated), sorted.
+func parseClosedFieldSet(body string) ([]string, string) {
+	if strings.TrimSpace(body) == "" {
+		return nil, "payload declaration has no fields"
+	}
+	var fields []string
+	for _, raw := range strings.Split(body, ",") {
+		field := unquoteMember(raw)
+		if field == "" {
+			return nil, "payload declaration contains an empty member"
+		}
+		if !payloadField.MatchString(field) {
+			return nil, "payload declaration field " + ir.Repr(field) + " is not an identifier; use dot-qualified ubiquitous-language names"
+		}
+		fields = append(fields, field)
+	}
+	out, why := uniqueSortedPayloadFields(fields)
+	if why != "" {
+		return nil, strings.Replace(why, "payload field set", "payload declaration", 1)
+	}
+	return out, ""
+}
+
+// architecturePayloadFields reads the closed field set of an Architecture
+// Contract event row's payload cell: every backticked field, or else a plain
+// comma- or semicolon-separated identifier list. A cell that states neither
+// is prose and yields a reason instead of fields.
+func architecturePayloadFields(cell string) ([]string, string) {
+	var toks []string
+	for _, match := range payloadBacktick.FindAllStringSubmatch(cell, -1) {
+		toks = append(toks, match[1])
+	}
+	if len(toks) > 0 {
+		return uniqueSortedPayloadFields(toks)
+	}
+	parts := strings.FieldsFunc(cell, func(r rune) bool { return r == ',' || r == ';' })
+	var fields []string
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" || !payloadField.MatchString(part) {
+			return nil, "payload cell contains non-identifier field " + ir.Repr(part) + "; backtick each field or use a comma-separated identifier list"
+		}
+		fields = append(fields, part)
+	}
+	if len(fields) == 0 {
+		return nil, "payload cell states no closed field set; backtick each field or use a comma-separated identifier list"
+	}
+	return uniqueSortedPayloadFields(fields)
+}
+
+func uniqueSortedPayloadFields(fields []string) ([]string, string) {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(fields))
+	for _, field := range fields {
+		field = strings.TrimSpace(field)
+		if field == "" {
+			return nil, "payload field set contains an empty member"
+		}
+		if seen[field] {
+			return nil, "payload field set has duplicate field " + ir.Repr(field)
+		}
+		seen[field] = true
+		out = append(out, field)
+	}
+	sort.Strings(out)
+	return out, ""
+}
+
+// isMarkdownSeparator reports whether a split table row is the header
+// separator (cells of dashes and optional alignment colons).
+func isMarkdownSeparator(cells []string) bool {
+	if len(cells) == 0 {
+		return false
+	}
+	for _, cell := range cells {
+		cell = strings.TrimSpace(cell)
+		if strings.Trim(cell, ":-") != "" || !strings.Contains(cell, "-") {
+			return false
+		}
+	}
+	return true
+}
+
+// checkMatrixDeclarationShapes reports the shape errors of the VALUES,
+// payload and derived: declarations on every matrix row: a malformed or
+// repeated group, a malformed member list, a reasonless waiver, and a payload
+// declaration on a row that does not name exactly one event. These are the
+// same conditions the projection refuses, surfaced here as Gx findings with
+// their row, so an author sees them without reading a projection error.
+func checkMatrixDeclarationShapes(g *Gate, design string) {
+	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
+		body, err := readDesignFile(design, path)
+		if err != nil {
+			g.Errs = append(g.Errs, filepath.Base(path)+": unreadable matrix: "+err.Error())
+			continue
+		}
+		for _, r := range walkTableRows(normalizeNewlines(body)) {
+			where := filepath.Base(path) + ":" + strconv.Itoa(r.line) + ": "
+			values := 0
+			for _, cell := range r.cells {
+				groups := valuesGroup.FindAllStringSubmatch(cell, -1)
+				if len(groups) == 0 && valuesOpening.MatchString(cell) {
+					g.Errs = append(g.Errs, where+"malformed VALUES declaration; write VALUES{a, b, c}")
+				}
+				for _, m := range groups {
+					values++
+					if _, why := parseValues(m[2]); why != "" {
+						g.Errs = append(g.Errs, where+why)
+					}
+				}
+				for _, at := range derivedWord.FindAllStringIndex(cell, -1) {
+					m := derivedFact.FindStringSubmatch(cell[at[0]:])
+					switch {
+					case m == nil:
+						g.Errs = append(g.Errs, where+"malformed derived waiver; write derived: fact_name (<reason>)")
+					case strings.TrimSpace(m[2]) == "":
+						g.Errs = append(g.Errs, where+"derived waiver for "+ir.Repr(m[1])+" names no reason")
+					default:
+						g.Count("derived waivers parsed")
+					}
+				}
+				if !payloadOpening.MatchString(cell) {
+					continue
+				}
+				matches := payloadDeclaration.FindAllStringSubmatch(cell, -1)
+				if len(matches) != 1 {
+					g.Errs = append(g.Errs, where+"a payload declaration must be exactly one complete payload {field, ...} or payload is exactly {field, ...}")
+					continue
+				}
+				if _, why := parseClosedFieldSet(matches[0][1]); why != "" {
+					g.Errs = append(g.Errs, where+why)
+					continue
+				}
+				events := []string(nil)
+				if ei := ir.FindCol(r.header, "event"); ei >= 0 {
+					events = eventNamesOf(cellAt(r.cells, ei))
+				}
+				if len(events) != 1 {
+					g.Errs = append(g.Errs, where+"payload declaration names "+strconv.Itoa(len(events))+" events; one closed payload set binds to exactly one event row")
+					continue
+				}
+				g.Count("payload declarations parsed")
+			}
+			if values > 1 {
+				g.Errs = append(g.Errs, where+"a row carries at most one VALUES{a, b, c} declaration")
+			} else if values == 1 {
+				g.Count("VALUES declarations parsed")
+			}
+		}
+	}
+}
+
+// authorizationRow is one row of the marked authorization inventory.
+type authorizationRow struct {
+	subject, admission, where string
+}
+
+type authorizationDocument struct {
+	path, text string
+}
+
+// authorizationInventoryCorpus returns every hand-written Markdown document of
+// the design that carries the authorization-inventory marker, and the number
+// of markers found.
+func authorizationInventoryCorpus(g *Gate, design string) ([]authorizationDocument, int) {
+	var documents []authorizationDocument
+	markers := 0
+	err := walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, rerr := filepath.Rel(design, path)
+		if rerr != nil {
+			rel = path
+		}
+		if ignoredHere(design, rel) {
+			if fi.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if fi.IsDir() || strings.ToLower(filepath.Ext(fi.Name())) != ".md" {
+			return nil
+		}
+		body, readErr := readDesignFile(design, path)
+		if readErr != nil {
+			return readErr
+		}
+		found := authorizationMarker.FindAll(body, -1)
+		if len(found) == 0 {
+			return nil
+		}
+		markers += len(found)
+		documents = append(documents, authorizationDocument{path: filepath.ToSlash(rel), text: string(body)})
+		return nil
+	})
+	if err != nil {
+		g.Errs = append(g.Errs, "authorization inventory scan failed: "+err.Error())
+	}
+	return documents, markers
+}
+
+// collectAuthorizationRows reads the inventory tables of the marked documents:
+// a table with an authorization-subject column and an admission column.
+func collectAuthorizationRows(g *Gate, documents []authorizationDocument) []authorizationRow {
+	var out []authorizationRow
+	for _, document := range documents {
+		reported := map[string]bool{} // one shape error per table, at its first row
+		for _, r := range walkTableRows(normalizeNewlines([]byte(document.text))) {
+			si, ai := colContaining(r.header, "authorization subject"), colContaining(r.header, "admission")
+			if si < 0 && ai < 0 {
+				continue
+			}
+			where := document.path + ":" + strconv.Itoa(r.line)
+			if si < 0 || ai < 0 {
+				if key := strings.Join(r.header, "|"); !reported[key] {
+					reported[key] = true
+					g.Errs = append(g.Errs, where+": authorization inventory table must have authorization subject and admission columns")
+				}
+				continue
+			}
+			out = append(out, authorizationRow{
+				subject: ir.CleanCell(cellAt(r.cells, si)), admission: strings.TrimSpace(cellAt(r.cells, ai)), where: where,
+			})
+		}
+	}
+	return out
+}
+
+// checkAuthorizationShape reports the shape errors of the marked
+// authorization inventory: more than one marker, a marker with no inventory
+// table, a row whose subject is not one Entity.action identifier, an empty or
+// malformed admission, a reasonless waiver, and a duplicate subject. Which
+// subjects owe a row, and whether an admission resolves, is Gy-rules'.
+func checkAuthorizationShape(g *Gate, design string) {
+	documents, markers := authorizationInventoryCorpus(g, design)
+	if markers == 0 {
+		return
+	}
+	if markers > 1 {
+		g.Errs = append(g.Errs, "authorization inventory marker appears "+strconv.Itoa(markers)+" times; one design has exactly one closed authorization inventory")
+	}
+	rows := collectAuthorizationRows(g, documents)
+	if len(rows) == 0 {
+		g.Errs = append(g.Errs, "authorization inventory marker has no table with authorization subject and admission columns")
+	}
+	seen := map[string]string{}
+	for _, row := range rows {
+		switch {
+		case row.subject == "":
+			g.Errs = append(g.Errs, row.where+": authorization row names no subject")
+			continue
+		case !authorizationSubject.MatchString(row.subject):
+			g.Errs = append(g.Errs, row.where+": authorization subject "+ir.Repr(row.subject)+" is not one Entity.action identifier")
+			continue
+		}
+		if prior, dup := seen[row.subject]; dup {
+			g.Errs = append(g.Errs, row.where+": duplicate authorization row for "+ir.Repr(row.subject)+" (first at "+prior+")")
+			continue
+		}
+		seen[row.subject] = row.where
+		if waiver := noAuthorization.FindStringSubmatch(row.admission); waiver != nil {
+			if strings.TrimSpace(waiver[1]) == "" {
+				g.Errs = append(g.Errs, row.where+": authorization waiver names no reason; write '(no authorization: <reason>)'")
+			}
+			g.Count("authorization rows read")
+			continue
+		}
+		switch {
+		case row.admission == "":
+			g.Errs = append(g.Errs, row.where+": authorization admission is empty; name a capability or waive with '(no authorization: <reason>)'")
+		case authorizationAdmission.FindStringSubmatch(row.admission) == nil:
+			g.Errs = append(g.Errs, row.where+": admission must name one capability as a backticked identifier or waive with '(no authorization: <reason>)'")
+		default:
+			g.Count("authorization rows read")
+		}
+	}
 }

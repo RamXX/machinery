@@ -55,7 +55,7 @@ func TestMalformedWritesDeclarationIsError(t *testing.T) {
 func TestUnknownDeclarationGroupIsError(t *testing.T) {
 	e := experimentNamed(t, "unknown-declaration-group")
 	design, _ := fixture(t)
-	mutateSaveWidgetContract(t, design, "atomic persist. MACHINE-WRITTEN{Widget.status}")
+	mutateSaveWidgetContract(t, design, "atomic persist. OWNED-BY{Widget.status}")
 	if g := gates.CheckTraceability(design); !containsAny(g.Errs, e.ExpectSubstr) {
 		t.Fatalf("%s escaped Gx: %v", e.Name, g.Errs)
 	}

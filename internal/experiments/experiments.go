@@ -134,8 +134,8 @@ var MachineryCheckExperiments = []Experiment{
 	// Gl-ledger warning (the tier never fails a gate, so ExpectExit is false).
 	{Name: "malformed-writes-declaration", Tool: "check", Mutation: "a WRITES group repeats a member",
 		ExpectSubstr: "WRITES declaration has duplicate member 'Widget.status'", ExpectExit: true},
-	{Name: "unknown-declaration-group", Tool: "check", Mutation: "a consumer-private MACHINE-WRITTEN{} group in a contract cell",
-		ExpectSubstr: "unknown declaration group MACHINE-WRITTEN{...}", ExpectExit: true},
+	{Name: "unknown-declaration-group", Tool: "check", Mutation: "a private OWNED-BY{} group in a contract cell",
+		ExpectSubstr: "unknown declaration group OWNED-BY{...}", ExpectExit: true},
 	{Name: "undeclared-fact-reference", Tool: "check", Mutation: "a contract cell quotes `Widget.status` outside any group",
 		ExpectSubstr: "undeclared fact reference `Widget.status`", ExpectExit: false},
 	// 2026-09-22, consistency layer Stage 3: the shipped Datalog rules of

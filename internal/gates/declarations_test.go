@@ -160,7 +160,7 @@ func TestUnknownDeclarationGroup(t *testing.T) {
 		name, cell string
 		unknown    string // "" means no finding
 	}{
-		{"consumer private group", "MACHINE-WRITTEN{Order.status}", "MACHINE-WRITTEN"},
+		{"private group", "OWNED-BY{Order.status}", "OWNED-BY"},
 		{"misspelled group", "WRITE{Order.status}", "WRITE"},
 		{"known groups", "CLAUSES{a-b} READS{x} VALUES{a, b} ORACLESET{o} WRITES{}", ""},
 		{"retired clauses group", "CLAUSES{resolved-task, applied-record} RETIRED{sop-coverage}", ""},
@@ -266,12 +266,12 @@ func TestParseContractDeclarations(t *testing.T) {
 // TestDeclarationFindingsSurfaceInGx pins where the parse-time findings
 // land: Gx-trace, as ERRORs in the file:line shape the VALUES findings use.
 func TestDeclarationFindingsSurfaceInGx(t *testing.T) {
-	design := valuesDesign(t, "| `persistOrder` | action | WRITES{Order.status, Order.status} MACHINE-WRITTEN{Order.state} | `order-paid-final` |\n")
+	design := valuesDesign(t, "| `persistOrder` | action | WRITES{Order.status, Order.status} OWNED-BY{Order.state} | `order-paid-final` |\n")
 	g := CheckTraceability(design)
 	if !hasErr(g, `Order.matrix.md:3: row 'persistOrder': WRITES declaration has duplicate member 'Order.status'`) {
 		t.Fatalf("duplicate WRITES member not surfaced: %v", g.Errs)
 	}
-	if !hasErr(g, `Order.matrix.md:3: row 'persistOrder': unknown declaration group MACHINE-WRITTEN{...}`) {
+	if !hasErr(g, `Order.matrix.md:3: row 'persistOrder': unknown declaration group OWNED-BY{...}`) {
 		t.Fatalf("unknown group not surfaced: %v", g.Errs)
 	}
 	clean := CheckTraceability(valuesDesign(t, "| `persistOrder` | action | WRITES{Order.state} | `order-paid-final` |\n"))
