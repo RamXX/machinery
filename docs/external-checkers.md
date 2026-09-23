@@ -627,24 +627,44 @@ reading end to end rather than taking on faith:
   `AnalyticsExport` sink. The invariant under test is `priv-no-unredacted-export`: no sensitive
   attribute reaches the sink without passing through redaction.
 - **the manifest**, `examples/pii-flow/design/checkers/pii-flow.checker.yaml`: claims `priv-*`,
-  declares `priv-consent-required` and `priv-minimal-collection` as residuals (consent and
-  collection-minimality are not decidable from a static flow graph), and carries a `config` block
-  naming which attributes are sensitive and which entities are the sink and the redactor, so the
-  Datalog program never has to guess at domain knowledge the projection does not carry.
-- **the rules**, `examples/pii-flow/design/checkers/pii-flow/rules.dl`: the canonical Datalog
-  statement of the fixed-point semantics. Taint propagates along `flows` edges from any entity
-  holding a `sensitive` attribute; a `redacted` entity blocks propagation, and a `leak` fires when
-  tainted data reaches a `sink`.
-- **the adapter**, `examples/pii-flow/design/checkers/pii-flow/adapter.py`: a standard-library-only
-  fixed-point implementation of those semantics. It reads `{projection}` and `{config}`, validates
-  the mounted rule contract, and maps no leaks to `pass` or each leak to a blocking finding. It runs
-  under the digest-pinned Python OCI userspace and never searches for a host interpreter or child tool.
-- **the committed outputs**, `.../pii-flow/projection.json` and `.../pii-flow/evidence.json`: the
-  real `machinery project` output and the adapter's real evidence for this design, so you can see an
-  actual `input_hash` binding a real projection to a real verdict rather than an abstract one.
-- **a sample registry entry**, `checkers.local.example.yaml`: pins the exact image digest and
-  `linux/amd64` platform, declares the adapter and rule file as read-only hashed inputs, and uses
-  Docker only as the local OCI control plane.
+  declares the five invariants a static flow graph cannot decide (consent, collection minimality,
+  purpose presence, redaction effectiveness, export idempotency) as residuals with reasons, and
+  carries a `config` block naming which attributes are sensitive and which entities are the sink
+  and the redactor, so the Datalog program never has to guess at domain knowledge the projection
+  does not carry. It stays on projection 1.0: the rules join only entities, attributes, and
+  relationships.
+- **the rules**, `examples/pii-flow/design/checkers/pii-flow/rules.dl`: the Datalog program Souffle
+  2.5 evaluates. Taint propagates along `flows` edges from any entity holding a `sensitive`
+  attribute; a `redacted` entity blocks propagation (stratified negation), and `leak` fires when
+  tainted data reaches a `sink`. `leak` and `tainted` are its two `.output` relations.
+- **the adapter**, `examples/pii-flow/design/checkers/pii-flow/adapter.py`: standard library only,
+  and translation only. `adapter.py run` writes the projection and `{config}` as five
+  tab-separated `.facts` files, runs `souffle --no-preprocessor -F <facts> -D <out> rules.dl`, and
+  maps `leak.csv` to evidence: `pass` with an explicit coverage row when the relation is empty, or
+  `fail` with one blocking finding per leaking sink. It records the engine version and rules digest
+  under `attestation` and writes every output relation to the trace at
+  `generated/souffle-outputs.json`. It fails closed, writing no evidence, when `souffle` is absent,
+  exits non-zero, prints anything, or leaves a declared output unwritten, when a fact value holds a
+  tab or line break, and when the projection carries a layer or schema it does not read.
+  `adapter.py verify` is the registry's replay command: it re-runs the engine and requires the
+  committed evidence and trace to be byte-identical.
+- **the committed outputs**, `.../pii-flow/projection.json`, `.../pii-flow/evidence.json`, and the
+  trace: the real `machinery project` output and the engine's real evidence for this design, so you
+  can see an actual `input_hash` binding a real projection to a real verdict rather than an
+  abstract one.
+- **the image**, `examples/pii-flow/souffle-image/Dockerfile`: CPython 3.14.7 plus the upstream
+  Souffle 2.5 binary, every input pinned by content. `scripts/pii-flow-image.sh` rebuilds it with a
+  digest-pinned BuildKit and fixed timestamps, so the digest is reproducible, and provisions it
+  locally through a loopback registry (the round trip gives the engine its `RepoDigests` entry).
+  A rebuilt digest that differs from the pin fails.
+- **a sample registry entry**, `checkers.local.example.yaml`: pins that image digest and
+  `linux/amd64`, declares the adapter and rule file as read-only hashed inputs, uses Docker only
+  as the local OCI control plane, and runs as-is with `--registry
+  examples/pii-flow/checkers.local.example.yaml`.
+
+The manifest's `runtime_closure` is derived, never hand-written: after changing the image, argv, or
+an input, `machinery verify-checkers` refuses to run and names the closure it derived from the
+registry, which you review and copy into the manifest before regenerating the evidence.
 
 This is the shape every checker in this guide follows; the rest of this section covers short
 variants where the mapping differs.

@@ -38,6 +38,28 @@ under their version heading when a release is cut.
   is staged and renamed into place, refuses to replace anything but facts output, and is
   byte-identical across reruns of an unchanged design. No checker manifest is needed.
 
+### Changed
+
+- **`examples/pii-flow` runs its rules under a real Datalog engine (consistency layer, Stage 2).**
+  `rules.dl` is now evaluated by Souffle 2.5 inside a digest-pinned `linux/amd64` image, and
+  `adapter.py` only translates: projection and config to `.facts`, `souffle --no-preprocessor`, then
+  `leak.csv` and `tainted.csv` to evidence with a complete coverage row, one blocking finding per
+  leaking sink, an engine `attestation`, and a committed trace at `generated/souffle-outputs.json`.
+  The hand-written fixed point is gone. The adapter fails closed, writing no evidence, when souffle
+  is absent, exits non-zero, prints anything, or leaves a declared output unwritten, when a fact
+  value holds a tab or line break, and when the projection is not exactly the 1.0 three-layer
+  contract. The registry's `verify` command is now a real replay that re-derives the evidence and
+  trace byte for byte. The image is built from `examples/pii-flow/souffle-image/Dockerfile` (every
+  input pinned by content) by `scripts/pii-flow-image.sh`, which rebuilds it reproducibly with a
+  pinned BuildKit and refuses any digest but
+  `localhost:5959/machinery/pii-flow-souffle@sha256:0fc676da92b8617afe82fb99b0c79f904504c086c5b9fdc81fd65e5fba3fc08b`.
+  The manifest stays on projection 1.0, so `input_hash` is unchanged; `runtime_closure` moves to
+  `sha256:7d54d5d31e5d0902116d1a249f185203a83e9565cb816c7aa2808567c0abb121` and the checker version
+  to `pii-flow-souffle-1`. The pii-flow full-check golden now counts 14 scanned design files (the
+  trace) instead of 13; the `Gk-pii-flow` line is unchanged. The design-engines CI job and
+  `make preflight` provision the image and run the new `TestPiiFlowSouffleVerdicts`, which proves a
+  `fail` verdict naming the leaking sink and every fail-closed path in the pinned image.
+
 ### Fixed
 
 - **Concurrent cold starts of the pinned Java runtime share one provisioner.** The
