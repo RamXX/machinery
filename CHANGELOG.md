@@ -130,9 +130,12 @@ under their version heading when a release is cut.
   trace byte for byte. The image is built from `examples/pii-flow/souffle-image/Dockerfile` (every
   input pinned by content) by `scripts/pii-flow-image.sh`, which rebuilds it reproducibly with a
   pinned BuildKit and refuses any digest but
-  `localhost:5959/machinery/pii-flow-souffle@sha256:0fc676da92b8617afe82fb99b0c79f904504c086c5b9fdc81fd65e5fba3fc08b`.
+  `localhost:5959/machinery/pii-flow-souffle@sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7`.
+  The image's final stage runs no command, only a `COPY` of files staged by the fetch stage, so a
+  native amd64 build and an emulated one on arm64 (which leaves `/root/.cache/rosetta` behind in
+  any layer where it executes) produce the same digest.
   The manifest stays on projection 1.0, so `input_hash` is unchanged; `runtime_closure` moves to
-  `sha256:7d54d5d31e5d0902116d1a249f185203a83e9565cb816c7aa2808567c0abb121` and the checker version
+  `sha256:bdde2cabffd09544dde5591cf1b26b137bbca8764af4166aa6fd180f2ad04b19` and the checker version
   to `pii-flow-souffle-1`. The pii-flow full-check golden now counts 14 scanned design files (the
   trace) instead of 13; the `Gk-pii-flow` line is unchanged. The design-engines CI job and
   `make preflight` provision the image and run the new `TestPiiFlowSouffleVerdicts`, which proves a

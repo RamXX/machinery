@@ -188,12 +188,13 @@ or to have machinery re-run the checker and confirm the verdict was earned:
    it fails if the rebuilt digest is not the pinned one:
 
    ```
-   localhost:5959/machinery/pii-flow-souffle@sha256:0fc676da92b8617afe82fb99b0c79f904504c086c5b9fdc81fd65e5fba3fc08b
+   localhost:5959/machinery/pii-flow-souffle@sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7
    ```
 
    On an arm64 host the `linux/amd64` build and every later run execute under
    emulation (Rosetta or qemu). That is emulated reproduction of the pinned
-   amd64 userspace, not native arm64 evidence.
+   amd64 userspace, not native arm64 evidence. The digest does not depend on
+   the host: see [Reproducibility](#reproducibility).
 
 2. Run the engine phase with the sample registry in place. Its input
    `source` paths resolve against the registry file's directory, so they name
@@ -215,6 +216,35 @@ or to have machinery re-run the checker and confirm the verdict was earned:
    with the same explicit platform, `--pull=never`, no network, a read-only
    root, and only the declared read-only inputs, confirms the fresh evidence and
    trace match the committed ones, then runs `adapter.py verify` as the replay.
+
+## Reproducibility
+
+The image digest is the same on every host that runs the script, native
+amd64 or arm64 under emulation. What makes it so is that the Dockerfile's
+final stage executes nothing: `dpkg-deb`, `ldconfig`, and the `souffle`
+smoke run all execute in the fetch stage, and the final stage only copies the
+staged files (the souffle binary, the unpacked libgomp1 and libncurses6
+payloads, and a regenerated `/etc/ld.so.cache`). An emulated process leaves
+host state in whatever layer it runs in: the earlier Dockerfile ran `dpkg -i`
+and `souffle --version` in the final stage, and under Rosetta that layer
+gained an empty `/root/.cache/rosetta` directory (three extra tar entries,
+`root`, `root/.cache`, `root/.cache/rosetta`, every other entry byte-identical),
+so an arm64 Mac pinned `sha256:0fc676da...` while native amd64 hosts, hosted CI
+included, built `sha256:a316c0bb...`. `TestPiiFlowImageFinalStageRunsNothing`
+fails if a `RUN` returns to the final stage. The two libraries are unpacked
+rather than installed through dpkg, so the image holds their files and
+copyright notices but no dpkg database records for them.
+
+Recorded builds of the current Dockerfile, each through
+`scripts/pii-flow-image.sh` (`--no-cache`, fresh builder and registry, pinned
+image removed first):
+
+| Host | Build | Digest |
+|---|---|---|
+| amd64 Linux, Docker 29.8.0, native | 1 | `sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7` |
+| amd64 Linux, Docker 29.8.0, native | 2 | `sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7` |
+| arm64 macOS, Docker Desktop 29.8.0, emulated | 1 | `sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7` |
+| arm64 macOS, Docker Desktop 29.8.0, emulated | 2 | `sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7` |
 
 ## Deriving `runtime_closure`
 
