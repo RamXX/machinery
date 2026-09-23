@@ -121,6 +121,40 @@ The reserved-layer error in v1 ("requesting `machines` fails loudly") is kept un
 layer lands; a layer is added to the manifest vocabulary only with its schema and a
 golden fixture.
 
+#### Projection v2, as implemented
+
+Stage 2 landed every layer of the table; `scenarios` stays reserved. The contract is
+`schemas/projection-v2.schema.json`, generated from the relation catalog in
+`internal/checker/relations.go`; the reader is `internal/gates/projection_readers.go`;
+`docs/external-checkers.md` is the user reference. Decisions settled while implementing:
+
+- **Selection.** A manifest naming only `model`, `invariants` and `relationships` gets the
+  1.0 projection byte for byte; any other layer selects 2.0. The 1.0 schema file is left
+  untouched and 2.0 is a sibling file, so no v1 consumer sees a changed contract.
+- **Shape.** 2.0 keeps the 1.0 `model` block (present exactly when a v1 layer is included)
+  and adds `layers.<layer>.<relation>`, one row per tuple with `stable_id`, `source` and
+  one string per column. `relationship` sits in the `relationships` layer, matching the
+  v1 include vocabulary.
+- **No prose columns.** `unit_derived(unit, fact)` and `no_authorization(subject)` drop
+  the reason column the rules sketch in section 4 gives them, because the reason is
+  prose. `event(id, producer)` names the producer; `event_participant` is producers and
+  consumers together; `unit_clauses` carries `active` or `retired`; `boundary` carries a
+  `role` (`boundary` or `external`); `supersedes(new, old)` takes the new type from the
+  declaring row's subject and `type_owner(type, owner)` names the declaring artifact.
+- **Ids.** Transition ids are the generated oracle's stable ids (`tr:Order.ORDE-eb2d3b`).
+  Fact id columns carry the stable id without its kind prefix, so `WRITES{Order.status}`
+  joins `attr` directly. A declaration on a matrix row that names no unit (a consumed-event
+  row) attaches to `matrix:M`, and a matrix with no machine JSON projects with `machine`
+  empty.
+- **Presence.** A layer is present only when its sources exist; a present layer claims all
+  of its relations, empty ones included. Two definitions of one stable id from different
+  places fail, naming both.
+- **Omitted.** `action_writes` (Modelith has no structured post-condition) and `bound_at`
+  (no `--impl` reader is wired into the projection yet).
+- **Facts form.** `machinery project <design> --facts <dir>` writes every present layer's
+  relations plus `relations.txt`; a round-trip test over every bundled example loads the
+  directory with `internal/datalog` and matches each relation's count to the JSON.
+
 ### 3.3 Rules
 
 **Syntax.** A Soufflé-compatible subset: `.decl`, `.input`, `.output`, Horn clauses,
