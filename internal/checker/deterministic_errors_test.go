@@ -20,6 +20,15 @@ func TestCheckerDeterminismHelper(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Every layer below is supported but absent from an empty fact set:
+		// the diagnostic must name the canonically first one in every process.
+		_, err = GenerateWithFacts(model, NewDesignFacts(), manifestWith([]string{"machines", "oracles", "actions"}, nil), validTestDesignID, "v0")
+		fmt.Print(err)
+	case "generate-reserved":
+		model, err := LoadModel(writeTemp(t, "determinism.modelith.yaml", sampleModel))
+		if err != nil {
+			t.Fatal(err)
+		}
 		_, err = Generate(model, manifestWith([]string{"machines", "actions", "scenarios"}, nil), validTestDesignID, "v0")
 		fmt.Print(err)
 	case "root":
@@ -65,8 +74,12 @@ func repeatedCheckerDiagnostic(t *testing.T, env ...string) string {
 
 func TestGenerateUnsupportedLayerDiagnosticIsProcessDeterministic(t *testing.T) {
 	got := repeatedCheckerDiagnostic(t, checkerDeterminismMode+"=generate")
-	if !strings.Contains(got, `layer "actions" is not yet supported`) {
-		t.Fatalf("unsupported layers did not use canonical priority: %q", got)
+	if !strings.Contains(got, `layer "actions" is absent from this design`) {
+		t.Fatalf("absent layers did not use canonical priority: %q", got)
+	}
+	got = repeatedCheckerDiagnostic(t, checkerDeterminismMode+"=generate-reserved")
+	if !strings.Contains(got, `layer "scenarios" is not yet supported`) {
+		t.Fatalf("a reserved layer must fail loudly before any fact is read: %q", got)
 	}
 }
 

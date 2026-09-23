@@ -26,7 +26,21 @@ type plannedProjection struct {
 // manifest in the design. It is the write side of the gk contract: the gate
 // reads exactly what this produced, so `machinery project` then `git commit` is
 // the loop a builder runs before the checker's adapter consumes the projection.
+// It serves v1 manifests only; ProjectAllWithFacts also serves v2 manifests.
 func ProjectAll(design, machineryVersion string) (results []ProjectResult, retErr error) {
+	return ProjectAllWithFacts(design, machineryVersion, nil)
+}
+
+// FactsLoader reads every fact layer of a design directory. The gates package
+// supplies it (gates.LoadDesignFacts); it is passed in rather than imported
+// because gates already imports this package.
+type FactsLoader func(design string) (*DesignFacts, error)
+
+// ProjectAllWithFacts is ProjectAll with a fact reader for manifests that
+// include a v2 layer. The reader runs once, over the same immutable source
+// snapshot the model is read from, and only when some manifest needs it, so a
+// design whose manifests are all v1 is projected exactly as before.
+func ProjectAllWithFacts(design, machineryVersion string, loadFacts FactsLoader) (results []ProjectResult, retErr error) {
 	snapshot, err := designlock.Acquire(design)
 	if err != nil {
 		return nil, err
@@ -95,9 +109,23 @@ func ProjectAll(design, machineryVersion string) (results []ProjectResult, retEr
 	if len(manifests) == 0 {
 		return nil, fmt.Errorf("no checkers/*.checker.yaml in %s", design)
 	}
+	var facts *DesignFacts
+	for _, man := range manifests {
+		if !NeedsDesignFacts(man) {
+			continue
+		}
+		if loadFacts == nil {
+			return nil, fmt.Errorf("%s: projection include names a v2 layer, which needs the design's facts; no fact reader was supplied", man.Checker.ID)
+		}
+		facts, err = loadFacts(snapshot.SourceRoot())
+		if err != nil {
+			return nil, fmt.Errorf("read design facts: %w", err)
+		}
+		break
+	}
 	plans := make([]plannedProjection, 0, len(manifests))
 	for _, man := range manifests {
-		proj, err := Generate(model, man, designID, machineryVersion)
+		proj, err := GenerateWithFacts(model, facts, man, designID, machineryVersion)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", man.Checker.ID, err)
 		}
