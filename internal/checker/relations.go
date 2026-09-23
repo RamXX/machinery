@@ -474,12 +474,8 @@ func (l *ProjLayers) UnmarshalJSON(data []byte) error {
 
 // validate holds the v2 layers to their contract against the include list.
 func (l *ProjLayers) validate(include []string) error {
-	var want []string
-	for _, layer := range include {
-		want = append(want, layer)
-	}
-	if strings.Join(l.order, ",") != strings.Join(want, ",") {
-		return fmt.Errorf("layers must carry exactly the included layers in canonical order (%s), got (%s)", strings.Join(want, ", "), strings.Join(l.order, ", "))
+	if strings.Join(l.order, ",") != strings.Join(include, ",") {
+		return fmt.Errorf("layers must carry exactly the included layers in canonical order (%s), got (%s)", strings.Join(include, ", "), strings.Join(l.order, ", "))
 	}
 	defs := map[string]Source{}
 	for _, layer := range l.order {

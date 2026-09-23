@@ -665,7 +665,7 @@ func (b *factBuilder) matrixRowFacts(mr matrixRow) {
 		}
 		for _, at := range derivedWord.FindAllStringIndex(cell, -1) {
 			m := derivedFact.FindStringSubmatch(cell[at[0]:])
-			if m == nil || strings.TrimSpace(m[2]) == "" {
+			if len(m) < 3 || strings.TrimSpace(m[2]) == "" {
 				b.fail("%s: malformed derived waiver; write derived: fact_name (<reason>)", where)
 				continue
 			}
