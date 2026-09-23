@@ -3,6 +3,7 @@ package runtimeclosure
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -329,6 +330,55 @@ func startCrashedJavaWinner(t *testing.T, base string) (*exec.Cmd, string) {
 		t.Fatalf("winner stage = %v, %v; want exactly one live stage", stages, err)
 	}
 	return winner, stages[0]
+}
+
+func TestProvisionJavaWaiterHonorsCancellationWhileWinnerProvisions(t *testing.T) {
+	if _, supported := javaArchivePins[runtime.GOOS+"/"+runtime.GOARCH]; !supported {
+		t.Skip("no Java archive pin for this test platform")
+	}
+	base := javaProvisionTestBase(t)
+	winner, stage := startCrashedJavaWinner(t, base)
+	defer func() {
+		_ = winner.Process.Kill()
+		_ = winner.Wait()
+	}()
+	archive := javaProvisionFakeArchive(t)
+	var downloads atomic.Int32
+	installJavaProvisionFake(t, archive, func(destination string) error {
+		downloads.Add(1)
+		return os.WriteFile(destination, archive, 0o600)
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan javaProvisionResult, 1)
+	go func() {
+		path, err := provisionedJavaPathContext(ctx)
+		done <- javaProvisionResult{path, err}
+	}()
+	select {
+	case got := <-done:
+		t.Fatalf("waiter returned while the winner held the lock: path=%q err=%v", got.path, got.err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	cancel()
+	var got javaProvisionResult
+	select {
+	case got = <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("canceled waiter did not return")
+	}
+	if got.path != "" || !errors.Is(got.err, context.Canceled) {
+		t.Fatalf("canceled waiter = path %q, err %v; want context.Canceled", got.path, got.err)
+	}
+	if n := downloads.Load(); n != 0 {
+		t.Fatalf("canceled waiter downloaded %d times", n)
+	}
+	if body, err := os.ReadFile(filepath.Join(stage, "runtime.archive")); err != nil || len(body) != len(archive)/2 {
+		t.Fatalf("canceled waiter disturbed the winner's stage: %d bytes, %v", len(body), err)
+	}
+	if winner.ProcessState != nil {
+		t.Fatalf("winner exited while the waiter was canceled: %v", winner.ProcessState)
+	}
 }
 
 type javaProvisionResult struct {

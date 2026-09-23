@@ -6,6 +6,23 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Concurrent cold starts of the pinned Java runtime share one provisioner (MAC-yoxb).** The
+  provisioning lock was a scope lock, and test binaries keep their scope locks beside their own
+  executable, so several packages under one `go test ./...` that cold-started the same user cache
+  each believed they held it. They staged into `<cache>/java/.java-stage-<n>/` at once, and each
+  one's stage recovery removed or witnessed the others' live stages, which failed as a vanished
+  `runtime.archive`, a missing `extracted` directory, or a stage file that "grew beyond its exact
+  snapshot" (the Dagger `test` job on a fresh cache). The lock now lives beside the runtime as
+  `<cache>/java/.java-provision.lock` (new `filelock.AcquireFileWaitContext`). One caller
+  provisions under the unchanged witness discipline; every other caller waits, bounded by its
+  context and the filelock acquisition limit, then opens the published runtime through the
+  normal receipt, closure-digest, and custody validation. A holder that dies releases the lock
+  with its process, and only the next holder removes the stage it left. `OpenJavaContext` carries
+  the caller's context into that wait. The runtime bytes and receipt are identical whether one or
+  five provisioners raced.
+
 ## [0.9.0] - 2026-09-22
 
 ### Added

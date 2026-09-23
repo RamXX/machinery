@@ -94,11 +94,18 @@ type Java struct {
 }
 
 func OpenJava() (*Java, error) {
+	return OpenJavaContext(context.Background())
+}
+
+// OpenJavaContext is OpenJava with a context that bounds how long the caller
+// waits for another process that is provisioning the pinned runtime into the
+// same cache.
+func OpenJavaContext(ctx context.Context) (*Java, error) {
 	source := os.Getenv(JavaEnv)
 	explicit := source != ""
 	if source == "" {
 		var err error
-		source, err = provisionedJavaPath()
+		source, err = provisionedJavaPathContext(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("provision pinned Java runtime: %w", err)
 		}

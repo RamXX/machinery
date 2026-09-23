@@ -74,7 +74,7 @@ func openFormalJava(workdir string) (*runtimeclosure.Java, error) {
 }
 
 func openFormalJavaScoped(ctx context.Context, workdir string) (*runtimeclosure.Java, error) {
-	java, err := runtimeclosure.OpenJava()
+	java, err := runtimeclosure.OpenJavaContext(ctx)
 	if err != nil {
 		return nil, err
 	}

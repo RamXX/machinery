@@ -85,7 +85,25 @@ var javaArchivePins = map[string]javaArchivePin{
 	"windows/amd64": {"OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip", "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e", true},
 }
 
-func provisionedJavaPath() (path string, retErr error) {
+// javaProvisionLockName is the provisioning lock inside the Java cache base.
+// It lives beside the runtime it guards rather than in a lock namespace, so
+// every process that shares the cache (separate package test binaries under
+// one `go test ./...` included) contends on the same file.
+const javaProvisionLockName = ".java-provision.lock"
+
+func provisionedJavaPath() (string, error) {
+	return provisionedJavaPathContext(context.Background())
+}
+
+// provisionedJavaPathContext returns the launcher of the pinned runtime,
+// provisioning it on first use. Exactly one caller per cache provisions: it
+// holds the cache's provisioning lock across recovery, download, extraction,
+// and publication. Every other caller waits on that lock (until ctx ends or
+// the filelock acquisition limit elapses) and then finds the published target
+// and validates it against its receipt like any warm-cache caller. A holder
+// that dies releases the lock with its process; the next holder recovers the
+// stage it left behind.
+func provisionedJavaPathContext(ctx context.Context) (path string, retErr error) {
 	pin, ok := javaArchivePins[runtime.GOOS+"/"+runtime.GOARCH]
 	if !ok {
 		return "", fmt.Errorf("no pinned Java runtime archive for %s/%s", runtime.GOOS, runtime.GOARCH)
@@ -98,9 +116,9 @@ func provisionedJavaPath() (path string, retErr error) {
 	if err := os.MkdirAll(base, 0o700); err != nil {
 		return "", err
 	}
-	lock, err := filelock.AcquireWait(base)
+	lock, err := filelock.AcquireFileWaitContext(ctx, base, javaProvisionLockName)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("wait for Java runtime provisioning lock: %w", err)
 	}
 	defer func() { retErr = errors.Join(retErr, lock.Release()) }()
 	if err := cachestage.Recover(base, ".java-stage-"); err != nil {
