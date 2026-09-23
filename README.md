@@ -794,178 +794,164 @@ Modelith's own linter.
 - **G5-pack** (decomposed designs): packs fresh, children pinned to the current packs, refinement
   proofs fresh, and every boundary-event row held to its direction (`consumes` or `produces`).
 
-## Proof it works: the go-crm example
+## Proof it works: the examples
 
-`examples/go-crm` is a Go CRM with a native CLI over an embedded
-[LadybugDB](https://github.com/LadybugDB/go-ladybug) graph and role- and
-ownership-based access control, taken end to end:
+### go-crm
+
+[`examples/go-crm`](examples/go-crm) is a Go CRM with a native CLI over an embedded
+[LadybugDB](https://github.com/LadybugDB/go-ladybug) graph and role- and ownership-based access
+control, taken end to end:
 
 - **Designed** through all four phases as the production target of a checked rebuild. The legacy
-  prototype and `migration.yaml` account for 4 legacy entities, 16 field mappings, 9 lifecycle
-  mappings, 4 coexistence/cutover phases, and 3 transition risks. The target domain model lints
-  clean (9 entities, 27 invariants); C4 model
-  with the dependency posture that an embedded store forces (corruption is fatal-until-restore, not a
-  transient); five state machines; a 1138-line `BUILD.md`.
+  prototype and `migration.yaml` account for 4 legacy entities, 16 data mappings, 9 lifecycle
+  mappings, 4 coexistence and cutover phases, and 3 transition risks. The target domain model lints
+  clean with 9 entities and 27 invariants; the C4 model carries the dependency posture an embedded
+  store forces (corruption is fatal until restore, not a transient); five state machines with 197
+  transitions; a 1,194-line `BUILD.md`.
 - **Built by a zero-context coding agent** under hard TDD: a test-writer wrote the suite from the
-  blueprint, the tests were locked, and an implementer made them pass without touching a test. Result:
-  362 tests green, 83% coverage, architecture boundaries upheld in the source. The one impossible test
-  was escalated as a design defect and fixed in the design, not the code.
-- **Gated** by `machinery check`: it certified the design consistent and caught a real contract defect
-  the prose review had missed. The hardened gates verify it non-vacuously: 194 transitions reconciled
-  row by row against the matrices, every guard, action, and actor covered by a named-unit contract,
-  every import edge checked against the architecture contract.
-- **Proven** by `make verify-formal`: eight TLC proofs plus 24 Alloy commands across policy,
-  integrity, and isolation (32 checks total), all green, regenerated from source every run. The
-  policy suite earned its place the hard way: run
-  against the RBAC invariants as first written, it found a Manager without a team could not write
-  even the records it owned (the write-scope rule granted by team membership only, and nothing
-  required a Manager to have a team), and a Manager could reassign a record to a user outside its
-  team, beyond its own authority. Both were invariant defects invisible to the linter and to TLC;
-  both are fixed in the domain model, and the checks that caught them now run on every design with
-  a policy annotation. The same annotation also compiles to a 70-row authorization oracle
-  (`Policy.oracle.md`) that the implementation's test suite asserts case by case, so the code is
-  held to the policy the same way the machines are held to their oracles.
+  blueprint, the tests were locked, and an implementer made them pass without touching a test. The
+  one impossible test was escalated as a design defect and fixed in the design, not the code.
+- **Gated** by `machinery check --impl`: all gates green, with 197 matrix rows reconciled, 186 named
+  units covered, 13 import edges verified, 6 closed milestones bound to reviewed commits, and every
+  one of the 275 committed oracle rows referenced from the test suite.
+- **Proven** by `machinery verify-formal`: eight TLC proofs plus 24 Alloy commands across policy,
+  integrity, and isolation (32 checks), regenerated from source every run. The policy suite found the
+  two access-control defects described [above](#access-control-a-manager-who-provably-cannot-write-their-own-records).
 
-Every number above is real output in this repository, not an illustration.
+Every number above is real output in this repository.
 
-And it holds on a second, deliberately different design. `examples/fulfillment` is a distributed
-order-fulfillment platform: microservices, a saga orchestrator, compensation, and a transactional
-outbox, with six state machines (the saga plus the Order, Payment, Reservation, Shipment, and
-OutboxMessage lifecycles). The same generators produced its formal models, and TLC checked them: the
-saga always terminates, and its data-refined model shows that money and stock are never silently
-lost, with compensation modeled per obligation so partial compensation is a real, checked state.
-Its integrity layer also carries the inverse side of the `Order.payment` 1:1 relationship as an
-axiom of the model (a `Cardinality_*` fact), so two
-orders cannot share one payment - a constraint that forward field multiplicity alone does not imply.
-Building that proof caught a real bug in the saga as first drawn, where a single failed refund could
-leave a customer charged with nothing returned. TLC produced the exact counterexample and the fix is
-checked. The hardened cross-layer gate then caught a second real defect: the domain model's saga
-enum had drifted from the machine and was missing the FailedDirty residual entirely. Across the
-example designs, `make verify-formal` checks every proof, all green, regenerated from source on each
-run (and only this step needs Java).
+### The other examples
 
-## Brownfield systems
+- [`examples/fulfillment`](examples/fulfillment) is the distributed stress test: microservices, a
+  saga orchestrator, compensation, and a transactional outbox, with six machines (the saga plus the
+  Order, Payment, Reservation, Shipment, and OutboxMessage lifecycles). Its data-refined model proves
+  money and stock are never silently lost, and it is where the refund defect and the enum drift above
+  were caught. `FINDINGS.md` records what strained and what was fixed.
+- [`examples/surreal-crm`](examples/surreal-crm/README.md) rebuilds go-crm over SurrealDB in Docker.
+  It exercises Gs-surface and an all-reuse `migration.yaml`. Its machines and oracles are
+  byte-identical to go-crm's, which is the lesson: mitigations reclassify failures, and the domain
+  does not move.
+- [`examples/portfolio-engine`](examples/portfolio-engine) is a Python drawdown portfolio
+  recommender in a different domain. It exercises the terminal-lifecycle pattern and a persistence
+  overlay renamed from the defaults, and its root BUILD manifest with six milestone packets is the
+  worked large-project, small-model handoff.
+- [`examples/checkout-split`](examples/checkout-split) is recursive decomposition: a parent that
+  stops at contracts plus two child designs, each a full machinery run against its frozen pack,
+  with TLC-checked proofs that each child refines the contract its neighbor relies on.
+- [`examples/pii-flow`](examples/pii-flow/README.md) is the external-checker reference described
+  above. The full default suite passes on it with zero blocking findings and the one Gv warning it
+  carries by design.
 
-The pipeline reads as greenfield, but the toolchain does not care. On an existing system you run
-the phases as archaeology instead of invention. Before architecture, classify every coherent legacy
-corpus area as behavior to preserve/port, capability to rearchitect/adapt, learning-only evidence,
-historical-only material, or unresolved intent. Missing classification never means "must port," and
-an unresolved product decision blocks the architecture handoff. Then write the Modelith model, the
-contract, and the machines for the target the evidence supports, and let the gates arbitrate what
-they can see. Be
-precise about what that is: the only code-facing gate is G4-import, and it reads import statements
-only, so what you get from day one is the import-boundary drift map, not a behavioral comparison.
-No gate executes or reads code behavior. Behavioral code-vs-model drift surfaces through
-characterization tests derived from the generated oracles; the oracle stable ids give every
-transition a durable test key, and G3's staleness DRIFT keeps the oracles regenerated as the model
-is corrected, which is the loop that maps the drift. The adjudication rule: oracle-derived tests
-start descriptive and become locked (hard TDD) once a human adjudicates each failing row as
-code-is-truth (fix the model) or model-is-truth (file the code defect). From there, revision mode
-is the operating loop: design changes as diffs, stable-id oracle diffs as the affected-test list,
-and state-migration notes for persisted machines, which a brownfield system has on day one. The
-first modeling pass is a real investment, roughly proportional to how undocumented the system is.
-Day one of adoption is a command, not a transcription exercise: `machinery baseline <design>
---impl .` scans the code exactly as G4 does, proposes the `baseline:` rules that tolerate today's
-violating edges (structurally distinct from intended `allow:` rules, and compatible with a `deny:`
-that keeps the intent written), and records `design/ratchet.json`, the snapshot that makes any NEW
-offender file on an amnestied edge a blocking finding, so the baseline can only shrink silently,
-never grow. For the staged team adoption protocol (the baseline and ratchet flow, incremental
-`--gate` lists, merge and CI recipes), see the
+## Brownfield, rebuild, and hybrid systems
+
+### Brownfield
+
+The pipeline reads as greenfield, but the toolchain does not care. On an existing system the phases
+run as archaeology. Before architecture, classify every coherent legacy corpus area as behavior to
+preserve or port, capability to rearchitect or adapt, learning-only evidence, historical-only
+material, or unresolved intent. A missing classification never means "must port," and an
+unresolved product decision blocks the architecture handoff. Then model the target the evidence
+supports and let the gates arbitrate what they can see.
+
+Be precise about what that is. The only code-facing gates are G4-import, which reads import
+statements, and Gt-tests and Gr-reads, which read test references and Git history. No gate executes
+code or reads its behavior. Behavioral drift surfaces through characterization tests derived from
+the generated oracles: stable ids give every transition a durable test key, and G3's DRIFT keeps
+the oracles regenerated as the model is corrected. Oracle-derived tests start descriptive and are
+locked (hard TDD) once a person adjudicates each failing row as code-is-truth (fix the model) or
+model-is-truth (file the code defect), recorded under `design/adjudications/` and held by
+Gj-adjudication. From there, revision mode is the operating loop: design changes as diffs,
+stable-id oracle diffs as the affected-test list, and state-migration notes for persisted machines.
+
+Day one is a command: `machinery baseline <design> --impl .` scans the code exactly as G4 does,
+proposes `baseline:` rules that tolerate today's violating edges (distinct from intended `allow:`
+rules, and compatible with a `deny:` that keeps the intent written), and records
+`design/ratchet.json`. From then on a new offending file on an amnestied edge is a blocking finding,
+so the baseline can only shrink. The staged team protocol is in the
 [brownfield team guide](docs/brownfield-team-guide.md).
 
-## Rebuild and hybrid systems
+### Rebuild and hybrid
 
 When the current platform works but should not be the production foundation, do not model a
-fictional halfway system. Keep `design/legacy/domain.modelith.yaml` as the current truth,
-`design/domain.modelith.yaml` as the target truth, and `design/migration.yaml` as the checked bridge.
-The optional file activates **Gm-transition**, which requires a disposition for every legacy entity,
-a mapped-or-new decision for every target entity, a salvage decision for implementation assets,
-complete field and lifecycle coverage for replacements, ordered source-of-truth phases, an explicit
-target-only cutover and rollback window, and owned failure postures for temporary migration
-dependencies. Shadow reads must define parity; dual writes must define idempotency, conflict
-resolution, and reconciliation.
-
-This keeps "save what can be saved" precise: characterized behavior, export readers, data, tests,
-or modules can be reused or wrapped deliberately, while obsolete schemas and topology are replaced
-without silently constraining the target. Gm checks contract completeness and narrative integration;
-the migration implementation and transformations remain the responsibility of the locked tests in
-BUILD.md. The [rebuild and hybrid guide](docs/rebuild-guide.md) contains the full contract reference,
-workflow, test checklist, and the worked Go CRM rebuild.
+halfway system. Keep `design/legacy/domain.modelith.yaml` as the current truth,
+`design/domain.modelith.yaml` as the target truth, and `design/migration.yaml` as the checked
+bridge. Gm-transition requires a disposition for every legacy entity, a mapped-or-new decision for
+every target entity, a salvage decision for implementation assets, complete field and lifecycle
+coverage for replacements, ordered source-of-truth phases, an explicit cutover and rollback window,
+and owned failure postures for temporary migration dependencies. Shadow reads must define parity;
+dual writes must define idempotency, conflict resolution, and reconciliation. A legacy type whose
+disposition names a target is owned by that disposition, so a contract row's
+`SUPERSEDES{type:...}` resolves against it.
 
 Gm's coverage universe is the legacy model the run declared, so it cannot see a subsystem the
-excavation missed. `design/legacy/surface.yaml`, the capability disposition ledger, closes that
-hole: it inventories the legacy system's mechanically enumerable surface (routes, CLI commands,
-tables, jobs, events, integrations) and maps every item to a target design element or an explicit
-dropped/deferred disposition. The file activates **Gs-surface**, and it deliberately does not
-depend on `migration.yaml`: a clean-break rebuild that drops the migration machinery keeps its
-completeness anchor. The [surface ledger guide](docs/surface-ledger.md) has the schema, the
-opening/closing sweep protocol, and the worked SurrealDB CRM rebuild.
-
-The forward twin of that question is asked by `design/surfaces.yaml`, the target surface ledger.
-Every gate before it looks at the design's internals; none of them asks how a person actually
-reaches an act. A model can declare that an administrator suspends a tenant, the architecture can
-place it, a machine can encode it, and the whole design can pass green while nothing names the
-screen, admin command, API route, or config release the administrator uses. The ledger maps every
-action whose actor is a person to a named surface, or defers it with a reason, and **Gu-surfaces**
-holds that set closed against the domain model. The [target surface guide](docs/target-surfaces.md)
-has the schema, the persona-walk sweep, and the gate's checks.
+excavation missed. The legacy surface ledger, `design/legacy/surface.yaml`, closes that hole by
+inventorying what can be enumerated mechanically (routes, CLI commands, tables, jobs, events,
+integrations) and disposing every item. The forward twin is the target surface ledger,
+`design/surfaces.yaml`: a model can declare that an administrator suspends a tenant, the architecture
+can place it, a machine can encode it, and the design can pass green while nothing names the screen
+or command the administrator uses. Gu-surfaces holds that set closed. Guides:
+[rebuild](docs/rebuild-guide.md), [surface ledger](docs/surface-ledger.md),
+[target surfaces](docs/target-surfaces.md).
 
 ## Which model to use where
 
-The gates check structure, not substance: a shallow domain model with the wrong invariants gates
+The gates check structure, not substance. A shallow domain model with the wrong invariants gates
 completely clean. Extracting the right invariants, pushing on fuzzy definitions, and deciding
-failure postures (Phases 0 through 2) is pure judgment with no machine backstop, so use the
-strongest reasoning model you have there. Phases 3 and 4 are a different regime: half of each
-machine is derived mechanically, and lint, oracle diff, reconciliation, and TLC catch most of what
-a weaker model would fumble, so a mid-tier model is much safer for the synthesis. The deterministic
-layer narrows the failure mode rather than removing it: with a weak interrogator you get a
-structurally consistent, formally verified model of the wrong system.
+failure postures (Phases 0 through 2) is judgment with no machine backstop, so use the strongest
+reasoning model you have there. Phases 3 and 4 are different: half of each machine is derived, and
+lint, oracle diff, reconciliation, the rules, and TLC catch most of what a weaker model would get
+wrong, so a mid-tier model is much safer for that synthesis. The deterministic layer narrows the
+failure mode without removing it: with a weak interrogator you get a structurally consistent,
+formally verified model of the wrong system.
 
-Execution is deliberately a different workload from design. For a large project, the root
-`BUILD.md` is only the ordered milestone and demo authority; every milestone links to one packet
-under `BUILD/` containing its domain, architecture, behavior, oracle, TDD, implementation, risk,
-recovery, and acceptance context. Each packet is capped at 64 KiB and may not depend on another
-packet for missing context. This keeps implementation tractable for smaller or local models without
-weakening the tests, proofs, or acceptance boundary.
+Execution is a different workload from design. For a large project the root `BUILD.md` is only the
+ordered milestone and demo authority; each milestone links to a packet under `BUILD/` carrying its
+domain, architecture, behavior, oracle, TDD, implementation, risk, recovery, and acceptance context.
+A pairwise packet stays under 64 KiB and may not depend on another packet for missing context. That
+keeps implementation within reach of smaller or local models without weakening the tests, proofs,
+or acceptance boundary.
 
-### When not to use machinery
+## When not to use machinery
 
-CRUD screens, UI-heavy surfaces, and pure transforms get a contract spec and ordinary tests, not
-the four-phase pipeline; forcing a machine onto them is ceremony, and it reads as ceremony.
-machinery pays off where state actually bites: lifecycle, saga, protocol, retry, and workflow
-logic, and the deterministic envelopes around agentic systems. Model the stateful core, not the
-whole repo.
+CRUD screens, UI-heavy surfaces, and pure transforms get a contract spec and ordinary tests, not the
+four-phase pipeline. Forcing a machine onto them is ceremony, and it reads as ceremony. machinery
+pays off where state bites: lifecycle, saga, protocol, retry, and workflow logic, and the
+deterministic envelopes around agentic systems. Model the stateful core, not the whole repository.
 
 ## What machinery does not verify
 
-The gates and proofs are exactly as strong as stated above, and no stronger. Not covered by any
-deterministic check or proof, by construction: whether the interrogation extracted the RIGHT
-invariants (a shallow domain model gates clean); guard and action semantics in code (the named-unit
-contracts carry them into unit, integration, and property tests, but a wrong implementation of a
-correctly-named guard is caught by tests, not proofs); races between concurrent machine instances
-and message loss, duplication, or reordering between machines (the models are single-instance; the
-event-contract table and the idempotency contracts govern those seams, and the tests exercise them);
-whether migration transformations preserve real production data (Gm proves decision coverage, not
-the implementation or a database run; mapping, reconciliation, and rollback tests hold that);
-coupling through shared database tables or bus topics (invisible to import analysis); and security,
-capacity, and observability beyond what the Phase 2 NFR record captures. The methodology's stance is
-to name every one of these residuals in the design artifacts rather than let a green check imply
-they are covered.
+The gates and proofs are exactly as strong as stated above. No deterministic check or proof covers:
 
-Inside what is checked, four claims stay separate and must not be conflated: artifact consistency
-(a committed artifact is byte-fresh against the current design), proof execution (a solver actually
-ran and reproduced what the committed evidence says, in `verify-formal`/`verify-checkers`), test
-execution (your suite actually ran and passed: the `Gt` oracle-coverage gate credits static
-discovery of test references only, and tests were not executed by any machinery gate; its own
-label reads "static discovery; tests not executed"), and
-current review (`Gv` attestations carry an explicit kind, `plan`, `current`, or `historical`, so
-a design-time review is never silently read as a current implementation review). The known runtime
-exclusions above stay named, owned test obligations (replay, races between concurrent machine
-instances, message duplication and reordering, migration, restore, and load) until the standalone
-test-assurance contract's enforcement lanes land; naming an obligation in guidance enforces nothing
-by itself. When machinery itself writes design artifacts, an interrupted publication blocks readers
-fail-closed and `machinery recover <design-dir>` reports it read-only, with `--apply` completing
-only a fully revalidated publication.
+- whether the interrogation extracted the right invariants (a shallow domain model gates clean);
+- guard and action semantics in code (the named-unit contracts carry them into unit, integration,
+  and property tests, and a wrong implementation of a correctly named guard is caught by tests, not
+  proofs);
+- races between concurrent machine instances, and message loss, duplication, or reordering between
+  machines (the models are single-instance; the event-contract table and idempotency contracts
+  govern those seams, and tests exercise them);
+- whether migration transformations preserve real production data (Gm proves decision coverage;
+  mapping, reconciliation, and rollback tests hold the rest);
+- coupling through shared database tables or bus topics, which import analysis cannot see;
+- security, capacity, and observability beyond what the Phase 2 NFR record captures;
+- facts a design states only in prose (the rules read declarations).
+
+The methodology names each residual in the design artifacts rather than letting a green check
+imply it is covered.
+
+Inside what is checked, four claims stay separate: artifact consistency (a committed artifact is
+byte-fresh against the current design), proof execution (a solver ran and reproduced what the
+committed evidence says, in `verify-formal` or `verify-checkers`), test execution (your suite ran
+and passed; the `Gt` gate credits static discovery of test references only, and tests were not
+executed by any machinery gate), and current review (`Gv` attestations carry an explicit kind,
+`plan`, `current`, or `historical`, so a design-time review is never read as a current
+implementation review). The known runtime exclusions (replay, races between concurrent machine
+instances, message duplication and reordering, migration, restore, and load) stay named, owned test
+obligations until the executable test-assurance contract's enforcement lanes land. Naming an
+obligation in guidance enforces nothing by itself.
+
+When machinery writes design artifacts and a publication is interrupted, readers block fail-closed.
+`machinery recover <design-dir>` reports the state read-only, and `--apply` completes only a fully
+revalidated publication.
 
 ## Install
 
