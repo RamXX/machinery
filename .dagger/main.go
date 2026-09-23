@@ -49,9 +49,12 @@ func New(
 	// .bin holds a host-built binary every job rebuilds for itself, and
 	// .vault/issues is tracker state. The rest of .vault stays, because
 	// tracked files under it are part of the worktree the formal gate proves
-	// clean, and excluding them would report them as deletions.
+	// clean, and excluding them would report them as deletions. .claude holds
+	// agent-session state (worktrees, the sidecar file) that is never tracked
+	// and can hold whole extra checkouts, which would breach the
+	// tree-inventory snapshot bound.
 	// +defaultPath="/"
-	// +ignore=[".bin", ".dagger/internal", ".vault/issues"]
+	// +ignore=[".bin", ".dagger/internal", ".vault/issues", ".claude"]
 	source *dagger.Directory,
 	// Target platform, for example linux/amd64 to mirror the hosted runners
 	// exactly. Defaults to the host architecture.
