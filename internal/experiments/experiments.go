@@ -138,6 +138,26 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "unknown declaration group MACHINE-WRITTEN{...}", ExpectExit: true},
 	{Name: "undeclared-fact-reference", Tool: "check", Mutation: "a contract cell quotes `Widget.status` outside any group",
 		ExpectSubstr: "undeclared fact reference `Widget.status`", ExpectExit: false},
+	// 2026-09-22, consistency layer Stage 3: the shipped Datalog rules of
+	// Gy-rules. finding_ relations run in shadow (printed, counted, never
+	// blocking) and warn_ relations are warnings, so none of these exits
+	// nonzero yet; Stage 4 promotes the finding_ tier to ERROR.
+	{Name: "rules-authz-missing", Tool: "check", Mutation: "Widget.publish becomes a System action with no authorization row",
+		ExpectSubstr: "row 'Widget.publish': authz_missing", ExpectExit: false},
+	{Name: "rules-authz-orphan", Tool: "check", Mutation: "an authorization row admits Widget.publish, which is not a System action",
+		ExpectSubstr: "row 'Widget.publish': authz_orphan", ExpectExit: false},
+	{Name: "rules-authz-unknown-capability", Tool: "check", Mutation: "an admission names appX, a fabricated suffix of the c4 element app",
+		ExpectSubstr: "authz_unknown_capability (capability 'appX')", ExpectExit: false},
+	{Name: "rules-fact-unresolved", Tool: "check", Mutation: "USES{Widget.stat} names no declared fact",
+		ExpectSubstr: "row 'Widget.guardCanPublish': fact_unresolved (fact 'Widget.stat')", ExpectExit: false},
+	{Name: "rules-values-disagree", Tool: "check", Mutation: "VALUES WidgetStatus{} adds a member the enum lacks",
+		ExpectSubstr: "values_disagree (group 'WidgetStatus', member 'Archived')", ExpectExit: false},
+	{Name: "rules-payload-twin", Tool: "check", Mutation: "a matrix payload {} omits one field of the contract's event payload",
+		ExpectSubstr: "payload_twin (event 'widget.published', field 'Widget.status')", ExpectExit: false},
+	{Name: "rules-supersession-cycle", Tool: "check", Mutation: "SUPERSEDES rows close A > B > C > A",
+		ExpectSubstr: "row 'WidgetA': supersession_cycle", ExpectExit: false},
+	{Name: "rules-effect-uncarried", Tool: "check", Mutation: "an action declares WRITES{Widget.status} and no CARRIES{}",
+		ExpectSubstr: "row 'Widget.commit': effect_uncarried", ExpectExit: false},
 }
 
 // RefineExperiments are the data-refinement reconciliation failures.
