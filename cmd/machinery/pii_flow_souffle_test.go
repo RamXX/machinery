@@ -357,3 +357,64 @@ func TestPiiFlowSouffleVerdicts(t *testing.T) {
 		}
 	})
 }
+
+// TestPiiFlowImageFinalStageRunsNothing guards the property that makes the
+// pinned Souffle image one digest on every host: its final stage executes no
+// command. A RUN there executes amd64 code under whatever the host provides,
+// and an emulated build leaves host state behind in that layer (Rosetta writes
+// /root/.cache/rosetta), so a native amd64 build and an arm64 build under
+// emulation would diverge. All execution belongs in the fetch stage, whose
+// staged files the final stage only copies.
+func TestPiiFlowImageFinalStageRunsNothing(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join(repoRootDir(t), "examples", "pii-flow", "souffle-image", "Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var final []string
+	stages := 0
+	for _, instruction := range dockerfileInstructions(string(body)) {
+		keyword := strings.ToUpper(strings.Fields(instruction)[0])
+		if keyword == "FROM" {
+			stages++
+			final = nil
+			continue
+		}
+		final = append(final, keyword)
+	}
+	if stages < 2 {
+		t.Fatalf("Dockerfile has %d stage(s); the image needs a fetch stage that executes and a final stage that only copies", stages)
+	}
+	if len(final) == 0 {
+		t.Fatal("final stage carries no instruction; it must COPY the staged files from the fetch stage")
+	}
+	for _, keyword := range final {
+		if keyword != "COPY" {
+			t.Errorf("final stage has a %s instruction; only COPY keeps the layer independent of the build host", keyword)
+		}
+	}
+}
+
+// dockerfileInstructions joins backslash continuations and drops comment and
+// blank lines, returning one string per Dockerfile instruction.
+func dockerfileInstructions(body string) []string {
+	var out []string
+	var current strings.Builder
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasSuffix(trimmed, "\\") {
+			current.WriteString(strings.TrimSuffix(trimmed, "\\"))
+			current.WriteString(" ")
+			continue
+		}
+		current.WriteString(trimmed)
+		out = append(out, current.String())
+		current.Reset()
+	}
+	if current.Len() > 0 {
+		out = append(out, current.String())
+	}
+	return out
+}
