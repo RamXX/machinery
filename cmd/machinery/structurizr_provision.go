@@ -132,7 +132,11 @@ func validateStructurizrCache(root string) error {
 	return nil
 }
 
-func downloadStructurizrArchive(url, destination string) (retErr error) {
+// downloadStructurizrArchive is the provisioner's download step; tests
+// substitute it to exercise provisioning without the network.
+var downloadStructurizrArchive = downloadPinnedStructurizrArchive
+
+func downloadPinnedStructurizrArchive(url, destination string) (retErr error) {
 	defer func() {
 		if retErr != nil {
 			removeErr := os.Remove(destination)
