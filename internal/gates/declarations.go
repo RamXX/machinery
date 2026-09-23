@@ -815,3 +815,65 @@ func checkAuthorizationShape(g *Gate, design string) {
 		}
 	}
 }
+
+// MigrationNote names the place a design that relied on the 0.9.0 prose
+// inference is told to read.
+const MigrationNote = `"Migrating from the 0.9.0 prose inference" in the machinery skill (skills/machinery/SKILL.md)`
+
+// proseFactToken is the backticked shape the 0.9.0 heuristics read as a fact
+// or a producer: a snake_case name or an Entity.member pair.
+var proseFactToken = regexp.MustCompile(`^(?:[a-z][a-z0-9]*(?:_[a-z0-9]+)+|[A-Z][A-Za-z0-9]*\.[a-z][A-Za-z0-9]*)$`)
+
+// checkPreCutoverInference is the one-release deprecation warning for a
+// design that relied on the 0.9.0 inference and never migrated: it declares
+// no WRITES{}, USES{} or PRODUCES{} anywhere, and some matrix row that carries
+// no declaration group quotes a snake_case or Entity.member token in prose.
+// Such a design used to have facts, writes and producers inferred from that
+// prose; now nothing is inferred, so the warning names the migration note.
+// One warning per design, at the first such row. A design with any of the
+// three declarations has migrated and never sees it. The warning is removed
+// in the release after next.
+func checkPreCutoverInference(g *Gate, design string, decls []Declaration) {
+	for _, d := range decls {
+		if d.Group == GroupWrites || d.Group == GroupUses || d.Group == GroupProduces {
+			return
+		}
+	}
+	names := designNameTokens(design)
+	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
+		body, err := readDesignFile(design, path)
+		if err != nil {
+			continue // the shape check reports an unreadable matrix
+		}
+		for _, r := range walkTableRows(normalizeNewlines(body)) {
+			nameCol := -1
+			if ni, _, _, ok := namedUnitCols(r.header); ok {
+				nameCol = ni
+			}
+			declared := false
+			for _, cell := range r.cells {
+				if len(scanGroups(cell)) > 0 || valuesOpening.MatchString(cell) || payloadOpening.MatchString(cell) || derivedWord.MatchString(cell) {
+					declared = true
+				}
+			}
+			if declared {
+				continue
+			}
+			row := rowIdentity(r)
+			for ci, cell := range r.cells {
+				if ci == nameCol {
+					continue
+				}
+				for _, m := range factBacktickSpan.FindAllStringSubmatch(cell, -1) {
+					tok := strings.TrimSpace(m[1])
+					if !proseFactToken.MatchString(tok) || names[tok] {
+						continue
+					}
+					g.Warns = append(g.Warns, filepath.Base(path)+":"+strconv.Itoa(r.line)+": row "+ir.Repr(row)+": `"+tok+
+						"` is quoted in prose, and the design declares no WRITES{}, USES{} or PRODUCES{} anywhere; machinery 0.9.0 inferred facts, writes and producers from such prose and no longer does, so declare them (see "+MigrationNote+"). This deprecation warning is removed in the release after next")
+					return
+				}
+			}
+		}
+	}
+}

@@ -42,46 +42,46 @@ attestations:
     date: 2026-09-02
     covers:
       - {path: machines/Payment.machine.json, hash: sha256:1f1ffcbd6a2f65c0bc5a840181d880f201f2acd9587b11ce8e344af9caa72b4e}
-      - {path: machines/Payment.matrix.md, hash: sha256:19155ed727a3df94d84dc31e3c38886e3c0d4fb315bfe27f696ef0a50f7953a2}
+      - {path: machines/Payment.matrix.md, hash: sha256:1b6b211f9adb833156004ea7acb62df873d68005dd43fa4850373f73ec025551}
   - claim: g3.invariant-enforcement
     kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers:
       - {path: machines/Payment.machine.json, hash: sha256:1f1ffcbd6a2f65c0bc5a840181d880f201f2acd9587b11ce8e344af9caa72b4e}
-      - {path: machines/Payment.matrix.md, hash: sha256:19155ed727a3df94d84dc31e3c38886e3c0d4fb315bfe27f696ef0a50f7953a2}
+      - {path: machines/Payment.matrix.md, hash: sha256:1b6b211f9adb833156004ea7acb62df873d68005dd43fa4850373f73ec025551}
   - claim: g3.residual-transitions
     kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers:
       - {path: machines/Payment.machine.json, hash: sha256:1f1ffcbd6a2f65c0bc5a840181d880f201f2acd9587b11ce8e344af9caa72b4e}
-      - {path: machines/Payment.matrix.md, hash: sha256:19155ed727a3df94d84dc31e3c38886e3c0d4fb315bfe27f696ef0a50f7953a2}
+      - {path: machines/Payment.matrix.md, hash: sha256:1b6b211f9adb833156004ea7acb62df873d68005dd43fa4850373f73ec025551}
   - claim: g3.event-redelivery
     kind: plan
     attestor: Machinery production-readiness review
     date: 2026-09-02
     covers:
       - {path: machines/Payment.machine.json, hash: sha256:1f1ffcbd6a2f65c0bc5a840181d880f201f2acd9587b11ce8e344af9caa72b4e}
-      - {path: machines/Payment.matrix.md, hash: sha256:19155ed727a3df94d84dc31e3c38886e3c0d4fb315bfe27f696ef0a50f7953a2}
+      - {path: machines/Payment.matrix.md, hash: sha256:1b6b211f9adb833156004ea7acb62df873d68005dd43fa4850373f73ec025551}
   - claim: gt.conformance-test-shape
     kind: plan
     attestor: coordinator
     date: 2026-09-06
     note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
-    covers: [{path: BUILD.md, hash: sha256:11a30329dc19878788dbaaab569eaaaf71a580639c5393e5c37b92a6b0e258b1}]
+    covers: [{path: BUILD.md, hash: sha256:cc5371dd4a90996d041431e209c021036a6e145dc58b327309579441f5871a1c}]
   - claim: g4.zero-context
     kind: plan
     attestor: coordinator
     date: 2026-09-06
     note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
-    covers: [{path: BUILD.md, hash: sha256:11a30329dc19878788dbaaab569eaaaf71a580639c5393e5c37b92a6b0e258b1}]
+    covers: [{path: BUILD.md, hash: sha256:cc5371dd4a90996d041431e209c021036a6e145dc58b327309579441f5871a1c}]
   - claim: g4.standin-coverage
     kind: plan
     attestor: coordinator
     date: 2026-09-06
     note: 'Re-reviewed 2026-09-06 over the corrected BUILD wholesale-conformance obligation (committed-FSM parsing, row/guard-input reconciliation, next state plus expected actions incl. entry/exit semantics); prospective plan only, no implementation suite exists for this design.'
-    covers: [{path: BUILD.md, hash: sha256:11a30329dc19878788dbaaab569eaaaf71a580639c5393e5c37b92a6b0e258b1}]
+    covers: [{path: BUILD.md, hash: sha256:cc5371dd4a90996d041431e209c021036a6e145dc58b327309579441f5871a1c}]
   - claim: g4.pack-event-discipline
     kind: plan
     attestor: Machinery production-readiness review

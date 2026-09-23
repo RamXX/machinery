@@ -69,7 +69,7 @@ attestations:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
+        hash: sha256:49db12cd092cd00ab4af8612d8af5807d708562036e6c6c2a7641af1d799770c
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md
@@ -91,7 +91,7 @@ attestations:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
+        hash: sha256:49db12cd092cd00ab4af8612d8af5807d708562036e6c6c2a7641af1d799770c
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md
@@ -113,7 +113,7 @@ attestations:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
+        hash: sha256:49db12cd092cd00ab4af8612d8af5807d708562036e6c6c2a7641af1d799770c
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md
@@ -135,7 +135,7 @@ attestations:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
+        hash: sha256:49db12cd092cd00ab4af8612d8af5807d708562036e6c6c2a7641af1d799770c
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md

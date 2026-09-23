@@ -2026,7 +2026,7 @@ func CheckTraceability(design string) *Gate {
 	// VALUES, payload, derived: and authorization-inventory declarations:
 	// parse-time findings only (declarations.go). What the declarations mean
 	// is Gy-rules' to decide over their projected facts.
-	checkDeclarations(g, design, archText)
+	checkPreCutoverInference(g, design, checkDeclarations(g, design, archText))
 	checkMatrixDeclarationShapes(g, design)
 	checkAuthorizationShape(g, design)
 	if !pack.HasPack(design) {

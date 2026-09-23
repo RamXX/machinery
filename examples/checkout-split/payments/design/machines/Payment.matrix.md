@@ -4,8 +4,8 @@
 
 | name | kind | signature | pre / post | maps to | test type | fixture |
 |---|---|---|---|---|---|---|
-| `markPaid` | action | `(ctx) -> publish` | on capture, enqueue markPaid in the outbox, same transaction as the status write | bus relationship; dedupe `Payment.id` | integration | real outbox table + fake broker (contract-tested) |
-| `markDeclined` | action | `(ctx) -> publish` | on decline, enqueue markDeclined in the outbox, same transaction | bus relationship; dedupe `Payment.id` | integration | real outbox table + fake broker (contract-tested) |
+| `markPaid` | action | `(ctx) -> publish` | on capture, enqueue markPaid in the outbox, same transaction as the status write. USES{Payment.id} | bus relationship; dedupe `Payment.id` | integration | real outbox table + fake broker (contract-tested) |
+| `markDeclined` | action | `(ctx) -> publish` | on decline, enqueue markDeclined in the outbox, same transaction. USES{Payment.id} | bus relationship; dedupe `Payment.id` | integration | real outbox table + fake broker (contract-tested) |
 | `recordRefund` | action | `(ctx) -> ctx` | stamps the refund; only reachable from Captured, which is `payment-single-capture` | inv `payment-single-capture` (structural) | unit | none |
 
 ## (b) Failure catalog

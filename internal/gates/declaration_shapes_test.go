@@ -146,3 +146,60 @@ func TestAuthorizationInventoryShapes(t *testing.T) {
 		t.Fatalf("both rows read: %v", g.Counts)
 	}
 }
+
+func deprecationWarnings(g *Gate) []string {
+	var out []string
+	for _, w := range g.Warns {
+		if strings.Contains(w, "0.9.0 inferred") {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// A design that never migrated (no WRITES, USES or PRODUCES anywhere) and
+// quotes a fact-shaped token in prose on a row with no group gets exactly one
+// deprecation warning, naming the migration note. A design that declares any
+// of the three has migrated and gets none, even with a prose backtick left;
+// a row that carries a group is a declared row, not prose inference.
+func TestPreCutoverInferenceWarning(t *testing.T) {
+	head := "| name | kind | contract (pre / post) | maps to |\n|---|---|---|---|\n"
+	g := CheckTraceability(valuesDesign(t, "| `markPaid` | action | records `Order.state` and `order_total` | `order-paid-final` |\n"+
+		"| `settle` | action | reads `order_total` | `order-paid-final` |\n"))
+	got := deprecationWarnings(g)
+	if len(got) != 1 || !strings.HasPrefix(got[0], "Order.matrix.md:3: row 'markPaid': `Order.state` is quoted in prose") ||
+		!strings.Contains(got[0], MigrationNote) || !strings.Contains(got[0], "removed in the release after next") {
+		t.Fatalf("one warning at the first prose token, naming the note: %v", got)
+	}
+	if len(g.Errs) != 0 && hasErr(g, "0.9.0") {
+		t.Fatalf("the deprecation is a warning, never an error: %v", g.Errs)
+	}
+	migrated := CheckTraceability(shapeDesign(t, head+
+		"| `markPaid` | action | records `Order.state` | `order-paid-final` |\n"+
+		"| `settle` | action | WRITES{Order.state} | `order-paid-final` |\n", nil))
+	if got := deprecationWarnings(migrated); len(got) != 0 {
+		t.Fatalf("a migrated design with one prose backtick left must not warn: %v", got)
+	}
+	grouped := CheckTraceability(shapeDesign(t, head+
+		"| `classify` | guard | reads `order_total`. VALUES{Placed, Paid} | `order-paid-final` |\n", nil))
+	if got := deprecationWarnings(grouped); len(got) != 0 {
+		t.Fatalf("a row with a declaration group is not prose inference: %v", got)
+	}
+	plain := CheckTraceability(shapeDesign(t, head+"| `markPaid` | action | records the payment | `order-paid-final` |\n", nil))
+	if got := deprecationWarnings(plain); len(got) != 0 {
+		t.Fatalf("no fact-shaped prose token, no warning: %v", got)
+	}
+}
+
+// The deprecation fires on no bundled example.
+func TestPreCutoverInferenceSilentOnExamples(t *testing.T) {
+	for _, rel := range bundledDesigns(t) {
+		design := filepath.Join("..", "..", filepath.FromSlash(rel))
+		if !HasMachines(design) {
+			continue
+		}
+		if got := deprecationWarnings(CheckTraceability(design)); len(got) != 0 {
+			t.Fatalf("%s: %v", rel, got)
+		}
+	}
+}
