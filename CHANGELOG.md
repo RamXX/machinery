@@ -8,7 +8,7 @@ under their version heading when a release is cut.
 
 ### Fixed
 
-- **Concurrent cold starts of the pinned Java runtime share one provisioner (MAC-yoxb).** The
+- **Concurrent cold starts of the pinned Java runtime share one provisioner.** The
   provisioning lock was a scope lock, and test binaries keep their scope locks beside their own
   executable, so several packages under one `go test ./...` that cold-started the same user cache
   each believed they held it. They staged into `<cache>/java/.java-stage-<n>/` at once, and each
