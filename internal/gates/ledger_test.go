@@ -386,3 +386,79 @@ func TestLedgerDuplicateTableMixedKeepsMarkerAdvice(t *testing.T) {
 		t.Fatalf("mixed duplicate lost the marker advice: %v", g.Warns)
 	}
 }
+
+// undeclaredFactDesign writes a design with one machine (Order, states
+// Placed, saving, Paid) and the given matrix body.
+func undeclaredFactDesign(t *testing.T, matrix string) string {
+	t.Helper()
+	design := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(design, "machines"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, filepath.Join(design, "machines", "Order.machine.json"), wiringMachine)
+	mustWrite(t, filepath.Join(design, "machines", "Order.matrix.md"), matrix)
+	return design
+}
+
+func undeclaredFactWarns(g *Gate) []string {
+	var out []string
+	for _, w := range g.Warns {
+		if strings.Contains(w, "undeclared fact reference") {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+func TestLedgerUndeclaredFactReference(t *testing.T) {
+	const header = "| name | kind | signature | pre / post | maps to |\n|---|---|---|---|---|\n"
+	row := func(name, contract, mapsTo string) string {
+		return "| `" + name + "` | action | `(ctx) -> ctx` | " + contract + " | " + mapsTo + " |\n"
+	}
+	t.Run("positive: a bare backticked fact in a contract cell", func(t *testing.T) {
+		g := CheckLedger(undeclaredFactDesign(t, "# Order\n\n"+header+row("persistOrder", "stores `Order.total` and `line_item_count`", "-")))
+		got := undeclaredFactWarns(g)
+		want := []string{
+			"machines/Order.matrix.md:5: row 'persistOrder': undeclared fact reference `Order.total`; declare it in USES{} or WRITES{} or drop the backticks",
+			"machines/Order.matrix.md:5: row 'persistOrder': undeclared fact reference `line_item_count`; declare it in USES{} or WRITES{} or drop the backticks",
+		}
+		if strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Fatalf("got %q", got)
+		}
+		if len(g.Errs) != 0 {
+			t.Fatalf("the tier is a warning, never an error: %v", g.Errs)
+		}
+	})
+	t.Run("positive: a payload reads cell", func(t *testing.T) {
+		g := CheckLedger(undeclaredFactDesign(t, "# Order\n\n| event | reacting unit | payload reads |\n|---|---|---|\n| `paid` | `markPaid` | reads `payment_ref` |\n"))
+		if got := undeclaredFactWarns(g); len(got) != 1 || !strings.Contains(got[0], "row 'paid': undeclared fact reference `payment_ref`") {
+			t.Fatalf("got %q", got)
+		}
+	})
+	t.Run("positive: a declaration on another row does not declare this one", func(t *testing.T) {
+		g := CheckLedger(undeclaredFactDesign(t, "# Order\n\n"+header+row("persistOrder", "WRITES{Order.total}", "-")+row("guardTotal", "true iff `Order.total` > 0", "-")))
+		if got := undeclaredFactWarns(g); len(got) != 1 || !strings.Contains(got[0], "row 'guardTotal'") {
+			t.Fatalf("got %q", got)
+		}
+	})
+	negatives := []struct{ name, rows string }{
+		{"declared in USES on the same row", row("guardTotal", "true iff `Order.total` > 0. USES{Order.total}", "-")},
+		{"declared in WRITES on the same row", row("persistOrder", "stores `Order.total`. WRITES{Order.total}", "-")},
+		{"inside a group", row("persistOrder", "USES{`Order.total`} CLAUSES{`a_b`} VALUES{`x_y`} READS{`c_d`}", "-")},
+		{"inside a payload group", row("emitPaid", "payload {`Order.id`, `order_ref`}", "-")},
+		{"inside and named by a derived form", row("scoreOrder", "computes `risk_score`; derived: risk_score (from `line_total` at read time, never stored)", "-")},
+		{"the row's own unit name", row("emit_order", "the `emit_order` step", "-")},
+		{"a machine state", row("persistOrder", "entered from `Order.saving`", "-")},
+		{"not fact-shaped", row("persistOrder", "`Order`, `ctx.retries`, `totalCents`, `order-paid-final`, `ORDER_ID`, `Order.Paid`, `a.b.c`", "-")},
+		{"outside the contract, clause and payload cells", row("persistOrder", "persists", "`Order.total`, `line_item_count`")},
+		{"fenced example", "```\n| `persistOrder` | action | `(ctx) -> ctx` | `Order.total` | - |\n```\n"},
+	}
+	for _, tc := range negatives {
+		t.Run("negative: "+tc.name, func(t *testing.T) {
+			g := CheckLedger(undeclaredFactDesign(t, "# Order\n\n"+header+tc.rows))
+			if got := undeclaredFactWarns(g); len(got) != 0 {
+				t.Fatalf("false positive: %q", got)
+			}
+		})
+	}
+}
