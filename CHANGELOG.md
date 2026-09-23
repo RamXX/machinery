@@ -6,6 +6,22 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Declaration groups `WRITES{}`, `USES{}`, `CARRIES{}` and `SUPERSEDES{}` (consistency layer,
+  Stage 1).** Matrix rows may declare the stored facts a unit writes (`WRITES{}` alone states a
+  read-only unit), the facts it uses, and what carries its effect (`column`, `outbox`, `sink`,
+  `signal`, `action`); Architecture Contract rows may declare `SUPERSEDES{type:OldName}`. Gx-trace
+  parses them into typed declarations and fails malformed, empty, duplicate, unterminated, nested,
+  and repeated groups. No gate reconciles them yet.
+- **Closed group-name vocabulary.** An upper-case `NAME{` in a matrix table cell that is not
+  `CLAUSES`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `CARRIES` or `SUPERSEDES` is a
+  Gx-trace error naming the row. A design carrying a private group (for example
+  `MACHINE-WRITTEN{}`) now fails until it maps that notation to the public grammar.
+- **Undeclared fact references warn in Gl-ledger.** A backticked snake_case or `Entity.attr`
+  token in a matrix contract, clause, or payload cell, outside every group and not declared by its
+  own row, is a warning: declare it in `USES{}` or `WRITES{}`, or drop the backticks.
+
 ### Fixed
 
 - **Concurrent cold starts of the pinned Java runtime share one provisioner.** The

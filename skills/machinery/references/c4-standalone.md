@@ -654,6 +654,15 @@ cannot infer that two differently named units intend one vocabulary. A unit
 that cites a vocabulary owned by another model entity, or whose owning entity
 types the set with a Modelith enum, does not redeclare it with `VALUES`.
 
+### Source supersession
+
+A contract row that replaces a stable type id declares it as `SUPERSEDES{type:LegacyDeal}` in any
+cell of that row: any markdown table row of ARCHITECTURE.md (its first cell names the row), or a
+line of the contract YAML fence (the enclosing `- id:` names the row). Only the `type:` kind exists;
+the target is a dotted identifier. An empty, duplicate, malformed, unterminated, or repeated group is
+a Gx-trace error. The declaration is parsed but not yet reconciled against ownership; the matrix
+groups `WRITES{}`, `USES{}`, and `CARRIES{}` are described in the skill.
+
 ### Machine-checkable format (mandatory on a decomposed parent)
 
 `machinery pack generate` extracts each subsystem's boundary events from this table by exact

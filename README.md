@@ -791,6 +791,16 @@ Duplicate, empty, malformed, and repeated groups fail. A referenced vocabulary
 owned by another model entity, or an enum typed on the owning entity, does not
 require a second local `VALUES` group.
 
+The declaration family also carries `WRITES{Entity.attr, ...}` (stored facts a unit writes;
+`WRITES{}` is read-only), `USES{fact, ...}` (facts a unit reads or names), and
+`CARRIES{kind:target, ...}` (what carries an effect: `column`, `outbox`, `sink`, `signal`,
+`action`) on matrix rows, and `SUPERSEDES{type:OldName}` on Architecture Contract rows. Gx-trace
+parses them and fails malformed, empty (except `WRITES{}`), duplicate, unterminated, and repeated
+groups, plus any upper-case `NAME{` in a matrix cell outside the closed group vocabulary. No gate
+reconciles them yet (see [docs/consistency-layer-proposal.md](docs/consistency-layer-proposal.md)).
+Gl-ledger warns on a backticked snake_case or `Entity.attr` token in a contract, clause, or payload
+cell that no group on its row declares.
+
 ## Use
 
 In an agent session (Claude Code, Codex, OpenCode, or any runtime that loads Agent Skills), from the
