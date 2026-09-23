@@ -162,13 +162,15 @@ an architecture join key, or a `VALUES` member on the same row. A unit-local com
 the waiver does not declare the fact for any other row. Quoted reason classes,
 classifications, producer names, and negated or rejected fields remain prose.
 
-A named-unit row that calls a vocabulary closed, an enum, or a reason class
-uses exactly one `VALUES{a, b, c}` group. Different units sharing a vocabulary
-can name it with `VALUES reason_class{a, b, c}`. Gx-trace compares it as a set with a
-same-named Modelith enum after case and separator normalization. Without such
-an enum, the row is the vocabulary's one declaration; prose cannot define a
-second list. A cited vocabulary owned by another model entity and a matching
-enum typed on the owning entity need no duplicate unit-local declaration.
+A closed vocabulary is one `VALUES{a, b, c}` group on a named-unit row.
+Different units sharing a vocabulary name it with `VALUES reason_class{a, b, c}`.
+A group binds to a Modelith enum by exact name and must then spell exactly the
+enum's members: `VALUES OrderState{...}` binds enum `OrderState`, and an
+unnamed `VALUES{...}` binds only when the unit name equals the enum name
+exactly. There is no case folding and no fuzzy matching: `VALUES{...}` on unit
+`orderState` binds nothing, and Gl-ledger warns on exactly that case, telling
+you to write `VALUES OrderState{...}`. Prose that calls a vocabulary closed
+declares nothing.
 
 Five more groups state what a unit touches. Gx-trace parses them and fails a
 malformed one; Gy-rules (below) reads them in shadow. Members use the dotted

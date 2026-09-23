@@ -446,14 +446,13 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   and non-empty reason are mandatory; the waiver covers only that row.
   Quoted reason classes, classifications, producer names, and negated or
   rejected fields are prose, not fact obligations.
-- A named-unit row that calls a vocabulary closed, an enum, or a reason class
-  declares its members once with `VALUES{a, b, c}`. Members are distinct
-  identifiers and order is immaterial. `VALUES reason_class{a, b, c}` names a
-  vocabulary shared by multiple units and reconciles their sets. Without a
-  name, identity is the normalized unit name; distinct unit names are not
-  inferred to denote the same vocabulary. A same-named Modelith enum must
-  agree exactly. A cited vocabulary owned by another model entity, or an enum
-  typed on this entity, does not need a second local declaration.
+- A closed vocabulary is one `VALUES{a, b, c}` group on a named-unit row.
+  Members are distinct identifiers and order is immaterial.
+  `VALUES reason_class{a, b, c}` names a vocabulary shared by multiple units.
+  A group binds to a Modelith enum by exact name and must then agree with it
+  exactly; an unnamed group's name is its unit's name, compared exactly (no
+  case folding: unit `orderState` binds no enum `OrderState`, a Gl-ledger
+  warning asks for `VALUES OrderState{...}`).
 - Five declaration groups state what a unit touches: `WRITES{Order.status}`
   (the stored facts it writes; `WRITES{}` is a read-only unit),
   `USES{Order.totalCents, LineItem.quantity}` (the facts it reads or names;

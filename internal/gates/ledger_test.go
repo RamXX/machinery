@@ -462,3 +462,32 @@ func TestLedgerUndeclaredFactReference(t *testing.T) {
 		})
 	}
 }
+
+// An unnamed VALUES{...} group binds by its unit's name, exactly. A unit name
+// equal to an enum name only when case is ignored binds nothing, so Gl warns
+// and tells the author to name the group; an exact unit name, a named group,
+// and a unit name matching no enum in any case stay silent.
+func TestValuesEnumCaseMismatchWarns(t *testing.T) {
+	model := "kind: DomainModel\nversion: v1\nenums:\n  OrderState:\n    values: [{name: Open}, {name: Closed}]\n" +
+		"entities:\n  Order:\n    attributes: [{name: state, type: OrderState}]\n"
+	matrix := "| name | kind | contract (pre / post) |\n|---|---|---|\n" +
+		"| `orderState` | guard | VALUES{Open, Closed} |\n" +
+		"| `OrderState` | guard | VALUES{Open, Closed} |\n" +
+		"| `orderstate` | guard | VALUES OrderState{Open, Closed} |\n" +
+		"| `reason` | guard | VALUES{late, early} |\n"
+	d := ledgerDesign(t, map[string]string{"domain.modelith.yaml": model, "machines/Order.matrix.md": matrix})
+	g := CheckLedger(d)
+	var hits []string
+	for _, w := range g.Warns {
+		if strings.Contains(w, "VALUES") {
+			hits = append(hits, w)
+		}
+	}
+	want := "machines/Order.matrix.md:3: row 'orderState': unnamed VALUES{...} takes the unit name 'orderState', which differs from enum 'OrderState' only in case and so binds no enum; name the group (VALUES OrderState{...}) to bind it"
+	if len(hits) != 1 || hits[0] != want {
+		t.Fatalf("want exactly the orderState warning, got %v", hits)
+	}
+	if len(g.Errs) != 0 {
+		t.Fatalf("the tier is a warning, never an error: %v", g.Errs)
+	}
+}

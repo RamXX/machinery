@@ -69,6 +69,7 @@ func CheckLedger(design string) *Gate {
 	checkHouseStyle(g, design)
 	checkDuplicateTables(g, design)
 	checkUndeclaredFactReferences(g, design)
+	checkValuesEnumCase(g, design)
 	return g
 }
 
@@ -620,6 +621,70 @@ func checkUndeclaredFactReferences(g *Gate, design string) {
 					}
 					seen[tok] = true
 					g.Warns = append(g.Warns, rel+":"+strconv.Itoa(r.line)+": row "+ir.Repr(row)+": undeclared fact reference `"+tok+"`; declare it in USES{} or WRITES{} or drop the backticks")
+				}
+			}
+		}
+	}
+}
+
+// checkValuesEnumCase warns on an unnamed VALUES{...} group whose unit name
+// matches a Modelith enum name only when case is ignored. The consistency
+// rules bind a group to an enum by exact name, and an unnamed group's name is
+// its unit's name, so VALUES{...} on unit orderState binds no enum
+// OrderState: the agreement the author meant is never checked. The binding
+// rule stays exact (no case folding, no fuzzy join); this warning tells the
+// author to name the group, VALUES OrderState{...}, which binds it.
+func checkValuesEnumCase(g *Gate, design string) {
+	paths := sortedGlob(filepath.Join(design, "machines"), "*.matrix.md")
+	if len(paths) == 0 {
+		return
+	}
+	dm := loadModelith(design, NewGate("values enum case"))
+	if dm == nil {
+		return // Gx reports the model
+	}
+	byLower := map[string][]string{}
+	if enums := dm.AsObject().GetObject("enums"); enums != nil {
+		for _, name := range enums.Keys() {
+			byLower[strings.ToLower(name)] = append(byLower[strings.ToLower(name)], name)
+		}
+	}
+	if len(byLower) == 0 {
+		return
+	}
+	for _, path := range paths {
+		body, ok := readTextOK(design, path)
+		if !ok {
+			continue
+		}
+		rel, rerr := filepath.Rel(design, path)
+		if rerr != nil {
+			rel = path
+		}
+		rel = filepath.ToSlash(rel)
+		for _, r := range walkTableRows(normalizeNewlines([]byte(body))) {
+			ni, _, _, named := namedUnitCols(r.header)
+			if !named {
+				continue
+			}
+			unnamed := false
+			for _, cell := range r.cells {
+				for _, m := range valuesGroup.FindAllStringSubmatch(cell, -1) {
+					if m[1] == "" {
+						unnamed = true
+					}
+				}
+			}
+			if !unnamed {
+				continue
+			}
+			for _, unit := range unitNames(cellAt(r.cells, ni)) {
+				for _, enum := range byLower[strings.ToLower(unit)] {
+					if enum == unit {
+						continue
+					}
+					g.Warns = append(g.Warns, rel+":"+strconv.Itoa(r.line)+": row "+ir.Repr(unit)+": unnamed VALUES{...} takes the unit name "+ir.Repr(unit)+
+						", which differs from enum "+ir.Repr(enum)+" only in case and so binds no enum; name the group (VALUES "+enum+"{...}) to bind it")
 				}
 			}
 		}

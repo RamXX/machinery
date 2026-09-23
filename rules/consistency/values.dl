@@ -4,8 +4,10 @@
 // that enum's members, in both directions: a member the enum lacks, and an
 // enum member the group omits, are each one finding. The group name is the
 // explicit VALUES name{...} or, for VALUES{...}, the unit name. Names are
-// compared exactly; an enum no attribute uses is not projected and so binds
-// no group.
+// compared exactly, with no case folding: VALUES{...} on unit orderState binds
+// no enum OrderState (Gl-ledger warns on that near miss and asks for
+// VALUES OrderState{...}). An enum no attribute uses is not projected and so
+// binds no group.
 
 .decl enum_member(id:symbol, enum:symbol, value:symbol)
 .input enum_member
