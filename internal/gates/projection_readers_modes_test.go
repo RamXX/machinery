@@ -363,3 +363,36 @@ func TestFactsSecondRunIsByteIdentical(t *testing.T) {
 		}
 	}
 }
+
+// unit_declares marks every declaration group on a unit row, so an empty
+// WRITES{} (declared read-only) stays distinguishable from no WRITES group:
+// the first yields a marker and no unit_writes row, the second neither.
+func TestFactsUnitDeclaresMarksEveryGroupIncludingEmptyWrites(t *testing.T) {
+	design := writeFactsDesign(t, t.TempDir(), map[string]string{
+		"machines/Order.machine.json": factsMachine,
+		"machines/Order.matrix.md": "| name | kind | event | pre / post |\n|---|---|---|---|\n" +
+			"| `readOnly` | action | - | WRITES{} USES{Order.total} |\n" +
+			"| `silent` | action | - | reads the order and says nothing structured |\n" +
+			"| `persist` | actor | `order.paid` | WRITES{Order.status} CARRIES{column:Order.status} CLAUSES{a} READS{Order.total} VALUES kind{x, y} payload {Order.status} |\n",
+	})
+	facts, err := LoadDesignFacts(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"Order.persist|CARRIES", "Order.persist|CLAUSES", "Order.persist|READS",
+		"Order.persist|VALUES", "Order.persist|WRITES", "Order.persist|payload",
+		"Order.readOnly|USES", "Order.readOnly|WRITES",
+	}
+	if got := factRows(facts, "unit_declares"); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("unit_declares = %v, want %v", got, want)
+	}
+	if got := factRows(facts, "unit_writes"); strings.Join(got, " ") != "Order.persist|Order.status" {
+		t.Fatalf("WRITES{} must add no unit_writes row: %v", got)
+	}
+	for _, row := range facts.Rows("unit_declares") {
+		if row.Source.Path != "machines/Order.matrix.md" || !strings.HasPrefix(row.StableID, "unit:Order.") {
+			t.Fatalf("unit_declares keeps the unit's stable id and row source: %+v", row)
+		}
+	}
+}

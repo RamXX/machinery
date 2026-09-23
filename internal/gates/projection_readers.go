@@ -598,8 +598,10 @@ func (b *factBuilder) matrices() {
 // fact: CLAUSES{}/RETIRED{} (unit_clauses), READS{} (unit_reads), VALUES{}
 // (unit_values), derived: (unit_derived), payload {} (unit_payload), and the
 // Stage 1 groups parsed by ParseMatrixDeclarations, WRITES{} (unit_writes),
-// USES{} (unit_uses) and CARRIES{} (unit_carries). A new group adds a case
-// here and a relation to the checker catalog, and nothing else moves.
+// USES{} (unit_uses) and CARRIES{} (unit_carries). Every group present on
+// the row, even an empty WRITES{}, also yields one unit_declares marker. A
+// new group adds a case here and a relation to the checker catalog, and
+// nothing else moves.
 func (b *factBuilder) matrixRowFacts(mr matrixRow) {
 	r := mr.row
 	where := fmt.Sprintf("%s:%d", mr.rel, r.line)
@@ -615,7 +617,20 @@ func (b *factBuilder) matrixRowFacts(mr matrixRow) {
 			fn(i, subject, mr.stableIDs[i])
 		}
 	}
+	declared := map[string]bool{}
 	for _, cell := range r.cells {
+		if clauseDecl.MatchString(cell) {
+			declared[GroupClauses] = true
+		}
+		if readsDecl.MatchString(cell) {
+			declared[GroupReads] = true
+		}
+		if valuesGroup.MatchString(cell) {
+			declared[GroupValues] = true
+		}
+		if payloadDeclaration.MatchString(cell) {
+			declared[GroupPayload] = true
+		}
 		for _, m := range clauseDecl.FindAllStringSubmatch(cell, -1) {
 			for _, status := range []struct {
 				name, body string
@@ -691,6 +706,7 @@ func (b *factBuilder) matrixRowFacts(mr matrixRow) {
 		}
 	}
 	for _, d := range mr.decls {
+		declared[d.Group] = true
 		switch d.Group {
 		case GroupWrites, GroupUses:
 			relation := "unit_writes"
@@ -710,7 +726,26 @@ func (b *factBuilder) matrixRowFacts(mr matrixRow) {
 			}
 		}
 	}
+	for _, group := range declarationMarkerGroups {
+		if declared[group] {
+			each(func(_ int, subject, sid string) {
+				b.add(mr.rel, r.line, "unit_declares", sid, subject, group)
+			})
+		}
+	}
 }
+
+// Group spellings of unit_declares beyond the Stage 1 groups. payload keeps
+// its lower-case spelling, as it is written in a matrix cell.
+const (
+	GroupClauses = "CLAUSES"
+	GroupReads   = "READS"
+	GroupValues  = "VALUES"
+	GroupPayload = "payload"
+)
+
+// declarationMarkerGroups is the unit_declares vocabulary in emission order.
+var declarationMarkerGroups = []string{GroupWrites, GroupUses, GroupCarries, GroupValues, GroupClauses, GroupReads, GroupPayload}
 
 // ---------------------------------------------------------------- oracles
 

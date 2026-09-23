@@ -69,6 +69,11 @@ var relationCatalog = []RelationSpec{
 	{Name: "unit_writes", Layer: "matrices", Columns: []string{"unit", "fact"}},
 	{Name: "unit_uses", Layer: "matrices", Columns: []string{"unit", "fact"}},
 	{Name: "unit_carries", Layer: "matrices", Columns: []string{"unit", "kind", "target"}},
+	// unit_declares marks each declaration group present on a unit row
+	// (WRITES, USES, CARRIES, VALUES, CLAUSES, READS, payload), so a rule
+	// can tell WRITES{} (declared read-only) from no WRITES at all: an empty
+	// group contributes no member row, only this marker.
+	{Name: "unit_declares", Layer: "matrices", Columns: []string{"unit", "group"}},
 
 	{Name: "event", Layer: "events", Columns: []string{"id", "producer"}, Defines: true},
 	{Name: "event_participant", Layer: "events", Columns: []string{"id", "participant"}},

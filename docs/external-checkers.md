@@ -174,7 +174,7 @@ first line) that a gate uses to print a human location, and one string per colum
 | `relationships` | `relationship(id, src, dst, cardinality)` | `rel:X->Y:card[:role]` | the Modelith model, cardinality as stated |
 | `actions` | `action(id, entity, name, actor)` | `action:Entity.name` | Modelith entity actions |
 | `machines` | `machine(id)`, `state(id, machine, kind)`, `transition(id, src, event, dst)`, `guard_on(transition, guard)`, `action_on(transition, action)`, `invoke(state, service)`, `context_key(machine, key)` | `machine:M`, `state:M.s`, `tr:M.<oracle stable id>` | `machines/*.machine.json`; a transition's id is the stable id of its generated oracle row |
-| `matrices` | `unit(id, machine, name, kind)`, `unit_clauses(unit, clause, status)`, `unit_reads(unit, event, field)`, `unit_values(unit, group, member)`, `unit_derived(unit, fact)`, `unit_payload(unit, event, field)`, `unit_writes(unit, fact)`, `unit_uses(unit, fact)`, `unit_carries(unit, kind, target)` | `unit:M.name`; `matrix:M` for a declaration on a non-unit row (a consumed-event row) | `machines/*.matrix.md` declaration groups: `CLAUSES{}`/`RETIRED{}`, `READS{}`, `VALUES{}`, `derived:`, `payload {}`, `WRITES{}`, `USES{}`, `CARRIES{}` |
+| `matrices` | `unit(id, machine, name, kind)`, `unit_clauses(unit, clause, status)`, `unit_reads(unit, event, field)`, `unit_values(unit, group, member)`, `unit_derived(unit, fact)`, `unit_payload(unit, event, field)`, `unit_writes(unit, fact)`, `unit_uses(unit, fact)`, `unit_carries(unit, kind, target)`, `unit_declares(unit, group)` | `unit:M.name`; `matrix:M` for a declaration on a non-unit row (a consumed-event row) | `machines/*.matrix.md` declaration groups: `CLAUSES{}`/`RETIRED{}`, `READS{}`, `VALUES{}`, `derived:`, `payload {}`, `WRITES{}`, `USES{}`, `CARRIES{}`; `unit_declares` marks each group present on the row (`WRITES`, `USES`, `CARRIES`, `VALUES`, `CLAUSES`, `READS`, `payload`), so `WRITES{}` (read-only) differs from no WRITES group |
 | `events` | `event(id, producer)`, `event_participant(id, participant)`, `event_consumer(id, consumer)`, `event_payload_field(id, field)` | `event:name` | ARCHITECTURE.md event-contract tables |
 | `c4` | `c4_element(id, kind, parent)`, `c4_relationship(src, dst)`, `boundary(id, element, role)`, `allowed_edge(src, dst)`, `reads_row(artifact, reader)` | `c4:id`, `boundary:id`, `external:id` | `workspace.dsl` and the Architecture Contract |
 | `authorization` | `admission(subject, capability)`, `no_authorization(subject)` | `action:Entity.name` | the table under the `machinery:authorization-inventory` marker |
@@ -198,6 +198,8 @@ What the layers settle:
   projected as written (`dod_id(M0, ZZZZ-abcdef)`); whether it exists is Gb's question. A cited test id
   is normalized to its stable id when an oracle declares it, and `ORACLESET{path}` expands to that
   file's rows.
+
+The 2.0 schema's `layers` objects are generated from the relation catalog in `internal/checker/relations.go`; after a catalog change, regenerate with `go test ./internal/checker -run TestProjectionV2SchemaIsGenerated -update` (the same test fails on a stale schema).
 - `action_writes` is not emitted: Modelith states no structured post-condition for an action.
 
 The binding discipline is unchanged: `input_hash` covers every projected field, the layers included,
