@@ -396,3 +396,32 @@ func TestFactsUnitDeclaresMarksEveryGroupIncludingEmptyWrites(t *testing.T) {
 		}
 	}
 }
+
+// PRODUCES{} projects one unit_produces row per member and a PRODUCES marker.
+// A row may carry PRODUCES and WRITES together (a consumer arm that writes
+// its own row and performs another entity's action): both project, neither
+// shadows the other. A consumed-event row names no unit, so its PRODUCES
+// attaches to the matrix id, like every declaration on such a row.
+func TestFactsProducesProjectsBesideWrites(t *testing.T) {
+	design := writeFactsDesign(t, t.TempDir(), map[string]string{
+		"machines/Order.machine.json": factsMachine,
+		"machines/Order.matrix.md": "| name | kind | event | pre / post |\n|---|---|---|---|\n" +
+			"| `settle` | actor | - | WRITES{Order.status} PRODUCES{Order.pay} CARRIES{column:Order.status} |\n\n" +
+			"| consumed event | reaction |\n|---|---|\n" +
+			"| `payment.captured` | PRODUCES{Order.pay} |\n",
+	})
+	facts, err := LoadDesignFacts(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := map[string][]string{
+		"unit_produces": {"Order|Order.pay", "Order.settle|Order.pay"},
+		"unit_writes":   {"Order.settle|Order.status"},
+		"unit_declares": {"Order|PRODUCES", "Order.settle|CARRIES", "Order.settle|PRODUCES", "Order.settle|WRITES"},
+	}
+	for relation, want := range checks {
+		if got := factRows(facts, relation); strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Fatalf("%s = %v, want %v", relation, got, want)
+		}
+	}
+}

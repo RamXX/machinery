@@ -165,7 +165,7 @@ entities:
 	"machines/Order.machine.json": factsMachine,
 	"machines/Order.matrix.md": "| name | kind | event | pre / post |\n|---|---|---|---|\n" +
 		"| `canPay` | guard | - | USES{Order.stat} VALUES OrderStatus{Placed, Voided} |\n" +
-		"| `persist` | actor | - | WRITES{Order.status} |\n" +
+		"| `persist` | actor | - | WRITES{Order.status} PRODUCES{Order.settle} |\n" +
 		"| `announce` | action | `order.paid` | payload {Order.id} |\n",
 	"ARCHITECTURE.md": "# Architecture\n\n| event | producer | consumer | delivery | payload |\n|---|---|---|---|---|\n" +
 		"| `order.paid` | app | ledger | at-least-once | `Order.id`, `Order.total` |\n\n" +

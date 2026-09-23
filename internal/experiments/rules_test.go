@@ -18,7 +18,8 @@ func init() {
 	RegisterRunner("rules_test.go",
 		"rules-authz-missing", "rules-authz-orphan", "rules-authz-unknown-capability",
 		"rules-fact-unresolved", "rules-values-disagree", "rules-payload-twin",
-		"rules-supersession-cycle", "rules-effect-uncarried")
+		"rules-supersession-cycle", "rules-effect-uncarried",
+		"rules-produces-owes-admission", "rules-produces-unknown-action")
 }
 
 // rulesFindings runs Gy-rules and returns its SHADOW and warning lines. The
@@ -181,4 +182,30 @@ func TestRulesEffectUncarried(t *testing.T) {
 	near, _ := fixture(t)
 	contractOf(t, near, "commit status", "commit status. WRITES{}")
 	refuteRuleFinding(t, near, "effect_uncarried")
+}
+
+// A produced action owes an admission though its Modelith actor is not
+// System; an admission discharges the produced obligation.
+func TestRulesProducesOwesAdmission(t *testing.T) {
+	design, _ := fixture(t)
+	contractOf(t, design, "commit status", "commit status. PRODUCES{Widget.publish}")
+	requireRuleFinding(t, "rules-produces-owes-admission", design)
+
+	near, _ := fixture(t)
+	contractOf(t, near, "commit status", "commit status. PRODUCES{Widget.publish}")
+	admit(t, near, "Widget.publish", "`app`")
+	refuteRuleFinding(t, near, "authz_")
+}
+
+// A PRODUCES member the model does not declare is its own finding, and owes
+// no admission (there is no action to admit); a declared one is silent.
+func TestRulesProducesUnknownAction(t *testing.T) {
+	design, _ := fixture(t)
+	contractOf(t, design, "commit status", "commit status. PRODUCES{Widget.unpublish}")
+	requireRuleFinding(t, "rules-produces-unknown-action", design)
+	refuteRuleFinding(t, design, "authz_missing")
+
+	near, _ := fixture(t)
+	contractOf(t, near, "commit status", "commit status. PRODUCES{Widget.publish}")
+	refuteRuleFinding(t, near, "produces_unknown_action")
 }

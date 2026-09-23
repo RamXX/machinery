@@ -170,7 +170,7 @@ an enum, the row is the vocabulary's one declaration; prose cannot define a
 second list. A cited vocabulary owned by another model entity and a matching
 enum typed on the owning entity need no duplicate unit-local declaration.
 
-Four more groups state what a unit touches. Gx-trace parses them and fails a
+Five more groups state what a unit touches. Gx-trace parses them and fails a
 malformed one; Gy-rules (below) reads them in shadow. Members use the dotted
 identifier grammar of payload fields; a group opens and closes in one table
 cell; a row carries at most one group of each name.
@@ -179,6 +179,10 @@ cell; a row carries at most one group of each name.
   writes. `WRITES{}` states a read-only unit.
 - `USES{Order.totalCents, LineItem.quantity}`: the facts the unit reads or
   names. An empty `USES{}` is an error; omit the group instead.
+- `PRODUCES{Order.markPaid}`: on the matrix row that names a cascade or
+  consumer arm, the Modelith actions that arm performs. Each member is one
+  `Entity.action` the model declares, and each owes an authorization
+  admission whatever its Modelith actor. An empty `PRODUCES{}` is an error.
 - `CARRIES{column:Order.status, outbox:OutboxMessage}`: what carries an
   action's or actor's effect. Kinds are `column`, `outbox`, `sink`, `signal`,
   and `action`.
@@ -187,7 +191,7 @@ cell; a row carries at most one group of each name.
 
 An upper-case word directly followed by `{` in a matrix table cell that names
 none of `CLAUSES`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`,
-`CARRIES`, or `SUPERSEDES` is an error, so a misspelled or private group never
+`PRODUCES`, `CARRIES`, or `SUPERSEDES` is an error, so a misspelled or private group never
 passes as prose. Gl-ledger warns on a backticked snake_case or `Entity.attr`
 token in a contract, clause, or payload cell that sits outside every group and
 that the row does not declare: declare it in `USES{}` or `WRITES{}`, or drop the

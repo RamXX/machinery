@@ -554,6 +554,7 @@
             "unit_writes",
             "unit_uses",
             "unit_carries",
+            "unit_produces",
             "unit_declares"
           ],
           "additionalProperties": false,
@@ -824,6 +825,33 @@
                     "$ref": "#/$defs/symbol"
                   },
                   "target": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
+            },
+            "unit_produces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "unit",
+                  "action"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "unit": {
+                    "$ref": "#/$defs/symbol"
+                  },
+                  "action": {
                     "$ref": "#/$defs/symbol"
                   }
                 }

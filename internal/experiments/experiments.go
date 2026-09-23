@@ -158,6 +158,14 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "row 'WidgetA': supersession_cycle", ExpectExit: false},
 	{Name: "rules-effect-uncarried", Tool: "check", Mutation: "an action declares WRITES{Widget.status} and no CARRIES{}",
 		ExpectSubstr: "row 'Widget.commit': effect_uncarried", ExpectExit: false},
+	// 2026-09-23, consistency layer Stage 4: PRODUCES{} declares the action a
+	// cascade or consumer arm performs, so a produced action owes an admission
+	// whatever its Modelith actor, and a produced name the model lacks is its
+	// own finding.
+	{Name: "rules-produces-owes-admission", Tool: "check", Mutation: "a matrix row declares PRODUCES{Widget.publish} (a non-System action) and no authorization row admits it",
+		ExpectSubstr: "row 'Widget.publish': authz_missing", ExpectExit: false},
+	{Name: "rules-produces-unknown-action", Tool: "check", Mutation: "PRODUCES{Widget.unpublish} names an action the model does not declare",
+		ExpectSubstr: "row 'Widget.commit': produces_unknown_action (action 'Widget.unpublish')", ExpectExit: false},
 }
 
 // RefineExperiments are the data-refinement reconciliation failures.

@@ -6,20 +6,22 @@
 // followed by a braced, comma-separated closed list, placed in a table cell.
 // CLAUSES{}, READS{}, VALUES{} and ORACLESET{} are parsed by their own
 // owners (clausedecl.go, payloadreads.go, values.go, the Gb packet reader).
-// This file adds four members and parses them into typed values, so a later
-// stage can project them as facts without re-reading the design:
+// This file adds five members and parses them into typed values, so the
+// projection can turn them into facts without re-reading the design:
 //
 //	WRITES{Order.status, Order.total}   the closed set of stored facts a unit writes
 //	WRITES{}                            a read-only unit
 //	USES{Order.total, line_item_count}  the closed set of facts a unit reads or names
+//	PRODUCES{Order.markPaid}            the Modelith actions a matrix row's cascade or
+//	                                    consumer arm performs; each owes an admission
 //	CARRIES{column:Order.status, outbox:order.confirmed}
 //	                                    what carries a unit's effect; kinds are
 //	                                    column, outbox, sink, signal, action
 //	SUPERSEDES{type:LegacyOrder}        on an Architecture Contract row: this row
 //	                                    replaces a stable type id (kind type only)
 //
-// No gate semantics hang on these yet. What is enforced is the grammar, at
-// parse time, and the closure of the group-name vocabulary: an upper-case
+// What is enforced here is the grammar, at parse time, and the closure of the
+// group-name vocabulary (the Gy-rules gate decides on the projected facts): an upper-case
 // word followed by `{` in a matrix table cell that names no known group is an
 // ERROR, exactly as an unknown `_` annotation is in the machine lint.
 //
@@ -57,11 +59,12 @@ import (
 	"github.com/RamXX/machinery/internal/ir"
 )
 
-// Declaration group names. The four below are parsed here; the rest are
+// Declaration group names. The five below are parsed here; the rest are
 // owned elsewhere and only recognized, so the unknown-group rule accepts them.
 const (
 	GroupWrites     = "WRITES"
 	GroupUses       = "USES"
+	GroupProduces   = "PRODUCES"
 	GroupCarries    = "CARRIES"
 	GroupSupersedes = "SUPERSEDES"
 )
@@ -70,8 +73,22 @@ const (
 // is lower-case and never reaches the upper-case opening scan.
 var knownDeclarationGroups = map[string]bool{
 	"CLAUSES": true, "RETIRED": true, "READS": true, "VALUES": true, "ORACLESET": true,
-	GroupWrites: true, GroupUses: true, GroupCarries: true, GroupSupersedes: true,
+	GroupWrites: true, GroupUses: true, GroupProduces: true, GroupCarries: true, GroupSupersedes: true,
 }
+
+// parsedHere reports whether a group is parsed by this file (the rest are
+// recognized only, and parsed by their own owners).
+func parsedHere(group string) bool {
+	switch group {
+	case GroupWrites, GroupUses, GroupProduces, GroupCarries, GroupSupersedes:
+		return true
+	}
+	return false
+}
+
+// producedAction is the Entity.action shape of a PRODUCES member: exactly one
+// dot, both halves identifiers, the shape of a Modelith action id.
+var producedAction = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*\.[A-Za-z][A-Za-z0-9_]*$`)
 
 // carrierKinds is the closed CARRIES kind vocabulary; supersessionKinds the
 // closed SUPERSEDES one (Stage 1 admits type replacement only).
@@ -84,17 +101,17 @@ var (
 // followed by an ASCII `{`. The leading class keeps the match whole-word
 // under RE2's lack of lookbehind: `RankedConstituent{` (CamelCase) and
 // `xWRITES{` never match; `err{` is lower-case and never matches. A
-// hyphenated or underscored name (`MACHINE-WRITTEN{`) is one word, so a
-// consumer's private group is reported whole.
+// hyphenated or underscored name (`OWNED-BY{`) is one word, so a private
+// group is reported whole.
 var groupOpening = regexp.MustCompile(`(?:^|[^A-Za-z0-9_-])([A-Z][A-Z0-9_-]*[A-Z0-9])\{`)
 
-// Declaration is one parsed WRITES, USES, CARRIES, or SUPERSEDES group.
+// Declaration is one parsed WRITES, USES, PRODUCES, CARRIES, or SUPERSEDES group.
 type Declaration struct {
 	File    string            // design-relative, slash-separated path
 	Line    int               // 1-based line of the table row
 	Row     string            // the row's unit name (named-unit tables) or first cell
 	Column  string            // header label of the cell carrying the group
-	Group   string            // GroupWrites, GroupUses, GroupCarries, GroupSupersedes
+	Group   string            // GroupWrites, GroupUses, GroupProduces, GroupCarries, GroupSupersedes
 	Members []string          // members in source order; "kind:target" for CARRIES/SUPERSEDES
 	Pairs   []DeclarationPair // CARRIES and SUPERSEDES members, split
 }
@@ -168,7 +185,11 @@ func parseDottedMembers(group, body string, allowEmpty bool) ([]string, string) 
 		if allowEmpty {
 			return []string{}, ""
 		}
-		return nil, group + "{} is empty; a unit that uses nothing declares no " + group + " group"
+		verb := "uses"
+		if group == GroupProduces {
+			verb = "produces"
+		}
+		return nil, group + "{} is empty; a unit that " + verb + " nothing declares no " + group + " group"
 	}
 	seen := map[string]bool{}
 	var out []string
@@ -247,6 +268,13 @@ func parseGroup(span groupSpan) (Declaration, string) {
 		d.Members, why = parseDottedMembers(GroupWrites, span.body, true)
 	case GroupUses:
 		d.Members, why = parseDottedMembers(GroupUses, span.body, false)
+	case GroupProduces:
+		d.Members, why = parseDottedMembers(GroupProduces, span.body, false)
+		for _, m := range d.Members {
+			if why == "" && !producedAction.MatchString(m) {
+				why = "PRODUCES member " + ir.Repr(m) + " is not one Entity.action identifier"
+			}
+		}
 	case GroupCarries:
 		d.Members, d.Pairs, why = parseKindPairs(GroupCarries, span.body, carrierKinds)
 	case GroupSupersedes:
@@ -305,7 +333,7 @@ func normalizeNewlines(body []byte) string {
 }
 
 // ParseMatrixDeclarations walks one matrix file and returns every WRITES,
-// USES, and CARRIES declaration in it, row by row, plus every parse-time
+// USES, PRODUCES, and CARRIES declaration in it, row by row, plus every parse-time
 // finding: a malformed, empty (where the empty form is not legal),
 // duplicated, unterminated or nested group, more than one group of a name on
 // one row, a SUPERSEDES group (which belongs on an Architecture Contract
@@ -325,9 +353,9 @@ func ParseMatrixDeclarations(file string, body []byte) ([]Declaration, []Declara
 			for _, span := range scanGroups(cell) {
 				switch {
 				case !knownDeclarationGroups[span.name]:
-					fail("unknown declaration group " + span.name + "{...}; known groups are CARRIES, CLAUSES, ORACLESET, READS, USES, VALUES, WRITES (SUPERSEDES on Architecture Contract rows) and payload {...}")
+					fail("unknown declaration group " + span.name + "{...}; known groups are CARRIES, CLAUSES, ORACLESET, PRODUCES, READS, USES, VALUES, WRITES (SUPERSEDES on Architecture Contract rows) and payload {...}")
 					continue
-				case span.name != GroupWrites && span.name != GroupUses && span.name != GroupCarries && span.name != GroupSupersedes:
+				case !parsedHere(span.name):
 					continue // CLAUSES, READS, VALUES, ORACLESET: owned by their own parsers
 				case span.end < 0:
 					fail(span.name + "{ is never closed in its cell; a group opens and closes inside one table cell and cannot span cells or rows")

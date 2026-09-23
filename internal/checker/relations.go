@@ -69,8 +69,12 @@ var relationCatalog = []RelationSpec{
 	{Name: "unit_writes", Layer: "matrices", Columns: []string{"unit", "fact"}},
 	{Name: "unit_uses", Layer: "matrices", Columns: []string{"unit", "fact"}},
 	{Name: "unit_carries", Layer: "matrices", Columns: []string{"unit", "kind", "target"}},
+	// unit_produces names each Modelith action a matrix row's cascade or
+	// consumer arm performs (PRODUCES{Entity.action}); a produced action owes
+	// an authorization admission like a System action.
+	{Name: "unit_produces", Layer: "matrices", Columns: []string{"unit", "action"}},
 	// unit_declares marks each declaration group present on a unit row
-	// (WRITES, USES, CARRIES, VALUES, CLAUSES, READS, payload), so a rule
+	// (WRITES, USES, PRODUCES, CARRIES, VALUES, CLAUSES, READS, payload), so a rule
 	// can tell WRITES{} (declared read-only) from no WRITES at all: an empty
 	// group contributes no member row, only this marker.
 	{Name: "unit_declares", Layer: "matrices", Columns: []string{"unit", "group"}},

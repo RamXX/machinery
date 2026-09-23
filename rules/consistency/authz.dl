@@ -2,14 +2,12 @@
 //
 // Every System write owes exactly one row in the marked authorization
 // inventory: an admission naming a capability, or a (no authorization: ...)
-// waiver. A System write is a Modelith action whose actor is System, unless
-// the matrix unit of the same id declares WRITES{} (read-only). The unit and
-// the action share an id when the matrix is named after the entity, which is
-// the design convention (machines/Order.matrix.md holds Order's units).
-//
-// Matrix cascade and consumer arms are not projected (their producer cell is
-// prose-shaped, and projection v2 has no relation for them), so a matrix
-// producer is not an obligation here; the 0.9.0 Gx heuristic still covers it.
+// waiver. A System write is a Modelith action whose actor is System, or an
+// action a matrix row names in PRODUCES{} (the cascade or consumer arm that
+// performs it), unless the matrix unit of the same id declares WRITES{}
+// (read-only). The unit and the action share an id when the matrix is named
+// after the entity, which is the design convention (machines/Order.matrix.md
+// holds Order's units).
 
 .decl action(id:symbol, entity:symbol, name:symbol, actor:symbol)
 .input action
@@ -23,6 +21,11 @@
 .input unit_declares
 .decl unit_writes(unit:symbol, fact:symbol)
 .input unit_writes
+.decl unit_produces(unit:symbol, action:symbol)
+.input unit_produces
+
+.decl declared_action(action:symbol)
+declared_action(A) :- action(A, _, _, _).
 
 .decl writes_something(unit:symbol)
 writes_something(U) :- unit_writes(U, _).
@@ -32,6 +35,7 @@ declared_read_only(U) :- unit_declares(U, "WRITES"), !writes_something(U).
 
 .decl system_write(action:symbol)
 system_write(A) :- action(A, _, _, "System"), !declared_read_only(A).
+system_write(A) :- unit_produces(_, A), declared_action(A), !declared_read_only(A).
 
 .decl admitted(subject:symbol)
 admitted(S) :- admission(S, _).
@@ -53,3 +57,9 @@ finding_authz_unknown_capability(S, C) :- admission(S, C), !capability(C).
 
 .decl capability(id:symbol)
 capability(C) :- c4_element(C, _, _).
+
+// A PRODUCES{} member naming no Modelith action: the row claims to perform an
+// action the model does not declare, so no admission can be owed or checked.
+.decl finding_produces_unknown_action(unit:symbol, action:symbol)
+.output finding_produces_unknown_action
+finding_produces_unknown_action(U, A) :- unit_produces(U, A), !declared_action(A).

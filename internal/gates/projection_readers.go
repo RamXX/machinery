@@ -597,8 +597,8 @@ func (b *factBuilder) matrices() {
 // matrices relations. It is the one place a new matrix declaration becomes a
 // fact: CLAUSES{}/RETIRED{} (unit_clauses), READS{} (unit_reads), VALUES{}
 // (unit_values), derived: (unit_derived), payload {} (unit_payload), and the
-// Stage 1 groups parsed by ParseMatrixDeclarations, WRITES{} (unit_writes),
-// USES{} (unit_uses) and CARRIES{} (unit_carries). Every group present on
+// groups parsed by ParseMatrixDeclarations, WRITES{} (unit_writes), USES{}
+// (unit_uses), PRODUCES{} (unit_produces) and CARRIES{} (unit_carries). Every group present on
 // the row, even an empty WRITES{}, also yields one unit_declares marker. A
 // new group adds a case here and a relation to the checker catalog, and
 // nothing else moves.
@@ -718,6 +718,12 @@ func (b *factBuilder) matrixRowFacts(mr matrixRow) {
 					b.add(mr.rel, r.line, relation, sid, subject, fact)
 				})
 			}
+		case GroupProduces:
+			for _, action := range d.Members {
+				each(func(_ int, subject, sid string) {
+					b.add(mr.rel, r.line, "unit_produces", sid, subject, action)
+				})
+			}
 		case GroupCarries:
 			for _, p := range d.Pairs {
 				each(func(_ int, subject, sid string) {
@@ -745,7 +751,7 @@ const (
 )
 
 // declarationMarkerGroups is the unit_declares vocabulary in emission order.
-var declarationMarkerGroups = []string{GroupWrites, GroupUses, GroupCarries, GroupValues, GroupClauses, GroupReads, GroupPayload}
+var declarationMarkerGroups = []string{GroupWrites, GroupUses, GroupProduces, GroupCarries, GroupValues, GroupClauses, GroupReads, GroupPayload}
 
 // ---------------------------------------------------------------- oracles
 

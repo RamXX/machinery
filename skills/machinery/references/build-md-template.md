@@ -454,10 +454,13 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   inferred to denote the same vocabulary. A same-named Modelith enum must
   agree exactly. A cited vocabulary owned by another model entity, or an enum
   typed on this entity, does not need a second local declaration.
-- Four declaration groups state what a unit touches: `WRITES{Order.status}`
+- Five declaration groups state what a unit touches: `WRITES{Order.status}`
   (the stored facts it writes; `WRITES{}` is a read-only unit),
   `USES{Order.totalCents, LineItem.quantity}` (the facts it reads or names;
-  never empty), `CARRIES{column:Order.status, outbox:OutboxMessage}` (what
+  never empty), `PRODUCES{Order.markPaid}` (on the row naming a cascade or
+  consumer arm: the Modelith actions that arm performs, each of which owes an
+  authorization admission; never empty, members are `Entity.action`),
+  `CARRIES{column:Order.status, outbox:OutboxMessage}` (what
   carries an action's or actor's effect; kinds `column`, `outbox`, `sink`,
   `signal`, `action`), and, on an Architecture Contract row only,
   `SUPERSEDES{type:LegacyDeal}` (the stable type id the row replaces). Members
@@ -465,7 +468,8 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   carries at most one group per name. Gx-trace fails an empty (where not
   allowed), duplicate, malformed, unterminated, or repeated group, and any
   upper-case `NAME{` in a matrix cell outside the closed vocabulary (`CLAUSES`,
-  `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `CARRIES`, `SUPERSEDES`).
+  `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `PRODUCES`, `CARRIES`,
+  `SUPERSEDES`).
   A backticked fact in a contract, clause, or payload cell that no group on
   its row declares is a Gl-ledger warning, never a finding that resolves it.
 - Every Modelith action whose actor is `System` and writes its resource, plus every producer named by

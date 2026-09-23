@@ -20,7 +20,7 @@ func TestShippedRulesLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string][]string{
-		"authz.dl":        {"finding_authz_missing", "finding_authz_orphan", "finding_authz_unknown_capability"},
+		"authz.dl":        {"finding_authz_missing", "finding_authz_orphan", "finding_authz_unknown_capability", "finding_produces_unknown_action"},
 		"carriers.dl":     {"warn_effect_uncarried", "finding_actor_uncarried"},
 		"facts.dl":        {"finding_fact_unresolved"},
 		"payload.dl":      {"finding_payload_twin"},
