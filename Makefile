@@ -31,7 +31,7 @@ ACTIONLINT_VERSION := $(shell cat .actionlint-version 2>/dev/null)
 INSTALL_DIR ?= $(HOME)/.local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: build dev-link uninstall test test-integration test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight preflight-fast dagger-ci dagger-job ci-linux hooks lint-install help
+.PHONY: build dev-link uninstall test test-integration test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight preflight-fast dagger-ci dagger-job ci-linux hooks lint-install runtime-pins help
 
 build: ## Build the machinery binary from source into .bin/machinery (needs Go)
 	@mkdir -p .bin && go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery
@@ -115,6 +115,9 @@ lint-install: ## Install the pinned static-analysis tools so local matches CI ex
 	@go install github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 	@echo "installed golangci-lint $(GOLANGCI_VERSION) to $(shell go env GOPATH)/bin"
 	@echo "installed actionlint $(ACTIONLINT_VERSION) to $(shell go env GOPATH)/bin"
+
+runtime-pins: ## Report pinned vs host vs latest upstream runtimes; exits non-zero when a pin is behind
+	@go run ./scripts/runtime-pins
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'
