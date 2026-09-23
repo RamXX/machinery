@@ -26,7 +26,7 @@ named-unit contract table and the failure catalog.
 | `incrementRetries` / `incrementCarrierRetries` | action | `(ctx) -> ctx` | increment the respective counter | - | unit | pure |
 | `recordCarrierError` / `recordCarrierTimeout` / `recordCarrierExhausted` / `recordDispatchFailed` | action | `(ctx,evt) -> ctx` | `lastError := classified carrier outcome`; a failed dispatch leaves the shipment truthfully Pending for the saga to compensate | C4 3 carrier posture | unit | pure |
 | `recordError` / `recordConflict` / `recordTimeout` / `recordUnknownError` / `recordRetriesExhausted` / `recordRoutingError` | action | `(ctx,evt) -> ctx` | `lastError := classified repo error` | maps repo errors | unit | pure |
-| `validateAddressCountry` | invariant | `(address) -> bool` | reject dispatch input when `Address.country` is empty before invoking the carrier | inv `address-country-present`; Shipment dispatch boundary | property | generated addresses with empty and non-empty country |
+| `validateAddressCountry` | invariant | `(address) -> bool` | reject dispatch input when `Address.country` is empty before invoking the carrier. USES{Address.country} | inv `address-country-present`; Shipment dispatch boundary | property | generated addresses with empty and non-empty country |
 
 Structural: `shipment-terminal` is enforced by Delivered and Lost being final states.
 

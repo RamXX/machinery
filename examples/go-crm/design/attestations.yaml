@@ -2,46 +2,46 @@ attestation_version: 2
 attestations:
   - claim: g2.action-ownership
     kind: plan
-    attestor: Codex lane/next-gates
+    attestor: Claude consistency-layer stage 1
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 3, 4, and 7a: the action-owner table still assigns domain actions to session or domain components; the 2026-09-06 change only adds internal/testoracle/** to the test-only ignore list and changes no owner mapping. The plan judgment stands.'
+    note: 'Re-reviewed 2026-09-22 over ARCHITECTURE.md section 7 after the consistency-layer Stage 1 edit: the Deal persistence row adds a SUPERSEDES{type:LegacyDeal} declaration and a clause citing the migration.yaml replace disposition; placement, ownership, edges, mitigation and event contracts are unchanged. The plan judgment stands; prior review note: Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 3, 4, and 7a: the action-owner table still assigns domain actions to session or domain components; the 2026-09-06 change only adds internal/testoracle/** to the test-only ignore list and changes no owner mapping. The plan judgment stands.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
+      - {path: ARCHITECTURE.md, hash: sha256:34c473df978f5ed3c436204190c19fd1b5a881a1cc4bda06165d2da22dcf8fe6}
   - claim: g2.interface-contract-rightness
     kind: plan
-    attestor: Codex lane/next-gates
+    attestor: Claude consistency-layer stage 1
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 4 and 5: allowed and denied edges, interface shapes, typed errors, and retry rules are unchanged; internal/testoracle is imported only by _test.go files, so the new ignore entry introduces no runtime crossing. The plan judgment stands.'
+    note: 'Re-reviewed 2026-09-22 over ARCHITECTURE.md section 7 after the consistency-layer Stage 1 edit: the Deal persistence row adds a SUPERSEDES{type:LegacyDeal} declaration and a clause citing the migration.yaml replace disposition; placement, ownership, edges, mitigation and event contracts are unchanged. The plan judgment stands; prior review note: Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 4 and 5: allowed and denied edges, interface shapes, typed errors, and retry rules are unchanged; internal/testoracle is imported only by _test.go files, so the new ignore entry introduces no runtime crossing. The plan judgment stands.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
+      - {path: ARCHITECTURE.md, hash: sha256:34c473df978f5ed3c436204190c19fd1b5a881a1cc4bda06165d2da22dcf8fe6}
   - claim: g2.placement-rightness
     kind: plan
-    attestor: Codex lane/next-gates
+    attestor: Claude consistency-layer stage 1
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 1 and 7: each aggregate, session, and command execution retains its placement, persistence, and single-writer transaction rule. The testoracle ignore entry does not change deployment or storage. The plan judgment stands.'
+    note: 'Re-reviewed 2026-09-22 over ARCHITECTURE.md section 7 after the consistency-layer Stage 1 edit: the Deal persistence row adds a SUPERSEDES{type:LegacyDeal} declaration and a clause citing the migration.yaml replace disposition; placement, ownership, edges, mitigation and event contracts are unchanged. The plan judgment stands; prior review note: Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 1 and 7: each aggregate, session, and command execution retains its placement, persistence, and single-writer transaction rule. The testoracle ignore entry does not change deployment or storage. The plan judgment stands.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
+      - {path: ARCHITECTURE.md, hash: sha256:34c473df978f5ed3c436204190c19fd1b5a881a1cc4bda06165d2da22dcf8fe6}
   - claim: g2.adoption-closure-discovery
     kind: plan
-    attestor: Codex lane/next-gates
+    attestor: Claude consistency-layer stage 1
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 2, 4, and 6: LadybugDB store and argon2 are still inventoried with mitigation and residual handling. The added internal/testoracle ignore covers a committed-oracle parser used only by tests, not an operated runtime closure. The plan judgment stands.'
+    note: 'Re-reviewed 2026-09-22 over ARCHITECTURE.md section 7 after the consistency-layer Stage 1 edit: the Deal persistence row adds a SUPERSEDES{type:LegacyDeal} declaration and a clause citing the migration.yaml replace disposition; placement, ownership, edges, mitigation and event contracts are unchanged. The plan judgment stands; prior review note: Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 2, 4, and 6: LadybugDB store and argon2 are still inventoried with mitigation and residual handling. The added internal/testoracle ignore covers a committed-oracle parser used only by tests, not an operated runtime closure. The plan judgment stands.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
+      - {path: ARCHITECTURE.md, hash: sha256:34c473df978f5ed3c436204190c19fd1b5a881a1cc4bda06165d2da22dcf8fe6}
   - claim: g2.event-contract-completeness
     kind: plan
-    attestor: Codex lane/next-gates
+    attestor: Claude consistency-layer stage 1
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 1 and 5: this local CLI declares no asynchronous event stream; its session, repository, authorization, and domain crossings retain explicit errors and idempotency rules. The test-only ignore addition changes no event or interface contract. The plan judgment stands.'
+    note: 'Re-reviewed 2026-09-22 over ARCHITECTURE.md section 7 after the consistency-layer Stage 1 edit: the Deal persistence row adds a SUPERSEDES{type:LegacyDeal} declaration and a clause citing the migration.yaml replace disposition; placement, ownership, edges, mitigation and event contracts are unchanged. The plan judgment stands; prior review note: Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 1 and 5: this local CLI declares no asynchronous event stream; its session, repository, authorization, and domain crossings retain explicit errors and idempotency rules. The test-only ignore addition changes no event or interface contract. The plan judgment stands.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
+      - {path: ARCHITECTURE.md, hash: sha256:34c473df978f5ed3c436204190c19fd1b5a881a1cc4bda06165d2da22dcf8fe6}
   - claim: g2.nfr-content
     kind: plan
-    attestor: Codex lane/next-gates
+    attestor: Claude consistency-layer stage 1
     date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 1, 6, and 8: local security, single-writer capacity, and exit-code and stderr observability remain explicit. Ignoring the test-only oracle parser changes none of these runtime assumptions. The plan judgment stands.'
+    note: 'Re-reviewed 2026-09-22 over ARCHITECTURE.md section 7 after the consistency-layer Stage 1 edit: the Deal persistence row adds a SUPERSEDES{type:LegacyDeal} declaration and a clause citing the migration.yaml replace disposition; placement, ownership, edges, mitigation and event contracts are unchanged. The plan judgment stands; prior review note: Re-reviewed 2026-09-22 over current ARCHITECTURE.md sections 1, 6, and 8: local security, single-writer capacity, and exit-code and stderr observability remain explicit. Ignoring the test-only oracle parser changes none of these runtime assumptions. The plan judgment stands.'
     covers:
-      - {path: ARCHITECTURE.md, hash: sha256:7dc2b0403a05192d958798503138af12ea0c062614178c23fd5a4217495a7dad}
+      - {path: ARCHITECTURE.md, hash: sha256:34c473df978f5ed3c436204190c19fd1b5a881a1cc4bda06165d2da22dcf8fe6}
   - claim: g3.guard-semantics
     kind: plan
     attestor: Codex CRM design review

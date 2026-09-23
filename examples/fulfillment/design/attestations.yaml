@@ -62,18 +62,18 @@ attestations:
         hash: sha256:b49cd5370d84a0e8194275006c1781d9bc4397e8a15f55df4e72a0221cefdaae
   - claim: g3.guard-semantics
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'Guard contracts were reconciled to their transition sites and invariant IDs; compound guards now expose closed CLAUSES vocabularies and routing guards have explicit fallbacks.'
+    attestor: Claude consistency-layer stage 1
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over the Order, FulfillmentSaga and Shipment matrices after the consistency-layer Stage 1 edits: the only changes are WRITES, USES and CARRIES declarations on persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning. The plan judgment stands; prior review note: Guard contracts were reconciled to their transition sites and invariant IDs; compound guards now expose closed CLAUSES vocabularies and routing guards have explicit fallbacks.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
       - path: machines/FulfillmentSaga.matrix.md
-        hash: sha256:ad12c5e03919c491c4a527d36beccde7832bb13552282cdd54845d58ed3928f1
+        hash: sha256:537049bf3fdd6e916c0d091f939d0e50de9f0a92d24fc8573a012956d245d305
       - path: machines/Order.machine.json
         hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
       - path: machines/Order.matrix.md
-        hash: sha256:2b3f2d142356e919eac6423484d19fdeb74a17fcd28f07fe5cce0e4005687ad9
+        hash: sha256:d8df6c2b0eed1935622007106f897ebbe1001f61ecdf593233dbb42b6bf98a96
       - path: machines/OutboxMessage.machine.json
         hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
       - path: machines/OutboxMessage.matrix.md
@@ -89,21 +89,21 @@ attestations:
       - path: machines/Shipment.machine.json
         hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
       - path: machines/Shipment.matrix.md
-        hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
+        hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
   - claim: g3.invariant-enforcement
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'All 25 invariants have a machine unit or generated integrity carrier; creation-time validations and terminal-state properties are named units rather than prose-only assertions.'
+    attestor: Claude consistency-layer stage 1
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over the Order, FulfillmentSaga and Shipment matrices after the consistency-layer Stage 1 edits: the only changes are WRITES, USES and CARRIES declarations on persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning. The plan judgment stands; prior review note: All 25 invariants have a machine unit or generated integrity carrier; creation-time validations and terminal-state properties are named units rather than prose-only assertions.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
       - path: machines/FulfillmentSaga.matrix.md
-        hash: sha256:ad12c5e03919c491c4a527d36beccde7832bb13552282cdd54845d58ed3928f1
+        hash: sha256:537049bf3fdd6e916c0d091f939d0e50de9f0a92d24fc8573a012956d245d305
       - path: machines/Order.machine.json
         hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
       - path: machines/Order.matrix.md
-        hash: sha256:2b3f2d142356e919eac6423484d19fdeb74a17fcd28f07fe5cce0e4005687ad9
+        hash: sha256:d8df6c2b0eed1935622007106f897ebbe1001f61ecdf593233dbb42b6bf98a96
       - path: machines/OutboxMessage.machine.json
         hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
       - path: machines/OutboxMessage.matrix.md
@@ -119,21 +119,21 @@ attestations:
       - path: machines/Shipment.machine.json
         hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
       - path: machines/Shipment.matrix.md
-        hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
+        hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
   - claim: g3.residual-transitions
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'Bus, gateway, database, carrier, timeout, retry exhaustion, and corrupt-router outcomes retain explicit transitions; unknown routing stops in a diagnosable routingFault residual rather than guessing domain state.'
+    attestor: Claude consistency-layer stage 1
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over the Order, FulfillmentSaga and Shipment matrices after the consistency-layer Stage 1 edits: the only changes are WRITES, USES and CARRIES declarations on persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning. The plan judgment stands; prior review note: Bus, gateway, database, carrier, timeout, retry exhaustion, and corrupt-router outcomes retain explicit transitions; unknown routing stops in a diagnosable routingFault residual rather than guessing domain state.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
       - path: machines/FulfillmentSaga.matrix.md
-        hash: sha256:ad12c5e03919c491c4a527d36beccde7832bb13552282cdd54845d58ed3928f1
+        hash: sha256:537049bf3fdd6e916c0d091f939d0e50de9f0a92d24fc8573a012956d245d305
       - path: machines/Order.machine.json
         hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
       - path: machines/Order.matrix.md
-        hash: sha256:2b3f2d142356e919eac6423484d19fdeb74a17fcd28f07fe5cce0e4005687ad9
+        hash: sha256:d8df6c2b0eed1935622007106f897ebbe1001f61ecdf593233dbb42b6bf98a96
       - path: machines/OutboxMessage.machine.json
         hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
       - path: machines/OutboxMessage.matrix.md
@@ -149,21 +149,21 @@ attestations:
       - path: machines/Shipment.machine.json
         hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
       - path: machines/Shipment.matrix.md
-        hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
+        hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
   - claim: g3.event-redelivery
     kind: plan
-    attestor: Codex production-readiness review
-    date: 2026-09-02
-    note: 'At-least-once commands and replies have event-contract rows, payload READS declarations, dedupe keys, and explicit stale or out-of-order dispositions in resting states.'
+    attestor: Claude consistency-layer stage 1
+    date: 2026-09-22
+    note: 'Re-reviewed 2026-09-22 over the Order, FulfillmentSaga and Shipment matrices after the consistency-layer Stage 1 edits: the only changes are WRITES, USES and CARRIES declarations on persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning. The plan judgment stands; prior review note: At-least-once commands and replies have event-contract rows, payload READS declarations, dedupe keys, and explicit stale or out-of-order dispositions in resting states.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
       - path: machines/FulfillmentSaga.matrix.md
-        hash: sha256:ad12c5e03919c491c4a527d36beccde7832bb13552282cdd54845d58ed3928f1
+        hash: sha256:537049bf3fdd6e916c0d091f939d0e50de9f0a92d24fc8573a012956d245d305
       - path: machines/Order.machine.json
         hash: sha256:33939a962517410160d592a5f5526de898a249ce62cd0ad9e6956b10c4a39176
       - path: machines/Order.matrix.md
-        hash: sha256:2b3f2d142356e919eac6423484d19fdeb74a17fcd28f07fe5cce0e4005687ad9
+        hash: sha256:d8df6c2b0eed1935622007106f897ebbe1001f61ecdf593233dbb42b6bf98a96
       - path: machines/OutboxMessage.machine.json
         hash: sha256:c8933d625b8b3a68c7e50af0efe202dbc811f2b3c8f89f37e7718232ecaeaf93
       - path: machines/OutboxMessage.matrix.md
@@ -179,7 +179,7 @@ attestations:
       - path: machines/Shipment.machine.json
         hash: sha256:39a355a3e946ddd344392732c9ea23623f8e8df3c2b61f20be03dcef0b4e6f6b
       - path: machines/Shipment.matrix.md
-        hash: sha256:22a75123501354be61151be95f185e3cd2984aa43555881583e1db0e37ea630d
+        hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
   - claim: gt.conformance-test-shape
     kind: plan
     attestor: Codex lane/next-gates

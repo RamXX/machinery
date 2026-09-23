@@ -14,7 +14,7 @@ the named-unit contract table and the failure catalog.
 | `dispatchShipment` | actor | `(orderId) -> ok \| err` | emits dispatch via the outbox; ok when the shipment is Dispatched | C4 `saga -> outbox -> bus -> shippingSvc`; inv `no-ship-before-pay` | integration | real bus + shipping service with carrier fake |
 | `compensate` | actor | `(orderId) -> ok \| err` | single idempotent step: refund if captured, release if reserved; ok only when every held obligation is undone | inv `saga-compensation`, `refund-within-capture` | integration + property | real bus + both services; property: compensate twice = compensate once |
 | `retriesExhausted` | guard | `(ctx) -> bool` | true iff `ctx.retries >= 3` | C4 3 compensation bound | unit | pure |
-| `incrementRetries` | action | `(ctx) -> ctx` | `retries := retries + 1` | - | unit | pure |
+| `incrementRetries` | action | `(ctx) -> ctx` | `retries := retries + 1`. WRITES{} | - | unit | pure |
 | `reserveBeforePay` | invariant | `(state) -> bool` | `reserve-before-pay`: the only path into Paying is successful completion of `reserveInventory`, so capture cannot begin before every reservation is Held | inv `reserve-before-pay` | model + unit | machine graph and command-emission assertion |
 | `sagaTerminal` | invariant | `(state) -> bool` | `saga-terminal`: Completed, Failed, and FailedDirty are final; no event or timer can leave them | inv `saga-terminal` | model + unit | machine graph final-state assertion |
 | `markReserved` / `markPaid` / `markShipped` | action | `(ctx,evt) -> ctx` | record the completed forward step (drives the Order aggregate's saga events) | Order actions of the same name | unit | pure |
