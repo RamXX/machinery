@@ -62,9 +62,9 @@ attestations:
         hash: sha256:b49cd5370d84a0e8194275006c1781d9bc4397e8a15f55df4e72a0221cefdaae
   - claim: g3.guard-semantics
     kind: plan
-    attestor: Claude consistency-layer stage 1
-    date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over the Order, FulfillmentSaga and Shipment matrices after the consistency-layer Stage 1 edits: the only changes are WRITES, USES and CARRIES declarations on persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning. The plan judgment stands; prior review note: Guard contracts were reconciled to their transition sites and invariant IDs; compound guards now expose closed CLAUSES vocabularies and routing guards have explicit fallbacks.'
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: 'Guard contracts were reconciled to their transition sites and invariant IDs; compound guards now expose closed CLAUSES vocabularies and routing guards have explicit fallbacks. Hash renewed 2026-09-22 after the consistency-layer Stage 1 edits, which add only WRITES, USES and CARRIES declarations to persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
@@ -92,9 +92,9 @@ attestations:
         hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
   - claim: g3.invariant-enforcement
     kind: plan
-    attestor: Claude consistency-layer stage 1
-    date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over the Order, FulfillmentSaga and Shipment matrices after the consistency-layer Stage 1 edits: the only changes are WRITES, USES and CARRIES declarations on persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning. The plan judgment stands; prior review note: All 25 invariants have a machine unit or generated integrity carrier; creation-time validations and terminal-state properties are named units rather than prose-only assertions.'
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: 'All 25 invariants have a machine unit or generated integrity carrier; creation-time validations and terminal-state properties are named units rather than prose-only assertions. Hash renewed 2026-09-22 after the consistency-layer Stage 1 edits, which add only WRITES, USES and CARRIES declarations to persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
@@ -122,9 +122,9 @@ attestations:
         hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
   - claim: g3.residual-transitions
     kind: plan
-    attestor: Claude consistency-layer stage 1
-    date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over the Order, FulfillmentSaga and Shipment matrices after the consistency-layer Stage 1 edits: the only changes are WRITES, USES and CARRIES declarations on persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning. The plan judgment stands; prior review note: Bus, gateway, database, carrier, timeout, retry exhaustion, and corrupt-router outcomes retain explicit transitions; unknown routing stops in a diagnosable routingFault residual rather than guessing domain state.'
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: 'Bus, gateway, database, carrier, timeout, retry exhaustion, and corrupt-router outcomes retain explicit transitions; unknown routing stops in a diagnosable routingFault residual rather than guessing domain state. Hash renewed 2026-09-22 after the consistency-layer Stage 1 edits, which add only WRITES, USES and CARRIES declarations to persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
@@ -152,9 +152,9 @@ attestations:
         hash: sha256:55d55a746ac01c5525f5f4ea7dcf6ddc86b9b3495ce60b1ead50d311612ebd7a
   - claim: g3.event-redelivery
     kind: plan
-    attestor: Claude consistency-layer stage 1
-    date: 2026-09-22
-    note: 'Re-reviewed 2026-09-22 over the Order, FulfillmentSaga and Shipment matrices after the consistency-layer Stage 1 edits: the only changes are WRITES, USES and CARRIES declarations on persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning. The plan judgment stands; prior review note: At-least-once commands and replies have event-contract rows, payload READS declarations, dedupe keys, and explicit stale or out-of-order dispositions in resting states.'
+    attestor: Codex production-readiness review
+    date: 2026-09-02
+    note: 'At-least-once commands and replies have event-contract rows, payload READS declarations, dedupe keys, and explicit stale or out-of-order dispositions in resting states. Hash renewed 2026-09-22 after the consistency-layer Stage 1 edits, which add only WRITES, USES and CARRIES declarations to persistOrder, guardCanConfirm, commitStatus, incrementRetries and validateAddressCountry; no guard contract, invariant carrier, failure row or redelivery rule changed meaning.'
     covers:
       - path: machines/FulfillmentSaga.machine.json
         hash: sha256:804175e855afd43210c9295cd27a590866d86e4c16ad6bf4e6920b4ba88834c7
