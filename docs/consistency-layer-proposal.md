@@ -1,6 +1,7 @@
 # Proposal: the consistency layer (declarations, facts, rules)
 
-**Status: proposal, not implemented.** Written 2026-09-22 against v0.9.0. It replaces
+**Status: Stages 1 to 4 implemented** (each has an "as implemented" subsection below; Stage 5,
+new rules without new Go, is open). Written 2026-09-22 against v0.9.0. It replaces
 the prose-heuristic implementation of the four Gx extensions that shipped in 0.9.0 with
 a declaration grammar, a fact projection, and rules evaluated as data, and it gives the
 remaining consistency gaps (effect carriers, twin tables, source supersession,
@@ -277,10 +278,9 @@ and runs unchanged under Soufflé.
   `finding_<code>` or `warn_<code>`, and every relation so named is an `.output`; no two files emit
   one relation; every output attribute is a symbol, and the first names the subject kind (`unit`,
   `action`, `subject`, `type`), which is how the gate locates the subject.
-- **Severity.** `finding_*` tuples are the new `SHADOW` severity: printed as `  SHADOW <message>`
-  after the warnings, counted on the `checked:` line as `N shadow finding(s)` (always shown, zero
-  included), never blocking, never a warning, not even under `--warnings-as-errors` or
-  `--complete`. `warn_*` tuples are ordinary warnings. Stage 4 promotes `finding_*` to ERROR.
+- **Severity.** Stage 3 ran `finding_*` tuples as a non-blocking preview severity of their own;
+  Stage 4 made them ERRORs and removed that severity (see Stage 4 below). `warn_*` tuples are
+  ordinary warnings.
 - **Messages.** `path:line: row 'X': <code> (attr 'value', ...)`, where `X` is the subject id and
   the location is the first projected row whose first column is `X` in the relations its kind
   names (`unit`, then the declaration rows `unit_declares` and `unit_derived`, so a finding on a
@@ -314,31 +314,78 @@ What the rules read and decide, where the text above left it open:
 - **carriers.dl.** Entry 20 ships in two tiers. `warn_effect_uncarried`: an action or actor unit
   with a non-empty `WRITES{}` and no `CARRIES{}` (a real warning; no bundled design has one).
   `finding_actor_uncarried`: an actor unit with no `CARRIES{}` that is not declared read-only by
-  `WRITES{}`. It is SHADOW, not warning, because the bundled designs' 42 actor units predate
-  `CARRIES{}`, and the example gate policy treats any warning as a failure; the promotion path is
-  to add `CARRIES{}` to those actors, then promote both to `finding_` and on to ERROR at Stage 4.
-- **supersession.dl.** `duplicate_owner` cannot fire yet: ARCHITECTURE.md is the only artifact
-  that owns a type. `dangling_replacement` fires on go-crm's `SUPERSEDES{type:LegacyDeal}`,
-  because the legacy type lives in `migration.yaml`, which projects no `type_owner`. The rule is
-  right on its input; the gap is the projection's.
+  `WRITES{}`. It ran as a preview, not a warning, because the bundled designs' 41 actor units
+  predated `CARRIES{}` and the example gate policy treats any warning as a failure; Stage 4 added
+  the carriers and merged both relations into `finding_effect_uncarried`.
+- **supersession.dl.** At Stage 3 `duplicate_owner` could not fire (ARCHITECTURE.md was the only
+  artifact owning a type) and `dangling_replacement` fired on go-crm's `SUPERSEDES{type:LegacyDeal}`,
+  because `migration.yaml` projected no `type_owner`. The rule was right on its input; Stage 4
+  closed the projection's gap.
 - **`unit_declares(unit, group)`** was added to projection 2.0 for these rules (one row per group
   present on a row: `WRITES`, `USES`, `CARRIES`, `VALUES`, `CLAUSES`, `READS`, `payload`).
 
 Evidence. `TestRulesParity` runs every rule file over every bundled example and one synthetic
-design on which every output but `finding_duplicate_owner` has tuples, under Soufflé and
-`internal/datalog`, comparing sorted outputs: 54 runs (6 files by 9 designs), all equal. The CI
+design on which every output has tuples (at Stage 3, every output but `finding_duplicate_owner`),
+under Soufflé and `internal/datalog`, comparing sorted outputs: 54 runs (6 files by 9 designs), all
+equal. The CI
 job `datalog-parity` runs it, with the evaluator's own parity corpus, in an image built from pinned
 inputs (`scripts/souffle.dockerfile`: Ubuntu 24.04 and golang 1.27.1 by digest, the Soufflé 2.5
 `.deb` by sha256, dependencies from a fixed Ubuntu snapshot), and fails if a test skipped its
-Soufflé half. `TestRulesShadowAgreement` compares the class A to D subjects of the 0.9.0 Gx checks
-with the `finding_*` subjects: on every activated example both are empty. Three fixtures record the
-structural discrepancies, each with a verdict:
+Soufflé half. At Stage 3 an agreement test compared the class A to D subjects of the 0.9.0 Gx
+checks with the `finding_*` subjects: on every activated example both were empty. Three fixtures
+recorded the structural discrepancies, each with a verdict (Stage 4 keeps them as rules-only
+fixtures):
 
 | Case | Only in | Right side and why |
 |---|---|---|
 | a System action whose description says it writes nothing | rules (`authz_missing`) | rules: the claim is prose; `WRITES{}` on the unit declares it |
 | a fact backticked in a contract cell, in no group | heuristic (unresolved fact) | rules: a bare token is prose, which Gl-ledger already warns on |
 | `VALUES{...}` on unit `orderState` against enum `OrderState` | heuristic (`VALUES` mismatch) | heuristic, on intent; the fix is a normalized group key in the projection, or the explicit `VALUES OrderState{...}` |
+
+#### Stage 4, as implemented
+
+The prose heuristics are gone and Gy-rules decides alone, at ERROR tier.
+
+- **Coverage first.** Nothing the heuristics covered was dropped before they were deleted:
+  - *Producers.* `PRODUCES{Entity.action, ...}` on the matrix row naming a cascade or consumer arm,
+    parsed with the Stage 1 groups, projected as `unit_produces(unit, action)`. In `authz.dl` a
+    produced action is a System write (so it owes an admission whatever its Modelith actor) unless
+    its own unit declares `WRITES{}`. A member the model does not declare is its own finding,
+    `produces_unknown_action`, and owes no admission (there is no action to admit). No bundled
+    example needed a `PRODUCES` group: the 0.9.0 producer-column inference found no matrix
+    producer on any of them.
+  - *Migration owners.* Every `migration.yaml` disposition naming a target projects
+    `type_owner(<legacy>, migration.yaml)`; a retired legacy entity names no target and is claimed
+    by nothing. go-crm's `LegacyDeal` replacement resolves, and `duplicate_owner` can now fire.
+  - *VALUES binding.* Exact names, no case folding and no fuzzy join: `VALUES Enum{...}` binds
+    `Enum`, and an unnamed group binds only when its unit name equals the enum name exactly.
+    Gl-ledger warns on an unnamed group whose unit name equals an enum name only when lower-cased,
+    naming the fix.
+  - *Carriers.* All 41 actor units of the bundled examples declare `CARRIES{}` from their own
+    signature, pre/post and maps-to columns. `warn_effect_uncarried` and `finding_actor_uncarried`
+    merged into `finding_effect_uncarried`; `finding_carrier_misplaced` rejects `CARRIES{}` on a
+    unit that is neither an action nor an actor.
+  - *Named vocabularies.* The one real defect the VALUES heuristic caught that no rule covered
+    (two units spelling one enum-less named group differently) is `finding_values_conflict`.
+- **Severity.** Every `finding_*` relation is an ERROR, printed with its `--explain` derivation
+  under the ERROR line. The Stage 3 preview severity is removed whole (the gate field, the
+  printing, the `checked:` count, the golden lines).
+- **Deletion.** `authz.go`, `facts.go`, `values.go` and `payloadtwins.go` are deleted with their
+  tests (2,639 lines), including every regular expression that decided a fact from prose and every
+  identifier naming one consumer's notation. The parsers they held (the `AUTHORIZATION.md` table,
+  `payload {}`, `derived:`, `VALUES{}`) live in `declarations.go`. Gx-trace narrows to
+  traceability plus the shape errors of those parsers and of the Stage 1 groups.
+- **One release of overlap.** Gx warns on a design that declares no `WRITES{}`, `USES{}` or
+  `PRODUCES{}` anywhere and quotes a snake_case or `Entity.member` token in prose on a row with no
+  group, naming the migration note in the machinery skill. A migrated design never sees it. It
+  fires on no bundled example (checkout-split and portfolio-engine gained the `USES{}` their prose
+  had named) and is removed in the release after next.
+- **Where it runs.** The stop hook selects `gy` with the CLI's activation rule (`machines/` or
+  `AUTHORIZATION.md`); `make preflight` runs the parity lane through
+  `make dagger-job JOB=datalog-parity`.
+- **Consumer notation.** A design with a private authorization notation generates the
+  `AUTHORIZATION.md` rows from its own reader and binds the generated file to that reader with a
+  `reads:` row (Gr-reads); machinery reads only the public table.
 
 ## 4. The rules, written out
 
@@ -428,11 +475,11 @@ byte-identical. Make `examples/pii-flow` run its `rules.dl` under a digest-pinne
 image and delete the hand-rolled fixed point from `adapter.py`, so the reference example
 is a real engine.
 
-**Stage 3. Evaluator, parity lane, shadow gate.** Land `internal/datalog` with the
+**Stage 3. Evaluator, parity lane, preview gate.** Land `internal/datalog` with the
 parser, stratification, semi-naive evaluation and derivation recording. Add the CI
 parity lane (Docker, Soufflé pinned by digest) that evaluates every shipped rule file over
 every golden fact set on both engines and diffs the outputs. Land `Gy-rules` with rules A
-through D running in shadow: findings are emitted at warning tier and the golden corpus
+through D running as a preview: findings are emitted without blocking and the golden corpus
 records both the Gx findings and the Gy findings side by side. Any subject the two
 disagree on is a fixture to write.
 

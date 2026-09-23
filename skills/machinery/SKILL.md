@@ -116,22 +116,22 @@ not the event-payload `READS{...}` grammar above. `Gr-reads` warns in a design-o
 commit. The exact closed grammar is in `docs/declared-reads.md`.
 
 When a matrix event row restates a complete payload, use exactly one
-`payload {field, ...}` or `payload is exactly {field, ...}` group. Gx-trace
-binds it to that row's one event and requires exact set equality with the
+`payload {field, ...}` or `payload is exactly {field, ...}` group. It binds to
+that row's one event, and Gy-rules requires exact set equality with the
 Architecture Contract payload cell. Payload prose without a group defines
 nothing.
 
-Every action whose Modelith actor is `System`, and every producer named in an
-exact producer column of a matrix cascade or consumer table, needs an
-authorization admission. A marked hand-written inventory (`AUTHORIZATION.md`
-or `ARCHITECTURE.md`) gives exact subject rows and is covered by g2 attestations.
-Its admission exactly names a declared C4 element, matrix producer, or
-residual-table preset; a row may instead use
-`(no authorization: <reason>)`. A matrix may carry the H2 form instead:
-`MACHINE-WRITTEN{action, ...}` in a resource's machine-written actions cell,
-and `MACHINE-WRITTEN-BY{action: producer, ...}` in the residual verb table's
-resource cell. The latter is producer-narrowed. A residual seat-side verb grant
-governs a non-System actor. A matrix with these marks needs no marker document.
+Every action whose Modelith actor is `System`, and every action a matrix row
+declares in `PRODUCES{}`, needs an authorization admission: one row of a marked
+hand-written inventory (`AUTHORIZATION.md` carrying the
+`<!-- machinery:authorization-inventory -->` marker), covered by g2
+attestations. The row's subject is the `Entity.action` id and its admission is
+one backticked capability declared in `workspace.dsl`, or
+`(no authorization: <reason>)`. A `System` action whose matrix unit declares
+`WRITES{}` is read-only and owes no row. Gy-rules reports a missing, orphan, or
+unresolvable admission; Gx-trace reports a malformed row. A design with its own
+authorization notation generates these rows from its own reader (see the
+migration note below).
 
 Run `machinery check <design> --gate g2,gu` plus each artifact-activated gate,
 and `machinery verify-c4 <design>`. Record the required attestation rows.
@@ -152,15 +152,13 @@ machines may reuse one guard name, and a declaration whose oracle rows only a
 sibling machine could supply is an error naming that sibling. A declared guard
 no oracle governs, such as one on a creation edge, owes nothing.
 
-Backticked facts in named-unit contract, clause, and payload columns use the
-snake-case grammar plus Modelith attribute naming styles, including `Entity.attr` and single-word facts
-used with an explicit fact verb. They resolve to a Modelith attribute, enum
-member, action, machine context key, event name or payload field, failure-catalog
-identifier, a Class C content knob, a versioned vertical field, a model relation,
-an architecture join key, or a `VALUES` member on the same row. A unit-local computed fact uses
-`derived: fact_name (<reason>)` on the same row; the reason is mandatory and
-the waiver does not declare the fact for any other row. Quoted reason classes,
-classifications, producer names, and negated or rejected fields remain prose.
+A fact a unit reads or names is declared in `USES{}` (and a stored fact it
+writes in `WRITES{}`); a backticked token in prose is quotation, never a fact.
+Each member resolves to a Modelith attribute (`Entity.attr`) or enum member, a
+machine context key, an event payload field, or, on the same row, a `VALUES`
+member or a `derived: fact_name (<reason>)` waiver for a unit-local computed
+fact. The reason is mandatory and the waiver does not declare the fact for any
+other row.
 
 A closed vocabulary is one `VALUES{a, b, c}` group on a named-unit row.
 Different units sharing a vocabulary name it with `VALUES reason_class{a, b, c}`.
@@ -218,6 +216,31 @@ the facts it matched with their `path:line` sources.
 Run `machinery oracle`, `machinery check <design> --gate g3`, and
 `machinery verify-formal <design>`. Read the verification reference for all
 four semantics patterns, including `control-flow-only`.
+
+#### Migrating from the 0.9.0 prose inference
+
+machinery 0.9.0 inferred facts, writes, read-only units and producers from the
+wording of matrix cells. That inference is gone; a design states each of them.
+Gx-trace warns, for one release, on a design that declares no `WRITES{}`,
+`USES{}` or `PRODUCES{}` anywhere and quotes a fact-shaped token in prose.
+
+- A fact the prose backticked: declare it in `USES{}` on the row, or drop the
+  backticks if it was only a quotation.
+- A unit the prose called read-only ("writes nothing"): declare `WRITES{}`.
+  A unit that writes: `WRITES{Entity.attr, ...}`.
+- A producer the 0.9.0 check read from a cascade or consumer table's producer
+  column: `PRODUCES{Entity.action}` on that row, plus its `AUTHORIZATION.md`
+  row.
+- Every actor, and every action with a non-empty `WRITES{}`: `CARRIES{}` naming
+  the column, outbox event, sink, signal, or other machine's unit that carries
+  its effect.
+- A `VALUES{...}` group whose unit name matches its enum only up to case: name
+  it, `VALUES Enum{...}`.
+- A design with its own authorization notation (resource action lists, producer
+  marks, residual verb tables): machinery no longer reads it. Generate the
+  `AUTHORIZATION.md` rows from the reader the design's own tooling already has,
+  and declare the file and that reader in a root `reads:` row so Gr-reads binds
+  the pair.
 
 ### Build handoff
 

@@ -13,11 +13,12 @@ under their version heading when a release is cut.
   read-only unit), the facts it uses, and what carries its effect (`column`, `outbox`, `sink`,
   `signal`, `action`); Architecture Contract rows may declare `SUPERSEDES{type:OldName}`. Gx-trace
   parses them into typed declarations and fails malformed, empty, duplicate, unterminated, nested,
-  and repeated groups. No gate reconciles them yet.
+  and repeated groups; Gy-rules decides on them.
 - **Closed group-name vocabulary.** An upper-case `NAME{` in a matrix table cell that is not
-  `CLAUSES`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `CARRIES` or `SUPERSEDES` is a
-  Gx-trace error naming the row. A design carrying a private group (for example
-  `MACHINE-WRITTEN{}`) now fails until it maps that notation to the public grammar.
+  `CLAUSES`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `PRODUCES`, `CARRIES` or
+  `SUPERSEDES` is a
+  Gx-trace error naming the row. A design carrying a private group now fails until it maps that
+  notation to the public grammar.
 - **Undeclared fact references warn in Gl-ledger.** A backticked snake_case or `Entity.attr`
   token in a matrix contract, clause, or payload cell, outside every group and not declared by its
   own row, is a warning: declare it in `USES{}` or `WRITES{}`, or drop the backticks.
@@ -37,31 +38,56 @@ under their version heading when a release is cut.
   columns): the input Souffle and the in-process evaluator read without an adapter. The directory
   is staged and renamed into place, refuses to replace anything but facts output, and is
   byte-identical across reruns of an unchanged design. No checker manifest is needed.
-- **Gy-rules (consistency layer, Stage 3), in shadow.** A new gate, `gy` in the `--gate`
-  vocabulary and in the default suite, active on a design with `machines/` or an
+- **Gy-rules (consistency layer, Stages 3 and 4).** A new gate, `gy` in the `--gate` vocabulary,
+  in the default suite and in the stop hook's selection, active on a design with `machines/` or an
   `AUTHORIZATION.md`. It evaluates the Datalog rules shipped under `rules/consistency/`
   (`authz`, `facts`, `values`, `payload`, `carriers`, `supersession`) with the in-process
-  evaluator over the design's facts, built in memory (nothing is written). `finding_*` results
-  print as a new `SHADOW` severity: counted on the `checked:` line as `N shadow finding(s)`, never
-  blocking and never a warning, including under `--warnings-as-errors` and `--complete`. Findings
-  read `path:line: row 'X': <code>`. `warn_effect_uncarried` (a unit with a non-empty `WRITES{}`
-  and no `CARRIES{}`) is a real warning. The bundled designs report 0 to 13 shadow findings each,
-  all actors without `CARRIES{}` plus go-crm's `LegacyDeal` replacement, which no design artifact
-  declares.
+  evaluator over the design's facts, built in memory (nothing is written). Every `finding_*`
+  result is an ERROR reading `path:line: row 'X': <code>`: `authz_missing`, `authz_orphan`,
+  `authz_unknown_capability`, `produces_unknown_action`, `fact_unresolved`, `values_disagree`,
+  `values_conflict`, `payload_twin`, `effect_uncarried`, `carrier_misplaced`,
+  `duplicate_owner`, `supersession_cycle` and `dangling_replacement`. A `warn_*` result would be
+  a warning; none ships.
+- **`PRODUCES{Entity.action}` (consistency layer, Stage 4).** The matrix row that names a cascade
+  or consumer arm declares the Modelith actions that arm performs. Each member is one
+  `Entity.action`; a produced action owes an authorization admission whatever its Modelith actor,
+  and a member the model does not declare is `produces_unknown_action`. Projected as
+  `unit_produces(unit, action)`.
+- **`migration.yaml` owns the legacy types it disposes.** Every disposition naming a target
+  projects `type_owner(<legacy>, migration.yaml)`, so `SUPERSEDES{type:<legacy>}` resolves; a
+  retired legacy entity is claimed by nothing.
+- **Gl-ledger warns when an unnamed `VALUES{...}` misses its enum only by case.** Groups bind to
+  Modelith enums by exact name, and an unnamed group takes its unit's name; `VALUES{...}` on unit
+  `orderState` binds no enum `OrderState`. The warning names the fix, `VALUES OrderState{...}`.
 - **`machinery check --explain`.** Prints under each Gy-rules finding the derivation that
   produced it: the rule file and 1-based rule index, then the matched facts with their
   `path:line` sources.
 - **`unit_declares(unit, group)` in projection 2.0.** One row per declaration group present on a
-  matrix row (`WRITES`, `USES`, `CARRIES`, `VALUES`, `CLAUSES`, `READS`, `payload`), so
+  matrix row (`WRITES`, `USES`, `PRODUCES`, `CARRIES`, `VALUES`, `CLAUSES`, `READS`, `payload`), so
   `WRITES{}` (declared read-only) is distinguishable from no `WRITES` group. The published
   `schemas/projection-v2.schema.json` gains the relation; it is now regenerated from the relation
   catalog by `go test ./internal/checker -run TestProjectionV2SchemaIsGenerated -update`.
 - **CI `datalog-parity` job.** Runs every shipped rule file over every bundled example, and the
   evaluator's own program corpus, under both engines against Souffle 2.5 in an image built from
-  pinned inputs (`scripts/souffle.dockerfile`), mirrored as `dagger call datalog-parity`.
+  pinned inputs (`scripts/souffle.dockerfile`), mirrored as `dagger call datalog-parity` and run by
+  `make preflight` through `make dagger-job JOB=datalog-parity`.
 
 ### Changed
 
+- **The consistency checks cut over from prose heuristics to the shipped rules (consistency
+  layer, Stage 4).** The 0.9.0 Gx-trace authorization inventory, named-unit fact resolution,
+  closed-vocabulary and payload-twin checks are deleted with every regular expression that decided
+  a fact from prose and every reader of one consumer's private notation. Gy-rules owns those
+  decisions over declared facts only, at ERROR tier. Gx-trace narrows back to traceability plus
+  the shape errors of the declaration parsers it keeps (`WRITES`, `USES`, `PRODUCES`, `CARRIES`,
+  `SUPERSEDES`, `VALUES`, `payload {}`, `derived:`, the marked `AUTHORIZATION.md` table); its
+  `checked:` line loses the heuristic counts and gains `authorization rows read`, `VALUES
+  declarations parsed`, `payload declarations parsed` and `derived waivers parsed`. Gx warns, for
+  one release, on a design that declares no `WRITES{}`, `USES{}` or `PRODUCES{}` anywhere and
+  quotes a snake_case or `Entity.member` token in prose on a row with no group: such a design
+  relied on the old inference. That warning is removed in the release after next. The bundled
+  examples declare a `CARRIES{}` on all 41 actor units and a `USES{}` where their prose named a
+  fact, and every Gy-rules result on them is empty.
 - **`examples/pii-flow` runs its rules under a real Datalog engine (consistency layer, Stage 2).**
   `rules.dl` is now evaluated by Souffle 2.5 inside a digest-pinned `linux/amd64` image, and
   `adapter.py` only translates: projection and config to `.facts`, `souffle --no-preprocessor`, then
@@ -81,6 +107,40 @@ under their version heading when a release is cut.
   trace) instead of 13; the `Gk-pii-flow` line is unchanged. The design-engines CI job and
   `make preflight` provision the image and run the new `TestPiiFlowSouffleVerdicts`, which proves a
   `fail` verdict naming the leaking sink and every fail-closed path in the pinned image.
+
+### Compatibility and migration
+
+**Existing designs.** A design green under 0.9.0 can now fail Gy-rules, and loses nothing it
+did not declare. Nothing is inferred from prose any more; declare instead:
+
+- `WRITES{Entity.attr, ...}` on each unit that writes stored facts, and `WRITES{}` on a unit the
+  0.9.0 scan treated as read-only because its prose said it writes nothing (a `System` action
+  whose unit declares `WRITES{}` owes no admission).
+- `USES{fact, ...}` on each unit whose contract names a fact; every member must resolve to a
+  Modelith attribute or enum member, a machine context key, an event payload field, or the row's
+  own `derived:` waiver or `VALUES` member. A backticked token outside every group is prose.
+- `PRODUCES{Entity.action, ...}` on each matrix row naming a cascade or consumer arm that
+  performs an action; each produced action needs an `AUTHORIZATION.md` row.
+- `CARRIES{kind:target, ...}` on every actor (unless it declares `WRITES{}`) and on every action
+  with a non-empty `WRITES{}`: `column:Entity.attr` for a repository write, `outbox:event` for an
+  outbox emission, `sink:element` for an external call or resource, `signal:name`, and
+  `action:Machine.unit` for an effect another machine's unit answers.
+- A named `VALUES Enum{...}` wherever an unnamed group's unit name differs from its enum's name,
+  case included.
+
+A design that carries its own authorization notation (resource action lists, producer marks,
+residual verb tables) keeps it for its own tooling, but machinery no longer reads it: generate
+the marked `AUTHORIZATION.md` rows (`Entity.action` subject, backticked capability or
+`(no authorization: <reason>)`) from the consumer's own reader, and declare the generated file
+and that reader in a `reads:` row so Gr-reads binds the pair. The migration note in the machinery
+skill ("Migrating from the 0.9.0 prose inference") walks through each case.
+
+**Proof scope.** A green Gy-rules establishes, over declared facts only, that every `System`
+and produced action has one admission naming a declared capability, every declared fact
+resolves, every enum-bound `VALUES` group equals its enum and every enum-less shared group agrees
+with itself, every `payload {}` twin equals its contract row, every effect names a carrier, and
+type supersession is acyclic with owned replacements. It says nothing about facts a design only
+mentions in prose.
 
 ### Fixed
 

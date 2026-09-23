@@ -437,12 +437,12 @@ sets, so give the mapping an artifact and G2 holds it in both directions. The he
 
 ## System authorization inventories (required when System writes exist)
 
-Every Modelith action whose actor is `System` and writes its resource is an autonomous write obligation. An action whose Modelith description or action-specific matrix row establishes that it only verifies a recorded row without changing it owes no resource-write admission. A matrix table
-with a distinct `producer` column and a cascade or consumer column adds one subject from each
-producer cell to the
-same obligation set. One hand-written Markdown artifact in the design, conventionally
-`AUTHORIZATION.md` or ARCHITECTURE.md, may carry this marker and one closed inventory. The artifact
-must be covered by the g2 attestation rows with a truthful review record:
+Every Modelith action whose actor is `System` is an autonomous write obligation, and so is every
+action a matrix row declares in `PRODUCES{Entity.action}` (the cascade or consumer arm that
+performs it). A `System` action whose matrix unit of the same id declares `WRITES{}` is read-only
+and owes nothing; prose saying it writes nothing does not discharge it. One hand-written Markdown
+artifact in the design, conventionally `AUTHORIZATION.md`, carries this marker and one closed
+inventory. The artifact must be covered by the g2 attestation rows with a truthful review record:
 
 ```
 <!-- machinery:authorization-inventory -->
@@ -450,30 +450,18 @@ must be covered by the g2 attestation rows with a truthful review record:
 
 | authorization subject | admission |
 |---|---|
-| `Order.markPaid` | `orders` |
-| `SearchIndex.rebuild` | `(no authorization: isolated rebuild worker has no caller identity)` |
+| `Order.confirm` | `orderSvc` |
+| `Outbox.purge` | (no authorization: operator-scheduled retention job) |
 
-Each producer cell names one identifier after Markdown annotations are removed; prose naming multiple
-subjects is an error. Each obligation appears exactly once by exact subject. Admission is one backticked identifier that exactly names a declared subject: a C4 element id in `workspace.dsl`, a producer name declared by a matrix, or a preset named in the residual verb table. A real C4 id followed by an invented capability suffix is not a declared subject and fails Gx. The gate proves the row exists and its admission names a declared subject. Resolving that subject against a capability list and checking implementation enforcement are separate work.
-The inventory records a plan assertion; implementation enforcement is reviewed
-separately. A genuinely unauthorizable internal write uses
-`(no authorization: <reason>)`; the reason is mandatory. Missing, duplicate, empty, and orphan rows
-are errors. The inventory is closed in both directions, so deleting a System action or matrix
-producer also requires deleting its stale authorization row.
-
-Alternatively, the H2 residual verb table and machine-written action inventory
-in a machine matrix are a first-class source. Gx reads
-`MACHINE-WRITTEN{action, ...}` only in a `machine-written actions` cell and
-`MACHINE-WRITTEN-BY{action: producer, ...}` only in the residual table's
-resource cell. The first admits that resource's named System action by name;
-the second admits it only under the stated producer set. An action cannot have
-both marks. For a resource with no machine-written list row, the residual verb
-table also admits a System write when every preset column withholds that
-action's write verb. A resource with a list row is held to that closed list;
-its residual verb cells cannot add an action. Residual seat columns grant
-verbs to non-System actors. A design
-using this matrix source owes no authorization marker; actions not granted by
-the matrix still report a missing admission.
+Each subject is one `Entity.action` id. Each admission is one backticked capability declared as an
+element in `workspace.dsl`, or `(no authorization: <reason>)` with a mandatory reason. Gx-trace
+reports a malformed row (a second marker, a missing column, a non-identifier subject, an empty or
+prose admission, a reasonless waiver, a duplicate subject). Gy-rules reports the obligations: a
+write with no row (`authz_missing`), a row for no write (`authz_orphan`), and an admission naming
+no declared element (`authz_unknown_capability`). The inventory records a plan assertion;
+implementation enforcement is reviewed separately. A design whose own tooling carries a private
+authorization notation generates these rows from its own reader, and a `reads:` row binds the
+generated file to that reader.
 
 ## Persistence and placement (the C4 to FSM bridge)
 
@@ -608,11 +596,11 @@ unarmed design carries no obligation at all.
 
 A matrix event row may restate the exact payload it implements with one group in any cell:
 `payload {Order.id, Order.paidAt}` or `payload is exactly {Order.id, Order.paidAt}`. This is a
-declaration, not prose. It binds to the row's one event and Gx-trace compares the field set with the
-payload cell of the Architecture Contract row for that event. Field order does not matter. Empty or
-duplicate members, malformed or repeated groups, a row naming zero or several events, conflicting
-declarations, an event with no architecture row, and unequal sets are errors. The mismatch prints
-both spellings.
+declaration, not prose. It binds to the row's one event, and Gy-rules compares the field set with
+the payload cell of the Architecture Contract row for that event (`payload_twin`, one finding per
+field present on one side only; an event whose contract cell states no closed set reports every
+declared field). Field order does not matter. Empty or duplicate members, malformed or repeated
+groups, and a row naming zero or several events are Gx-trace errors.
 
 The architecture payload cell supplies its closed set through backticked field names, or through a
 comma-separated list in which every member is an identifier. Use domain names such as `Order.id`,

@@ -430,22 +430,14 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   and blank or unknown explicit consumers also fail the armed tier.
 - An event row that restates the complete payload declares exactly one
   `payload {field, ...}` or `payload is exactly {field, ...}` group. Gx-trace
-  binds it to that row's one event and requires set equality with the
+  binds it to that row's one event, and Gy-rules requires set equality with the
   Architecture Contract payload cell. Field order is immaterial; empty,
-  duplicate, malformed, conflicting, missing, or multi-event declarations
-  fail. A payload mention without a group stays prose and defines nothing.
-- In named-unit contract, clause, and payload columns, backticked facts use
-  snake-case plus the Modelith attribute naming styles. `Entity.attr` resolves the named pair;
-  a single-word fact is checked when preceded by an explicit fact verb. Facts
-  also resolve to Modelith enum members and actions, event names and payload
-  fields (including prose-shaped payload cells), Class C content keys, vertical
-  YAML fields, relation names and keys, architecture join keys, machine context
-  keys, failure-catalog identifiers, and members of a
-  `VALUES` group on the same row. A unit-computed value uses the
-  row-local grammar `derived: authored_default_ref (<reason>)`. The fact name
-  and non-empty reason are mandatory; the waiver covers only that row.
-  Quoted reason classes, classifications, producer names, and negated or
-  rejected fields are prose, not fact obligations.
+  duplicate, malformed, or multi-event declarations fail in Gx-trace. A payload mention without a group stays prose and defines nothing.
+- A fact a unit reads or names is declared in `USES{}`, a stored fact it writes in `WRITES{}`.
+  Each member resolves to a Modelith attribute or enum member, a machine context key, an event
+  payload field, or, on the same row, a `VALUES` member or a `derived: fact_name (<reason>)`
+  waiver for a unit-computed value (the reason is mandatory and covers only that row). A
+  backticked token in prose is quotation, never a fact.
 - A closed vocabulary is one `VALUES{a, b, c}` group on a named-unit row.
   Members are distinct identifiers and order is immaterial.
   `VALUES reason_class{a, b, c}` names a vocabulary shared by multiple units.
@@ -471,26 +463,12 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   `SUPERSEDES`).
   A backticked fact in a contract, clause, or payload cell that no group on
   its row declares is a Gl-ledger warning, never a finding that resolves it.
-- Every Modelith action whose actor is `System` and writes its resource, plus every producer named by
-  a matrix cascade or consumer-arm table, has an admission in either a marked
-  hand-written authorization inventory, covered by g2 attestation rows, or the
-  H2 matrix form. `MACHINE-WRITTEN{action, ...}` belongs in a resource's
-  machine-written actions cell; `MACHINE-WRITTEN-BY{action: producer, ...}`
-  belongs in its residual verb table resource cell and admits only those
-  producers. For a resource with no machine-written list row, the residual
-  verb table admits a System write when every preset withholds its write verb.
-  A list row closes that fallback. An action declared to verify a recorded row
-  without changing it owes no resource-write admission. Residual seat cells
-  govern non-System actor verbs. The matrix
-  form needs no marker document. A
-  producer column must be distinct from a `producer / consumer` prose column.
-  Its admission cell names one exact declared subject as a backticked
-  identifier: a C4 element id, a matrix producer name, or a preset in the
-  residual verb table. An invented suffix under a C4 id fails. Gx proves row
-  existence and declared-subject resolution; capability-list resolution is
-  later work. Alternatively, the cell
-  carries `(no authorization: <reason>)`. Empty,
-  missing, duplicate, orphan, and reasonless-waiver rows fail in Gx-trace.
+- Every Modelith action whose actor is `System`, and every action a matrix row declares in
+  `PRODUCES{}`, has one row in the marked, g2-attested hand-written authorization inventory
+  (`AUTHORIZATION.md`): subject `Entity.action`, admission one backticked capability declared in
+  `workspace.dsl` or `(no authorization: <reason>)`. A `System` action whose unit declares
+  `WRITES{}` owes none. Gx-trace fails a malformed row; Gy-rules fails a missing, orphan, or
+  unresolvable admission.
 - Incident-derived invariants and fixtures carry a PROVENANCE pointer to the
   primary record (the customer report, the post-mortem document), so the
   attested re-derivation set is enumerable; a fixture named after an
