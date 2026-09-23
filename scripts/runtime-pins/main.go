@@ -4,14 +4,26 @@
 //
 // The pinned column is read from internal/runtimeclosure, the single owner
 // of every runtime pin. The host column runs the runtime found on PATH. The
-// latest column is fetched from each runtime's own release index; an
-// unreachable index prints "offline" instead of failing. The command exits 1
-// when any pin differs from a known latest release, and, under -strict, 2
-// when an index could not be reached, so a scheduled job can flag either.
+// latest column is fetched from each runtime's own release index. When no
+// index can be reached at all the column prints "offline"; when one index
+// fails while others answer, its cell names the failure ("lookup failed:
+// HTTP 403") and a warning is printed, because that is a broken lookup, not
+// a missing network.
 //
-//	go run ./scripts/runtime-pins            # report; exit 1 on drift
-//	go run ./scripts/runtime-pins -offline   # pinned and host only
-//	go run ./scripts/runtime-pins -strict    # also fail when an index is unreachable
+// Status is "ok" or "drift" (pin versus latest upstream) or "unknown" (no
+// latest), plus "host behind" or "host ahead" when the runtime on PATH is
+// not the pinned version, which is what fails the native suites locally.
+//
+// Exit codes: 1 when a pin is behind upstream; 2 under -strict when a latest
+// release is unknown; 3 under -host-strict when a host runtime is not the
+// pinned version; else 0. CI runs -strict (it has no host runtimes);
+// -host-strict is for a contributor machine. `go run` reports every nonzero
+// exit as 1; build the binary to see the distinct codes.
+//
+//	go run ./scripts/runtime-pins                 # report; exit 1 on drift
+//	go run ./scripts/runtime-pins -offline        # pinned and host only
+//	go run ./scripts/runtime-pins -strict         # also fail on an unknown latest
+//	go run ./scripts/runtime-pins -host-strict    # also fail when the host is not the pin
 package main
 
 import (
@@ -36,14 +48,16 @@ import (
 )
 
 const (
-	offline = "offline"
-	absent  = "absent"
+	offline      = "offline"
+	absent       = "absent"
+	lookupFailed = "lookup failed: "
 )
 
 // sources names every upstream index. Tests point them at local servers.
 type sources struct {
 	OTPTable       string // erlang/otp otp_versions.table: every OTP release and its erts
-	ElixirBuilds   string // builds.hex.pm Elixir build list
+	ElixirReleases string // GitHub releases API for elixir-lang/elixir
+	ElixirBuilds   string // builds.hex.pm Elixir build list, the fallback
 	NodeIndex      string // nodejs.org release index
 	TypeScript     string // npm registry dist-tag latest
 	PythonReleases string // python.org release API
@@ -54,6 +68,7 @@ type sources struct {
 
 var upstream = sources{
 	OTPTable:       "https://raw.githubusercontent.com/erlang/otp/master/otp_versions.table",
+	ElixirReleases: "https://api.github.com/repos/elixir-lang/elixir/releases?per_page=50",
 	ElixirBuilds:   "https://builds.hex.pm/builds/elixir/builds.txt",
 	NodeIndex:      "https://nodejs.org/dist/index.json",
 	TypeScript:     "https://registry.npmjs.org/typescript/latest",
@@ -71,17 +86,42 @@ type row struct {
 	Latest  string
 }
 
-// Status is "ok" when the pin is the latest release, "drift" when it is
+// PinStatus is "ok" when the pin is the latest release, "drift" when it is
 // not, and "unknown" when the latest release could not be fetched.
-func (r row) Status() string {
+func (r row) PinStatus() string {
 	switch {
-	case r.Latest == offline:
+	case r.Latest == offline || strings.HasPrefix(r.Latest, lookupFailed):
 		return "unknown"
 	case r.Latest == r.Pinned:
 		return "ok"
 	default:
 		return "drift"
 	}
+}
+
+// HostStatus is "host behind" or "host ahead" when the runtime on PATH is
+// not the pinned version, else empty. Java is exempt: machinery provisions
+// its pinned Temurin itself, so the PATH java never gates a suite.
+func (r row) HostStatus() string {
+	if r.Host == absent || r.Host == "" || r.Runtime == "Java" {
+		return ""
+	}
+	switch c := compareVersions(r.Host, r.Pinned); {
+	case c < 0:
+		return "host behind"
+	case c > 0:
+		return "host ahead"
+	default:
+		return ""
+	}
+}
+
+// Status is the pin verdict, plus the host verdict when there is one.
+func (r row) Status() string {
+	if host := r.HostStatus(); host != "" {
+		return r.PinStatus() + ", " + host
+	}
+	return r.PinStatus()
 }
 
 // pinned is the closed list of pinned runtimes, in report order, read from
@@ -101,7 +141,8 @@ func pinned() []row {
 
 func main() {
 	offlineFlag := flag.Bool("offline", false, "do not contact upstream indexes")
-	strict := flag.Bool("strict", false, "exit 2 when an upstream index cannot be reached")
+	strict := flag.Bool("strict", false, "exit 2 when a latest upstream release is unknown")
+	hostStrict := flag.Bool("host-strict", false, "exit 3 when a runtime on PATH is not the pinned version")
 	timeout := flag.Duration("timeout", 20*time.Second, "per-request timeout")
 	flag.Parse()
 	ctx := context.Background()
@@ -114,28 +155,34 @@ func main() {
 		}
 	} else {
 		client := &http.Client{Timeout: *timeout}
-		notes = fillLatest(ctx, rows, fetcher{client: client}, upstream)
+		notes = fillLatest(ctx, rows, fetcher{client: client, githubToken: os.Getenv("GITHUB_TOKEN")}, upstream)
 	}
 	fmt.Print(render(rows, notes))
-	os.Exit(exitCode(rows, *strict))
+	os.Exit(exitCode(rows, *strict, *hostStrict))
 }
 
 // exitCode is 1 on any drift, else 2 under strict when a latest release is
-// unknown, else 0.
-func exitCode(rows []row, strict bool) int {
-	unknown := false
+// unknown, else 3 under hostStrict when a host runtime is not the pin,
+// else 0.
+func exitCode(rows []row, strict, hostStrict bool) int {
+	unknown, host := false, false
 	for _, r := range rows {
-		switch r.Status() {
+		switch r.PinStatus() {
 		case "drift":
 			return 1
 		case "unknown":
 			unknown = true
 		}
+		host = host || r.HostStatus() != ""
 	}
-	if strict && unknown {
+	switch {
+	case strict && unknown:
 		return 2
+	case hostStrict && host:
+		return 3
+	default:
+		return 0
 	}
-	return 0
 }
 
 // render prints the report as a Markdown table, readable in a terminal and
@@ -225,37 +272,98 @@ func extractVersion(res []*regexp.Regexp, out []byte) string {
 	return ""
 }
 
-type fetcher struct{ client *http.Client }
+type fetcher struct {
+	client *http.Client
+	// githubToken authenticates GitHub API calls when set (the workflow
+	// passes the job token); unauthenticated calls share a 60/hour limit.
+	githubToken string
+}
+
+// httpError is a non-200 answer. rateLimited marks GitHub's exhausted
+// quota (403 or 429 with X-RateLimit-Remaining: 0) so it is reported as
+// such instead of as a generic denial.
+type httpError struct {
+	url         string
+	code        int
+	rateLimited bool
+}
+
+func (e *httpError) Error() string {
+	if e.rateLimited {
+		return fmt.Sprintf("GET %s: rate limited (HTTP %d)", e.url, e.code)
+	}
+	return fmt.Sprintf("GET %s: HTTP %d", e.url, e.code)
+}
+
+// networkError is a request that never got an HTTP answer (DNS, connect,
+// timeout): the only failure that counts toward "offline".
+type networkError struct{ err error }
+
+func (e *networkError) Error() string { return e.err.Error() }
+func (e *networkError) Unwrap() error { return e.err }
 
 func (f fetcher) get(ctx context.Context, url string) ([]byte, error) {
+	return f.getWith(ctx, url, nil)
+}
+
+func (f fetcher) getWith(ctx context.Context, url string, header http.Header) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
+	for key, values := range header {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
 	req.Header.Set("User-Agent", "machinery-runtime-pins")
 	resp, err := f.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, &networkError{err}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: HTTP %d", url, resp.StatusCode)
+		limited := (resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests) &&
+			resp.Header.Get("X-RateLimit-Remaining") == "0"
+		return nil, &httpError{url: url, code: resp.StatusCode, rateLimited: limited}
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+}
+
+// failureClass names why a lookup failed, for the latest-upstream cell.
+func failureClass(err error) string {
+	var h *httpError
+	var n *networkError
+	switch {
+	case errors.As(err, &h) && h.rateLimited:
+		return fmt.Sprintf("rate limited (HTTP %d)", h.code)
+	case errors.As(err, &h):
+		return fmt.Sprintf("HTTP %d", h.code)
+	case errors.As(err, &n):
+		return "network"
+	default:
+		return "parse"
+	}
 }
 
 // fillLatest fetches every index concurrently and fills the latest column;
 // any failure leaves that row "offline". It returns informational notes.
 func fillLatest(ctx context.Context, rows []row, f fetcher, src sources) []string {
 	latest := map[string]string{}
+	failures := map[string]error{}
 	var notes []string
 	var mu sync.Mutex
 	set := func(runtime, version string, err error) {
 		mu.Lock()
 		defer mu.Unlock()
-		if err == nil && version != "" {
-			latest[runtime] = version
+		if err == nil && version == "" {
+			err = errors.New("empty version")
 		}
+		if err != nil {
+			failures[runtime] = err
+			return
+		}
+		latest[runtime] = version
 	}
 	javaMajor := javaFeature(runtimeclosure.PinnedJavaRuntimeVersion)
 	jobs := []func(){
@@ -264,7 +372,7 @@ func fillLatest(ctx context.Context, rows []row, f fetcher, src sources) []strin
 			set("Erlang/OTP", otp, err)
 			set("erts", erts, err)
 		},
-		func() { v, err := latestElixir(ctx, f, src.ElixirBuilds); set("Elixir", v, err) },
+		func() { v, err := latestElixir(ctx, f, src.ElixirReleases, src.ElixirBuilds); set("Elixir", v, err) },
 		func() { v, err := latestNode(ctx, f, src.NodeIndex); set("Node", v, err) },
 		func() { v, err := latestTypeScript(ctx, f, src.TypeScript); set("TypeScript", v, err) },
 		func() { v, err := latestPython(ctx, f, src.PythonReleases); set("Python", v, err) },
@@ -285,11 +393,28 @@ func fillLatest(ctx context.Context, rows []row, f fetcher, src sources) []strin
 		go func() { defer wg.Done(); job() }()
 	}
 	wg.Wait()
+	// "offline" only when nothing answered and every failure is a network
+	// failure; otherwise each failed cell names its own failure.
+	allOffline := len(latest) == 0
+	for _, err := range failures {
+		allOffline = allOffline && failureClass(err) == "network"
+	}
 	for i := range rows {
-		rows[i].Latest = offline
-		if v, ok := latest[rows[i].Runtime]; ok {
+		runtime := rows[i].Runtime
+		if v, ok := latest[runtime]; ok {
 			rows[i].Latest = v
+			continue
 		}
+		if allOffline {
+			rows[i].Latest = offline
+			continue
+		}
+		err := failures[runtime]
+		if err == nil {
+			err = errors.New("no result")
+		}
+		rows[i].Latest = lookupFailed + failureClass(err)
+		notes = append(notes, fmt.Sprintf("warning: %s latest-upstream lookup failed: %v", runtime, err))
 	}
 	return notes
 }
@@ -362,8 +487,54 @@ func latestOTP(ctx context.Context, f fetcher, url string) (string, string, erro
 	return otp, erts[otp], nil
 }
 
-// latestElixir reads the hex.pm build list: "v<version> <sha> <date> ...".
-func latestElixir(ctx context.Context, f fetcher, url string) (string, error) {
+// latestElixir asks the GitHub releases API first and falls back to the
+// hex.pm build list when GitHub fails (most often the unauthenticated rate
+// limit). Both failing returns both errors; the GitHub one classifies the
+// cell unless it was only a network error.
+func latestElixir(ctx context.Context, f fetcher, releasesURL, buildsURL string) (string, error) {
+	version, githubErr := latestElixirGitHub(ctx, f, releasesURL)
+	if githubErr == nil {
+		return version, nil
+	}
+	version, buildsErr := latestElixirBuilds(ctx, f, buildsURL)
+	if buildsErr == nil {
+		return version, nil
+	}
+	var n *networkError
+	if errors.As(githubErr, &n) {
+		return "", errors.Join(buildsErr, githubErr)
+	}
+	return "", errors.Join(githubErr, buildsErr)
+}
+
+func latestElixirGitHub(ctx context.Context, f fetcher, url string) (string, error) {
+	header := http.Header{"Accept": {"application/vnd.github+json"}, "X-Github-Api-Version": {"2022-11-28"}}
+	if f.githubToken != "" {
+		header.Set("Authorization", "Bearer "+f.githubToken)
+	}
+	body, err := f.getWith(ctx, url, header)
+	if err != nil {
+		return "", err
+	}
+	var releases []struct {
+		TagName    string `json:"tag_name"`
+		Draft      bool   `json:"draft"`
+		Prerelease bool   `json:"prerelease"`
+	}
+	if err := json.Unmarshal(body, &releases); err != nil {
+		return "", err
+	}
+	var versions []string
+	for _, release := range releases {
+		if !release.Draft && !release.Prerelease {
+			versions = append(versions, strings.TrimPrefix(release.TagName, "v"))
+		}
+	}
+	return maxVersion(versions)
+}
+
+// latestElixirBuilds reads the hex.pm build list: "v<version> <sha> <date> ...".
+func latestElixirBuilds(ctx context.Context, f fetcher, url string) (string, error) {
 	body, err := f.get(ctx, url)
 	if err != nil {
 		return "", err

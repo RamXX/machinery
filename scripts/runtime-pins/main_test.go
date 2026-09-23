@@ -21,12 +21,13 @@ var indexFixtures = map[string]string{
 		"v1.20.4 bbb 2026-08-28T10:41:23Z sha\n" +
 		"v1.21.0-rc.0 ccc 2026-09-01T00:00:00Z sha\n" +
 		"main ddd 2026-09-20T00:00:00Z sha\n",
-	"/node":       `[{"version":"v26.10.0","lts":false},{"version":"v26.9.0","lts":false},{"version":"v24.12.0","lts":"Krypton"}]`,
-	"/typescript": `{"name":"typescript","version":"7.0.2"}`,
-	"/python":     `[{"name":"Python 3.14.7"},{"name":"Python 3.13.12"},{"name":"Python 3.14.10"},{"name":"Python 3.15.0rc2"}]`,
-	"/java/21":    `{"releases":["jdk-21.0.12.1+1","jdk-21.0.12+8","jdk-21.0.11+10"]}`,
-	"/java/info":  `{"available_lts_releases":[8,11,17,21,25],"most_recent_lts":25}`,
-	"/go":         `[{"version":"go1.27.1","stable":true},{"version":"go1.28rc1","stable":false},{"version":"go1.26.8","stable":true}]`,
+	"/github/elixir": `[{"tag_name":"v1.21.0-rc.0","prerelease":true},{"tag_name":"v1.20.4"},{"tag_name":"v1.19.6"},{"tag_name":"v1.22.0","draft":true}]`,
+	"/node":          `[{"version":"v26.10.0","lts":false},{"version":"v26.9.0","lts":false},{"version":"v24.12.0","lts":"Krypton"}]`,
+	"/typescript":    `{"name":"typescript","version":"7.0.2"}`,
+	"/python":        `[{"name":"Python 3.14.7"},{"name":"Python 3.13.12"},{"name":"Python 3.14.10"},{"name":"Python 3.15.0rc2"}]`,
+	"/java/21":       `{"releases":["jdk-21.0.12.1+1","jdk-21.0.12+8","jdk-21.0.11+10"]}`,
+	"/java/info":     `{"available_lts_releases":[8,11,17,21,25],"most_recent_lts":25}`,
+	"/go":            `[{"version":"go1.27.1","stable":true},{"version":"go1.28rc1","stable":false},{"version":"go1.26.8","stable":true}]`,
 }
 
 func fixtureServer(t *testing.T) (*httptest.Server, sources) {
@@ -35,6 +36,15 @@ func fixtureServer(t *testing.T) (*httptest.Server, sources) {
 		path := r.URL.Path
 		if path == "/java" {
 			path = "/java/" + strings.TrimPrefix(strings.Split(r.URL.Query().Get("version"), ",")[0], "[")
+		}
+		if path == "/github/limited" {
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			http.Error(w, "rate limit exceeded", http.StatusForbidden)
+			return
+		}
+		if path == "/github/denied" {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
 		}
 		body, ok := indexFixtures[path]
 		if !ok {
@@ -46,6 +56,7 @@ func fixtureServer(t *testing.T) (*httptest.Server, sources) {
 	t.Cleanup(server.Close)
 	return server, sources{
 		OTPTable:       server.URL + "/otp",
+		ElixirReleases: server.URL + "/github/elixir",
 		ElixirBuilds:   server.URL + "/elixir",
 		NodeIndex:      server.URL + "/node",
 		TypeScript:     server.URL + "/typescript",
@@ -70,7 +81,8 @@ func TestLatestParsersPickNewestRelease(t *testing.T) {
 		got  func() (string, error)
 		want string
 	}{
-		{"elixir skips rc and branch builds", func() (string, error) { return latestElixir(ctx, f, src.ElixirBuilds) }, "1.20.4"},
+		{"elixir from GitHub skips drafts and prereleases", func() (string, error) { return latestElixir(ctx, f, src.ElixirReleases, "") }, "1.20.4"},
+		{"elixir builds list skips rc and branch builds", func() (string, error) { return latestElixirBuilds(ctx, f, src.ElixirBuilds) }, "1.20.4"},
 		{"node", func() (string, error) { return latestNode(ctx, f, src.NodeIndex) }, "26.10.0"},
 		{"typescript", func() (string, error) { return latestTypeScript(ctx, f, src.TypeScript) }, "7.0.2"},
 		{"python compares numerically and skips rc", func() (string, error) { return latestPython(ctx, f, src.PythonReleases) }, "3.14.10"},
@@ -101,7 +113,7 @@ func TestFillLatestReportsDriftAndNewerLTS(t *testing.T) {
 	if len(notes) != 1 || !strings.Contains(notes[0], "newest Temurin LTS is 25") {
 		t.Errorf("notes %q do not report the newer Java LTS", notes)
 	}
-	if exitCode(rows, false) != 1 {
+	if exitCode(rows, false, false) != 1 {
 		t.Error("drift must exit 1")
 	}
 }
@@ -118,10 +130,10 @@ func TestUnreachableIndexIsOffline(t *testing.T) {
 			t.Errorf("row %+v is not offline", r)
 		}
 	}
-	if exitCode(rows, false) != 0 {
+	if exitCode(rows, false, false) != 0 {
 		t.Error("offline without -strict must exit 0")
 	}
-	if exitCode(rows, true) != 2 {
+	if exitCode(rows, true, false) != 2 {
 		t.Error("offline under -strict must exit 2")
 	}
 	table := render(rows, nil)
@@ -178,5 +190,82 @@ func TestCompareVersions(t *testing.T) {
 		if got := compareVersions(c.a, c.b); got != c.want {
 			t.Errorf("compare(%s, %s) = %d, want %d", c.a, c.b, got, c.want)
 		}
+	}
+}
+
+func TestElixirFallsBackToBuildsWhenGitHubRateLimited(t *testing.T) {
+	server, src := fixtureServer(t)
+	got, err := latestElixir(context.Background(), testFetcher(), server.URL+"/github/limited", src.ElixirBuilds)
+	if err != nil || got != "1.20.4" {
+		t.Fatalf("fallback = %q (%v), want 1.20.4 from builds.hex.pm", got, err)
+	}
+}
+
+func TestElixirBothSourcesFailingNamesTheRateLimit(t *testing.T) {
+	server, _ := fixtureServer(t)
+	_, err := latestElixir(context.Background(), testFetcher(), server.URL+"/github/limited", server.URL+"/missing")
+	if err == nil || failureClass(err) != "rate limited (HTTP 403)" {
+		t.Fatalf("error %v classified %q, want the rate limit", err, failureClass(err))
+	}
+}
+
+// TestSingleFailedLookupIsNotOffline: one index failing while the others
+// answer is a broken lookup. Its cell names the failure, a warning is
+// printed, the run passes by default and fails under -strict.
+func TestSingleFailedLookupIsNotOffline(t *testing.T) {
+	server, src := fixtureServer(t)
+	src.ElixirReleases = server.URL + "/github/denied"
+	src.ElixirBuilds = server.URL + "/missing"
+	rows := pinned()
+	notes := fillLatest(context.Background(), rows, testFetcher(), src)
+	var elixir row
+	for _, r := range rows {
+		if r.Runtime == "Elixir" {
+			elixir = r
+		} else if r.Latest == offline || strings.HasPrefix(r.Latest, lookupFailed) {
+			t.Errorf("row %+v should have resolved", r)
+		}
+	}
+	if elixir.Latest != "lookup failed: HTTP 403" || elixir.PinStatus() != "unknown" {
+		t.Fatalf("Elixir row %+v, want lookup failed: HTTP 403", elixir)
+	}
+	warned := false
+	for _, note := range notes {
+		warned = warned || strings.HasPrefix(note, "warning: Elixir latest-upstream lookup failed")
+	}
+	if !warned {
+		t.Errorf("notes %q carry no Elixir warning", notes)
+	}
+	elixirOnly := []row{elixir}
+	if exitCode(elixirOnly, false, false) != 0 || exitCode(elixirOnly, true, false) != 2 {
+		t.Error("a failed lookup must exit 0 by default and 2 under -strict")
+	}
+}
+
+func TestHostBehindIsReportedAndFailsOnlyUnderHostStrict(t *testing.T) {
+	rows := []row{
+		{Runtime: "Node", Pinned: "26.10.0", Host: "26.9.0", Latest: "26.10.0"},
+		{Runtime: "Python", Pinned: "3.14.7", Host: "3.14.7", Latest: "3.14.7"},
+		{Runtime: "Go", Pinned: "1.27.1", Host: absent, Latest: "1.27.1"},
+		{Runtime: "Java", Pinned: "21.0.12.1+1", Host: "21.0.12.1", Latest: "21.0.12.1+1"},
+	}
+	want := []string{"ok, host behind", "ok", "ok", "ok"}
+	for i, r := range rows {
+		if r.Status() != want[i] {
+			t.Errorf("%s status %q, want %q", r.Runtime, r.Status(), want[i])
+		}
+	}
+	if (row{Runtime: "Elixir", Pinned: "1.20.4", Host: "1.21.0", Latest: "1.20.4"}).Status() != "ok, host ahead" {
+		t.Error("a newer host must report host ahead")
+	}
+	if exitCode(rows, true, false) != 0 {
+		t.Error("host behind must not fail without -host-strict")
+	}
+	if exitCode(rows, false, true) != 3 {
+		t.Error("host behind must exit 3 under -host-strict")
+	}
+	drift := append([]row{{Runtime: "Node", Pinned: "26.9.0", Host: "26.9.0", Latest: "26.10.0"}}, rows...)
+	if exitCode(drift, false, true) != 1 {
+		t.Error("drift must take precedence over host mismatch")
 	}
 }
