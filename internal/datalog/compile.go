@@ -111,6 +111,29 @@ func (p *Program) InputRelations() []string { return p.names(p.inputs) }
 // order.
 func (p *Program) OutputRelations() []string { return p.names(p.outputs) }
 
+// Relations returns the names of every declared relation in declaration
+// order.
+func (p *Program) Relations() []string {
+	names := make([]string, len(p.decls))
+	for i, d := range p.decls {
+		names[i] = d.Name
+	}
+	return names
+}
+
+// Decl returns a copy of a relation's declaration: its attribute names and
+// types, its IO directives and its position. ok is false for an undeclared
+// relation.
+func (p *Program) Decl(name string) (d Decl, ok bool) {
+	ri, ok := p.relIdx[name]
+	if !ok {
+		return Decl{}, false
+	}
+	d = *p.decls[ri]
+	d.Attrs = append([]Attr(nil), d.Attrs...)
+	return d, true
+}
+
 // Parse parses and checks a program. name labels positions in errors.
 func Parse(src, name string) (*Program, error) {
 	ps, err := parse(name, src)

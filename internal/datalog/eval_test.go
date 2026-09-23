@@ -409,6 +409,33 @@ c(N, K) :- k(K), N = count : { v(K, _) }.
 	}
 }
 
+func TestDeclAccessor(t *testing.T) {
+	p := mustParse(t, `.decl k(unit:symbol)
+.input k
+.decl r(unit:symbol, n:number)
+.output r
+r(K, N) :- k(K), N = count : { k(K) }.
+`)
+	d, ok := p.Decl("r")
+	if !ok || d.Name != "r" || !d.Output || d.Input || len(d.Attrs) != 2 ||
+		d.Attrs[0] != (Attr{Name: "unit", Type: Symbol}) || d.Attrs[1] != (Attr{Name: "n", Type: Number}) || d.Pos.Line != 3 {
+		t.Fatalf("Decl(r) = %+v, %v", d, ok)
+	}
+	d.Attrs[0].Name = "mutated"
+	if again, _ := p.Decl("r"); again.Attrs[0].Name != "unit" {
+		t.Fatal("Decl must return a copy")
+	}
+	if k, _ := p.Decl("k"); !k.Input || k.Output {
+		t.Fatalf("Decl(k) = %+v", k)
+	}
+	if got := strings.Join(p.Relations(), ","); got != "k,r" {
+		t.Fatalf("Relations() = %s, want declaration order k,r", got)
+	}
+	if _, ok := p.Decl("missing"); ok {
+		t.Fatal("an undeclared relation has no Decl")
+	}
+}
+
 func TestAggregateResultAlreadyBound(t *testing.T) {
 	src := `.decl k(a:symbol)
 .input k
