@@ -50,8 +50,12 @@ property over the domain model's relationship graph.
 ## A complete design, not a bare checker harness
 
 The checker is the point of this example, but the design around it is
-complete enough that the **full default gate suite passes with warnings promoted to failures**
-(`machinery check examples/pii-flow/design --warnings-as-errors`, no `--gate` narrowing):
+complete enough that the **full default gate suite passes with zero blocking findings**
+(`machinery check examples/pii-flow/design`, no `--gate` narrowing). One warning remains by
+design: `Gv-attest` reports `gt.conformance-test-shape: plan only; current implementation review
+missing`, because this example ships no implementation, and a current-review claim can only be
+discharged against one. Promoting warnings to failures therefore fails on that single line until an
+implementation exists; every other gate is warning-free:
 
 - the model carries a `DataSubject` lifecycle (`SubjectStatus`:
   Active/Erased) with `register`/`erase` actions and the
