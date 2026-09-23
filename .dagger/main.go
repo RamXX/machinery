@@ -167,16 +167,29 @@ func (m *Machinery) dockerd() *dagger.Service {
 
 // withDocker binds the daemon a job needs to pull and run pinned images, and
 // puts the job's temp directory on the one path both sides can resolve.
-func (m *Machinery) withDocker(c *dagger.Container, job string) *dagger.Container {
-	return c.
+//
+// user is the account the job runs as ("" keeps root). The job directory is
+// created as root and handed to uid 1000, because the cache volume persists
+// across runs and its parent directory may already belong to root from an
+// earlier job or daemon; an unprivileged mkdir there fails with EACCES and
+// the job dies before its first test.
+func (m *Machinery) withDocker(c *dagger.Container, job, user string) *dagger.Container {
+	dir := sharedTmpPath + "/tmp/" + job
+	c = c.
 		WithServiceBinding("docker", m.dockerd()).
 		WithEnvVariable("DOCKER_HOST", "tcp://docker:2375").
 		// uid 1000 so an unprivileged job can write here; root is not
 		// blocked by a 1000-owned directory.
 		WithMountedCache(sharedTmpPath, m.sharedTmp(),
 			dagger.ContainerWithMountedCacheOpts{Owner: "1000:1000"}).
-		WithExec([]string{"mkdir", "-p", sharedTmpPath + "/tmp/" + job}).
-		WithEnvVariable("TMPDIR", sharedTmpPath+"/tmp/"+job)
+		WithUser("root").
+		WithExec([]string{"bash", "-euo", "pipefail", "-c",
+			"mkdir -p " + dir + " && chown 1000:1000 " + sharedTmpPath + "/tmp " + dir}).
+		WithEnvVariable("TMPDIR", dir)
+	if user != "" {
+		c = c.WithUser(user)
+	}
+	return c
 }
 
 // shInShared runs a script from a copy of the worktree on the shared path.
@@ -326,7 +339,7 @@ echo "go.mod and go.sum tidy"`)
 
 // Test is the full race sweep over every package: the hosted ci test job.
 func (m *Machinery) Test(ctx context.Context) (string, error) {
-	return m.shInShared(ctx, m.withDocker(m.baseAs(ciUser), "test"), "test",
+	return m.shInShared(ctx, m.withDocker(m.baseAs(ciUser), "test", ciUser), "test",
 		`go test -race -count=1 ./... -timeout=`+goTestTimeout)
 }
 
@@ -427,7 +440,7 @@ make modelith-render-check`)
 // compilation and the reference external checker, including the real pinned
 // OCI checker runtime.
 func (m *Machinery) DesignEngines(ctx context.Context) (string, error) {
-	return m.shInShared(ctx, m.withDocker(m.Base(), "design-engines"), "design-engines", `
+	return m.shInShared(ctx, m.withDocker(m.Base(), "design-engines", ""), "design-engines", `
 make build
 test -s .java-runtime-pin
 test -s .structurizr-pin
@@ -478,7 +491,7 @@ echo "every registered external checker re-ran"`)
 // exec would abort the pipeline and take the evidence with it, so the lane
 // runs without -e here and the verdict travels inside the directory.
 func (m *Machinery) IntegrationEvidence() *dagger.Directory {
-	return m.withDocker(m.Base(), "integration-required").
+	return m.withDocker(m.Base(), "integration-required", "").
 		WithEnvVariable("MACHINERY_INTEGRATION_REPORT_DIR", "/evidence").
 		WithExec([]string{"bash", "-c", `
 set +e
@@ -595,7 +608,7 @@ echo "regeneration left the tree clean"`)
 // the canary for environment-driven divergence, such as a Go toolchain update
 // changing generated output.
 func (m *Machinery) GoldenNightly(ctx context.Context) (string, error) {
-	return m.shInShared(ctx, m.withDocker(m.baseAs(ciUser), "golden-nightly"), "golden-nightly", `
+	return m.shInShared(ctx, m.withDocker(m.baseAs(ciUser), "golden-nightly", ciUser), "golden-nightly", `
 go test -count=1 ./... -timeout=20m
 go test -count=1 -run TestGolden ./cmd/machinery`)
 }
