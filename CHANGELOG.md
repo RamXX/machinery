@@ -71,9 +71,37 @@ under their version heading when a release is cut.
   evaluator's own program corpus, under both engines against Souffle 2.5 in an image built from
   pinned inputs (`scripts/souffle.dockerfile`), mirrored as `dagger call datalog-parity` and run by
   `make preflight` through `make dagger-job JOB=datalog-parity`.
+- **Contract-only records (consistency layer, Stage 5).** An immutable or creation-time record has a
+  named-unit matrix and no machine. Its ARCHITECTURE.md placement row declares that with
+  `(no machine: <reason>)`, and that waiver is the only declaration: G3 accepts the matrix without
+  a machine (and counts it), Gd accepts its `CLAUSES{}` without an owning machine or oracle, and
+  Gy-rules reads the same waiver. `records.dl` adds `orphan_matrix` (a matrix with neither a
+  machine nor a waiver) and `waived_machine_present` (a waiver on a component that has a machine).
+  A contract-only clause set owes no suffixed transition id; its obligation is the assurance
+  inventory's `guard-clause` key per active clause.
+- **`RESERVED{type:Name}` (consistency layer, Stage 5).** An Architecture Contract row may reserve a
+  type id as not yet defined; the reserving row owns nothing, and the group is an error in a
+  matrix. `supersession.dl` adds `stale_reservation` (a reserved type some artifact owns) and
+  `superseded_in_packet` (a `slices.yaml` `row:` citation whose key is a superseded type).
+- **BUILD.md oracle binding table (consistency layer, Stage 5).** A BUILD.md table with an `oracle`
+  column and a `bound at` column states where the suite binds each oracle id (test file paths
+  relative to the implementation root, or `unbound`). Under `machinery check --impl`, `bindings.dl`
+  compares it with the oracle rows each test file binds under Gt's credit rules:
+  `milestone_binding_stale` (the table says unbound, a test binds it) and
+  `milestone_binding_phantom` (the table names a path that binds nothing for the id). Without
+  `--impl` neither fires.
+- **Projection 2.0 relations for Stage 5.** `matrix(id)` (matrices), `no_machine_waiver(component)`
+  (c4), `reserved(type, row)` (supersession), and `packet_cites(slice, row)`,
+  `milestone_says_bound(oracle, path)`, `milestone_says_unbound(oracle)`, `bound_at(oracle, path)`
+  and `test_file(path)` (milestones). `bound_at` and `test_file` are filled only by
+  `machinery check --impl`; `machinery project` emits them empty. The schema is regenerated.
+- **`rules/README.md`** lists every shipped rule file, its findings, and the declarations it reads.
 
 ### Changed
 
+- **G3's orphan-matrix error names the contract-only declaration.** A matrix with no machine and
+  no placement waiver still fails G3; the message now says that a contract-only record's matrix is
+  declared by `(no machine: <reason>)` on its placement row. `Gy-rules` evaluates eight rule files.
 - **The consistency checks cut over from prose heuristics to the shipped rules (consistency
   layer, Stage 4).** The 0.9.0 Gx-trace authorization inventory, named-unit fact resolution,
   closed-vocabulary and payload-twin checks are deleted with every regular expression that decided

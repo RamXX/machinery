@@ -499,6 +499,25 @@ gate, including the machine rule above, which only ever holds the rows that exis
 row over a waiver. A persisted record with no lifecycle is a row (`(no machine: ...)`), not a
 waiver; the waiver is for the genuinely unplaced.
 
+**Contract-only records.** An immutable or creation-time record (an append-only erasure record, a
+retention policy row) has no lifecycle, so it has no machine, but it still has a contract: its
+named-unit matrix, `machines/<Name>.matrix.md`, with its guards, actions, `CLAUSES{}`, `WRITES{}`
+and invariant `maps to` cells. The placement row's `(no machine: <reason>)` waiver on `<Name>` is
+what declares that matrix contract-only, and it is the only declaration: G3 accepts the matrix
+without a machine, Gd accepts its `CLAUSES{}` without an owning machine or oracle, and Gy-rules reads
+the same waiver as `no_machine_waiver`. Without the waiver (or with an empty reason) the matrix is a
+stale orphan: G3 reports it and Gy-rules reports `orphan_matrix`. A waiver on a component that does
+have a machine is `waived_machine_present`. A contract-only record never gets a fake machine or an
+empty oracle. Its `CLAUSES{}` govern no transition, so they owe no suffixed transition id; their
+coverage obligation is the assurance inventory's `guard-clause` key, one per active clause (owner
+the matrix name, id `guard:clause`), which a locked suite binds like any other obligation. Every
+reference in the matrix still resolves: a stale invariant or an unresolved `WRITES{}`/`USES{}`
+member fails as it does in any matrix.
+
+| component | machine placement | persistence | concurrency serialization |
+|---|---|---|---|
+| `ErasureRecord` (no machine: immutable append-only record; contract in machines/ErasureRecord.matrix.md) | n/a | row, insert only | single writer |
+
 Elixir maps almost 1:1 to a supervised process per aggregate. Go, Rust, and Python need the explicit
 persisted-state plus lock pattern, or an event-sourced log, because there is no cheap per-entity process.
 
@@ -648,8 +667,17 @@ A contract row that replaces a stable type id declares it as `SUPERSEDES{type:Le
 cell of that row: any markdown table row of ARCHITECTURE.md (its first cell names the row), or a
 line of the contract YAML fence (the enclosing `- id:` names the row). Only the `type:` kind exists;
 the target is a dotted identifier. An empty, duplicate, malformed, unterminated, or repeated group is
-a Gx-trace error. The declaration is parsed but not yet reconciled against ownership; the matrix
-groups `WRITES{}`, `USES{}`, and `CARRIES{}` are described in the skill.
+a Gx-trace error. Gy-rules reconciles it against ownership: a cycle of replacements, a replacement
+of a type no artifact owns, and two artifacts owning one type each fail. The matrix groups
+`WRITES{}`, `USES{}`, and `CARRIES{}` are described in the skill.
+
+A row that reserves a type id as not yet defined declares it as `RESERVED{type:ReadbackReceipt}`,
+on the same rows and with the same grammar. The reserving row owns nothing. Once any artifact owns
+the type (a `SUPERSEDES` row whose subject it is, or a `migration.yaml` disposition naming it as a
+legacy type), the reservation is stale and Gy-rules reports `stale_reservation`: remove it, so the
+old missing-definition claim does not compete with the new owner. A `slices.yaml` citation
+`row:<path>#<section>#<Key>` whose key is a superseded type is `superseded_in_packet`: the packet
+would hand the replaced definition to an executor as its current contract.
 
 ### Machine-checkable format (mandatory on a decomposed parent)
 

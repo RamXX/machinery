@@ -188,10 +188,14 @@ cell; a row carries at most one group of each name.
   and `action`.
 - `SUPERSEDES{type:LegacyDeal}`: on an Architecture Contract row, never a
   matrix row, the stable type id this row replaces. Only `type:` exists.
+- `RESERVED{type:ReadbackReceipt}`: on an Architecture Contract row, never a
+  matrix row, a type this row reserves as not yet defined. Only `type:`
+  exists. Once any artifact owns the type (a `SUPERSEDES` row naming it, or a
+  `migration.yaml` disposition), the reservation is stale and must be removed.
 
 An upper-case word directly followed by `{` in a matrix table cell that names
 none of `CLAUSES`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`,
-`PRODUCES`, `CARRIES`, or `SUPERSEDES` is an error, so a misspelled or private group never
+`PRODUCES`, `CARRIES`, `SUPERSEDES`, or `RESERVED` is an error, so a misspelled or private group never
 passes as prose. Gl-ledger warns on a backticked snake_case or `Entity.attr`
 token in a contract, clause, or payload cell that sits outside every group and
 that the row does not declare: declare it in `USES{}` or `WRITES{}`, or drop the
@@ -208,8 +212,14 @@ resolves (`fact_unresolved`), a `VALUES` group disagreeing with the
 same-named enum (`values_disagree`), a `payload {}` twin out of step with its
 contract row (`payload_twin`), an actor with no `CARRIES{}` or a writing
 action with none (`effect_uncarried`), `CARRIES{}` on a unit that is neither
-an action nor an actor (`carrier_misplaced`), and supersession cycles,
-dangling replacements and duplicate owners. `machinery check <design> --gate gy --explain`
+an action nor an actor (`carrier_misplaced`), supersession cycles,
+dangling replacements and duplicate owners, a `RESERVED` type some artifact
+owns (`stale_reservation`), a `slices.yaml` `row:` citation of a superseded
+type (`superseded_in_packet`), a matrix with neither a machine nor a
+`(no machine: <reason>)` placement waiver (`orphan_matrix`), a waiver on a
+component that has a machine (`waived_machine_present`), and, under `--impl`
+only, a BUILD.md oracle binding row that disagrees with the suite
+(`milestone_binding_stale`, `milestone_binding_phantom`). `machinery check <design> --gate gy --explain`
 prints under each finding its derivation: the rule file and rule number, then
 the facts it matched with their `path:line` sources.
 

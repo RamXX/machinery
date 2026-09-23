@@ -1,7 +1,7 @@
 # Proposal: the consistency layer (declarations, facts, rules)
 
-**Status: Stages 1 to 4 implemented** (each has an "as implemented" subsection below; Stage 5,
-new rules without new Go, is open). Written 2026-09-22 against v0.9.0. It replaces
+**Status: Stages 1 to 5 implemented** (each has an "as implemented" subsection below).
+Written 2026-09-22 against v0.9.0. It replaces
 the prose-heuristic implementation of the four Gx extensions that shipped in 0.9.0 with
 a declaration grammar, a fact projection, and rules evaluated as data, and it gives the
 remaining consistency gaps (effect carriers, twin tables, source supersession,
@@ -150,8 +150,8 @@ Stage 2 landed every layer of the table; `scenarios` stays reserved. The contrac
 - **Presence.** A layer is present only when its sources exist; a present layer claims all
   of its relations, empty ones included. Two definitions of one stable id from different
   places fail, naming both.
-- **Omitted.** `action_writes` (Modelith has no structured post-condition) and `bound_at`
-  (no `--impl` reader is wired into the projection yet).
+- **Omitted.** `action_writes` (Modelith has no structured post-condition). `bound_at` was
+  omitted until Stage 5, which added it with `test_file`, filled only by `machinery check --impl`.
 - **Facts form.** `machinery project <design> --facts <dir>` writes every present layer's
   relations plus `relations.txt`; a round-trip test over every bundled example loads the
   directory with `internal/datalog` and matches each relation's count to the JSON.
@@ -386,6 +386,72 @@ The prose heuristics are gone and Gy-rules decides alone, at ERROR tier.
 - **Consumer notation.** A design with a private authorization notation generates the
   `AUTHORIZATION.md` rows from its own reader and binds the generated file to that reader with a
   `reads:` row (Gr-reads); machinery reads only the public table.
+
+#### Stage 5, as implemented
+
+Entries 13, 15 and 37 (residual) land as two new rule files (`records.dl`, `bindings.dl`), two new
+rules in `supersession.dl`, one new declaration (`RESERVED{}`), and no new gate. Entry 20 landed in Stage 4 (`carriers.dl`); entry
+16 is judgment and ships no rule (see Stage 5 in section 5). Eight rule files now ship; the
+catalog of rule files, findings and the declarations each reads is `rules/README.md`.
+
+- **Contract-only records (entry 13), `records.dl`.** The declaration is the existing placement
+  waiver: a persistence-and-placement row whose first component carries `(no machine: <reason>)`.
+  `NoMachineWaivers` (internal/gates/gates.go) is its one reader; Gx's placement check, the
+  projection, G3 and Gd all go through it. The projection adds `matrix(id)` (every
+  `machines/*.matrix.md`, machine or not) and `no_machine_waiver(component)` (a waiver with a
+  reason; an empty reason is no waiver, Gx reports the row, and nothing is projected). Rules:
+  `finding_orphan_matrix(matrix)` for a matrix with neither a machine nor a waiver, and
+  `finding_waived_machine_present(component)` for a waiver beside a machine. Two gate paths change,
+  both by consulting that reader, never a second parser: G3 (`CheckMachines`) no longer reports a
+  waived matrix as an orphan and counts it (`contract-only matrices (no machine: waived)`); Gd,
+  through `collectClauseDecls` (shared with Gt and the assurance inventory), no longer demands an
+  owning machine and oracle for a waived matrix's `CLAUSES{}`. Why earlier records passed and new
+  ones did not, as far as public contracts show: before Stage 5 every machine-less
+  `machines/<X>.matrix.md` failed G3, with or without `CLAUSES{}` and with or without a waiver
+  (the fixture without its waiver pins that behavior), so a record accepted then either had a
+  machine of the same stem or kept its contract outside `machines/*.matrix.md`; Gd's
+  owning-machine error was added on top only when the record declared `CLAUSES{}`. The waiver was
+  read by Gx alone and answered only Gx's placement question. **Clause obligation.** A
+  contract-only clause set governs no transition, so it binds no oracle row and owes no suffixed
+  transition id (Gt's `checkClauseCoverage` iterates the governed rows, and there are none); the
+  obligation is stated in the assurance inventory as one `guard-clause` key per active clause,
+  owner the matrix name, id `guard:clause`, which a locked suite binds like any obligation. A
+  sibling machine's oracle governing the same guard is still an ownership error. The synthetic
+  fixture (`internal/experiments/records_test.go`) is an append-only `ErasureRecord` with a
+  `WRITES`/`CARRIES` action and a `CLAUSES` guard: it passes G3, Gd, Gx and Gy with no warning;
+  without the waiver, or with an empty reason, it fails G3, Gx and Gy; a stale invariant and an
+  unresolved `WRITES` member in it still fail.
+- **Source supersession (entry 15), `supersession.dl`.** `RESERVED{type:Name}` on an Architecture
+  Contract row, parsed with `SUPERSEDES` (kind `type` only, an error in a matrix), projects
+  `reserved(type, row)`; the reserving row owns nothing. `slices.yaml` citations
+  `row:<path>#<section>#<key>` project `packet_cites(slice, key)`. Rules:
+  `finding_stale_reservation(type)` (a reserved type some artifact owns) and
+  `finding_superseded_in_packet(slice, type)` (a slice citing the row of a superseded type). The
+  join is on the row key: a packet that cites the replaced row by its type name is caught; one
+  that reaches the old definition through a `section:` or `file:` citation is not, because those
+  citations name no type.
+- **Milestone binding twin (entry 37 residual), `bindings.dl`.** Gb parsed no binding table, so the
+  minimal parse is defined here: any BUILD.md table with an `oracle` column and a `bound at`
+  column; each row keyed by one oracle id (a test id normalized to its stable id), its cell either
+  the literal `unbound` or comma-separated test file paths relative to the implementation root.
+  Anything else in the cell fails the projection. `milestone_says_bound(oracle, path)` and
+  `milestone_says_unbound(oracle)` come from the design. Under `machinery check --impl`, Gy-rules
+  (`CheckRulesImpl`) adds `test_file(path)` and `bound_at(oracle, path)` from Gt's own test corpus
+  and credit rules (`OracleBindings` in oraclecov.go: a file binds a row when its executable test
+  text names the stable id whole-token, or it earns the wholesale conformance-parse credit for the
+  row's oracle). Rules: `finding_milestone_binding_stale(oracle)` and
+  `finding_milestone_binding_phantom(oracle, path)`; the phantom rule is guarded by `test_file(_)`,
+  so without `--impl` both are silent. `machinery project` reads no implementation and emits both
+  relations empty. No bundled example has an implementation with a binding table (fulfillment has
+  no implementation directory), so a synthetic fixture covers it; go-crm's golden check, which runs
+  with `--impl`, now projects its `bound_at` rows and stays clean.
+- **Subject kinds.** The gate's subject vocabulary grows by `matrix`, `component`, `slice` and
+  `oracle`, each resolved through the relations that carry it (`matrix`; `no_machine_waiver`;
+  `packet_cites`, `slice_claim`; the binding rows, then `oracle_row`), and `type` also resolves
+  through `reserved`.
+- **Evidence.** `TestRulesParity` covers 8 rule files over 9 designs (72 runs), the synthetic
+  design now with an implementation so every output, the binding twins included, is compared
+  populated under both engines.
 
 ## 4. The rules, written out
 

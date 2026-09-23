@@ -294,6 +294,22 @@ Every milestone in this plan is discharged the same way, held by Ga-accept:
   history anchor and applies the same ancestry proof.
 - Prior attempts are not kept in the tree: one file per milestone, and git history is the record.
 
+### Oracle bindings (optional)
+A plan may state where the locked suite binds each oracle id, in a table whose header has an
+`oracle` column and a `bound at` column. Each row is keyed by one oracle id (a test id is read as
+its stable id); the bound-at cell is one or more comma-separated test file paths relative to the
+implementation root (backticks allowed) or the literal `unbound`. Any other cell fails the
+projection. The table restates a fact the suite also states, so under `machinery check --impl`
+Gy-rules compares the two with Gt's own test corpus and credit rules: a row saying `unbound` for an
+id a test file binds is `milestone_binding_stale`, and a row naming a path that binds nothing for
+the id (a missing file, or a file binding other ids) is `milestone_binding_phantom`. Without
+`--impl` neither is checked.
+
+| oracle | bound at |
+|---|---|
+| ORDE-eb2d3b | `internal/order/order_test.go` |
+| ORDE-41c0aa | unbound |
+
 The skeleton's `NFR:` line (the format contract above) is what carries the NFR-record mechanisms
 into the plan; Gb holds its presence and non-emptiness, and only whether the named mechanisms are
 the record's actual mechanisms stays attested.
@@ -454,13 +470,15 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   `CARRIES{column:Order.status, outbox:OutboxMessage}` (what
   carries an action's or actor's effect; kinds `column`, `outbox`, `sink`,
   `signal`, `action`), and, on an Architecture Contract row only,
-  `SUPERSEDES{type:LegacyDeal}` (the stable type id the row replaces). Members
+  `SUPERSEDES{type:LegacyDeal}` (the stable type id the row replaces) and
+  `RESERVED{type:ReadbackReceipt}` (a type id the row reserves as not yet
+  defined; stale once any artifact owns it). Members
   are dotted identifiers; a group opens and closes in one table cell; a row
   carries at most one group per name. Gx-trace fails an empty (where not
   allowed), duplicate, malformed, unterminated, or repeated group, and any
   upper-case `NAME{` in a matrix cell outside the closed vocabulary (`CLAUSES`,
   `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `PRODUCES`, `CARRIES`,
-  `SUPERSEDES`).
+  `SUPERSEDES`, `RESERVED`).
   A backticked fact in a contract, clause, or payload cell that no group on
   its row declares is a Gl-ledger warning, never a finding that resolves it.
 - Every Modelith action whose actor is `System`, and every action a matrix row declares in
