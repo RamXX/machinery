@@ -154,7 +154,7 @@ func provisionedJavaPathContext(ctx context.Context) (path string, retErr error)
 		}
 	}()
 	archive := filepath.Join(stage, "runtime.archive")
-	url := "https://github.com/adoptium/temurin21-binaries/releases/download/" + pinnedJavaReleaseTag + "/" + pin.asset
+	url := fmt.Sprintf("https://github.com/adoptium/temurin%d-binaries/releases/download/%s/%s", RequiredJavaMajor, pinnedJavaReleaseTag, pin.asset)
 	if err := downloadJavaRuntimeArchive(url, archive, pin.sha); err != nil {
 		return "", err
 	}
