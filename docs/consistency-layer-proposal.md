@@ -159,6 +159,71 @@ H2 gaps were found late.
 `subject_id` back to the file and row through the projection's source map, so the
 message still says `machines/Order.matrix.md row persistOrder`, as it does now.
 
+#### Subset, as implemented
+
+`internal/datalog` (Stage 3, first slice: package and tests only, no gate wired)
+accepts exactly the following, and every program it accepts runs unchanged under
+Soufflé 2.5 with identical output relations. The parity test runs each program under
+`internal/datalog/testdata/programs` through both engines when `souffle` is on PATH
+and compares the outputs after sorting the lines of both (Soufflé does not fix the
+row order of its output files).
+
+- **Items.** `.decl name(attr:type, ...)` with one or more attributes;
+  `.input name` and `.output name`, one relation each, no IO parameters; rules
+  `head(...) :- literal, ... .` with a single head. Comments `//` and `/* */`.
+- **Types.** `symbol`. `number` only as an attribute type for relations that carry
+  aggregate results; an `.input` relation must be all `symbol`.
+- **Terms.** Variables (any identifier; `_x` is an ordinary variable), the wildcard
+  `_` (not in a head, not in a comparison), and double-quoted string constants
+  without backslashes, tabs, newlines or carriage returns.
+- **Literals.** Positive atoms, negated atoms `!r(...)`, comparisons `=` and `!=`,
+  `V = count : { ... }` and `V = min X : { ... }` with the braced body only. `min`
+  is accepted only over a `number` variable, because Soufflé rejects `min` over
+  symbols; in practice `min` ranges over `count` results.
+- **Aggregate grouping.** A variable inside an aggregate that also occurs outside
+  it groups the aggregate and must be bound by a positive atom outside it (as in
+  Soufflé). `count` of an empty group is 0; `min` of an empty group yields no tuple.
+  Nested aggregates are rejected.
+- **Range restriction.** Every head variable, and every variable in a negated atom
+  or comparison, must be bound by a positive body atom or be an aggregate result.
+- **Stratification.** Negation or aggregation inside a strongly connected component
+  is a compile error that prints the cycle, for example
+  `cycle through negation p -> r -> q -> p`.
+- **Rejected with a position.** Records, ADTs, arithmetic, number literals,
+  functors (built-in and `@user`), comparisons other than `=`/`!=`, `.type`,
+  `.plan`, `.printsize`, `.functor`, `.comp`, `.init`, `.pragma`, relation
+  qualifiers (`brie`, `eqrel`, `inline`, `magic`, `choice-domain`, ...),
+  subsumption, disjunction, multiple heads, ground facts in the program text,
+  nullary relations, `max`/`sum`/`mean`, `count :` without braces, the
+  preprocessor, and Soufflé keywords used as names.
+
+Decisions settled while implementing:
+
+- **Tabs.** A tab is always the column separator in `.facts` and `.csv` files, so a
+  symbol can never contain a tab, newline or carriage return. Such values are
+  rejected where they enter: Go inputs (error), program constants (parse error), fact
+  files (the line has the wrong column count). The two characters `\t` in a fact file
+  are two ordinary characters in both engines. A trailing carriage return on a fact
+  line is dropped, as Soufflé drops it; an empty line is a one-column tuple holding
+  the empty symbol, as in Soufflé.
+- **Inputs.** A missing input for an `.input` relation is an error (Soufflé errors on
+  a missing fact file). Inputs for relations the program does not mark `.input` are
+  ignored, as Soufflé ignores stray fact files, so one `--facts` directory can feed
+  many rule files. Duplicate input rows collapse; inputs are sorted before loading.
+- **`.input` with rules** is allowed, as in Soufflé: facts are seeded and the rules
+  add to them. **`.output` on an `.input` relation** is allowed and writes the
+  deduplicated facts.
+- **Output order.** `Result.Output` and the written `.csv` files are sorted column by
+  column, symbols bytewise and numbers numerically.
+- **Derivations.** With `Options.Explain`, each derived tuple records its first
+  derivation: the 1-based rule index, the rule's position, and the tuples matched by
+  the rule's positive body atoms outside aggregates (negations and aggregates have no
+  witness tuples). `Result.Explain` returns a tree whose leaves are input facts; an
+  input fact is a one-node tree.
+- **Limits.** `MaxTuples` (default 10,000,000, input facts included) and
+  `MaxIterations` (default 1,000,000 evaluation rounds summed over all strata). Hitting
+  either returns an error wrapping `ErrLimit` and no result.
+
 ## 4. The rules, written out
 
 These replace the four 0.9.0 checks and cover the open gaps. Each is short enough to

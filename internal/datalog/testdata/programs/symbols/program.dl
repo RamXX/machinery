@@ -13,3 +13,10 @@ spaced(I) :- name(I, "two words").
 .decl tagged(id:symbol, tag:symbol)
 .output tagged
 tagged(I, "has a tag") :- name(I, _), I != "".
+// Constants that a C preprocessor might misread outside a string.
+.decl literal(id:symbol, text:symbol)
+.output literal
+literal(I, "// not a comment") :- name(I, "value").
+literal(I, "/* nor this */") :- name(I, "value").
+literal(I, "it's #1 ??= ok") :- name(I, "value").
+literal(I, "  padded  ") :- name(I, "value").
