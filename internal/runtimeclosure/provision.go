@@ -22,10 +22,21 @@ import (
 	"github.com/RamXX/machinery/internal/filelock"
 )
 
+// The Temurin pin is owned by pinnedJavaVersion, pinnedJavaBuild and
+// pinnedJavaReleaseDate; every other spelling of it is derived below, and
+// .java-runtime-pin plus the archive table are tested against them.
 const (
-	PinnedJavaRuntimeVersion = "21.0.12.1+1"
-	PinnedJavaProbeVersion   = "21.0.12.1+1-LTS"
-	pinnedJavaReleaseTag     = "jdk-21.0.12.1%2B1"
+	// pinnedJavaVersion is the exact java.version the pinned build reports.
+	pinnedJavaVersion = "21.0.12.1"
+	// pinnedJavaBuild is the Temurin build number after the "+".
+	pinnedJavaBuild = "1"
+	// pinnedJavaReleaseDate is the release date the pinned build prints in
+	// its canonical `java -version` banner.
+	pinnedJavaReleaseDate = "2026-08-18"
+
+	PinnedJavaRuntimeVersion = pinnedJavaVersion + "+" + pinnedJavaBuild
+	PinnedJavaProbeVersion   = PinnedJavaRuntimeVersion + "-LTS"
+	pinnedJavaReleaseTag     = "jdk-" + pinnedJavaVersion + "%2B" + pinnedJavaBuild
 	javaArchiveMaxBytes      = int64(400 << 20)
 	javaExtractMaxBytes      = int64(2 << 30)
 	javaExtractMaxFiles      = 30_000
