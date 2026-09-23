@@ -102,6 +102,52 @@ read by CI, `make lint-install`, and preflight. To bump it: edit that file, run
 `make lint-install`, then `make preflight-fast`. If it is clean locally, CI's
 lint job runs the identical binary.
 
+## Runtime pins
+
+machinery stays on the latest release of every native runtime it pins
+(Erlang/OTP and its erts, Elixir, Node, TypeScript, CPython, Temurin Java, Go)
+for security reasons. Dependabot covers Go modules and actions; the runtimes
+are covered by a drift report:
+
+```sh
+make runtime-pins   # pinned, host-installed and latest-upstream per runtime
+```
+
+It exits non-zero when a pin is behind its latest upstream release, and prints
+`offline` in the upstream column when an index cannot be reached.
+`.github/workflows/runtime-pins.yml` runs it every Monday and opens or updates
+the issue "runtime pins behind upstream" with the table. Bumping a pin is a
+normal weekly chore, not a release event.
+
+Each pin is defined once, in `internal/runtimeclosure` (`RequiredOTPVersion`,
+`RequiredErtsVersion`, `RequiredElixirVersion`, `RequiredNodeRelease`,
+`RequiredTypeScriptVersion`, `RequiredPythonVersion`, `RequiredGoVersion`, and
+`pinnedJavaVersion` with its build and banner date in `provision.go`). The
+integration lane derives its catalog from those constants. The other files
+that spell a version (the assurance-runtimes action, `scripts/ci-linux.dockerfile`,
+`testdata/integration-lanes/*.json` and the contracts, `.java-runtime-pin`,
+`go.mod`, README and docs) are held to them by `go test ./scripts/runtime-pins`
+and `go test ./internal/runtimeclosure`, which name every site that disagrees.
+For OTP, take the erts version from `otp_versions.table`; for Java, take the
+archive checksums from the Adoptium API. Then run the suites:
+
+```sh
+go test ./scripts/runtime-pins ./internal/runtimeclosure/...   # every pin site agrees
+go test -count=1 ./internal/runtimeclosure/... ./scripts/integration-lane/... ./internal/tdd/...
+make test && make check && make golden && make verify-formal
+```
+
+The native suites run against the runtimes on your PATH and fail closed on any
+other version, so upgrade the host first (for example `brew upgrade node`).
+
+Java tracks the latest patch of the Temurin 21 LTS line. Temurin 25 LTS was
+tried on 2026-09-22 (25.0.4.1+1): TLC results were identical, but every Alloy
+run failed because JDK 25 prints JEP 472 restricted-method warnings for
+kodkod's `System::load`, and the Alloy runner rejects any extra engine output
+("alloy exec emitted unexpected success diagnostics"). The probe also needs
+`stdin.encoding`, a property new in JDK 25, allowed. Moving to 25 is a
+separate change that has to handle both.
+
 ## Versioning
 
 Versions are numeric only (`vX.Y.Z`); local builds are not marked, so a bare
