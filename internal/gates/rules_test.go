@@ -25,7 +25,7 @@ func TestShippedRulesLoad(t *testing.T) {
 		"facts.dl":        {"finding_fact_unresolved"},
 		"payload.dl":      {"finding_payload_twin"},
 		"supersession.dl": {"finding_duplicate_owner", "finding_supersession_cycle", "finding_dangling_replacement"},
-		"values.dl":       {"finding_values_disagree"},
+		"values.dl":       {"finding_values_disagree", "finding_values_conflict"},
 	}
 	if len(set.files) != len(want) {
 		t.Fatalf("%d rule files loaded, want %d", len(set.files), len(want))

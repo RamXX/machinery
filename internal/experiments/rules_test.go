@@ -20,7 +20,7 @@ func init() {
 		"rules-fact-unresolved", "rules-values-disagree", "rules-payload-twin",
 		"rules-supersession-cycle", "rules-effect-uncarried",
 		"rules-produces-owes-admission", "rules-produces-unknown-action",
-		"rules-actor-uncarried", "rules-carrier-misplaced")
+		"rules-actor-uncarried", "rules-carrier-misplaced", "rules-values-conflict")
 }
 
 // rulesFindings runs Gy-rules and returns its ERROR and warning lines. The
@@ -118,6 +118,20 @@ func TestRulesFactUnresolved(t *testing.T) {
 	near, _ := fixture(t)
 	contractOf(t, near, "actor may publish", "actor may publish. USES{Widget.status}")
 	refuteRuleFinding(t, near, "fact_unresolved")
+}
+
+// A named vocabulary with no enum is declared by its groups, which must agree;
+// the same set spelled twice is silent.
+func TestRulesValuesConflict(t *testing.T) {
+	design, _ := fixture(t)
+	contractOf(t, design, "commit status", "commit status. VALUES reason{late, lost}")
+	contractOf(t, design, "stash pending", "stash pending. VALUES reason{late, early}")
+	requireRuleFinding(t, "rules-values-conflict", design)
+
+	near, _ := fixture(t)
+	contractOf(t, near, "commit status", "commit status. VALUES reason{late, lost}")
+	contractOf(t, near, "stash pending", "stash pending. VALUES reason{lost, late}")
+	refuteRuleFinding(t, near, "values_conflict")
 }
 
 func TestRulesValuesDisagree(t *testing.T) {

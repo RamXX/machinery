@@ -151,6 +151,8 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "row 'Widget.guardCanPublish': fact_unresolved (fact 'Widget.stat')", ExpectExit: true},
 	{Name: "rules-values-disagree", Tool: "check", Mutation: "VALUES WidgetStatus{} adds a member the enum lacks",
 		ExpectSubstr: "values_disagree (group 'WidgetStatus', member 'Archived')", ExpectExit: true},
+	{Name: "rules-values-conflict", Tool: "check", Mutation: "two units spell the enum-less group reason as {late, lost} and {late, early}",
+		ExpectSubstr: "row 'Widget.commit': values_conflict (group 'reason', member 'lost')", ExpectExit: true},
 	{Name: "rules-payload-twin", Tool: "check", Mutation: "a matrix payload {} omits one field of the contract's event payload",
 		ExpectSubstr: "payload_twin (event 'widget.published', field 'Widget.status')", ExpectExit: true},
 	{Name: "rules-supersession-cycle", Tool: "check", Mutation: "SUPERSEDES rows close A > B > C > A",

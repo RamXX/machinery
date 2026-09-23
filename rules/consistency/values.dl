@@ -27,3 +27,10 @@ unit_group(U, G) :- unit_values(U, G, _).
 .output finding_values_disagree
 finding_values_disagree(U, G, V) :- unit_values(U, G, V), enum_exists(G), !enum_value(G, V).
 finding_values_disagree(U, G, V) :- unit_group(U, G), enum_value(G, V), !unit_values(U, G, V).
+
+// Two units spelling one enum-less group differently: each member one unit
+// has and another unit of the same group lacks is one finding on the unit
+// that has it. A group bound to an enum is held to the enum above instead.
+.decl finding_values_conflict(unit:symbol, group:symbol, member:symbol)
+.output finding_values_conflict
+finding_values_conflict(U, G, V) :- unit_values(U, G, V), unit_group(U2, G), U != U2, !unit_values(U2, G, V), !enum_exists(G).
