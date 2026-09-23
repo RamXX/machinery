@@ -8,6 +8,7 @@ scripts/example-inventory.sh
 scripts/git-safe.sh
 scripts/modelith-inventory.sh
 scripts/modelith-render.sh
+scripts/pii-flow-image.sh
 scripts/preflight-fast.sh
 scripts/preflight.sh
 scripts/shellcheck-inventory.sh
