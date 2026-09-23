@@ -50,12 +50,9 @@ func alloyJarPath() (string, error) {
 	return filepath.Join(cache, "machinery", "alloy-dist-"+alloyVersion+".jar"), nil
 }
 
-func ensureAlloyJar() (string, error) {
-	return ensureAlloyJarContext(context.Background())
-}
-
-// ensureAlloyJarContext is ensureAlloyJar with a context bounding the wait
-// for another process that is fetching into the same cache.
+// ensureAlloyJarContext fetches and checksum-verifies the pinned Alloy jar on
+// first use; ctx bounds the wait for another process fetching into the same
+// cache.
 func ensureAlloyJarContext(ctx context.Context) (string, error) {
 	want, err := overrideSHA("ALLOY_TOOLS_JAR", "ALLOY_TOOLS_JAR_SHA256", alloySHA256)
 	if err != nil {

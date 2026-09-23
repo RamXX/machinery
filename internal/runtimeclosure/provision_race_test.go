@@ -160,7 +160,7 @@ func startJavaProvisionHelper(t *testing.T, cacheRoot, sync, mode, id string, pe
 	t.Helper()
 	// The helper is killed explicitly (the crash tests depend on choosing
 	// the moment), so its context is never canceled.
-	cmd := exec.CommandContext(context.Background(), os.Args[0],"-test.run=^TestJavaProvisionHelper$", "-test.count=1")
+	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestJavaProvisionHelper$", "-test.count=1")
 	cmd.Env = append(os.Environ(),
 		javaProvisionHelperEnv+"="+mode,
 		javaProvisionSyncEnv+"="+sync,
