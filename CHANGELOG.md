@@ -21,7 +21,12 @@ under their version heading when a release is cut.
   normal receipt, closure-digest, and custody validation. A holder that dies releases the lock
   with its process, and only the next holder removes the stage it left. `OpenJavaContext` carries
   the caller's context into that wait. The runtime bytes and receipt are identical whether one or
-  five provisioners raced.
+  five provisioners raced. The same holds for the two sibling caches that had the same scope-lock
+  hole: the TLA+ and Alloy jars (lock in a private `.machinery-formal-jar-lock` directory under the
+  user cache, outside the replaceable `machinery` parent, so replacing that parent still cannot
+  split it) and the Structurizr CLI (`<cache>/machinery/structurizr/.structurizr-provision.lock`).
+  Waiters rehash the installed jar or revalidate the Structurizr receipt and closure digest, and
+  their wait honors the caller's context.
 
 ## [0.9.0] - 2026-09-22
 
