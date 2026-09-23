@@ -7,8 +7,8 @@ type: bug
 labels: [formal, runtimeclosure, flaky-under-load, dagger, ci]
 created_at: 2026-09-23T08:39:54Z
 created_by: ramirosalas
-updated_at: 2026-09-23T16:36:44Z
-content_hash: "sha256:265bc4ef1a7b065feb045e9d9468b0abfa73f7f140dd781fa4c3f9b3c2c2fe98"
+updated_at: 2026-09-23T17:20:11Z
+content_hash: "sha256:6418d37e83e438b11b0308b82f5d45718adab17d87d147b92c15579cf3842343"
 ---
 
 ## Description
@@ -28,6 +28,11 @@ Root cause: provisionedJavaPath locked the Java cache with filelock.AcquireWait(
 Fix: 8254e299 adds filelock.AcquireFileWaitContext (lock file inside a caller-owned private directory; same flock/LockFileEx acquisition, path-identity revalidation, bounded wait = earlier of ctx and the 10-minute acquisition limit). 1ec9aaf1 makes provisioning take <cache>/java/.java-provision.lock through it: one holder provisions under the unchanged witness discipline, the rest wait and then validate the published runtime through the warm-cache receipt/closure path; OpenJavaContext carries ctx (formal scoped opener and integration lane pass theirs). Kernel releases the lock on holder death; only the next holder recovers the stale stage. Tests: 3e4387e7 (RED, cross-process barrier race), 1ec9aaf1 (crashed winner, cancellation while waiting, 5-way byte-identical runtime and receipt). Follow-ups ded89fcb (noctx lint), 4dd76ecb (CHANGELOG without tracker id, required by TestAssuranceDocsStandaloneMachineryOnly).
 
 Latent siblings with the same scope-lock-on-shared-cache shape, not changed here: internal/formal/formal.go fetchJar (filelock.AcquireWait(formalJarLockScope(parent))) and cmd/machinery/structurizr_provision.go.
+2026-09-23 class fix, same branch (not pushed). The formal-jar cache and the Structurizr cache had the same scope-lock-in-test-binary hole and now take a lock beside the resource via filelock.AcquireFileWaitContext.
+- Formal jars: d26695bb (RED: two cross-process fetchers both download; five quarantine each other's live temp files; waiter does not wait), d26de89c (fix). Lock at <cache>/.machinery-formal-jar-lock/jars.lock, a private dir under the stable cache ancestor, not under the replaceable machinery parent, so TestConcurrentTLAAndAlloyFetchesRetainOneAuthorityAcrossCacheParentReplacement still holds. fetchJarContext/ensureJarContext/ensureAlloyJarContext carry ctx; runTLCScoped/runAlloyScoped pass theirs; ctx also bounds the download.
+- Structurizr: 5a4bcdac (download step made substitutable, no behavior change), f7fc1c3f (RED), 1b408f73 (fix; lock <cache>/machinery/structurizr/.structurizr-provision.lock; provisionStructurizrContext).
+- 50022497 CHANGELOG extended (no issue id); 42117d0e drops unused ensureAlloyJar and gofmts the Java race helper.
+Which test binaries share each cache in the Dagger test job (go test -race ./... as uid ci, one /home/ci/.cache): Java: internal/runtimeclosure (custody_integration_test, java_test) and internal/formal (custody/process tests) - two binaries, the observed race. Formal jars: only internal/formal (custody_integration_test clears TLA_TOOLS_JAR/ALLOY_TOOLS_JAR and fetches into the real cache); in-process fetches were already serialized. Structurizr: only cmd/machinery, whose TestMain sandboxes HOME/XDG_CACHE_HOME per process, so nothing shares it today. The integration lane provisions Java under its own HOME/XDG_CACHE_HOME.
 
 ## History
 
