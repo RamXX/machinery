@@ -308,6 +308,47 @@ func startCrashedJarFetcher(t *testing.T, dest string) (*exec.Cmd, *jarFetchServ
 	}
 }
 
+func TestFetchJarWaiterHonorsCancellationWhileWinnerFetches(t *testing.T) {
+	dest := jarFetchCache(t)
+	winner, server, stage := startCrashedJarFetcher(t, dest)
+	defer func() {
+		_ = winner.Process.Kill()
+		_ = winner.Wait()
+	}()
+	before := server.requests.Load()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan jarFetchResult, 1)
+	go func() {
+		path, err := fetchJarContext(ctx, dest, server.URL+"/ok", "test jar", jarFetchSHA())
+		done <- jarFetchResult{path, err}
+	}()
+	select {
+	case got := <-done:
+		t.Fatalf("waiter returned while the winner held the lock: path=%q err=%v", got.path, got.err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	cancel()
+	var got jarFetchResult
+	select {
+	case got = <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("canceled waiter did not return")
+	}
+	if got.path != "" || !errors.Is(got.err, context.Canceled) {
+		t.Fatalf("canceled waiter = path %q, err %v; want context.Canceled", got.path, got.err)
+	}
+	if n := server.requests.Load() - before; n != 0 {
+		t.Fatalf("canceled waiter downloaded %d times", n)
+	}
+	if info, err := os.Stat(stage); err != nil || info.Size() != int64(len(jarFetchBody)/2) {
+		t.Fatalf("canceled waiter disturbed the winner's stage: %v, %v", info, err)
+	}
+	if winner.ProcessState != nil {
+		t.Fatalf("winner exited while the waiter was canceled: %v", winner.ProcessState)
+	}
+}
+
 type jarFetchResult struct {
 	path string
 	err  error

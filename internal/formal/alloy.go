@@ -51,6 +51,12 @@ func alloyJarPath() (string, error) {
 }
 
 func ensureAlloyJar() (string, error) {
+	return ensureAlloyJarContext(context.Background())
+}
+
+// ensureAlloyJarContext is ensureAlloyJar with a context bounding the wait
+// for another process that is fetching into the same cache.
+func ensureAlloyJarContext(ctx context.Context) (string, error) {
 	want, err := overrideSHA("ALLOY_TOOLS_JAR", "ALLOY_TOOLS_JAR_SHA256", alloySHA256)
 	if err != nil {
 		return "", err
@@ -59,7 +65,7 @@ func ensureAlloyJar() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fetchJar(path,
+	return fetchJarContext(ctx, path,
 		"https://github.com/AlloyTools/org.alloytools.alloy/releases/download/"+alloyVersion+"/org.alloytools.alloy.dist.jar",
 		"org.alloytools.alloy.dist.jar "+alloyVersion, want)
 }
@@ -334,7 +340,7 @@ func runAlloy(alsPath string, commands []alloy.Command) (result []AlloyVerdict, 
 }
 
 func runAlloyScoped(ctx context.Context, alsPath string, commands []alloy.Command) (result []AlloyVerdict, notes []string, retErr error) {
-	jar, err := ensureAlloyJar()
+	jar, err := ensureAlloyJarContext(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

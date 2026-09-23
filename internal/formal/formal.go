@@ -107,6 +107,12 @@ func jarPath() (string, error) {
 
 // ensureJar fetches+checksum-verifies the pinned jar on first use (like tlc.sh).
 func ensureJar() (string, error) {
+	return ensureJarContext(context.Background())
+}
+
+// ensureJarContext is ensureJar with a context bounding the wait for another
+// process that is fetching into the same cache.
+func ensureJarContext(ctx context.Context) (string, error) {
 	want, err := overrideSHA("TLA_TOOLS_JAR", "TLA_TOOLS_JAR_SHA256", tlaSHA256)
 	if err != nil {
 		return "", err
@@ -115,7 +121,7 @@ func ensureJar() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fetchJar(path,
+	return fetchJarContext(ctx, path,
 		"https://github.com/tlaplus/tlaplus/releases/download/"+tlaVersion+"/tla2tools.jar",
 		"tla2tools.jar "+tlaVersion, want)
 }
@@ -222,6 +228,29 @@ var formalAfterJarCacheLock func(string)
 func formalJarStagePrefix(dest string) string {
 	sum := sha256.Sum256([]byte(filepath.Base(dest)))
 	return ".machinery-jar-" + hex.EncodeToString(sum[:8]) + "-"
+}
+
+// formalJarLockDirName is the private directory, directly under the stable
+// cache ancestor formalJarLockScope names, that holds the formal jar cache's
+// provisioning lock. The lock file lives there rather than in a scope-lock
+// namespace, which test binaries keep beside their own executable, so every
+// process sharing the cache contends on one file; and it lives outside the
+// replaceable cache parent, so replacing that parent never splits it.
+const (
+	formalJarLockDirName = ".machinery-formal-jar-lock"
+	formalJarLockName    = "jars.lock"
+)
+
+func acquireFormalJarLock(ctx context.Context, parent string) (*filelock.Lock, error) {
+	dir := filepath.Join(formalJarLockScope(parent), formalJarLockDirName)
+	if err := os.Mkdir(dir, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
+		return nil, err
+	}
+	lock, err := filelock.AcquireFileWaitContext(ctx, dir, formalJarLockName)
+	if err != nil {
+		return nil, fmt.Errorf("wait for formal jar cache lock: %w", err)
+	}
+	return lock, nil
 }
 
 func formalJarLockScope(parent string) string {
@@ -385,12 +414,22 @@ func recoverFormalJarStages(root *os.Root, prefix string) error {
 // for all cache-parent operations and rejects a replaced public parent path on
 // return. The destination-derived stage prefix ensures crash recovery can
 // never claim another tool's or a foreign generic temporary file.
-func fetchJar(dest, url, label, wantSHA string) (_ string, retErr error) {
+func fetchJar(dest, url, label, wantSHA string) (string, error) {
+	return fetchJarContext(context.Background(), dest, url, label, wantSHA)
+}
+
+// fetchJarContext is fetchJar bounded by ctx. Exactly one caller per cache
+// holds the jar-cache lock across recovery, download, and installation; every
+// other caller waits (until ctx ends or the filelock acquisition limit
+// elapses) and then rehashes the installed jar like any warm-cache caller. A
+// holder that dies releases the lock with its process, and the next holder
+// recovers the temporary file it left.
+func fetchJarContext(ctx context.Context, dest, url, label, wantSHA string) (_ string, retErr error) {
 	parent := filepath.Dir(dest)
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return "", err
 	}
-	lock, err := filelock.AcquireWait(formalJarLockScope(parent))
+	lock, err := acquireFormalJarLock(ctx, parent)
 	if err != nil {
 		return "", err
 	}
@@ -450,9 +489,9 @@ func fetchJar(dest, url, label, wantSHA string) (_ string, retErr error) {
 			retErr = errors.Join(retErr, q.Remove())
 		}
 	}()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	downloadCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
 	}
@@ -551,7 +590,7 @@ func runTLC(tlaPath, cfgPath string) (output string, retErr error) {
 }
 
 func runTLCScoped(ctx context.Context, tlaPath, cfgPath string) (output string, retErr error) {
-	jar, err := ensureJar()
+	jar, err := ensureJarContext(ctx)
 	if err != nil {
 		return "", err
 	}
