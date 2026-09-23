@@ -177,6 +177,11 @@ mentions in prose.
 
 ### Fixed
 
+- **The forged-activation lane test no longer depends on the parent's descriptor table.** On the
+  hosted macOS runner the test process inherits a socket on fd 9, which turned the forged
+  `MACHINERY_INTERNAL_CTL=9` claim into a present-but-unmarked channel and a different (equally
+  correct) refusal than the case asserts. The child now gets fds 3 through 9 pinned to `/dev/null`.
+
 - **Concurrent cold starts of the pinned Java runtime share one provisioner.** The
   provisioning lock was a scope lock, and test binaries keep their scope locks beside their own
   executable, so several packages under one `go test ./...` that cold-started the same user cache
