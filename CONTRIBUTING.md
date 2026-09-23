@@ -67,8 +67,8 @@ It runs the hosted `test` job (`go test -race -count=1 ./... -timeout=30m`) and
 the hosted `integration-required` job (`go run ./scripts/integration-lane --lane
 required`) inside a pinned 2-CPU `linux/amd64` container carrying the exact
 runtime identities `.github/actions/assurance-runtimes` installs: Go 1.27.1,
-Node 26.8.1 with TypeScript 7.0.2, CPython 3.14.7, and Elixir 1.20.4 on OTP
-29.0.6. The lane re-verifies each identity and fails closed, so a drifted image
+Node 26.10.0 with TypeScript 7.0.2, CPython 3.14.7, and Elixir 1.20.4 on OTP
+29.1.1. The lane re-verifies each identity and fails closed, so a drifted image
 stage is reported, never silently tolerated.
 
 That container reproduces the Linux kernel and filesystem semantics, the 2-CPU

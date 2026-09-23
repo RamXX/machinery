@@ -24,7 +24,7 @@ import (
 
 // The exact approved TypeScript closure of the first-release catalog
 // (docs/test-assurance-contract.md section 6): node-test-typescript/v1
-// executes only under Node 26.8.1 with the TypeScript compiler 7.0.2 on the
+// executes only under Node 26.10.0 with the TypeScript compiler 7.0.2 on the
 // pinned native platforms darwin/arm64 and linux/amd64. OpenTypeScript
 // binds the complete closure by exact bytes without launching anything: the
 // node executable, the TypeScript package tree (CLI shim, API surface,
@@ -40,7 +40,7 @@ const (
 	TypeScriptProfile = tddRuntimeProfile
 	// RequiredNodeRelease is the exact Node runtime release, the single
 	// owner of the Node pin.
-	RequiredNodeRelease = "26.8.1"
+	RequiredNodeRelease = "26.10.0"
 	// RequiredNodeVersion is the exact Node runtime version as `node
 	// --version` prints it.
 	RequiredNodeVersion = "v" + RequiredNodeRelease
@@ -80,7 +80,7 @@ type TypeScriptRequest struct {
 	ExpectedClosure string
 }
 
-// TypeScript is the pinned Node 26.8.1 / TypeScript 7.0.2 runtime handle
+// TypeScript is the pinned Node 26.10.0 / TypeScript 7.0.2 runtime handle
 // implementing tdd.RuntimeHandle. nodeLibrary binds the node runtime's own
 // shared library (libnode) when the installation links one; it is part of
 // the closure exactly like the executables.

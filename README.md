@@ -505,7 +505,7 @@ and release checks. Neither command installs anything.
   guarantees are not claimed; process custody, formal verification, and the assurance lanes are
   unix-only and refuse on Windows. Use Linux or macOS for the full toolchain.
 
-  **Build from source** (if you have [Go](https://go.dev/dl/) 1.27+; `go.mod` pins 1.27.0):
+  **Build from source** (if you have [Go](https://go.dev/dl/) 1.27+; `go.mod` pins 1.27.1):
   ```bash
   go build -o machinery ./cmd/machinery    # then: machinery install --from .
   ```

@@ -11,8 +11,8 @@ frozen v1 file, fragment or test.
 defines the closed assurance fragment schema `machinery.assurance.lane/v1`.
 `testdata/integration-lanes/assurance-runtime-pins.json` declares the exact
 first-release native catalog: go-testing/v1 Go 1.27.1; node-test-typescript/v1
-Node 26.8.1 with TypeScript 7.0.2; python-unittest/v1 CPython 3.14.7;
-elixir-exunit/v1 Elixir 1.20.4 with Mix 1.20.4, OTP major 29 and ERTS 17.0.6
+Node 26.10.0 with TypeScript 7.0.2; python-unittest/v1 CPython 3.14.7;
+elixir-exunit/v1 Elixir 1.20.4 with Mix 1.20.4, OTP major 29 and ERTS 17.1
 (the OTP patch identity is bound through the runtime's own reported ERTS
 version). Git 2.55.0 is declared as a gate runtime, never a fifth test
 adapter. Both native platforms, darwin/arm64 and linux/amd64, are pinned.
@@ -38,9 +38,9 @@ then provisions:
   anything else fails UNSUPPORTED_PLATFORM rather than degrading.
 - Every one of the four adapter runtimes is really present and its native
   version identity matches the pin exactly: `go version` (go1.27.1), `node
-  --version` (v26.8.1), `tsc --version` (Version 7.0.2), `python3 --version`
+  --version` (v26.10.0), `tsc --version` (Version 7.0.2), `python3 --version`
   (Python 3.14.7), `elixir --version` (Elixir 1.20.4, Erlang/OTP 29,
-  erts-17.0.6) and `mix --version` (Mix 1.20.4). Each receipt binds the
+  erts-17.1) and `mix --version` (Mix 1.20.4). Each receipt binds the
   resolved executable bytes by sha256. A missing runtime, a mismatched
   identity, or an extra undeclared language fails closed; no runtime is
   fetched or installed during replay, and an arbitrary PATH shim is not a

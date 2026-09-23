@@ -105,7 +105,7 @@ func TestParseTypeScriptWitness(t *testing.T) {
 }
 
 // tsRealStreamLines is a frozen sample of REAL node:test embedded-reporter
-// output (Node 26.8.1, paths normalized to a fixed prepared root): the
+// output (the pinned Node, paths normalized to a fixed prepared root): the
 // enqueue/dequeue vocabulary with entry-file scoping, a passed complete, the
 // helper witness diagnostic, both native summaries and the terminal
 // sentinel.

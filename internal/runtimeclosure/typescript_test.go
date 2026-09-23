@@ -2,7 +2,7 @@
 
 package runtimeclosure
 
-// RED contract for MAC-avfp: the pinned Node 26.8.1 / TypeScript 7.0.2
+// RED contract for MAC-avfp: the pinned Node / TypeScript
 // runtime closure. Every subject needs the real GREEN handle; the RED stub
 // fails each with ErrTypeScriptClosureNotImplemented instead of silently
 // passing. No subject launches an unowned subprocess.

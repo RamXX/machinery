@@ -2,8 +2,8 @@
 # tier in.
 #
 # Every runtime identity here mirrors .github/actions/assurance-runtimes, the
-# single owner of the hosted runtime pins: Go 1.27.1, Node 26.8.1 with
-# TypeScript 7.0.2, CPython 3.14.7, Elixir 1.20.4 on OTP 29.0.6. The required
+# single owner of the hosted runtime pins: Go 1.27.1, Node 26.10.0 with
+# TypeScript 7.0.2, CPython 3.14.7, Elixir 1.20.4 on OTP 29.1.1. The required
 # lane re-verifies each identity against testdata/integration-lanes and fails
 # closed, so a drifted stage here fails loudly instead of producing evidence
 # that does not match hosted CI.
@@ -13,9 +13,9 @@
 # MACHINERY_CI_LINUX_<STAGE>_IMAGE for every stage.
 
 ARG GO_IMAGE=golang:1.27.1-trixie
-ARG NODE_IMAGE=node:26.8.1-trixie-slim
+ARG NODE_IMAGE=node:26.10.0-trixie-slim
 ARG PYTHON_IMAGE=python:3.14.7-slim-trixie
-ARG ELIXIR_IMAGE=hexpm/elixir:1.20.4-erlang-29.0.6-debian-trixie-20260824-slim
+ARG ELIXIR_IMAGE=hexpm/elixir:1.20.4-erlang-29.1.1-debian-trixie-20260918-slim
 ARG DOCKER_CLI_IMAGE=docker:29.7.2-cli
 
 FROM ${NODE_IMAGE} AS node
@@ -34,7 +34,7 @@ RUN apt-get update \
       libreadline8 libssl3 zlib1g \
  && rm -rf /var/lib/apt/lists/*
 
-# Node 26.8.1 and its npm, from the pinned upstream image.
+# Node 26.10.0 and its npm, from the pinned upstream image.
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
@@ -46,7 +46,7 @@ COPY --from=python /usr/local/lib/python3.14 /usr/local/lib/python3.14
 COPY --from=python /usr/local/lib/libpython3.14.so.1.0 /usr/local/lib/libpython3.14.so.1.0
 RUN ln -sf python3.14 /usr/local/bin/python3 && ldconfig
 
-# Elixir 1.20.4 on OTP 29.0.6, from the pinned upstream image.
+# Elixir 1.20.4 on OTP 29.1.1, from the pinned upstream image.
 COPY --from=elixir /usr/local/lib/erlang /usr/local/lib/erlang
 COPY --from=elixir /usr/local/lib/elixir /usr/local/lib/elixir
 RUN for tool in erl erlc escript elixir elixirc mix iex; do \
