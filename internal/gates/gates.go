@@ -29,10 +29,13 @@ import (
 
 // Gate holds findings plus an explicit record of what was verified.
 type Gate struct {
-	Title        string
-	Errs         []string
-	Drift        []string
-	Warns        []string
+	Title string
+	Errs  []string
+	Drift []string
+	Warns []string
+	// Shadow holds findings of a rule running in shadow mode (Gy-rules in
+	// Stage 3): printed and counted, never blocking and never a warning.
+	Shadow       []string
 	Notes        []string
 	Counts       map[string]int
 	countOrder   []string // insertion order of count keys (matches Python dict)
@@ -42,6 +45,24 @@ type Gate struct {
 	// from the running binary. Absence of a stamp records nothing: pre-stamp
 	// artifacts are not skew.
 	stampVersions map[string]bool
+	// explain holds, per finding text, the indented derivation lines Emit
+	// prints under that finding (Gy-rules with --explain).
+	explain map[string][]string
+}
+
+// addExplain attaches derivation lines to a finding's text.
+func (g *Gate) addExplain(finding string, lines []string) {
+	if g.explain == nil {
+		g.explain = map[string][]string{}
+	}
+	g.explain[finding] = lines
+}
+
+// emitExplain prints a finding's derivation lines, aligned under its text.
+func (g *Gate) emitExplain(out io.Writer, finding string) {
+	for _, line := range g.explain[finding] {
+		fmt.Fprintf(out, "         %s\n", line)
+	}
 }
 
 // recordStamp notes the generator version stamped into a checked committed
@@ -167,8 +188,10 @@ func (g *Gate) CheckedExtra(segment string) {
 	g.checkedExtra = append(g.checkedExtra, segment)
 }
 
-// Emit prints the gate like Python (ERRS, DRIFT, warns, notes, checked:, ok).
-// Returns the number of blocking findings (errs + drift).
+// Emit prints the gate like Python (ERRS, DRIFT, warns, notes, checked:, ok),
+// with SHADOW findings after the warnings. Returns the number of blocking
+// findings (errs + drift); a SHADOW finding never blocks and never makes the
+// gate less than ok.
 func (g *Gate) Emit(out io.Writer) int {
 	fmt.Fprintf(out, "== %s ==\n", g.Title)
 	for _, e := range g.Errs {
@@ -179,6 +202,11 @@ func (g *Gate) Emit(out io.Writer) int {
 	}
 	for _, w := range g.Warns {
 		fmt.Fprintf(out, "  warn   %s\n", w)
+		g.emitExplain(out, w)
+	}
+	for _, s := range g.Shadow {
+		fmt.Fprintf(out, "  SHADOW %s\n", s)
+		g.emitExplain(out, s)
 	}
 	for _, a := range g.Notes {
 		fmt.Fprintf(out, "  note   %s\n", a)

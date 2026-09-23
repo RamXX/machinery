@@ -1,0 +1,55 @@
+// Authorization inventory (proposal section 4, rule A; NEXT.md entry 34).
+//
+// Every System write owes exactly one row in the marked authorization
+// inventory: an admission naming a capability, or a (no authorization: ...)
+// waiver. A System write is a Modelith action whose actor is System, unless
+// the matrix unit of the same id declares WRITES{} (read-only). The unit and
+// the action share an id when the matrix is named after the entity, which is
+// the design convention (machines/Order.matrix.md holds Order's units).
+//
+// Matrix cascade and consumer arms are not projected (their producer cell is
+// prose-shaped, and projection v2 has no relation for them), so a matrix
+// producer is not an obligation here; the 0.9.0 Gx heuristic still covers it.
+
+.decl action(id:symbol, entity:symbol, name:symbol, actor:symbol)
+.input action
+.decl admission(subject:symbol, capability:symbol)
+.input admission
+.decl no_authorization(subject:symbol)
+.input no_authorization
+.decl c4_element(id:symbol, kind:symbol, parent:symbol)
+.input c4_element
+.decl unit_declares(unit:symbol, group:symbol)
+.input unit_declares
+.decl unit_writes(unit:symbol, fact:symbol)
+.input unit_writes
+
+.decl writes_something(unit:symbol)
+writes_something(U) :- unit_writes(U, _).
+
+.decl declared_read_only(unit:symbol)
+declared_read_only(U) :- unit_declares(U, "WRITES"), !writes_something(U).
+
+.decl system_write(action:symbol)
+system_write(A) :- action(A, _, _, "System"), !declared_read_only(A).
+
+.decl admitted(subject:symbol)
+admitted(S) :- admission(S, _).
+
+// A System write with neither an admission nor a waiver.
+.decl finding_authz_missing(action:symbol)
+.output finding_authz_missing
+finding_authz_missing(A) :- system_write(A), !admitted(A), !no_authorization(A).
+
+// An admission for a subject that is not a System write: a stale row.
+.decl finding_authz_orphan(subject:symbol)
+.output finding_authz_orphan
+finding_authz_orphan(S) :- admission(S, _), !system_write(S).
+
+// An admission naming a capability no workspace.dsl element declares.
+.decl finding_authz_unknown_capability(subject:symbol, capability:symbol)
+.output finding_authz_unknown_capability
+finding_authz_unknown_capability(S, C) :- admission(S, C), !capability(C).
+
+.decl capability(id:symbol)
+capability(C) :- c4_element(C, _, _).

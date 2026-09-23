@@ -1,0 +1,42 @@
+// Effect carriers (proposal section 4, rule E; NEXT.md entry 20). New
+// behavior with no 0.9.0 counterpart.
+//
+// warn_effect_uncarried: an action- or actor-kind unit that declares a
+// non-empty WRITES{} and names no CARRIES{}. A warning, not an error: the
+// promotion path is warn_ to finding_ (shadow, then error tier) once the
+// bundled designs and the skill's matrix template carry CARRIES{} for every
+// writing unit. WRITES{} (declared read-only) writes nothing and owes no
+// carrier.
+//
+// finding_actor_uncarried: an actor-kind unit that names no CARRIES{} and is
+// not declared read-only by WRITES{}. An actor's effect is its invocation, so
+// it owes a carrier whether or not it lists WRITES. It is the half of entry
+// 20 no bundled design satisfies yet (their actors predate CARRIES{}), so it
+// runs as a shadow finding: printed and counted, never blocking.
+
+.decl unit(id:symbol, machine:symbol, name:symbol, kind:symbol)
+.input unit
+.decl unit_writes(unit:symbol, fact:symbol)
+.input unit_writes
+.decl unit_carries(unit:symbol, kind:symbol, target:symbol)
+.input unit_carries
+.decl unit_declares(unit:symbol, group:symbol)
+.input unit_declares
+
+.decl carried(unit:symbol)
+carried(U) :- unit_carries(U, _, _).
+
+.decl writes_something(unit:symbol)
+writes_something(U) :- unit_writes(U, _).
+
+.decl declared_read_only(unit:symbol)
+declared_read_only(U) :- unit_declares(U, "WRITES"), !writes_something(U).
+
+.decl warn_effect_uncarried(unit:symbol)
+.output warn_effect_uncarried
+warn_effect_uncarried(U) :- unit(U, _, _, "action"), writes_something(U), !carried(U).
+warn_effect_uncarried(U) :- unit(U, _, _, "actor"), writes_something(U), !carried(U).
+
+.decl finding_actor_uncarried(unit:symbol)
+.output finding_actor_uncarried
+finding_actor_uncarried(U) :- unit(U, _, _, "actor"), !carried(U), !declared_read_only(U).

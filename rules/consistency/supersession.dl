@@ -1,0 +1,32 @@
+// Source supersession (proposal section 4, rule F; NEXT.md entry 15).
+//
+// type_owner(type, owner) names the artifact declaring a type (today a
+// SUPERSEDES{type:Old} row of the Architecture Contract; a schema catalog
+// would add its own path); supersedes(new, old) is one replacement.
+
+.decl type_owner(type:symbol, owner:symbol)
+.input type_owner
+.decl supersedes(new:symbol, old:symbol)
+.input supersedes
+
+// Two artifacts claim one type.
+.decl finding_duplicate_owner(type:symbol)
+.output finding_duplicate_owner
+finding_duplicate_owner(T) :- type_owner(T, S1), type_owner(T, S2), S1 != S2.
+
+.decl chain(type:symbol, older:symbol)
+chain(A, B) :- supersedes(A, B).
+chain(A, C) :- chain(A, B), supersedes(B, C).
+
+// A type that, through replacements, replaces itself.
+.decl finding_supersession_cycle(type:symbol)
+.output finding_supersession_cycle
+finding_supersession_cycle(T) :- chain(T, T).
+
+.decl owned(type:symbol)
+owned(T) :- type_owner(T, _).
+
+// A replacement of a type no artifact of the design declares.
+.decl finding_dangling_replacement(type:symbol, old:symbol)
+.output finding_dangling_replacement
+finding_dangling_replacement(N, O) :- supersedes(N, O), !owned(O).
