@@ -128,6 +128,16 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "not in the exposes list of widget.store", ExpectExit: true},
 	{Name: "source-outside-contract", Tool: "check", Mutation: "rogue package",
 		ExpectSubstr: "maps to no contract boundary", ExpectExit: true},
+	// 2026-09-22, consistency layer Stage 1: the declaration grammar is closed.
+	// A malformed WRITES group and an unknown upper-case group name are
+	// Gx-trace errors; a backticked fact quoted outside every group is a
+	// Gl-ledger warning (the tier never fails a gate, so ExpectExit is false).
+	{Name: "malformed-writes-declaration", Tool: "check", Mutation: "a WRITES group repeats a member",
+		ExpectSubstr: "WRITES declaration has duplicate member 'Widget.status'", ExpectExit: true},
+	{Name: "unknown-declaration-group", Tool: "check", Mutation: "a consumer-private MACHINE-WRITTEN{} group in a contract cell",
+		ExpectSubstr: "unknown declaration group MACHINE-WRITTEN{...}", ExpectExit: true},
+	{Name: "undeclared-fact-reference", Tool: "check", Mutation: "a contract cell quotes `Widget.status` outside any group",
+		ExpectSubstr: "undeclared fact reference `Widget.status`", ExpectExit: false},
 }
 
 // RefineExperiments are the data-refinement reconciliation failures.
