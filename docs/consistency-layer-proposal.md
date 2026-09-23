@@ -495,6 +495,19 @@ deprecation warning is acceptable; two is not.
 plus fixtures plus, where needed, one declaration each. From this point the cost of a
 consistency gap is a rule and a fixture.
 
+Entry 16 (challenge invented prerequisites and incompatible proof reuse) is judgment,
+not a rule, and Stage 5 ships no rule for it. Its questions are whether a newly
+blocking dependency is necessary for the consumer claim it blocks, and whether a
+reused receipt's authority, lifecycle preconditions and scope hold for a new claim.
+Both are questions about meaning. A rule joins only what a design declares, so a rule
+for entry 16 would either restate the author's own statement of necessity (and check
+nothing) or infer necessity from matching names and field shapes, which is the prose
+inference principle 1 forbids and entry 16 itself warns against ("matching field
+shapes or names do not import the producer's authority"). The parts of it that are
+facts already have rules: a replaced or dangling source (`supersession.dl`), a stale
+reservation, an unresolved fact (`facts.dl`). The necessity review stays with the
+conductor and the human reviewer, beside readiness and failure traces (section 7).
+
 Order of value: Stage 2 unlocks every consumer checker immediately, including the NIL
 hook, even before the evaluator exists. Stage 3 is where the H2-shaped code stops being
 needed. Stage 4 is where it leaves.
