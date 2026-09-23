@@ -61,7 +61,9 @@ the three commands you actually run.
 - **`machinery project <design>`** generates and writes the committed projection for every
   `design/checkers/*.checker.yaml` manifest, one file each, to the path its `evidence.projection_out`
   names. This is the write side of the contract: run it, then `git commit` the result, before your
-  adapter ever consumes the projection. It needs no registry and no engine.
+  adapter ever consumes the projection. It needs no registry and no engine. With `--facts <dir>` it
+  instead writes the design's fact relations as `.facts` files for a Datalog engine (see "Facts"
+  below) and touches no checker projection.
 - **`machinery check <design> --gate gk`** is the pure, hermetic gate (`Gk-<id>` per checker), one of
   the names in `--gate`'s vocabulary: `gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5`. It never runs an
   engine and never touches the registry; it reconciles the manifest, byte-matches the committed
@@ -79,7 +81,8 @@ the three commands you actually run.
 
 | Piece | Who writes it | Where it lives | What it is |
 |---|---|---|---|
-| `projection.schema.json` | machinery | [`schemas/projection.schema.json`](../schemas/projection.schema.json) | the canonical, deterministic slice of the design machinery hands you |
+| `projection.schema.json` | machinery | [`schemas/projection.schema.json`](../schemas/projection.schema.json) | the canonical, deterministic slice of the design machinery hands you (1.0) |
+| `projection-v2.schema.json` | machinery | [`schemas/projection-v2.schema.json`](../schemas/projection-v2.schema.json) | the 2.0 superset, with the relational layers, for a manifest naming any layer beyond the 1.0 three |
 | `evidence.schema.json` | machinery | [`schemas/evidence.schema.json`](../schemas/evidence.schema.json) | the verdict + coverage + provenance you hand back |
 | the manifest | you | `design/checkers/<id>.checker.yaml` (committed, tool-neutral) | which slice you need, what you cover, where your evidence sits |
 | the registry | you | `.machinery/checkers.local.yaml` (repo root, git-ignored) | immutable OCI image plus exact platform, mounted-input closure, local engine, and run/replay argv for `<id>` |
@@ -94,16 +97,23 @@ and the adapter is the only thing that has to know both languages.
 
 ### Projection (machinery to checker)
 
-A single JSON object, one per checker, carrying exactly the layers the manifest asked for. **v1
-projects three layers only: `model` (entities and attributes), `invariants`, and `relationships`.**
-Requesting `actions`, `scenarios`, `machines`, `c4`, or `oracles` in a manifest's `projection.include`
-is not silently dropped: both `machinery project` and the `gk` gate fail loudly, because a checker
-that believes it received a layer it never got is worse than a checker that never ran. Those five
-names are reserved in the schema for a later revision; write your manifest against `model`,
-`invariants`, and `relationships` today.
+A single JSON object, one per checker, carrying exactly the layers the manifest asked for. There are
+two versions of the contract, and the manifest's `projection.include` selects between them:
+
+- **1.0** ([`schemas/projection.schema.json`](../schemas/projection.schema.json)): a manifest whose
+  include names only `model` (entities and attributes), `invariants`, and `relationships` gets the
+  1.0 projection, byte for byte what machinery produced before 2.0 existed. Every committed v1
+  projection and evidence file keeps binding; nothing about a v1 manifest changes.
+- **2.0** ([`schemas/projection-v2.schema.json`](../schemas/projection-v2.schema.json)): a manifest
+  that names any other layer gets the 2.0 projection, described under "Projection 2.0" below.
+
+`scenarios` is still reserved. Requesting it, or requesting a layer the design does not have (a
+`machines` layer on a design with no `machines/*.machine.json`), is not silently dropped: both
+`machinery project` and the `gk` gate fail loudly, because a checker that believes it received a
+layer it never got is worse than a checker that never ran.
 
 Every element is keyed by a stable id, so a verdict binds to an identity that survives renames, not
-to a line number. v1 emits natural composite ids derived straight from your Modelith names:
+to a line number. The 1.0 layers emit natural composite ids derived straight from your Modelith names:
 
 | Element | Stable id shape | Example |
 |---|---|---|
@@ -139,6 +149,79 @@ Three things about the projection's determinism matter to you:
   trusts this mirror. `machinery check --gate gk` and `machinery verify-checkers` always recompute
   `input_hash` from the projection bytes themselves; the mirror being present, absent, or wrong
   changes nothing about what they check.
+
+### Projection 2.0: relational layers
+
+2.0 is a superset of 1.0. It keeps the 1.0 `model` object, unchanged in shape, whenever a v1 layer is
+included, and adds `layers`: for each included layer, every relation the layer owns, one array of
+rows per relation (an empty array when the design has none). Each row carries the `stable_id` of the
+element it describes, a `source` object `{path, line}` (design-relative, forward slashes, 1-based
+first line) that a gate uses to print a human location, and one string per column:
+
+```json
+"machines": {
+  "state": [
+    {"stable_id": "state:Order.Paid", "source": {"path": "machines/Order.machine.json", "line": 31},
+     "id": "Order.Paid", "machine": "Order", "kind": "atomic"}
+  ]
+}
+```
+
+| Layer | Relations (columns) | Stable id | Read from |
+|---|---|---|---|
+| `model` | `entity(id)`, `attr(id, entity, datatype)`, `enum_member(id, enum, value)` | `entity:X`, `attr:X.a`, `enum:X.a.v` | the Modelith model; `enum_member` for each attribute typed by a Modelith enum |
+| `invariants` | `invariant(id)`, `invariant_owner(id, entity)` | `inv:id` | the Modelith model |
+| `relationships` | `relationship(id, src, dst, cardinality)` | `rel:X->Y:card[:role]` | the Modelith model, cardinality as stated |
+| `actions` | `action(id, entity, name, actor)` | `action:Entity.name` | Modelith entity actions |
+| `machines` | `machine(id)`, `state(id, machine, kind)`, `transition(id, src, event, dst)`, `guard_on(transition, guard)`, `action_on(transition, action)`, `invoke(state, service)`, `context_key(machine, key)` | `machine:M`, `state:M.s`, `tr:M.<oracle stable id>` | `machines/*.machine.json`; a transition's id is the stable id of its generated oracle row |
+| `matrices` | `unit(id, machine, name, kind)`, `unit_clauses(unit, clause, status)`, `unit_reads(unit, event, field)`, `unit_values(unit, group, member)`, `unit_derived(unit, fact)`, `unit_payload(unit, event, field)`, `unit_writes(unit, fact)`, `unit_uses(unit, fact)`, `unit_carries(unit, kind, target)` | `unit:M.name`; `matrix:M` for a declaration on a non-unit row (a consumed-event row) | `machines/*.matrix.md` declaration groups: `CLAUSES{}`/`RETIRED{}`, `READS{}`, `VALUES{}`, `derived:`, `payload {}`, `WRITES{}`, `USES{}`, `CARRIES{}` |
+| `events` | `event(id, producer)`, `event_participant(id, participant)`, `event_consumer(id, consumer)`, `event_payload_field(id, field)` | `event:name` | ARCHITECTURE.md event-contract tables |
+| `c4` | `c4_element(id, kind, parent)`, `c4_relationship(src, dst)`, `boundary(id, element, role)`, `allowed_edge(src, dst)`, `reads_row(artifact, reader)` | `c4:id`, `boundary:id`, `external:id` | `workspace.dsl` and the Architecture Contract |
+| `authorization` | `admission(subject, capability)`, `no_authorization(subject)` | `action:Entity.name` | the table under the `machinery:authorization-inventory` marker |
+| `oracles` | `oracle_row(id, machine, transition)` | `orc:id` | `machines/*.oracle.md`, `formal/Policy.oracle.md`, `formal/Isolation.oracle.md` |
+| `milestones` | `milestone(id, status)`, `dod_id(milestone, oracle)`, `slice_claim(slice, oracle)` | `ms:M<n>`, `slice:M<n>-S<k>` | BUILD.md's Build plan and `slices.yaml` |
+| `supersession` | `type_owner(type, owner)`, `supersedes(new, old)` | `type:Name` | `SUPERSEDES{type:Old}` on Architecture Contract rows |
+
+What the layers settle:
+
+- **Prose never becomes a column.** Every value is an identifier or an enumerated value. A Modelith
+  definition or description, an invariant statement, the reason of a `derived:` waiver or of a
+  `(no authorization: ...)` waiver, and an event payload cell that states no closed field set are never
+  projected. That is why `unit_derived` and `no_authorization` carry no reason column.
+- **A layer is present only when its source exists.** A design with no `machines/` has no `machines`,
+  `matrices`, or `oracles` layer at all, rather than empty ones; a present layer carries every one of
+  its relations. A matrix whose machine JSON is missing still projects, with `machine` empty.
+- **Duplicates fail.** Two rows of a defining relation (see the schema description) that give one
+  stable id from two different places make the projection fail, naming both `path:line` sources.
+  Identical tuples collapse: a relation is a set.
+- **As stated, not validated.** A milestone DoD that cites an oracle id no committed oracle declares is
+  projected as written (`dod_id(M0, ZZZZ-abcdef)`); whether it exists is Gb's question. A cited test id
+  is normalized to its stable id when an oracle declares it, and `ORACLESET{path}` expands to that
+  file's rows.
+- `action_writes` is not emitted: Modelith states no structured post-condition for an action.
+
+The binding discipline is unchanged: `input_hash` covers every projected field, the layers included,
+except `generated` and `machinery_version`.
+
+### Facts: `machinery project <design> --facts <dir>`
+
+The same relations, for every layer the design has (not per manifest), as fact files any Datalog
+engine reads directly, Souffle and machinery's own `internal/datalog` alike:
+
+- one `<relation>.facts` per relation: one tuple per line, columns separated by a tab, lines sorted
+  bytewise, an empty file for an empty relation of a present layer, no file for an absent layer;
+- `relations.txt`: one line per emitted relation, `name<TAB>arity<TAB>layer<TAB>col1,col2,...`, in
+  catalog order, so a rule file can write its `.decl` lines from it.
+
+The fact format has no escape, so a symbol can never hold a tab, carriage return, or newline. Since only
+identifiers and enumerated values are projected, none of them ever should; a value that does is
+refused with its source location rather than escaped. Id columns carry the stable id without its
+kind prefix (`Order.status`, not `attr:Order.status`), because the relation already names the kind and
+a rule must be able to join `WRITES{Order.status}` against `attr`. The directory is staged beside its
+target and renamed into place; an existing target is replaced only when it holds nothing but facts
+output. A second run over an unchanged design writes byte-identical files. `--facts` reads the design
+under the same reader snapshot as `machinery check`, needs no checker manifest, and writes no
+checker projection.
 
 ### Evidence (checker to machinery)
 
@@ -179,8 +262,9 @@ checker:
   runtime_closure: sha256:...          # exact OCI image + platform + argv + mounted-input closure
 
 # The slice you need. Machinery projects exactly this, in canonical order, and owns its freshness.
-# v1 supports model, invariants, and relationships only. Naming actions, scenarios, machines, c4, or
-# oracles here fails machinery project and the gate loudly; they are reserved for a later revision.
+# Naming only model, invariants, and relationships gets the 1.0 projection; any other layer (actions,
+# machines, matrices, events, c4, authorization, oracles, milestones, supersession) gets 2.0.
+# scenarios is reserved and fails machinery project and the gate loudly.
 projection:
   include: [model, invariants, relationships]
   requires: [gx]                        # gates whose validated artifacts this projection assumes; informational in v1, see "Order" below

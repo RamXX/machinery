@@ -21,6 +21,22 @@ under their version heading when a release is cut.
 - **Undeclared fact references warn in Gl-ledger.** A backticked snake_case or `Entity.attr`
   token in a matrix contract, clause, or payload cell, outside every group and not declared by its
   own row, is a warning: declare it in `USES{}` or `WRITES{}`, or drop the backticks.
+- **Projection 2.0 (consistency layer, Stage 2).** A checker manifest may now include `actions`,
+  `machines`, `matrices`, `events`, `c4`, `authorization`, `oracles`, `milestones` and
+  `supersession`. Such a manifest gets `projection_schema: "2.0"`
+  ([`schemas/projection-v2.schema.json`](schemas/projection-v2.schema.json)): the 1.0 `model` block
+  when a v1 layer is included, plus `layers`, one array of rows per relation, each row with its
+  stable id and a design-relative `source` `{path, line}`. Only identifiers and enumerated values
+  are projected, never prose. `Gk` and `verify-checkers` regenerate 2.0 projections from the design
+  and bind evidence to them exactly as for 1.0. A manifest naming only `model`, `invariants` and
+  `relationships` keeps the 1.0 projection byte for byte, so every committed v1 projection and
+  evidence file (`examples/pii-flow` among them) still binds. `scenarios` stays reserved, and a
+  layer the design does not have fails loudly.
+- **`machinery project <design> --facts <dir>`.** Writes every fact relation the design has as
+  tab-separated `<relation>.facts` files plus a `relations.txt` index (name, arity, layer,
+  columns): the input Souffle and the in-process evaluator read without an adapter. The directory
+  is staged and renamed into place, refuses to replace anything but facts output, and is
+  byte-identical across reruns of an unchanged design. No checker manifest is needed.
 
 ### Fixed
 

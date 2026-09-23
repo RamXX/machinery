@@ -85,7 +85,15 @@ One line per subcommand:
 - `machinery project <design-dir>` writes the committed projection for every external-checker
   manifest (`design/checkers/*.checker.yaml`): the design slice a checker consumes, keyed by Modelith
   stable id, with the binding `input_hash` mirrored under `generated` for adapters. The write side of
-  the Gk contract; see `docs/external-checkers.md`.
+  the Gk contract; see `docs/external-checkers.md`. A manifest naming only model, invariants and
+  relationships gets the 1.0 projection unchanged; one naming any other layer (actions, machines,
+  matrices, events, c4, authorization, oracles, milestones, supersession) gets 2.0, which adds those
+  relations with a stable id and a `source` path:line per row.
+- `machinery project <design-dir> --facts <dir>` writes the design's fact relations instead: one
+  tab-separated `<relation>.facts` per relation of every layer the design has, plus `relations.txt`
+  (name, arity, layer, columns), the input Souffle and `internal/datalog` read. The directory is
+  staged and renamed into place; a rerun over an unchanged design is byte-identical. No manifest is
+  needed and no checker projection is touched.
 - `machinery pack generate <parent-design>` emits the frozen per-subsystem contract packs
   (`design/packs/<id>.pack/`) from `decomposition.yaml`: the owned domain slice, the boundary event
   rows, the contract machine plus its TLA+ module, the delegated invariants, and a content hash.
