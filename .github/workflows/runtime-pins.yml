@@ -31,10 +31,17 @@ jobs:
           cache: true
       - name: Report runtime pins
         id: report
+        env:
+          # Authenticates the GitHub releases lookup (Elixir) past the
+          # unauthenticated rate limit.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
           status=0
-          go run ./scripts/runtime-pins -strict > "$RUNNER_TEMP/runtime-pins.md" || status=$?
+          # Built, not `go run`: go run turns every nonzero exit into 1, and
+          # the issue text distinguishes drift (1) from a failed lookup (2).
+          go build -o "$RUNNER_TEMP/runtime-pins" ./scripts/runtime-pins
+          "$RUNNER_TEMP/runtime-pins" -strict > "$RUNNER_TEMP/runtime-pins.md" || status=$?
           cat "$RUNNER_TEMP/runtime-pins.md"
           printf 'status=%s\n' "$status" >> "$GITHUB_OUTPUT"
       - name: Open or update the drift issue
@@ -51,7 +58,7 @@ jobs:
             if [ "$STATUS" = 1 ]; then
               echo "At least one pinned runtime is behind its latest upstream release."
             else
-              echo "At least one upstream release index could not be read, so the pins could not be checked."
+              echo "At least one latest-upstream lookup failed (offline or lookup failed in the table), so those pins could not be checked."
             fi
             echo
             cat "$RUNNER_TEMP/runtime-pins.md"

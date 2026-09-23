@@ -113,11 +113,19 @@ are covered by a drift report:
 make runtime-pins   # pinned, host-installed and latest-upstream per runtime
 ```
 
-It exits non-zero when a pin is behind its latest upstream release, and prints
-`offline` in the upstream column when an index cannot be reached.
-`.github/workflows/runtime-pins.yml` runs it every Monday and opens or updates
-the issue "runtime pins behind upstream" with the table. Bumping a pin is a
-normal weekly chore, not a release event.
+It exits 1 when a pin is behind its latest upstream release. The upstream
+column prints `offline` only when no index can be reached at all; when one
+lookup fails while others answer, its cell names the failure (for example
+`lookup failed: HTTP 403`) and a warning is printed. `-strict` exits 2 on any
+unknown upstream version. The status column adds `host behind` (or `host
+ahead`) when the runtime on your PATH is not the pinned version, which is what
+makes the native suites fail locally; that exits 0 by default, and
+`go run ./scripts/runtime-pins -host-strict` exits 3 on it. Elixir is looked
+up through the GitHub releases API (set `GITHUB_TOKEN` to avoid the
+unauthenticated rate limit) with builds.hex.pm as the fallback.
+`.github/workflows/runtime-pins.yml` runs it with `-strict` every Monday and
+opens or updates the issue "runtime pins behind upstream" with the table.
+Bumping a pin is a normal weekly chore, not a release event.
 
 Each pin is defined once, in `internal/runtimeclosure` (`RequiredOTPVersion`,
 `RequiredErtsVersion`, `RequiredElixirVersion`, `RequiredNodeRelease`,
