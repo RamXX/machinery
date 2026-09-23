@@ -144,7 +144,7 @@ finding_ghost("Nowhere.unit", E) :- entity(E).
 	if blocking := g.Emit(&out); blocking != 0 {
 		t.Fatalf("a SHADOW finding never blocks, got %d", blocking)
 	}
-	want := `== Gy-rules ==
+	want := `== Gy-rules  consistency rules over projected facts ==
   SHADOW Nowhere.unit (no source): ghost (fact 'Order')
          finding_ghost("Nowhere.unit", "Order")  [ghost.dl rule 1]
            entity("Order")  [fact domain.modelith.yaml:11]
@@ -204,7 +204,7 @@ func TestRulesGateNotActivatedWhenExplicitlySelected(t *testing.T) {
 	}
 	var out bytes.Buffer
 	run[0].Emit(&out)
-	want := "== Gy-rules ==\n  note   not activated: the design has no machines/ and no AUTHORIZATION.md, the sources the consistency rules read\n  checked: nothing\n  ok\n"
+	want := "== Gy-rules  consistency rules over projected facts ==\n  note   not activated: the design has no machines/ and no AUTHORIZATION.md, the sources the consistency rules read\n  checked: nothing\n  ok\n"
 	if out.String() != want {
 		t.Fatalf("got:\n%s", out.String())
 	}

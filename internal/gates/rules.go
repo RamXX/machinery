@@ -35,7 +35,7 @@ import (
 )
 
 // RulesGateTitle is the Gy-rules gate header.
-const RulesGateTitle = "Gy-rules"
+const RulesGateTitle = "Gy-rules  consistency rules over projected facts"
 
 // Output relation prefixes and the tier each selects.
 const (
