@@ -1759,6 +1759,13 @@ func selectGatesCheckedInSnapshot(snapshot *gates.Snapshot, designDir string, cf
 		// carry G3/Gx.
 		run["gx"] = true
 	}
+	if gates.RulesActive(designDir) {
+		// the consistency rules activate exactly as in the CLI default
+		// suite: on machines/ or an AUTHORIZATION.md, the two sources only
+		// they read. A machine-less design with an inventory still owes its
+		// System writes an admission, so the stop hook holds it too.
+		run["gy"] = true
+	}
 	if fileExists(filepath.Join(designDir, "BUILD.md")) {
 		// unlike Gx, the plan-shape gate applies even on a machine-less
 		// decomposed parent: the manifest BUILD.md is still its artifact

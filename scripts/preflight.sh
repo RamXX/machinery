@@ -11,7 +11,8 @@
 #   this script                 the fast tier, then the heavy tier below
 #
 # Heavy tier: the race sweep, the required native integration lane, the
-# registered implementation modules, TLC formal verification, C4 compilation,
+# registered implementation modules, TLC formal verification, the Datalog
+# rules parity lane, C4 compilation,
 # and external checker reproduction. Any failure exits non-zero.
 #
 # Run directly any time with:   make preflight   (or  scripts/preflight.sh)
@@ -70,6 +71,12 @@ done
 # 5. engine-backed formal suite (formal.yml) -------------------------------
 say "formal verification (regeneration + TLC)"
 make verify-formal || fail "formal verification failed"
+
+# 5b. Datalog parity (ci: datalog-parity job) ------------------------------
+# Every shipped consistency rule file over every bundled example, under native
+# Soufflé and the in-process evaluator, in the pinned image the CI job uses.
+say "Datalog rules parity (Soufflé vs internal/datalog, pinned image)"
+make dagger-job JOB=datalog-parity || fail "Datalog rules parity failed"
 
 # 6. C4 engine compilation (ci: engine-verification job) -------------------
 say "C4 compilation (Structurizr CLI)"
