@@ -435,3 +435,48 @@ func TestRealBinaryOverAMutatedExampleCopy(t *testing.T) {
 		t.Fatalf("the example copy changed: %v", d)
 	}
 }
+
+// A consistency baseline turns Gy-rules findings and Gl-ledger warnings into
+// "baselined:" notes (with --explain, a derivation under the note), a fixed
+// one into a resolved note, and adds "N baselined" to the checked line. The
+// parser reads every such line as a note, so none of them gates: the old
+// blocking and warning lines land under resolved, and the diff exits 0.
+func TestBaselinedAndResolvedNotesParseAsNotes(t *testing.T) {
+	dir := t.TempDir()
+	design := filepath.Join(dir, "design")
+	writeFile(t, filepath.Join(design, "BUILD.md"), "x\n", 0o644)
+	before := "== Gl-ledger  session ledgers + house style ==\n" +
+		"  warn   machines/Order.matrix.md:3: row 'canPay': undeclared fact reference `Order.total`; declare it in USES{} or WRITES{} or drop the backticks\n" +
+		"  checked: 1 undeclared fact references\n" +
+		"== Gy-rules  consistency rules over projected facts ==\n" +
+		"  ERROR  machines/Ledger.matrix.md:1: row 'Ledger': orphan_matrix\n" +
+		"  checked: 8 rule files evaluated, 25 facts\n\n1 blocking (ERROR/DRIFT) finding(s)\n"
+	after := "== Gl-ledger  session ledgers + house style ==\n" +
+		"  note   baselined: machines/Order.matrix.md:3: row 'canPay': undeclared fact reference `Order.total`; declare it in USES{} or WRITES{} or drop the backticks\n" +
+		"  note   baselined undeclared fact machines/Order.matrix.md: row 'recordPay': `ghost_token` resolved; run machinery baseline to shrink the ratchet\n" +
+		"  checked: 1 undeclared fact references, 1 baselined, 1 baselined entries resolved\n  ok\n" +
+		"== Gy-rules  consistency rules over projected facts ==\n" +
+		"  note   baselined: machines/Ledger.matrix.md:1: row 'Ledger': orphan_matrix\n" +
+		"         finding_orphan_matrix(\"Ledger\")  [records.dl rule 1]\n" +
+		"           matrix(\"Ledger\")  [fact machines/Ledger.matrix.md:1]\n" +
+		"  note   baselined finding finding_fact_unresolved('Order.canPay', 'Order.stat') resolved; run machinery baseline to shrink the ratchet\n" +
+		"  checked: 8 rule files evaluated, 25 facts, 1 baselined, 1 baselined entries resolved\n  ok\n\n0 blocking (ERROR/DRIFT) finding(s)\n"
+	res, err := parseCheck(after, newNormalizer(dir, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := res.count(sevNote); n != 4 || res.count(sevError)+res.count(sevWarn) != 0 {
+		t.Fatalf("baselined and resolved lines must parse as 4 notes and nothing else: %#v", res.findings())
+	}
+	for _, g := range res.Gates {
+		if g.verdict() != verdictOK {
+			t.Fatalf("%s verdict %s, want ok", g.ID, g.verdict())
+		}
+	}
+	oldBin := writeFake(t, dir, "old", fake{version: "v1", canned: before, exit: 1})
+	newBin := writeFake(t, dir, "new", fake{version: "v2", canned: after})
+	code, out, _ := runTool(t, "-old", oldBin, "-new", newBin, "-design", design)
+	if code != exitOK || !strings.Contains(out, "== new findings: 0 blocking, 0 warnings, 4 notes ==") {
+		t.Fatalf("exit = %d, want 0 with four new notes\n%s", code, out)
+	}
+}
