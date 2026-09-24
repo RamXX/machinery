@@ -85,7 +85,7 @@ func TestLedgerResolvesBacktickedTokens(t *testing.T) {
 		{"enum value, its own name", "settled_late", "settled_later"},
 		{"context key, bare", "retry_count", "retry_counts"},
 		{"context key, qualified by machine", "Order.attempts", "Order.attempt"},
-		{"event from the event contract", "order_confirmed", "order_confirmd"},
+		{"event from the event contract", "order_confirmed", "order_confirmed_v2"},
 		{"event, entity-shaped", "Order.shipped", "Order.shippd"},
 		{"entity invariant id", "order_total_positive", "order_total_negative"},
 		{"model invariant id", "ledger_balanced", "ledger_balance"},
