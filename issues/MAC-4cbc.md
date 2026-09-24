@@ -8,7 +8,8 @@ labels: [dagger, ci, gates]
 created_at: 2026-09-24T21:33:44Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:cc349832509f685f83eec613f7a23e766484cab3a8605813fe1dee14bd4f3b5c"
+content_hash: "sha256:305a5d3fa0e44dea77366a7d4af9fcdc2a56e5f2aa7d9afe9c0c4d2ed6648c9e"
+blocked_by: [MAC-n35t]
 ---
 
 ## Description
@@ -29,9 +30,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-24T21:33:56Z dep_added: blocked_by MAC-n35t
 
 ## Links
-
+- Blocked by: [[MAC-n35t]]
 
 ## Comments

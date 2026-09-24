@@ -8,7 +8,8 @@ labels: [linux, containers, aba, dirscan]
 created_at: 2026-09-24T21:32:05Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:05Z
-content_hash: "sha256:b6b62e5274cb6a71bd9a4200f488af6a2a16d0ead6cc057485e9e5a1a295d079"
+content_hash: "sha256:459b2c9e1e4cfe8a9072841ba427a3ca08145fc362d30326ea780f31f2206879"
+blocks: [MAC-4cbc]
 ---
 
 ## Description
@@ -35,9 +36,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-24T21:33:56Z dep_added: blocks MAC-4cbc
 
 ## Links
-
+- Blocks: [[MAC-4cbc]]
 
 ## Comments
