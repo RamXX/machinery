@@ -1,14 +1,16 @@
 ---
 id: MAC-zafm
 title: "Move the gate definition to a Dagger module with one owner per policy"
-status: open
+status: closed
 priority: 1
 type: feature
 labels: [release-process, ci, dagger]
 created_at: 2026-09-08T16:36:40Z
 created_by: ramirosalas
-updated_at: 2026-09-08T16:36:40Z
-content_hash: "sha256:c74fbfeecf167bb418d544134e73431d2c0c6dc1bc0b5462effc2badee792109"
+updated_at: 2026-09-24T21:33:44Z
+content_hash: "sha256:86cdcdd98f07c79b6f812a60dde1e50b2bcd3ee0b292aeff68384e630d43f9d3"
+closed_at: 2026-09-24T21:33:44Z
+close_reason: "Mostly delivered in 0.8.0 (da1226e8, a9dd4b53). Residual preflight heavy tier filed as MAC-4cbc; release.yml in MAC-y8lj. Triage 2026-09-24."
 ---
 
 ## Description
@@ -46,7 +48,7 @@ The gate-tiering story (fast pre-push, `make ci-linux`, custody suites in the la
 
 
 ## History
-
+- 2026-09-24T21:33:44Z status: open -> closed
 
 ## Links
 
