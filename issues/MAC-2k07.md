@@ -8,7 +8,8 @@ labels: [preflight, tooling]
 created_at: 2026-09-08T07:58:27Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:31:55Z
-content_hash: "sha256:6b27dde8304502852c5bc82a63b35ebfffdb4d2544e9b41d5906d8b196db9192"
+content_hash: "sha256:ec6368592367f09224ef4c32ed2d8481ff27839f081401836a4dfee7b75e4dec"
+related: [MAC-qo6n]
 ---
 
 ## Description
@@ -55,6 +56,6 @@ Triage 2026-09-24: partial. b9242e8a prunes .claude (scripts/modelith-render.sh:
 
 
 ## Links
-
+- Related: [[MAC-qo6n]]
 
 ## Comments
