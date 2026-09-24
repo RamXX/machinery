@@ -8,8 +8,8 @@ labels: [assurance, adapters, consumer]
 created_at: 2026-09-08T19:32:45Z
 created_by: ramirosalas
 updated_at: 2026-09-08T19:32:45Z
-content_hash: "sha256:12bc46c0b407bb48373e2db4629bff69933d99ed041a1a72525b285dd92ac147"
-blocks: [MAC-sd7g, MAC-cup9]
+content_hash: "sha256:3cbdd4b3c343778ec203edf6684fa9224fe115828de8c5cf604c72d60d386a80"
+blocks: [MAC-sd7g, MAC-cup9, MAC-9azz]
 ---
 
 ## Description
@@ -34,8 +34,9 @@ H2 (Elixir modular monolith), first affected at M1 RED.
 ## History
 - 2026-09-24T21:33:56Z dep_added: blocks MAC-sd7g
 - 2026-09-24T21:33:56Z dep_added: blocks MAC-cup9
+- 2026-09-24T21:33:56Z dep_added: blocks MAC-9azz
 
 ## Links
-- Blocks: [[MAC-sd7g]], [[MAC-cup9]]
+- Blocks: [[MAC-sd7g]], [[MAC-cup9]], [[MAC-9azz]]
 
 ## Comments
