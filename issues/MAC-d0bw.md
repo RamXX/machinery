@@ -2,13 +2,13 @@
 id: MAC-d0bw
 title: "packet: milestone:<shard> citation unresolvable when the shard's Build plan section opens with an N/A preamble"
 status: open
-priority: 2
+priority: 3
 type: bug
 labels: [packet, gw, h2]
 created_at: 2026-09-10T19:13:53Z
 created_by: ramirosalas
-updated_at: 2026-09-10T19:13:53Z
-content_hash: "sha256:840f49c6f4ea5c1410f8fd946a6b69554bf19e6f7e5f7535e611ce539902d0dc"
+updated_at: 2026-09-24T21:33:46Z
+content_hash: "sha256:c90f42b1b032c7204611aed9230a96c4323455b81ee8396a40f799c601ed50af"
 ---
 
 ## Description
@@ -21,7 +21,7 @@ H2 shards (design/BUILD/core.md, trust.md, assess.md) open section 9 with 'N/A -
 
 
 ## Notes
-
+Triage 2026-09-24: valid (planBlocksOf short-circuits on N/A, packet.go ~619) but H2 worked around it with subsections.
 
 ## History
 
